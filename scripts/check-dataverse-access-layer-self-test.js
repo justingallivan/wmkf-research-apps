@@ -2,13 +2,20 @@
 /**
  * Binding self-test for scripts/check-dataverse-access-layer.js.
  *
- * Builds an isolated fixture tree under a temp dir and runs the census with
- * --root so real application files are not modified. The fixtures cover the
- * Stage-0 binding contract: direct calls, in-file constants, default dependency
- * aliases, fallback aliases, aliased imports, changeset URL attribution, and
- * permanent path exemptions. They also cover the Stage-1 line-tolerant
- * allowlist ratchet: green baseline, count exceeds, stale allowlist entry, and
- * new unresolved raw access.
+ * Builds isolated fixture trees under a temp dir and runs the census with
+ * --root so real application files are not modified. Two fixture families:
+ *
+ * 1. Census-behavior fixtures (setupFixtures/runFixtureAssertions): the
+ *    Stage-0 binding contract via --json/--report — direct calls, in-file
+ *    constants, default dependency aliases, fallback aliases, aliased
+ *    imports, changeset URL attribution, and permanent path exemptions.
+ *
+ * 2. Stage-8 law-mode fixtures (runLaw*Assertion): default-mode pass/fail
+ *    behavior now that the allowlist file and count ratchet are gone —
+ *    a clean non-entity-transport-only tree passes; an entity-attributed
+ *    call, an unresolved alias, an unresolved changeset operation, and an
+ *    unrecognized method name on a Dynamics alias each fail; exempt paths
+ *    still pass regardless of what they call.
  */
 
 const fs = require('fs');
@@ -18,7 +25,6 @@ const { execSync } = require('child_process');
 const repoRoot = path.resolve(__dirname, '..');
 const gate = path.join(repoRoot, 'scripts', 'check-dataverse-access-layer.js');
 const tempRoot = path.join(repoRoot, '.dataverse_access_layer_selftest_tmp');
-const { buildAllowlist } = require('./check-dataverse-access-layer.js');
 
 function cleanup() {
   if (fs.existsSync(tempRoot)) fs.rmSync(tempRoot, { recursive: true, force: true });
@@ -61,30 +67,11 @@ function hasEntry(entries, partial) {
   ));
 }
 
-function collectFixtureEntries() {
-  const jsonRun = runGate(['--json']);
-  expect(jsonRun.status === 0, `--json exited ${jsonRun.status}\n${jsonRun.output}`);
-  return parseJsonOutput(jsonRun.output);
-}
-
-function writeAllowlist(entries) {
-  write(tempRoot, 'scripts/dataverse-access-allowlist.json', `${JSON.stringify({
-    description: 'Self-test fixture allowlist; generated from temp-root census.',
-    entries: buildAllowlist(entries),
-  }, null, 2)}\n`);
-}
-
-function setupAllowlistedBaseline() {
-  setupFixtures();
-  const entries = collectFixtureEntries();
-  writeAllowlist(entries);
-  return entries;
-}
-
 function expectGreen(label) {
   const run = runGate();
   expect(run.status === 0, `${label} should pass, exited ${run.status}\n${run.output}`);
   expect(run.output === '', `${label} should be silent, got:\n${run.output}`);
+  console.log(`PASS ${label}`);
 }
 
 function expectRed(label, assertions) {
@@ -173,10 +160,6 @@ function setupFixtures() {
 function runFixtureAssertions() {
   setupFixtures();
 
-  const defaultRun = runGate();
-  expect(defaultRun.status === 0, `default mode should pass without an allowlist\n${defaultRun.output}`);
-  expect(defaultRun.output === '', `default mode without an allowlist should be silent, got:\n${defaultRun.output}`);
-
   const jsonRun = runGate(['--json']);
   expect(jsonRun.status === 0, `--json exited ${jsonRun.status}\n${jsonRun.output}`);
   const entries = parseJsonOutput(jsonRun.output);
@@ -238,47 +221,57 @@ function runFixtureAssertions() {
   console.log(`PASS fixture census assertions (${entries.length} entries)`);
 }
 
-function runAllowlistBaselineAssertion() {
-  const entries = setupAllowlistedBaseline();
-  expectGreen('allowlisted baseline');
-  console.log(`PASS allowlisted baseline (${buildAllowlist(entries).length} allowlist entries)`);
+// --- Stage-8 law-mode fixtures ---------------------------------------------
+
+function runLawCleanAssertion() {
+  cleanup();
+
+  write(tempRoot, 'lib/services/notification-service.js', `
+    import { DynamicsService } from './dynamics-service.js';
+    export async function notify(input) {
+      return DynamicsService.createAndSendEmail(input);
+    }
+  `);
+
+  write(tempRoot, 'pages/api/grant-reporting/extract.js', `
+    import { DynamicsService } from '../../../lib/services/dynamics-service.js';
+    export default async function handler(req, res) {
+      await DynamicsService.logAiRun({ requestGuid: req.body.id, taskType: 'extract' });
+      res.status(200).end();
+    }
+  `);
+
+  write(tempRoot, 'pages/api/test-email.js', `
+    import { DynamicsService } from '../../lib/services/dynamics-service.js';
+    export default async function handler(req, res) {
+      await DynamicsService.createEmailActivity({ subject: 's', body: 'b' });
+      res.status(200).end();
+    }
+  `);
+
+  expectGreen('clean non-entity-transport-only tree');
 }
 
-function runCountExceedsAssertion() {
-  setupAllowlistedBaseline();
+function runLawEntityAttributedAssertion() {
+  cleanup();
+
   write(tempRoot, 'pages/api/direct.js', `
     import { DynamicsService } from '../../../lib/services/dynamics-service.js';
     export default async function handler(req, res) {
-      await DynamicsService.queryRecords('akoya_requests', { top: 1 });
       return DynamicsService.queryRecords('akoya_requests', { top: 1 });
     }
   `);
 
-  expectRed('count-exceeds drift assertion', (output) => {
-    expect(output.includes('raw access keys not in allowlist or above allowed count'), output);
-    expect(output.includes('pages/api/direct.js | import | DynamicsService.queryRecords | akoya_requests'), output);
-    expect(output.includes('current 2, allowlist 1'), output);
+  expectRed('entity-attributed raw call fails', (output) => {
+    expect(output.includes('LAW VIOLATION'), output);
+    expect(output.includes('pages/api/direct.js'), output);
+    expect(output.includes('DynamicsService.queryRecords | akoya_requests'), output);
   });
 }
 
-function runStaleEntryAssertion() {
-  setupAllowlistedBaseline();
-  write(tempRoot, 'pages/api/direct.js', `
-    import { DynamicsService } from '../../../lib/services/dynamics-service.js';
-    export default async function handler(req, res) {
-      res.status(200).json({ ok: true });
-    }
-  `);
+function runLawUnresolvedAliasAssertion() {
+  cleanup();
 
-  expectRed('stale-entry drift assertion', (output) => {
-    expect(output.includes('allowlist entries above current census; shrink required'), output);
-    expect(output.includes('pages/api/direct.js | import | DynamicsService.queryRecords | akoya_requests'), output);
-    expect(output.includes('current 0, allowlist 1'), output);
-  });
-}
-
-function runNewUnresolvedAssertion() {
-  setupAllowlistedBaseline();
   write(tempRoot, 'pages/api/new-unresolved.js', `
     import { DynamicsService } from '../../lib/services/dynamics-service.js';
     export default async function handler(req, res) {
@@ -286,10 +279,74 @@ function runNewUnresolvedAssertion() {
     }
   `);
 
-  expectRed('new-unresolved drift assertion', (output) => {
-    expect(output.includes('new unresolved raw access keys not in Stage-0 allowlist'), output);
-    expect(output.includes('pages/api/new-unresolved.js | import | DynamicsService.getRecord | unresolved'), output);
+  expectRed('unresolved-alias call fails', (output) => {
+    expect(output.includes('LAW VIOLATION'), output);
+    expect(output.includes('pages/api/new-unresolved.js'), output);
+    expect(output.includes('DynamicsService.getRecord | unresolved'), output);
   });
+}
+
+function runLawChangesetUnresolvedAssertion() {
+  cleanup();
+
+  write(tempRoot, 'pages/api/unresolved-changeset.js', `
+    import { DynamicsService } from '../../lib/services/dynamics-service.js';
+    export default async function handler(req, res) {
+      await DynamicsService.executeChangeset(buildOperations(req.body));
+      res.status(200).end();
+    }
+  `);
+
+  expectRed('changeset-unresolved call fails', (output) => {
+    expect(output.includes('LAW VIOLATION'), output);
+    expect(output.includes('pages/api/unresolved-changeset.js'), output);
+    expect(output.includes('DynamicsService.executeChangeset | changeset-unresolved'), output);
+  });
+}
+
+function runLawUnknownMethodAssertion() {
+  cleanup();
+
+  write(tempRoot, 'pages/api/new-method.js', `
+    import { DynamicsService } from '../../lib/services/dynamics-service.js';
+    export default async function handler(req, res) {
+      await DynamicsService.bulkArchiveRecords('akoya_requests');
+      res.status(200).end();
+    }
+  `);
+
+  expectRed('unknown method name fails rather than passing as non-entity-transport', (output) => {
+    expect(output.includes('LAW VIOLATION'), output);
+    expect(output.includes('pages/api/new-method.js'), output);
+    expect(output.includes('DynamicsService.bulkArchiveRecords | unknown-method:bulkArchiveRecords'), output);
+  });
+}
+
+function runLawExemptPathAssertion() {
+  cleanup();
+
+  write(tempRoot, 'pages/dynamics-explorer.js', `
+    import { DynamicsService } from '../lib/services/dynamics-service.js';
+    export default function Explorer() {
+      return DynamicsService.queryRecords('akoya_requests', {});
+    }
+  `);
+
+  write(tempRoot, 'pages/api/dynamics-explorer/chat.js', `
+    import { DynamicsService } from '../../../lib/services/dynamics-service.js';
+    export default async function handler() {
+      return DynamicsService.queryRecords('should_not_count', {});
+    }
+  `);
+
+  write(tempRoot, 'lib/dataverse/adapters/contact.js', `
+    import { DynamicsService } from '../../services/dynamics-service.js';
+    export async function getById(id) {
+      return DynamicsService.getRecord('contacts', id);
+    }
+  `);
+
+  expectGreen('exempt power-tool and DAL-internal paths still pass');
 }
 
 function runLiveParseAssertion() {
@@ -306,24 +363,34 @@ function parseMode(argv) {
   const modeIndex = argv.indexOf('--mode');
   if (modeIndex === -1) return 'all';
   const mode = argv[modeIndex + 1];
-  if (!mode) throw new Error('--mode requires one of: all, green, count-exceeds, stale-entry, new-unresolved');
+  if (!mode) {
+    throw new Error(
+      '--mode requires one of: all, fixtures, clean, entity, unresolved-alias, '
+      + 'changeset-unresolved, unknown-method, exempt',
+    );
+  }
   return mode;
 }
 
 function runMode(mode) {
   if (mode === 'all') {
     runFixtureAssertions();
-    runAllowlistBaselineAssertion();
-    runCountExceedsAssertion();
-    runStaleEntryAssertion();
-    runNewUnresolvedAssertion();
+    runLawCleanAssertion();
+    runLawEntityAttributedAssertion();
+    runLawUnresolvedAliasAssertion();
+    runLawChangesetUnresolvedAssertion();
+    runLawUnknownMethodAssertion();
+    runLawExemptPathAssertion();
     runLiveParseAssertion();
     return;
   }
-  if (mode === 'green') return runAllowlistBaselineAssertion();
-  if (mode === 'count-exceeds') return runCountExceedsAssertion();
-  if (mode === 'stale-entry') return runStaleEntryAssertion();
-  if (mode === 'new-unresolved') return runNewUnresolvedAssertion();
+  if (mode === 'fixtures') return runFixtureAssertions();
+  if (mode === 'clean') return runLawCleanAssertion();
+  if (mode === 'entity') return runLawEntityAttributedAssertion();
+  if (mode === 'unresolved-alias') return runLawUnresolvedAliasAssertion();
+  if (mode === 'changeset-unresolved') return runLawChangesetUnresolvedAssertion();
+  if (mode === 'unknown-method') return runLawUnknownMethodAssertion();
+  if (mode === 'exempt') return runLawExemptPathAssertion();
   throw new Error(`unknown --mode ${mode}`);
 }
 
