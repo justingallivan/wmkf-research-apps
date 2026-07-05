@@ -157,7 +157,9 @@ export const authOptions = {
             if (tempResult.rows[0]?.id) {
               await grantDefaultApps(tempResult.rows[0].id);
               // Fire-and-forget new user notification
-              NotificationService.notifyNewUser({ id: tempResult.rows[0].id, name: displayName, azure_email: azureEmail }).catch(() => {});
+              withDalContext('notification-email', () =>
+                NotificationService.notifyNewUser({ id: tempResult.rows[0].id, name: displayName, azure_email: azureEmail })
+              ).catch(() => {});
               // Fire-and-forget Dynamics identity link
               withDalContext('staff-signin-reconcile', () =>
                 reconcileProfile(tempResult.rows[0].id, { silent: true })
@@ -180,7 +182,9 @@ export const authOptions = {
           if (newResult.rows[0]?.id) {
             await grantDefaultApps(newResult.rows[0].id);
             // Fire-and-forget new user notification
-            NotificationService.notifyNewUser({ id: newResult.rows[0].id, name: displayName, azure_email: azureEmail }).catch(() => {});
+            withDalContext('notification-email', () =>
+              NotificationService.notifyNewUser({ id: newResult.rows[0].id, name: displayName, azure_email: azureEmail })
+            ).catch(() => {});
             // Fire-and-forget Dynamics identity link
             withDalContext('staff-signin-reconcile', () =>
               reconcileProfile(newResult.rows[0].id, { silent: true })

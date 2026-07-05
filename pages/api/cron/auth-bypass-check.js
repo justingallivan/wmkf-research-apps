@@ -18,6 +18,7 @@
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import MaintenanceService from '../../../lib/services/maintenance-service';
 import { checkEmergencyAuthBypass } from '../../../lib/utils/auth-bypass-monitor';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -29,9 +30,11 @@ export default async function handler(req, res) {
   const runId = await MaintenanceService.startRun('auth-bypass-check');
 
   try {
-    const result = await checkEmergencyAuthBypass({
-      source: 'cron/auth-bypass-check',
-    });
+    const result = await withDalContext('cron-auth-bypass-check', () =>
+      checkEmergencyAuthBypass({
+        source: 'cron/auth-bypass-check',
+      })
+    );
 
     // The monitor swallows its own errors and reports them in `result.error`.
     // Surface that as a failed run so the maintenance dashboard flags it.

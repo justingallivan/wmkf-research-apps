@@ -482,7 +482,7 @@ export default async function handler(req, res) {
     // sent and lose a fire-and-forget promise mid-write. The audit row at
     // step 16 above is the per-event durable evidence; the system_alerts
     // row is what surfaces on the admin dashboard for triage.
-    await NotificationService.notify({
+    await withDalContext('notification-email', () => NotificationService.notify({
       type: 'virus_detection_intake',
       severity: 'error',
       title: `Virus scan rejected an applicant attachment (${pending.filename})`,
@@ -518,7 +518,7 @@ export default async function handler(req, res) {
       // Category routing handles the foundation alerts address — configure
       // recipients for the 'virus-detection' category in /admin → Alert Recipients.
       category: 'virus-detection',
-    }).catch(err => {
+    })).catch(err => {
       // Alert failure must never block the client rejection. Logged so an
       // operator can investigate after the fact.
       console.error(`[attach] detection alert failed for draft ${draftId}: ${err.message}`);

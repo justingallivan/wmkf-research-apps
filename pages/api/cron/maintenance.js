@@ -228,7 +228,7 @@ export default async function handler(req, res) {
       })
       .join('; ');
 
-    await NotificationService.notify({
+    await withDalContext('notification-email', () => NotificationService.notify({
       type: 'maintenance',
       severity: hasSubtaskFailure ? 'error' : 'info',
       title: hasSubtaskFailure
@@ -238,7 +238,7 @@ export default async function handler(req, res) {
       metadata: { ...results, failedSubtasks },
       source: 'cron/maintenance',
       category: 'ops',
-    });
+    }));
 
     return res.json({
       ok: !hasSubtaskFailure,
@@ -255,7 +255,7 @@ export default async function handler(req, res) {
       details: results,
     });
 
-    await NotificationService.notify({
+    await withDalContext('notification-email', () => NotificationService.notify({
       type: 'maintenance',
       severity: 'error',
       title: 'Daily maintenance failed',
@@ -263,7 +263,7 @@ export default async function handler(req, res) {
       metadata: results,
       source: 'cron/maintenance',
       category: 'ops',
-    });
+    }));
 
     return res.status(500).json({ error: 'Maintenance failed', message: error.message });
   }

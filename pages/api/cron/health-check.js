@@ -15,6 +15,7 @@ import { runHealthChecks } from '../../../lib/utils/health-checker';
 import AlertService from '../../../lib/services/alert-service';
 import NotificationService from '../../../lib/services/notification-service';
 import MaintenanceService from '../../../lib/services/maintenance-service';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -86,7 +87,7 @@ export default async function handler(req, res) {
 
       const resolveKey = health.overall === 'unhealthy' ? 'health:unhealthy' : 'health:degraded';
 
-      await NotificationService.notify({
+      await withDalContext('notification-email', () => NotificationService.notify({
         type: 'health',
         severity,
         title: `System ${health.overall}: ${[...failedServices, ...warnServices].join(', ')}`,
@@ -101,7 +102,7 @@ export default async function handler(req, res) {
         source: 'cron/health-check',
         autoResolveKey: resolveKey,
         category: 'ops',
-      });
+      }));
     }
 
     await MaintenanceService.completeRun(runId, {

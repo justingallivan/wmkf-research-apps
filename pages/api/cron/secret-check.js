@@ -22,6 +22,7 @@ import { listSettings } from '../../../lib/services/settings-service';
 import AlertService from '../../../lib/services/alert-service';
 import MaintenanceService from '../../../lib/services/maintenance-service';
 import { TRACKED_SECRETS } from '../../../lib/utils/tracked-secrets';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 
 // Cadence enforcement: this cron alerts ONLY against an explicit
 // `secret_expiration:<key>` setting in Dataverse `wmkf_appsystemsettings`.
@@ -78,7 +79,7 @@ export default async function handler(req, res) {
           ? `EXPIRED: ${secret.name}`
           : `${secret.name} expires in ${daysUntilExpiry} day${daysUntilExpiry === 1 ? '' : 's'}`;
 
-        await NotificationService.notify({
+        await withDalContext('notification-email', () => NotificationService.notify({
           type: 'secret_expiration',
           severity,
           title,
@@ -94,7 +95,7 @@ export default async function handler(req, res) {
           autoResolveKey,
           category: 'ops',
           emailAdmins: true,
-        });
+        }));
       } else {
         // Secret is healthy — auto-resolve any prior alerts for it
         await AlertService.autoResolve(autoResolveKey);

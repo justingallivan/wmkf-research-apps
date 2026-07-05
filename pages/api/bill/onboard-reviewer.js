@@ -15,6 +15,7 @@
 import { verifyInternalCall } from '../../../lib/bill/internal-call-auth';
 import { onboardReviewer, validateOnboardInput } from '../../../lib/bill/onboard-reviewer-service';
 import NotificationService from '../../../lib/services/notification-service';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 
 export const config = {
   api: { bodyParser: false },
@@ -87,7 +88,7 @@ export default async function handler(req, res) {
     // Notification is best-effort; never let it convert a 500 into something
     // worse (e.g., a notification-system failure should still return 500).
     try {
-      await NotificationService.notify({
+      await withDalContext('notification-email', () => NotificationService.notify({
         type: 'bill_unhandled_error',
         severity: 'error',
         title: 'BILL onboarding endpoint: unhandled exception',
@@ -99,7 +100,7 @@ export default async function handler(req, res) {
         },
         source: 'bill/onboard-reviewer',
         category: 'spend',
-      });
+      }));
     } catch (notifyErr) {
       console.error('[bill-onboard-reviewer] notify() failed during 500 path:', notifyErr?.message || notifyErr);
     }

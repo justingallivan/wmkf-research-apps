@@ -25,6 +25,7 @@ import {
   wrapUntrustedContent,
   buildUntrustedContentPreamble,
 } from '../../../lib/utils/ai-payload-boundary';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 
 const ERROR_THRESHOLD = 10; // minimum errors to trigger AI analysis
 const LOOKBACK_MS = 6 * 60 * 60 * 1000; // 6 hours
@@ -139,7 +140,7 @@ export default async function handler(req, res) {
     }
 
     // Create alert with analysis
-    await NotificationService.notify({
+    await withDalContext('notification-email', () => NotificationService.notify({
       type: 'log_analysis',
       severity: errors.length >= 50 ? 'error' : 'warning',
       title: `${errors.length} server errors in last 6 hours`,
@@ -151,7 +152,7 @@ export default async function handler(req, res) {
       },
       source: 'cron/log-analysis',
       category: 'ops',
-    });
+    }));
 
     await MaintenanceService.completeRun(runId, {
       status: 'completed',
