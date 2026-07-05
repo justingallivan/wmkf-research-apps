@@ -48,6 +48,7 @@ related:
 | [PDF_INPUT_FOR_BACKEND.md](PDF_INPUT_FOR_BACKEND.md) | history | active |  | 2. PDF prompt-caching cuts subsequent calls by 90% and is verified working. The staged 3-pass pipeline drops from $0.39 → $0.20 per proposal and... | 2026-07-02 |
 | [REQUEST_WORKBENCH_BUILD_PLAN.md](REQUEST_WORKBENCH_BUILD_PLAN.md) | plan | active |  | - Build the full Workbench, not just the allowlist unblock. | 2026-07-02 |
 | [REQUEST_WORKBENCH_SCOPING.md](REQUEST_WORKBENCH_SCOPING.md) | plan | active |  | Per-PD navigation model for the grant lifecycle: the D26 patch and the J27 build. | 2026-07-02 |
+| [ROUTE_SERVICE_CONSOLIDATION_PLAN.md](ROUTE_SERVICE_CONSOLIDATION_PLAN.md) | plan | draft | yes | Staged extraction of business logic from pages/api routes into per-domain services; routes become thin shells. Every stage leaves the build green. | 2026-07-04 |
 | [STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md](STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md) | plan | active |  | Today [VERIFIED via source, S303] lib/external/review-form-schema.js exports a hardcoded reviewFormSchema.fields array, statically imported by 8... | 2026-07-02 |
 | [STRATEGY.md](STRATEGY.md) | plan | active |  | Last updated: 2026-05-08 (previously 2026-03-12) — living document, updated as things evolve. | 2026-07-02 |
 | [SYSTEM_MODEL.md](SYSTEM_MODEL.md) | source-of-truth | canonical | yes | The model has one organizing principle, two orthogonal axes, and a small set of layers. Get those and the rest follows. | 2026-07-02 |
