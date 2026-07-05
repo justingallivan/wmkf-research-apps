@@ -17,11 +17,26 @@
  *   (f) dynamics-service import (the second source family)
  *   (g) a root-level pages/api/*.js route with a boundary import (proves
  *       root-level files are classified, not skipped)
+ *   (h) ESM import-then-export-named wrapper (`import { x } from '<adapter>';
+ *       export { x }`) consumed by a route -- the binding is re-published by
+ *       identity, which plain `export ... from` detection misses.
+ *   (i) CJS `const a = require('<adapter>'); module.exports = { a }` wrapper
+ *       consumed by a route.
+ *
+ * HARD-FAIL fixtures prove non-literal require()/import() sources fail CLOSED
+ * instead of silently evading the census:
+ *   (j) route with a non-literal dynamic import(p) of an adapter path
+ *   (k) route with a non-literal require(adapterPath)
+ *   (m) route consuming a wrapper whose non-literal require() sits in a
+ *       module.exports re-export position (unresolved-equivalent, reachable)
  *
  * GREEN fixtures: a clean shell route; a route importing only a per-domain
  * lib/services/<domain>/ service (which USES an adapter internally but does
- * not re-export it); and the exempt dirs (pages/api/dynamics-explorer/,
- * pages/api/dataverse-export/) which are never counted.
+ * not re-export it); the exempt dirs (pages/api/dynamics-explorer/,
+ * pages/api/dataverse-export/) which are never counted; and (l) a route
+ * importing a service that itself imports an adapter and exports its OWN
+ * wrapper function (NOT the imported binding) -- the false-positive guard that
+ * keeps binding-level taint from firing on legitimate services.
  *
  * Plus: the wave taxonomy fails closed on an unclassifiable route, and the
  * ratchet fires when the count diverges from the committed baseline.
@@ -43,6 +58,8 @@ const RED_ROUTES = [
   'pages/api/cron/red-require.js',
   'pages/api/review-manager/red-dynamics.js',
   'pages/api/red-root.js',
+  'pages/api/reviewer-finder/red-import-then-export.js',
+  'pages/api/cron/red-cjs-reexport.js',
 ];
 
 const GREEN_ROUTES = [
@@ -50,6 +67,7 @@ const GREEN_ROUTES = [
   'pages/api/review-manager/green-service.js',
   'pages/api/dynamics-explorer/chat.js',
   'pages/api/dataverse-export/thing.js',
+  'pages/api/review-manager/green-own-wrapper.js',
 ];
 
 function cleanup() {
@@ -93,10 +111,28 @@ function setupFixtures() {
   write(tempRoot, 'lib/wrappers/suggestion-wrapper.js', `
     export * from '../dataverse/adapters/reviewer-suggestion.js';
   `);
+  // (h) import-then-export-named wrapper: pulls a boundary binding and
+  // re-publishes it by identity (no `export ... from`).
+  write(tempRoot, 'lib/wrappers/import-then-export-wrapper.js', `
+    import { getById } from '../dataverse/adapters/reviewer-suggestion.js';
+    export { getById };
+  `);
+  // (i) CJS wrapper: whole adapter module cached then re-exported by identity.
+  write(tempRoot, 'lib/wrappers/cjs-reexport-wrapper.js', `
+    const a = require('../dataverse/adapters/reviewer-suggestion.js');
+    module.exports = { a };
+  `);
   // Legitimate per-domain service: USES an adapter, does NOT re-export it.
   write(tempRoot, 'lib/services/review-manager/withdraw-sufficient-service.js', `
     import { getById } from '../../dataverse/adapters/reviewer-suggestion.js';
     export async function run(id) { return getById(id); }
+  `);
+  // (l) Legitimate service: imports a boundary binding and exports its OWN
+  // wrapper function (fetchThing), NOT the imported binding. Binding-level taint
+  // must NOT fire on a consumer that imports only fetchThing.
+  write(tempRoot, 'lib/services/review-manager/own-wrapper-service.js', `
+    import { getById } from '../../dataverse/adapters/reviewer-suggestion.js';
+    export function fetchThing(id) { return getById(id); }
   `);
 
   // (a) direct adapter import
@@ -145,6 +181,18 @@ function setupFixtures() {
     export default function handler(req, res) { return getById(req.query.id); }
   `);
 
+  // (h) route consuming the import-then-export wrapper by the tainted name
+  write(tempRoot, 'pages/api/reviewer-finder/red-import-then-export.js', `
+    import { getById } from '../../../lib/wrappers/import-then-export-wrapper.js';
+    export default function handler(req, res) { return getById(req.query.id); }
+  `);
+
+  // (i) route consuming the CJS re-export wrapper by the tainted name
+  write(tempRoot, 'pages/api/cron/red-cjs-reexport.js', `
+    import { a } from '../../../lib/wrappers/cjs-reexport-wrapper.js';
+    export default function handler(req, res) { return a.getById(req.query.id); }
+  `);
+
   // GREEN: clean shell route
   write(tempRoot, 'pages/api/workbench/green-shell.js', `
     export default function handler(req, res) { res.status(200).end(); }
@@ -154,6 +202,13 @@ function setupFixtures() {
   write(tempRoot, 'pages/api/review-manager/green-service.js', `
     import { run } from '../../../lib/services/review-manager/withdraw-sufficient-service.js';
     export default async function handler(req, res) { return run(req.query.id); }
+  `);
+
+  // (l) GREEN: imports a service's OWN wrapper function (not the re-exported
+  // boundary binding). Binding-level taint must not fire here.
+  write(tempRoot, 'pages/api/review-manager/green-own-wrapper.js', `
+    import { fetchThing } from '../../../lib/services/review-manager/own-wrapper-service.js';
+    export default async function handler(req, res) { return fetchThing(req.query.id); }
   `);
 
   // GREEN: exempt dirs are never counted, even with a direct boundary import
@@ -194,6 +249,16 @@ function runDetectionAssertions() {
   expect(reexport && /re-export via .*wrapper/.test(reexport.reason),
     `re-export route reason did not name the wrapper: ${JSON.stringify(reexport)}`);
 
+  // (h) import-then-export taint names the specific re-exported binding + wrapper.
+  const importThenExport = entries.find((e) => e.file === 'pages/api/reviewer-finder/red-import-then-export.js');
+  expect(importThenExport && /binding '.*' re-export via .*import-then-export-wrapper/.test(importThenExport.reason),
+    `import-then-export route reason did not name the binding/wrapper: ${JSON.stringify(importThenExport)}`);
+
+  // (i) CJS re-export taint attributed to the wrapper.
+  const cjsReexport = entries.find((e) => e.file === 'pages/api/cron/red-cjs-reexport.js');
+  expect(cjsReexport && /re-export via .*cjs-reexport-wrapper/.test(cjsReexport.reason),
+    `CJS re-export route reason did not name the wrapper: ${JSON.stringify(cjsReexport)}`);
+
   console.log(`PASS detection assertions (${entries.length} boundary routes; ${GREEN_ROUTES.length} green untouched)`);
 }
 
@@ -227,13 +292,64 @@ function runUnclassifiableAssertion() {
 
 function runRatchetFallAssertion() {
   setupFixtures();
-  // Fixture has 7 boundary routes; committed baseline is 49, so default mode
+  // Fixture has 9 boundary routes; committed baseline is 49, so default mode
   // must report a FALLING count and demand a same-commit baseline update.
   const run = runGate();
   expect(run.status !== 0, 'ratchet should fail when count diverges from baseline');
   expect(run.output.includes('RATCHET UPDATE REQUIRED'), `expected ratchet-update message, got:\n${run.output}`);
-  expect(/fell from \d+ to 7/.test(run.output), `expected 'fell from N to 7', got:\n${run.output}`);
+  expect(/fell from \d+ to 9/.test(run.output), `expected 'fell from N to 9', got:\n${run.output}`);
   console.log('PASS ratchet fires on divergent count');
+}
+
+// (j)(k)(m) Non-literal require()/import() sources must fail CLOSED: a plain
+// census cannot resolve them, so instead of silently evading detection the gate
+// hard-errors with file:line. Pre-patch these passed silently (fail OPEN).
+function runUnresolvedFailClosedAssertions() {
+  cleanup();
+  write(tempRoot, 'lib/dataverse/adapters/reviewer-suggestion.js', `
+    export function getById(id) { return { id }; }
+  `);
+  // (m) wrapper whose non-literal require sits in a module.exports re-export
+  // position -- its published identity is an unknowable boundary source.
+  write(tempRoot, 'lib/wrappers/unresolved-reexport-wrapper.js', `
+    module.exports = require(process.env.ADAPTER_PATH);
+  `);
+
+  // (j) route: non-literal dynamic import(p) of an adapter path
+  write(tempRoot, 'pages/api/admin/red-unresolved-import.js', `
+    export default async function handler(req, res) {
+      const p = '../../../lib/dataverse/adapters/reviewer-suggestion.js';
+      const m = await import(p);
+      return m.getById(req.query.id);
+    }
+  `);
+  // (k) route: non-literal require(adapterPath)
+  write(tempRoot, 'pages/api/cron/red-unresolved-require.js', `
+    export default function handler(req, res) {
+      const p = '../../../lib/dataverse/adapters/reviewer-suggestion.js';
+      return require(p).getById(req.query.id);
+    }
+  `);
+  // (m) route consuming the unresolved-equivalent wrapper
+  write(tempRoot, 'pages/api/workbench/red-unresolved-wrapper.js', `
+    import { getById } from '../../../lib/wrappers/unresolved-reexport-wrapper.js';
+    export default function handler(req, res) { return getById(req.query.id); }
+  `);
+
+  const run = runGate(['--json']);
+  expect(run.status !== 0, `unresolved sources should fail closed, exited 0:\n${run.output}`);
+  expect(run.output.includes('unresolved-boundary-source'),
+    `expected unresolved-boundary-source error, got:\n${run.output}`);
+  // (j)(k): in-route non-literal sources reported with file:line.
+  expect(/pages\/api\/admin\/red-unresolved-import\.js:\d+/.test(run.output),
+    `expected file:line for dynamic import(p), got:\n${run.output}`);
+  expect(/pages\/api\/cron\/red-unresolved-require\.js:\d+/.test(run.output),
+    `expected file:line for require(p), got:\n${run.output}`);
+  // (m): route reaching an unresolved-equivalent wrapper, naming the origin.
+  expect(run.output.includes('pages/api/workbench/red-unresolved-wrapper.js')
+    && run.output.includes('unresolved-reexport-wrapper.js'),
+    `expected wrapper-reach failure naming the origin, got:\n${run.output}`);
+  console.log('PASS non-literal sources fail closed (j/k in-route, m via wrapper)');
 }
 
 function runLiveParseAssertion() {
@@ -251,7 +367,7 @@ function parseMode(argv) {
   if (modeIndex === -1) return 'all';
   const mode = argv[modeIndex + 1];
   if (!mode) {
-    throw new Error('--mode requires one of: all, detection, report, unclassifiable, ratchet, live');
+    throw new Error('--mode requires one of: all, detection, report, unclassifiable, ratchet, unresolved, live');
   }
   return mode;
 }
@@ -262,6 +378,7 @@ function runMode(mode) {
     runReportAssertions();
     runUnclassifiableAssertion();
     runRatchetFallAssertion();
+    runUnresolvedFailClosedAssertions();
     runLiveParseAssertion();
     return;
   }
@@ -269,6 +386,7 @@ function runMode(mode) {
   if (mode === 'report') return runReportAssertions();
   if (mode === 'unclassifiable') return runUnclassifiableAssertion();
   if (mode === 'ratchet') return runRatchetFallAssertion();
+  if (mode === 'unresolved') return runUnresolvedFailClosedAssertions();
   if (mode === 'live') return runLiveParseAssertion();
   throw new Error(`unknown --mode ${mode}`);
 }

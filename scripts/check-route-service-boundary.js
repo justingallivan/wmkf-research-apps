@@ -39,6 +39,9 @@ const {
   stringLiteralValue,
   importCallSourceNode,
   buildParentMap,
+  propName,
+  nodeLine,
+  isCommonJsExportTarget,
   isInsideCommonJsExportRight,
   toRel,
 } = require('./lib/ast-scan-core');
@@ -129,22 +132,86 @@ function collectFiles(root) {
   }
 }
 
-// Every module-source reference a file makes, via the hardened mechanisms the
-// shared core recognizes. `reexport` marks references that re-publish the
-// source to the importer (ESM export-from / CJS module.exports = require(...)),
-// which is how a thin wrapper taints its consumers.
-function collectReferences(ast) {
+// Everything about a file the boundary analysis needs, via the hardened
+// mechanisms the shared core recognizes:
+//   - refs: every module-source reference. `reexport` marks references that
+//     re-publish the source to the importer (ESM export-from / CJS
+//     module.exports = require(...)), which is how a thin wrapper taints
+//     consumers.
+//   - importedBindings: local name -> { spec, imported } for every binding
+//     introduced by a static import or `const x = require('<spec>')`. `imported`
+//     is the EXTERNAL name pulled from the source ('*' for a namespace/whole-CJS
+//     import, 'default' for a default import). Paired with exportedBindings this
+//     catches the import-then-export wrapper (a binding pulled from a boundary
+//     source and re-published by IDENTITY), which `export ... from` misses.
+//   - exportedBindings: external export name -> local name, for identity
+//     re-exports via `export { local as external }`, `export default local`,
+//     `module.exports = { external: local }`, or `exports.external = local`.
+//     A bare `module.exports = local` re-publishes the WHOLE namespace and is
+//     recorded as exportsWholeNamespace (the local name). Locally DEFINED
+//     functions are never in importedBindings, so exporting them never taints
+//     (the legitimate-service false-positive guard). Taint is tracked per
+//     EXPORT NAME, so a service that re-exports one adapter constant does not
+//     taint consumers that import only its own functions.
+//   - unresolved: non-literal require()/import() sources. These fail OPEN in a
+//     plain census (their target is unknowable), so we record them and fail
+//     CLOSED downstream. `reexport` marks a non-literal source in a re-export
+//     position, which could silently confer boundary-equivalence.
+function collectFileInfo(ast) {
   const refs = [];
+  const importedBindings = new Map();
+  const exportedBindings = new Map();
+  const exportsWholeNamespace = new Set();
+  const unresolved = [];
   const parentMap = buildParentMap(ast);
 
   walkAst(ast, (node) => {
     if (node.type === 'ImportDeclaration' && node.source) {
       refs.push({ spec: node.source.value, kind: 'import', reexport: false });
+      for (const spec of node.specifiers || []) {
+        if (!spec.local || !spec.local.name) continue;
+        let imported = '*';
+        if (spec.type === 'ImportDefaultSpecifier') imported = 'default';
+        else if (spec.type === 'ImportSpecifier') imported = spec.imported ? (spec.imported.name || spec.imported.value) : spec.local.name;
+        importedBindings.set(spec.local.name, { spec: node.source.value, imported });
+      }
       return;
     }
     if ((node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration') && node.source) {
       refs.push({ spec: node.source.value, kind: 'export-from', reexport: true });
       return;
+    }
+    // `export { local }` / `export { local as external }` (no source).
+    if (node.type === 'ExportNamedDeclaration' && !node.source && node.specifiers) {
+      for (const spec of node.specifiers) {
+        if (spec.type === 'ExportSpecifier' && spec.local && spec.local.name) {
+          const external = spec.exported ? (spec.exported.name || spec.exported.value) : spec.local.name;
+          exportedBindings.set(external, spec.local.name);
+        }
+      }
+      return;
+    }
+    // `export default local`.
+    if (node.type === 'ExportDefaultDeclaration' && node.declaration && node.declaration.type === 'Identifier') {
+      exportedBindings.set('default', node.declaration.name);
+      return;
+    }
+    // CJS identity re-exports: `module.exports = local` (whole namespace),
+    // `module.exports = { external: local }`, `exports.external = local`.
+    if (node.type === 'AssignmentExpression' && isCommonJsExportTarget(node.left)) {
+      const right = node.right;
+      const targetProp = node.left.type !== 'Identifier' && propName(node.left.property);
+      if (right.type === 'Identifier') {
+        if (isModuleExportsRoot(node.left)) exportsWholeNamespace.add(right.name);
+        else if (targetProp) exportedBindings.set(targetProp, right.name);
+      } else if (right.type === 'ObjectExpression' && isModuleExportsRoot(node.left)) {
+        for (const prop of right.properties || []) {
+          if (prop.type === 'ObjectProperty' && prop.value && prop.value.type === 'Identifier') {
+            const external = propName(prop.key);
+            if (external) exportedBindings.set(external, prop.value.name);
+          }
+        }
+      }
     }
     if (node.type === 'CallExpression'
       && node.callee.type === 'Identifier'
@@ -153,6 +220,12 @@ function collectReferences(ast) {
       const spec = stringLiteralValue(node.arguments[0]);
       if (spec != null) {
         refs.push({ spec, kind: 'require', reexport: isInsideCommonJsExportRight(node, parentMap) });
+        const parent = parentMap.get(node);
+        if (parent && parent.type === 'VariableDeclarator' && parent.init === node) {
+          bindRequireDestructure(parent.id, spec, importedBindings);
+        }
+      } else {
+        unresolved.push({ kind: 'require', line: nodeLine(node), reexport: isInsideCommonJsExportRight(node, parentMap) });
       }
       return;
     }
@@ -160,10 +233,39 @@ function collectReferences(ast) {
     if (dynSource) {
       const spec = stringLiteralValue(dynSource);
       if (spec != null) refs.push({ spec, kind: 'dynamic-import', reexport: false });
+      else unresolved.push({ kind: 'dynamic-import', line: nodeLine(node), reexport: isInsideCommonJsExportRight(node, parentMap) });
     }
   });
 
-  return refs;
+  return { refs, importedBindings, exportedBindings, exportsWholeNamespace, unresolved };
+}
+
+// `module.exports = X` (or `module.exports.foo`/`exports.foo` where the ROOT is
+// module.exports) replaces the whole namespace; distinguish it from a
+// `exports.name = X` single-name export.
+function isModuleExportsRoot(target) {
+  return target.type === 'MemberExpression'
+    && target.object.type === 'Identifier'
+    && target.object.name === 'module'
+    && propName(target.property) === 'exports';
+}
+
+// `const a = require(spec)` -> local a imports '*'; `const { y: z } = require(spec)`
+// -> local z imports external y. Only flat Identifier/ObjectPattern handled.
+function bindRequireDestructure(id, spec, importedBindings) {
+  if (!id) return;
+  if (id.type === 'Identifier') {
+    importedBindings.set(id.name, { spec, imported: '*' });
+    return;
+  }
+  if (id.type === 'ObjectPattern') {
+    for (const prop of id.properties || []) {
+      if (prop.type === 'ObjectProperty' && prop.value && prop.value.type === 'Identifier') {
+        const external = propName(prop.key);
+        if (external) importedBindings.set(prop.value.name, { spec, imported: external });
+      }
+    }
+  }
 }
 
 function resolveLocalSpec(fromRel, spec, fileSet) {
@@ -182,7 +284,7 @@ function analyzeRoot(root) {
   const files = collectFiles(root);
   const relPaths = files.map((f) => toRel(root, f));
   const fileSet = new Set(relPaths);
-  const refsByFile = new Map();
+  const infoByFile = new Map();
 
   for (const full of files) {
     const rel = toRel(root, full);
@@ -193,7 +295,7 @@ function analyzeRoot(root) {
     } catch (err) {
       throw new Error(`route-service-boundary parse error in ${rel}: ${err.message}`);
     }
-    refsByFile.set(rel, collectReferences(ast));
+    infoByFile.set(rel, collectFileInfo(ast));
   }
 
   // Match a reference against the boundary families. A relative specifier is
@@ -208,39 +310,166 @@ function analyzeRoot(root) {
     return null;
   }
 
-  // A file is boundary-equivalent (a thin re-export wrapper) if it re-exports a
-  // boundary source, or re-exports another boundary-equivalent module.
+  const EMPTY_INFO = { refs: [], importedBindings: new Map(), exportedBindings: new Map(), exportsWholeNamespace: new Set(), unresolved: [] };
+  const infoOf = (rel) => infoByFile.get(rel) || EMPTY_INFO;
+
+  // A file is boundary-equivalent (a thin PASSTHROUGH wrapper) if it re-exports a
+  // boundary source wholesale via `export * from` / `export ... from` /
+  // `module.exports = require(...)`, or does so for another boundary-equivalent
+  // module. Importing ANY name from such a file reaches the boundary.
   const boundaryEquivalent = new Set();
+  // Binding-level taint: per module, the EXTERNAL export names that re-publish a
+  // boundary binding by identity (import-then-export). A route reaches the
+  // boundary only if it imports one of THESE names -- so a legitimate service
+  // that re-exports one adapter constant does not taint consumers that import
+  // only its own functions. boundaryNamespace holds files whose WHOLE namespace
+  // is a re-published boundary binding (`module.exports = adapterBinding`).
+  const boundaryExports = new Map();
+  const boundaryNamespace = new Set();
+  const exportsOf = (rel) => {
+    let s = boundaryExports.get(rel);
+    if (!s) { s = new Set(); boundaryExports.set(rel, s); }
+    return s;
+  };
+  // Is a local binding (an { spec, imported } entry) boundary-tainted?
+  function bindingIsBoundary(fromRel, entry) {
+    if (!entry) return false;
+    if (boundaryKind(fromRel, entry.spec)) return true;
+    const target = resolveLocalSpec(fromRel, entry.spec, fileSet);
+    if (target == null) return false;
+    if (boundaryEquivalent.has(target) || boundaryNamespace.has(target)) return true;
+    const exp = boundaryExports.get(target);
+    if (!exp) return false;
+    return entry.imported === '*' ? exp.size > 0 : exp.has(entry.imported);
+  }
+
+  // A file is unresolved-equivalent if a non-literal require()/import() sits in
+  // a re-export position (its published identity is a boundary source we cannot
+  // see), or it re-publishes another unresolved-equivalent module. `origin`
+  // remembers the file:line of the non-literal source for the failure message.
+  const unresolvedEquivalent = new Set();
+  const unresolvedOrigin = new Map();
+
   let changed = true;
   while (changed) {
     changed = false;
     for (const rel of relPaths) {
-      if (boundaryEquivalent.has(rel)) continue;
-      const refs = refsByFile.get(rel) || [];
-      const wraps = refs.some((ref) => {
-        if (!ref.reexport) return false;
-        if (boundaryKind(rel, ref.spec)) return true;
-        const target = resolveLocalSpec(rel, ref.spec, fileSet);
-        return target != null && boundaryEquivalent.has(target);
-      });
-      if (wraps) {
-        boundaryEquivalent.add(rel);
-        changed = true;
+      const info = infoOf(rel);
+
+      if (!boundaryEquivalent.has(rel)) {
+        const wraps = info.refs.some((ref) => {
+          if (!ref.reexport) return false;
+          if (boundaryKind(rel, ref.spec)) return true;
+          const target = resolveLocalSpec(rel, ref.spec, fileSet);
+          return target != null && boundaryEquivalent.has(target);
+        });
+        if (wraps) {
+          boundaryEquivalent.add(rel);
+          changed = true;
+        }
+      }
+
+      if (!boundaryNamespace.has(rel)) {
+        for (const local of info.exportsWholeNamespace) {
+          if (bindingIsBoundary(rel, info.importedBindings.get(local))) {
+            boundaryNamespace.add(rel);
+            changed = true;
+            break;
+          }
+        }
+      }
+
+      const already = boundaryExports.get(rel);
+      for (const [external, local] of info.exportedBindings) {
+        if (already && already.has(external)) continue;
+        if (bindingIsBoundary(rel, info.importedBindings.get(local))) {
+          exportsOf(rel).add(external);
+          changed = true;
+        }
+      }
+
+      if (!unresolvedEquivalent.has(rel)) {
+        const selfMarker = info.unresolved.find((u) => u.reexport);
+        let origin = selfMarker ? { file: rel, line: selfMarker.line } : null;
+        if (!origin) {
+          const propagate = (spec) => {
+            const target = resolveLocalSpec(rel, spec, fileSet);
+            return target != null && unresolvedEquivalent.has(target) ? unresolvedOrigin.get(target) : null;
+          };
+          for (const ref of info.refs) {
+            if (!ref.reexport) continue;
+            origin = propagate(ref.spec);
+            if (origin) break;
+          }
+          if (!origin) {
+            for (const [, local] of info.exportedBindings) {
+              const entry = info.importedBindings.get(local);
+              if (!entry) continue;
+              origin = propagate(entry.spec);
+              if (origin) break;
+            }
+          }
+        }
+        if (origin) {
+          unresolvedEquivalent.add(rel);
+          unresolvedOrigin.set(rel, origin);
+          changed = true;
+        }
       }
     }
   }
 
+  // Fail closed on non-literal require()/import() sources that can affect the
+  // census: a non-literal source directly in a route (the route may be pulling
+  // a boundary source we cannot see), or a route that reaches a module made
+  // unresolved-equivalent by a non-literal re-export.
+  const unresolvedFailures = [];
+  for (const rel of relPaths) {
+    if (!rel.startsWith(ROUTE_ROOT) || isExemptRoute(rel)) continue;
+    const info = infoOf(rel);
+    for (const u of info.unresolved) {
+      unresolvedFailures.push(`${rel}:${u.line} (non-literal ${u.kind}() in route)`);
+    }
+    for (const ref of info.refs) {
+      const target = resolveLocalSpec(rel, ref.spec, fileSet);
+      if (target != null && unresolvedEquivalent.has(target)) {
+        const o = unresolvedOrigin.get(target);
+        unresolvedFailures.push(`${rel} reaches unresolved boundary source via ${target} (non-literal ${o ? `at ${o.file}:${o.line}` : 'source'})`);
+      }
+    }
+  }
+  if (unresolvedFailures.length > 0) {
+    throw new Error(
+      'route-service-boundary: unresolved-boundary-source -- a non-literal require()/import() '
+      + 'source reachable from a route cannot be resolved, so the boundary census would fail OPEN. '
+      + 'Make the source a string literal (or route it through a per-domain service):\n'
+      + unresolvedFailures.map((f) => `  + ${f}`).join('\n'),
+    );
+  }
+
   // Why each route reaches the boundary, for reporting.
   function routeReach(rel) {
-    const refs = refsByFile.get(rel) || [];
-    for (const ref of refs) {
+    const info = infoOf(rel);
+    for (const ref of info.refs) {
       const kind = boundaryKind(rel, ref.spec);
       if (kind === 'adapter') return `adapter import (${ref.kind})`;
       if (kind === 'dynamics') return `dynamics-service import (${ref.kind})`;
     }
-    for (const ref of refs) {
+    for (const ref of info.refs) {
       const target = resolveLocalSpec(rel, ref.spec, fileSet);
       if (target != null && boundaryEquivalent.has(target)) return `adapter re-export via ${target} (${ref.kind})`;
+    }
+    // Binding-level: the route imports a specific name that a module re-publishes
+    // from a boundary source by identity (import-then-export).
+    for (const [, entry] of info.importedBindings) {
+      const target = resolveLocalSpec(rel, entry.spec, fileSet);
+      if (target == null) continue;
+      if (boundaryNamespace.has(target)) return `adapter binding re-export via ${target} (import)`;
+      const exp = boundaryExports.get(target);
+      if (!exp) continue;
+      if (entry.imported === '*' ? exp.size > 0 : exp.has(entry.imported)) {
+        return `adapter binding '${entry.imported}' re-export via ${target} (import)`;
+      }
     }
     return null;
   }

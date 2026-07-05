@@ -330,8 +330,33 @@ review verdict + findings + resolutions)*
   `reviewer-finder/my-candidates.js`. Thin coverage flagged for wave planning:
   `reviewer-finder/save-candidates.js` (29.3 KB) and `workbench/enrich-recommended.js` are
   each covered only by `tests/unit/reviewer-route-identity-gate.test.js`. Full route→test
-  table below. Post-stage fresh-context review: pending (interval rule — Stage 1 may not
-  start until it clears).
+  table below.
+- 2026-07-04 (S331): **Post-stage review round 1 (Codex adversarial, fresh-context): NOT
+  SATISFIED — 2 Highs**, both confirmed against source and fixed same session:
+  (1) import-then-export wrappers escaped the boundary-equivalent taint (`reexport: true`
+  was only set for `export … from` / CJS export-right require); fixed with binding-level
+  taint — `boundaryExports` tracks which exported names re-publish a boundary binding, and
+  a consumer is counted only when it imports a tainted name (namespace imports taint if any
+  tainted export exists). False-positive guard verified live: `lib/services/prompt-store.js`
+  re-exports `PROMPT_STORE_ERROR_CODES` from an adapter, but `reviewer-finder/
+  prompt-override.js` imports only local service functions, so it correctly stays out of the
+  census (a coarse file-level fix wrongly pushed the count to 50; the binding-level design
+  holds it at 49).
+  (2) Non-literal `require()`/dynamic `import()` sources fell through silently (fail-open);
+  fixed with `unresolved` markers that HARD-FAIL with `file:line` when in an in-scope route
+  or in a `module.exports` re-export position of a route-reachable module. **Scoping
+  decision (owner-ratified, flagged to re-review):** the hard-fail is NOT "any
+  route-reachable module" — 6 benign non-literal requires exist live (bundler-avoidance in
+  `lib/dataverse/client.js`, lazy backend selection in `app-access-service.js`,
+  `database-service.js`, `settings-service.js`, `prompt-resolver.js` fallback import), 4
+  route-reachable; the broad reading would red the live gate on day one. Mirrors the
+  dataverse gate's boundary-decision-relevant scoping; no per-file exemptions added.
+  Self-test grew to 9 red / 5 green fixture classes incl. (h) ESM import-then-export
+  wrapper, (i) CJS binding re-export wrapper, (j)/(k) non-literal import()/require() in a
+  route (hard-fail), (l) GREEN service-uses-adapter-exports-own-functions; all proven
+  non-decorative against the saved pre-patch gate (it exited 0 on h/i/j/k). Live census 49
+  unchanged; dataverse gate + self-test untouched-green. Post-stage re-review: see next
+  entry (interval rule — Stage 1 may not start until it clears).
 
 ### Stage 0 route→test inventory (2026-07-04, S331)
 
