@@ -11,6 +11,10 @@
  * verification Bash/Read calls and paraphrased into tables before showing the
  * review).
  *
+ * For codex-rescue, also preserves background launch notices as durable handoffs:
+ * the job id and /codex:status command are the only link Claude has after a
+ * detached run.
+ *
  * Trigger: the sanctioned Codex flow always runs through the Agent/Task tool with
  * subagent_type 'codex:codex-rescue' (the skill mandates it), so we match that
  * tool and confirm 'codex' appears in the tool input. A raw `codex exec` via Bash
@@ -40,6 +44,13 @@ process.stdin.on('end', () => {
       ? /codex/i.test(ti.subagent_type)
       : /codex/i.test(JSON.stringify(ti));
     if (!looksCodex) return;
+    const looksCodexRescue = hasSubagentField
+      ? /codex:codex-rescue|codex-rescue/i.test(ti.subagent_type)
+      : /codex:codex-rescue|codex-rescue/i.test(JSON.stringify(ti));
+
+    const rescueHandoffReminder = looksCodexRescue
+      ? ' If the verbatim Codex output is a background launch notice, preserve the job id and `/codex:status <job-id>` command exactly; do not paraphrase it into a vague promise or claim Claude will automatically notice completion.'
+      : '';
 
     const msg =
       'STOP — a Codex review just returned. Per feedback-share-codex-verbatim and ' +
@@ -47,7 +58,7 @@ process.stdin.on('end', () => {
       'Codex\'s output VERBATIM: paste it as a quote, with NO paraphrase, NO table, ' +
       'and NO commentary before or after it. Do NOT run any verification (Bash/Read/' +
       'Grep), edit any file, or analyse the findings until AFTER you have shown the ' +
-      'verbatim output. Report first, then act.';
+      'verbatim output. Report first, then act.' + rescueHandoffReminder;
 
     process.stdout.write(JSON.stringify({
       hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: msg },

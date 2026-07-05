@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 /*
- * PreToolUse hook (Task|Agent): self-trace gate BEFORE delegating a review to Codex.
+ * PreToolUse hook (Task|Agent): self-trace gate BEFORE delegating a review to Codex,
+ * plus a durable handoff guard for codex-rescue.
  *
  * Fires the instant a Codex review / pre-impl-review subagent is about to be
  * spawned. Injects a mandatory lifecycle+provenance self-review gate I must work through
@@ -32,7 +33,10 @@
  * A non-Codex agent doing search/implementation (Explore, general-purpose) does NOT
  * fire, to keep the hook off the common fan-out path.
  *
- * Narrow blocker: repo-local discovery asks ("check whether any route streams",
+ * Narrow blockers:
+ *   - codex-rescue prompts must carry the foreground/durable-handoff contract,
+ *     so Claude does not launch detached Codex work and then lose the result.
+ *   - repo-local discovery asks ("check whether any route streams",
  * "verify if any callers exist") must include adjacent completed trace evidence
  * or a visible [DELEGATED-DISCOVERY: reason] escape. The broad SELF-TRACE
  * reminder remains advisory.
@@ -40,6 +44,12 @@
  * FAILS OPEN on parse/helper errors.
  */
 let input = '';
+function hasRescueHandoffContract(prompt) {
+  return /CODEX RESCUE HANDOFF/i.test(prompt) ||
+    /do not (?:add|pass|use) `?--background`?/i.test(prompt) ||
+    /foreground[\s\S]{0,140}(?:unless|except)[\s\S]{0,140}`?--background`?/i.test(prompt);
+}
+
 process.stdin.on('data', (c) => { input += c; });
 process.stdin.on('end', () => {
   try {
@@ -56,7 +66,12 @@ process.stdin.on('end', () => {
     // (a) Any Codex subagent. Check the structured field, then fall back to scanning
     // the whole tool_input so a renamed field still trips it (parity with the sibling
     // codex-verbatim-reminder.js).
-    const looksCodex = /codex/i.test(subagent) || /codex/i.test(JSON.stringify(ti));
+    const serializedToolInput = JSON.stringify(ti);
+    const looksCodex = /codex/i.test(subagent) || /codex/i.test(serializedToolInput);
+    const looksCodexRescue =
+      /codex:codex-rescue|codex-rescue/i.test(subagent) ||
+      /codex:codex-rescue|codex-rescue/i.test(serializedToolInput) ||
+      /\/codex:rescue\b/i.test(prompt);
     // (b) Any other delegation whose prompt asks for a review/verify/critique pass.
     // Kept deliberately broad on phrasing AND number (finding/findings) — a false
     // positive is cheap, a missed review delegation defeats the gate.
@@ -64,6 +79,18 @@ process.stdin.on('end', () => {
       /\b(pre[- ]?impl(?:ementation)?|post[- ]?impl(?:ementation)?|design review|code review|review (?:this|the|my|our|these)|re-?review|confirm[- ]?(?:or|\/)[- ]?refute|adversarial|red[- ]?team|critique|sanity[- ]?check|audit (?:this|the|my)|validate (?:this|the|my)|verify (?:this|the|these|my|our)|check (?:my|the) reasoning|look(?:ing)? for (?:regressions|bugs)|find(?: the)? bugs?|scrutin)/i
         .test(prompt);
     if (!looksCodex && !looksReview) return;
+
+    if (looksCodexRescue && !hasRescueHandoffContract(prompt)) {
+      console.error(
+        'BLOCKED: codex-rescue delegation must include the durable foreground handoff contract.\n' +
+        'Re-run the same codex-rescue Agent/Task prompt with this preface:\n' +
+        'CODEX RESCUE HANDOFF: Run Codex in foreground for work Claude must consume in this turn. ' +
+        'Do not add/pass/use `--background` unless the human explicitly requested background mode. ' +
+        'If background mode is explicitly requested, preserve the job id and `/codex:status <job-id>` ' +
+        'handoff verbatim and do not claim Claude will automatically notice completion.'
+      );
+      process.exit(2);
+    }
 
     const untracedDiscovery = findUntracedDiscoveryAsks(prompt);
     if (untracedDiscovery.length) {
@@ -79,7 +106,15 @@ process.stdin.on('end', () => {
       process.exit(2);
     }
 
+    const rescueMsg = looksCodexRescue
+      ? 'CODEX RESCUE HANDOFF - keep the Claude<->Codex link durable.\n' +
+        '  - Run Codex in foreground for work Claude must consume in this turn; do not add/pass/use `--background` unless the human explicitly requested background mode.\n' +
+        '  - If background mode is explicitly requested, preserve the job id and `/codex:status <job-id>` handoff verbatim; do not replace it with a vague promise or claim Claude will automatically notice completion.\n' +
+        '  - Preserve any Codex session ID, thread ID, resume command, or result command shown by the companion output.'
+      : '';
+
     const msg =
+      (rescueMsg ? `${rescueMsg}\n\n` : '') +
       'SELF-TRACE GATE — before this review delegation, complete lifecycle and ' +
       'provenance/value-semantics tracing with file evidence. Put the trace in the ' +
       'delegation prompt so the reviewer can verify it directly.\n' +

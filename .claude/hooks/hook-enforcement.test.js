@@ -127,6 +127,49 @@ test('review delegation guard allows adjacent trace evidence', () => {
   assert.match(result.stdout, /SELF-TRACE GATE/);
 });
 
+test('codex rescue guard blocks prompts without foreground handoff contract', () => {
+  const result = runHook('pre-review-delegation-trace-guard.js', {
+    tool_name: 'Agent',
+    tool_input: {
+      subagent_type: 'codex:codex-rescue',
+      prompt: 'Help finish the failing route-service boundary work.',
+    },
+  });
+  assert.strictEqual(result.status, 2, result.stderr);
+  assert.match(result.stderr, /durable foreground handoff contract/);
+  assert.match(result.stderr, /Do not add\/pass\/use `--background`/);
+});
+
+test('codex rescue guard allows prompts with foreground handoff contract', () => {
+  const result = runHook('pre-review-delegation-trace-guard.js', {
+    tool_name: 'Agent',
+    tool_input: {
+      subagent_type: 'codex:codex-rescue',
+      prompt: [
+        'CODEX RESCUE HANDOFF: Run Codex in foreground for work Claude must consume in this turn.',
+        'Do not add/pass/use `--background` unless the human explicitly requested background mode.',
+        'Help finish the failing route-service boundary work.',
+      ].join('\n'),
+    },
+  });
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.match(result.stdout, /CODEX RESCUE HANDOFF - keep the Claude<->Codex link durable/);
+  assert.match(result.stdout, /SELF-TRACE GATE/);
+});
+
+test('codex verbatim reminder preserves rescue background launch handoff', () => {
+  const result = runHook('codex-verbatim-reminder.js', {
+    tool_name: 'Task',
+    tool_input: {
+      subagent_type: 'codex:codex-rescue',
+      prompt: 'CODEX RESCUE HANDOFF: run background because the human explicitly requested it.',
+    },
+  });
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.match(result.stdout, /background launch notice/);
+  assert.match(result.stdout, /\/codex:status <job-id>/);
+});
+
 test('scope claim reminder blocks plan assumption leakage into derived counts', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-scope-leak-'));
   const result = runHook('scope-claim-reminder.js', {
