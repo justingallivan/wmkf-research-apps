@@ -445,5 +445,169 @@ describe('send-emails — fail-closed on unknown templateType', () => {
       expect(createAndSendEmail).toHaveBeenCalledTimes(0);
       expect(updateLifecycle).toHaveBeenCalledTimes(0);
     });
+
+    // Terminal-sequence pin (Stage 2b pre-extraction contract): every pre-loop
+    // fail-closed guard (templateType here; drafts-shape/GUID guards below) emits
+    // exactly ONE event and ends the stream WITHOUT ever reaching 'result' or
+    // 'complete' — the SSE contract's error path is `error` -> stream end, full stop,
+    // never `error` -> `complete` and never a second event.
+    test(`${templateType} emits ONLY the error event — no result/complete, stream ends`, async () => {
+      const res = await run({ drafts: [draft()], templateType });
+      const seq = events(res).map((e) => e.event);
+      expect(seq).toEqual(['error']);
+      expect(res.end).toHaveBeenCalledTimes(1);
+    });
   }
+});
+
+describe('send-emails — pre-loop fail-closed guards (SSE error terminal sequence)', () => {
+  test('empty drafts array: single error event, no result/complete', async () => {
+    const res = await run({ drafts: [], templateType: 'invitation' });
+    const seq = events(res).map((e) => e.event);
+    expect(seq).toEqual(['error']);
+    expect(events(res)[0].data.message).toBe('drafts array is required');
+    expect(res.end).toHaveBeenCalledTimes(1);
+  });
+
+  test('missing required draft field: single error event, no result/complete', async () => {
+    const res = await run({ drafts: [{ suggestionId: SUG_1, subject: 'S' }], templateType: 'invitation' });
+    const seq = events(res).map((e) => e.event);
+    expect(seq).toEqual(['error']);
+    expect(events(res)[0].data.message).toMatch(/each draft must have suggestionId, subject, body/);
+  });
+
+  test('non-GUID suggestionId: single error event, findById never called', async () => {
+    const res = await run({
+      drafts: [{ suggestionId: 'not-a-guid', subject: 'S', body: 'B' }],
+      templateType: 'invitation',
+    });
+    const seq = events(res).map((e) => e.event);
+    expect(seq).toEqual(['error']);
+    expect(events(res)[0].data.message).toMatch(/valid GUID/);
+    expect(findById).toHaveBeenCalledTimes(0);
+  });
+});
+
+describe('send-emails — pre-stream 4xx (before SSE headers are ever written)', () => {
+  test('wrong method (GET) returns a plain 405 with Allow-less JSON body, never SSE', async () => {
+    const req = createMockReq({ method: 'GET', query: {}, body: {} });
+    const res = createMockRes();
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(405);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Method not allowed' });
+    expect(res.write).not.toHaveBeenCalled();
+    expect(res.setHeader).not.toHaveBeenCalledWith('Content-Type', 'text/event-stream');
+  });
+});
+
+describe('send-emails — full SSE event vocabulary and ordering (Stage 2b pre-extraction contract)', () => {
+  // Three-recipient batch exercising all three per-recipient terminal branches in
+  // one run — success (email_sent), skip (no email → skipped, no email_failed/
+  // email_sent), and a REAL send-time failure (email_failed via the try/catch
+  // around createAndSendEmail, distinct from the missing-suggestion `failed` path
+  // already pinned by the "partial-success batch" describe above).
+  const SUG_SKIP = 'a4444444-4444-4444-8444-444444444444';
+  const SUG_SENDFAIL = 'd5555555-5555-4555-8555-555555555555';
+
+  test('event name sequence is exactly: progress(starting) -> progress(resolving_recipients) -> progress(fetching_attachments) -> progress(sending) -> per-recipient interleaved progress/email_sent/email_failed -> progress(updating_lifecycle) -> result -> complete', async () => {
+    SUGGESTIONS = {
+      [SUG_1]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_1 }),
+      [SUG_SKIP]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_SKIP, _wmkf_potentialreviewer_value: 'pr-skip' }),
+      [SUG_SENDFAIL]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_SENDFAIL, _wmkf_potentialreviewer_value: 'pr-fail' }),
+    };
+    // Per-suggestion person lookup: PERSON is a single fixture object keyed by the
+    // shared getRecord mock (see top-of-file getRecord), which does not vary by id —
+    // so drive the skip/fail branches through getRecord's entity dispatch instead by
+    // overriding it for this test only.
+    getRecord.mockImplementation(async (entity, id) => {
+      if (entity === 'wmkf_potentialreviewerses') {
+        if (id === 'pr-skip') return { wmkf_potentialreviewersid: 'pr-skip', wmkf_name: 'No Email', wmkf_emailaddress: null, wmkf_emailsource: 'orcid', wmkf_identitystatus: 'confirmed' };
+        if (id === 'pr-fail') return { wmkf_potentialreviewersid: 'pr-fail', wmkf_name: 'Send Fails', wmkf_emailaddress: 'fail@example.org', wmkf_emailsource: 'orcid', wmkf_identitystatus: 'confirmed' };
+        return PERSON;
+      }
+      if (entity === 'akoya_requests') return REQUEST;
+      if (entity === 'systemusers') return SYSTEMUSER;
+      return null;
+    });
+    createAndSendEmail.mockImplementation(async (payload) => {
+      if (payload.to === 'fail@example.org') throw new Error('Dynamics transport error');
+      return { emailId: 'email-1' };
+    });
+
+    const res = await run({
+      drafts: [draft(SUG_1), draft(SUG_SKIP), draft(SUG_SENDFAIL)],
+      templateType: 'invitation',
+    });
+
+    const seq = events(res).map((e) => e.event);
+
+    // Fixed prefix.
+    expect(seq.slice(0, 4)).toEqual(['progress', 'progress', 'progress', 'progress']);
+    // Terminal suffix: result then complete, always in that order and always last.
+    expect(seq.slice(-2)).toEqual(['result', 'complete']);
+    // Per-recipient events present exactly once each, in emission order.
+    expect(seq).toContain('email_sent');
+    expect(seq).toContain('email_failed');
+    expect(seq.indexOf('email_sent')).toBeLessThan(seq.indexOf('result'));
+    expect(seq.indexOf('email_failed')).toBeLessThan(seq.indexOf('result'));
+    // 'updating_lifecycle' progress frame (only emitted because markAsSent + sent.length>0)
+    // must fall between the per-recipient events and the terminal result/complete pair.
+    const progressStages = events(res).filter((e) => e.event === 'progress').map((e) => e.data.stage);
+    expect(progressStages.slice(0, 4)).toEqual(['starting', 'resolving_recipients', 'fetching_attachments', 'sending']);
+    expect(progressStages).toContain('updating_lifecycle');
+    expect(progressStages.indexOf('updating_lifecycle')).toBeGreaterThan(progressStages.lastIndexOf('sending') - 1);
+
+    const r = resultOf(res);
+    expect(r.stats).toMatchObject({ sent: 1, failed: 1, skipped: 1, total: 3 });
+    expect(r.sent.map((s) => s.suggestionId)).toEqual([SUG_1]);
+    expect(r.failed.map((f) => f.suggestionId)).toEqual([SUG_SENDFAIL]);
+    expect(r.skipped.map((s) => s.suggestionId)).toEqual([SUG_SKIP]);
+  });
+});
+
+describe('send-emails — lifecycle-after-send ordering (Stage 2b pre-extraction contract)', () => {
+  test('the Dynamics send call happens BEFORE the lifecycle write for the same recipient', async () => {
+    await run({ drafts: [draft()], templateType: 'invitation' });
+
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(updateLifecycle).toHaveBeenCalledTimes(1);
+    const sendOrder = createAndSendEmail.mock.invocationCallOrder[0];
+    const lifecycleOrder = updateLifecycle.mock.invocationCallOrder[0];
+    expect(sendOrder).toBeLessThan(lifecycleOrder);
+  });
+
+  test('a send-time failure never reaches the lifecycle write for that recipient', async () => {
+    createAndSendEmail.mockImplementationOnce(async () => { throw new Error('boom'); });
+    const res = await run({ drafts: [draft()], templateType: 'invitation' });
+
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    expect(resultOf(res).failed).toHaveLength(1);
+    expect(resultOf(res).sent).toHaveLength(0);
+  });
+});
+
+describe('send-emails — mid-stream failure sequence (real send-time exception, not a missing-row/skip failure)', () => {
+  test('a send-time exception for one recipient in a multi-recipient batch: email_failed fires, batch continues, terminal sequence is still result -> complete (never error)', async () => {
+    const freshId = 'e6666666-6666-4666-8666-666666666666';
+    SUGGESTIONS = {
+      [SUG_1]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_1 }),
+      [freshId]: baseSuggestion({ wmkf_appreviewersuggestionid: freshId }),
+    };
+    let call = 0;
+    createAndSendEmail.mockImplementation(async () => {
+      call++;
+      if (call === 1) throw new Error('transient Dynamics failure');
+      return { emailId: 'email-2' };
+    });
+
+    const res = await run({ drafts: [draft(SUG_1), draft(freshId)], templateType: 'invitation' });
+    const seq = events(res).map((e) => e.event);
+
+    expect(seq).not.toContain('error');
+    expect(seq.slice(-2)).toEqual(['result', 'complete']);
+    const r = resultOf(res);
+    expect(r.stats).toMatchObject({ sent: 1, failed: 1, total: 2 });
+    expect(events(res).find((e) => e.event === 'email_failed').data.error).toBe('transient Dynamics failure');
+  });
 });
