@@ -14,6 +14,7 @@ import {
   stampProposalFirstAccessed,
   getForSubmitFinalityCheck,
   patchReviewReceipt,
+  getByIdWithSelect,
 } from '../../lib/dataverse/adapters/reviewer-suggestion.js';
 
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
@@ -32,6 +33,25 @@ describe('getForEtagRefresh', () => {
   it('propagates errors unchanged', async () => {
     jest.spyOn(DynamicsService, 'getRecord').mockRejectedValue(new Error('transient'));
     await expect(getForEtagRefresh(SUGGESTION_ID)).rejects.toThrow('transient');
+  });
+});
+
+describe('getByIdWithSelect (generic passthrough)', () => {
+  it('byte-mirrors reviewer-manual-reminder.js\'s SUGGESTION_SELECT read', async () => {
+    const select = [
+      'wmkf_appreviewersuggestionid', '_wmkf_request_value', '_wmkf_potentialreviewer_value',
+      'wmkf_accepted', 'wmkf_reviewstatus', 'wmkf_reviewreceivedat',
+      'wmkf_applicantdisposition', 'wmkf_remindercount',
+    ].join(',');
+    const spy = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ wmkf_appreviewersuggestionid: SUGGESTION_ID });
+    const out = await getByIdWithSelect(SUGGESTION_ID, select);
+    expect(out).toEqual({ wmkf_appreviewersuggestionid: SUGGESTION_ID });
+    expect(spy).toHaveBeenCalledWith('wmkf_appreviewersuggestions', SUGGESTION_ID, { select });
+  });
+
+  it('propagates errors unchanged', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockRejectedValue(new Error('not found'));
+    await expect(getByIdWithSelect(SUGGESTION_ID, 'a,b')).rejects.toThrow('not found');
   });
 });
 
