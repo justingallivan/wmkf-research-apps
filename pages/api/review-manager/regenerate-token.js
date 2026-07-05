@@ -16,14 +16,19 @@
  * Side-effect: any prior outstanding token for this suggestion immediately
  * stops verifying — the verifier compares the presented JWT's hash against
  * the stored hash, and we just overwrote it.
+ *
+ * Thin route shell (Route→Service Consolidation Plan, Stage 2): method
+ * dispatch → auth guard → input validation (incl. expiresAt parsing) →
+ * withDalContext → one service call → result/error→HTTP mapping. All
+ * business logic (excluded fail-closed chokepoint, mint, best-effort draft
+ * cleanup) lives in lib/services/review-manager/regenerate-token-service.js.
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
-import { mintAndStore } from '../../../lib/external/token-lifecycle';
-import ReviewDraftService from '../../../lib/services/review-draft-service';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
-import { APPLICANT_DISPOSITION_EXCLUDED, getForTokenRegeneration } from '../../../lib/dataverse/adapters/reviewer-suggestion';
+import { withDalContext } from '../../../lib/dataverse/core/context';
+import { ServiceHttpError } from '../../../lib/services/service-http-error';
+import { regenerateToken } from '../../../lib/services/review-manager/regenerate-token-service';
 
 const DEFAULT_TTL_DAYS = 90;
 
@@ -38,84 +43,39 @@ export default async function handler(req, res) {
 
   const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
 
-  try {
-    const { suggestionId, expiresAt: rawExpires } = req.body || {};
-    if (!suggestionId || typeof suggestionId !== 'string') {
-      return res.status(400).json({ ok: false, reason: 'validation', errors: ['suggestionId required.'] });
-    }
-    // GUID-validate before it becomes a Dataverse record-id selector (getRecord
-    // interpolates it raw into the request URL).
-    if (!isGuid(suggestionId)) {
-      return res.status(400).json({ ok: false, reason: 'validation', errors: ['suggestionId must be a valid GUID.'] });
-    }
-
-    let expiresAt;
-    if (rawExpires) {
-      expiresAt = new Date(rawExpires);
-      if (Number.isNaN(expiresAt.getTime())) {
-        return res.status(400).json({ ok: false, reason: 'validation', errors: ['expiresAt must be a valid ISO date.'] });
-      }
-      if (expiresAt.getTime() <= Date.now()) {
-        return res.status(400).json({ ok: false, reason: 'validation', errors: ['expiresAt must be in the future.'] });
-      }
-    } else {
-      expiresAt = new Date(Date.now() + DEFAULT_TTL_DAYS * 24 * 60 * 60 * 1000);
-    }
-
-    // Look up the suggestion to get its requestId — required for token payload.
-    let suggestion;
-    try {
-      suggestion = await bypassDynamicsRestrictions('regenerate-token-lookup', () =>
-        getForTokenRegeneration(suggestionId),
-      );
-    } catch (e) {
-      if (/Get record failed \(404\)/.test(e.message || '')) {
-        return res.status(404).json({ ok: false, reason: 'not_found' });
-      }
-      throw e;
-    }
-
-    // Fail closed on an applicant-"excluded" engagement. This is a direct-mint
-    // path (mintAndStore, not ensureToken), so it carries its own disposition
-    // chokepoint — never regenerate a magic link for a reviewer the applicant
-    // asked us not to use (Phase 0.7).
-    if (suggestion?.wmkf_applicantdisposition === APPLICANT_DISPOSITION_EXCLUDED) {
-      return res.status(409).json({ ok: false, reason: 'excluded' });
-    }
-
-    const requestId = suggestion?._wmkf_request_value;
-    if (!requestId) {
-      return res.status(404).json({ ok: false, reason: 'not_found' });
-    }
-
-    const result = await mintAndStore({ suggestionId, requestId, expiresAt, actingUserSystemId });
-
-    // Regenerating mints a NEW link (lost email / leak / re-enable). Drafts key on
-    // the stable suggestion_id, not the token, so a stale (possibly tampered)
-    // draft would otherwise resurface under the new link — drop it here, NOT in
-    // mintAndStore (which also runs on every benign reminder/email resend via
-    // reviewer-reminder-sweep.js + render-emails.js, where the draft must
-    // survive). Plan §9 #draft-token / Codex P1-4. Accepted edge: a benign
-    // "lost email" regen also clears the draft (rare; the reviewer re-enters).
-    // Best-effort: the token is already minted, so a delete failure must not fail
-    // the regenerate (GC / the next regen sweeps a leftover). Same accepted
-    // sub-second autosave-resurrection residual as revoke-token.js (Codex S302
-    // P1): a draft PUT verified just before the hash flip can land after this
-    // delete, but the resurrected draft is dead (old token can't read/submit it).
-    try {
-      await ReviewDraftService.deleteBySuggestion(suggestionId);
-    } catch (e) {
-      console.error('[review-manager regenerate-token] draft cleanup failed (non-fatal):', e.message);
-    }
-
-    return res.status(200).json({
-      ok: true,
-      url: result.url,
-      expiresAt: result.expiresAt.toISOString(),
-      jti: result.jti,
-    });
-  } catch (error) {
-    console.error('[review-manager regenerate-token] error:', error);
-    return res.status(500).json({ ok: false, reason: 'server_error' });
+  const { suggestionId, expiresAt: rawExpires } = req.body || {};
+  if (!suggestionId || typeof suggestionId !== 'string') {
+    return res.status(400).json({ ok: false, reason: 'validation', errors: ['suggestionId required.'] });
   }
+  // GUID-validate before it becomes a Dataverse record-id selector (getRecord
+  // interpolates it raw into the request URL).
+  if (!isGuid(suggestionId)) {
+    return res.status(400).json({ ok: false, reason: 'validation', errors: ['suggestionId must be a valid GUID.'] });
+  }
+
+  let expiresAt;
+  if (rawExpires) {
+    expiresAt = new Date(rawExpires);
+    if (Number.isNaN(expiresAt.getTime())) {
+      return res.status(400).json({ ok: false, reason: 'validation', errors: ['expiresAt must be a valid ISO date.'] });
+    }
+    if (expiresAt.getTime() <= Date.now()) {
+      return res.status(400).json({ ok: false, reason: 'validation', errors: ['expiresAt must be in the future.'] });
+    }
+  } else {
+    expiresAt = new Date(Date.now() + DEFAULT_TTL_DAYS * 24 * 60 * 60 * 1000);
+  }
+
+  return withDalContext('regenerate-token-lookup', async () => {
+    try {
+      const result = await regenerateToken({ suggestionId, expiresAt, actingUserSystemId });
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof ServiceHttpError) {
+        return res.status(error.httpStatus).json(error.body ?? { error: error.message });
+      }
+      console.error('[review-manager regenerate-token] error:', error);
+      return res.status(500).json({ ok: false, reason: 'server_error' });
+    }
+  });
 }

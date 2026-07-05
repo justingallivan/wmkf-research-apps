@@ -1,9 +1,8 @@
 /**
  * GET /api/review-manager/download-review?suggestionId=...&filename=...
  *
- * Stream a completed review back to staff. File lives in SharePoint at
- * `akoya_request/{request}/Reviewer_Uploads/{reviewerSubfolder}/`,
- * pointed at by `wmkf_reviewsharepointfolder`. Streamed via Graph as
+ * Stream a completed review back to staff. File lives in SharePoint,
+ * pointed at by `wmkf_reviewsharepointfolder`; streamed via Graph as
  * the foundation's app registration.
  *
  * Authorization scope: staff-shared. Any user with `review-manager` app
@@ -12,28 +11,22 @@
  * grant managers, and the CSO collaborate across proposals), and reviews
  * are not user-owned data. The PD-scoping you see in `my-candidates` and
  * `reviewers.js` is a UX convenience for the default listing view, not an
- * auth boundary.
+ * auth boundary. If the org-wide model later changes, tighten by resolving
+ * suggestion → request → PD here.
  *
- * If the org-wide model later changes (e.g., a more sensitive grant program
- * needs PD-only access), tighten by resolving suggestion → request → PD
- * and adding a `_wmkf_programdirector_value === access.session.dynamicsSystemuserId`
- * check here.
- *
- * (The pre-Phase-5 Vercel Blob fallback was retired 2026-05-03; prod
- * had zero rows still pointing at Blob storage at the time of removal.)
- *
- * Caller passes `suggestionId`. Optional `filename` selects a specific
- * file when the upload included multiple; defaults to the primary
- * filename stored on the row (wmkf_reviewfilename).
+ * Thin route shell (Route→Service Consolidation Plan, Stage 2): method
+ * dispatch → auth guard → input validation → withDalContext → one service
+ * call → result/error→HTTP mapping. The 200 is BINARY: the shell owns the
+ * golden headers + res.send(buffer); the service returns a plain file
+ * descriptor. All lookup/Graph logic lives in
+ * lib/services/review-manager/download-review-service.js.
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
-import { getForDownload } from '../../../lib/dataverse/adapters/reviewer-suggestion';
-import { GraphService } from '../../../lib/services/graph-service';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
-
-const REVIEW_LIBRARY = 'akoya_request';
+import { withDalContext } from '../../../lib/dataverse/core/context';
+import { ServiceHttpError } from '../../../lib/services/service-http-error';
+import { downloadReview } from '../../../lib/services/review-manager/download-review-service';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -54,46 +47,29 @@ export default async function handler(req, res) {
     return res.status(400).json({ ok: false, reason: 'validation', errors: ['suggestionId must be a valid GUID.'] });
   }
 
-  try {
-    let suggestion;
+  return withDalContext('download-review-lookup', async () => {
     try {
-      suggestion = await bypassDynamicsRestrictions('download-review-lookup', () =>
-        getForDownload(suggestionId),
+      const file = await downloadReview({ suggestionId, requestedFilename });
+      res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${encodeFilename(file.filename)}"`,
       );
+      res.setHeader('Content-Length', file.size);
+      res.setHeader('Cache-Control', 'private, no-store');
+      return res.status(200).send(file.buffer);
     } catch (e) {
-      if (/Get record failed \(404\)/.test(e.message || '')) {
-        return res.status(404).json({ ok: false, reason: 'not_found' });
+      if (e instanceof ServiceHttpError) {
+        return res.status(e.httpStatus).json(e.body ?? { error: e.message });
       }
-      throw e;
+      console.error('[download-review] error:', e);
+      return res.status(500).json({
+        ok: false,
+        reason: 'server_error',
+        details: process.env.NODE_ENV === 'development' ? e.message : undefined,
+      });
     }
-
-    const folder = suggestion?.wmkf_reviewsharepointfolder;
-    const primaryFilename = suggestion?.wmkf_reviewfilename;
-
-    if (!folder) {
-      return res.status(404).json({ ok: false, reason: 'no_review_on_file' });
-    }
-    const filename = requestedFilename || primaryFilename;
-    if (!filename) {
-      return res.status(404).json({ ok: false, reason: 'no_filename_on_row' });
-    }
-    const file = await GraphService.downloadFileByPath(REVIEW_LIBRARY, folder, filename);
-    res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${encodeFilename(file.filename)}"`,
-    );
-    res.setHeader('Content-Length', file.size);
-    res.setHeader('Cache-Control', 'private, no-store');
-    return res.status(200).send(file.buffer);
-  } catch (e) {
-    console.error('[download-review] error:', e);
-    return res.status(500).json({
-      ok: false,
-      reason: 'server_error',
-      details: process.env.NODE_ENV === 'development' ? e.message : undefined,
-    });
-  }
+  });
 }
 
 function encodeFilename(name) {
