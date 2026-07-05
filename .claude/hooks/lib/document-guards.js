@@ -46,6 +46,31 @@ function proposedTextForTool(data, root) {
   return existing.replace(oldString, newString);
 }
 
+/*
+ * Text INTRODUCED by this tool call only — the source-read guard must judge
+ * the delta, not re-litigate every path a long historical plan doc already
+ * names (whole-doc scanning there blocks unrelated paragraph edits).
+ * Edit → new_string; Write over an existing file → lines not already present;
+ * Write of a new file → full content.
+ */
+function newlyIntroducedText(data, root) {
+  const tool = data && data.tool_name;
+  const ti = (data && data.tool_input) || {};
+  if (tool === 'Edit') {
+    return typeof ti.new_string === 'string' ? ti.new_string : null;
+  }
+  if (tool !== 'Write') return null;
+  const content = typeof ti.content === 'string' ? ti.content : null;
+  if (content == null) return null;
+
+  const filePath = typeof ti.file_path === 'string' ? ti.file_path : '';
+  const full = filePath ? resolveInside(root, repoRelative(root, filePath)) : null;
+  if (!full || !fs.existsSync(full)) return content;
+
+  const existingLines = new Set(fs.readFileSync(full, 'utf8').split(/\r?\n/));
+  return content.split(/\r?\n/).filter((line) => !existingLines.has(line)).join('\n');
+}
+
 function frontmatterValue(text, key) {
   const match = String(text || '').match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!match) return '';
@@ -235,6 +260,7 @@ function findUntracedDiscoveryAsks(prompt) {
 
 module.exports = {
   docMentionsChangedSource,
+  newlyIntroducedText,
   extractNamedSourcePaths,
   findAssumptionQuantityLeaks,
   findUntracedDiscoveryAsks,

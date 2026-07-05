@@ -74,6 +74,20 @@ test('recognizes transcript Read/Open and shell read evidence', () => {
   assert.strictEqual(transcriptHasReadEvidence(transcript, root, 'pages/api/missing.js'), false);
 });
 
+test('newlyIntroducedText judges the delta, not the whole document', () => {
+  const { newlyIntroducedText } = require('./document-guards');
+  const editDelta = newlyIntroducedText(
+    { tool_name: 'Edit', tool_input: { old_string: 'names lib/services/old.js here', new_string: 'no paths in the replacement' } },
+    '/tmp/wmkf-hooks-test'
+  );
+  assert.strictEqual(editDelta, 'no paths in the replacement');
+  const newFile = newlyIntroducedText(
+    { tool_name: 'Write', tool_input: { file_path: '/tmp/wmkf-hooks-test/docs/NEW_PLAN.md', content: 'names pages/api/foo.js' } },
+    '/tmp/wmkf-hooks-test'
+  );
+  assert.strictEqual(newFile, 'names pages/api/foo.js');
+});
+
 test('recognizes codegraph_explore output as read evidence', () => {
   const root = path.resolve('/tmp/wmkf-hooks-test');
   const transcript = [

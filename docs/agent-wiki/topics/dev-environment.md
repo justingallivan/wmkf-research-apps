@@ -144,9 +144,11 @@ in-artifact escape marker — never a silent env var:
   unresolved quantity (TBD/[ASSUMED]) with unqualified derived counts on the same subject.
   Escapes: keep the derived count visibly `[ASSUMED]`, or add `[DERIVED-FROM: <probe>]`;
   historical log lines must state their resolution inline.
-- **`plan-named-source-read-guard.js`** — `PreToolUse(Write|Edit)`, BLOCKS a plan doc naming a
-  live `pages/`/`lib/` source file with no read evidence in the session transcript (Read,
-  shell readers, or codegraph_explore output all count). Escape: `[NOT-READ: <path> — reason]`.
+- **`plan-named-source-read-guard.js`** — `PreToolUse(Write|Edit)`, BLOCKS when the text a
+  plan-doc edit INTRODUCES (delta-scoped — an unrelated paragraph edit does not re-litigate
+  every path a long historical plan already names) names a live `pages/`/`lib/` source file
+  with no read evidence in the session transcript (Read, shell readers, or codegraph_explore
+  output all count). Escape: `[NOT-READ: <path> — reason]` anywhere in the doc.
 - **`session-lifecycle.js`** — tracks docs touched this session; when a `scripts/`/`lib/`
   source file changes afterward, docs mentioning it get flagged and UNRESOLVED plan/design-doc
   staleness blocks at Stop. Acks: `[RECHECKED after <path> change: ...]` or

@@ -17,6 +17,7 @@ const {
   extractNamedSourcePaths,
   hasNotReadEscape,
   isPlanDoc,
+  newlyIntroducedText,
   proposedTextForTool,
   repoRelative,
   resolveInside,
@@ -41,7 +42,12 @@ process.stdin.on('end', () => {
     const proposed = proposedTextForTool(data, root);
     if (!proposed || !isPlanDoc(rel, proposed)) return;
 
-    const namedSources = extractNamedSourcePaths(proposed)
+    // Judge only the text this call introduces — a paragraph edit in a long
+    // historical plan must not re-litigate every path the doc already names.
+    const introduced = newlyIntroducedText(data, root);
+    if (!introduced) return;
+
+    const namedSources = extractNamedSourcePaths(introduced)
       .filter((sourceRel) => {
         const full = resolveInside(root, sourceRel);
         return full && fs.existsSync(full) && fs.statSync(full).isFile();
