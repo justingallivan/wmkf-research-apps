@@ -3,29 +3,25 @@
  *
  * POST — set the triage status (`wmkf_triagestatus`) on a request. Triage is a
  * staff winnowing signal that drives DASHBOARD VISIBILITY ONLY (Advancing vs
- * Set aside; reversible). It replaces the throwaway d26Allowlist.js. See
+ * Set aside; reversible). Body: { requestId (akoya_request GUID),
+ * triageStatus (numeric option value) }.
+ *
+ * AUTHORIZATION: requireAppAccess('reviewers') here, then a HARD server-side
+ * manage gate (superuser OR lead PD) enforced in the service — see
+ * lib/services/workbench/triage-service.js and
  * docs/WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md.
  *
- * AUTHORIZATION — HARD server-side manage gate (NOT the fail-open/UI-only
- * `canManage` posture used by the org-open reviewer-workflow APIs, S207). This
- * writes an AUTHORITATIVE visibility field, so the gate is enforced server-side:
- *
- *   requireAppAccess('reviewers')  AND
- *   ( caller is a superuser
- *     OR the request's lead PD (`_wmkf_programdirector_value`) is non-null AND
- *        equals the caller's dynamicsSystemuserId )
- *
- * A null/absent lead PD → 403 for non-superusers (superuser only). Connor edits
- * directly in Dataverse if a non-lead-PD change is needed.
- *
- * Body: { requestId (akoya_request GUID), triageStatus (numeric option value) }.
+ * Thin route shell (Route→Service Consolidation Plan, Stage 4 wave): method
+ * dispatch → auth guard → input validation → withDalContext → one service
+ * call → result/error→HTTP mapping.
  */
 
-import { requireAppAccess, getUserRole } from '../../../lib/utils/auth';
-import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request.js';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { requireAppAccess } from '../../../lib/utils/auth';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import { isGuid } from '../../../lib/utils/guid';
 import { isValidTriageValue } from '../../../shared/config/triageStatus';
+import { ServiceHttpError } from '../../../lib/services/service-http-error';
+import { setTriageStatus } from '../../../lib/services/workbench/triage-service';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '8kb' } },
@@ -54,43 +50,19 @@ export default async function handler(req, res) {
   }
   const triageValue = Number(triageStatus);
 
-  return bypassDynamicsRestrictions('workbench-triage', async () => {
+  return withDalContext('workbench-triage', async () => {
     try {
-      // Derive superuser status server-side. requireAppAccess bypasses app
-      // checks for superusers but does NOT expose an isSuperuser flag, so we
-      // resolve it explicitly via the canonical (uncached) role helper.
-      const isSuperuser = (await getUserRole(access.profileId)) === 'superuser';
-
-      let request;
-      try {
-        request = await grantRequestAdapter.getById(requestId, {
-          select: 'akoya_requestid,_wmkf_programdirector_value',
-        });
-      } catch {
-        request = null;
-      }
-      if (!request?.akoya_requestid) {
-        return res.status(404).json({ error: `No request found for ${requestId}` });
-      }
-
-      // Hard manage gate: superuser, or the request's lead PD. A null/absent
-      // lead PD is superuser-only (no PD to match against → fail closed).
-      if (!isSuperuser) {
-        const leadPd = request._wmkf_programdirector_value || null;
-        const callerSystemId = access.session?.user?.dynamicsSystemuserId || null;
-        const isLeadPd = !!leadPd && !!callerSystemId
-          && String(leadPd).toLowerCase() === String(callerSystemId).toLowerCase();
-        if (!isLeadPd) {
-          return res.status(403).json({ error: 'Only the lead Program Director (or a superuser) can set triage status for this request.' });
-        }
-      }
-
-      await grantRequestAdapter.updateById(requestId, {
-        wmkf_triagestatus: triageValue,
-      }, { actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null });
-
-      return res.status(200).json({ success: true, requestId, triageStatus: triageValue });
+      const body = await setTriageStatus({
+        requestId,
+        triageValue,
+        profileId: access.profileId,
+        callerSystemId: access.session?.user?.dynamicsSystemuserId || null,
+      });
+      return res.status(200).json(body);
     } catch (error) {
+      if (error instanceof ServiceHttpError) {
+        return res.status(error.httpStatus).json(error.body ?? { error: error.message });
+      }
       console.error('workbench triage error:', error);
       return res.status(500).json({
         error: 'Failed to set triage status',

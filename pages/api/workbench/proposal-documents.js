@@ -4,16 +4,18 @@
  * GET ?requestId=<akoya_requestid GUID> → { slots, otherDocuments, libraries, errors }
  *
  * Lists the request's Phase I SharePoint documents for the Workbench Proposal
- * tab (slot-matched + "other"). Read-only, gated `reviewers`. Request number +
- * cycle are resolved server-side (not trusted from the client). Downloads go
- * through /api/workbench/download-proposal-document, which re-validates scope.
+ * tab (slot-matched + "other"). Read-only, gated `reviewers`.
+ *
+ * Thin route shell (Route→Service Consolidation Plan, Stage 4 wave): method
+ * dispatch → auth guard → GUID validation → withDalContext → one service
+ * call → result/error→HTTP mapping. Resolution + listing logic lives in
+ * lib/services/workbench/proposal-documents-service.js.
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
-import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
-import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
-import { listProposalDocuments } from '../../../lib/services/workbench-proposal-documents';
+import { withDalContext } from '../../../lib/dataverse/core/context';
+import { ServiceHttpError } from '../../../lib/services/service-http-error';
+import { listWorkbenchProposalDocuments } from '../../../lib/services/workbench/proposal-documents-service';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -30,21 +32,14 @@ export default async function handler(req, res) {
   if (!requestId) return res.status(400).json({ error: 'requestId is required' });
   if (!GUID_RE.test(requestId)) return res.status(400).json({ error: 'requestId is not a valid GUID' });
 
-  return bypassDynamicsRestrictions('workbench-proposal-documents', async () => {
+  return withDalContext('workbench-proposal-documents', async () => {
     try {
-      let rec;
-      try {
-        rec = await grantRequestAdapter.getById(requestId, { select: grantRequestAdapter.SELECT_PROFILES.DOCUMENT_SCOPE });
-      } catch {
-        return res.status(404).json({ error: `No request found for ${requestId}` });
-      }
-      const requestNumber = rec.akoya_requestnum;
-      const cycleCode = rec.wmkf_meetingdate ? meetingDateToCycleCode(rec.wmkf_meetingdate) : null;
-
-      // Derive scope only from the resolved record, never the raw query param.
-      const result = await listProposalDocuments(rec.akoya_requestid, requestNumber, cycleCode);
-      return res.status(200).json({ success: true, ...result });
+      const body = await listWorkbenchProposalDocuments({ requestId });
+      return res.status(200).json(body);
     } catch (err) {
+      if (err instanceof ServiceHttpError) {
+        return res.status(err.httpStatus).json(err.body ?? { error: err.message });
+      }
       console.error('workbench proposal-documents error:', err);
       return res.status(500).json({
         error: 'Failed to list proposal documents',

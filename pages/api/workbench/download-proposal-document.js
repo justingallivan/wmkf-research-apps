@@ -12,15 +12,22 @@
  *   2. The folder's top-level segment MUST be a request folder whose GUID suffix
  *      matches `requestId` — blocks downloading arbitrary SharePoint content or
  *      probing other requests' folders.
- *   3. Library allowlisting is enforced by GraphService.getDriveId.
+ *   3. The (library, folder, filename) triple must be a Proposal-tab document
+ *      the list service surfaces for this request (authoritative membership
+ *      check in the service); library allowlisting via GraphService.getDriveId.
+ *
+ * Thin route shell (Route→Service Consolidation Plan, Stage 4 wave): method
+ * dispatch → auth guard → input validation → withDalContext → one service
+ * call → result/error→HTTP mapping. The 200 is BINARY: the shell owns the
+ * disposition decision + golden headers + res.send(buffer); lookup/scope/
+ * Graph logic lives in
+ * lib/services/workbench/download-proposal-document-service.js.
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
-import { GraphService } from '../../../lib/services/graph-service';
-import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
-import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
-import { listProposalDocuments } from '../../../lib/services/workbench-proposal-documents';
+import { withDalContext } from '../../../lib/dataverse/core/context';
+import { ServiceHttpError } from '../../../lib/services/service-http-error';
+import { downloadProposalDocument } from '../../../lib/services/workbench/download-proposal-document-service';
 
 export const config = {
   api: { responseLimit: false }, // large PDFs / xlsx
@@ -61,65 +68,42 @@ export default async function handler(req, res) {
 
   // Fast fail-closed pre-check: the folder's top-level segment must belong to
   // this request (GUID suffix). Subfolders (e.g. `1002794_ABCD.../Phase I`) are
-  // allowed. The authoritative scope check is the membership test below.
+  // allowed. The authoritative scope check is the service's membership test.
   const topLevel = String(folder).split('/')[0];
   const match = REQUEST_FOLDER_RE.exec(topLevel);
   if (!match || match[2] !== expectedSuffix) {
     return res.status(403).json({ error: 'Folder does not belong to the specified request' });
   }
 
-  return bypassDynamicsRestrictions('workbench-download-proposal-document', async () => {
-    // Authoritative scope: the requested (library, folder, filename) MUST be one
-    // of the Proposal-tab Phase I documents the list service surfaces for this
-    // request — not just any file under the request folder. Re-derive that set
-    // from the request's own record (never from the raw query params).
-    let rec;
+  return withDalContext('workbench-download-proposal-document', async () => {
+    let file;
     try {
-      rec = await grantRequestAdapter.getById(requestId, { select: grantRequestAdapter.SELECT_PROFILES.DOCUMENT_SCOPE });
-    } catch {
-      return res.status(404).json({ error: `No request found for ${requestId}` });
-    }
-    const cycleCode = rec.wmkf_meetingdate ? meetingDateToCycleCode(rec.wmkf_meetingdate) : null;
-    const { slots, otherDocuments } = await listProposalDocuments(rec.akoya_requestid, rec.akoya_requestnum, cycleCode);
-    const allowed = new Set([
-      ...slots.filter((s) => s.found).map((s) => `${s.library}::${s.folder}::${s.name}`),
-      ...otherDocuments.map((d) => `${d.library}::${d.folder}::${d.name}`),
-    ]);
-    if (!allowed.has(`${library}::${folder}::${filename}`)) {
-      return res.status(403).json({ error: 'File is not a Proposal-tab document for this request' });
-    }
-
-    try {
-      const { buffer, mimeType, filename: resolvedName, size } = await GraphService.downloadFileByPath(
-        String(library),
-        String(folder),
-        String(filename),
-      );
-
-      // Inline only when explicitly requested AND the type is safe to render in
-      // the browser; otherwise force download. nosniff (below) stops content-type
-      // confusion, so a non-PDF can't be coerced into inline script execution.
-      const wantInline = String(req.query.disposition || '').toLowerCase() === 'inline';
-      const dispType = wantInline && SAFE_INLINE_MIME.has(mimeType) ? 'inline' : 'attachment';
-
-      res.setHeader('Content-Type', mimeType);
-      res.setHeader('Content-Disposition', `${dispType}; filename="${resolvedName.replace(/"/g, '\\"')}"`);
-      res.setHeader('Content-Length', size);
-      res.setHeader('Cache-Control', 'private, max-age=300');
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-
-      // Binary download (attachment + nosniff + request-GUID + membership validation above).
-      // nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write
-      res.send(buffer);
+      file = await downloadProposalDocument({ requestId, library, folder, filename });
     } catch (error) {
-      console.error('Proposal document download error:', error.message);
-      if (error.message.includes('not in the allowlist')) {
-        return res.status(403).json({ error: 'Access to this document library is not permitted' });
+      if (error instanceof ServiceHttpError) {
+        return res.status(error.httpStatus).json(error.body ?? { error: error.message });
       }
-      if (error.message.includes('File not found') || error.message.includes('(404)')) {
-        return res.status(404).json({ error: 'File not found' });
-      }
-      return res.status(502).json({ error: 'Failed to download document from SharePoint' });
+      // Historical behavior: non-Graph failures outside the download call had
+      // no 500 mapping in this route — propagate unchanged.
+      throw error;
     }
+
+    const { buffer, mimeType, filename: resolvedName, size } = file;
+
+    // Inline only when explicitly requested AND the type is safe to render in
+    // the browser; otherwise force download. nosniff (below) stops content-type
+    // confusion, so a non-PDF can't be coerced into inline script execution.
+    const wantInline = String(req.query.disposition || '').toLowerCase() === 'inline';
+    const dispType = wantInline && SAFE_INLINE_MIME.has(mimeType) ? 'inline' : 'attachment';
+
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `${dispType}; filename="${resolvedName.replace(/"/g, '\\"')}"`);
+    res.setHeader('Content-Length', size);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+
+    // Binary download (attachment + nosniff + request-GUID + membership validation above).
+    // nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write
+    res.send(buffer);
   });
 }

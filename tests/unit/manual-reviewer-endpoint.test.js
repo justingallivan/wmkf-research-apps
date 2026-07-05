@@ -38,7 +38,10 @@ jest.mock('../../lib/dataverse/adapters/contact', () => ({
 }));
 
 const lookupReviewerIdentity = jest.fn(async () => ({ outcome: 'none' }));
-jest.mock('../../pages/api/workbench/reviewer-lookup', () => ({
+// Mock the CANONICAL lib module (Stage 4 extraction: the service imports
+// lib/services/reviewer-identity-lookup directly; the pages/api/workbench/
+// reviewer-lookup route re-exports this same binding, so this mock covers both).
+jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
   lookupReviewerIdentity: (...a) => lookupReviewerIdentity(...a),
 }));
 
