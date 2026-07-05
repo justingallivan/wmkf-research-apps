@@ -217,7 +217,12 @@ describe('notification email transport is wrapped', () => {
   // DynamicsService.createAndSendEmail → resolveSystemUser →
   // queryRecords('systemusers') was unwrapped, breaking notifyNewUser
   // from the sign-in callback.
-  test('source wraps DynamicsService.createAndSendEmail in bypass context', () => {
+  //
+  // S333 bypass-strip Stage 2: the wrapper is now the sanctioned
+  // `withDalContext` (behavior-identical to the retired
+  // `bypassDynamicsRestrictions`, same label); the shape assertion tracks
+  // the rename.
+  test('source wraps DynamicsService.createAndSendEmail in a trusted DAL context', () => {
     const fs = require('fs');
     const path = require('path');
     const src = fs.readFileSync(
@@ -225,8 +230,9 @@ describe('notification email transport is wrapped', () => {
       'utf8'
     );
     expect(src).toMatch(
-      /bypassDynamicsRestrictions\(\s*['"]notification-email['"][^]*?DynamicsService\.createAndSendEmail\s*\(/
+      /withDalContext\(\s*['"]notification-email['"][^]*?DynamicsService\.createAndSendEmail\s*\(/
     );
+    expect(src).not.toMatch(/bypassDynamicsRestrictions/);
   });
 });
 
@@ -265,7 +271,11 @@ describe('test-email endpoint is wrapped', () => {
 });
 
 describe('drain duplicate-PK recovery wraps the request read', () => {
-  test('source wraps the recovery read in bypassDynamicsRestrictions', () => {
+  // S333 bypass-strip Stage 2: the wrapper is now the sanctioned
+  // `withDalContext` (behavior-identical to the retired
+  // `bypassDynamicsRestrictions`, same label); the shape assertion tracks
+  // the rename.
+  test('source wraps the recovery read in a trusted DAL context', () => {
     const fs = require('fs');
     const path = require('path');
     // Stage 5 extraction (plumbing-only retarget): the drain engine incl.
@@ -281,7 +291,8 @@ describe('drain duplicate-PK recovery wraps the request read', () => {
     // adapter itself still calls DynamicsService.getRecord, so the
     // restriction-context invariant is preserved one call deeper.
     expect(src).toMatch(
-      /bypassDynamicsRestrictions\(\s*['"]drain-recover-request-created['"][^]*?grantRequestAdapter\.getById\s*\(/
+      /withDalContext\(\s*['"]drain-recover-request-created['"][^]*?grantRequestAdapter\.getById\s*\(/
     );
+    expect(src).not.toMatch(/bypassDynamicsRestrictions/);
   });
 });
