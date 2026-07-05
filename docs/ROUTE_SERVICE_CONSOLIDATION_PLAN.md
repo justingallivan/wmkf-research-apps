@@ -2,7 +2,7 @@
 title: Route→Service Consolidation Plan
 domain: architecture
 kind: plan
-status: draft
+status: active
 summary: "Staged extraction of business logic from pages/api routes into per-domain services; routes become thin shells. Every stage leaves the build green."
 canonical: true
 cataloged: 2026-07-04
@@ -27,8 +27,10 @@ context → call service → map result/error to HTTP.** The DAL migration (Stag
 cleaned the layer *below* (adapters); this campaign cleans the layer *above* (routes). It ends,
 like the DAL campaign, with a census gate that becomes law.
 
-**Status: PLAN ONLY — not executed.** Written Session 330 (2026-07-04). Requires plan-review
-checkpoint P0 (below) before Stage 0 starts.
+**Status: P0-APPROVED, not yet executed.** Written Session 330 (2026-07-04); passed the P0
+adversarial plan review (Codex, 3 rounds, final verdict SATISFIED with zero live-state errors,
+2026-07-04). Stage 0 may start. Pre-stage re-probes remain mandatory — counts verified
+2026-07-04 go stale as the tree moves.
 
 **Executor profile.** Each stage is written to be executed by a cheaper model (Sonnet-class) with no
 prior context, following this document plus the per-stage checklist. Judgment calls are pre-made
@@ -269,7 +271,8 @@ build + all-gates run. Campaign close-out entry in `DEVELOPMENT_LOG.md`.
 review verdict + findings + resolutions)*
 
 - 2026-07-04 (S330): Plan drafted. Baseline probed (47 adapter-importing routes; 8 dynamics-service
-  importers outside exempt dirs, union TBD at Stage 0; suite 4188/4188). Sent to P0.
+  importers outside exempt dirs, union then still unprobed — historical record of the round-1
+  live-state error; resolved to 49 the same day, see next entries; suite 4188/4188). Sent to P0.
 - 2026-07-04 (S330): **P0 round 1 (Codex, owner-run console session): NOT SATISFIED** — 1
   live-state error (wave table implied 47-route coverage while the true union is 49; the two
   DynamicsService-only routes `grant-reporting/extract.js` and `test-email.js` were unstaged)
@@ -289,4 +292,11 @@ review verdict + findings + resolutions)*
   micro-stage **2s** with its own census delta, `send-emails.js` split out as stage **2b**,
   wave deltas restated to sum exactly to 49 (1+8+1+1+5+16+17); gate self-test spec expanded to
   prove adapter-source detection inherits the hardened scanner classes (alias/re-export/
-  dynamic-import/inline-require) plus root-level route classification. Awaiting P0 round 3.
+  dynamic-import/inline-require) plus root-level route classification. Sent to P0 round 3.
+- 2026-07-04 (S330): **P0 round 3 (Codex): SATISFIED — zero live-state errors.** All round-2
+  repairs verified against live code (objective wording vs `my-candidates.js:69` dispatch;
+  stage deltas vs live census 47/8/49 with the running-sum rule; SSE confirmed for all three
+  streaming routes; gate self-test spec vs the hardened scanner's audit classes). P0 closed;
+  plan promoted draft → active. Execution not started; Stage 0 is the next action for this
+  campaign, in a dedicated session, after the owner's prod `DATAVERSE_DAL_ENFORCEMENT` flip
+  per the agreed sequencing.
