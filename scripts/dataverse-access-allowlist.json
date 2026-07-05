@@ -4,21 +4,28 @@
   "entries": [
     {
       "file": "lib/bill/honorarium-onboard-orchestrator.js",
-      "kind": "fallback-alias",
+      "kind": "import",
+      "clientMethod": "DynamicsService.createRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/bill/honorarium-onboard-orchestrator.js",
+      "kind": "dynamic-client",
       "clientMethod": "dynamics.createRecord",
       "entity": "akoya_requests",
       "count": 1
     },
     {
       "file": "lib/bill/honorarium-onboard-orchestrator.js",
-      "kind": "fallback-alias",
+      "kind": "dynamic-client",
       "clientMethod": "dynamics.getRecord",
       "entity": "akoya_requests",
       "count": 1
     },
     {
       "file": "lib/bill/honorarium-onboard-orchestrator.js",
-      "kind": "fallback-alias",
+      "kind": "dynamic-client",
       "clientMethod": "dynamics.updateRecord",
       "entity": "contacts",
       "count": 1
