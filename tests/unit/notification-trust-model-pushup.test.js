@@ -27,6 +27,7 @@ const mockBlobDel = jest.fn();
 const mockBlobList = jest.fn();
 const mockListSettings = jest.fn();
 const mockGetSettingStrict = jest.fn();
+const mockRequireAppAccess = jest.fn();
 const mockAlertService = {
   createAlert: jest.fn(),
   autoResolve: jest.fn(),
@@ -122,6 +123,7 @@ jest.mock('../../lib/bill/onboard-reviewer-service', () => ({
   validateOnboardInput: mockValidateOnboardInput,
 }));
 jest.mock('../../lib/utils/cron-auth', () => ({ verifyCronSecret: mockVerifyCronSecret }));
+jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: mockRequireAppAccess }));
 jest.mock('../../lib/utils/health-checker', () => ({ runHealthChecks: mockRunHealthChecks }));
 jest.mock('../../lib/services/alert-service', () => mockAlertService);
 jest.mock('../../lib/services/alert-recipients', () => mockAlertRecipients);
@@ -233,6 +235,10 @@ const logAnalysisHandler = require('../../pages/api/cron/log-analysis').default;
 const maintenanceHandler = require('../../pages/api/cron/maintenance').default;
 const secretCheckHandler = require('../../pages/api/cron/secret-check').default;
 const granteeRemindersHandler = require('../../pages/api/cron/grantee-deliverable-reminders').default;
+const reviewThankyousHandler = require('../../pages/api/cron/send-review-thankyous').default;
+const reviewerRemindersHandler = require('../../pages/api/cron/reviewer-reminders').default;
+const sendReviewReminderHandler = require('../../pages/api/review-manager/send-review-reminder').default;
+const withdrawSufficientHandler = require('../../pages/api/review-manager/withdraw-sufficient').default;
 const attachHandler = require('../../pages/api/intake/draft/attach').default;
 const MaintenanceService = require('../../lib/services/maintenance-service');
 const { writeReviewFiles } = require('../../lib/services/review-upload');
@@ -482,6 +488,7 @@ beforeEach(() => {
   });
   mockAlertRecipients.getSuperuserRoster.mockResolvedValue(['admin@example.com']);
   mockVerifyCronSecret.mockReturnValue(true);
+  mockRequireAppAccess.mockResolvedValue({ session: { user: { dynamicsSystemuserId: PD_ID } } });
   mockVerifyInternalCall.mockReturnValue({ ok: true });
   mockGrantApps.mockResolvedValue(undefined);
   mockReconcileProfile.mockResolvedValue(undefined);
@@ -899,13 +906,18 @@ describe('notification trust-model Stage 2 pushed-up wrappers', () => {
   });
 
   test('site 11 - manual review reminder default alert inherits review-manager-send-review-reminder context', async () => {
+    // Form A: drive the real route handler (requireAppAccess mocked) so its own
+    // withDalContext is what establishes context.
     const seen = watchNotifyEntry();
     mockBlankEmailDefault((key) => key === 'email.reviewer_reminder_review_due.subject');
 
-    await expect(withDalContext('review-manager-send-review-reminder', () =>
-      sendManualReviewDueReminder({ requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, actingUserSystemId: PD_ID }),
-    )).resolves.toMatchObject({ ok: false, reason: 'misconfigured' });
+    const res = makeRes();
+    await sendReviewReminderHandler(
+      { method: 'POST', headers: {}, body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID } },
+      res,
+    );
 
+    expect(res.body).toMatchObject({ ok: false, reason: 'misconfigured' });
     expectTrustedNotify(seen, {
       type: 'email_default_misconfigured',
       source: 'reviewer-reminders-review-due-manual',
@@ -913,7 +925,10 @@ describe('notification trust-model Stage 2 pushed-up wrappers', () => {
   });
 
   test('site 11 - review thank-you default alert inherits cron-review-thankyous context', async () => {
+    // Form A: drive the real cron handler so its own withDalContext is what's tested.
     const seen = watchNotifyEntry();
+    jest.spyOn(MaintenanceService, 'startRun').mockResolvedValue('run-1');
+    jest.spyOn(MaintenanceService, 'completeRun').mockResolvedValue(undefined);
     mockBlankEmailDefault((key) => key === 'email.reviewer_thankyou.subject');
     mockReviewerSuggestionAdapter.queryAllSuggestions.mockResolvedValue({
       records: [{
@@ -923,10 +938,11 @@ describe('notification trust-model Stage 2 pushed-up wrappers', () => {
       }],
     });
 
-    await expect(withDalContext('cron-review-thankyous', () =>
-      sweepReviewThankYous({ maxBatch: 1 }),
-    )).resolves.toMatchObject({ scanned: 1, skippedMisconfigured: 1 });
+    const res = makeRes();
+    await reviewThankyousHandler({ method: 'GET', headers: {}, query: { maxBatch: '1' } }, res);
 
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ scanned: 1, skippedMisconfigured: 1 });
     expectTrustedNotify(seen, {
       type: 'email_default_misconfigured',
       source: 'reviewer-thankyous',
@@ -934,19 +950,23 @@ describe('notification trust-model Stage 2 pushed-up wrappers', () => {
   });
 
   test('site 11 - reviewer reminder default alerts inherit cron-reviewer-reminders context', async () => {
+    // Form A: drive the real cron handler so its own withDalContext is what's tested.
     const seen = watchNotifyEntry();
+    jest.spyOn(MaintenanceService, 'startRun').mockResolvedValue('run-1');
+    jest.spyOn(MaintenanceService, 'completeRun').mockResolvedValue(undefined);
     mockBlankEmailDefault((key) => (
       key === 'email.reviewer_reminder_respond_by.subject'
       || key === 'email.reviewer_reminder_review_due.subject'
     ));
 
-    await expect(withDalContext('cron-reviewer-reminders', () =>
-      sweepReviewerReminders({ maxBatch: 1 }),
-    )).resolves.toMatchObject({
+    const res = makeRes();
+    await reviewerRemindersHandler({ method: 'GET', headers: {}, query: { maxBatch: '1' } }, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({
       respond: expect.objectContaining({ scanned: 0 }),
       reviewDue: expect.objectContaining({ scanned: 0 }),
     });
-
     expectTrustedNotify(seen, {
       type: 'email_default_misconfigured',
       source: 'reviewer-reminders-respond-by',
@@ -958,16 +978,17 @@ describe('notification trust-model Stage 2 pushed-up wrappers', () => {
   });
 
   test('site 11 - withdraw-sufficient default alert inherits review-manager-withdraw-sufficient context', async () => {
+    // Form A: drive the real route handler (requireAppAccess mocked).
     const seen = watchNotifyEntry();
     mockBlankEmailDefault((key) => key === 'email.reviewer_withdraw.subject');
 
-    await expect(withDalContext('review-manager-withdraw-sufficient', () =>
-      withdrawSufficient({
-        requestId: REQUEST_ID,
-        suggestionIds: [SUGGESTION_ID],
-        actingUserSystemId: PD_ID,
-      }),
-    )).resolves.toMatchObject({
+    const res = makeRes();
+    await withdrawSufficientHandler(
+      { method: 'POST', headers: {}, body: { requestId: REQUEST_ID, suggestionIds: [SUGGESTION_ID] } },
+      res,
+    );
+
+    expect(res.body).toMatchObject({
       ok: true,
       withdrawn: 1,
       results: [{ suggestionId: SUGGESTION_ID, status: 'withdrawn_email_skipped' }],
