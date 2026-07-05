@@ -35,6 +35,22 @@ describe('grantee-deliverable.queryDeliverables (characterization)', () => {
   });
 });
 
+describe('grantee-deliverable.queryAllDeliverables (characterization)', () => {
+  test('golden: forwards options verbatim to queryAllRecords (day-12 reminder scan shape)', async () => {
+    const result = { records: [{ wmkf_granteedeliverableid: GUID }], capped: false, totalCount: 1, hasMore: false };
+    const qAll = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue(result);
+    const options = { select: SELECT, filter: 'wmkf_deliverablestatus eq 100000000', orderby: 'wmkf_inviteddate asc' };
+    const out = await granteeDeliverable.queryAllDeliverables(options);
+    expect(out).toBe(result);
+    expect(qAll).toHaveBeenCalledWith('wmkf_granteedeliverables', options);
+  });
+
+  test('failure path: propagates a queryAllRecords rejection', async () => {
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockRejectedValue(new Error('boom'));
+    await expect(granteeDeliverable.queryAllDeliverables({})).rejects.toThrow('boom');
+  });
+});
+
 describe('grantee-deliverable.create (characterization)', () => {
   test('golden: forwards payload + options verbatim', async () => {
     const c = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue({ wmkf_granteedeliverableid: GUID });
