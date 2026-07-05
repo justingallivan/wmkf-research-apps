@@ -7,7 +7,9 @@
  */
 
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
-import { findByEmail, getById } from '../../lib/dataverse/adapters/system-user.js';
+import {
+  findByEmail, getById, getByIdWithSelect, queryUsers,
+} from '../../lib/dataverse/adapters/system-user.js';
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -38,5 +40,38 @@ describe('system-user.getById', () => {
     expect(get).toHaveBeenCalledWith('systemusers', 'su-2', {
       select: 'systemuserid,internalemailaddress,isdisabled',
     });
+  });
+});
+
+describe('system-user.getByIdWithSelect', () => {
+  test('byte-mirrors email-signature.resolveSignatureForRequest select', async () => {
+    const get = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ fullname: 'Jane PD' });
+    const out = await getByIdWithSelect('su-3', 'systemuserid,fullname,internalemailaddress,isdisabled');
+    expect(out).toEqual({ fullname: 'Jane PD' });
+    expect(get).toHaveBeenCalledWith('systemusers', 'su-3', {
+      select: 'systemuserid,fullname,internalemailaddress,isdisabled',
+    });
+  });
+
+  test('byte-mirrors program-director-resolver.resolveProgramDirectorEmailForRequest narrower select', async () => {
+    const get = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ isdisabled: false });
+    await getByIdWithSelect('su-4', 'internalemailaddress,isdisabled');
+    expect(get).toHaveBeenCalledWith('systemusers', 'su-4', {
+      select: 'internalemailaddress,isdisabled',
+    });
+  });
+});
+
+describe('system-user.queryUsers', () => {
+  test('forwards options verbatim to DynamicsService.queryRecords', async () => {
+    const query = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
+    const options = {
+      select: 'systemuserid,fullname,internalemailaddress,isdisabled',
+      filter: "internalemailaddress eq 'pd@example.org' and isdisabled eq false",
+      top: 1,
+    };
+    const out = await queryUsers(options);
+    expect(out).toEqual({ records: [] });
+    expect(query).toHaveBeenCalledWith('systemusers', options);
   });
 });
