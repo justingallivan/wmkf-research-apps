@@ -509,22 +509,8 @@
     {
       "file": "pages/api/phase-i-dynamics/summarize.js",
       "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/phase-i-dynamics/summarize.js",
-      "kind": "import",
       "clientMethod": "DynamicsService.logAiRun",
       "entity": "non-entity-transport",
-      "count": 1
-    },
-    {
-      "file": "pages/api/phase-i-dynamics/summarize.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "akoya_requests",
       "count": 1
     },
     {
