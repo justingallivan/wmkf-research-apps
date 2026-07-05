@@ -77,16 +77,17 @@ pushed (`493bd748`…`903867c9`).
 
 ### Verified Open
 
-1. **Execute `docs/BYPASS_STRIP_PLAN.md`** — the main event. Stages: S0
-   characterization harness (positive pins + per-cluster NEGATIVE controls per
-   the folded review) → S1 pages MECHANICAL-RENAME (clusters A1–A4, incl.
-   nextauth + cron; all verified mechanical by the reviewer) → S2 lib
-   convert-in-place (B1–B3 + the two alert-service default params) → S3
-   three-shape law gate (`check-dynamics-context-boundary`, AST, reusing
-   `ast-scan-core.js`). One behavioral STOP-AND-ASK on file: site 43
-   `onboard-reviewer-service.js:435` variable label (pre-ruled safe; re-confirm
-   at execution). Stage 4 trust-model tightening stays OWNER DECISION.
-   Pre-stage re-probe of the ALL-references sweep is mandatory.
+1. **`docs/BYPASS_STRIP_PLAN.md` — EXECUTED, Stages 0-4 (S333, 2026-07-05).**
+   Stages 0-3 (characterization, mechanical strip, import-boundary law) landed
+   and passed one Codex adversarial review round (1 P1, folded same-session).
+   Owner then directed executing Stage 4 (trust-model tightening) too: 4
+   nested-redundant wrappers removed (sites 40, 47, 49, 50) and 6 entry-seam
+   wrappers pushed up to their real callers (sites 34, 35, 44, 45, 46, 48) —
+   site 33 (`notification-service.js`) deliberately left as-is (its DAL-touching
+   branch sits inside a 21-caller shared utility; safely auditing the full
+   fan-out was judged out of scope). Full Stage Log in the plan doc. **Open:**
+   a second fresh-context review round covering the Stage 4 diff specifically
+   has not yet run.
 
 2. **Research-first refactor candidates (after the strip)** — oversized
    `discovery-service.js` (2,347 lines) / `contact-enrichment-service.js`
@@ -114,8 +115,10 @@ pushed (`493bd748`…`903867c9`).
 
 1. **Chunk-loop gate + security-gate walk consolidation: DECLINED** (S332,
    recorded in the CHUNK/GATE_SCRIPT Stage Logs).
-2. **ALS-presence trust model** — accepted until the bypass strip completes
-   (now the active campaign; tightening is its Stage 4 OWNER DECISION).
+2. **ALS-presence trust model** — bypass strip (Stages 0-4) is complete
+   (S333); site 33 (`notification-service.js`) is the one deliberate
+   exception, left un-pushed-up (see item 1 above). Do not reopen without a
+   new decision to audit `notify()`'s full 21-caller fan-out.
 3. **Do not re-add CodeQL** (`180e9046`, `198fbd97`).
 4. **Do not delete `lib/services/anthropic-admin.js`** (pricing cron imports).
 5. **Client-side export remains the decision** until a Power Automate flow
@@ -125,7 +128,7 @@ pushed (`493bd748`…`903867c9`).
 
 | File | Purpose |
 |------|---------|
-| `docs/BYPASS_STRIP_PLAN.md` | Next campaign, review-folded; Stage 0 is the entry point. |
+| `docs/BYPASS_STRIP_PLAN.md` | Executed campaign (Stages 0-4, S333); Stage Log has full record; second fresh-context review of Stage 4 still pending. |
 | `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md` | Closed campaign record + drain-defect post-mortem. |
 | `docs/ODATA_ESCAPE_CONSOLIDATION_PLAN.md` / `CHUNK_CONSOLIDATION_PLAN.md` / `GATE_SCRIPT_CONSOLIDATION_PLAN.md` | The three closed refactor exercises (plans double as summaries). |
 | `scripts/lib/selftest-fixture.js` + `scripts/lib/walk-files.js` | New canonical helpers — REQUIRED for new self-tests/gate walks. |
