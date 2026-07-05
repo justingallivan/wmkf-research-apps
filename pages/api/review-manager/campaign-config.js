@@ -10,83 +10,24 @@
  *   body: { requestId: <GUID>, config: { <any subset of the editable fields above> } }
  *   → { success: true, requestId, config }   (only provided fields are written)
  *
- * Per-request reviewer-engagement campaign config persisted as DISCRETE columns on
- * `akoya_request` (provisioned 2026-06-21, wave7-reviewer-engagement) so the Phase-3
- * reminder cron and Phase-4 quota sweep can OData $filter server-side. Written first on
- * the initial invite-batch send (send-emails.js); this route is the "editable later from
- * the Reviewers tab" surface (spec §3.E). `quotaNotifiedAt` is a Phase-4 system marker —
- * READ-ONLY here; the route refuses to write it.
+ * Thin route shell (Route→Service Consolidation Plan, Stage 2): method
+ * dispatch → auth guard → input validation → withDalContext → one service
+ * call per verb → result/error→HTTP mapping. All business logic (writable
+ * field map, coercion, read-before-write, quotaNotifiedAt read-only rule)
+ * lives in lib/services/review-manager/campaign-config-service.js.
  *
  * Auth: same boundary as the rest of the review-manager reviewer surface —
- * requireAppAccess('review-manager','reviewers') + bypassDynamicsRestrictions (reviewer
- * outreach is a foundation-owned, staff-shared workflow, not user-private). requestId is
- * GUID-validated before it reaches a Dataverse selector (trust-boundary-guid).
+ * requireAppAccess('review-manager','reviewers') + withDalContext (reviewer
+ * outreach is a foundation-owned, staff-shared workflow, not user-private).
+ * requestId is GUID-validated before it reaches a Dataverse selector
+ * (trust-boundary-guid).
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
-import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request.js';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
-
-// camelCase field → { Dataverse column, value kind }. quotaNotifiedAt is intentionally
-// absent from the WRITABLE set (system marker, read-only).
-const WRITABLE_FIELDS = {
-  respondOffsetDays: { col: 'wmkf_respondoffsetdays', kind: 'int' },
-  reviewDueDate: { col: 'wmkf_reviewduedate', kind: 'date' },
-  respondReminderEnabled: { col: 'wmkf_respondreminderenabled', kind: 'bool' },
-  respondReminderLeadDays: { col: 'wmkf_respondreminderleaddays', kind: 'int' },
-  reviewDueReminderEnabled: { col: 'wmkf_reviewduereminderenabled', kind: 'bool' },
-  reviewDueReminderLeadDays: { col: 'wmkf_reviewduereminderleaddays', kind: 'int' },
-  desiredCount: { col: 'wmkf_desiredcount', kind: 'int' },
-};
-
-const READ_SELECT = [
-  'akoya_requestid',
-  ...Object.values(WRITABLE_FIELDS).map((f) => f.col),
-  'wmkf_quotanotifiedat',
-].join(',');
-
-function isYmd(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const [y, m, d] = value.split('-').map(Number);
-  if (m < 1 || m > 12 || d < 1 || d > 31) return false;
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
-}
-
-function readConfig(rec) {
-  return {
-    respondOffsetDays: rec?.wmkf_respondoffsetdays ?? null,
-    reviewDueDate: rec?.wmkf_reviewduedate ?? null,
-    respondReminderEnabled: rec?.wmkf_respondreminderenabled ?? null,
-    respondReminderLeadDays: rec?.wmkf_respondreminderleaddays ?? null,
-    reviewDueReminderEnabled: rec?.wmkf_reviewduereminderenabled ?? null,
-    reviewDueReminderLeadDays: rec?.wmkf_reviewduereminderleaddays ?? null,
-    desiredCount: rec?.wmkf_desiredcount ?? null,
-    quotaNotifiedAt: rec?.wmkf_quotanotifiedat ?? null,
-  };
-}
-
-// Validate + coerce a single provided field. Returns { col, value } or throws a
-// caller-facing message. `null` is allowed (explicitly clears the column).
-function coerceField(name, raw) {
-  const spec = WRITABLE_FIELDS[name];
-  if (!spec) throw new Error(`Unknown or read-only config field: ${name}`);
-  if (raw === null) return { col: spec.col, value: null };
-  if (spec.kind === 'int') {
-    if (!Number.isInteger(raw) || raw < 0) throw new Error(`${name} must be a non-negative integer`);
-    return { col: spec.col, value: raw };
-  }
-  if (spec.kind === 'bool') {
-    if (typeof raw !== 'boolean') throw new Error(`${name} must be a boolean`);
-    return { col: spec.col, value: raw };
-  }
-  if (spec.kind === 'date') {
-    if (!isYmd(raw)) throw new Error(`${name} must be a YYYY-MM-DD date or null`);
-    return { col: spec.col, value: raw };
-  }
-  throw new Error(`Unhandled field kind for ${name}`);
-}
+import { withDalContext } from '../../../lib/dataverse/core/context';
+import { ServiceHttpError } from '../../../lib/services/service-http-error';
+import { getCampaignConfig, saveCampaignConfig } from '../../../lib/services/review-manager/campaign-config-service';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -106,59 +47,23 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'requestId must be a GUID' });
   }
 
-  return bypassDynamicsRestrictions('review-manager-campaign-config', async () => {
+  if (req.method === 'POST') {
+    const config = req.body?.config;
+    if (!config || typeof config !== 'object' || Array.isArray(config)) {
+      return res.status(400).json({ error: 'config object is required' });
+    }
+  }
+
+  return withDalContext('review-manager-campaign-config', async () => {
     try {
-      if (req.method === 'GET') {
-        let rec;
-        try {
-          rec = await grantRequestAdapter.getById(requestId, { select: READ_SELECT });
-        } catch {
-          rec = null;
-        }
-        if (!rec?.akoya_requestid) {
-          return res.status(404).json({ error: `No request found for ${requestId}` });
-        }
-        return res.status(200).json({ requestId, config: readConfig(rec) });
-      }
-
-      // POST — build the patch from only the provided, valid fields.
-      const config = req.body?.config;
-      if (!config || typeof config !== 'object' || Array.isArray(config)) {
-        return res.status(400).json({ error: 'config object is required' });
-      }
-      const patch = {};
-      try {
-        for (const [name, raw] of Object.entries(config)) {
-          if (raw === undefined) continue;
-          const { col, value } = coerceField(name, raw);
-          patch[col] = value;
-        }
-      } catch (validationErr) {
-        return res.status(400).json({ error: validationErr.message });
-      }
-      if (Object.keys(patch).length === 0) {
-        return res.status(400).json({ error: 'config must contain at least one editable field' });
-      }
-
-      // Confirm the request exists before writing (a 404 from updateRecord is opaque).
-      let rec;
-      try {
-        rec = await grantRequestAdapter.getById(requestId, { select: READ_SELECT });
-      } catch {
-        rec = null;
-      }
-      if (!rec?.akoya_requestid) {
-        return res.status(404).json({ error: `No request found for ${requestId}` });
-      }
-
-      await grantRequestAdapter.updateById(requestId, patch, { actingUserSystemId });
-
-      const merged = { ...readConfig(rec) };
-      for (const [name, raw] of Object.entries(config)) {
-        if (raw !== undefined && WRITABLE_FIELDS[name]) merged[name] = raw;
-      }
-      return res.status(200).json({ success: true, requestId, config: merged });
+      const result = req.method === 'GET'
+        ? await getCampaignConfig({ requestId })
+        : await saveCampaignConfig({ requestId, config: req.body.config, actingUserSystemId });
+      return res.status(200).json(result);
     } catch (error) {
+      if (error instanceof ServiceHttpError) {
+        return res.status(error.httpStatus).json(error.body ?? { error: error.message });
+      }
       console.error('campaign-config error:', error);
       return res.status(500).json({ error: 'Failed to read or write campaign config' });
     }

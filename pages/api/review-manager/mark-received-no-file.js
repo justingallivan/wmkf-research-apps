@@ -24,19 +24,19 @@
  *
  * Does NOT revoke the token — reviewer might still want to send the actual
  * file later, and the link's other expiry rules apply normally.
+ *
+ * Thin route shell (Route→Service Consolidation Plan, Stage 2): method
+ * dispatch → auth guard → input validation → withDalContext → one service
+ * call → result/error→HTTP mapping. All business logic (live-question-set
+ * validation, single-PATCH vs atomic-changeset branch) lives in
+ * lib/services/review-manager/mark-received-no-file-service.js.
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
-import { validateReviewForm } from '../../../lib/external/review-form-schema';
-import { getActiveQuestionSet } from '../../../lib/external/review-question-fetcher';
-import { buildRatingSnapshotRows } from '../../../lib/external/review-answer-snapshot';
-import { patchReviewReceipt, ENTITY_SET_NAME as SUGGESTION_ENTITY_SET } from '../../../lib/dataverse/adapters/reviewer-suggestion';
-import { answerUpsertDescriptor } from '../../../lib/dataverse/adapters/review-answer';
-import { runChangeset, atomicParentWithChildren } from '../../../lib/dataverse/core/changeset';
-
-const ENTITY_SET = SUGGESTION_ENTITY_SET;
+import { withDalContext } from '../../../lib/dataverse/core/context';
+import { ServiceHttpError } from '../../../lib/services/service-http-error';
+import { markReceivedNoFile } from '../../../lib/services/review-manager/mark-received-no-file-service';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -47,66 +47,28 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'review-manager', 'reviewers');
   if (!access) return;
 
-  try {
-    const { suggestionId, structuredData } = req.body || {};
-    if (!suggestionId || typeof suggestionId !== 'string') {
-      return res.status(400).json({ ok: false, reason: 'validation', errors: ['suggestionId required.'] });
-    }
-    // GUID-validate before it becomes a Dataverse record-id selector
-    // (updateRecord interpolates it raw into the request URL).
-    if (!isGuid(suggestionId)) {
-      return res.status(400).json({ ok: false, reason: 'validation', errors: ['suggestionId must be a valid GUID.'] });
-    }
-
-    // Validate against the LIVE question set (fail-closed) so a staff-edited
-    // rating domain/order is honoured exactly as the reviewer submit path does.
-    const questionSet = await getActiveQuestionSet();
-    const formResult = validateReviewForm(structuredData, { partial: true, fields: questionSet });
-    if (!formResult.ok) {
-      return res.status(400).json(formResult);
-    }
-
-    const patch = {
-      ...formResult.dataverseValues,
-      wmkf_reviewreceivedat: new Date().toISOString(),
-      wmkf_reviewuploadedbystaff: true,
-    };
-
-    const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
-
-    // Write the rating snapshot rows. Post-Phase-E ratings live ONLY in the
-    // snapshot (`patch` no longer carries the rating columns). Only ratings
-    // actually present get a row — the "informal feedback" scenario omits
-    // structuredData, so ratings stay empty, no snapshot row is written, and
-    // aggregates keep skipping the row.
-    const ratingRows = buildRatingSnapshotRows(formResult.ratings, questionSet);
-    const snapshotKeys = new Set(
-      questionSet.filter((f) => f.type === 'picklist' || f.type === 'richtext').map((f) => f.key),
-    );
-
-    try {
-      await bypassDynamicsRestrictions('mark-received-no-file', async () => {
-        if (ratingRows.length === 0) {
-          await patchReviewReceipt(suggestionId, patch, { actingUserSystemId });
-          return;
-        }
-        // Atomic: rating upserts (by alternate key) + the parent PATCH in one
-        // changeset, so a parent-only row can never be left behind on a partial
-        // failure (the exact gap Phase D closes).
-        const children = ratingRows.map((row) => answerUpsertDescriptor(suggestionId, row, snapshotKeys));
-        const parent = { method: 'PATCH', entitySet: ENTITY_SET, key: suggestionId, body: patch };
-        await runChangeset(atomicParentWithChildren({ parent, children }), { actingUserSystemId });
-      });
-    } catch (e) {
-      if (/(?:update|changeset).*404/i.test(e.message || '') || e.status === 404) {
-        return res.status(404).json({ ok: false, reason: 'not_found' });
-      }
-      throw e;
-    }
-
-    return res.status(200).json({ ok: true });
-  } catch (error) {
-    console.error('[review-manager mark-received-no-file] error:', error);
-    return res.status(500).json({ ok: false, reason: 'server_error' });
+  const { suggestionId, structuredData } = req.body || {};
+  if (!suggestionId || typeof suggestionId !== 'string') {
+    return res.status(400).json({ ok: false, reason: 'validation', errors: ['suggestionId required.'] });
   }
+  // GUID-validate before it becomes a Dataverse record-id selector
+  // (updateRecord interpolates it raw into the request URL).
+  if (!isGuid(suggestionId)) {
+    return res.status(400).json({ ok: false, reason: 'validation', errors: ['suggestionId must be a valid GUID.'] });
+  }
+
+  const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
+
+  return withDalContext('mark-received-no-file', async () => {
+    try {
+      const result = await markReceivedNoFile({ suggestionId, structuredData, actingUserSystemId });
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof ServiceHttpError) {
+        return res.status(error.httpStatus).json(error.body ?? { error: error.message });
+      }
+      console.error('[review-manager mark-received-no-file] error:', error);
+      return res.status(500).json({ ok: false, reason: 'server_error' });
+    }
+  });
 }
