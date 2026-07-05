@@ -165,6 +165,13 @@
     },
     {
       "file": "lib/services/reviewer-merge.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.disassociate",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-merge.js",
       "kind": "fallback-alias",
       "clientMethod": "dyn.disassociate",
       "entity": "akoya_requests",
