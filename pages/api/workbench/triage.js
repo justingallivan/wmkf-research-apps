@@ -22,7 +22,7 @@
  */
 
 import { requireAppAccess, getUserRole } from '../../../lib/utils/auth';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
+import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request.js';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { isGuid } from '../../../lib/utils/guid';
 import { isValidTriageValue } from '../../../shared/config/triageStatus';
@@ -63,7 +63,7 @@ export default async function handler(req, res) {
 
       let request;
       try {
-        request = await DynamicsService.getRecord('akoya_requests', requestId, {
+        request = await grantRequestAdapter.getById(requestId, {
           select: 'akoya_requestid,_wmkf_programdirector_value',
         });
       } catch {
@@ -85,7 +85,7 @@ export default async function handler(req, res) {
         }
       }
 
-      await DynamicsService.updateRecord('akoya_requests', requestId, {
+      await grantRequestAdapter.updateById(requestId, {
         wmkf_triagestatus: triageValue,
       }, { actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null });
 
