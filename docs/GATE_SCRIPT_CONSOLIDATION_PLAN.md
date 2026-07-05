@@ -3,7 +3,7 @@ title: Gate-Script Scaffold Consolidation Plan
 domain: architecture
 kind: plan
 status: draft
-summary: "Consolidate CI-gate scaffolds onto selftest-fixture.js (19 self-tests) and walk-files.js (6 markdown gates); byte-identical census bar. Draft."
+summary: "Consolidate CI-gate scaffolds onto selftest-fixture.js (18 of 19 self-tests) and walk-files.js (6 markdown gates); byte-identical census bar. Draft."
 canonical: true
 cataloged: 2026-07-05
 owner: product-engineering
@@ -26,9 +26,12 @@ two mechanical scaffolds:
 
 - **Class 1 — self-test fixture setup/teardown.** Self-tests scaffold a fixture directory (either in
   `os.tmpdir()` or *in-repo*), point the real gate at it, assert red-then-green, and tear it down.
-  The same `cleanup()` (`fs.rmSync(dir, { recursive: true, force: true })`) + `try/finally` + mkdir
-  pattern is copy-pasted across 19 self-tests. Consolidate the **lifecycle** (create + guaranteed
-  cleanup + crash safety) onto `scripts/lib/selftest-fixture.js`.
+  19 self-tests share the scaffold idiom in two shapes: the **15 in-repo** self-tests each copy-paste
+  the same one-line `cleanup()` helper (`fs.rmSync(dir, { recursive: true, force: true })` guarded by
+  `existsSync`) but call it at **self-test-specific points** — entry, mid-body, `catch`, and/or
+  `finally`; the timing is NOT uniform (see the Cleanup-Timing Table) — while the **4 OS-tmp**
+  self-tests have **no cleanup at all**. Consolidate the **creation + disposer** onto
+  `scripts/lib/selftest-fixture.js`, preserving every existing cleanup call point 1:1.
 - **Class 2 — hand-rolled recursive directory walks.** Gates each hand-roll a `readdirSync` walk to
   build their scanned-file census. One cohort of 6 markdown-doc gates shares a *byte-identical* walk
   skeleton differing only in already-externalized constants/callbacks. Consolidate that skeleton onto
@@ -42,7 +45,7 @@ change that would alter a census or verdict means the site was misclassified —
 **Executor profile.** Written to be executed by a cheaper model (Sonnet-class) with no prior context,
 following this document plus each stage's checklist. Every judgment is pre-made here; anything not
 pre-made is marked **STOP-AND-ASK**. The only deferred items are the Stage 3 OWNER-DECISION walk cohort
-and two per-gate verifications flagged in Stage 0.
+and the Stage 0 orphan-visibility verification.
 
 `scripts/lib/` is the established home for gate helpers (`ast-scan-core.js`, `canonical-facts.js`,
 `docs-catalog.js`, `point-in-time-files.js`) `[VERIFIED via ls scripts/lib/ this session]`. **Neither
@@ -89,16 +92,42 @@ ever scans `os.tmpdir()`).
 
 **Adjacent, NOT in Class 1 scope:** `check-instruction-architecture.js:31` is a **gate** (not a
 self-test) that `mkdtempSync`es into `os.tmpdir()` — but it already has `finally { fs.rmSync(tmp, …) }`
-at `:49-50` `[VERIFIED via Read this session]`. It is a well-behaved optional `withTmpFixture` adopter,
-recorded as future work, not part of the required slice.
+at `:49-50` `[VERIFIED via Read this session]`. It is a well-behaved optional `registerTmpFixture`
+adopter, recorded as future work, not part of the required slice.
 
 ### Class 1b — In-repo scaffold self-tests (the DANGEROUS class)
 
 `[VERIFIED via grep -rnE "selftest_tmp|function cleanup|rmSync|process.on|mkdirSync|INCLUDE_|finally" over each file this session]`
 
-Every one already has `cleanup()` = `if (fs.existsSync(x)) fs.rmSync(x, { recursive: true, force: true })`,
-called **both** on entry (before mkdir) **and** in `try/finally`. **None registers a process-level exit
-or signal handler** — see the SIGKILL note below.
+Every one already defines `cleanup()` = `if (fs.existsSync(x)) fs.rmSync(x, { recursive: true, force: true })`
+— but **calls it at self-test-specific points that are NOT uniform** (review round 1 finding 2): some use
+`try/finally`, others clean mid-body and in `catch` with **no `finally` at all**. **None registers a
+process-level exit or signal handler** — see the SIGKILL note below. The exact call points are the
+adoption contract (each must be preserved 1:1 — Architecture decision 1):
+
+#### Cleanup-Timing Table (all 19 self-tests; every cell `[VERIFIED via grep -nE "cleanup\(\)|} finally|} catch" per file this session]`)
+
+| # | Self-test | Entry cleanup | Mid-body `cleanup()` calls | `finally`? | `catch` cleanup? |
+|---|---|---|---|---|---|
+| 1a-1 | `check-agent-wiki-self-test.js` | none | none | no | no — **no cleanup at all** |
+| 1a-2 | `check-harness-framing-self-test.js` | none | none | no | no — **no cleanup at all** |
+| 1a-3 | `check-memory-router-self-test.js` | none | none | no | no — **no cleanup at all** |
+| 1a-4 | `check-model-registry-self-test.js` | none | none | no | no — **no cleanup at all** |
+| 1b-1 | `check-secret-scan-self-test.js` | `:62` | none | **YES** `:73` — runs BEFORE the live-baseline gate run at `:76-83` (ordering is load-bearing: baseline must see a clean tree) | no |
+| 1b-2 | `check-scaffolding-tokens-self-test.js` | `:58` | none | **YES** `:67` — before the baseline run at `:73-77` | no |
+| 1b-3 | `check-doc-symbol-refs-self-test.js` | `:94` | `:118`, `:125` | **YES** `:137` (inner try) | no |
+| 1b-4 | `check-build-claim-freshness-self-test.js` | `:83` | `:105`, `:112` | **YES** `:124` (inner try) | no |
+| 1b-5 | `check-canonical-pointers-self-test.js` | `:114` (in `assertCleanRunWhenNoFixtures`) | `:120`, `:123` — cleans before/after each clean-baseline run | **NO** | **YES** `:131` |
+| 1b-6 | `check-drain-table-mentions-self-test.js` | `:143` | `:169`, `:180`, `:185`, `:195`, `:198` | **NO** | **YES** `:207` |
+| 1b-7 | `check-prompt-storage-mentions-self-test.js` | `:183` | `:209`, `:215`, `:220`, `:230`, `:233` | **NO** | **YES** `:242` |
+| 1b-8 | `check-doc-currency-self-test.js` | `:150` | `:182` | **NO** | **YES** `:211` |
+| 1b-9 | `check-fact-consistency-self-test.js` | `:387` (first line of `main()`) | `:390` | **NO** | **YES** `:398` |
+| 1b-10 | `check-route-service-boundary-self-test.js` | `:123` | `:367` | **YES** `:543` | no (catch `:539` contains no `cleanup()` call) |
+| 1b-11 | `check-dataverse-access-layer-self-test.js` | `:87` | **25 calls** (`:229`…`:651`, one per scenario) | **YES** `:758` | no |
+| 1b-12 | `check-model-override-warming-self-test.js` | `:196` (first line of `main()`) | `:174` (per-case, inside `runCases` loop) | **YES** `:201` (inner try) | **YES** `:209` |
+| 1b-13 | `check-trust-boundary-guid-self-test.js` | `:154` (first line of `main()`) | `:129` (per-case, inside `runCases` loop) | **YES** `:159` (inner try) | **YES** `:167` |
+| 1b-14 | `check-api-route-security-matrix-self-test.js` | `:94` | `:135`, `:146`, `:157`, `:165`, `:168` | **NO** | **YES** `:177` |
+| 1b-15 | `check-coverage-self-test.js` | `:129` | `:157` | **NO** | **YES** `:182` — **EXCLUDED from adoption; see below** |
 
 | # | Self-test | In-repo fixture path(s) | Gate-side include/exclude coupling |
 |---|---|---|---|
@@ -116,12 +145,12 @@ or signal handler** — see the SIGKILL note below.
 | 1b-12 | `check-model-override-warming-self-test.js` (`:19`) | `.model_warm_selftest_tmp` | gate root override |
 | 1b-13 | `check-trust-boundary-guid-self-test.js` (`:18`) | `.tbg_selftest_tmp` | gate root override |
 | 1b-14 | `check-api-route-security-matrix-self-test.js` (`:26`) | `pages/_route_gate_selftest_tmp` **+ a fixture matrix FILE** (`cleanup()` rmSyncs both, `:30-32`) | route prefix `/_route_gate_selftest_tmp` |
-| 1b-15 | `check-coverage-self-test.js` (`:39`) | `lib/services/atlas_selftest_tmp` | **DIVERGENT** — its own header (`:27-29`) documents a **race** with the `check-application-state-atlas` gate, which scans `lib/services` and can see this dir mid-run |
+| 1b-15 | `check-coverage-self-test.js` (`:39`) | `lib/services/atlas_selftest_tmp` | **EXCLUDED/LEAVE — not adopted** (review round 1 finding 3). It has **no `finally`**: it cleans mid-body at `:157` and in `catch` at `:182` only, and its header (`:27-29`) documents a **real race** with the `check-application-state-atlas` gate, whose `SCAN_DIRS` includes `lib/` (`check-application-state-atlas.js:36-40` `[VERIFIED via Read this session]`) with only a dot/build-dir skip in its walk (`:82-84`). Its cleanup timing is semantically load-bearing; leave verbatim, record as future work |
 
 Totals: **15 in-repo-scaffold self-tests** — a **CENSUS CORRECTION vs the input's claim of 2**
 (the input named only 1b-1 and 1b-2). The `.route_service_boundary_selftest_tmp` incident tonight is
-1b-10, confirming these in-repo dirs are the dangerous class. Combined Class 1 = **19 self-tests**
-(4 OS-tmp + 15 in-repo).
+1b-10, confirming these in-repo dirs are the dangerous class. Combined Class 1 census = **19 self-tests**
+(4 OS-tmp + 15 in-repo); **adoption slice = 18** (1b-15 is EXCLUDED/LEAVE).
 
 **SIGKILL note (load-bearing, do not skip).** A `process.on('exit'|'SIGINT'|'SIGTERM'|'uncaughtException')`
 handler is catchable-crash insurance only; **`SIGKILL` (kill -9) is uncatchable by any Node handler**, so
@@ -204,49 +233,54 @@ security-gate walks (Stage 3 OWNER DECISION) + ~12 other divergent/flat/decoy si
 
 ### Class 1 — `scripts/lib/selftest-fixture.js` (CJS; every self-test is `require`-based CJS)
 
-Primary API is the **register-and-return** form, because it maps onto the existing code as a minimal,
-low-drift diff (replace one `mkdtempSync(...)` call, or one `cleanup()`+`mkdir` pair, in place) rather
-than forcing every self-test body to be re-nested inside a callback closure:
+Primary API is the **register-and-return-a-disposer** form (review round 1 finding 1). The Cleanup-Timing
+Table shows cleanup runs at PRECISE in-body points — e.g. `secret-scan`'s `finally` cleanup at `:73`
+runs BEFORE its live-baseline gate run at `:76-83`, and `canonical-pointers` cleans before/after each
+clean-baseline run (`:114`/`:120`/`:123`) `[VERIFIED via Read/grep this session]` — so cleanup timing is
+part of each self-test's semantics, not an implementation detail the helper may own:
 
 ```js
 // scripts/lib/selftest-fixture.js
 const repoRoot = path.resolve(__dirname, '..', '..'); // scripts/lib → repo root
 
-// OS-tmp fixture: mkdtemp under os.tmpdir(), register a catchable-crash + normal-exit cleanup,
-// return the absolute dir. Replaces `fs.mkdtempSync(path.join(os.tmpdir(), prefix))`.
-function registerTmpFixture(prefix) { /* mkdtempSync + register cleanup on exit/SIGINT/SIGTERM/uncaughtException; return dir */ }
+// OS-tmp fixture: mkdtemp under os.tmpdir(); ADDITIVELY register best-effort crash/exit cleanup.
+// Returns { dir, cleanup } — cleanup() rmSyncs the dir and is idempotent.
+function registerTmpFixture(prefix) { /* mkdtempSync; register exit/SIGINT/SIGTERM/uncaughtException handler; return { dir, cleanup } */ }
 
-// In-repo fixture: cleanup-on-entry (self-heal a prior orphan), mkdir recursive, register cleanup,
-// return absolute path(s). Accepts a string or an array (fact-consistency needs 2; the api-route
-// matrix needs a dir + a file — rmSync{recursive,force} handles both).
-function registerRepoFixture(relPathOrArray) { /* per path: rmSync if exists; mkdirSync recursive; register cleanup; return abs */ }
-
-// Thin callback sugar for the few self-tests already shaped around a single fixture + try/finally
-// (1b-1 secret-scan, 1b-2 scaffolding-tokens). Optional; register form is always acceptable.
-function withTmpFixture(prefix, fn) { /* registerTmpFixture + finally cleanup */ }
-function withRepoFixture(relPathOrArray, fn) { /* registerRepoFixture + finally cleanup */ }
+// In-repo fixture: cleanup-on-entry (self-heal a prior orphan), mkdir recursive, ADDITIVELY register
+// crash/exit cleanup. Accepts a string or an array of relative paths (fact-consistency needs 2 dirs;
+// the api-route matrix needs a dir + a file — rmSync{recursive,force} handles both).
+// Returns { paths, cleanup } — cleanup() rmSyncs every registered path and is idempotent.
+function registerRepoFixture(relPathOrArray) { /* per path: rmSync if exists; mkdirSync recursive; register handler; return { paths, cleanup } */ }
 ```
 
-1. **The helper owns lifecycle ONLY.** create + cleanup-on-entry + cleanup-on-exit + best-effort
-   catchable-crash handlers. It does **NOT** touch: the `env: { …INCLUDE_SELFTEST_TMP… }` passed to each
-   `runGate()`, the fixture file *contents*, the gate invocation, or the red/green assertions. Those stay
-   verbatim in each self-test. **The env-var include mechanic is gate-specific and is NEVER moved into
-   the helper** — it remains where it is.
-2. **Cleanup semantics are byte-identical to today's `cleanup()`:** `fs.rmSync(path, { recursive: true, force: true })`
+1. **Every existing cleanup call site is preserved 1:1 (the disposer rule — do not relitigate).**
+   Adoption replaces each self-test's local `cleanup()` *definition* with the returned disposer
+   (`const { paths, cleanup } = registerRepoFixture(…)`), and every existing `cleanup()` *call* — entry,
+   mid-body, `catch`, `finally`, per the Cleanup-Timing Table — stays at its exact current point, now
+   invoking the disposer. No call is added, removed, or moved. The process-exit registration is
+   **ADDITIVE crash insurance only** and is NEVER a replacement for any in-body cleanup call; in
+   particular, cleanup that today runs before a live-baseline gate run must still run before it.
+   There is no callback (`withFixture`) form: re-nesting bodies into a closure would force cleanup to
+   the closure boundary and change the timings the table pins.
+2. **The helper owns creation + disposer + crash insurance ONLY.** It does **NOT** touch: the
+   `env: { …INCLUDE_SELFTEST_TMP… }` passed to each `runGate()`, the fixture file *contents*, the gate
+   invocation, or the red/green assertions. Those stay verbatim in each self-test. **The env-var include
+   mechanic is gate-specific and is NEVER moved into the helper.**
+3. **Disposer semantics are byte-identical to today's `cleanup()`:** `fs.rmSync(path, { recursive: true, force: true })`
    guarded by an existence check, applied to each registered path. No new deletion scope.
-3. **SIGKILL is out of scope** (uncatchable). The helper does not claim to prevent kill -9 orphans; it
+4. **SIGKILL is out of scope** (uncatchable). The helper does not claim to prevent kill -9 orphans; it
    preserves cleanup-on-entry (self-heal) and adds catchable-crash cleanup. Do not add SIGKILL machinery.
-4. **`registerRepoFixture` does not create or modify any `.gitignore` entry, `EXCLUDE_DIR` regex, or gate
+5. **`registerRepoFixture` does not create or modify any `.gitignore` entry, `EXCLUDE_DIR` regex, or gate
    scope.** Fixture visibility to gates is governed exactly as today.
-5. **Behavior invariant (the one thing that must never change):** each self-test still writes the same
-   fixtures, passes the same env vars to the same gate invocation, and makes the same red-then-green
-   assertions, producing the same pass/fail. Adoption changes *only* how the fixture dir is created and
-   destroyed.
-6. **`check-coverage-self-test.js` (1b-15) adopts last and carefully.** Its documented race with the
-   `check-application-state-atlas` gate over the shared `lib/services/atlas_selftest_tmp` dir means it is
-   the one 1b site whose cleanup timing is semantically load-bearing. If adoption would change *when*
-   cleanup runs relative to that gate, **STOP-AND-ASK**; otherwise adopt with the register form (which
-   preserves the existing finally-timed cleanup).
+6. **Behavior invariant (the one thing that must never change):** each self-test still writes the same
+   fixtures, passes the same env vars to the same gate invocation, cleans at the same points, and makes
+   the same red-then-green assertions, producing the same pass/fail. Adoption changes *only* where the
+   create/dispose code lives.
+7. **`check-coverage-self-test.js` (1b-15) is EXCLUDED — never adopted** (review round 1 finding 3).
+   It has no `finally` (mid-body `:157` + `catch` `:182` only), and its cleanup timing races the
+   `check-application-state-atlas` gate's scan of `lib/` (`check-application-state-atlas.js:36-40`).
+   Leave it verbatim; record as future work. If an executor reaches it in Stage 1, STOP.
 
 ### Class 2 — `scripts/lib/walk-files.js` (CJS)
 
@@ -265,24 +299,25 @@ function walkTree(root, { repoRoot, shouldExcludeRel, onFile }) {
 }
 ```
 
-7. **`walkTree` reproduces the Family B skeleton verbatim.** Same `readdirSync(dir, { withFileTypes: true })`,
+8. **`walkTree` reproduces the Family B skeleton verbatim.** Same `readdirSync(dir, { withFileTypes: true })`,
    same iteration order, same `path.join` / `path.relative(repoRoot, …)`, same `isDirectory` branch, same
    "recurse unless excluded, else handle file". The gate passes its **own** `shouldExcludeRel`
    (wrapping its existing `EXCLUDE_DIR.test` / `shouldExcludeRelPath`) and its **own** `onFile`
    (its existing `addIfLive`/`addIfLiveMarkdown`). No `ROOTS`, `SINGLE_FILES`, `EXCLUDE_DIR`, ext filter,
    symlink lstat, or special-cased-file logic moves or changes.
-8. **`SINGLE_FILES` pre-passes stay in the gate**, unchanged — `walkTree` replaces only the `ROOTS` walk
+9. **`SINGLE_FILES` pre-passes stay in the gate**, unchanged — `walkTree` replaces only the `ROOTS` walk
    loop body's inner IIFE, not the surrounding `for (const rootRel of ROOTS)` / `SINGLE_FILES` handling.
    (Gates that `throw` on a missing root — B2, B6 — keep that throw in the surrounding loop.)
-9. **Walk consolidation changes NO gate's `ROOTS`/`SCAN_DIRS`/`SINGLE_FILES` and NO skip semantics.**
+10. **Walk consolidation changes NO gate's `ROOTS`/`SCAN_DIRS`/`SINGLE_FILES` and NO skip semantics.**
    Byte-identical census is the acceptance bar. Any walk whose exclude set or ordering would change by
    adoption is DIVERGENT by definition and is not in this slice.
-10. **The 4 code-tree security-gate walks are NOT touched in Stages 1–2** (Stage 3 OWNER DECISION only).
+11. **The 4 code-tree security-gate walks are NOT touched in Stages 1–2** (Stage 3 OWNER DECISION only).
 
 ## Non-goals
 
 Changing any gate's scanned census or verdict; changing any `EXCLUDE_DIR` regex, `ROOTS`, `SCAN_DIRS`,
-`SINGLE_FILES`, or env-var include mechanic; moving the env-include logic into a helper; adding
+`SINGLE_FILES`, or env-var include mechanic; moving the env-include logic into a helper; moving, adding,
+or removing any existing cleanup call point; adopting 1b-15 (`check-coverage-self-test.js`); adding
 `.gitignore` entries for fixture dirs; SIGKILL-proofing; touching the 4 code-tree security-gate walks
 (DAL / route-service-boundary / trust-boundary-guid / model-override-warming); touching git-ls-files
 census gates, generators, flat readdirs, no-skip walks, or the route-lifecycle resolver; converting any
@@ -292,27 +327,39 @@ file's module system (all gates + self-tests are CJS; both helpers are CJS); int
 
 ## Self-checking method
 
-**Characterization mechanism (chosen): an fs-layer census trace, external to every gate.**
-Stage 0 adds `scripts/lib/__gate-census-trace.js` — a **preload shim** (a Stage-0 artifact, NOT part of
-any gate's logic; may be removed after the refactor). It monkeypatches `fs.readFileSync` and
-`fs.readdirSync` to append each resolved path to the file named by `GATE_CENSUS_OUT`. Each touched gate
-is run as:
+**Characterization mechanism (chosen, review round 1 finding 4): PRIMARY oracle = byte-identical
+verdict output + exit code from a DIRECT gate run; SECONDARY oracle = an fs-read trace of the same
+direct run.** Stage 0 adds `scripts/lib/__gate-census-trace.js` — a **preload shim** (a Stage-0
+artifact, NOT part of any gate's logic; may be removed after the refactor). It monkeypatches
+`fs.readFileSync` and `fs.readdirSync` to append each resolved path to the file named by
+`GATE_CENSUS_OUT`. Each touched gate is run as:
 
 ```bash
-GATE_CENSUS_OUT=/tmp/census/<gate>.before node -r ./scripts/lib/__gate-census-trace.js scripts/<gate>.js
-node scripts/<gate>.js > /tmp/census/<gate>.verdict.before 2>&1; echo "exit=$?" >> …   # verdict capture
+node scripts/<gate>.js > /tmp/census/<gate>.verdict.before 2>&1; echo "exit=$?" >> …   # PRIMARY oracle
+GATE_CENSUS_OUT=/tmp/census/<gate>.fsread.before node -r ./scripts/lib/__gate-census-trace.js scripts/<gate>.js   # SECONDARY
 ```
 
-- **Why this is verdict-safe:** the shim wraps `fs` at the Node layer; it cannot alter what the gate
-  decides. It works identically before and after the refactor and is agnostic to whether the gate uses
-  its own walk or `walkTree` — it records the actual files opened.
-- **Why the diff is clean:** Node's own module-load `readFileSync` noise is identical before and after,
-  so `diff <(sort -u before) <(sort -u after)` cancels it and isolates exactly the census delta. The bar
-  is **empty diff** for the file census AND **byte-identical** verdict output + exit code.
-- **git-ls-files gates** (`secret-scan`, `scaffolding-tokens`) are NOT touched, so no trace is required
-  for them; they appear only in the green-baseline run.
+- **Direct gate runs ONLY — never trace through a self-test.** A child gate process spawned by a
+  self-test's `execSync` does **not** inherit `-r`, so tracing a self-test observes nothing from the
+  gate; and self-test fixtures use per-run `Math.random()` names
+  (`check-coverage-self-test.js:124-127`, `check-doc-currency-self-test.js:127-129`
+  `[VERIFIED via Read this session]`) that would make any raw diff unstable. The trace is defined
+  exclusively over `node scripts/<gate>.js` invoked directly against the live repo.
+- **Disclosed blind spot — git subprocess reads.** The shim sees Node `fs` calls only. B2 and B6 also
+  consult git via `execFileSync('git', ['check-ignore', '--stdin'], …)`
+  (`check-doc-symbol-refs.js:176-186`, `check-build-claim-freshness.js:198-208` `[VERIFIED via Read
+  this session]`), and the untouched `secret-scan`/`scaffolding-tokens` gates census via `git ls-files`.
+  The fs-read trace CANNOT see those subprocess reads. That is why the **verdict output + exit code is
+  the primary acceptance oracle for every gate (and the decisive one for B2/B6)**; the fs-read diff is
+  corroborating evidence for the walk-produced census, not the bar by itself.
+- **Path normalization before diffing:** filter out any traced path under `os.tmpdir()` and any path
+  containing `_selftest_tmp`/`selftest_tmp`, then `diff <(sort -u before) <(sort -u after)`. Node's own
+  module-load `readFileSync` noise is identical before and after and cancels in the diff. The bar is
+  **empty normalized fs-read diff** AND (primary) **byte-identical verdict output + exit code**.
+- **Verdict-safety:** the shim wraps `fs` at the Node layer and only appends to a side file; it cannot
+  alter what the gate decides, and it is agnostic to whether the gate uses its own walk or `walkTree`.
 - For the Family B `.md` census specifically, the census-relevant reads are the files opened by
-  `addIfLive → readFileSync`; the trace captures exactly those.
+  `addIfLive → readFileSync`; the trace captures exactly those in the direct run.
 
 **Green baseline of all gate self-tests (Stage 0).** Run every `check:*` gate and every `check:*:self-test`
 **sequentially, never in parallel** (self-tests scaffold fixtures into paths gates scan; a parallel gate
@@ -357,31 +404,41 @@ a P0 stop.
 **Tests that must exist first:** Stage 0 BEFORE artifacts for every gate behind an adopted self-test.
 
 1. Create `scripts/lib/selftest-fixture.js` (Architecture, Class 1). Add a focused unit test
-   `tests/unit/selftest-fixture.test.js`: `registerTmpFixture` creates + cleans; `registerRepoFixture`
-   self-heals a pre-existing dir, creates, and cleans; array form handles multiple paths and a file;
-   cleanup is `rmSync{recursive,force}`; a thrown error inside `withRepoFixture` still cleans.
-2. Adopt in clusters, gates between; **each cluster: run the adopted self-tests, then re-capture the
-   gate census+verdict and diff against Stage 0 BEFORE (must be empty/byte-identical), then commit.**
+   `tests/unit/selftest-fixture.test.js`: `registerTmpFixture` creates and its returned `cleanup()`
+   removes; `registerRepoFixture` self-heals a pre-existing dir on entry, creates, and its disposer
+   removes; array form handles multiple paths and a plain file; disposer is idempotent (double-call
+   safe) and is `rmSync{recursive,force}` guarded by `existsSync`; the exit-handler registration fires
+   on normal exit without disturbing an already-disposed fixture.
+2. Adopt in clusters, gates between. **At every adopted self-test, apply the disposer rule (Architecture
+   decision 1): each existing `cleanup()` call point in the Cleanup-Timing Table is preserved 1:1 —
+   entry, mid-body, `catch`, `finally` — now calling the returned disposer.** Each cluster: run the
+   adopted self-tests, then re-capture the gate census+verdict (direct gate runs) and diff against
+   Stage 0 BEFORE (must be empty/byte-identical), then commit.
    - **Cluster 1A — OS-tmp (safest, zero census interaction):** 1a-1…1a-4. Note `harness-framing` has
      **5** roots and `memory-router` has **2** — adopt every root. No gate scans `os.tmpdir()`, so the
-     census diff is trivially empty; the change is purely orphan cleanup.
+     census diff is trivially empty; the change is purely orphan cleanup (these files have no existing
+     cleanup calls to preserve — the exit-handler cleanup is pure addition).
    - **Cluster 1B-env — env-gated in-repo:** 1b-1, 1b-2, 1b-3, 1b-4. Keep each `env: {…INCLUDE_…}` and
-     each gate-side `EXCLUDE_DIR` verbatim.
-   - **Cluster 1B-docs — `docs/`-scanned in-repo:** 1b-5…1b-9 (fact-consistency has 2 dirs).
-   - **Cluster 1B-root — dotdir/root-override in-repo:** 1b-10…1b-14 (api-route matrix: dir + file).
-   - **Cluster 1B-race — LAST:** 1b-15 `check-coverage-self-test.js`. Adopt only if cleanup timing is
-     preserved; else STOP-AND-ASK (Architecture decision 6).
-3. **Done means:** helper + unit test green; all adopted self-tests green; **every touched gate's
-   census+verdict byte-identical to Stage 0 BEFORE**; full suite green.
+     each gate-side `EXCLUDE_DIR` verbatim. 1b-1/1b-2's `finally` cleanup MUST stay before their
+     live-baseline runs (Cleanup-Timing Table).
+   - **Cluster 1B-docs — `docs/`-scanned in-repo:** 1b-5…1b-9 (fact-consistency has 2 dirs). These are
+     the no-`finally`, mid-body + `catch` cleaners — every call point stays put.
+   - **Cluster 1B-root — dotdir/root-override in-repo:** 1b-10…1b-14 (api-route matrix: dir + file;
+     dataverse: 25 mid-body calls, all preserved).
+   - **1b-15 `check-coverage-self-test.js` is EXCLUDED — do not adopt it** (Architecture decision 7).
+     If you reach it, STOP.
+3. **Done means:** helper + unit test green; all 18 adopted self-tests green with every cleanup call
+   point unchanged; **every touched gate's census+verdict byte-identical to Stage 0 BEFORE**; 1b-15
+   untouched; full suite green.
 
-**STOP-AND-ASK markers:** any gate census/verdict diff is non-empty (site misclassified); the coverage
-self-test race would change cleanup timing.
+**STOP-AND-ASK markers:** any gate census/verdict diff is non-empty (site misclassified); any adoption
+that cannot preserve a cleanup call point 1:1.
 
 ### Stage 2 — Class 2 walk helper + Family B adoption (6 gates)
 
 **Tests that must exist first:** Stage 0 BEFORE census for B1–B6.
 
-1. Create `scripts/lib/walk-files.js` (`walkTree`, Architecture decision 7). Add
+1. Create `scripts/lib/walk-files.js` (`walkTree`, Architecture decision 8). Add
    `tests/unit/walk-files.test.js`: a synthetic tree proves `walkTree` yields the same files in the same
    order as a hand-rolled `readdirSync` recurse, honors `shouldExcludeRel`, and calls `onFile` on every
    non-dir entry.
@@ -464,5 +521,41 @@ touched gates, self-tests green, no new npm scripts needed; if declined — reco
   - Deferred / STOP-AND-ASK: Stage 3 code-tree walk cohort (OWNER DECISION); `check-coverage-self-test`
     (1b-15) adoption vs its documented atlas-gate race; per-gate orphan-visibility outcomes (Stage 0
     step 4). No other open behavioral STOP-AND-ASK sites.
+- 2026-07-05: **Adversarial plan review round 1 (Codex, fresh-context): NOT SATISFIED — 3 P0 + 1 HIGH,
+  all verified against source this session and folded in.** Family B (Class 2) was verified CLEAN by the
+  reviewer ("B1-B6 match, and the proposed walkTree ... preserves onFile(full) plus B1/B6 symlink
+  lstatSync placement because those remain inside addIfLive") — Class 2 untouched by this round.
+  Verbatim severities/titles:
+  (1) *P0 — register-form cleanup ambiguous, can change self-test semantics* — cleanup runs at PRECISE
+  in-body points (secret-scan `finally` cleanup at `:73` runs BEFORE the live baseline at `:76-83`;
+  canonical-pointers cleans before/after clean-baseline runs at `:114`/`:120`/`:123` `[VERIFIED via
+  Read/grep this session]`). Folded: Architecture Class 1 rewritten — `registerTmpFixture`/
+  `registerRepoFixture` now return an explicit **disposer** (`{ dir|paths, cleanup }`); adoption rule
+  (decision 1) mandates every existing cleanup call site preserved 1:1 at its exact point; exit-handler
+  registration is ADDITIVE crash insurance only; the callback (`with*Fixture`) form was REMOVED from the
+  API because closure-boundary cleanup would change pinned timings.
+  (2) *P0 — live-state cleanup classification errors* — the draft claimed the cleanup+`try/finally`
+  pattern was "copy-pasted across 19 self-tests" (1a files have NO cleanup) and that every 1b cleanup
+  was entry + `finally` (several are entry/mid-body + `catch` with NO `finally`: fact-consistency
+  `:387/:390` + catch `:398`; api-route-matrix `:135`-`:168` + catch `:177`; canonical-pointers,
+  drain-table, prompt-storage, doc-currency likewise `[VERIFIED via grep per file this session]`).
+  Folded: both blanket statements replaced; a per-file **Cleanup-Timing Table** (19 rows: entry /
+  mid-body lines / `finally`? / `catch`?) added to Class 1b and made the adoption contract.
+  (3) *P0 — 1b-15 must be excluded* — `check-coverage-self-test.js` has NO `finally` (mid-body `:157` +
+  catch `:182` `[VERIFIED via grep this session]`), and the atlas gate scans `lib/`
+  (`check-application-state-atlas.js:36-40` SCAN_DIRS `[VERIFIED via Read this session]`), so the
+  documented race is real and the draft's "preserves the existing finally-timed cleanup" claim was
+  false. Folded: 1b-15 reclassified **EXCLUDED/LEAVE** outright (Architecture decision 7, Non-goals,
+  Stage 1); conditional STOP-AND-ASK adoption removed; adoption slice 19→**18**.
+  (4) *HIGH — census trace overstated* — the fs shim cannot see git subprocess reads
+  (`check-doc-symbol-refs.js:176-186`, `check-build-claim-freshness.js:198-208` `git check-ignore`
+  `[VERIFIED via Read this session]`); child gate processes spawned by self-tests don't inherit `-r`;
+  random fixture names (`check-coverage-self-test.js:124-127`, `check-doc-currency-self-test.js:127-129`)
+  destabilize raw diffs. Folded: mechanism redefined as a DIRECT-gate content-read trace only (never
+  traced through self-tests); **byte-identical verdict output + exit code promoted to the PRIMARY
+  oracle** (decisive for B2/B6), fs-read diff demoted to secondary; path normalization added (filter
+  `os.tmpdir()` and `*selftest_tmp` paths before diffing); git-subprocess blind spot disclosed inline.
+  Consequential renumbering: Class 2 architecture decisions are now 8–11. Amendments applied this
+  session; plan remains `status: draft`, not executed.
 
 <!-- end of plan -->
