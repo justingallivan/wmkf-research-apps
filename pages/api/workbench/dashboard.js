@@ -31,7 +31,6 @@
  */
 
 import { getUserRole, requireAppAccess } from '../../../lib/utils/auth';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { resolveByEmail } from '../../../lib/services/program-director-resolver';
 import { meetingDateToCycleCode, cycleCodeToOdataFilter, cycleCodeToLabel } from '../../../lib/utils/cycle-code';
@@ -167,7 +166,7 @@ async function listProposals(res, pd, cycleCode, scope, includeSetAside, isSuper
   const filters = [`(${cycleFilter})`, visibility];
   if (scope === 'my') filters.push(`_wmkf_programdirector_value eq ${pd.systemuserid}`);
 
-  const { records } = await DynamicsService.queryAllRecords('akoya_requests', {
+  const { records } = await grantRequestAdapter.queryAllRequests({
     select: PROPOSAL_SELECT,
     filter: filters.join(' and '),
     orderby: 'akoya_requestnum asc',

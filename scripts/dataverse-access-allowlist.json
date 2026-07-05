@@ -752,13 +752,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/workbench/dashboard.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryAllRecords",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "pages/api/workbench/grantee-deliverables/recipients.js",
       "kind": "import",
       "clientMethod": "DynamicsService.getRecord",
