@@ -24,6 +24,7 @@ P3 wording caveat, no regression; verbatim verdict in the Stage Log). The docs-c
 law) BUILT (S332, 2026-07-05):** `scripts/check-odata-escape.js` + self-test, registered in
 `package.json`, `.github/workflows/test.yml`, `docs/CI_GATES_REFERENCE.md`, and
 `.claude/skills/start/SKILL.md`. See Stage Log for probes/counts/test results.
+[RECHECKED after scripts/check-odata-escape.js change: this doc's Stage 3 BUILT claim describes exactly that file — created this session by the gate build in progress; the builder's Stage Log entry + commit finalize it]
 
 **Objective.** Several files hand-roll OData single-quoted-literal escaping (`String(x).replace(/'/g, "''")`
 and bare `x.replace(/'/g, "''")` variants) instead of calling the canonical primitive in
