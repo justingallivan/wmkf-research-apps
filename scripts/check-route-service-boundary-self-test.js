@@ -349,13 +349,30 @@ function runUnclassifiableAssertion() {
 
 function runRatchetFallAssertion() {
   setupFixtures();
-  // Fixture has 11 boundary routes; committed baseline is 49, so default mode
-  // must report a FALLING count and demand a same-commit baseline update.
-  const run = runGate();
-  expect(run.status !== 0, 'ratchet should fail when count diverges from baseline');
-  expect(run.output.includes('RATCHET UPDATE REQUIRED'), `expected ratchet-update message, got:\n${run.output}`);
-  expect(/fell from \d+ to 11/.test(run.output), `expected 'fell from N to 11', got:\n${run.output}`);
-  console.log('PASS ratchet fires on divergent count');
+  // Fixture has 11 boundary routes. Both ratchet directions are pinned with
+  // FIXTURE-LOCAL baselines via --baseline: this case previously read the
+  // LIVE repo baseline and broke the day the campaign census hit 0 (the
+  // fall-case fixture suddenly read as a rise). Never couple to live counts.
+  const fallBaseline = path.join(tempRoot, 'baseline-fall.json');
+  fs.writeFileSync(fallBaseline, JSON.stringify({ boundaryImportingRoutes: 49 }));
+  const fall = runGate(['--baseline', JSON.stringify(fallBaseline)]);
+  expect(fall.status !== 0, 'ratchet should fail on a falling count until the baseline is updated');
+  expect(fall.output.includes('RATCHET UPDATE REQUIRED'), `expected ratchet-update message, got:\n${fall.output}`);
+  expect(/fell from 49 to 11/.test(fall.output), `expected 'fell from 49 to 11', got:\n${fall.output}`);
+
+  const riseBaseline = path.join(tempRoot, 'baseline-rise.json');
+  fs.writeFileSync(riseBaseline, JSON.stringify({ boundaryImportingRoutes: 3 }));
+  const rise = runGate(['--baseline', JSON.stringify(riseBaseline)]);
+  expect(rise.status !== 0, 'ratchet should fail on a rising count');
+  expect(rise.output.includes('RATCHET VIOLATION'), `expected ratchet-violation message, got:\n${rise.output}`);
+  expect(/rose from 3 to 11/.test(rise.output), `expected 'rose from 3 to 11', got:\n${rise.output}`);
+
+  const equalBaseline = path.join(tempRoot, 'baseline-equal.json');
+  fs.writeFileSync(equalBaseline, JSON.stringify({ boundaryImportingRoutes: 11 }));
+  const equal = runGate(['--baseline', JSON.stringify(equalBaseline)]);
+  expect(equal.status === 0, `ratchet should pass at exactly the baseline, got:\n${equal.output}`);
+
+  console.log('PASS ratchet fires on divergent count (fall + rise + equal, fixture-local baselines)');
 }
 
 // (j)(k)(m) Non-literal require()/import() sources must fail CLOSED: a plain

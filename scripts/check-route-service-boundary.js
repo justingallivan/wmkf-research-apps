@@ -74,13 +74,20 @@ function isBoundarySource(value) {
 }
 
 function parseArgs(argv) {
-  const args = { root: DEFAULT_ROOT, report: false, json: false };
+  const args = { root: DEFAULT_ROOT, report: false, json: false, baseline: null };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--root') {
       const value = argv[++i];
       if (!value) throw new Error('--root requires a directory');
       args.root = path.resolve(value);
+    } else if (arg === '--baseline') {
+      // Self-test-only override: point the ratchet at a fixture baseline so
+      // the self-test never depends on the LIVE baseline value (it broke the
+      // day the live census hit 0 — the fall-case fixture read as a rise).
+      const value = argv[++i];
+      if (!value) throw new Error('--baseline requires a file path');
+      args.baseline = path.resolve(value);
     } else if (arg === '--report') {
       args.report = true;
     } else if (arg === '--json') {
@@ -682,19 +689,20 @@ function formatReport(routes) {
   return lines.join('\n');
 }
 
-function readBaseline() {
-  if (!fs.existsSync(BASELINE_PATH)) {
-    throw new Error(`baseline file missing: ${BASELINE_PATH}`);
+function readBaseline(baselinePath) {
+  const effective = baselinePath || BASELINE_PATH;
+  if (!fs.existsSync(effective)) {
+    throw new Error(`baseline file missing: ${effective}`);
   }
-  const parsed = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
+  const parsed = JSON.parse(fs.readFileSync(effective, 'utf8'));
   if (typeof parsed.boundaryImportingRoutes !== 'number') {
     throw new Error('baseline must contain numeric "boundaryImportingRoutes"');
   }
   return parsed.boundaryImportingRoutes;
 }
 
-function checkRatchet(routes) {
-  const baseline = readBaseline();
+function checkRatchet(routes, baselinePath) {
+  const baseline = readBaseline(baselinePath);
   const count = routes.length;
 
   if (count > baseline) {
@@ -739,7 +747,7 @@ function main(argv = process.argv.slice(2)) {
   // Ratchet mode also validates the wave taxonomy so an unclassifiable route
   // fails the gate rather than passing silently.
   buildClassification(routes);
-  return checkRatchet(routes);
+  return checkRatchet(routes, args.baseline);
 }
 
 if (require.main === module) {
