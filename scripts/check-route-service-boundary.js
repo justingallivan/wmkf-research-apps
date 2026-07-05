@@ -41,6 +41,8 @@ const {
   buildParentMap,
   propName,
   nodeLine,
+  bindingNames,
+  climbExpressionWrappers,
   isCommonJsExportTarget,
   isInsideCommonJsExportRight,
   toRel,
@@ -157,13 +159,30 @@ function collectFiles(root) {
 //     plain census (their target is unknowable), so we record them and fail
 //     CLOSED downstream. `reexport` marks a non-literal source in a re-export
 //     position, which could silently confer boundary-equivalence.
+//   - unresolvedBindings: local name -> line, for locals initialized by a
+//     non-literal require()/import() declarator (incl. destructuring and
+//     awaited import). Identity-exporting such a local re-publishes an
+//     unknowable source, so it must also fail closed -- but a locally DEFINED
+//     function that merely CALLS the unresolved value is not an identity
+//     export (keeps lazy-backend services green).
 function collectFileInfo(ast) {
   const refs = [];
   const importedBindings = new Map();
   const exportedBindings = new Map();
   const exportsWholeNamespace = new Set();
   const unresolved = [];
+  const unresolvedBindings = new Map();
   const parentMap = buildParentMap(ast);
+
+  // If `callNode` (possibly wrapped in await/parens/TS casts) initializes a
+  // variable declarator, record every local name the pattern binds as unresolved.
+  function captureUnresolvedDeclarator(callNode) {
+    const climbed = climbExpressionWrappers(callNode, parentMap);
+    const parent = parentMap.get(climbed);
+    if (parent && parent.type === 'VariableDeclarator' && parent.init === climbed) {
+      for (const name of bindingNames(parent.id)) unresolvedBindings.set(name, nodeLine(callNode));
+    }
+  }
 
   walkAst(ast, (node) => {
     if (node.type === 'ImportDeclaration' && node.source) {
@@ -226,6 +245,7 @@ function collectFileInfo(ast) {
         }
       } else {
         unresolved.push({ kind: 'require', line: nodeLine(node), reexport: isInsideCommonJsExportRight(node, parentMap) });
+        captureUnresolvedDeclarator(node);
       }
       return;
     }
@@ -233,11 +253,14 @@ function collectFileInfo(ast) {
     if (dynSource) {
       const spec = stringLiteralValue(dynSource);
       if (spec != null) refs.push({ spec, kind: 'dynamic-import', reexport: false });
-      else unresolved.push({ kind: 'dynamic-import', line: nodeLine(node), reexport: isInsideCommonJsExportRight(node, parentMap) });
+      else {
+        unresolved.push({ kind: 'dynamic-import', line: nodeLine(node), reexport: isInsideCommonJsExportRight(node, parentMap) });
+        captureUnresolvedDeclarator(node);
+      }
     }
   });
 
-  return { refs, importedBindings, exportedBindings, exportsWholeNamespace, unresolved };
+  return { refs, importedBindings, exportedBindings, exportsWholeNamespace, unresolved, unresolvedBindings };
 }
 
 // `module.exports = X` (or `module.exports.foo`/`exports.foo` where the ROOT is
@@ -310,7 +333,7 @@ function analyzeRoot(root) {
     return null;
   }
 
-  const EMPTY_INFO = { refs: [], importedBindings: new Map(), exportedBindings: new Map(), exportsWholeNamespace: new Set(), unresolved: [] };
+  const EMPTY_INFO = { refs: [], importedBindings: new Map(), exportedBindings: new Map(), exportsWholeNamespace: new Set(), unresolved: [], unresolvedBindings: new Map() };
   const infoOf = (rel) => infoByFile.get(rel) || EMPTY_INFO;
 
   // A file is boundary-equivalent (a thin PASSTHROUGH wrapper) if it re-exports a
@@ -391,6 +414,22 @@ function analyzeRoot(root) {
       if (!unresolvedEquivalent.has(rel)) {
         const selfMarker = info.unresolved.find((u) => u.reexport);
         let origin = selfMarker ? { file: rel, line: selfMarker.line } : null;
+        // An unresolved LOCAL BINDING (`const a = require(p)`) that is
+        // identity-exported re-publishes the unknowable source just like a
+        // require in export position. A locally defined function that merely
+        // CALLS the unresolved value is never an identity export.
+        if (!origin) {
+          const identityExportedLocals = [
+            ...info.exportsWholeNamespace,
+            ...[...info.exportedBindings.values()],
+          ];
+          for (const local of identityExportedLocals) {
+            if (info.unresolvedBindings.has(local)) {
+              origin = { file: rel, line: info.unresolvedBindings.get(local) };
+              break;
+            }
+          }
+        }
         if (!origin) {
           const propagate = (spec) => {
             const target = resolveLocalSpec(rel, spec, fileSet);
@@ -402,7 +441,7 @@ function analyzeRoot(root) {
             if (origin) break;
           }
           if (!origin) {
-            for (const [, local] of info.exportedBindings) {
+            for (const local of [...info.exportsWholeNamespace, ...[...info.exportedBindings.values()]]) {
               const entry = info.importedBindings.get(local);
               if (!entry) continue;
               origin = propagate(entry.spec);

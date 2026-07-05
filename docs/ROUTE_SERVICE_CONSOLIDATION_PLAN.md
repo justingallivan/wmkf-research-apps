@@ -145,7 +145,7 @@ Two loops, both mandatory:
 1. Write `scripts/check-route-service-boundary.js`: for every file under `pages/api` (excluding the
    two carried-over exempt dirs), detect imports of `lib/dataverse/adapters/*` and
    `lib/services/dynamics-service`.
-   `[RECHECKED after scripts/check-route-service-boundary.js change: spec still accurate — b3bbdad4 added binding-level re-export taint + fail-closed non-literal sources on top of this contract; live census 49, gate + self-test green]` Modes: `--report` (rollup by domain), default = ratchet mode
+   `[RECHECKED after scripts/check-route-service-boundary.js change: spec still accurate — b3bbdad4 added binding-level re-export taint + fail-closed non-literal sources, and the round-2 fix added unresolved-binding propagation, on top of this contract; live census 49, gate + self-test green]` Modes: `--report` (rollup by domain), default = ratchet mode
    against a committed baseline file `scripts/route-service-boundary-baseline.json`
    (`{ "boundaryImportingRoutes": <N> }`, N = union of both import kinds). Fail if the count
    RISES; a falling count must update the baseline in the same commit. **Reuse the hardened
@@ -358,6 +358,24 @@ review verdict + findings + resolutions)*
   non-decorative against the saved pre-patch gate (it exited 0 on h/i/j/k). Live census 49
   unchanged; dataverse gate + self-test untouched-green. Post-stage re-review: see next
   entry (interval rule — Stage 1 may not start until it clears).
+- 2026-07-05 (S331): **Post-stage review round 2 (Codex adversarial): NOT SATISFIED — 1
+  High.** Round-1 fixes (h/i, direct j/k) confirmed materially covered and the non-literal
+  scoping decision accepted in principle, but the unresolved taint did not propagate through
+  LOCAL BINDINGS: `const a = require(process.env.ADAPTER_PATH); module.exports = a;` (or
+  `= { a }` / `exports.a = a`) evaded — the non-literal require was recorded unresolved but
+  not re-exported, and the export of `a` carried no unresolved provenance (Codex proved
+  evasion with a virtual-FS probe: `analyzeRoot()` returned `[]`). Fixed same session:
+  `collectFileInfo` now records `unresolvedBindings` for every name a declarator binds when
+  its init (climbing await/paren wrappers, destructuring included) is a non-literal
+  `require()`/`import()`; a module becomes unresolved-equivalent when any unresolved binding
+  is identity-exported, with propagation through whole-namespace exports. False-positive
+  posture held: the three live lazy-backend services (`app-access-service.js`,
+  `database-service.js`, `settings-service.js`) assign `require(modName)` inside a getter
+  (assignment, not identity export) and stay green with all three route-reachable. New
+  fixtures (n)/(o)/(p) proven non-decorative against the saved round-1 gate (it returned
+  exit 0 on all three; patched gate exits 2 naming each wrapper with file:line); GREEN (q)
+  module-scope-require-own-function-exports stays clean. Live census 49 unchanged. Round-3
+  re-review pending.
 
 ### Stage 0 route→test inventory (2026-07-04, S331)
 

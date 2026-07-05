@@ -29,14 +29,21 @@
  *   (k) route with a non-literal require(adapterPath)
  *   (m) route consuming a wrapper whose non-literal require() sits in a
  *       module.exports re-export position (unresolved-equivalent, reachable)
+ *   (n)(o)(p) route consuming a wrapper that binds a non-literal require() to
+ *       a LOCAL (`const a = require(p)`) and identity-exports it via
+ *       `module.exports = a` / `module.exports = { a }` / `exports.a = a` --
+ *       the local-binding hop that reexport-position detection alone misses
  *
  * GREEN fixtures: a clean shell route; a route importing only a per-domain
  * lib/services/<domain>/ service (which USES an adapter internally but does
  * not re-export it); the exempt dirs (pages/api/dynamics-explorer/,
- * pages/api/dataverse-export/) which are never counted; and (l) a route
+ * pages/api/dataverse-export/) which are never counted; (l) a route
  * importing a service that itself imports an adapter and exports its OWN
  * wrapper function (NOT the imported binding) -- the false-positive guard that
- * keeps binding-level taint from firing on legitimate services.
+ * keeps binding-level taint from firing on legitimate services; and (q) a
+ * lazy-backend service holding a non-literal require() result in a
+ * module-scope local while exporting only its OWN functions (the live
+ * app-access/database/settings-service shape) -- must NOT fail closed.
  *
  * Plus: the wave taxonomy fails closed on an unclassifiable route, and the
  * ratchet fires when the count diverges from the committed baseline.
@@ -336,6 +343,45 @@ function runUnresolvedFailClosedAssertions() {
     export default function handler(req, res) { return getById(req.query.id); }
   `);
 
+  // (n)(o)(p) wrappers binding a non-literal require() to a LOCAL and
+  // identity-exporting it -- the local-binding hop.
+  write(tempRoot, 'lib/wrappers/n-local-namespace-wrapper.js', `
+    const a = require(process.env.ADAPTER_PATH);
+    module.exports = a;
+  `);
+  write(tempRoot, 'lib/wrappers/o-local-object-wrapper.js', `
+    const a = require(process.env.ADAPTER_PATH);
+    module.exports = { a };
+  `);
+  write(tempRoot, 'lib/wrappers/p-local-exports-wrapper.js', `
+    const a = require(process.env.ADAPTER_PATH);
+    exports.a = a;
+  `);
+  write(tempRoot, 'pages/api/admin/red-unresolved-local-namespace.js', `
+    import a from '../../../lib/wrappers/n-local-namespace-wrapper.js';
+    export default function handler(req, res) { return a.getById(req.query.id); }
+  `);
+  write(tempRoot, 'pages/api/cron/red-unresolved-local-object.js', `
+    import { a } from '../../../lib/wrappers/o-local-object-wrapper.js';
+    export default function handler(req, res) { return a.getById(req.query.id); }
+  `);
+  write(tempRoot, 'pages/api/workbench/red-unresolved-local-exports.js', `
+    import { a } from '../../../lib/wrappers/p-local-exports-wrapper.js';
+    export default function handler(req, res) { return a.getById(req.query.id); }
+  `);
+
+  // (q) GREEN: lazy-backend service shape -- non-literal require() held in a
+  // module-scope local, but only OWN functions are exported. Must not trip.
+  write(tempRoot, 'lib/services/lazy-backend-service.js', `
+    const _impl = require(process.env.BACKEND_PATH);
+    function getThing(id) { return _impl.getById(id); }
+    module.exports = { getThing };
+  `);
+  write(tempRoot, 'pages/api/review-manager/green-lazy-backend.js', `
+    import { getThing } from '../../../lib/services/lazy-backend-service.js';
+    export default function handler(req, res) { return getThing(req.query.id); }
+  `);
+
   const run = runGate(['--json']);
   expect(run.status !== 0, `unresolved sources should fail closed, exited 0:\n${run.output}`);
   expect(run.output.includes('unresolved-boundary-source'),
@@ -349,7 +395,21 @@ function runUnresolvedFailClosedAssertions() {
   expect(run.output.includes('pages/api/workbench/red-unresolved-wrapper.js')
     && run.output.includes('unresolved-reexport-wrapper.js'),
     `expected wrapper-reach failure naming the origin, got:\n${run.output}`);
-  console.log('PASS non-literal sources fail closed (j/k in-route, m via wrapper)');
+  // (n)(o)(p): local-binding identity exports fail closed, naming the wrapper.
+  expect(run.output.includes('pages/api/admin/red-unresolved-local-namespace.js')
+    && run.output.includes('n-local-namespace-wrapper.js'),
+    `expected local-namespace wrapper failure (n), got:\n${run.output}`);
+  expect(run.output.includes('pages/api/cron/red-unresolved-local-object.js')
+    && run.output.includes('o-local-object-wrapper.js'),
+    `expected local-object wrapper failure (o), got:\n${run.output}`);
+  expect(run.output.includes('pages/api/workbench/red-unresolved-local-exports.js')
+    && run.output.includes('p-local-exports-wrapper.js'),
+    `expected local-exports wrapper failure (p), got:\n${run.output}`);
+  // (q): the lazy-backend service and its consumer must NOT appear.
+  expect(!run.output.includes('lazy-backend-service.js')
+    && !run.output.includes('green-lazy-backend.js'),
+    `lazy-backend GREEN fixture wrongly tripped fail-closed:\n${run.output}`);
+  console.log('PASS non-literal sources fail closed (j/k in-route, m via wrapper, n/o/p via local binding; q lazy-backend green)');
 }
 
 function runLiveParseAssertion() {
