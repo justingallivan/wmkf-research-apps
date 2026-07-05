@@ -23,7 +23,7 @@ import { randomUUID } from 'crypto';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 import { generateFieldPrimer, groundPrimerExperts } from '../../../lib/services/field-primer-service';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
+import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request.js';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
 import { getProposalText } from '../../../lib/services/workbench-proposal-documents';
@@ -80,7 +80,7 @@ export default async function handler(req, res) {
 
       let rec;
       try {
-        rec = await DynamicsService.getRecord('akoya_requests', String(requestId), {
+        rec = await grantRequestAdapter.getById(String(requestId), {
           select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate,wmkf_ai_fieldprimer',
         });
       } catch {
@@ -113,13 +113,13 @@ export default async function handler(req, res) {
       // claim 412s on the stale ETag and backs off — only one cold generation runs.
       const myNonce = randomUUID();
       try {
-        await DynamicsService.updateRecord(
-          'akoya_requests', rec.akoya_requestid,
+        await grantRequestAdapter.updateById(
+          rec.akoya_requestid,
           { wmkf_ai_fieldprimer: makeFieldPrimerLease(nowIso, myNonce) },
           { ifMatch: rec._etag },
         );
       } catch (e) {
-        const re = await DynamicsService.getRecord('akoya_requests', rec.akoya_requestid, { select: 'wmkf_ai_fieldprimer' });
+        const re = await grantRequestAdapter.getById(rec.akoya_requestid, { select: 'wmkf_ai_fieldprimer' });
         const reEnv = parseFieldPrimerEnvelope(re.wmkf_ai_fieldprimer);
         if (reEnv) return res.status(200).json({ envelope: reEnv, persisted: true, reused: true });
         return res.status(200).json({ status: 'generating' });
@@ -130,7 +130,7 @@ export default async function handler(req, res) {
       // REGENERATE doesn't destroy the existing primer.
       const restorePrior = async () => {
         try {
-          await DynamicsService.updateRecord('akoya_requests', rec.akoya_requestid, { wmkf_ai_fieldprimer: priorValue });
+          await grantRequestAdapter.updateById(rec.akoya_requestid, { wmkf_ai_fieldprimer: priorValue });
         } catch (e) {
           console.error('[field-primer/generate] lease restore failed:', e.message);
         }
@@ -173,7 +173,7 @@ export default async function handler(req, res) {
       // fresh ETag — so a regenerate/slow generator can't overwrite a newer
       // envelope, and we never clobber a peer that reclaimed an expired lease.
       try {
-        const cur = await DynamicsService.getRecord('akoya_requests', rec.akoya_requestid, {
+        const cur = await grantRequestAdapter.getById(rec.akoya_requestid, {
           select: 'wmkf_ai_fieldprimer',
         });
         const curLease = parseFieldPrimerLease(cur.wmkf_ai_fieldprimer, Date.now());
@@ -181,8 +181,8 @@ export default async function handler(req, res) {
           if (!cur._etag) {
             return res.status(200).json({ envelope, persisted: false, persistError: true });
           }
-          await DynamicsService.updateRecord(
-            'akoya_requests', rec.akoya_requestid,
+          await grantRequestAdapter.updateById(
+            rec.akoya_requestid,
             { wmkf_ai_fieldprimer: JSON.stringify(envelope) },
             { ifMatch: cur._etag },
           );

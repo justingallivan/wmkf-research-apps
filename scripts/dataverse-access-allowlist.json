@@ -500,20 +500,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/field-primer/generate.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 3
-    },
-    {
-      "file": "pages/api/field-primer/generate.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "akoya_requests",
-      "count": 3
-    },
-    {
       "file": "pages/api/grant-reporting/extract.js",
       "kind": "import",
       "clientMethod": "DynamicsService.logAiRun",
