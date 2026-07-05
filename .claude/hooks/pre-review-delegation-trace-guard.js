@@ -34,6 +34,9 @@
  * fire, to keep the hook off the common fan-out path.
  *
  * Narrow blockers:
+ *   - codex-rescue prompts that look like review/adversarial/confirm-refute
+ *     requests must use the Codex review path instead, unless explicitly marked
+ *     with [INTENTIONAL-RESCUE: reason].
  *   - codex-rescue prompts must carry the foreground/durable-handoff contract,
  *     so Claude does not launch detached Codex work and then lose the result.
  *   - repo-local discovery asks ("check whether any route streams",
@@ -48,6 +51,15 @@ function hasRescueHandoffContract(prompt) {
   return /CODEX RESCUE HANDOFF/i.test(prompt) ||
     /do not (?:add|pass|use) `?--background`?/i.test(prompt) ||
     /foreground[\s\S]{0,140}(?:unless|except)[\s\S]{0,140}`?--background`?/i.test(prompt);
+}
+
+function hasIntentionalRescueOverride(prompt) {
+  return /\[INTENTIONAL-RESCUE:\s*[^\]]+\]/i.test(prompt);
+}
+
+function looksLikeCodexReviewRequest(prompt) {
+  return /\b(adversarial|red[- ]?team|design review|code review|plan review|re-?review|confirm[- ]?(?:or|\/)[- ]?refute|review\s+(?:only|this|the|my|our|these|docs?|plan|diff|changes?|implementation|work)|read[- ]only[\s\S]{0,60}review|review[\s\S]{0,60}read[- ]only|P[0-3][\s\S]{0,100}(?:review|verdict|findings|required changes|satisfied)|GO\/NO-GO|REQUIRED CHANGES|SATISFIED)\b/i
+    .test(prompt);
 }
 
 process.stdin.on('data', (c) => { input += c; });
@@ -79,6 +91,17 @@ process.stdin.on('end', () => {
       /\b(pre[- ]?impl(?:ementation)?|post[- ]?impl(?:ementation)?|design review|code review|review (?:this|the|my|our|these)|re-?review|confirm[- ]?(?:or|\/)[- ]?refute|adversarial|red[- ]?team|critique|sanity[- ]?check|audit (?:this|the|my)|validate (?:this|the|my)|verify (?:this|the|these|my|our)|check (?:my|the) reasoning|look(?:ing)? for (?:regressions|bugs)|find(?: the)? bugs?|scrutin)/i
         .test(prompt);
     if (!looksCodex && !looksReview) return;
+
+    if (looksCodexRescue &&
+      looksLikeCodexReviewRequest(prompt) &&
+      !hasIntentionalRescueOverride(prompt)) {
+      console.error(
+        'BLOCKED: review-shaped Codex delegation must use the Codex review path, not codex-rescue.\n' +
+        'Use `/codex:review --wait` for ordinary review, or `/codex:adversarial-review --wait` for adversarial/P0/required-changes verdicts.\n' +
+        'If this is intentionally rescue despite review language, re-run rescue with `[INTENTIONAL-RESCUE: <reason>]` plus the CODEX RESCUE HANDOFF preface.'
+      );
+      process.exit(2);
+    }
 
     if (looksCodexRescue && !hasRescueHandoffContract(prompt)) {
       console.error(

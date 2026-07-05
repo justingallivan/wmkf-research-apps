@@ -140,6 +140,22 @@ test('codex rescue guard blocks prompts without foreground handoff contract', ()
   assert.match(result.stderr, /Do not add\/pass\/use `--background`/);
 });
 
+test('codex rescue guard blocks review-shaped prompts that should use review path', () => {
+  const result = runHook('pre-review-delegation-trace-guard.js', {
+    tool_name: 'Agent',
+    tool_input: {
+      subagent_type: 'codex:codex-rescue',
+      prompt: [
+        'CODEX RESCUE HANDOFF: Run Codex in foreground for work Claude must consume in this turn.',
+        'P0 adversarial plan review. End with exactly SATISFIED or REQUIRED CHANGES.',
+      ].join('\n'),
+    },
+  });
+  assert.strictEqual(result.status, 2, result.stderr);
+  assert.match(result.stderr, /review-shaped Codex delegation/);
+  assert.match(result.stderr, /\/codex:adversarial-review --wait/);
+});
+
 test('codex rescue guard allows prompts with foreground handoff contract', () => {
   const result = runHook('pre-review-delegation-trace-guard.js', {
     tool_name: 'Agent',
@@ -155,6 +171,23 @@ test('codex rescue guard allows prompts with foreground handoff contract', () =>
   assert.strictEqual(result.status, 0, result.stderr);
   assert.match(result.stdout, /CODEX RESCUE HANDOFF - keep the Claude<->Codex link durable/);
   assert.match(result.stdout, /SELF-TRACE GATE/);
+});
+
+test('codex rescue guard allows intentionally marked rescue with review language', () => {
+  const result = runHook('pre-review-delegation-trace-guard.js', {
+    tool_name: 'Agent',
+    tool_input: {
+      subagent_type: 'codex:codex-rescue',
+      prompt: [
+        'CODEX RESCUE HANDOFF: Run Codex in foreground for work Claude must consume in this turn.',
+        'Do not add/pass/use `--background` unless the human explicitly requested background mode.',
+        '[INTENTIONAL-RESCUE: implementation help after a prior review; this is not asking Codex to review.]',
+        'Help apply the required fixes from the review.',
+      ].join('\n'),
+    },
+  });
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.match(result.stdout, /CODEX RESCUE HANDOFF/);
 });
 
 test('codex verbatim reminder preserves rescue background launch handoff', () => {
