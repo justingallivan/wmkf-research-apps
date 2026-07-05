@@ -6,49 +6,30 @@
  * the form locks read-only afterward; there is no edit/re-submit (diverges from
  * the legacy "replace your submission" upload grace, removed with the upload UI).
  *
- * Pipeline:
- *   1. token verify + rate-limit + recordTokenOutcome (same boundary as /draft).
- *   2. engagement gate — must be in the authoring stage (stage2b).
- *   3. FINALITY precheck — 409 if wmkf_reviewreceivedat is already set. (Belt and
- *      suspenders with the in-changeset If-Match: a client can fetch a fresh
- *      post-submit etag and replay, so the precheck is the authoritative finality
- *      guard; §9 #C-conc / Codex P0-2.)
- *   4. server-sanitize every rich-text answer (the write is the security boundary,
- *      not render), then validateReviewSubmission against the CURRENT schema.
- *   5. buildReviewSubmission → { parentPatch, answerRows } (the single producer).
- *   6. ATOMIC write via the DAL/core changeset helper (runChangeset): upsert the N answer rows
- *      by the (suggestion, questionkey) alternate key + PATCH the parent
- *      (affiliation, 3 ratings, receivedat) guarded by If-Match. All-or-nothing.
- *   7. ONLY after the changeset commits: delete the Postgres draft (best-effort —
- *      a stale draft is harmless, GET returns null post-submit and GC sweeps it).
- *
  * Responses:
  *   200  { ok: true, receivedAt }
  *   400  validation { ok:false, reason:'validation', errors }
  *   401  token verification failed
+ *   403  op_not_permitted (token minted without 'upload_review')
  *   404  token not found
- *   409  review_received_locked (already submitted) | materials_not_sent (not in
- *        the authoring stage) | conflict (concurrent change — If-Match 412)
  *   405  method not POST
+ *   409  review_received_locked | materials_not_sent | set_changed | conflict
  *   429  rate limited
  *   500  internal
+ *
+ * Thin route shell (Route→Service Consolidation Plan, Stage 5, fail-closed
+ * batch): the TOKEN BOUNDARY — method dispatch → rate limit → token verify →
+ * outcome recording → failure envelopes → fail-closed `tokenHasOp` ops gate —
+ * is byte-identical to the historical route (the token IS the auth; no
+ * requireAppAccess on this surface). The submit pipeline (finality/stage
+ * gates, sanitize/validate/build, atomic changeset, draft delete) lives in
+ * lib/services/external-review/submit-service.js.
  */
 
 import { verifySuggestionToken, tokenHasOp } from '../../../../../lib/external/verify-suggestion-token';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
-import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
-import ReviewDraftService from '../../../../../lib/services/review-draft-service';
-import { computeEngagementState } from '../../../../../lib/external/review-engagement-state';
-import { getActiveQuestionSet, questionSetVersion } from '../../../../../lib/external/review-question-fetcher';
-import { sanitizeReviewHtml } from '../../../../../lib/external/sanitize-review-html';
-import { validateReviewSubmission, buildReviewSubmission } from '../../../../../lib/external/build-review-submission';
-import { getForSubmitFinalityCheck, ENTITY_SET_NAME as SUGGESTION_ENTITY_SET } from '../../../../../lib/dataverse/adapters/reviewer-suggestion';
-import { answerUpsertDescriptor } from '../../../../../lib/dataverse/adapters/review-answer';
-import { runChangeset, atomicParentWithChildren } from '../../../../../lib/dataverse/core/changeset';
-
-const PARENT_ENTITY_SET = SUGGESTION_ENTITY_SET;
-const REVIEW_RECEIVED_LOCKED_MESSAGE =
-  'This review has already been submitted. To make a change, please contact your Program Director.';
+import { ServiceHttpError } from '../../../../../lib/services/service-http-error';
+import { submitReview } from '../../../../../lib/services/external-review/submit-service';
 
 // Rich-text answers can be sizeable; cap the JSON body (mirrors /draft).
 export const config = {
@@ -56,24 +37,6 @@ export const config = {
     bodyParser: { sizeLimit: '2mb' },
   },
 };
-
-/** Server-sanitize every rich-text answer before validation/build — the write is the boundary. */
-function sanitizeRichText(answers, richtextKeys) {
-  const out = { ...answers };
-  for (const key of richtextKeys) {
-    if (typeof out[key] === 'string') out[key] = sanitizeReviewHtml(out[key]);
-    else if (out[key] != null) out[key] = ''; // non-string → drop to empty
-  }
-  return out;
-}
-
-function reviewReceivedLocked(res) {
-  return res.status(409).json({
-    ok: false,
-    reason: 'review_received_locked',
-    message: REVIEW_RECEIVED_LOCKED_MESSAGE,
-  });
-}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -105,130 +68,12 @@ export default async function handler(req, res) {
       return res.status(403).json({ ok: false, reason: 'op_not_permitted' });
     }
 
-    const { suggestion } = verified;
-    const suggestionId = suggestion.wmkf_appreviewersuggestionid;
-    const engagement = computeEngagementState(suggestion);
-
-    // Finality first: a submitted review never accepts another submit. This is
-    // the authoritative finality guard (the If-Match below can be defeated by a
-    // client re-reading a fresh post-submit etag).
-    if (suggestion.wmkf_reviewreceivedat) {
-      return reviewReceivedLocked(res);
-    }
-    // Authoring-stage gate: submit only while the form is open (materials
-    // released, not withdrawn). Mirrors the /draft PUT gate.
-    if (engagement.view !== 'stage2b') {
-      return res.status(409).json({
-        ok: false,
-        reason: 'materials_not_sent',
-        message: 'The review form is not open for this engagement.',
-      });
-    }
-
-    // Load the CURRENT question set (Dataverse-authored, fail-closed). The whole
-    // pipeline — sanitize, validate, build, snapshot-key allowlist — uses it.
-    const questionSet = await getActiveQuestionSet();
-    const richtextKeys = questionSet.filter((f) => f.type === 'richtext').map((f) => f.key);
-    const snapshotKeys = new Set(
-      questionSet.filter((f) => f.type === 'picklist' || f.type === 'richtext').map((f) => f.key),
-    );
-
-    // set_changed reload signal (Codex P1): if the client submitted against an
-    // older question set than the live one, tell it to reload rather than
-    // returning a confusing field-level validation error. The client echoes the
-    // setVersion it rendered; an absent setVersion skips the check (older clients).
-    const clientSetVersion = req.body && typeof req.body === 'object' ? req.body.setVersion : undefined;
-    if (typeof clientSetVersion === 'string' && clientSetVersion !== questionSetVersion(questionSet)) {
-      return res.status(409).json({
-        ok: false,
-        reason: 'set_changed',
-        message: 'The review questions changed since you opened this form. Please reload to see the current questions.',
-      });
-    }
-
-    // Sanitize → validate against the current set.
-    const answers = (req.body && typeof req.body === 'object' && req.body.answers) || {};
-    const sanitized = sanitizeRichText(answers, richtextKeys);
-    const validation = validateReviewSubmission(sanitized, questionSet);
-    if (!validation.ok) {
-      return res.status(400).json({ ok: false, reason: 'validation', errors: validation.errors });
-    }
-
-    // Single producer of parent PATCH + answer rows.
-    const receivedAt = new Date().toISOString();
-    const { parentPatch, answerRows } = buildReviewSubmission(validation.normalized, { receivedAt, questionSet });
-
-    // Atomic write: N answer upserts (by alternate key) + the parent PATCH
-    // (If-Match-guarded) in one changeset.
-    try {
-      await bypassDynamicsRestrictions('external-review-submit', async () => {
-        // The parent PATCH MUST carry a row-version If-Match — it is the only
-        // guard against a true pre-commit race (two submits that both passed the
-        // finality precheck). Fail closed if we can't get one (Codex S302 P1).
-        let parentEtag = suggestion._etag;
-        if (!parentEtag) {
-          // Re-read for a fresh etag — AND re-check finality in the SAME read.
-          // The verify-time receivedat is stale here; without re-checking it, a
-          // racing submit that committed between our verify and this re-read
-          // would hand us a fresh (non-stale) etag whose If-Match then PASSES,
-          // letting us overwrite the already-submitted review (Codex S302 P1b).
-          const fresh = await getForSubmitFinalityCheck(suggestionId);
-          if (fresh?.wmkf_reviewreceivedat) {
-            const err = new Error('Review was submitted concurrently');
-            err.code = 'ALREADY_SUBMITTED';
-            throw err;
-          }
-          parentEtag = fresh?._etag || null;
-        }
-        if (!parentEtag) {
-          const err = new Error('Could not obtain a row-version etag for the parent If-Match guard');
-          err.code = 'NO_ETAG';
-          throw err;
-        }
-
-        const children = answerRows.map((row) => answerUpsertDescriptor(suggestionId, row, snapshotKeys));
-        const parent = {
-          method: 'PATCH',
-          entitySet: PARENT_ENTITY_SET,
-          key: suggestionId,
-          body: parentPatch,
-          ifMatch: parentEtag,
-        };
-        await runChangeset(atomicParentWithChildren({ parent, children }));
-      });
-    } catch (e) {
-      // ALREADY_SUBMITTED = a racing submit committed before ours (caught by the
-      // fallback finality re-read). Surface the same locked reason as the
-      // up-front precheck so the client shows the final, no-retry message.
-      if (e.code === 'ALREADY_SUBMITTED') {
-        return reviewReceivedLocked(res);
-      }
-      // 412 = concurrent change since page load (a staff edit, or a racing
-      // submit). NO_ETAG = we refused to write without a lock. Both mean nothing
-      // was written (the changeset is atomic) — surface a 409 so the client
-      // reloads rather than retrying blindly.
-      if (e.status === 412 || e.code === 'NO_ETAG') {
-        return res.status(409).json({
-          ok: false,
-          reason: 'conflict',
-          message: 'This review changed since you opened it. Please reload and try again.',
-        });
-      }
-      console.error('[external review submit] changeset failed:', e.message);
-      return res.status(500).json({ ok: false, reason: 'server_error' });
-    }
-
-    // Commit succeeded → delete the draft. Best-effort: a lingering draft is
-    // harmless (GET returns null once submitted; GC sweeps it) and must never
-    // turn a successful submit into a user-visible error.
-    try {
-      await ReviewDraftService.deleteBySuggestion(suggestionId);
-    } catch (e) {
-      console.error('[external review submit] post-commit draft delete failed (non-fatal):', e.message);
-    }
-
-    return res.status(200).json({ ok: true, receivedAt });
+    const result = await submitReview({ suggestion: verified.suggestion, body: req.body });
+    return res.status(200).json(result);
   } catch (e) {
+    if (e instanceof ServiceHttpError) {
+      return res.status(e.httpStatus).json(e.body ?? { ok: false, reason: e.message });
+    }
     console.error('[external review submit] error:', e);
     return res.status(500).json({ ok: false, reason: 'server_error' });
   }

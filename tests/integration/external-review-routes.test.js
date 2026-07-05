@@ -365,6 +365,66 @@ describe('/api/external/review/[token]/context', () => {
       ].join(','),
     });
   });
+
+  // ── Stage 5 Phase A gap fill — envelope pins ──────────────────────────────
+  it('405s a non-GET with Allow header and the { ok:false, reason } envelope', async () => {
+    const req = createMockReq({ method: 'POST', query: { token: 'good-token' } });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(405);
+    expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'method_not_allowed' });
+    expect(res.setHeader).toHaveBeenCalledWith('Allow', 'GET');
+    expect(verifySuggestionToken).not.toHaveBeenCalled();
+  });
+
+  it('stage2a: policy fetch failure is fail-closed → 500 policy_misconfigured (envelope pinned)', async () => {
+    const { getActivePolicies } = require('../../lib/external/policy-fetcher');
+    getActivePolicies.mockRejectedValueOnce(new Error('missing slot'));
+    verifySuggestionToken.mockResolvedValue({
+      ...verifiedSuggestion,
+      suggestion: {
+        ...verifiedSuggestion.suggestion,
+        wmkf_proposalfirstaccessed: '2026-05-01T00:00:00.000Z',
+        wmkf_accepted: false, wmkf_declined: false, wmkf_reviewstatus: null, wmkf_reviewreceivedat: null,
+      },
+    });
+    const req = createMockReq({ method: 'GET', query: { token: 'good-token' } });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'policy_misconfigured' });
+  });
+
+  it('stage2a 200 envelope: full top-level key set pinned (files empty, questions null pre-materials)', async () => {
+    verifySuggestionToken.mockResolvedValue({
+      ...verifiedSuggestion,
+      suggestion: {
+        ...verifiedSuggestion.suggestion,
+        wmkf_proposalfirstaccessed: '2026-05-01T00:00:00.000Z',
+        wmkf_accepted: false, wmkf_declined: false, wmkf_reviewstatus: null, wmkf_reviewreceivedat: null,
+      },
+    });
+    const req = createMockReq({ method: 'GET', query: { token: 'good-token' } });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(Object.keys(res._data).sort()).toEqual([
+      'engagementState', 'etag', 'files', 'ok', 'policies', 'prefill',
+      'proposal', 'questionSetVersion', 'questions', 'reviewer', 'submission',
+      'tokenExpiresAt',
+    ]);
+    expect(res._data.ok).toBe(true);
+    expect(res._data.engagementState.view).toBe('stage2a');
+    expect(res._data.files).toEqual([]); // pre-materials: no Graph round trip
+    expect(getRequestSharePointBuckets).not.toHaveBeenCalled();
+    expect(res._data.questions).toBeNull();
+    expect(res._data.questionSetVersion).toBeNull();
+    expect(res._data.policies).toEqual(expect.objectContaining({ 'reviewer-coi': expect.any(Object) }));
+    // Stage-2a prefill fields present (additive contract).
+    expect(res._data.prefill).toEqual(expect.objectContaining({
+      affiliation: expect.any(String), firstName: expect.any(String), address: expect.any(Object),
+    }));
+  });
 });
 
 describe('/api/external/review/[token]/proposal', () => {
@@ -1008,5 +1068,100 @@ describe('/api/external/review/[token]/respond', () => {
     expect(applyStage2aResponse).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: 'withdrawn_sufficient' }));
+  });
+
+  // ── Stage 5 Phase A gap fill — envelope + ordering pins ──────────────────
+  it('405s a non-POST with Allow header and the { ok:false, reason } envelope', async () => {
+    const req = createMockReq({ method: 'GET', query: { token: 'good-token' } });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(405);
+    expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'method_not_allowed' });
+    expect(res.setHeader).toHaveBeenCalledWith('Allow', 'POST');
+    expect(verifySuggestionToken).not.toHaveBeenCalled();
+  });
+
+  it('invalid token → 401 with the verifier reason; nothing staged or written', async () => {
+    verifySuggestionToken.mockResolvedValue({ ok: false, reason: 'expired' });
+    const req = createMockReq({ method: 'POST', query: { token: 'stale' }, headers: {}, body: { action: 'decline' } });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'expired' });
+    expect(applyStage2aResponse).not.toHaveBeenCalled();
+    expect(enqueueReviewerAcceptanceJob).not.toHaveBeenCalled();
+  });
+
+  it('unknown token → 404 not_found envelope', async () => {
+    verifySuggestionToken.mockResolvedValue({ ok: false, reason: 'not_found' });
+    const req = createMockReq({ method: 'POST', query: { token: 'missing' }, headers: {}, body: { action: 'decline' } });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'not_found' });
+  });
+
+  it('fresh accept 200 envelope pinned exactly (drain contract: acceptanceJobId surfaced)', async () => {
+    verifySuggestionToken.mockResolvedValue(fresh);
+    const req = createMockReq({
+      method: 'POST', query: { token: 'good-token' }, headers: {},
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'Town', postalCode: '94000', country: 'US', phone: '+1 555 0100' } },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res._data).toEqual({
+      ok: true,
+      idempotent: false,
+      acceptanceJobId: 101,
+      engagementState: { view: 'accepted-pre-materials', accepted: true, declined: false },
+    });
+  });
+
+  it('accept write ORDERING pinned: durable job staged accept_pending BEFORE the Dataverse PATCH, queued-marker after (drain contract)', async () => {
+    verifySuggestionToken.mockResolvedValue(fresh);
+    const req = createMockReq({
+      method: 'POST', query: { token: 'good-token' }, headers: {},
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'Town', postalCode: '94000', country: 'US', phone: '+1 555 0100' } },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    const enqueueOrder = enqueueReviewerAcceptanceJob.mock.invocationCallOrder[0];
+    const patchOrder = applyStage2aResponse.mock.invocationCallOrder[0];
+    const queuedOrder = markReviewerAcceptanceJobQueued.mock.invocationCallOrder[0];
+    expect(enqueueOrder).toBeLessThan(patchOrder);
+    expect(patchOrder).toBeLessThan(queuedOrder);
+    // Status value the drain consumes — must never change spelling.
+    expect(enqueueReviewerAcceptanceJob.mock.calls[0][0].status).toBe('accept_pending');
+  });
+
+  it('fresh decline 200 envelope pinned exactly', async () => {
+    verifySuggestionToken.mockResolvedValue(fresh);
+    const req = createMockReq({ method: 'POST', query: { token: 'good-token' }, headers: {}, body: { action: 'decline', decline: {} } });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res._data).toEqual({
+      ok: true,
+      idempotent: false,
+      engagementState: { view: 'declined', accepted: false, declined: true },
+    });
+  });
+
+  it('repeat decline replays idempotently with NO re-stamp (envelope pinned)', async () => {
+    verifySuggestionToken.mockResolvedValue({
+      ...fresh,
+      suggestion: { ...fresh.suggestion, wmkf_declined: true },
+    });
+    const req = createMockReq({ method: 'POST', query: { token: 'good-token' }, headers: {}, body: { action: 'decline', decline: {} } });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res._data).toEqual({
+      ok: true,
+      idempotent: true,
+      engagementState: { view: 'declined', accepted: false, declined: true },
+    });
+    expect(applyStage2aResponse).not.toHaveBeenCalled();
   });
 });

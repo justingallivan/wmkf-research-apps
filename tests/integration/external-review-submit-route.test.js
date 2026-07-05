@@ -299,6 +299,58 @@ describe('happy path — atomic write', () => {
     expect(res.statusCode).toBe(200);
     expect(res._data.ok).toBe(true);
   });
+
+  it('200 envelope pinned exactly: { ok: true, receivedAt } and nothing else', async () => {
+    const { req, res } = post({ answers: validAnswers() });
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(res._data).toEqual({ ok: true, receivedAt: expect.any(String) });
+    expect(Object.keys(res._data).sort()).toEqual(['ok', 'receivedAt']);
+  });
+});
+
+describe('concurrency envelopes (Stage 5 Phase A gap fill)', () => {
+  it('412 from the changeset → 409 conflict with the reload message; draft NOT deleted', async () => {
+    DynamicsService.executeChangeset.mockRejectedValue(Object.assign(new Error('precondition failed'), { status: 412 }));
+    const { req, res } = post({ answers: validAnswers() });
+    await handler(req, res);
+    expect(res.statusCode).toBe(409);
+    expect(res._data).toEqual({
+      ok: false,
+      reason: 'conflict',
+      message: 'This review changed since you opened it. Please reload and try again.',
+    });
+    expect(ReviewDraftService.deleteBySuggestion).not.toHaveBeenCalled();
+  });
+
+  it('no verify-time etag + racing submit committed → 409 review_received_locked (fallback finality re-read)', async () => {
+    verifySuggestionToken.mockResolvedValue({
+      ok: true,
+      suggestion: suggestion({ _etag: null }),
+      payload: { ops: ['download_proposal', 'upload_review'] },
+    });
+    // getForSubmitFinalityCheck re-read shows the race winner's receivedat.
+    DynamicsService.getRecord.mockResolvedValue({ _etag: 'W/"fresh"', wmkf_reviewreceivedat: '2026-07-01T00:00:00Z' });
+    const { req, res } = post({ answers: validAnswers() });
+    await handler(req, res);
+    expect(res.statusCode).toBe(409);
+    expect(res._data.reason).toBe('review_received_locked');
+    expect(DynamicsService.executeChangeset).not.toHaveBeenCalled();
+  });
+
+  it('no etag anywhere → 409 conflict (NO_ETAG fail-closed, nothing written)', async () => {
+    verifySuggestionToken.mockResolvedValue({
+      ok: true,
+      suggestion: suggestion({ _etag: null }),
+      payload: { ops: ['download_proposal', 'upload_review'] },
+    });
+    DynamicsService.getRecord.mockResolvedValue({ wmkf_reviewreceivedat: null, _etag: null });
+    const { req, res } = post({ answers: validAnswers() });
+    await handler(req, res);
+    expect(res.statusCode).toBe(409);
+    expect(res._data.reason).toBe('conflict');
+    expect(DynamicsService.executeChangeset).not.toHaveBeenCalled();
+  });
 });
 
 describe('concurrency + failure mapping', () => {
