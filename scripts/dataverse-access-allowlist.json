@@ -353,13 +353,6 @@
       "count": 1
     },
     {
-      "file": "lib/utils/sharepoint-buckets.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "sharepointdocumentlocations",
-      "count": 2
-    },
-    {
       "file": "pages/api/admin/review-questions.js",
       "kind": "import",
       "clientMethod": "DynamicsService.queryRecords",
