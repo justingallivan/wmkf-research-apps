@@ -23,8 +23,8 @@ import { buildCacheableSystemPrompt, buildUserPrompt } from '../../../shared/con
 import { logUsage, estimateCostCents } from '../../../lib/utils/usage-logger';
 import { LLMClient } from '../../../lib/services/llm-client';
 import { createHash } from 'crypto';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import * as sharepointDocumentLocationAdapter from '../../../lib/dataverse/adapters/sharepoint-document-location.js';
 import { GraphService } from '../../../lib/services/graph-service';
 import {
   DATA_CLASSES,
@@ -59,10 +59,8 @@ export default async function handler(req, res) {
     }
 
     // Step 1: Resolve SharePoint folder for this request
-    const locResult = await DynamicsService.queryRecords('sharepointdocumentlocations', {
+    const locResult = await sharepointDocumentLocationAdapter.findByRegardingObject(requestId, {
       select: 'name,relativeurl,_parentsiteorlocation_value',
-      filter: `_regardingobjectid_value eq '${requestId}'`,
-      top: 10,
     });
 
     if (!locResult.records.length) {
@@ -80,9 +78,8 @@ export default async function handler(req, res) {
     let libraryName = 'akoya_request';
     if (parentIds.length > 0) {
       try {
-        const parentResult = await DynamicsService.queryRecords('sharepointdocumentlocations', {
+        const parentResult = await sharepointDocumentLocationAdapter.findByParentIds(parentIds, {
           select: 'relativeurl',
-          filter: parentIds.map(id => `sharepointdocumentlocationid eq ${id}`).join(' or '),
           top: 5,
         });
         if (parentResult.records.length > 0 && parentResult.records[0].relativeurl) {

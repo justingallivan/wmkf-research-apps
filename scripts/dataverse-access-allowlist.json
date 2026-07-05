@@ -430,13 +430,6 @@
       "count": 2
     },
     {
-      "file": "pages/api/expertise-finder/batch-match.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "sharepointdocumentlocations",
-      "count": 2
-    },
-    {
       "file": "pages/api/external/review/[token]/context.js",
       "kind": "import",
       "clientMethod": "DynamicsService.getRecord",
