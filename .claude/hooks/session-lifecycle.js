@@ -7,8 +7,13 @@ const os = require('os');
 const path = require('path');
 const { execFileSync, spawnSync } = require('child_process');
 const { checkAgentInvariants } = require('../../scripts/check-agent-invariants');
+const {
+  docMentionsChangedSource,
+  hasStalenessAck,
+  isPlanOrDesignDoc,
+} = require('./lib/document-guards');
 
-const STATE_VERSION = 1;
+const STATE_VERSION = 2;
 const GATE_MAP = [
   { test: /^pages\/api\//, gates: ['check:api-routes'] },
   { test: /^(lib\/db\/|docs\/atlas\/|docs\/APPLICATION_STATE_ATLAS\.md|scripts\/audit-(?:postgres|dataverse)-state\.js)/, gates: ['check:atlas'] },
@@ -125,6 +130,79 @@ function additionalContext(hookEventName, message) {
   }));
 }
 
+function initStateCollections(state) {
+  if (!Array.isArray(state.touched)) state.touched = [];
+  if (!Array.isArray(state.touchLog)) state.touchLog = [];
+  if (!Array.isArray(state.staleDocWarnings)) state.staleDocWarnings = [];
+}
+
+function isSourceStalenessPath(relativePath) {
+  return /^(?:scripts|lib)\/.+\.(?:js|jsx|ts|tsx|mjs|cjs)$/.test(relativePath);
+}
+
+function isDocsMarkdown(relativePath) {
+  return /^docs\/.+\.md$/.test(relativePath);
+}
+
+function warningKey(warning) {
+  return `${warning.docPath}|${warning.changedPath}`;
+}
+
+function readText(root, relativePath) {
+  try { return fs.readFileSync(path.join(root, relativePath), 'utf8'); } catch { return ''; }
+}
+
+function detectStaleDocWarnings(root, state, changedPath) {
+  if (!isSourceStalenessPath(changedPath)) return [];
+  const priorDocs = [...new Set((state.touchLog || [])
+    .map((entry) => entry && entry.path)
+    .filter((entryPath) => entryPath && isDocsMarkdown(entryPath)))];
+
+  const warnings = [];
+  for (const docPath of priorDocs) {
+    const text = readText(root, docPath);
+    if (!text) continue;
+    const mention = docMentionsChangedSource(text, changedPath);
+    if (!mention || hasStalenessAck(text, changedPath)) continue;
+    warnings.push({
+      docPath,
+      changedPath,
+      term: mention.term,
+      strict: isPlanOrDesignDoc(docPath, text),
+      createdAt: new Date().toISOString(),
+    });
+  }
+  return warnings;
+}
+
+function unresolvedStaleDocWarnings(root, state) {
+  const unresolved = [];
+  const seen = new Set();
+  for (const warning of state.staleDocWarnings || []) {
+    if (!warning || !warning.docPath || !warning.changedPath) continue;
+    const key = warningKey(warning);
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const text = readText(root, warning.docPath);
+    const mention = text && docMentionsChangedSource(text, warning.changedPath);
+    if (!text || !mention || hasStalenessAck(text, warning.changedPath)) continue;
+    unresolved.push({ ...warning, term: mention.term });
+  }
+  return unresolved;
+}
+
+function staleDocWarningMessage(warnings, changedPath) {
+  const docs = warnings.map((warning) =>
+    `  - ${warning.docPath} mentions \`${warning.term}\`${warning.strict ? ' (Stop-blocking plan/design doc)' : ''}`
+  ).join('\n');
+  return (
+    `Same-session doc staleness: \`${changedPath}\` changed after docs modified earlier in this session mention it.\n` +
+    `${docs}\n` +
+    `Re-open/update the doc claim, or add a visible marker near it: [RECHECKED after ${changedPath} change: <file:line/probe>] or [STALE-ACCEPTED: ${changedPath} — reason].`
+  );
+}
+
 // Once-per-session-open: route domain work to the agent wiki (discoverability —
 // the wiki is the retrieval launch-pad, but only if agents are reminded to read
 // it during planning, not just when a watched path is edited) and surface memory
@@ -164,6 +242,8 @@ function start(input, root, file) {
     baseline: snapshot(root),
     baselineInvariantFailures: invariantFailures(root).map((item) => item.name),
     touched: [],
+    touchLog: [],
+    staleDocWarnings: [],
     gateCache: {},
   };
   saveState(file, state);
@@ -179,8 +259,16 @@ function record(input, root, file) {
   if (!relativePath) return;
   const state = loadState(file);
   if (!state) return;
+  initStateCollections(state);
+  const newWarnings = detectStaleDocWarnings(root, state, relativePath)
+    .filter((warning) => !state.staleDocWarnings.some((existing) =>
+      warningKey(existing) === warningKey(warning)
+    ));
   if (!state.touched.includes(relativePath)) state.touched.push(relativePath);
+  state.touchLog.push({ path: relativePath, at: new Date().toISOString() });
+  state.staleDocWarnings.push(...newWarnings);
   saveState(file, state);
+  if (newWarnings.length) additionalContext('PostToolUse', staleDocWarningMessage(newWarnings, relativePath));
 }
 
 function runGate(root, gate) {
@@ -206,6 +294,7 @@ function stop(input, root, file) {
     return;
   }
 
+  initStateCollections(state);
   const owned = changedOwnedPaths(root, state);
   const currentFailures = invariantFailures(root);
   const newlyBrokenProtected = currentFailures.filter((item) =>
@@ -215,6 +304,23 @@ function stop(input, root, file) {
 
   if (newlyBrokenProtected.length) {
     console.error(`Agent instruction invariant broken during this session: ${newlyBrokenProtected.map((item) => item.name).join(', ')}. Run \`npm run check:agent-invariants\` and repair the symlink(s) before stopping.`);
+    process.exit(2);
+  }
+
+  const unresolvedStaleDocs = unresolvedStaleDocWarnings(root, state);
+  state.staleDocWarnings = unresolvedStaleDocs;
+  saveState(file, state);
+  const strictStaleDocs = unresolvedStaleDocs.filter((warning) => warning.strict);
+  if (strictStaleDocs.length) {
+    const summary = strictStaleDocs.map((warning) =>
+      `  - ${warning.docPath} still mentions \`${warning.term}\` after ${warning.changedPath} changed`
+    ).join('\n');
+    console.error(
+      'Same-session doc staleness unresolved for plan/design docs:\n' +
+      `${summary}\n` +
+      'Re-open/update each doc claim, or add a visible marker near the claim: ' +
+      '[RECHECKED after <changed-path> change: <file:line/probe>] or [STALE-ACCEPTED: <changed-path> — reason].'
+    );
     process.exit(2);
   }
 
@@ -270,8 +376,10 @@ if (require.main === module) main();
 
 module.exports = {
   changedOwnedPaths,
+  detectStaleDocWarnings,
   dirtyPaths,
   fingerprint,
   gatesForPaths,
+  unresolvedStaleDocWarnings,
   snapshot,
 };

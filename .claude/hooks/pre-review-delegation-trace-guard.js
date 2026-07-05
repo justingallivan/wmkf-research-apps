@@ -32,7 +32,12 @@
  * A non-Codex agent doing search/implementation (Explore, general-purpose) does NOT
  * fire, to keep the hook off the common fan-out path.
  *
- * FAILS OPEN: any parse error / missing field exits 0 silently — never blocks.
+ * Narrow blocker: repo-local discovery asks ("check whether any route streams",
+ * "verify if any callers exist") must include adjacent completed trace evidence
+ * or a visible [DELEGATED-DISCOVERY: reason] escape. The broad SELF-TRACE
+ * reminder remains advisory.
+ *
+ * FAILS OPEN on parse/helper errors.
  */
 let input = '';
 process.stdin.on('data', (c) => { input += c; });
@@ -46,6 +51,7 @@ process.stdin.on('end', () => {
     const ti = data.tool_input || {};
     const subagent = typeof ti.subagent_type === 'string' ? ti.subagent_type : '';
     const prompt = typeof ti.prompt === 'string' ? ti.prompt : '';
+    const { findUntracedDiscoveryAsks } = require('./lib/document-guards');
 
     // (a) Any Codex subagent. Check the structured field, then fall back to scanning
     // the whole tool_input so a renamed field still trips it (parity with the sibling
@@ -58,6 +64,20 @@ process.stdin.on('end', () => {
       /\b(pre[- ]?impl(?:ementation)?|post[- ]?impl(?:ementation)?|design review|code review|review (?:this|the|my|our|these)|re-?review|confirm[- ]?(?:or|\/)[- ]?refute|adversarial|red[- ]?team|critique|sanity[- ]?check|audit (?:this|the|my)|validate (?:this|the|my)|verify (?:this|the|these|my|our)|check (?:my|the) reasoning|look(?:ing)? for (?:regressions|bugs)|find(?: the)? bugs?|scrutin)/i
         .test(prompt);
     if (!looksCodex && !looksReview) return;
+
+    const untracedDiscovery = findUntracedDiscoveryAsks(prompt);
+    if (untracedDiscovery.length) {
+      const details = untracedDiscovery.slice(0, 5).map((miss) =>
+        `  - prompt line ${miss.lineNumber}: ${miss.line}`
+      ).join('\n');
+      console.error(
+        'BLOCKED: review delegation outsources repo-local discovery that must be self-traced first.\n' +
+        `${details}\n` +
+        'For each discovery ask, add an adjacent TRACED:/Evidence: block with file:line proof, ' +
+        'or a visible [DELEGATED-DISCOVERY: reason local trace is impossible] escape.'
+      );
+      process.exit(2);
+    }
 
     const msg =
       'SELF-TRACE GATE — before this review delegation, complete lifecycle and ' +

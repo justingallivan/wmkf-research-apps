@@ -7,10 +7,17 @@
  * file) is about to gain a SCOPE/QUANTITY claim, inject a non-blocking reminder to
  * verify by FALSIFICATION rather than confirmation.
  *
- * FAILS OPEN: any parse error / missing field / unexpected shape exits 0 silently,
- * so this can never block a legitimate edit. Stays quiet unless BOTH the path is in
- * scope AND the new text contains a quantifier signature.
+ * Narrow blocker: plan docs may not combine an unresolved count assumption/TBD with
+ * unqualified derived-count/coverage claims on the same subject. That visible
+ * cross-document consistency failure was not catchable by the old edit-local
+ * reminder. Escape hatches must live in the artifact: keep the derived claim
+ * [ASSUMED] or add [DERIVED-FROM: <file:line/probe>; independent of TBD count].
+ *
+ * FAILS OPEN on parse/helper errors. Stays quiet unless BOTH the path is in scope
+ * AND the text contains a quantifier signature.
  */
+const path = require('path');
+
 let input = '';
 process.stdin.on('data', (c) => { input += c; });
 process.stdin.on('end', () => {
@@ -21,9 +28,17 @@ process.stdin.on('end', () => {
     if (!fp) return;
 
     const base = fp.split('/').pop();
+    const root = path.resolve(data.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd());
+    const {
+      findAssumptionQuantityLeaks,
+      isPlanDoc,
+      proposedTextForTool,
+      repoRelative,
+    } = require('./lib/document-guards');
+    const rel = repoRelative(root, fp);
     const inScope =
-      /(^|\/)docs\//.test(fp) ||
-      /(^|\/)\.claude-memory\//.test(fp) ||
+      /^docs\//.test(rel) ||
+      /^\.claude-memory\//.test(rel) ||
       ['CLAUDE.md', 'SESSION_PROMPT.md', 'AGENTS.md'].indexOf(base) !== -1;
     if (!inScope) return;
 
@@ -33,6 +48,23 @@ process.stdin.on('end', () => {
       (typeof ti.new_string === 'string' && ti.new_string) ||
       '';
     if (!text) return;
+
+    const proposed = proposedTextForTool(data, root);
+    if (proposed && isPlanDoc(rel, proposed)) {
+      const leaks = findAssumptionQuantityLeaks(proposed);
+      if (leaks.length) {
+        const details = leaks.slice(0, 3).map(({ uncertainty, claim }) =>
+          `  - ${rel}:${uncertainty.lineNumber} leaves a count uncertain, while ${rel}:${claim.lineNumber} makes an unqualified numeric count/coverage claim.`
+        ).join('\n');
+        console.error(
+          'BLOCKED: plan document mixes unresolved quantity uncertainty with unqualified derived counts.\n' +
+          `${details}\n` +
+          'Keep downstream counts visibly [ASSUMED], or add a line-local ' +
+          '[DERIVED-FROM: <file:line/probe>; independent of TBD count] marker.'
+        );
+        process.exit(2);
+      }
+    }
 
     // Scope/quantity signatures: universal quantifiers + "the rest" / "source of
     // truth" + "N of M". Case-insensitive.

@@ -130,13 +130,27 @@ fail open on any other error; then wire it into the `PreToolUse`→`Bash` block 
 
 ## Other Discipline Hooks (non-commit)
 
-- **`pre-review-delegation-trace-guard.js`** — `PreToolUse(Task|Agent)`, ADVISORY (injects
-  context, never blocks). Fires before a review/verify delegation (any Codex subagent, or any
-  agent with a review-worded prompt) and adds a LIFECYCLE (trace from the landed state /
-  the edge the code omits) + PROVENANCE (what produced a value; a contract's failure path,
-  not just its shape) self-trace with file:line evidence before delegating. The reviewer should
-  receive the trace evidence, not just the assertion. Complements the PostToolUse
-  `codex-verbatim-reminder.js`. Fail-open.
+S330 added a plan/review enforcement layer (Codex-built, designed from the four S330 P0
+coverage-miss mechanisms; shared detectors in **`.claude/hooks/lib/document-guards.js`**,
+plain-node tests beside it). All fail open on internal errors; every blocker has a VISIBLE
+in-artifact escape marker — never a silent env var:
+
+- **`pre-review-delegation-trace-guard.js`** — `PreToolUse(Task|Agent)`. The broad
+  LIFECYCLE+PROVENANCE self-trace reminder stays ADVISORY, but repo-local discovery asks in a
+  review delegation prompt ("check whether any routes stream") now BLOCK unless adjacent
+  TRACED:/Evidence: file:line proof or a `[DELEGATED-DISCOVERY: reason]` escape is present.
+  Complements the PostToolUse `codex-verbatim-reminder.js`.
+- **`scope-claim-reminder.js`** — `PreToolUse(Write|Edit)`, now BLOCKS plan docs that mix an
+  unresolved quantity (TBD/[ASSUMED]) with unqualified derived counts on the same subject.
+  Escapes: keep the derived count visibly `[ASSUMED]`, or add `[DERIVED-FROM: <probe>]`;
+  historical log lines must state their resolution inline.
+- **`plan-named-source-read-guard.js`** — `PreToolUse(Write|Edit)`, BLOCKS a plan doc naming a
+  live `pages/`/`lib/` source file with no read evidence in the session transcript (Read,
+  shell readers, or codegraph_explore output all count). Escape: `[NOT-READ: <path> — reason]`.
+- **`session-lifecycle.js`** — tracks docs touched this session; when a `scripts/`/`lib/`
+  source file changes afterward, docs mentioning it get flagged and UNRESOLVED plan/design-doc
+  staleness blocks at Stop. Acks: `[RECHECKED after <path> change: ...]` or
+  `[STALE-ACCEPTED: ...]` on a line mentioning the changed path.
 
 ## Standard Probe
 
