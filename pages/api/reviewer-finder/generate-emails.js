@@ -36,9 +36,9 @@ import { BASE_CONFIG, getModelForApp } from '../../../shared/config/baseConfig';
 import { safeFetch, isAllowedUrl } from '../../../lib/utils/safe-fetch';
 import { readUploadedBlobBuffer } from '../../../lib/utils/uploaded-blob';
 import { isPrivateCycleMaterialPathname } from '../../../lib/utils/cycle-material-ref';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
+import { queryPersons } from '../../../lib/dataverse/adapters/app-request-person';
 import { getById as getRequestById } from '../../../lib/dataverse/adapters/grant-request';
 
 const ROLE_COPI = 100000001;
@@ -87,7 +87,7 @@ async function lookupProposalInfoForCandidates(suggestionIds) {
         console.error(`akoya_request lookup failed for ${rid}:`, err.message);
       }
       try {
-        const { records: copiRows } = await DynamicsService.queryRecords('wmkf_apprequestpersons', {
+        const { records: copiRows } = await queryPersons({
           select: '_wmkf_contact_value,wmkf_authorposition',
           filter: `_wmkf_request_value eq ${rid} and wmkf_role eq ${ROLE_COPI}`,
           orderby: 'wmkf_authorposition asc,createdon asc',
