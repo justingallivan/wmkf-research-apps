@@ -392,7 +392,14 @@ everywhere the other gates are; if declined — record the decision in the Stage
     `contact-history-service.test.js:138` REPLACED with a non-GUID rejection/no-adapter-call pin.
   - **Verification:** targeted jest 36/36; `check:dataverse-access-layer` (+ self-test) exit 0;
     `check:route-service-boundary` exit 0; **full `npm test`: 414 suites / 4680 tests, exit 0.**
-  - Stage 3 (escape law) NOT built — deferred pending owner decision.
+  - Stage 3 (escape law) NOT built at execution time — deferred pending owner decision.
+- 2026-07-05: **Stage 3 (escape-law gate): APPROVED — owner decision (S332, 2026-07-05).** Owner
+  accepted the recommendation to build the grep-gate shape: `scripts/check-odata-escape.js` fails
+  CI on any new hand-rolled OData single-quote escape (`.replace(/'/g, "''")` and variants) under
+  `lib/`/`pages/`/`shared/`/`modules/` outside `lib/dataverse/core/odata.js`, honoring the same
+  out-of-scope carve-outs this plan recorded (doc comments, `dynamics-explorer` exempt dir,
+  `scripts/`). Build in progress this session — the gate's own Stage entry lands here when it
+  clears its self-test and registrations.
   - Staleness recheck (this plan's claims re-read against the executed diff, commit 629d67e4):
     - [RECHECKED after lib/dataverse/role-apply.js change: both sites now `odata.escape`, pins green]
     - [RECHECKED after lib/services/dataverse-settings-service.js change: 3 sites swapped, pins green]

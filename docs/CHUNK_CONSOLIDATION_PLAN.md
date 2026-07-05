@@ -527,4 +527,9 @@ flagged, registered everywhere the other gates are; if declined — record the d
   `npm test` re-run at `8e2fee7e`: **416 suites / 4707 tests, exit 0** `[VERIFIED via npm test this
   session]`. Reviewer also confirmed the round-1 Stage Log relay is faithful and unsoftened.
 
+- 2026-07-05: **Stage 3 (chunk-loop lint/gate law): DECLINED — owner decision (S332, 2026-07-05).**
+  Owner accepted the recommendation: the duplication class is cosmetic (not security-adjacent), the
+  B1-B4/C1 allowlist invites churn, and `lib/utils/chunk.js` is discoverable by example. No gate
+  built; this decision is final unless the owner reopens it.
+
 <!-- end of plan -->

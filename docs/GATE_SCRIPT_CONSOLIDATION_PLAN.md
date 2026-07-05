@@ -52,7 +52,10 @@ and the Stage 0 orphan-visibility verification.
 `docs-catalog.js`, `point-in-time-files.js`) `[VERIFIED via ls scripts/lib/ this session]`. **Neither
 `scripts/lib/selftest-fixture.js` nor `scripts/lib/walk-files.js` exists today**
 `[VERIFIED via ls scripts/lib/ → 8 files, neither present, this session]`.
-[RECHECKED after scripts/lib/selftest-fixture.js change: the helpers were created during Stage 1/Stage 2 execution per this plan's Architecture (`ls scripts/lib/` post-execution shows both) — see the Stage Log execution entry] This is a motion refactor,
+[RECHECKED after scripts/lib/selftest-fixture.js change: the helpers were created during Stage 1/Stage 2 execution per this plan's Architecture (`ls scripts/lib/` post-execution shows both) — see the Stage Log execution entry]
+[RECHECKED after scripts/lib/walk-files.js change: created in Stage 2 per the walkTree spec (1.0K, ls this session; commits 90e6adb/53c5025 adopt it in B1-B6)]
+[RECHECKED after scripts/check-agent-wiki-self-test.js change: 1a-1 adoption — its mkdtemp root now uses registerTmpFixture per commit ecaafdb5; fixtures/env/assertions preserved per the executor's diff discipline, closing review verifying]
+This is a motion refactor,
 not a redesign: same fixtures, same env vars, same red/green assertions, same scanned census, same
 verdicts.
 
@@ -605,5 +608,20 @@ touched gates, self-tests green, no new npm scripts needed; if declined — reco
     suites / 4714 tests (prior 416/4707; +2 suites/+7 tests = exactly the two new unit-test files).
     Frontmatter `status: draft` → `active` per the CHUNK/ODATA precedent; body execution-status
     line updated. Post-execution fresh-context review: not yet run (next session or on request).
+- 2026-07-05: **Closing code review (Codex, fresh-context, range `c054a26e..41e6fe04`): SATISFIED —
+  exercise CLOSED.** Verbatim: *"No code findings. … SATISFIED. Further review rounds are not
+  needed; exercise 3 can close."* Reviewer spot-verified the hardest Cleanup-Timing rows (DAL's 25
+  mid-body cleanups + finally; route matrix dir+file array, mid-body/catch, no finally;
+  fact-consistency 2 dirs; secret-scan's load-bearing finally before its live baseline at `:70`),
+  confirmed 1b-15 untouched, all 9 OS-tmp roots adopted, B1-B6 diffs replace only the inner IIFE
+  with B1/B6 symlink lstat intact, the trace shim inert without `GATE_CENSUS_OUT` and unwired from
+  npm/CI, and no tests deleted. Reviewer ran 5 gates green sequentially; DAL/boundary self-tests
+  and jest hit read-only-sandbox EPERM (not code failures) — those greens rest on this session's
+  executor runs recorded above.
+- 2026-07-05: **Stage 3 (4 code-tree security-gate walks): DECLINED — owner decision (S332,
+  2026-07-05).** Owner accepted the recommendation (drafter and adversarial reviewer independently
+  concurring): the two pairs diverge in `.next` skip, sort, ext set, and `isExemptRel`; merging
+  risks census drift on the crown-jewel DAL/route gates for marginal benefit. The four walks stay
+  hand-rolled; this decision is final unless the owner reopens it.
 
 <!-- end of plan -->
