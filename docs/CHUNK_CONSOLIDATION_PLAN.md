@@ -3,7 +3,7 @@ title: Array-Chunk Consolidation Plan
 domain: architecture
 kind: plan
 status: draft
-summary: "Consolidate hand-rolled array-chunking loops onto lib/utils/chunk.js: 17 mechanical swaps, 3 index-using left with comment, 1 sibling leave. Draft."
+summary: "Consolidate hand-rolled array-chunking loops onto lib/utils/chunk.js: 17 mechanical swaps, 4 index-using left with comment, 1 sibling leave. Draft."
 canonical: true
 cataloged: 2026-07-05
 owner: product-engineering
@@ -52,9 +52,10 @@ DECISION.
 | Canonical helper | `chunk(array, size)` in `lib/utils/chunk.js` — **to be created in Stage 0** | file does not yet exist `[VERIFIED via ls, this session]` |
 | Total `for (let i = 0; i < X.length; i += …)` scaffolds under `lib/ pages/ shared/ modules/` | **23** | `[VERIFIED via grep -rnE "for \(let i = 0; i < [A-Za-z_.]+\.length; i \+= " lib/ pages/ shared/ modules/ --include=*.js \| wc -l = 23]` |
 | — of those, `i += 1` plain-iteration loops (NOT chunk sites) | **2** | `role-apply.js:76` (`ops.length; i += 1`), `discovery-service.js:1015` (`candidates.length; i += 1`) — no `slice`, step 1 `[VERIFIED via grep this session]` |
-| **In-scope chunk sites** (`i += <sizeVar/const>` with a `slice(i, i+size)` body) | **21** (across 14 files) | derived independently: 23 − 2 plain loops = 21 |
-| — MECHANICAL (body never reads `i`) → swap | **17 sites / 12 files** | see Classification |
-| — INDEX-USING (body reads `i`) → leave-with-comment | **3 sites / 3 files** | see Classification |
+| Chunk scaffolds whose counter is NOT named `i` (missed by the grep above; found by review round 1) | **1** — `discovery-service.js:2269` (`batchStart += BATCH_SIZE`) | `[VERIFIED via Read :2265-2305 this session]` — the census grep must ALSO run the any-identifier variant `grep -rnE "for \(let [A-Za-z_]+ = 0; [A-Za-z_]+ < [A-Za-z_.]+\.length; [A-Za-z_]+ \+= " …` |
+| **In-scope chunk sites** (counter `+= <sizeVar/const>` with a `slice(counter, counter+size)` body) | **22** (across 14 files) | derived independently: 23 − 2 plain loops + 1 non-`i` counter = 22 |
+| — MECHANICAL (body never reads the counter) → swap | **17 sites / 12 files** | see Classification |
+| — INDEX-USING (body reads the counter) → leave-with-comment | **4 sites / 4 files** | see Classification |
 | — EXEMPT/LEAVE (sibling-cohesion) | **1 site / 1 file** | `chat.js:2166`, see Classification |
 | Decoys that must NOT be conflated | 8+ `decoder.decode(value,{stream:true})` streaming `chunk` vars in `pages/*.js`; 3 `scripts/` named `chunked/chunks` helpers | `[VERIFIED via grep, listed in Decoys]` |
 | Module format of `lib/utils/` single-purpose helpers | **ESM** (`export function …`) | `guid.js:22`, `date-ymd.js:14`, `orcid-normalize.js:14`, `name-normalization.js:14` all `export function` `[VERIFIED via grep this session]` |
@@ -71,7 +72,7 @@ DECISION.
 | Module / site | Test file | Pins the chunk boundary? |
 |---|---|---|
 | `review-answer.js:80` | `tests/unit/review-answer-adapter.test.js:115-117` | **YES** — 21 ids → asserts split into 20+1 (OR-chain length bound) |
-| `reviewer-rollup.js:35` | `tests/unit/reviewer-rollup.test.js:52-53` | **YES** — 30 ids → asserts chunking at 25 per OR-chain call |
+| `reviewer-rollup.js:35` | `tests/unit/reviewer-rollup.test.js:52-53` | **PARTIAL** — 30 ids → asserts only `toHaveBeenCalledTimes(2)`, NOT batch contents/order `[VERIFIED via Read :52-57 this session; review round 1 finding 2]` — strengthen in Stage 0 |
 | `reviewer-suggestion.js:351` (`aggregateReviewHistory`) | `tests/unit/reviewer-suggestion-review-history.test.js` | **VERIFY in Stage 0** — header says "batched"; confirm it feeds >25 ids and asserts the split, else add |
 | `reviewer-suggestion.js:1000/:1071` (`findByPD`/`findAcceptedByPD`) | `tests/unit/adapter-characterization-stage2.test.js` pins the *filter string*, not the >25 split | **GAP** on the chunk boundary |
 | `reviewer-suggestion-sweep.js:61` | none found | **GAP** |
@@ -80,7 +81,7 @@ DECISION.
 | `discovery-service.js:451` | none found for the concurrency batching | **GAP** |
 | `contact-history-service.js:136` | `tests/unit/contact-history-service.test.js` exists | **VERIFY in Stage 0** — confirm it feeds >50 request ids and asserts the split, else add |
 | `my-candidates-service.js:349/:366/:388` | `tests/unit/my-candidates-service.test.js` (no length>25 fixtures) | **GAP** |
-| `my-proposals-service.js:212` | none found | **GAP** |
+| `my-proposals-service.js:212` | `tests/unit/my-proposals-service.test.js:136` | **PARTIAL** — 30 request rows → asserts `queryAllSuggestions` called twice `[VERIFIED via Read :136-146 this session; review round 1 finding 3 corrected the earlier GAP claim]` — strengthen to contents/order in Stage 0 |
 | `evaluate-multi-perspective.js:233` (`processWithConcurrency`) | none found | **GAP** — generic helper, trivially unit-testable |
 
 ---
@@ -169,7 +170,7 @@ that opening line is untouched.
 
 > Site 11 (`discovery-service.js`) is the **only CJS mechanical site** — it uses `const { chunk: chunked } = require('../utils/chunk.js')`. Interop is proven (Baseline row: `orcid-normalize`/`name-normalization` ESM helpers are already `require`d from CJS services and run green under jest/babel). All other mechanical sites are ESM and use `import { chunk as chunked } from '…/utils/chunk.js'`.
 
-### (b) INDEX-USING → leave the scaffold, add a one-line comment citing this plan (3 sites / 3 files)
+### (b) INDEX-USING → leave the scaffold, add a one-line comment citing this plan (4 sites / 4 files)
 
 **Ruling (pre-made, do not relitigate):** these sites read the counter `i` in the loop body. The
 canonical `chunk(array, size)` intentionally does NOT expose an index — adding an index-bearing
@@ -182,6 +183,7 @@ Therefore these sites are **left exactly as-is**, with a single added comment:
 | B1 | `lib/services/pubmed-service.js:166-167` (`fetchArticles`) | rate-limit "not the last chunk" guard `if (i + chunkSize < pmids.length)` at `:172` before a `setTimeout` delay | `[VERIFIED via Read :166-176]` — **census correction vs the input list, which flagged the delays but not that `i` is load-bearing** |
 | B2 | `lib/services/claude-reviewer-service.js:425-432` (`scoreCandidates` batch loop) | `const batchNum = Math.floor(i / BATCH_SIZE) + 1;` at `:433` for the progress message | `[VERIFIED via Read :425-434]` — **census correction: the input list described this only as an "abort check between batches"; the abort check at `:429` is body-preserved, but `batchNum` reads `i`, making the site INDEX-USING, not a mechanical swap** |
 | B3 | `pages/api/dynamics-explorer/chat.js:2150-2151` (export batch build) | `batches.push({ records: records.slice(i, i + BATCH_SIZE), startIndex: i })` — `startIndex` is stored and later read at `:2205` `records[batch.startIndex + j]` to merge AI results back | `[VERIFIED via Read :2150-2151, :2202-2207]` |
+| B4 | `lib/services/discovery-service.js:2269-2305` (`checkCoauthorshipsForCandidates` COI batch loop; counter named `batchStart`, not `i`) | `batchEnd = Math.min(batchStart + BATCH_SIZE, candidates.length)` at `:2270` feeds the progress message `Checking COI for candidates ${batchStart + 1}-${batchEnd} of ${candidates.length}` at `:2276` and the not-last-batch rate-limit guard `if (batchEnd < candidates.length)` at `:2301` | `[VERIFIED via Read :2265-2305 this session]` — found by review round 1; missed by the `i`-only census grep |
 
 ### (c) EXEMPT/LEAVE (1 site / 1 file)
 
@@ -266,8 +268,8 @@ A gate and its self-test run **sequentially, never in parallel**. A red gate is 
 
 ### Stage 0 — Helper + edge-case unit test + characterization pins (no production behavior change)
 
-1. Re-run the disconfirming census grep (Stage Log); confirm the 21-site / 14-file list still matches
-   (log any drift).
+1. Re-run BOTH disconfirming census greps — the `i`-counter form AND the any-identifier form
+   (Baseline rows 2 and 4); confirm the 22-site / 14-file list still matches (log any drift).
 2. Create `lib/utils/chunk.js` exactly as in "The canonical semantics" (ESM `export function chunk`).
 3. Add `tests/unit/utils/chunk.test.js` covering EVERY edge case:
    - `chunk([1,2,3,4,5], 2)` → `[[1,2],[3,4],[5]]` (partial tail).
@@ -280,10 +282,20 @@ A gate and its self-test run **sequentially, never in parallel**. A red gate is 
      AND an ESM import both resolve and run green under jest/babel — mirrors the exercise-1 Stage Log
      step that recorded `require('…/core/odata.js')` (CJS) and `import * as odata` (ESM) both green.
      (The `require`-from-CJS path is the one that matters for site 11; prove it here before Stage 1.)
-4. For each **GAP / VERIFY** row in the coverage table, add or extend a focused unit test that mocks
-   the downstream client/query and feeds an input of `SIZE + 1` elements, asserting the downstream is
-   called twice with batches of size `SIZE` then `1` (the model already used by
-   `review-answer-adapter.test.js:115` and `reviewer-rollup.test.js:52`). For `VERIFY` rows
+   - **Raw-node interop probe (review round 1 finding 5):** jest/babel green is NOT sufficient for
+     `discovery-service.js` — raw Node scripts load it outside any transpiler
+     (`scripts/test-all-candidates.js:2`, `scripts/probe-scoring-delta.mjs:216`,
+     `scripts/smoke-discover-dispositions.mjs:106` `[VERIFIED via sed of those three lines this
+     session — CJS require + two dynamic imports]`). Run `node -e "require('./lib/services/discovery-service.js')"` (and a
+     `node --input-type=module` import of `lib/utils/chunk.js`) after the Stage 1 Cluster B swap; both
+     must load clean, mirroring the direct-load checks the exercise-1 closing review ran.
+4. For each **GAP / PARTIAL / VERIFY** row in the coverage table, add or extend a focused unit test
+   that mocks the downstream client/query, feeds an input of `SIZE + 1` elements, and asserts —
+   **for every mechanical site, not just call count (review round 1 finding 4)** — (i) the downstream
+   is called exactly twice, (ii) the FIRST call received exactly elements `0..SIZE-1` in order, and
+   (iii) the SECOND call received exactly element `SIZE` (assert the actual ids/contents passed, e.g.
+   via `mock.calls[0]` argument inspection, the model of `review-answer-adapter.test.js:115`). A
+   call-count-only pin cannot distinguish reordered or misassigned batches. For `VERIFY` rows
    (`reviewer-suggestion-review-history.test.js`, `contact-history-service.test.js`) first read the
    test; if it already feeds `> SIZE` and asserts the split, record "already pinned"; else extend it.
    - `evaluate-multi-perspective.js` `processWithConcurrency`: call it directly with 3 items and
@@ -322,14 +334,18 @@ chunk scaffold remains in those 12 files; Stage 0 pins unchanged-green; full sui
 misclassified. If CJS↔ESM interop for `chunk.js` is uncertain in `discovery-service.js`, re-run the
 Stage 0 interop pin before guessing.
 
-### Stage 2 — INDEX-USING comments (B1–B3) + confirm EXEMPT (C1)
+### Stage 2 — INDEX-USING comments (B1–B4) + EXEMPT comment (C1)
 
-- Add the one-line "index-bearing; not consolidated" comment (Decision 3 wording, Classification (b))
-  at B1 (`pubmed-service.js:166`), B2 (`claude-reviewer-service.js:425`), B3 (`chat.js:2150`). No code
-  behavior change; no test change (existing tests must stay green).
-- C1 (`chat.js:2165`) — no edit; record it as "left for sibling cohesion" in the Stage Log.
+- Add the one-line "index-bearing; not consolidated" comment (Classification (b) wording)
+  at B1 (`pubmed-service.js:166`), B2 (`claude-reviewer-service.js:425`), B3 (`chat.js:2150`), and
+  B4 (`discovery-service.js:2269`). No code behavior change; no test change (existing tests must
+  stay green).
+- C1 (`chat.js:2165`) — **add an in-code comment too** (review round 1 finding 6):
+  `// Mechanically swappable, but left hand-rolled for cohesion with the index-bearing sibling loop above (startIndex merge). See docs/CHUNK_CONSOLIDATION_PLAN.md C1.`
+  An uncommented exception invites a future "cleanup" that half-refactors the function; if Stage 3 is
+  built, C1 joins the allowlist.
 
-**Done means:** B1–B3 carry the citing comment; C1 recorded; gates green; full suite green.
+**Done means:** B1–B4 and C1 carry their citing comments; gates green; full suite green.
 
 ### Stage 3 — Chunk-loop lint/gate law (OPTIONAL — OWNER DECISION)
 
@@ -337,10 +353,11 @@ Prevent NEW hand-rolled `for (let i = 0; i < X.length; i += N) { … slice(i, i 
 from reappearing. **Owner decides whether to build this.**
 
 Proposed shape (pick one):
-- **Grep gate** `scripts/check-array-chunk.js`: fail if the `for (let i …; i += <sizeVar>) { … slice(i, i + <same>) }`
-  scaffold appears under `lib/`/`pages/`/`shared/`/`modules/`, EXCEPT `lib/utils/chunk.js` itself and
-  the recorded INDEX-USING allowlist (B1–B3) + EXEMPT (C1). Must NOT flag `i += 1` plain loops or the
-  stream-decode decoys. Register in `package.json`, `docs/CI_GATES_REFERENCE.md`, the `/start` gate
+- **Grep gate** `scripts/check-array-chunk.js`: fail if the chunk scaffold appears under
+  `lib/`/`pages/`/`shared/`/`modules/` — matching ANY counter identifier, not just `i`
+  (review round 1 finding 1: `batchStart += BATCH_SIZE` at `discovery-service.js:2269` evaded the
+  `i`-only pattern) — EXCEPT `lib/utils/chunk.js` itself and the recorded INDEX-USING allowlist
+  (B1–B4) + EXEMPT (C1). Must NOT flag `+= 1` plain loops or the stream-decode decoys. Register in `package.json`, `docs/CI_GATES_REFERENCE.md`, the `/start` gate
   list, and `.github/workflows/test.yml`; ship a self-test proving it catches a new hand-rolled site
   and passes on `chunked(…)` usage, on the allowlisted index loops, and on the decoys.
 - **ESLint `no-restricted-syntax`** targeting the `slice(i, i + N)`-inside-`for`-with-`i += N` shape.
@@ -389,5 +406,30 @@ flagged, registered everywhere the other gates are; if declined — record the d
   - No behavioral STOP-AND-ASK sites. Deferred: Stage 3 gate (OWNER DECISION); two coverage rows
     (`reviewer-suggestion-review-history.test.js`, `contact-history-service.test.js`) to VERIFY in
     Stage 0 before claiming existing chunk-boundary coverage.
+- 2026-07-05: **Adversarial plan review round 1 (Codex, fresh-context): NOT SATISFIED — 6 findings,
+  all verified against source this session and folded in.** Verbatim severities/titles:
+  (1) *P0 — Census is incomplete* — `checkCoauthorshipsForCandidates` chunk loop at
+  `discovery-service.js:2269` uses counter `batchStart`, evading the `i`-only census grep; added as
+  **B4 INDEX-USING** (reads `batchStart`/`batchEnd`/`candidates.length` in the progress message and
+  the not-last-batch delay guard). Census corrected **21→22 sites / 14 files; index-using 3→4**; the
+  any-identifier census grep added to Baseline and Stage 0 (disconfirming re-run this session found
+  exactly this one non-`i` scaffold repo-wide).
+  (2) *HIGH — coverage table overclaims `reviewer-rollup`* — `reviewer-rollup.test.js:52` pins call
+  count only; row downgraded YES→PARTIAL, strengthen in Stage 0.
+  (3) *HIGH — false GAP for `my-proposals-service`* — `my-proposals-service.test.js:136` already pins
+  the 25+5 split (call count); row corrected GAP→PARTIAL.
+  (4) *MEDIUM — Stage 0 pins under-specified* — pins now must assert exact batch CONTENTS and ORDER
+  via `mock.calls` inspection at every mechanical site, not call counts.
+  (5) *MEDIUM — raw-Node interop matters for `discovery-service`* — it is loaded by raw node scripts
+  (`test-all-candidates.js:2` require; `probe-scoring-delta.mjs:216` and
+  `smoke-discover-dispositions.mjs:106` dynamic import `[VERIFIED via sed this session]`); Stage 0/1
+  gain a `node -e` direct-load probe.
+  (6) *LOW — C1 uncommented exception* — Stage 2 now adds an in-code sibling-cohesion comment at C1
+  and puts it on the Stage 3 allowlist.
+  Reviewer also independently confirmed: no `while`+`splice` / `Array.from(Math.ceil())` / reduce /
+  `i = i + N` / generator chunkers in scope; the 2 excluded `+= 1` loops are not chunk sites; the 17
+  MECHANICAL bodies are clean of indirect counter reads and source mutation; all live size inputs are
+  positive constants (discovery `4`, evaluate route `2`, COI loop `5` or `2`); the dynamics-explorer
+  exempt-dir rejection is correct (DAL-gate scoped). Amendments committed; execution may start.
 
 <!-- end of plan -->

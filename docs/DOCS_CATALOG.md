@@ -35,7 +35,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [CHUNK_CONSOLIDATION_PLAN.md](CHUNK_CONSOLIDATION_PLAN.md) | plan | draft | yes | Consolidate hand-rolled array-chunking loops onto lib/utils/chunk.js: 17 mechanical swaps, 3 index-using left with comment, 1 sibling leave. Draft. | 2026-07-05 |
+| [CHUNK_CONSOLIDATION_PLAN.md](CHUNK_CONSOLIDATION_PLAN.md) | plan | draft | yes | Consolidate hand-rolled array-chunking loops onto lib/utils/chunk.js: 17 mechanical swaps, 4 index-using left with comment, 1 sibling leave. Draft. | 2026-07-05 |
 | [DIAGRAM_BEHAVIORAL_FLOW.md](DIAGRAM_BEHAVIORAL_FLOW.md) | spec | active |  | This sequence diagram traces a concrete execution path (e.g., /api/process-phase-i), showing how services interact during an AI analysis task. | 2026-07-02 |
 | [DIAGRAM_DATA_ENGINE.md](DIAGRAM_DATA_ENGINE.md) | spec | active |  | This pipeline visualization focuses on the internal data complexities, specifically the OData parser and identity merging required for Dataverse. | 2026-07-02 |
 | [DIAGRAM_SECURITY_FORTRESS.md](DIAGRAM_SECURITY_FORTRESS.md) | spec | active |  | This flowchart demonstrates the \"Fail-Closed\" security architecture mandated by the project guidelines, highlighting the specific restriction... | 2026-07-02 |
