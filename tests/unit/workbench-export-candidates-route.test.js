@@ -71,6 +71,14 @@ test('non-POST → 405', async () => {
   expect(res.statusCode).toBe(405);
 });
 
+test('unauthenticated caller: short-circuit, no request/export work attempted', async () => {
+  requireAppAccess.mockResolvedValueOnce(null);
+  const res = mockRes();
+  await handler(reqOf(body()), res);
+  expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+  expect(buildReviewerCandidateWorkbook).not.toHaveBeenCalled();
+});
+
 test('invalid requestId → 400, no read attempted', async () => {
   const res = mockRes();
   await handler(reqOf(body({ requestId: 'not-a-guid' })), res);
@@ -78,16 +86,41 @@ test('invalid requestId → 400, no read attempted', async () => {
   expect(DynamicsService.getRecord).not.toHaveBeenCalled();
 });
 
-test('golden path: builds the workbook from the authoritatively-fetched request metadata', async () => {
+test('empty candidates array → 400, no read attempted', async () => {
+  const res = mockRes();
+  await handler(reqOf(body({ candidates: [] })), res);
+  expect(res.statusCode).toBe(400);
+  expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+});
+
+test('too many candidates (>500) → 400, no read attempted', async () => {
+  const res = mockRes();
+  const many = Array.from({ length: 501 }, (_, i) => ({ name: `Reviewer ${i}` }));
+  await handler(reqOf(body({ candidates: many })), res);
+  expect(res.statusCode).toBe(400);
+  expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+});
+
+test('golden path: builds the workbook from the authoritatively-fetched request metadata (full envelope pin)', async () => {
   const res = mockRes();
   await handler(reqOf(body()), res);
   expect(res.statusCode).toBe(200);
   expect(DynamicsService.getRecord).toHaveBeenCalledWith('akoya_requests', REQUEST_ID, { select: REQUEST_SELECT });
   expect(buildReviewerCandidateWorkbook).toHaveBeenCalledWith({
-    meta: expect.objectContaining({ requestNumber: '1002794', institution: 'Example University', pi: 'Dr. Ada Lovelace' }),
+    meta: expect.objectContaining({
+      requestNumber: '1002794',
+      institution: 'Example University',
+      pi: 'Dr. Ada Lovelace',
+      applicant: null,
+      title: 'A Study',
+      program: null,
+      cycleLabel: 'June 2026',
+    }),
     candidates: body().candidates,
   });
   expect(res.headers['Content-Type']).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  expect(res.headers['Content-Disposition']).toMatch(/^attachment; filename="reviewer-candidates-1002794-\d{4}-\d{2}-\d{2}\.xlsx"$/);
+  expect(res.headers['Content-Length']).toBe(Buffer.from('xlsx-bytes').length);
   expect(res.body).toEqual(Buffer.from('xlsx-bytes'));
 });
 

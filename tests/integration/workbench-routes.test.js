@@ -213,6 +213,14 @@ describe('/api/workbench/dashboard', () => {
     await handler(createMockReq({ method: 'POST' }), res);
     expect(res.status).toHaveBeenCalledWith(405);
   });
+
+  it('404s when the caller has no active Dynamics systemuser', async () => {
+    mockAuthenticatedUser(1, ['reviewers']);
+    resolveByEmail.mockResolvedValueOnce(null);
+    const res = createMockRes();
+    await handler(createMockReq({ method: 'GET' }), res);
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
 });
 
 describe('/api/workbench/resolve-request', () => {
@@ -231,6 +239,13 @@ describe('/api/workbench/resolve-request', () => {
     const res = createMockRes();
     await handler(createMockReq({ method: 'GET' }), res);
     expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it('rejects a non-GET method', async () => {
+    mockAuthenticatedUser(1, ['reviewers']);
+    const res = createMockRes();
+    await handler(createMockReq({ method: 'POST' }), res);
+    expect(res.status).toHaveBeenCalledWith(405);
   });
 
   it('resolves a request number to its GUID + cycle for a reviewers grant', async () => {

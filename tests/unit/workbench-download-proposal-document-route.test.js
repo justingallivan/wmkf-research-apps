@@ -76,16 +76,43 @@ test('non-GET → 405', async () => {
   expect(res.statusCode).toBe(405);
 });
 
-test('golden path: streams the requested file with proxied headers', async () => {
+test('unauthenticated caller: short-circuit, no request/document work attempted', async () => {
+  requireAppAccess.mockResolvedValueOnce(null);
+  const res = mockRes();
+  await handler(reqOf(query()), res);
+  expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+  expect(GraphService.downloadFileByPath).not.toHaveBeenCalled();
+});
+
+test('golden path: streams the requested file with proxied headers (full envelope pin)', async () => {
   const res = mockRes();
   await handler(reqOf(query()), res);
   expect(res.statusCode).toBe(200);
   expect(DynamicsService.getRecord).toHaveBeenCalledWith('akoya_requests', REQUEST_ID, {
     select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate',
   });
-  expect(res.headers['Content-Type']).toBe('application/pdf');
-  expect(res.headers['Content-Length']).toBe(9);
+  expect(res.headers).toEqual({
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': 'attachment; filename="proposal.pdf"',
+    'Content-Length': 9,
+    'Cache-Control': 'private, max-age=300',
+    'X-Content-Type-Options': 'nosniff',
+  });
   expect(res.body).toEqual(Buffer.from('pdf-bytes'));
+});
+
+test('?disposition=inline on a safe MIME type serves inline; unsafe types stay attachment', async () => {
+  const res = mockRes();
+  await handler(reqOf({ ...query(), disposition: 'inline' }), res);
+  expect(res.headers['Content-Disposition']).toBe('inline; filename="proposal.pdf"');
+});
+
+test('folder GUID suffix mismatch → 403 before the wrapped scope check runs', async () => {
+  const res = mockRes();
+  await handler(reqOf(query({ folder: `1002794_${'0'.repeat(32)}/Phase I` })), res);
+  expect(res.statusCode).toBe(403);
+  expect(res.body).toEqual({ error: 'Folder does not belong to the specified request' });
+  expect(DynamicsService.getRecord).not.toHaveBeenCalled();
 });
 
 test('request not found → 404, no download attempted', async () => {

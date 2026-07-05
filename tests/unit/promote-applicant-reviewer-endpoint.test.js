@@ -60,6 +60,14 @@ it('405s on non-POST', async () => {
   expect(r.headers.Allow).toBe('POST');
 });
 
+it('unauthenticated caller: short-circuit, no request/promotion work attempted', async () => {
+  requireAppAccess.mockResolvedValueOnce(null);
+  const r = res();
+  await handler(post({ requestId: REQUEST_ID, suggestionId: SUGGESTION_ID }), r);
+  expect(findById).not.toHaveBeenCalled();
+  expect(updateLifecycle).not.toHaveBeenCalled();
+});
+
 it('400s on non-GUID ids before any Dataverse selector', async () => {
   const r = res();
   await handler(post({ requestId: 'not-a-guid', suggestionId: SUGGESTION_ID }), r);

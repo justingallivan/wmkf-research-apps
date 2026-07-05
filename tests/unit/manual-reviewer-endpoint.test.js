@@ -106,6 +106,15 @@ describe('validation', () => {
     expect(getRecord).not.toHaveBeenCalled();
   });
 
+  it('404s when the request GUID does not resolve', async () => {
+    getRecord.mockRejectedValueOnce(new Error('not found'));
+    const r = res();
+    await handler(post({ requestId: REQ, name: 'Ada Lovelace' }), r);
+    expect(r.statusCode).toBe(404);
+    expect(r.body).toEqual({ error: `No request found for ${REQ}` });
+    expect(createReviewer).not.toHaveBeenCalled();
+  });
+
   it('rejects a bad requestId, missing name, and malformed email', async () => {
     let r = res();
     await handler(post({ requestId: 'not-a-guid', name: 'Ada Lovelace' }), r);

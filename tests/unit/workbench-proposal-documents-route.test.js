@@ -55,6 +55,14 @@ test('non-GET → 405', async () => {
   expect(res.statusCode).toBe(405);
 });
 
+test('unauthenticated caller: short-circuit, no request/document work attempted', async () => {
+  requireAppAccess.mockResolvedValueOnce(null);
+  const res = mockRes();
+  await handler(reqOf({ requestId: REQUEST_ID }), res);
+  expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+  expect(listProposalDocuments).not.toHaveBeenCalled();
+});
+
 test('missing/invalid requestId → 400, no read attempted', async () => {
   let res = mockRes();
   await handler(reqOf({}), res);
@@ -74,7 +82,13 @@ test('golden path: resolves scope from the record, not the raw query param', asy
     select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate',
   });
   expect(listProposalDocuments).toHaveBeenCalledWith(REQUEST_ID, '1002794', 'J26');
-  expect(res.body).toMatchObject({ success: true, slots: expect.any(Array), otherDocuments: [] });
+  expect(res.body).toEqual({
+    success: true,
+    slots: [{ found: true, library: 'Documents', folder: 'x', name: 'proposal.pdf' }],
+    otherDocuments: [],
+    libraries: ['Documents'],
+    errors: [],
+  });
 });
 
 test('request not found → 404, no document listing attempted', async () => {

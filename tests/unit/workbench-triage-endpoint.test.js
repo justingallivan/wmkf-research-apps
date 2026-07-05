@@ -65,10 +65,19 @@ test('405 on non-POST', async () => {
   expect(r.statusCode).toBe(405);
 });
 
-test('lead PD can set triage — writes only wmkf_triagestatus', async () => {
+test('unauthenticated caller: short-circuit, no record read or write attempted', async () => {
+  requireAppAccess.mockResolvedValueOnce(null);
+  const r = res();
+  await handler(post({ requestId: REQ, triageStatus: TRIAGE_STATUS.ADVANCING }), r);
+  expect(getRecord).not.toHaveBeenCalled();
+  expect(updateRecord).not.toHaveBeenCalled();
+});
+
+test('lead PD can set triage — writes only wmkf_triagestatus, full envelope pin', async () => {
   const r = res();
   await handler(post({ requestId: REQ, triageStatus: TRIAGE_STATUS.ADVANCING }), r);
   expect(r.statusCode).toBe(200);
+  expect(r.body).toEqual({ success: true, requestId: REQ, triageStatus: TRIAGE_STATUS.ADVANCING });
   expect(updateRecord).toHaveBeenCalledTimes(1);
   const [entitySet, id, patch] = updateRecord.mock.calls[0];
   expect(entitySet).toBe('akoya_requests');

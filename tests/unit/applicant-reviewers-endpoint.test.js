@@ -33,10 +33,11 @@ jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: { getRecord: (...a) => getRecord(...a) },
 }));
 
-// No slots populated, so ensureApplicantRecommended is never invoked; mock the
+// No slots populated, so ensureApplicantRecommended is never invoked by default; mock the
 // module anyway so its dataverse-adapter transitive deps don't load.
+const ensureApplicantRecommended = jest.fn(async () => ({ id: 'sug-1', created: true, skippedExcluded: false }));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
-  ensureApplicantRecommended: jest.fn(),
+  ensureApplicantRecommended: (...a) => ensureApplicantRecommended(...a),
 }));
 
 jest.mock('../../lib/utils/cycle-code', () => ({ meetingDateToCycleCode: () => null }));
@@ -70,6 +71,19 @@ function get(requestId = VALID_GUID) {
 beforeEach(() => {
   jest.clearAllMocks();
   requireAppAccess.mockResolvedValue({ profileId: 7, session: { user: {} } });
+  getRecord.mockResolvedValue({
+    akoya_requestid: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    akoya_requestnum: '1002788',
+    akoya_title: 'Engineered gene circuits',
+    wmkf_meetingdate: null,
+    wmkf_excludedreviewers: 'Mya Breitbart',
+  });
+  ensureApplicantRecommended.mockResolvedValue({ id: 'sug-1', created: true, skippedExcluded: false });
+  extractExcludedReviewers.mockResolvedValue({
+    names: [{ name: 'Mya Breitbart', affiliation: null }],
+    substantive: true,
+    parseFailed: false,
+  });
 });
 
 describe('handler gates', () => {
@@ -80,11 +94,17 @@ describe('handler gates', () => {
     expect(loadModelOverrides).not.toHaveBeenCalled();
   });
 
-  it('stops when auth fails', async () => {
-    requireAppAccess.mockResolvedValue(null);
+  it('unauthenticated caller: 401 short-circuit, no work performed', async () => {
+    requireAppAccess.mockImplementation(async (_req, resArg) => {
+      resArg.status(401).json({ error: 'Unauthorized' });
+      return null;
+    });
     const r = res();
     await handler(get(), r);
+    expect(r.statusCode).toBe(401);
+    expect(loadModelOverrides).not.toHaveBeenCalled();
     expect(extractExcludedReviewers).not.toHaveBeenCalled();
+    expect(getRecord).not.toHaveBeenCalled();
   });
 
   it('400s on a non-GUID requestId', async () => {
@@ -92,6 +112,15 @@ describe('handler gates', () => {
     await handler(get('not-a-guid'), r);
     expect(r.statusCode).toBe(400);
     expect(loadModelOverrides).not.toHaveBeenCalled();
+  });
+
+  it('404s when the request GUID does not resolve', async () => {
+    getRecord.mockRejectedValueOnce(new Error('not found'));
+    const r = res();
+    await handler(get(), r);
+    expect(r.statusCode).toBe(404);
+    expect(r.body).toEqual({ error: `No request found for ${VALID_GUID}` });
+    expect(extractExcludedReviewers).not.toHaveBeenCalled();
   });
 });
 
@@ -111,5 +140,48 @@ describe('excluded-reviewer extraction', () => {
     expect(extractExcludedReviewers).toHaveBeenCalledTimes(1);
     expect(loadModelOverrides.mock.invocationCallOrder[0])
       .toBeLessThan(extractExcludedReviewers.mock.invocationCallOrder[0]);
+  });
+});
+
+describe('happy-path envelope (full pin)', () => {
+  it('pins the exact 200 response shape for a populated-slot request', async () => {
+    getRecord.mockResolvedValue({
+      akoya_requestid: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      akoya_requestnum: '1002788',
+      akoya_title: 'Engineered gene circuits',
+      wmkf_meetingdate: null,
+      wmkf_excludedreviewers: 'Mya Breitbart',
+      _wmkf_potentialreviewer1_value: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+      _wmkf_potentialreviewer1_value_formatted: 'Dr. Slot One',
+    });
+    ensureApplicantRecommended.mockResolvedValue({ id: 'sugg-slot1', created: true, skippedExcluded: false });
+    const r = res();
+    await handler(get(), r);
+    expect(r.statusCode).toBe(200);
+    expect(r.body).toEqual({
+      success: true,
+      requestId: VALID_GUID,
+      requestNumber: '1002788',
+      cycleCode: null,
+      recommended: [{
+        slot: 1,
+        potentialReviewerId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        name: 'Dr. Slot One',
+        suggestionId: 'sugg-slot1',
+        created: true,
+        skippedExcluded: false,
+      }],
+      recommendedCount: 1,
+      recommendedCreated: 1,
+      slotsPopulated: 1,
+      recommendedFailed: undefined,
+      recommendedComplete: true,
+      excluded: [{ name: 'Mya Breitbart', affiliation: null }],
+      excludedNames: ['Mya Breitbart'],
+      excludedRaw: 'Mya Breitbart',
+      excludedSubstantive: true,
+      excludedParseFailed: false,
+      errors: undefined,
+    });
   });
 });
