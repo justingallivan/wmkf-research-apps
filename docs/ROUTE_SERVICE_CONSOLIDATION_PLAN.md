@@ -582,6 +582,38 @@ review verdict + findings + resolutions)*
   all 15 sibling routes checked clean. High-risk semantics, characterization integrity
   (both declared exceptions exactly as declared, no other drift), and the census chain
   33→24→23→17 all verified.
+- 2026-07-05 (S331): **Stage 5 (fail-closed tail, 17 routes, four batches) executed —
+  census ZERO, 49/49 converted.** Batch 1 (`8f731a0d`/`57fed98c`): admin ×4 +
+  expertise-finder ×2 + field-primer + root test-email (service placed under
+  lib/services/admin/ — requireSuperuser diagnostic tooling; guards byte-untouched;
+  test-email's two branch labels kept via dispatch-selected label; field-primer Mode B
+  verified pure-LLM → context stays on Mode A only); census 17→9. Batch 2 (`b85c870f`):
+  grant-reporting ×2 + phase-i-dynamics — S330 audit fix preserved as a DECLARED
+  Decision-3 exception (extract-service keeps its per-write
+  withDalContext('grant-reporting-extract-ai-log'), narrower trust preferred over widening
+  across the LLM pipeline); classifyFile moved to its canonical
+  lib/services/grant-reporting/classify-file.js home; census 9→6. Batch 3 (`5f4dc863`):
+  external token routes — token boundaries byte-identical (token IS the auth); drain
+  contract (enqueue accept_pending BEFORE Dataverse PATCH) pinned at both levels; context's
+  five branch-specific scopes preserved per the P1m caveat; census 6→3. Batch 4
+  (`787feb00`, `a1a07876`): two cron routes with NAMED idempotency mechanisms
+  (grantee-deliverable-reminders: claim-before-send — status flip with If-Match BEFORE
+  createAndSendEmail, so double-send is impossible and the failure mode is a missed
+  reminder; generate-grantee-titles: write-when-empty + fresh-ETag If-Match) — then a
+  STOP-AND-ASK on drain-submissions that surfaced a REAL LATENT PRODUCTION DEFECT: the
+  drain's adapter writes ran with no trusted DAL context, fail-closed under
+  DATAVERSE_DAL_ENFORCEMENT since the S330 prod flip (enforcement probe confirmed; drain
+  suites mock dynamics-service wholesale which is why tests were green; prod logs clean
+  because idle ticks 200 regardless). Owner-side ruling: fixed in `787feb00` —
+  processJob wraps every state handler in withDalContext('drain-submissions') per the DAL
+  Stage 7 doctrine; regression test drives the real context machinery; recordFailure
+  bookkeeping deliberately outside. **MORNING FLAG: verify prod intake drains end-to-end;
+  jobs that parked terminal since the flip may need manual requeue.** (`787feb00` also
+  carries the two cron extractions — commit message describes only the fix; recorded here
+  for accuracy.) Final extraction (`a1a07876`): 892-line drain engine service; census
+  3→1→0. Suite 4670/4670 (409 suites). Running sum: 49 of 49 converted `[VERIFIED via
+  census 49→0 across the per-stage boundary gate runs logged above]`. Post-stage review:
+  next entry.
 
 ### Stage 0 route→test inventory (2026-07-04, S331)
 
