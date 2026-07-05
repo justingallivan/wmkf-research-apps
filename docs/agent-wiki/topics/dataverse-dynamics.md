@@ -64,6 +64,16 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   of by the static gate); see `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`
   stage log Session 330 entry.
 - Validate OData before issuing it.
+- **Route→Service layout is law (Route→Service consolidation Stage 7,
+  2026-07-05):** `pages/api` routes are thin shells and may not import
+  `lib/dataverse/adapters/*` or `lib/services/dynamics-service` — business
+  logic lives in per-domain `lib/services/<domain>/` services (only the
+  services touch adapters/`DynamicsService`). Enforced by
+  `check:route-service-boundary` in law mode (no baseline, no ratchet)
+  `[VERIFIED via scripts/check-route-service-boundary.js checkLaw + the live
+  gate run at census 0, 2026-07-05]`; exempt dirs remain
+  `pages/api/dynamics-explorer/` + `pages/api/dataverse-export/`. See
+  `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md`.
 - Entity/table schemas, read/write paths, source-of-truth, and drop status live in the Atlas.
 - Existing databases use `node scripts/apply-migrations.js`; `scripts/setup-database.js` is fresh-install-only.
 

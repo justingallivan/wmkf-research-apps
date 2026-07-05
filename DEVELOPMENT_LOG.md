@@ -10,6 +10,18 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Route→Service consolidation: all 49 routes shelled, gate promoted to law, drain prod defect fixed (Session 331)
+
+**Milestone:** The Route→Service consolidation campaign (planned S330) executed end-to-end in one overnight autonomous session — Stages 0-7, census 49→0: every in-scope `pages/api` route became a thin shell over a new `lib/services/<domain>/` service, and `check:route-service-boundary` was promoted from ratchet to permanent law. Mid-campaign, the Stage 5 STOP-AND-ASK discipline surfaced a real latent production defect: the intake drain's Dataverse writes ran with no trusted DAL context — fail-closed broken since the S330 enforcement flip — fixed same session with a per-job `withDalContext` and a real-machinery regression test.
+**Sessions:** 331 (plan authored + P0-approved S330).
+**Ship state:**
+- 51 files across 11 new domain-service directories; suite 4188→4670 (+482 characterization/service tests); build green; all gates green.
+- Streaming template (P1s) and multi-verb template (P1m, with branch-scope caveat) ratified by fresh-context Codex checkpoints; `ServiceHttpError` base shapes every shell's error mapping; five stage reviews all cleared with same-session finding resolution.
+- Boundary gate hardened through five adversarial rounds during Stage 0 (binding taint, fail-closed non-literal sources, late-assignment + alias-chain provenance) before any extraction began.
+- **MORNING FLAG:** verify prod intake drains end-to-end post-deploy; jobs parked terminal since the flip may need manual requeue.
+**Why it matters:** the layer above the DAL is now structurally clean and law-enforced (guard → validate → context → service call → map), business logic is unit-testable for the first time across 49 routes, and the in-campaign bypass strip converted every legacy route-level `bypassDynamicsRestrictions` it touched.
+**Pointers:** `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md` Stage Log (execution + review record); `scripts/check-route-service-boundary.js` (law); `lib/services/cron/drain-submissions-service.js` (drain fix); commits `311f4879`…close-out.
+
 ## July 2026 — DAL security-complete: prod enforcement live, gate hardened to real law, harness enforcement hooks (Session 330)
 
 **Milestone:** `DATAVERSE_DAL_ENFORCEMENT=on` shipped to production (Vercel env + redeploy, `reviews.wmkeck.org`) after the last security gaps closed the same session: the S329 email-write High (3 asserts + tests, Codex pass-with-findings), and a Codex adversarial review of the Stage 8 gate itself (verdict "not sound as load-bearing law yet" — 3 Highs: ordinary JS indirection escaped the census) fixed via a sanctioned-reference audit designed through a 5-round Codex iteration to SATISFIED.

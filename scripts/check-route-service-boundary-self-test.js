@@ -57,8 +57,9 @@
  * module-scope local while exporting only its OWN functions (the live
  * app-access/database/settings-service shape) -- must NOT fail closed.
  *
- * Plus: the wave taxonomy fails closed on an unclassifiable route, and the
- * ratchet fires when the count diverges from the committed baseline.
+ * LAW MODE (Stage 7): the default run must exit non-zero naming EVERY red
+ * route (no baseline, no ratchet — zero boundary routes is the only passing
+ * state), and a green-only fixture tree must exit 0.
  */
 
 const fs = require('fs');
@@ -286,10 +287,10 @@ function runDetectionAssertions() {
   expect(entries.length === RED_ROUTES.length,
     `expected exactly ${RED_ROUTES.length} boundary routes, got ${entries.length}`);
 
-  // (g) root-level classification: domain '(root)', Stage 5.
+  // (g) root-level routes carry the '(root)' domain (not skipped).
   const root = entries.find((e) => e.file === 'pages/api/red-root.js');
-  expect(root && root.domain === '(root)' && root.stage === 5,
-    `root-level route not classified as (root)/Stage 5: ${JSON.stringify(root)}`);
+  expect(root && root.domain === '(root)',
+    `root-level route not attributed to the (root) domain: ${JSON.stringify(root)}`);
 
   // (c) re-export taint attributed to the wrapper.
   const reexport = entries.find((e) => e.file === 'pages/api/reviewer-finder/red-reexport.js');
@@ -324,55 +325,39 @@ function runReportAssertions() {
   const run = runGate(['--report']);
   expect(run.status === 0, `--report exited ${run.status}\n${run.output}`);
   expect(run.output.includes('Route-service boundary census'), 'report missing header');
-  expect(run.output.includes('## Wave classification'), 'report missing wave classification');
-  expect(run.output.includes('Stage 5 - tail'), 'report missing tail stage heading');
+  expect(run.output.includes('law mode since Stage 7'), 'report missing law-mode banner');
+  expect(run.output.includes('## Boundary-importing routes'), 'report missing route listing');
+  expect(run.output.includes('| workbench |'), 'report missing the domain rollup');
   console.log('PASS report assertions');
 }
 
-function runUnclassifiableAssertion() {
-  cleanup();
-  write(tempRoot, 'lib/dataverse/adapters/reviewer-suggestion.js', `
-    export function getById(id) { return { id }; }
-  `);
-  // Route under a domain outside the Stage 1-5 taxonomy must fail closed.
-  write(tempRoot, 'pages/api/unknown-widget/foo.js', `
-    import { getById } from '../../../lib/dataverse/adapters/reviewer-suggestion.js';
-    export default function handler(req, res) { return getById(req.query.id); }
-  `);
-
-  const run = runGate(['--json']);
-  expect(run.status !== 0, 'unclassifiable route should fail, exited 0');
-  expect(run.output.includes('unclassifiable'), `expected unclassifiable error, got:\n${run.output}`);
-  expect(run.output.includes('pages/api/unknown-widget/foo.js'), `error did not name the route:\n${run.output}`);
-  console.log('PASS unclassifiable route fails closed');
-}
-
-function runRatchetFallAssertion() {
+// Stage 7 LAW MODE: the default run fails closed on ANY in-scope boundary
+// route -- exit non-zero, naming every red route -- with no baseline involved.
+// Greens (incl. exempt dirs) never appear; a green-only tree exits 0.
+function runLawModeAssertions() {
   setupFixtures();
-  // Fixture has 11 boundary routes. Both ratchet directions are pinned with
-  // FIXTURE-LOCAL baselines via --baseline: this case previously read the
-  // LIVE repo baseline and broke the day the campaign census hit 0 (the
-  // fall-case fixture suddenly read as a rise). Never couple to live counts.
-  const fallBaseline = path.join(tempRoot, 'baseline-fall.json');
-  fs.writeFileSync(fallBaseline, JSON.stringify({ boundaryImportingRoutes: 49 }));
-  const fall = runGate(['--baseline', JSON.stringify(fallBaseline)]);
-  expect(fall.status !== 0, 'ratchet should fail on a falling count until the baseline is updated');
-  expect(fall.output.includes('RATCHET UPDATE REQUIRED'), `expected ratchet-update message, got:\n${fall.output}`);
-  expect(/fell from 49 to 11/.test(fall.output), `expected 'fell from 49 to 11', got:\n${fall.output}`);
 
-  const riseBaseline = path.join(tempRoot, 'baseline-rise.json');
-  fs.writeFileSync(riseBaseline, JSON.stringify({ boundaryImportingRoutes: 3 }));
-  const rise = runGate(['--baseline', JSON.stringify(riseBaseline)]);
-  expect(rise.status !== 0, 'ratchet should fail on a rising count');
-  expect(rise.output.includes('RATCHET VIOLATION'), `expected ratchet-violation message, got:\n${rise.output}`);
-  expect(/rose from 3 to 11/.test(rise.output), `expected 'rose from 3 to 11', got:\n${rise.output}`);
+  const red = runGate([]);
+  expect(red.status !== 0, `law mode should fail with boundary routes present, exited 0:\n${red.output}`);
+  expect(red.output.includes('LAW VIOLATION'), `expected LAW VIOLATION message, got:\n${red.output}`);
+  for (const route of RED_ROUTES) {
+    expect(red.output.includes(route), `law failure did not name ${route}:\n${red.output}`);
+  }
+  for (const green of GREEN_ROUTES) {
+    expect(!red.output.includes(green), `law failure wrongly named GREEN fixture ${green}:\n${red.output}`);
+  }
+  expect(!fs.existsSync(path.join(repoRoot, 'scripts', 'route-service-boundary-baseline.json')),
+    'law mode must have no baseline file (scripts/route-service-boundary-baseline.json should be deleted)');
 
-  const equalBaseline = path.join(tempRoot, 'baseline-equal.json');
-  fs.writeFileSync(equalBaseline, JSON.stringify({ boundaryImportingRoutes: 11 }));
-  const equal = runGate(['--baseline', JSON.stringify(equalBaseline)]);
-  expect(equal.status === 0, `ratchet should pass at exactly the baseline, got:\n${equal.output}`);
+  // Green-only tree: strip every red route and wrapper-consuming route; the
+  // remaining shells/services/exempt dirs must pass law mode with exit 0.
+  for (const route of RED_ROUTES) {
+    fs.rmSync(path.join(tempRoot, route), { force: true });
+  }
+  const green = runGate([]);
+  expect(green.status === 0, `law mode should pass on a green-only tree, got:\n${green.output}`);
 
-  console.log('PASS ratchet fires on divergent count (fall + rise + equal, fixture-local baselines)');
+  console.log(`PASS law-mode assertions (${RED_ROUTES.length} reds named, greens clean, green-only tree exits 0, no baseline file)`);
 }
 
 // (j)(k)(m) Non-literal require()/import() sources must fail CLOSED: a plain
@@ -527,7 +512,7 @@ function parseMode(argv) {
   if (modeIndex === -1) return 'all';
   const mode = argv[modeIndex + 1];
   if (!mode) {
-    throw new Error('--mode requires one of: all, detection, report, unclassifiable, ratchet, unresolved, live');
+    throw new Error('--mode requires one of: all, detection, report, law, unresolved, live');
   }
   return mode;
 }
@@ -536,16 +521,14 @@ function runMode(mode) {
   if (mode === 'all') {
     runDetectionAssertions();
     runReportAssertions();
-    runUnclassifiableAssertion();
-    runRatchetFallAssertion();
+    runLawModeAssertions();
     runUnresolvedFailClosedAssertions();
     runLiveParseAssertion();
     return;
   }
   if (mode === 'detection') return runDetectionAssertions();
   if (mode === 'report') return runReportAssertions();
-  if (mode === 'unclassifiable') return runUnclassifiableAssertion();
-  if (mode === 'ratchet') return runRatchetFallAssertion();
+  if (mode === 'law') return runLawModeAssertions();
   if (mode === 'unresolved') return runUnresolvedFailClosedAssertions();
   if (mode === 'live') return runLiveParseAssertion();
   throw new Error(`unknown --mode ${mode}`);

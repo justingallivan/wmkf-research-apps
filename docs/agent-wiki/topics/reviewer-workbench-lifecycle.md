@@ -299,6 +299,15 @@ Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 ## Operating Notes
 
+- **Route→Service layout (Stage 7, 2026-07-05): every workbench and
+  review-manager route is a thin shell; the lifecycle/business logic lives in
+  `lib/services/workbench/` (incl. `grantee-deliverables/`) and
+  `lib/services/review-manager/`.** Routes may not import
+  `lib/dataverse/adapters/*` or `lib/services/dynamics-service` — enforced by
+  `check:route-service-boundary` (law mode) `[VERIFIED via the gate run at
+  census 0, 2026-07-05; docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md]`. Lifecycle
+  behavior changes belong in the domain service; the shell keeps only guard →
+  validate → DAL context → service call → HTTP mapping.
 - **Save-time Tier-0 affiliation-email rescue — "reviewer has no email on the Invite tab" trap (S317).**
   When contact enrichment RUNS but does not COMPLETE (a partial / timed-out run — the person
   record carries `wmkf_lastchecked` but no `wmkf_metricsupdatedat`/`wmkf_hindex`), a

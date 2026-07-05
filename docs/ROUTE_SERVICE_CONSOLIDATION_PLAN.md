@@ -27,10 +27,12 @@ context → call service → map result/error to HTTP.** The DAL migration (Stag
 cleaned the layer *below* (adapters); this campaign cleans the layer *above* (routes). It ends,
 like the DAL campaign, with a census gate that becomes law.
 
-**Status: P0-APPROVED, not yet executed.** Written Session 330 (2026-07-04); passed the P0
-adversarial plan review (Codex, 3 rounds, final verdict SATISFIED with zero live-state errors,
-2026-07-04). Stage 0 may start. Pre-stage re-probes remain mandatory — counts verified
-2026-07-04 go stale as the tree moves.
+**Execution status: ALL STAGES 0–7 COMPLETE (S331, 2026-07-05).** Written Session 330 (2026-07-04); passed the P0
+adversarial plan review (Codex, 3 rounds, SATISFIED with zero live-state errors). Executed
+end-to-end in Session 331: Stages 0-7, census 49→0, gate promoted to permanent law
+(`check:route-service-boundary`, law mode). The Baseline table below and the wave table's
+counts are the historical 2026-07-04 record; the Stage Log at the bottom is the execution
+record and carries the per-stage review verdicts.
 
 **Executor profile.** Each stage is written to be executed by a cheaper model (Sonnet-class) with no
 prior context, following this document plus the per-stage checklist. Judgment calls are pre-made
@@ -632,6 +634,33 @@ review verdict + findings + resolutions)*
   boundary gate red — root-caused to the self-test's live-baseline coupling (broke the day
   the census hit 0) + a SIGKILL-orphaned temp fixture dir that the gate provably cannot
   scan; fixed in `84f8af91` (--baseline override, fall/rise/equal fixture-local pins).
+- 2026-07-05 (S331): **Stage 6 decision (owner): NO shared shell helper — divergence is
+  real.** Evidence across the waves: byte-pinned 405 asymmetries (Allow vs no-Allow), the
+  P1m ruling that per-verb error mapping is not shareable, dev-details 500 branches,
+  method-before-auth ordering in load-proposal, and streaming/binary shells that share no
+  boilerplate. A helper would invite normalizing characterized asymmetries. Recorded and
+  skipped per the plan's decision branch.
+- 2026-07-05 (S331): **Stage 7 executed — ratchet became LAW; CAMPAIGN CLOSED.** Gate
+  default mode is now law (any in-scope boundary-importing route exits 1 naming every
+  route; zero is the only passing state; mirrors the dataverse gate's Stage 8 posture);
+  `--baseline` and the entire ratchet path REMOVED; `route-service-boundary-baseline.json`
+  deleted; `--report`/`--json` keep a domain rollup (wave buckets retired with the
+  campaign). Self-test reworked to law-mode fixtures: red classes (a)-(u) each assert the
+  law failure names the route; green-only tree exits 0; temp-root discipline unchanged.
+  Docs reconciled: `docs/CI_GATES_REFERENCE.md` both rows law-style; `/start` skill gate
+  comment; `docs/API_ROUTE_SECURITY_MATRIX.md` header note (logic moved to
+  `lib/services/<domain>/`; URLs/guards/envelopes unchanged; per-route rows untouched);
+  agent-wiki topics dataverse-dynamics / reviewer-workbench-lifecycle /
+  reviewer-origination / security-auth refreshed. Verification: law gate + law self-test
+  green; agent-wiki/doc-currency/fact-consistency/canonical-pointers green; full suite
+  4670/4670; build exit 0. Campaign totals (all `[VERIFIED via this session's gate/jest
+  runs + ls]`): 49 routes → 0 across Stages 1-5, executed in one session (S331); 51 files
+  across 11 new domain-service directories (services + their shared helpers); suite
+  4188→4670 (+482 tests: characterization + service unit suites); five fresh-context stage
+  reviews plus P1/P1s/P1m checkpoints (all cleared; findings resolved same-session); one
+  real latent production defect found and fixed (drain DAL context). Completion is
+  recorded in the header's execution-status line (frontmatter stays `active` per the
+  docs-catalog status enum and the DAL plan's precedent).
 
 ### Stage 0 route→test inventory (2026-07-04, S331)
 

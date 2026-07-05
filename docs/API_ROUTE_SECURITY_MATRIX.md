@@ -16,7 +16,17 @@ related:
 
 # API Route Security Matrix
 
-Last updated: 2026-06-25
+Last updated: 2026-07-05
+
+> **Route→Service consolidation (Stage 7, 2026-07-05):** the business logic of
+> the `pages/api` routes now lives in per-domain `lib/services/<domain>/`
+> services; each route is a thin shell (guard → validate → DAL context →
+> service call → HTTP mapping). Route URLs, guards, response envelopes, and
+> the authorization posture recorded in the rows below are UNCHANGED by that
+> campaign — only the location of the logic moved. Enforced by
+> `check:route-service-boundary` (law mode: no route may import
+> `lib/dataverse/adapters/*` or `lib/services/dynamics-service`); see
+> `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md`.
 
 ## Purpose
 

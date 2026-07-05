@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 /**
- * Stage-0 Route→Service boundary census gate.
+ * Stage-7 Route→Service boundary LAW gate.
  *
- * Counts how many pages/api route files still reach the Dataverse layer
- * directly -- either importing a `lib/dataverse/adapters/*` module or importing
+ * The Route→Service consolidation campaign (docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md,
+ * Stages 0-5) shelled every `pages/api` route onto per-domain
+ * `lib/services/<domain>/` services and drove the boundary census to zero.
+ * Stage 7 made that permanent law: ANY in-scope route file that reaches the
+ * Dataverse layer directly -- importing a `lib/dataverse/adapters/*` module or
  * `lib/services/dynamics-service` -- outside the two carried-over exempt dirs
- * (pages/api/dynamics-explorer/, pages/api/dataverse-export/). This is the
- * Route→Service consolidation campaign's ratchet: as routes are shelled onto
- * per-domain services, the count falls; it may never rise.
+ * (pages/api/dynamics-explorer/, pages/api/dataverse-export/) fails this gate.
+ * There is no baseline file and no count ratchet -- this is the law, mirroring
+ * scripts/check-dataverse-access-layer.js one layer up.
  *
  * Detection reuses the hardened scanner primitives from
  * scripts/lib/ast-scan-core.js (the same core the Dataverse access-layer gate
@@ -15,20 +18,20 @@
  * of a boundary source are all recognized, and adapter re-export through a
  * thin wrapper module consumed by a route taints the route. This deliberately
  * avoids a looser per-file string matcher, which ordinary indirection evades.
+ * Non-literal require()/import() sources reachable from a route fail CLOSED.
  *
  * A route that USES a normal per-domain service (which internally calls an
  * adapter but does NOT re-export it) is NOT counted -- that is the desired end
  * state. Only direct boundary imports and thin re-export wrappers count.
  *
  * Modes:
- *   --report  Rollup by domain plus a wave-bucket classification of EVERY
- *             in-scope route (Stages 1-5 of docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md).
- *             An unclassifiable route is a hard error, never a silent skip.
- *   --json    Raw { file, domain, stage, reason } entries for in-scope
+ *   --report  Domain rollup + per-route listing of any in-scope
+ *             boundary-importing routes (informational; exits 0). The Stage 1-5
+ *             wave classification was retired with the campaign.
+ *   --json    Raw { file, domain, reason } entries for in-scope
  *             boundary-importing routes.
- *   (default) Ratchet against scripts/route-service-boundary-baseline.json
- *             { "boundaryImportingRoutes": N }. Fails if the live count RISES;
- *             a FALLING count must update the baseline in the same commit.
+ *   (default) LAW MODE: exits non-zero naming every in-scope
+ *             boundary-importing route. Zero is the only passing state.
  */
 
 const fs = require('fs');
@@ -50,7 +53,6 @@ const {
 } = require('./lib/ast-scan-core');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
-const BASELINE_PATH = path.resolve(__dirname, 'route-service-boundary-baseline.json');
 const SCAN_DIRS = ['pages', 'lib', 'shared', 'modules'];
 const JS_EXT_RE = /\.(?:cjs|mjs|js|jsx|ts|tsx)$/;
 const RESOLVE_EXTS = ['', '.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '/index.js', '/index.ts'];
@@ -74,20 +76,13 @@ function isBoundarySource(value) {
 }
 
 function parseArgs(argv) {
-  const args = { root: DEFAULT_ROOT, report: false, json: false, baseline: null };
+  const args = { root: DEFAULT_ROOT, report: false, json: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--root') {
       const value = argv[++i];
       if (!value) throw new Error('--root requires a directory');
       args.root = path.resolve(value);
-    } else if (arg === '--baseline') {
-      // Self-test-only override: point the ratchet at a fixture baseline so
-      // the self-test never depends on the LIVE baseline value (it broke the
-      // day the live census hit 0 — the fall-case fixture read as a rise).
-      const value = argv[++i];
-      if (!value) throw new Error('--baseline requires a file path');
-      args.baseline = path.resolve(value);
     } else if (arg === '--report') {
       args.report = true;
     } else if (arg === '--json') {
@@ -105,11 +100,10 @@ function usage() {
   return [
     'Usage: node scripts/check-route-service-boundary.js [--root <dir>] [--report] [--json]',
     '',
-    'Default mode ratchets the count of pages/api routes importing Dataverse',
-    'adapters or dynamics-service (outside exempt dirs) against',
-    'scripts/route-service-boundary-baseline.json. A rising count fails; a',
-    'falling count requires updating the baseline in the same commit.',
-    '--report prints a per-domain rollup and wave-bucket classification.',
+    'Default mode is LAW MODE (Route→Service consolidation Stage 7): any',
+    'pages/api route importing Dataverse adapters or dynamics-service (outside',
+    'the exempt dirs) fails the gate. No baseline file, no count ratchet.',
+    '--report prints a per-domain rollup and the offending routes (exit 0).',
     '--json prints the raw boundary-importing route entries.',
   ].join('\n');
 }
@@ -604,55 +598,26 @@ function analyzeRoot(root) {
   return routes;
 }
 
-// Wave-bucket classification per docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md
-// Stages 1-5. Returns null for an unclassifiable route (a hard error).
-const WAVE_STAGES = {
-  1: 'Stage 1 - pilot (review-manager/withdraw-sufficient)',
-  2: 'Stage 2 - review-manager, non-streaming',
-  '2s': 'Stage 2s - streaming pilot (reviewer-finder/generate-emails)',
-  '2b': 'Stage 2b - review-manager/send-emails (streaming)',
-  3: 'Stage 3 - reviewer-finder, remaining',
-  4: 'Stage 4 - workbench',
-  5: 'Stage 5 - tail (admin/external/cron/expertise-finder/grant-reporting/phase-i-dynamics/field-primer/root-level)',
-};
-const TAIL_DOMAINS = new Set([
-  'admin', 'external', 'cron', 'expertise-finder',
-  'grant-reporting', 'phase-i-dynamics', 'field-primer',
-]);
-
-function classifyRoute(rel) {
+// Domain = first path segment under pages/api/ ('(root)' for root-level
+// routes). The Stage 1-5 wave classification was retired at Stage 7 -- law
+// mode fails on ANY boundary route regardless of where it lives, so the
+// report keeps only the domain rollup.
+function routeDomain(rel) {
   const sub = rel.slice(ROUTE_ROOT.length);
   const slash = sub.indexOf('/');
-  const domain = slash === -1 ? '(root)' : sub.slice(0, slash);
-
-  if (sub === 'review-manager/withdraw-sufficient.js') return { domain, stage: 1 };
-  if (sub === 'review-manager/send-emails.js') return { domain, stage: '2b' };
-  if (sub === 'reviewer-finder/generate-emails.js') return { domain, stage: '2s' };
-
-  if (domain === 'review-manager') return { domain, stage: 2 };
-  if (domain === 'reviewer-finder') return { domain, stage: 3 };
-  if (domain === 'workbench') return { domain, stage: 4 };
-  if (domain === '(root)' || TAIL_DOMAINS.has(domain)) return { domain, stage: 5 };
-  return { domain, stage: null };
+  return slash === -1 ? '(root)' : sub.slice(0, slash);
 }
 
-function buildClassification(routes) {
-  const rows = routes.map((route) => {
-    const { domain, stage } = classifyRoute(route.file);
-    return { file: route.file, reason: route.reason, domain, stage };
-  });
-  const unclassifiable = rows.filter((r) => r.stage === null);
-  if (unclassifiable.length > 0) {
-    throw new Error(
-      'route-service-boundary: unclassifiable in-scope route(s) -- resolve the wave taxonomy, do not skip:\n'
-      + unclassifiable.map((r) => `  + ${r.file} (domain: ${r.domain})`).join('\n'),
-    );
-  }
-  return rows;
+function buildRows(routes) {
+  return routes.map((route) => ({
+    file: route.file,
+    reason: route.reason,
+    domain: routeDomain(route.file),
+  }));
 }
 
 function formatReport(routes) {
-  const rows = buildClassification(routes);
+  const rows = buildRows(routes);
 
   const byDomain = new Map();
   for (const row of rows) {
@@ -660,72 +625,40 @@ function formatReport(routes) {
   }
   const domainRollup = [...byDomain.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
-  const byStage = new Map();
-  for (const row of rows) {
-    if (!byStage.has(row.stage)) byStage.set(row.stage, []);
-    byStage.get(row.stage).push(row);
-  }
-  const stageOrder = [1, 2, '2s', '2b', 3, 4, 5];
-
   const lines = [
-    'Route-service boundary census',
+    'Route-service boundary census (law mode since Stage 7 -- 0 is the only passing state)',
     `Boundary-importing routes (in scope): ${rows.length}`,
     `Domains: ${byDomain.size}`,
-    '',
-    '| Domain | Routes |',
-    '|---|---:|',
   ];
-  for (const [domain, count] of domainRollup) {
-    lines.push(`| ${domain} | ${count} |`);
-  }
-  lines.push('', '## Wave classification');
-  for (const stage of stageOrder) {
-    const stageRows = byStage.get(stage) || [];
-    lines.push('', `### ${WAVE_STAGES[stage]} - ${stageRows.length} route(s)`);
-    for (const row of stageRows.sort((a, b) => a.file.localeCompare(b.file))) {
+  if (rows.length > 0) {
+    lines.push('', '| Domain | Routes |', '|---|---:|');
+    for (const [domain, count] of domainRollup) {
+      lines.push(`| ${domain} | ${count} |`);
+    }
+    lines.push('', '## Boundary-importing routes');
+    for (const row of rows.sort((a, b) => a.file.localeCompare(b.file))) {
       lines.push(`  - ${row.file}  [${row.reason}]`);
     }
   }
   return lines.join('\n');
 }
 
-function readBaseline(baselinePath) {
-  const effective = baselinePath || BASELINE_PATH;
-  if (!fs.existsSync(effective)) {
-    throw new Error(`baseline file missing: ${effective}`);
-  }
-  const parsed = JSON.parse(fs.readFileSync(effective, 'utf8'));
-  if (typeof parsed.boundaryImportingRoutes !== 'number') {
-    throw new Error('baseline must contain numeric "boundaryImportingRoutes"');
-  }
-  return parsed.boundaryImportingRoutes;
-}
+// Stage 7 law: no in-scope pages/api route may import lib/dataverse/adapters/*
+// or lib/services/dynamics-service (directly or through a thin re-export
+// wrapper). There is no allowlist and no count ratchet left to exempt a route.
+function checkLaw(routes) {
+  if (routes.length === 0) return 0;
 
-function checkRatchet(routes, baselinePath) {
-  const baseline = readBaseline(baselinePath);
-  const count = routes.length;
-
-  if (count > baseline) {
-    console.error('route-service-boundary RATCHET VIOLATION:');
-    console.error(`  boundary-importing routes rose from ${baseline} to ${count} (+${count - baseline}).`);
-    console.error('  Shell the new route(s) onto per-domain lib/services/<domain>/ services;');
-    console.error('  a route may not import lib/dataverse/adapters/* or lib/services/dynamics-service directly.');
-    console.error('  In-scope boundary-importing routes:');
-    for (const route of routes.slice(0, 60)) {
-      console.error(`    + ${route.file} | ${route.reason}`);
-    }
-    if (routes.length > 60) console.error(`    ... ${routes.length - 60} more`);
-    return 1;
+  console.error('route-service-boundary LAW VIOLATION:');
+  console.error(`  pages/api route(s) reaching the Dataverse layer directly (${routes.length}):`);
+  for (const route of routes.slice(0, 60)) {
+    console.error(`    + ${route.file} | ${route.reason}`);
   }
-
-  if (count < baseline) {
-    console.error('route-service-boundary RATCHET UPDATE REQUIRED:');
-    console.error(`  boundary-importing routes fell from ${baseline} to ${count} (-${baseline - count}).`);
-    console.error(`  Update scripts/route-service-boundary-baseline.json "boundaryImportingRoutes" to ${count} in the same commit.`);
-    return 1;
-  }
-
-  return 0;
+  if (routes.length > 60) console.error(`    ... ${routes.length - 60} more`);
+  console.error('  Shell the route onto a per-domain lib/services/<domain>/ service;');
+  console.error('  a route may not import lib/dataverse/adapters/* or lib/services/dynamics-service.');
+  console.error('  (docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md, Stage 7 — law mode.)');
+  return 1;
 }
 
 function main(argv = process.argv.slice(2)) {
@@ -737,17 +670,13 @@ function main(argv = process.argv.slice(2)) {
 
   const routes = analyzeRoot(args.root);
   if (args.json) {
-    const rows = buildClassification(routes);
-    console.log(JSON.stringify(rows, null, 2));
+    console.log(JSON.stringify(buildRows(routes), null, 2));
   }
   if (args.report) {
     console.log(formatReport(routes));
   }
   if (args.report || args.json) return 0;
-  // Ratchet mode also validates the wave taxonomy so an unclassifiable route
-  // fails the gate rather than passing silently.
-  buildClassification(routes);
-  return checkRatchet(routes, args.baseline);
+  return checkLaw(routes);
 }
 
 if (require.main === module) {
@@ -761,9 +690,10 @@ if (require.main === module) {
 
 module.exports = {
   analyzeRoot,
-  classifyRoute,
-  buildClassification,
+  routeDomain,
+  buildRows,
   formatReport,
+  checkLaw,
   isBoundarySource,
   isAdapterSource,
   isDynamicsServiceSource,

@@ -174,6 +174,13 @@ bare keyword→author lane is what underperformed.
 
 ## Operating Notes
 
+- **Route→Service layout (Stage 7, 2026-07-05): the reviewer-finder routes are
+  thin shells; origination business logic lives in `lib/services/reviewer-finder/`
+  (plus the flat discovery/dedup services).** Routes may not import
+  `lib/dataverse/adapters/*` or `lib/services/dynamics-service` — enforced by
+  `check:route-service-boundary` (law mode) `[VERIFIED via the gate run at
+  census 0, 2026-07-05; docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md]`. Edit the
+  service, not the route, when changing lane/ranking behavior.
 - **Web-discovery via an ungrounded LLM was EVALUATED and ABANDONED (S230).**
   The Perplexity reviewer-agent produced ungrounded reviewers and affiliations.
   Keep reviewer web discovery grounded before using it. Memory

@@ -42,6 +42,12 @@ private Blob/file access, prompt-injection hardening, and download proxy pattern
 - API keys and secrets stay server-side.
 - Private intake Blob operations use `INTAKE_BLOB_RW_TOKEN`.
 - API route security changes must reconcile the security matrix.
+- Route→Service consolidation (Stage 7, 2026-07-05) moved route business logic
+  into `lib/services/<domain>/` services; route URLs, guards, and response
+  envelopes are unchanged and the matrix rows still describe the live guard
+  posture `[VERIFIED via check:api-routes green + the route-service-boundary
+  law gate at census 0, 2026-07-05]`. Auth guards stay IN the route shells
+  (never in services).
 - `NEXTAUTH_URL` is the canonical public origin for NextAuth callbacks and the
   state-changing API Origin/Referer check. Do not point it at a new staff domain
   until the matching Azure/Entra redirect URI is configured and smoke-tested.
