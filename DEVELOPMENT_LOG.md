@@ -10,6 +10,14 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Three reviewed refactor consolidations closed + escape-law gate + bypass-strip campaign scoped (Sessions 331–332)
+
+**Milestone:** Three full plan→adversarial-Codex-review→amend→execute→closing-review cycles completed in one run: OData escape consolidation (12 sites onto `odata.escape`, PASS-WITH-FINDINGS close), array-chunk consolidation (new `lib/utils/chunk.js`, 17 mechanical swaps, SATISFIED after a two-round converge), and gate-script scaffold consolidation (new `scripts/lib/selftest-fixture.js` disposer helper adopted by 18 self-tests + `scripts/lib/walk-files.js` adopted by the 6 byte-identical markdown gates, SATISFIED with zero findings under a byte-identical census+verdict bar). Owner rulings recorded: odata escape-law gate BUILT (`check:odata-escape`, 565 files green); chunk-loop and security-gate-walk gates DECLINED. The next campaign — stripping all 52 functional `bypassDynamicsRestrictions` scopes onto `withDalContext` — is scoped, adversarially reviewed, and folded (`docs/BYPASS_STRIP_PLAN.md`), including a review-caught P0: two default-parameter bypass aliases invisible to call-site greps.
+**Sessions:** 331–332.
+**Ship state:** suite 416→418 suites / 4707→4714 tests; all gates green incl. the new law gate; every exercise's plan doc doubles as its execution + review record.
+**Why it matters:** the repo now has canonical helpers where five copy-paste families used to drift (odata escaping, array chunking, self-test fixtures, gate walks), each protected by pins or law gates; and the DAL campaign's final remainder has an execution-ready, review-hardened plan.
+**Pointers:** `docs/ODATA_ESCAPE_CONSOLIDATION_PLAN.md`, `docs/CHUNK_CONSOLIDATION_PLAN.md`, `docs/GATE_SCRIPT_CONSOLIDATION_PLAN.md`, `docs/BYPASS_STRIP_PLAN.md` (all Stage Logs); `scripts/check-odata-escape.js`.
+
 ## July 2026 — Route→Service consolidation: all 49 routes shelled, gate promoted to law, drain prod defect fixed (Session 331)
 
 **Milestone:** The Route→Service consolidation campaign (planned S330) executed end-to-end in one overnight autonomous session — Stages 0-7, census 49→0: every in-scope `pages/api` route became a thin shell over a new `lib/services/<domain>/` service, and `check:route-service-boundary` was promoted from ratchet to permanent law. Mid-campaign, the Stage 5 STOP-AND-ASK discipline surfaced a real latent production defect: the intake drain's Dataverse writes ran with no trusted DAL context — fail-closed broken since the S330 enforcement flip — fixed same session with a per-job `withDalContext` and a real-machinery regression test.
@@ -18,7 +26,7 @@ The pre-Session 84 chronological per-session log (everything after the September
 - 51 files across 11 new domain-service directories; suite 4188→4670 (+482 characterization/service tests); build green; all gates green.
 - Streaming template (P1s) and multi-verb template (P1m, with branch-scope caveat) ratified by fresh-context Codex checkpoints; `ServiceHttpError` base shapes every shell's error mapping; five stage reviews all cleared with same-session finding resolution.
 - Boundary gate hardened through five adversarial rounds during Stage 0 (binding taint, fail-closed non-literal sources, late-assignment + alias-chain provenance) before any extraction began.
-- **MORNING FLAG:** verify prod intake drains end-to-end post-deploy; jobs parked terminal since the flip may need manual requeue.
+- **MORNING FLAG (RESOLVED S332):** owner-approved read-only prod audit found `submission_jobs` empty — zero jobs ever enqueued, so the defect never stranded a submission; no requeue. Drain cron healthy (2-min ticks, all 200s).
 **Why it matters:** the layer above the DAL is now structurally clean and law-enforced (guard → validate → context → service call → map), business logic is unit-testable for the first time across 49 routes, and the in-campaign bypass strip converted every legacy route-level `bypassDynamicsRestrictions` it touched.
 **Pointers:** `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md` Stage Log (execution + review record); `scripts/check-route-service-boundary.js` (law); `lib/services/cron/drain-submissions-service.js` (drain fix); commits `311f4879`…close-out.
 
