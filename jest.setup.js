@@ -36,6 +36,13 @@ process.env.NODE_ENV = 'test'
 process.env.CLAUDE_API_KEY = 'test-claude-api-key'
 process.env.API_SECRET_KEY = 'test-secret-key'
 
+// DAL Stage 7 (docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md): entity-CRUD
+// fail-closed enforcement is ON in test (and dev) by default already — see
+// lib/services/dynamics-context.js#isDalEnforcementOn's NODE_ENV-keyed
+// default — but set it explicitly here so the test env's posture doesn't
+// silently drift if that default ever changes. OFF only in prod.
+process.env.DATAVERSE_DAL_ENFORCEMENT = 'on'
+
 // Default mock for the app-access service. Wave 1 closeout (2026-05-12)
 // moved listAppKeysForUser from Postgres to a Dataverse-by-default dispatch
 // wrapper; without this default, any test that lets a requireAppAccess-
