@@ -10,6 +10,19 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Dataverse data-access layer: all 9 migration stages executed in one session (Session 329)
+
+**Milestone:** The entire staged Dataverse DAL migration — census, CI ratchet, core toolkit, ~80 caller-file conversions, restriction-context fold-in, and the gate becoming law — executed start-to-finish, one session, via parallel worktree agents (Codex + Opus + Sonnet) with serial Claude review/merge and Codex adversarial reviews at each phase boundary (plan NEEDS-REWORK → fixed; Stage 2, waves 3–6: not refuted).
+**Sessions:** 329 (plan authored + approved S328).
+**Ship state:**
+- `lib/dataverse/core/` (odata/entity-registry/errors/changeset/context) + 18 per-entity adapters; zero raw entity Dataverse calls outside the DAL and exempt power tools (census 211 identities → 12, all non-entity-transport).
+- `check:dataverse-access-layer` is LAW in CI: alias-aware, changeset-aware, unknown-method fail-closed; allowlist deleted.
+- Entity writes fail closed outside a trusted post-auth context under `DATAVERSE_DAL_ENFORCEMENT` (on outside prod; **prod flip pending owner deploy decision**). CLAUDE.md invariant updated.
+- Also: pricing-canary standing test red fixed (was masking CI `Tests` for 2+ sessions — the atlas red it hid is the cautionary tale).
+**Why it matters:** entity-name guessing, per-route SELECT/filter drift, and unwrapped writes are now structurally unrepresentable, not just policed after the fact.
+**Open:** mechanical strip of 79 legacy wrapper importers; prod enforcement flip.
+**Pointers:** `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` (stage log = full audit trail); merges `6b9ddc83`…`3cf4a506`.
+
 ## July 2026 — Reviewer pipeline browser-proven end-to-end; release flow hardened; thank-you automation (Session 328)
 
 **Milestone:** The first live review traveled the whole pipeline — invite → accept → drain-queue confirmation → portal submit → Compare/Export/AI synthesis — in an owner-driven staged rehearsal that surfaced and same-day-fixed two production blockers and four UX/correctness gaps.

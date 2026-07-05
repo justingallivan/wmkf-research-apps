@@ -28,8 +28,8 @@ A red gate in this set on `main` blocks new commits to the affected surface. Est
 | `check:atlas:self-test` | Every Atlas detection pattern from `docs/CLAUDE_COVERAGE_LESSONS.md` exercised against synthetic fixtures. | Same scope as `:atlas` — silent detector regressions would be invisible without it. |
 | `check:api-routes` | API route files under `pages/api/**` must appear in `docs/API_ROUTE_SECURITY_MATRIX.md`. Hard-fails on missing-from-matrix; **warns** (non-fatal) on routes with no recognized guard token. Recognized guards include session guards (`requireAppAccess`, etc.), the cron/suggestion-token helpers, and (2026-06-11) HMAC helpers `verifyInternalCall`/`verifyBillWebhook` — the HMAC exemption applies only when the route's matrix row also documents a shared-secret/HMAC boundary, so an undocumented HMAC-token route still warns. Paths overridable via `API_ROUTE_GATE_API_ROOT`/`API_ROUTE_GATE_MATRIX_PATH` (used by the self-test). | PRs touching `pages/api/**` without a matrix update. |
 | `check:api-routes:self-test` | Drives the gate against synthetic fixture routes + matrix: HMAC-documented → no warn; HMAC-undocumented → warn; known guard → no warn; intentional `None` → no warn; no-guard → warn; missing-from-matrix → hard-fail. | Silent regressions in guard recognition or the missing-route hard-fail. |
-| `check:dataverse-access-layer` | Babel-AST census of raw `DynamicsService` calls in application code, including import/require aliases, defaulted dependency aliases, and `executeChangeset` operation URLs, compared against `scripts/dataverse-access-allowlist.json`. | New raw Dataverse transport use outside the approved legacy baseline; stale allowlist entries must shrink as callers move behind adapters. |
-| `check:dataverse-access-layer:self-test` | Synthetic fixture tree proving direct calls, constants, aliases, changesets, exemptions, green allowlist baseline, count-exceeds, stale-entry, and new-unresolved failures. | Silent regressions in the Stage-1 ratchet or its line-tolerant count-key comparison. |
+| `check:dataverse-access-layer` | Babel-AST census of raw `DynamicsService` calls in application code (import/require aliases, defaulted dependency aliases, `executeChangeset` operation URLs). LAW MODE since Stage 8: fails on ANY identity whose entity is not `non-entity-transport` — no allowlist, no ratchet. | Any raw entity-attributed, unresolved, changeset-unresolved, or unknown-method Dataverse transport use outside the DAL (`lib/dataverse/`) and exempt power tools. |
+| `check:dataverse-access-layer:self-test` | Synthetic fixture tree proving direct calls, constants, aliases, changesets, exemptions, plus law-mode reds: entity call, unresolved alias, unresolved changeset op, unknown method name; clean transport-only tree passes. | Silent regressions in the law gate or its census classification. |
 
 The fix is always to make the gate green. Adding to `ALLOWED_UNDOCUMENTED_*` requires a written justification and is a last resort, not a default. The rule applies regardless of which session caused the red state: "not my regression" is not a valid reason to proceed past it.
 
@@ -43,21 +43,23 @@ If a retry reports "Another next build process is already running" after an inte
 
 ## Gate details
 
-### `check:dataverse-access-layer` — raw Dataverse access ratchet (S329)
+### `check:dataverse-access-layer` — Dataverse data-access LAW (S329, Stage 8)
 
-Freezes the Stage-0 raw `DynamicsService` census while the Dataverse data-access
-layer migration proceeds. The gate scans `pages/`, `lib/`, and `shared/` but
-exempts the entity-generic power tools, the transport itself, and DAL internals
-listed in `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`.
+The migration's permanent gate. Scans `pages/`, `lib/`, and `shared/` (minus
+the entity-generic power tools, the transport itself, and DAL internals listed
+in `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`) and fails on ANY raw
+`DynamicsService` call identity that does not classify as
+`non-entity-transport` — the closed permanent surface (`createAndSendEmail`,
+`addEmailAttachment`, `createEmailActivity`, `logAiRun`). No allowlist file,
+no ratchet: Stage 8 deleted both.
 
-- Allowlist: `scripts/dataverse-access-allowlist.json`.
-- Comparison key: line-tolerant `{file, kind, clientMethod, entity}` with a
-  `count`; source line numbers remain in `--json` output for human diagnosis but
-  do not participate in default-mode comparison.
-- Fails when a current key is absent from the allowlist, a current count exceeds
-  its allowed count, an allowlist count exceeds the current census, or a new
-  `unresolved` / `changeset-unresolved` key appears outside the Stage-0
-  baseline.
+- Failure classes: entity-attributed raw call; unresolved alias; unresolved
+  changeset operation; unrecognized method name (`unknown-method:*` — a new
+  DynamicsService method fails closed until the census is taught its name).
+- Alias-aware (import/require aliases, defaulted dependency injection) and
+  changeset-aware (per-operation URL attribution), unchanged from Stage 0.
+- The fix is never "exempt it": route the call through
+  `lib/dataverse/adapters/` (or `lib/dataverse/core/changeset.js` for batches).
 - Self-test: `npm run check:dataverse-access-layer:self-test`.
 
 ### `check:fact-consistency` — registered scalar drift

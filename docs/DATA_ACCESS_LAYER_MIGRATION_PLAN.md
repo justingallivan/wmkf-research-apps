@@ -24,15 +24,17 @@ restriction context folds INTO the layer as a deliberate late stage;
 delivery = ratchet + gate (freeze new raw usage immediately, convert
 opportunistically + occasional dedicated sessions).
 
-**Execution status: Stages 0–7 COMPLETE (S329, 2026-07-04).** Census probe,
-ratchet gate, core toolkit, 18 adapters, all conversion waves (allowlist
-181 → 12, all non-entity-transport), and the Stage 7 restriction fold-in:
-`core/context.js` post-auth trusted context, flag-gated fail-closed entity-
-write enforcement (`DATAVERSE_DAL_ENFORCEMENT`, on outside production), 8
-canary wrapper strips. Remaining: the mechanical strip of 79 wrapper files
-`[VERIFIED 2026-07-04 via grep -rl "^import.*bypassDynamicsRestrictions"
-pages lib shared, minus core/context.js]` (follow-up pass), the PROD
-enforcement flip (owner deploy decision), and Stage 8 (close-out).
+**Execution status: ALL STAGES 0–8 COMPLETE (S329, 2026-07-04).** Census
+probe, law gate (allowlist deleted), core toolkit, 18 adapters, all
+conversion waves, restriction fold-in. Final census: 12 identities / 11
+files, all non-entity-transport. Two items remain OPEN outside the staged
+plan: the mechanical strip of 79 legacy `bypassDynamicsRestrictions` importer
+files `[VERIFIED 2026-07-04 via grep -rl "^import.*bypassDynamicsRestrictions"
+pages lib shared, minus core/context.js]` (functionally correct as-is — the
+legacy wrapper IS a trusted context) and the PROD `DATAVERSE_DAL_ENFORCEMENT`
+flip (owner deploy decision). The doc stays `status: active` until those two
+close — deliberately NOT flipped to superseded despite the Stage 8 text, to
+avoid declaring false completion.
 
 ## Why (baseline evidence)
 
@@ -488,10 +490,37 @@ Drift found → this doc is edited BEFORE the next stage starts.
   green. CLAUDE.md invariant wording + wiki reconciled this commit. PROD flag
   flip = pending owner deploy decision.
 
-## Appendix A — Baseline census
+- 2026-07-04 (S329): **Stage 8 executed** (Sonnet worktree build, Claude
+  review; merge `3cf4a506`, build commit `21fc7e66`). Allowlist file DELETED;
+  gate is law: fails on any identity not `non-entity-transport`, with the
+  permitted surface a CLOSED method-name set (`createAndSendEmail`,
+  `addEmailAttachment`, `createEmailActivity`, `logAiRun` `[VERIFIED via
+  scripts/check-dataverse-access-layer.js:66-71]`) and unknown method names
+  failing closed as `unknown-method:*` `[VERIFIED via :710]` — closing the
+  silent-pass gap where unrecognized methods defaulted to transport. Self-test
+  reworked to law-mode fixtures (entity / unresolved-alias /
+  changeset-unresolved / unknown-method reds; clean + exempt greens). Suite
+  4181/4181; build clean; atlas green post-deletion. CI_GATES_REFERENCE
+  reconciled. Codex post-impl review of Stage 7 in flight; Stage 8 review
+  optional at owner's call.
 
-Populated by Stage 0 `[VERIFIED 2026-07-04 via
-node scripts/check-dataverse-access-layer.js --report]`.
+## Appendix A — Census (Stage 0 baseline → Stage 8 final)
+
+**Stage 8 FINAL census** `[VERIFIED 2026-07-04 via
+node scripts/check-dataverse-access-layer.js --report, post-Stage-8]`:
+
+| Entity | Calls | Files | Methods |
+|---|---:|---:|---|
+| non-entity-transport | 12 | 11 | createAndSendEmail:9, createEmailActivity:1, logAiRun:2 |
+
+12 call identities / 11 files / 1 bucket — the closed permanent
+DynamicsService surface. Every entity-attributed identity is gone (211 → 12);
+the law gate fails on anything else, including unknown method names.
+
+---
+
+Stage-0 baseline for the historical record `[VERIFIED 2026-07-04 via the same
+probe pre-Stage-1]`:
 
 Literal-grep baseline retained for comparison: 86 caller files / ≥15 entity
 sets / 39 filter strings / 97 bypass files / 18 suggestion-entity and 74
