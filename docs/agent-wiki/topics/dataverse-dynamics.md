@@ -49,9 +49,11 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   (create/update/delete/disassociate/executeChangeset) are fail-closed outside
   a trusted context under `DATAVERSE_DAL_ENFORCEMENT` — explicit `on`/`off`,
   unset = on outside production `[VERIFIED via
-  lib/services/dynamics-context.js:123 isDalEnforcementOn + 5
+  lib/services/dynamics-context.js:124 isDalEnforcementOn + 5
   assertTrustedDalContext call sites in lib/services/dynamics-service.js]`.
-  Prod flip is a pending deploy decision.
+  **Prod flipped 2026-07-04 (S330):** `DATAVERSE_DAL_ENFORCEMENT=on` set as an explicit
+  Vercel production env var and redeployed (aliased `reviews.wmkeck.org`) — enforcement is
+  live in ALL environments; initial runtime-log scan clean.
   **Resolved (Session 330, 2026-07-04):** the email-write helpers
   `createEmailActivity`/`addEmailAttachment`/`sendEmail` in
   `dynamics-service.js` now call `assertTrustedDalContext` as their first

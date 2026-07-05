@@ -85,7 +85,8 @@ here; anything not pre-made is marked **STOP-AND-ASK**.
    the in-campaign bypass strip). Two guards per route (P0 review change 6): (a) AST/precheck
    that the existing call passes a STRING label — `withDalContext` throws on missing/non-string
    labels where `bypassDynamicsRestrictions` accepts a bare function
-   `[VERIFIED via lib/services/dynamics-context.js:67-75 vs lib/dataverse/core/context.js:47-49]`;
+   `[VERIFIED via lib/services/dynamics-context.js:67-75 vs lib/dataverse/core/context.js:47-49]`
+   `[RECHECKED after lib/services/dynamics-context.js change: comment-only edit at :112-119, bypassDynamicsRestrictions still at :67]`;
    (b) a same-or-wider-scope assertion: the new context boundary must enclose every
    Dataverse-touching statement the old one enclosed — shelling a route must never strand a
    Dataverse call outside the trusted scope (the characterization tests plus enforcement-on jest

@@ -27,14 +27,16 @@ opportunistically + occasional dedicated sessions).
 **Execution status: ALL STAGES 0–8 COMPLETE (S329, 2026-07-04).** Census
 probe, law gate (allowlist deleted), core toolkit, 18 adapters, all
 conversion waves, restriction fold-in. Final census: 12 identities / 11
-files, all non-entity-transport. Two items remain OPEN outside the staged
-plan: the mechanical strip of 79 legacy `bypassDynamicsRestrictions` importer
-files `[VERIFIED 2026-07-04 via grep -rl "^import.*bypassDynamicsRestrictions"
-pages lib shared, minus core/context.js]` (functionally correct as-is — the
-legacy wrapper IS a trusted context) and the PROD `DATAVERSE_DAL_ENFORCEMENT`
-flip (owner deploy decision). The doc stays `status: active` until those two
-close — deliberately NOT flipped to superseded despite the Stage 8 text, to
-avoid declaring false completion.
+files, all non-entity-transport. The PROD `DATAVERSE_DAL_ENFORCEMENT` flip is
+CLOSED (2026-07-04/S330 — explicit `=on` in Vercel production, redeployed; see
+stage log). One item remains OPEN outside the staged plan: the mechanical
+strip of the legacy `bypassDynamicsRestrictions` importer files (census when
+scoping: `git grep -l "import.*bypassDynamicsRestrictions" -- lib pages
+scripts` — 81 on 2026-07-04, count moves with conversions; functionally
+correct as-is — the legacy wrapper IS a trusted context; owner decision
+2026-07-04: strip ends with trust-model tightening). The doc stays
+`status: active` until the strip closes — deliberately NOT flipped to
+superseded despite the Stage 8 text, to avoid declaring false completion.
 
 ## Why (baseline evidence)
 
@@ -477,7 +479,7 @@ Drift found → this doc is edited BEFORE the next stage starts.
   create/update/delete/disassociate/executeChangeset assert trusted context
   under `DATAVERSE_DAL_ENFORCEMENT` (explicit on/off; unset = on outside
   production — a committed `.env.development` is impossible here, .gitignore
-  excludes `.env*`) `[VERIFIED via lib/services/dynamics-context.js:123 +
+  excludes `.env*`) `[RECHECKED after lib/services/dynamics-context.js change: comment-only, isDalEnforcementOn now at :124]` `[VERIFIED via lib/services/dynamics-context.js:124 +
   5 assert sites in dynamics-service.js]`; `runChangeset` asserts
   independently for call-site attribution. Reads keep prior `checkRestriction`
   behavior; exempt tools unaffected (no entity CRUD in their paths). 8 canary
@@ -601,6 +603,18 @@ Drift found → this doc is edited BEFORE the next stage starts.
   runtime `assertTrustedDalContext` still guarded entity writes and the S330
   email-helper methods; this correction closes the static-census silent-green
   gap rather than adding the first runtime guard.
+
+- 2026-07-04 (S330): **PROD `DATAVERSE_DAL_ENFORCEMENT` FLIPPED — Stage 7 work item 3
+  closed.** Explicit `DATAVERSE_DAL_ENFORCEMENT=on` added to Vercel production env
+  (previously unset = off in prod per the NODE_ENV-keyed default) and production redeployed
+  (aliased `reviews.wmkeck.org`, Ready in 56s). Preconditions all satisfied first, same
+  session: email-write High closed, extract.js audit-write context fixed, law-gate census
+  correction merged. Initial runtime-log scan clean (no `no trusted Dataverse context`
+  throws); all 10 production email call sites plus entity-write paths were caller-verified
+  inside trusted contexts before the flip. Enforcement is now active in ALL environments.
+  Remaining campaign item: the legacy `bypassDynamicsRestrictions` strip (ends with
+  trust-model tightening per owner decision 2026-07-04), sequenced after this flip proves
+  out in prod.
 
 ## Appendix A — Census (Stage 0 baseline → Stage 8 final)
 
