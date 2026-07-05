@@ -145,7 +145,7 @@ Two loops, both mandatory:
 1. Write `scripts/check-route-service-boundary.js`: for every file under `pages/api` (excluding the
    two carried-over exempt dirs), detect imports of `lib/dataverse/adapters/*` and
    `lib/services/dynamics-service`.
-   `[RECHECKED after scripts/check-route-service-boundary.js change: spec still accurate — b3bbdad4 added binding-level re-export taint + fail-closed non-literal sources, and the round-2 fix added unresolved-binding propagation, on top of this contract; live census 49, gate + self-test green]` Modes: `--report` (rollup by domain), default = ratchet mode
+   `[RECHECKED after scripts/check-route-service-boundary.js change: spec still accurate — review rounds hardened it on top of this contract (b3bbdad4 binding-level re-export taint + fail-closed non-literal sources; dc60b3e6 unresolved-binding propagation; round-3 fix late-assignment provenance); live census 49, gate + self-test green]` Modes: `--report` (rollup by domain), default = ratchet mode
    against a committed baseline file `scripts/route-service-boundary-baseline.json`
    (`{ "boundaryImportingRoutes": <N> }`, N = union of both import kinds). Fail if the count
    RISES; a falling count must update the baseline in the same commit. **Reuse the hardened
@@ -376,6 +376,21 @@ review verdict + findings + resolutions)*
   exit 0 on all three; patched gate exits 2 naming each wrapper with file:line); GREEN (q)
   module-scope-require-own-function-exports stays clean. Live census 49 unchanged. Round-3
   re-review pending.
+- 2026-07-05 (S331): **Post-stage review round 3 (Codex adversarial): NOT SATISFIED — 1
+  High**, the adjacent variant of round 2: LATE-ASSIGNED bindings carried no provenance
+  (`let a; a = require(p); module.exports = a` evaded both the unresolved hard-fail AND, in
+  the literal-adapter variant, the boundary count — Codex in-memory probe returned `[]`).
+  Round 2's declarator fixes (n)/(o)/(p) were confirmed closed and q/lazy services green.
+  Fixed same session: `assignedIdentifierTarget` records provenance when a
+  require()/import() (wrapper-climbing) is the RHS of a plain identifier assignment —
+  literal sources → `importedBindings`, non-literal → `unresolvedBindings`; the existing
+  identity-export propagation needed no changes. The three lazy-backend getter services'
+  late assignments now ENTER the unresolved-binding set and stay green solely via the
+  identity-export check (they export own functions / `{ DatabaseService }`) — verified
+  live, census 49 with all three route-reachable. New fixtures: (r) late-assign non-literal
+  wrapper (hard-fail path), (s) late-assign literal adapter wrapper (boundary-count path);
+  both proven evading the saved round-2 gate (exit 0) and caught by the patched gate.
+  Self-test now 10 red / 5 green. Round-4 re-review pending.
 
 ### Stage 0 route→test inventory (2026-07-04, S331)
 

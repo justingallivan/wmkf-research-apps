@@ -174,14 +174,46 @@ function collectFileInfo(ast) {
   const unresolvedBindings = new Map();
   const parentMap = buildParentMap(ast);
 
-  // If `callNode` (possibly wrapped in await/parens/TS casts) initializes a
-  // variable declarator, record every local name the pattern binds as unresolved.
-  function captureUnresolvedDeclarator(callNode) {
+  // If `callNode` (possibly wrapped in await/parens/TS casts) is the RHS of a
+  // plain `name = ...` assignment, return the target identifier's name. Late
+  // assignment (`let a; a = require(...)`) carries the same provenance as a
+  // declarator initializer; without this it evades both taint paths.
+  function assignedIdentifierTarget(callNode) {
+    const climbed = climbExpressionWrappers(callNode, parentMap);
+    const parent = parentMap.get(climbed);
+    if (parent && parent.type === 'AssignmentExpression'
+      && parent.operator === '='
+      && parent.right === climbed
+      && parent.left.type === 'Identifier') {
+      return parent.left.name;
+    }
+    return null;
+  }
+
+  // Record provenance for a LITERAL require()/import() bound to a local: as a
+  // declarator initializer (incl. destructuring) or via late assignment.
+  function captureResolvedBinding(callNode, spec) {
+    const climbed = climbExpressionWrappers(callNode, parentMap);
+    const parent = parentMap.get(climbed);
+    if (parent && parent.type === 'VariableDeclarator' && parent.init === climbed) {
+      bindRequireDestructure(parent.id, spec, importedBindings);
+      return;
+    }
+    const target = assignedIdentifierTarget(callNode);
+    if (target) importedBindings.set(target, { spec, imported: '*' });
+  }
+
+  // Record every local a NON-LITERAL require()/import() binds as unresolved:
+  // declarator patterns and late `name = require(p)` assignments alike.
+  function captureUnresolvedBinding(callNode) {
     const climbed = climbExpressionWrappers(callNode, parentMap);
     const parent = parentMap.get(climbed);
     if (parent && parent.type === 'VariableDeclarator' && parent.init === climbed) {
       for (const name of bindingNames(parent.id)) unresolvedBindings.set(name, nodeLine(callNode));
+      return;
     }
+    const target = assignedIdentifierTarget(callNode);
+    if (target) unresolvedBindings.set(target, nodeLine(callNode));
   }
 
   walkAst(ast, (node) => {
@@ -239,23 +271,22 @@ function collectFileInfo(ast) {
       const spec = stringLiteralValue(node.arguments[0]);
       if (spec != null) {
         refs.push({ spec, kind: 'require', reexport: isInsideCommonJsExportRight(node, parentMap) });
-        const parent = parentMap.get(node);
-        if (parent && parent.type === 'VariableDeclarator' && parent.init === node) {
-          bindRequireDestructure(parent.id, spec, importedBindings);
-        }
+        captureResolvedBinding(node, spec);
       } else {
         unresolved.push({ kind: 'require', line: nodeLine(node), reexport: isInsideCommonJsExportRight(node, parentMap) });
-        captureUnresolvedDeclarator(node);
+        captureUnresolvedBinding(node);
       }
       return;
     }
     const dynSource = importCallSourceNode(node);
     if (dynSource) {
       const spec = stringLiteralValue(dynSource);
-      if (spec != null) refs.push({ spec, kind: 'dynamic-import', reexport: false });
-      else {
+      if (spec != null) {
+        refs.push({ spec, kind: 'dynamic-import', reexport: false });
+        captureResolvedBinding(node, spec);
+      } else {
         unresolved.push({ kind: 'dynamic-import', line: nodeLine(node), reexport: isInsideCommonJsExportRight(node, parentMap) });
-        captureUnresolvedDeclarator(node);
+        captureUnresolvedBinding(node);
       }
     }
   });

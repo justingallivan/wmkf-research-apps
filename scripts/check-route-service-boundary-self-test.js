@@ -22,6 +22,9 @@
  *       identity, which plain `export ... from` detection misses.
  *   (i) CJS `const a = require('<adapter>'); module.exports = { a }` wrapper
  *       consumed by a route.
+ *   (s) CJS LATE-ASSIGNED literal wrapper (`let a; a = require('<adapter>');
+ *       module.exports = a`) consumed by a route -- provenance must survive
+ *       late assignment, not only declarator initialization.
  *
  * HARD-FAIL fixtures prove non-literal require()/import() sources fail CLOSED
  * instead of silently evading the census:
@@ -33,6 +36,9 @@
  *       a LOCAL (`const a = require(p)`) and identity-exports it via
  *       `module.exports = a` / `module.exports = { a }` / `exports.a = a` --
  *       the local-binding hop that reexport-position detection alone misses
+ *   (r) route consuming a wrapper that LATE-ASSIGNS a non-literal require()
+ *       (`let a; a = require(p); module.exports = a`) -- assignment-carried
+ *       provenance for the unresolved path
  *
  * GREEN fixtures: a clean shell route; a route importing only a per-domain
  * lib/services/<domain>/ service (which USES an adapter internally but does
@@ -67,6 +73,7 @@ const RED_ROUTES = [
   'pages/api/red-root.js',
   'pages/api/reviewer-finder/red-import-then-export.js',
   'pages/api/cron/red-cjs-reexport.js',
+  'pages/api/workbench/red-late-assign.js',
 ];
 
 const GREEN_ROUTES = [
@@ -128,6 +135,12 @@ function setupFixtures() {
   write(tempRoot, 'lib/wrappers/cjs-reexport-wrapper.js', `
     const a = require('../dataverse/adapters/reviewer-suggestion.js');
     module.exports = { a };
+  `);
+  // (s) CJS wrapper: LATE-ASSIGNED literal adapter require, identity-exported.
+  write(tempRoot, 'lib/wrappers/late-assign-wrapper.js', `
+    let a;
+    a = require('../dataverse/adapters/reviewer-suggestion.js');
+    module.exports = a;
   `);
   // Legitimate per-domain service: USES an adapter, does NOT re-export it.
   write(tempRoot, 'lib/services/review-manager/withdraw-sufficient-service.js', `
@@ -200,6 +213,12 @@ function setupFixtures() {
     export default function handler(req, res) { return a.getById(req.query.id); }
   `);
 
+  // (s) route consuming the late-assigned literal wrapper
+  write(tempRoot, 'pages/api/workbench/red-late-assign.js', `
+    import a from '../../../lib/wrappers/late-assign-wrapper.js';
+    export default function handler(req, res) { return a.getById(req.query.id); }
+  `);
+
   // GREEN: clean shell route
   write(tempRoot, 'pages/api/workbench/green-shell.js', `
     export default function handler(req, res) { res.status(200).end(); }
@@ -266,6 +285,11 @@ function runDetectionAssertions() {
   expect(cjsReexport && /re-export via .*cjs-reexport-wrapper/.test(cjsReexport.reason),
     `CJS re-export route reason did not name the wrapper: ${JSON.stringify(cjsReexport)}`);
 
+  // (s) late-assigned literal wrapper taint attributed to the wrapper.
+  const lateAssign = entries.find((e) => e.file === 'pages/api/workbench/red-late-assign.js');
+  expect(lateAssign && /re-export via .*late-assign-wrapper/.test(lateAssign.reason),
+    `late-assign route reason did not name the wrapper: ${JSON.stringify(lateAssign)}`);
+
   console.log(`PASS detection assertions (${entries.length} boundary routes; ${GREEN_ROUTES.length} green untouched)`);
 }
 
@@ -299,12 +323,12 @@ function runUnclassifiableAssertion() {
 
 function runRatchetFallAssertion() {
   setupFixtures();
-  // Fixture has 9 boundary routes; committed baseline is 49, so default mode
+  // Fixture has 10 boundary routes; committed baseline is 49, so default mode
   // must report a FALLING count and demand a same-commit baseline update.
   const run = runGate();
   expect(run.status !== 0, 'ratchet should fail when count diverges from baseline');
   expect(run.output.includes('RATCHET UPDATE REQUIRED'), `expected ratchet-update message, got:\n${run.output}`);
-  expect(/fell from \d+ to 9/.test(run.output), `expected 'fell from N to 9', got:\n${run.output}`);
+  expect(/fell from \d+ to 10/.test(run.output), `expected 'fell from N to 10', got:\n${run.output}`);
   console.log('PASS ratchet fires on divergent count');
 }
 
@@ -370,6 +394,18 @@ function runUnresolvedFailClosedAssertions() {
     export default function handler(req, res) { return a.getById(req.query.id); }
   `);
 
+  // (r) wrapper LATE-ASSIGNING a non-literal require() to a local, then
+  // identity-exporting it -- assignment-carried unresolved provenance.
+  write(tempRoot, 'lib/wrappers/r-late-unresolved-wrapper.js', `
+    let a;
+    a = require(process.env.ADAPTER_PATH);
+    module.exports = a;
+  `);
+  write(tempRoot, 'pages/api/admin/red-unresolved-late-assign.js', `
+    import a from '../../../lib/wrappers/r-late-unresolved-wrapper.js';
+    export default function handler(req, res) { return a.getById(req.query.id); }
+  `);
+
   // (q) GREEN: lazy-backend service shape -- non-literal require() held in a
   // module-scope local, but only OWN functions are exported. Must not trip.
   write(tempRoot, 'lib/services/lazy-backend-service.js', `
@@ -405,11 +441,15 @@ function runUnresolvedFailClosedAssertions() {
   expect(run.output.includes('pages/api/workbench/red-unresolved-local-exports.js')
     && run.output.includes('p-local-exports-wrapper.js'),
     `expected local-exports wrapper failure (p), got:\n${run.output}`);
+  // (r): late-assigned unresolved binding fails closed, naming the wrapper.
+  expect(run.output.includes('pages/api/admin/red-unresolved-late-assign.js')
+    && run.output.includes('r-late-unresolved-wrapper.js'),
+    `expected late-assign wrapper failure (r), got:\n${run.output}`);
   // (q): the lazy-backend service and its consumer must NOT appear.
   expect(!run.output.includes('lazy-backend-service.js')
     && !run.output.includes('green-lazy-backend.js'),
     `lazy-backend GREEN fixture wrongly tripped fail-closed:\n${run.output}`);
-  console.log('PASS non-literal sources fail closed (j/k in-route, m via wrapper, n/o/p via local binding; q lazy-backend green)');
+  console.log('PASS non-literal sources fail closed (j/k in-route, m via wrapper, n/o/p via local binding, r late-assign; q lazy-backend green)');
 }
 
 function runLiveParseAssertion() {
