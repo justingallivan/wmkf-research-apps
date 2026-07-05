@@ -51,6 +51,8 @@ import { get as blobGet } from '@vercel/blob';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { GraphService } from '../../../lib/services/graph-service';
+import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request.js';
+import * as proposalBudgetLineAdapter from '../../../lib/dataverse/adapters/proposal-budget-line.js';
 import { classify } from '../../../lib/utils/drain-error-classifier';
 import { buildNoResponseError } from '../../../lib/utils/service-error';
 import IntakeAuditService from '../../../lib/services/intake-audit-service';
@@ -461,11 +463,7 @@ async function recoverRequestCreated(client, job, originalError) {
   let existing;
   try {
     existing = await bypassDynamicsRestrictions('drain-recover-request-created', () =>
-      DynamicsService.getRecord(
-        'akoya_requests',
-        job.request_id,
-        { select: 'akoya_requestnum' },
-      )
+      grantRequestAdapter.getById(job.request_id, { select: 'akoya_requestnum' })
     );
   } catch (err) {
     const cls = classify(err);
@@ -768,7 +766,7 @@ async function handleFilesMoved(client, job) {
 
     const body = buildBudgetLinePayload(row, job.request_id);
     try {
-      await DynamicsService.createRecord('wmkf_proposalbudgetlines', body);
+      await proposalBudgetLineAdapter.create(body);
     } catch (err) {
       const cls = classify(err);
       if (cls.category === 'duplicate_pk') {
