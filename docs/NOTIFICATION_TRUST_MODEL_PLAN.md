@@ -15,7 +15,8 @@ related:
 
 # NotificationService Trust-Model Push-Up Plan
 
-**Execution status: DRAFTED, NOT EXECUTED, NOT REVIEWED (2026-07-05).** This is the site-33 follow-on
+**Execution status: DRAFTED, NOT EXECUTED, REVIEWED ONCE — NEEDS REWORK findings folded in, NOT
+RE-REVIEWED (2026-07-05).** This is the site-33 follow-on
 the owner asked for after `docs/BYPASS_STRIP_PLAN.md` Stage 4 closed everything else. Stage 4's own
 text explicitly deferred this site: its DAL-touching branch sits inside a shared utility (`notify()`),
 most of whose callers never reach it, and safely auditing that full fan-out was out of scope for that
@@ -52,17 +53,18 @@ Decision 3.
 
 | Fact | Value | Evidence |
 |---|---|---|
-| Real callers of `NotificationService.notify(` / `.notifyNewUser(` (non-comment, excluding `notification-service.js` itself) | 21 files | `[VERIFIED via grep -rln "NotificationService\.notify(\|NotificationService\.notifyNewUser(\|notifications\.notify(" lib pages --include=*.js, excluding notification-service.js, this session]` |
+| Real callers of `NotificationService.notify(` / `.notifyNewUser(` (non-comment, excluding `notification-service.js` itself) | 22 files (21 literal call-site matches + 1 additional indirect caller, #22, that assigns `notify` to a local and calls it via `.call(...)`, which the literal grep does not match) | `[VERIFIED via grep -rln "NotificationService\.notify(\|NotificationService\.notifyNewUser(\|notifications\.notify(" lib pages --include=*.js, excluding notification-service.js, this session; #22 found via a fresh-context Codex adversarial review of this plan and independently confirmed via grep -n "notify" lib/services/maintenance-service.js, this session]` |
 | `sendAdminEmail` trigger condition | `shouldEmail = alert && (emailAdmins || severity === 'error' || severity === 'critical')` | `[VERIFIED via lib/services/notification-service.js:75-76]` |
 | `notify()`'s own wrap | `withDalContext('notification-email', () => DynamicsService.createAndSendEmail(...))` inside `sendAdminEmail` | `[VERIFIED via lib/services/notification-service.js:176-183]` |
 | Gate scope | `DynamicsService.createAndSendEmail` is a WRITE gated by `assertTrustedDalContext` | `[VERIFIED via lib/services/dynamics-service.js:1232 assertTrustedDalContext('DynamicsService.createEmailActivity') and sibling gates on the email-transport methods — createAndSendEmail/addEmailAttachment/createEmailActivity/sendEmail all gated, per BYPASS_STRIP_PLAN.md Objective]` |
 
-Note on scope of the counts in this section: the 21-caller figure and the NEVER-REACHES/REACHES split
-below are a direct-caller classification, closed and counted this session. The separate, open-ended
-fan-out behind rows #10 and #11 (indirect callers of `onboardReviewer()` and `readRequiredEmailDefaults()`
-respectively) is a distinct, NOT-fully-counted quantity — flagged explicitly in those rows and in
-Decision 2 — and does not add to or subtract from the 21/8/13 figures above, which describe only
-`notify()`'s own direct callers.
+Note on scope of the counts in this section: the 22-caller figure and the NEVER-REACHES/REACHES split
+below are a direct-caller classification, closed and counted this session (22 = 21 literal grep matches
++ 1 indirect caller, #22, added after a Codex adversarial review of this plan's first draft found it).
+The separate, open-ended fan-out behind rows #10 and #11 (indirect callers of `onboardReviewer()` and
+`readRequiredEmailDefaults()` respectively) is a distinct, not-fully-counted quantity — flagged
+explicitly in those rows and in Decision 2 — and does not add to or subtract from the 22/8/14 figures
+above, which describe only `notify()`'s own direct callers.
 
 ### Classification: does each caller's `notify()` call ever reach the email branch?
 
@@ -81,27 +83,28 @@ covers these harmlessly if they ever DO reach it, and they currently do not:
 | 7 | `lib/services/reviewer-quota.js` | `info` | not set (no `emailAdmins` anywhere in file) `[VERIFIED via grep -n emailAdmins lib/services/reviewer-quota.js — 0 hits]` |
 | 8 | `pages/api/cron/pricing-canary.js` | `warning` (both call sites) | not set (no `emailAdmins` anywhere in file) `[VERIFIED via grep -n emailAdmins pages/api/cron/pricing-canary.js — 0 hits]` |
 
-**REACHES (confirmed path to `sendAdminEmail`) — 13 files, #9-21** — Stage 1 candidates below:
+**REACHES (confirmed path to `sendAdminEmail`) — 14 files, #9-22** — Stage 1 candidates below:
 
 | # | File | Trigger | Caller graph (traced this session) | Hop depth |
 |---|---|---|---|---|
 | 9 | `pages/api/auth/[...nextauth].js` → `NotificationService.notifyNewUser(...)` (fire-and-forget, `.catch(()=>{})`) | `notifyNewUser` hardcodes `emailAdmins: true` `[VERIFIED via notification-service.js:198-209]` | Entry point itself (NextAuth `signIn` callback) — **the original motivating case for site 33** | 1 (direct) |
-| 10 | `lib/bill/onboard-reviewer-service.js` → `unhandled()` (severity `error`) and `notifyAlertOnly()` (`emailAdmins: true`) | `[VERIFIED via :511-529 (unhandled), :531-548 (notifyAlertOnly)]` | Callers of `onboardReviewer()`: `pages/api/bill/onboard-reviewer.js` (route) — **also independently REACHES, see #14** — and `lib/bill/honorarium-onboard-orchestrator.js` (already NEVER-REACHES itself, but calls `onboardReviewer` which can) | 2 (via `onboardReviewer`) |
-| 11 | `lib/services/email-defaults.js` → `notifyMisconfiguredDefault()` | severity `error` + `emailAdmins: true` `[VERIFIED via :4-20]` | Callers of `readRequiredEmailDefaults`, found via `grep -rln email-defaults lib pages --include=*.js` this session — file list only, **individual caller bodies NOT read this session**: [NOT-READ: lib/seed/email-defaults/reviewer-templates.js, lib/services/reviewer-manual-reminder.js, lib/services/reviewer-thankyou-sweep.js, lib/services/reviewer-release-config.js, lib/services/reviewer-reminder-sweep.js, lib/services/reviewer-acceptance-email.js, lib/services/review-manager/withdraw-sufficient-service.js, lib/services/cron/grantee-deliverable-reminders-service.js, pages/profile-settings.js, pages/api/email-defaults/grantee-invite.js, pages/api/email-defaults/reviewer-templates.js, pages/api/cron/grantee-deliverable-reminders.js — full per-caller context-posture trace is explicitly Stage 2 work (Decision 2), not resolved by this plan. The count of callers reaching THIS row's branch is not established in this plan; deferred to Stage 2 (Decision 2). | multi-hop (NOT traced further this session — flagged for separate scoping, Decision 3) |
+| 10 | `lib/bill/onboard-reviewer-service.js` — reaches the email branch via FOUR distinct call sites, not just two: the invalid-input guard (severity `error`) at line ~108, `billFailure()` (severity `error`/`critical` depending on error type) at ~481-503 (called from ~209, ~248, ~259), `unhandled()` (severity `error`) at ~511-529, and `notifyAlertOnly()` (`emailAdmins: true`) at ~531-548 — a Codex adversarial review of this plan's first draft found the first two were omitted | `[VERIFIED via :105-118 (invalid-input guard), :481-503 (billFailure), :511-529 (unhandled), :531-548 (notifyAlertOnly); :209,:248,:259 (billFailure call sites)]` | Callers of `onboardReviewer()`: `pages/api/bill/onboard-reviewer.js` (route) — **also independently REACHES, see #14** — and `lib/bill/honorarium-onboard-orchestrator.js` (already NEVER-REACHES itself, but calls `onboardReviewer` which can) | 2 (via `onboardReviewer`) |
+| 11 | `lib/services/email-defaults.js` → `notifyMisconfiguredDefault()` | severity `error` + `emailAdmins: true` `[VERIFIED via :4-20]` | **A Codex adversarial review of this plan's first draft flagged this row's file list as overreaching** — the list below is an unverified `grep -rln "email-defaults"` HIT LIST, not a confirmed caller graph: it may include files that reference `email-defaults.js` for a reason other than calling `readRequiredEmailDefaults()`, or that call it but never reach `notifyMisconfiguredDefault()`'s branch. It is named here only so Stage 2 has a starting point, not as a verified census: [NOT-READ, hit-list only, NOT a caller graph: lib/seed/email-defaults/reviewer-templates.js, lib/services/reviewer-manual-reminder.js, lib/services/reviewer-thankyou-sweep.js, lib/services/reviewer-release-config.js, lib/services/reviewer-reminder-sweep.js, lib/services/reviewer-acceptance-email.js, lib/services/review-manager/withdraw-sufficient-service.js, lib/services/cron/grantee-deliverable-reminders-service.js, pages/profile-settings.js, pages/api/email-defaults/grantee-invite.js, pages/api/email-defaults/reviewer-templates.js, pages/api/cron/grantee-deliverable-reminders.js]. Stage 2 must re-derive the exact caller set via symbol-level tracing of `readRequiredEmailDefaults()` and `notifyMisconfiguredDefault()` specifically, not reuse this grep hit list as ground truth. The count of callers reaching THIS row's branch is not established in this plan; deferred to Stage 2 (Decision 2). | multi-hop (NOT traced further this session — flagged for separate scoping, Decision 3) |
 | 12 | `lib/services/review-upload.js` (severity `error`, virus-detection alert) | `[VERIFIED via :476-478]` | Callers of `writeReviewFiles`: `pages/api/review-manager/upload-review.js`, `pages/api/external/review/[token]/upload.js` (both already establish `withDalContext` around the WHOLE `writeReviewFiles` call as of `BYPASS_STRIP_PLAN.md` Stage 1/4a — **this notify call is likely ALREADY covered**, needs confirmation the notify call site is lexically inside that wrap, not after it) | 1 (direct, likely already safe) |
 | 13 | `lib/services/reviewer-acceptance-drain.js` (`emailAdmins: true` at one call site) | `[VERIFIED via :181-184]` | Callers: `pages/api/cron/drain-reviewer-acceptances.js` (already establishes `withDalContext('cron-drain-reviewer-acceptances')` per Stage 1 cluster A3 site 30 — **likely already covered**, needs confirmation of scope) | 1 (direct, likely already safe) |
 | 14 | `pages/api/bill/onboard-reviewer.js` (route itself, severity `error` on its own 500 path) | `[VERIFIED via :90-92]` | Entry point itself — route currently has NO `withDalContext` of its own `[VERIFIED via grep -n withDalContext pages/api/bill/onboard-reviewer.js — 0 hits]` | 1 (direct) |
-| 15 | `lib/utils/auth-bypass-monitor.js` (`emailAdmins: true`) | `[VERIFIED via :60-71]` | Callers: `pages/api/cron/auth-bypass-check.js` [NOT-READ: found via grep -rln only, body not opened this session], `lib/utils/migration-drift.js` (itself unresolved — see #16) `[VERIFIED via grep -rln auth-bypass-monitor pages lib]` | 1-2 |
-| 16 | `lib/utils/migration-drift.js` (severity `error`, both call sites) | `[VERIFIED via :53-55,87-89]` | **No caller found** — `detectMigrationDrift()` is not exported and no `pages/` route or cron references `migration-drift` at all `[VERIFIED via grep -rn migration-drift pages --include=*.js — 0 hits; grep -n "^export" lib/utils/migration-drift.js shows no export]`. **Flag: possible dead code, or invoked via a mechanism this grep didn't match (e.g. a script, or dynamic require) — needs a dedicated liveness check before ANY action, per CLAUDE.md's destructive-carryover verification rule.** | no live caller found this session — **STOP-AND-ASK before Stage 1** |
+| 15 | `lib/utils/auth-bypass-monitor.js`'s `checkEmergencyAuthBypass()` (severity `critical` at one call site, `emailAdmins: true` at another) | `[VERIFIED via :60-71]` | **Corrected by a Codex adversarial review of this plan's first draft** (the original row named `migration-drift.js` as a caller — that was wrong, it is only a comment reference there). The two REAL callers are: `pages/api/cron/auth-bypass-check.js`, a static import `[VERIFIED via pages/api/cron/auth-bypass-check.js:20]`, currently unwrapped `[VERIFIED via grep -n withDalContext pages/api/cron/auth-bypass-check.js — 0 hits]`; and `instrumentation.js`'s `register()` cold-start hook, a dynamic `import()` at line ~19-22, also currently unwrapped — see #16, same hook | 1 (direct, two independent callers, both currently uncovered) |
+| 16 | `lib/utils/migration-drift.js`'s `detectMigrationDrift()` (severity `error`, both call sites) | `[VERIFIED via :53-55,87-89]` | **Corrected by a Codex adversarial review of this plan's first draft** — the original row called this dead code with no caller; that was wrong. `detectMigrationDrift` IS exported (`module.exports`) `[VERIFIED via lib/utils/migration-drift.js:105]` and IS called on every server cold start by `instrumentation.js`'s `register()` via a dynamic `import()` at line ~30-31 `[VERIFIED via instrumentation.js:27-34]`. This is the SAME cold-start hook that calls `auth-bypass-monitor.js` (#15) — `register()`'s two try/catch blocks are the entry point for both rows. No `withDalContext` wraps this path anywhere `[VERIFIED via grep -n withDalContext instrumentation.js lib/utils/migration-drift.js lib/utils/auth-bypass-monitor.js — 0 hits across all three files]`; both alert paths currently depend entirely on `notify()`'s own internal wrap, and `instrumentation.js`'s outer try/catch only logs and swallows a failure here, so a premature wrapper removal would silently break cold-start alerting in production | 1 (direct, currently uncovered) |
+| 22 | `lib/services/maintenance-service.js`'s `_safeBillAlert()` (severity `error` at ~196-203 and ~240-247, `emailAdmins: true` at both) | `[VERIFIED via :270-272 (notify.call indirection), :196-203 and :240-247 (severity/emailAdmins), :258-262 (_safeBillAlert definition)]` | **Found by a Codex adversarial review of this plan's first draft**, which the census's literal-callsite grep missed because the file assigns `NotificationService.notify` to a local `notify` and invokes it via `notify.call(...)`, not a literal `NotificationService.notify(` token. Sole real caller of `_safeBillAlert` is `sweepBillOnboarding()`, whose sole real caller is `pages/api/cron/maintenance.js`, which already establishes `withDalContext('bill-onboarding-resume', ...)` around the WHOLE `sweepBillOnboarding()` call `[VERIFIED via pages/api/cron/maintenance.js:114-116]` — **confirmed already covered**, matching the #12/#13 pattern | 1 (direct, confirmed already covered) |
 | 17 | `pages/api/cron/health-check.js` (severity escalates to `error` when `consecutiveUnhealthy >= 2`) | `[VERIFIED via :85-95]` | Entry point itself — needs a check for existing `withDalContext` | 1 (direct) |
 | 18 | `pages/api/cron/log-analysis.js` (severity `error` when `errors.length >= 50`) | `[VERIFIED via :142-144]` | Entry point itself — needs a check for existing `withDalContext` | 1 (direct) |
 | 19 | `pages/api/cron/maintenance.js` (severity `error` conditionally, 2 call sites) | `[VERIFIED via :231-233,258-260]` | Entry point itself — **this route now establishes `withDalContext` for sites 34/35 (Stage 4b) but NOT around its own summary/failure `notify()` calls at :231/:258** — needs confirmation those calls are outside the 34/35 wraps (they are, per the file's per-step try/catch structure `[VERIFIED via pages/api/cron/maintenance.js, read in full this session for the Stage 4b push-up]`) | 1 (direct, needs its own wrap or confirmation it's already covered) |
 | 20 | `pages/api/cron/secret-check.js` (`emailAdmins: true`) | `[VERIFIED via :81-96]` | Entry point itself — needs a check for existing `withDalContext` | 1 (direct) |
 | 21 | `pages/api/intake/draft/attach.js` (severity `error`, virus-detection alert) | `[VERIFIED via :485-487]` | Entry point itself — **this route already establishes 2 narrow scopes (`intake-attach-bridge` :140, `intake-attach-membership` :172, per Stage 1) but the notify call at :485 is lexically OUTSIDE both** — confirmed unwrapped, needs its own scope (matching site 44's "sixth narrow scope" pattern from Stage 4b) | 1 (direct, confirmed NOT currently covered by neighbors) |
 
-The NEVER-REACHES table above lists 8 files (#1-8) and the REACHES table lists 13 (#9-21); together
-they account for the 21 direct callers named in the Baseline row above. This closed count is unaffected
-by the separately-flagged, not-yet-counted indirect fan-out under #11 (see the Note above the
+The NEVER-REACHES table above lists 8 files (#1-8) and the REACHES table lists 14 (#9-22); together
+they account for the 22 direct callers named in the Baseline row above. This closed count is unaffected
+by the separately-flagged, not-fully-counted indirect fan-out under #11 (see the Note above the
 Classification heading).
 
 ---
@@ -109,28 +112,37 @@ Classification heading).
 ## Decisions (draft — for review, not yet owner-approved)
 
 1. **Only single-hop REACHES sites are in this plan's Stage 1 scope.** That is #9, #14, #17, #18, #19,
-   #20, #21 (7 sites) plus #12 and #13 pending confirmation they're already covered (if confirmed
-   covered, they need NO action — just a characterization test proving it, not a code change).
-2. **#10 (`onboard-reviewer-service.js`) and #11 (`email-defaults.js`) are multi-hop and OUT of this
+   #20, #21 (7 sites) plus #12, #13, and #22, all three already confirmed covered by their callers'
+   existing wraps (no code change needed for those three — just a characterization test proving it).
+2. **#15 (`auth-bypass-monitor.js`) and #16 (`migration-drift.js`) are ALSO in this plan's Stage 1 scope,
+   added after a Codex adversarial review corrected both rows.** Both are single-hop direct callers, not
+   multi-hop, so they belong in Stage 1 rather than deferred to Stage 2: `pages/api/cron/auth-bypass-check.js`
+   needs its own new `withDalContext` wrap (#15's route caller), and `instrumentation.js`'s `register()`
+   cold-start hook needs its own new wrap covering BOTH #15's and #16's alert calls (its two try/catch
+   blocks are a single, simple two-call entry point — this plan's judgment call is that it is safe and
+   appropriate to wrap now rather than defer, since it is not itself a further shared utility with
+   its own untraced callers; it IS the real entry point).
+3. **#10 (`onboard-reviewer-service.js`) and #11 (`email-defaults.js`) are multi-hop and OUT of this
    plan's Stage 1** — each needs its own caller-graph trace (of `onboardReviewer`'s callers, and
    `readRequiredEmailDefaults`'s callers respectively — those files are named above but their bodies
    are NOT read this session; see the [NOT-READ] marker) before any push-up decision can be made
    safely. Recommend a Stage 2, scoped and reviewed separately, only after Stage 1 closes.
-3. **#16 (`migration-drift.js`) is a STOP-AND-ASK, not a push-up candidate.** Before this plan's
-   execution touches it, confirm whether `detectMigrationDrift()` has a live caller this session's
-   greps missed (script, cron registry, dynamic import) or whether it is dead code — a decision
-   distinct from and prior to any Stage 4b-style trust-model work.
 4. **Byte-identical labels, as in Stage 4a/4b.** The relocated wrap keeps the label
-   `'notification-email'` exactly; only the callee boundary moves.
+   `'notification-email'` exactly; only the callee boundary moves. The two NEW wraps this plan adds
+   (`instrumentation.js`'s cold-start hook, `auth-bypass-check.js`'s route) are new establishment points,
+   not relocations, so they may use their own descriptive labels (e.g. `'cold-start-alerts'`,
+   `'cron-auth-bypass-check'`) rather than reusing `'notification-email'`, since there is no existing
+   label to preserve at those two sites.
 5. **No scope widening beyond what Stage 4b already established as safe** (broadening a wrap to cover
    more code than before is acceptable per the `cleanupBlobs` precedent; narrowing or stranding a call
    is not).
 
 ## Non-goals
 
-Touching #10/#11's deeper fan-out in this plan; resolving #16's liveness question by assumption; any
-change to `notify()`'s email-vs-no-email branching logic; any change to `sendAdminEmail`'s recipient
-resolution.
+Touching #10/#11's deeper fan-out in this plan; any change to `notify()`'s email-vs-no-email branching
+logic; any change to `sendAdminEmail`'s recipient resolution; changing `instrumentation.js`'s
+fire-and-forget/best-effort cold-start semantics (the new wrap must not turn a caught, logged failure
+into an uncaught one).
 
 ---
 
@@ -151,16 +163,17 @@ closed, exactly as Stage 3/4 both required.
 
 ### Stage 0 — Pre-execution verification (before touching any code)
 
-1. Resolve #16 (`migration-drift.js`) liveness — STOP-AND-ASK per Decision 3.
-2. Confirm #12 (`review-upload.js`) and #13 (`reviewer-acceptance-drain.js`) are ALREADY covered by
-   their callers' existing wraps (read the exact lexical scope; if covered, no code change, just add a
-   characterization test proving it; if NOT covered, promote to Stage 1).
-3. Re-run the disconfirming census greps (caller count, severity/emailAdmins per file) — confirm no
-   drift from this plan's Baseline.
+1. Confirm #12 (`review-upload.js`), #13 (`reviewer-acceptance-drain.js`), and #22
+   (`maintenance-service.js`) are ALREADY covered by their callers' existing wraps (read the exact
+   lexical scope; each is believed covered per the Classification table above — if NOT covered on
+   re-read, promote to an active Stage 1 code change instead of a characterization-only site).
+2. Re-run the disconfirming census greps (caller count, severity/emailAdmins per file) — confirm no
+   drift from this plan's Baseline, including the #22 indirect-call and #15/#16 dynamic-import shapes
+   a literal-callsite grep alone will not surface (see the Baseline evidence note).
 
-### Stage 1 — Single-hop push-ups (7 sites: #9, #14, #17, #18, #19, #20, #21)
+### Stage 1 — Single-hop push-ups (9 sites: #9, #14, #15, #16, #17, #18, #19, #20, #21)
 
-Same per-site loop as `BYPASS_STRIP_PLAN.md` Stage 1: add `withDalContext('notification-email', ...)`
+Same per-site loop as `BYPASS_STRIP_PLAN.md` Stage 1: add `withDalContext(...)`
 at each real entry point around its `notify()` call (or the smallest enclosing block that reaches it),
 add/confirm a characterization test (real `DynamicsService`, negative control + positive pin), run
 targeted suite + gates, commit per site or small cluster.
@@ -169,10 +182,18 @@ targeted suite + gates, commit per site or small cluster.
 the `notifyNewUser(...)` call itself, not awaited-and-swallowed in a way that changes the fire-and-forget
 semantics.
 
+**#15/#16 (`instrumentation.js`'s cold-start hook) need the same care**: `register()`'s two try/catch
+blocks are individually caught and logged, not propagated — the new wrap must preserve that, wrapping
+each call (or both, in one `withDalContext` spanning the function body) without turning a caught failure
+into an uncaught one that could break server cold start. `pages/api/cron/auth-bypass-check.js` (#15's
+other caller) is a plain route wrap, same shape as #17/#18/#20.
+
 Once Stage 1 closes, `notify()`'s own `'notification-email'` wrap is removed ONLY IF every REACHES site
-(including #12/#13 once confirmed, and excluding the explicitly-deferred #10/#11 multi-hop sites) is
-covered by its own caller — otherwise the wrap must stay (a partial push-up that removes the shared
-safety net is the drain-defect failure class this plan exists to avoid).
+— #9, #12, #13, #14, #15, #16, #17, #18, #19, #20, #21, #22 — is covered by its own caller (excluding
+the explicitly-deferred #10/#11 multi-hop sites, per Decision 3) — otherwise the wrap must stay
+(a partial push-up that removes the shared safety net is the drain-defect failure class this plan
+exists to avoid; a Codex adversarial review of this plan's first draft flagged this explicitly, since
+the original draft's Stage 1 scope did not yet cover #15/#16/#22).
 
 ### Stage 2 (separately scoped, NOT part of this plan's execution) — Multi-hop sites #10, #11
 
@@ -199,5 +220,25 @@ Codex adversarial review of the full diff, same acceptance bar as `BYPASS_STRIP_
   and 1 (#16, `migration-drift.js`) has no traceable live caller and is a STOP-AND-ASK before any
   action. Drafted in response to an explicit owner request to close the site-33 gap left open by
   `BYPASS_STRIP_PLAN.md` Stage 4.
+
+- 2026-07-05: **Plan revised after a fresh-context Codex adversarial review returned NEEDS REWORK on
+  the draft above.** The reviewing agent traced the caller graph independently from source and found
+  the first draft's census was structurally too narrow: its literal-callsite grep could not see an
+  indirect caller that assigns `notify` to a local and invokes it via `.call(...)` (now #22,
+  `maintenance-service.js`), or callers reached only through a dynamic `import()` (`instrumentation.js`'s
+  cold-start hook, which reaches both #15 and #16). Two rows were materially wrong, not just
+  incomplete: #16 (`migration-drift.js`) was called dead code with no caller — it is live, exported,
+  and invoked on every cold start; #15 (`auth-bypass-monitor.js`) named the wrong second caller
+  (`migration-drift.js`, a comment-only reference, instead of `instrumentation.js`, the real one). Row
+  #10 was under-described (two of its four email-reaching call sites were omitted). Row #11's
+  `[NOT-READ]` file list was reframed as an unverified hit list rather than a caller graph. All seven
+  Codex findings were independently re-verified against source (file:line citations added throughout)
+  before this revision, per this file's own `[VERIFIED via ...]` convention — see the Baseline evidence
+  note and rows #10, #15, #16, #22 above. Updated counts: 22 real direct callers (was 21), 8
+  NEVER-REACHES (unchanged), 14 REACHES (was 13). Stage 1 scope grew from 7 to 9 sites (#15 and #16
+  added, both single-hop and no longer a liveness question); #22 joined #12/#13 as confirmed-covered,
+  no-code-change sites. The shared `'notification-email'` wrapper's removal condition was tightened to
+  require ALL twelve REACHES sites covered, not the original seven-site subset. Still `status: draft`;
+  not yet re-reviewed after this revision, not executed.
 
 <!-- end of plan -->
