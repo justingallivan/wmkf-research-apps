@@ -16,6 +16,11 @@ import { DynamicsService } from '../../lib/services/dynamics-service';
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: jest.fn((_label, fn) => fn()),
+  // core/changeset.js#runChangeset asserts a trusted DAL context (Stage 7,
+  // docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md); this route's own bypass above
+  // is mocked to a no-op passthrough, so the assertion is mocked too — the
+  // route establishes a real context in production.
+  assertTrustedDalContext: jest.fn(),
 }));
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {

@@ -15,9 +15,26 @@
  * itself is a Dataverse server property proven in prod by the S301 spike
  * (scripts/probe-dataverse-batch-changeset.mjs); here we assert the helper's
  * contract surface — a rejected changeset surfaces as a throw, not a partial.
+ *
+ * Stage 7 (docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md): executeChangeset now
+ * requires a trusted Dataverse context once its input validation passes
+ * (enforcement is on by default in test — jest.setup.js). Every test below
+ * that reaches the transport wraps its body in `ctx(...)`
+ * (`bypassDynamicsRestrictions`), matching how a real caller (a converted
+ * DAL entry point) would already have one. The "input validation" describe
+ * block deliberately runs WITHOUT a context: those calls throw on malformed
+ * input before the context check even runs, so they must keep passing with
+ * no context at all (a `beforeEach` establishing context does NOT work here
+ * — jest-circus does not run hooks and tests in the same AsyncLocalStorage
+ * causal chain; verified empirically).
  */
 
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
+import { bypassDynamicsRestrictions } from '../../lib/services/dynamics-context.js';
+
+function ctx(fn) {
+  return () => bypassDynamicsRestrictions('test:dynamics-service-changeset', fn);
+}
 
 const ACTING_GUID = '00000000-0000-0000-0000-000000000abc';
 const CRLF = '\r\n';
@@ -100,7 +117,7 @@ const TWO_UPSERTS = [
 // ── 1. Body construction ──────────────────────────────────────────────────────
 
 describe('executeChangeset — changeset body construction', () => {
-  test('builds one multipart/mixed $batch wrapping a single changeset of ops', async () => {
+  test('builds one multipart/mixed $batch wrapping a single changeset of ops', ctx(async () => {
     mockToken();
     fetch.mockImplementationOnce(() => Promise.resolve(multipartResponse([
       { contentId: 1, status: 204 }, { contentId: 2, status: 204 },
@@ -128,9 +145,9 @@ describe('executeChangeset — changeset body construction', () => {
     expect(body).toContain('{"wmkf_reviewrating1":3}');
     // closing boundaries
     expect(body).toContain(`--${batchBoundary}--`);
-  });
+  }));
 
-  test('a POST op carries its JSON body; a DELETE op carries none', async () => {
+  test('a POST op carries its JSON body; a DELETE op carries none', ctx(async () => {
     mockToken();
     fetch.mockImplementationOnce(() => Promise.resolve(multipartResponse([
       { contentId: 1, status: 204 }, { contentId: 2, status: 204 },
@@ -145,13 +162,13 @@ describe('executeChangeset — changeset body construction', () => {
     expect(body).toContain('POST https://example.crm.dynamics.com/api/data/v9.2/wmkf_appreviewanswers HTTP/1.1');
     expect(body).toContain('{"wmkf_questionkey":"q2"}');
     expect(body).toContain('DELETE https://example.crm.dynamics.com/api/data/v9.2/wmkf_appreviewanswers(33333333-3333-3333-3333-333333333333) HTTP/1.1');
-  });
+  }));
 });
 
 // ── 2. Per-op If-Match ──────────────────────────────────────────────────────────
 
 describe('executeChangeset — per-operation If-Match', () => {
-  test('ifMatch lands as an If-Match header on its op only', async () => {
+  test('ifMatch lands as an If-Match header on its op only', ctx(async () => {
     mockToken();
     fetch.mockImplementationOnce(() => Promise.resolve(multipartResponse([
       { contentId: 1, status: 204 }, { contentId: 2, status: 204 },
@@ -169,13 +186,13 @@ describe('executeChangeset — per-operation If-Match', () => {
     const ifMatchIdx = body.indexOf('If-Match:');
     expect(ifMatchIdx).toBeGreaterThan(parentIdx);
     expect(parentIdx).toBeGreaterThan(answersIdx);
-  });
+  }));
 });
 
 // ── 3. Multipart-response parsing (success) ─────────────────────────────────────
 
 describe('executeChangeset — multipart-response parsing', () => {
-  test('success returns one 2xx result per op (real upsert shape: 204 No Content, body null)', async () => {
+  test('success returns one 2xx result per op (real upsert shape: 204 No Content, body null)', ctx(async () => {
     mockToken();
     // The reviewer submit shape: PATCH upsert-by-alt-key → 204, parent PATCH → 204.
     // Create-in-changeset ops also return 204 (no body); we do not surface OData-EntityId.
@@ -190,9 +207,9 @@ describe('executeChangeset — multipart-response parsing', () => {
       { contentId: 1, status: 204, body: null },
       { contentId: 2, status: 204, body: null },
     ]);
-  });
+  }));
 
-  test('parses an op JSON body when one is returned (e.g. return=representation)', async () => {
+  test('parses an op JSON body when one is returned (e.g. return=representation)', ctx(async () => {
     mockToken();
     fetch.mockImplementationOnce(() => Promise.resolve(multipartResponse([
       { contentId: 1, status: 201, body: { wmkf_appreviewanswerid: 'new-1' } },
@@ -202,9 +219,9 @@ describe('executeChangeset — multipart-response parsing', () => {
       [{ method: 'POST', url: 'wmkf_appreviewanswers', body: { wmkf_questionkey: 'q2' } }],
     );
     expect(result.operations).toEqual([{ contentId: 1, status: 201, body: { wmkf_appreviewanswerid: 'new-1' } }]);
-  });
+  }));
 
-  test('attaches MSCRMCallerID to the $batch request when actingUserSystemId is set', async () => {
+  test('attaches MSCRMCallerID to the $batch request when actingUserSystemId is set', ctx(async () => {
     mockToken();
     fetch.mockImplementationOnce(() => Promise.resolve(multipartResponse([{ contentId: 1, status: 204 }])));
 
@@ -213,21 +230,21 @@ describe('executeChangeset — multipart-response parsing', () => {
       { actingUserSystemId: ACTING_GUID },
     );
     expect(lastBatchCall()[1].headers.MSCRMCallerID).toBe(ACTING_GUID);
-  });
+  }));
 
-  test('omits MSCRMCallerID for external-token (unattended) flows', async () => {
+  test('omits MSCRMCallerID for external-token (unattended) flows', ctx(async () => {
     mockToken();
     fetch.mockImplementationOnce(() => Promise.resolve(multipartResponse([{ contentId: 1, status: 204 }])));
 
     await DynamicsService.executeChangeset([{ method: 'PATCH', url: 'akoya_requests(g)', body: { x: 1 } }]);
     expect(lastBatchCall()[1].headers.MSCRMCallerID).toBeUndefined();
-  });
+  }));
 });
 
 // ── 4. All-or-nothing on one failed op ─────────────────────────────────────────
 
 describe('executeChangeset — all-or-nothing rollback', () => {
-  test('a stale If-Match (embedded 412) throws with .status 412 and the Dataverse code', async () => {
+  test('a stale If-Match (embedded 412) throws with .status 412 and the Dataverse code', ctx(async () => {
     mockToken();
     // Outer 400-wrapping an embedded 412 changeset failure (the real Dataverse shape).
     fetch.mockImplementationOnce(() => Promise.resolve(multipartResponse(
@@ -239,9 +256,9 @@ describe('executeChangeset — all-or-nothing rollback', () => {
       status: 412,
       dataverseCode: '0x80060891',
     });
-  });
+  }));
 
-  test('a validation failure (embedded 400) throws with .status 400 — nothing returned as ok', async () => {
+  test('a validation failure (embedded 400) throws with .status 400 — nothing returned as ok', ctx(async () => {
     mockToken();
     fetch.mockImplementationOnce(() => Promise.resolve(multipartResponse(
       [{ contentId: 1, status: 400, reason: 'Bad Request', body: { error: { code: '0x80040265', message: 'invalid value' } } }],
@@ -249,9 +266,9 @@ describe('executeChangeset — all-or-nothing rollback', () => {
     )));
 
     await expect(DynamicsService.executeChangeset(TWO_UPSERTS)).rejects.toMatchObject({ status: 400 });
-  });
+  }));
 
-  test('falls back to the outer status when Dataverse returns a bare JSON error (no multipart)', async () => {
+  test('falls back to the outer status when Dataverse returns a bare JSON error (no multipart)', ctx(async () => {
     mockToken();
     fetch.mockImplementationOnce(() =>
       Promise.resolve(jsonErrorResponse(400, { error: { code: '0x80048d19', message: 'changeset rejected' } })),
@@ -261,13 +278,13 @@ describe('executeChangeset — all-or-nothing rollback', () => {
       status: 400,
       dataverseCode: '0x80048d19',
     });
-  });
+  }));
 });
 
 // ── 4b. Fail-closed when the parser can't confirm every op (P1) ─────────────────
 
 describe('executeChangeset — fail-closed on unconfirmable commit', () => {
-  test('an outer-200 multipart response that under-counts ops throws (does not report ok)', async () => {
+  test('an outer-200 multipart response that under-counts ops throws (does not report ok)', ctx(async () => {
     mockToken();
     // Two ops requested, but the response only carries ONE embedded result — the
     // parser cannot prove the second op committed, so the changeset is unconfirmed.
@@ -278,9 +295,9 @@ describe('executeChangeset — fail-closed on unconfirmable commit', () => {
     await expect(DynamicsService.executeChangeset(TWO_UPSERTS)).rejects.toThrow(
       /could not confirm an atomic commit: parsed 1 of 2/,
     );
-  });
+  }));
 
-  test('an embedded op with an unparseable status line (status 0) throws', async () => {
+  test('an embedded op with an unparseable status line (status 0) throws', ctx(async () => {
     mockToken();
     // Hand-craft a multipart body whose embedded HTTP response has no status line.
     const cs = 'changesetresponse_X';
@@ -310,13 +327,13 @@ describe('executeChangeset — fail-closed on unconfirmable commit', () => {
     await expect(
       DynamicsService.executeChangeset([{ method: 'PATCH', url: 'akoya_requests(g)', body: { x: 1 } }]),
     ).rejects.toThrow(/could not confirm an atomic commit/);
-  });
+  }));
 });
 
 // ── 4c. Wire-format tolerance: LF endings + case-insensitive MIME (P2) ──────────
 
 describe('executeChangeset — response parser tolerance', () => {
-  test('parses a response with LF line endings and lowercase content-type headers', async () => {
+  test('parses a response with LF line endings and lowercase content-type headers', ctx(async () => {
     mockToken();
     const cs = 'changesetresponse_LF';
     const batch = 'batchresponse_LF';
@@ -348,10 +365,14 @@ describe('executeChangeset — response parser tolerance', () => {
     );
     expect(result.ok).toBe(true);
     expect(result.operations).toEqual([{ contentId: 1, status: 204, body: null }]);
-  });
+  }));
 });
 
 // ── 5. Input validation ─────────────────────────────────────────────────────────
+// Deliberately NOT wrapped in ctx(): these calls throw on malformed input
+// before the trusted-context check runs, so they must keep passing with no
+// context at all — proving the enforcement check is genuinely ordered after
+// validation, not just incidentally satisfied by every test having a context.
 
 describe('executeChangeset — input validation', () => {
   test('rejects an empty operations array', async () => {

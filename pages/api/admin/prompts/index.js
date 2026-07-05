@@ -18,7 +18,7 @@
  */
 import { requireSuperuser } from '../../../../lib/utils/auth';
 import * as aiPrompt from '../../../../lib/dataverse/adapters/ai-prompt';
-import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../../lib/dataverse/core/context';
 
 function mapRow(r, { hasCurrent }) {
   return {
@@ -51,7 +51,7 @@ export default async function handler(req, res) {
   if (!gate) return;
 
   try {
-    return await bypassDynamicsRestrictions('admin-prompts-list', async () => {
+    return await withDalContext('admin-prompts-list', async () => {
       const [currentRes, nonCurrentRes] = await Promise.all([
         aiPrompt.listCurrent(),
         aiPrompt.listNonCurrent(),

@@ -13,6 +13,7 @@
 
 import { jest } from '@jest/globals';
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
+import { bypassDynamicsRestrictions } from '../../lib/services/dynamics-context.js';
 import * as reviewAnswer from '../../lib/dataverse/adapters/review-answer.js';
 import * as changeset from '../../lib/dataverse/core/changeset.js';
 
@@ -323,7 +324,13 @@ describe('changeset atomic parent+answers (covers the external-review submit flo
     const children = answerRows.map((row) => reviewAnswer.answerUpsertDescriptor(SID_A, row, snapshotKeys));
     const parent = { method: 'PATCH', entitySet: 'wmkf_appreviewersuggestions', key: SID_A, body: parentPatch, ifMatch: 'W/"9"' };
     const ops = changeset.atomicParentWithChildren({ parent, children });
-    await changeset.runChangeset(ops, { actingUserSystemId: 'user-1' });
+    // runChangeset requires a trusted DAL context under Stage-7 enforcement
+    // (docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md); real callers already
+    // establish one (e.g. the external-review submit route's
+    // bypassDynamicsRestrictions wrapper) before reaching this helper.
+    await bypassDynamicsRestrictions('test-review-answer-changeset', () =>
+      changeset.runChangeset(ops, { actingUserSystemId: 'user-1' }),
+    );
 
     expect(exec).toHaveBeenCalledTimes(1);
     expect(exec.mock.calls[0][1]).toEqual({ actingUserSystemId: 'user-1' });
@@ -339,7 +346,9 @@ describe('changeset atomic parent+answers (covers the external-review submit flo
     err.status = 412;
     jest.spyOn(DynamicsService, 'executeChangeset').mockRejectedValue(err);
     await expect(
-      changeset.runChangeset([{ method: 'PATCH', entitySet: 'wmkf_appreviewersuggestions', key: SID_A, body: {} }]),
+      bypassDynamicsRestrictions('test-review-answer-changeset', () =>
+        changeset.runChangeset([{ method: 'PATCH', entitySet: 'wmkf_appreviewersuggestions', key: SID_A, body: {} }]),
+      ),
     ).rejects.toMatchObject({ status: 412 });
   });
 });

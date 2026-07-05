@@ -20,7 +20,7 @@
  */
 
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import { sweepReviewThankYous } from '../../../lib/services/reviewer-thankyou-sweep';
 import MaintenanceService from '../../../lib/services/maintenance-service';
 
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
   const runId = await MaintenanceService.startRun('review-thankyous');
 
   try {
-    const result = await bypassDynamicsRestrictions('cron-review-thankyous', () =>
+    const result = await withDalContext('cron-review-thankyous', () =>
       sweepReviewThankYous({ maxBatch, dryRun }),
     );
 

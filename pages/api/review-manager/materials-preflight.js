@@ -12,13 +12,13 @@
  * portal actually shows; this route intentionally does not re-implement the folder-policy filter.
  *
  * Auth: same staff-shared boundary as the rest of Review Manager — requireAppAccess
- * ('review-manager','reviewers') + bypassDynamicsRestrictions. requestId is GUID-validated
+ * ('review-manager','reviewers') + withDalContext. requestId is GUID-validated
  * before it reaches a Dataverse selector (trust-boundary-guid).
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import { listReviewerMaterials } from '../../../lib/external/reviewer-materials';
 import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request.js';
 
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const request = await bypassDynamicsRestrictions('review-manager-materials-preflight', () =>
+    const request = await withDalContext('review-manager-materials-preflight', () =>
       grantRequestAdapter.getById(requestId, {
         select: grantRequestAdapter.SELECT_PROFILES.IDENTITY,
       }),
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
       return res.status(404).json({ ok: false, reason: 'not_found' });
     }
 
-    const files = await bypassDynamicsRestrictions('review-manager-materials-preflight', () =>
+    const files = await withDalContext('review-manager-materials-preflight', () =>
       listReviewerMaterials(request.akoya_requestid, request.akoya_requestnum),
     );
     return res.status(200).json({ ok: true, fileCount: files.length });

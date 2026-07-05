@@ -10,6 +10,11 @@
 jest.mock('../../lib/utils/auth', () => ({ requireSuperuser: jest.fn(async () => ({ profileId: 7 })) }));
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (labelOrFn, maybeFn) => (typeof labelOrFn === 'function' ? labelOrFn() : maybeFn()),
+  // core/changeset.js#runChangeset asserts a trusted DAL context (Stage 7,
+  // docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md); this route's own bypass above
+  // is mocked to a no-op passthrough, so the assertion is mocked too — the
+  // route establishes a real context in production.
+  assertTrustedDalContext: () => {},
 }));
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {

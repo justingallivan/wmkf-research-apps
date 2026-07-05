@@ -18,9 +18,22 @@
  */
 
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
-import { withDynamicsContext } from '../../lib/services/dynamics-context.js';
+import { withDynamicsContext, bypassDynamicsRestrictions } from '../../lib/services/dynamics-context.js';
 
 const ACTING_GUID = '00000000-0000-0000-0000-000000000abc';
+
+// Entity-CRUD calls in this file exercise the REAL DynamicsService write
+// helpers (only `fetch` is mocked), so under Stage-7 enforcement
+// (docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md, on by default in test —
+// jest.setup.js) they now require a trusted Dataverse context, same as any
+// real caller would establish. Every test body below runs wrapped in
+// `bypassDynamicsRestrictions` for exactly this reason. (A `beforeEach`
+// establishing the context does NOT work here — jest-circus does not run
+// hooks and tests in the same AsyncLocalStorage causal chain, so the store
+// set in a hook is invisible inside the test body; verified empirically.)
+function ctx(fn) {
+  return () => bypassDynamicsRestrictions('test:dynamics-service-caller-id', fn);
+}
 
 beforeAll(() => {
   process.env.DYNAMICS_URL = 'https://example.crm.dynamics.com';
@@ -68,7 +81,7 @@ function lastWriteHeaders() {
 }
 
 describe('MSCRMCallerID — direct write helpers', () => {
-  test('createRecord adds the header when actingUserSystemId is set', async () => {
+  test('createRecord adds the header when actingUserSystemId is set', ctx(async () => {
     fetch.mockImplementationOnce((url) =>
       Promise.resolve({ ok: true, json: () => Promise.resolve({ access_token: 't', expires_in: 3600 }) }),
     );
@@ -77,14 +90,14 @@ describe('MSCRMCallerID — direct write helpers', () => {
     );
     await DynamicsService.createRecord('wmkf_ai_runs', { foo: 'bar' }, { actingUserSystemId: ACTING_GUID });
     expect(lastWriteHeaders().MSCRMCallerID).toBe(ACTING_GUID);
-  });
+  }));
 
-  test('createRecord omits the header when actingUserSystemId is null', async () => {
+  test('createRecord omits the header when actingUserSystemId is null', ctx(async () => {
     await DynamicsService.createRecord('wmkf_ai_runs', { foo: 'bar' });
     expect(lastWriteHeaders().MSCRMCallerID).toBeUndefined();
-  });
+  }));
 
-  test('updateRecord adds the header alongside If-Match', async () => {
+  test('updateRecord adds the header alongside If-Match', ctx(async () => {
     await DynamicsService.updateRecord(
       'akoya_requests',
       'guid',
@@ -94,30 +107,30 @@ describe('MSCRMCallerID — direct write helpers', () => {
     const h = lastWriteHeaders();
     expect(h.MSCRMCallerID).toBe(ACTING_GUID);
     expect(h['If-Match']).toBe('W/"123"');
-  });
+  }));
 
-  test('deleteRecord adds the header', async () => {
+  test('deleteRecord adds the header', ctx(async () => {
     await DynamicsService.deleteRecord('wmkf_ai_runs', 'guid', { actingUserSystemId: ACTING_GUID });
     expect(lastWriteHeaders().MSCRMCallerID).toBe(ACTING_GUID);
-  });
+  }));
 });
 
 describe('MSCRMCallerID — feature flag', () => {
-  test('flag disabled suppresses the header even when actingUserSystemId is supplied', async () => {
+  test('flag disabled suppresses the header even when actingUserSystemId is supplied', ctx(async () => {
     process.env.DYNAMICS_IMPERSONATION_ENABLED = 'false';
     await DynamicsService.createRecord('wmkf_ai_runs', { foo: 'bar' }, { actingUserSystemId: ACTING_GUID });
     expect(lastWriteHeaders().MSCRMCallerID).toBeUndefined();
-  });
+  }));
 
-  test('flag unset suppresses the header', async () => {
+  test('flag unset suppresses the header', ctx(async () => {
     delete process.env.DYNAMICS_IMPERSONATION_ENABLED;
     await DynamicsService.updateRecord('akoya_requests', 'g', { x: 1 }, { actingUserSystemId: ACTING_GUID });
     expect(lastWriteHeaders().MSCRMCallerID).toBeUndefined();
-  });
+  }));
 });
 
 describe('MSCRMCallerID — composed helpers', () => {
-  test('logAiRun forwards actingUserSystemId to the underlying createRecord', async () => {
+  test('logAiRun forwards actingUserSystemId to the underlying createRecord', ctx(async () => {
     await DynamicsService.logAiRun({
       requestGuid: '11111111-1111-1111-1111-111111111111',
       taskType: 'summary',
@@ -126,9 +139,9 @@ describe('MSCRMCallerID — composed helpers', () => {
       actingUserSystemId: ACTING_GUID,
     });
     expect(lastWriteHeaders().MSCRMCallerID).toBe(ACTING_GUID);
-  });
+  }));
 
-  test('logAiRun honors hash rawOutputRetention', async () => {
+  test('logAiRun honors hash rawOutputRetention', ctx(async () => {
     await DynamicsService.logAiRun({
       requestGuid: '11111111-1111-1111-1111-111111111111',
       taskType: 'summary',
@@ -147,7 +160,7 @@ describe('MSCRMCallerID — composed helpers', () => {
       originalChars: 'sensitive generated narrative'.length,
       sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
     }));
-  });
+  }));
 
   test('updateIfEmpty: when the field is empty, the PATCH carries the header', async () => {
     // Token, then GET (empty field), then PATCH
@@ -226,7 +239,7 @@ describe('MSCRMCallerID — composed helpers', () => {
 });
 
 describe('MSCRMCallerID — privilege-intersection fallback', () => {
-  test('403 on impersonated write retries once without the header and surfaces the retry response', async () => {
+  test('403 on impersonated write retries once without the header and surfaces the retry response', ctx(async () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     // Token, then 403 from Dataverse, then the retry succeeds
@@ -264,9 +277,9 @@ describe('MSCRMCallerID — privilege-intersection fallback', () => {
     );
 
     warnSpy.mockRestore();
-  });
+  }));
 
-  test('non-403 errors are not retried (regular failure path)', async () => {
+  test('non-403 errors are not retried (regular failure path)', ctx(async () => {
     fetch.mockImplementationOnce(() =>
       Promise.resolve({ ok: true, json: () => Promise.resolve({ access_token: 't', expires_in: 3600 }) }),
     );
@@ -287,9 +300,9 @@ describe('MSCRMCallerID — privilege-intersection fallback', () => {
     ).rejects.toMatchObject({ status: 412 });
 
     expect(nonTokenCalls()).toHaveLength(1);
-  });
+  }));
 
-  test('non-impersonated 403 (no caller id) is not retried', async () => {
+  test('non-impersonated 403 (no caller id) is not retried', ctx(async () => {
     fetch.mockImplementationOnce(() =>
       Promise.resolve({ ok: true, json: () => Promise.resolve({ access_token: 't', expires_in: 3600 }) }),
     );
@@ -307,7 +320,7 @@ describe('MSCRMCallerID — privilege-intersection fallback', () => {
     ).rejects.toThrow(/403/);
 
     expect(nonTokenCalls()).toHaveLength(1);
-  });
+  }));
 });
 
 describe('Reads never carry MSCRMCallerID', () => {

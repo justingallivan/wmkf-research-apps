@@ -16,9 +16,22 @@ jest.mock('../../lib/external/review-question-fetcher', () => {
 
 import { GraphService } from '../../lib/services/graph-service.js';
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
+import { bypassDynamicsRestrictions } from '../../lib/services/dynamics-context.js';
 import NotificationService from '../../lib/services/notification-service.js';
 import { clearResolverCache } from '../../lib/services/program-director-resolver.js';
-import { writeReviewFiles, buildReviewerSubfolder } from '../../lib/services/review-upload.js';
+import { writeReviewFiles as writeReviewFilesReal, buildReviewerSubfolder } from '../../lib/services/review-upload.js';
+
+// `installMocks` (below) replaces `DynamicsService.executeChangeset` directly
+// with a bare jest.fn(), but the rating-row write path still goes through the
+// REAL `lib/dataverse/core/changeset.js#runChangeset`, which — under Stage-7
+// enforcement (docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md; on by default in
+// test) — now requires a trusted Dataverse context before composing the
+// changeset. Real callers of `writeReviewFiles` already run inside one (e.g.
+// the external-review submit route's bypassDynamicsRestrictions wrapper), so
+// every call in this file goes through the same wrapper.
+function writeReviewFiles(...args) {
+  return bypassDynamicsRestrictions('test-review-upload', () => writeReviewFilesReal(...args));
+}
 
 // The parent PATCH body, whichever write path ran: an atomic changeset when
 // rating rows are present (the happy path), or a bare updateRecord otherwise.

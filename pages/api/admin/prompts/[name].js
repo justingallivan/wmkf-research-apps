@@ -31,7 +31,7 @@ import { randomUUID, createHash } from 'crypto';
 import { sql } from '@vercel/postgres';
 import { requireSuperuser } from '../../../../lib/utils/auth';
 import * as aiPrompt from '../../../../lib/dataverse/adapters/ai-prompt';
-import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../../lib/dataverse/core/context';
 import { validatePromptForSave } from '../../../../lib/utils/prompt-validators';
 import { validateReviewedClaudeModelValue } from '../../../../lib/services/model-review-validation';
 
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
   if (!name) return res.status(400).json({ error: 'prompt name required' });
 
   try {
-    return await bypassDynamicsRestrictions('admin-prompts-publish', async () => {
+    return await withDalContext('admin-prompts-publish', async () => {
       if (req.method === 'GET') return await handleGet(res, name);
       return await handlePut(req, res, name, gate.profileId);
     });

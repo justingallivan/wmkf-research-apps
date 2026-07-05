@@ -15,7 +15,7 @@
  */
 
 import { verifySuggestionToken } from '../../../../../lib/external/verify-suggestion-token';
-import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../../../lib/dataverse/core/context';
 import { listReviewerMaterials } from '../../../../../lib/external/reviewer-materials';
 import { getActivePolicies } from '../../../../../lib/external/policy-fetcher';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
@@ -73,7 +73,7 @@ export default async function handler(req, res) {
     // Best-effort first-access stamp. (Existing behavior preserved.)
     if (!suggestion.wmkf_proposalfirstaccessed) {
       try {
-        await bypassDynamicsRestrictions('external-first-access', () =>
+        await withDalContext('external-first-access', () =>
           stampProposalFirstAccessed(suggestion.wmkf_appreviewersuggestionid),
         );
         // The stamp bumped the row's etag; the one we read pre-stamp is now
@@ -82,7 +82,7 @@ export default async function handler(req, res) {
         // false-412. If the re-read fails, return null (disable the lock for
         // this one response) rather than hand back a known-stale etag.
         try {
-          const fresh = await bypassDynamicsRestrictions('external-context-refetch-etag', () =>
+          const fresh = await withDalContext('external-context-refetch-etag', () =>
             getForEtagRefresh(suggestion.wmkf_appreviewersuggestionid),
           );
           etag = fresh?._etag || null;
@@ -111,7 +111,7 @@ export default async function handler(req, res) {
     let files = [];
     if (engagementState.view === 'stage2b' || engagementState.view === 'submitted') {
       try {
-        files = await bypassDynamicsRestrictions('external-list-files', () =>
+        files = await withDalContext('external-list-files', () =>
           listReviewerMaterials(request.akoya_requestid, request.akoya_requestnum),
         );
       } catch (e) {
@@ -152,7 +152,7 @@ export default async function handler(req, res) {
       || (engagementState.view === 'declined' && engagementState.canFlipState);
     if (needStage2aData) {
       try {
-        coPIs = await bypassDynamicsRestrictions('external-context-copis', () =>
+        coPIs = await withDalContext('external-context-copis', () =>
           fetchCoPIs(request.akoya_requestid),
         );
       } catch (e) {
@@ -171,7 +171,7 @@ export default async function handler(req, res) {
       const contactId = reviewer?._wmkf_contact_value;
       if (contactId) {
         try {
-          contactPrefill = await bypassDynamicsRestrictions('external-context-contact', () =>
+          contactPrefill = await withDalContext('external-context-contact', () =>
             getContactByIdWithSelect(contactId, [
               'firstname', 'lastname', 'nickname', 'jobtitle', 'emailaddress1',
               'wmkf_orcid', 'adx_organizationname', '_parentcustomerid_value',
