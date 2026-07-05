@@ -150,6 +150,33 @@ test('rejects a disallowed method with 405 + Allow header', async () => {
   expect(DynamicsService.queryAllRecords).not.toHaveBeenCalled();
 });
 
+test('200 summary envelope pinned exactly (Stage 5 Phase A)', async () => {
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [row(1)], totalCount: 1, capped: false });
+  const res = makeRes();
+  await handler(req(), res);
+  expect(res.statusCode).toBe(200);
+  expect(res.body).toEqual({
+    cycleCode: 'J26',
+    totalCount: 1,
+    scanned: 1,
+    generated: 1,
+    skippedNoSource: 0,
+    skippedConcurrent: 0,
+    failed: 0,
+    deferred: 0,
+    capped: false,
+    failures: [],
+  });
+});
+
+test('503 envelope pinned: { error, cycleCode } (Stage 5 Phase A)', async () => {
+  DynamicsService.queryAllRecords.mockRejectedValue(new Error('dataverse down'));
+  const res = makeRes();
+  await handler(req(), res);
+  expect(res.statusCode).toBe(503);
+  expect(res.body).toEqual({ error: 'Awardee query failed.', cycleCode: 'J26' });
+});
+
 test('time-budget exhausted → unprocessed rows are deferred (not generated)', async () => {
   DynamicsService.queryAllRecords.mockResolvedValue({ records: [row(1), row(2)], totalCount: 2, capped: false });
   // Deadline computed from the first Date.now(); every subsequent check is past it,

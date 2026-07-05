@@ -286,6 +286,62 @@ test('capped query reports deferred unreturned rows', async () => {
   expect(res.body.deferred).toBe(2);
 });
 
+// ── Stage 5 Phase A gap fill — envelope pins ────────────────────────────────
+test('405s a disallowed method with Allow header + pinned envelope, before the cron gate', async () => {
+  const res = mockRes();
+  await handler({ method: 'PUT', query: {}, headers: {} }, res);
+  expect(res.statusCode).toBe(405);
+  expect(res.body).toEqual({ error: 'Method not allowed' });
+  expect(res.headers.Allow).toBe('GET, POST');
+  expect(verifyCronSecret).not.toHaveBeenCalled();
+});
+
+test('cron secret rejection short-circuits before any query', async () => {
+  verifyCronSecret.mockReturnValue(false);
+  const res = mockRes();
+  await handler(req(), res);
+  expect(DynamicsService.queryAllRecords).not.toHaveBeenCalled();
+  expect(getSettingStrict).not.toHaveBeenCalled();
+});
+
+test('query failure → 503 pinned envelope (whole run retried next tick)', async () => {
+  DynamicsService.queryAllRecords.mockRejectedValue(new Error('dataverse down'));
+  const res = mockRes();
+  await handler(req(), res);
+  expect(res.statusCode).toBe(503);
+  expect(res.body).toEqual({ error: 'Deliverable query failed.' });
+});
+
+test('200 summary envelope pinned exactly', async () => {
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [deliv(1)], totalCount: 1, capped: false });
+  const res = mockRes();
+  await handler(req(), res);
+  expect(res.statusCode).toBe(200);
+  expect(res.body).toEqual({
+    totalCount: 1,
+    scanned: 1,
+    reminded: 1,
+    skippedNoPd: 0,
+    skippedNoRecipient: 0,
+    skippedMisconfigured: 0,
+    claimFailed: 0,
+    sendFailed: 0,
+    capped: false,
+    deferred: 0,
+    failures: [],
+  });
+});
+
+test('IDEMPOTENCY (claim-before-send): 412 on the claim means another run owns the row — no email', async () => {
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [deliv(1)], totalCount: 1, capped: false });
+  DynamicsService.updateRecord.mockRejectedValueOnce(Object.assign(new Error('precondition failed'), { status: 412 }));
+  const res = mockRes();
+  await handler(req(), res);
+  expect(res.body.claimFailed).toBe(1);
+  expect(res.body.reminded).toBe(0);
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+});
+
 test('per-row send failure is isolated from a later successful row', async () => {
   DynamicsService.queryAllRecords.mockResolvedValue({ records: [deliv(1), deliv(2)], totalCount: 2, capped: false });
   DynamicsService.createAndSendEmail

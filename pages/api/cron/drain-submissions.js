@@ -49,6 +49,7 @@ import crypto from 'crypto';
 import pkg from 'pg';
 import { get as blobGet } from '@vercel/blob';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import { GraphService } from '../../../lib/services/graph-service';
 import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request.js';
 import * as proposalBudgetLineAdapter from '../../../lib/dataverse/adapters/proposal-budget-line.js';
@@ -856,7 +857,14 @@ async function processJob(client, job) {
     return;
   }
   try {
-    await handler(client, job);
+    // Trusted DAL context for the job's state handler. The drain is a
+    // sanctioned unattended writer (verifyDrainCronSecret is this route's
+    // auth); its adapter writes (grant-request/budget-line creates in
+    // scanning/files_moved) fail closed under DATAVERSE_DAL_ENFORCEMENT
+    // without this — latent since the prod flip (S330), confirmed by an
+    // enforcement probe S331. Post-auth entry points establish context via
+    // withDalContext per the DAL Stage 7 doctrine.
+    await withDalContext('drain-submissions', () => handler(client, job));
   } catch (err) {
     // Last-resort safety net — any unhandled throw becomes a recorded failure.
     // The classifier sees the structured error and routes terminal/retry.
