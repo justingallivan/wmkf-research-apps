@@ -104,16 +104,21 @@ describe('buildReviewContext', () => {
       .rejects.toMatchObject({ httpStatus: 500, body: { ok: false, reason: 'policy_misconfigured' } });
   });
 
-  it('preserves the historical branch-specific DAL scope labels (first-access + stage2a)', async () => {
+  it('preserves the historical branch-specific DAL scope labels (first-access + stage2a) plus the S333 Stage 4b read-ratings scope', async () => {
     await buildReviewContext({
       suggestion: baseSuggestion({ wmkf_proposalfirstaccessed: null }),
       request,
       reviewer: { ...reviewer, _wmkf_contact_value: 'contact-1' },
     });
     const labels = withDalContext.mock.calls.map(([l]) => l);
+    // 'read-ratings-by-suggestion' was pushed up here from
+    // lib/external/review-answer-snapshot.js (S333 Stage 4b trust-model
+    // tightening, site 44) — a sixth narrow scope, same label, same
+    // sibling-to-not-inside-the-others posture as before the move.
     expect(labels).toEqual([
       'external-first-access',
       'external-context-refetch-etag',
+      'read-ratings-by-suggestion',
       'external-context-copis',
       'external-context-contact',
     ]);

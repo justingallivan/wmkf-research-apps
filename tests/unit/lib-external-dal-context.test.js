@@ -55,7 +55,7 @@ describe('lib/external DAL context (S333 characterization, sites 44-46, 48)', ()
     expect(hasTrustedDalContext()).toBe(false);
   });
 
-  test('site 44 — readRatingsBySuggestion runs inside a trusted context', async () => {
+  test('site 44 — readRatingsBySuggestion runs inside the CALLER-established context (context-service.js push-up)', async () => {
     const { readRatingsBySuggestion } = require('../../lib/external/review-answer-snapshot.js');
     const seen = { inside: null };
     reviewAnswerAdapter.readRatingsBySuggestion.mockImplementation(async () => {
@@ -63,7 +63,11 @@ describe('lib/external DAL context (S333 characterization, sites 44-46, 48)', ()
       return { impact: 1, risk: 2, overallRating: 3 };
     });
 
-    await readRatingsBySuggestion('11111111-1111-1111-1111-111111111111');
+    // Matches lib/services/external-review/context-service.js:
+    // withDalContext('read-ratings-by-suggestion', () => readRatingsBySuggestion(...))
+    await withDalContext('read-ratings-by-suggestion', () =>
+      readRatingsBySuggestion('11111111-1111-1111-1111-111111111111'),
+    );
 
     expect(seen.inside).toBe(true);
     expect(hasTrustedDalContext()).toBe(false);
