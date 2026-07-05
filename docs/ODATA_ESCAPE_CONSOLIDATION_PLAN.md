@@ -16,7 +16,9 @@ related:
 
 # OData Escape Consolidation Plan
 
-**Execution status: STAGES 0–2 COMPLETE (S331, 2026-07-05).** The docs-catalog enum has no
+**Execution status: STAGES 0–2 COMPLETE AND REVIEW-CLOSED (S331, 2026-07-05).** Closing Codex
+code review of `5477a226..629d67e4`: **PASS-WITH-FINDINGS — no further review round needed** (one
+P3 wording caveat, no regression; verbatim verdict in the Stage Log). The docs-catalog enum has no
 "completed" value, so — mirroring `ROUTE_SERVICE_CONSOLIDATION_PLAN` precedent — frontmatter
 `status` stays `active` (a live enum value) and this body line records completion. Stage 3 (optional
 escape law) NOT built — deferred pending owner decision. See Stage Log for probes/counts/test results.
@@ -401,3 +403,22 @@ everywhere the other gates are; if declined — record the decision in the Stage
     - [RECHECKED after lib/external/review-answer-snapshot.js change: ESM mechanical swap, existing pin green]
     - [RECHECKED after lib/services/grant-cycles-dataverse.js change: D1 encodeURIComponent(odata.escape) per ruling, full-URL pin green]
     - [RECHECKED after lib/services/reviewer-finder/contact-history-service.js change: D2 eqGuid per ruling, rejection pin replaces quote-escape test]
+- 2026-07-05 (S331): **Closing code review (Codex, fresh-context, range `5477a226..629d67e4`):
+  PASS-WITH-FINDINGS — exercise CLOSED.** Reviewer's verdict verbatim: *"No further OData escape
+  review round is needed; the consolidation exercise can close. The one finding is an
+  acceptance-wording / pre-existing route-behavior caveat, not a regression in commit `629d67e4`."*
+  - Finding P3 (verbatim): *"The route-level 500 claim is overbroad, but this is not a new
+    regression."* — `app-access.js:88/:105` ignore the service's caught `{ error }` result and
+    return success; prefs deletes return 200 with `success: false` or a count
+    (`user-preferences.js:135/:147`); only the prefs single POST maps to 500
+    (`user-preferences.js:89`). Baseline `5477a226` behaved identically, so the guarded swaps
+    preserved behavior. Disposition: the overbroad "route-level 500" phrasing lived only in the
+    review REQUEST, not in this plan (this doc claims "preserving the fail-closed throw", which the
+    reviewer confirmed at service level); no code or doc change required. The route-level
+    error-swallowing in `app-access.js` is pre-existing and out of this refactor's scope.
+  - Reviewer independently EXECUTED both guards across number/null/undefined/object/array —
+    both throw before `client.get`; verified D1 pin catches a dropped `encodeURIComponent` (asserts
+    `%20` in the exact URL), D2 `eqGuid` in both filters + replacement pin, byte-preservation of the
+    8 mechanical swaps against `git show 5477a226`, fresh census 0 in-scope, CJS/ESM direct-load
+    clean. Jest could not run in the reviewer's read-only sandbox (EPERM on temp writes); test
+    greens rest on this session's runs recorded above.
