@@ -20,6 +20,7 @@ import { requireAppAccess } from '../../../lib/utils/auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { ingestApplicantReviewers } from '../../../lib/services/workbench/applicant-reviewers-service';
+import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -46,6 +47,11 @@ export default async function handler(req, res) {
 
   const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
   const userProfileId = access.profileId || null;
+
+  // Model overrides must be warmed at the route level before any model
+  // resolution (check:model-override-warming contract); the service warms
+  // again defensively but the gate requires the awaited call here.
+  await loadModelOverrides();
 
   return withDalContext('workbench-applicant-reviewers', async () => {
     try {
