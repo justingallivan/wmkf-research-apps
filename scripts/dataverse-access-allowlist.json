@@ -416,27 +416,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/review-manager/withdraw-sufficient.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/review-manager/withdraw-sufficient.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "systemusers",
-      "count": 1
-    },
-    {
-      "file": "pages/api/review-manager/withdraw-sufficient.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "wmkf_potentialreviewerses",
-      "count": 1
-    },
-    {
       "file": "pages/api/reviewer-finder/contact-history.js",
       "kind": "import",
       "clientMethod": "DynamicsService.queryAllRecords",
