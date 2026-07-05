@@ -18,10 +18,8 @@
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid, allGuids } from '../../../lib/utils/guid';
 import { withDalContext } from '../../../lib/dataverse/core/context';
-import {
-  withdrawSufficient,
-  WithdrawSufficientError,
-} from '../../../lib/services/review-manager/withdraw-sufficient-service';
+import { ServiceHttpError } from '../../../lib/services/service-http-error';
+import { withdrawSufficient } from '../../../lib/services/review-manager/withdraw-sufficient-service';
 
 const MAX_BATCH = 100;
 
@@ -55,8 +53,8 @@ export default async function handler(req, res) {
       const result = await withdrawSufficient({ requestId, suggestionIds, actingUserSystemId });
       return res.status(200).json(result);
     } catch (error) {
-      if (error instanceof WithdrawSufficientError && error.httpStatus) {
-        return res.status(error.httpStatus).json({ error: error.message });
+      if (error instanceof ServiceHttpError) {
+        return res.status(error.httpStatus).json(error.body ?? { error: error.message });
       }
       console.error('withdraw-sufficient error:', error);
       return res.status(500).json({ error: 'Failed to withdraw reviewers' });

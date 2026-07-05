@@ -75,8 +75,14 @@ here; anything not pre-made is marked **STOP-AND-ASK**.
    (`review-manager/`, `reviewer-finder/`, `workbench/`, …), following the `dataverse-export/`
    precedent. Existing flat services are NOT moved (out of scope).
 3. **Service contract.** Services take plain argument objects (never `req`/`res`), return plain
-   values, and throw typed errors carrying enough for the shell to map to HTTP (domain Error
-   subclass with `httpStatus`; exact shape finalized in the pilot). Services assume a trusted DAL
+   values, and throw typed errors carrying enough for the shell to map to HTTP. **Error shape
+   (finalized by the pilot + P1 amendment 1):** every domain error extends the shared base
+   `ServiceHttpError` (`lib/services/service-http-error.js` — `httpStatus` required, optional
+   `body` = exact JSON the shell sends, optional `code`); shells map
+   `res.status(e.httpStatus).json(e.body ?? { error: e.message })`. Routes whose existing
+   non-2xx envelopes are NOT `{ error }`-shaped (e.g. `{ ok:false, reason }` in
+   `external/review/[token]/respond.js`, `{ status, errors }` in `admin/review-questions.js`)
+   set `body` explicitly so the envelope is preserved byte-exact. Services assume a trusted DAL
    context already exists — they never establish one. Context establishment stays at the route
    (post-auth), per the Stage 7 DAL doctrine in `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`.
 4. **Trust-wrapper conversion while touching.** When a converted route currently uses legacy
@@ -232,6 +238,9 @@ list.
 | 5 | tail | admin 4, external 3, cron 3, expertise-finder 2, grant-reporting 2 (incl. DynamicsService-only `extract.js`), phase-i-dynamics 1, field-primer 1, root-level 1 (`test-email.js`) — 17 total, closing the 49-route union | Cron routes keep `verifyCronSecret` + context shape exactly; external routes keep token-verification guards untouched. These are fail-closed production surfaces — any ambiguity is **STOP-AND-ASK**. Root-level routes have no domain dir; their services go under the closest domain namespace (Stage 0 classification decides, recorded in the Stage Log). |
 
 **Per-wave contract (identical for Stages 2-5):**
+- **Pre-extraction envelope inventory (P1 amendment 2):** before moving logic, list every non-2xx
+  response body shape the route emits (grep its `res.status(...).json(...)` calls); pin moved
+  envelopes in tests; non-`{ error }` shapes use `ServiceHttpError.body` (Decision 3).
 - **Tests before:** every route in the wave has characterization coverage (write the gaps found in
   Stage 0 FIRST, as their own commit, green before extraction begins). The minimum
   (auth/method/envelope/one error path) applies only to plain request-response routes.
@@ -244,7 +253,11 @@ list.
   `tests/unit/my-candidates-partial-save-on-email-conflict.test.js`). The Stage 0 inventory
   marks which routes carry these traits so wave executors don't rediscover them.
 - **Per-file loop:** extract service → shell the route → service unit test → targeted jest →
-  commit (one route or one small cluster per commit).
+  **static shell audit (P1 amendment 3):** grep the shelled route for adapter/`dynamics-service`/
+  `bypassDynamicsRestrictions` imports (must be none), exactly one string-labeled
+  `withDalContext` per verb, no residual business logic — the behavior suite alone won't catch
+  a route that kept the legacy wrapper (the integration tests mock below it) → commit (one
+  route or one small cluster per commit).
 - **Wave close:** full verification block; baseline JSON updated — expected delta = the stage's
   "Expected census delta" column, and the running sum across Stages 1-5 must land exactly on
   the 49-route union (1+8+1+1+5+16+17 = 49); post-stage fresh-context review; Stage Log entry
@@ -422,6 +435,27 @@ review verdict + findings + resolutions)*
   logged in 20 min — matches the known plugin job-tracking bugs); killed, job record
   cleaned, relaunched via synchronous `codex exec --sandbox read-only`, completed normally.
   Prefer `codex exec` for review runs when the companion path stalls.
+- 2026-07-05 (S331): **Stage 1 (pilot) executed and P1-cleared.** Pre-stage re-probe: census
+  49, zero drift. Phase A (`eefd606b`): 4 characterization tests added (405+Allow, auth
+  short-circuit, exact happy-path envelope, 404 domain error) — none of the four plan-minimum
+  classes pre-existed; 14/14 green. Phase B (`f87f4f7e`): route 172→65-line shell;
+  `lib/services/review-manager/withdraw-sufficient-service.js` (166 lines) preserves
+  per-suggestion partial-success `results[]` verbatim + state-before-email `ifMatch` ordering;
+  legacy bypass → `withDalContext('review-manager-withdraw-sufficient')` (string label +
+  same-or-wider scope verified — `withDalContext` at `lib/dataverse/core/context.js:46-54`
+  delegates to `bypassDynamicsRestrictions`); 13-test service unit suite; census 49→48,
+  baseline same commit; suite 4205/4205; build green.
+  **P1 retrospective (Codex, fresh-context): PASS-WITH-FINDINGS, no Highs.** Medium: pilot
+  error shape too narrow as campaign template → fixed same session with shared base
+  `ServiceHttpError` (`lib/services/service-http-error.js`; `httpStatus`/`body`/`code`;
+  shells map `e.body ?? { error: e.message }`; `WithdrawSufficientError` now extends it,
+  signature unchanged, 31/31 tests green). Low: behavior suite alone can't prove shell shape
+  (integration test mocks `dynamics-context` below `withDalContext`) → static shell audit
+  added to the per-file loop. All five P1 amendments folded into Decision 3 + per-wave
+  contract. Operational notes: two more Codex hangs this stage — root cause found:
+  `codex exec` in a non-TTY background shell blocks on stdin ("Reading additional input from
+  stdin..."); ALWAYS launch with `< /dev/null`. Watchdog upgraded to session-file-growth
+  stall detection (8 min frozen = stall) rather than wall-clock-only.
 
 ### Stage 0 route→test inventory (2026-07-04, S331)
 
