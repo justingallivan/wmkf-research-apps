@@ -409,6 +409,16 @@ review verdict + findings + resolutions)*
   gate. Self-test 11 red / 5 green. Lazy services + q green; live census 49 unchanged.
   Round-5 re-review = clearance verification (verify alias fix + confirm the round-4 class
   enumeration is fully dispositioned).
+- 2026-07-05 (S331): **Post-stage review round 5 (Codex, clearance verification): SATISFIED
+  — zero findings. Stage 0 interval-rule review CLEARS; Stage 1 may start.** Codex
+  re-probed its round-4 alias shapes in-memory (literal 2-hop and 3-hop chains counted;
+  non-literal alias hop hard-fails `unresolved-boundary-source`; green shapes l/q return
+  empty), confirmed live census 49 with the three lazy-backend services absent, confirmed
+  the round-4 class enumeration fully dispositioned, and confirmed Stage Log rounds 3-4
+  accurate. Operational note: the round-5 run through the plugin companion hung (0 commands
+  logged in 20 min — matches the known plugin job-tracking bugs); killed, job record
+  cleaned, relaunched via synchronous `codex exec --sandbox read-only`, completed normally.
+  Prefer `codex exec` for review runs when the companion path stalls.
 
 ### Stage 0 route→test inventory (2026-07-04, S331)
 
