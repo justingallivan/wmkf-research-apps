@@ -144,7 +144,10 @@ Two loops, both mandatory:
 
 1. Write `scripts/check-route-service-boundary.js`: for every file under `pages/api` (excluding the
    two carried-over exempt dirs), detect imports of `lib/dataverse/adapters/*` and
-   `lib/services/dynamics-service`. Modes: `--report` (rollup by domain), default = ratchet mode
+   `lib/services/dynamics-service`. `[RECHECKED after scripts/check-route-service-boundary.js
+   change (b3bbdad4): spec still accurate — the fix added binding-level re-export taint and
+   fail-closed non-literal sources on top of this contract; live census 49, gate + self-test
+   green]` Modes: `--report` (rollup by domain), default = ratchet mode
    against a committed baseline file `scripts/route-service-boundary-baseline.json`
    (`{ "boundaryImportingRoutes": <N> }`, N = union of both import kinds). Fail if the count
    RISES; a falling count must update the baseline in the same commit. **Reuse the hardened
