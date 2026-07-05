@@ -572,6 +572,16 @@ review verdict + findings + resolutions)*
   Wave-close final: all gates green, suite 4504/4504 (395 suites), build exit 0. Running
   sum: 32 of 49 converted `[VERIFIED via census 49→17 across the per-stage boundary gate
   runs logged above]`. Post-stage review: next entry.
+- 2026-07-05 (S331): **Stage 4 post-stage review (Codex, fresh-context): SATISFIED — zero
+  findings. Stage 4 CLEARS; Stage 5 may start.** P1m-caveat application in abstract.js
+  verified exact against historical scopes via git show; 2s-template compliance verified;
+  the model-override-warming fix chain ratified (inverted pin "closes the prior bad pin
+  rather than masking behavior") and the systemic question answered: the gate scans route
+  import graphs transitively and only accepts route-level awaited warms
+  (check-model-override-warming.js:256), so the service-warm class cannot silently recur;
+  all 15 sibling routes checked clean. High-risk semantics, characterization integrity
+  (both declared exceptions exactly as declared, no other drift), and the census chain
+  33→24→23→17 all verified.
 
 ### Stage 0 route→test inventory (2026-07-04, S331)
 
