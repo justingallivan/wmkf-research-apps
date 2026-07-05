@@ -494,5 +494,27 @@ flagged, registered everywhere the other gates are; if declined — record the d
     top-level docs cataloged). Full suite green at close: **416 suites / 4707 tests** — no
     regression, no STOP condition hit, no deviation from the plan. Stage 3 (chunk-loop lint/gate
     law) remains an OWNER DECISION and was NOT built this session.
+- 2026-07-05: **Closing code review round 1 (Codex, fresh-context, range `555c86b8..e29a291e`):
+  NOT SATISFIED — 2 findings; both resolved.** Verbatim: *"Production chunk behavior looks correctly
+  executed, but the committed docs catalog is not self-contained and one required Stage 0 boundary
+  pin is under-specified."*
+  - Finding 1 (HIGH, verbatim): *"Committed docs catalog references a file missing from the commit"*
+    — `e29a291e`'s regenerated `DOCS_CATALOG.md` cataloged `GATE_SCRIPT_CONSOLIDATION_PLAN.md`
+    while that doc sat untracked (the generator scans the working tree, and a parallel agent had
+    just written the doc). Resolution: already structurally fixed by commit `ed47a22e`, which
+    committed that plan doc; at HEAD the catalog is self-contained (`git cat-file -e
+    ed47a22e:docs/GATE_SCRIPT_CONSOLIDATION_PLAN.md` succeeds `[VERIFIED via the commit landing
+    this session]`). Process lesson recorded: never regenerate the docs catalog while another
+    agent's doc sits untracked — commit order matters.
+  - Finding 2 (MEDIUM, verbatim): *"Site 17's new test does not actually pin the `[2, 1]` chunk
+    boundary"* — the pin asserted result/dispatch order, which passes under one big `Promise.all`
+    or singleton rounds. Resolution: test rewritten with a deferred-promise harness
+    (`evaluate-multi-perspective-concurrency.test.js`) proving ROUND separation: after dispatch,
+    exactly items 1-2 started; resolving only item 1 releases nothing; completing round 1 starts
+    exactly item 3. Fails by construction under all-at-once or singleton batching. Suite green.
+  - Reviewer verified-passes (verbatim summary): all 17 swap bodies byte-identical vs `555c86b8`;
+    alias uniform; helper + edge-case tests match plan semantics; raw-node CJS load exit 0;
+    post-swap census exact; no decoys touched; no chunk-helper mock; suite delta plausible.
+  - Focused re-review round 2 requested on the two fixes per the reviewer's explicit ask.
 
 <!-- end of plan -->

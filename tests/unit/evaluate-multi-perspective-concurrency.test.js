@@ -9,18 +9,36 @@
 const { processWithConcurrency } = require('../../pages/api/evaluate-multi-perspective');
 
 describe('processWithConcurrency (chunk boundary)', () => {
-  test('limit=2 over 3 items: two batches, first gets items 0-1 in order, second gets item 2', async () => {
-    const order = [];
-    const processorFn = async (item) => {
-      order.push(item);
-      return item * 10;
+  test('limit=2 over 3 items: two rounds of sizes [2, 1] — item 3 cannot start until items 1 and 2 resolve', async () => {
+    // Deferred-promise harness: proves ROUND separation, not just dispatch order.
+    // A single Promise.all over all 3, or three singleton rounds, fails this test.
+    const started = [];
+    const deferreds = new Map();
+    const processorFn = (item) => {
+      started.push(item);
+      let resolve;
+      const p = new Promise((r) => { resolve = r; });
+      deferreds.set(item, () => resolve(item * 10));
+      return p;
     };
 
-    const results = await processWithConcurrency([1, 2, 3], processorFn, 2);
+    const resultsPromise = processWithConcurrency([1, 2, 3], processorFn, 2);
 
-    expect(results).toEqual([10, 20, 30]);
-    // Batch call order: items 0-1 dispatched together (round 1), item 2 alone (round 2).
-    expect(order).toEqual([1, 2, 3]);
+    await Promise.resolve(); // flush microtasks so round 1 dispatches
+    expect(started).toEqual([1, 2]); // round 1 is exactly items 1-2; item 3 not started
+
+    deferreds.get(1)(); // resolving only ONE of round 1 must not release round 2
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(started).toEqual([1, 2]);
+
+    deferreds.get(2)(); // completing round 1 releases round 2: exactly item 3
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(started).toEqual([1, 2, 3]);
+
+    deferreds.get(3)();
+    await expect(resultsPromise).resolves.toEqual([10, 20, 30]);
   });
 
   test('results preserve input order even when a later item in a batch resolves first', async () => {
