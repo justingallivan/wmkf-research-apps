@@ -70,6 +70,61 @@ beforeEach(() => {
   getProposalText.mockReset();
 });
 
+describe('POST /api/field-primer/generate — envelope inventory gap fill (Stage 5 Phase A)', () => {
+  test('405 on non-POST, Allow header omitted (route does not set one)', async () => {
+    const res = mockRes();
+    await handler({ method: 'GET', body: {}, headers: {} }, res);
+    expect(res.statusCode).toBe(405);
+    expect(res.body).toEqual({ error: 'Method not allowed' });
+    expect(requireAppAccess).not.toHaveBeenCalled();
+  });
+
+  test('unauth: requireAppAccess short-circuits (writes its own response, handler returns without calling downstream)', async () => {
+    requireAppAccess.mockResolvedValueOnce(null);
+    const res = mockRes();
+    await handler(reqOf({ requestId: GUID }), res);
+    // requireAppAccess owns the response in the false-return contract; the route
+    // itself must not have progressed past the gate.
+    expect(generateFieldPrimer).not.toHaveBeenCalled();
+    expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+    expect(requireAppAccess).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), 'reviewer-finder', 'reviewers',
+    );
+  });
+
+  test('golden: standalone Mode B (proposalText, no requestId) — full envelope pinned, no persistence', async () => {
+    generateFieldPrimer.mockResolvedValue({
+      primer: { experts: [] }, model: 'claude-test', runId: 'run-standalone',
+    });
+    const res = mockRes();
+    await handler(reqOf({ proposalText: 'B'.repeat(60), focus: 'genomics' }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ primer: { experts: [] }, runId: 'run-standalone', model: 'claude-test' });
+    expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+    expect(generateFieldPrimer).toHaveBeenCalledWith({
+      proposalText: 'B'.repeat(60), focus: 'genomics', runSource: 'Vercel Interactive',
+    });
+  });
+
+  test('domain error: standalone Mode B with no requestId and short proposalText -> 400', async () => {
+    const res = mockRes();
+    await handler(reqOf({ proposalText: 'too short' }), res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: 'proposalText is required (min ~50 chars), or pass a requestId.' });
+    expect(generateFieldPrimer).not.toHaveBeenCalled();
+  });
+
+  test('domain error: invalid requestId GUID -> 400, no adapter call', async () => {
+    const res = mockRes();
+    await handler(reqOf({ requestId: 'not-a-guid' }), res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: 'requestId is not a valid GUID' });
+    expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+  });
+});
+
 describe('POST /api/field-primer/generate (requestId mode, grant-request adapter contract)', () => {
   test('golden: reuse-existing envelope — no paid call, persisted:true reused:true', async () => {
     const envelope = { schema: FIELD_PRIMER_ENVELOPE_SCHEMA, generatedAt: '2026-01-01T00:00:00.000Z', primer: { experts: [] } };

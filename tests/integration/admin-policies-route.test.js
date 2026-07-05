@@ -71,6 +71,27 @@ beforeEach(() => {
   sql.mockResolvedValue({ rows: [{ id: 1 }] });
 });
 
+describe('envelope inventory gap fill (Stage 5 Phase A)', () => {
+  it('405 on unsupported method, no auth check performed', async () => {
+    const { requireSuperuser } = require('../../lib/utils/auth');
+    requireSuperuser.mockClear();
+    const res = mockRes();
+    await handler({ method: 'DELETE', body: {} }, res);
+    expect(res.statusCode).toBe(405);
+    expect(res.body).toEqual({ error: 'Method not allowed' });
+    expect(requireSuperuser).not.toHaveBeenCalled();
+  });
+
+  it('unauth: requireSuperuser short-circuits (GET), no Dataverse call', async () => {
+    const { requireSuperuser } = require('../../lib/utils/auth');
+    requireSuperuser.mockResolvedValueOnce(null);
+    DynamicsService.queryRecords.mockClear();
+    const res = mockRes();
+    await handler({ method: 'GET' }, res);
+    expect(DynamicsService.queryRecords).not.toHaveBeenCalled();
+  });
+});
+
 describe('GET', () => {
   it('returns both visible slots with active version, history, and a parentEtag', async () => {
     DynamicsService.queryRecords.mockImplementation((entity, opts) => {
@@ -151,6 +172,17 @@ describe('POST publish', () => {
       statecode: 1, statuscode: 2,
     });
     expect(sql.mock.calls.length).toBeGreaterThanOrEqual(2); // pending + final audit
+    // Full response envelope pinned byte-exact (optimistic-locking publish result).
+    expect(res.body).toEqual({
+      status: 'completed',
+      child: { id: NEW_VERSION_ID, created: true, reused: false },
+      parent: { flipped: true },
+      priorRetired: true,
+      auditWritten: true,
+      warnings: [],
+      orphan: null,
+      freshState: null,
+    });
   });
 
   it('400 invalid_input on an unknown slot code (allowlist gate, no Dataverse call)', async () => {

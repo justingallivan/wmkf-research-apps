@@ -68,29 +68,50 @@ describe('/api/test-email — superuser-only gate', () => {
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
-  it('allows a superuser: draft mode creates an email activity', async () => {
+  it('allows a superuser: draft mode creates an email activity — full envelope pinned', async () => {
     mockAuthenticatedUser(2, [], { isSuperuser: true });
-    const req = createMockReq({ method: 'POST', body: validBody({ sendMode: 'draft' }) });
+    const req = createMockReq({ method: 'POST', body: validBody({ sendMode: 'draft', to: 'r@x.org' }) });
     const res = createMockRes();
     await handler(req, res);
     expect(createEmailActivity).toHaveBeenCalledTimes(1);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true, status: 'draft' }));
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      emailId: 'draft-activity-id',
+      status: 'draft',
+      message: 'Draft email created (not sent). Activity ID: draft-activity-id',
+    });
   });
 
-  it('allows a superuser: send mode sends the email', async () => {
+  it('allows a superuser: send mode sends the email — full envelope pinned', async () => {
     mockAuthenticatedUser(2, [], { isSuperuser: true });
-    const req = createMockReq({ method: 'POST', body: validBody({ sendMode: 'send' }) });
+    const req = createMockReq({ method: 'POST', body: validBody({ sendMode: 'send', to: 'r@x.org' }) });
     const res = createMockRes();
     await handler(req, res);
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true, status: 'sent' }));
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      emailId: 'sent-email-id',
+      status: 'sent',
+      message: 'Email sent successfully from user2@wmkeck.org to r@x.org',
+    });
   });
 
-  it('superuser with missing fields → 400 (gate passed, validation failed)', async () => {
+  it('superuser with missing fields → 400, envelope pinned (gate passed, validation failed)', async () => {
     mockAuthenticatedUser(2, [], { isSuperuser: true });
     const req = createMockReq({ method: 'POST', body: { subject: 'S' } });
     const res = createMockRes();
     await handler(req, res);
     expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Missing required fields: to, subject, body' });
+  });
+
+  it('domain error: service rejection → 500 with { success:false, error } envelope', async () => {
+    mockAuthenticatedUser(2, [], { isSuperuser: true });
+    createAndSendEmail.mockRejectedValueOnce(new Error('Dynamics unavailable'));
+    const req = createMockReq({ method: 'POST', body: validBody({ sendMode: 'send' }) });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ success: false, error: 'Dynamics unavailable' });
   });
 });

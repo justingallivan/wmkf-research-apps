@@ -75,6 +75,59 @@ beforeEach(() => {
   sql.mockResolvedValue({ rows: [] });
 });
 
+describe('envelope inventory gap fill (Stage 5 Phase A)', () => {
+  it('405 on unsupported method, Allow header set, no auth check performed', async () => {
+    const { requireSuperuser } = require('../../lib/utils/auth');
+    requireSuperuser.mockClear();
+    const res = mockRes();
+    await handler({ method: 'DELETE', query: {}, body: {} }, res);
+    expect(res.statusCode).toBe(405);
+    expect(res.body).toEqual({ error: 'Method not allowed' });
+    expect(res.headers.Allow).toBe('GET, POST');
+    expect(requireSuperuser).not.toHaveBeenCalled();
+  });
+
+  it('unauth: requireSuperuser short-circuits (GET), no Dataverse call', async () => {
+    const { requireSuperuser } = require('../../lib/utils/auth');
+    requireSuperuser.mockResolvedValueOnce(null);
+    DynamicsService.queryRecords.mockClear();
+    const res = mockRes();
+    await handler({ method: 'GET', query: {} }, res);
+    expect(DynamicsService.queryRecords).not.toHaveBeenCalled();
+  });
+
+  it('GET golden: single-row full envelope pinned (id, etag-derived version, all normalized fields present)', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({ records: [rawString('id-aff', 'affiliation', 0)] });
+    const res = mockRes();
+    await handler({ method: 'GET', query: {} }, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({
+      questions: [{
+        id: 'id-aff',
+        etag: 'W/"id-aff"',
+        key: 'affiliation',
+        order: 0,
+        label: 'Question affiliation',
+        type: 'string',
+        required: true,
+      }],
+      version: versionOf([rawString('id-aff', 'affiliation', 0)]),
+    });
+  });
+
+  it('POST golden: completed envelope pinned exactly (no extra/missing keys)', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({ records: baseRaw() });
+    const res = mockRes();
+    const submit = [...submittedFour(), { id: 'id-q4', key: 'q4', label: 'Edited q4', type: 'richtext', required: true }];
+    await handler({ method: 'POST', query: {}, body: { questions: submit, baseVersion: versionOf(baseRaw()) } }, res);
+    expect(res.statusCode).toBe(200);
+    expect(Object.keys(res.body).sort()).toEqual(['auditWritten', 'status', 'summary', 'version']);
+    expect(res.body.status).toBe('completed');
+    expect(res.body.auditWritten).toBe(true);
+    expect(res.body.summary).toEqual({ created: 0, updated: 1, deleted: 0, reordered: 0 });
+  });
+});
+
 describe('GET', () => {
   it('returns the active set (with ids) and a version token', async () => {
     DynamicsService.queryRecords.mockResolvedValue({ records: baseRaw() });

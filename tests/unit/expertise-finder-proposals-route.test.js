@@ -74,10 +74,41 @@ describe('GET /api/expertise-finder/proposals (grant-request adapter contract)',
     });
   });
 
-  test('failure: missing fiscalYear -> 400, no query issued', async () => {
+  test('failure: missing fiscalYear -> 400, envelope pinned, no query issued', async () => {
     const res = mockRes();
     await handler(reqOf({}), res);
     expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: 'fiscalYear is required' });
     expect(DynamicsService.queryAllRecords).not.toHaveBeenCalled();
+  });
+
+  test('405 on non-GET, no auth check performed', async () => {
+    const res = mockRes();
+    await handler({ method: 'POST', query: {}, headers: {} }, res);
+    expect(res.statusCode).toBe(405);
+    expect(res.body).toEqual({ error: 'Method not allowed' });
+    expect(requireAppAccess).not.toHaveBeenCalled();
+  });
+
+  test('unauth: requireAppAccess short-circuits, no query issued', async () => {
+    requireAppAccess.mockResolvedValueOnce(null);
+    const res = mockRes();
+    await handler(reqOf({ fiscalYear: 'December 2025' }), res);
+    expect(DynamicsService.queryAllRecords).not.toHaveBeenCalled();
+    expect(requireAppAccess).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'expertise-finder');
+  });
+
+  test('domain error: adapter query throws -> 500, details omitted outside development', async () => {
+    const prevEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    DynamicsService.queryAllRecords.mockRejectedValueOnce(new Error('Dynamics timeout'));
+    const res = mockRes();
+    try {
+      await handler(reqOf({ fiscalYear: 'December 2025' }), res);
+    } finally {
+      process.env.NODE_ENV = prevEnv;
+    }
+    expect(res.statusCode).toBe(500);
+    expect(res.body).toEqual({ error: 'Failed to query proposals from Dynamics', details: undefined });
   });
 });

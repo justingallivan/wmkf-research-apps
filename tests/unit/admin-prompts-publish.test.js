@@ -42,6 +42,63 @@ beforeEach(() => {
   sql.mockClear();
 });
 
+describe('/api/admin/prompts/[name] — envelope inventory gap fill (Stage 5 Phase A)', () => {
+  it('405 on unsupported method, no auth check performed', async () => {
+    const { requireSuperuser } = require('../../lib/utils/auth');
+    requireSuperuser.mockClear();
+    const res = mockRes();
+    await handler({ method: 'DELETE', query: { name: NAME }, body: {} }, res);
+    expect(res.statusCode).toBe(405);
+    expect(res.body).toEqual({ error: 'Method not allowed' });
+    expect(requireSuperuser).not.toHaveBeenCalled();
+  });
+
+  it('unauth: requireSuperuser short-circuits (GET), no adapter call', async () => {
+    const { requireSuperuser } = require('../../lib/utils/auth');
+    requireSuperuser.mockResolvedValueOnce(null);
+    DynamicsService.queryRecords.mockClear();
+    const res = mockRes();
+    await handler({ method: 'GET', query: { name: NAME } }, res);
+    expect(DynamicsService.queryRecords).not.toHaveBeenCalled();
+  });
+
+  it('missing name -> 400', async () => {
+    const res = mockRes();
+    await handler({ method: 'GET', query: { name: '' } }, res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: 'prompt name required' });
+  });
+
+  it('GET golden: current row + history full envelope pinned', async () => {
+    DynamicsService.queryRecords.mockResolvedValueOnce({
+      records: [
+        currentRow({ version: 4, id: 'cur', body: 'B4' }),
+        { wmkf_ai_promptid: 'hist', wmkf_ai_promptname: NAME, wmkf_promptversion: 3, wmkf_ai_iscurrent: false, wmkf_ai_promptbody: 'B3' },
+      ],
+    });
+    const res = mockRes();
+    await handler({ method: 'GET', query: { name: NAME } }, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.name).toBe(NAME);
+    expect(res.body.invariantError).toBeNull();
+    expect(res.body.current).toEqual({
+      id: 'cur', name: NAME, version: 4, isCurrent: true, status: null,
+      systemPrompt: '', body: 'B4', variables: null, outputSchema: null,
+      model: 'sonnet', temperature: null, maxTokens: null,
+      createdOn: null, publishedAt: null, modifiedOn: null, modifiedById: null, modifiedByName: null,
+    });
+    expect(res.body.history.map((h) => h.version)).toEqual([4, 3]);
+  });
+
+  it('GET domain error: no rows for name -> 404', async () => {
+    DynamicsService.queryRecords.mockResolvedValueOnce({ records: [] });
+    const res = mockRes();
+    await handler({ method: 'GET', query: { name: NAME } }, res);
+    expect(res.statusCode).toBe(404);
+    expect(res.body).toEqual({ error: `No prompt named "${NAME}"` });
+  });
+});
+
 describe('PUT /api/admin/prompts/[name]', () => {
   it('rejects an invalid body (400 invalid_body)', async () => {
     const res = mockRes();
