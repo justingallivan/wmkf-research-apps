@@ -444,20 +444,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/reviewer-finder/my-proposals.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryAllRecords",
-      "entity": "akoya_requests",
-      "count": 2
-    },
-    {
-      "file": "pages/api/reviewer-finder/my-proposals.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryAllRecords",
-      "entity": "wmkf_appreviewersuggestions",
-      "count": 1
-    },
-    {
       "file": "pages/api/test-email.js",
       "kind": "import",
       "clientMethod": "DynamicsService.createAndSendEmail",
