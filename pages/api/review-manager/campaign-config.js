@@ -25,7 +25,7 @@
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
+import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request.js';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 
 // camelCase field → { Dataverse column, value kind }. quotaNotifiedAt is intentionally
@@ -111,7 +111,7 @@ export default async function handler(req, res) {
       if (req.method === 'GET') {
         let rec;
         try {
-          rec = await DynamicsService.getRecord('akoya_requests', requestId, { select: READ_SELECT });
+          rec = await grantRequestAdapter.getById(requestId, { select: READ_SELECT });
         } catch {
           rec = null;
         }
@@ -143,7 +143,7 @@ export default async function handler(req, res) {
       // Confirm the request exists before writing (a 404 from updateRecord is opaque).
       let rec;
       try {
-        rec = await DynamicsService.getRecord('akoya_requests', requestId, { select: READ_SELECT });
+        rec = await grantRequestAdapter.getById(requestId, { select: READ_SELECT });
       } catch {
         rec = null;
       }
@@ -151,7 +151,7 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: `No request found for ${requestId}` });
       }
 
-      await DynamicsService.updateRecord('akoya_requests', requestId, patch, { actingUserSystemId });
+      await grantRequestAdapter.updateById(requestId, patch, { actingUserSystemId });
 
       const merged = { ...readConfig(rec) };
       for (const [name, raw] of Object.entries(config)) {

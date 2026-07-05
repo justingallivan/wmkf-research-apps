@@ -29,6 +29,7 @@ import { createLLMClient } from '../../../lib/services/llm-client';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { loadFile } from '../../../lib/utils/file-loader';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
+import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request.js';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import {
   DATA_CLASSES,
@@ -92,7 +93,7 @@ export default async function handler(req, res) {
     // write. If another caller has updated the row in between, PATCH returns 412.
     let preflightEtag = null;
     if (!overwrite) {
-      const existing = await DynamicsService.getRecord('akoya_requests', requestGuid, {
+      const existing = await grantRequestAdapter.getById(requestGuid, {
         select: 'wmkf_ai_summary,modifiedon',
       });
       const current = (existing?.wmkf_ai_summary || '').trim();
@@ -181,8 +182,7 @@ export default async function handler(req, res) {
     let writebackFailureCategory = null;
     let serverSideWritebackError = null;
     try {
-      await DynamicsService.updateRecord(
-        'akoya_requests',
+      await grantRequestAdapter.updateById(
         requestGuid,
         { wmkf_ai_summary: summaryText },
         {

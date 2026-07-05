@@ -26,7 +26,7 @@
  */
 
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
+import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request.js';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 import { cycleCodeToOdataFilter } from '../../../lib/utils/cycle-code';
@@ -34,7 +34,6 @@ import { GRANTEE_RESEARCH_PROGRAM_IDS } from '../../../shared/config/granteeRese
 import { generateGranteeTitle } from '../../../lib/services/grantee-title-service';
 
 const PHASEI_INVITED = 100000003; // wmkf_phaseistatus = Invited (the board flip)
-const ENTITY_SET = 'akoya_requests';
 const SELECT = 'akoya_requestid,akoya_requestnum,akoya_title,wmkf_abstract,wmkf_wmkfprojectdescription';
 const MIN_ABSTRACT_CHARS = 50;
 
@@ -101,7 +100,7 @@ export default async function handler(req, res) {
     try {
       // queryAllRecords (paginated) — NOT queryRecords (caps $top at 100); the research
       // Invited set for a cycle can exceed 100. Honor `capped` rather than drop the tail.
-      const result = await DynamicsService.queryAllRecords(ENTITY_SET, { select: SELECT, filter });
+      const result = await grantRequestAdapter.queryAllRequests({ select: SELECT, filter });
       records = result.records || [];
       capped = Boolean(result.capped);
       totalCount = result.totalCount || records.length;
@@ -191,7 +190,7 @@ async function processRow(row, summary) {
   try {
     // Re-read for a FRESH _etag + re-confirm empty (TOCTOU: staff may have curated it
     // between the batch query and now). Refuse a bare write without an _etag.
-    const fresh = await DynamicsService.getRecord(ENTITY_SET, row.akoya_requestid, {
+    const fresh = await grantRequestAdapter.getById(row.akoya_requestid, {
       select: 'wmkf_wmkfprojectdescription',
     });
     // Empty Memo is stored as null (verified S269: `eq null` matches the empty field),
@@ -207,8 +206,7 @@ async function processRow(row, summary) {
       summary.failures.push({ requestNum, reason: 'no _etag (refused bare write)' });
       return;
     }
-    await DynamicsService.updateRecord(
-      ENTITY_SET,
+    await grantRequestAdapter.updateById(
       row.akoya_requestid,
       { wmkf_wmkfprojectdescription: editedTitle },
       { ifMatch: fresh._etag },

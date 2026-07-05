@@ -122,13 +122,6 @@
       "count": 1
     },
     {
-      "file": "lib/services/grantee-upload.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "lib/services/maintenance-service.js",
       "kind": "require",
       "clientMethod": "DynamicsService.queryAllRecords",
@@ -276,20 +269,6 @@
       "count": 1
     },
     {
-      "file": "lib/services/reviewer-quota.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 2
-    },
-    {
-      "file": "lib/services/reviewer-quota.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "lib/services/reviewer-reminder-sweep.js",
       "kind": "import",
       "clientMethod": "DynamicsService.createAndSendEmail",
@@ -416,27 +395,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/cron/generate-grantee-titles.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/cron/generate-grantee-titles.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryAllRecords",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/cron/generate-grantee-titles.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "pages/api/cron/grantee-deliverable-reminders.js",
       "kind": "import",
       "clientMethod": "DynamicsService.createAndSendEmail",
@@ -484,13 +442,6 @@
       "clientMethod": "DynamicsService.queryRecords",
       "entity": "sharepointdocumentlocations",
       "count": 2
-    },
-    {
-      "file": "pages/api/expertise-finder/proposals.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryAllRecords",
-      "entity": "akoya_requests",
-      "count": 1
     },
     {
       "file": "pages/api/external/review/[token]/context.js",
@@ -542,20 +493,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/field-primer/generate.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 3
-    },
-    {
-      "file": "pages/api/field-primer/generate.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "akoya_requests",
-      "count": 3
-    },
-    {
       "file": "pages/api/grant-reporting/extract.js",
       "kind": "import",
       "clientMethod": "DynamicsService.logAiRun",
@@ -565,36 +502,8 @@
     {
       "file": "pages/api/phase-i-dynamics/summarize.js",
       "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/phase-i-dynamics/summarize.js",
-      "kind": "import",
       "clientMethod": "DynamicsService.logAiRun",
       "entity": "non-entity-transport",
-      "count": 1
-    },
-    {
-      "file": "pages/api/phase-i-dynamics/summarize.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/review-manager/campaign-config.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 2
-    },
-    {
-      "file": "pages/api/review-manager/campaign-config.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "akoya_requests",
       "count": 1
     },
     {
@@ -843,55 +752,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/workbench/dashboard.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryAllRecords",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/workbench/grantee-deliverables/abstract.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 3
-    },
-    {
-      "file": "pages/api/workbench/grantee-deliverables/abstract.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/workbench/grantee-deliverables/awardees.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/workbench/grantee-deliverables/cycle-export.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryAllRecords",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/workbench/grantee-deliverables/generate.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 2
-    },
-    {
-      "file": "pages/api/workbench/grantee-deliverables/generate.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "pages/api/workbench/grantee-deliverables/recipients.js",
       "kind": "import",
       "clientMethod": "DynamicsService.getRecord",
@@ -910,20 +770,6 @@
       "kind": "import",
       "clientMethod": "DynamicsService.createAndSendEmail",
       "entity": "non-entity-transport",
-      "count": 1
-    },
-    {
-      "file": "pages/api/workbench/triage.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/workbench/triage.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "akoya_requests",
       "count": 1
     }
   ]
