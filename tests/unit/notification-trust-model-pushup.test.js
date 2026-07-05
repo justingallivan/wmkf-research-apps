@@ -26,6 +26,7 @@ const mockBlobGet = jest.fn();
 const mockBlobDel = jest.fn();
 const mockBlobList = jest.fn();
 const mockListSettings = jest.fn();
+const mockGetSettingStrict = jest.fn();
 const mockAlertService = {
   createAlert: jest.fn(),
   autoResolve: jest.fn(),
@@ -61,11 +62,39 @@ const mockReviewerSuggestionAdapter = {
   patchReviewReceipt: jest.fn(),
   queryAllSuggestions: jest.fn(),
   getForAcceptanceDrain: jest.fn(),
+  getByIdWithSelect: jest.fn(),
+  findById: jest.fn(),
+  updateLifecycle: jest.fn(),
+  patchFields: jest.fn(),
+  setHonorariumRequest: jest.fn(),
+  isExcluded: jest.fn((row) => row?.wmkf_applicantdisposition === 100000001),
+  notExcludedFilter: jest.fn(() => 'wmkf_applicantdisposition ne 100000001'),
   ENTITY_SET_NAME: 'wmkf_appreviewersuggestions',
 };
-const mockPotentialReviewerAdapter = { getById: jest.fn() };
-const mockGrantRequestAdapter = { updateById: jest.fn() };
+const mockPotentialReviewerAdapter = {
+  getById: jest.fn(),
+  getByIdWithSelect: jest.fn(),
+  setContactLink: jest.fn(),
+};
+const mockGrantRequestAdapter = {
+  create: jest.fn(),
+  getById: jest.fn(),
+  updateById: jest.fn(),
+};
 const mockGrantCycleAdapter = { queryAllCycles: jest.fn() };
+const mockContactAdapter = {
+  updateFields: jest.fn(),
+  getByIdWithSelect: jest.fn(),
+};
+const mockSystemUserAdapter = {
+  getById: jest.fn(),
+  getByIdWithSelect: jest.fn(),
+};
+const mockGranteeDeliverableAdapter = {
+  queryAllDeliverables: jest.fn(),
+  update: jest.fn(),
+};
+const mockResolveSignatureForRequest = jest.fn();
 const mockOnboardingState = {
   listStuck: jest.fn(),
   listPending: jest.fn(),
@@ -108,7 +137,10 @@ jest.mock('../../lib/services/review-draft-service', () => ({
   default: mockReviewDraftService,
 }));
 jest.mock('../../lib/services/database-service', () => ({ DatabaseService: {} }));
-jest.mock('../../lib/services/settings-service', () => ({ listSettings: mockListSettings }));
+jest.mock('../../lib/services/settings-service', () => ({
+  listSettings: mockListSettings,
+  getSettingStrict: mockGetSettingStrict,
+}));
 jest.mock('../../lib/services/intake-draft-service', () => ({
   __esModule: true,
   default: mockIntakeDraftService,
@@ -157,6 +189,9 @@ jest.mock('../../lib/external/token-lifecycle', () => ({
 jest.mock('../../lib/services/program-director-resolver', () => ({
   resolveProgramDirectorEmailForRequest: mockResolveProgramDirectorEmailForRequest,
 }));
+jest.mock('../../lib/services/email-signature', () => ({
+  resolveSignatureForRequest: mockResolveSignatureForRequest,
+}));
 jest.mock('../../lib/services/sharepoint-cleanup', () => ({
   cleanupSharePointItems: jest.fn().mockResolvedValue(true),
 }));
@@ -170,6 +205,9 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => mockReviewer
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => mockPotentialReviewerAdapter);
 jest.mock('../../lib/dataverse/adapters/grant-request', () => mockGrantRequestAdapter);
 jest.mock('../../lib/dataverse/adapters/grant-cycle', () => mockGrantCycleAdapter);
+jest.mock('../../lib/dataverse/adapters/contact', () => mockContactAdapter);
+jest.mock('../../lib/dataverse/adapters/system-user', () => mockSystemUserAdapter);
+jest.mock('../../lib/dataverse/adapters/grantee-deliverable', () => mockGranteeDeliverableAdapter);
 jest.mock('../../lib/dataverse/adapters/review-answer', () => ({
   answerUpsertDescriptor: jest.fn(),
 }));
@@ -198,6 +236,12 @@ const attachHandler = require('../../pages/api/intake/draft/attach').default;
 const MaintenanceService = require('../../lib/services/maintenance-service');
 const { writeReviewFiles } = require('../../lib/services/review-upload');
 const { processReviewerAcceptanceJob } = require('../../lib/services/reviewer-acceptance-drain');
+const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
+const { sendManualReviewDueReminder } = require('../../lib/services/reviewer-manual-reminder');
+const { sweepReviewThankYous } = require('../../lib/services/reviewer-thankyou-sweep');
+const { sweepReviewerReminders } = require('../../lib/services/reviewer-reminder-sweep');
+const { withdrawSufficient } = require('../../lib/services/review-manager/withdraw-sufficient-service');
+const { runGranteeDeliverableReminders } = require('../../lib/services/cron/grantee-deliverable-reminders-service');
 
 const originalEnv = { ...process.env };
 const originalNotify = NotificationService.notify;
@@ -205,6 +249,10 @@ const originalNotify = NotificationService.notify;
 const PDF_BYTES = Buffer.from('%PDF-1.4\n');
 const SUGGESTION_ID = '11111111-1111-1111-1111-111111111111';
 const REQUEST_ID = '22222222-2222-2222-2222-222222222222';
+const REVIEWER_ID = '33333333-3333-3333-3333-333333333333';
+const CONTACT_ID = '44444444-4444-4444-4444-444444444444';
+const HONORARIUM_REQUEST_ID = '55555555-5555-5555-5555-555555555555';
+const PD_ID = '66666666-6666-6666-6666-666666666666';
 const ACCEPTED_AT = '2026-01-01T00:00:00.000Z';
 
 function okJson(body) {
@@ -282,6 +330,103 @@ function makeRawReq(body) {
   return req;
 }
 
+function mockBlankEmailDefault(matchKey = () => true) {
+  mockGetSettingStrict.mockImplementation(async (key) => (
+    matchKey(key)
+      ? { found: true, value: '   ' }
+      : { found: true, value: `configured ${key}` }
+  ));
+}
+
+function mockUnavailableEmailDefault(matchKey = () => true) {
+  mockGetSettingStrict.mockImplementation(async (key) => {
+    if (matchKey(key)) throw new Error(`unavailable ${key}`);
+    return { found: true, value: `configured ${key}` };
+  });
+}
+
+function makeAcceptanceJob({ isAcceptRepeat = true } = {}) {
+  return {
+    id: 7,
+    lease_token: 'lease-1',
+    status: 'accepted',
+    suggestion_id: SUGGESTION_ID,
+    accepted_at: ACCEPTED_AT,
+    payload: {
+      acceptedAt: ACCEPTED_AT,
+      isAcceptRepeat,
+      suggestion: {
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        _wmkf_honorariumrequest_value: HONORARIUM_REQUEST_ID,
+        _wmkf_potentialreviewer_value: REVIEWER_ID,
+      },
+      request: {
+        akoya_requestid: REQUEST_ID,
+        akoya_requestnum: '1001',
+        akoya_title: 'Test Request',
+        wmkf_reviewduedate: '2026-08-01',
+        wmkf_meetingdate: '2026-06-01',
+        _wmkf_programdirector_value: PD_ID,
+      },
+      reviewer: {
+        wmkf_potentialreviewersid: REVIEWER_ID,
+        _wmkf_contact_value: CONTACT_ID,
+        wmkf_name: 'Reviewer One',
+        wmkf_firstname: 'Reviewer',
+        wmkf_lastname: 'One',
+        wmkf_emailaddress: 'reviewer@example.com',
+      },
+      body: {
+        address: {
+          line1: '1 Main St',
+          city: 'Los Angeles',
+          state: 'CA',
+          postalCode: '90000',
+          country: 'US',
+        },
+        contactEdits: {},
+      },
+    },
+    steps: {},
+  };
+}
+
+function makeAcceptanceDrainDeps(overrides = {}) {
+  return {
+    suggestions: {
+      getForAcceptanceDrain: jest.fn().mockResolvedValue({
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        _wmkf_potentialreviewer_value: REVIEWER_ID,
+        _wmkf_honorariumrequest_value: HONORARIUM_REQUEST_ID,
+        wmkf_accepted: true,
+        wmkf_declined: false,
+        wmkf_responsereceivedat: ACCEPTED_AT,
+      }),
+    },
+    jobs: {
+      cancelReviewerAcceptanceJob: jest.fn(),
+      completeReviewerAcceptanceJob: jest.fn(),
+      mergeReviewerAcceptanceJobStep: jest.fn(),
+    },
+    potentialReviewers: {
+      getById: jest.fn().mockResolvedValue({
+        wmkf_potentialreviewersid: REVIEWER_ID,
+        _wmkf_contact_value: CONTACT_ID,
+        wmkf_name: 'Reviewer One',
+        wmkf_emailaddress: 'reviewer@example.com',
+      }),
+    },
+    ensureHonorarium: jest.fn().mockResolvedValue({ contactId: CONTACT_ID }),
+    captureOrcid: jest.fn().mockResolvedValue(undefined),
+    captureIdentity: jest.fn().mockResolvedValue(undefined),
+    syncNameTitle: jest.fn().mockResolvedValue(undefined),
+    alertEmail: jest.fn().mockResolvedValue(undefined),
+    alertAffiliation: jest.fn().mockResolvedValue(undefined),
+    quota: jest.fn().mockResolvedValue(undefined),
+    ...overrides,
+  };
+}
+
 function mockDefaultMaintenanceRun() {
   jest.spyOn(MaintenanceService, 'startRun').mockResolvedValue('run-1');
   jest.spyOn(MaintenanceService, 'completeRun').mockResolvedValue(undefined);
@@ -348,6 +493,7 @@ beforeEach(() => {
   mockValidateReviewForm.mockReturnValue({ ok: true, dataverseValues: {}, ratings: {} });
   mockGetActiveQuestionSet.mockResolvedValue([]);
   mockResolveProgramDirectorEmailForRequest.mockResolvedValue('pd@example.com');
+  mockGetSettingStrict.mockResolvedValue({ found: true, value: 'Configured email default' });
   mockBlobDel.mockResolvedValue(undefined);
   mockBlobList.mockResolvedValue({ blobs: [], cursor: null });
   mockIntakeAuditService.log.mockResolvedValue(null);
@@ -360,6 +506,89 @@ beforeEach(() => {
   mockOnboardingState.bumpAttempt.mockResolvedValue(1);
   mockOnboardingState.cleanupCompleted.mockResolvedValue(0);
   mockOptionSetValues.assertOptionSetValuesConfigured.mockImplementation(() => {});
+  mockContactAdapter.updateFields.mockResolvedValue(undefined);
+  mockContactAdapter.getByIdWithSelect.mockResolvedValue({
+    contactid: CONTACT_ID,
+    fullname: 'Reviewer One',
+    emailaddress1: 'reviewer@example.com',
+  });
+  mockSystemUserAdapter.getById.mockResolvedValue({
+    systemuserid: PD_ID,
+    fullname: 'Program Director',
+    internalemailaddress: 'pd@example.com',
+    isdisabled: false,
+  });
+  mockSystemUserAdapter.getByIdWithSelect.mockResolvedValue({
+    systemuserid: PD_ID,
+    fullname: 'Program Director',
+    internalemailaddress: 'pd@example.com',
+    isdisabled: false,
+  });
+  mockResolveSignatureForRequest.mockResolvedValue({ signature: 'Program Director' });
+  mockReviewerSuggestionAdapter.queryAllSuggestions.mockResolvedValue({ records: [] });
+  mockReviewerSuggestionAdapter.getByIdWithSelect.mockResolvedValue({
+    wmkf_appreviewersuggestionid: SUGGESTION_ID,
+    _wmkf_request_value: REQUEST_ID,
+    _wmkf_potentialreviewer_value: REVIEWER_ID,
+    wmkf_accepted: true,
+    wmkf_reviewstatus: 100000001,
+    wmkf_reviewreceivedat: null,
+    wmkf_applicantdisposition: null,
+    wmkf_remindercount: 0,
+    _etag: 'W/"1"',
+  });
+  mockReviewerSuggestionAdapter.findById.mockResolvedValue({
+    wmkf_appreviewersuggestionid: SUGGESTION_ID,
+    _wmkf_request_value: REQUEST_ID,
+    _wmkf_potentialreviewer_value: REVIEWER_ID,
+    wmkf_invited: true,
+    wmkf_accepted: false,
+    wmkf_declined: false,
+    wmkf_responsetype: null,
+    _etag: 'W/"1"',
+  });
+  mockReviewerSuggestionAdapter.updateLifecycle.mockResolvedValue(undefined);
+  mockReviewerSuggestionAdapter.patchFields.mockResolvedValue(undefined);
+  mockReviewerSuggestionAdapter.patchReviewReceipt.mockResolvedValue(undefined);
+  mockReviewerSuggestionAdapter.setHonorariumRequest.mockResolvedValue(undefined);
+  mockPotentialReviewerAdapter.getById.mockResolvedValue({
+    wmkf_potentialreviewersid: REVIEWER_ID,
+    _wmkf_contact_value: CONTACT_ID,
+    wmkf_name: 'Reviewer One',
+    wmkf_emailaddress: 'reviewer@example.com',
+  });
+  mockPotentialReviewerAdapter.getByIdWithSelect.mockResolvedValue({
+    wmkf_potentialreviewersid: REVIEWER_ID,
+    wmkf_name: 'Reviewer One',
+    wmkf_emailaddress: 'reviewer@example.com',
+  });
+  mockPotentialReviewerAdapter.setContactLink.mockResolvedValue(undefined);
+  mockGrantRequestAdapter.getById.mockResolvedValue({
+    akoya_requestid: REQUEST_ID,
+    akoya_requestnum: '1001',
+    akoya_title: 'Test Request',
+    _wmkf_programdirector_value: PD_ID,
+    _wmkf_projectleader_value: CONTACT_ID,
+    _akoya_primarycontactid_value: CONTACT_ID,
+    wmkf_reviewduedate: '2026-01-01',
+    wmkf_respondreminderenabled: true,
+    wmkf_respondoffsetdays: 7,
+    wmkf_respondreminderleaddays: 1,
+    wmkf_reviewduereminderenabled: true,
+    wmkf_reviewduereminderleaddays: 1,
+  });
+  mockGrantRequestAdapter.create.mockResolvedValue({ akoya_requestid: HONORARIUM_REQUEST_ID });
+  mockGranteeDeliverableAdapter.queryAllDeliverables.mockResolvedValue({
+    records: [{
+      wmkf_granteedeliverableid: 'deliverable-1',
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_inviteddate: '2026-01-01T00:00:00.000Z',
+      _etag: 'W/"1"',
+    }],
+    totalCount: 1,
+    capped: false,
+  });
+  mockGranteeDeliverableAdapter.update.mockResolvedValue(undefined);
   mockReviewerSuggestionAdapter.getForExternalVerification.mockResolvedValue({
     wmkf_appreviewersuggestionid: SUGGESTION_ID,
     _wmkf_request_value: REQUEST_ID,
@@ -598,6 +827,184 @@ describe('notification trust-model Stage 1 pushed-up wrappers', () => {
 
     expect(res.statusCode).toBe(422);
     expectTrustedNotify(seen, { type: 'virus_detection_intake', source: 'intake-attach' });
+  });
+});
+
+describe('notification trust-model Stage 2 pushed-up wrappers', () => {
+  test('site 10 - bill onboard route service alerts inherit bill-onboard-reviewer context', async () => {
+    const seen = watchNotifyEntry();
+    process.env.BILL_INTEGRATION_SECRET = 'x'.repeat(32);
+    mockValidateOnboardInput.mockReturnValue(null);
+    mockOnboardReviewer.mockImplementation(async () => {
+      await NotificationService.notify({
+        type: 'bill_ambiguous_match',
+        severity: 'warning',
+        emailAdmins: true,
+        title: 'BILL network search returned multiple matches for Reviewer',
+        message: 'Ops needs to confirm which BILL Network member this reviewer maps to.',
+        metadata: { honorariumRequestId: HONORARIUM_REQUEST_ID, reviewerContactId: CONTACT_ID },
+        source: 'bill/onboard-reviewer',
+        category: 'spend',
+      });
+      return { ok: true, status: 'ambiguous_match' };
+    });
+    const res = makeRes();
+
+    await billOnboardHandler(makeRawReq({
+      honorariumRequestId: HONORARIUM_REQUEST_ID,
+      reviewerContactId: CONTACT_ID,
+      reviewerName: 'Reviewer One',
+      reviewerEmail: 'reviewer@example.com',
+      address: { line1: '1 Main', city: 'Los Angeles', zipOrPostalCode: '90000', country: 'US' },
+    }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ ok: true, status: 'ambiguous_match' });
+    expectTrustedNotify(seen, { type: 'bill_ambiguous_match', source: 'bill/onboard-reviewer' });
+  });
+
+  test('site 10b - reviewer acceptance drain onboard alert inherits cron-drain-reviewer-acceptances context', async () => {
+    const seen = watchNotifyEntry();
+    const onboard = jest.fn(async () => {
+      await NotificationService.notify({
+        type: 'bill_ambiguous_match',
+        severity: 'warning',
+        emailAdmins: true,
+        title: 'BILL network search returned multiple matches for Reviewer',
+        message: 'Ops needs to confirm which BILL Network member this reviewer maps to.',
+        metadata: { honorariumRequestId: HONORARIUM_REQUEST_ID, reviewerContactId: CONTACT_ID },
+        source: 'bill/onboard-reviewer',
+        category: 'spend',
+      });
+      return { ok: true, status: 'ambiguous_match' };
+    });
+    const ensureHonorarium = jest.fn((args) => ensureHonorariumOnboarding(args, {
+      contacts: { updateFields: jest.fn().mockResolvedValue(undefined) },
+      onboard,
+      backProp: jest.fn().mockResolvedValue(undefined),
+      isDeferred: () => false,
+    }));
+    const deps = makeAcceptanceDrainDeps({
+      ensureHonorarium,
+      sendAcceptanceEmail: jest.fn().mockResolvedValue({ sent: true }),
+    });
+
+    await expect(withDalContext('cron-drain-reviewer-acceptances', () =>
+      processReviewerAcceptanceJob(makeAcceptanceJob({ isAcceptRepeat: true }), deps),
+    )).resolves.toMatchObject({ status: 'completed' });
+
+    expect(onboard).toHaveBeenCalledTimes(1);
+    expectTrustedNotify(seen, { type: 'bill_ambiguous_match', source: 'bill/onboard-reviewer' });
+  });
+
+  test('site 11 - manual review reminder default alert inherits review-manager-send-review-reminder context', async () => {
+    const seen = watchNotifyEntry();
+    mockBlankEmailDefault((key) => key === 'email.reviewer_reminder_review_due.subject');
+
+    await expect(withDalContext('review-manager-send-review-reminder', () =>
+      sendManualReviewDueReminder({ requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, actingUserSystemId: PD_ID }),
+    )).resolves.toMatchObject({ ok: false, reason: 'misconfigured' });
+
+    expectTrustedNotify(seen, {
+      type: 'email_default_misconfigured',
+      source: 'reviewer-reminders-review-due-manual',
+    });
+  });
+
+  test('site 11 - review thank-you default alert inherits cron-review-thankyous context', async () => {
+    const seen = watchNotifyEntry();
+    mockBlankEmailDefault((key) => key === 'email.reviewer_thankyou.subject');
+    mockReviewerSuggestionAdapter.queryAllSuggestions.mockResolvedValue({
+      records: [{
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        _wmkf_potentialreviewer_value: REVIEWER_ID,
+        _wmkf_request_value: REQUEST_ID,
+      }],
+    });
+
+    await expect(withDalContext('cron-review-thankyous', () =>
+      sweepReviewThankYous({ maxBatch: 1 }),
+    )).resolves.toMatchObject({ scanned: 1, skippedMisconfigured: 1 });
+
+    expectTrustedNotify(seen, {
+      type: 'email_default_misconfigured',
+      source: 'reviewer-thankyous',
+    });
+  });
+
+  test('site 11 - reviewer reminder default alerts inherit cron-reviewer-reminders context', async () => {
+    const seen = watchNotifyEntry();
+    mockBlankEmailDefault((key) => (
+      key === 'email.reviewer_reminder_respond_by.subject'
+      || key === 'email.reviewer_reminder_review_due.subject'
+    ));
+
+    await expect(withDalContext('cron-reviewer-reminders', () =>
+      sweepReviewerReminders({ maxBatch: 1 }),
+    )).resolves.toMatchObject({
+      respond: expect.objectContaining({ scanned: 0 }),
+      reviewDue: expect.objectContaining({ scanned: 0 }),
+    });
+
+    expectTrustedNotify(seen, {
+      type: 'email_default_misconfigured',
+      source: 'reviewer-reminders-respond-by',
+    });
+    expectTrustedNotify(seen, {
+      type: 'email_default_misconfigured',
+      source: 'reviewer-reminders-review-due',
+    });
+  });
+
+  test('site 11 - withdraw-sufficient default alert inherits review-manager-withdraw-sufficient context', async () => {
+    const seen = watchNotifyEntry();
+    mockBlankEmailDefault((key) => key === 'email.reviewer_withdraw.subject');
+
+    await expect(withDalContext('review-manager-withdraw-sufficient', () =>
+      withdrawSufficient({
+        requestId: REQUEST_ID,
+        suggestionIds: [SUGGESTION_ID],
+        actingUserSystemId: PD_ID,
+      }),
+    )).resolves.toMatchObject({
+      ok: true,
+      withdrawn: 1,
+      results: [{ suggestionId: SUGGESTION_ID, status: 'withdrawn_email_skipped' }],
+    });
+
+    expectTrustedNotify(seen, {
+      type: 'email_default_misconfigured',
+      source: 'review-manager/withdraw-sufficient',
+    });
+  });
+
+  test('site 11 - acceptance confirmation default alert inherits cron-drain-reviewer-acceptances context', async () => {
+    const seen = watchNotifyEntry();
+    mockBlankEmailDefault((key) => key === 'email.reviewer_acceptance.subject');
+    const deps = makeAcceptanceDrainDeps();
+
+    await expect(withDalContext('cron-drain-reviewer-acceptances', () =>
+      processReviewerAcceptanceJob(makeAcceptanceJob({ isAcceptRepeat: false }), deps),
+    )).resolves.toMatchObject({ status: 'completed' });
+
+    expectTrustedNotify(seen, {
+      type: 'email_default_misconfigured',
+      source: 'external/review/respond:acceptance-confirmation',
+    });
+  });
+
+  test('site 11 - grantee deliverable reminder default alert inherits grantee-deliverable-reminders-cron context', async () => {
+    const seen = watchNotifyEntry();
+    mockUnavailableEmailDefault((key) => key === 'email.grantee_reminder.body');
+
+    await expect(withDalContext('grantee-deliverable-reminders-cron', () =>
+      runGranteeDeliverableReminders(),
+    )).resolves.toMatchObject({ scanned: 1, skippedMisconfigured: 1 });
+
+    expectTrustedNotify(seen, {
+      type: 'email_default_misconfigured',
+      source: 'grantee-deliverable-reminders',
+    });
   });
 });
 

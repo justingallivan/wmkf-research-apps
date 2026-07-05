@@ -78,7 +78,7 @@ export default async function handler(req, res) {
 
   // Drive orchestration.
   try {
-    const result = await onboardReviewer(body);
+    const result = await withDalContext('bill-onboard-reviewer', () => onboardReviewer(body));
     return res.status(200).json(result);
   } catch (err) {
     const msg = err?.message || String(err);
