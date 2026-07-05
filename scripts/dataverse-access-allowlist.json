@@ -39,13 +39,6 @@
     },
     {
       "file": "pages/api/admin/review-questions.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "unresolved",
-      "count": 1
-    },
-    {
-      "file": "pages/api/admin/review-questions.js",
       "kind": "import:changeset-unresolved",
       "clientMethod": "DynamicsService.executeChangeset",
       "entity": "changeset-unresolved",
