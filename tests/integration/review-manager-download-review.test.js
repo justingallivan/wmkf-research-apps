@@ -43,6 +43,16 @@ describe('/api/review-manager/download-review', () => {
     handler = mod.default;
   });
 
+  it('405s on a non-GET method with an Allow header, before auth runs', async () => {
+    const req = createMockReq({ method: 'POST', query: { suggestionId: SUGGESTION_ID } });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(405);
+    expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'method_not_allowed' });
+    expect(res.setHeader).toHaveBeenCalledWith('Allow', 'GET');
+    expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+  });
+
   it('returns 401 when unauthenticated', async () => {
     mockUnauthenticated();
     const req = createMockReq({ method: 'GET', query: { suggestionId: SUGGESTION_ID } });
@@ -91,6 +101,12 @@ describe('/api/review-manager/download-review', () => {
     );
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.send).toHaveBeenCalledWith(Buffer.from('pdf-bytes'));
+    expect(res._headers).toMatchObject({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'attachment; filename="review.pdf"',
+      'Content-Length': 1234,
+      'Cache-Control': 'private, no-store',
+    });
   });
 
   it('maps a Dataverse 404 to a not_found response', async () => {

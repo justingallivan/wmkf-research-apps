@@ -55,6 +55,24 @@ function post(body) {
   return { req, res };
 }
 
+test('wrong method → 405 with Allow header, before auth runs', async () => {
+  const req = createMockReq({ method: 'GET', body: {} });
+  const res = createMockRes();
+  await handler(req, res);
+  expect(res.statusCode).toBe(405);
+  expect(res._data).toEqual({ ok: false, reason: 'method_not_allowed' });
+  expect(res.setHeader).toHaveBeenCalledWith('Allow', 'POST');
+  expect(requireAppAccess).not.toHaveBeenCalled();
+});
+
+test('unauthenticated → short-circuits before any lookup or write', async () => {
+  requireAppAccess.mockResolvedValueOnce(null);
+  const { req, res } = post({ suggestionId: SUGGESTION_ID, structuredData: { impact: 3 } });
+  await handler(req, res);
+  expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  expect(DynamicsService.executeChangeset).not.toHaveBeenCalled();
+});
+
 test('ratings present → atomic changeset with 3 rating upserts + parent PATCH; no bare updateRecord', async () => {
   const { req, res } = post({ suggestionId: SUGGESTION_ID, structuredData: { impact: 3, risk: 2, overallRating: 5 } });
   await handler(req, res);
@@ -86,6 +104,7 @@ test('informal feedback (no structuredData) → parent-only updateRecord, NO sna
   const { req, res } = post({ suggestionId: SUGGESTION_ID });
   await handler(req, res);
   expect(res.statusCode).toBe(200);
+  expect(res._data).toEqual({ ok: true });
 
   expect(DynamicsService.executeChangeset).not.toHaveBeenCalled();
   expect(DynamicsService.updateRecord).toHaveBeenCalledTimes(1);

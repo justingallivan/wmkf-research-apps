@@ -64,6 +64,19 @@ describe('/api/review-manager/regenerate-token', () => {
     expect(mintAndStore).not.toHaveBeenCalled();
   });
 
+  it('rejects non-POST methods with 405, Allow: POST, and the full envelope', async () => {
+    // Method check runs before the auth gate, so no session/access mock is needed here.
+    const req = createMockReq({ method: 'GET', body: {} });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.setHeader).toHaveBeenCalledWith('Allow', 'POST');
+    expect(res.status).toHaveBeenCalledWith(405);
+    expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'method_not_allowed' });
+    expect(mintAndStore).not.toHaveBeenCalled();
+  });
+
   it('returns 403 when caller lacks review-manager app access', async () => {
     mockAuthenticatedUser(1, ['reviewer-finder']);
     const req = createMockReq({ method: 'POST', body: { suggestionId: SUGGESTION_ID } });

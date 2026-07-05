@@ -82,6 +82,23 @@ function post(body) {
   return { req, res };
 }
 
+test('GET is rejected with 405 method_not_allowed and Allow: POST', async () => {
+  const { req, res } = post();
+  req.method = 'GET';
+  await handler(req, res);
+  expect(res.statusCode).toBe(405);
+  expect(res._data).toEqual({ ok: false, reason: 'method_not_allowed' });
+  expect(res._headers.Allow).toBe('POST');
+});
+
+test('unauthenticated request short-circuits before any Dataverse call', async () => {
+  requireAppAccess.mockResolvedValueOnce(null);
+  const { req, res } = post({ requestId: REQUEST_ID });
+  await handler(req, res);
+  expect(res.status).not.toHaveBeenCalled();
+  expect(suggestionAdapter.findByRequest).not.toHaveBeenCalled();
+});
+
 test('rejects a non-GUID requestId with 400, before any Dataverse call', async () => {
   const { req, res } = post({ requestId: 'not-a-guid' });
   await handler(req, res);
@@ -167,6 +184,32 @@ test('overwrite:true bypasses the already-exists gate and passes forceOverwrite 
   expect(digest).toContain('Question type: richtext');
   expect(digest).toContain('Answer text: Strong methodology.');
   expect(digest).not.toContain('<p>');
+});
+
+test('200 success pins the full response envelope (ok, synthesis, runId, writtenToDynamics)', async () => {
+  suggestionAdapter.findByRequest.mockResolvedValue([
+    {
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      _wmkf_potentialreviewer_value: PERSON_ID,
+      wmkf_accepted: true,
+      wmkf_reviewreceivedat: '2026-06-01T00:00:00Z',
+      wmkf_revieweraffiliation: 'Test University',
+    },
+  ]);
+  DynamicsService.getRecord.mockResolvedValue({ wmkf_reviewsynthesisjson: null });
+  const synthesis = { consensus: ['x'], disagreements: [], keyConcerns: [], ratingSummaries: [], overall: 'ok' };
+  executePrompt.mockResolvedValue({
+    blocked: false,
+    parsed: { synthesis },
+    runId: 'run-full',
+    writeResults: { allOk: true, results: [{ output: 'synthesis', ok: true }] },
+  });
+
+  const { req, res } = post({ requestId: REQUEST_ID });
+  await handler(req, res);
+
+  expect(res.statusCode).toBe(200);
+  expect(res._data).toEqual({ ok: true, synthesis, runId: 'run-full', writtenToDynamics: true });
 });
 
 test('no prior synthesis (empty memo) proceeds without overwrite flag', async () => {

@@ -46,6 +46,24 @@ beforeEach(() => {
   DynamicsService.updateRecord.mockReset().mockResolvedValue({});
 });
 
+describe('method + auth envelope', () => {
+  test('wrong method -> 405 with Allow header, no auth/adapter call', async () => {
+    const res = mockRes();
+    await handler({ method: 'DELETE', query: {}, headers: {} }, res);
+    expect(res.statusCode).toBe(405);
+    expect(res.body).toEqual({ error: 'Method not allowed' });
+    expect(res.headers.Allow).toBe('GET, POST');
+    expect(requireAppAccess).not.toHaveBeenCalled();
+  });
+
+  test('unauthenticated -> short-circuits before any GUID/adapter work', async () => {
+    requireAppAccess.mockResolvedValueOnce(null);
+    const res = mockRes();
+    await handler({ method: 'GET', query: { requestId: GUID }, headers: {} }, res);
+    expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+  });
+});
+
 describe('GET /api/review-manager/campaign-config (grant-request adapter contract)', () => {
   test('golden: reads the config off the exact READ_SELECT projection', async () => {
     DynamicsService.getRecord.mockResolvedValueOnce({

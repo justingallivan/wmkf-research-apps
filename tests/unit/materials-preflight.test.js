@@ -51,12 +51,35 @@ test('rejects non-GET methods', async () => {
   expect(res.status).toHaveBeenCalledWith(405);
 });
 
+test('non-GET rejection sets Allow: GET and the full envelope', async () => {
+  const req = createMockReq({ method: 'POST' });
+  const res = createMockRes();
+  await handler(req, res);
+  expect(res.setHeader).toHaveBeenCalledWith('Allow', 'GET');
+  expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'method_not_allowed' });
+});
+
 test('is app-gated (requireAppAccess denial short-circuits)', async () => {
   requireAppAccess.mockResolvedValue(null);
   const { req, res } = get({ requestId: REQUEST_ID });
   await handler(req, res);
   expect(DynamicsService.getRecord).not.toHaveBeenCalled();
   expect(res.status).not.toHaveBeenCalledWith(200);
+});
+
+test('unauthenticated request passes through requireAppAccess\'s 401 untouched', async () => {
+  // requireAppAccess writes its own response for the unauthenticated case
+  // (lib/utils/auth.js: res.status(401).json({ error: 'Authentication required' }); return null).
+  // The route itself does nothing further once it gets a falsy return — pin that pass-through.
+  requireAppAccess.mockImplementation(async (_req, resArg) => {
+    resArg.status(401).json({ error: 'Authentication required' });
+    return null;
+  });
+  const { req, res } = get({ requestId: REQUEST_ID });
+  await handler(req, res);
+  expect(res.status).toHaveBeenCalledWith(401);
+  expect(res.json).toHaveBeenCalledWith({ error: 'Authentication required' });
+  expect(DynamicsService.getRecord).not.toHaveBeenCalled();
 });
 
 test('rejects a non-GUID requestId before it reaches Dataverse', async () => {
