@@ -22,7 +22,7 @@
  */
 
 import { requireAppAccess } from '../../../../lib/utils/auth';
-import { DynamicsService } from '../../../../lib/services/dynamics-service';
+import * as grantRequestAdapter from '../../../../lib/dataverse/adapters/grant-request.js';
 import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
 import { resolveByEmail } from '../../../../lib/services/program-director-resolver';
 import { getDeliverableForRequest } from '../../../../lib/services/grantee-deliverable-record';
@@ -81,7 +81,7 @@ export default async function handler(req, res) {
         ` and _wmkf_projectleader_value ne null and (${programClause})` +
         (scope === 'mine' ? ` and _wmkf_programdirector_value eq ${pd.systemuserid}` : '');
 
-      const { records } = await DynamicsService.queryRecords('akoya_requests', {
+      const { records } = await grantRequestAdapter.queryRequests({
         select: SELECT,
         filter,
         orderby: 'akoya_requestnum asc',
