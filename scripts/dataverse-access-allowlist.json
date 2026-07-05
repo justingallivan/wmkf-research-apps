@@ -59,13 +59,6 @@
       "count": 1
     },
     {
-      "file": "lib/services/email-signature.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "systemusers",
-      "count": 1
-    },
-    {
       "file": "lib/services/maintenance-service.js",
       "kind": "require",
       "clientMethod": "DynamicsService.queryAllRecords",
