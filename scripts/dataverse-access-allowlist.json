@@ -87,34 +87,6 @@
       "count": 1
     },
     {
-      "file": "lib/services/reviewer-merge.js",
-      "kind": "fallback-alias",
-      "clientMethod": "dyn.disassociate",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "lib/services/reviewer-merge.js",
-      "kind": "fallback-alias",
-      "clientMethod": "dyn.queryAllRecords",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "lib/services/reviewer-merge.js",
-      "kind": "fallback-alias",
-      "clientMethod": "dyn.updateRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "lib/services/reviewer-merge.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.disassociate",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "lib/services/reviewer-reminder-sweep.js",
       "kind": "import",
       "clientMethod": "DynamicsService.createAndSendEmail",
