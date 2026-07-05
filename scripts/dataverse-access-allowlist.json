@@ -199,41 +199,6 @@
       "count": 1
     },
     {
-      "file": "lib/services/review-upload.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "wmkf_appreviewersuggestions",
-      "count": 2
-    },
-    {
-      "file": "lib/services/review-upload.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.resolveEntitySetName",
-      "entity": "wmkf_appreviewanswers",
-      "count": 1
-    },
-    {
-      "file": "lib/services/review-upload.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "wmkf_appreviewersuggestions",
-      "count": 1
-    },
-    {
-      "file": "lib/services/review-upload.js",
-      "kind": "import:changeset-op:PATCH",
-      "clientMethod": "DynamicsService.executeChangeset",
-      "entity": "wmkf_appreviewanswers",
-      "count": 1
-    },
-    {
-      "file": "lib/services/review-upload.js",
-      "kind": "import:changeset-op:PATCH",
-      "clientMethod": "DynamicsService.executeChangeset",
-      "entity": "wmkf_appreviewersuggestions",
-      "count": 1
-    },
-    {
       "file": "lib/services/reviewer-acceptance-email.js",
       "kind": "import",
       "clientMethod": "DynamicsService.createAndSendEmail",
