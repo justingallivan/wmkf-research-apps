@@ -456,6 +456,25 @@ review verdict + findings + resolutions)*
   `codex exec` in a non-TTY background shell blocks on stdin ("Reading additional input from
   stdin..."); ALWAYS launch with `< /dev/null`. Watchdog upgraded to session-file-growth
   stall detection (8 min frozen = stall) rather than wall-clock-only.
+- 2026-07-05 (S331): **Stage 2 (review-manager non-streaming wave) executed.** Pre-stage
+  re-probe: census 48, review-manager 9 (8 wave + send-emails→2b), zero drift. Phase A
+  (`76a8d2eb`): envelope inventory + characterization gaps for all 8 routes (70/70 across 9
+  suites); asymmetries pinned before extraction — reviewers.js sequential batch PATCH
+  (midway failure leaves earlier writes applied), render-emails + reviewers 405 without
+  Allow, download-review binary 200 + golden headers, materials-preflight sanitized
+  200-failure. Phase B in three clusters (`442a588e`, `638ab89e`, `199fdd5f`): 8/8 routes
+  shelled to `lib/services/review-manager/` services with ServiceHttpError mapping (explicit
+  `body` on every non-`{error}` envelope), legacy bypass → labeled `withDalContext` (labels
+  kept; scopes same-or-wider per route, widenings noted per cluster commit), static shell
+  audits clean, per-route service unit suites added. Census 48→40 — exactly the plan's
+  expected wave delta; running sum 1+8 = 9 of 49. (Disconfirming grep note: two
+  review-manager routes outside the census — `send-review-reminder.js`, `upload-review.js`
+  — still call `bypassDynamicsRestrictions` without boundary imports `[VERIFIED via grep
+  this session]`; they are bypass-strip work, not route-service census work.) Cluster 1 additionally received a
+  line-by-line independent verification by a second agent (an accidental duplicate executor
+  turned verifier — findings matched the committed work). Wave-close verification: all
+  gates green, suite 4274/4274 (369 suites), build exit 0. Post-stage fresh-context review:
+  next entry (interval rule — stage 2s may not start until it clears).
 
 ### Stage 0 route→test inventory (2026-07-04, S331)
 
