@@ -145,6 +145,10 @@ If you're touching a service or utility, read its header before this catalog. If
 
 - **`form-schema.js`** — Intake-portal form schema loader. Static import map (`SCHEMAS[formKey]`); `findFileField` walker; `countFieldEntries` cardinality helper.
 
+### Collections
+
+- **`chunk.js`** — Canonical array-chunk helper: `chunk(array, size)` → in-order sub-arrays of ≤ size. Fail-closed: non-array → `TypeError`, non-positive-integer size → `RangeError`; `[]` → `[]`; input never mutated. Import under the alias `chunked` at call sites (per-iteration variables are commonly named `chunk`). **Use this — not a hand-rolled `for (i += N) slice` loop** (consolidated S331-332, `docs/CHUNK_CONSOLIDATION_PLAN.md`).
+
 ### Secrets
 
 - **`tracked-secrets.js`** — Canonical `TRACKED_SECRETS` list for rotation/expiration alerting. Consumed by `pages/api/cron/secret-check.js` + `pages/api/admin/secrets.js`. **`docs/CREDENTIALS_RUNBOOK.md` mirrors this list by hand — this file is the canonical source.**
