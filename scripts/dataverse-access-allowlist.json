@@ -374,20 +374,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/review-manager/render-emails.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/review-manager/render-emails.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "wmkf_potentialreviewerses",
-      "count": 1
-    },
-    {
       "file": "pages/api/review-manager/reviewers.js",
       "kind": "import",
       "clientMethod": "DynamicsService.getRecord",
