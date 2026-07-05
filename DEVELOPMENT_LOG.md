@@ -10,6 +10,18 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — DAL security-complete: prod enforcement live, gate hardened to real law, harness enforcement hooks (Session 330)
+
+**Milestone:** `DATAVERSE_DAL_ENFORCEMENT=on` shipped to production (Vercel env + redeploy, `reviews.wmkeck.org`) after the last security gaps closed the same session: the S329 email-write High (3 asserts + tests, Codex pass-with-findings), and a Codex adversarial review of the Stage 8 gate itself (verdict "not sound as load-bearing law yet" — 3 Highs: ordinary JS indirection escaped the census) fixed via a sanctioned-reference audit designed through a 5-round Codex iteration to SATISFIED.
+**Sessions:** 330.
+**Ship state:**
+- Enforcement active in ALL environments; runtime logs clean post-flip; all 10 production email call sites caller-verified in trusted contexts before the flip.
+- Gate outlaws indirection (re-exports, destructured/bound methods, client pass-through, inline/dynamic requires → `unattributable-use:*` law violations); 16 new red fixture classes; live burn-down zero.
+- Plan/review enforcement hook layer (Codex-built from the S330 P0 coverage-miss post-mortem): assumption-count leakage, plan-names-unread-sources, same-session doc staleness (Stop-blocking), untraced discovery delegation — all blockers with visible in-artifact escapes; two live catches same day.
+- Route→Service consolidation plan authored, P0-approved (3 Codex rounds, final zero live-state errors), `status: active`, unexecuted.
+**Why it matters:** the DAL trust boundary is now enforced where it counts (prod) and the gate that guards it can no longer be evaded by accident; planning failures that caused the P0 misses are now mechanically blocked, not just remembered.
+**Pointers:** `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` stage log; `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md`; `.claude/hooks/lib/document-guards.js`; commits `fff391bb`…`4ef83c77`.
+
 ## July 2026 — Dataverse data-access layer: all 9 migration stages executed in one session (Session 329)
 
 **Milestone:** The entire staged Dataverse DAL migration — census, CI ratchet, core toolkit, ~80 caller-file conversions, restriction-context fold-in, and the gate becoming law — executed start-to-finish, one session, via parallel worktree agents (Codex + Opus + Sonnet) with serial Claude review/merge and Codex adversarial reviews at each phase boundary (plan NEEDS-REWORK → fixed; Stage 2, waves 3–6: not refuted).
@@ -17,10 +29,10 @@ The pre-Session 84 chronological per-session log (everything after the September
 **Ship state:**
 - `lib/dataverse/core/` (odata/entity-registry/errors/changeset/context) + 18 per-entity adapters; zero raw entity Dataverse calls outside the DAL and exempt power tools (census 211 identities → 12, all non-entity-transport).
 - `check:dataverse-access-layer` is LAW in CI: alias-aware, changeset-aware, unknown-method fail-closed; allowlist deleted.
-- Entity writes fail closed outside a trusted post-auth context under `DATAVERSE_DAL_ENFORCEMENT` (on outside prod; **prod flip pending owner deploy decision**). CLAUDE.md invariant updated.
+- Entity writes fail closed outside a trusted post-auth context under `DATAVERSE_DAL_ENFORCEMENT` (on outside prod; **prod flip pending owner deploy decision** — flipped Session 330). CLAUDE.md invariant updated.
 - Also: pricing-canary standing test red fixed (was masking CI `Tests` for 2+ sessions — the atlas red it hid is the cautionary tale).
 **Why it matters:** entity-name guessing, per-route SELECT/filter drift, and unwrapped writes are now structurally unrepresentable, not just policed after the fact.
-**Open:** post-impl Codex adversarial review of Stage 7 (completed 2026-07-05) found a High-severity gap — `createEmailActivity`/`addEmailAttachment`/`sendEmail` in `dynamics-service.js` reach the network with no `assertTrustedDalContext`, exempted by Stage 8's own gate as `non-entity-transport`. Fix before calling Stage 7/8 security-complete. (closed Session 330) Also open: mechanical strip of 79 legacy wrapper importers; prod enforcement flip.
+**Open:** post-impl Codex adversarial review of Stage 7 (completed 2026-07-05) found a High-severity gap — `createEmailActivity`/`addEmailAttachment`/`sendEmail` in `dynamics-service.js` reach the network with no `assertTrustedDalContext`, exempted by Stage 8's own gate as `non-entity-transport`. Fix before calling Stage 7/8 security-complete. (closed Session 330) Also open: mechanical strip of 79 legacy wrapper importers; prod enforcement flip (flipped Session 330 — strip is the sole remaining item).
 **Pointers:** `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` (stage log = full audit trail); merges `6b9ddc83`…`3cf4a506`.
 
 ## July 2026 — Reviewer pipeline browser-proven end-to-end; release flow hardened; thank-you automation (Session 328)

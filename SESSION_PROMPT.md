@@ -1,173 +1,151 @@
-# Session 330 Prompt: Close the Stage 7 email-write gap; decide prod DAL flip
+# Session 331 Prompt: Pick the next campaign — legacy bypass strip or Route→Service Stage 0
 
-## Session 329 Summary
+## Session 330 Summary
 
-Session 329 executed the ENTIRE staged Dataverse data-access-layer migration
-(Stages 0-8) in one session via parallel worktree agents (Codex + Opus +
-Sonnet builds, serial Claude review/merge), with Codex adversarial review at
-each phase boundary. The mid-session crash this session opened with (app
-`beforeQuit`/restart, 3 terminal PTYs killed) turned out to be a clean
-restart, not data loss — the crashed session's last subagent ("Stage 8:
-ratchet becomes law") had already completed and merged before the restart,
-and a background Codex review kicked off right after the restart (via the
-daemon, independent of the killed terminal PTYs) ran to completion
-unaffected. Full audit trail: `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`
-stage log (354-530ish). Milestone entry: `DEVELOPMENT_LOG.md` "July 2026 —
-... Session 329".
+Session 330 closed out the DAL campaign's security work end-to-end and stood up
+two new pieces of durable infrastructure. Everything below is committed and
+pushed (`fff391bb`…`4ef83c77` + close-out).
 
 ### What Was Completed
 
-1. **Plan hardening (pre-execution)** — second adversarial review (Codex)
-   refuted the original probe/gate design (2 P0 + 4 P1: aliased-writer blind
-   spots, `executeChangeset` raw-CRUD backdoor, Bulk Export subtree
-   unexempted, Stage 8 wording banned the adapters themselves, Wave 3 missed
-   answer-snapshot writes, Stage 7 auth-ordering risk). Plan amended in
-   place before any code changed.
+1. **S329 email-write High closed** — `createEmailActivity`/`addEmailAttachment`/
+   `sendEmail` now call `assertTrustedDalContext` first (all 10 production call
+   sites pre-verified inside trusted contexts); `grant-reporting/extract.js`
+   `tryLogAiRun` wrapped in `withDalContext` (was silently dropping audit rows
+   under dev/test enforcement); email + `withDynamicsContext` coverage added to
+   `tests/unit/dal-enforcement.test.js`. Codex re-review: pass-with-findings;
+   both findings (fetch-mock isolation, brittle census count) fixed. The Medium
+   "ALS-presence-only trust" finding is ACCEPTED until the legacy strip
+   (documented in the DAL plan stage log). `fff391bb`, `7bdebc76`.
 
-2. **Stages 0-1** — Babel-AST census gate (`scripts/check-dataverse-access-layer.js`,
-   alias-aware, changeset-attribution-aware) + allowlist ratchet (211 → 181
-   entries), CI-registered, self-tested (6 fixture kinds).
+2. **Stage 8 gate hardened to real law** — Codex adversarial review of
+   `scripts/check-dataverse-access-layer.js` found 3 Highs (ordinary JS
+   indirection produced zero census entries). Fix designed via 5-round Codex
+   iteration to SATISFIED, Codex-built, Claude-reviewed: sanctioned-reference
+   audit (`unattributable-use:*` on any recognized-binding use outside a
+   whitelist), `modules/` scanned, 16 red fixture classes, live burn-down zero.
+   `0d531098`.
 
-3. **Stage 2 + adapter wave** — `lib/dataverse/core/` toolkit (odata/
-   entity-registry/errors/changeset/context) + all 18 per-entity adapters
-   `[VERIFIED via ls lib/dataverse/adapters/ — 18 files]`, tests-first.
+3. **PROD `DATAVERSE_DAL_ENFORCEMENT` FLIPPED** — explicit `=on` in Vercel
+   production env + redeploy (aliased `reviews.wmkeck.org`). Runtime logs clean
+   post-flip; drain/health crons cycling 200s. Enforcement active in ALL
+   environments. Docs reconciled across every restatement. `4ef83c77`.
 
-4. **Stages 3-6 (bulk conversion)** — ~80 caller files converted across 7
-   parallel worktree clusters + 3 sequential tails; allowlist 181 → 12, all
-   12 non-entity-transport. Full suite 4163/4163 at wave close.
+4. **Route→Service consolidation plan authored and P0-APPROVED** —
+   `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md`, `status: active`, NOT executed.
+   3 adversarial P0 rounds (round 1: 1 live-state error + 7 changes; round 3:
+   SATISFIED, zero live-state errors). 49-route union, staged waves with named
+   micro-stages (2s streaming pilot = `generate-emails.js`; 2b =
+   `send-emails.js`), P1s/P1m secondary pilots, gate reuses the hardened
+   scanner primitives. `9f40a23b`…`54b66f33`.
 
-5. **Stage 7** — restriction context folds into the layer:
-   `withDalContext(scopeLabel, fn)` (thin wrapper over the existing
-   `bypassDynamicsRestrictions` ALS), entity CRUD + `executeChangeset` assert
-   a trusted context under `DATAVERSE_DAL_ENFORCEMENT` (unset = on outside
-   prod). CLAUDE.md invariant + wiki reconciled. **Prod flag flip is a
-   pending owner deploy decision.**
+5. **Plan/review enforcement hook layer** — Codex-built from the S330 P0
+   coverage-miss post-mortem, Claude-reviewed and tuned (codegraph counts as
+   read evidence; source-read guard is delta-scoped). Four mechanisms now
+   BLOCK with visible in-artifact escapes: assumption-count leakage
+   (`[DERIVED-FROM:]`), plan-names-unread-sources (`[NOT-READ:]`),
+   same-session doc staleness (`[RECHECKED after…]`/`[STALE-ACCEPTED:]`,
+   Stop-blocking), untraced discovery delegation (`[DELEGATED-DISCOVERY:]`).
+   Shared detectors + plain-node tests in `.claude/hooks/lib/document-guards.js`.
+   Two live catches on day one. `cc004a95`, `9a633ddd` (+ owner-side
+   `be83243e`, `05422a74` codex-rescue routing guards).
 
-6. **Stage 8** — gate becomes law: allowlist file DELETED, gate fails on any
-   identity not in the closed `non-entity-transport` method set, unknown
-   method names fail closed. Suite 4181/4181, build clean.
+6. **Codex plugin job-tracking bugs researched and recorded** — lost/zombie
+   jobs root-caused to plugin #432/#428/#412 + upstream console indexing;
+   operating rules in `.claude-memory/reference-codex-plugin-job-tracking-bugs.md`
+   (foreground-only rescue runs, no daemon queries mid-job, `--fresh` for
+   writes, paste-ready prompts for owner console visibility). `db923c2e`.
 
-7. **Codex post-impl review of Stage 7 (this session, 2026-07-05) — COMPLETED,
-   verdict "needs changes."** See Verified Open #1 below — this is the one
-   real open item from the whole migration.
-
-8. **Docs reconciled this session**: `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`
-   stage log, `DEVELOPMENT_LOG.md` Session-329 "Open" line, and
-   `docs/agent-wiki/topics/dataverse-dynamics.md` (both the fail-closed
-   ground-rule claim and the stale "9 adapters" operating note) all updated
-   to reflect the Codex finding — none of them mentioned it before this
-   close-out, `npm run check:agent-wiki` green after.
-
-### Commits (Stage 7 → close-out; see plan doc for the full Stage 0-6 list)
-
-- `59c38843` Merge Stage 7: DAL restriction fold-in
-- `23ac6171` docs(data-layer): Stage 7 reconciliation
-- `21fc7e66` feat(data-layer): Stage 8 — ratchet becomes law, allowlist deleted
-- `3cf4a506` Merge Stage 8
-- `41edacd9` docs(data-layer): Stage 8 close-out
-
-(This session's doc-reconciliation edits are uncommitted as of this
-handoff — see Step 2 below, commit them before anything else.)
+### Commits
+`fff391bb`, `7bdebc76`, `9f40a23b`, `0d531098`, `db923c2e`, `eb383fde`,
+`157327b3`, `27a20134`, `54b66f33`, `cc004a95`, `be83243e`, `05422a74`,
+`9a633ddd`, `4ef83c77`, plus this close-out.
 
 ## Next Items
 
 ### Verified Open
 
-1. **Fix the Stage 7 email-write enforcement gap (Codex finding, High
-   severity).**
-   Evidence: `[VERIFIED via lib/services/dynamics-service.js:1231,1302,1337]`
-   — `createEmailActivity`, `addEmailAttachment`, `sendEmail` perform
-   Dataverse POST/action calls with no `assertTrustedDalContext`.
-   `[VERIFIED via scripts/check-dataverse-access-layer.js:66]` — these 3
-   method names (+ `logAiRun`) are the closed `non-entity-transport` exempt
-   set, so the law-mode gate stays green while these paths are unguarded raw
-   writes. Fix: add `assertTrustedDalContext` calls to these 3 methods (or
-   decide/document why email-send is intentionally exempt from the DAL trust
-   boundary — but that contradicts the Stage 7/8 "entity-changing network
-   paths are fail-closed" framing already asserted in CLAUDE.md and the
-   wiki). Do this BEFORE flipping `DATAVERSE_DAL_ENFORCEMENT` in prod or
-   calling Stage 7/8 security-complete.
+1. **Legacy `bypassDynamicsRestrictions` strip** (the DAL campaign's sole
+   remaining item). Evidence: `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`
+   open-items header `[VERIFIED 2026-07-04]`; census command there (81 files on
+   2026-07-04 — recount at start). Owner decisions already made 2026-07-04:
+   in-campaign, sequenced AFTER the prod flip (now done), ends with trust-model
+   tightening so `assertTrustedDalContext` can distinguish DAL-established
+   contexts. Good parallel-worktree batch job; touching the 49 Route→Service
+   in-scope routes twice is wasteful — see Owner Decision 1 below.
 
-2. **Medium-severity Codex findings, same review — lower priority, owner call
-   needed on each:**
-   - "Trusted context" is ALS-presence only, not proof of post-auth
-     establishment (`context.js:46,66`; `dynamics-context.js:140`) — no
-     concrete exploit found, but the trust model can't distinguish a
-     caller-owned post-auth wrap from an arbitrary legacy-bypass context.
-   - `pages/api/grant-reporting/extract.js:590` calls `DynamicsService.logAiRun`
-     with no DAL context; if enforcement flips on in prod, this audit write
-     throws and is silently swallowed at `:600` (non-fatal by design, but
-     worth deciding if audit-loss-on-flip is acceptable).
-   - `tests/unit/dal-enforcement.test.js:87` doesn't cover the email helpers
-     or `withDynamicsContext` as a write-trusted context — add coverage
-     alongside the fix in #1.
+2. **Route→Service consolidation Stage 0** (census gate + test inventory, no
+   prod code). Evidence: plan `status: active`, P0 round 3 SATISFIED
+   `[VERIFIED via docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md stage log]`.
+   Pre-stage re-probe of all baseline counts is mandatory per the plan.
 
-3. **Commit this session's doc-reconciliation edits** (uncommitted at
-   handoff): `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`, `DEVELOPMENT_LOG.md`,
-   `docs/agent-wiki/topics/dataverse-dynamics.md`. `npm run check:agent-wiki`
-   already verified green.
+3. **`(node:4)` warning on `pages/api/cron/drain-submissions`** — error-level
+   log line on an otherwise-200 cron, observed post-flip 2026-07-04 (predates
+   nothing DAL — cron succeeds and also logs clean cycles). Evidence: vercel
+   runtime logs, deployment `wmkfresearchapps-k4pzrfhkv`. Low priority; read
+   the full warning text via `vercel logs` when convenient.
 
 ### Owner Decision Needed
 
-1. **Prod `DATAVERSE_DAL_ENFORCEMENT` flip.** Evidence: unset = on outside
-   production; prod itself needs an explicit flip. Should wait until
-   Verified Open #1 (email-write gap) is closed — flipping now would still
-   leave email sends unguarded, just with the rest of entity CRUD enforced.
-
-2. **Mechanical strip of the remaining legacy `bypassDynamicsRestrictions`
-   importers** (plan doc's Stage 7 entry counted 79 post-merge; a fresh
-   `grep`-based recount just now landed in the low-80s depending on method,
-   so treat the exact count as [ASSUMED stale] and recount before scoping —
-   direction is unchanged) — functionally correct as-is (legacy wrapper IS a
-   trusted context), purely a follow-up cleanup pass. Schedule whenever, no
-   urgency.
-
-3. **Session 328 items not yet revisited this session** — thank-you cron
-   proof + rehearsal cleanup, owner browser spot-check of the release flow.
-   Not re-verified this session; check `.claude-memory/` and a fresh probe
-   before assuming still-open (durable-carryover rule) — see prior
-   SESSION_PROMPT history for detail if picking these back up.
+1. **Which campaign runs next session — strip first or Route→Service Stage 0/1
+   first?** They overlap: converting a route to a service shell replaces its
+   bypass wrapper anyway (plan Decision 4), so strip-first does ~49 of its 81
+   files twice. Recommendation on file: run Route→Service waves first, let them
+   absorb the route-side strip for free, then a smaller mechanical strip pass
+   (lib/ + scripts/ remainder) closes the DAL campaign and unlocks trust
+   tightening.
 
 ### Parked
 
-1. **Spec-audit docs recovery** (work computer only, ~2026-07-08).
+1. **Spec-audit design-docs recovery** (work computer only, ~2026-07-08).
    Evidence: `.claude-memory/project-spec-audit-docs-recovery-parked.md`.
 
 ### Verify Before Acting
 
-1. **Do not assume "entity writes are fail-closed" covers email sends** —
-   the wiki now flags this explicitly (`docs/agent-wiki/topics/dataverse-dynamics.md`),
-   but if anyone quotes the older CLAUDE.md/Stage-7-reconciliation wording
-   in isolation it reads as full coverage. It is not, until Verified Open #1
-   ships.
+1. **Session 328 carryover: thank-you cron proof + rehearsal cleanup; owner
+   browser spot-check of the release flow.** Not re-verified in S329 or S330.
+   Check `.claude-memory/` + a fresh probe before treating as open work.
+   (Post-flip log window showed `drain-submissions`/`drain-reviewer-acceptances`/
+   `health-check` cycling 200; `send-review-thankyous` did NOT appear in that
+   window — its schedule/proof status is unverified this session.)
+2. **Prod DAL enforcement watch.** Initial post-flip logs clean, but only
+   ~30 min of traffic observed. Early next session: grep runtime logs for
+   `no trusted Dataverse context` before starting new work on this surface.
 
 ### Do Not Reopen Without New Decision
 
-1. **Do not re-add CodeQL** (`180e9046`, `198fbd97`).
-2. **Do not delete `lib/services/anthropic-admin.js`** (pricing cron imports).
-3. **Client-side export remains the decision** until a Power Automate flow
+1. **ALS-presence trust model** — accepted until the legacy strip completes
+   (DAL plan stage log, 2026-07-04). Tightening early breaks legacy importers.
+2. **Email methods stay in the gate's `non-entity-transport` exempt set** —
+   intentional; they are runtime-guarded since `fff391bb`, and the exemption is
+   census taxonomy, not a security hole (Codex-verified twice).
+3. **Do not re-add CodeQL** (`180e9046`, `198fbd97`).
+4. **Do not delete `lib/services/anthropic-admin.js`** (pricing cron imports).
+5. **Client-side export remains the decision** until a Power Automate flow
    exists (`docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md` decision 4).
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` | Full 9-stage plan + stage log (complete audit trail, incl. the Codex finding). |
-| `lib/services/dynamics-service.js` | `createEmailActivity`/`addEmailAttachment`/`sendEmail` — the unguarded methods to fix. |
-| `scripts/check-dataverse-access-layer.js` | Law-mode gate; `NON_ENTITY_TRANSPORT_METHODS` closed list (line ~66). |
-| `lib/dataverse/core/context.js` | `withDalContext`, `hasTrustedDalContext`. |
-| `lib/services/dynamics-context.js` | `isDalEnforcementOn`, `assertTrustedDalContext`. |
-| `tests/unit/dal-enforcement.test.js` | Fail-closed test suite — needs email-helper coverage added. |
-| `docs/agent-wiki/topics/dataverse-dynamics.md` | Reconciled this session with the email-write gap. |
+| `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` | DAL campaign audit trail; open-items header lists the strip as sole remainder. |
+| `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md` | Next campaign, P0-approved; Stage 0 is the entry point. |
+| `scripts/check-dataverse-access-layer.js` | Law gate with sanctioned-reference audit — reuse its primitives for the new route gate. |
+| `.claude/hooks/lib/document-guards.js` | Shared detectors for the enforcement hook layer (+ plain-node tests beside it). |
+| `.claude-memory/reference-codex-plugin-job-tracking-bugs.md` | Codex delegation operating rules (foreground-only, no mid-job daemon queries, --fresh for writes). |
+| `.claude-memory/feedback-plan-contracts-read-the-extremes.md` | Plan-authoring guards behind the new hooks. |
 
 ## Testing
 
 ```bash
-# Gates for this surface
+# Gates for the surfaces touched this session
 npm run check:dataverse-access-layer && npm run check:dataverse-access-layer:self-test
-npm run check:agent-wiki
+node .claude/hooks/lib/document-guards.test.js && node .claude/hooks/hook-enforcement.test.js
 npx jest tests/unit/dal-enforcement.test.js
 
-# Full suite (was 4181/4181 at Stage 8 close; pricing-canary was fixed in S329, no longer a known-red)
+# Full suite (4188/4188 at close)
 npm test
+
+# Prod enforcement watch
+vercel logs <latest-prod-deployment-url> | grep -i "trusted Dataverse"
 ```
