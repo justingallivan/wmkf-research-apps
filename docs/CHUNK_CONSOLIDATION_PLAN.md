@@ -2,8 +2,8 @@
 title: Array-Chunk Consolidation Plan
 domain: architecture
 kind: plan
-status: draft
-summary: "Consolidate hand-rolled array-chunking loops onto lib/utils/chunk.js: 17 mechanical swaps, 4 index-using left with comment, 1 sibling leave. Draft."
+status: active
+summary: "Consolidate array-chunking loops onto lib/utils/chunk.js: 17 mechanical swaps, 4 index-using left with comment, 1 sibling leave. Stages 0-2 complete."
 canonical: true
 cataloged: 2026-07-05
 owner: product-engineering
@@ -16,10 +16,26 @@ related:
 
 # Array-Chunk Consolidation Plan
 
-**Execution status: DRAFT — not yet executed, not yet reviewed.** The docs-catalog frontmatter
-`status` enum has no "completed" value; this stays `draft` until execution, then follows the
-`ODATA_ESCAPE_CONSOLIDATION_PLAN` precedent (a body line records completion, frontmatter moves to a
-live enum value). See the Stage Log for probes/counts.
+**Execution status: STAGES 0-2 COMPLETE (2026-07-05).** The docs-catalog frontmatter `status` enum
+has no "completed" value; per the `ODATA_ESCAPE_CONSOLIDATION_PLAN` precedent this body line records
+completion and frontmatter moved from `draft` to the live enum value `active`. Stage 3 (the optional
+chunk-loop lint/gate law) remains an OWNER DECISION and was not built. See the Stage Log for
+probes/counts.
+
+Staleness rechecks — the file mentions below changed BECAUSE this plan was executed (commits
+`a8cc2a9a..6b99ae0f`); each site now matches its Classification ruling:
+[RECHECKED after lib/dataverse/adapters/review-answer.js change: site 1 mechanical swap, commit 3cd9e858]
+[RECHECKED after lib/dataverse/adapters/reviewer-suggestion.js change: sites 2-4 mechanical swaps, commit 3cd9e858]
+[RECHECKED after lib/services/reviewer-rollup.js change: site 5 mechanical swap, commit 5009b2c1]
+[RECHECKED after lib/services/reviewer-suggestion-sweep.js change: site 6 mechanical swap, commit 5009b2c1]
+[RECHECKED after lib/services/review-manager/synthesize-reviews-service.js change: sites 7-8 mechanical swaps, commit 5009b2c1]
+[RECHECKED after lib/services/review-manager/reviewers-service.js change: sites 9-10 mechanical swaps, commit 5009b2c1]
+[RECHECKED after lib/services/discovery-service.js change: site 11 mechanical swap (commit 5009b2c1) + B4 index-using comment (commit 6b99ae0f)]
+[RECHECKED after lib/services/reviewer-finder/contact-history-service.js change: site 12 mechanical swap, commit a368a088]
+[RECHECKED after lib/services/reviewer-finder/my-candidates-service.js change: sites 13-15 mechanical swaps, commit a368a088]
+[RECHECKED after lib/services/reviewer-finder/my-proposals-service.js change: site 16 mechanical swap, commit a368a088]
+[RECHECKED after lib/services/pubmed-service.js change: B1 index-using comment only, commit 6b99ae0f]
+[RECHECKED after lib/services/claude-reviewer-service.js change: B2 index-using comment only, commit 6b99ae0f]
 
 **Objective.** Many files hand-roll the same array-chunking idiom —
 `for (let i = 0; i < arr.length; i += N) { const chunk = arr.slice(i, i + N); … }` — to bound
@@ -433,5 +449,50 @@ flagged, registered everywhere the other gates are; if declined — record the d
   MECHANICAL bodies are clean of indirect counter reads and source mutation; all live size inputs are
   positive constants (discovery `4`, evaluate route `2`, COI loop `5` or `2`); the dynamics-explorer
   exempt-dir rejection is correct (DAL-gate scoped). Amendments committed; execution may start.
+- 2026-07-05: **Stages 0-2 executed (Sonnet, this session).** Pre-execution census re-run
+  (both the `i`-only and any-identifier disconfirming greps) matched the plan's 22-site/14-file
+  list exactly — no drift.
+  - **Stage 0** (commit `a8cc2a9a`): created `lib/utils/chunk.js` exactly per "The canonical
+    semantics"; added `tests/unit/utils/chunk.test.js` (partial tail, empty, size>array, exact
+    multiple + no-mutation, non-array → TypeError ×4, non-positive-integer size → RangeError ×5,
+    CJS `require` + ESM `import` interop) — 15 tests, all green pre-swap. Strengthened the two
+    PARTIAL pins (`reviewer-rollup.test.js`, `my-proposals-service.test.js`) to assert exact
+    batch contents/order via `mock.calls` (not just call counts). Resolved both VERIFY rows by
+    reading the tests first: `reviewer-suggestion-review-history.test.js` had no split test (only
+    2 ids) → added one; `contact-history-service.test.js` had a call-count-only split test →
+    strengthened to contents/order. Added a new contents/order chunk-boundary pin for every
+    remaining GAP row: `findByPD`/`findAcceptedByPD` (in
+    `adapter-characterization-stage2.test.js`), `reviewer-suggestion-sweep.test.js`,
+    `synthesize-reviews-service.test.js` (both `fetchPersonNames` CHUNK=25 and
+    `fetchAnswerTextsBySuggestion` CHUNK=20), `reviewers-service.test.js` (both
+    `fetchPotentialReviewers`/`fetchResearchersByPerson`, disambiguated by `select` since the two
+    loops interleave under `Promise.all`), `my-candidates-service.test.js` (person-id pin +
+    account-id pin covering all three of its chunked helpers), `discovery-openalex-publications.test.js`
+    (`backfillOpenAlexPublications` concurrency-batch pin), and a new
+    `tests/unit/evaluate-multi-perspective-concurrency.test.js` (required exporting
+    `processWithConcurrency`, previously module-local — no behavior change). Full suite green at
+    **414 suites / 4680 tests** pre-swap baseline (measured via a disposable `git worktree` at the
+    pre-Stage-0 commit) vs **416 suites / 4707 tests** after Stage 0 (2 new suites, 27 new tests;
+    every pre-existing test still passing).
+  - **Stage 1** (commits `3cd9e858` Cluster A, `5009b2c1` Cluster B, `a368a088` Cluster C,
+    `a8366c40` Cluster D): all 17 MECHANICAL sites swapped onto `for (const VAR of chunked(COLL,
+    SIZE))` per Architecture Decision 3 (`chunked` alias), scaffold-only, every loop body
+    byte-preserved — including `discovery-service.js`'s CJS `require` form and its abort-check
+    body quirk (kept as the loop's first statement, still short-circuits before the batch is
+    processed). Post-Cluster-B raw-node probe `node -e "require('./lib/services/discovery-service.js')"`
+    loaded clean. Per-cluster: Stage 0 pins stayed green, `check:dataverse-access-layer` (+
+    `:self-test`) green after every cluster, and Cluster D additionally ran
+    `check:route-service-boundary` (+ `:self-test`) green. Post-Stage-1 re-census confirmed only
+    the canonical helper's own loop, the 2 plain `i += 1` loops, B1-B4, and C1 remain as
+    `for (i +=` scaffolds repo-wide — all 17 mechanical scaffolds gone. Full suite green at
+    416/4707 (unchanged from post-Stage-0, as expected for a scaffold-only swap).
+  - **Stage 2** (commit `6b99ae0f`): added the exact-wording citing comments at B1
+    (`pubmed-service.js:166`), B2 (`claude-reviewer-service.js:425`), B3 (`chat.js:2150`), B4
+    (`discovery-service.js:2269`), and the sibling-cohesion comment at C1 (`chat.js:2165`).
+    Comment-only; full suite unchanged at 416/4707.
+  - **Close**: `npm run generate:docs-catalog` + `npm run check:docs-catalog` both clean (196
+    top-level docs cataloged). Full suite green at close: **416 suites / 4707 tests** — no
+    regression, no STOP condition hit, no deviation from the plan. Stage 3 (chunk-loop lint/gate
+    law) remains an OWNER DECISION and was NOT built this session.
 
 <!-- end of plan -->

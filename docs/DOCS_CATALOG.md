@@ -35,12 +35,13 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [CHUNK_CONSOLIDATION_PLAN.md](CHUNK_CONSOLIDATION_PLAN.md) | plan | draft | yes | Consolidate hand-rolled array-chunking loops onto lib/utils/chunk.js: 17 mechanical swaps, 4 index-using left with comment, 1 sibling leave. Draft. | 2026-07-05 |
+| [CHUNK_CONSOLIDATION_PLAN.md](CHUNK_CONSOLIDATION_PLAN.md) | plan | active | yes | Consolidate array-chunking loops onto lib/utils/chunk.js: 17 mechanical swaps, 4 index-using left with comment, 1 sibling leave. Stages 0-2 complete. | 2026-07-05 |
 | [DIAGRAM_BEHAVIORAL_FLOW.md](DIAGRAM_BEHAVIORAL_FLOW.md) | spec | active |  | This sequence diagram traces a concrete execution path (e.g., /api/process-phase-i), showing how services interact during an AI analysis task. | 2026-07-02 |
 | [DIAGRAM_DATA_ENGINE.md](DIAGRAM_DATA_ENGINE.md) | spec | active |  | This pipeline visualization focuses on the internal data complexities, specifically the OData parser and identity merging required for Dataverse. | 2026-07-02 |
 | [DIAGRAM_SECURITY_FORTRESS.md](DIAGRAM_SECURITY_FORTRESS.md) | spec | active |  | This flowchart demonstrates the \"Fail-Closed\" security architecture mandated by the project guidelines, highlighting the specific restriction... | 2026-07-02 |
 | [DIAGRAM_SYSTEM_LANDSCAPE.md](DIAGRAM_SYSTEM_LANDSCAPE.md) | spec | active |  | This diagram illustrates the Next.js API acting as the central orchestration layer between the Microsoft ecosystem, external academic/government... | 2026-07-02 |
 | [EXTERNAL_REVIEWER_INTAKE_PLAN.md](EXTERNAL_REVIEWER_INTAKE_PLAN.md) | plan | active |  | Related docs: - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md — file storage model (Connor-shareable) - Memory:... | 2026-07-02 |
+| [GATE_SCRIPT_CONSOLIDATION_PLAN.md](GATE_SCRIPT_CONSOLIDATION_PLAN.md) | plan | draft | yes | Consolidate CI-gate scaffolds onto selftest-fixture.js (19 self-tests) and walk-files.js (6 markdown gates); byte-identical census bar. Draft. | 2026-07-05 |
 | [GRANT_CYCLE_LIFECYCLE.md](GRANT_CYCLE_LIFECYCLE.md) | source-of-truth | canonical | yes | Status: Mixed — some AI fields and post-approval flows are live; PA-orchestrated flows are still pending. See \"What's live now (2026-05-08)\" below. | 2026-07-02 |
 | [GROUP_B_WRITEUP_SPINE_DESIGN.md](GROUP_B_WRITEUP_SPINE_DESIGN.md) | spec | active |  | Audience: Justin + Connor Status: Design — not yet built; pending Connor's input on Dataverse schema and PA flow Date: 2026-06-16. | 2026-07-02 |
 | [NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md](NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md) | source-of-truth | canonical | yes | History left three *different* kinds of legacy naming, and they look alike until you trace callers:. | 2026-07-02 |

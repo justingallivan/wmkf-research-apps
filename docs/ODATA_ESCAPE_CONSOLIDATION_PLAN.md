@@ -403,6 +403,8 @@ everywhere the other gates are; if declined — record the decision in the Stage
     - [RECHECKED after lib/external/review-answer-snapshot.js change: ESM mechanical swap, existing pin green]
     - [RECHECKED after lib/services/grant-cycles-dataverse.js change: D1 encodeURIComponent(odata.escape) per ruling, full-URL pin green]
     - [RECHECKED after lib/services/reviewer-finder/contact-history-service.js change: D2 eqGuid per ruling, rejection pin replaces quote-escape test]
+    - [RECHECKED after lib/dataverse/adapters/review-answer.js change: chunk-scaffold swap only (CHUNK_CONSOLIDATION_PLAN commit 3cd9e858); this plan's escape claims about the file are unaffected]
+    - [RECHECKED after lib/dataverse/adapters/reviewer-suggestion.js change: chunk-scaffold swaps only (commit 3cd9e858); the odata.escape usage this plan cites is untouched]
 - 2026-07-05 (S331): **Closing code review (Codex, fresh-context, range `5477a226..629d67e4`):
   PASS-WITH-FINDINGS — exercise CLOSED.** Reviewer's verdict verbatim: *"No further OData escape
   review round is needed; the consolidation exercise can close. The one finding is an
