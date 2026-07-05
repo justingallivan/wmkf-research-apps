@@ -16,7 +16,7 @@
  *   4. server-sanitize every rich-text answer (the write is the security boundary,
  *      not render), then validateReviewSubmission against the CURRENT schema.
  *   5. buildReviewSubmission → { parentPatch, answerRows } (the single producer).
- *   6. ATOMIC write via DynamicsService.executeChangeset: upsert the N answer rows
+ *   6. ATOMIC write via the DAL/core changeset helper (runChangeset): upsert the N answer rows
  *      by the (suggestion, questionkey) alternate key + PATCH the parent
  *      (affiliation, 3 ratings, receivedat) guarded by If-Match. All-or-nothing.
  *   7. ONLY after the changeset commits: delete the Postgres draft (best-effort —
@@ -36,16 +36,17 @@
 
 import { verifySuggestionToken, tokenHasOp } from '../../../../../lib/external/verify-suggestion-token';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
-import { DynamicsService } from '../../../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
 import ReviewDraftService from '../../../../../lib/services/review-draft-service';
 import { computeEngagementState } from '../../../../../lib/external/review-engagement-state';
 import { getActiveQuestionSet, questionSetVersion } from '../../../../../lib/external/review-question-fetcher';
 import { sanitizeReviewHtml } from '../../../../../lib/external/sanitize-review-html';
 import { validateReviewSubmission, buildReviewSubmission } from '../../../../../lib/external/build-review-submission';
-import { answerRowUrl, answerRowBody } from '../../../../../lib/external/review-answer-snapshot';
+import { getForSubmitFinalityCheck, ENTITY_SET_NAME as SUGGESTION_ENTITY_SET } from '../../../../../lib/dataverse/adapters/reviewer-suggestion';
+import { answerUpsertDescriptor } from '../../../../../lib/dataverse/adapters/review-answer';
+import { runChangeset, atomicParentWithChildren } from '../../../../../lib/dataverse/core/changeset';
 
-const PARENT_ENTITY_SET = 'wmkf_appreviewersuggestions';
+const PARENT_ENTITY_SET = SUGGESTION_ENTITY_SET;
 const REVIEW_RECEIVED_LOCKED_MESSAGE =
   'This review has already been submitted. To make a change, please contact your Program Director.';
 
@@ -171,9 +172,7 @@ export default async function handler(req, res) {
           // racing submit that committed between our verify and this re-read
           // would hand us a fresh (non-stale) etag whose If-Match then PASSES,
           // letting us overwrite the already-submitted review (Codex S302 P1b).
-          const fresh = await DynamicsService.getRecord(PARENT_ENTITY_SET, suggestionId, {
-            select: 'wmkf_appreviewersuggestionid,wmkf_reviewreceivedat',
-          });
+          const fresh = await getForSubmitFinalityCheck(suggestionId);
           if (fresh?.wmkf_reviewreceivedat) {
             const err = new Error('Review was submitted concurrently');
             err.code = 'ALREADY_SUBMITTED';
@@ -187,19 +186,15 @@ export default async function handler(req, res) {
           throw err;
         }
 
-        const answerEntitySet = await DynamicsService.resolveEntitySetName('wmkf_appreviewanswer');
-        const operations = answerRows.map((row) => ({
+        const children = answerRows.map((row) => answerUpsertDescriptor(suggestionId, row, snapshotKeys));
+        const parent = {
           method: 'PATCH',
-          url: answerRowUrl(answerEntitySet, suggestionId, row.questionKey, snapshotKeys),
-          body: answerRowBody(row),
-        }));
-        operations.push({
-          method: 'PATCH',
-          url: `${PARENT_ENTITY_SET}(${suggestionId})`,
+          entitySet: PARENT_ENTITY_SET,
+          key: suggestionId,
           body: parentPatch,
           ifMatch: parentEtag,
-        });
-        await DynamicsService.executeChangeset(operations);
+        };
+        await runChangeset(atomicParentWithChildren({ parent, children }));
       });
     } catch (e) {
       // ALREADY_SUBMITTED = a racing submit committed before ours (caught by the
