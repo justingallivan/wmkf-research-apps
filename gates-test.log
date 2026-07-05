@@ -1,0 +1,7 @@
+> node scripts/check-harness-framing-self-test.js
+  ok   clean active files pass and rationale sidecar is ignored
+  ok   self-focused skill framing fails
+  ok   emitted hook failure framing fails but comment alone would not
+  ok   self-focused wiki topic framing fails
+  ok   backup archive is ignored
+harness-framing self-test OK — active/rationale/backup fixtures behaved as expected.
