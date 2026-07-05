@@ -15,7 +15,6 @@
  */
 
 import { verifySuggestionToken } from '../../../../../lib/external/verify-suggestion-token';
-import { DynamicsService } from '../../../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
 import { listReviewerMaterials } from '../../../../../lib/external/reviewer-materials';
 import { getActivePolicies } from '../../../../../lib/external/policy-fetcher';
@@ -26,6 +25,7 @@ import { computeEngagementState } from '../../../../../lib/external/review-engag
 import { getActiveQuestionSet, questionSetVersion } from '../../../../../lib/external/review-question-fetcher';
 import { readRatingsBySuggestion } from '../../../../../lib/external/review-answer-snapshot';
 import { getForEtagRefresh, stampProposalFirstAccessed } from '../../../../../lib/dataverse/adapters/reviewer-suggestion';
+import { getByIdWithSelect as getContactByIdWithSelect } from '../../../../../lib/dataverse/adapters/contact';
 
 // Slots Stage 2a renders. Hardcoded per build plan §4a.
 const STAGE_2A_POLICY_SLOTS = ['reviewer-coi', 'reviewer-ai-use'];
@@ -172,17 +172,15 @@ export default async function handler(req, res) {
       if (contactId) {
         try {
           contactPrefill = await bypassDynamicsRestrictions('external-context-contact', () =>
-            DynamicsService.getRecord('contacts', contactId, {
-              select: [
-                'firstname', 'lastname', 'nickname', 'jobtitle', 'emailaddress1',
-                'wmkf_orcid', 'adx_organizationname', '_parentcustomerid_value',
-                // Payment mailing address — prefills the Stage 2a address card
-                // (chunk 5). Only populated when the reviewer is already a
-                // promoted contact; new reviewers type it fresh.
-                'address1_line1', 'address1_line2', 'address1_city',
-                'address1_stateorprovince', 'address1_postalcode', 'address1_country',
-              ].join(','),
-            }),
+            getContactByIdWithSelect(contactId, [
+              'firstname', 'lastname', 'nickname', 'jobtitle', 'emailaddress1',
+              'wmkf_orcid', 'adx_organizationname', '_parentcustomerid_value',
+              // Payment mailing address — prefills the Stage 2a address card
+              // (chunk 5). Only populated when the reviewer is already a
+              // promoted contact; new reviewers type it fresh.
+              'address1_line1', 'address1_line2', 'address1_city',
+              'address1_stateorprovince', 'address1_postalcode', 'address1_country',
+            ]),
           );
         } catch (e) {
           console.error('[external context] contact lookup failed:', e.message);
