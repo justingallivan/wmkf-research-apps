@@ -330,6 +330,41 @@ describe('/api/external/review/[token]/context', () => {
     expect(readRatingsBySuggestion).toHaveBeenCalledWith('suggestion-1');
     expect(res._data.prefill).toMatchObject({ impact: 4, risk: 2, overallRating: 5 });
   });
+
+  it('stage2a with a promoted-contact reviewer looks up the contact with the prefill select (contact.getByIdWithSelect passthrough)', async () => {
+    verifySuggestionToken.mockResolvedValue({
+      ...verifiedSuggestion,
+      suggestion: {
+        ...verifiedSuggestion.suggestion,
+        wmkf_accepted: false,
+        wmkf_declined: false,
+        wmkf_reviewstatus: null,
+        wmkf_reviewreceivedat: null,
+      },
+      reviewer: { ...verifiedSuggestion.reviewer, _wmkf_contact_value: 'contact-1' },
+    });
+    getRequestSharePointBuckets.mockResolvedValue([]);
+    DynamicsService.getRecord.mockImplementation(async (entitySet) => {
+      if (entitySet === 'contacts') {
+        return { contactid: 'contact-1', firstname: 'Jane', lastname: 'Doe' };
+      }
+      return { wmkf_appreviewersuggestionid: 'suggestion-1', _etag: 'W/"1001"' };
+    });
+
+    const req = createMockReq({ method: 'GET', query: { token: 'good-token' } });
+    const res = createMockRes();
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(DynamicsService.getRecord).toHaveBeenCalledWith('contacts', 'contact-1', {
+      select: [
+        'firstname', 'lastname', 'nickname', 'jobtitle', 'emailaddress1',
+        'wmkf_orcid', 'adx_organizationname', '_parentcustomerid_value',
+        'address1_line1', 'address1_line2', 'address1_city',
+        'address1_stateorprovince', 'address1_postalcode', 'address1_country',
+      ].join(','),
+    });
+  });
 });
 
 describe('/api/external/review/[token]/proposal', () => {
