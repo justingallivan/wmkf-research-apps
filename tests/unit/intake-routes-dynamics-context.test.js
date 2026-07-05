@@ -240,7 +240,7 @@ describe('test-email endpoint is wrapped', () => {
   });
 });
 
-describe('drain duplicate-PK recovery wraps DynamicsService.getRecord', () => {
+describe('drain duplicate-PK recovery wraps the request read', () => {
   test('source wraps the recovery read in bypassDynamicsRestrictions', () => {
     const fs = require('fs');
     const path = require('path');
@@ -248,10 +248,13 @@ describe('drain duplicate-PK recovery wraps DynamicsService.getRecord', () => {
       path.join(__dirname, '../../pages/api/cron/drain-submissions.js'),
       'utf8'
     );
-    // The wrapper must lexically enclose DynamicsService.getRecord, not just
-    // appear somewhere in the file with the right label.
+    // The wrapper must lexically enclose the request read, not just appear
+    // somewhere in the file with the right label. The read now goes through
+    // grantRequestAdapter.getById (data-access-layer migration tail-2B) — that
+    // adapter itself still calls DynamicsService.getRecord, so the
+    // restriction-context invariant is preserved one call deeper.
     expect(src).toMatch(
-      /bypassDynamicsRestrictions\(\s*['"]drain-recover-request-created['"][^]*?DynamicsService\.getRecord\s*\(/
+      /bypassDynamicsRestrictions\(\s*['"]drain-recover-request-created['"][^]*?grantRequestAdapter\.getById\s*\(/
     );
   });
 });
