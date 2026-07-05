@@ -16,6 +16,7 @@
  */
 
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import MaintenanceService from '../../../lib/services/maintenance-service';
 import ReviewDraftService from '../../../lib/services/review-draft-service';
 import AlertService from '../../../lib/services/alert-service';
@@ -106,7 +107,13 @@ export default async function handler(req, res) {
     //      a Dynamics blip after the BILL side succeeded. Idempotent; fails closed
     //      on a malformed (pending_match NULL) marker. See docs/BILL_CHUNK_4_DESIGN.md.
     try {
-      results.billOnboardingResume = await MaintenanceService.sweepBillOnboarding();
+      // S333 Stage 4b: trust-model tightening — this route now establishes
+      // the trusted context itself (the sole caller), matching Route→Service
+      // Decision 3. Label byte-preserved from the wrap that used to live
+      // inside sweepBillOnboarding() itself.
+      results.billOnboardingResume = await withDalContext('bill-onboarding-resume', () =>
+        MaintenanceService.sweepBillOnboarding(),
+      );
     } catch (error) {
       results.billOnboardingResume = { error: error.message };
     }
@@ -143,7 +150,13 @@ export default async function handler(req, res) {
 
     // 7. Blob cleanup (actual deletion, not dry run)
     try {
-      results.blobs = await MaintenanceService.cleanupBlobs(config.blob_days, false);
+      // S333 Stage 4b: trust-model tightening — this route now establishes
+      // the trusted context itself (the sole caller), matching Route→Service
+      // Decision 3. Label byte-preserved from the wrap that used to live
+      // inside cleanupBlobs() itself.
+      results.blobs = await withDalContext('maintenance-blob-scan', () =>
+        MaintenanceService.cleanupBlobs(config.blob_days, false),
+      );
       totalDeleted += results.blobs.deleted;
     } catch (error) {
       results.blobs = { error: error.message };

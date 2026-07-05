@@ -10,6 +10,7 @@
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import { revoke } from '../../../lib/external/token-lifecycle';
 import ReviewDraftService from '../../../lib/services/review-draft-service';
 
@@ -37,7 +38,12 @@ export default async function handler(req, res) {
     }
 
     try {
-      await revoke(suggestionId, { actingUserSystemId });
+      // S333 Stage 4b: trust-model tightening — this route now establishes
+      // the trusted context itself (the sole caller), matching Route→Service
+      // Decision 3 ("services assume a trusted DAL context already exists;
+      // establishment stays at the route"). Label byte-preserved from the
+      // wrap that used to live inside revoke() itself.
+      await withDalContext('external-token-revoke', () => revoke(suggestionId, { actingUserSystemId }));
     } catch (e) {
       if (/update.*failed.*404/i.test(e.message || '')) {
         return res.status(404).json({ ok: false, reason: 'not_found' });

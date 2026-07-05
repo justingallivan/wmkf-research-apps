@@ -1,27 +1,32 @@
 /**
- * S333 bypass-strip Stage 4a characterization: nested-redundant wrapper
- * removal for lib/external/token-lifecycle.js (BYPASS_STRIP_PLAN.md sites
- * 47 mintAndStore/external-token-mint, 49 ensureToken/ensure-token-read,
- * 50 extendForPostSubmissionWindow/external-token-post-submission).
+ * S333 bypass-strip Stage 4 characterization for lib/external/token-lifecycle.js:
  *
- * Every real production caller of these three functions was traced this
- * session and confirmed to already wrap the WHOLE call in an outer
- * withDalContext (my-candidates.js 'my-candidates'; send-review-reminder.js /
- * cron/reviewer-reminders.js 'review-manager-send-review-reminder' /
- * 'cron-reviewer-reminders'; render-emails.js 'review-manager-render';
- * regenerate-token.js 'regenerate-token-lookup'; upload-review.js /
- * external/review/[token]/upload.js 'review-manager-upload' /
- * 'external-upload'), so the functions' own local withDalContext wrap is
- * redundant nesting — removed per Stage 4.
+ * Stage 4a (nested-redundant REMOVAL) — sites 47 mintAndStore/external-token-mint,
+ * 49 ensureToken/ensure-token-read, 50 extendForPostSubmissionWindow/
+ * external-token-post-submission. Every real production caller of these three
+ * functions was traced this session and confirmed to already wrap the WHOLE
+ * call in an outer withDalContext (my-candidates.js 'my-candidates';
+ * send-review-reminder.js / cron/reviewer-reminders.js
+ * 'review-manager-send-review-reminder' / 'cron-reviewer-reminders';
+ * render-emails.js 'review-manager-render'; regenerate-token.js
+ * 'regenerate-token-lookup'; upload-review.js / external/review/[token]/upload.js
+ * 'review-manager-upload' / 'external-upload'), so the functions' own local
+ * withDalContext wrap was redundant nesting — removed.
+ *
+ * Stage 4b (entry-seam PUSH-UP) — site 48 revoke/external-token-revoke. Its
+ * sole caller, pages/api/review-manager/revoke-token.js, established NO
+ * context of its own — the function's local wrap was the only thing
+ * providing trusted context. The wrap moved TO that route (same label,
+ * relocated) and was removed from revoke() itself.
  *
  * Drives the REAL DynamicsService.updateRecord/getRecord (no dynamics-service
  * mock — the existing token-lifecycle.test.js / adapters-caller-id.test.js
  * mock DynamicsService's static methods directly, which bypasses
  * assertTrustedDalContext entirely and would pass identically whether or not
- * the removed wrap existed; that blind spot is exactly why this file exists).
- * Negative controls prove the removed wrap was the only thing establishing
- * context for these functions in isolation; positive pins prove the caller's
- * outer context still reaches the write after removal.
+ * the wrap existed/moved; that blind spot is exactly why this file exists).
+ * Negative controls prove the removed/relocated wrap was the only thing
+ * establishing context for these functions in isolation; positive pins prove
+ * the caller's context still reaches the write.
  *
  * @jest-environment node
  */
@@ -29,7 +34,7 @@
 import { jest } from '@jest/globals';
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { withDalContext } from '../../lib/dataverse/core/context.js';
-import { mintAndStore, ensureToken, extendForPostSubmissionWindow } from '../../lib/external/token-lifecycle.js';
+import { mintAndStore, ensureToken, extendForPostSubmissionWindow, revoke } from '../../lib/external/token-lifecycle.js';
 
 const SUGGESTION_ID = '11111111-1111-1111-1111-111111111111';
 const REQUEST_ID = '22222222-2222-2222-2222-222222222222';
@@ -114,6 +119,21 @@ describe('token-lifecycle nested-redundant wrapper removal (S333 Stage 4a)', () 
       await expect(
         withDalContext('review-manager-upload', () => extendForPostSubmissionWindow(SUGGESTION_ID)),
       ).resolves.toBeDefined();
+    });
+  });
+
+  describe('revoke (site 48, Stage 4b entry-seam push-up)', () => {
+    test('negative control: called with no context, the write throws before any network call', async () => {
+      const spy = jest.spyOn(global, 'fetch');
+      await expect(revoke(SUGGESTION_ID)).rejects.toThrow(/no trusted Dataverse context/);
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    test('positive pin: succeeds when the CALLER (revoke-token.js) establishes withDalContext', async () => {
+      mockFetchOk({ id: SUGGESTION_ID });
+      await expect(
+        withDalContext('external-token-revoke', () => revoke(SUGGESTION_ID)),
+      ).resolves.toBeUndefined();
     });
   });
 });

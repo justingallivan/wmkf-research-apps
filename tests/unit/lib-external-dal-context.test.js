@@ -11,6 +11,11 @@
  *   46 external-token-verify (verify-suggestion-token.js)
  *   48 external-token-revoke (token-lifecycle.js revoke())
  *
+ * Stage 4b (2026-07-05): site 48's local wrap was pushed up to
+ * pages/api/review-manager/revoke-token.js (the sole caller, which
+ * established no context of its own) and removed from revoke() itself; its
+ * sub-test below now wraps the call exactly as the route does.
+ *
  * @jest-environment node
  */
 
@@ -37,7 +42,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion.js', () => ({
   extendExternalTokenExpiry: jest.fn(),
 }));
 
-const { hasTrustedDalContext } = require('../../lib/dataverse/core/context');
+const { hasTrustedDalContext, withDalContext } = require('../../lib/dataverse/core/context');
 const reviewAnswerAdapter = require('../../lib/dataverse/adapters/review-answer.js');
 const { verifyToken } = require('../../lib/services/external-token');
 const grantRequestAdapter = require('../../lib/dataverse/adapters/grant-request.js');
@@ -100,14 +105,16 @@ describe('lib/external DAL context (S333 characterization, sites 44-46, 48)', ()
     expect(hasTrustedDalContext()).toBe(false);
   });
 
-  test('site 48 — token-lifecycle revoke runs the write inside a trusted context', async () => {
+  test('site 48 — token-lifecycle revoke runs the write inside the CALLER-established context (route push-up)', async () => {
     const { revoke } = require('../../lib/external/token-lifecycle.js');
     const seen = { inside: null };
     reviewerSuggestionAdapter.revokeExternalToken.mockImplementation(async () => {
       seen.inside = hasTrustedDalContext();
     });
 
-    await revoke('sug-1');
+    // Matches pages/api/review-manager/revoke-token.js:
+    // withDalContext('external-token-revoke', () => revoke(suggestionId, ...))
+    await withDalContext('external-token-revoke', () => revoke('sug-1'));
 
     expect(seen.inside).toBe(true);
     expect(hasTrustedDalContext()).toBe(false);
