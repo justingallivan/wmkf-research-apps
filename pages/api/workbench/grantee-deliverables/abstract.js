@@ -37,7 +37,7 @@
  */
 
 import { requireAppAccess } from '../../../../lib/utils/auth';
-import { DynamicsService } from '../../../../lib/services/dynamics-service';
+import * as grantRequestAdapter from '../../../../lib/dataverse/adapters/grant-request.js';
 import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
 import { isGuid } from '../../../../lib/utils/guid';
 import { getDeliverableForRequest } from '../../../../lib/services/grantee-deliverable-record';
@@ -104,7 +104,7 @@ export default async function handler(req, res) {
       try {
         let row;
         try {
-          row = await DynamicsService.getRecord('akoya_requests', requestId, { select: REQUEST_SELECT });
+          row = await grantRequestAdapter.getById(requestId, { select: REQUEST_SELECT });
         } catch {
           row = null;
         }
@@ -165,7 +165,7 @@ export default async function handler(req, res) {
     try {
       let row;
       try {
-        row = await DynamicsService.getRecord('akoya_requests', requestId, { select: REQUEST_SELECT });
+        row = await grantRequestAdapter.getById(requestId, { select: REQUEST_SELECT });
       } catch {
         row = null;
       }
@@ -201,8 +201,7 @@ export default async function handler(req, res) {
       }
 
       try {
-        await DynamicsService.updateRecord(
-          'akoya_requests',
+        await grantRequestAdapter.updateById(
           row.akoya_requestid,
           { [target.field]: text },
           {
@@ -225,7 +224,7 @@ export default async function handler(req, res) {
       // Re-read for the new etag so the PD can keep editing without a reload.
       let newEtag = null;
       try {
-        const after = await DynamicsService.getRecord('akoya_requests', requestId, { select: 'akoya_requestid' });
+        const after = await grantRequestAdapter.getById(requestId, { select: 'akoya_requestid' });
         newEtag = after._etag || null;
       } catch { /* non-fatal; client can reload to get a fresh etag */ }
 

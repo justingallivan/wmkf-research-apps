@@ -766,20 +766,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/workbench/grantee-deliverables/abstract.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 3
-    },
-    {
-      "file": "pages/api/workbench/grantee-deliverables/abstract.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "pages/api/workbench/grantee-deliverables/awardees.js",
       "kind": "import",
       "clientMethod": "DynamicsService.queryRecords",
