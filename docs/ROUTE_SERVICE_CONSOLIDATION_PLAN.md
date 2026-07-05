@@ -502,6 +502,24 @@ review verdict + findings + resolutions)*
   externally reaped twice (task + watchdog pair-killed, codex process dying with them);
   protocol now: launch codex exec DETACHED (`nohup … & disown`, output to scratchpad,
   `< /dev/null`) with a disposable poller — the review survives poller loss.
+- 2026-07-05 (S331): **Stage 2b executed and cleared — review-manager domain closed.**
+  Phase A (`e56bf221`): full conditional SSE vocabulary pinned per P1s template notes (9
+  added, 20→29 route tests; 61/61 combined), and the render-emails overlap question the
+  wave table had left open is now RESOLVED with evidence: `loadCycleConfigs` was duplicated
+  with different field projections; HTML helpers are not shared. Phase B (`2201a9b2`):
+  shared `cycle-config-loader.js` preserving each caller's exact historical projection (no
+  silent superset); `send-emails-service.js` (842 lines) on the 2s template; route
+  871→105-line shell; one `withDalContext('review-manager-send')` (old bypass additionally
+  wrapped only non-Dataverse framing — 4b satisfied). Census 39→38 `[VERIFIED via
+  check:route-service-boundary run this session]`. **Post-stage review (Codex,
+  fresh-context): SATISFIED, no findings — 2b CLEARS, Stage 3 may start.** Reviewer
+  verified both historical projections at pinned file:lines, swept lib/ for a third
+  cycle-config duplicate (none — grant-cycles-dataverse.js, maintenance-service.js,
+  grant-cycle.js adapter are different concerns), confirmed all seven Dataverse touchpoints
+  inside the new context, guard order, lifecycle-after-send + failure-skips-lifecycle,
+  characterization byte-integrity via git diff. Milestone sweep: all gates green, suite
+  4307/4307 (371 suites), build exit 0. Running sum: 11 of 49 converted `[VERIFIED via
+  census 49→38 across the per-stage boundary gate runs logged above]`.
 
 ### Stage 0 route→test inventory (2026-07-04, S331)
 
