@@ -27,11 +27,12 @@
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid, allGuids } from '../../../lib/utils/guid';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { resolveByEmail as resolvePD } from '../../../lib/services/program-director-resolver';
 import { meetingDateToCycleCode, cycleCodeToLabel } from '../../../lib/utils/cycle-code';
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
+import { getById as getRequestById, findByRequestNumber } from '../../../lib/dataverse/adapters/grant-request';
+import { queryReviewers } from '../../../lib/dataverse/adapters/potential-reviewer';
 import { ratingsFromAnswers } from '../../../lib/external/review-answer-snapshot';
 import { getActiveQuestionSet } from '../../../lib/external/review-question-fetcher';
 // Answer-snapshot reader hoisted to a shared module (also used by the thank-you
@@ -411,19 +412,14 @@ async function handlePatch(req, res, access) {
 async function fetchRequestByIdOrNumber({ requestId, requestNumber }) {
   if (requestId) {
     try {
-      const r = await DynamicsService.getRecord('akoya_requests', requestId, { select: REQUEST_FIELDS.join(',') });
+      const r = await getRequestById(requestId, { select: REQUEST_FIELDS });
       return projectRequest(r);
     } catch (e) {
       return null;
     }
   }
   if (requestNumber) {
-    const safe = String(requestNumber).replace(/'/g, "''");
-    const { records } = await DynamicsService.queryRecords('akoya_requests', {
-      select: REQUEST_FIELDS.join(','),
-      filter: `akoya_requestnum eq '${safe}'`,
-      top: 1,
-    });
+    const { records } = await findByRequestNumber(requestNumber, { select: REQUEST_FIELDS, top: 1 });
     return records[0] ? projectRequest(records[0]) : null;
   }
   return null;
@@ -436,7 +432,7 @@ async function fetchPotentialReviewers(ids) {
   for (let i = 0; i < ids.length; i += CHUNK) {
     const chunk = ids.slice(i, i + CHUNK);
     const orChain = chunk.map((id) => `wmkf_potentialreviewersid eq ${id}`).join(' or ');
-    const { records } = await DynamicsService.queryRecords('wmkf_potentialreviewerses', {
+    const { records } = await queryReviewers({
       select: 'wmkf_potentialreviewersid,wmkf_name,wmkf_emailaddress,wmkf_organizationname',
       filter: orChain,
       top: 500,
@@ -481,7 +477,7 @@ async function fetchResearchersByPerson(personIds) {
   for (let i = 0; i < personIds.length; i += CHUNK) {
     const chunk = personIds.slice(i, i + CHUNK);
     const orChain = chunk.map((id) => `wmkf_potentialreviewersid eq ${id}`).join(' or ');
-    const { records } = await DynamicsService.queryRecords('wmkf_potentialreviewerses', {
+    const { records } = await queryReviewers({
       select: 'wmkf_potentialreviewersid,wmkf_primaryaffiliation,wmkf_website,wmkf_hindex,wmkf_totalcitations',
       filter: orChain,
       top: 500,
