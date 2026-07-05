@@ -234,13 +234,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/reviewer-finder/my-candidates.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "accounts",
-      "count": 1
-    },
-    {
       "file": "pages/api/test-email.js",
       "kind": "import",
       "clientMethod": "DynamicsService.createAndSendEmail",

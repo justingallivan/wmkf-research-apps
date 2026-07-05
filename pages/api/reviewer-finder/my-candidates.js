@@ -22,7 +22,6 @@
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { resolveByEmail as resolvePD } from '../../../lib/services/program-director-resolver';
 import { meetingDateToCycleCode, cycleCodeToLabel } from '../../../lib/utils/cycle-code';
@@ -30,6 +29,7 @@ import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-sug
 import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/potential-reviewer';
 import * as researcherAdapter from '../../../lib/dataverse/adapters/researcher';
 import { getById as getRequestById, findByRequestNumber } from '../../../lib/dataverse/adapters/grant-request';
+import { queryAccounts } from '../../../lib/dataverse/adapters/account';
 import { ensureToken } from '../../../lib/external/token-lifecycle';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import { translateDuplicateKeyError } from '../../../lib/dataverse/duplicate-key';
@@ -366,7 +366,7 @@ async function fetchApplicantAkas(accountIds) {
   for (let i = 0; i < accountIds.length; i += CHUNK) {
     const chunk = accountIds.slice(i, i + CHUNK);
     const orChain = chunk.map((id) => `accountid eq ${id}`).join(' or ');
-    const { records } = await DynamicsService.queryRecords('accounts', {
+    const { records } = await queryAccounts({
       select: 'accountid,akoya_aka,name',
       filter: orChain,
       top: 500,
