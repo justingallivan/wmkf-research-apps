@@ -45,7 +45,17 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 const mockFindOrCreateByEmail = jest.fn(async () => ({ id: 'c-1', created: false }));
 const mockSetContactLink = jest.fn(async () => {});
 jest.mock('../../lib/dataverse/adapters/contact', () => ({ findOrCreateByEmail: (...a) => mockFindOrCreateByEmail(...a) }));
-jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({ setContactLink: (...a) => mockSetContactLink(...a) }));
+jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => {
+  // getByIdWithSelect is a thin DynamicsService passthrough (data-access-layer
+  // conversion, Stages 3-6) — forward through the ALSO-mocked getRecord above
+  // so the existing suite (which stubs getRecord by entity set) keeps working.
+  const { DynamicsService } = jest.requireMock('../../lib/services/dynamics-service');
+  return {
+    setContactLink: (...a) => mockSetContactLink(...a),
+    getByIdWithSelect: (id, { select } = {}) =>
+      DynamicsService.getRecord('wmkf_potentialreviewerses', id, { select }),
+  };
+});
 jest.mock('../../lib/services/backprop-reviewer-orcid', () => ({ backPropReviewerOrcidToContact: jest.fn(async () => ({ action: 'noop' })) }));
 // Stage-aware secure-link button label: send-emails reads email.reviewer_<type>.button_label.
 jest.mock('../../lib/services/settings-service', () => ({

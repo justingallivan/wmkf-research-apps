@@ -55,6 +55,7 @@ import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import * as contactAdapter from '../../../lib/dataverse/adapters/contact';
 import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/potential-reviewer';
+import { getById as getRequestById, updateById as updateRequestById } from '../../../lib/dataverse/adapters/grant-request';
 import { backPropReviewerOrcidToContact } from '../../../lib/services/backprop-reviewer-orcid';
 import { getSettingStrict } from '../../../lib/services/settings-service';
 import { shouldSkipDuplicateInvitation, sendAllowsAttachments, isKnownTemplateType, recipientMayReceiveAttachments, emailConfidence } from '../../../lib/utils/reviewer-invite';
@@ -193,10 +194,10 @@ export default async function handler(req, res) {
       const personId = sug._wmkf_potentialreviewer_value;
       const requestId = sug._wmkf_request_value;
       const [person, request] = await Promise.all([
-        personId ? DynamicsService.getRecord('wmkf_potentialreviewerses', personId, {
+        personId ? potentialReviewerAdapter.getByIdWithSelect(personId, {
           select: 'wmkf_potentialreviewersid,wmkf_name,wmkf_emailaddress,wmkf_firstname,wmkf_lastname,_wmkf_contact_value,wmkf_orcid,wmkf_identitystatus,wmkf_emailsource',
         }).catch(() => null) : null,
-        requestId ? DynamicsService.getRecord('akoya_requests', requestId, {
+        requestId ? getRequestById(requestId, {
           select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate,wmkf_respondoffsetdays,wmkf_reviewduedate,_wmkf_programdirector_value',
         }).catch(() => null) : null,
       ]);
@@ -636,7 +637,7 @@ export default async function handler(req, res) {
           if (dueDate != null && reqRec.wmkf_reviewduedate == null) patch.wmkf_reviewduedate = dueDate;
           if (Object.keys(patch).length === 0) continue;
           try {
-            await DynamicsService.updateRecord('akoya_requests', reqId, patch, { actingUserSystemId });
+            await updateRequestById(reqId, patch, { actingUserSystemId });
           } catch (cfgErr) {
             console.warn(`Campaign-config write failed for request ${reqId} (invites already sent):`, cfgErr.message);
           }
