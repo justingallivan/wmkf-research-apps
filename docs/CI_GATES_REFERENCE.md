@@ -125,12 +125,16 @@ converted every direct `bypassDynamicsRestrictions` call site to
 - `--root <dir>` override for the self-test's fixture tree; `--json` prints
   the raw violation list.
 - Self-test: `npm run check:dynamics-context-boundary:self-test` — fixture-based,
-  proves all ten required RED shapes (static import, aliased import,
-  namespace/member access, dynamic import, inline require, re-export,
-  non-literal source fail-closed, literal empty-restrictions, non-literal
-  restrictions fail-closed, script-only-outside-scripts) each name their
-  fixture file, and that the sanctioned importer, the definition file, the
-  Explorer carve-out, ordinary `withDalContext` usage, and a legitimate
+  proves all twelve required RED shapes (the plan's original ten — static
+  import, aliased import, namespace/member access, dynamic import, inline
+  require, re-export, non-literal source fail-closed, literal
+  empty-restrictions, non-literal restrictions fail-closed,
+  script-only-outside-scripts — plus two more a fresh-context Codex
+  adversarial review found missing: an aliased-import and a namespace/
+  member-form `withDynamicsContext` call, both with empty restrictions)
+  each name their fixture file, and that the sanctioned importer, the
+  definition file, the Explorer carve-out, ordinary `withDalContext` usage,
+  and a legitimate
   non-empty-restrictions caller are never flagged.
 
 ### `check:fact-consistency` — registered scalar drift

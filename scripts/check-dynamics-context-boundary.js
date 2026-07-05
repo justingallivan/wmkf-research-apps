@@ -261,11 +261,56 @@ function restrictionsPropertyValue(objectExpr) {
   return { found: false };
 }
 
-function auditWithDynamicsContextRestrictions(ast, rel, violations, isExempt) {
-  walkAst(ast, (node) => {
-    if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return;
-    if (node.callee.type !== 'Identifier' || node.callee.name !== 'withDynamicsContext') return;
+// Collect every local binding that could invoke withDynamicsContext: the bare
+// name itself, any aliased named import/destructure (any source, fail-closed —
+// same "key on the name, not the resolved source" posture as rule 1), and any
+// namespace-style whole-module binding (import * as X / const X = require(...)
+// with an Identifier id, no destructuring) that a later `.withDynamicsContext(...)`
+// member call could reach. Without this, an aliased import
+// (`import { withDynamicsContext as raw }`) or a namespace/member-form call
+// (`dc.withDynamicsContext(...)`) would silently evade the restrictions audit.
+function collectWithDynamicsContextBindings(ast) {
+  const aliasNames = new Set(['withDynamicsContext']);
+  const namespaceNames = new Set();
 
+  walkAst(ast, (node) => {
+    if (node.type === 'ImportDeclaration') {
+      for (const spec of node.specifiers || []) {
+        if (spec.type === 'ImportSpecifier' && propName(spec.imported) === 'withDynamicsContext') {
+          aliasNames.add(spec.local.name);
+        } else if (spec.type === 'ImportNamespaceSpecifier') {
+          namespaceNames.add(spec.local.name);
+        }
+      }
+      return;
+    }
+
+    if (node.type === 'VariableDeclarator' && node.init) {
+      const init = unwrapExpression(node.init);
+      const isRequire = init && init.type === 'CallExpression' && init.callee.type === 'Identifier' && init.callee.name === 'require';
+      const isDynamicImport = !!importCallSourceNode(init);
+      if (!isRequire && !isDynamicImport) return;
+
+      if (node.id.type === 'ObjectPattern') {
+        for (const prop of node.id.properties || []) {
+          if (prop.type !== 'ObjectProperty') continue;
+          if (propName(prop.key) === 'withDynamicsContext') {
+            for (const name of bindingNames(prop.value)) aliasNames.add(name);
+          }
+        }
+      } else if (node.id.type === 'Identifier') {
+        namespaceNames.add(node.id.name);
+      }
+    }
+  });
+
+  return { aliasNames, namespaceNames };
+}
+
+function auditWithDynamicsContextRestrictions(ast, rel, violations, isExempt) {
+  const { aliasNames, namespaceNames } = collectWithDynamicsContextBindings(ast);
+
+  function checkCall(node) {
     const firstArg = node.arguments && node.arguments[0];
     const { found, value } = restrictionsPropertyValue(unwrapExpression(firstArg));
 
@@ -282,6 +327,27 @@ function auditWithDynamicsContextRestrictions(ast, rel, violations, isExempt) {
     }
     if (!isExempt) {
       violations.push(makeViolation(rel, node, 'unresolved-restrictions', 'withDynamicsContext(...) — non-literal restrictions expression'));
+    }
+  }
+
+  walkAst(ast, (node) => {
+    if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return;
+    const callee = node.callee;
+
+    if (callee.type === 'Identifier' && aliasNames.has(callee.name)) {
+      checkCall(node);
+      return;
+    }
+
+    if ((callee.type === 'MemberExpression' || callee.type === 'OptionalMemberExpression')
+      && propName(callee.property) === 'withDynamicsContext') {
+      const obj = unwrapExpression(callee.object);
+      const isNamespaceRef = obj && obj.type === 'Identifier' && namespaceNames.has(obj.name);
+      const isInlineRequire = obj && obj.type === 'CallExpression' && obj.callee.type === 'Identifier' && obj.callee.name === 'require';
+      const isInlineDynamicImport = !!importCallSourceNode(obj);
+      if (isNamespaceRef || isInlineRequire || isInlineDynamicImport) {
+        checkCall(node);
+      }
     }
   });
 }

@@ -10,7 +10,10 @@
  * shapes trips the gate (naming file:line) while the GREEN fixtures — the
  * sanctioned importer, the sanctioned withDynamicsContext definition site, the
  * Explorer's loaded-restrictions path, and ordinary withDalContext usage —
- * never do.
+ * never do. Adds two more RED fixtures (aliased-import and namespace/member-form
+ * `withDynamicsContext` calls) closing the evasion hole a fresh-context Codex
+ * adversarial review found in rule 2's original bare-Identifier-only callee
+ * check (docs/BYPASS_STRIP_PLAN.md Stage Log).
  *
  * Fixtures are pure text (never actually required/imported), so no real
  * `dynamics-context` module needs to exist in the fixture tree — detection is
@@ -170,6 +173,21 @@ function writeRedFixtures() {
     import { enterDynamicsBypassForScript } from './dynamics-context';
     export function f() { return enterDynamicsBypassForScript('x'); }
   `);
+
+  // (xi) adversarial-review finding (P1): aliased named import of
+  // withDynamicsContext with empty restrictions -> RED. A bare-Identifier-only
+  // callee check would miss this.
+  write('lib/services/red-aliased-withdynamicscontext.js', `
+    import { withDynamicsContext as raw } from './dynamics-context';
+    export function f() { return raw({ restrictions: [], requestId: 'x' }, () => 1); }
+  `);
+
+  // (xii) adversarial-review finding (P1): namespace/member-form
+  // withDynamicsContext call with empty restrictions -> RED.
+  write('lib/services/red-namespace-withdynamicscontext.js', `
+    import * as dc from './dynamics-context';
+    export function f() { return dc.withDynamicsContext({ restrictions: [], requestId: 'x' }, () => 1); }
+  `);
 }
 
 function removeRedFixtures() {
@@ -178,6 +196,7 @@ function removeRedFixtures() {
     'red-dynamic-import.js', 'red-inline-require.js', 'red-reexport.js',
     'red-nonliteral-source.js', 'red-empty-restrictions.js',
     'red-unresolved-restrictions.js', 'red-script-only-outside-scripts.js',
+    'red-aliased-withdynamicscontext.js', 'red-namespace-withdynamicscontext.js',
   ];
   for (const name of names) fs.rmSync(path.join(tempRoot, 'lib/services', name), { force: true });
 }
@@ -200,6 +219,8 @@ function runRedAssertion() {
     ['red-empty-restrictions.js', 'empty-restrictions'],
     ['red-unresolved-restrictions.js', 'unresolved-restrictions'],
     ['red-script-only-outside-scripts.js', 'script-only-outside-scripts'],
+    ['red-aliased-withdynamicscontext.js', 'empty-restrictions'],
+    ['red-namespace-withdynamicscontext.js', 'empty-restrictions'],
   ];
   for (const [file, rule] of mustFlag) {
     expect(run.output.includes(file) && run.output.includes(rule),
@@ -217,7 +238,7 @@ function runRedAssertion() {
     expect(!run.output.includes(file), `GREEN fixture ${file} wrongly flagged:\n${run.output}`);
   }
 
-  console.log(`PASS red assertion (all 10 required shapes flagged; ${mustNotFlag.length} green fixtures clean)`);
+  console.log(`PASS red assertion (all ${mustFlag.length} required shapes flagged; ${mustNotFlag.length} green fixtures clean)`);
 }
 
 function runGreenAssertion() {

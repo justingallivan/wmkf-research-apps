@@ -2,8 +2,8 @@
 title: bypassDynamicsRestrictions Strip Plan
 domain: architecture
 kind: plan
-status: draft
-summary: "Convert 52 functional bypass scopes to withDalContext (32 pages + 20 lib incl. 2 default-param aliases), byte-identical; then a bypass-shape law."
+status: active
+summary: "Converted 52 bypass scopes to withDalContext, byte-identical; bypass-shape law (Stage 3) built. Executed S333."
 canonical: true
 owner: product-engineering
 related:
@@ -16,11 +16,15 @@ related:
 
 # bypassDynamicsRestrictions Strip Plan
 
-**Execution status: DRAFTED, NOT EXECUTED, NOT REVIEWED (2026-07-05).** Frontmatter `status: draft`;
-the docs-catalog enum has no "completed" value, so on execution this line records progress and
-frontmatter moves to the live enum value `active` (per the `CHUNK`/`GATE_SCRIPT`/`ODATA` precedent).
-The final import-boundary law (Stage 3) and the trust-model tightening beyond the mechanical strip are
-framed as **OWNER DECISIONS** below.
+**Execution status: STAGES 0–3 COMPLETE AND REVIEW-CLOSED (S333, 2026-07-05).** Frontmatter
+`status` moved to the live enum value `active` (the docs-catalog enum has no "completed" value,
+mirroring the `CHUNK`/`GATE_SCRIPT`/`ODATA` precedent). All 52 functional bypass scopes converted
+to `withDalContext` (Stages 1–2); the import-boundary law (Stage 3,
+`scripts/check-dynamics-context-boundary.js`) built per owner decision (build now, AST gate shape).
+Post-execution fresh-context review: Codex adversarial review (round 1) found one P1 (Stage 3
+rule 2 evadable via an aliased/namespace-form `withDynamicsContext` call) — folded same-session
+(Stage Log). Trust-model tightening beyond the mechanical strip (Stage 4) remains an **OWNER
+DECISION**, deferred per the plan's own recommendation.
 
 **Evidence provenance.** Every call site's enclosing function, upstream auth guard, fn body, and caller
 graph in the Classification tables was gathered by four fresh-context census sweeps this session
@@ -608,5 +612,53 @@ benefit.
   lines) `[VERIFIED via grep this session]`; Baseline row corrected, with the two `lib/` comment-only
   mentions noted. Frontmatter summary and Objective updated to the 52-functional-scope census. Plan remains
   `status: draft`, not executed; catalog regeneration deferred to the orchestrator per session constraints.
+- 2026-07-05 (S333): **Stages 0-3 executed.** Stage 0: pre-stage re-probe confirmed the 52-scope/
+  40-file census unchanged, no new alias shape; added real-context (no dynamics-context mock)
+  positive+negative-control characterization tests for every high-risk cluster (33-36, 41-46, 48,
+  A4 nextauth 31-32, the two aliased alert-service default-param sites 51-52), including a live
+  re-confirmation of site 43's two literal-label bindings (the plan's one behavioral STOP-AND-ASK,
+  pre-ruled safe — reconfirmed true). Suite 418→426 suites / 4714→4736 tests (`42a497f0`). Stage 1:
+  all 32 pages sites (26 files, clusters A1-A4) mechanically renamed to `withDalContext`,
+  byte-identical label/fn/scope; two stale source-shape regression assertions in
+  `tests/unit/intake-routes-dynamics-context.test.js` (nextauth, tied to the renamed identifier)
+  updated to track the new name (`3f9ac4ea`). Stage 2: all 20 lib scopes (14 files, clusters
+  B1-B3, incl. the two default-param initializer retargets) converted in place; three stale
+  doc-comment mentions of the retired identifier fixed (`lib/dataverse/adapters/ai-prompt.js`,
+  `lib/dataverse/adapters/review-answer.js`, `lib/services/prompt-store.js`); two more stale
+  source-shape assertions (notification-email, drain-recover-request-created) updated (`5bd193fd`).
+  Post-Stage-2 ALL-references sweep: only `lib/dataverse/core/context.js` (the sanctioned
+  importer) and `lib/services/dynamics-context.js` (the definition) reference
+  `bypassDynamicsRestrictions` anywhere in `pages`/`lib`/`shared`/`modules` — the strip is
+  complete. Owner decision on Stage 3 (asked mid-session): **build now, AST gate shape**
+  (recommended option, per the plan's own recommendation). Stage 3:
+  `scripts/check-dynamics-context-boundary.js` + self-test built, reusing
+  `scripts/lib/ast-scan-core.js`'s shared scanner primitives; landed directly as fail-closed LAW
+  (no ratchet — Stage 2 had already reduced the live census to 0); registered in `package.json`,
+  `.github/workflows/test.yml`, `docs/CI_GATES_REFERENCE.md`, and the `/start` gate list
+  (`2a0a1507`). Full suite 426/4736 green throughout; `check:dataverse-access-layer`,
+  `check:route-service-boundary` (+ self-tests), `check:agent-invariants`, `check:doc-currency`,
+  `check:agent-wiki`, `check:docs-catalog` all green at each stage boundary.
+  **Post-execution fresh-context review (Codex adversarial, round 1): NOT SATISFIED — 1 P1,
+  folded same-session.** Reviewer VERIFIED GOOD (verbatim relay): every swapped call site is
+  rename-only (label/fn/scope byte-identical) across pages/lib/services/lib/bill/lib/external
+  incl. the two aliased default-param sites; no leftover `bypassDynamicsRestrictions` import
+  outside the sanctioned wrapper/definition; no (b)-classified site was removed; Explorer/scripts/
+  tests untouched (only the two tracked source-shape-assertion updates + new characterization test
+  additions); the new `*-dal-context.test.js` tests drive the real `hasTrustedDalContext()`
+  machinery, not a mock. Finding: **P1 — Stage 3 rule 2 (`auditWithDynamicsContextRestrictions`)
+  originally matched only a bare `Identifier` callee named `withDynamicsContext`**, so an aliased
+  named import (`import { withDynamicsContext as raw }`) or a namespace/member-form call
+  (`dc.withDynamicsContext(...)`) with empty/unresolvable restrictions would silently evade the
+  restrictions audit — defeating the rule's anti-regression purpose. **Folded:** rule 2 now
+  collects every local binding that could reach `withDynamicsContext` (bare name, any aliased
+  named import/destructure regardless of source, and any namespace-style whole-module binding),
+  and checks calls via a tracked alias identifier OR `<namespace>.withDynamicsContext(...)` /
+  inline `require(...)/import(...).withDynamicsContext(...)`, mirroring rule 1's
+  name-keyed-not-source-keyed posture. Self-test expanded from 10 to 12 required RED fixtures
+  (added: aliased-import and namespace/member-form `withDynamicsContext` calls, both with empty
+  restrictions) plus the 5 GREEN fixtures, all passing; live repo re-verified clean (572 files,
+  0 violations) after the fix. `npm test`/self-test execution failed in the Codex reviewer's
+  read-only sandbox (EPERM writing Jest cache / fixture tmpdirs) — re-run directly in this
+  session's writable environment and confirmed green (see above); not a code defect.
 
 <!-- end of plan -->
