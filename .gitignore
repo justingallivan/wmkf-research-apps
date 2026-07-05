@@ -115,3 +115,6 @@ scripts/.orcid-contact-provenance.json
 
 # Reviewer-finder smoke run artifacts (reproducible via scripts/smoke-discover-dispositions.mjs; local review only, S238)
 smoke-results-*.txt
+
+# stray agent run logs at repo root
+/*.log
