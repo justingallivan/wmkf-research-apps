@@ -439,30 +439,9 @@
     {
       "file": "pages/api/reviewer-finder/my-candidates.js",
       "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/reviewer-finder/my-candidates.js",
-      "kind": "import",
       "clientMethod": "DynamicsService.queryRecords",
       "entity": "accounts",
       "count": 1
-    },
-    {
-      "file": "pages/api/reviewer-finder/my-candidates.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/reviewer-finder/my-candidates.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "wmkf_potentialreviewerses",
-      "count": 2
     },
     {
       "file": "pages/api/reviewer-finder/my-proposals.js",
