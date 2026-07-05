@@ -30,3 +30,25 @@ describe('account.getById (characterization)', () => {
     await expect(account.getById(GUID, { select: 'name' })).rejects.toThrow('not found');
   });
 });
+
+describe('account.queryAccounts (characterization)', () => {
+  test('golden: forwards options verbatim to DynamicsService.queryRecords (my-candidates aka batch shape)', async () => {
+    const query = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
+      records: [{ accountid: GUID, akoya_aka: 'AKA U', name: 'Some University' }],
+    });
+    const options = {
+      select: 'accountid,akoya_aka,name',
+      filter: `accountid eq ${GUID}`,
+      top: 500,
+    };
+    const out = await account.queryAccounts(options);
+    expect(out).toEqual({ records: [{ accountid: GUID, akoya_aka: 'AKA U', name: 'Some University' }] });
+    expect(query).toHaveBeenCalledWith('accounts', options);
+  });
+
+  test('failure path: propagates a rejection', async () => {
+    jest.spyOn(DynamicsService, 'queryRecords').mockRejectedValue(new Error('transient'));
+    await expect(account.queryAccounts({ select: 'accountid', filter: 'accountid eq x', top: 1 }))
+      .rejects.toThrow('transient');
+  });
+});
