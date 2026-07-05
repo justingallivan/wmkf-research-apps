@@ -2,7 +2,8 @@
  * Unit tests for lib/bill/onboard-reviewer-service.js + internal-call-auth.js.
  *
  * Strategy:
- *   - Inject fakes for billClient, dynamics (DynamicsService shape), and
+ *   - Inject fakes for billClient, contacts/requests (grant-request/contact
+ *     adapter shapes), and
  *     NotificationService into onboardReviewer().
  *   - For auth tests: drive verifyInternalCall directly with crafted headers
  *     against a known body + secret.
@@ -47,9 +48,12 @@ function makeDeps(overrides = {}) {
       notifications: {
         notify: async (args) => { notifyCalls.push(args); return { id: 1 }; },
       },
-      dynamics: overrides.dynamics || {
-        getRecord: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
-        updateRecord: jest.fn().mockResolvedValue(undefined),
+      contacts: overrides.contacts || {
+        getBillingFieldsById: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
+        updateFields: jest.fn().mockResolvedValue(undefined),
+      },
+      requests: overrides.requests || {
+        updateById: jest.fn().mockResolvedValue(undefined),
       },
       billClient: overrides.billClient || {
         createBillVendor: jest.fn().mockResolvedValue({ vendorId: '009ABC' }),
@@ -81,9 +85,9 @@ describe('onboardReviewer — happy paths', () => {
 
   test('returning reviewer (wmkf_billcomid populated) → reused_existing', async () => {
     const { notifyCalls, deps } = makeDeps({
-      dynamics: {
-        getRecord: jest.fn().mockResolvedValue({ wmkf_billcomid: '009OLD', akoya_isvendor: true }),
-        updateRecord: jest.fn().mockResolvedValue(undefined),
+      contacts: {
+        getBillingFieldsById: jest.fn().mockResolvedValue({ wmkf_billcomid: '009OLD', akoya_isvendor: true }),
+        updateFields: jest.fn().mockResolvedValue(undefined),
       },
     });
     const result = await onboardReviewer(BASE_INPUT, deps);
@@ -91,11 +95,8 @@ describe('onboardReviewer — happy paths', () => {
     expect(result.vendorId).toBe('009OLD');
     expect(deps.billClient.createBillVendor).not.toHaveBeenCalled();
     expect(notifyCalls).toEqual([]);
-    // Post-impl P1 #1: pre-read uses { select } shape, not array.
-    expect(deps.dynamics.getRecord).toHaveBeenCalledWith(
-      'contacts', BASE_INPUT.reviewerContactId,
-      { select: 'wmkf_billcomid,akoya_isvendor' },
-    );
+    // Post-impl P1 #1: pre-read uses the billing-fields adapter passthrough.
+    expect(deps.contacts.getBillingFieldsById).toHaveBeenCalledWith(BASE_INPUT.reviewerContactId);
   });
 
   test('no network match → status: no_match (no alert)', async () => {
@@ -142,7 +143,7 @@ describe('onboardReviewer — BILL_ENABLED=false fallback', () => {
     expect(result.status).toBe('alert_only');
     expect(result.ok).toBe(true);
     expect(deps.billClient.createBillVendor).not.toHaveBeenCalled();
-    expect(deps.dynamics.getRecord).not.toHaveBeenCalled();
+    expect(deps.contacts.getBillingFieldsById).not.toHaveBeenCalled();
     expect(notifyCalls).toHaveLength(1);
     expect(notifyCalls[0].type).toBe('bill_manual_onboarding');
     expect(notifyCalls[0].emailAdmins).toBe(true);
@@ -162,7 +163,7 @@ describe('onboardReviewer — BILL_ONBOARDING_DEFERRED (this-cycle gate)', () =>
     expect(result.status).toBe('deferred');
     expect(result.ok).toBe(true);
     expect(deps.billClient.createBillVendor).not.toHaveBeenCalled();
-    expect(deps.dynamics.getRecord).not.toHaveBeenCalled();
+    expect(deps.contacts.getBillingFieldsById).not.toHaveBeenCalled();
     // Unlike alert_only, the deferred gate stays silent — payment is manual.
     expect(notifyCalls).toEqual([]);
   });
@@ -236,20 +237,18 @@ describe('onboardReviewer — Dataverse PATCH failures', () => {
   afterEach(() => { delete process.env.BILL_ENABLED; });
 
   test('contact PATCH retried once then alerts as error', async () => {
-    const updateRecord = jest.fn()
+    const updateFields = jest.fn()
       .mockRejectedValueOnce(new Error('transient'))
-      .mockRejectedValueOnce(new Error('still failing'))
-      .mockResolvedValue(undefined); // for the akoya_request PATCH if reached
+      .mockRejectedValueOnce(new Error('still failing'));
     const { notifyCalls, deps } = makeDeps({
-      dynamics: {
-        getRecord: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
-        updateRecord,
+      contacts: {
+        getBillingFieldsById: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
+        updateFields,
       },
     });
     const result = await onboardReviewer(BASE_INPUT, deps);
     // The contact PATCH should have been called twice (1 retry).
-    const contactCalls = updateRecord.mock.calls.filter(c => c[0] === 'contacts');
-    expect(contactCalls).toHaveLength(2);
+    expect(updateFields).toHaveBeenCalledTimes(2);
     // Error alert emitted for the contact PATCH failure.
     const contactAlert = notifyCalls.find(c => c.type === 'bill_contact_patch_failed');
     expect(contactAlert).toBeDefined();
@@ -261,23 +260,20 @@ describe('onboardReviewer — Dataverse PATCH failures', () => {
   });
 
   test('akoya_request PATCH failure → retry+backoff then torn-state marker + warning alert', async () => {
-    const updateRecord = jest.fn().mockImplementation((entitySet) => {
-      if (entitySet === 'akoya_requests') throw new Error('dataverse 500');
-      return Promise.resolve();
-    });
+    const updateById = jest.fn().mockRejectedValue(new Error('dataverse 500'));
     const { notifyCalls, deps } = makeDeps({
-      dynamics: {
-        getRecord: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
-        updateRecord,
+      contacts: {
+        getBillingFieldsById: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
+        updateFields: jest.fn().mockResolvedValue(undefined),
       },
+      requests: { updateById },
     });
     const result = await onboardReviewer(BASE_INPUT, deps);
     const requestAlerts = notifyCalls.filter(c => c.type === 'bill_request_patch_failed');
     expect(requestAlerts).toHaveLength(1);
     expect(requestAlerts[0].severity).toBe('warning');
     // Fix #3: request PATCH now retries with backoff (3 attempts) before giving up.
-    const reqCalls = updateRecord.mock.calls.filter(c => c[0] === 'akoya_requests');
-    expect(reqCalls).toHaveLength(3);
+    expect(updateById).toHaveBeenCalledTimes(3);
     // Durable torn-state marker written for the resume sweep (matched path).
     expect(deps.onboardingState.markDynamicsPending).toHaveBeenCalledWith(
       BASE_INPUT.honorariumRequestId,
@@ -288,15 +284,12 @@ describe('onboardReviewer — Dataverse PATCH failures', () => {
   });
 
   test('no_match path: request PATCH failure → status=partial, intendedStatus=no_match', async () => {
-    const updateRecord = jest.fn().mockImplementation((entitySet) => {
-      if (entitySet === 'akoya_requests') throw new Error('dv 500');
-      return Promise.resolve();
-    });
     const { notifyCalls, deps } = makeDeps({
-      dynamics: {
-        getRecord: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
-        updateRecord,
+      contacts: {
+        getBillingFieldsById: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
+        updateFields: jest.fn().mockResolvedValue(undefined),
       },
+      requests: { updateById: jest.fn().mockRejectedValue(new Error('dv 500')) },
       billClient: {
         createBillVendor: jest.fn().mockResolvedValue({ vendorId: '009ABC' }),
         searchBillNetwork: jest.fn().mockResolvedValue({ exactMatchCount: 0, pni: null, networkId: null, allResults: [] }),
@@ -315,15 +308,12 @@ describe('onboardReviewer — Dataverse PATCH failures', () => {
   });
 
   test('ambiguous_match + PATCH failure → status=partial, intendedStatus=ambiguous_match, ambiguous-alert still emits', async () => {
-    const updateRecord = jest.fn().mockImplementation((entitySet) => {
-      if (entitySet === 'akoya_requests') throw new Error('dv 500');
-      return Promise.resolve();
-    });
     const { notifyCalls, deps } = makeDeps({
-      dynamics: {
-        getRecord: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
-        updateRecord,
+      contacts: {
+        getBillingFieldsById: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
+        updateFields: jest.fn().mockResolvedValue(undefined),
       },
+      requests: { updateById: jest.fn().mockRejectedValue(new Error('dv 500')) },
       billClient: {
         createBillVendor: jest.fn().mockResolvedValue({ vendorId: '009ABC' }),
         searchBillNetwork: jest.fn().mockResolvedValue({
@@ -346,19 +336,16 @@ describe('onboardReviewer — safeNotify (P1 #4)', () => {
   afterEach(() => { delete process.env.BILL_ENABLED; });
 
   test('notification-system failure does not crash the orchestrator', async () => {
-    const updateRecord = jest.fn().mockImplementation((entitySet) => {
-      if (entitySet === 'akoya_requests') throw new Error('dv 500');
-      return Promise.resolve();
-    });
     const broken = {
       notify: jest.fn().mockRejectedValue(new Error('alert backend down')),
     };
     const deps = {
       notifications: broken,
-      dynamics: {
-        getRecord: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
-        updateRecord,
+      contacts: {
+        getBillingFieldsById: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
+        updateFields: jest.fn().mockResolvedValue(undefined),
       },
+      requests: { updateById: jest.fn().mockRejectedValue(new Error('dv 500')) },
       billClient: {
         createBillVendor: jest.fn().mockResolvedValue({ vendorId: '009ABC' }),
         searchBillNetwork: jest.fn().mockResolvedValue({ exactMatchCount: 1, pni: 'P', networkId: 'P', allResults: [{ id: 'P' }] }),
@@ -389,16 +376,16 @@ describe('onboardReviewer — durable-state hardening (chunk-4)', () => {
     expect(result.status).toBe('in_progress');
     expect(deps.billClient.createBillVendor).not.toHaveBeenCalled();
     expect(deps.billClient.searchBillNetwork).not.toHaveBeenCalled();
-    expect(deps.dynamics.getRecord).not.toHaveBeenCalled();
+    expect(deps.contacts.getBillingFieldsById).not.toHaveBeenCalled();
     expect(notifyCalls).toEqual([]);
   });
 
   test('re-accept of a STRANDED row (vendor_id staged) RESUMES without replaying BILL side effects', async () => {
-    const updateRecord = jest.fn().mockResolvedValue(undefined);
+    const updateFields = jest.fn().mockResolvedValue(undefined);
     const { deps } = makeDeps({
-      dynamics: {
-        getRecord: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
-        updateRecord,
+      contacts: {
+        getBillingFieldsById: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
+        updateFields,
       },
       onboardingState: makeOnboardingStateFake({
         reserveOnboarding: jest.fn().mockResolvedValue({ reserved: false, row: { vendor_id: '009STRANDED' } }),
@@ -410,9 +397,8 @@ describe('onboardReviewer — durable-state hardening (chunk-4)', () => {
     expect(deps.billClient.createBillVendor).not.toHaveBeenCalled();
     expect(deps.billClient.searchBillNetwork).not.toHaveBeenCalled();
     expect(deps.billClient.sendNetworkInvitation).not.toHaveBeenCalled();
-    const contactCalls = updateRecord.mock.calls.filter(c => c[0] === 'contacts');
-    expect(contactCalls.length).toBeGreaterThanOrEqual(1);
-    expect(contactCalls[0][2]).toMatchObject({ wmkf_billcomid: '009STRANDED', akoya_isvendor: true });
+    expect(updateFields.mock.calls.length).toBeGreaterThanOrEqual(1);
+    expect(updateFields.mock.calls[0][1]).toMatchObject({ wmkf_billcomid: '009STRANDED', akoya_isvendor: true });
     expect(result.status).toBe('resume_reconciled');
     expect(result.vendorId).toBe('009STRANDED');
   });
@@ -434,14 +420,11 @@ describe('onboardReviewer — durable-state hardening (chunk-4)', () => {
     const onboardingState = makeOnboardingStateFake({
       setVendorId: jest.fn().mockImplementation(async () => { order.push('setVendorId'); }),
     });
-    const updateRecord = jest.fn().mockImplementation(async (entitySet) => {
-      if (entitySet === 'contacts') order.push('contactPatch');
-    });
     const { deps } = makeDeps({
       onboardingState,
-      dynamics: {
-        getRecord: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
-        updateRecord,
+      contacts: {
+        getBillingFieldsById: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
+        updateFields: jest.fn().mockImplementation(async () => { order.push('contactPatch'); }),
       },
     });
     await onboardReviewer(BASE_INPUT, deps);

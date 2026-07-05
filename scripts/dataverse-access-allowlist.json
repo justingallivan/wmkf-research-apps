@@ -3,27 +3,6 @@
   "generatedFrom": "node scripts/check-dataverse-access-layer.js --json",
   "entries": [
     {
-      "file": "lib/bill/onboard-reviewer-service.js",
-      "kind": "dynamic-client",
-      "clientMethod": "dynamics.getRecord",
-      "entity": "contacts",
-      "count": 1
-    },
-    {
-      "file": "lib/bill/onboard-reviewer-service.js",
-      "kind": "dynamic-client",
-      "clientMethod": "dynamics.updateRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "lib/bill/onboard-reviewer-service.js",
-      "kind": "dynamic-client",
-      "clientMethod": "dynamics.updateRecord",
-      "entity": "contacts",
-      "count": 1
-    },
-    {
       "file": "lib/services/dynamics-explorer-taxonomy.js",
       "kind": "import",
       "clientMethod": "DynamicsService.resolveLogicalName",
