@@ -18,7 +18,8 @@ related:
 
 **Objective.** Today 49 `pages/api` route files reach the Dataverse layer directly (47 import
 adapters; 2 more import `DynamicsService` only) and carry inline
-business logic — the largest are 20-40 KB single-verb files (`review-manager/send-emails.js` 39.5 KB,
+business logic — the largest are 20-40 KB route files, some streaming (SSE) and at least one
+multi-verb (`my-candidates.js` dispatches GET/PATCH/DELETE) (`review-manager/send-emails.js` 39.5 KB,
 `reviewer-finder/my-candidates.js` 34 KB, `reviewer-finder/save-candidates.js` 29.3 KB
 `[VERIFIED 2026-07-04 via ls]`). This plan moves that logic into per-domain services under
 `lib/services/<domain>/`, leaving each route a thin shell: **guard → validate input → establish DAL
@@ -155,10 +156,17 @@ Two loops, both mandatory:
    including the two DynamicsService-only routes and any root-level `pages/api/*.js` file
    (e.g. `pages/api/test-email.js` has no domain directory) — no route may fall outside the
    taxonomy silently; an unclassifiable route is a Stage 0 error to resolve, not skip.
-2. Write its self-test with synthetic fixtures (red: fixture route importing an adapter above
-   baseline; green: clean shell route). **Caution:** fixture files containing import strings can
-   trip the repo's scanner gates — use an env-var-pointed fixture root (the
-   `check:api-routes:self-test` pattern), never fixtures under `pages/`.
+2. Write its self-test with synthetic fixtures. RED fixtures must prove the adapter-source
+   family INHERITS the hardened scanner behavior, not just the trivial case: (a) direct
+   adapter import in a route; (b) adapter import via in-file alias; (c) adapter re-export
+   through a wrapper module consumed by a route; (d) dynamic `import()` of an adapter source;
+   (e) inline `require('<adapter path>')...` chain; (f) `dynamics-service` import (the second
+   source family); (g) a root-level `pages/api/*.js` route with a boundary import — proving
+   root-level files are classified, not skipped. GREEN fixtures: a clean shell route; a
+   route importing only `lib/services/<domain>/` services; the exempt dirs untouched.
+   **Caution:** fixture files containing import strings can trip the repo's scanner gates —
+   use a temp fixture root the gate is pointed at (the dataverse self-test's temp-root +
+   `--root` pattern), never fixtures under `pages/`.
 3. Register both in `package.json` and `docs/CI_GATES_REFERENCE.md`; add to the `/start` gate list
    in `.claude/skills/start/SKILL.md`.
 4. Test inventory: for each in-scope route (the census output), record in the Stage Log whether any
@@ -191,11 +199,11 @@ proves partial-success/state-before-email extraction but teaches NEITHER the str
 multi-verb pattern. Two additional mandatory checkpoints:
 - **P1s (streaming pilot):** the smallest streaming route,
   `reviewer-finder/generate-emails.js` (23.6K vs `enrich-recommended.js` 30.2K,
-  `send-emails.js` 39.5K `[VERIFIED 2026-07-04 via ls]`), is pulled FORWARD across wave order
-  and converted as the streaming pilot — full verification block plus a fresh-context review
-  of the event-contract extraction — BEFORE any other streaming route (including wave 2's
-  `send-emails.js`) may start. `send-emails.js` therefore moves to the END of the streaming
-  set, after P1s clears.
+  `send-emails.js` 39.5K `[VERIFIED 2026-07-04 via ls]`), converts as its own named
+  micro-stage **2s** in the wave table — with its own baseline update, verification block,
+  and fresh-context review — BEFORE any other streaming route may start. `send-emails.js`
+  is correspondingly its own stage **2b**, gated on the 2s review clearing;
+  `enrich-recommended.js` stays in wave 4 but may not start before 2s clears either.
 - **P1m (multi-verb pilot):** the first multi-verb route converted gets the same treatment
   BEFORE `my-candidates.js` may start.
 
@@ -207,10 +215,12 @@ tail. **The authoritative file list for every wave is the Stage 0 census re-run 
 the domain counts below are the 2026-07-04 baseline, recorded for delta-checking, not as a frozen
 list.
 
-| Stage | Wave | Baseline size | Notes |
+| Stage | Wave | Expected census delta | Notes |
 |---|---|---|---|
-| 2 | review-manager | 10 routes incl. pilot (9 remaining) | One `lib/services/review-manager/` namespace. Convert smallest-first; `send-emails.js` (39.5 KB) LAST. `render-emails.js` and `send-emails.js` visibly share email-template concerns `[ASSUMED — executor verifies overlap before extracting]`: if confirmed, extract ONE shared module, not two copies. |
-| 3 | reviewer-finder | 6 routes | Heavy read paths; `my-candidates.js` (34 KB) and `save-candidates.js` (29.3 KB) last. Characterization tests must pin response envelopes BEFORE moving — clients depend on exact shapes. |
+| 2 | review-manager, non-streaming | 8 (domain has 10: pilot converted in Stage 1, `send-emails.js` deferred to 2b, 8 remain) | One `lib/services/review-manager/` namespace. Convert smallest-first. |
+| 2s | **P1s streaming-pilot micro-stage**: `reviewer-finder/generate-emails.js`, pulled forward from wave 3 | 1 | Own baseline update + fresh-context review (the P1s checkpoint). No other streaming route may start until this review clears. |
+| 2b | `review-manager/send-emails.js` | 1 | Streaming; starts only after P1s clears. `render-emails.js` and `send-emails.js` visibly share email-template concerns `[ASSUMED — executor verifies overlap before extracting]`: if confirmed, extract ONE shared module, not two copies. |
+| 3 | reviewer-finder, remaining | 5 (`generate-emails.js` already converted in 2s) | Heavy read paths; `my-candidates.js` (34 KB, multi-verb — P1m applies) and `save-candidates.js` (29.3 KB) last. Characterization tests must pin response envelopes BEFORE moving — clients depend on exact shapes. |
 | 4 | workbench | 16 routes | Largest wave — split into ≥3 commit series (`grantee-deliverables/` sub-tree as its own series); re-probe between series. |
 | 5 | tail | admin 4, external 3, cron 3, expertise-finder 2, grant-reporting 2 (incl. DynamicsService-only `extract.js`), phase-i-dynamics 1, field-primer 1, root-level 1 (`test-email.js`) — 17 total, closing the 49-route union | Cron routes keep `verifyCronSecret` + context shape exactly; external routes keep token-verification guards untouched. These are fail-closed production surfaces — any ambiguity is **STOP-AND-ASK**. Root-level routes have no domain dir; their services go under the closest domain namespace (Stage 0 classification decides, recorded in the Stage Log). |
 
@@ -228,8 +238,10 @@ list.
   marks which routes carry these traits so wave executors don't rediscover them.
 - **Per-file loop:** extract service → shell the route → service unit test → targeted jest →
   commit (one route or one small cluster per commit).
-- **Wave close:** full verification block; baseline JSON updated (expected delta = wave size);
-  post-stage fresh-context review; Stage Log entry with before/after counts.
+- **Wave close:** full verification block; baseline JSON updated — expected delta = the stage's
+  "Expected census delta" column, and the running sum across Stages 1-5 must land exactly on
+  the 49-route union (1+8+1+1+5+16+17 = 49); post-stage fresh-context review; Stage Log entry
+  with before/after counts.
 
 ### Stage 6 — Boilerplate unification (conditional)
 
@@ -269,4 +281,12 @@ review verdict + findings + resolutions)*
   hardened dataverse-scanner primitives via a shared module + adapter-source detection;
   Decision 4 gains the string-label AST precheck and same-or-wider-scope assertion;
   characterization minimums upgraded for streaming/partial-success/multi-verb routes.
-  Awaiting P0 round 2.
+  Sent to P0 round 2.
+- 2026-07-04 (S330): **P0 round 2 (Codex): NOT SATISFIED** — round-1 repairs verified live
+  (union 49, streaming trio, smallest streamer, 48 string-label bypass calls probed), but 1
+  residual live-state error (objective still said "single-verb files" while naming multi-verb
+  `my-candidates.js`) + 3 changes. Folded in: objective wording fixed; P1s made a named
+  micro-stage **2s** with its own census delta, `send-emails.js` split out as stage **2b**,
+  wave deltas restated to sum exactly to 49 (1+8+1+1+5+16+17); gate self-test spec expanded to
+  prove adapter-source detection inherits the hardened scanner classes (alias/re-export/
+  dynamic-import/inline-require) plus root-level route classification. Awaiting P0 round 3.
