@@ -50,6 +50,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { isPointInTimeBasename } = require('./lib/point-in-time-files');
+const { walkTree } = require('./lib/walk-files');
 
 const repoRoot = path.resolve(__dirname, '..');
 
@@ -119,17 +120,7 @@ function collectFiles() {
     if (!fs.existsSync(root)) {
       throw new Error(`doc-symbol-refs configuration error: required scan root is missing: ${rootRel}. Restore it or update ROOTS deliberately.`);
     }
-    (function walkDir(dir) {
-      for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, ent.name);
-        const rel = path.relative(repoRoot, full);
-        if (ent.isDirectory()) {
-          if (!shouldExcludeRelPath(rel)) walkDir(full);
-        } else {
-          addIfLive(full);
-        }
-      }
-    })(root);
+    walkTree(root, { repoRoot, shouldExcludeRel: shouldExcludeRelPath, onFile: addIfLive });
   }
   return out;
 }

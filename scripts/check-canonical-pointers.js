@@ -24,6 +24,7 @@ const path = require('path');
 const { repoRoot, CANONICAL_FACTS } = require('./lib/canonical-facts');
 const { CANONICAL_COUNTS_REL } = require('./lib/canonical-counts-render');
 const { isPointInTimeBasename } = require('./lib/point-in-time-files');
+const { walkTree } = require('./lib/walk-files');
 
 const SINGLE_FILES = ['CLAUDE.md', 'SESSION_PROMPT.md', 'README.md', 'GEMINI.md'];
 const ROOTS = ['docs', '.claude-memory'];
@@ -57,17 +58,7 @@ function collectFiles() {
   for (const rootRel of ROOTS) {
     const root = path.join(repoRoot, rootRel);
     if (!fs.existsSync(root)) continue;
-    (function walkDir(dir) {
-      for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, ent.name);
-        const rel = path.relative(repoRoot, full);
-        if (ent.isDirectory()) {
-          if (!EXCLUDE_DIR.test(rel)) walkDir(full);
-        } else {
-          addIfLive(full);
-        }
-      }
-    })(root);
+    walkTree(root, { repoRoot, shouldExcludeRel: (rel) => EXCLUDE_DIR.test(rel), onFile: addIfLive });
   }
   return out;
 }
