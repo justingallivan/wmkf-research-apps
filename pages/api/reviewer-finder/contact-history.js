@@ -41,10 +41,10 @@
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { meetingDateToCycleCode, cycleCodeToLabel } from '../../../lib/utils/cycle-code';
 import { queryAllRequests, queryRequests } from '../../../lib/dataverse/adapters/grant-request';
+import { queryAllPersons } from '../../../lib/dataverse/adapters/app-request-person';
 
 const ROLE_PI = 100000000;
 const ROLE_COPI = 100000001;
@@ -91,7 +91,7 @@ export default async function handler(req, res) {
         // Key Personnel / Other for the intake portal roster; reviewer-finder
         // history must stay scoped to PI + Co-PI, so filter at source rather
         // than relying on the PI-or-else-Co-PI mapping below.
-        DynamicsService.queryAllRecords('wmkf_apprequestpersons', {
+        queryAllPersons({
           select: '_wmkf_request_value,wmkf_role,wmkf_authorposition',
           filter: `_wmkf_contact_value eq ${escapedContactId} and (wmkf_role eq ${ROLE_PI} or wmkf_role eq ${ROLE_COPI})`,
         }),
