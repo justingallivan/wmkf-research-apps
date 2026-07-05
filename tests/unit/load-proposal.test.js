@@ -69,10 +69,15 @@ test('rejects non-POST (405)', async () => {
 });
 
 test('stops when auth fails', async () => {
-  requireAppAccess.mockResolvedValue(null);
+  requireAppAccess.mockImplementation(async (req, resp) => {
+    resp.status(401).json({ error: 'Authentication required' });
+    return null;
+  });
   const r = res();
   await handler(post({ requestId: VALID_GUID }), r);
   expect(getRecord).not.toHaveBeenCalled();
+  expect(r.statusCode).toBe(401);
+  expect(r.body).toEqual({ error: 'Authentication required' });
 });
 
 test('400s when requestId is missing', async () => {
@@ -125,4 +130,53 @@ test('golden path: downloads the best-guess proposal and uploads it to Blob', as
     requestNumber: '1002836',
   });
   expect(r.body.picked).toBe('akoya_request::FOLDER::Project Narrative.pdf');
+  expect(r.body).toEqual({
+    success: true,
+    blobUrl: 'https://blob.example/proposal.pdf',
+    filename: 'Project Narrative.pdf',
+    contentType: 'application/pdf',
+    size: 100,
+    picked: 'akoya_request::FOLDER::Project Narrative.pdf',
+    requestNumber: '1002836',
+    allFiles: [{
+      name: 'Project Narrative.pdf',
+      size: 100,
+      mimeType: 'application/pdf',
+      lastModified: '2026-01-01',
+      library: 'akoya_request',
+      folder: 'FOLDER',
+      classification: 'proposal',
+    }],
+  });
+});
+
+test('404s with { error, libraries } when no SharePoint files are found for the request', async () => {
+  getRecord.mockResolvedValue({ akoya_requestid: VALID_GUID, akoya_requestnum: '1002836' });
+  getRequestSharePointBuckets.mockResolvedValue([{ library: 'akoya_request', folder: 'FOLDER' }]);
+  listFiles.mockResolvedValue([]);
+
+  const r = res();
+  await handler(post({ requestId: VALID_GUID }), r);
+
+  expect(r.statusCode).toBe(404);
+  expect(r.body).toEqual({
+    error: 'No SharePoint files found for this request.',
+    requestNumber: '1002836',
+    libraries: [{ library: 'akoya_request', folder: 'FOLDER', error: null }],
+  });
+});
+
+test('400s with { error, allFiles } when an explicit fileKey override is not found', async () => {
+  getRecord.mockResolvedValue({ akoya_requestid: VALID_GUID, akoya_requestnum: '1002836' });
+  getRequestSharePointBuckets.mockResolvedValue([{ library: 'akoya_request', folder: 'FOLDER' }]);
+  listFiles.mockResolvedValue([
+    { name: 'Project Narrative.pdf', size: 100, mimeType: 'application/pdf', lastModified: '2026-01-01', folder: 'FOLDER' },
+  ]);
+
+  const r = res();
+  await handler(post({ requestId: VALID_GUID, fileKey: 'nope::nope::nope' }), r);
+
+  expect(r.statusCode).toBe(400);
+  expect(r.body.error).toBe("fileKey not found in this request's libraries: nope::nope::nope");
+  expect(Array.isArray(r.body.allFiles)).toBe(true);
 });

@@ -36,6 +36,51 @@ beforeEach(() => {
   requireAppAccess.mockResolvedValue({ session: { user: { azureEmail: 'pd@example.org' } } });
 });
 
+test('wrong method → 405', async () => {
+  const req = createMockReq({ method: 'POST', query: {} });
+  const res = createMockRes();
+  await handler(req, res);
+
+  expect(res.status).toHaveBeenCalledWith(405);
+  expect(res._data).toEqual({ error: 'Method not allowed' });
+});
+
+test('unauthenticated (requireAppAccess denies) → route returns immediately, does not touch the response requireAppAccess already sent', async () => {
+  requireAppAccess.mockImplementationOnce(async (req, resp) => {
+    resp.status(401).json({ error: 'Authentication required' });
+    return null;
+  });
+  const req = createMockReq({ method: 'GET', query: {} });
+  const res = createMockRes();
+  await handler(req, res);
+
+  expect(res.status).toHaveBeenCalledWith(401);
+  expect(res._data).toEqual({ error: 'Authentication required' });
+  expect(resolveByEmail).not.toHaveBeenCalled();
+});
+
+test('failure path: session has no azureEmail → 400', async () => {
+  requireAppAccess.mockResolvedValue({ session: { user: {} } });
+  const req = createMockReq({ method: 'GET', query: {} });
+  const res = createMockRes();
+  await handler(req, res);
+
+  expect(res.status).toHaveBeenCalledWith(400);
+  expect(res._data).toEqual({
+    error: 'Could not determine your email from the session. Sign out and back in.',
+  });
+});
+
+test('failure path: invalid cycleCode → 400', async () => {
+  resolveByEmail.mockResolvedValue(PD);
+  const req = createMockReq({ method: 'GET', query: { cycleCode: 'not-a-cycle' } });
+  const res = createMockRes();
+  await handler(req, res);
+
+  expect(res.status).toHaveBeenCalledWith(400);
+  expect(res._data).toEqual({ error: 'Invalid cycleCode: not-a-cycle' });
+});
+
 test('golden path: no cycleCode returns the distinct cycles for the PD', async () => {
   resolveByEmail.mockResolvedValue(PD);
   DynamicsService.queryAllRecords.mockResolvedValue({
@@ -47,11 +92,11 @@ test('golden path: no cycleCode returns the distinct cycles for the PD', async (
   await handler(req, res);
 
   expect(res.status).toHaveBeenCalledWith(200);
-  expect(res._data.success).toBe(true);
-  expect(res._data.programDirector).toEqual({ systemuserid: 'pd-1', fullName: 'Dr. PD' });
-  expect(res._data.cycles).toEqual([
-    expect.objectContaining({ code: 'J26', count: 1 }),
-  ]);
+  expect(res._data).toEqual({
+    success: true,
+    programDirector: { systemuserid: 'pd-1', fullName: 'Dr. PD' },
+    cycles: [{ code: 'J26', year: 2026, month: 6, count: 1, latestMeetingDate: '2026-06-15' }],
+  });
 });
 
 test('golden path: cycleCode returns the proposals-in-cycle DTO with reviewer counts', async () => {
@@ -84,9 +129,31 @@ test('golden path: cycleCode returns the proposals-in-cycle DTO with reviewer co
   await handler(req, res);
 
   expect(res.status).toHaveBeenCalledWith(200);
-  expect(res._data.proposals).toEqual([
-    expect.objectContaining({ requestId: 'r1', requestNumber: 'REQ-1', reviewerAccepted: 1 }),
-  ]);
+  expect(res._data).toEqual({
+    success: true,
+    programDirector: { systemuserid: 'pd-1', fullName: 'Dr. PD' },
+    cycleCode: 'J26',
+    status: 'actionable',
+    proposals: [{
+      requestId: 'r1',
+      requestNumber: 'REQ-1',
+      reviewerInvited: 1,
+      reviewerAccepted: 1,
+      reviewerDeclined: 0,
+      reviewerHeld: 0,
+      meetingDate: '2026-06-15',
+      meetingDateFormatted: null,
+      abstract: null,
+      requestStatus: 'Phase II Pending',
+      phaseIIStatus: null,
+      applicant: null,
+      projectLeader: null,
+      grantProgram: null,
+      programArea: null,
+      reviewerSlotsFilled: 0,
+      reviewerSlotsTotal: 5,
+    }],
+  });
 });
 
 test('failure path: no active Dynamics systemuser for the PD email → 404', async () => {
