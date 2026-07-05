@@ -98,6 +98,7 @@ npm run check:status-enum-parity && npm run check:status-enum-parity:self-test #
 npm run check:trust-boundary-guid && npm run check:trust-boundary-guid:self-test # client-supplied id → Dataverse selector must be GUID-validated (also a blocking commit guard)
 npm run check:dataverse-access-layer && npm run check:dataverse-access-layer:self-test # raw DynamicsService access ratchet; line-tolerant allowlist counts
 npm run check:odata-escape && npm run check:odata-escape:self-test            # hand-rolled OData single-quote escapes must route through odata.escape (sequential pairing, same convention as the gates above)
+npm run check:dynamics-context-boundary && npm run check:dynamics-context-boundary:self-test # bypassDynamicsRestrictions import boundary + empty-restrictions withDynamicsContext + script-only-outside-scripts (LAW mode, S333 bypass-strip Stage 3)
 npm run check:route-lifecycle-auth && npm run check:route-lifecycle-auth:self-test # ROUTE_NAMESPACE_LIFECYCLE.guardAppKeys must match each route's real requireAppAccess args (fail-closed)
 npm run check:route-service-boundary && npm run check:route-service-boundary:self-test # pages/api routes reaching Dataverse adapters/dynamics-service directly (LAW mode since Route→Service Stage 7; no baseline)
 npm run check:secret-scan && npm run check:secret-scan:self-test              # no real secret-shaped values in tracked files (GHAS-free push protection)

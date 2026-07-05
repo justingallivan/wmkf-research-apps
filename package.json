@@ -71,6 +71,8 @@
     "check:dataverse-access-layer:self-test": "node scripts/check-dataverse-access-layer-self-test.js",
     "check:odata-escape": "node scripts/check-odata-escape.js",
     "check:odata-escape:self-test": "node scripts/check-odata-escape-self-test.js",
+    "check:dynamics-context-boundary": "node scripts/check-dynamics-context-boundary.js",
+    "check:dynamics-context-boundary:self-test": "node scripts/check-dynamics-context-boundary-self-test.js",
     "check:route-lifecycle-auth": "node scripts/check-route-lifecycle-auth.js",
     "check:route-lifecycle-auth:self-test": "node scripts/check-route-lifecycle-auth-self-test.js",
     "check:route-service-boundary": "node scripts/check-route-service-boundary.js",

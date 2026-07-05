@@ -95,6 +95,44 @@ single-quoted-replacement variant, flexible whitespace, any receiver including
   (after removal), and that the HTML/XML/comment-only/canonical-file/exempt-dir
   shapes are never flagged.
 
+### `check:dynamics-context-boundary` — bypass import-boundary LAW (S333, Stage 3)
+
+Owner-approved regression gate for `docs/BYPASS_STRIP_PLAN.md` (Stages 1-2
+converted every direct `bypassDynamicsRestrictions` call site to
+`withDalContext`; Stage 3 keeps it that way). Babel-AST scan of `pages/`,
+`lib/`, `shared/`, `modules/` failing on any of three shapes:
+
+1. Any import/require/dynamic-import/re-export/inline-member-access of
+   `bypassDynamicsRestrictions`, outside `lib/dataverse/core/context.js` (the
+   one sanctioned `withDalContext` wrapper). Detection keys on the imported/
+   destructured NAME rather than a resolved module source, so a non-literal
+   `require()`/`import()` source fails closed for free.
+2. Any `withDynamicsContext(...)` call whose `restrictions` is a literal
+   empty array (`[]` — functionally identical bypass) or any other
+   non-literal-array expression this gate cannot prove is non-empty (fail
+   CLOSED), except the Explorer's loaded-restrictions caller under
+   `pages/api/dynamics-explorer/` and `lib/services/dynamics-context.js`
+   itself (the primitive necessarily contains the shape it implements).
+3. Any `enterDynamicsBypassForScript` reference (its SCRIPT-ONLY contract)
+   appearing in a scanned dir — these dirs are never `scripts/`, so any
+   occurrence at all is a violation.
+
+- `withDalContext` calls are always allowed. LAW mode from the start — the
+  S333 mechanical strip already reduced the live census to 0 before this gate
+  shipped, so there was no ratchet/ `--report` period.
+- Shares the hardened scanner core (`scripts/lib/ast-scan-core.js`) with the
+  dataverse and route-service gates.
+- `--root <dir>` override for the self-test's fixture tree; `--json` prints
+  the raw violation list.
+- Self-test: `npm run check:dynamics-context-boundary:self-test` — fixture-based,
+  proves all ten required RED shapes (static import, aliased import,
+  namespace/member access, dynamic import, inline require, re-export,
+  non-literal source fail-closed, literal empty-restrictions, non-literal
+  restrictions fail-closed, script-only-outside-scripts) each name their
+  fixture file, and that the sanctioned importer, the definition file, the
+  Explorer carve-out, ordinary `withDalContext` usage, and a legitimate
+  non-empty-restrictions caller are never flagged.
+
 ### `check:fact-consistency` — registered scalar drift
 
 The mandatory fan-in for code-derived scalars that get denormalized across docs (the recurring "fix in one place, stale restatement rots elsewhere" failure mode; S166 produced it ≥3× in one session).

@@ -38,6 +38,8 @@ jobs:
       - run: npm run check:dataverse-access-layer:self-test
       - run: npm run check:odata-escape
       - run: npm run check:odata-escape:self-test
+      - run: npm run check:dynamics-context-boundary
+      - run: npm run check:dynamics-context-boundary:self-test
       - run: npm run check:route-service-boundary
       - run: npm run check:route-service-boundary:self-test
       - run: npm run check:route-lifecycle-auth
