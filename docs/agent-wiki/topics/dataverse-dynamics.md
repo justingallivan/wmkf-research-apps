@@ -52,6 +52,13 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   lib/services/dynamics-context.js:123 isDalEnforcementOn + 5
   assertTrustedDalContext call sites in lib/services/dynamics-service.js]`.
   Prod flip is a pending deploy decision.
+  **Known gap (Codex post-impl review, 2026-07-05, not yet fixed):** the
+  email-write helpers `createEmailActivity`/`addEmailAttachment`/`sendEmail`
+  in `dynamics-service.js` reach the network with NO
+  `assertTrustedDalContext` call — Stage 8's gate exempts their method names
+  as `non-entity-transport`, so this stays green. Do not treat "entity writes
+  are fail-closed" as covering email sends until this is fixed; see
+  `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` stage log 2026-07-05 entry.
 - Validate OData before issuing it.
 - Entity/table schemas, read/write paths, source-of-truth, and drop status live in the Atlas.
 - Existing databases use `node scripts/apply-migrations.js`; `scripts/setup-database.js` is fresh-install-only.
@@ -66,18 +73,21 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
 
 ## Operating Notes
 
-- **Data-access layer migration is live (S329): `lib/dataverse/core/` exists
-  and a CI ratchet freezes raw usage.** `entity-registry.js` `entitySet()`
-  throws on any entity-set name outside the Stage-0 census (never guess names —
-  the S328 `wmkf_prompts`/`wmkf_aiprompts` 404s are the motivating case);
-  `odata.js` owns escape/eq/eqGuid filter builders; the adapter layer (9
-  adapters as of S329, incl. new policy / review-question / ai-prompt /
-  review-answer / grant-request) consumes them, and `core/changeset.js` is the
-  registry-validated batch path. Any NEW raw `DynamicsService` call (direct,
-  aliased, or via
-  `executeChangeset`) in `pages/`+`lib/`+`shared/` fails
-  `check:dataverse-access-layer` until it moves behind an adapter or the
-  allowlist shrinks. Plan + stage log: `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`.
+- **Data-access layer migration is COMPLETE as of Stage 8 (S329): all 9
+  stages executed in one session.** `lib/dataverse/core/` (odata / entity-registry
+  / errors / changeset / context) + 18 per-entity adapters `[VERIFIED via
+  ls lib/dataverse/adapters/ — 18 files]`. `entity-registry.js`
+  `entitySet()` throws on any entity-set name outside the Stage-0 census
+  (never guess names — the S328 `wmkf_prompts`/`wmkf_aiprompts` 404s are the
+  motivating case); `odata.js` owns escape/eq/eqGuid filter builders;
+  `core/changeset.js` is the registry-validated batch path. The gate
+  (`check:dataverse-access-layer`) is now LAW, not a ratchet — the allowlist
+  file was deleted at Stage 8; any raw `DynamicsService` call (direct,
+  aliased, or via `executeChangeset`) in `pages/`+`lib/`+`shared/` that isn't
+  behind an adapter or on the closed `non-entity-transport` method list fails
+  closed, including unrecognized method names. Plan + full stage log:
+  `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`. See the known email-helper
+  enforcement gap above before assuming this closes every write path.
 - OData null filters do not behave like SQL.
 - The sandbox is not drop-in prod parity.
 - Do not rebuild Explorer behavior when the Power Tools surface should be reused.

@@ -1,211 +1,173 @@
-# Session 329 Prompt: Verify thank-you cron proof, clean up rehearsal data, schedule data-layer Stage 0
+# Session 330 Prompt: Close the Stage 7 email-write gap; decide prod DAL flip
 
-## Session 328 Summary
+## Session 329 Summary
 
-Session 328 executed the staged review-submission rehearsal end-to-end with the
-owner driving the browser (request 1002788, reviewer "Test Case"
-rarebit.skits-6f@icloud.com). The rehearsal proved the full pipeline live —
-invite → accept → S325 drain-queue confirmation (1 job, completed, 0 retries)
-→ portal submit (11 answer rows) → Reviews tab Compare/Export → AI synthesis
-(1,709-char JSON persisted) — and surfaced two production blockers plus four
-UX/correctness gaps, all fixed and deployed same-session. Two new features
-shipped (thank-you sweep, materials preflight guard) and the Dataverse
-data-access layer migration plan was authored, adversarially verified, and
-committed (execution NOT started).
+Session 329 executed the ENTIRE staged Dataverse data-access-layer migration
+(Stages 0-8) in one session via parallel worktree agents (Codex + Opus +
+Sonnet builds, serial Claude review/merge), with Codex adversarial review at
+each phase boundary. The mid-session crash this session opened with (app
+`beforeQuit`/restart, 3 terminal PTYs killed) turned out to be a clean
+restart, not data loss — the crashed session's last subagent ("Stage 8:
+ratchet becomes law") had already completed and merged before the restart,
+and a background Codex review kicked off right after the restart (via the
+daemon, independent of the killed terminal PTYs) ran to completion
+unaffected. Full audit trail: `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`
+stage log (354-530ish). Milestone entry: `DEVELOPMENT_LOG.md` "July 2026 —
+... Session 329".
 
 ### What Was Completed
 
-1. **Rehearsal tooling + execution**
-   - `scripts/probe-review-rehearsal-state.mjs` (read-only before/after
-     snapshot) and `reset-reviewer-for-testing.js --clear-synthesis`.
-   - Rehearsal executed; S325 drain carryover CLOSED (verified completed job).
+1. **Plan hardening (pre-execution)** — second adversarial review (Codex)
+   refuted the original probe/gate design (2 P0 + 4 P1: aliased-writer blind
+   spots, `executeChangeset` raw-CRUD backdoor, Bulk Export subtree
+   unexempted, Stage 8 wording banned the adapters themselves, Wave 3 missed
+   answer-snapshot writes, Stage 7 auth-ordering risk). Plan amended in
+   place before any code changed.
 
-2. **Production blockers found by the rehearsal (fixed + deployed)**
-   - `claude-sonnet-5` was unregistered → Executor fail-closed 500. Registered
-     in `model-capabilities.js` + `model-pricing.js` ($3/$15, 1M/128K).
-   - Synthesis prompt `wmkf_ai_maxtokens` 2000 → truncated JSON under
-     Sonnet 5 default adaptive thinking. Seed + live row (owner-approved
-     PATCH) now 8000.
+2. **Stages 0-1** — Babel-AST census gate (`scripts/check-dataverse-access-layer.js`,
+   alias-aware, changeset-attribution-aware) + allowlist ratchet (211 → 181
+   entries), CI-registered, self-tested (6 fixture kinds).
 
-3. **Release-flow overhaul (owner decisions)**
-   - Release emails default to the tokenized portal link; email attachment
-     behind new admin setting `reviewer.release.attach_proposal_email`
-     (default OFF, fails closed; admin card added). Kills the public-Blob
-     proposal copy in the default path.
-   - Release button respects checkbox selection (subset of accepted).
-   - Materials preflight guard: new GET `/api/review-manager/materials-preflight`
-     shares the portal's `isReviewerMaterial` filter (hoisted
-     `listReviewerMaterials`); empty folder → amber banner + "Release anyway?".
+3. **Stage 2 + adapter wave** — `lib/dataverse/core/` toolkit (odata/
+   entity-registry/errors/changeset/context) + all 18 per-entity adapters
+   `[VERIFIED via ls lib/dataverse/adapters/ — 18 files]`, tests-first.
 
-4. **Portal/lifecycle correctness**
-   - Token `ops` claim enforced fail-closed on proposal/upload/submit/draft
-     routes (`tokenHasOp`; behavioral no-op for all minted tokens).
-   - Submit changeset now advances `wmkf_reviewstatus` → 100000003
-     (Review Received) atomically; Track badge + work-remaining follow.
-   - Submitted portal view hides the empty "hasn't shared materials" card.
+4. **Stages 3-6 (bulk conversion)** — ~80 caller files converted across 7
+   parallel worktree clusters + 3 sequential tails; allowlist 181 → 12, all
+   12 non-entity-transport. Full suite 4163/4163 at wave close.
 
-5. **Thank-you sweep (new automation)**
-   - `lib/services/reviewer-thankyou-sweep.js` + cron
-     `/api/cron/send-review-thankyous` (vercel.json `30 10 * * *`).
-     Claim-before-send on `wmkf_thankyousentat` (at-most-once); DOCX courtesy
-     copy of the reviewer's own review attached as real bytes
-     (activitymimeattachments, never Blob); attachment failure degrades to
-     plain send. `fetchAnswersBySuggestion` hoisted to
-     `lib/services/review-answers.js` (re-sanitization preserved).
+5. **Stage 7** — restriction context folds into the layer:
+   `withDalContext(scopeLabel, fn)` (thin wrapper over the existing
+   `bypassDynamicsRestrictions` ALS), entity CRUD + `executeChangeset` assert
+   a trusted context under `DATAVERSE_DAL_ENFORCEMENT` (unset = on outside
+   prod). CLAUDE.md invariant + wiki reconciled. **Prod flag flip is a
+   pending owner deploy decision.**
 
-6. **Data-access layer migration plan (docs only)**
-   - `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`: 9 stages, ratchet+gate,
-     restriction-context fold-in gated on owner go/no-go. Baselines
-     complement-derived + fresh-context verified (0 refuted). NOT started.
+6. **Stage 8** — gate becomes law: allowlist file DELETED, gate fails on any
+   identity not in the closed `non-entity-transport` method set, unknown
+   method names fail closed. Suite 4181/4181, build clean.
 
-### Commits
+7. **Codex post-impl review of Stage 7 (this session, 2026-07-05) — COMPLETED,
+   verdict "needs changes."** See Verified Open #1 below — this is the one
+   real open item from the whole migration.
 
-- `467d3b1b` scripts: rehearsal cleanup + snapshot tooling
-- `23e65f71` fix(models): register claude-sonnet-5
-- `f57b37d4` fix(prompts): review-synthesis maxtokens 2000→8000
-- `19e3cd3d` fix(reviewers): Release button respects selection
-- `9a776b8e` fix(external): enforce token ops claim (fail closed)
-- `8de6487d` feat(reviewers): link-first release + attachment admin toggle
-- `31b71770` fix(portal): hide empty materials card after submission
-- `cd7f908e` fix(external): submit advances wmkf_reviewstatus
-- `51573c79` feat(reviewers): thank-you sweep + DOCX courtesy copy
-- `03a26842` feat(reviewers): materials preflight guard
-- `a2131328` docs: data-access layer migration plan
+8. **Docs reconciled this session**: `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`
+   stage log, `DEVELOPMENT_LOG.md` Session-329 "Open" line, and
+   `docs/agent-wiki/topics/dataverse-dynamics.md` (both the fail-closed
+   ground-rule claim and the stale "9 adapters" operating note) all updated
+   to reflect the Codex finding — none of them mentioned it before this
+   close-out, `npm run check:agent-wiki` green after.
+
+### Commits (Stage 7 → close-out; see plan doc for the full Stage 0-6 list)
+
+- `59c38843` Merge Stage 7: DAL restriction fold-in
+- `23ac6171` docs(data-layer): Stage 7 reconciliation
+- `21fc7e66` feat(data-layer): Stage 8 — ratchet becomes law, allowlist deleted
+- `3cf4a506` Merge Stage 8
+- `41edacd9` docs(data-layer): Stage 8 close-out
+
+(This session's doc-reconciliation edits are uncommitted as of this
+handoff — see Step 2 below, commit them before anything else.)
 
 ## Next Items
 
 ### Verified Open
 
-1. **Verify the first thank-you cron run, then clean up the rehearsal data.**
-   Evidence: cron `30 10 * * *` in vercel.json (`51573c79`). [VERIFIED
-   2026-07-04 via live probe] exactly 2 suggestions system-wide have
-   `wmkf_reviewreceivedat` set; the older (6ad328b4…, received 2026-05-27)
-   already has `wmkf_thankyousentat` set so is NOT eligible — the Test Case
-   row (1e9815ea…) is the only sweep-eligible row.
-   Steps: after the first run post-deploy, check rarebit.skits-6f@icloud.com
-   for the thank-you + DOCX attachment; check the maintenance run record and
-   `wmkf_thankyousentat` via
-   `node scripts/probe-review-rehearsal-state.mjs --requestNumber 1002788 --email rarebit.skits-6f@icloud.com`.
-   THEN clean up:
-   `node scripts/reset-reviewer-for-testing.js --email rarebit.skits-6f@icloud.com --requestNumber 1002788 --clear-synthesis --commit`
-   and re-probe to confirm pristine. Cleanup before the cron proof loses the
-   free E2E test — owner agreed to let the cron fire first.
+1. **Fix the Stage 7 email-write enforcement gap (Codex finding, High
+   severity).**
+   Evidence: `[VERIFIED via lib/services/dynamics-service.js:1231,1302,1337]`
+   — `createEmailActivity`, `addEmailAttachment`, `sendEmail` perform
+   Dataverse POST/action calls with no `assertTrustedDalContext`.
+   `[VERIFIED via scripts/check-dataverse-access-layer.js:66]` — these 3
+   method names (+ `logAiRun`) are the closed `non-entity-transport` exempt
+   set, so the law-mode gate stays green while these paths are unguarded raw
+   writes. Fix: add `assertTrustedDalContext` calls to these 3 methods (or
+   decide/document why email-send is intentionally exempt from the DAL trust
+   boundary — but that contradicts the Stage 7/8 "entity-changing network
+   paths are fail-closed" framing already asserted in CLAUDE.md and the
+   wiki). Do this BEFORE flipping `DATAVERSE_DAL_ENFORCEMENT` in prod or
+   calling Stage 7/8 security-complete.
 
-2. **Owner browser spot-check of the new release flow.**
-   Evidence: `8de6487d` + `03a26842` deployed; unit-proven, not browser-driven.
-   Check: release modal shows portal-link note (no file picker); on 1002788
-   specifically, the empty-materials amber warning + "Release anyway?" confirm
-   (its Reviewer_Downloads folder is genuinely empty).
+2. **Medium-severity Codex findings, same review — lower priority, owner call
+   needed on each:**
+   - "Trusted context" is ALS-presence only, not proof of post-auth
+     establishment (`context.js:46,66`; `dynamics-context.js:140`) — no
+     concrete exploit found, but the trust model can't distinguish a
+     caller-owned post-auth wrap from an arbitrary legacy-bypass context.
+   - `pages/api/grant-reporting/extract.js:590` calls `DynamicsService.logAiRun`
+     with no DAL context; if enforcement flips on in prod, this audit write
+     throws and is silently swallowed at `:600` (non-fatal by design, but
+     worth deciding if audit-loss-on-flip is acceptable).
+   - `tests/unit/dal-enforcement.test.js:87` doesn't cover the email helpers
+     or `withDynamicsContext` as a write-trusted context — add coverage
+     alongside the fix in #1.
+
+3. **Commit this session's doc-reconciliation edits** (uncommitted at
+   handoff): `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`, `DEVELOPMENT_LOG.md`,
+   `docs/agent-wiki/topics/dataverse-dynamics.md`. `npm run check:agent-wiki`
+   already verified green.
 
 ### Owner Decision Needed
 
-1. **Schedule data-access migration Stage 0 (census probe + baseline).**
-   Evidence: `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` (owner approved
-   scope/cadence S328; execution not started). Stage 0/1 are docs+gate only,
-   zero behavior change — good filler for any session.
+1. **Prod `DATAVERSE_DAL_ENFORCEMENT` flip.** Evidence: unset = on outside
+   production; prod itself needs an explicit flip. Should wait until
+   Verified Open #1 (email-write gap) is closed — flipping now would still
+   leave email sends unguarded, just with the rest of entity CRUD enforced.
 
-2. **Manual review-due reminder P2 hardening** (carried from S327).
-   Evidence: `lib/services/reviewer-manual-reminder.js:106-107`,
-   `pages/api/review-manager/send-review-reminder.js:63-65` (echoes low-level
-   `result.errors`), `lib/services/reviewer-reminder-sweep.js:301-305`.
-   Decide: fix now or when the surface is next touched.
+2. **Mechanical strip of the remaining legacy `bypassDynamicsRestrictions`
+   importers** (plan doc's Stage 7 entry counted 79 post-merge; a fresh
+   `grep`-based recount just now landed in the low-80s depending on method,
+   so treat the exact count as [ASSUMED stale] and recount before scoping —
+   direction is unchanged) — functionally correct as-is (legacy wrapper IS a
+   trusted context), purely a follow-up cleanup pass. Schedule whenever, no
+   urgency.
 
-3. **Campaign-settings UX revisit** (owner ask S326).
-   Evidence: `.claude-memory/project-campaign-settings-ux-revisit.md`
-   [OWNER-REPORTED, not source-verified]. Preflight per that memory before
-   scoping.
-
-4. **Review rendition formatting pass** (owner ask S328).
-   Evidence: `.claude-memory/project-review-output-formatting.md`. Courtesy
-   copy ships first-pass; staff DOCX/PDF also to be restyled — one effort over
-   the shared `composeReviewReport` seam. Owner schedules.
+3. **Session 328 items not yet revisited this session** — thank-you cron
+   proof + rehearsal cleanup, owner browser spot-check of the release flow.
+   Not re-verified this session; check `.claude-memory/` and a fresh probe
+   before assuming still-open (durable-carryover rule) — see prior
+   SESSION_PROMPT history for detail if picking these back up.
 
 ### Parked
 
 1. **Spec-audit docs recovery** (work computer only, ~2026-07-08).
    Evidence: `.claude-memory/project-spec-audit-docs-recovery-parked.md`.
 
-2. **Institution-COI ledger calibration.**
-   Evidence: `scripts/probe-institution-coi-breakdown.mjs`; needs accumulated
-   `coi_dropped` rows.
-
 ### Verify Before Acting
 
-1. **Track badge on the TEST row stays "Materials Sent" until cleanup** — the
-   status-transition fix (`cd7f908e`) is forward-only. Not a bug; do not
-   "fix" it; cleanup resets the row.
-
-2. **AwardeeTab stale-response guard** is narrow: only `copyWebsiteHtml()`
-   (`shared/components/workbench/AwardeeTab.js:302-318`) lacks the
-   request-check. Only if touching AwardeeTab.
-
-3. **Old S322 cleanup suggestions**: grep live callers first
-   (`docs/DEAD_CODE_DELETION_MANIFEST.md` correction history).
-
-4. **At-most-once email semantics are owner-approved design** for BOTH the
-   acceptance confirmation (S325) AND the new thank-you sweep (S328).
-   Product/ops approval required before retry-on-failure.
-
-5. **Synthesis concurrent-generate race remains accepted** (S326 contract;
-   S327/S328 did not change it). No locking without an owner ask.
+1. **Do not assume "entity writes are fail-closed" covers email sends** —
+   the wiki now flags this explicitly (`docs/agent-wiki/topics/dataverse-dynamics.md`),
+   but if anyone quotes the older CLAUDE.md/Stage-7-reconciliation wording
+   in isolation it reads as full coverage. It is not, until Verified Open #1
+   ships.
 
 ### Do Not Reopen Without New Decision
 
-1. **S325 drain-queue monitoring is CLOSED** — first accept verified completed
-   (S328 probe: 1 job, completed, 0 retries, confirmation sent).
-2. **Synthesis replay fixture is MOOT** — rehearsal produced real synthesis
-   output; owner decision #2 from S327 answered by events.
-3. **review-synthesis.generate IS visible/editable in /admin → Prompt
-   Templates** (locale sort puts it after reviewer-finder entries; verified by
-   owner S328).
-4. **Do not re-add CodeQL** (`180e9046`, `198fbd97`).
-5. **Do not delete `lib/services/anthropic-admin.js`** (pricing cron imports).
-6. **Two advisory hooks remain retired; `pre-commit-self-review.js` kept**
-   (`docs/HARNESS_INSTRUCTION_AUDIT_S322.md`).
-7. **Client-side export remains the decision** until a Power Automate flow
+1. **Do not re-add CodeQL** (`180e9046`, `198fbd97`).
+2. **Do not delete `lib/services/anthropic-admin.js`** (pricing cron imports).
+3. **Client-side export remains the decision** until a Power Automate flow
    exists (`docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md` decision 4).
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` | Staged data-layer migration plan; Stage 0 not started. |
-| `lib/services/reviewer-thankyou-sweep.js` | Thank-you sweep (claim-before-send, DOCX attachment). |
-| `pages/api/cron/send-review-thankyous.js` | Cron route (10:30 daily, vercel.json). |
-| `lib/services/review-answers.js` | Shared answer-snapshot reader (re-sanitizing). |
-| `shared/utils/review-report.js` / `review-report-docx.js` | Report composition + `composeSingleReviewCopy` / server DOCX. |
-| `pages/api/review-manager/materials-preflight.js` | Reviewer-visible file count for release warning. |
-| `pages/api/review-manager/release-settings.js` | Attach-proposal-email admin setting (GET/PUT). |
-| `lib/external/reviewer-materials.js` | `listReviewerMaterials` — ONE filter for portal + preflight. |
-| `lib/external/verify-suggestion-token.js` | `tokenHasOp` ops-claim predicate. |
-| `lib/external/build-review-submission.js` | Submit parentPatch (now sets reviewstatus 100000003). |
-| `scripts/probe-review-rehearsal-state.mjs` | Read-only rehearsal state probe. |
-| `scripts/reset-reviewer-for-testing.js` | Cleanup incl. `--clear-synthesis`. |
+| `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` | Full 9-stage plan + stage log (complete audit trail, incl. the Codex finding). |
+| `lib/services/dynamics-service.js` | `createEmailActivity`/`addEmailAttachment`/`sendEmail` — the unguarded methods to fix. |
+| `scripts/check-dataverse-access-layer.js` | Law-mode gate; `NON_ENTITY_TRANSPORT_METHODS` closed list (line ~66). |
+| `lib/dataverse/core/context.js` | `withDalContext`, `hasTrustedDalContext`. |
+| `lib/services/dynamics-context.js` | `isDalEnforcementOn`, `assertTrustedDalContext`. |
+| `tests/unit/dal-enforcement.test.js` | Fail-closed test suite — needs email-helper coverage added. |
+| `docs/agent-wiki/topics/dataverse-dynamics.md` | Reconciled this session with the email-write gap. |
 
 ## Testing
 
 ```bash
-# Rehearsal state / cleanup
-node scripts/probe-review-rehearsal-state.mjs --requestNumber 1002788 --email rarebit.skits-6f@icloud.com
-node scripts/reset-reviewer-for-testing.js --email rarebit.skits-6f@icloud.com --requestNumber 1002788 --clear-synthesis   # add --commit to apply
+# Gates for this surface
+npm run check:dataverse-access-layer && npm run check:dataverse-access-layer:self-test
+npm run check:agent-wiki
+npx jest tests/unit/dal-enforcement.test.js
 
-# This session's suites
-npx jest tests/unit/reviewer-thankyou-sweep.test.js tests/unit/review-single-review-copy.test.js \
-  tests/unit/send-review-thankyous-cron.test.js tests/unit/materials-preflight.test.js \
-  tests/unit/reviewer-manage-proposal-attachment.test.js tests/unit/build-review-submission.test.js \
-  tests/unit/materials-view-files-card.test.js tests/unit/verify-suggestion-token.test.js \
-  tests/integration/external-review-routes.test.js tests/integration/external-review-submit-route.test.js \
-  tests/integration/external-review-draft-route.test.js
-
-# Gates for these surfaces
-npm run check:api-routes && npm run check:api-routes:self-test
-npm run check:trust-boundary-guid && npm run check:route-lifecycle-auth
-npm run check:model-registry && npm run check:status-enum-parity
+# Full suite (was 4181/4181 at Stage 8 close; pricing-canary was fixed in S329, no longer a known-red)
+npm test
 ```
-
-Notes:
-- Known pre-existing red: `tests/unit/pricing-canary.test.js` (verified failing
-  identically on unmodified main during S328; unrelated to this session).
-- Full `npm run build` was exercised via the 5 production deploys this session
-  (all READY); the last local full-suite run was 3835/3836 (the pricing-canary
-  pre-existing failure).

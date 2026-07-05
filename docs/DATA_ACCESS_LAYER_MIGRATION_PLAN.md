@@ -501,8 +501,33 @@ Drift found → this doc is edited BEFORE the next stage starts.
   reworked to law-mode fixtures (entity / unresolved-alias /
   changeset-unresolved / unknown-method reds; clean + exempt greens). Suite
   4181/4181; build clean; atlas green post-deletion. CI_GATES_REFERENCE
-  reconciled. Codex post-impl review of Stage 7 in flight; Stage 8 review
-  optional at owner's call.
+  reconciled.
+
+- 2026-07-05 (S329): **Codex post-impl adversarial review of Stage 7
+  completed** (read-only, `task-mr77bsot-gt2byy`; verdict: **needs changes
+  before Stage 7 is security-complete**). Findings:
+  - **High**: `DynamicsService.createEmailActivity` (`dynamics-service.js:1231`),
+    `addEmailAttachment` (`:1302`), and `sendEmail` (`:1337`) perform
+    Dataverse POST/action calls with NO `assertTrustedDalContext` — these are
+    exactly the 4 method names Stage 8's gate classifies
+    `non-entity-transport` (`scripts/check-dataverse-access-layer.js:66`), so
+    the law-mode gate stays green while these paths remain unguarded raw
+    writes. Refutes "entity-changing network paths are fail-closed."
+  - **Medium**: "trusted context" is ALS-presence only, not proof of
+    post-auth establishment (`context.js:46,66`; `dynamics-context.js:140`)
+    — cannot distinguish a caller-owned post-auth wrap from an arbitrary
+    `withDynamicsContext`/legacy-bypass context. No concrete wrap-before-auth
+    bug found in the 6 sampled canary routes.
+  - **Medium**: `pages/api/grant-reporting/extract.js:590` calls
+    `DynamicsService.logAiRun` (guarded, writes via `createRecord`) with no
+    DAL context — if `DATAVERSE_DAL_ENFORCEMENT=on` in prod, this
+    authenticated route's audit write throws and is swallowed at `:600`.
+  - **Low/Medium**: `tests/unit/dal-enforcement.test.js:87` doesn't cover the
+    email helpers, `withDynamicsContext` as a write-trusted context, or
+    unset/production `NODE_ENV` defaults.
+  Not yet fixed. Stage 8's "law" framing (commit `41edacd9`) predates this
+  finding — treat the email-write gap as open before calling Stage 7/8
+  security-complete or flipping `DATAVERSE_DAL_ENFORCEMENT` in prod.
 
 ## Appendix A — Census (Stage 0 baseline → Stage 8 final)
 
