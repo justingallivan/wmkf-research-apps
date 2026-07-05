@@ -28,13 +28,15 @@
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { validateReviewForm } from '../../../lib/external/review-form-schema';
 import { getActiveQuestionSet } from '../../../lib/external/review-question-fetcher';
-import { buildRatingSnapshotRows, answerRowUrl, answerRowBody } from '../../../lib/external/review-answer-snapshot';
+import { buildRatingSnapshotRows } from '../../../lib/external/review-answer-snapshot';
+import { patchReviewReceipt, ENTITY_SET_NAME as SUGGESTION_ENTITY_SET } from '../../../lib/dataverse/adapters/reviewer-suggestion';
+import { answerUpsertDescriptor } from '../../../lib/dataverse/adapters/review-answer';
+import { runChangeset, atomicParentWithChildren } from '../../../lib/dataverse/core/changeset';
 
-const ENTITY_SET = 'wmkf_appreviewersuggestions';
+const ENTITY_SET = SUGGESTION_ENTITY_SET;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -85,20 +87,15 @@ export default async function handler(req, res) {
     try {
       await bypassDynamicsRestrictions('mark-received-no-file', async () => {
         if (ratingRows.length === 0) {
-          await DynamicsService.updateRecord(ENTITY_SET, suggestionId, patch, { actingUserSystemId });
+          await patchReviewReceipt(suggestionId, patch, { actingUserSystemId });
           return;
         }
         // Atomic: rating upserts (by alternate key) + the parent PATCH in one
         // changeset, so a parent-only row can never be left behind on a partial
         // failure (the exact gap Phase D closes).
-        const answerEntitySet = await DynamicsService.resolveEntitySetName('wmkf_appreviewanswer');
-        const operations = ratingRows.map((row) => ({
-          method: 'PATCH',
-          url: answerRowUrl(answerEntitySet, suggestionId, row.questionKey, snapshotKeys),
-          body: answerRowBody(row),
-        }));
-        operations.push({ method: 'PATCH', url: `${ENTITY_SET}(${suggestionId})`, body: patch });
-        await DynamicsService.executeChangeset(operations, { actingUserSystemId });
+        const children = ratingRows.map((row) => answerUpsertDescriptor(suggestionId, row, snapshotKeys));
+        const parent = { method: 'PATCH', entitySet: ENTITY_SET, key: suggestionId, body: patch };
+        await runChangeset(atomicParentWithChildren({ parent, children }), { actingUserSystemId });
       });
     } catch (e) {
       if (/(?:update|changeset).*404/i.test(e.message || '') || e.status === 404) {
