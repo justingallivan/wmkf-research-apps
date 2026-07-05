@@ -3,7 +3,7 @@ title: bypassDynamicsRestrictions Strip Plan
 domain: architecture
 kind: plan
 status: active
-summary: "Converted 52 bypass scopes to withDalContext, byte-identical; bypass-shape law (Stage 3) built. Executed S333."
+summary: "Converted 52 bypass scopes to withDalContext; bypass-shape law built; Stage 4 tightening executed for 10/11 sites (site 33 deferred). S333."
 canonical: true
 owner: product-engineering
 related:
@@ -16,15 +16,21 @@ related:
 
 # bypassDynamicsRestrictions Strip Plan
 
-**Execution status: STAGES 0–3 COMPLETE AND REVIEW-CLOSED (S333, 2026-07-05).** Frontmatter
+**Execution status: STAGES 0–4 COMPLETE (S333, 2026-07-05).** Frontmatter
 `status` moved to the live enum value `active` (the docs-catalog enum has no "completed" value,
 mirroring the `CHUNK`/`GATE_SCRIPT`/`ODATA` precedent). All 52 functional bypass scopes converted
 to `withDalContext` (Stages 1–2); the import-boundary law (Stage 3,
-`scripts/check-dynamics-context-boundary.js`) built per owner decision (build now, AST gate shape).
-Post-execution fresh-context review: Codex adversarial review (round 1) found one P1 (Stage 3
-rule 2 evadable via an aliased/namespace-form `withDynamicsContext` call) — folded same-session
-(Stage Log). Trust-model tightening beyond the mechanical strip (Stage 4) remains an **OWNER
-DECISION**, deferred per the plan's own recommendation.
+`scripts/check-dynamics-context-boundary.js`) built per owner decision (build now, AST gate shape) —
+one round of Codex adversarial review found one P1 (rule 2 evadable via an aliased/namespace-form
+`withDynamicsContext` call), folded same-session (Stage Log). Stage 4 trust-model tightening —
+explicitly optional/owner-decision below — was executed on **owner direction** for 10 of the 11
+non-mechanical sites: 4 nested-redundant wrappers **removed** (sites 40, 47, 49, 50) after tracing
+every real caller (not just the ones the Classification table named); 6 entry-seam wrappers
+**pushed up** to their real callers (sites 34, 35, 44, 45, 46, 48). Site 33
+(`notification-service.js`) was **deliberately left as-is** — its DAL-touching branch sits inside a
+21-caller shared utility (`notify()`), most of which never reach it, and safely auditing that full
+fan-out is out of scope for this session; this is a new, narrower deferral than the plan's original
+blanket Stage 4 recommendation. A second fresh-context review round covering Stage 4 is pending.
 
 **Evidence provenance.** Every call site's enclosing function, upstream auth guard, fn body, and caller
 graph in the Classification tables was gathered by four fresh-context census sweeps this session
@@ -511,26 +517,40 @@ appearing outside `scripts/`/`tests/` → RED; plus GREEN fixtures for `withDalC
 built — gate + self-test green at census 0, registered everywhere the sibling gates are; if declined —
 record the decision here and skip (the strip still stands; only the anti-regression ratchet is absent).
 
-### Stage 4 — Trust-model tightening beyond the mechanical strip (OPTIONAL — OWNER DECISION)
+### Stage 4 — Trust-model tightening beyond the mechanical strip (EXECUTED on owner direction, 10/11 sites, S333 2026-07-05)
 
 Beyond the behavior-identity strip, the doctrinal ideal is that context is established **only at the
-thinnest post-auth boundary**, with **no redundant nesting**. That means:
-- **Removing** the nested-redundant wrappers (sites 40, 47, 49, 50) so the read/write relies on the
-  upstream `withDalContext` — but only after proving **every** call path (including exported/test callers)
-  is in-context; otherwise the removal strands a Dataverse call and fail-closes in prod (the drain-defect
-  class).
-- **Pushing entry-seam context up** for the thin-caller seams (e.g. establish `withDalContext` in
-  `cron/maintenance.js`, `bill/onboard-reviewer.js`, `review-manager/revoke-token.js` and drop the lib
-  wrapper) so lib services stop establishing context — matching the Route→Service Decision 3 doctrine
-  ("services assume a trusted DAL context already exists; establishment stays at the route").
+thinnest post-auth boundary**, with **no redundant nesting**. This section originally recommended
+deferring the whole exercise (real text preserved below); the **owner directed execution** this
+session. Both sub-exercises were carried out with the same acceptance bar the recommendation named
+(characterization proving trusted context at the inner op, fresh-context review pending, gates green
+throughout):
 
-Each of these is a per-caller-fanout exercise with the drain-defect risk and is explicitly **out of the
-mechanical strip** (Route→Service Decision 4: "trust-model tightening comes at the end of the strip").
-**Owner decides** whether to pursue it, per-site, with the same acceptance bar (characterization proving
-trusted context at the inner op, fresh-context review, gates green). **Recommendation:** defer — the
-mechanical strip + Stage 3 law already delivers the objective's enforcement (only `core/context.js` imports
+- **Removed** the nested-redundant wrappers (sites 40, 47, 49, 50) after re-tracing **every** real
+  caller (not just the ones the Classification table named — `mintAndStore`, e.g., turned out to have
+  3 additional production callers beyond the one traced: `reviewer-reminder-sweep.js`,
+  `render-emails-service.js`, `regenerate-token-service.js`; all confirmed already nested inside an
+  established context via their own routes before the removal). No call path was stranded.
+- **Pushed entry-seam context up** for 6 of the 7 remaining sites — 34/35 (`maintenance-service.js` →
+  `cron/maintenance.js`), 44 (`review-answer-snapshot.js` → `context-service.js`, relocated as a sixth
+  narrow scope per that file's own declared P1m doctrine, not widened), 45 (`verify-grantee-token.js` →
+  its 2 real callers), 46 (`verify-suggestion-token.js` → all 6 real callers — wider fan-out than 45,
+  same mechanical pattern), 48 (`token-lifecycle.js` `revoke` → `revoke-token.js`).
+- **Site 33 (`notification-service.js`) deliberately left as-is** — NOT pushed up. Its DAL-touching
+  branch (`sendAdminEmail`) is reached only from inside the widely-shared `notify()` utility, which has
+  **21 real callers** across cron routes, page routes, and lib services (re-verified via disconfirming
+  grep), most of which never trigger the email branch at all (only `severity: error|critical` or
+  `emailAdmins: true`). Safely auditing all 21 callers' context posture is a materially larger,
+  higher-risk fan-out than any other Stage 4 site and was judged out of scope for this session — a
+  narrower, evidence-driven deferral than the blanket "defer everything" recommendation below. The
+  mechanical-strip rename for site 33 (Stages 1-2) stands; only the entry-seam push-up is deferred.
+
+**Original recommendation (superseded by the owner's execution decision above, preserved for
+context):** "Owner decides whether to pursue it, per-site... Recommendation: defer — the mechanical
+strip + Stage 3 law already delivers the objective's enforcement (only `core/context.js` imports
 bypass); nesting removal is a cosmetic/doctrinal cleanup that trades real drain-class risk for marginal
-benefit.
+benefit." Each site remains a per-caller-fanout exercise with the drain-defect risk (Route→Service
+Decision 4: "trust-model tightening comes at the end of the strip").
 
 ---
 
@@ -660,5 +680,41 @@ benefit.
   0 violations) after the fix. `npm test`/self-test execution failed in the Codex reviewer's
   read-only sandbox (EPERM writing Jest cache / fixture tmpdirs) — re-run directly in this
   session's writable environment and confirmed green (see above); not a code defect.
+- 2026-07-05 (S333): **Stage 4 executed on owner direction (10/11 sites).** Owner explicitly asked to
+  "complete the Stage 4 trust-model tightening" (this plan's own recommendation was to defer). Every
+  candidate site's real caller graph was re-derived from scratch this session (not assumed from the
+  Classification table) before any code changed:
+  - **Removals (sites 40, 47, 49, 50):** re-traced ALL real callers of `recoverRequestCreated`,
+    `mintAndStore`, `ensureToken`, `extendForPostSubmissionWindow`. Found `mintAndStore` has 3
+    production callers beyond the one the table named (`reviewer-reminder-sweep.js`,
+    `render-emails-service.js`, `regenerate-token-service.js`) — each confirmed to run inside a
+    route-established context (`review-manager-send-review-reminder` / `cron-reviewer-reminders` /
+    `review-manager-render` / `regenerate-token-lookup`) before removing the local wrap. Removed all
+    4 local wraps; added `tests/unit/token-lifecycle-nested-context.test.js` (real
+    `DynamicsService.updateRecord`/`getRecord`, no mock — negative control: no-context call throws
+    `no trusted Dataverse context` before any network call; positive pin: succeeds under the
+    caller's `withDalContext`) and updated `tests/unit/intake-routes-dynamics-context.test.js`'s
+    drain-recovery assertion. Discovered along the way: `DynamicsService.checkRestriction` requires
+    SOME context (even untrusted) for READS too, throwing `Restrictions not initialized` — not just
+    the write-gate's `assertTrustedDalContext` — corrected an initial characterization-test
+    assumption before it shipped (`cc13ce2d`).
+  - **Push-ups (sites 34, 35, 44, 45, 46, 48):** each site's local wrap moved to its real caller(s),
+    label byte-preserved. Site 44 relocated (not widened) into `context-service.js` as a sixth narrow
+    scope, matching that file's own declared P1m doctrine — required updating a label-sequence
+    regression pin in `external-review-services.test.js` to include it. Site 46 (`verifySuggestionToken`)
+    turned out to have 6 real callers (not 1) — all 6 external-review token routes got the same
+    mechanical push-up. `pages/api/review-manager/revoke-token.js` does NOT call
+    `verifySuggestionToken` (an earlier grep hit there was a comment mention only). Commits: `cc13ce2d`
+    (34/35/48), `c1718c5f` (45), `f6d57ee5` (44), `c357215b` (46).
+  - **Site 33 deliberately NOT pushed up** — re-derived and re-verified (disconfirming grep) that
+    `NotificationService.notify()` has **21 real callers** across cron/page routes and lib services,
+    most of which never reach the DAL-touching `sendAdminEmail` branch (only `severity:
+    error|critical` or `emailAdmins: true` triggers it). Auditing all 21 callers' context posture
+    safely is a materially larger fan-out than any other Stage 4 site; judged out of scope this
+    session. This narrows (does not blanket-defer) the original Stage 4 recommendation.
+  - Full suite 427/4744 green after each landing; `check:dataverse-access-layer`,
+    `check:route-service-boundary`, `check:dynamics-context-boundary` (+ all self-tests),
+    `check:api-routes`, `check:agent-wiki` green throughout. A second fresh-context review round
+    covering the Stage 4 diff specifically is still pending (not yet run this session).
 
 <!-- end of plan -->

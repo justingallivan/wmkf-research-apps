@@ -35,7 +35,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [BYPASS_STRIP_PLAN.md](BYPASS_STRIP_PLAN.md) | plan | active | yes | Converted 52 bypass scopes to withDalContext, byte-identical; bypass-shape law (Stage 3) built. Executed S333. |  |
+| [BYPASS_STRIP_PLAN.md](BYPASS_STRIP_PLAN.md) | plan | active | yes | Converted 52 bypass scopes to withDalContext; bypass-shape law built; Stage 4 tightening executed for 10/11 sites (site 33 deferred). S333. |  |
 | [CHUNK_CONSOLIDATION_PLAN.md](CHUNK_CONSOLIDATION_PLAN.md) | plan | active | yes | Consolidate array-chunking loops onto lib/utils/chunk.js: 17 mechanical swaps, 4 index-using left with comment, 1 sibling leave. Stages 0-2 complete. | 2026-07-05 |
 | [DIAGRAM_BEHAVIORAL_FLOW.md](DIAGRAM_BEHAVIORAL_FLOW.md) | spec | active |  | This sequence diagram traces a concrete execution path (e.g., /api/process-phase-i), showing how services interact during an AI analysis task. | 2026-07-02 |
 | [DIAGRAM_DATA_ENGINE.md](DIAGRAM_DATA_ENGINE.md) | spec | active |  | This pipeline visualization focuses on the internal data complexities, specifically the OData parser and identity merging required for Dataverse. | 2026-07-02 |
