@@ -242,3 +242,36 @@ describe('grant-request.queryAllRequests (business-filter passthrough)', () => {
     expect(qAll).toHaveBeenCalledWith('akoya_requests', opts);
   });
 });
+
+// ──────────────── create / disassociate (ownership-skip leftover conversion) ────────────────
+
+describe('grant-request.create (byte-mirror passthrough)', () => {
+  test('drain-submissions createBody shape: 2-arg createRecord, no options', async () => {
+    const created = { akoya_requestid: GUID_A, akoya_requestnum: 'R-100' };
+    const c = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue(created);
+    const body = {
+      akoya_requestid: GUID_A,
+      'akoya_Account@odata.bind': '/accounts(acct-1)',
+    };
+    const out = await grantRequest.create(body);
+    expect(out).toBe(created);
+    expect(c).toHaveBeenCalledWith('akoya_requests', body);
+    expect(c.mock.calls[0]).toHaveLength(2);
+  });
+
+  test('honorarium-onboard-orchestrator createBody shape: also 2-arg, no options', async () => {
+    const c = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue({});
+    const body = { akoya_requestid: GUID_A, 'wmkf_ReviewedProposal@odata.bind': `/akoya_requests(${GUID_A})` };
+    await grantRequest.create(body);
+    expect(c).toHaveBeenCalledWith('akoya_requests', body);
+    expect(c.mock.calls[0]).toHaveLength(2);
+  });
+});
+
+describe('grant-request.disassociate (byte-mirror passthrough)', () => {
+  test('forwards requestId/navProperty/options verbatim to DynamicsService.disassociate', async () => {
+    const d = jest.spyOn(DynamicsService, 'disassociate').mockResolvedValue(undefined);
+    await grantRequest.disassociate(GUID_A, 'wmkf_PotentialReviewer2', { actingUserSystemId: 'sys-1' });
+    expect(d).toHaveBeenCalledWith('akoya_requests', GUID_A, 'wmkf_PotentialReviewer2', { actingUserSystemId: 'sys-1' });
+  });
+});
