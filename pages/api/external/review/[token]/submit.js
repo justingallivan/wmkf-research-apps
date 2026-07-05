@@ -28,6 +28,7 @@
 
 import { verifySuggestionToken, tokenHasOp } from '../../../../../lib/external/verify-suggestion-token';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
+import { withDalContext } from '../../../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../../../lib/services/service-http-error';
 import { submitReview } from '../../../../../lib/services/external-review/submit-service';
 
@@ -52,7 +53,10 @@ export default async function handler(req, res) {
       return res.status(429).json({ ok: false, reason: 'rate_limited' });
     }
 
-    const verified = await verifySuggestionToken(token);
+    // S333 Stage 4b: trust-model tightening — this route now establishes
+    // the trusted context itself (label byte-preserved from the wrap that
+    // used to live inside verifySuggestionToken() itself).
+    const verified = await withDalContext('external-token-verify', () => verifySuggestionToken(token));
     await recordTokenOutcome(req, token, verified.ok);
     if (!verified.ok) {
       return res.status(verified.reason === 'not_found' ? 404 : 401).json({

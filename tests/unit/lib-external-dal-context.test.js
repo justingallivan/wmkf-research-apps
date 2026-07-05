@@ -91,7 +91,7 @@ describe('lib/external DAL context (S333 characterization, sites 44-46, 48)', ()
     expect(hasTrustedDalContext()).toBe(false);
   });
 
-  test('site 46 — verifySuggestionToken runs the suggestion read inside a trusted context', async () => {
+  test('site 46 — verifySuggestionToken runs the suggestion read inside the CALLER-established context (route push-up)', async () => {
     const { verifySuggestionToken } = require('../../lib/external/verify-suggestion-token.js');
     const seen = { inside: null };
     verifyToken.mockResolvedValue({ valid: true, payload: { suggestionId: 'sug-1' } });
@@ -105,7 +105,9 @@ describe('lib/external DAL context (S333 characterization, sites 44-46, 48)', ()
       };
     });
 
-    await verifySuggestionToken('jwt-token');
+    // Matches all six external/review/[token]/*.js callers:
+    // withDalContext('external-token-verify', () => verifySuggestionToken(token))
+    await withDalContext('external-token-verify', () => verifySuggestionToken('jwt-token'));
 
     expect(seen.inside).toBe(true);
     expect(hasTrustedDalContext()).toBe(false);
