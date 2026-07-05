@@ -520,6 +520,36 @@ review verdict + findings + resolutions)*
   characterization byte-integrity via git diff. Milestone sweep: all gates green, suite
   4307/4307 (371 suites), build exit 0. Running sum: 11 of 49 converted `[VERIFIED via
   census 49→38 across the per-stage boundary gate runs logged above]`.
+- 2026-07-05 (S331): **Stage 3 (reviewer-finder wave) executed; P1m ratified with caveat.**
+  Phase A (`807fe7ea`): envelope inventory + characterization for all 5 routes (full suite
+  4336 at close); my-candidates found ALREADY decomposed per-verb (Decision 1 pre-stage
+  requirement structurally satisfied); my-proposals found already on withDalContext.
+  Cluster 1 (`83ddf2cb`): contact-history/load-proposal/my-proposals — load-proposal's
+  method-before-auth order preserved; census 38→35. Cluster 2 (`db1d1a76`):
+  save-candidates 541→76-line shell, 474-line service, partial-success envelopes byte-exact
+  (422 always carries both rejected counts; 200 keys conditional — historical asymmetry
+  verified against `git show` by the reviewer); identity-gate suite 42/42 unmodified;
+  census 35→34. Cluster 3 (`26b098b1`): my-candidates P1m pilot — 705→115-line shell, one
+  service method per verb, one context around dispatch (same scope as historical single
+  bypass), duplicate-email 409 partialSuccess/savedFields preserved with
+  accumulator-outside-try; census 34→33. Suite 4384/4384.
+  **Post-stage review (Codex, fresh-context): PASS-WITH-FINDINGS — zero code findings; the
+  one LOW was this missing Stage Log entry (resolved by this entry). Stage 3 CLEARS; Stage
+  4 may start. P1M RULING: multi-verb template RATIFIED with one caveat** — "one context
+  around dispatch" applies only when the historical route had one shared auth/trust
+  boundary for all verbs; a future multi-verb route with branch-specific auth or DAL scopes
+  must preserve those branch boundaries. The five ratified P1m notes (record for future
+  multi-verb conversions): (1) one context around dispatch per the caveat above; (2)
+  per-verb error mapping in per-verb shell handlers, never one generic catch (verbs kept
+  different 500 messages; proposals-mode sanitizes while siblings leak dev details); (3)
+  validation placement follows branch entanglement — branch-independent input checks stay
+  in the shell, validations interleaved with body-shape dispatch move into the service as
+  typed errors (hoisting reorders observable behavior); (4) typed-error passthrough
+  (`instanceof ServiceHttpError → rethrow`) must precede provider-error translation or
+  domain errors get eaten; (5) partial-success accumulators (savedFields) declared OUTSIDE
+  the try so the catch can report partial success — pin with a dedicated test before
+  moving. Running sum: 16 of 49 converted `[VERIFIED via census 49→33 across the per-stage
+  boundary gate runs logged above]`.
 
 ### Stage 0 route→test inventory (2026-07-04, S331)
 
