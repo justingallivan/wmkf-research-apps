@@ -73,20 +73,6 @@
       "count": 1
     },
     {
-      "file": "lib/services/program-director-resolver.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "systemusers",
-      "count": 1
-    },
-    {
-      "file": "lib/services/program-director-resolver.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "systemusers",
-      "count": 1
-    },
-    {
       "file": "lib/services/prompt-resolver.js",
       "kind": "import",
       "clientMethod": "DynamicsService.getRecord",
