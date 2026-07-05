@@ -2147,6 +2147,7 @@ Return ONLY the JSON array, no other text.`;
 
   // Split records into batches
   const batches = [];
+  // Index-bearing batch loop; not consolidated onto lib/utils/chunk.js (needs i). See docs/CHUNK_CONSOLIDATION_PLAN.md.
   for (let i = 0; i < records.length; i += BATCH_SIZE) {
     batches.push({ records: records.slice(i, i + BATCH_SIZE), startIndex: i });
   }
@@ -2162,6 +2163,7 @@ Return ONLY the JSON array, no other text.`;
   }
 
   // Process batches with concurrency limit
+  // Mechanically swappable, but left hand-rolled for cohesion with the index-bearing sibling loop above (startIndex merge). See docs/CHUNK_CONSOLIDATION_PLAN.md C1.
   for (let i = 0; i < batches.length; i += CONCURRENCY) {
     const chunk = batches.slice(i, i + CONCURRENCY);
 
