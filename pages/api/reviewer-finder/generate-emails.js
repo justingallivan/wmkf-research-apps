@@ -39,6 +39,7 @@ import { isPrivateCycleMaterialPathname } from '../../../lib/utils/cycle-materia
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
+import { getById as getRequestById } from '../../../lib/dataverse/adapters/grant-request';
 
 const ROLE_COPI = 100000001;
 
@@ -78,7 +79,7 @@ async function lookupProposalInfoForCandidates(suggestionIds) {
     const coPiNamesByRequestId = new Map();
     await Promise.all(distinctRequestIds.map(async (rid) => {
       try {
-        const req = await DynamicsService.getRecord('akoya_requests', rid, {
+        const req = await getRequestById(rid, {
           select: 'akoya_requestid,akoya_title,wmkf_abstract,wmkf_organizationname,_akoya_applicantid_value,_wmkf_projectleader_value',
         });
         requestById.set(rid, req);
@@ -546,8 +547,7 @@ export default async function handler(req, res) {
         await bypassDynamicsRestrictions('generate-emails-mark-sent', async () => {
           for (const suggestionId of suggestionIdsToUpdate) {
             try {
-              await DynamicsService.updateRecord(
-                'wmkf_appreviewersuggestions',
+              await suggestionAdapter.patchFields(
                 suggestionId,
                 { wmkf_emailsentat: now, wmkf_invited: true },
               );
