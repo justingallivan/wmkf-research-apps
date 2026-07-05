@@ -3,7 +3,7 @@ title: bypassDynamicsRestrictions Strip Plan
 domain: architecture
 kind: plan
 status: draft
-summary: "Convert 50 bypassDynamicsRestrictions calls to withDalContext (32 pages + 18 lib), byte-identical; then an import-boundary law. Trust tightening deferred."
+summary: "Convert 52 functional bypass scopes to withDalContext (32 pages + 20 lib incl. 2 default-param aliases), byte-identical; then a bypass-shape law."
 canonical: true
 owner: product-engineering
 related:
@@ -31,8 +31,10 @@ execution (Self-checking method).
 
 **Objective.** Trusted Dataverse context must be established **only** via `withDalContext(scopeLabel, fn)`
 (`lib/dataverse/core/context.js:46`) at post-auth entry points, plus the sanctioned script-only variant
-`enterDynamicsBypassForScript` (`lib/services/dynamics-context.js:176`). Today **50 direct
-`bypassDynamicsRestrictions(...)` call sites** remain in `pages/`+`lib/` (32 pages / 18 lib). This plan
+`enterDynamicsBypassForScript` (`lib/services/dynamics-context.js:176`). Today **50 literal direct
+`bypassDynamicsRestrictions(...)` call sites** remain in `pages/`+`lib/` (32 pages / 18 lib), plus **2
+aliased default-parameter scopes** in the alert services (review round 1 finding 1) — **52 functional
+bypass scopes / 40 files** total. This plan
 converts each to `withDalContext` **in place, byte-identical**, then installs an import-boundary law so
 that after the strip **only `lib/dataverse/core/context.js` may import `bypassDynamicsRestrictions`** from
 the ALS module (the `withDalContext` wrapper is the one sanctioned importer). `withDalContext` is a thin,
@@ -75,13 +77,16 @@ corrections matter because the orchestrator's traced input counted some comment/
 | `withDalContext` throws on non-string / empty label | **YES** | `[VERIFIED via lib/dataverse/core/context.js:47-49]` — `bypassDynamicsRestrictions` accepts a bare fn, so the label form must be checked before swapping (Decision 3) |
 | Direct `bypassDynamicsRestrictions(` **call sites** in `lib/` (real, non-comment, ex-wrapper/def) | **18 calls / 12 files** | `[VERIFIED via grep -rn "bypassDynamicsRestrictions(" lib --include=*.js \| grep -v _archived, comment/wrapper/def stripped, this session]` — **CORRECTION** vs traced input's "28 calls / 19 files" (that counted 7 doc-comment lines, the `core/context.js:53` wrapper, and the `dynamics-context.js:67` definition) |
 | Direct `bypassDynamicsRestrictions(` **call sites** in `pages/` | **32 calls / 26 files** | `[VERIFIED via same grep on pages, 1 comment stripped, this session]` — **CORRECTION** vs traced input's "28 calls / 27 files" |
-| Total strip scope | **50 calls / 38 files** | 18 lib + 32 pages |
+| Literal direct-call strip scope | **50 calls / 38 files** | 18 lib + 32 pages |
+| Aliased bypass scopes (default-parameter dependency `withDynamicsBypass = bypassDynamicsRestrictions`) | **2 scopes / 2 files** | `lib/services/alert-reviewer-email-mismatch.js:44` (call `:55`) and `lib/services/alert-reviewer-affiliation-mismatch.js` (import `:12`, default param `withDynamicsBypass = bypassDynamicsRestrictions` at `:66`, call `:77`) — invisible to the call-site grep because the call goes through the injected alias (review round 1 finding 1, P0) |
+| **Functional bypass scopes — the true strip scope** | **52 scopes / 40 files** | 50 literal + 2 aliased |
+| Any THIRD alias (stored reference / default param / re-export) beyond the two alert services? | **NONE found** | `[VERIFIED via grep -rn "bypassDynamicsRestrictions" lib pages shared modules (ALL references, not just calls), comments stripped, this session]` — every remaining non-call reference is a plain import line in a file already in the 40-file census; the assignment-pattern grep (`= *bypassDynamicsRestrictions\|export.*bypassDynamicsRestrictions`) matches only the two alert default-params. Executors re-run this ALL-references sweep at every pre-stage re-probe |
 | Existing `withDalContext(` non-core call sites (real, non-comment) | **~50** | `[VERIFIED via grep -rn "withDalContext(" lib pages \| grep -v "_archived\|core/context", comments stripped, this session ≈ 50]` — **CORRECTION** vs traced input's "28"; the Route→Service campaign adopted it heavily. Not load-bearing for this plan (proves the target shape is dominant) |
 | Label is inert? | **NO** — feeds state-leak detection | `[VERIFIED via lib/services/dynamics-service.js:229-233]` `checkRestriction` reads `ctx.requestId` (= the label) and warns on interleave mismatch. Labels MUST be byte-preserved in every swap (Decision 2) |
 | Import cycle risk from importing `withDalContext`? | **NONE** | `core/context.js` imports only `../../services/dynamics-context.js` `[VERIFIED via core/context.js:31]`; `dynamics-context.js` imports only `node:async_hooks` `[VERIFIED via dynamics-context.js:37]`. No convertible file is imported by that chain → importing `withDalContext` anywhere is cycle-free |
 | Enforcement in the test suite | **ON** | `[VERIFIED via jest.setup.js:44 DATAVERSE_DAL_ENFORCEMENT='on' + :35 NODE_ENV='test']` — any test exercising a converted path with a stranded Dataverse write THROWS. This is the global safety net |
 | `scripts/` `bypassDynamicsRestrictions(` call sites | **46** | `[VERIFIED via grep -rn on scripts --include=*.js --include=*.mjs, comments stripped]` |
-| `scripts/` already using `enterDynamicsBypassForScript` | present (4 import sites) | `[VERIFIED via grep this session]` — the script-only idiom is already in use |
+| `scripts/` already using `enterDynamicsBypassForScript` | **59 call sites / 58 script files** (+4 static-import lines) | `[VERIFIED via grep -rn "enterDynamicsBypassForScript(" scripts, non-import lines = 59; grep -rl = 58 files, this session]` — **CORRECTION** of this plan's own drafting figure "4 import sites" (review round 1 finding 4): that grep matched only static `import` lines; the idiom is in fact the dominant script pattern. The only `lib/` mentions are comments (`core/context.js:59`, `dynamics-service.js:222`) `[VERIFIED via grep this session]` |
 | Law scan scope | `pages`, `lib`, `shared`, `modules` (NOT `scripts`, NOT `tests`) | `[VERIFIED via scripts/check-dataverse-access-layer.js:63 SCAN_DIRS]` — scripts/ and tests/ are out of scope by construction |
 | Test files referencing `bypassDynamicsRestrictions` | 92 files | `[VERIFIED via grep tests/ this session]` — category (d), out of scan scope, left |
 | Explorer's `withDynamicsContext` (non-empty restrictions) importers | only `pages/api/dynamics-explorer/chat.js` | `[VERIFIED via grep this session]` — a separate export; NOT touched (exempt tool, Decision 6) |
@@ -220,7 +225,7 @@ use `withDalContext` immediately after `verifyCronSecret`.
 identity-provisioning layer, not a `requireAppAccess` route). Flagged for OWNER awareness (Stage 4) but
 **not** a STOP-AND-ASK — the swap changes nothing.
 
-### (b) SEMANTIC — lib boundaries, pre-ruled convert-in-place (18 sites / 12 files) `[census sweeps 3-4]`
+### (b) SEMANTIC — lib boundaries, pre-ruled convert-in-place (20 scopes / 14 files) `[census sweeps 3-4 + review round 1 finding 1]`
 
 **Ruling (pre-made, do not relitigate for the mechanical strip):** each site converts in place to
 `withDalContext('<same-label>', <same fn>)` with the import swapped to `lib/dataverse/core/context`.
@@ -249,6 +254,17 @@ deferred tightening), defensive-mixed, or MIXED. **No (b) site is removed in thi
 | 48 | `lib/external/token-lifecycle.js:70` | `external-token-revoke` | `revoke` → `revokeExternalToken` write | **ENTRY-seam** — sole caller `review-manager/revoke-token.js:40` is `requireAppAccess`-only, establishes no Dataverse context |
 | 49 | `lib/external/token-lifecycle.js:94` | `ensure-token-read` | `ensureToken` → `getForTokenStatus` | **NESTED-redundant** — sole caller `my-candidates-service.js:562` runs under `withDalContext('my-candidates')` |
 | 50 | `lib/external/token-lifecycle.js:158` | `external-token-post-submission` | `extendForPostSubmissionWindow` → `extendExternalTokenExpiry` write | **NESTED-redundant** — sole caller `review-upload.js:270` (`writeReviewFiles`) always runs inside an established context |
+| 51 | `lib/services/alert-reviewer-email-mismatch.js:44` (default param) + `:55` (call through alias `withDynamicsBypass`) | `external-reviewer-email-mismatch-contact-read` | `alertReviewerEmailMismatch` → `contactsAdapter.getById` read + notify | **ALIASED default-param scope** `[VERIFIED via Read in full this session: import :11, default `withDynamicsBypass = bypassDynamicsRestrictions` :44, call :55]`. Convert-in-place: the DEFAULT becomes `withDynamicsBypass = withDalContext`; the injected-deps path (tests, any caller passing `deps.withDynamicsBypass`) is untouched. Label byte-preserved |
+| 52 | `lib/services/alert-reviewer-affiliation-mismatch.js:66` (default param) + `:77` (call through alias) | `external-reviewer-affiliation-mismatch-contact-read` | `alertReviewerAffiliationMismatch` → `contactsAdapter.getInstitutionById` read + notify | **ALIASED default-param scope** (read in full this session: import `:12`, default `:66`, call `:77` — see the Baseline alias row for the read-guard escape). Same convert-in-place ruling as site 51 |
+
+**Ruling for sites 51-52 (pre-made, review round 1 finding 1 P0):** the swap edits the **default-parameter
+initializer only** — `withDynamicsBypass = bypassDynamicsRestrictions` → `withDynamicsBypass = withDalContext`
+— plus the import swap; call sites `:55`/`:77`, labels, and the `deps` injection contract are byte-identical.
+Because their existing tests inject `withDynamicsBypass` (`tests/unit/alert-reviewer-email-mismatch.test.js:14`,
+`tests/unit/alert-reviewer-affiliation-mismatch.test.js:18` `[VERIFIED via sed of both this session]`),
+**today's suites never exercise the default path** — Stage 0 adds a DEFAULT-path characterization for each
+(call with no `deps.withDynamicsBypass`, mock only the adapter, assert `hasTrustedDalContext() === true`
+inside the adapter call) before the swap.
 
 **STOP-AND-ASK — site 43 (`onboard-reviewer-service.js:435`).** The label is the variable `context`
 (param of `patchAkoyaRequestWithRetry`), bound at its two call sites to the string literals
@@ -290,7 +306,8 @@ never touched and never trip the law.
    (`dynamics-service.js:229-233`). Copy it character-for-character. Site 43's variable label is copied as
    the variable `context`.
 3. **String-label precheck before every swap.** `withDalContext` throws on a non-string/empty label
-   (`core/context.js:47-49`). All 49 literal-label sites are safe by inspection. Site 43 (variable) is the
+   (`core/context.js:47-49`). All 51 literal-label scopes (49 literal direct calls + sites 51-52, whose
+   labels at `:55`/`:77` are literals) are safe by inspection. Site 43 (variable) is the
    STOP-AND-ASK: confirm both bindings are string literals before swapping.
 4. **Import form matches the file.** ESM files (`import { withDalContext } from '<rel>/lib/dataverse/core/context';`);
    the CJS files use `const { withDalContext } = require('<rel>/dataverse/core/context');`. Importing
@@ -302,8 +319,12 @@ never touched and never trip the law.
    restores the outer store). **Removing a redundant nested wrapper is the Stage 4 OWNER-DECISION
    tightening, NOT this strip** — removal risks stranding a Dataverse call for any direct/test caller that
    does not establish context (sites 40, 47, 49, 50 are exported and/or test-invoked).
-6. **Explorer is exempt.** `withDynamicsContext({ restrictions, requestId }, fn)` (non-empty restrictions,
-   Explorer field/table browsing) is a different export and is never touched.
+6. **Explorer is exempt from the STRIP; empty-restrictions `withDynamicsContext` is NOT exempt from the
+   LAW.** The Explorer's loaded-restrictions `withDynamicsContext({ restrictions, requestId }, fn)`
+   (`chat.js:124`, restrictions from `getActiveRestrictions()`) is a different, sanctioned use and is never
+   touched. But `withDynamicsContext({ restrictions: [] }, fn)` is functionally identical bypass
+   (`dynamics-context.js:67-76` — `bypassDynamicsRestrictions` IS that call), so the Stage 3 law also
+   covers the empty/unresolvable-restrictions shape (review round 1 finding 2).
 7. **One commit per cluster, gates between.** Cluster by directory/domain; each cluster leaves the build
    green with `check:dataverse-access-layer` (+ self-test), `check:route-service-boundary` (+ self-test),
    and the targeted suite.
@@ -321,7 +342,10 @@ concept or a second notion of trust.
 ## Self-checking method
 
 **Pre-stage re-probe.** Before each stage, re-run the disconfirming census greps (Stage Log) — the lib and
-pages `bypassDynamicsRestrictions(` sweeps AND the growing `withDalContext(` sweep — and diff against this
+pages `bypassDynamicsRestrictions(` call sweeps, the **ALL-references alias sweep** (every
+`bypassDynamicsRestrictions` token in `lib`/`pages`/`shared`/`modules`, so a new default-param /
+stored-reference / re-export alias like sites 51-52 cannot hide from a call-shaped grep — review round 1
+finding 1), AND the growing `withDalContext(` sweep — and diff against this
 plan's Classification. Drift → update the stage list BEFORE starting and log the delta. Never execute
 against a stale list.
 
@@ -331,8 +355,24 @@ mocks) and asserts the inner Dataverse op sees `hasTrustedDalContext() === true`
 `tests/unit/drain-submissions-dal-context.test.js` `[VERIFIED via Read this session]`. Because the swap is
 a behavior-identity rename, the SAME test must stay green after the swap (proving the boundary is
 unchanged). Prioritize sites whose scope is a sub-section (intake bridge/membership, PI-identity) or whose
-context is entry-seam/MIXED (sites 33-36, 41-46, 48); whole-body wraps and nested-redundant sites are
-lower-risk but still covered by:
+context is entry-seam/MIXED (sites 33-36, 41-46, 48) and the aliased sites 51-52; whole-body wraps and
+nested-redundant sites are lower-risk but still covered by the global safety net below.
+
+**Negative controls are REQUIRED, not optional (review round 1 finding 3, P1).** A positive-only
+`hasTrustedDalContext() === true` pin is decorative wherever a test mocks or injects the context machinery
+— exactly how sites 51-52 are invisible today: their suites inject `withDynamicsBypass`
+(`alert-reviewer-email-mismatch.test.js:14`, `alert-reviewer-affiliation-mismatch.test.js:18`) and never
+run the default import. The generic failure pins already exist and are the baseline to cite:
+`tests/unit/dal-enforcement.test.js:78` (`assertTrustedDalContext` throws outside any context with
+enforcement on) and `:91-96` (`DynamicsService.createRecord` rejects BEFORE any network call)
+`[VERIFIED via sed of tests/unit/dal-enforcement.test.js:70-100 this session]`. For the high-risk
+clusters — the NextAuth fire-and-forget (A4), the entry-seam/MIXED lib services (33-36, 41-43, 44-46, 48),
+the token-verification seams (45-46), and the two alert services (51-52) — Stage 0 must add, per cluster,
+EITHER (i) a **negative control**: the same inner op invoked OUTSIDE any context still rejects with
+"no trusted Dataverse context" (proving the positive pin actually exercises enforcement), OR (ii) a
+**same-adapter enforcement probe**: drive the real adapter write/read path with no context and assert the
+fail-closed rejection. A cluster whose positive pin cannot be paired with a working negative control is a
+mocked-out pin — rewrite it before trusting it.
 
 **The global safety net.** `jest.setup.js:44` runs the suite with `DATAVERSE_DAL_ENFORCEMENT='on'`, so any
 test that exercises a converted path with a Dataverse call stranded outside a trusted scope **throws**.
@@ -355,12 +395,17 @@ tests prove trusted context at the inner op. High findings block.
 
 ### Stage 0 — Characterization harness (no production behavior change)
 
-1. Re-run BOTH disconfirming census greps (lib + pages `bypassDynamicsRestrictions(`); confirm the
-   50-site / 38-file list still matches (log any drift).
+1. Re-run the disconfirming census greps: the lib + pages `bypassDynamicsRestrictions(` call sweeps AND
+   the ALL-references alias sweep (Self-checking method); confirm the 52-scope / 40-file list (50 literal
+   + sites 51-52) still matches, and that no NEW alias shape has appeared (log any drift).
 2. For every cluster in Stages 1-2, ensure a real-context test exists that asserts
-   `hasTrustedDalContext() === true` at the inner Dataverse op (drain-test pattern). Add where missing,
+   `hasTrustedDalContext() === true` at the inner Dataverse op (drain-test pattern), **paired with the
+   required negative control / enforcement probe for the high-risk clusters** (Self-checking method,
+   finding 3). Add where missing,
    prioritizing sub-section-scoped and entry-seam/MIXED sites (33-36, 41-46, 48). For site 43, add a test
    that drives both `patchAkoyaRequestSuccess`/`patchAkoyaRequestNoMatch` paths under enforcement-on.
+   For sites 51-52, add the DEFAULT-path characterization (no injected `withDynamicsBypass`) — the
+   existing suites inject the dependency and never run the default import.
 3. Confirm the full suite is green at the current baseline count with `DATAVERSE_DAL_ENFORCEMENT='on'`.
 4. **Done means:** characterization tests exist and are green (proving trusted context at each cluster's
    inner op TODAY); full suite green; commit.
@@ -384,20 +429,24 @@ any of the 26 files; Stage 0 characterization unchanged-green; full suite green.
 **STOP-AND-ASK:** if any swap would change a characterization test's trusted-context assertion, STOP — the
 site was misclassified or the scope changed.
 
-### Stage 2 — lib SEMANTIC convert-in-place (18 sites / 12 files), clusters B1-B3
+### Stage 2 — lib SEMANTIC convert-in-place (20 scopes / 14 files), clusters B1-B3
 
 Same per-cluster loop as Stage 1 (import swap + byte-identical rename + dead-import removal + gates).
 
-- **Cluster B1 — lib/services** (sites 33-40): notification, maintenance (2), execute-prompt,
-  prompt-resolver, reviewer-prompt-resolver, contact-enrichment, drain-submissions (`:435`). Run the drain
+- **Cluster B1 — lib/services** (sites 33-40 + 51-52): notification, maintenance (2), execute-prompt,
+  prompt-resolver, reviewer-prompt-resolver, contact-enrichment, drain-submissions (`:435`), and the two
+  ALIASED alert services (default-param initializer swap per the sites 51-52 ruling; run their new
+  DEFAULT-path characterization from Stage 0). Run the drain
   DAL-context test (`drain-submissions-dal-context.test.js`) — it must stay green (site 40 stays nested).
 - **Cluster B2 — lib/bill** (sites 41-43): onboard-reviewer-service. **Handle site 43 per the STOP-AND-ASK**
   (confirm the two literal bindings; run the bill-onboard suite under enforcement-on before committing).
 - **Cluster B3 — lib/external** (sites 44-50): review-answer-snapshot, verify-grantee-token,
   verify-suggestion-token, token-lifecycle (4).
 
-**Done means:** all 18 lib sites call `withDalContext`; no `bypassDynamicsRestrictions` import remains in
-the 12 files; every characterization test green; full suite green. After Stage 2, the **only**
+**Done means:** all 20 lib scopes route through `withDalContext` (18 direct calls renamed + 2 default-param
+initializers retargeted); no `bypassDynamicsRestrictions` import remains in
+the 14 files; every characterization test (positive pins + negative controls + the 51-52 default-path
+tests) green; full suite green. After Stage 2, the **only**
 `bypassDynamicsRestrictions` importer in `pages`/`lib`/`shared`/`modules` is
 `lib/dataverse/core/context.js`.
 
@@ -412,24 +461,47 @@ reappear. **Owner decides the shape**; recommendation follows.
 
 - **Recommended: a sibling gate `scripts/check-dynamics-context-boundary.js`** (do NOT overload
   `check-dataverse-access-layer.js` — that gate is a DynamicsService *transport-call* census, a different
-  concern from an *import-graph* check). The gate scans `SCAN_DIRS` = `pages`/`lib`/`shared`/`modules` and
-  **fails on any `import`/`require`/dynamic-import/re-export of `bypassDynamicsRestrictions` from the
-  `dynamics-context` module except in `lib/dataverse/core/context.js`**. It reuses `scripts/lib/ast-scan-core.js`
+  concern from an *import-graph/bypass-shape* check). The gate scans `SCAN_DIRS` =
+  `pages`/`lib`/`shared`/`modules` and fails on **any of three bypass shapes** outside the sanctioned
+  importer `lib/dataverse/core/context.js`:
+  1. any `import`/`require`/dynamic-import/re-export of `bypassDynamicsRestrictions` from the
+     `dynamics-context` module;
+  2. **any `withDynamicsContext` call whose `restrictions` is a literal/known-empty array** —
+     `withDynamicsContext({ restrictions: [] }, fn)` is functionally identical bypass and would evade a
+     bypass-import-only gate (review round 1 finding 2, P1). **Fail CLOSED on non-literal `restrictions`
+     expressions** (a variable the gate cannot resolve is a potential empty-array bypass), EXCEPT the one
+     sanctioned live path: the Explorer's loaded-restrictions call at
+     `pages/api/dynamics-explorer/chat.js:124` (`{ restrictions, requestId }` where `restrictions` comes
+     from `getActiveRestrictions()`; import at `:29`) `[VERIFIED via sed of chat.js:25-32,120-128 this
+     session — the ONLY live withDynamicsContext caller outside dynamics-context.js per grep]`. Simplest
+     carve-out: keep the DAL gate's existing `pages/api/dynamics-explorer/` exempt-dir precedent
+     (`check-dataverse-access-layer.js:75-81`) for this rule only;
+  3. **any `enterDynamicsBypassForScript` import/call appearing outside `scripts/`** (its SCRIPT-ONLY
+     contract, `dynamics-context.js:154-178`; today's only `lib/` mentions are comments —
+     `core/context.js:59`, `dynamics-service.js:222` `[VERIFIED via grep this session]`).
+
+  It reuses `scripts/lib/ast-scan-core.js`
   import/require recognizers (the same helpers `check-dataverse-access-layer.js` and
   `check-route-service-boundary.js` use, so all indirection shapes — static import, ESM re-export, dynamic
-  `import()`, inline `require()` — are recognized and non-literal sources fail closed). It leaves
-  `withDalContext` calls untouched (allowed anywhere), and leaves `withDynamicsContext` (Explorer) and
-  `enterDynamicsBypassForScript` alone. **Ratchet-then-law:** while any lib site still imports bypass
-  (before Stage 2 completes), run in `--report` count mode; flip to fail-closed law (census 0, no
+  `import()`, inline `require()`, aliased bindings — are recognized and non-literal sources fail closed).
+  `withDalContext` calls stay allowed anywhere. **Ratchet-then-law:** while any lib site still imports
+  bypass (before Stage 2 completes), run in `--report` count mode; flip to fail-closed law (census 0, no
   allowlist, no ratchet) once Stage 2 lands, mirroring the DAL/route ratchet-then-law playbook.
 - **Alternative:** an ESLint `no-restricted-imports` rule on the `bypassDynamicsRestrictions` named import
   with a `lib/dataverse/core/context.js` override. Weaker (misses dynamic import / require indirection,
-  couples to lint config) — recommend the grep/AST gate.
+  cannot see the empty-restrictions `withDynamicsContext` shape at all, couples to lint config) —
+  recommend the AST gate.
 
 Register the chosen gate in `package.json` (`check:dynamics-context-boundary` + `:self-test`),
 `docs/CI_GATES_REFERENCE.md`, the `/start` gate list, and `.github/workflows/test.yml`. Ship a self-test
-proving it (i) catches a new violating import in a fixture, (ii) passes on `withDalContext` usage, (iii)
-passes on the sanctioned `core/context.js` importer, and (iv) does not flag `scripts/`/`tests/`.
+proving the REQUIRED fixture list (expanded per review round 1 finding 2): (i) a new violating static
+import; (ii) an aliased named import (`import { bypassDynamicsRestrictions as x }`); (iii) namespace /
+member access (`ctx.bypassDynamicsRestrictions`); (iv) dynamic `import()`; (v) inline `require()`;
+(vi) a re-export; (vii) a non-literal require/import source → fail closed; (viii) a literal
+empty-restrictions `withDynamicsContext({ restrictions: [] }, fn)` → RED; (ix) a non-literal-restrictions
+`withDynamicsContext` outside the Explorer carve-out → RED (fail closed); (x) `enterDynamicsBypassForScript`
+appearing outside `scripts/`/`tests/` → RED; plus GREEN fixtures for `withDalContext` usage, the sanctioned
+`core/context.js` importer, the Explorer's loaded-restrictions path, and `scripts/`/`tests/` files.
 
 **STOP-AND-ASK** on whether to build it now vs. defer, and on grep/AST-gate vs. ESLint. **Done means:** if
 built — gate + self-test green at census 0, registered everywhere the sibling gates are; if declined —
@@ -495,5 +567,46 @@ benefit.
     (bound to two string literals at `:415`/`:422`); pre-ruled safe, executor re-confirms + runs the
     bill-onboard suite before swapping. Deferred: Stage 3 import-law shape; Stage 4 tightening — both OWNER
     DECISIONS.
+- 2026-07-05: **Adversarial plan review round 1 (Codex, fresh-context): NOT SATISFIED — 1 P0, 2 P1, 1 P2;
+  all four verified against source this session and folded in.** Reviewer VERIFIED GOOD (verbatim relay):
+  the literal census (50/38 = 32 pages + 18 lib), the withDalContext drop-in equivalence (sole disclosed
+  delta: non-empty-string label + function validation at `context.js:46`), the nextauth mechanical ruling,
+  all five cron CRON_SECRET-before-bypass orderings, site 43's literal-labels pre-ruling, and the
+  `ctx.requestId` label-consumer finding. Findings and fold-ins:
+  (1) *P0 — two live functional bypass scopes missing*: `alert-reviewer-email-mismatch.js` (default param
+  `:44`, call `:55`) and `alert-reviewer-affiliation-mismatch.js` (default param `:66`, call `:77`) call
+  bypass through an injected `withDynamicsBypass` DEFAULT-PARAMETER alias, invisible to the call-site grep
+  `[re-VERIFIED via Read of both files in full this session]`. Folded: Baseline now distinguishes
+  **50 literal direct calls / 38 files** from **52 functional bypass scopes / 40 files**; sites 51-52 added
+  to Classification (b) (20 scopes / 14 files) with a default-initializer convert-in-place ruling; Stage 2
+  Cluster B1 extended; Stage 0 adds their DEFAULT-path characterization (their suites inject
+  `withDynamicsBypass` at `alert-reviewer-email-mismatch.test.js:14` /
+  `alert-reviewer-affiliation-mismatch.test.js:18` and never run the default import). **Third-alias sweep
+  run this session: NONE found** — the ALL-references grep over `lib`/`pages`/`shared`/`modules` shows
+  every remaining non-call reference is a plain import line in an already-censused file; the
+  assignment/re-export-pattern grep matches only the two alert default-params. The ALL-references alias
+  sweep is now a mandatory pre-stage re-probe.
+  (2) *P1 — Stage 3 law evasion hole*: `withDynamicsContext({ restrictions: [] }, fn)` is functionally
+  identical bypass (`dynamics-context.js:67-76`) and would evade a bypass-import-only gate. Live code has
+  only the Explorer's loaded-restrictions call (`chat.js:29` import, `:124` call — the ONLY live caller
+  outside dynamics-context.js `[re-VERIFIED via grep + sed this session]`). Folded: the Stage 3 gate now
+  fails on literal/known-empty-restrictions `withDynamicsContext` outside the sanctioned wrapper, fails
+  CLOSED on non-literal restrictions expressions, carves out the Explorer path (exempt-dir precedent), and
+  additionally reds `enterDynamicsBypassForScript` outside `scripts/`; the self-test fixture list expanded
+  to: alias import, namespace/member access, dynamic `import()`, inline `require()`, re-export, non-literal
+  fail-closed, empty-restrictions `withDynamicsContext`, and out-of-scripts `enterDynamicsBypassForScript`.
+  Decision 6 reworded (Explorer exempt from the STRIP; empty-restrictions shape NOT exempt from the LAW).
+  (3) *P1 — characterization too positive-only*: a `hasTrustedDalContext()===true` pin is decorative where
+  tests mock/inject the context machinery (exactly the sites-51/52 blind spot). Folded: Self-checking
+  method now REQUIRES, for the high-risk clusters (NextAuth fire-and-forget, entry-seam/MIXED lib services,
+  token verification, the two alert services), a per-cluster negative control (same op OUTSIDE context
+  still rejects) or a same-adapter enforcement probe, citing the existing generic failure pins
+  `tests/unit/dal-enforcement.test.js:78` (throws outside any context) and `:91-96` (raw write rejects
+  before any network call) `[VERIFIED via sed this session]` as the baseline.
+  (4) *P2 — stale count*: the drafting Baseline said `enterDynamicsBypassForScript` had "4 import sites";
+  re-derived live census is **59 call sites / 58 script files** (the "4" had counted only static `import`
+  lines) `[VERIFIED via grep this session]`; Baseline row corrected, with the two `lib/` comment-only
+  mentions noted. Frontmatter summary and Objective updated to the 52-functional-scope census. Plan remains
+  `status: draft`, not executed; catalog regeneration deferred to the orchestrator per session constraints.
 
 <!-- end of plan -->
