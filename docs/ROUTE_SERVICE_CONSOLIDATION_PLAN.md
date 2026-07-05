@@ -190,6 +190,9 @@ additions for any gap the Stage 0 inventory flagged: status codes for (a) unauth
 
 1. Create `lib/services/review-manager/withdraw-sufficient-service.js` holding all business logic;
    route becomes the shell per Decision 1; legacy wrapper → `withDalContext` (Decision 4).
+   `[RECHECKED after lib/services/review-manager/withdraw-sufficient-service.js change: step executed 2026-07-05 —
+   service created, route shelled (65 lines) onto withDalContext('review-manager-withdraw-sufficient'), baseline
+   49→48; integration 14/14, service unit 13/13, full suite 4205/4205, build + gates green; P1 review pending]`
 2. Add a unit test for the SERVICE (logic-level, adapters mocked) — the new test layer that could
    not exist while logic lived in the route.
 3. Run the full verification block. Census count drops by ≥1; update baseline JSON same commit.
