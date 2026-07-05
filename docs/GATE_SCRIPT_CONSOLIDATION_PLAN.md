@@ -2,8 +2,8 @@
 title: Gate-Script Scaffold Consolidation Plan
 domain: architecture
 kind: plan
-status: draft
-summary: "Consolidate CI-gate scaffolds onto selftest-fixture.js (18 of 19 self-tests) and walk-files.js (6 markdown gates); byte-identical census bar. Draft."
+status: active
+summary: "Consolidate CI-gate scaffolds onto selftest-fixture.js (18 self-tests) and walk-files.js (6 markdown gates); byte-identical bar. Stages 0-2 complete."
 canonical: true
 cataloged: 2026-07-05
 owner: product-engineering
@@ -16,10 +16,11 @@ related:
 
 # Gate-Script Scaffold Consolidation Plan
 
-**Execution status: DRAFT — not yet executed, not yet reviewed.** The docs-catalog frontmatter
-`status` enum has no "completed" value; this stays `draft` until execution, then follows the
-`CHUNK_CONSOLIDATION_PLAN` / `ODATA_ESCAPE_CONSOLIDATION_PLAN` precedent (a body line records
-completion, frontmatter moves to a live enum value). See the Stage Log for probes/counts.
+**Execution status: STAGES 0-2 COMPLETE (2026-07-05).** The docs-catalog frontmatter `status` enum
+has no "completed" value; per the `CHUNK_CONSOLIDATION_PLAN` / `ODATA_ESCAPE_CONSOLIDATION_PLAN`
+precedent this body line records completion and frontmatter moved from `draft` to the live enum
+value `active`. Stage 3 (the 4 code-tree security-gate walks) remains an OWNER DECISION and was not
+built; 1b-15 remains EXCLUDED/LEAVE. See the Stage Log for probes/counts and the execution entry.
 
 **Objective.** The CI gate scripts under `scripts/` (`check-*.js` and their `*-self-test.js`) duplicate
 two mechanical scaffolds:
@@ -50,7 +51,8 @@ and the Stage 0 orphan-visibility verification.
 `scripts/lib/` is the established home for gate helpers (`ast-scan-core.js`, `canonical-facts.js`,
 `docs-catalog.js`, `point-in-time-files.js`) `[VERIFIED via ls scripts/lib/ this session]`. **Neither
 `scripts/lib/selftest-fixture.js` nor `scripts/lib/walk-files.js` exists today**
-`[VERIFIED via ls scripts/lib/ → 8 files, neither present, this session]`. This is a motion refactor,
+`[VERIFIED via ls scripts/lib/ → 8 files, neither present, this session]`.
+[RECHECKED after scripts/lib/selftest-fixture.js change: the helpers were created during Stage 1/Stage 2 execution per this plan's Architecture (`ls scripts/lib/` post-execution shows both) — see the Stage Log execution entry] This is a motion refactor,
 not a redesign: same fixtures, same env vars, same red/green assertions, same scanned census, same
 verdicts.
 
@@ -558,5 +560,50 @@ touched gates, self-tests green, no new npm scripts needed; if declined — reco
   `os.tmpdir()` and `*selftest_tmp` paths before diffing); git-subprocess blind spot disclosed inline.
   Consequential renumbering: Class 2 architecture decisions are now 8–11. Amendments applied this
   session; plan remains `status: draft`, not executed.
+
+- 2026-07-05: **Stages 0–2 EXECUTED (Claude, this session). All census/verdict bars met; no
+  STOP-AND-ASK site forced; 1b-15 untouched; Stage 3 skipped (OWNER DECISION, unbuilt).**
+  Commits: `b057eec` (Stage 0 shim + characterization), `ecaafdb` (Stage 1 helper + unit test +
+  cluster 1A), `80de910` (cluster 1B-env), `9dba7c0` (cluster 1B-docs), `32be853` (cluster 1B-root),
+  `90e6adb` (Stage 2 walkTree + unit test + B1–B3), `53c5025` (B4–B6), plus this close-out commit.
+  - **Stage 0.** Disconfirming census greps re-run: ZERO drift vs this plan's Baseline (10
+    `mkdtempSync` hits / 6 files; 15 in-repo `selftest_tmp` self-test files; 28 `readdirSync` files;
+    no `.gitignore` selftest entries). `scripts/lib/__gate-census-trace.js` created per the amended
+    mechanism. BEFORE census+verdict captured for all 19 touched gates (direct runs). The Stage 0
+    green baseline was certified AFTER precursor commit `c054a26e` resolved a pre-existing
+    `check:drain-table-mentions` red (a one-line doc-drift annotation in
+    `docs/CHUNK_CONSOLIDATION_PLAN.md:470`, unrelated to gate scripts; correctly STOPped on, fixed
+    by the owner's session, then re-certified). `npm test` green: 416 suites / 4707 tests.
+  - **Stage 0 orphan-visibility table (empty-dir probes, per-1b dir; no verdict changed with any
+    orphan present):** `docs/agent-wiki/_*` fixtures (1b-1…1b-4) are readdir-visible to the 5
+    docs-walking gates (canonical-pointers, drain-table, prompt-storage, doc-currency,
+    fact-consistency) AND to check-agent-wiki, plus the two env-hatch gates when opted in;
+    `docs/*_selftest_tmp` (1b-5…1b-9) are readdir-visible to the same 5 docs-walking gates;
+    `scripts/fact_consistency_selftest_tmp` is readdir-visible to check-application-state-atlas;
+    root dot-dirs (1b-10…1b-13) are invisible to EVERY gate's walk; `pages/_route_gate_selftest_tmp`
+    and `lib/services/atlas_selftest_tmp` (1b-14, 1b-15) are readdir-visible to the code-tree gates
+    (route-service-boundary, dataverse-access-layer, model-override-warming) and atlas respectively.
+    All in-scope dirs rely on cleanup-on-entry (preserved) as the plan predicted; none false-fails a
+    gate when orphaned empty. No exclusions added (Non-goal).
+  - **Stage 1.** `scripts/lib/selftest-fixture.js` + `tests/unit/selftest-fixture.test.js` (4 tests).
+    18 of 19 self-tests adopted per the Cleanup-Timing Table — every pre-existing `cleanup()` call
+    point preserved 1:1 (dataverse's 25 mid-body calls included); 1a files gained exit-handler
+    cleanup only (they had none); api-route-matrix uses the array form (dir + matrix FILE).
+    1b-15 `check-coverage-self-test.js` NOT adopted (excluded). Per-cluster census diffs EMPTY and
+    verdicts BYTE-IDENTICAL vs Stage 0 BEFORE for all touched gates, with one disclosed, fully
+    attributed exception class: the untouched git-ls-files gates secret-scan/scaffolding-tokens
+    (zero code changes to either) report +3 scanned tracked files (2121→2124 / 2126→2129) — exactly
+    the shim, the helper, and the unit test this plan itself added to the repo; both gates exit 0.
+  - **Stage 2.** `scripts/lib/walk-files.js` (`walkTree`) + `tests/unit/walk-files.test.js` (3
+    tests). B1–B6 adopted one at a time, inner ROOTS-loop IIFE only; `SINGLE_FILES`/`ROOTS`/
+    `EXCLUDE_DIR`/predicates/handlers/missing-root throws untouched. All six verdicts BYTE-IDENTICAL
+    (primary oracle, decisive for B2/B6's git-subprocess blind spot); all six normalized fs-read
+    diffs contain exactly ONE added line — Node's module-load `readFileSync` of
+    `scripts/lib/walk-files.js` itself (require noise, not a scanned census file); all six
+    self-tests green.
+  - **Close.** Full gate + self-test baseline re-run sequentially: ALL GREEN. `npm test`: 418
+    suites / 4714 tests (prior 416/4707; +2 suites/+7 tests = exactly the two new unit-test files).
+    Frontmatter `status: draft` → `active` per the CHUNK/ODATA precedent; body execution-status
+    line updated. Post-execution fresh-context review: not yet run (next session or on request).
 
 <!-- end of plan -->
