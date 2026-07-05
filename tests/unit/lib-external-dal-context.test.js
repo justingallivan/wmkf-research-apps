@@ -69,7 +69,7 @@ describe('lib/external DAL context (S333 characterization, sites 44-46, 48)', ()
     expect(hasTrustedDalContext()).toBe(false);
   });
 
-  test('site 45 — verifyGranteeToken runs the request/deliverable read inside a trusted context', async () => {
+  test('site 45 — verifyGranteeToken runs the request/deliverable read inside the CALLER-established context (route push-up)', async () => {
     const { verifyGranteeToken } = require('../../lib/external/verify-grantee-token.js');
     const seen = { inside: null };
     verifyToken.mockResolvedValue({ valid: true, payload: { aud: 'grantee', subject: 'req-1' } });
@@ -78,7 +78,9 @@ describe('lib/external DAL context (S333 characterization, sites 44-46, 48)', ()
       return { akoya_requestid: 'req-1', akoya_requestnum: '1002794' };
     });
 
-    const out = await verifyGranteeToken('jwt-token');
+    // Matches both external/grantee/[token]/context.js and .../submit.js:
+    // withDalContext('grantee-token-verify', () => verifyGranteeToken(token))
+    const out = await withDalContext('grantee-token-verify', () => verifyGranteeToken('jwt-token'));
 
     expect(out.ok).toBe(true);
     expect(seen.inside).toBe(true);

@@ -85,7 +85,10 @@ export default async function handler(req, res) {
       return res.status(429).json({ ok: false, reason: 'rate_limited' });
     }
 
-    const verified = await verifyGranteeToken(token);
+    // S333 Stage 4b: trust-model tightening — this route now establishes
+    // the trusted context itself (label byte-preserved from the wrap that
+    // used to live inside verifyGranteeToken() itself).
+    const verified = await withDalContext('grantee-token-verify', () => verifyGranteeToken(token));
     await recordTokenOutcome(req, token, verified.ok);
     if (!verified.ok) {
       return res.status(verified.reason === 'not_found' ? 404 : 401).json({
