@@ -62,12 +62,11 @@ test('unresolvable request → ServiceHttpError 404 with the historical message'
   await expect(ingestApplicantReviewers(args)).rejects.toBeInstanceOf(ServiceHttpError);
 });
 
-test('warms model overrides before any extraction call', async () => {
+test('does NOT warm model overrides itself — warming is the shell\'s job (check:model-override-warming contract; the endpoint test pins the once-only route-level call)', async () => {
   getById.mockResolvedValue(baseRequest({ wmkf_excludedreviewers: 'Mya Breitbart' }));
   extractExcludedReviewers.mockResolvedValue({ names: [{ name: 'Mya Breitbart', affiliation: null }], substantive: true, parseFailed: false });
   await ingestApplicantReviewers(args);
-  expect(loadModelOverrides.mock.invocationCallOrder[0])
-    .toBeLessThan(extractExcludedReviewers.mock.invocationCallOrder[0]);
+  expect(loadModelOverrides).not.toHaveBeenCalled();
 });
 
 test('dedupes the same person across slots (single response entry, slotsPopulated counts distinct)', async () => {
