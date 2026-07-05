@@ -14,17 +14,16 @@
  */
 
 import { requireAppAccess } from '../../../../lib/utils/auth';
-import { DynamicsService } from '../../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
 import { isGuid } from '../../../../lib/utils/guid';
-
-const CONTACT_SELECT = 'contactid,fullname,firstname,lastname,emailaddress1';
+import * as grantRequestAdapter from '../../../../lib/dataverse/adapters/grant-request.js';
+import * as contactAdapter from '../../../../lib/dataverse/adapters/contact.js';
 
 async function resolveContact(id) {
   if (!id) return { contactId: null, name: null, email: null, hasEmail: false };
   let c;
   try {
-    c = await DynamicsService.getRecord('contacts', id, { select: CONTACT_SELECT });
+    c = await contactAdapter.getInviteRecipientById(id);
   } catch {
     // Lookup points at a contact we can't read — surface the id but no PII.
     return { contactId: id, name: null, email: null, hasEmail: false };
@@ -53,8 +52,8 @@ export default async function handler(req, res) {
     try {
       let row;
       try {
-        row = await DynamicsService.getRecord('akoya_requests', requestId, {
-          select: 'akoya_requestid,_wmkf_projectleader_value,_akoya_primarycontactid_value',
+        row = await grantRequestAdapter.getById(requestId, {
+          select: ['akoya_requestid', '_wmkf_projectleader_value', '_akoya_primarycontactid_value'],
         });
       } catch {
         row = null;
