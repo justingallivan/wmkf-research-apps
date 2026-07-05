@@ -24,11 +24,12 @@ restriction context folds INTO the layer as a deliberate late stage;
 delivery = ratchet + gate (freeze new raw usage immediately, convert
 opportunistically + occasional dedicated sessions).
 
-**Execution status: Stages 0–2 COMPLETE; conversion batch 1 MERGED (S329,
-2026-07-04).** Census probe, ratchet gate, core toolkit, 11 adapters, and 33
-converted caller files (7 parallel clusters). Allowlist 181 → 132 count-keys.
-Remaining: the sequential tail (akoya writes, cross-entity files, unresolved
-census entries, documented business-filter skips), then Stages 7–8.
+**Execution status: Stages 0–6 COMPLETE (S329, 2026-07-04).** Census probe,
+ratchet gate, core toolkit, 18 adapters, and ALL conversion waves done:
+allowlist 181 → 12 count-keys, every remaining entry non-entity-transport
+(permanent exemptions). Entity + unresolved raw Dataverse usage in
+`pages/`+`lib/`+`shared/` is ZERO. Remaining: Stage 7 (restriction fold-in;
+owner go given S329) and Stage 8 (close-out).
 
 ## Why (baseline evidence)
 
@@ -447,6 +448,21 @@ Drift found → this doc is edited BEFORE the next stage starts.
   `dashboard.js#listProposals` (caller-owned business filters per the
   grant-request adapter design note), plus all akoya write files, cross-entity
   files, and unresolved census entries.
+
+- 2026-07-04 (S329): **Waves 3–6 COMPLETE** (tails 1–3: 3 further Sonnet
+  worktree agents + Claude closeout, merges `1ac8ba46`…`d6fd5593`). Akoya
+  write conversions with exact-PATCH-body tests; business-filter files onto
+  `queryRequests`/`queryAllRequests` passthroughs (filters stay caller-built
+  per the adapter design note); all cross-entity files incl. the 3 changeset
+  flows onto `core/changeset.js` (operation arrays byte-identical per
+  unchanged integration tests); BILL/merge injection seams reshaped to
+  adapter-shaped deps; all 6 unresolved-census files resolved and converted;
+  `core/changeset.js` gained bare-collection POST for the review-questions
+  editor; `dynamics-explorer-taxonomy.js` exempted (sole importer is the
+  exempt Explorer route). Adapter layer: 18 modules `[VERIFIED via ls
+  lib/dataverse/adapters]`. Allowlist 132 → 12, all 12 non-entity-transport
+  `[VERIFIED via allowlist entity scan — 0 non-transport]`. Full suite
+  4163/4163; build clean. Stage 7 precondition MET.
 
 ## Appendix A — Baseline census
 
