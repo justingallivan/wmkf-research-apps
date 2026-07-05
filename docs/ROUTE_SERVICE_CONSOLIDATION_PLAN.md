@@ -550,6 +550,28 @@ review verdict + findings + resolutions)*
   the try so the catch can report partial success — pin with a dedicated test before
   moving. Running sum: 16 of 49 converted `[VERIFIED via census 49→33 across the per-stage
   boundary gate runs logged above]`.
+- 2026-07-05 (S331): **Stage 4 (workbench wave, 16 routes, three series) executed.**
+  Series A (`5d1fa746` phase A, `f27fb128` extraction): 9 core routes; all single-verb, no
+  P1m concerns; binary routes on send-in-shell; manual-reviewer's 409 conflict-code family
+  as explicit bodies; one ratified deviation (manual-reviewer service imports
+  lookupReviewerIdentity from its canonical lib home; mock retarget verified plumbing-only);
+  census 33→24. Series B (`4e2dec35`): enrich-recommended on the 2s template — all three
+  streaming routes now converted; census 24→23. Series C (`5fa5638b`): grantee-deliverables
+  subtree in nested lib/services/workbench/grantee-deliverables/; abstract.js is the first
+  live application of the P1m caveat (two historical branch-specific DAL scopes preserved
+  as two per-verb contexts); send-invite's partial-success statusPersisted:false and
+  generate's ETag idempotency moved verbatim; census 23→17.
+  **Wave-close red-gate catch and fix (`4d40a326`, `5f88c393`, `c87ec743`):** the full
+  sweep caught check:model-override-warming red — series A had moved applicant-reviewers'
+  loadModelOverrides() warm into the service, but the gate contract requires the awaited
+  call at ROUTE level (per-cluster targeted gates don't include this gate; the wave-close
+  full sweep exists for exactly this). Fixed to a single route-level warm; the series-A
+  service test that pinned service-side warming was superseded and inverted to pin
+  NOT-called (the endpoint suite pins the once-only route-level call). Lesson for Stage 5
+  executors: when a route touches model resolution, the warm stays in the shell.
+  Wave-close final: all gates green, suite 4504/4504 (395 suites), build exit 0. Running
+  sum: 32 of 49 converted `[VERIFIED via census 49→17 across the per-stage boundary gate
+  runs logged above]`. Post-stage review: next entry.
 
 ### Stage 0 route→test inventory (2026-07-04, S331)
 
