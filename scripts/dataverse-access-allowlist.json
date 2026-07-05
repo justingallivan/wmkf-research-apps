@@ -451,20 +451,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/external/review/[token]/context.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "wmkf_appreviewersuggestions",
-      "count": 1
-    },
-    {
-      "file": "pages/api/external/review/[token]/context.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "wmkf_appreviewersuggestions",
-      "count": 1
-    },
-    {
       "file": "pages/api/external/review/[token]/submit.js",
       "kind": "import",
       "clientMethod": "DynamicsService.getRecord",

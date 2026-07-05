@@ -25,6 +25,7 @@ import { fetchCoPIs } from '../../../../../lib/services/proposal-participants';
 import { computeEngagementState } from '../../../../../lib/external/review-engagement-state';
 import { getActiveQuestionSet, questionSetVersion } from '../../../../../lib/external/review-question-fetcher';
 import { readRatingsBySuggestion } from '../../../../../lib/external/review-answer-snapshot';
+import { getForEtagRefresh, stampProposalFirstAccessed } from '../../../../../lib/dataverse/adapters/reviewer-suggestion';
 
 // Slots Stage 2a renders. Hardcoded per build plan §4a.
 const STAGE_2A_POLICY_SLOTS = ['reviewer-coi', 'reviewer-ai-use'];
@@ -73,11 +74,7 @@ export default async function handler(req, res) {
     if (!suggestion.wmkf_proposalfirstaccessed) {
       try {
         await bypassDynamicsRestrictions('external-first-access', () =>
-          DynamicsService.updateRecord(
-            'wmkf_appreviewersuggestions',
-            suggestion.wmkf_appreviewersuggestionid,
-            { wmkf_proposalfirstaccessed: new Date().toISOString() },
-          ),
+          stampProposalFirstAccessed(suggestion.wmkf_appreviewersuggestionid),
         );
         // The stamp bumped the row's etag; the one we read pre-stamp is now
         // stale. Re-read it so the client's round-tripped If-Match matches
@@ -86,11 +83,7 @@ export default async function handler(req, res) {
         // this one response) rather than hand back a known-stale etag.
         try {
           const fresh = await bypassDynamicsRestrictions('external-context-refetch-etag', () =>
-            DynamicsService.getRecord(
-              'wmkf_appreviewersuggestions',
-              suggestion.wmkf_appreviewersuggestionid,
-              { select: 'wmkf_appreviewersuggestionid' },
-            ),
+            getForEtagRefresh(suggestion.wmkf_appreviewersuggestionid),
           );
           etag = fresh?._etag || null;
         } catch (e2) {
