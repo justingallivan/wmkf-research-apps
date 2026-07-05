@@ -482,6 +482,26 @@ review verdict + findings + resolutions)*
   scope narrowing found; census 40 independently re-run; characterization files proven
   unchanged through extraction via git diff. Reviewer re-ran the four non-mutating gates
   itself (self-tests blocked by read-only sandbox — covered by the owner-side full sweep).
+- 2026-07-05 (S331): **Stage 2s (streaming pilot) executed and P1s-cleared.** Phase A
+  (`845dac6b`): full SSE event vocabulary pinned pre-extraction per Decision 1a —
+  progress/email_generated/result/complete/error with payload key sets, terminal sequences,
+  non-terminal per-candidate failure, time-budget abort; 11/11. Phase B (`44c8f97f`): route
+  630→164-line shell (405/auth/rate-limit order, SSE framing, res.end everywhere);
+  `lib/services/reviewer-finder/generate-emails-service.js` (578 lines) exposes
+  `generateEmails(args, onEvent)`, never touches `res`, terminal failures emit one `error`
+  event and RESOLVE (not throw); one `withDalContext('reviewer-finder-generate-emails')`
+  widened over and retired both legacy step scopes. Census 40→39. (`eac878d5`/`7ec80250`:
+  stray agent *.log files removed from the extraction commit + root `/*.log` gitignore.)
+  **P1s checkpoint (Codex, fresh-context): SATISFIED, no blocking findings — P1s CLEARS;
+  2b may start.** Resolve-after-terminal-error ratified as THE streaming template; template
+  notes for 2b/enrich-recommended recorded: shell owns headers/serialization/res.end;
+  res.write failures are transport failures, not service-domain errors; pin the FULL
+  conditional event vocabulary before extraction (send-emails: partial sent/failed/skipped
+  arrays + lifecycle-after-send ordering; enrich-recommended: empty/terminal frames +
+  progress ordering). Operational note: harness background tasks hosting codex exec were
+  externally reaped twice (task + watchdog pair-killed, codex process dying with them);
+  protocol now: launch codex exec DETACHED (`nohup … & disown`, output to scratchpad,
+  `< /dev/null`) with a disposable poller — the review survives poller loss.
 
 ### Stage 0 route→test inventory (2026-07-04, S331)
 
