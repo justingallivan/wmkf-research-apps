@@ -256,8 +256,16 @@ describe('changeset.buildOperationUrl', () => {
       /unknown entity set/,
     );
   });
-  test('missing key AND keyPredicate throws', () => {
-    expect(() => changeset.buildOperationUrl({ entitySet: 'wmkf_appreviewersuggestions' })).toThrow(
+  test('missing key AND keyPredicate throws for PATCH', () => {
+    expect(() => changeset.buildOperationUrl({ method: 'PATCH', entitySet: 'wmkf_appreviewersuggestions' })).toThrow(
+      /requires a key or keyPredicate/,
+    );
+  });
+  test('bare-collection POST (no key) → set itself; create ops only (S329 review-questions)', () => {
+    expect(changeset.buildOperationUrl({ method: 'POST', entitySet: 'wmkf_reviewquestions' })).toBe(
+      'wmkf_reviewquestions',
+    );
+    expect(() => changeset.buildOperationUrl({ method: 'DELETE', entitySet: 'wmkf_reviewquestions' })).toThrow(
       /requires a key or keyPredicate/,
     );
   });

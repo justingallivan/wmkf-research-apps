@@ -22,6 +22,9 @@ const EXEMPT_FILES = new Set([
   'pages/dynamics-explorer.js',
   'pages/dataverse-bulk-export.js',
   'lib/services/dynamics-service.js',
+  // Explorer power-tool helper: sole importer is pages/api/dynamics-explorer/chat.js
+  // (exempt dir); its one raw call is a resolveLogicalName metadata lookup (S329 tail 3).
+  'lib/services/dynamics-explorer-taxonomy.js',
 ]);
 
 const EXEMPT_DIRS = [

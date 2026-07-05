@@ -15,22 +15,22 @@
  *   2. validate the submitted set (pure: review-question-save.js).
  *   3. re-read the live active set; if `baseVersion` != its current version →
  *      409 set_changed (another superuser saved meanwhile; the editor reloads).
- *   4. diff submitted vs current BY ROW ID → one executeChangeset operation list
+ *   4. diff submitted vs current BY ROW ID → one DAL changeset descriptor list
  *      (create / update / soft-delete). Key-immutability is enforced here.
  *   5. if there are ops: write a 'pending' audit row (HARD-ABORT if the audit
  *      table is unavailable — audit is a precondition), run the ONE atomic
  *      changeset, invalidate the fetcher cache, write the 'final' audit row.
  *
  * The atomic changeset means a partial save can't leave the set inconsistent —
- * either the whole edit lands or none of it does (DynamicsService.executeChangeset
- * throws unless every sub-op is 2xx).
+ * either the whole edit lands or none of it does (core/changeset runChangeset →
+ * DynamicsService.executeChangeset throws unless every sub-op is 2xx).
  */
 
 import { randomUUID } from 'crypto';
 import { sql } from '@vercel/postgres';
 import { requireSuperuser } from '../../../lib/utils/auth';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { runChangeset } from '../../../lib/dataverse/core/changeset';
 import { normalizeRow, questionSetVersion, invalidate } from '../../../lib/external/review-question-fetcher';
 import { validateSubmittedSet, buildChangeset, missingParentBoundKeys, ENTITY_SET } from '../../../lib/admin/review-question-save';
 import { queryActiveQuestions } from '../../../lib/dataverse/adapters/review-question';
@@ -166,7 +166,7 @@ async function handlePost(req, res, profileId) {
 
   // 5b. One atomic changeset.
   try {
-    await DynamicsService.executeChangeset(plan.operations);
+    await runChangeset(plan.operations);
   } catch (err) {
     console.error('[admin/review-questions] changeset failed:', err);
     // A 412 means a concurrent save touched a row between our version read and

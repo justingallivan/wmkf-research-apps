@@ -3,13 +3,6 @@
   "generatedFrom": "node scripts/check-dataverse-access-layer.js --json",
   "entries": [
     {
-      "file": "lib/services/dynamics-explorer-taxonomy.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.resolveLogicalName",
-      "entity": "unresolved",
-      "count": 1
-    },
-    {
       "file": "lib/services/notification-service.js",
       "kind": "require",
       "clientMethod": "DynamicsService.createAndSendEmail",
@@ -35,13 +28,6 @@
       "kind": "import",
       "clientMethod": "DynamicsService.createAndSendEmail",
       "entity": "non-entity-transport",
-      "count": 1
-    },
-    {
-      "file": "pages/api/admin/review-questions.js",
-      "kind": "import:changeset-unresolved",
-      "clientMethod": "DynamicsService.executeChangeset",
-      "entity": "changeset-unresolved",
       "count": 1
     },
     {

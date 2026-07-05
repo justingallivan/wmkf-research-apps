@@ -78,7 +78,8 @@ describe('buildChangeset', () => {
     const out = buildChangeset([], v([richField('q2')]));
     expect(out.ok).toBe(true);
     expect(out.operations).toHaveLength(1);
-    expect(out.operations[0]).toMatchObject({ method: 'POST', url: ENTITY_SET });
+    expect(out.operations[0]).toMatchObject({ method: 'POST', entitySet: ENTITY_SET });
+    expect(out.operations[0]).not.toHaveProperty('key');
     expect(out.operations[0].body.wmkf_questionkey).toBe('q2');
     // Primary name must be the LOWERCASE logical name; the schema-name casing
     // `wmkf_Name` is rejected by the Web API (0x80048d19) — caught in prod S304.
@@ -91,7 +92,7 @@ describe('buildChangeset', () => {
     const cur = [current('id-1', 'q2', 0)];
     const out = buildChangeset(cur, v([{ id: 'id-1', ...richField('q2', { label: 'New text' }) }]));
     expect(out.operations).toHaveLength(1);
-    expect(out.operations[0]).toMatchObject({ method: 'PATCH', url: `${ENTITY_SET}(id-1)` });
+    expect(out.operations[0]).toMatchObject({ method: 'PATCH', entitySet: ENTITY_SET, key: 'id-1' });
     expect(out.operations[0].body.wmkf_questiontext).toBe('New text');
     expect(out.operations[0].body).not.toHaveProperty('wmkf_questionkey');
     expect(out.summary.updated).toBe(1);
@@ -113,7 +114,7 @@ describe('buildChangeset', () => {
   it('soft-deletes a removed row (current id not resubmitted)', () => {
     const cur = [current('id-1', 'q2', 0), current('id-2', 'q4', 1)];
     const out = buildChangeset(cur, v([{ id: 'id-1', ...richField('q2') }]));
-    const del = out.operations.find((o) => o.url === `${ENTITY_SET}(id-2)`);
+    const del = out.operations.find((o) => o.key === 'id-2');
     expect(del).toMatchObject({ method: 'PATCH', body: INACTIVE_STATE });
     expect(out.summary.deleted).toBe(1);
   });
@@ -124,8 +125,8 @@ describe('buildChangeset', () => {
       { ...current('id-2', 'q4', 1), etag: 'W/"22"' },
     ];
     const out = buildChangeset(cur, v([{ id: 'id-1', ...richField('q2', { label: 'edited' }) }]));
-    const upd = out.operations.find((o) => o.url === `${ENTITY_SET}(id-1)` && o.body.wmkf_questiontext);
-    const del = out.operations.find((o) => o.url === `${ENTITY_SET}(id-2)` && o.body.statecode === 1);
+    const upd = out.operations.find((o) => o.key === 'id-1' && o.body.wmkf_questiontext);
+    const del = out.operations.find((o) => o.key === 'id-2' && o.body.statecode === 1);
     expect(upd.ifMatch).toBe('W/"11"');
     expect(del.ifMatch).toBe('W/"22"');
   });
@@ -161,6 +162,6 @@ describe('buildChangeset', () => {
     expect(out.summary.updated).toBe(1);
     // id-1 only moved → reordered
     expect(out.summary.reordered).toBe(1);
-    expect(out.operations.some((o) => o.url === `${ENTITY_SET}(id-3)` && o.body.statecode === 1)).toBe(true);
+    expect(out.operations.some((o) => o.key === 'id-3' && o.body.statecode === 1)).toBe(true);
   });
 });
