@@ -43,6 +43,7 @@ const {
   nodeLine,
   bindingNames,
   climbExpressionWrappers,
+  unwrapExpression,
   isCommonJsExportTarget,
   isInsideCommonJsExportRight,
   toRel,
@@ -172,6 +173,12 @@ function collectFileInfo(ast) {
   const exportsWholeNamespace = new Set();
   const unresolved = [];
   const unresolvedBindings = new Map();
+  // Same-file Identifier->Identifier alias edges (`const b = a` / `b = a`).
+  // Provenance flows from `from` to `to` in a post-walk fixpoint, so an alias
+  // chain (a -> b -> c) cannot launder a require()/import() binding before an
+  // identity export. Collection is module-agnostic, matching the binding
+  // captures above; the identity-export check is the noise filter.
+  const aliasEdges = [];
   const parentMap = buildParentMap(ast);
 
   // If `callNode` (possibly wrapped in await/parens/TS casts) is the RHS of a
@@ -247,6 +254,24 @@ function collectFileInfo(ast) {
       exportedBindings.set('default', node.declaration.name);
       return;
     }
+    // Alias edge: `const b = a` (Identifier declarator with Identifier init).
+    if (node.type === 'VariableDeclarator'
+      && node.id.type === 'Identifier'
+      && node.init) {
+      const init = unwrapExpression(node.init);
+      if (init && init.type === 'Identifier') {
+        aliasEdges.push({ from: init.name, to: node.id.name });
+      }
+    }
+    // Alias edge: `b = a` (plain assignment, Identifier on both sides).
+    if (node.type === 'AssignmentExpression'
+      && node.operator === '='
+      && node.left.type === 'Identifier') {
+      const right = unwrapExpression(node.right);
+      if (right && right.type === 'Identifier') {
+        aliasEdges.push({ from: right.name, to: node.left.name });
+      }
+    }
     // CJS identity re-exports: `module.exports = local` (whole namespace),
     // `module.exports = { external: local }`, `exports.external = local`.
     if (node.type === 'AssignmentExpression' && isCommonJsExportTarget(node.left)) {
@@ -290,6 +315,24 @@ function collectFileInfo(ast) {
       }
     }
   });
+
+  // Transitive same-file alias provenance: fixpoint-propagate membership in
+  // importedBindings and unresolvedBindings across alias edges, so chains of
+  // any length carry provenance to the identity-export check.
+  let aliasChanged = true;
+  while (aliasChanged) {
+    aliasChanged = false;
+    for (const { from, to } of aliasEdges) {
+      if (!importedBindings.has(to) && importedBindings.has(from)) {
+        importedBindings.set(to, importedBindings.get(from));
+        aliasChanged = true;
+      }
+      if (!unresolvedBindings.has(to) && unresolvedBindings.has(from)) {
+        unresolvedBindings.set(to, unresolvedBindings.get(from));
+        aliasChanged = true;
+      }
+    }
+  }
 
   return { refs, importedBindings, exportedBindings, exportsWholeNamespace, unresolved, unresolvedBindings };
 }

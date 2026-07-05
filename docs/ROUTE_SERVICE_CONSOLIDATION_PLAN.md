@@ -145,7 +145,7 @@ Two loops, both mandatory:
 1. Write `scripts/check-route-service-boundary.js`: for every file under `pages/api` (excluding the
    two carried-over exempt dirs), detect imports of `lib/dataverse/adapters/*` and
    `lib/services/dynamics-service`.
-   `[RECHECKED after scripts/check-route-service-boundary.js change: spec still accurate — review rounds hardened it on top of this contract (b3bbdad4 binding-level re-export taint + fail-closed non-literal sources; dc60b3e6 unresolved-binding propagation; round-3 fix late-assignment provenance); live census 49, gate + self-test green]` Modes: `--report` (rollup by domain), default = ratchet mode
+   `[RECHECKED after scripts/check-route-service-boundary.js change: spec still accurate — review rounds hardened it on top of this contract (b3bbdad4 binding-level re-export taint + fail-closed non-literal sources; dc60b3e6 unresolved-binding propagation; 52652882 late-assignment provenance; round-4 fix same-file alias-chain propagation); live census 49, gate + self-test green]` Modes: `--report` (rollup by domain), default = ratchet mode
    against a committed baseline file `scripts/route-service-boundary-baseline.json`
    (`{ "boundaryImportingRoutes": <N> }`, N = union of both import kinds). Fail if the count
    RISES; a falling count must update the baseline in the same commit. **Reuse the hardened
@@ -391,6 +391,24 @@ review verdict + findings + resolutions)*
   wrapper (hard-fail path), (s) late-assign literal adapter wrapper (boundary-count path);
   both proven evading the saved round-2 gate (exit 0) and caught by the patched gate.
   Self-test now 10 red / 5 green. Round-4 re-review pending.
+- 2026-07-05 (S331): **Post-stage review round 4 (Codex adversarial): NOT SATISFIED — 1
+  High, WITH class adjudication.** Round-3 fix verified good (literal late-assign counted,
+  non-literal fails closed, lazy services + q green, census 49). Codex enumerated the
+  remaining binding-flow evasion class and ruled: same-file ALIAS CHAINS are the only
+  realistic remaining shape (`const a = require('<adapter>'); const b = a;
+  module.exports = b` — probe-confirmed evading both count and hard-fail paths);
+  object-property namespace construction "adjacent but less likely"; array assignment
+  destructuring "adversarial-only for this codebase"; function-returned require outside the
+  ratchet (route-side non-literal already fails closed). Fixed same session: alias edges
+  collected from Identifier→Identifier declarators and plain assignments (wrapper-climbing),
+  post-walk fixpoint propagates importedBindings AND unresolvedBindings provenance across
+  chains of any length; identity-export checks unchanged (alias collection is
+  module-agnostic like the existing binding captures — the identity-export check remains the
+  noise filter). Fixtures (t) literal length-3 alias chain (count path) and (u) non-literal
+  alias chain w/ late-assign hop (hard-fail path), both proven evading the saved round-3
+  gate. Self-test 11 red / 5 green. Lazy services + q green; live census 49 unchanged.
+  Round-5 re-review = clearance verification (verify alias fix + confirm the round-4 class
+  enumeration is fully dispositioned).
 
 ### Stage 0 route→test inventory (2026-07-04, S331)
 
