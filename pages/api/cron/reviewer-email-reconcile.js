@@ -14,7 +14,7 @@
  */
 
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import { reconcileReviewerEmails } from '../../../lib/services/reviewer-email-reconciler';
 import MaintenanceService from '../../../lib/services/maintenance-service';
 
@@ -35,7 +35,7 @@ export default async function handler(req, res) {
 
   const runId = await MaintenanceService.startRun('reviewer-email-reconcile');
   try {
-    const result = await bypassDynamicsRestrictions('cron-reviewer-email-reconcile', () =>
+    const result = await withDalContext('cron-reviewer-email-reconcile', () =>
       reconcileReviewerEmails({ maxBatch, dryRun }),
     );
 

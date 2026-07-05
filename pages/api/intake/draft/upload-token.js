@@ -34,7 +34,7 @@ import { hasLiveMembership } from '../../../../lib/services/membership-service';
 import IntakeDraftService from '../../../../lib/services/intake-draft-service';
 import IntakeAuditService from '../../../../lib/services/intake-audit-service';
 import { resolveContactForSession } from '../../../../lib/services/contact-bridge-service';
-import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../../lib/dataverse/core/context';
 import { sanitizeBlobFilename } from '../../../../lib/utils/blob-filename';
 import { getIntakeBlobToken } from '../../../../lib/utils/intake-blob';
 import { checkIntakeRateLimit } from '../../../../lib/intake/rate-limit';
@@ -135,7 +135,7 @@ export default async function handler(req, res) {
     // 6) Bridge
     let bridgeResult;
     try {
-      bridgeResult = await bypassDynamicsRestrictions('intake-upload-token-bridge', () =>
+      bridgeResult = await withDalContext('intake-upload-token-bridge', () =>
         resolveContactForSession({
           oid: contactOid,
           email: session.user.contactEmail,
@@ -170,7 +170,7 @@ export default async function handler(req, res) {
     // 7) Membership
     let allowed;
     try {
-      allowed = await bypassDynamicsRestrictions('intake-upload-token-membership', () =>
+      allowed = await withDalContext('intake-upload-token-membership', () =>
         hasLiveMembership(contactId, draft.account_id)
       );
     } catch (err) {

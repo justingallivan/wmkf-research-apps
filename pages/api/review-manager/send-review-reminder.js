@@ -24,7 +24,7 @@
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import { sendManualReviewDueReminder } from '../../../lib/services/reviewer-manual-reminder';
 
 const REASON_STATUS = {
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, reason: 'validation', errors: ['suggestionId must be a valid GUID.'] });
     }
 
-    const result = await bypassDynamicsRestrictions('review-manager-send-review-reminder', () =>
+    const result = await withDalContext('review-manager-send-review-reminder', () =>
       sendManualReviewDueReminder({ requestId, suggestionId, actingUserSystemId }),
     );
 

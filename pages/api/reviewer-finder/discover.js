@@ -23,7 +23,7 @@ import { withReviewerProvenance } from '../../../lib/utils/reviewer-provenance';
 import { sanitizeReferredSeeds, buildReferredSeedCandidate, blockReferredSeed } from '../../../lib/utils/reviewer-referral-seeds';
 import { partitionByExcluded } from '../../../lib/utils/reviewer-name-match';
 import { lookupReviewerIdentity } from '../../../lib/services/reviewer-identity-lookup';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import { resolveProposalPI, excludePiIdentity, appendPiName, piInstitutions } from '../../../lib/services/proposal-pi-identity';
 import { recordCoiDropped } from '../../../lib/services/reviewer-roster-store';
 import { pruneCandidateForRoster } from '../../../shared/components/reviewers/reviewer-search-logic';
@@ -179,7 +179,7 @@ export default async function handler(req, res) {
     let piIdentity = null;
     if (requestId) {
       try {
-        piIdentity = await bypassDynamicsRestrictions(
+        piIdentity = await withDalContext(
           'reviewer-discover-pi-identity',
           () => resolveProposalPI(requestId, { signal: deadlineController.signal })
         );
@@ -410,7 +410,7 @@ export default async function handler(req, res) {
 
       let referredCandidates = [];
       if (seedsForLookup.length > 0) {
-        referredCandidates = await bypassDynamicsRestrictions(
+        referredCandidates = await withDalContext(
           'reviewer-discover-referred-seeds',
           async () => {
             const built = [];

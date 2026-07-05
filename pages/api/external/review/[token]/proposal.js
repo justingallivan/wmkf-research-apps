@@ -14,7 +14,7 @@
 import { verifySuggestionToken, tokenHasOp } from '../../../../../lib/external/verify-suggestion-token';
 import { GraphService } from '../../../../../lib/services/graph-service';
 import { getRequestSharePointBuckets } from '../../../../../lib/utils/sharepoint-buckets';
-import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../../../lib/dataverse/core/context';
 import { isReviewerMaterial } from '../../../../../lib/external/reviewer-materials';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 
@@ -53,7 +53,7 @@ export default async function handler(req, res) {
 
     const { request } = verified;
 
-    const allowed = await bypassDynamicsRestrictions('external-validate-file', () =>
+    const allowed = await withDalContext('external-validate-file', () =>
       isFileInRequestSet(
         request.akoya_requestid,
         request.akoya_requestnum,

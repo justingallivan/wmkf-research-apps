@@ -16,7 +16,7 @@
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import { planMerge, executeMerge, projectMergePlanForClient } from '../../../lib/services/reviewer-merge';
 
 export default async function handler(req, res) {
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
 
   const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
 
-  return bypassDynamicsRestrictions('merge-candidates', async () => {
+  return withDalContext('merge-candidates', async () => {
     try {
       if (!confirm) {
         const plan = await planMerge({ keeperId, loserId });

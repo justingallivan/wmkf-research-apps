@@ -39,7 +39,7 @@ import { hasLiveMembership } from '../../../../lib/services/membership-service';
 import IntakeDraftService from '../../../../lib/services/intake-draft-service';
 import IntakeAuditService from '../../../../lib/services/intake-audit-service';
 import { resolveContactForSession } from '../../../../lib/services/contact-bridge-service';
-import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../../lib/dataverse/core/context';
 import { scanBytes } from '../../../../lib/services/cloudmersive-scan';
 import { isVirusScanEnabled } from '../../../../lib/utils/virus-scan-config';
 import { validateIntakeAttachment, sniffFileType } from '../../../../lib/utils/file-magic';
@@ -137,7 +137,7 @@ export default async function handler(req, res) {
     // 6) Bridge
     let bridgeResult;
     try {
-      bridgeResult = await bypassDynamicsRestrictions('intake-attach-bridge', () =>
+      bridgeResult = await withDalContext('intake-attach-bridge', () =>
         resolveContactForSession({
           oid: contactOid,
           email: session.user.contactEmail,
@@ -169,7 +169,7 @@ export default async function handler(req, res) {
     // 7) Membership
     let allowed;
     try {
-      allowed = await bypassDynamicsRestrictions('intake-attach-membership', () =>
+      allowed = await withDalContext('intake-attach-membership', () =>
         hasLiveMembership(contactId, draft.account_id)
       );
     } catch (err) {

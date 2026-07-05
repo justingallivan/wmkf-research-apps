@@ -16,7 +16,7 @@
 import Busboy from 'busboy';
 import { verifyGranteeToken } from '../../../../../lib/external/verify-grantee-token';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
-import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../../../lib/dataverse/core/context';
 import { writeGranteeDeliverables, MAX_IMAGE_BYTES } from '../../../../../lib/services/grantee-upload';
 import { isGranteeEditableStatus } from '../../../../../shared/config/granteeDeliverableStatus';
 
@@ -64,7 +64,7 @@ export default async function handler(req, res) {
     const caption = parsed.fields.caption || '';
     const imageFile = parsed.files[0] || null;
 
-    const result = await bypassDynamicsRestrictions('grantee-submit', () =>
+    const result = await withDalContext('grantee-submit', () =>
       writeGranteeDeliverables({ request, deliverable, editedAbstract, caption, imageFile }));
 
     if (!result.ok) {

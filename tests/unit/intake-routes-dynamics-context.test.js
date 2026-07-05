@@ -185,7 +185,12 @@ describe('staff sign-in reconcileProfile is wrapped', () => {
   // Direct module-shape assertion is the right scope: importing the full
   // NextAuth route handler pulls Postgres + the provider config. The fix
   // is structurally a single-line wrap; pin it by reading the source.
-  test('source contains bypassDynamicsRestrictions around reconcileProfile', () => {
+  //
+  // S333 bypass-strip Stage 1: the wrapper is now the sanctioned
+  // `withDalContext` (behavior-identical to the retired
+  // `bypassDynamicsRestrictions`, same label); the shape assertion tracks
+  // the rename.
+  test('source contains withDalContext around reconcileProfile', () => {
     const fs = require('fs');
     const path = require('path');
     const src = fs.readFileSync(
@@ -196,12 +201,14 @@ describe('staff sign-in reconcileProfile is wrapped', () => {
     // reconcileProfile must appear lexically inside each wrapper — not
     // just somewhere else in the file.
     const wrappedShape = src.match(
-      /bypassDynamicsRestrictions\(\s*['"]staff-signin-reconcile['"][^]*?reconcileProfile\s*\(/g
+      /withDalContext\(\s*['"]staff-signin-reconcile['"][^]*?reconcileProfile\s*\(/g
     );
     expect(wrappedShape?.length || 0).toBeGreaterThanOrEqual(2);
     // No bare reconcileProfile(...).catch — every call site must go
     // through the wrapper.
     expect(src).not.toMatch(/^\s*reconcileProfile\([^)]*\)\.catch/m);
+    // No unwrapped legacy shape remains.
+    expect(src).not.toMatch(/bypassDynamicsRestrictions/);
   });
 });
 

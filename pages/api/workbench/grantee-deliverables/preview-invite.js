@@ -17,7 +17,7 @@
 
 import { requireAppAccess } from '../../../../lib/utils/auth';
 import { renderGranteeInviteHtml } from '../../../../lib/external/grantee-invite-email';
-import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../../lib/dataverse/core/context';
 import { appendSignatureBlock, resolveSignatureForRequest } from '../../../../lib/services/email-signature';
 import { isGuid } from '../../../../lib/utils/guid';
 
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'The email body is required.' });
   }
 
-  return bypassDynamicsRestrictions('grantee-preview-invite', async () => {
+  return withDalContext('grantee-preview-invite', async () => {
     const signatureBlock = await resolveSignatureForRequest(requestId);
     const html = renderGranteeInviteHtml({
       bodyText: appendSignatureBlock(bodyText, signatureBlock),

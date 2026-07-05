@@ -20,7 +20,7 @@ import { ClaudeReviewerService } from '../../../lib/services/claude-reviewer-ser
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 import { DEFAULT_REVIEWER_COUNT } from '../../../shared/config/reviewerFinderPreferences';
 import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import { loadReviewerRequestContext } from '../../../lib/services/reviewer-request-context';
 
 const limiter = nextRateLimiter({ max: 10 });
@@ -179,7 +179,7 @@ export default async function handler(req, res) {
       message: 'Loading request metadata from Dataverse...',
     });
     try {
-      requestContext = await bypassDynamicsRestrictions('reviewer-finder-analyze-request-context', () =>
+      requestContext = await withDalContext('reviewer-finder-analyze-request-context', () =>
         loadReviewerRequestContext(trimmedRequestId));
       sendEvent('progress', {
         stage: 'metadata',

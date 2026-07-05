@@ -19,7 +19,7 @@
 
 import { verifyGranteeToken } from '../../../../../lib/external/verify-grantee-token';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
-import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../../../lib/dataverse/core/context';
 import { assembleGranteeDocument } from '../../../../../lib/services/grantee-document-assembly';
 import { renderAwardBlock } from '../../../../../lib/services/grantee-document-html';
 import {
@@ -59,7 +59,7 @@ const SUBMITTED_VIEW_STATUSES = new Set([
  */
 async function buildPreviewHtml(requestId) {
   try {
-    const model = await bypassDynamicsRestrictions('grantee-portal-preview', () =>
+    const model = await withDalContext('grantee-portal-preview', () =>
       assembleGranteeDocument(requestId, { includeImageRef: false }),
     );
     if (!model) return null;

@@ -13,7 +13,7 @@
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import {
   fetchReviewerRollup,
   deriveWorkRemaining,
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'requestId is not a valid GUID' });
   }
 
-  return bypassDynamicsRestrictions('workbench-reviewer-rollup', async () => {
+  return withDalContext('workbench-reviewer-rollup', async () => {
     try {
       const map = await fetchReviewerRollup([requestId]);
       // Match the returned key case-insensitively: Dataverse can echo

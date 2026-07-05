@@ -58,7 +58,7 @@ import { hasSubmitterRole } from '../../../lib/services/membership-service';
 import IntakeDraftService from '../../../lib/services/intake-draft-service';
 import IntakeAuditService from '../../../lib/services/intake-audit-service';
 import { resolveContactForSession } from '../../../lib/services/contact-bridge-service';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import { validateAttachmentShape, validateAttachmentSet } from '../../../lib/utils/intake-attachment-shape';
 import { validateBudgetLineRow } from '../../../lib/utils/intake-budget-line-payload';
 import { checkIntakeRateLimit } from '../../../lib/intake/rate-limit';
@@ -133,7 +133,7 @@ export default async function handler(req, res) {
   //    false for every applicant (the bug this commit fixes).
   let bridgeResult;
   try {
-    bridgeResult = await bypassDynamicsRestrictions('intake-submit-bridge', () =>
+    bridgeResult = await withDalContext('intake-submit-bridge', () =>
       resolveContactForSession({
         oid: contactOid,
         email: session.user.contactEmail,
@@ -184,7 +184,7 @@ export default async function handler(req, res) {
   //    The membership service handles the approved+active+Submitter triple-check.
   let isSubmitter;
   try {
-    isSubmitter = await bypassDynamicsRestrictions('intake-submit-membership', () =>
+    isSubmitter = await withDalContext('intake-submit-membership', () =>
       hasSubmitterRole(contactId, accountId)
     );
   } catch (err) {

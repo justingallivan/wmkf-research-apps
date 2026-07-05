@@ -13,7 +13,7 @@
 
 import { requireSuperuser } from '../../../lib/utils/auth';
 import { reconcileBatch } from '../../../lib/services/dynamics-identity-service';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
   const all = req.body?.all === true;
 
   try {
-    const result = await bypassDynamicsRestrictions('admin-reconcile-identities', () =>
+    const result = await withDalContext('admin-reconcile-identities', () =>
       reconcileBatch({ staleDays: 30, includeNull: true, includeAll: all }),
     );
 

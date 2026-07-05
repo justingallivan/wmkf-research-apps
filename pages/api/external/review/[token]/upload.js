@@ -12,7 +12,7 @@ import Busboy from 'busboy';
 import { verifySuggestionToken, tokenHasOp } from '../../../../../lib/external/verify-suggestion-token';
 import { writeReviewFiles } from '../../../../../lib/services/review-upload';
 import { respondForFailedReviewUpload } from '../../../../../lib/utils/review-upload-response';
-import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../../../lib/dataverse/core/context';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 MB per file
@@ -92,7 +92,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, reason: 'validation', errors: ['At least one file is required.'] });
     }
 
-    const result = await bypassDynamicsRestrictions('external-upload', () =>
+    const result = await withDalContext('external-upload', () =>
       writeReviewFiles({
         suggestionId: verified.suggestion.wmkf_appreviewersuggestionid,
         files,

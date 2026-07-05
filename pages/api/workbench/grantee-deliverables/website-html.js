@@ -20,7 +20,7 @@
  */
 
 import { requireAppAccess } from '../../../../lib/utils/auth';
-import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../../lib/dataverse/core/context';
 import { isGuid } from '../../../../lib/utils/guid';
 import { assembleGranteeDocument } from '../../../../lib/services/grantee-document-assembly';
 import { renderAwardBlock } from '../../../../lib/services/grantee-document-html';
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'requestId must be a GUID' });
   }
 
-  return bypassDynamicsRestrictions('grantee-website-html', async () => {
+  return withDalContext('grantee-website-html', async () => {
     try {
       const model = await assembleGranteeDocument(requestId, { includeImageRef: true });
       if (!model) {

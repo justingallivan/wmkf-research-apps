@@ -20,7 +20,7 @@ import Busboy from 'busboy';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { writeReviewFiles } from '../../../lib/services/review-upload';
 import { respondForFailedReviewUpload } from '../../../lib/utils/review-upload-response';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_FILES = 5;
@@ -74,7 +74,7 @@ export default async function handler(req, res) {
     // form data.
     const { suggestionId: _ignored, ...structuredData } = fields;
 
-    const result = await bypassDynamicsRestrictions('review-manager-upload', () =>
+    const result = await withDalContext('review-manager-upload', () =>
       writeReviewFiles({
         suggestionId,
         files,

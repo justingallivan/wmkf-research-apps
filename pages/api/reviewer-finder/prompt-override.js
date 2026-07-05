@@ -15,7 +15,7 @@
  */
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { DatabaseService } from '../../../lib/services/database-service';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import { fetchCurrentPrompt } from '../../../lib/services/prompt-store';
 import { PREFERENCE_KEYS } from '../../../shared/config/reviewerFinderPreferences';
 import { validatePromptForSave } from '../../../lib/utils/prompt-validators';
@@ -51,7 +51,7 @@ export default async function handler(req, res) {
 /** Fetch the current Dataverse template (base) + version; fall back to the code template. */
 async function loadBase(name) {
   try {
-    const row = await bypassDynamicsRestrictions('prompt-override-base', () => fetchCurrentPrompt(name));
+    const row = await withDalContext('prompt-override-base', () => fetchCurrentPrompt(name));
     return {
       templateBody: row.wmkf_ai_promptbody || CODE_TEMPLATES[name],
       version: row.wmkf_promptversion ?? null,

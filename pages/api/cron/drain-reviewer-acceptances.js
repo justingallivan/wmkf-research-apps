@@ -10,7 +10,7 @@
  */
 
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import { drainReviewerAcceptanceJobs } from '../../../lib/services/reviewer-acceptance-drain';
 import MaintenanceService from '../../../lib/services/maintenance-service';
 
@@ -31,7 +31,7 @@ export default async function handler(req, res) {
   const runId = await MaintenanceService.startRun('drain-reviewer-acceptances');
 
   try {
-    const result = await bypassDynamicsRestrictions('cron-drain-reviewer-acceptances', () =>
+    const result = await withDalContext('cron-drain-reviewer-acceptances', () =>
       drainReviewerAcceptanceJobs({ limit, lockSeconds }),
     );
     const status = result.failed > 0 ? 'failed' : 'completed';

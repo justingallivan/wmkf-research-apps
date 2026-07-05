@@ -30,7 +30,7 @@ import { DEFAULT_APP_GRANTS } from '../../../shared/config/appRegistry';
 import NotificationService from '../../../lib/services/notification-service';
 import { grantApps } from '../../../lib/services/app-access-service';
 import { reconcileProfile } from '../../../lib/services/dynamics-identity-service';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 
 // Entra External ID tenant uses the CIAM endpoint family, not the regular
 // `login.microsoftonline.com` family. The well-known doc anchors discovery
@@ -159,7 +159,7 @@ export const authOptions = {
               // Fire-and-forget new user notification
               NotificationService.notifyNewUser({ id: tempResult.rows[0].id, name: displayName, azure_email: azureEmail }).catch(() => {});
               // Fire-and-forget Dynamics identity link
-              bypassDynamicsRestrictions('staff-signin-reconcile', () =>
+              withDalContext('staff-signin-reconcile', () =>
                 reconcileProfile(tempResult.rows[0].id, { silent: true })
               ).catch(() => {});
             }
@@ -182,7 +182,7 @@ export const authOptions = {
             // Fire-and-forget new user notification
             NotificationService.notifyNewUser({ id: newResult.rows[0].id, name: displayName, azure_email: azureEmail }).catch(() => {});
             // Fire-and-forget Dynamics identity link
-            bypassDynamicsRestrictions('staff-signin-reconcile', () =>
+            withDalContext('staff-signin-reconcile', () =>
               reconcileProfile(newResult.rows[0].id, { silent: true })
             ).catch(() => {});
           }

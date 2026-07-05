@@ -27,7 +27,7 @@ import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { BASE_CONFIG } from '../../../shared/config/baseConfig';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import { resolveProposalPI, piInstitutions } from '../../../lib/services/proposal-pi-identity';
 
 const limiter = nextRateLimiter({ max: 10 });
@@ -132,7 +132,7 @@ export default async function handler(req, res) {
     let coiInstitutions = authorInstitution;
     if (requestId) {
       try {
-        const pi = await bypassDynamicsRestrictions(
+        const pi = await withDalContext(
           'reviewer-enrich-contacts-pi-identity',
           () => resolveProposalPI(requestId, { signal: deadlineController.signal })
         );

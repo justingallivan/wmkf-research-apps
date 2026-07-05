@@ -8,7 +8,7 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import { normalizeOrcid } from '../../../lib/utils/orcid-normalize';
 import { lookupReviewerIdentity } from '../../../lib/services/reviewer-identity-lookup';
 
@@ -53,7 +53,7 @@ export default async function handler(req, res) {
   if (email && !EMAIL_RE.test(email)) return res.status(400).json({ error: 'email must be a valid email address' });
   if (orcidRaw && !orcid) return res.status(400).json({ error: 'orcid must be a valid ORCID iD' });
 
-  return bypassDynamicsRestrictions('workbench-reviewer-lookup', async () => {
+  return withDalContext('workbench-reviewer-lookup', async () => {
     try {
       const out = await lookupReviewerIdentity({ name, email: email || null, orcid });
       return res.status(200).json(out);
