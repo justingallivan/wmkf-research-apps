@@ -347,4 +347,33 @@ Codex adversarial review of the full diff, same acceptance bar as `BYPASS_STRIP_
   is 7 sites in 6 functions. Stage 2 execution = one production wrap (`onboard-reviewer.js:81`) plus
   characterization tests for the 8 already-covered paths; no service-internal changes. Not yet executed.
 
+- 2026-07-05: **Stage 2 executed and reviewed (uncommitted at time of writing; see commit).** One
+  production wrap added — `pages/api/bill/onboard-reviewer.js:81`,
+  `withDalContext('bill-onboard-reviewer', () => onboardReviewer(body))` — plus 8 characterization tests
+  appended to `tests/unit/notification-trust-model-pushup.test.js` (22 tests total in the file). Service
+  internals (`onboard-reviewer-service.js`, `email-defaults.js`), the shared `notify()` wrapper, and all
+  docs untouched. Green: full suite 428 suites / 4766 tests, build, and the four boundary gates + self-tests.
+  **Test-strength caveat (honest):** the tests are of two kinds. The #10 ROUTE test drives the real
+  handler (`billOnboardHandler`), so it genuinely GUARDS the new wrap — mutation-proven: reverting the
+  `:81` wrap turns it red at `expect(hit.trusted).toBe(true)`. The #10b-drain and all six #11 tests are
+  service-level: they call `withDalContext('<label>', () => serviceFn(...))` with the label supplied by
+  the TEST, not the handler, so they prove the service chain PROPAGATES context to the alert (no async
+  context loss) but do NOT guard that the real handler establishes it — mutation-confirmed: neutralizing
+  the grantee cron's own wrap left its test green. Handler coverage for those 7 paths therefore rests on
+  the source trace above (each handler's `withDalContext` open line was personally read), which is
+  sufficient while the shared internal `'notification-email'` net remains. **Precondition added to the
+  net-removal step (below): before removing the shared net, upgrade the #10b/#11 characterization tests
+  to drive their real handlers (Form A), so the handler wraps are regression-guarded once the net — the
+  current backstop — is gone.**
+
+## Stage 3 — Remove the shared internal `'notification-email'` wrapper (NOT YET DONE)
+
+Precondition now MET on coverage (every REACHES entry point establishes context, Stages 1-2), but NOT
+on test-guard: first upgrade the #10b/#11 tests from service-level to handler-level (see the caveat in
+the 2026-07-05 Stage 2 entry) so removing the net cannot silently un-guard a handler wrap. Then remove
+`withDalContext('notification-email', ...)` from `sendAdminEmail` (`notification-service.js`), and prove
+via the (now handler-level) characterization suite + the existing no-context negative control that every
+path still establishes trusted context at its entry point. This is the dangerous step (the drain-defect
+failure class); do it under fresh-context review, as its own change.
+
 <!-- end of plan -->
