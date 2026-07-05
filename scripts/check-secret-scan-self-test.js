@@ -13,6 +13,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { scanText, readTrackedSecretNames, assignmentRegexFor } = require('./check-secret-scan.js');
+const { registerRepoFixture } = require('./lib/selftest-fixture');
 
 const repoRoot = path.resolve(__dirname, '..');
 const gatePath = path.join(repoRoot, 'scripts', 'check-secret-scan.js');
@@ -48,7 +49,6 @@ check('placeholder private key header is ignored', scan('example: -----BEGIN PRI
 
 const tmpRel = path.join('docs', 'agent-wiki', '_secret_scan_selftest_tmp');
 const tmpAbs = path.join(repoRoot, tmpRel);
-function cleanup() { if (fs.existsSync(tmpAbs)) fs.rmSync(tmpAbs, { recursive: true, force: true }); }
 function runGate() {
   try {
     return { status: 0, output: execSync(`node ${JSON.stringify(gatePath)}`, {
@@ -58,10 +58,8 @@ function runGate() {
   } catch (e) { return { status: e.status || 1, output: (e.stdout || '') + (e.stderr || '') }; }
 }
 
+const { cleanup } = registerRepoFixture(tmpRel); // cleans a prior orphan on entry, then mkdirs
 try {
-  cleanup();
-  fs.mkdirSync(tmpAbs, { recursive: true });
-
   fs.writeFileSync(path.join(tmpAbs, 'leaked.env'), `CLAUDE_API_KEY=${realAnthropic}\n`);
   const dirty = runGate();
   check('gate FAILS on a real-looking temp secret', dirty.status !== 0);

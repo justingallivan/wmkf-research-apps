@@ -14,6 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const { registerRepoFixture } = require('./lib/selftest-fixture');
 
 const repoRoot = path.resolve(__dirname, '..');
 const gate = path.join(repoRoot, 'scripts', 'check-doc-symbol-refs.js');
@@ -29,9 +30,9 @@ const PRESENT = 'scripts/check-doc-symbol-refs.js';
 const GITIGNORED_SUBDIR = 'ignored-artifacts';
 const GITIGNORED_REF = `docs/agent-wiki/_doc_symbol_refs_selftest_tmp/${GITIGNORED_SUBDIR}/out.json`;
 
-function cleanup() {
-  if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
-}
+// Disposer from the shared helper (cleans a prior orphan at registration and
+// on catchable exit); every pre-existing cleanup() call point below is kept 1:1.
+const { cleanup } = registerRepoFixture('docs/agent-wiki/_doc_symbol_refs_selftest_tmp');
 
 function runGate() {
   try {

@@ -14,6 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { scanText } = require('./check-scaffolding-tokens.js');
+const { registerRepoFixture } = require('./lib/selftest-fixture');
 
 const repoRoot = path.resolve(__dirname, '..');
 const failures = [];
@@ -44,7 +45,6 @@ check('plain prose not flagged', scanText('Just normal documentation text.').len
 // ── End-to-end: real gate catches a leaked temp file, passes when clean ──────
 const tmpRel = path.join('docs', 'agent-wiki', '_scaffold_tokens_selftest_tmp');
 const tmpAbs = path.join(repoRoot, tmpRel);
-function cleanup() { if (fs.existsSync(tmpAbs)) fs.rmSync(tmpAbs, { recursive: true, force: true }); }
 function runGate() {
   try {
     return { status: 0, output: execSync(`node ${JSON.stringify(path.join(repoRoot, 'scripts', 'check-scaffolding-tokens.js'))}`, {
@@ -54,9 +54,8 @@ function runGate() {
   } catch (e) { return { status: e.status || 1, output: (e.stdout || '') + (e.stderr || '') }; }
 }
 
+const { cleanup } = registerRepoFixture(tmpRel); // cleans a prior orphan on entry, then mkdirs
 try {
-  cleanup();
-  fs.mkdirSync(tmpAbs, { recursive: true });
   fs.writeFileSync(path.join(tmpAbs, 'leaked.md'), `# doc\nbody\n${tok('content', true)}\n`);
   const dirty = runGate();
   check('gate FAILS on a leaked temp file', dirty.status !== 0);
