@@ -15,10 +15,11 @@ related:
 
 # NotificationService Trust-Model Push-Up Plan
 
-**Execution status: DRAFTED, REVIEWED, DOC CLEANED, CENSUS RE-CLOSED AT 23 (three-way verified),
-STAGE 0 PASSED, STAGE 1 NOT YET EXECUTED (2026-07-05).** Owner has signed off on execution; Stage 1
-code is pending, to be applied by Codex and reviewed by Claude before anything commits. This is the
-site-33 follow-on
+**Execution status: STAGE 1 EXECUTED, REVIEWED, AND COMMITTED (`23cff83`, 2026-07-05).** Census
+re-closed at 23 (three-way verified, `02d3cd9`); Stage 0 passed; all 9 single-hop push-ups landed with
+characterization coverage; `notify()`'s shared internal wrapper intentionally retained. **Remaining:
+Stage 2 (multi-hop #10/#11) not started, and the shared-wrapper removal is a separate later human
+decision once every REACHES site is covered — neither is done.** This is the site-33 follow-on
 the owner asked for after `docs/BYPASS_STRIP_PLAN.md` Stage 4 closed everything else. Stage 4's own
 text explicitly deferred this site: its DAL-touching branch sits inside a shared utility (`notify()`),
 most of whose callers never reach it, and safely auditing that full fan-out was out of scope for that
@@ -278,5 +279,22 @@ Codex adversarial review of the full diff, same acceptance bar as `BYPASS_STRIP_
   preserved). Owner signed off on execution: Stage 1 to be applied by Codex, then reviewed by Claude on
   the uncommitted diff before any commit; the shared `'notification-email'` wrapper stays in place this
   pass regardless (its removal is a later, separate human decision once all REACHES sites are covered).
+
+- 2026-07-05: **Stage 1 executed, reviewed, and committed (`23cff83`).** Codex applied `withDalContext`
+  wraps at all 9 single-hop sites (#9, #14, #15, #16, #17, #18, #19, #20, #21) and added a 14-test
+  characterization suite (`tests/unit/notification-trust-model-pushup.test.js`) covering #9 and the
+  already-covered #12/#13/#22 with real `NotificationService`/`DynamicsService`, a no-context negative
+  control, and positive trusted-context pins. Labels: byte-identical `'notification-email'` for the
+  relocations; new establishment points use `'cron-auth-bypass-check'` (auth-bypass-check route) and
+  `'cold-start-alerts'` (`instrumentation.js` `register()`, covering both #15's and #16's cold-start
+  alert calls). Claude reviewed the uncommitted diff at source before commit: confirmed the shared
+  internal `notify()` wrapper and #10/#11 are untouched; each new wrap encloses the reaching `notify()`
+  call and mirrors an existing sibling wrap; fire-and-forget (#9/#21) and cold-start catch/log/swallow
+  (#15/#16) semantics preserved; nested same-label `withDalContext` is safe (ALS re-entrancy, covered by
+  `token-lifecycle-nested-context.test.js`); no double-wrap in `maintenance.js` (`:231/:258` are
+  top-level, outside the `bill-onboarding-resume`/`maintenance-blob-scan` scopes). Green independently:
+  full suite 428 suites / 4758 tests, `check:dynamics-context-boundary` / `dataverse-access-layer` /
+  `route-service-boundary` / `api-routes` (+ self-tests), and `npm run build`. Stage 2 (#10/#11) and the
+  shared-wrapper removal remain open.
 
 <!-- end of plan -->
