@@ -606,14 +606,32 @@ review verdict + findings + resolutions)*
   suites mock dynamics-service wholesale which is why tests were green; prod logs clean
   because idle ticks 200 regardless). Owner-side ruling: fixed in `787feb00` —
   processJob wraps every state handler in withDalContext('drain-submissions') per the DAL
-  Stage 7 doctrine; regression test drives the real context machinery; recordFailure
-  bookkeeping deliberately outside. **MORNING FLAG: verify prod intake drains end-to-end;
+  Stage 7 doctrine; regression test drives the real context machinery; the catch-path
+  SAFETY-NET recordFailure runs outside the context (handler-local recordFailure calls run
+  inside it — harmless PG/alert bookkeeping, no Dataverse writes; precision per the Stage 5
+  review LOW). **MORNING FLAG: verify prod intake drains end-to-end;
   jobs that parked terminal since the flip may need manual requeue.** (`787feb00` also
   carries the two cron extractions — commit message describes only the fix; recorded here
   for accuracy.) Final extraction (`a1a07876`): 892-line drain engine service; census
   3→1→0. Suite 4670/4670 (409 suites). Running sum: 49 of 49 converted `[VERIFIED via
   census 49→0 across the per-stage boundary gate runs logged above]`. Post-stage review:
   next entry.
+- 2026-07-05 (S331): **Stage 5 post-stage review (Codex, fresh-context):
+  PASS-WITH-FINDINGS — DRAIN FIX RULED CORRECT; Stage 5 CLEARS; Stages 6-7 may start.**
+  The latent defect confirmed real on BOTH write paths (handleScanning grant-request create
+  AND handleFilesMoved budget-line creates); fix verified with nested-bypass safety
+  (dynamics-context ALS wrapper) and no drain-breaking issue in lease renewal, recovery, or
+  classifier paths. All security boundaries verified byte-preserved (strict drain secret,
+  shared cron secrets before context, external token boundaries + accept_pending
+  enqueue-before-PATCH); all four declared Decision-3 exceptions scope-identical to
+  historical wrappers; both cron idempotency mechanisms verified at file:line; census chain
+  17→9→6→3→1→0 exact; self-test decoupling sound. One LOW (resolved same session): the
+  recordFailure-placement wording overstated — only the catch-path safety-net call runs
+  outside the per-job context; handler-local calls run inside (harmless, PG/alert only);
+  service header + this log corrected. Also: the stage-close sweep transiently reported the
+  boundary gate red — root-caused to the self-test's live-baseline coupling (broke the day
+  the census hit 0) + a SIGKILL-orphaned temp fixture dir that the gate provably cannot
+  scan; fixed in `84f8af91` (--baseline override, fall/rise/equal fixture-local pins).
 
 ### Stage 0 route→test inventory (2026-07-04, S331)
 
