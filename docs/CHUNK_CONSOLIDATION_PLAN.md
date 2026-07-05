@@ -516,5 +516,15 @@ flagged, registered everywhere the other gates are; if declined — record the d
     alias uniform; helper + edge-case tests match plan semantics; raw-node CJS load exit 0;
     post-swap census exact; no decoys touched; no chunk-helper mock; suite delta plausible.
   - Focused re-review round 2 requested on the two fixes per the reviewer's explicit ask.
+- 2026-07-05: **Closing code review round 2 (Codex, fresh-context, range `e29a291e..8e2fee7e`):
+  SATISFIED — exercise CLOSED.** Verbatim: *"No remaining findings. … Verdict: SATISFIED.
+  Exercise 2 can now close."* Reviewer verified finding 1 via `git cat-file -e` (exit 0) plus a
+  scripted catalog link check (198 `docs/` refs, `missing: []`), and finding 2 by adjudicating the
+  deferred-promise harness against both failure modes (single `Promise.all` → item 3 starts early;
+  singleton rounds → first assertion sees `[1]`), microtask-flush adequacy, and no-mock use of the
+  real exported `processWithConcurrency` + real `chunked` helper. Reviewer's sandbox could not run
+  jest (EPERM on haste-map writes); test greens rest on this session's local runs — full
+  `npm test` re-run at `8e2fee7e`: **416 suites / 4707 tests, exit 0** `[VERIFIED via npm test this
+  session]`. Reviewer also confirmed the round-1 Stage Log relay is faithful and unsoftened.
 
 <!-- end of plan -->
