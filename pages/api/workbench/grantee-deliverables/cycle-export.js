@@ -22,7 +22,7 @@
  */
 
 import { requireAppAccess } from '../../../../lib/utils/auth';
-import { DynamicsService } from '../../../../lib/services/dynamics-service';
+import * as grantRequestAdapter from '../../../../lib/dataverse/adapters/grant-request.js';
 import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
 import { cycleCodeToOdataFilter, cycleCodeToLabel } from '../../../../lib/utils/cycle-code';
 import { GRANTEE_RESEARCH_PROGRAM_IDS, GRANTEE_AWARDED_STATUS } from '../../../../shared/config/granteeResearchPrograms';
@@ -78,7 +78,7 @@ export default async function handler(req, res) {
     let capped = false;
     let totalCount = 0;
     try {
-      const { records, totalCount: queriedTotalCount, capped: queryCapped } = await DynamicsService.queryAllRecords('akoya_requests', {
+      const { records, totalCount: queriedTotalCount, capped: queryCapped } = await grantRequestAdapter.queryAllRequests({
         select: 'akoya_requestid',
         filter,
         orderby: 'akoya_requestnum asc',
