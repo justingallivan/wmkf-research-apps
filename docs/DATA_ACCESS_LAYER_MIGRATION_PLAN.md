@@ -552,10 +552,12 @@ Drift found → this doc is edited BEFORE the next stage starts.
   distinguish a caller-owned post-auth wrap from an arbitrary
   `withDynamicsContext`/legacy-bypass context) is **accepted as-is, not
   fixed**: tightening `hasTrustedDalContext`/`assertTrustedDalContext` today
-  would break the 105 non-test files across the live tree that import
-  `bypassDynamicsRestrictions` `[VERIFIED via grep -rl "import.*
-  bypassDynamicsRestrictions" --include="*.js", excluding tests/ and
-  .claude/worktrees/]` — all trusted by design under the current model.
+  would break the non-test live-tree files that import
+  `bypassDynamicsRestrictions` — all trusted by design under the current
+  model. (Census when scoping the strip: `git grep -l "import.*bypassDynamicsRestrictions" -- lib pages scripts`
+  — tracked files only, so worktree clones are excluded by construction;
+  the count moves with ongoing conversions, so it is deliberately not
+  frozen here.)
   Revisit when the mechanical strip of those legacy bypass call sites runs;
   no code change made this session.
 

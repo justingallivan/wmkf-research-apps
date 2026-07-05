@@ -47,6 +47,9 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.restoreAllMocks();
+  // Tests below replace global.fetch wholesale; jest.setup.js only mockClear()s
+  // it, so restore the bare baseline to keep implementations from leaking.
+  global.fetch = jest.fn();
   delete process.env.DATAVERSE_DAL_ENFORCEMENT;
 });
 
