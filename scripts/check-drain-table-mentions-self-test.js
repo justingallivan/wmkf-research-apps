@@ -10,14 +10,15 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const { registerRepoFixture } = require('./lib/selftest-fixture');
 
 const repoRoot = path.resolve(__dirname, '..');
 const gate = path.join(repoRoot, 'scripts', 'check-drain-table-mentions.js');
 const tempDir = path.join(repoRoot, 'docs', 'drain_table_selftest_tmp');
 
-function cleanup() {
-  if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
-}
+// Disposer from the shared helper (cleans a prior orphan at registration and
+// on catchable exit); every pre-existing cleanup() call point below is kept 1:1.
+const { cleanup } = registerRepoFixture('docs/drain_table_selftest_tmp');
 
 function runGate() {
   try {

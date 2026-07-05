@@ -23,6 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const { registerRepoFixture } = require('./lib/selftest-fixture');
 
 const repoRoot = path.resolve(__dirname, '..');
 // Inside docs/ so the gate's walker scans it; not in SKIP_DIRS; not a
@@ -105,11 +106,9 @@ const FIXTURES = [
   },
 ];
 
-function cleanup() {
-  if (fs.existsSync(tempDir)) {
-    fs.rmSync(tempDir, { recursive: true, force: true });
-  }
-}
+// Disposer from the shared helper (cleans a prior orphan at registration and
+// on catchable exit); every pre-existing cleanup() call point below is kept 1:1.
+const { cleanup } = registerRepoFixture('docs/doc_currency_selftest_tmp');
 
 function runGate() {
   try {
