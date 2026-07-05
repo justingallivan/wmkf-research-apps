@@ -20,6 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const { registerRepoFixture } = require('./lib/selftest-fixture');
 
 const repoRoot = path.resolve(__dirname, '..');
 const gate = path.join(repoRoot, 'scripts', 'check-api-route-security-matrix.js');
@@ -27,10 +28,12 @@ const fixtureApiRoot = path.join(repoRoot, 'pages', '_route_gate_selftest_tmp');
 const fixtureMatrix = path.join(repoRoot, 'scripts', '_route_gate_selftest_matrix.md');
 const routePrefix = '/_route_gate_selftest_tmp';
 
-function cleanup() {
-  if (fs.existsSync(fixtureApiRoot)) fs.rmSync(fixtureApiRoot, { recursive: true, force: true });
-  if (fs.existsSync(fixtureMatrix)) fs.rmSync(fixtureMatrix, { force: true });
-}
+// Disposer from the shared helper (cleans a prior orphan at registration and
+// on catchable exit); every pre-existing cleanup() call point below is kept 1:1.
+const { cleanup } = registerRepoFixture(
+  ['pages/_route_gate_selftest_tmp', 'scripts/_route_gate_selftest_matrix.md'],
+  { filePaths: ['scripts/_route_gate_selftest_matrix.md'] }
+);
 
 function runGate(env) {
   // Merge stderr into stdout (2>&1): the gate writes its no-guard warnings via

@@ -65,6 +65,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const { registerRepoFixture } = require('./lib/selftest-fixture');
 
 const repoRoot = path.resolve(__dirname, '..');
 const gate = path.join(repoRoot, 'scripts', 'check-route-service-boundary.js');
@@ -92,9 +93,9 @@ const GREEN_ROUTES = [
   'pages/api/review-manager/green-own-wrapper.js',
 ];
 
-function cleanup() {
-  if (fs.existsSync(tempRoot)) fs.rmSync(tempRoot, { recursive: true, force: true });
-}
+// Disposer from the shared helper (cleans a prior orphan at registration and
+// on catchable exit); every pre-existing cleanup() call point below is kept 1:1.
+const { cleanup } = registerRepoFixture('.route_service_boundary_selftest_tmp');
 
 function write(root, rel, body) {
   const full = path.join(root, rel);
