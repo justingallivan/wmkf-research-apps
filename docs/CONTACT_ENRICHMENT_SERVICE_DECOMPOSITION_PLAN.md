@@ -121,30 +121,27 @@ Stage-0 mechanical call graph.**
 | 8 | `search-tiers.js` | `claudeWebSearch` (Tier 3, PAID/LLM), `buildGoogleScholarUrl` | `llm-client`/`MultiLLMService`, `SerpContactService`, `ContactParser`, constants (`CLAUDE_WEB_SEARCH_SCHEMA`), `getModelForApp` | 190 |
 | 9 | `persistence.js` (**DAL / write path**) | `saveToDatabase` | `withDalContext`, `potentialReviewerAdapter`, `researcherAdapter`, `reviewer-identity-resolver` (`mayPersistIdentity`, `RESOLVER_SOURCED_FIELDS`), identity-anchor (`_fieldPersistAllowed`), `ContactParser` (`isDocumentUrl`) | 110 |
 | 10 | `cost.js` | `estimateCost` | constants (`COSTS`) | 70 |
-| — | `contact-enrichment-service.js` (**facade**) | `enrichCandidate` (Tier 0–4 orchestrator) + `enrichCandidates` (batch) + `_finalize` + `_applyAffiliationOverride` + all delegating wrappers + `COSTS` re-export | all of the above | see Q1 |
+| 11 | `tiers.js` (**Q1-B, highest-risk cut**) | the five tier bodies from `enrichCandidate` as `applyTier{0..4}(candidate, result, options)` + `_finalize` + `_applyAffiliationOverride` (the finalize/persist glue the tiers short-circuit into) | identity-anchor, domain-evidence, email-adjudication, openalex-metrics, page-email, search-tiers, persistence, constants, `ContactParser` | 220 |
+| — | `contact-enrichment-service.js` (**facade**) | `enrichCandidate` (~120 L shell that sequences `applyTier0..4` + `_finalize`) + `enrichCandidates` (batch) + all delegating wrappers + `COSTS` re-export | all of the above | ~350 |
 
 **`_applyAffiliationOverride`** (~40 L) is small and called only from `_finalize`; sketch keeps it with
 the orchestration core on the facade, but it could fold into `persistence.js` or its own file — a
 granularity nit for review.
 
-## Q1 — The key open decision: where does the Tier 0–4 orchestrator live?
+## Q1 — DECIDED (owner, S336): extract the Tier 0–4 tiers (Q1-B)
 
 `enrichCandidate` is **433 L** [VERIFIED via :468–901] — the single biggest reason the file is large. It
-mutates `result` in place across five tiers. Two options:
+mutates `result` in place across five tiers.
 
-- **Q1-A (lower risk, chosen default): `enrichCandidate` + `enrichCandidates` + `_finalize` stay whole
-  on the facade** as the orchestration layer (mirrors `discover` staying on the discovery facade). Facade
-  lands at **~700–750 L** — smaller than today but not as thin as the 668 L discovery facade, because
-  this orchestrator is bigger than `discover` was.
-- **Q1-B (thinner facade, higher behavior-freeze risk): extract the five tiers** into a `tiers.js`
-  (each tier a `applyTierN(candidate, result, options)` function threading the mutable `result`), leaving
-  a ~120 L `enrichCandidate` shell on the facade → facade **~350 L**. This is the riskiest cut (the
-  mutable-context threading is exactly where a naive move changes behavior), so it would get the heaviest
-  characterization + Codex scrutiny.
-
-**Recommendation: start with Q1-A** (ship the low-risk win: 1,776 → ~750 L facade + 10 clean leaf
-modules), and treat Q1-B as an optional follow-up stage once the leaves are safely out and green. Owner
-to confirm before Stage 0.
+**Owner decision (S336): Q1-B — extract the tiers.** The five tier bodies move into `tiers.js` as
+`applyTier{0..4}(candidate, result, options)` functions (module 11 above), leaving a ~120 L
+`enrichCandidate` shell on the facade that sequences them → facade **~350 L** (parity with the 668 L
+discovery facade goal, thinner given a smaller wrapper set). This is the **riskiest cut** in the plan:
+the mutable-`result` threading and the tier **early-return / short-circuit** control flow are exactly
+where a naive move changes behavior (see C9). It gets the heaviest characterization coverage and the
+most scrutinous Codex review, and lands as its own late stage (Stage 9) AFTER every leaf it depends on
+is already extracted and green. The alternative (Q1-A: keep the orchestrator whole on the facade,
+~750 L) was **not** chosen.
 
 ## Behavior-preservation constraints (the risk surface)
 
@@ -183,6 +180,17 @@ to confirm before Stage 0.
   data ownership, so no new `check:atlas` rows. Verify each stage against the touched gates
   (`check:doc-symbol-refs`, `check:doc-currency`, `check:agent-wiki`, plus the LAW gates for the
   persistence stage), per CLAUDE.md rule 4.
+- **C9 — Tier extraction: mutable `result` + early-return control flow (the Q1-B care-point).** The
+  `enrichCandidate` tiers do not return pure values — they mutate `result.contactEnrichment` in place AND
+  can **short-circuit the remaining tiers** by returning early through `_finalize` (e.g. Tier 0 does
+  `return this._finalize(candidate, result, …)` at [VERIFIED via :566]). When the tiers move into
+  `tiers.js`, this control flow must be preserved exactly: an `applyTierN` that finds a terminal result
+  must signal "stop and finalize" to the shell (return the finalized result / a done sentinel), and the
+  shell must honor it so no tier that used to be skipped now runs, and no tier that used to run now gets
+  skipped. **Stage 0 must first enumerate every early `return` / short-circuit path in
+  `enrichCandidate:468–901`** (only Tier 0's is cited above; the rest are unenumerated) so the shell
+  contract covers them all; the characterization suite must exercise each tier's found/not-found branch
+  AND the short-circuit boundaries between tiers before the extraction.
 
 ## Staging (leaf-first, each stage independently green + reviewed)
 
@@ -204,19 +212,23 @@ review → commit.** Leaf modules first so the facade delegates incrementally an
 - **Stage 7 — `cost.js`** (trivial leaf).
 - **Stage 8 — `persistence.js`** (the DAL write unit; C5). **Highest scrutiny + the three LAW gates.**
   Land last of the leaves so the write path moves as an isolated, independently reviewed step.
-- **Stage 9 — facade finalize / dead-import cleanup.** Drop imports now only used by moved modules;
-  confirm the facade is `enrichCandidate` + `enrichCandidates` + `_finalize` (+ `_applyAffiliationOverride`
-  per Q1-A) + wrappers. (Optional **Stage 10 = Q1-B** tier extraction, only if owner opts in.)
+- **Stage 9 — `tiers.js` (Q1-B tier extraction; C9). The single highest-risk stage.** Only after every
+  leaf it depends on (Stages 1–8) is extracted and green. First enumerate all early-return/short-circuit
+  paths (C9) and land a mutation-proven characterization suite covering every tier's found/not-found
+  branch + the inter-tier short-circuit boundaries; then move the five tier bodies + `_finalize` +
+  `_applyAffiliationOverride` into `tiers.js`, leaving the ~120 L `enrichCandidate` shell on the facade.
+  Fresh-context Codex review with the tier control-flow diff as the focus.
+- **Stage 10 — facade finalize / dead-import cleanup.** Drop imports now only used by moved modules;
+  confirm the facade is the `enrichCandidate` shell + `enrichCandidates` + delegating wrappers +
+  `COSTS` re-export, ~350 L.
 
-## Open questions for review
+## Open questions
 
-- **Q1 (owner):** Q1-A (orchestrator stays whole on facade, ~750 L, low risk) vs Q1-B (extract tiers,
-  ~350 L facade, higher risk). Recommendation: Q1-A now, Q1-B as optional later stage.
-- **Q2 (owner/Codex):** module granularity — 10 modules as sketched, or coarser? Obvious folds:
-  `abort` → `constants`; `cost` → `constants` or the facade; `identity-anchor` + `domain-evidence` into
-  one `identity.js` (~340 L, over the 250 target).
+- **Q1 — DECIDED (owner, S336):** Q1-B, extract the tiers (facade ~350 L). See the Q1 section + C9.
+- **Q2 — DECIDED (owner, S336):** 10 leaf modules as sketched (+ `tiers.js` from Q1-B = 11 total under
+  `lib/services/contact-enrichment/`); no coarser fold.
 - **Q3 (Codex round 1):** verify the regenerated per-method dependency column is complete and acyclic
-  (the discovery round-1 BLOCKER class).
+  (the discovery round-1 BLOCKER class), and that C9's early-return enumeration is exhaustive.
 - **Q4:** characterization-coverage gaps — which of the ~44 methods have NO direct unit coverage today
   and need a mutation-proven characterization suite added before their cluster moves.
 
