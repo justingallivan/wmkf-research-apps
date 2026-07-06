@@ -54,6 +54,7 @@
 - Proposal docs / phasing / Phase I-II: project-j27-doc-capture-evolution.md; project-grant-phasing-evolution.md; project-phaseistatus-decision-lifecycle.md
 - Grantee and email templates: project-grantee-deliverable-email-voice.md; project-email-template-token-syntax.md
 - Deferred cleanup / dead-code session: project-deferred-code-cleanup.md
+- Parked: project-wide prompt-caching audit (Anthropic flagged low cache-hit rate, S339): project-cache-hit-rate-review.md
 - Parked: spec-audit design-docs recovery (work computer, ~2026-07-08): project-spec-audit-docs-recovery-parked.md
 - Private-repo CI (why CodeQL gone, Semgrep split, Pro needed for branch protection): project-private-repo-ci-visibility.md
 - E2E reviewer suite re-baseline (RESOLVED 2026-07-04, 23/23 green; client-UX drift lesson): project-e2e-reviewer-rebaseline-parked.md

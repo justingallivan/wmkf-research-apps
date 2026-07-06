@@ -241,6 +241,12 @@ related:
 | [REVIEWER_TRACK_B_IDENTITY_SPEC.md](REVIEWER_TRACK_B_IDENTITY_SPEC.md) | spec | active |  | Original status: PROPOSED. Builds on the shipped S232 ORCID spine (Track A), the S233 honorific + topic-threshold fixes (Fixes 1/2), and the S233... | 2026-07-02 |
 | [REVIEWER_WEB_DISCOVERY_PLAN.md](REVIEWER_WEB_DISCOVERY_PLAN.md) | plan | active |  | - *Probe (not in the app):* scripts/probe-perplexity-reviewer-agent.mjs — one sonar-pro chat call that BOTH searches and reasons, returning... | 2026-07-02 |
 
+## reviewer-origination
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md](REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md) | plan | draft |  | Plan: recompute institution COI server-side in save-candidates (fail-closed on incomplete applicant-alias context) instead of trusting client flags (F2+F4). |  |
+
 ## reviewer-workbench
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
