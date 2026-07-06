@@ -65,7 +65,9 @@ Because scripts and tests pin methods **by name on the class**, the facade must 
 public (non-underscore) surface** — not just the route entry points. Underscore-prefixed methods
 (`_isPreprintPublication`, `_affiliationWeightsMap`, `_recencyWeightedAffiliation`) are verified to
 have **zero external references** [VERIFIED via grep -a `*.js`/`*.mjs`, excluding `.next/` and the
-file itself, S335] and become module-private functions.
+file itself, S335]. (Execution note: they became module-private functions *inside* their cluster
+modules, but the facade kept thin delegating wrappers for them to preserve the exact class surface —
+see the wrapper-count note under the layout table.)
 
 ## Verified internal call graph (behavior-freeze input)
 
@@ -100,8 +102,13 @@ from 2,348).
 | 13 | `ranking.js` | `rankAllCandidates` | publications (`countRecentPublications`), `DeduplicationService`, `reviewer-provenance` (`withReviewerProvenance`) | 40 |
 | — | `discovery-service.js` (**facade**) | `discover` orchestrator + all static props + the delegating static methods | all of the above | ~350 |
 
-The delegating wrappers number **50** = 54 total methods − 3 underscore-private − `discover` (which
-the facade implements directly) [VERIFIED via call-graph method enumeration, S335].
+The delegating wrappers number **53** = 54 total methods − `discover` (which the facade implements
+directly) [VERIFIED via call-graph method enumeration + facade grep, S335]. **Execution deviation from
+the original plan:** the 3 underscore-prefixed methods (`_isPreprintPublication`,
+`_affiliationWeightsMap`, `_recencyWeightedAffiliation`) — already `static _x` on the pre-decomposition
+class — were kept as thin delegating wrappers on the facade rather than dropped, to preserve the
+*exact* `DiscoveryService.*` surface (behavior-freeze). They are module-private *inside* their cluster
+modules and still have zero external callers.
 
 > The module-layout table above is the FORWARD DESIGN for all 13 target modules; the 8 rows now
 > extracted (Stages 0–3) match their committed source and the per-stage notes below carry the
@@ -152,10 +159,11 @@ These are the non-mechanical parts — where a naive cut-and-paste would silentl
   inside their consuming modules (value is identical), **and** the facade must re-expose **all 10** as
   static props so external `DiscoveryService.<CONST>` reads keep resolving.
 - **C2 — Full facade surface.** Every non-underscore method must remain callable as
-  `DiscoveryService.foo` (scripts + tests pin them). The facade delegates all 50 public non-`discover`
+  `DiscoveryService.foo` (scripts + tests pin them). The facade delegates all **53** non-`discover`
   methods and re-exposes all **10** static class properties (the top-8 block + the two OpenAlex-backfill
   statics at `discovery-service.js:422-423` my first-pass call-graph missed — Codex review round-1
-  BLOCKER). Underscore methods stay private (verified no external refs).
+  BLOCKER). As-built, that 53 includes thin wrappers for the 3 underscore methods (kept to preserve the
+  exact surface); they are module-private inside their cluster modules, verified no external refs.
 - **C3 — `this` / `DiscoveryService` self-references.** The `discover` orchestrator (stays on the
   facade) calls sub-methods via both `this.foo()` and `DiscoveryService.foo()`
   [VERIFIED via discovery-service.js:166-375]. Those keep resolving through the facade's delegating
@@ -298,10 +306,11 @@ review → commit**. Leaf modules first so the facade delegates incrementally an
   no material findings** — the [medium] is resolved, facade still passes `this.MIN_PUBLICATIONS`, no
   dangling `MIN_PUBLICATIONS` reference, no regression. [RECHECKED after lib/services/discovery/verification.js change: this note describes the committed Stage 5 state — the module exports the 3 functions and the facade delegates each, passing this.MIN_PUBLICATIONS with no default-param substitution.]
 - **Stage 6 — facade finalization. ✅ EXECUTED (S335).** `discovery-service.js` now holds only the
-  `discover` orchestrator + the 12 static props + the 50 delegating wrappers. Removed the 12
-  now-unused top-level imports (all rxiv/OpenAlex/PubMed services, `ReviewerIdentityEvidence`,
+  `discover` orchestrator + the **10** static props + the **53** delegating wrappers
+  [VERIFIED via facade grep, S335]. Removed **11 now-unused top-level declarations** — 10 `require`
+  statements (the rxiv/OpenAlex/PubMed services, `ReviewerIdentityEvidence`,
   `ReviewerWorkAuthorResolver`+`normalizeOrcid`, `ContactParser`, `chunk`, the `reviewer-provenance`
-  trio) and the env-const destructure — every one moved into a cluster module; only
+  trio) plus the env-const destructure — every binding moved into a cluster module; only
   `DeduplicationService` (used by `discover`) and `C` (static props) remain. Verified: facade loads;
   eslint clean (no unused/undefined); no stray refs to the removed symbols; the **full suite is green
   (436 suites / 4849 tests)** and touched gates pass. **Facade 682 → 668 L — final: 2,348 → 668
