@@ -279,18 +279,26 @@ calls never create imports — only leaf utility imports exist:
 **This import graph is acyclic** — asserted by construction (modules never import the facade or each
 other's method modules; only `constants`/`http` are shared leaves). **Runtime call DAG via `svc`**
 (module → modules whose methods it reaches through the facade):
-`schema` → {`auth`, `restrictions`} (+ intra-module `getEntityDefinitions`);
-`read-ops` → {`auth`, `restrictions`, `schema`, `annotations`};
+`auth` → {`http`} (`getAccessToken` bare-calls `fetchWithTimeout`);
+`schema` → {`auth`, `restrictions`, `http`} (+ intra-module `getEntityDefinitions`);
+`read-ops` → {`auth`, `restrictions`, `schema`, `annotations`, `http`};
 `write-core` → {`auth`, `http`, `annotations`, `read-ops`} (the `read-ops` edge is
-`updateIfEmpty` → `svc.getRecord` `:880`);
+`updateIfEmpty` → `svc.getRecord`);
 `changeset` → {`auth`, `write-core`};
-`email` → {`auth`, `read-ops`, `schema`, `write-core`};
+`email` → {`auth`, `read-ops`, `schema`, `write-core`, `http`};
 `ai-run` → {`write-core`}.
-No back-edges exist (`read-ops` never calls a write module; `auth`/`restrictions`/`annotations` are
-pure leaves) — **the runtime graph is also an acyclic DAG; no BLOCKER cycles found.** Stage 0 must
-regenerate this mechanically (per-method body scan for `this.X(`) and replace this hand-built table —
-the hand-built dependency column was the round-1 BLOCKER on both prior plans; treat this one as
-unverified until the script runs.
+`restrictions`, `annotations`, `http`, `constants` are pure leaves (no outgoing cross-cluster edge);
+`http` is the shared base every network-calling cluster reaches for `buildHeaders`/`fetchWithTimeout`.
+No back-edges exist (`read-ops` never calls a write module) — **the runtime graph is an acyclic DAG;
+no BLOCKER cycles found.** Because `http` was extracted first (Stage 0), its universal in-edges
+resolve as static imports into an already-materialized lower module, so leaf-first ordering holds.
+**[VERIFIED S338 via mechanical scan — `scripts`-style AST scan (`@babel/parser`), re-runnable at
+`scratchpad/dag-scan.js`].** Regenerated per-method (`this.X(` calls + bare private-fn calls +
+non-call `this.<PROP>` reads); ACYCLIC confirmed; **zero `this` inside nested non-arrow functions**
+(C1 svc-dispatch is safe). Correction vs the prior hand-built table: it wrongly listed `auth` as a
+pure leaf and omitted the `→ http` edges on `auth`/`schema`/`read-ops`/`email` — every
+network-calling cluster calls `fetchWithTimeout`/`this.buildHeaders` directly, not only via
+`write-core`. No cycle introduced; extraction order unaffected.
 
 ## Target module layout
 
@@ -328,9 +336,12 @@ touched gates → commit. Leaf-first per the DAG.
   Lead probe during the stage. Six-shape self-test matrix (relative form) + sibling probe landed;
   agent-wiki watch_paths updated. Verified: bypass probes fail the gate (exit 1) / green after
   delete; all 4 LAW gates + self-tests, `check:doc-symbol-refs`, `check:agent-wiki` green; full suite
-  4945/4945 (behavior-freeze holds). **DEFERRED within Stage 0:** the mechanical per-method
-  call-graph regen of the hand-built DAG table (low value for two leaf modules; most useful before
-  the `write-core`/`changeset` stages — do it at Checkpoint C). **ADVERSARIAL REVIEW (DEDICATED,
+  4945/4945 (behavior-freeze holds). **DAG regen — DONE (S338, pulled forward from Checkpoint C):**
+  the mechanical per-method scan ran (`scratchpad/dag-scan.js`, `@babel/parser`); graph is ACYCLIC and
+  the hand-built table was CORRECTED — it had wrongly listed `auth` as a pure leaf and omitted the
+  `→ http` edges on `auth`/`schema`/`read-ops`/`email` (see the Mechanical call graph section). No
+  cycle, extraction order unaffected; also confirmed zero `this` in nested non-arrow functions (C1
+  safe). **ADVERSARIAL REVIEW (DEDICATED,
   plan-mandated): DONE (S338).** Two independent Codex passes; the plan-doc pass returned
   SOUND-WITH-FIXES (C1 static-read + named-import bypass, both folded in pre-build); the Stage-0 build
   pass returned BLOCKER on a computed/non-literal source gap — `auditDynamicsSubmoduleImports` matched
