@@ -2,8 +2,8 @@
 title: ContactEnrichmentService Decomposition Plan
 domain: architecture
 kind: plan
-status: draft
-summary: "IN PROGRESS (S337): ContactEnrichmentService (1,776 L) → lib/services/contact-enrichment/*.js behind a facade. Checkpoints A + B done; behavior-freeze."
+status: active
+summary: "DONE (S337): ContactEnrichmentService (1,776 L) split into lib/services/contact-enrichment/*.js behind a facade. All 10 stages executed; some reviews pending."
 canonical: true
 owner: product-engineering
 related:
@@ -15,9 +15,11 @@ related:
 
 # ContactEnrichmentService Decomposition Plan
 
-**Status: IN PROGRESS (S337) — plan authored + 3 Codex review rounds folded; Stage 0 + Checkpoint A
-(Stages 1, 2, 4, 7) + Checkpoint A2 (Stage 6) + Checkpoint B (Stages 3, 5) + Stage 8 (Checkpoint C)
-EXECUTED; the Checkpoint C dedicated Codex review + Stage 9/10 (Checkpoint D) pending.** This applies the exact
+**Status: DONE (S337) — plan authored + 3 Codex review rounds folded; Stage 0 + Checkpoint A
+(Stages 1, 2, 4, 7) + Checkpoint A2 (Stage 6) + Checkpoint B (Stages 3, 5) + Stage 8 (Checkpoint C) +
+Stage 9/10 (Checkpoint D) all EXECUTED.** The dedicated Codex reviews for Checkpoints A2, B, C, and D
+are still pending (batched-review cadence — see "Execution cadence" below; each checkpoint's own
+characterization suite + gates are green independent of that review). This applies the exact
 cadence proven on the DiscoveryService decomposition (S335, `docs/DISCOVERY_SERVICE_DECOMPOSITION_PLAN.md`):
 strategy chosen up front (facade + extracted modules), then leaf-first staged extraction, each cluster
 characterization-covered (baselined green pre-extraction, mutation-proven) BEFORE the code moves, each
@@ -387,15 +389,39 @@ modules first so the facade delegates incrementally and the DAG never breaks. Th
   (`check:dataverse-access-layer`, `check:route-service-boundary`, `check:dynamics-context-boundary`);
   `check:doc-symbol-refs` green. Dedicated Checkpoint C Codex review still pending.
   [RECHECKED after lib/services/contact-enrichment/persistence.js change: matches committed Stage 8 (`d79f1494`).]
-- **Stage 9 — `tiers.js` (Q1-B tier extraction; C9). The single highest-risk stage.** Only after every
-  leaf it depends on (Stages 1–8) is extracted and green. First enumerate all early-return/short-circuit
-  paths (C9) and land a mutation-proven characterization suite covering every tier's found/not-found
-  branch + the inter-tier short-circuit boundaries; then move the five tier bodies + `_finalize` +
-  `_applyAffiliationOverride` into `tiers.js`, leaving the ~120 L `enrichCandidate` shell on the facade.
-  Fresh-context Codex review with the tier control-flow diff as the focus.
-- **Stage 10 — facade finalize / dead-import cleanup.** Drop imports now only used by moved modules;
-  confirm the facade is the `enrichCandidate` shell + `enrichCandidates` + delegating wrappers +
-  `COSTS` re-export, ~350 L.
+- **Stage 9 — `tiers.js` (Q1-B tier extraction; C9). The single highest-risk stage. ✅ EXECUTED (S337,
+  characterization `cc95e2b8`, extraction `f84f6355`).** C9's early-return/short-circuit enumeration was
+  confirmed exhaustive against the live :225–545 body (no unlisted branch found — including one detail
+  the plan's enumeration didn't spell out: Tier 4's catch block never checks `signal?.aborted`, unlike
+  Tier 3, so Tier 4 errors are ALWAYS swallowed even under a fired abort — pinned by its own
+  characterization case). A 30-case characterization suite
+  (`tests/unit/contact-enrichment-tiers.test.js`) was baselined green pre-extraction and mutation-proven
+  (neutering the Tier-1 recent short-circuit, swapping two `_finalize` steps, and disabling the Tier-3
+  abort-rethrow guard each broke a specific assertion group; reverted clean). The five tier bodies moved
+  to `tiers.js` as `applyTier0..4`, each returning a `'finalize' | 'continue'` string signal (Tier 3 never
+  signals finalize — it either continues or throws, and the shell lets the throw propagate uncaught); plus
+  `finalize` (was `_finalize`) and `applyAffiliationOverride` (was `_applyAffiliationOverride`). The
+  facade's `enrichCandidate` is now a ~60 L shell that drives `applyTier0..4`, interprets each signal, and
+  still owns the Tier 2/3-4 glue block (`effectiveInstitution`/`searchCandidate`/`effectiveAnchor`/
+  `hasIdentityAnchor` + the no-anchor abstain) — a judgment call: that glue isn't one of the five tier
+  bodies and is shared prep for BOTH Tier 3 and Tier 4, so it stayed on the facade rather than being
+  folded into either tier function. C10: `applyTier3`'s `claudeWebSearch` call and `finalize`'s
+  `saveToDatabase` call take an explicit `service` argument (the facade class) to stay spyable; `finalize`
+  ALSO dispatches `applyAffiliationOverride` through `service._applyAffiliationOverride(...)` — a
+  deliberate extension of C10 beyond the plan's three named edges, done so the characterization suite's
+  step-order spy on that method keeps intercepting post-extraction. 277 covering tests green pre/post;
+  full suite (442 suites / 4,945 tests) green; eslint clean; all three LAW gates +
+  `prompt-injection-tagging` + `doc-symbol-refs` + `agent-invariants` green.
+  [RECHECKED after lib/services/contact-enrichment/tiers.js change: matches committed Stage 9 (`f84f6355`).]
+  Dedicated Checkpoint D Codex review still pending.
+- **Stage 10 — facade finalize / dead-import cleanup. ✅ EXECUTED (S337, `e4fe8ec9`).** Dropped the
+  facade's now-dead `ContactParser`/`ORCIDService`/`SerpContactService`/`reviewer-identity-resolver`
+  imports (moved into `tiers.js` in Stage 9). Facade is now the `enrichCandidate` shell +
+  `enrichCandidates` + delegating wrappers + `COSTS` re-export, **529 lines** — over the plan's ~350 L
+  forward estimate; the gap is the ~55-line result-object literal in `enrichCandidate` plus JSDoc, not
+  unextracted method bodies (verified: no tier/finalize logic remains on the facade past the delegating
+  wrappers). eslint clean; same green suite/gate results as Stage 9 (no behavior change, import-only).
+  [RECHECKED after lib/services/contact-enrichment-service.js change: matches committed Stage 10 (`e4fe8ec9`).]
 
 ## Execution cadence (chosen S336) — batched review, per-stage for high-risk
 
@@ -423,8 +449,10 @@ diffs*. Order respects the verified DAG (leaves → dependents → tiers → fac
 - **Checkpoint C — `persistence.js` (Stage 8), dedicated per-stage review.** The DAL write unit (C5).
   Reviewed alone with the three LAW gates as the focus; not batched.
 - **Checkpoint D — `tiers.js` (Stage 9) + facade finalize (Stage 10), dedicated per-stage review.** The
-  highest-risk cut (C9 tier control-flow, C10 spyable dispatch, C12 `_finalize` step order). Reviewed
-  alone with the tier control-flow diff as the focus; Stage 10 cleanup folds into the same review.
+  highest-risk cut (C9 tier control-flow, C10 spyable dispatch, C12 `_finalize` step order). **Both stages
+  EXECUTED (S337, characterization `cc95e2b8`, extraction `f84f6355`, cleanup `e4fe8ec9`); the dedicated
+  Codex review with the tier control-flow diff as the focus is still pending** (Stage 10 cleanup folds
+  into the same review).
 
 Rationale: batches A+B move the ~36 low-risk helper methods behind two combined reviews; A2, C, and D
 isolate the three stages that can actually mishandle a security gate (A2), corrupt durable state (C), or
@@ -433,12 +461,16 @@ re-review) before the next one starts.
 
 ## Open questions
 
-- **Q1 — DECIDED (owner, S336):** Q1-B, extract the tiers (facade ~350 L). See the Q1 section + C9.
+- **Q1 — DECIDED (owner, S336), EXECUTED (S337):** Q1-B, extract the tiers. The facade landed at 529 L,
+  above the ~350 L forward estimate (the result-object literal + JSDoc account for the gap, not
+  unextracted logic). See the Q1 section + C9.
 - **Q2 — DECIDED (owner, S336):** 10 leaf modules as sketched (+ `tiers.js` from Q1-B = 11 total under
   `lib/services/contact-enrichment/`); no coarser fold.
-- **Q3 — RESOLVED (Stage 0, S336):** the mechanical call-graph regenerated the dependency table and
-  confirmed it is an acyclic DAG (see "VERIFIED mechanical call graph"). C9's early-return enumeration
-  still needs a final exhaustiveness pass in the Stage 9 characterization (Checkpoint D).
+- **Q3 — RESOLVED (Stage 0, S336; C9 enumeration confirmed Stage 9, S337):** the mechanical call-graph
+  regenerated the dependency table and confirmed it is an acyclic DAG (see "VERIFIED mechanical call
+  graph"). C9's early-return enumeration was confirmed exhaustive against the live `enrichCandidate` body
+  in the Stage 9 characterization (Checkpoint D) — no unlisted branch beyond the one extra detail noted
+  in the Stage 9 log (Tier 4's catch never checks `signal?.aborted`).
 - **Q4:** characterization-coverage gaps — which of the ~44 methods have NO direct unit coverage today
   and need a mutation-proven characterization suite added before their cluster moves.
 
