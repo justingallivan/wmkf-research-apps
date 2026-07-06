@@ -341,6 +341,114 @@ one high-traffic route per app after each deploy step.
 
 ---
 
+## Stage 9 — Universal transport guard (capstone; import-mechanism-independent)
+
+**Added S338.** Stages 3–8 move DynamicsService callers behind adapters, and
+**every adapter routes through DynamicsService** [VERIFIED S338:
+`grep -rln DynamicsService lib/dataverse/adapters/` = 18 files; `…createClient`
+= 0]. That closes the *DynamicsService* perimeter but leaves two enforcement
+gaps the per-entity waves never touch, both rooted in *where* the guard sits
+(per-call-site) rather than *at the transport*:
+
+- **(a) Static-census blind spot.** `check-dataverse-access-layer` cannot
+  attribute fully-opaque imports (`require(runtimeVar)`); the S338 decomposition
+  Stage-0 gate closes the statically-resolvable shapes, but the opaque tail is
+  irreducible for static analysis (see `DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md`
+  "accepted residual").
+- **(b) Parallel unguarded transport.** `lib/dataverse/client.js`
+  `createClient().call()` is a full GET/POST/PATCH/DELETE Dataverse transport
+  with **no** trusted-context assertion [VERIFIED S338] — a second access layer
+  the DynamicsService-scoped gate and DAL asserts never cover.
+
+Both close at the root by asserting trusted context at the **transport egress**,
+making the import mechanism irrelevant.
+
+### Gap detail (verified S338)
+
+- Reads inside DynamicsService are NOT the gap: `checkRestriction` throws
+  unconditionally on missing context [VERIFIED], strictly stronger than the
+  flag-gated write assert.
+- The real gap is unguarded **write** transports. Live `client.js` writes:
+  `wmkf_appsystemsettings` (tracked, **Wave 3**); `wmkf_appgrantcycles`
+  (tracked, **Wave 6**); and `wmkf_appuserpreferences` +
+  `wmkf_appuserappaccesses` which are in **NO wave** [VERIFIED: grep count 0 in
+  this plan] — genuinely untracked. app-access is on the auth hot path.
+- Census (S338): all 8 prefs/app-access write entry points run with **no**
+  trusted context today, including `grantDefaultApps` on every new staff sign-in
+  (`pages/api/auth/[...nextauth].js` — the grant call is bare while adjacent
+  notification calls are `withDalContext`-wrapped). Root cause: `lib/utils/auth.js`
+  `requireAppAccess` establishes no DAL context.
+
+### Design (converged S338)
+
+- **Keystone — guard the DynamicsService Dataverse-fetch site** (a
+  Dataverse-specific `dataverseFetch` wrapper in `lib/services/dynamics/http.js`,
+  post-decomposition; NOT the generic `fetchWithTimeout`, which anticipates
+  sharing with `graph-service.js`). Because 18/18 adapters funnel through
+  DynamicsService, this guards every adapter + all reads + the method gaps **by
+  construction** — import-independent and permanent.
+- **`client.js` = tail-coverage, not keystone.** The waves are *retiring*
+  `client.js` per entity; a permanent guard there covers only the residual
+  non-adapter consumers (export clients, health-checker, ~36 scripts,
+  identity-map) plus the untracked prefs/app-access pair. Interim write-asserts
+  protect the tracked entities until their wave lands.
+- **Method-asserts** on the unguarded DynamicsService surfaces (`searchRecords`
+  with no `entities`; metadata reads `getEntityDefinitions`/`getEntityKey`) as
+  defense-in-depth.
+- Interim and permanent guards converge cleanly — same ALS-presence predicate,
+  idempotent — so a caller wrapped for the interim guard is correctly wrapped
+  for its adapter successor (no rework).
+
+### Rollout (warn → wrap → enforce; fail-closed end state)
+
+Flag `DATAVERSE_DAL_UNIVERSAL` ∈ `off | warn | on` (default `off`).
+
+1. **Warn-mode — DONE S338 (commit `5a16f36`).** `assertDataverseAccess()` on
+   the 5 prefs/app-access write functions; default-off no-op; `warn` logs
+   `[dal-universal]` without throwing. Observability only.
+2. **Wrap the entry points** in `withDalContext` — the 8 prefs/app-access write
+   entries (delicate: the sign-in `grantDefaultApps` path) plus the auth-root
+   establishing its own labeled context (mirrors NextAuth's existing
+   `staff-signin-reconcile` wrap; not circular — `withDalContext` performs no
+   auth, it labels a scope). The substantive, migration-convergent work.
+3. **Keystone + method asserts (AFTER decomposition Checkpoint F)** — the
+   `dynamics/http.js` Dataverse-fetch guard + `searchRecords`/metadata asserts.
+   Warn first. Runs after Checkpoint F so it does not break the decomposition's
+   behavior-freeze baselines.
+4. **Flip warn→on** per environment (dev/test → preview → prod), same
+   runtime-log-scan protocol as the S330 `DATAVERSE_DAL_ENFORCEMENT` flip.
+5. **Reconcile durable surfaces** at enforce: the CLAUDE.md invariant
+   (writes-only → universal), the agent-wiki assert-site count (stale "5" → 8 in
+   `dynamics-service.js` [VERIFIED S338] + 1 at `lib/dataverse/core/changeset.js:97`
+   [VERIFIED S338] = 9), the census-gate residual
+   comment, and this stage log.
+
+**Sequencing:** step 3 (DynamicsService side) is strictly post-Checkpoint-F;
+steps 1–2 (`client.js` + entry wraps) are disjoint from the decomposition and
+may proceed independently — step 1 already has.
+
+### Open owner decisions (Q1–Q9; defaults noted)
+
+- **Q1 flag shape** — new `DATAVERSE_DAL_UNIVERSAL` vs extend the proven
+  `DATAVERSE_DAL_ENFORCEMENT`. *Default: new flag (implemented S338).*
+- **Q2 `searchRecords` no-entities** — assert context, AND reject org-wide
+  search when the context carries non-empty restrictions.
+- **Q3 scripts** — shared bootstrap helper calling `enterDynamicsBypassForScript`.
+- **Q4 auth as trust root** — `withDalContext('auth-…')` inside the auth
+  lookups (self-certifying; NextAuth already does this).
+- **Q5 health-checker** — wrap the two callers vs a documented liveness
+  exemption. *Default: wrap.*
+- **Q6 metadata reads** — include under the guard for uniformity.
+- **Q7 flag end-game** — fold `DATAVERSE_DAL_UNIVERSAL` + `DATAVERSE_DAL_ENFORCEMENT`
+  into one unconditional posture at closeout (with the planned legacy
+  `bypassDynamicsRestrictions` strip).
+- **Q8 sequencing** — *Default: warn shipped now; enforce after warn observation.*
+- **Q9 prefs/app-access** — migrate into a wave (adapters) vs leave on
+  `client.js` behind the standing guard. *Default: leave — tiny app-config;
+  adapter migration is churn for no coverage gain once the transport guard exists.*
+
+---
+
 ## Plan self-check protocol (meta)
 
 This plan was produced under the fresh-context rule: baseline counts were
@@ -615,6 +723,16 @@ Drift found → this doc is edited BEFORE the next stage starts.
   Remaining campaign item: the legacy `bypassDynamicsRestrictions` strip (ends with
   trust-model tightening per owner decision 2026-07-04), sequenced after this flip proves
   out in prod.
+- 2026-07-06 (S338): **Stage 9 (universal transport guard) added as capstone.** A
+  full-source analysis (Fable) found the per-entity waves leave two gaps: the static
+  census's opaque-import tail, and `lib/dataverse/client.js`, a parallel unguarded write
+  transport. Verified this session: 18/18 adapters route through DynamicsService (0 through
+  client.js); prefs (`wmkf_appuserpreferences`) + app-access (`wmkf_appuserappaccesses`)
+  writes are unguarded AND named in no wave; census found all 8 prefs/app-access write
+  entry points context-less today (incl. `grantDefaultApps` on new-user sign-in). Step 1
+  (warn-mode `DATAVERSE_DAL_UNIVERSAL` guard, default off) shipped (commit `5a16f36`);
+  wrap-entry-points + enforce deferred pending warn observation, DynamicsService-side after
+  decomposition Checkpoint F. Q1–Q9 open for owner.
 
 ## Appendix A — Census (Stage 0 baseline → Stage 8 final)
 
