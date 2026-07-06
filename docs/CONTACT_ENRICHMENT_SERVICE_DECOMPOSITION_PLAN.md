@@ -295,11 +295,12 @@ is already extracted and green. The alternative (Q1-A: keep the orchestrator who
   preserved — C9 covers `_finalize`'s *arguments*, C12 covers its *internal step order*. Stage 9's
   characterization must assert the order (e.g. spy call-order on the step methods), not just the outputs.
 
-## Staging (leaf-first, each stage independently green + reviewed)
+## Staging (leaf-first, each stage independently green)
 
-Cadence per stage: **trace → land characterization coverage (baseline green pre-extraction,
-mutation-prove it discriminates) → extract one cluster → run suite + touched gates → fresh-context Codex
-review → commit.** Leaf modules first so the facade delegates incrementally and the DAG never breaks.
+Per-stage work: **trace → land characterization coverage (baseline green pre-extraction,
+mutation-prove it discriminates) → extract one cluster → run suite + touched gates → commit.** Leaf
+modules first so the facade delegates incrementally and the DAG never breaks. The **review checkpoints**
+(when Codex sees the work) follow the batched cadence in "Execution cadence" below, not one-per-stage.
 
 - **Stage 0 — `constants.js` + `abort.js` + facade wiring + mechanical call-graph. ✅ EXECUTED (S336,
   `3f5c0fb8`).** Extracted `CLAUDE_WEB_SEARCH_SCHEMA`/`SEARCH_EMAIL_SOURCES`/`EXPLICIT_EMAIL_PERSIST_SOURCES`/
@@ -313,7 +314,8 @@ review → commit.** Leaf modules first so the facade delegates incrementally an
   [RECHECKED after lib/services/contact-enrichment/constants.js change: matches committed Stage 0 (`3f5c0fb8`).]
   [RECHECKED after lib/services/contact-enrichment/abort.js change: matches committed Stage 0 (`3f5c0fb8`).]
   [RECHECKED after lib/services/contact-enrichment-service.js change: facade re-exposes `COSTS`; requires both new modules; matches committed Stage 0 (`3f5c0fb8`).]
-- **Stage 1 — `identity-anchor.js`** (leaf; 9 methods). Characterize the untested ones first.
+- **Stage 1 — `identity-anchor.js`** (leaf; 8 methods, after `_fieldPersistAllowed` moved to
+  `persistence.js` per R1). Characterize the untested ones first.
 - **Stage 2 — `domain-evidence.js`** (depends on Stage 1).
 - **Stage 3 — `email-adjudication.js`** (depends on domain-evidence; heavily test-pinned — largely
   already covered).
@@ -335,13 +337,41 @@ review → commit.** Leaf modules first so the facade delegates incrementally an
   confirm the facade is the `enrichCandidate` shell + `enrichCandidates` + delegating wrappers +
   `COSTS` re-export, ~350 L.
 
+## Execution cadence (chosen S336) — batched review, per-stage for high-risk
+
+Codex review is the expensive step, so it is applied at **checkpoints sized to risk**, not once per
+stage. Every stage still lands its own characterization coverage, green suite, touched gates, and commit
+(the per-stage work above); the checkpoints below control only *when Codex sees a batch of committed
+diffs*. Order respects the verified DAG (leaves → dependents → tiers → facade).
+
+- **Checkpoint A — leaf batch (one combined Codex review):** Stages **1 `identity-anchor`,
+  2 `domain-evidence`, 4 `openalex-metrics`, 6 `search-tiers`, 7 `cost`**. All are DAG leaves (no
+  inter-module method edges except into already-committed modules) and low-risk *motion* — pure/compute
+  helpers plus stateless external-service calls. Commit each stage separately, then one review over the
+  combined diff. **Caveat:** Stage 6 `search-tiers` carries C6 (A7 registry `callSiteFiles` update in the
+  same commit) + C11 (preserve 3 dynamic ESM imports); flag both explicitly in the batch-A review brief
+  so they get individual attention even inside the batch.
+- **Checkpoint B — domain-evidence dependents (one combined Codex review):** Stages **3
+  `email-adjudication`, 5 `page-email`**. Both depend only on `domain-evidence` (committed in A). Heavily
+  test-pinned (largely already covered). C11's env-flag-not-hoisted rule lives in Stage 5.
+- **Checkpoint C — `persistence.js` (Stage 8), dedicated per-stage review.** The DAL write unit (C5).
+  Reviewed alone with the three LAW gates as the focus; not batched.
+- **Checkpoint D — `tiers.js` (Stage 9) + facade finalize (Stage 10), dedicated per-stage review.** The
+  highest-risk cut (C9 tier control-flow, C10 spyable dispatch, C12 `_finalize` step order). Reviewed
+  alone with the tier control-flow diff as the focus; Stage 10 cleanup folds into the same review.
+
+Rationale: batches A+B move ~40 low-risk helper methods behind two combined reviews; C and D isolate the
+two stages that can actually corrupt durable state or change tier control flow. If any batch review
+returns a BLOCKER, that batch converges (fold → re-review) before the next checkpoint starts.
+
 ## Open questions
 
 - **Q1 — DECIDED (owner, S336):** Q1-B, extract the tiers (facade ~350 L). See the Q1 section + C9.
 - **Q2 — DECIDED (owner, S336):** 10 leaf modules as sketched (+ `tiers.js` from Q1-B = 11 total under
   `lib/services/contact-enrichment/`); no coarser fold.
-- **Q3 (Codex round 1):** verify the regenerated per-method dependency column is complete and acyclic
-  (the discovery round-1 BLOCKER class), and that C9's early-return enumeration is exhaustive.
+- **Q3 — RESOLVED (Stage 0, S336):** the mechanical call-graph regenerated the dependency table and
+  confirmed it is an acyclic DAG (see "VERIFIED mechanical call graph"). C9's early-return enumeration
+  still needs a final exhaustiveness pass in the Stage 9 characterization (Checkpoint D).
 - **Q4:** characterization-coverage gaps — which of the ~44 methods have NO direct unit coverage today
   and need a mutation-proven characterization suite added before their cluster moves.
 
