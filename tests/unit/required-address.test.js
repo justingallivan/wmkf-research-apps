@@ -9,25 +9,29 @@
  * no route mocks needed since the module is dependency-free.
  */
 import {
+  addressRequiresState,
   missingRequiredAddressFields,
   REQUIRED_ADDRESS_FIELDS,
+  requiredAddressFieldsFor,
+  STATE_REQUIRED_COUNTRIES,
   validateAddress,
 } from '../../lib/external/required-address';
 
 const ALL = ['line1', 'city', 'postalCode', 'country', 'phone'];
 
 describe('required-address shared presence check', () => {
-  // line2 + state are intentionally optional (mirrors the client's Stage2aView).
+  // line2 is intentionally optional. State/province is conditional by country.
   const complete = {
-    line1: '1 St', line2: '', city: 'T', state: '',
+    line1: '1 St', line2: '', city: 'T', state: 'CA',
     postalCode: '9', country: 'US', phone: '+1 555 0100',
   };
 
   it('exposes the canonical required-field list', () => {
     expect(REQUIRED_ADDRESS_FIELDS).toEqual(ALL);
+    expect(STATE_REQUIRED_COUNTRIES).toEqual(['US', 'CA']);
   });
 
-  it('returns [] for a complete required set (line2/state optional)', () => {
+  it('returns [] for a complete US required set', () => {
     expect(missingRequiredAddressFields(complete)).toEqual([]);
   });
 
@@ -45,17 +49,32 @@ describe('required-address shared presence check', () => {
     expect(missingRequiredAddressFields({ ...complete, phone: '   ' })).toContain('phone');
   });
 
+  it('requires state/province for US and Canada only', () => {
+    expect(addressRequiresState({ country: 'US' })).toBe(true);
+    expect(addressRequiresState({ country: 'ca' })).toBe(true);
+    expect(addressRequiresState({ country: 'GB' })).toBe(false);
+    expect(requiredAddressFieldsFor({ country: 'US' })).toContain('state');
+    expect(requiredAddressFieldsFor({ country: 'CA' })).toContain('state');
+    expect(requiredAddressFieldsFor({ country: 'GB' })).not.toContain('state');
+    expect(missingRequiredAddressFields({ ...complete, state: '' })).toEqual(['state']);
+    expect(missingRequiredAddressFields({ ...complete, country: 'CA', state: '  ' })).toEqual(['state']);
+  });
+
+  it('does not infer state/province is required before country is selected', () => {
+    expect(missingRequiredAddressFields({ ...complete, country: '', state: '' })).toEqual(['country']);
+  });
+
   // The exact gap the backfill now guards: a historical contact whose address was
   // PATCHed best-effort can be PARTIAL (not empty). Fresh accept would have rejected
   // it with a 422; the backfill must skip it rather than mint an unpayable honorarium.
   it('flags a partial (non-empty but incomplete) captured address', () => {
-    const partial = { line1: '1 St', city: 'T', country: 'US' }; // no postalCode, no phone
+    const partial = { line1: '1 St', city: 'T', state: 'CA', country: 'US' }; // no postalCode, no phone
     expect(missingRequiredAddressFields(partial)).toEqual(['postalCode', 'phone']);
   });
 
-  it('does not flag optional line2/state when missing', () => {
+  it('does not flag optional line2/state when missing outside the US and Canada', () => {
     expect(missingRequiredAddressFields({
-      line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100',
+      line1: '1 St', city: 'T', postalCode: '9', country: 'GB', phone: '+1 555 0100',
     })).toEqual([]);
   });
 

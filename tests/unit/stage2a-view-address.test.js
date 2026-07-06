@@ -65,6 +65,8 @@ describe('Stage2aView payment-address card', () => {
     expect(screen.getByDisplayValue('123 Main St')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Townsville')).toBeInTheDocument();
     expect(screen.getByDisplayValue('94000')).toBeInTheDocument();
+    expect(screen.getByLabelText(/State \/ Province/)).toHaveValue('CA');
+    expect(screen.getByLabelText(/State \/ Province/)).toBeRequired();
     // Phone is collected in the address card (required this cycle for manual payment).
     expect(screen.getByDisplayValue('+1 555 123 4567')).toBeInTheDocument();
     // Country select reflects the prefilled ISO-2 code.
@@ -95,12 +97,30 @@ describe('Stage2aView payment-address card', () => {
     // A previously-omitted territory is present.
     expect(screen.getByRole('option', { name: 'Puerto Rico' })).toBeInTheDocument();
   });
+
+  it('makes state/province optional outside the US and Canada', () => {
+    renderView(makeData({
+      prefill: {
+        address: {
+          line1: '1 Long Road',
+          city: 'Oxford',
+          state: '',
+          postalCode: 'OX1 1AA',
+          country: 'GB',
+          phone: '+44 20 0000 0000',
+        },
+      },
+    }));
+
+    expect(screen.getByLabelText(/State \/ Province/)).not.toBeRequired();
+    expect(screen.getByText('Optional outside the United States and Canada.')).toBeInTheDocument();
+  });
 });
 
 describe('missingAddressFields', () => {
-  const complete = { line1: '1 St', line2: '', city: 'T', state: '', postalCode: '9', country: 'US', phone: '+1 555 0100' };
+  const complete = { line1: '1 St', line2: '', city: 'T', state: 'CA', postalCode: '9', country: 'US', phone: '+1 555 0100' };
 
-  it('returns [] for a complete required set (line2/state optional)', () => {
+  it('returns [] for a complete US required set', () => {
     expect(missingAddressFields(complete)).toEqual([]);
   });
 
@@ -113,6 +133,16 @@ describe('missingAddressFields', () => {
     expect(missingAddressFields({ ...complete, phone: '   ' })).toContain('phone');
   });
 
+  it('requires state/province for US and Canada only', () => {
+    expect(missingAddressFields({ ...complete, state: '' })).toEqual(['state']);
+    expect(missingAddressFields({ ...complete, country: 'CA', state: '  ' })).toEqual(['state']);
+    expect(missingAddressFields({ ...complete, country: 'GB', state: '' })).toEqual([]);
+  });
+
+  it('does not infer state/province is required before country is selected', () => {
+    expect(missingAddressFields({ ...complete, country: '', state: '' })).toEqual(['country']);
+  });
+
   it('flags a country that is not exactly 2 chars (server contract)', () => {
     expect(missingAddressFields({ ...complete, country: 'U' })).toContain('country');
     expect(missingAddressFields({ ...complete, country: 'USA' })).toContain('country');
@@ -123,8 +153,8 @@ describe('missingAddressFields', () => {
 describe('buildAddressPayload', () => {
   it('keeps only trimmed non-empty fields', () => {
     expect(
-      buildAddressPayload({ line1: ' 1 St ', line2: '', city: 'T', state: '   ', postalCode: '9', country: 'US' }),
-    ).toEqual({ line1: '1 St', city: 'T', postalCode: '9', country: 'US' });
+      buildAddressPayload({ line1: ' 1 St ', line2: '', city: 'T', state: '   ', postalCode: '9', country: 'GB' }),
+    ).toEqual({ line1: '1 St', city: 'T', postalCode: '9', country: 'GB' });
   });
 
   it('returns {} for an all-empty address', () => {
