@@ -389,7 +389,7 @@ touched gates → commit. Leaf-first per the DAG.
   suite **4957/4957**; `check:dataverse-access-layer` + `check:dynamics-context-boundary` green
   (599 files, 0 violations, now incl. `auth.js`); semgrep `.semgrep/token-audit.yaml` 0 findings on
   `auth.js` (C14). **BATCHED review still pending** — runs after Stages 2–3 land.
-  - [RECHECKED after lib/services/dynamics/auth.js create: S339 — verbatim `getAccessToken` + `tokenCache` + new `resetTokenCache`; deps http/constants/service-error; semgrep token-audit 0 findings; suite 4957/4957]
+  - [RECHECKED after lib/services/dynamics/auth.js change: S339 — verbatim `getAccessToken` + `tokenCache` + new `resetTokenCache`; deps http/constants/service-error; semgrep token-audit 0 findings; suite 4957/4957]
   - [RECHECKED after lib/services/dynamics-service.js change: S339 — facade rewired (`getAccessToken` delegate + `resetTokenCache` in `clearCaches`), behavior-freeze; no stray `tokenCache` ref; suite green]
   - Note: this extraction shifts `dynamics-service.js` line numbers below the old auth block up by ~48; the Q9 plan's `dynamics-service.js` line citations (method-name-anchored) are reconciled at the Q9 worktree merge, not mid-flight.
 - **Checkpoint A Stage 2 — `restrictions.js`. EXECUTED S339.** `resolveLogicalName` +
@@ -406,7 +406,7 @@ touched gates → commit. Leaf-first per the DAG.
   `restrictions.js` imports `getDynamicsContext`, a read, not `bypassDynamicsRestrictions`, so the
   boundary gate is satisfied); `check:dataverse-access-layer` green. **Checkpoint A batched review
   still pending** — after Stage 3.
-  - [RECHECKED after lib/services/dynamics/restrictions.js create: S339 — verbatim `resolveLogicalName` + `checkRestriction` + private expand parsers; deps constants/dynamics-context; suite 4965/4965; context-boundary gate green]
+  - [RECHECKED after lib/services/dynamics/restrictions.js change: S339 — verbatim `resolveLogicalName` + `checkRestriction` + private expand parsers; deps constants/dynamics-context; suite 4965/4965; context-boundary gate green]
   - [RECHECKED after lib/services/dynamics-service.js change: S339 — facade rewired (both wrappers delegate; `getDynamicsContext`/`ENTITY_SET_TO_LOGICAL` imports removed), no stray refs, behavior-freeze; suite green]
 - **Checkpoint A Stage 3 — `annotations.js`. EXECUTED S339.** `processAnnotations` (static, pure —
   no `this`, no deps) moved verbatim to `lib/services/dynamics/annotations.js`; facade keeps a thin
@@ -417,7 +417,7 @@ touched gates → commit. Leaf-first per the DAG.
   FormattedValue→`_formatted`, lookuplogicalname→`_entity`, other `@odata`/`@Microsoft` stripped,
   non-object passthrough) — green pre- and post-extraction. Verified: full suite **4970/4970**;
   `check:dataverse-access-layer` + `check:dynamics-context-boundary` green (601 files, 0 violations).
-  - [RECHECKED after lib/services/dynamics/annotations.js create: S339 — verbatim `processAnnotations`, pure/no-deps; suite 4970/4970]
+  - [RECHECKED after lib/services/dynamics/annotations.js change: S339 — verbatim `processAnnotations`, pure/no-deps; suite 4970/4970]
   - [RECHECKED after lib/services/dynamics-service.js change: S339 — facade wrapper delegates, impl fully moved (no stray `annotationSuffix`), behavior-freeze; suite green]
   **→ Checkpoint A leaf batch (Stages 1–3) is now CODE-COMPLETE; the plan-mandated BATCHED
   adversarial review is the remaining gate before Checkpoint B.**

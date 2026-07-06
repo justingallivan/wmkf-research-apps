@@ -436,6 +436,13 @@ may proceed independently — step 1 already has.
 > method/assert-site (e.g. `assertTrustedDalContext` write sites), not brittle line numbers, so it
 > stays valid; and every `auth.js` here is `lib/utils/auth.js`, not the extracted
 > `lib/services/dynamics/auth.js`. Reconciled at the decomposition's Checkpoint F sweep.
+> **[STALE-ACCEPTED: lib/services/dynamics/restrictions.js — not referenced here]** and
+> **[STALE-ACCEPTED: lib/services/dynamics/annotations.js — not referenced here]**: this plan's
+> "restriction(s)" and "annotation(s)" wording is the restriction-context concept / `checkRestriction`
+> behavior and the OData-annotation word — NOT the newly-extracted
+> `lib/services/dynamics/restrictions.js` / `annotations.js` modules (Checkpoint A Stages 2–3, S339).
+> Those extractions are verbatim behavior-freeze, so the concept is unchanged
+> `[VERIFIED via full suite 4970/4970 + check:dynamics-context-boundary green]`.
 
 Owner reviewed all nine; **defaults adopted on Q1–Q8, Q9 reversed to migrate.**
 
