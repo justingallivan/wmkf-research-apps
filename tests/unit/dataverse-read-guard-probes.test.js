@@ -1,10 +1,9 @@
 /**
  * @jest-environment node
  *
- * Q9 Stage 1f: read-side DATAVERSE_DAL_UNIVERSAL probes should observe
- * context coverage for prefs/app-access reads before the transport swap.
- * They live inside each service try/catch so read APIs keep their historical
- * falsy/empty fallback behavior even if the flag is accidentally set to on.
+ * Q9 Stage 1f/3: read-side DATAVERSE_DAL_UNIVERSAL probes still observe the
+ * not-yet-migrated app-access reads. Prefs probes were removed when prefs moved
+ * to the DynamicsService adapter in Stage 3.
  */
 jest.mock('@vercel/postgres', () => ({ sql: jest.fn() }));
 jest.mock('../../lib/services/dataverse-identity-map', () => ({
@@ -13,7 +12,6 @@ jest.mock('../../lib/services/dataverse-identity-map', () => ({
 }));
 
 const { sql } = require('@vercel/postgres');
-const prefs = require('../../lib/services/dataverse-prefs-service');
 const appAccess = require('../../lib/services/dataverse-app-access-service');
 
 const FLAG = 'DATAVERSE_DAL_UNIVERSAL';
@@ -37,31 +35,22 @@ afterEach(() => {
   }
 });
 
-test('warn mode emits read labels for prefs and app-access read APIs', async () => {
+test('warn mode emits read labels for app-access read APIs', async () => {
   process.env[FLAG] = 'warn';
 
-  await prefs.getUserPreferences(7);
-  await prefs.getDecryptedApiKey(7, 'api_key_ncbi');
-  await prefs.hasPreference(7, 'some_key');
   await appAccess.listAppKeysForUser(7);
   await appAccess.listAllGrantsForAdmin();
 
   const messages = warnSpy.mock.calls.map(([message]) => message);
   expect(messages).toEqual([
-    '[dal-universal] prefs:read executed without trusted Dataverse context',
-    '[dal-universal] prefs:read executed without trusted Dataverse context',
-    '[dal-universal] prefs:read executed without trusted Dataverse context',
     '[dal-universal] app-access:read executed without trusted Dataverse context',
     '[dal-universal] app-access:read executed without trusted Dataverse context',
   ]);
 });
 
-test('on mode read probes preserve service fallback contracts', async () => {
+test('on mode app-access read probes preserve service fallback contracts', async () => {
   process.env[FLAG] = 'on';
 
-  await expect(prefs.getUserPreferences(7)).resolves.toEqual({});
-  await expect(prefs.getDecryptedApiKey(7, 'api_key_ncbi')).resolves.toBeNull();
-  await expect(prefs.hasPreference(7, 'some_key')).resolves.toBe(false);
   await expect(appAccess.listAppKeysForUser(7)).resolves.toEqual([]);
   await expect(appAccess.listAllGrantsForAdmin()).resolves.toEqual([]);
 

@@ -177,6 +177,12 @@ const filter = `… eq '${odata.escape(appKey)}'`;
 > Both `findRow` functions are internal; the pins require exporting `findRow` from each module (a
 > test-only export, matching the "utils exposed for tests" convention already used by
 > `grant-cycles-dataverse.js`). No production caller changes.
+>
+> Q9 follow-up (2026-07-06): the prefs transport migration moved site #10 out of the
+> service-local `findRow` and into `lib/dataverse/adapters/user-preference.js`
+> `findByOwnerAndKey`. The behavior-level pin moved with it: the test now mocks
+> `DynamicsService.queryRecords` and asserts non-string keys throw before any query call. Site #8
+> remains in `lib/services/dataverse-app-access-service.js` until the app-access wave lands.
 
 ### DIVERGENT → owner-ruled (2 sites / 2 files)
 
@@ -451,6 +457,14 @@ everywhere the other gates are; if declined — record the decision in the Stage
     - [RECHECKED after lib/services/reviewer-finder/contact-history-service.js change: D2 eqGuid per ruling, rejection pin replaces quote-escape test]
     - [RECHECKED after lib/dataverse/adapters/review-answer.js change: chunk-scaffold swap only (CHUNK_CONSOLIDATION_PLAN commit 3cd9e858); this plan's escape claims about the file are unaffected]
     - [RECHECKED after lib/dataverse/adapters/reviewer-suggestion.js change: chunk-scaffold swaps only (commit 3cd9e858); the odata.escape usage this plan cites is untouched]
+- 2026-07-06 (Q9 prefs transport follow-up): **Prefs guarded-swap pin relocated, behavior unchanged.**
+  `lib/services/dataverse-prefs-service.js` no longer owns a service-local `findRow` after the Q9
+  Stage 3 prefs adapter swap. The S331 site #10 guard now lives in
+  `lib/dataverse/adapters/user-preference.js` `findByOwnerAndKey`, and
+  `tests/unit/dataverse-guarded-swap-odata-escape.test.js` mocks
+  `DynamicsService.queryRecords` to assert `TypeError` plus zero transport calls. This is the
+  OQ-4 pin rewrite from `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md`; the escape-law outcome and
+  app-access site #8 are unchanged.
 - 2026-07-05 (S331): **Closing code review (Codex, fresh-context, range `5477a226..629d67e4`):
   PASS-WITH-FINDINGS — exercise CLOSED.** Reviewer's verdict verbatim: *"No further OData escape
   review round is needed; the consolidation exercise can close. The one finding is an
