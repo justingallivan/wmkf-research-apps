@@ -14,9 +14,8 @@ related:
 
 # DiscoveryService Decomposition Plan
 
-**Status: APPROVED — Codex adversarial review round 2 returned SATISFIED (no material findings) on the
-reconciled plan. Ready to execute Stage 0 under the documented per-stage verification gates. NO CODE
-WRITTEN YET.**
+**Status: STAGE 0 EXECUTED (S335) — plan approved via two Codex adversarial-review rounds; `constants.js`
+created and the facade wired, no method bodies moved. Stages 1–6 pending. See Review log / stage note.**
 
 All material claims below are grounded in artifacts produced THIS session — the mechanically-computed
 internal call graph (a script over `lib/services/discovery-service.js`), a `grep -a` whole-repo caller
@@ -183,11 +182,15 @@ These are the non-mechanical parts — where a naive cut-and-paste would silentl
 Same cadence proven on site-33: **trace → extract one cluster → run suite → fresh-context Codex
 review → commit**. Leaf modules first so the facade delegates incrementally and the DAG never breaks.
 
-- **Stage 0 — `constants.js` + facade wiring.** Extract the 10 static class props **and** the 3
-  env-derived module consts (C7) to `constants.js`; the class re-exposes the 10 statics as static props
-  (`static MIN_PUBLICATIONS = C.MIN_PUBLICATIONS;` etc.), the env consts stay module-level. No method
-  bodies move yet. Proves both the constant-passthrough contract (C1) and the env-const sharing (C7)
-  before anything depends on them.
+- **Stage 0 — `constants.js` + facade wiring. ✅ EXECUTED (S335).** Created
+  `lib/services/discovery/constants.js` with the 10 static class props **and** the 3 env-derived module
+  consts (C7). The facade `require`s it as `C`, re-exposes the 10 statics as own static props
+  (`static MIN_PUBLICATIONS = C.MIN_PUBLICATIONS;` etc.), and destructures `DEBUG`/`NCBI_API_KEY`/
+  `PUBMED_DELAY` from it (module-level bindings unchanged). No method bodies moved. Verified: module
+  loads; all 10 statics equal the constants; `MIN_PUBLICATIONS` is still a reassignable own prop (C1);
+  8 DiscoveryService-covering unit suites (111 tests) + the enrich-recommended integration suite
+  (14 tests) green; touched gates (`check:dataverse-access-layer`, `check:route-service-boundary`,
+  `check:atlas`, `check:doc-symbol-refs`, `check:doc-currency`, `check:agent-wiki`) green.
 - **Stage 1 — `name-matching.js`** (pure leaf). Highest-fanout helper cluster; extracting it first
   de-risks affiliation + verification.
 - **Stage 2 — `affiliation.js`** (depends on Stage 1).
