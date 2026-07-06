@@ -17,8 +17,9 @@ Fable authored it from a full source read; owner approved Q1–Q4; an adversaria
 
 ### What Was Completed
 
-1. **Startup red gate fixed** — 9 `publications.js` code-symbol mentions in
+1. **Startup red gate fixed** — 9 `publications.js` code-symbol mentions in <!-- drain-table:ignore reason=code-symbol-filename -->
    `docs/DISCOVERY_SERVICE_DECOMPOSITION_PLAN.md` annotated for `check:drain-table-mentions` (`8d21a4b9`).
+
 2. **Checkpoint A2 — `search-tiers.js`** (`1f91ac0a`): `claudeWebSearch` + `buildGoogleScholarUrl`; C6
    A7 registry moved to the new path; 3 dynamic ESM imports preserved (C11) + depth-rewritten (C13).
 3. **Checkpoint B — `email-adjudication.js` + `page-email.js`** (`f0a62415`, `df1afa79`, doc `9fe39261`):
