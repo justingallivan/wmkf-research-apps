@@ -14,8 +14,9 @@ related:
 
 # DiscoveryService Decomposition Plan
 
-**Status: DRAFT — reconciled after Codex adversarial review round 1 (CHANGES-REQUIRED; both BLOCKERs
-fixed — see Review log). Awaiting re-review before Stage 0. NO CODE WRITTEN.**
+**Status: APPROVED — Codex adversarial review round 2 returned SATISFIED (no material findings) on the
+reconciled plan. Ready to execute Stage 0 under the documented per-stage verification gates. NO CODE
+WRITTEN YET.**
 
 All material claims below are grounded in artifacts produced THIS session — the mechanically-computed
 internal call graph (a script over `lib/services/discovery-service.js`), a `grep -a` whole-repo caller
@@ -246,7 +247,12 @@ Stages 3 and 4 may each be split into per-module commits if a review round wants
   `verification`, `withReviewerProvenance` in `ranking`). Fixes: constants row → 10 statics + 3 env
   consts; new constraint **C7**; dependency column regenerated mechanically; the four open questions
   resolved with Codex's recommendations. The DAG-acyclic / method-mapping / facade-strategy core was
-  confirmed sound. **Next: re-review of this reconciled plan, then Stage 0.**
+  confirmed sound.
+- **Round 2 — Codex adversarial re-review (S335, reconciled plan commit `84d9eb43`): SATISFIED /
+  approve, no material findings.** Independently re-verified against source: all 10 statics enumerated
+  and re-exposed, `MIN_PUBLICATIONS` pass-through preserved, env consts carried into the affected
+  dependency rows, all 54 methods mapped exactly once, re-derived module DAG acyclic. No new
+  inaccuracies or staging blockers. **Cleared to execute Stage 0.**
 
 ## Non-goals / do-not-touch
 
