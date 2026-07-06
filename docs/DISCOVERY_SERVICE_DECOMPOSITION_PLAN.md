@@ -14,8 +14,8 @@ related:
 
 # DiscoveryService Decomposition Plan
 
-**Status: STAGE 0 EXECUTED (S335) — plan approved via two Codex adversarial-review rounds; `constants.js`
-created and the facade wired, no method bodies moved. Stages 1–6 pending. See Review log / stage note.**
+**Status: STAGES 0–1 EXECUTED (S335) — plan approved via two Codex adversarial-review rounds;
+`constants.js` + `name-matching.js` extracted behind the facade. Stages 2–6 pending. See stage notes.**
 
 All material claims below are grounded in artifacts produced THIS session — the mechanically-computed
 internal call graph (a script over `lib/services/discovery-service.js`), a `grep -a` whole-repo caller
@@ -195,8 +195,16 @@ review → commit**. Leaf modules first so the facade delegates incrementally an
   [RECHECKED after lib/services/discovery/constants.js + lib/services/discovery-service.js change:
   this note describes the committed Stage 0 state (`f688dce7`) — constants.js holds the 10 statics +
   3 env consts; the facade re-exposes all 10 as own static props and destructures the env consts.]
-- **Stage 1 — `name-matching.js`** (pure leaf). Highest-fanout helper cluster; extracting it first
-  de-risks affiliation + verification.
+- **Stage 1 — `name-matching.js` (pure leaf). ✅ EXECUTED (S335).** Moved the 8-method cluster
+  (`normalizeNameForMatch`, `firstNamesEquivalent`, `generateNameVariants`, `nameMatchEvidence`,
+  `namesMatch`, `filterToMatchingAuthor`, `filterToMatchingAuthorMultiVariant`, `evaluateNameEvidence`)
+  to `lib/services/discovery/name-matching.js`; internal `this.X` self-calls became direct function
+  calls, `NICKNAME_MAP` from `./constants`; the facade delegates all 8. Per Q2 (none had direct unit
+  coverage), first landed a 25-test characterization suite `tests/unit/discovery-name-matching.test.js`,
+  baselined green against pre-extraction code, then mutation-proven (neutralize the nickname branch →
+  suite goes red). Post-extraction: 10 suites / 150 tests green; touched gates green; facade 2,290 →
+  2,135 L. [RECHECKED after lib/services/discovery/name-matching.js change: this note describes the
+  committed Stage 1 state — the module exports the 8 functions and the facade delegates each.]
 - **Stage 2 — `affiliation.js`** (depends on Stage 1).
 - **Stage 3 — independent leaves, one commit each (or grouped):** `research-area.js`,
   `match-signals.js`, `provenance.js`, `publications.js`, `pubmed-query.js`. None depend on each other.
