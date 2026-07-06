@@ -82,11 +82,17 @@ Codex round 1 + re-run S336]:
   - `lib/services/workbench/enrich-recommended-service.js` — `enrichCandidates` (:249)
   - (`lib/utils/scholar-url.js` is **NOT** a caller — it has its own independent scholar-URL helper and
     only a comment reference at :35. Removed from the inventory.)
-- **Scripts (5):** `scripts/test-contact-enrichment.js` (`claudeWebSearch`),
-  `scripts/smoke-identity-resolver-verdict.js` (`enrichCandidate`),
-  `scripts/smoke-reviewer-contact-anchoring.mjs` (`enrichCandidate`, `_validateEmailAgainstVerifiedDomain`
-  — **was missing from the first draft**), `scripts/measure-scholar-orcid-crosstab.js`,
-  `scripts/probe-rudenko-email-trace.js`.
+- **Scripts (3 — corrected in R2, this is the exact mechanical-scan output):**
+  `scripts/test-contact-enrichment.js` (`claudeWebSearch`, :59),
+  `scripts/smoke-identity-resolver-verdict.js` (`enrichCandidate`, :70),
+  `scripts/smoke-reviewer-contact-anchoring.mjs` (`enrichCandidate` :108,:134;
+  `_validateEmailAgainstVerifiedDomain` :76).
+  (**Removed in R2:** `scripts/measure-scholar-orcid-crosstab.js` has only a comment reference, no call
+  [VERIFIED via scan]; `scripts/probe-rudenko-email-trace.js` **does not exist** — both were carried into
+  the first draft without verification.) Two `lib/services` files (`reviewer-contact-audit.js:6`,
+  `reviewer-identity-resolver.js:5`) mention `ContactEnrichmentService.enrichCandidate` in **JSDoc
+  comments only**, not as calls [VERIFIED via read] — they are imported BY this service, so a real call
+  would be circular.
 - **Tests (≈11 files)** pin many methods **including underscore ones** directly:
   `_attachEmailFromResolvedPage`, `_validateEmailAgainstVerifiedDomain`, `_collectContactLeads`,
   `_addContactLead`, `_selectGroundedEmail`, `_applyAffiliationOverride`,
@@ -127,9 +133,9 @@ Stage-0 mechanical call graph.**
 | 3 | `identity-anchor.js` | `_identityAnchorForCandidate`, `_cleanInstitution`, `_effectiveInstitution`, `_searchCandidateWithInstitution`, `_anchorWithInstitution`, `_hasOrcidAnchor`, `_markUnanchoredAbstain`, `_getAnchoredOrcidProfile` (`_fieldPersistAllowed` **moved to persistence.js**, R1) | `ORCIDService`, `normalizeOrcid` | 120 |
 | 4 | `domain-evidence.js` | `_institutionTokens`, `_institutionsContradict`, `_resultContradictsAnchor`, `_normalizeDomain`, `_emailDomain`, `_domainRelated`, `_emailDomainRelatedToAny`, `_addInstitutionDomain`, `_currentOrcidInstitutionRefs`, `_strongInstitutionDisplayMatch`, `_buildInstitutionDomainEvidence` | identity-anchor (`_cleanInstitution`/`_effectiveInstitution`), `safe-fetch` (`safeFetchInstitutionPage`, `hostWithinDomain`), **`ContactParser` (:193,208), `normalizeOrcid` (:272), `mayPersistIdentity` (:278), `OpenAlexService`** (added, R1 BLOCKER-3) | 210 |
 | 5 | `email-adjudication.js` | `_markEmailContested`, `_readjudicateNameMismatchRejectedEmail`, `_addContactLead`, `_collectContactLeads`, `_validateEmailAgainstVerifiedDomain` | domain-evidence, constants (`SEARCH_EMAIL_SOURCES`, `EXPLICIT_EMAIL_PERSIST_SOURCES`) | 180 |
-| 6 | `openalex-metrics.js` | `_attachOpenAlexMetrics`, `_buildOpenAlexAuthorDto` | `OpenAlexService`, `reviewer-identity-resolver` (`resolveIdentity`/`isOpenAlexAuthorAccepted`) | 140 |
+| 6 | `openalex-metrics.js` | `_attachOpenAlexMetrics`, `_buildOpenAlexAuthorDto` | `OpenAlexService`, `reviewer-identity-resolver` (**`isOpenAlexAuthorAccepted` only**, :962 — `resolveIdentity` is in `_finalize`/`tiers.js` at :1247, R2 removed the false edge) | 140 |
 | 7 | `page-email.js` | `_normForNameMatch`, `_parseCandidateName`, `_emailDomainRelated`, `_windowNamesCandidate`, `_personalPageSlug`, `_slugNamesCandidate`, `_selectGroundedEmail`, `_orderCandidateUrls`, `_attachEmailFromResolvedPage` | domain-evidence, `safe-fetch`, `ContactParser`, **constants (`SEARCH_EMAIL_SOURCES`, :1188), `abortError` (:1195)** (added, R1 BLOCKER-3) | 210 |
-| 8 | `search-tiers.js` | `claudeWebSearch` (Tier 3, PAID/LLM), `buildGoogleScholarUrl` | `llm-client`/`MultiLLMService`, `SerpContactService`, `ContactParser`, constants (`CLAUDE_WEB_SEARCH_SCHEMA`), `getModelForApp`; **preserves dynamic ESM imports (:1645,1660), C11** | 190 |
+| 8 | `search-tiers.js` | `claudeWebSearch` (Tier 3, PAID/LLM), `buildGoogleScholarUrl` | `ContactParser`, constants (`CLAUDE_WEB_SEARCH_SCHEMA`), `getModelForApp`; **3 dynamic ESM imports preserved (C11): `ai-payload-boundary` (:1645), `llm-client` (:1660), `ai-output-schema` (:1722)**. (**`SerpContactService` REMOVED** — R2: it's Tier 4 inside `tiers.js` at :797, not used by `claudeWebSearch`) | 190 |
 | 9 | `persistence.js` (**DAL / write path**) | `saveToDatabase`, **`_fieldPersistAllowed`** (moved here, R1 — only `saveToDatabase` uses it, :1529–1530) | `withDalContext`, `potentialReviewerAdapter`, `researcherAdapter`, `reviewer-identity-resolver` (`mayPersistIdentity`, `RESOLVER_SOURCED_FIELDS`), constants (`EXPLICIT_EMAIL_PERSIST_SOURCES`), `ContactParser` (`isDocumentUrl`) | 120 |
 | 10 | `cost.js` | `estimateCost` | constants (`COSTS`) | 70 |
 | 11 | `tiers.js` (**Q1-B, highest-risk cut**) | the five tier bodies from `enrichCandidate` as `applyTier{0..4}(candidate, result, options)` + `_finalize` + `_applyAffiliationOverride` (the finalize glue `_finalize` calls after resolver/domain/contact-lead work, :1273 — kept with `_finalize`, R1 MINOR-7) | identity-anchor, domain-evidence, email-adjudication, openalex-metrics, page-email, search-tiers, persistence, constants, `ContactParser`, **`ORCIDService` (:622), `SerpContactService` (:797), resolver exports (:1246)** (added, R1 BLOCKER-3); **must dispatch `claudeWebSearch`/`saveToDatabase` through the facade `this`, not imports (C10)** | 220 |
@@ -188,10 +194,15 @@ is already extracted and green. The alternative (Q1-A: keep the orchestrator who
   scripts/check-dynamics-context-boundary.js:45]. The gates stay green **provided `persistence.js` imports
   the adapters but does NOT re-export adapter identities**, and the `return withDalContext(…)` wrapper
   stays around every adapter call [VERIFIED via :1540]. Verify green after the move regardless.
-- **C6 — A7 prompt-injection marker.** `CLAUDE_WEB_SEARCH_SCHEMA` is the Tier-3 model-output schema
-  [VERIFIED via :62–71]; `claudeWebSearch` validates model output against it. Moving the schema to
-  `constants.js` and the method to `search-tiers.js` must carry the A7 surface marker so
-  `check:prompt-injection-tagging` stays green.
+- **C6 — A7 prompt-injection marker AND gate registry (round-2: the registry is the real gap).**
+  `CLAUDE_WEB_SEARCH_SCHEMA` is the Tier-3 model-output schema [VERIFIED via :62–71]; `claudeWebSearch`
+  validates model output against it. Moving the schema to `constants.js` and the method to
+  `search-tiers.js` must carry the A7 surface marker. **Critically, the gate's registry hard-codes the
+  file path** — `check-prompt-injection-tagging.js` has `{ id: 'contact-enrichment', … callSiteFiles:
+  ['lib/services/contact-enrichment-service.js'] }` [VERIFIED via scripts/check-prompt-injection-tagging.js:325–329].
+  So Stage 6 must update that `callSiteFiles` entry to `lib/services/contact-enrichment/search-tiers.js`
+  (or list both during the transition) **in the same commit** as the method move, then run
+  `check:prompt-injection-tagging` — otherwise the gate goes red.
 - **C7 — Shared external singletons.** `ContactParser`, `ORCIDService`, `OpenAlexService`,
   `SerpContactService`, `reviewer-identity-resolver`, `reviewer-contact-audit`, `safe-fetch`,
   `getModelForApp`, `normalizeOrcid` are imported by multiple target modules. Each module imports what it
@@ -203,15 +214,21 @@ is already extracted and green. The alternative (Q1-A: keep the orchestrator who
 - **C9 — Tier extraction: mutable `result` + early-return control flow (the Q1-B care-point).**
   Rewritten after Codex round 1 (BLOCKER-2: the first draft only cited Tier 0's early return). The tiers
   mutate `result.contactEnrichment` in place and mix **terminal short-circuits**, **fall-through
-  mutations**, and a **throw**. The full control-flow inventory [VERIFIED via :468–901, Codex round 1]:
+  mutations**, and a **throw**. The control-flow inventory below is line-cited but **Stage 0 must confirm
+  it is exhaustive** against the full :468–901 body (round 2 found round 1's list incomplete — do not
+  treat this as final):
   - **Terminal returns through `_finalize`:** Tier 0 affiliation email `return this._finalize(…)`
     [:566]; Tier 1 **recent** PubMed email [:602]; the final catch-all return [:876].
   - **Tier 3 aborts by THROWING**, not finalizing [:772] — the shell must let it propagate, not convert
     it to a finalize.
   - **Fall-through (mutate, then continue to the next tier):** a *stale* (non-recent) PubMed email falls
-    through; ORCID email/website/affiliation fall through; the no-anchor abstain mutates then falls
-    through; Tier 3 **non-abort** errors are swallowed (caught, not rethrown); Tier 4 skips when **any**
-    email already exists (not just a recent one).
+    through; ORCID email/website/affiliation fall through; **ORCID errors + no-credential skips fall
+    through** [:675–682]; the no-anchor abstain mutates then falls through; **Tier 3 skipped-no-anchor /
+    no-API-key branches** [:777–780]; Tier 3 **non-abort** errors are swallowed (caught, not rethrown);
+    **Tier 4 SerpAPI non-abort errors + no-key skips** [:859–872]; Tier 4 skips when **any** email already
+    exists (not just a recent one). (Expanded in R2 — the round-1 list named the branch *classes* but not
+    every concrete skip/error branch; this enumeration is now line-cited, but Stage 0 must still confirm
+    it is complete against the full :468–901 body before extraction.)
   - **`_finalize` arg fidelity:** the early returns use the default `scholarCandidate = candidate`,
     while the final return passes `scholarCandidate: searchCandidate` — the extracted shell/sentinel must
     reproduce **each call's exact `_finalize` args**, not a single normalized call.
@@ -237,8 +254,19 @@ is already extracted and green. The alternative (Q1-A: keep the orchestrator who
   [VERIFIED via :1181]; a test mutates that env **after import**
   [VERIFIED via resolved-page-email-tier-service.test.js:37]. So the flag must NOT be hoisted to a
   module-load `const` in `page-email.js` — keep the read inside the function. Likewise `claudeWebSearch`
-  uses **dynamic `import()` of ESM** [VERIFIED via :1645,1660]; `search-tiers.js` must preserve the
-  dynamic imports (no static top-of-file `require`/`import` conversion).
+  uses **three dynamic `import()`s of ESM** [VERIFIED via :1645 `ai-payload-boundary`, :1660 `llm-client`,
+  :1722 `ai-output-schema`]; `search-tiers.js` must preserve **all three** dynamic imports (no static
+  top-of-file `require`/`import` conversion — `ai-output-schema.js` and the payload-boundary util are ESM
+  and cannot be `require`d from CommonJS). (R2 added the third import — round 1 named only two.)
+- **C12 — `_finalize` step ordering is a load-bearing invariant (round-2 new MAJOR).** `_finalize` runs a
+  fixed sequence: OpenAlex metrics → identity resolve → institution-domain evidence → resolved-page email
+  → domain validation → name-mismatch readjudication → contact-lead collection → affiliation override →
+  persistence [VERIFIED via :1243–1276]. The in-code comments state several steps depend on a prior
+  step's output (e.g. domain validation runs *after* the domain sets are built; lead collection runs
+  *after* the cross-check discards; the affiliation pin runs *after* `resolveIdentity` so the override
+  can't corrupt the evidence basis). When `_finalize` moves to `tiers.js`, this exact order must be
+  preserved — C9 covers `_finalize`'s *arguments*, C12 covers its *internal step order*. Stage 9's
+  characterization must assert the order (e.g. spy call-order on the step methods), not just the outputs.
 
 ## Staging (leaf-first, each stage independently green + reviewed)
 
@@ -256,7 +284,9 @@ review → commit.** Leaf modules first so the facade delegates incrementally an
   already covered).
 - **Stage 4 — `openalex-metrics.js`** (independent leaf).
 - **Stage 5 — `page-email.js`** (depends on domain-evidence).
-- **Stage 6 — `search-tiers.js`** (Tier-3 LLM + scholar URL; carries C6 marker).
+- **Stage 6 — `search-tiers.js`** (Tier-3 LLM + scholar URL). Carries the C6 A7 marker AND, in the same
+  commit, updates the `check-prompt-injection-tagging.js` registry `callSiteFiles` to the new path; keeps
+  all three dynamic ESM imports (C11); then run `check:prompt-injection-tagging`.
 - **Stage 7 — `cost.js`** (trivial leaf).
 - **Stage 8 — `persistence.js`** (the DAL write unit; C5). **Highest scrutiny + the three LAW gates.**
   Land last of the leaves so the write path moves as an isolated, independently reviewed step.
