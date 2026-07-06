@@ -85,6 +85,19 @@ consolidation with `graph-service.js`'s duplicate `fetchWithTimeout`, and any ad
   `lib/dataverse/core/`), and update both self-tests (`check-dataverse-access-layer-self-test.js`,
   `check-route-service-boundary-self-test.js`) with positive+negative fixtures — all in the Stage-0
   commit. Alternative (keep matchers, rely on convention): rejected — it converts a LAW into a hole.
+  **Source-regex extension ALONE is insufficient** [flagged by adversarial review, S338]: the
+  access-layer scanner attributes calls only for imports it can alias — an import named
+  `DynamicsService`, a default import, or a namespace import from a matched source. An ordinary NAMED
+  import (`import { createRecord, executeChangeset } from 'lib/services/dynamics/write-core.js'`) from
+  a non-exempt `lib/`/`lib/shared/modules/` file would NOT be alias-attributed, so the bare
+  `createRecord(...)`/`executeChangeset(...)` call slips the gate — a residual bypass hole the
+  directory split OPENS. **Stage 0 must make `check-dataverse-access-layer.js` fail closed on ANY
+  non-exempt import of `lib/services/dynamics/*` regardless of shape** — named import, namespace
+  import, default import, `require()` destructure, dynamic `import()`, and re-export
+  (`export { createRecord } from …`). The Stage-0 self-test matrix must include a FAILING fixture for
+  each of those six shapes, from BOTH a `pages/api/` route and a non-exempt `lib/` file (the
+  access-layer law covers `lib/shared/modules`, not just routes). Verify the matcher empirically
+  against these fixtures; do not post-hoc trust the regex.
 
 ## Behavior-preservation constraints
 
@@ -101,12 +114,21 @@ consolidation with `graph-service.js`'s duplicate `fetchWithTimeout`, and any ad
   `:1408,:1437`; `countRecords` → `this.getPrimaryIdAttribute` `:530`), a "self-call → direct
   import" rewrite would break class-level spies AND the raw-reassignment tests. **Rule: every
   extracted method becomes a module function whose first parameter is the class
-  (`function queryRecords(svc, entitySet, opts)`), and every `this.X(` in a moved body is rewritten
-  to `svc.X(` — nothing else in the body changes. The facade wrapper is
+  (`function queryRecords(svc, entitySet, opts)`), and every class-surface `this.` access in a moved
+  body is rewritten to `svc.` — this covers both CALL edges (`this.getRecord(` → `svc.getRecord(`)
+  AND non-call STATIC-PROPERTY reads (`this.AI_RUN_TASK_TYPES` → `svc.AI_RUN_TASK_TYPES`); nothing
+  else in the body changes. The facade wrapper is
   `static queryRecords(...args) { return readOps.queryRecords(this, ...args); }`.** This is the ONLY
   permitted body rewrite besides C4's cache seam. It preserves spy/reassignment dispatch on every
   sibling edge uniformly and eliminates all compile-time import cycles (modules never import the
-  facade).
+  facade). **The call-only reading of this rule is a known trap** [VERIFIED via read]: `logAiRun`
+  (`:1152-1188`) reads `this.AI_RUN_TASK_TYPES` (`:1155`) and `this.AI_RUN_STATUSES` (`:1160`) as
+  properties, not calls — extracting it to `function logAiRun(svc, …)` while leaving those as `this.*`
+  would dereference an unbound receiver and throw. **Mechanical guard (Stage 0 + every extraction
+  stage): after each extraction, grep the moved module for any surviving `this.` — a module function
+  must contain ZERO `this.` tokens.** Land a `logAiRun` characterization that pins facade-static
+  resolution (`svc.AI_RUN_TASK_TYPES`/`svc.AI_RUN_STATUSES` unknown-key throws) plus `svc.createRecord`
+  dispatch BEFORE the ai-run extraction (Checkpoint F).
 - **C2 — `assertTrustedDalContext` fail-closed sites move verbatim, position-exact.** The 8 call
   sites [VERIFIED via grep]: `createRecord:788`, `updateRecord:826`, `deleteRecord:932`,
   `disassociate:971`, `executeChangeset:1049`, `createEmailActivity:1232`,
@@ -141,9 +163,12 @@ consolidation with `graph-service.js`'s duplicate `fetchWithTimeout`, and any ad
   (`:69`) and the source matcher is `:216`; `check-route-service-boundary.js` matcher is `:67`.
   Without extension, (a) the new modules are un-gated import targets (bypass hole), and (b) nothing
   breaks visibly — the failure mode is silent. Stage 0 must: extend both matchers to
-  `lib/services/dynamics/`, add the dir to access-layer EXEMPT_DIRS, extend BOTH self-tests with a
-  fixture proving a route/lib import of a new module FAILS the gate, and run
-  `check:dataverse-access-layer`, `check:dataverse-access-layer:self-test`,
+  `lib/services/dynamics/`, add the dir to access-layer EXEMPT_DIRS, make the access-layer gate fail
+  closed on ANY non-exempt import shape from `lib/services/dynamics/*` (named / namespace / default /
+  `require()` destructure / dynamic `import()` / re-export — NOT just `DynamicsService`-aliased
+  imports; see Q4 for why source-regex extension alone leaves a named-import hole), extend BOTH
+  self-tests with the six-shape FAILING-fixture matrix from both a route and a non-exempt `lib/` file,
+  and run `check:dataverse-access-layer`, `check:dataverse-access-layer:self-test`,
   `check:route-service-boundary`, `check:route-service-boundary:self-test`. The
   `NON_ENTITY_TRANSPORT_METHODS` closed list (`check-dataverse-access-layer.js:106-111`:
   `createAndSendEmail`, `addEmailAttachment`, `createEmailActivity`, `logAiRun`) keys on method
@@ -296,9 +321,11 @@ touched gates → commit. Leaf-first per the DAG.
 - **Stage 0 — scaffolding + gate extension + mechanical call graph. DEDICATED review.**
   Create `lib/services/dynamics/` with `constants.js` + `http.js` (verbatim moves of `:18-67`,
   `:137-145`, `:1709-1728`); facade imports them. **Same commit:** the C5/Q4 matcher + EXEMPT_DIRS +
-  self-test updates to `check-dataverse-access-layer.js` and `check-route-service-boundary.js`. Run
-  the mechanical per-method call-graph script and replace this plan's hand-built DAG table. Gates
-  tripped: `check:dataverse-access-layer` (+self-test), `check:route-service-boundary` (+self-test),
+  fail-closed-on-all-import-shapes + six-shape self-test matrix updates to
+  `check-dataverse-access-layer.js` and `check-route-service-boundary.js` (see Q4/C5 — a bare named
+  import must FAIL, not just a `DynamicsService`-aliased one). Run the mechanical per-method
+  call-graph script and replace this plan's hand-built DAG table. Gates tripped:
+  `check:dataverse-access-layer` (+self-test), `check:route-service-boundary` (+self-test),
   `check:doc-symbol-refs`, `check:agent-wiki` (add `lib/services/dynamics/**` to the
   dataverse-dynamics topic watch_paths in the same commit). Dedicated review because a bad matcher
   extension silently opens a LAW hole.
