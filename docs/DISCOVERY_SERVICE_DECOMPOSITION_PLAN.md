@@ -203,8 +203,11 @@ review → commit**. Leaf modules first so the facade delegates incrementally an
   coverage), first landed a 25-test characterization suite `tests/unit/discovery-name-matching.test.js`,
   baselined green against pre-extraction code, then mutation-proven (neutralize the nickname branch →
   suite goes red). Post-extraction: 10 suites / 150 tests green; touched gates green; facade 2,290 →
-  2,135 L. [RECHECKED after lib/services/discovery/name-matching.js change: this note describes the
-  committed Stage 1 state — the module exports the 8 functions and the facade delegates each.]
+  2,135 L. Fresh-context Codex review of the diff (`649c9d33` vs `f688dce7`): SATISFIED, no material
+  findings (independently diffed all 8 bodies, ran the 25 characterization cases + an old-vs-current
+  fixture comparison). [RECHECKED after lib/services/discovery/name-matching.js change: this note
+  describes the committed Stage 1 state — the module exports the 8 functions and the facade delegates
+  each.]
 - **Stage 2 — `affiliation.js`** (depends on Stage 1).
 - **Stage 3 — independent leaves, one commit each (or grouped):** `research-area.js`,
   `match-signals.js`, `provenance.js`, `publications.js`, `pubmed-query.js`. None depend on each other.
