@@ -16,7 +16,7 @@ related:
 
 # DynamicsService Decomposition Plan
 
-**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoints A–F pending.** This applies the exact cadence proven on the
+**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stage 1 (`auth.js`) EXECUTED (S339); Stages 2–3 + Checkpoint A batched review pending; Checkpoints B–F pending.** This applies the exact cadence proven on the
 DiscoveryService decomposition (S335) and the ContactEnrichmentService decomposition (S336):
 strategy chosen up front (facade + extracted modules), leaf-first staged extraction, each cluster
 characterization-covered (baselined green pre-extraction, mutation-proven) BEFORE the code moves,
@@ -377,6 +377,21 @@ touched gates → commit. Leaf-first per the DAG.
   `check:doc-symbol-refs`, `check:agent-wiki` (add `lib/services/dynamics/**` to the
   dataverse-dynamics topic watch_paths in the same commit). Dedicated review because a bad matcher
   extension silently opens a LAW hole.
+- **Checkpoint A Stage 1 — `auth.js`. EXECUTED S339 (main checkout, parallel with the Q9 worktree
+  build).** `tokenCache` (module `let`) + `getAccessToken` (static, uses no `this`) moved verbatim
+  to `lib/services/dynamics/auth.js`; the Q3 `resetTokenCache` export created and the facade's
+  `clearCaches` now calls it (schemaCache resets stay inline until Stage 4). Facade keeps a thin
+  `static getAccessToken()` delegating wrapper (mirrors the Stage-0 `buildHeaders` pattern — the
+  module import shadows inside the method body; the ~15 internal `this.getAccessToken()` sites and 8
+  test spies on `DynamicsService.getAccessToken` unchanged). Characterization added FIRST
+  (`tests/unit/dynamics-service-auth.test.js`: caching reuse, 60s pre-expiry refresh, still-valid
+  no-refresh, missing-env forced non-transient) — green pre-extraction, green post. Verified: full
+  suite **4957/4957**; `check:dataverse-access-layer` + `check:dynamics-context-boundary` green
+  (599 files, 0 violations, now incl. `auth.js`); semgrep `.semgrep/token-audit.yaml` 0 findings on
+  `auth.js` (C14). **BATCHED review still pending** — runs after Stages 2–3 land.
+  - [RECHECKED after lib/services/dynamics/auth.js create: S339 — verbatim `getAccessToken` + `tokenCache` + new `resetTokenCache`; deps http/constants/service-error; semgrep token-audit 0 findings; suite 4957/4957]
+  - [RECHECKED after lib/services/dynamics-service.js change: S339 — facade rewired (`getAccessToken` delegate + `resetTokenCache` in `clearCaches`), behavior-freeze; no stray `tokenCache` ref; suite green]
+  - Note: this extraction shifts `dynamics-service.js` line numbers below the old auth block up by ~48; the Q9 plan's `dynamics-service.js` line citations (method-name-anchored) are reconciled at the Q9 worktree merge, not mid-flight.
 - **Checkpoint A — leaf batch. BATCHED review.** Stage 1 `auth.js` (+ `resetTokenCache`, C4/C14;
   add characterization for token caching/expiry/missing-env non-transient error), Stage 2
   `restrictions.js` (C3; add characterization for no-context throw, table/field/expand restriction
