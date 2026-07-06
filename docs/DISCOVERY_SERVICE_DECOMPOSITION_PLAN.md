@@ -273,6 +273,9 @@ review → commit**. Leaf modules first so the facade delegates incrementally an
   `discovery-track-b-mapping.test.js` (3) — mutation-proven; merge/partition/gradeCoauthorCOI/rank kept
   their existing `discovery-track-b-identity.test.js` coverage. 190 existing + 15 new tests green;
   touched gates green; facade 1,455 → 962 L (**2,348 → 962 overall, ~59%**).
+  Fresh-context Codex review (`4c7b83cc` vs `2bf03915`): SATISFIED, no material findings — all 13
+  bodies identical, C1 pass-through / Q3 placement / lazy-require paths / author selection / ranking /
+  Track-B mapping / surface / no-cycle all held (eslint clean).
   [RECHECKED after lib/services/discovery/track-b-identity.js lib/services/discovery/coauthor-coi.js lib/services/discovery/literature-search.js lib/services/discovery/ranking.js change: this note describes the committed Stage 4 state — each module exports its functions and the facade delegates each.]
 - **Stage 5 — `verification.js`** (the hub; depends on Stages 1–4). The 272-line
   `verifyClaudeSuggestions` is the single most delicate move — extract last, with the constant
