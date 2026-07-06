@@ -14,10 +14,11 @@ related:
 
 # DiscoveryService Decomposition Plan
 
-**Status: STAGES 0–3 EXECUTED (S335) — plan approved via two Codex adversarial-review rounds; 8
+**Status: STAGES 0–4 EXECUTED (S335) — plan approved via two Codex adversarial-review rounds; 12
 modules extracted behind the facade (`constants`, `name-matching`, `affiliation`, `research-area`,
-`pubmed-query`, `match-signals`, `provenance`, `publications`); facade 2,348 → 1,455 L. Stages 4–6
-pending (Stage 3 Codex review next). See stage notes.**
+`pubmed-query`, `match-signals`, `provenance`, `publications`, `track-b-identity`, `coauthor-coi`,
+`literature-search`, `ranking`); facade 2,348 → 962 L (~59%). Stages 5–6 pending (Stage 4 Codex review
+next; Stage 5 `verification.js` is the delicate hub). See stage notes.**
 
 All material claims below are grounded in artifacts produced THIS session — the mechanically-computed
 internal call graph (a script over `lib/services/discovery-service.js`), a `grep -a` whole-repo caller
@@ -260,8 +261,19 @@ review → commit**. Leaf modules first so the facade delegates incrementally an
   facade delegates each.] **Stage 3 Codex review (both batches, `dcfb8483..5e112eb9`): SATISFIED, no
   material findings** — all 23 methods verified body-identical, facade surface intact, statics still
   exposed, no require cycle, old-vs-new runtime samples matched.
-- **Stage 4 — mid-tier:** `literature-search.js`, `track-b-identity.js`, `coauthor-coi.js`,
-  `ranking.js`.
+- **Stage 4 — mid-tier. ✅ EXECUTED (S335).** Extracted 4 modules (13 methods):
+  `track-b-identity.js` (`partitionByPublicationBar` — `MIN_PUBLICATIONS` passed in by the facade per
+  C1 —, `resolveTrackBIdentities`, `mapTrackBIdentityResult`, `mergeTrackBWithNeedsReviewBySharedOrcid`),
+  `coauthor-coi.js` (`gradeCoauthorCOI` [moved here per Q3], `checkCoauthorHistory`,
+  `toPubMedAuthorFormat`, `checkCoauthorshipsForCandidates`), `literature-search.js` (the 4 dormant
+  Track-B `search*` methods; bioRxiv/chemRxiv lazy-`require` paths adjusted to `../`), `ranking.js`
+  (`rankAllCandidates`, `countRecentPublications` imported from `./publications`). Internal `this.X` →
+  direct calls; facade delegates all 13. Per Q2, added characterization for the untested methods —
+  `discovery-coauthor-coi.test.js` (8), `discovery-literature-search.test.js` (4, all services mocked),
+  `discovery-track-b-mapping.test.js` (3) — mutation-proven; merge/partition/gradeCoauthorCOI/rank kept
+  their existing `discovery-track-b-identity.test.js` coverage. 190 existing + 15 new tests green;
+  touched gates green; facade 1,455 → 962 L (**2,348 → 962 overall, ~59%**).
+  [RECHECKED after lib/services/discovery/track-b-identity.js lib/services/discovery/coauthor-coi.js lib/services/discovery/literature-search.js lib/services/discovery/ranking.js change: this note describes the committed Stage 4 state — each module exports its functions and the facade delegates each.]
 - **Stage 5 — `verification.js`** (the hub; depends on Stages 1–4). The 272-line
   `verifyClaudeSuggestions` is the single most delicate move — extract last, with the constant
   pass-through (C1) and the `this.`→import rewrite (C3) under the most scrutiny.
