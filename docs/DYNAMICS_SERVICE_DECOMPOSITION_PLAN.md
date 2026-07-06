@@ -416,9 +416,9 @@ touched gates → commit. Leaf-first per the DAG.
   picklist maps + retention plumbing (characterize truncation marker math `:1194-1198` and
   unknown-taskType/status throws); then dead-import cleanup, confirm facade ≈260 L, full suite +
   ALL FIVE law gates + `check:doc-currency`/`check:agent-wiki`/`check:doc-symbol-refs`, update this
-  plan's status header, `/sweep` the fact-level restatements (agent-wiki topic cites
-  "5 assertTrustedDalContext call sites in lib/services/dynamics-service.js" at
-  `docs/agent-wiki/topics/dataverse-dynamics.md:52-53` — that count and path must be reconciled).
+  plan's status header, `/sweep` the fact-level restatements (the agent-wiki assert-site count was
+  corrected 5→8 in `docs/agent-wiki/topics/dataverse-dynamics.md` S338, commit `426463c` — 8 in
+  dynamics-service.js + 1 in `core/changeset.js:97`; re-verify at finalize).
 
 If any checkpoint review returns a BLOCKER, that checkpoint converges (fold → re-review) before the
 next begins.
