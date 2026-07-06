@@ -466,8 +466,9 @@ Owner reviewed all nine; **defaults adopted on Q1–Q8, Q9 reversed to migrate.*
   and two entry points are on the auth hot path (`listAppKeysForUser` via
   `lib/utils/auth.js`; `grantDefaultApps` on sign-in), the Q4/step-2 context wrap is
   a HARD PREREQUISITE of the transport swap — wrap each caller before moving it, or
-  it throws in production. Detailed staged migration plan tracked separately
-  (S339 Fable draft → owner/Claude review before execution).
+  it throws in production. Detailed staged migration plan:
+  `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md` (S339 Fable draft, Claude-verified; P-1
+  sandbox-URL precondition CLEARED via `vercel env ls`; pending Codex review before execution).
 
 ---
 

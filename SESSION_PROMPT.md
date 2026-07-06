@@ -78,7 +78,8 @@ bypasses were found and closed** before any further extraction.
    into a DAL wave (adapters → DynamicsService) for the single-transport end-state. Consequence: the
    Q4/step-2 context wrap is now a hard prerequisite of the transport swap (DynamicsService reads throw
    on missing context; `listAppKeysForUser` + `grantDefaultApps` are on the auth hot path). Staged
-   migration plan drafted separately (Fable, S339) → pending Claude/owner review before execution.
+   migration plan: `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md` (Fable draft, Claude-verified;
+   P-1 sandbox-URL precondition CLEARED via `vercel env ls`; pending Codex review before execution).
 
 ### Do Not Reopen Without New Decision
 

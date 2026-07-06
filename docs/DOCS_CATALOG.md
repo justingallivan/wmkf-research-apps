@@ -69,6 +69,7 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [DATA_ACCESS_LAYER_MIGRATION_PLAN.md](DATA_ACCESS_LAYER_MIGRATION_PLAN.md) | plan | active |  | Ratchet-gated migration of raw/aliased DynamicsService callers into per-entity adapters; ends fail-closed. Approved S328; amended after S329 Codex review. | 2026-07-04 |
+| [Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md](Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md) | plan | active |  | Staged migration of prefs + app-access off client.js into DynamicsService adapters (DAL-plan Stage 9 Q9). Wrap-before-swap; prefs first, app-access last. | 2026-07-06 |
 
 ## dataverse
 
