@@ -16,8 +16,8 @@ related:
 # ContactEnrichmentService Decomposition Plan
 
 **Status: IN PROGRESS (S337) — plan authored + 3 Codex review rounds folded; Stage 0 + Checkpoint A
-(Stages 1, 2, 4, 7) + Checkpoint A2 (Stage 6) + Checkpoint B (Stages 3, 5) EXECUTED; Checkpoint C (8) +
-D (9, 10) pending.** This applies the exact
+(Stages 1, 2, 4, 7) + Checkpoint A2 (Stage 6) + Checkpoint B (Stages 3, 5) + Stage 8 (Checkpoint C)
+EXECUTED; the Checkpoint C dedicated Codex review + Stage 9/10 (Checkpoint D) pending.** This applies the exact
 cadence proven on the DiscoveryService decomposition (S335, `docs/DISCOVERY_SERVICE_DECOMPOSITION_PLAN.md`):
 strategy chosen up front (facade + extracted modules), then leaf-first staged extraction, each cluster
 characterization-covered (baselined green pre-extraction, mutation-proven) BEFORE the code moves, each
@@ -375,6 +375,18 @@ modules first so the facade delegates incrementally and the DAG never breaks. Th
   [RECHECKED after lib/services/contact-enrichment/cost.js change: matches committed Stage 7 (`c9939dc9`).]
 - **Stage 8 — `persistence.js`** (the DAL write unit; C5). **Highest scrutiny + the three LAW gates.**
   Land last of the leaves so the write path moves as an isolated, independently reviewed step.
+  **✅ EXECUTED (S337, `d79f1494`).** `saveToDatabase` + `_fieldPersistAllowed` moved verbatim (the
+  `withDalContext('contact-enrichment-save', …)` wrapper, both adapter calls, the partial-failure log
+  contract, and the identity-gate blocks all intact); facade delegates both, preserving
+  `jest.spyOn(ContactEnrichmentService, 'saveToDatabase')` and `this.saveToDatabase`/
+  `this._fieldPersistAllowed` self-calls (C10). `persistence.js` imports the adapters but does not
+  re-export them (`module.exports = { fieldPersistAllowed, saveToDatabase }`). Baselined 247 tests green
+  pre-extraction; mutation-proven the identity gate (neutered `blockByIdentity` → 1 failure in
+  `save-to-database-identity-gate.test.js`; reverted → green). Post-extraction: same 247 tests green;
+  eslint clean; all three LAW gates green with 0 violations
+  (`check:dataverse-access-layer`, `check:route-service-boundary`, `check:dynamics-context-boundary`);
+  `check:doc-symbol-refs` green. Dedicated Checkpoint C Codex review still pending.
+  [RECHECKED after lib/services/contact-enrichment/persistence.js change: matches committed Stage 8 (`d79f1494`).]
 - **Stage 9 — `tiers.js` (Q1-B tier extraction; C9). The single highest-risk stage.** Only after every
   leaf it depends on (Stages 1–8) is extracted and green. First enumerate all early-return/short-circuit
   paths (C9) and land a mutation-proven characterization suite covering every tier's found/not-found
