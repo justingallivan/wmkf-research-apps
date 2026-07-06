@@ -321,11 +321,14 @@ const SURFACES = [
     callSiteFiles: ['lib/services/execute-prompt.js'],
   },
   {
-    // Service-local prompt — wrap + preamble live in the service.
+    // Service-local prompt — wrap + preamble live in the service. Stage 6 of
+    // the ContactEnrichmentService decomposition moved claudeWebSearch (and
+    // both markers) to the search-tiers cluster; the facade is now a thin
+    // delegating wrapper with no markers of its own.
     id: 'contact-enrichment',
     inv: 21,
     status: 'migrated',
-    callSiteFiles: ['lib/services/contact-enrichment-service.js'],
+    callSiteFiles: ['lib/services/contact-enrichment/search-tiers.js'],
   },
   {
     id: 'reviewer-finder-emails',
