@@ -191,18 +191,18 @@ Dataverse services. The migration swaps the two services' *internals*; no route 
   `DATAVERSE_DAL_UNIVERSAL` to `warn`→`on` for that tail on the same schedule, or leave until
   those waves land? (This plan only *requires* `warn`.)
 - **OQ-4:** Pin-test rewrite consent per 1.4.4 (S331 ruling artifact).
-- **OQ-5 (blocking Stage 4; Codex re-review P1):** `listAllGrantsForAdmin` is an unfiltered
-  full-entity pull that NO DynamicsService read primitive supports (`queryRecords` and
-  `queryAllRecords` both reject unfiltered — `dynamics-service.js:405-406,:591-592`). Choose the
-  read path: **(a)** add a bounded admin-list primitive to DynamicsService (e.g.
-  `queryAllRecords` variant that permits an explicit "admin, no-filter, capped 5000" mode behind
-  the same restriction/context check) — cleanest for full retirement; **(b)** keep ONLY
-  `listAllGrantsForAdmin` on `client.js` behind the standing universal guard (partial migration —
-  writes + per-user reads move, admin-list stays) — pragmatic but `client.js` not fully retired;
-  **(c)** reshape the admin view to page per-user via `listByUser` (N calls) — likely too slow.
-  Recommendation to owner: **(a)** if full `client.js` retirement is the goal of the Q9 reversal;
-  **(b)** if not. This is a DynamicsService-surface change, so it also interacts with the
-  decomposition (§6).
+- **OQ-5 — RESOLVED (2026-07-06/S339): option (a) — add a bounded admin-list primitive to
+  DynamicsService.** `listAllGrantsForAdmin` is an unfiltered full-entity pull that no current
+  read primitive supports (`queryRecords` throws on unfiltered `>25`; `queryAllRecords` requires a
+  filter — `dynamics-service.js:405-406,:591-592`). Owner chose to add the primitive (not keep
+  `listAll` on `client.js`), consistent with the Q9 reversal's goal of full `client.js`
+  retirement. Design (Stage 4 step 0): a `queryAllRecordsAdmin(entitySet, {select, orderby})`
+  (name TBD at build) that permits an explicit no-filter pull, reuses the SAME
+  `checkRestriction` context guard as the other reads, walks `@odata.nextLink`, and caps at
+  `MAX_EXPORT_RECORDS` (5000) — i.e. `queryAllRecords` minus the filter requirement, gated so ONLY
+  an explicit admin call reaches it. This is a DynamicsService-surface addition → coordinate with
+  the decomposition (§6): it lands in the facade before Checkpoint A extracts read-ops, or in
+  `read-ops`/`http` if it lands after.
 
 ---
 
@@ -396,14 +396,15 @@ dynamics-service.js:398-407,:590-593]`) — two distinct cases:**
   id; bounded by the app-definition count — a dozen-ish, far under any cap) → `queryRecords` is
   safe for the single-row find; use `queryAllRecords` (filtered) for `listByUser` to be
   truncation-proof.
-- **`listAllGrantsForAdmin` is the BLOCKER.** It is a deliberately UNFILTERED full-entity pull
-  (`dataverse-app-access-service.js:71-75`, `$top=5000`, all grants across all users). BOTH
-  DynamicsService read primitives reject it: `queryRecords` throws (`!filter && top>25`,
-  `:405-406`) and `queryAllRecords` throws on the missing filter (`:591-592`, "unfiltered
-  full-table dumps are not allowed"). There is **no existing primitive** for an unfiltered admin
-  pull — by design. This makes app-access migration NOT a mechanical swap. **Resolve OQ-5 before
-  Stage 4** (see §1.6). Do not begin the app-access swap until the `listAll` read path has an
-  agreed primitive.
+- **`listAllGrantsForAdmin` needs a new read primitive (OQ-5 RESOLVED → option a).** It is a
+  deliberately UNFILTERED full-entity pull (`dataverse-app-access-service.js:71-75`, `$top=5000`,
+  all grants across all users). BOTH current DynamicsService read primitives reject it:
+  `queryRecords` throws (`!filter && top>25`, `:405-406`) and `queryAllRecords` throws on the
+  missing filter (`:591-592`). **Stage 4 step 0 (before the swap):** add the bounded admin
+  primitive per OQ-5 (`queryAllRecordsAdmin` or similar — no-filter allowed, same
+  `checkRestriction` guard, `@odata.nextLink`, 5000 cap) with its own unit test, then route the
+  adapter's `listAll` through it. Do not begin the caller swap until that primitive is in and
+  tested. Coordinate the DynamicsService addition with the decomposition (§6).
 
 Extra rigor for the hot path:
 - Preview E2E BEFORE prod: fresh sign-in (new profile → default grants → landing page), plus an
@@ -455,7 +456,7 @@ adapter attribution with zero new violations.
 | **Auth-path silent lockout** (highest) | post-swap missing context → `checkRestriction` throw → caught → `[]` → every user "Access Not Available"; NOT a 500, so no error-rate alarm | Stage-1 wrap of `requireAppAccess` lands first and is warn-observed (Stage 2) against the SAME ALS predicate DynamicsService uses; app-access swapped LAST (Stage 4) after prefs proves the pattern; explicit log-scan trigger on `[dataverse-app-access]` error lines; single-commit revert |
 | ~~Sandbox-URL repoint~~ **RESOLVED** | services' `SANDBOX \|\| URL` fallback vs DynamicsService's `DYNAMICS_URL` | **CLOSED S339: no `DYNAMICS_SANDBOX_URL` in any Vercel env `[VERIFIED via vercel env ls]` → fallback is dead code, swap URL-neutral.** Delete the dead fallback during each swap |
 | Ownership-binding regression | different create path | bind keys pass through `createRecord` body verbatim (`dynamics-service.js:758-763` [VERIFIED]); characterization asserts body bytes; never pass `actingUserSystemId` |
-| **List reads truncate/throw through `queryRecords`** (Codex re-review P1, CONFIRMED) | `queryRecords` caps `$top≤100`, defaults 25, throws on unfiltered>25 (`dynamics-service.js:398-407`); per-user prefs list has no `$top`, admin `listAll` is unfiltered `$top=5000` | per-user lists use filtered `queryAllRecords`; `listAll` has NO primitive → **OQ-5** blocks Stage 4 until resolved; char-tests with >25 prefs / bulk grants |
+| **List reads truncate/throw through `queryRecords`** (Codex re-review P1, CONFIRMED) | `queryRecords` caps `$top≤100`, defaults 25, throws on unfiltered>25 (`dynamics-service.js:398-407`); per-user prefs list has no `$top`, admin `listAll` is unfiltered `$top=5000` | per-user lists use filtered `queryAllRecords`; `listAll` gets a new bounded admin primitive (OQ-5 RESOLVED → option a, Stage 4 step 0); char-tests with >25 prefs / bulk grants |
 | **Prompt-override silently stops applying** (Codex P1, CONFIRMED) | `reviewer-prompt-resolver` override read is bare → post-swap throws → caught → `null` → `overrideUsed:false`, no error | **1h** wraps the read at the service layer + an `overrideUsed:true`-survives-swap test; analyze/discover added to the Stage-2 warn exercise |
 | Missed read path (email-signature transitive callers, crons) | reads throw unconditionally | Stage 1g per-site verification with recorded verdicts; Stage-2 warn logs from the 1f read probes catch anything the static trace missed |
 | Pin-test erosion (S331 ruling) | `findRow` signature change | behavior-level pin re-established at adapter level (TypeError + zero transport calls); owner flagged (OQ-4) |
@@ -543,5 +544,12 @@ change needed (client.js path has no context requirement; `warn` flag tolerates 
     per-user lists + char-tests >25; **new OQ-5** blocks Stage 4 until the `listAll` read path is
     decided (add a bounded admin primitive vs. keep only `listAll` on `client.js`).
   - Stage 1h and Stage 2.5 confirmed correct as written; no regression.
+- **2026-07-06 (S339) — OQ-5 resolved by owner; plan is EXECUTION-READY.** Owner chose option (a):
+  add a bounded admin-list primitive to DynamicsService for `listAllGrantsForAdmin` (full
+  `client.js` retirement, matching the Q9 reversal goal). Folded into OQ-5, Stage 4 step 0, and
+  the risk table. All open blockers now resolved (P-1 cleared; OQ-1 closed; OQ-5 decided). OQ-2
+  (warn window) and OQ-4 (S331 pin-test consent) remain execution-time confirmations, not
+  blockers. Per owner: **no further Codex review before build; Codex reviews the implementation
+  after the build.** Next actor: build executor, starting Stage 1.
 
 No decomposition checkpoint is a prerequisite; only avoid interleaving commits with it.

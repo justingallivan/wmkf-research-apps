@@ -78,8 +78,12 @@ bypasses were found and closed** before any further extraction.
    into a DAL wave (adapters → DynamicsService) for the single-transport end-state. Consequence: the
    Q4/step-2 context wrap is now a hard prerequisite of the transport swap (DynamicsService reads throw
    on missing context; `listAppKeysForUser` + `grantDefaultApps` are on the auth hot path). Staged
-   migration plan: `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md` (Fable draft, Claude-verified;
-   P-1 sandbox-URL precondition CLEARED via `vercel env ls`; pending Codex review before execution).
+   migration plan `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md` is **EXECUTION-READY** (S339):
+   Fable draft, Claude-verified, TWO Codex adversarial rounds (REFUTED→patched→SOUND-WITH-FIXES),
+   all blockers resolved — P-1 cleared (`vercel env ls`), OQ-1 closed, OQ-5 resolved (add a bounded
+   admin-list primitive for `listAllGrantsForAdmin`; full `client.js` retirement). Owner ruling: no
+   further Codex review before build; **Codex reviews the implementation after the build.** Next
+   actor: build executor, starting Stage 1 (context wraps incl. the confirmed 1h resolver fix).
 
 ### Do Not Reopen Without New Decision
 
