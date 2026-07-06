@@ -20,6 +20,7 @@ canonical_docs:
   - docs/DATAVERSE_POWER_TOOLS_DESIGN.md
 watch_paths:
   - lib/services/dynamics-service.js
+  - lib/services/dynamics/**
   - lib/services/dynamics-context.js
   - lib/services/dynamics-odata-validator.js
   - lib/services/dynamics-identity-service.js

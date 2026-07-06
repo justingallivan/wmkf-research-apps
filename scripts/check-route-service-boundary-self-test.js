@@ -83,6 +83,8 @@ const RED_ROUTES = [
   'pages/api/cron/red-cjs-reexport.js',
   'pages/api/workbench/red-late-assign.js',
   'pages/api/admin/red-alias-chain.js',
+  // S338 Stage 0 (Q4/C5): lib/services/dynamics/ submodule matcher extension.
+  'pages/api/review-manager/red-dynamics-submodule.js',
 ];
 
 const GREEN_ROUTES = [
@@ -91,6 +93,8 @@ const GREEN_ROUTES = [
   'pages/api/dynamics-explorer/chat.js',
   'pages/api/dataverse-export/thing.js',
   'pages/api/review-manager/green-own-wrapper.js',
+  // S338 Stage 0: exempt route dir still passes with a dynamics/ submodule import.
+  'pages/api/dynamics-explorer/chat-submodule.js',
 ];
 
 // Disposer from the shared helper (cleans a prior orphan at registration and
@@ -268,6 +272,21 @@ function setupFixtures() {
   write(tempRoot, 'pages/api/dataverse-export/thing.js', `
     import { DynamicsService } from '../../../lib/services/dynamics-service.js';
     export default function handler() { return DynamicsService.queryRecords(); }
+  `);
+
+  // (v) S338 Stage 0 (Q4/C5): direct named import from the new
+  // lib/services/dynamics/ submodule directory -- the boundary-source matcher
+  // extension must catch this the same as a dynamics-service.js import.
+  write(tempRoot, 'pages/api/review-manager/red-dynamics-submodule.js', `
+    import { createRecord } from '../../../lib/services/dynamics/write-core.js';
+    export default function handler(req, res) { return createRecord('contacts', {}); }
+  `);
+
+  // GREEN: exempt route dir still passes with a dynamics/ submodule import,
+  // confirming EXEMPT_ROUTE_DIRS is unaffected by the matcher extension.
+  write(tempRoot, 'pages/api/dynamics-explorer/chat-submodule.js', `
+    import { createRecord } from '../../../lib/services/dynamics/write-core.js';
+    export default function handler() { return createRecord('contacts', {}); }
   `);
 }
 

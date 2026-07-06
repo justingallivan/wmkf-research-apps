@@ -67,12 +67,20 @@ function isDynamicsServiceSource(value) {
   return typeof value === 'string' && /(?:^|\/)dynamics-service(?:\.js)?$/.test(value);
 }
 
+// S338 Stage 0 (Q4/C5): the decomposition submodules are as much the
+// Dataverse boundary as dynamics-service.js itself; a route importing
+// lib/services/dynamics/write-core.js directly is the same bypass as
+// importing the facade.
+function isDynamicsSubmoduleSource(value) {
+  return typeof value === 'string' && /(?:^|\/)lib\/services\/dynamics\//.test(value);
+}
+
 function isAdapterSource(value) {
   return typeof value === 'string' && /(?:^|\/)lib\/dataverse\/adapters\/[^/]+/.test(value);
 }
 
 function isBoundarySource(value) {
-  return isAdapterSource(value) || isDynamicsServiceSource(value);
+  return isAdapterSource(value) || isDynamicsServiceSource(value) || isDynamicsSubmoduleSource(value);
 }
 
 function parseArgs(argv) {
@@ -405,6 +413,7 @@ function analyzeRoot(root) {
     const matchPath = resolved || spec;
     if (isAdapterSource(matchPath)) return 'adapter';
     if (isDynamicsServiceSource(matchPath)) return 'dynamics';
+    if (isDynamicsSubmoduleSource(matchPath)) return 'dynamics';
     return null;
   }
 

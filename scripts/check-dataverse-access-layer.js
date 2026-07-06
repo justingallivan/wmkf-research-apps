@@ -78,6 +78,12 @@ const EXEMPT_DIRS = [
   'lib/services/dataverse-export/',
   'lib/dataverse/core/',
   'lib/dataverse/adapters/',
+  // DynamicsService decomposition (S338 Stage 0): the extracted submodules
+  // legitimately contain Dataverse transport primitives; they are the DAL
+  // internals now, same status as lib/dataverse/core/. Files here import each
+  // other freely. Non-exempt importers of this directory are caught below by
+  // auditDynamicsSubmoduleImports (source-based, fail-closed).
+  'lib/services/dynamics/',
 ];
 
 const ENTITY_ARG_METHODS = new Set([
@@ -214,6 +220,97 @@ function parseFile(source, rel) {
 
 function isDynamicsModuleSource(value) {
   return typeof value === 'string' && /(?:^|\/)dynamics-service(?:\.js)?$/.test(value);
+}
+
+// S338 Stage 0 (Q4/C5): decomposition submodule directory. Source-string match
+// only — deliberately NOT alias-gated like isDynamicsModuleSource above, so it
+// catches every import shape (named, namespace, default, require, dynamic
+// import, re-export) regardless of what binding name the importer chooses.
+// A bare `import { createRecord } from '.../dynamics/write-core.js'` would
+// register no alias under collectImportAndRequireAliases and would otherwise
+// slip the census entirely; this predicate + auditDynamicsSubmoduleImports
+// below is the fail-closed backstop for that hole.
+// Resolution-based submodule matcher (S338 Q4/C5, Lead directive). The raw AST
+// source specifier only MEANS a module location after resolution against the
+// importer's directory — matching the unresolved string fails for the relative
+// forms a non-exempt lib/services sibling would actually write
+// (`import { x } from './dynamics/http.js'`). So:
+//   - LOCAL specifier (starts with '.'): pure path-math resolve to a repo-rel
+//     POSIX path (no disk access, so self-test fixtures resolve too), then flag
+//     if it is exactly lib/services/dynamics or under it.
+//   - NON-relative (bare / root-relative): keep the literal-substring test as a
+//     fallback covering any root-relative form.
+// `root` is the scan root; `rel` is the importing file's repo-relative path.
+function isDynamicsSubmoduleTarget(source, root, rel) {
+  if (typeof source !== 'string' || source.length === 0) return false;
+  if (source.startsWith('.')) {
+    const importerDir = path.dirname(path.join(root, rel));
+    const resolved = path.relative(root, path.resolve(importerDir, source))
+      .split(path.sep)
+      .join('/');
+    return resolved === 'lib/services/dynamics' || resolved.startsWith('lib/services/dynamics/');
+  }
+  return /(?:^|\/)lib\/services\/dynamics\//.test(source);
+}
+
+// Fail-closed audit (S338 Q4/C5): flags ANY non-exempt file's import of
+// lib/services/dynamics/* regardless of specifier/binding shape OR specifier
+// form (relative vs root-relative). Exempt files/dirs (EXEMPT_FILES/EXEMPT_DIRS,
+// including the new lib/services/dynamics/ dir itself) never reach analyzeFile,
+// so this only ever fires for genuinely non-exempt importers — see
+// collectFiles/isExemptRel. Entity is a distinct string (never
+// 'non-entity-transport'), so the violations filter in report()
+// (entity !== 'non-entity-transport') always flags it — no allowlist path.
+function auditDynamicsSubmoduleImports(ast, root, rel, entries) {
+  const emitted = new WeakSet();
+  const emit = (node) => {
+    emitOnce(entries, emitted, makeEntry({
+      rel,
+      entity: 'dynamics-submodule-import',
+      method: 'import',
+      line: nodeLine(node),
+      client: 'lib/services/dynamics',
+      kind: 'dynamics-submodule-import',
+    }), node);
+  };
+  const matches = (source) => isDynamicsSubmoduleTarget(source, root, rel);
+
+  walkAst(ast, (node) => {
+    // import ... from './dynamics/x.js' — named, default, and namespace
+    // specifiers are all covered by matching the (resolved) source, not the
+    // specifier shape.
+    if (node.type === 'ImportDeclaration' && node.source && matches(node.source.value)) {
+      emit(node);
+      return;
+    }
+
+    // export { x } from '...' / export * from '...' (re-export)
+    if ((node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration')
+      && node.source
+      && matches(node.source.value)) {
+      emit(node);
+      return;
+    }
+
+    // require('./dynamics/x.js') in any shape (destructure, bare, etc.).
+    // NOTE: the file-scope isRequireCall is bound to the dynamics-service
+    // source matcher, so it can't be reused here — detect a require() call
+    // shape directly and let `matches` (resolution-based) do the targeting.
+    if (node.type === 'CallExpression'
+      && node.callee.type === 'Identifier'
+      && node.callee.name === 'require'
+      && node.arguments.length > 0
+      && matches(stringLiteralValue(node.arguments[0]))) {
+      emit(node);
+      return;
+    }
+
+    // dynamic import('./dynamics/x.js')
+    const importSource = importCallSourceNode(node);
+    if (importSource && matches(stringLiteralValue(importSource))) {
+      emit(node);
+    }
+  });
 }
 
 function isDynamicsServiceSourceMember(node) {
@@ -1068,6 +1165,7 @@ function analyzeFile(root, fullPath) {
   const entries = [];
 
   entries.push(...auditUnattributableUses(ast, ctx, rel, parentMap));
+  auditDynamicsSubmoduleImports(ast, root, rel, entries);
 
   walkAst(ast, (node) => {
     if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return;

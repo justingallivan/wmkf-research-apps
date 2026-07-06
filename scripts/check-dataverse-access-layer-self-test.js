@@ -662,6 +662,121 @@ function runLawDynamicImportDirectGreenAssertion() {
   expectGreen('resolvable awaited dynamic-import direct call passes');
 }
 
+// S338 Stage 0 (Q4/C5): six-shape fail-closed matrix for the new
+// lib/services/dynamics/ directory, proving the source-based
+// auditDynamicsSubmoduleImports backstop — not just the alias-gated
+// unattributable-use paths above, which a bare named import slips past.
+const DYNAMICS_SUBMODULE_SHAPE_FILES = (importPath) => ({
+  'named.js': `
+    import { createRecord } from '${importPath}';
+    export default async function useIt() { return createRecord; }
+  `,
+  'namespace.js': `
+    import * as writeCore from '${importPath}';
+    export default async function useIt() { return writeCore; }
+  `,
+  'default.js': `
+    import writeCore from '${importPath}';
+    export default async function useIt() { return writeCore; }
+  `,
+  'require.js': `
+    export default async function useIt() {
+      const { createRecord } = require('${importPath}');
+      return createRecord;
+    }
+  `,
+  'dynamic-import.js': `
+    export default async function useIt() {
+      const { createRecord } = await import('${importPath}');
+      return createRecord;
+    }
+  `,
+  'reexport.js': `
+    export { createRecord } from '${importPath}';
+  `,
+});
+
+function runLawDynamicsSubmoduleRouteMatrixAssertion() {
+  cleanup();
+
+  const shapes = DYNAMICS_SUBMODULE_SHAPE_FILES('../../lib/services/dynamics/write-core.js');
+  const files = [];
+  for (const [suffix, body] of Object.entries(shapes)) {
+    const rel = `pages/api/dynamics-submodule-${suffix}`;
+    write(tempRoot, rel, body);
+    files.push(rel);
+  }
+
+  expectRed('route-level dynamics submodule import fails for all six shapes', (output) => {
+    for (const rel of files) {
+      expect(output.includes(rel), `expected violation for ${rel}, got:\n${output}`);
+    }
+    expect(output.includes('dynamics-submodule-import'), output);
+  });
+}
+
+function runLawDynamicsSubmoduleLibMatrixAssertion() {
+  cleanup();
+
+  // RELATIVE-form matrix (the real bypass the resolution-based matcher closes).
+  // A non-exempt lib/bill/ sibling reaches the submodule via
+  // '../services/dynamics/write-core.js' — a specifier that does NOT contain
+  // the literal 'lib/services/dynamics/' substring; only resolution against the
+  // importer's directory reveals its target. All six shapes must fail.
+  const shapes = DYNAMICS_SUBMODULE_SHAPE_FILES('../services/dynamics/write-core.js');
+  const files = [];
+  for (const [suffix, body] of Object.entries(shapes)) {
+    const rel = `lib/bill/dynamics-submodule-${suffix}`;
+    write(tempRoot, rel, body);
+    files.push(rel);
+  }
+
+  expectRed('non-exempt lib/ dynamics submodule RELATIVE import fails for all six shapes', (output) => {
+    for (const rel of files) {
+      expect(output.includes(rel), `expected violation for ${rel}, got:\n${output}`);
+    }
+    expect(output.includes('dynamics-submodule-import'), output);
+  });
+}
+
+// The exact Lead-probe form: a non-exempt lib/services/ sibling reaching a
+// submodule via the single-dot './dynamics/*' specifier (distinct resolution
+// case from the '../services/...' matrix above). Must fail.
+function runLawDynamicsSubmoduleSiblingDotSlashAssertion() {
+  cleanup();
+
+  write(tempRoot, 'lib/services/probe-sibling.js', `
+    import { fetchWithTimeout } from './dynamics/http.js';
+    export default async function h() { return fetchWithTimeout; }
+  `);
+
+  expectRed('lib/services sibling ./dynamics import fails', (output) => {
+    expect(output.includes('lib/services/probe-sibling.js'), output);
+    expect(output.includes('dynamics-submodule-import'), output);
+  });
+}
+
+function runLawDynamicsSubmoduleExemptGreenAssertion() {
+  cleanup();
+
+  // Exempt dir (a sibling submodule importing another submodule) and the
+  // exempt facade file both importing lib/services/dynamics/* must still pass
+  // — the fail-closed audit only fires for non-exempt importers.
+  write(tempRoot, 'lib/services/dynamics/schema.js', `
+    import { buildHeaders } from './http.js';
+    export function getEntityDefinitions() { return buildHeaders; }
+  `);
+
+  write(tempRoot, 'lib/services/dynamics-service.js', `
+    import { buildHeaders } from './dynamics/http.js';
+    export class DynamicsService {
+      static buildHeaders(token) { return buildHeaders(token); }
+    }
+  `);
+
+  expectGreen('exempt dynamics/ submodule and facade importing dynamics/ pass');
+}
+
 function runLiveParseAssertion() {
   const output = execSync(`node ${JSON.stringify(gate)} --report`, {
     cwd: repoRoot,
@@ -684,7 +799,8 @@ function parseMode(argv) {
       + 'extracted-method, bound-method, client-argument, computed-concat, '
       + 'dynamic-import-unresolved, esm-source-reexport, cjs-require-reexport, '
       + 'cjs-object-reexport, inline-require-attributed, inline-require-computed, '
-      + 'esm-namespace-reexport, cjs-namespace-container, namespace-argument',
+      + 'esm-namespace-reexport, cjs-namespace-container, namespace-argument, '
+      + 'dynamics-submodule-route, dynamics-submodule-lib, dynamics-submodule-exempt-green',
     );
   }
   return mode;
@@ -718,6 +834,10 @@ function runMode(mode) {
     runLawSanctionedDirectCallAssertion();
     runLawNonExportedAliasGreenAssertion();
     runLawDynamicImportDirectGreenAssertion();
+    runLawDynamicsSubmoduleRouteMatrixAssertion();
+    runLawDynamicsSubmoduleLibMatrixAssertion();
+    runLawDynamicsSubmoduleSiblingDotSlashAssertion();
+    runLawDynamicsSubmoduleExemptGreenAssertion();
     runLiveParseAssertion();
     return;
   }
@@ -747,6 +867,10 @@ function runMode(mode) {
   if (mode === 'sanctioned-direct') return runLawSanctionedDirectCallAssertion();
   if (mode === 'alias-green') return runLawNonExportedAliasGreenAssertion();
   if (mode === 'dynamic-import-green') return runLawDynamicImportDirectGreenAssertion();
+  if (mode === 'dynamics-submodule-route') return runLawDynamicsSubmoduleRouteMatrixAssertion();
+  if (mode === 'dynamics-submodule-lib') return runLawDynamicsSubmoduleLibMatrixAssertion();
+  if (mode === 'dynamics-submodule-sibling') return runLawDynamicsSubmoduleSiblingDotSlashAssertion();
+  if (mode === 'dynamics-submodule-exempt-green') return runLawDynamicsSubmoduleExemptGreenAssertion();
   throw new Error(`unknown --mode ${mode}`);
 }
 
