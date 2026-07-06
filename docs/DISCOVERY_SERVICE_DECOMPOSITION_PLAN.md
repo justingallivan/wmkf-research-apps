@@ -14,7 +14,8 @@ related:
 
 # DiscoveryService Decomposition Plan
 
-**Status: DRAFT — pre-implementation, awaiting fresh-context Codex review. NO CODE WRITTEN.**
+**Status: DRAFT — reconciled after Codex adversarial review round 1 (CHANGES-REQUIRED; both BLOCKERs
+fixed — see Review log). Awaiting re-review before Stage 0. NO CODE WRITTEN.**
 
 All material claims below are grounded in artifacts produced THIS session — the mechanically-computed
 internal call graph (a script over `lib/services/discovery-service.js`), a `grep -a` whole-repo caller
@@ -81,23 +82,31 @@ from 2,348).
 
 | # | Module | Methods (moved from the class) | Depends on | ~L |
 |---|--------|--------------------------------|-----------|----|
-| 1 | `constants.js` | `MIN_PUBLICATIONS`, `YEARS_LOOKBACK`, `COAUTHOR_COI_STRONG_MIN`, `VERIFICATION_STATUSES`, `VERIFICATION_SKIPPED_REASON`, `TRACK_B_IDENTITY_RESOLUTION_LIMIT`, `TRACK_B_ENABLED`, `NICKNAME_MAP` | — | 60 |
+| 1 | `constants.js` | **10 static class props:** `MIN_PUBLICATIONS`, `YEARS_LOOKBACK`, `COAUTHOR_COI_STRONG_MIN`, `VERIFICATION_STATUSES`, `VERIFICATION_SKIPPED_REASON`, `TRACK_B_IDENTITY_RESOLUTION_LIMIT`, `TRACK_B_ENABLED`, `NICKNAME_MAP`, `OPENALEX_PUB_BACKFILL_LIMIT`, `OPENALEX_PUB_BACKFILL_CONCURRENCY` **+ 3 env-derived module consts:** `DEBUG`, `NCBI_API_KEY`, `PUBMED_DELAY` (see C7) | — | 70 |
 | 2 | `name-matching.js` | `normalizeNameForMatch`, `firstNamesEquivalent`, `nameMatchEvidence`, `namesMatch`, `evaluateNameEvidence`, `generateNameVariants`, `filterToMatchingAuthor`, `filterToMatchingAuthorMultiVariant` | constants (`NICKNAME_MAP`) | 230 |
 | 3 | `affiliation.js` | `normalizeAffiliationForComparison`, `_affiliationWeightsMap`, `_recencyWeightedAffiliation`, `extractBestAffiliation`, `collectAffiliationHistory`, `extractBestAffiliationMultiVariant` | name-matching | 140 |
 | 4 | `research-area.js` | `isClearlyBiomedicalResearchArea`, `isPhysicalOrEngineeringResearchArea`, `isClearlyNonBiomedicalVerifierArea`, `articlesLookBiomedicalOrClinical`, `evaluateCrossFieldNamesakeGuard`, `isCrossFieldDiscoveredContamination` | — | 70 |
 | 5 | `match-signals.js` | `filterByExpertiseRelevance`, `calculateExpertiseMatch`, `checkExpertiseMismatch`, `checkInstitutionMismatch` | — | 290 |
 | 6 | `provenance.js` | `normalizeSuggestionSource`, `provenanceOriginForVerifiedSuggestion`, `provenanceOriginForUnverifiedSuggestion`, `provenanceOriginForSpineSuggestion`, `mapSpineVerificationResult`, `unverifiedSuggestion`, `evaluateVerificationIncoherence` | constants, `reviewer-provenance` util, `ContactParser` | 200 |
-| 7 | `publications.js` | `_isPreprintPublication`, `dedupePublicationsByTitle`, `backfillOpenAlexPublications`, `countRecentPublications` | constants (`YEARS_LOOKBACK`), `OpenAlexService`, `chunk` | 110 |
+| 7 | `publications.js` | `_isPreprintPublication`, `dedupePublicationsByTitle`, `backfillOpenAlexPublications`, `countRecentPublications` | constants (`YEARS_LOOKBACK`, `VERIFICATION_STATUSES`, `OPENALEX_PUB_BACKFILL_LIMIT`, `OPENALEX_PUB_BACKFILL_CONCURRENCY`), `OpenAlexService`, `chunk` | 110 |
 | 8 | `pubmed-query.js` | `buildAuthorQuery`, `buildDisambiguatedAuthorQuery` | constants (`YEARS_LOOKBACK`) | 50 |
-| 9 | `literature-search.js` | `searchPubMed`, `searchArXiv`, `searchBioRxiv`, `searchChemRxiv` | constants, `PubMedService`/`ArXivService`/`BioRxivService`/`ChemRxivService`, `reviewer-provenance` | 250 |
-| 10 | `track-b-identity.js` | `resolveTrackBIdentities`, `mapTrackBIdentityResult`, `mergeTrackBWithNeedsReviewBySharedOrcid`, `partitionByPublicationBar` | constants (`MIN_PUBLICATIONS` via pass-through), `ReviewerWorkAuthorResolver`, `reviewer-provenance` | 130 |
-| 11 | `coauthor-coi.js` | `gradeCoauthorCOI`, `checkCoauthorHistory`, `toPubMedAuthorFormat`, `checkCoauthorshipsForCandidates` | constants (`COAUTHOR_COI_STRONG_MIN`), `PubMedService` | 160 |
-| 12 | `verification.js` | `verifyClaudeSuggestions`, `pubMedVerificationContract`, `suggestionVerifierRouting` | name-matching, affiliation, match-signals, provenance, publications, pubmed-query, research-area, constants | 300 |
-| 13 | `ranking.js` | `rankAllCandidates` | publications (`countRecentPublications`), `DeduplicationService` | 40 |
+| 9 | `literature-search.js` | `searchPubMed`, `searchArXiv`, `searchBioRxiv`, `searchChemRxiv` | constants (`YEARS_LOOKBACK`, env `PUBMED_DELAY`), `PubMedService`/`ArXivService`/`BioRxivService`/`ChemRxivService`, `reviewer-provenance` | 250 |
+| 10 | `track-b-identity.js` | `resolveTrackBIdentities`, `mapTrackBIdentityResult`, `mergeTrackBWithNeedsReviewBySharedOrcid`, `partitionByPublicationBar` | constants (`MIN_PUBLICATIONS` via pass-through, `VERIFICATION_STATUSES`), `ReviewerWorkAuthorResolver`+`normalizeOrcid`, `reviewer-provenance` | 130 |
+| 11 | `coauthor-coi.js` | `gradeCoauthorCOI`, `checkCoauthorHistory`, `toPubMedAuthorFormat`, `checkCoauthorshipsForCandidates` | constants (`COAUTHOR_COI_STRONG_MIN`, env `NCBI_API_KEY`, env `PUBMED_DELAY`), `PubMedService` | 160 |
+| 12 | `verification.js` | `verifyClaudeSuggestions`, `pubMedVerificationContract`, `suggestionVerifierRouting` | name-matching, affiliation, match-signals, provenance, publications, pubmed-query, research-area, constants (`MIN_PUBLICATIONS`, `VERIFICATION_STATUSES`, `VERIFICATION_SKIPPED_REASON`, env `DEBUG`, env `PUBMED_DELAY`), `PubMedService`, `ReviewerIdentityEvidence`, `reviewer-provenance` | 300 |
+| 13 | `ranking.js` | `rankAllCandidates` | publications (`countRecentPublications`), `DeduplicationService`, `reviewer-provenance` (`withReviewerProvenance`) | 40 |
 | — | `discovery-service.js` (**facade**) | `discover` orchestrator + all static props + the delegating static methods | all of the above | ~350 |
 
 The delegating wrappers number **50** = 54 total methods − 3 underscore-private − `discover` (which
-the facade implements directly) [VERIFIED via call-graph method enumeration, S335].
+the facade implements directly) [VERIFIED via call-graph method enumeration, S335]. The facade also
+re-exposes **all 10 static class properties** (C2) — including the two OpenAlex-backfill statics an
+external test reads directly (C1).
+
+The `Depends on` column was regenerated mechanically after Codex review round 1 (a per-method pass
+recording sibling-method calls, static-prop reads, module-level env consts, and imported identifiers)
+[VERIFIED via call-graph script v2 over lib/services/discovery-service.js, S335]. The added arrows all
+point at leaf modules (`constants`) or external services — no new inter-module *method* edge — so the
+DAG remains acyclic and leaf-first extraction stays safe.
 
 **Note on granularity.** The owner-approved sketch listed 6 illustrative modules
 (`literature-search`, `name-matching`, `affiliation`, `verification`, `track-b-identity`, `ranking`,
@@ -121,15 +130,19 @@ These are the non-mechanical parts — where a naive cut-and-paste would silentl
   `static partitionByPublicationBar(c) { return partitionByPublicationBar(c, this.MIN_PUBLICATIONS); }`
   and the extracted `partitionByPublicationBar(candidates, minPublications)` takes it as a parameter.
   A module that `require`s a frozen constant instead would break the test's mutation and any runtime
-  override. `MIN_PUBLICATIONS` is the **only** static the tests mutate [VERIFIED via grep for
-  `DiscoveryService.<STATIC> =` assignments in tests/, S335]; the others (`TRACK_B_ENABLED`,
-  `YEARS_LOOKBACK`, etc.) are read-only and can be plain `require`s from `constants.js` — but they
-  must ALSO remain readable as `DiscoveryService.YEARS_LOOKBACK` (a production caller reads it) so the
-  facade re-exposes every constant as a static prop.
+  override. `MIN_PUBLICATIONS` is the **only** static the tests/scripts *mutate* [VERIFIED via grep for
+  `DiscoveryService.<STATIC> =` assignments in tests/ and scripts/, S335]; the other 9 statics are
+  read-only. **But read-only is not the same as internal:** `OPENALEX_PUB_BACKFILL_CONCURRENCY` is read
+  as `DiscoveryService.OPENALEX_PUB_BACKFILL_CONCURRENCY` by
+  `tests/unit/discovery-openalex-publications.test.js:143` [VERIFIED via grep, S335], and a production
+  caller reads `DiscoveryService.YEARS_LOOKBACK`. So the read-only statics can be plain `require`s
+  inside their consuming modules (value is identical), **and** the facade must re-expose **all 10** as
+  static props so external `DiscoveryService.<CONST>` reads keep resolving.
 - **C2 — Full facade surface.** Every non-underscore method must remain callable as
-  `DiscoveryService.foo` (scripts + tests pin them). The facade delegates all public non-`discover`
-  methods and re-exposes all 8 static constants. Underscore methods stay private (verified no external
-  refs).
+  `DiscoveryService.foo` (scripts + tests pin them). The facade delegates all 50 public non-`discover`
+  methods and re-exposes all **10** static class properties (the top-8 block + the two OpenAlex-backfill
+  statics at `discovery-service.js:422-423` my first-pass call-graph missed — Codex review round-1
+  BLOCKER). Underscore methods stay private (verified no external refs).
 - **C3 — `this` / `DiscoveryService` self-references.** The `discover` orchestrator (stays on the
   facade) calls sub-methods via both `this.foo()` and `DiscoveryService.foo()`
   [VERIFIED via discovery-service.js:166-375]. Those keep resolving through the facade's delegating
@@ -152,15 +165,28 @@ These are the non-mechanical parts — where a naive cut-and-paste would silentl
   particular reference `lib/services/discovery-service.js` paths that will still exist (facade stays).
   New module paths get no new Atlas rows (no new data ownership — pure code motion). **Verify each
   stage against the touched gates**, per CLAUDE.md rule 4.
+- **C7 — Module-level env-derived consts (`DEBUG`, `NCBI_API_KEY`, `PUBMED_DELAY`).** These are
+  top-of-file `const`s derived from `process.env` at module load [VERIFIED via discovery-service.js:24,
+  27-28], read inside methods that move to `verification.js`, `literature-search.js`, and
+  `coauthor-coi.js` (`PUBMED_DELAY` at :550,563,1227,2202,2303; `DEBUG` at :572,590,619,720;
+  `NCBI_API_KEY` at :2265) [VERIFIED via grep, S335]. **Requirement:** extract them once into the shared
+  `constants.js` (env section) and have every consuming module import them from there — do NOT
+  re-derive them independently per module (harmless while env is stable, but it invites drift and a
+  test that stubs `process.env` in one place would then see divergent values). They are NOT class
+  statics and are never read as `DiscoveryService.X`, so the facade does not re-expose them. This is
+  the Codex review round-1 dependency-fidelity BLOCKER — every method that reads one of these carries a
+  `constants` dependency in the layout table above.
 
 ## Staging (leaf-first, each stage independently green + reviewed)
 
 Same cadence proven on site-33: **trace → extract one cluster → run suite → fresh-context Codex
 review → commit**. Leaf modules first so the facade delegates incrementally and the DAG never breaks.
 
-- **Stage 0 — `constants.js` + facade wiring.** Extract the 8 statics to `constants.js`; the class
-  re-exposes them as static props (`static MIN_PUBLICATIONS = C.MIN_PUBLICATIONS;` etc.). No method
-  bodies move yet. Proves the constant-passthrough contract (C1) before anything depends on it.
+- **Stage 0 — `constants.js` + facade wiring.** Extract the 10 static class props **and** the 3
+  env-derived module consts (C7) to `constants.js`; the class re-exposes the 10 statics as static props
+  (`static MIN_PUBLICATIONS = C.MIN_PUBLICATIONS;` etc.), the env consts stay module-level. No method
+  bodies move yet. Proves both the constant-passthrough contract (C1) and the env-const sharing (C7)
+  before anything depends on them.
 - **Stage 1 — `name-matching.js`** (pure leaf). Highest-fanout helper cluster; extracting it first
   de-risks affiliation + verification.
 - **Stage 2 — `affiliation.js`** (depends on Stage 1).
@@ -192,19 +218,35 @@ Stages 3 and 4 may each be split into per-module commits if a review round wants
 - **Gates:** run the touched gates listed in C6 at each stage; full `npm test` before Stages 5/6 commit.
 - **Per-stage fresh-context Codex review** on the shipped diff (`reference-codex-detached-exec-protocol.md`).
 
-## Open questions for review
+## Open questions — RESOLVED after Codex review round 1
 
-1. **Module granularity:** 13 modules (max ~300 L target) as tabled, or consolidate to a coarser
-   layout (roughly 8 modules)?
-2. **Characterization gaps (C-gap list):** pre-write characterization tests for the 4 uncovered
-   clusters, or rely on the existing integration test + the pure-code-motion invariant?
-3. **`gradeCoauthorCOI` placement:** tabled under `coauthor-coi.js` (its only caller,
-   `checkCoauthorshipsForCandidates`, lives there) but it's also conceptually a Track-B COI grade —
-   is `coauthor-coi.js` the right home, or `track-b-identity.js`?
-4. **Facade delegation style:** explicit hand-written wrappers (one per method, most readable and
-   greppable) vs. a programmatic `Object.assign`/loop that wires delegations from a manifest (less
-   boilerplate, but hides the surface from grep and static analysis). Recommendation: **explicit
-   wrappers** — the whole point is legibility, and the gates grep for method names.
+1. **Module granularity → KEEP 13.** Codex: keep 13 only *after* regenerating the dependency table
+   from a mechanical pass; otherwise consolidate. The table has now been regenerated (see the note
+   under the layout table), so 13 modules stands. The alternative coarser layout (roughly 8) remains
+   documented above as a fallback if a later stage finds the import surface unwieldy.
+2. **Characterization gaps → PRE-WRITE tests.** Codex: add characterization tests before extraction
+   for the uncovered clusters — "pure code motion is not enough here." Adopted: each stage that moves a
+   currently-untested cluster (`checkInstitutionMismatch`, `nameMatchEvidence`/`evaluateNameEvidence`,
+   the four `search*` methods, `checkExpertiseMismatch`) first lands a characterization test,
+   mutation-proven to discriminate (neutralize the moved logic → test goes red), THEN moves the code.
+3. **`gradeCoauthorCOI` placement → `coauthor-coi.js`.** Codex concurs: keep it with its only caller
+   `checkCoauthorshipsForCandidates`, not `track-b-identity.js`. Settled.
+4. **Facade delegation style → explicit hand-written wrappers.** Codex concurs, and notes the missing
+   OpenAlex static is direct evidence that grep/static visibility matters — a programmatic
+   `Object.assign` loop would have hidden exactly that surface. Settled.
+
+## Review log
+
+- **Round 1 — Codex adversarial review (S335, plan commit `a9ba8ca3`): CHANGES-REQUIRED.** Two
+  BLOCKERs, both verified against source and reconciled here:
+  (1) the plan under-counted static class props as 8 — the class has **10** (`OPENALEX_PUB_BACKFILL_LIMIT`
+  / `OPENALEX_PUB_BACKFILL_CONCURRENCY` at `discovery-service.js:422-423`, the latter externally read by
+  `discovery-openalex-publications.test.js:143`); (2) the `Depends on` column dropped real deps
+  (`DEBUG`/`NCBI_API_KEY`/`PUBMED_DELAY` module consts, `PubMedService`/`ReviewerIdentityEvidence` in
+  `verification`, `withReviewerProvenance` in `ranking`). Fixes: constants row → 10 statics + 3 env
+  consts; new constraint **C7**; dependency column regenerated mechanically; the four open questions
+  resolved with Codex's recommendations. The DAG-acyclic / method-mapping / facade-strategy core was
+  confirmed sound. **Next: re-review of this reconciled plan, then Stage 0.**
 
 ## Non-goals / do-not-touch
 
