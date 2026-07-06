@@ -141,6 +141,7 @@ consolidation with `graph-service.js`'s duplicate `fetchWithTimeout`, and any ad
   module import (post-Q4 gate extension) is still runtime-guarded. `DATAVERSE_DAL_ENFORCEMENT` is on
   in all envs (prod flipped 2026-07-04, S330 — `docs/agent-wiki/topics/dataverse-dynamics.md:54`);
   `tests/unit/dal-enforcement.test.js` must stay green at every checkpoint.
+  [STALE-ACCEPTED: lib/services/dynamics-context.js — S338 added an unrelated additive `assertDataverseAccess` warn-guard (commit `5a16f36`, `DATAVERSE_DAL_UNIVERSAL`, default off) for the client.js prefs/app-access gap; it does NOT touch `assertTrustedDalContext`/`getDynamicsContext`/`checkRestriction`, so C2/C3 and every dynamics-context.js reference in this plan remain accurate.]
 - **C3 — `checkRestriction` fail-closed context read.** `checkRestriction` (`:219-268`) reads the
   AsyncLocalStorage context via `getDynamicsContext()` and **throws when no context is set**
   (`:224-227`). This whole method + `splitExpandSegments`/`parseExpandSegment` (`:1528-1563`) move
