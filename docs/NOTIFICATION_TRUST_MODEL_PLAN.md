@@ -18,12 +18,14 @@ related:
 **Execution status: STAGES 1 AND 2 EXECUTED, REVIEWED, AND COMMITTED; STAGE 3 IN PROGRESS
 (2026-07-05).** Census re-closed at 23 (three-way verified, `02d3cd9`); Stage 0 passed; Stage 1's 9
 single-hop push-ups landed (`23cff83`) and Stage 2's 1 push-up + coverage landed (`1b69d4f`), both under
-fresh-context Codex review. `notify()`'s shared internal wrapper is intentionally retained. **Stage 3
-(remove the shared wrapper) is underway: its precondition is upgrading all 10 already-covered
-characterization tests from service-level to handler-driven — 5 of 10 done (`a1f13af`, `5fa8522`), the
-remaining 5 (drain cron ×3 sharing one wrap, #22 maintenance, #12 review-upload ×2) deferred into the
-removal change. The wrapper removal itself is NOT done** and is a separate reviewed step once all 10
-guards exist. This is the site-33 follow-on
+fresh-context Codex review. **Stage 3 COMPLETE: the shared internal `withDalContext('notification-email')`
+wrapper was REMOVED from `sendAdminEmail` (`notification-service.js:171`); site 33 is fully closed.** All
+10 already-covered characterization tests are handler-driven and mutation-proven; 2 stale tests
+(`notification-service-dal-context`, `intake-routes-dynamics-context`) were realigned to the new
+"assumes ambient context" contract; full suite 428/4770 green incl. the real-DynamicsService no-context
+negative control; and a fresh-context Codex adversarial review of the removal returned SATISFIED with no
+findings (fresh `rg -a` census confirmed no email-reaching caller is uncovered). This is the site-33
+follow-on
 the owner asked for after `docs/BYPASS_STRIP_PLAN.md` Stage 4 closed everything else. Stage 4's own
 text explicitly deferred this site: its DAL-touching branch sits inside a shared utility (`notify()`),
 most of whose callers never reach it, and safely auditing that full fan-out was out of scope for that
@@ -390,7 +392,7 @@ Codex adversarial review of the full diff, same acceptance bar as `BYPASS_STRIP_
   `requireAppAccess` mocked, and the drain-based tests (#10b, #13, #11-acceptance) need the handler
   driven with real adapter mocks instead of injected `deps`.
 
-## Stage 3 — Remove the shared internal `'notification-email'` wrapper (NOT YET DONE)
+## Stage 3 — Remove the shared internal `'notification-email'` wrapper (DONE)
 
 Precondition now MET on coverage (every REACHES entry point establishes context, Stages 1-2), but NOT
 on test-guard: first upgrade EVERY already-covered site's characterization test from service-level to
@@ -407,5 +409,23 @@ remaining 5 conversion units are the **drain cron** (one handler-driven test cov
 via the (now handler-level) characterization suite + the existing no-context negative control that every
 path still establishes trusted context at its entry point. This is the dangerous step (the drain-defect
 failure class); do it under fresh-context review, as its own change.
+
+- 2026-07-05: **Stage 3 executed — shared internal wrapper REMOVED; site 33 CLOSED.** Completed the
+  precondition (all 10 already-covered characterization tests now handler-driven, each mutation-proven:
+  neutralizing the handler wrap flips the guard's `trusted` assertion red), then removed
+  `withDalContext('notification-email', ...)` from `sendAdminEmail` — it now calls
+  `DynamicsService.createAndSendEmail` directly and assumes an ambient trusted context (a code comment at
+  `notification-service.js:171` warns against re-adding an internal wrap). The last 3 guards (drain cron
+  covering #10b/#13/#11-acceptance, #22 maintenance sweep, #12 upload routes) drive the real handlers with
+  the wrapped service spied to capture `hasTrustedDalContext()`. Two pre-existing tests that pinned the old
+  self-establish contract were realigned honestly to the new behavior (bare `sendAdminEmail` runs
+  untrusted; an ambient context propagates). Verified: full suite 428 suites / 4770 tests green including
+  the real-`DynamicsService` no-context negative control (which now proves the fail-closed enforcement is
+  the only backstop), `npm run build`, and the four boundary gates + self-tests. A fresh-context Codex
+  adversarial review of the whole removal returned **SATISFIED, no findings** — its independent `rg -a`
+  census re-confirmed all 23 email-reaching callers are wrapped at their entry point and that nothing
+  calls `sendAdminEmail` directly outside `NotificationService`. The site-33 push-up (deferred from
+  `BYPASS_STRIP_PLAN.md` Stage 4) is now fully closed; Stage 4's doctrine (establishment at the entry
+  point, services assume trusted context) holds for the notification path with no shared net remaining.
 
 <!-- end of plan -->
