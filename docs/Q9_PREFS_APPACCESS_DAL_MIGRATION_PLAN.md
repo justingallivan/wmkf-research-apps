@@ -191,6 +191,18 @@ Dataverse services. The migration swaps the two services' *internals*; no route 
   `DATAVERSE_DAL_UNIVERSAL` to `warn`→`on` for that tail on the same schedule, or leave until
   those waves land? (This plan only *requires* `warn`.)
 - **OQ-4:** Pin-test rewrite consent per 1.4.4 (S331 ruling artifact).
+- **OQ-5 (blocking Stage 4; Codex re-review P1):** `listAllGrantsForAdmin` is an unfiltered
+  full-entity pull that NO DynamicsService read primitive supports (`queryRecords` and
+  `queryAllRecords` both reject unfiltered — `dynamics-service.js:405-406,:591-592`). Choose the
+  read path: **(a)** add a bounded admin-list primitive to DynamicsService (e.g.
+  `queryAllRecords` variant that permits an explicit "admin, no-filter, capped 5000" mode behind
+  the same restriction/context check) — cleanest for full retirement; **(b)** keep ONLY
+  `listAllGrantsForAdmin` on `client.js` behind the standing universal guard (partial migration —
+  writes + per-user reads move, admin-list stays) — pragmatic but `client.js` not fully retired;
+  **(c)** reshape the admin view to page per-user via `listByUser` (N calls) — likely too slow.
+  Recommendation to owner: **(a)** if full `client.js` retirement is the goal of the Q9 reversal;
+  **(b)** if not. This is a DynamicsService-surface change, so it also interacts with the
+  decomposition (§6).
 
 ---
 
@@ -343,12 +355,19 @@ each swap stage; do not defer to Stage 5.
 2. **Adapter** `lib/dataverse/adapters/user-preference.js`: register
    `'wmkf_appuserpreferences'` in `KNOWN_ENTITY_SETS`; functions
    `findByOwnerAndKey(systemuserid, key)` (carries the S331 non-string guard first),
-   `listByOwner(systemuserid)`, `create(body)`, `update(id, body)`, `remove(id)` — each a
-   byte-mirror of the service's current select/filter/body via
-   `DynamicsService.queryRecords/createRecord/updateRecord/deleteRecord`; header comment
+   `listByOwner(systemuserid)`, `create(body)`, `update(id, body)`, `remove(id)`; header comment
    documents CALLER-OWNED context posture (house style, cf. `adapters/system-user.js:14-17`).
-   No `actingUserSystemId`. Adapter-level guarded-swap pin test (TypeError + zero
-   `queryRecords` calls) added alongside.
+   No `actingUserSystemId`. Adapter-level guarded-swap pin test added alongside.
+   **Read-primitive constraint (Codex re-review P1, CONFIRMED `[VERIFIED via
+   dynamics-service.js:398-407,:590-593]`):** `DynamicsService.queryRecords` caps
+   `$top = min(top||25, 100)` and throws on `!filter && top>25`. The current per-user prefs read
+   has NO `$top` (`dataverse-prefs-service.js:63-66`), so a naive `queryRecords` route would
+   SILENTLY CAP at 25. `findByOwnerAndKey` (single row, `$top=1`) is fine on `queryRecords`. For
+   `listByOwner` (a user's full pref set) use the **filtered paginated** primitive
+   `DynamicsService.queryAllRecords(entitySet, {select, filter})` — it requires a filter (owner id
+   IS the filter, so allowed) and walks `@odata.nextLink` to `MAX_EXPORT_RECORDS` (5000). Do NOT
+   route `listByOwner` through `queryRecords`. Adds a characterization test with **>25 prefs for
+   one owner** proving no truncation.
 3. **Swap** `dataverse-prefs-service.js` internals: drop `getClient`/`client.js` imports and the
    `DYNAMICS_SANDBOX_URL` fallback; call the adapter inside the existing try/catch blocks;
    encryption stays in the service; delete the service-local `findRow` + its
@@ -367,10 +386,26 @@ each swap stage; do not defer to Stage 5.
 
 ### Stage 4 — App-access wave (only after Stage 3 has soaked in prod; OQ-2 window)
 Same six steps for `dataverse-app-access-service.js` → `lib/dataverse/adapters/app-access.js`
-(register `'wmkf_appuserappaccesses'`; mirrors for `findByUserAndApp`, `listByUser`, `listAll`
-(`$top=5000` preserved, `:74`), `create` (bind keys preserved), `remove`). Postgres
-`user_profiles` read and identity-map calls stay in the service (cross-store join is service
-logic, not adapter transport). Extra rigor for the hot path:
+(register `'wmkf_appuserappaccesses'`; mirrors for `findByUserAndApp`, `listByUser`, `listAll`,
+`create` (bind keys preserved), `remove`). Postgres `user_profiles` read and identity-map calls
+stay in the service (cross-store join is service logic, not adapter transport).
+
+**Read-primitive constraint (Codex re-review P1, CONFIRMED `[VERIFIED via
+dynamics-service.js:398-407,:590-593]`) — two distinct cases:**
+- `findByUserAndApp` (single row, `$top=1`) and `listByUser` (per-user grants, filtered by user
+  id; bounded by the app-definition count — a dozen-ish, far under any cap) → `queryRecords` is
+  safe for the single-row find; use `queryAllRecords` (filtered) for `listByUser` to be
+  truncation-proof.
+- **`listAllGrantsForAdmin` is the BLOCKER.** It is a deliberately UNFILTERED full-entity pull
+  (`dataverse-app-access-service.js:71-75`, `$top=5000`, all grants across all users). BOTH
+  DynamicsService read primitives reject it: `queryRecords` throws (`!filter && top>25`,
+  `:405-406`) and `queryAllRecords` throws on the missing filter (`:591-592`, "unfiltered
+  full-table dumps are not allowed"). There is **no existing primitive** for an unfiltered admin
+  pull — by design. This makes app-access migration NOT a mechanical swap. **Resolve OQ-5 before
+  Stage 4** (see §1.6). Do not begin the app-access swap until the `listAll` read path has an
+  agreed primitive.
+
+Extra rigor for the hot path:
 - Preview E2E BEFORE prod: fresh sign-in (new profile → default grants → landing page), plus an
   existing user hitting an app route with a cold cache.
 - Deploy prod at a low-traffic moment; watch logs live; the 2-min app-access cache
@@ -420,6 +455,7 @@ adapter attribution with zero new violations.
 | **Auth-path silent lockout** (highest) | post-swap missing context → `checkRestriction` throw → caught → `[]` → every user "Access Not Available"; NOT a 500, so no error-rate alarm | Stage-1 wrap of `requireAppAccess` lands first and is warn-observed (Stage 2) against the SAME ALS predicate DynamicsService uses; app-access swapped LAST (Stage 4) after prefs proves the pattern; explicit log-scan trigger on `[dataverse-app-access]` error lines; single-commit revert |
 | ~~Sandbox-URL repoint~~ **RESOLVED** | services' `SANDBOX \|\| URL` fallback vs DynamicsService's `DYNAMICS_URL` | **CLOSED S339: no `DYNAMICS_SANDBOX_URL` in any Vercel env `[VERIFIED via vercel env ls]` → fallback is dead code, swap URL-neutral.** Delete the dead fallback during each swap |
 | Ownership-binding regression | different create path | bind keys pass through `createRecord` body verbatim (`dynamics-service.js:758-763` [VERIFIED]); characterization asserts body bytes; never pass `actingUserSystemId` |
+| **List reads truncate/throw through `queryRecords`** (Codex re-review P1, CONFIRMED) | `queryRecords` caps `$top≤100`, defaults 25, throws on unfiltered>25 (`dynamics-service.js:398-407`); per-user prefs list has no `$top`, admin `listAll` is unfiltered `$top=5000` | per-user lists use filtered `queryAllRecords`; `listAll` has NO primitive → **OQ-5** blocks Stage 4 until resolved; char-tests with >25 prefs / bulk grants |
 | **Prompt-override silently stops applying** (Codex P1, CONFIRMED) | `reviewer-prompt-resolver` override read is bare → post-swap throws → caught → `null` → `overrideUsed:false`, no error | **1h** wraps the read at the service layer + an `overrideUsed:true`-survives-swap test; analyze/discover added to the Stage-2 warn exercise |
 | Missed read path (email-signature transitive callers, crons) | reads throw unconditionally | Stage 1g per-site verification with recorded verdicts; Stage-2 warn logs from the 1f read probes catch anything the static trace missed |
 | Pin-test erosion (S331 ruling) | `findRow` signature change | behavior-level pin re-established at adapter level (TypeError + zero transport calls); owner flagged (OQ-4) |
@@ -495,5 +531,17 @@ change needed (client.js path has no context requirement; `warn` flag tolerates 
     script bypass. Fix: **new Stage 2.5** converts/retires each per entity BEFORE its swap (was
     deferred to Stage 5).
   - Re-review requested from Codex over the patched plan.
+- **2026-07-06 (S339) — Codex re-review: SOUND-WITH-FIXES.** Confirmed P1/P2 adequately closed by
+  Stage 1h + Stage 2.5. One NEW finding, verified against source by Claude and folded in:
+  - **P1-list (high) CONFIRMED** — the adapter recipe routed list reads through
+    `DynamicsService.queryRecords`, which caps `$top=min(top||25,100)` and throws on unfiltered
+    `>25` (`dynamics-service.js:398-407`). Per-user prefs list (no `$top`) would silently cap at
+    25; admin `listAllGrantsForAdmin` (unfiltered `$top=5000`) would throw. Claude went one level
+    deeper: the existing paginated primitive `queryAllRecords` (`:590`) REQUIRES a filter
+    (`:591-592`), so it fixes per-user lists but CANNOT serve the unfiltered admin pull — there is
+    no existing primitive for it. Fixes: Stage 3/4 recipes now use filtered `queryAllRecords` for
+    per-user lists + char-tests >25; **new OQ-5** blocks Stage 4 until the `listAll` read path is
+    decided (add a bounded admin primitive vs. keep only `listAll` on `client.js`).
+  - Stage 1h and Stage 2.5 confirmed correct as written; no regression.
 
 No decomposition checkpoint is a prerequisite; only avoid interleaving commits with it.
