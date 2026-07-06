@@ -67,3 +67,29 @@ describe('collectAffiliationHistory — all distinct affiliations, most-recent-f
     expect(DiscoveryService.collectAffiliationHistory(articles, ['Jane Smith'])).toEqual([]);
   });
 });
+
+// Characterization added before Stage 2 (docs/DISCOVERY_SERVICE_DECOMPOSITION_PLAN.md) to pin the
+// previously-untested affiliation-normalizer's regex branches before the code moves to
+// lib/services/discovery/affiliation.js. Values are the actual pre-extraction outputs.
+describe('normalizeAffiliationForComparison — institution-name extraction', () => {
+  const norm = (s) => DiscoveryService.normalizeAffiliationForComparison(s);
+  test('empty/falsy → empty string', () => {
+    expect(norm('')).toBe('');
+    expect(norm(null)).toBe('');
+  });
+  test('"University of X" pattern, country + trailing segments stripped', () => {
+    expect(norm('University of Oregon, Eugene, USA')).toBe('university of oregon');
+  });
+  test('"X University" pattern', () => {
+    expect(norm('Harvard University, Cambridge')).toBe('harvard university');
+  });
+  test('"X Institute" pattern', () => {
+    expect(norm('Broad Institute, Cambridge')).toBe('broad institute');
+  });
+  test('no keyword → lowercased first-50-char fallback', () => {
+    expect(norm('Cold Spring Harbor Laboratory')).toBe('cold spring harbor laboratory');
+  });
+  test('strips an embedded email segment', () => {
+    expect(norm('MIT . jdoe@mit.edu')).toBe('mit');
+  });
+});

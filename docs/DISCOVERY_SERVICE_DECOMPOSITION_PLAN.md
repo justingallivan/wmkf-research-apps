@@ -14,8 +14,9 @@ related:
 
 # DiscoveryService Decomposition Plan
 
-**Status: STAGES 0–1 EXECUTED (S335) — plan approved via two Codex adversarial-review rounds;
-`constants.js` + `name-matching.js` extracted behind the facade. Stages 2–6 pending. See stage notes.**
+**Status: STAGES 0–2 EXECUTED (S335) — plan approved via two Codex adversarial-review rounds;
+`constants.js` + `name-matching.js` + `affiliation.js` extracted behind the facade. Stages 3–6
+pending. See stage notes.**
 
 All material claims below are grounded in artifacts produced THIS session — the mechanically-computed
 internal call graph (a script over `lib/services/discovery-service.js`), a `grep -a` whole-repo caller
@@ -208,7 +209,17 @@ review → commit**. Leaf modules first so the facade delegates incrementally an
   fixture comparison). [RECHECKED after lib/services/discovery/name-matching.js change: this note
   describes the committed Stage 1 state — the module exports the 8 functions and the facade delegates
   each.]
-- **Stage 2 — `affiliation.js`** (depends on Stage 1).
+- **Stage 2 — `affiliation.js` (depends on Stage 1). ✅ EXECUTED (S335).** Moved the 6-method cluster
+  (`extractBestAffiliation`, `_affiliationWeightsMap`, `_recencyWeightedAffiliation`,
+  `collectAffiliationHistory`, `normalizeAffiliationForComparison`, `extractBestAffiliationMultiVariant`)
+  to `lib/services/discovery/affiliation.js`; internal `this.X` → direct calls, author-name matching
+  imported from `./name-matching`; the facade delegates all 6 (the `normalizeAffiliationForComparison`
+  wrapper param renamed `affiliationString` to avoid shadowing the imported module). The 3 public
+  methods were already covered; per Q2 added 6 characterization cases for the untested
+  `normalizeAffiliationForComparison` regex branches (baselined green, mutation-proven). Post-extraction:
+  10 suites / 156 tests green; touched gates green; facade 2,135 → 2,029 L. [RECHECKED after
+  lib/services/discovery/affiliation.js change: this note describes the committed Stage 2 state — the
+  module exports the 6 functions and the facade delegates each.]
 - **Stage 3 — independent leaves, one commit each (or grouped):** `research-area.js`,
   `match-signals.js`, `provenance.js`, `publications.js`, `pubmed-query.js`. None depend on each other.
 - **Stage 4 — mid-tier:** `literature-search.js`, `track-b-identity.js`, `coauthor-coi.js`,
