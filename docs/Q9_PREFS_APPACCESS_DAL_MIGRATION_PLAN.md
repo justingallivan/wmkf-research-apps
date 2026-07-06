@@ -29,6 +29,17 @@ plan's "leave them" default.
 
 Every claim below was re-probed against the live tree this session unless marked `[UNVERIFIED]`.
 
+> **[STALE-ACCEPTED: lib/services/dynamics-service.js — line numbers only].** This plan's
+> `dynamics-service.js` citations (e.g. `queryRecords :398-407`, `queryAllRecords :590`,
+> `createRecord :758-763`, `checkRestriction :188-190`) were captured pre-decomposition. The
+> parallel DynamicsService decomposition (Checkpoint A Stage 1, S339) extracted `auth.js` and
+> shifted lines below the old auth block up by ~48. **Method-name anchors remain valid; line numbers
+> are approximate** and are re-derived against live source when each Q9 stage is built (Stage 4 reads
+> the current file). Reconciled fully at the Q9 worktree merge.
+> **[STALE-ACCEPTED: lib/services/dynamics/auth.js — not referenced here].** Every `auth.js` in this
+> plan is `lib/utils/auth.js` (the `requireAppAccess` auth hot path), NOT the newly-extracted
+> `lib/services/dynamics/auth.js` — unrelated file, same basename.
+
 ---
 
 ## 1. Preconditions / probes (verified state)

@@ -16,7 +16,7 @@ related:
 
 # DynamicsService Decomposition Plan
 
-**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoints A–F pending.** This applies the exact cadence proven on the
+**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stages 1 (`auth.js`) + 2 (`restrictions.js`) + 3 (`annotations.js`) all EXECUTED + BATCHED adversarial review PASSED (S339, verdict SOUND/approve — "could not refute the behavior-freeze", no material findings, base `d4463548..HEAD`); Checkpoint B (read path) is now UNBLOCKED; Checkpoints B–F pending.** This applies the exact cadence proven on the
 DiscoveryService decomposition (S335) and the ContactEnrichmentService decomposition (S336):
 strategy chosen up front (facade + extracted modules), leaf-first staged extraction, each cluster
 characterization-covered (baselined green pre-extraction, mutation-proven) BEFORE the code moves,
@@ -377,6 +377,54 @@ touched gates → commit. Leaf-first per the DAG.
   `check:doc-symbol-refs`, `check:agent-wiki` (add `lib/services/dynamics/**` to the
   dataverse-dynamics topic watch_paths in the same commit). Dedicated review because a bad matcher
   extension silently opens a LAW hole.
+- **Checkpoint A Stage 1 — `auth.js`. EXECUTED S339 (main checkout, parallel with the Q9 worktree
+  build).** `tokenCache` (module `let`) + `getAccessToken` (static, uses no `this`) moved verbatim
+  to `lib/services/dynamics/auth.js`; the Q3 `resetTokenCache` export created and the facade's
+  `clearCaches` now calls it (schemaCache resets stay inline until Stage 4). Facade keeps a thin
+  `static getAccessToken()` delegating wrapper (mirrors the Stage-0 `buildHeaders` pattern — the
+  module import shadows inside the method body; the ~15 internal `this.getAccessToken()` sites and 8
+  test spies on `DynamicsService.getAccessToken` unchanged). Characterization added FIRST
+  (`tests/unit/dynamics-service-auth.test.js`: caching reuse, 60s pre-expiry refresh, still-valid
+  no-refresh, missing-env forced non-transient) — green pre-extraction, green post. Verified: full
+  suite **4957/4957**; `check:dataverse-access-layer` + `check:dynamics-context-boundary` green
+  (599 files, 0 violations, now incl. `auth.js`); semgrep `.semgrep/token-audit.yaml` 0 findings on
+  `auth.js` (C14). **BATCHED review still pending** — runs after Stages 2–3 land.
+  - [RECHECKED after lib/services/dynamics/auth.js change: S339 — verbatim `getAccessToken` + `tokenCache` + new `resetTokenCache`; deps http/constants/service-error; semgrep token-audit 0 findings; suite 4957/4957]
+  - [RECHECKED after lib/services/dynamics-service.js change: S339 — facade rewired (`getAccessToken` delegate + `resetTokenCache` in `clearCaches`), behavior-freeze; no stray `tokenCache` ref; suite green]
+  - Note: this extraction shifts `dynamics-service.js` line numbers below the old auth block up by ~48; the Q9 plan's `dynamics-service.js` line citations (method-name-anchored) are reconciled at the Q9 worktree merge, not mid-flight.
+- **Checkpoint A Stage 2 — `restrictions.js`. EXECUTED S339.** `resolveLogicalName` +
+  `checkRestriction` (both static, `this`-free) moved verbatim to
+  `lib/services/dynamics/restrictions.js`, together with the two module-private `$expand` parsers
+  (`splitExpandSegments`, `parseExpandSegment`) used only by `checkRestriction`. Facade keeps both
+  as thin delegating wrappers (internal `this.` + external `DynamicsService.` calls unchanged); its
+  now-orphaned imports dropped (`getDynamicsContext` from dynamics-context, `ENTITY_SET_TO_LOGICAL`
+  from constants — both were used only by this cluster). Characterization added FIRST
+  (`tests/unit/dynamics-service-checkrestriction.test.js`: fail-closed no-context throw, table +
+  field denials, `$expand` table + nested-`$select` field denials, requestId-mismatch warn,
+  `resolveLogicalName` mapping) — green pre- and post-extraction. Verified: full suite
+  **4965/4965**; `check:dynamics-context-boundary` + self-test green (600 files, 0 violations —
+  `restrictions.js` imports `getDynamicsContext`, a read, not `bypassDynamicsRestrictions`, so the
+  boundary gate is satisfied); `check:dataverse-access-layer` green. **Checkpoint A batched review
+  still pending** — after Stage 3.
+  - [RECHECKED after lib/services/dynamics/restrictions.js change: S339 — verbatim `resolveLogicalName` + `checkRestriction` + private expand parsers; deps constants/dynamics-context; suite 4965/4965; context-boundary gate green]
+  - [RECHECKED after lib/services/dynamics-service.js change: S339 — facade rewired (both wrappers delegate; `getDynamicsContext`/`ENTITY_SET_TO_LOGICAL` imports removed), no stray refs, behavior-freeze; suite green]
+- **Checkpoint A Stage 3 — `annotations.js`. EXECUTED S339.** `processAnnotations` (static, pure —
+  no `this`, no deps) moved verbatim to `lib/services/dynamics/annotations.js`; facade keeps a thin
+  delegating wrapper (internal `this.processAnnotations` + the 3 external
+  `DynamicsService.processAnnotations` refs — `dataverse-export/live-taxonomy.js`,
+  `dataverse-export/fetch-client.js`, `dynamics-explorer/chat.js` — unchanged). Characterization
+  added FIRST (`tests/unit/dynamics-service-annotations.test.js`: `@odata.etag`→`_etag` preservation,
+  FormattedValue→`_formatted`, lookuplogicalname→`_entity`, other `@odata`/`@Microsoft` stripped,
+  non-object passthrough) — green pre- and post-extraction. Verified: full suite **4970/4970**;
+  `check:dataverse-access-layer` + `check:dynamics-context-boundary` green (601 files, 0 violations).
+  - [RECHECKED after lib/services/dynamics/annotations.js change: S339 — verbatim `processAnnotations`, pure/no-deps; suite 4970/4970]
+  - [RECHECKED after lib/services/dynamics-service.js change: S339 — facade wrapper delegates, impl fully moved (no stray `annotationSuffix`), behavior-freeze; suite green]
+  **→ Checkpoint A leaf batch (Stages 1–3) CODE-COMPLETE + BATCHED adversarial review PASSED
+  (S339, Codex, base `d4463548..HEAD`): verdict SOUND/approve, "could not refute the
+  behavior-freeze", no material findings (it independently confirmed byte-identity modulo the
+  static→function outdent, wrapper delegation to module bindings with no recursion, facade call
+  sites still `this.X`, leaf-module imports confined to the facade, and the shared `auth.js`
+  token-cache binding). Checkpoint B (read path) is UNBLOCKED.**
 - **Checkpoint A — leaf batch. BATCHED review.** Stage 1 `auth.js` (+ `resetTokenCache`, C4/C14;
   add characterization for token caching/expiry/missing-env non-transient error), Stage 2
   `restrictions.js` (C3; add characterization for no-context throw, table/field/expand restriction
