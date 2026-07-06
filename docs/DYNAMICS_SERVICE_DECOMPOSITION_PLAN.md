@@ -16,7 +16,7 @@ related:
 
 # DynamicsService Decomposition Plan
 
-**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stages 1 (`auth.js`) + 2 (`restrictions.js`) + 3 (`annotations.js`) all EXECUTED (S339); Checkpoint A BATCHED REVIEW pending (all three leaf extractions code-complete); Checkpoints B–F pending.** This applies the exact cadence proven on the
+**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stages 1 (`auth.js`) + 2 (`restrictions.js`) + 3 (`annotations.js`) all EXECUTED + BATCHED adversarial review PASSED (S339, verdict SOUND/approve — "could not refute the behavior-freeze", no material findings, base `d4463548..HEAD`); Checkpoint B (read path) is now UNBLOCKED; Checkpoints B–F pending.** This applies the exact cadence proven on the
 DiscoveryService decomposition (S335) and the ContactEnrichmentService decomposition (S336):
 strategy chosen up front (facade + extracted modules), leaf-first staged extraction, each cluster
 characterization-covered (baselined green pre-extraction, mutation-proven) BEFORE the code moves,
@@ -419,8 +419,12 @@ touched gates → commit. Leaf-first per the DAG.
   `check:dataverse-access-layer` + `check:dynamics-context-boundary` green (601 files, 0 violations).
   - [RECHECKED after lib/services/dynamics/annotations.js change: S339 — verbatim `processAnnotations`, pure/no-deps; suite 4970/4970]
   - [RECHECKED after lib/services/dynamics-service.js change: S339 — facade wrapper delegates, impl fully moved (no stray `annotationSuffix`), behavior-freeze; suite green]
-  **→ Checkpoint A leaf batch (Stages 1–3) is now CODE-COMPLETE; the plan-mandated BATCHED
-  adversarial review is the remaining gate before Checkpoint B.**
+  **→ Checkpoint A leaf batch (Stages 1–3) CODE-COMPLETE + BATCHED adversarial review PASSED
+  (S339, Codex, base `d4463548..HEAD`): verdict SOUND/approve, "could not refute the
+  behavior-freeze", no material findings (it independently confirmed byte-identity modulo the
+  static→function outdent, wrapper delegation to module bindings with no recursion, facade call
+  sites still `this.X`, leaf-module imports confined to the facade, and the shared `auth.js`
+  token-cache binding). Checkpoint B (read path) is UNBLOCKED.**
 - **Checkpoint A — leaf batch. BATCHED review.** Stage 1 `auth.js` (+ `resetTokenCache`, C4/C14;
   add characterization for token caching/expiry/missing-env non-transient error), Stage 2
   `restrictions.js` (C3; add characterization for no-context throw, table/field/expand restriction
