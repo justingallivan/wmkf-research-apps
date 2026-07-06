@@ -2,7 +2,7 @@
 title: DynamicsService Decomposition Plan
 domain: architecture
 kind: plan
-status: draft
+status: active
 summary: "PLANNED: DynamicsService (1,728 L Dataverse WRITE hub) → lib/services/dynamics/*.js behind a thin facade; behavior-freeze, DAL guards + 5 LAW gates preserved."
 canonical: true
 owner: product-engineering
@@ -16,7 +16,7 @@ related:
 
 # DynamicsService Decomposition Plan
 
-**Status: DRAFT — plan authored; no code moved.** This applies the exact cadence proven on the
+**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoints A–F pending.** This applies the exact cadence proven on the
 DiscoveryService decomposition (S335) and the ContactEnrichmentService decomposition (S336):
 strategy chosen up front (facade + extracted modules), leaf-first staged extraction, each cluster
 characterization-covered (baselined green pre-extraction, mutation-proven) BEFORE the code moves,
@@ -318,7 +318,20 @@ Per-stage work (identical to the proven cadence): trace → land characterizatio
 green pre-extraction, mutation-proven) → extract one cluster verbatim (C1 rewrite only) → run suite +
 touched gates → commit. Leaf-first per the DAG.
 
-- **Stage 0 — scaffolding + gate extension + mechanical call graph. DEDICATED review.**
+- **Stage 0 — scaffolding + gate extension + mechanical call graph. DEDICATED review. — EXECUTED
+  S338 (commit `f65966f`).** `constants.js` (48 L) + `http.js` (42 L) extracted verbatim; facade
+  −56 L (static `buildHeaders` delegate + `fetchWithTimeout` import; `tokenCache`/`schemaCache` left
+  in place). Both LAW gates extended fail-closed on `lib/services/dynamics/*`; the access-layer
+  matcher is **resolution-based** (`isDynamicsSubmoduleTarget` resolves relative specifiers to a
+  repo-rel path) — a strengthening beyond the six-shape framing, closing a relative-import hole
+  (`./dynamics/x.js` from a non-exempt `lib` sibling) that raw-substring matching missed, caught by
+  Lead probe during the stage. Six-shape self-test matrix (relative form) + sibling probe landed;
+  agent-wiki watch_paths updated. Verified: bypass probes fail the gate (exit 1) / green after
+  delete; all 4 LAW gates + self-tests, `check:doc-symbol-refs`, `check:agent-wiki` green; full suite
+  4945/4945 (behavior-freeze holds). **DEFERRED within Stage 0:** the mechanical per-method
+  call-graph regen of the hand-built DAG table (low value for two leaf modules; most useful before
+  the `write-core`/`changeset` stages — do it at Checkpoint C). **OUTSTANDING:** the plan-mandated
+  fresh-context `/codex:adversarial-review` of this Stage-0 diff before Checkpoint A begins.
   Create `lib/services/dynamics/` with `constants.js` + `http.js` (verbatim moves of `:18-67`,
   `:137-145`, `:1709-1728`); facade imports them. **Same commit:** the C5/Q4 matcher + EXEMPT_DIRS +
   fail-closed-on-all-import-shapes + six-shape self-test matrix updates to
