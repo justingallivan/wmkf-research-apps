@@ -93,7 +93,7 @@ from 2,348).
 | 4 | `research-area.js` | `isClearlyBiomedicalResearchArea`, `isPhysicalOrEngineeringResearchArea`, `isClearlyNonBiomedicalVerifierArea`, `articlesLookBiomedicalOrClinical`, `evaluateCrossFieldNamesakeGuard`, `isCrossFieldDiscoveredContamination` | — | 70 |
 | 5 | `match-signals.js` | `filterByExpertiseRelevance`, `calculateExpertiseMatch`, `checkExpertiseMismatch`, `checkInstitutionMismatch` | — | 290 |
 | 6 | `provenance.js` | `normalizeSuggestionSource`, `provenanceOriginForVerifiedSuggestion`, `provenanceOriginForUnverifiedSuggestion`, `provenanceOriginForSpineSuggestion`, `mapSpineVerificationResult`, `unverifiedSuggestion`, `evaluateVerificationIncoherence` | constants, `reviewer-provenance` util, `ContactParser` | 200 |
-| 7 | `publications.js` | `_isPreprintPublication`, `dedupePublicationsByTitle`, `backfillOpenAlexPublications`, `countRecentPublications` | constants (`YEARS_LOOKBACK`, `VERIFICATION_STATUSES`, `OPENALEX_PUB_BACKFILL_LIMIT`, `OPENALEX_PUB_BACKFILL_CONCURRENCY`), `OpenAlexService`, `chunk` | 110 |
+| 7 | `publications.js` | `_isPreprintPublication`, `dedupePublicationsByTitle`, `backfillOpenAlexPublications`, `countRecentPublications` | constants (`YEARS_LOOKBACK`, `VERIFICATION_STATUSES`, `OPENALEX_PUB_BACKFILL_LIMIT`, `OPENALEX_PUB_BACKFILL_CONCURRENCY`), `OpenAlexService`, `chunk` | 110 | <!-- drain-table:ignore reason=code-module -->
 | 8 | `pubmed-query.js` | `buildAuthorQuery`, `buildDisambiguatedAuthorQuery` | constants (`YEARS_LOOKBACK`) | 50 |
 | 9 | `literature-search.js` | `searchPubMed`, `searchArXiv`, `searchBioRxiv`, `searchChemRxiv` | constants (`YEARS_LOOKBACK`, env `PUBMED_DELAY`), `PubMedService`/`ArXivService`/`BioRxivService`/`ChemRxivService`, `reviewer-provenance` | 250 |
 | 10 | `track-b-identity.js` | `resolveTrackBIdentities`, `mapTrackBIdentityResult`, `mergeTrackBWithNeedsReviewBySharedOrcid`, `partitionByPublicationBar` | constants (`MIN_PUBLICATIONS` via pass-through, `VERIFICATION_STATUSES`), `ReviewerWorkAuthorResolver`+`normalizeOrcid`, `reviewer-provenance` | 130 |
@@ -116,7 +116,7 @@ modules and still have zero external callers.
 > (`literature-search`, `track-b-identity`, `coauthor-coi`, `verification`, `ranking`) remain Stage 4–6
 > design targets.
 >
-> [RECHECKED after lib/services/discovery/constants.js lib/services/discovery/name-matching.js lib/services/discovery/affiliation.js lib/services/discovery/research-area.js lib/services/discovery/pubmed-query.js lib/services/discovery/match-signals.js lib/services/discovery/provenance.js lib/services/discovery/publications.js change: all 8 extracted modules match their committed source per the per-stage notes below.]
+> [RECHECKED after lib/services/discovery/constants.js lib/services/discovery/name-matching.js lib/services/discovery/affiliation.js lib/services/discovery/research-area.js lib/services/discovery/pubmed-query.js lib/services/discovery/match-signals.js lib/services/discovery/provenance.js lib/services/discovery/publications.js change: all 8 extracted modules match their committed source per the per-stage notes below.] <!-- drain-table:ignore reason=code-module -->
 
 The facade also
 re-exposes **all 10 static class properties** (C2) — including the two OpenAlex-backfill statics an
@@ -154,7 +154,7 @@ These are the non-mechanical parts — where a naive cut-and-paste would silentl
   `DiscoveryService.<STATIC> =` assignments in tests/ and scripts/, S335]; the other 9 statics are
   read-only. **But read-only is not the same as internal:** `OPENALEX_PUB_BACKFILL_CONCURRENCY` is read
   as `DiscoveryService.OPENALEX_PUB_BACKFILL_CONCURRENCY` by
-  `tests/unit/discovery-openalex-publications.test.js:143` [VERIFIED via grep, S335], and a production
+  `tests/unit/discovery-openalex-publications.test.js:143` [VERIFIED via grep, S335], and a production <!-- drain-table:ignore reason=code-module -->
   caller reads `DiscoveryService.YEARS_LOOKBACK`. So the read-only statics can be plain `require`s
   inside their consuming modules (value is identical), **and** the facade must re-expose **all 10** as
   static props so external `DiscoveryService.<CONST>` reads keep resolving.
@@ -243,7 +243,7 @@ review → commit**. Leaf modules first so the facade delegates incrementally an
   lib/services/discovery/affiliation.js change: this note describes the committed Stage 2 state — the
   module exports the 6 functions and the facade delegates each.]
 - **Stage 3 — independent leaves, one commit each (or grouped):** `research-area.js`,
-  `match-signals.js`, `provenance.js`, `publications.js`, `pubmed-query.js`. None depend on each other.
+  `match-signals.js`, `provenance.js`, `publications.js`, `pubmed-query.js`. None depend on each other. <!-- drain-table:ignore reason=code-module -->
   **Batch 1 ✅ EXECUTED (S335):** `research-area.js` (6 methods:
   `isClearlyBiomedicalResearchArea`, `isPhysicalOrEngineeringResearchArea`,
   `isClearlyNonBiomedicalVerifierArea`, `articlesLookBiomedicalOrClinical`,
@@ -257,14 +257,14 @@ review → commit**. Leaf modules first so the facade delegates incrementally an
   (7 methods: `normalizeSuggestionSource`, `provenanceOriginForVerifiedSuggestion`,
   `provenanceOriginForUnverifiedSuggestion`, `provenanceOriginForSpineSuggestion`,
   `mapSpineVerificationResult`, `unverifiedSuggestion`, `evaluateVerificationIncoherence`), and
-  `publications.js` (4 methods: `_isPreprintPublication`, `dedupePublicationsByTitle`,
+  `publications.js` (4 methods: `_isPreprintPublication`, `dedupePublicationsByTitle`, <!-- drain-table:ignore reason=code-module -->
   `backfillOpenAlexPublications`, `countRecentPublications`). Added characterization suites
   `discovery-match-signals.test.js` (16 cases) + `discovery-provenance.test.js` (8 cases) for the
-  untested clusters (baselined green + mutation-proven); `publications` relied on existing
-  `discovery-openalex-publications.test.js`. Facade wrappers `dedupePublicationsByTitle(pubs)` and
-  `checkExpertiseMismatch(pubs)` renamed their param to avoid shadowing the `publications` import.
+  untested clusters (baselined green + mutation-proven); `publications` relied on existing <!-- drain-table:ignore reason=code-module -->
+  `discovery-openalex-publications.test.js`. Facade wrappers `dedupePublicationsByTitle(pubs)` and <!-- drain-table:ignore reason=code-module -->
+  `checkExpertiseMismatch(pubs)` renamed their param to avoid shadowing the `publications` import. <!-- drain-table:ignore reason=code-module -->
   14 suites / 190 tests green; touched gates green; facade 1,967 → 1,455 L (**2,348 → 1,455 overall,
-  ~38%**). [RECHECKED after lib/services/discovery/match-signals.js + provenance.js + publications.js
+  ~38%**). [RECHECKED after lib/services/discovery/match-signals.js + provenance.js + publications.js <!-- drain-table:ignore reason=code-module -->
   change: this note describes the committed batch-2 state — each module exports its functions and the
   facade delegates each.] **Stage 3 Codex review (both batches, `dcfb8483..5e112eb9`): SATISFIED, no
   material findings** — all 23 methods verified body-identical, facade surface intact, statics still
