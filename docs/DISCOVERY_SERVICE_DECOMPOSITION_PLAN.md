@@ -2,8 +2,8 @@
 title: DiscoveryService Decomposition Plan
 domain: architecture
 kind: plan
-status: draft
-summary: "Decompose the 2,348-line DiscoveryService god-class into cohesive lib/services/discovery/*.js modules behind a thin delegating facade. Behavior-freeze."
+status: active
+summary: "COMPLETE (S335): DiscoveryService decomposed from 2,348 L into 13 lib/services/discovery/*.js modules behind a thin delegating facade (668 L). Behavior-freeze."
 canonical: true
 owner: product-engineering
 related:
@@ -14,9 +14,11 @@ related:
 
 # DiscoveryService Decomposition Plan
 
-**Status: STAGES 0–5 EXECUTED (S335) — plan approved via two Codex adversarial-review rounds; all 13
-modules extracted behind the facade; facade 2,348 → 682 L (~71%). Only Stage 6 (facade finalization +
-unused-import cleanup) remains. See stage notes.**
+**Status: COMPLETE (S335) — all 6 stages executed and Codex-reviewed SATISFIED. `DiscoveryService`
+decomposed into 13 `lib/services/discovery/*.js` modules behind a thin delegating facade; facade
+2,348 → 668 L (~72%). Full suite green (436 suites / 4849 tests); behavior-freeze held throughout
+(the one Codex finding — a Stage-5 default-param C1 regression — was caught and fixed). See stage
+notes for per-stage detail.**
 
 All material claims below are grounded in artifacts produced THIS session — the mechanically-computed
 internal call graph (a script over `lib/services/discovery-service.js`), a `grep -a` whole-repo caller
@@ -292,10 +294,18 @@ review → commit**. Leaf modules first so the facade delegates incrementally an
   param* masked an explicit-`undefined` override (if the static were `undefined`, the pre-extraction
   body read `undefined`; the extracted body silently substituted the constant). Fixed by **removing the
   default** so the param mirrors `this.MIN_PUBLICATIONS` exactly (facade is the only caller — verified
-  no other importer). 204 tests still green post-fix. [RECHECKED after lib/services/discovery/verification.js change: this note describes the committed Stage 5 state — the module exports the 3 functions and the facade delegates each, passing this.MIN_PUBLICATIONS with no default-param substitution.]
-- **Stage 6 — facade finalization.** `discovery-service.js` now holds only `discover` + static props
-  + delegations. Confirm the target line count, confirm the full public surface still resolves, final
-  full-suite run + fresh review.
+  no other importer). 204 tests still green post-fix. **Round 2 (`1228ebef` vs `15b9cebd`): SATISFIED,
+  no material findings** — the [medium] is resolved, facade still passes `this.MIN_PUBLICATIONS`, no
+  dangling `MIN_PUBLICATIONS` reference, no regression. [RECHECKED after lib/services/discovery/verification.js change: this note describes the committed Stage 5 state — the module exports the 3 functions and the facade delegates each, passing this.MIN_PUBLICATIONS with no default-param substitution.]
+- **Stage 6 — facade finalization. ✅ EXECUTED (S335).** `discovery-service.js` now holds only the
+  `discover` orchestrator + the 12 static props + the 50 delegating wrappers. Removed the 12
+  now-unused top-level imports (all rxiv/OpenAlex/PubMed services, `ReviewerIdentityEvidence`,
+  `ReviewerWorkAuthorResolver`+`normalizeOrcid`, `ContactParser`, `chunk`, the `reviewer-provenance`
+  trio) and the env-const destructure — every one moved into a cluster module; only
+  `DeduplicationService` (used by `discover`) and `C` (static props) remain. Verified: facade loads;
+  eslint clean (no unused/undefined); no stray refs to the removed symbols; the **full suite is green
+  (436 suites / 4849 tests)** and touched gates pass. **Facade 682 → 668 L — final: 2,348 → 668
+  (~72% smaller); 13 modules totalling ~2,330 L, none over ~320 L.**
 
 Stages 3 and 4 may each be split into per-module commits if a review round wants finer granularity.
 
