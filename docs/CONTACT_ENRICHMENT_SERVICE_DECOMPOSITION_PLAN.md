@@ -3,7 +3,7 @@ title: ContactEnrichmentService Decomposition Plan
 domain: architecture
 kind: plan
 status: draft
-summary: "IN PROGRESS (S336): decompose ContactEnrichmentService (1,776 L) into lib/services/contact-enrichment/*.js behind a thin facade. Stage 0 done; behavior-freeze."
+summary: "IN PROGRESS (S336): ContactEnrichmentService (1,776 L) → lib/services/contact-enrichment/*.js behind a facade. Stage 0 + Checkpoint A done; behavior-freeze."
 canonical: true
 owner: product-engineering
 related:
@@ -15,8 +15,8 @@ related:
 
 # ContactEnrichmentService Decomposition Plan
 
-**Status: IN PROGRESS (S336) — plan authored + 2 Codex review rounds folded; Stage 0 EXECUTED
-(`3f5c0fb8`); Stages 1–10 pending.** This applies the exact
+**Status: IN PROGRESS (S336) — plan authored + 3 Codex review rounds folded; Stage 0 + Checkpoint A
+(Stages 1, 2, 4, 7) EXECUTED; Checkpoint A2 (Stage 6) + B (3, 5) + C (8) + D (9, 10) pending.** This applies the exact
 cadence proven on the DiscoveryService decomposition (S335, `docs/DISCOVERY_SERVICE_DECOMPOSITION_PLAN.md`):
 strategy chosen up front (facade + extracted modules), then leaf-first staged extraction, each cluster
 characterization-covered (baselined green pre-extraction, mutation-proven) BEFORE the code moves, each
@@ -325,19 +325,35 @@ modules first so the facade delegates incrementally and the DAG never breaks. Th
   [RECHECKED after lib/services/contact-enrichment/constants.js change: matches committed Stage 0 (`3f5c0fb8`).]
   [RECHECKED after lib/services/contact-enrichment/abort.js change: matches committed Stage 0 (`3f5c0fb8`).]
   [RECHECKED after lib/services/contact-enrichment-service.js change: facade re-exposes `COSTS`; requires both new modules; matches committed Stage 0 (`3f5c0fb8`).]
-- **Stage 1 — `identity-anchor.js`** (leaf; 8 methods, after `_fieldPersistAllowed` moved to
-  `persistence.js` per R1). Characterize the untested ones first.
-- **Stage 2 — `domain-evidence.js`** (depends on Stage 1).
+- **Stage 1 — `identity-anchor.js`. ✅ EXECUTED (S336, `19dacedf`).** 8 helpers moved verbatim;
+  `this._cleanInstitution` self-call → direct; facade delegates all 8; `_fieldPersistAllowed` left in
+  place (moves to `persistence.js` in Stage 8 per R1). Added 22 characterization cases (none had prior
+  direct coverage), baselined + mutation-proven. 12 suites / 203 tests green; eslint + gates green.
+  [RECHECKED after lib/services/contact-enrichment/identity-anchor.js change: matches committed Stage 1 (`19dacedf`).]
+- **Stage 2 — `domain-evidence.js`. ✅ EXECUTED (S336, `91618142`).** TRUE leaf (the mechanical graph
+  corrected the earlier "depends on Stage 1" sketch — no domain-evidence method calls identity-anchor).
+  11 helpers moved verbatim; self-calls → direct; facade delegates all 11. Added 22 characterization
+  cases for the 10 pure helpers (`_buildInstitutionDomainEvidence` already covered by contact-leads-slice2a);
+  baselined + mutation-proven. 13 suites / 225 tests green; eslint + gates green.
+  [RECHECKED after lib/services/contact-enrichment/domain-evidence.js change: matches committed Stage 2 (`91618142`).]
 - **Stage 3 — `email-adjudication.js`** (depends on domain-evidence; heavily test-pinned — largely
-  already covered).
-- **Stage 4 — `openalex-metrics.js`** (independent leaf).
+  already covered). Checkpoint B.
+- **Stage 4 — `openalex-metrics.js` (independent leaf). ✅ EXECUTED (S336, `efeadc97`).** 2 methods moved
+  verbatim (with the method JSDoc); `this._buildOpenAlexAuthorDto` self-calls → direct; facade delegates
+  both. Removed the now-dead facade imports `OpenAlexService`/`normalizeOrcid`/`isOpenAlexAuthorAccepted`.
+  Added direct pins for `_buildOpenAlexAuthorDto` + the no-anchor skip; resolved-anchor paths stay covered
+  by contact-enrichment-scholar-metrics (mutation-proven). 14 suites / 228 tests green; eslint + gates green.
+  [RECHECKED after lib/services/contact-enrichment/openalex-metrics.js change: matches committed Stage 4 (`efeadc97`).]
 - **Stage 5 — `page-email.js`** (depends on domain-evidence).
 - **Stage 6 — `search-tiers.js`** (Tier-3 LLM + scholar URL). **Not a low-risk leaf — gets its own
   review (Checkpoint A2).** Carries the C6 A7 marker AND, in the same commit, updates the
   `check-prompt-injection-tagging.js` registry `callSiteFiles` to the new path; keeps all three dynamic
   ESM imports (C11) with their string paths rewritten for the new depth (C13); then run
   `check:prompt-injection-tagging`.
-- **Stage 7 — `cost.js`** (trivial leaf).
+- **Stage 7 — `cost.js` (trivial leaf). ✅ EXECUTED (S336, `c9939dc9`).** `estimateCost` moved verbatim;
+  facade delegates; `COSTS` import retained. Added 4 characterization cases pinning the cost math;
+  baselined + mutation-proven. 15 suites / 232 tests green; eslint + gates green. **Completes Checkpoint A.**
+  [RECHECKED after lib/services/contact-enrichment/cost.js change: matches committed Stage 7 (`c9939dc9`).]
 - **Stage 8 — `persistence.js`** (the DAL write unit; C5). **Highest scrutiny + the three LAW gates.**
   Land last of the leaves so the write path moves as an isolated, independently reviewed step.
 - **Stage 9 — `tiers.js` (Q1-B tier extraction; C9). The single highest-risk stage.** Only after every
