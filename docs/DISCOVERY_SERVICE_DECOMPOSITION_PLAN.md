@@ -190,7 +190,11 @@ review → commit**. Leaf modules first so the facade delegates incrementally an
   loads; all 10 statics equal the constants; `MIN_PUBLICATIONS` is still a reassignable own prop (C1);
   8 DiscoveryService-covering unit suites (111 tests) + the enrich-recommended integration suite
   (14 tests) green; touched gates (`check:dataverse-access-layer`, `check:route-service-boundary`,
-  `check:atlas`, `check:doc-symbol-refs`, `check:doc-currency`, `check:agent-wiki`) green.
+  `check:atlas`, `check:doc-symbol-refs`, `check:doc-currency`, `check:agent-wiki`) green. Fresh-context
+  Codex review of the diff (`f688dce7` vs `949a61c8`): SATISFIED, no material findings.
+  [RECHECKED after lib/services/discovery/constants.js + lib/services/discovery-service.js change:
+  this note describes the committed Stage 0 state (`f688dce7`) — constants.js holds the 10 statics +
+  3 env consts; the facade re-exposes all 10 as own static props and destructures the env consts.]
 - **Stage 1 — `name-matching.js`** (pure leaf). Highest-fanout helper cluster; extracting it first
   de-risks affiliation + verification.
 - **Stage 2 — `affiliation.js`** (depends on Stage 1).
