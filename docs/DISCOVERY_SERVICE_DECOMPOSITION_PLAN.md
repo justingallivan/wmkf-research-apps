@@ -224,6 +224,17 @@ review → commit**. Leaf modules first so the facade delegates incrementally an
   module exports the 6 functions and the facade delegates each.]
 - **Stage 3 — independent leaves, one commit each (or grouped):** `research-area.js`,
   `match-signals.js`, `provenance.js`, `publications.js`, `pubmed-query.js`. None depend on each other.
+  **Batch 1 ✅ EXECUTED (S335):** `research-area.js` (6 methods:
+  `isClearlyBiomedicalResearchArea`, `isPhysicalOrEngineeringResearchArea`,
+  `isClearlyNonBiomedicalVerifierArea`, `articlesLookBiomedicalOrClinical`,
+  `evaluateCrossFieldNamesakeGuard`, `isCrossFieldDiscoveredContamination`) and `pubmed-query.js`
+  (2 methods: `buildAuthorQuery`, `buildDisambiguatedAuthorQuery`, `YEARS_LOOKBACK` from `./constants`).
+  Added characterization suites `tests/unit/discovery-research-area.test.js` (11 cases) +
+  `tests/unit/discovery-pubmed-query.test.js` (3 cases), baselined green + mutation-proven; 12 suites /
+  167 tests green; touched gates green; facade 2,029 → 1,967 L. **Batch 2 pending:** `match-signals.js`,
+  `provenance.js`, `publications.js`. Stage 3 Codex review runs once the batches land. [RECHECKED after
+  lib/services/discovery/research-area.js + lib/services/discovery/pubmed-query.js change: this note
+  describes the committed batch-1 state — each module exports its functions and the facade delegates.]
 - **Stage 4 — mid-tier:** `literature-search.js`, `track-b-identity.js`, `coauthor-coi.js`,
   `ranking.js`.
 - **Stage 5 — `verification.js`** (the hub; depends on Stages 1–4). The 272-line
