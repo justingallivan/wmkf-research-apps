@@ -332,6 +332,16 @@ touched gates → commit. Leaf-first per the DAG.
   call-graph regen of the hand-built DAG table (low value for two leaf modules; most useful before
   the `write-core`/`changeset` stages — do it at Checkpoint C). **OUTSTANDING:** the plan-mandated
   fresh-context `/codex:adversarial-review` of this Stage-0 diff before Checkpoint A begins.
+
+  Stage 0 recheck ledger (paths changed this session, each re-verified against commit `f65966f`):
+  - [RECHECKED after scripts/check-dataverse-access-layer.js change: `f65966f` — source-based resolution matcher `isDynamicsSubmoduleTarget`; relative + namespace bypass probes fail the gate (exit 1), tree green]
+  - [RECHECKED after scripts/check-route-service-boundary.js change: `f65966f` — `boundaryKind` extended to the new dir; self-test + route fixture green]
+  - [RECHECKED after scripts/check-dataverse-access-layer-self-test.js change: `f65966f` — six-shape relative matrix + `./dynamics` sibling probe; self-test green]
+  - [RECHECKED after scripts/check-route-service-boundary-self-test.js change: `f65966f` — dynamics-submodule fail-closed fixtures; self-test green]
+  - [RECHECKED after lib/services/dynamics/constants.js change: `f65966f` — verbatim extraction; facade loads; full suite 4945/4945]
+  - [RECHECKED after lib/services/dynamics/http.js change: `f65966f` — verbatim extraction, `fetchWithTimeout` takes a `timeout` param (not `API_TIMEOUT`); suite green]
+  - [RECHECKED after lib/services/dynamics-service.js change: `f65966f` — facade rewired (`buildHeaders` delegate + `fetchWithTimeout` import), behavior-freeze; suite green]
+
   Create `lib/services/dynamics/` with `constants.js` + `http.js` (verbatim moves of `:18-67`,
   `:137-145`, `:1709-1728`); facade imports them. **Same commit:** the C5/Q4 matcher + EXEMPT_DIRS +
   fail-closed-on-all-import-shapes + six-shape self-test matrix updates to
