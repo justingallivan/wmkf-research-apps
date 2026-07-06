@@ -71,26 +71,37 @@ is **no C1 (live-mutated-static) trap** here; the constants can be plain module 
 ## Why a facade (not a call-site rewrite)
 
 The external surface reaches deep into underscore-prefixed "internal" methods (tests pin them by name),
-so a facade is the low-churn path. Caller inventory [VERIFIED via grep whole-repo, excluding
-`.next/` and `.claude/worktrees/`, S336]:
+so a facade is the low-churn path. Caller inventory — **corrected after Codex review round 1** (the
+round-1 caller finding: the first-pass inventory listed `scholar-url.js` as a caller and claimed an
+external `.COSTS` read; neither is true). This is a **mechanical `ContactEnrichmentService.<method>`
+scan** [VERIFIED via node AST-ish grep over pages/lib/scripts/tests/shared excluding the file itself,
+Codex round 1 + re-run S336]:
 
-- **Production callers (3):**
-  - `pages/api/reviewer-finder/enrich-contacts.js` — `enrichCandidates`
-  - `lib/services/workbench/enrich-recommended-service.js` — `enrichCandidate`, `enrichCandidates`,
-    plus internal helpers it reaches into
-  - `lib/utils/scholar-url.js` — `buildGoogleScholarUrl`
-- **Scripts (≈4):** `scripts/test-contact-enrichment.js`, `scripts/smoke-identity-resolver-verdict.js`,
-  `scripts/measure-scholar-orcid-crosstab.js`, `scripts/probe-rudenko-email-trace.js`.
+- **Production callers (2):**
+  - `pages/api/reviewer-finder/enrich-contacts.js` — `estimateCost` (:98), `enrichCandidates` (:106)
+  - `lib/services/workbench/enrich-recommended-service.js` — `enrichCandidates` (:249)
+  - (`lib/utils/scholar-url.js` is **NOT** a caller — it has its own independent scholar-URL helper and
+    only a comment reference at :35. Removed from the inventory.)
+- **Scripts (5):** `scripts/test-contact-enrichment.js` (`claudeWebSearch`),
+  `scripts/smoke-identity-resolver-verdict.js` (`enrichCandidate`),
+  `scripts/smoke-reviewer-contact-anchoring.mjs` (`enrichCandidate`, `_validateEmailAgainstVerifiedDomain`
+  — **was missing from the first draft**), `scripts/measure-scholar-orcid-crosstab.js`,
+  `scripts/probe-rudenko-email-trace.js`.
 - **Tests (≈11 files)** pin many methods **including underscore ones** directly:
   `_attachEmailFromResolvedPage`, `_validateEmailAgainstVerifiedDomain`, `_collectContactLeads`,
   `_addContactLead`, `_selectGroundedEmail`, `_applyAffiliationOverride`,
-  `_readjudicateNameMismatchRejectedEmail`, `_buildInstitutionDomainEvidence` [VERIFIED via
-  `ContactEnrichmentService.<method>` grep, S336], and `.COSTS` is read as a static prop.
+  `_readjudicateNameMismatchRejectedEmail`, `_buildInstitutionDomainEvidence`, `saveToDatabase`,
+  `claudeWebSearch`, `enrichCandidate`, `enrichCandidates`, `estimateCost` [VERIFIED via mechanical scan,
+  S336]. **`.COSTS` is NOT read by any external caller** — the only `.COSTS` reference outside a method
+  body is the class's own static assignment at `contact-enrichment-service.js:1774` [VERIFIED via scan].
+  So the facade re-exposes `COSTS` only because `enrichCandidates`/`estimateCost` read it internally, not
+  for an external consumer.
 
-Because scripts and tests pin methods **by name on the class**, the facade must delegate the **entire
-surface those callers touch** — including the underscore methods they pin (kept as thin delegating
-wrappers, module-private inside their cluster module, exactly as discovery did for its 3 underscore
-methods).
+Because scripts and tests pin methods **by name on the class** — **and several tests `jest.spyOn` the
+class methods** (`saveToDatabase`, `claudeWebSearch`, `enrichCandidate`; see C10) — the facade must
+delegate the **entire surface those callers touch**, including the underscore methods they pin (kept as
+thin delegating wrappers, module-private inside their cluster module) AND preserve spyable dispatch for
+the internally-called ones.
 
 ## Verified internal self-call graph (behavior-freeze input)
 
@@ -113,20 +124,22 @@ Stage-0 mechanical call graph.**
 |---|--------|------------------------------------------|---------------------|----|
 | 1 | `constants.js` | `COSTS`, `SEARCH_EMAIL_SOURCES`, `EXPLICIT_EMAIL_PERSIST_SOURCES`, `CLAUDE_WEB_SEARCH_SCHEMA` (Tier-3 output schema — **carries the A7 prompt-injection marker**, C6) | — | 50 |
 | 2 | `abort.js` | module fns `abortError`, `isDeadlineAbort` | — | 30 |
-| 3 | `identity-anchor.js` | `_identityAnchorForCandidate`, `_cleanInstitution`, `_effectiveInstitution`, `_searchCandidateWithInstitution`, `_anchorWithInstitution`, `_hasOrcidAnchor`, `_fieldPersistAllowed`, `_markUnanchoredAbstain`, `_getAnchoredOrcidProfile` | `ORCIDService`, `normalizeOrcid` | 130 |
-| 4 | `domain-evidence.js` | `_institutionTokens`, `_institutionsContradict`, `_resultContradictsAnchor`, `_normalizeDomain`, `_emailDomain`, `_domainRelated`, `_emailDomainRelatedToAny`, `_addInstitutionDomain`, `_currentOrcidInstitutionRefs`, `_strongInstitutionDisplayMatch`, `_buildInstitutionDomainEvidence` | identity-anchor (`_cleanInstitution`/`_effectiveInstitution`), `safe-fetch` (`safeFetchInstitutionPage`, `hostWithinDomain`) | 210 |
+| 3 | `identity-anchor.js` | `_identityAnchorForCandidate`, `_cleanInstitution`, `_effectiveInstitution`, `_searchCandidateWithInstitution`, `_anchorWithInstitution`, `_hasOrcidAnchor`, `_markUnanchoredAbstain`, `_getAnchoredOrcidProfile` (`_fieldPersistAllowed` **moved to persistence.js**, R1) | `ORCIDService`, `normalizeOrcid` | 120 |
+| 4 | `domain-evidence.js` | `_institutionTokens`, `_institutionsContradict`, `_resultContradictsAnchor`, `_normalizeDomain`, `_emailDomain`, `_domainRelated`, `_emailDomainRelatedToAny`, `_addInstitutionDomain`, `_currentOrcidInstitutionRefs`, `_strongInstitutionDisplayMatch`, `_buildInstitutionDomainEvidence` | identity-anchor (`_cleanInstitution`/`_effectiveInstitution`), `safe-fetch` (`safeFetchInstitutionPage`, `hostWithinDomain`), **`ContactParser` (:193,208), `normalizeOrcid` (:272), `mayPersistIdentity` (:278), `OpenAlexService`** (added, R1 BLOCKER-3) | 210 |
 | 5 | `email-adjudication.js` | `_markEmailContested`, `_readjudicateNameMismatchRejectedEmail`, `_addContactLead`, `_collectContactLeads`, `_validateEmailAgainstVerifiedDomain` | domain-evidence, constants (`SEARCH_EMAIL_SOURCES`, `EXPLICIT_EMAIL_PERSIST_SOURCES`) | 180 |
 | 6 | `openalex-metrics.js` | `_attachOpenAlexMetrics`, `_buildOpenAlexAuthorDto` | `OpenAlexService`, `reviewer-identity-resolver` (`resolveIdentity`/`isOpenAlexAuthorAccepted`) | 140 |
-| 7 | `page-email.js` | `_normForNameMatch`, `_parseCandidateName`, `_emailDomainRelated`, `_windowNamesCandidate`, `_personalPageSlug`, `_slugNamesCandidate`, `_selectGroundedEmail`, `_orderCandidateUrls`, `_attachEmailFromResolvedPage` | domain-evidence, `safe-fetch`, `ContactParser` | 210 |
-| 8 | `search-tiers.js` | `claudeWebSearch` (Tier 3, PAID/LLM), `buildGoogleScholarUrl` | `llm-client`/`MultiLLMService`, `SerpContactService`, `ContactParser`, constants (`CLAUDE_WEB_SEARCH_SCHEMA`), `getModelForApp` | 190 |
-| 9 | `persistence.js` (**DAL / write path**) | `saveToDatabase` | `withDalContext`, `potentialReviewerAdapter`, `researcherAdapter`, `reviewer-identity-resolver` (`mayPersistIdentity`, `RESOLVER_SOURCED_FIELDS`), identity-anchor (`_fieldPersistAllowed`), `ContactParser` (`isDocumentUrl`) | 110 |
+| 7 | `page-email.js` | `_normForNameMatch`, `_parseCandidateName`, `_emailDomainRelated`, `_windowNamesCandidate`, `_personalPageSlug`, `_slugNamesCandidate`, `_selectGroundedEmail`, `_orderCandidateUrls`, `_attachEmailFromResolvedPage` | domain-evidence, `safe-fetch`, `ContactParser`, **constants (`SEARCH_EMAIL_SOURCES`, :1188), `abortError` (:1195)** (added, R1 BLOCKER-3) | 210 |
+| 8 | `search-tiers.js` | `claudeWebSearch` (Tier 3, PAID/LLM), `buildGoogleScholarUrl` | `llm-client`/`MultiLLMService`, `SerpContactService`, `ContactParser`, constants (`CLAUDE_WEB_SEARCH_SCHEMA`), `getModelForApp`; **preserves dynamic ESM imports (:1645,1660), C11** | 190 |
+| 9 | `persistence.js` (**DAL / write path**) | `saveToDatabase`, **`_fieldPersistAllowed`** (moved here, R1 — only `saveToDatabase` uses it, :1529–1530) | `withDalContext`, `potentialReviewerAdapter`, `researcherAdapter`, `reviewer-identity-resolver` (`mayPersistIdentity`, `RESOLVER_SOURCED_FIELDS`), constants (`EXPLICIT_EMAIL_PERSIST_SOURCES`), `ContactParser` (`isDocumentUrl`) | 120 |
 | 10 | `cost.js` | `estimateCost` | constants (`COSTS`) | 70 |
-| 11 | `tiers.js` (**Q1-B, highest-risk cut**) | the five tier bodies from `enrichCandidate` as `applyTier{0..4}(candidate, result, options)` + `_finalize` + `_applyAffiliationOverride` (the finalize/persist glue the tiers short-circuit into) | identity-anchor, domain-evidence, email-adjudication, openalex-metrics, page-email, search-tiers, persistence, constants, `ContactParser` | 220 |
+| 11 | `tiers.js` (**Q1-B, highest-risk cut**) | the five tier bodies from `enrichCandidate` as `applyTier{0..4}(candidate, result, options)` + `_finalize` + `_applyAffiliationOverride` (the finalize glue `_finalize` calls after resolver/domain/contact-lead work, :1273 — kept with `_finalize`, R1 MINOR-7) | identity-anchor, domain-evidence, email-adjudication, openalex-metrics, page-email, search-tiers, persistence, constants, `ContactParser`, **`ORCIDService` (:622), `SerpContactService` (:797), resolver exports (:1246)** (added, R1 BLOCKER-3); **must dispatch `claudeWebSearch`/`saveToDatabase` through the facade `this`, not imports (C10)** | 220 |
 | — | `contact-enrichment-service.js` (**facade**) | `enrichCandidate` (~120 L shell that sequences `applyTier0..4` + `_finalize`) + `enrichCandidates` (batch) + all delegating wrappers + `COSTS` re-export | all of the above | ~350 |
 
-**`_applyAffiliationOverride`** (~40 L) is small and called only from `_finalize`; sketch keeps it with
-the orchestration core on the facade, but it could fold into `persistence.js` or its own file — a
-granularity nit for review.
+**The `Depends on` column above is STILL a sketch with hand-applied round-1 corrections — Stage 0 must
+replace it wholesale with the mechanical per-method call graph** (Codex round-1 BLOCKER-3: the sketch had
+real missing/misplaced edges; the specific ones it named are folded in above, but a by-eye column is not
+trustworthy — regenerate it). `_applyAffiliationOverride` lives with `_finalize` in `tiers.js`
+(round-1 MINOR-7 resolved the earlier table/note contradiction).
 
 ## Q1 — DECIDED (owner, S336): extract the Tier 0–4 tiers (Q1-B)
 
@@ -146,9 +159,11 @@ is already extracted and green. The alternative (Q1-A: keep the orchestrator who
 ## Behavior-preservation constraints (the risk surface)
 
 - **C1 — No runtime-mutated statics (unlike discovery).** Verified: nothing does
-  `ContactEnrichmentService.X = …` [VERIFIED via grep tests/ + scripts/, S336]. `COSTS` is *read*
-  externally (`.COSTS`) but never mutated, so it can be a plain `require` from `constants.js`, and the
-  facade re-exposes it as a static prop for the external reads. No live-value-passthrough wrappers
+  `ContactEnrichmentService.X = …` [VERIFIED via grep tests/ + scripts/, S336]. `COSTS` moves to
+  `constants.js` as a plain `require`; the facade re-exposes it as a static prop because
+  `enrichCandidates`/`estimateCost` read it **internally** — **not** for an external consumer (round 1
+  disconfirmed the first-draft "read externally" claim: the only `.COSTS` outside a method body is the
+  class's own assignment at :1774 [VERIFIED via mechanical scan]). No live-value-passthrough wrappers
   needed.
 - **C2 — Full facade surface.** Every method a script/test pins must remain callable as
   `ContactEnrichmentService.foo` — including the underscore methods tests pin (list in "Why a facade").
@@ -166,8 +181,13 @@ is already extracted and green. The alternative (Q1-A: keep the orchestrator who
   (`mayPersistIdentity`, `RESOLVER_SOURCED_FIELDS`, `blockByIdentity`/`blockScholar`)
   [VERIFIED via :1527–1631]. **Run the three LAW-mode gates after this stage:**
   `check:dataverse-access-layer`, `check:route-service-boundary`, `check:dynamics-context-boundary`.
-  The gates are line-tolerant allowlists keyed on file — a new `lib/services/contact-enrichment/persistence.js`
-  path may need an allowlist entry; verify against the gate baselines before committing (Stage 8 note).
+  **No allowlist entry should be needed** (round-1 correction — the first draft overstated this):
+  `check-dataverse-access-layer.js` runs with **no allowlist file** [VERIFIED via
+  scripts/check-dataverse-access-layer.js:14], `check-route-service-boundary.js` has **no baseline/ratchet**
+  [VERIFIED via :12], and `withDalContext` is explicitly **allowed** by the context gate [VERIFIED via
+  scripts/check-dynamics-context-boundary.js:45]. The gates stay green **provided `persistence.js` imports
+  the adapters but does NOT re-export adapter identities**, and the `return withDalContext(…)` wrapper
+  stays around every adapter call [VERIFIED via :1540]. Verify green after the move regardless.
 - **C6 — A7 prompt-injection marker.** `CLAUDE_WEB_SEARCH_SCHEMA` is the Tier-3 model-output schema
   [VERIFIED via :62–71]; `claudeWebSearch` validates model output against it. Moving the schema to
   `constants.js` and the method to `search-tiers.js` must carry the A7 surface marker so
@@ -180,17 +200,45 @@ is already extracted and green. The alternative (Q1-A: keep the orchestrator who
   data ownership, so no new `check:atlas` rows. Verify each stage against the touched gates
   (`check:doc-symbol-refs`, `check:doc-currency`, `check:agent-wiki`, plus the LAW gates for the
   persistence stage), per CLAUDE.md rule 4.
-- **C9 — Tier extraction: mutable `result` + early-return control flow (the Q1-B care-point).** The
-  `enrichCandidate` tiers do not return pure values — they mutate `result.contactEnrichment` in place AND
-  can **short-circuit the remaining tiers** by returning early through `_finalize` (e.g. Tier 0 does
-  `return this._finalize(candidate, result, …)` at [VERIFIED via :566]). When the tiers move into
-  `tiers.js`, this control flow must be preserved exactly: an `applyTierN` that finds a terminal result
-  must signal "stop and finalize" to the shell (return the finalized result / a done sentinel), and the
-  shell must honor it so no tier that used to be skipped now runs, and no tier that used to run now gets
-  skipped. **Stage 0 must first enumerate every early `return` / short-circuit path in
-  `enrichCandidate:468–901`** (only Tier 0's is cited above; the rest are unenumerated) so the shell
-  contract covers them all; the characterization suite must exercise each tier's found/not-found branch
-  AND the short-circuit boundaries between tiers before the extraction.
+- **C9 — Tier extraction: mutable `result` + early-return control flow (the Q1-B care-point).**
+  Rewritten after Codex round 1 (BLOCKER-2: the first draft only cited Tier 0's early return). The tiers
+  mutate `result.contactEnrichment` in place and mix **terminal short-circuits**, **fall-through
+  mutations**, and a **throw**. The full control-flow inventory [VERIFIED via :468–901, Codex round 1]:
+  - **Terminal returns through `_finalize`:** Tier 0 affiliation email `return this._finalize(…)`
+    [:566]; Tier 1 **recent** PubMed email [:602]; the final catch-all return [:876].
+  - **Tier 3 aborts by THROWING**, not finalizing [:772] — the shell must let it propagate, not convert
+    it to a finalize.
+  - **Fall-through (mutate, then continue to the next tier):** a *stale* (non-recent) PubMed email falls
+    through; ORCID email/website/affiliation fall through; the no-anchor abstain mutates then falls
+    through; Tier 3 **non-abort** errors are swallowed (caught, not rethrown); Tier 4 skips when **any**
+    email already exists (not just a recent one).
+  - **`_finalize` arg fidelity:** the early returns use the default `scholarCandidate = candidate`,
+    while the final return passes `scholarCandidate: searchCandidate` — the extracted shell/sentinel must
+    reproduce **each call's exact `_finalize` args**, not a single normalized call.
+
+  When the tiers move to `tiers.js`, an `applyTierN` must signal "terminal / finalized" vs. "continue"
+  vs. "throw" to the shell so no tier that used to run is skipped and none that was skipped now runs.
+  The characterization suite must exercise every tier's found / not-found / stale / abort / non-abort-error
+  branch AND the inter-tier short-circuit boundaries BEFORE the extraction.
+- **C10 — Spyable facade dispatch (round-1 BLOCKER-1; the sharpest behavior-freeze trap).** Several tests
+  `jest.spyOn(ContactEnrichmentService, 'saveToDatabase' | 'claudeWebSearch' | 'enrichCandidate')`
+  [VERIFIED via grep tests/, S336 — e.g. contact-enrichment-affiliation-pin.test.js:137,309;
+  contact-enrichment-abort.test.js:173; contact-enrichment-scholar-metrics.test.js:137,40]. These edges
+  are called **internally**: `_finalize` calls `this.saveToDatabase` [:1276], Tier 3 calls
+  `this.claudeWebSearch` [:717], `enrichCandidates` calls `this.enrichCandidate`. If the extracted
+  `tiers.js`/`_finalize` code invokes these as **closed-over imported functions**, the class-level spies
+  no longer intercept → both the tests break AND any real caller relying on the override sees different
+  behavior. **Requirement:** the moved implementations must dispatch these spy-patched edges **through the
+  facade class** (e.g. pass the facade as `this`, or inject `this.claudeWebSearch`/`this.saveToDatabase`/
+  `this.enrichCandidate`), NOT via direct module imports. This is the one place where "self-call → direct
+  import" (the normal C3 rewrite) is FORBIDDEN.
+- **C11 — Runtime `process.env` reads + dynamic ESM imports must not be hoisted (round-1 MAJOR-6).**
+  `_attachEmailFromResolvedPage` reads `process.env.REVIEWER_PAGE_EMAIL_TIER_ENABLED` **at call time**
+  [VERIFIED via :1181]; a test mutates that env **after import**
+  [VERIFIED via resolved-page-email-tier-service.test.js:37]. So the flag must NOT be hoisted to a
+  module-load `const` in `page-email.js` — keep the read inside the function. Likewise `claudeWebSearch`
+  uses **dynamic `import()` of ESM** [VERIFIED via :1645,1660]; `search-tiers.js` must preserve the
+  dynamic imports (no static top-of-file `require`/`import` conversion).
 
 ## Staging (leaf-first, each stage independently green + reviewed)
 
