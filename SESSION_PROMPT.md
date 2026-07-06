@@ -1,115 +1,109 @@
-# Session 335 Prompt: Notification site-33 CLOSED — next up, service-decomposition refactors
+# Session 336 Prompt: DiscoveryService decomposed — next up, contact-enrichment / dynamics-service
 
-## Session 334 Summary
+## Session 335 Summary
 
-Drove the site-33 notification trust-model push-up (`docs/NOTIFICATION_TRUST_MODEL_PLAN.md`) from
-`status: draft, needs re-review` all the way to **fully executed and closed** across three stages, each
-under its own fresh-context Codex adversarial review. The through-line lesson: the plan's original
-caller census was built with literal `grep` and had **three silent blind spots** — a binary-flagged file,
-a `.call` local alias, and a dynamic `import()` — that hid 3 real callers. Re-closed the census at **23**
-verified three independent ways (`grep -a` union, whole-repo sweep, CodeGraph caller query).
+Executed the **DiscoveryService decomposition** end-to-end (carried service-decomposition item from
+S331–334). Drove `lib/services/discovery-service.js` from a **2,348-line static god-class → a 668-line
+thin delegating facade** (~72% smaller) over **13 cohesive `lib/services/discovery/*.js` modules**, as a
+strict **behavior-freeze** (pure code motion, zero semantic change). Plan authored and approved via two
+Codex adversarial-review rounds; all 6 execution stages independently Codex-reviewed **SATISFIED**.
+
+The through-line: strategy chosen up front (facade + extracted modules, so every `DiscoveryService.method()`
+call site — 2 routes, 12 scripts, 8 test files — keeps working unchanged), then each cluster got
+characterization coverage (baselined green pre-extraction, **mutation-proven** to discriminate) BEFORE the
+code moved. Full suite **436 suites / 4849 tests green** (+79 new characterization tests over the 428/4770
+S334 baseline); eslint clean; all touched gates pass.
 
 ### What Was Completed
 
-1. **Startup red gate fixed** — `check:memory-router` was red (`feedback-dont-tune-against-hook-source.md`
-   missing a `status:` key). Added `status: active` (`3aa3ac9`).
+1. **Plan + 2 review rounds** (`a9ba8ca3`, `84d9eb43`, `949a61c8`) — `docs/DISCOVERY_SERVICE_DECOMPOSITION_PLAN.md`.
+   Round 1 CHANGES-REQUIRED: 2 verified BLOCKERs (missed 2 static props → 10 not 8; incomplete dependency
+   column → added the `DEBUG`/`NCBI_API_KEY`/`PUBMED_DELAY` env consts, constraint **C7**). Round 2 SATISFIED.
 
-2. **Census re-closed at 23 + plan cleaned** (`02d3cd9`) — Codex's Stage 0 STOP-on-drift caught
-   `pages/api/cron/pricing-refresh.js` (a binary-flagged file grep silently dropped). Verified NEVER-REACHES,
-   so Stage 1 scope was unchanged. Recorded the grep-blind-spots lesson in memory (`7d77121`, folded into
-   `feedback-symbol-consumer-fanout.md`).
+2. **Stages 0–6 executed** (all SATISFIED):
+   - S0 `constants.js` (`f688dce7`) · S1 `name-matching.js` (`649c9d33`) · S2 `affiliation.js` (`4dea718a`)
+   - S3 `research-area`+`pubmed-query` (`de20589e`), `match-signals`+`provenance`+`publications` (`5e112eb9`)
+   - S4 `track-b-identity`+`coauthor-coi`+`literature-search`+`ranking` (`4c7b83cc`)
+   - S5 `verification.js` — the 272-line `verifyClaudeSuggestions` hub (`15b9cebd`)
+   - S6 facade finalization / dead-import cleanup (`a552480e`)
 
-3. **Stage 1 — 9 single-hop push-ups** (`23cff83`): `withDalContext` added at #9,14,15,16,17,18,19,20,21
-   + a 14-test characterization suite (`tests/unit/notification-trust-model-pushup.test.js`). Reviewed;
-   also mutation-proved the tests discriminate, and recorded the scope-widen at the two monitor sites
-   (`0a179ef`).
+3. **One real bug caught by review + fixed** (`1228ebef`): a Stage-5 `minPublications = MIN_PUBLICATIONS`
+   *default param* masked an explicit-`undefined` override (diverging from the pre-extraction
+   `this.MIN_PUBLICATIONS` read under C1). Removed the default so the param mirrors the facade static
+   exactly. **Lesson recorded:** `.claude-memory/feedback-behavior-freeze-passthrough-no-default.md`.
 
-4. **Stage 2 — multi-hop #10/#11** (`ff1da81` scope, `1b69d4f` code): traced both fan-outs (CodeGraph +
-   `grep -a`); collapsed to **1 new wrap** (`onboard-reviewer.js:81`) + coverage — everything else already
-   covered by existing route/cron wraps. Reviewed.
+4. **Doc-count reconciliation** (`00313e52`) — Codex final review flagged the plan's facade counts (12→10
+   static props, 50→53 wrappers, 12→11 removed imports) and the underscore-methods deviation (kept as thin
+   wrappers to preserve the exact surface, not made private). Reconciled every restatement.
 
-5. **Stage 3 — removed the shared net** (`5fa8522` + `a1f13af` test upgrades, `5d685c7` removal): upgraded
-   **all 10 already-covered characterization tests to handler-driven** (each mutation-proven — neutralize
-   the handler wrap → guard goes red), then removed `withDalContext('notification-email', ...)` from
-   `sendAdminEmail`. It now assumes an ambient trusted context; `createAndSendEmail`'s
-   `assertTrustedDalContext` is the sole fail-closed backstop (proven by the real-`DynamicsService`
-   no-context negative control). Realigned 2 pre-existing tests that pinned the old self-establish contract.
-   Fresh-context Codex review: **SATISFIED, no findings**.
-
-Three fresh-context Codex reviews across the arc: the two on shipped code returned only P2 doc-consistency
-items (fixed in `0a10400`, `9d3c926`); the final removal review found nothing. Full suite **428/4770 green**.
-
-### Commits
-- `3aa3ac9` fix: memory-router gate (status:active)
-- `02d3cd9` docs: clean plan + re-close census at 23 (three-way verified)
-- `23cff83` feat(dal): Stage 1 push-ups (9 sites) · `5bdf121` docs · `0a179ef` docs (scope-widen + mutation-proof)
-- `7d77121` memory: caller-census grep blind spots → grep -a + CodeGraph
-- `ff1da81` docs: trace + scope Stage 2 · `1b69d4f` feat(dal): Stage 2 push-ups (#10/#11) · `96d12c0` docs
-- `a1f13af` docs+test: S1/S2 review verdict + grantee handler-guard POC · `5fa8522` test: 5 Form-A conversions · `0a10400` docs: reconcile after S3-review P2
-- `5d685c7` feat(dal): remove shared notification-email wrapper — site 33 closed · `9d3c926` docs: mark Stage 3 done
+### Commits (21 total, `a9ba8ca3`…`00313e52`, all on `main`)
+Plan: `a9ba8ca3` `84d9eb43` `949a61c8`. Stages: `f688dce7` `649c9d33` `4dea718a` `de20589e` `5e112eb9`
+`4c7b83cc` `15b9cebd` `a552480e`. Fix: `1228ebef`. Review/doc records: `da9c19d4` `b7fb6be1` `dcfb8483`
+`2bf03915` `859a8bad` + hook-ack fixes `c404d490` `70b92f33` `1d66361e` + `00313e52`.
 
 ## Next Items
 
 ### Verified Open
 
-1. **Service-decomposition refactors (carried S331-332, not started).**
-   Evidence: `git wc -l` this session — `lib/services/discovery-service.js` (2,348 lines) and
-   `lib/services/contact-enrichment-service.js` (1,776 lines), both still oversized;
-   `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md` closing notes. Decompose each; also the flat `lib/services`
-   domain-fold (needs a CodeGraph pass first). Same plan→trace→execute→fresh-review cadence that worked
-   for site-33 — and use `grep -a` + CodeGraph for any caller census, not literal grep (this session's
-   lesson: `feedback-symbol-consumer-fanout.md`).
+1. **`contact-enrichment-service.js` decomposition** (next service-decomposition candidate).
+   Evidence: `wc -l lib/services/contact-enrichment-service.js` = **1,776 L** (S335, still oversized;
+   discovery-service is now done). Same cadence proven this session: plan → 2 review rounds → leaf-first
+   staged extraction behind a facade, characterization + mutation-proof per cluster, per-stage Codex review.
+   The reusable playbook is `docs/DISCOVERY_SERVICE_DECOMPOSITION_PLAN.md`.
+
+2. **`dynamics-service.js` (1,728 L)** — the other oversized service, but it is the Dataverse write hub
+   (LAW-mode gates: `check:dataverse-access-layer`, `check:route-service-boundary`, trust-boundary,
+   context-boundary). Evidence: `wc -l` = 1,728 L. HIGHER RISK than discovery (not a pure static-method
+   class; carries auth/restriction context). Would need its own plan + heavy contract-reconcile before touching.
+
+3. **The flat `lib/services` domain-fold** (carried S331). Evidence: `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md`.
+   Needs a CodeGraph pass first to group the ~50 flat service files into domain subdirs; larger and cross-cutting.
 
 ### Backlog (small, owner-priority when convenient)
 
-1. **`pages/api/app-access.js` swallows service errors** (P3, pre-existing).
-   Evidence: still returns `res.json({ success: true })` on the grant path (`:91`) and `res.json({ success: true })`
-   at `:25` regardless of a service `{ error }`. NOTE: line numbers shifted from the old `:88/:105` — re-locate
-   before fixing. Fix = route returns an error status when the service reports one.
-2. **1b-15 atlas-gate ↔ `check-coverage-self-test.js` race** over the shared `lib/services/atlas_selftest_tmp`
-   dir — documented wart; a real fix needs a dedicated fixture path. Not re-verified this session.
-3. **pg `sslmode=verify-full`** — `(node:4)` cron stderr warning wants an explicit `sslmode=verify-full`
-   in the connection string before pg v9. One-line env change + redeploy. Not re-verified this session.
+1. **`pages/api/app-access.js` swallows service errors** (P3, pre-existing). Evidence: still returns
+   `res.json({ success: true })` at `:25` (and the grant path) regardless of a service `{ error }`
+   [VERIFIED via grep, S335 — line numbers shifted again; re-locate before fixing]. Fix = return an error
+   status when the service reports one.
+2. **1b-15 atlas-gate ↔ `check-coverage-self-test.js` race** over shared `lib/services/atlas_selftest_tmp`.
+   Documented wart; real fix needs a dedicated fixture path. Not re-verified S335.
+3. **pg `sslmode=verify-full`** — cron stderr `(node:4)` warning wants explicit `sslmode=verify-full`
+   before pg v9. One-line env change + redeploy. Not re-verified S335.
 
 ### Parked
 
-1. **Spec-audit design-docs recovery** (work computer only, ~2026-07-08).
-   Evidence: `.claude-memory/project-spec-audit-docs-recovery-parked.md`.
+1. **Spec-audit design-docs recovery** (work computer, ~2026-07-08). Evidence:
+   `.claude-memory/project-spec-audit-docs-recovery-parked.md`.
 
 ### Do Not Reopen Without New Decision
 
-1. **Notification site-33 (`NOTIFICATION_TRUST_MODEL_PLAN.md`): CLOSED.** All three stages executed and
-   independently reviewed; the shared `notification-email` wrapper is removed; census closed at 23.
-   Evidence: plan Execution-status line + Stage Log (2026-07-05 entries); commit `5d685c7`. The code comment
-   at `notification-service.js:171` warns against re-adding an internal wrap — heed it.
-2. **`docs/BYPASS_STRIP_PLAN.md` Stages 0-4: CLOSED** (site 33 was its one deferred exception, now also closed).
-3. **Chunk-loop gate + security-gate walk consolidation: DECLINED** (S332).
-4. **Do not re-add CodeQL** (`180e9046`, `198fbd97`).
-5. **Do not delete `lib/services/anthropic-admin.js`** (pricing cron imports).
-6. **Client-side export remains the decision** until a Power Automate flow exists
-   (`docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md` decision 4).
+1. **DiscoveryService decomposition: COMPLETE.** All 6 stages executed + Codex-reviewed SATISFIED; facade
+   668 L; behavior-freeze held (full suite 436/4849 green). Evidence: `DISCOVERY_SERVICE_DECOMPOSITION_PLAN.md`
+   status line + stage notes; commits `f688dce7`…`00313e52`. Do not re-extract; extend the modules in place.
+2. **Notification site-33 (`NOTIFICATION_TRUST_MODEL_PLAN.md`): CLOSED** (S334). `BYPASS_STRIP_PLAN.md`
+   Stages 0-4: CLOSED. Chunk-loop/security-gate consolidation: DECLINED (S332). No CodeQL re-add. Do not
+   delete `lib/services/anthropic-admin.js`. Client-side export decision stands.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/NOTIFICATION_TRUST_MODEL_PLAN.md` | CLOSED site-33 record — full Stage Log + all three Codex review rounds. |
-| `tests/unit/notification-trust-model-pushup.test.js` | 25-test handler-driven characterization suite (10 already-covered guards + negative control). |
-| `lib/services/notification-service.js` | `sendAdminEmail` now assumes ambient DAL context (`:171` comment). |
-| `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md` | Closed campaign record; source of the refactor-candidate backlog. |
-| `.claude-memory/feedback-symbol-consumer-fanout.md` | Caller-census grep blind spots (binary / `.call` / dynamic-import) → use `grep -a` + CodeGraph. |
-| `.claude-memory/reference-codex-detached-exec-protocol.md` | How to run detached read-only Codex reviews (used 3× this session, no failures). |
+| `docs/DISCOVERY_SERVICE_DECOMPOSITION_PLAN.md` | COMPLETE record — strategy, verified dep graph, C1–C7 constraints, per-stage notes + all Codex verdicts. The reusable decomposition playbook. |
+| `lib/services/discovery-service.js` | 668-line facade: `discover` orchestrator + 10 static props + 53 delegating wrappers. |
+| `lib/services/discovery/*.js` | 13 cluster modules (constants, name-matching, affiliation, research-area, pubmed-query, match-signals, provenance, publications, track-b-identity, coauthor-coi, literature-search, ranking, verification). |
+| `tests/unit/discovery-*.test.js` | Characterization suites (8 new this session; mutation-proven). |
+| `.claude-memory/feedback-behavior-freeze-passthrough-no-default.md` | The C1 default-param trap caught by Codex. |
 
 ## Testing
 
 ```bash
-# Site-33 suite (10 handler-driven guards + negative control)
-npx jest tests/unit/notification-trust-model-pushup.test.js
+# All discovery characterization + covering suites
+npx jest tests/unit/discovery-*.test.js tests/unit/track-b-honorific-and-cross-field.test.js \
+  tests/unit/reviewer-suggestion-data-quality.test.js tests/integration/enrich-recommended-route.test.js
 
-# Boundary gates touched this arc
-npm run check:dynamics-context-boundary && npm run check:dynamics-context-boundary:self-test
-npm run check:route-service-boundary && npm run check:route-service-boundary:self-test
+# Boundary gates the decomposition touched
+npm run check:dataverse-access-layer && npm run check:route-service-boundary && npm run check:doc-symbol-refs
 
-# Full suite (was 428 suites / 4770 tests green end of S334)
+# Full suite (436 suites / 4849 tests green end of S335)
 npm test
 ```
