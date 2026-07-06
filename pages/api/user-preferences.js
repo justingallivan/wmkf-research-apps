@@ -10,6 +10,7 @@
 
 import { DatabaseService } from '../../lib/services/database-service';
 import { requireAuthWithProfile } from '../../lib/utils/auth';
+import { withDalContext } from '../../lib/dataverse/core/context';
 import { PREFERENCE_KEYS } from '../../shared/config/reviewerFinderPreferences';
 
 // Keys that this generic endpoint must NOT write — they have a dedicated,
@@ -27,11 +28,11 @@ export default async function handler(req, res) {
 
   switch (req.method) {
     case 'GET':
-      return handleGet(req, res, profileId);
+      return withDalContext('user-preferences', () => handleGet(req, res, profileId));
     case 'POST':
-      return handlePost(req, res, profileId);
+      return withDalContext('user-preferences', () => handlePost(req, res, profileId));
     case 'DELETE':
-      return handleDelete(req, res, profileId);
+      return withDalContext('user-preferences', () => handleDelete(req, res, profileId));
     default:
       return res.status(405).json({ error: 'Method not allowed' });
   }

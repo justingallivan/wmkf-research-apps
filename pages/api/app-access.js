@@ -8,6 +8,7 @@
  */
 
 import { requireAuthWithProfile, isAuthRequired, clearAppAccessCache, getUserRole } from '../../lib/utils/auth';
+import { withDalContext } from '../../lib/dataverse/core/context';
 import { ALL_APP_KEYS } from '../../shared/config/appRegistry';
 import {
   listAppKeysForUser,
@@ -32,11 +33,14 @@ export default async function handler(req, res) {
 
   switch (req.method) {
     case 'GET':
-      return handleGet(req, res, profileId, isSuperuser);
+      return withDalContext('app-access-admin', () =>
+        handleGet(req, res, profileId, isSuperuser));
     case 'POST':
-      return handlePost(req, res, profileId, isSuperuser);
+      return withDalContext('app-access-admin', () =>
+        handlePost(req, res, profileId, isSuperuser));
     case 'DELETE':
-      return handleDelete(req, res, profileId, isSuperuser);
+      return withDalContext('app-access-admin', () =>
+        handleDelete(req, res, profileId, isSuperuser));
     default:
       return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -107,4 +111,3 @@ async function handleDelete(req, res, profileId, isSuperuser) {
   clearAppAccessCache(userProfileId);
   return res.json({ success: true, revoked: apps });
 }
-

@@ -8,10 +8,6 @@
  * code template. We build valid bodies by appending a marker to the real
  * template (all required labels/placeholders survive).
  */
-jest.mock('../../lib/services/dynamics-context.js', () => ({
-  bypassDynamicsRestrictions: (labelOrFn, maybeFn) =>
-    (typeof labelOrFn === 'function' ? labelOrFn() : maybeFn()),
-}));
 jest.mock('../../lib/services/prompt-store.js', () => ({
   fetchCurrentPrompt: jest.fn(),
   PROMPT_STORE_ERROR_CODES: { NOT_FOUND: 'PROMPT_NOT_FOUND', DUPLICATE_CURRENT: 'PROMPT_DUPLICATE_CURRENT' },
@@ -22,6 +18,7 @@ jest.mock('../../lib/services/database-service.js', () => ({
 
 import { fetchCurrentPrompt } from '../../lib/services/prompt-store.js';
 import { DatabaseService } from '../../lib/services/database-service.js';
+import { hasTrustedDalContext } from '../../lib/dataverse/core/context.js';
 import { PREFERENCE_KEYS } from '../../shared/config/reviewerFinderPreferences.js';
 import {
   resolveReviewerPrompt,
@@ -72,6 +69,21 @@ describe('resolveReviewerPrompt — tiers', () => {
     const r = await resolveReviewerPrompt(NAME, { userProfileId: 'u1' });
     expect(r.overrideUsed).toBe(true);
     expect(r.staleOverride).toEqual({ baseVersion: 3, currentVersion: 7 });
+  });
+
+  it('reads per-user overrides inside a trusted DAL context', async () => {
+    const seen = { inside: null };
+    fetchCurrentPrompt.mockResolvedValue(dvRow({ version: 5 }));
+    DatabaseService.getUserPreferences.mockImplementation(async () => {
+      seen.inside = hasTrustedDalContext();
+      return overridePref({ body: OVERRIDE_BODY, basePromptId: 'r5', baseVersion: 5 });
+    });
+
+    const r = await resolveReviewerPrompt(NAME, { userProfileId: 'u1' });
+
+    expect(r.overrideUsed).toBe(true);
+    expect(seen.inside).toBe(true);
+    expect(hasTrustedDalContext()).toBe(false);
   });
 
   it('ignores a malformed (unparseable) override and falls to Dataverse', async () => {
