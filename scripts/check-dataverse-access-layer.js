@@ -253,6 +253,30 @@ function isDynamicsSubmoduleTarget(source, root, rel) {
   return /(?:^|\/)lib\/services\/dynamics\//.test(source);
 }
 
+// Resolve a require()/dynamic-import() source ARGUMENT node to a target path,
+// then test it. The value is the AST node; its meaning as a module path is only
+// recoverable through the gate's string-resolution (resolveString handles
+// const-bound identifiers and '+'-concatenation) or, for a template literal
+// whose interpolation is opaque, via the STATIC leading quasi (the directory
+// lives in the prefix even when the filename is dynamic). Fully-opaque sources
+// (bare `require(pathVar)` with no resolvable binding, a function-call source,
+// or a template with an opaque leading segment) resolve to null and are left
+// UNFLAGGED — flagging every dynamic import repo-wide would false-positive on
+// legitimate Next.js lazy-loading; the runtime assertTrustedDalContext backstops
+// writes on that accepted residual tail.
+function matchesDynamicSource(argNode, ctx, root, rel) {
+  const resolved = resolveString(argNode, ctx);
+  if (typeof resolved === 'string' && resolved.length > 0) {
+    return isDynamicsSubmoduleTarget(resolved, root, rel);
+  }
+  const tpl = unwrapExpression(argNode);
+  if (tpl && tpl.type === 'TemplateLiteral' && tpl.quasis.length > 0) {
+    const prefix = tpl.quasis[0].value.cooked ?? tpl.quasis[0].value.raw ?? '';
+    if (prefix.length > 0) return isDynamicsSubmoduleTarget(prefix, root, rel);
+  }
+  return false;
+}
+
 // Fail-closed audit (S338 Q4/C5): flags ANY non-exempt file's import of
 // lib/services/dynamics/* regardless of specifier/binding shape OR specifier
 // form (relative vs root-relative). Exempt files/dirs (EXEMPT_FILES/EXEMPT_DIRS,
@@ -261,7 +285,7 @@ function isDynamicsSubmoduleTarget(source, root, rel) {
 // collectFiles/isExemptRel. Entity is a distinct string (never
 // 'non-entity-transport'), so the violations filter in report()
 // (entity !== 'non-entity-transport') always flags it — no allowlist path.
-function auditDynamicsSubmoduleImports(ast, root, rel, entries) {
+function auditDynamicsSubmoduleImports(ast, ctx, root, rel, entries) {
   const emitted = new WeakSet();
   const emit = (node) => {
     emitOnce(entries, emitted, makeEntry({
@@ -273,13 +297,15 @@ function auditDynamicsSubmoduleImports(ast, root, rel, entries) {
       kind: 'dynamics-submodule-import',
     }), node);
   };
-  const matches = (source) => isDynamicsSubmoduleTarget(source, root, rel);
+  // Static ESM import/export-from sources are always StringLiterals (template
+  // literals aren't legal there), so a literal-string test is complete for them.
+  const matchesStatic = (source) => isDynamicsSubmoduleTarget(source, root, rel);
 
   walkAst(ast, (node) => {
     // import ... from './dynamics/x.js' — named, default, and namespace
     // specifiers are all covered by matching the (resolved) source, not the
     // specifier shape.
-    if (node.type === 'ImportDeclaration' && node.source && matches(node.source.value)) {
+    if (node.type === 'ImportDeclaration' && node.source && matchesStatic(node.source.value)) {
       emit(node);
       return;
     }
@@ -287,27 +313,28 @@ function auditDynamicsSubmoduleImports(ast, root, rel, entries) {
     // export { x } from '...' / export * from '...' (re-export)
     if ((node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration')
       && node.source
-      && matches(node.source.value)) {
+      && matchesStatic(node.source.value)) {
       emit(node);
       return;
     }
 
-    // require('./dynamics/x.js') in any shape (destructure, bare, etc.).
-    // NOTE: the file-scope isRequireCall is bound to the dynamics-service
-    // source matcher, so it can't be reused here — detect a require() call
-    // shape directly and let `matches` (resolution-based) do the targeting.
+    // require(<expr>) in any shape (destructure, bare, const-bound, concat,
+    // template-prefix). NOTE: the file-scope isRequireCall is bound to the
+    // dynamics-service source matcher, so it can't be reused here — detect a
+    // require() call shape directly and let matchesDynamicSource (resolution +
+    // template-prefix) do the targeting.
     if (node.type === 'CallExpression'
       && node.callee.type === 'Identifier'
       && node.callee.name === 'require'
       && node.arguments.length > 0
-      && matches(stringLiteralValue(node.arguments[0]))) {
+      && matchesDynamicSource(node.arguments[0], ctx, root, rel)) {
       emit(node);
       return;
     }
 
-    // dynamic import('./dynamics/x.js')
+    // dynamic import(<expr>) — same resolution/template-prefix handling.
     const importSource = importCallSourceNode(node);
-    if (importSource && matches(stringLiteralValue(importSource))) {
+    if (importSource && matchesDynamicSource(importSource, ctx, root, rel)) {
       emit(node);
     }
   });
@@ -1165,7 +1192,7 @@ function analyzeFile(root, fullPath) {
   const entries = [];
 
   entries.push(...auditUnattributableUses(ast, ctx, rel, parentMap));
-  auditDynamicsSubmoduleImports(ast, root, rel, entries);
+  auditDynamicsSubmoduleImports(ast, ctx, root, rel, entries);
 
   walkAst(ast, (node) => {
     if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return;

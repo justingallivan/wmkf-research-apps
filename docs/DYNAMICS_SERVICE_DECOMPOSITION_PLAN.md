@@ -330,13 +330,26 @@ touched gates → commit. Leaf-first per the DAG.
   delete; all 4 LAW gates + self-tests, `check:doc-symbol-refs`, `check:agent-wiki` green; full suite
   4945/4945 (behavior-freeze holds). **DEFERRED within Stage 0:** the mechanical per-method
   call-graph regen of the hand-built DAG table (low value for two leaf modules; most useful before
-  the `write-core`/`changeset` stages — do it at Checkpoint C). **OUTSTANDING:** the plan-mandated
-  fresh-context `/codex:adversarial-review` of this Stage-0 diff before Checkpoint A begins.
+  the `write-core`/`changeset` stages — do it at Checkpoint C). **ADVERSARIAL REVIEW (DEDICATED,
+  plan-mandated): DONE (S338).** Two independent Codex passes; the plan-doc pass returned
+  SOUND-WITH-FIXES (C1 static-read + named-import bypass, both folded in pre-build); the Stage-0 build
+  pass returned BLOCKER on a computed/non-literal source gap — `auditDynamicsSubmoduleImports` matched
+  literal strings only, so `` import(`./dynamics/${x}`) `` / `require(constPrefix + 'x.js')` slipped.
+  Fixed: require()/dynamic-import() sources now go through `matchesDynamicSource` (the gate's
+  `resolveString` for const-bound/concat + a TemplateLiteral static-prefix check). Lead-verified: both
+  computed probes now fail the gate (exit 1), a non-dynamics computed-import green control is NOT
+  flagged (no false positive). **ACCEPTED RESIDUAL (Lead override, bounded):** a *fully opaque* source
+  (`require(externalVar)` / call-sourced import with no resolvable static part) cannot be resolved by
+  static analysis and is left unflagged — flagging all non-literal dynamic imports repo-wide would
+  false-positive on legitimate Next.js lazy-loading. This tail (a) is shared by the pre-existing
+  `dynamics-service.js` matcher (not a Stage-0 regression) and (b) is backstopped at runtime by
+  `assertTrustedDalContext` inside every write method (C2), which fires regardless of import mechanism
+  — so the static-census gap does not defeat the actual write-enforcement boundary.
 
   Stage 0 recheck ledger (paths changed this session, each re-verified against commit `f65966f`):
-  - [RECHECKED after scripts/check-dataverse-access-layer.js change: `f65966f` — source-based resolution matcher `isDynamicsSubmoduleTarget`; relative + namespace bypass probes fail the gate (exit 1), tree green]
+  - [RECHECKED after scripts/check-dataverse-access-layer.js change: `f65966f` + computed-source follow-up — source-based `isDynamicsSubmoduleTarget` (relative + namespace) AND `matchesDynamicSource` (const/concat/template-prefix); relative, namespace, template-literal, and const-concat bypass probes all fail the gate (exit 1); non-dynamics computed-import green control not flagged; tree green]
   - [RECHECKED after scripts/check-route-service-boundary.js change: `f65966f` — `boundaryKind` extended to the new dir; self-test + route fixture green]
-  - [RECHECKED after scripts/check-dataverse-access-layer-self-test.js change: `f65966f` — six-shape relative matrix + `./dynamics` sibling probe; self-test green]
+  - [RECHECKED after scripts/check-dataverse-access-layer-self-test.js change: `f65966f` + computed-source follow-up — six-shape relative matrix + `./dynamics` sibling probe + computed RED (template + concat) + computed GREEN control; self-test green]
   - [RECHECKED after scripts/check-route-service-boundary-self-test.js change: `f65966f` — dynamics-submodule fail-closed fixtures; self-test green]
   - [RECHECKED after lib/services/dynamics/constants.js change: `f65966f` — verbatim extraction; facade loads; full suite 4945/4945]
   - [RECHECKED after lib/services/dynamics/http.js change: `f65966f` — verbatim extraction, `fetchWithTimeout` takes a `timeout` param (not `API_TIMEOUT`); suite green]

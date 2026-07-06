@@ -756,6 +756,46 @@ function runLawDynamicsSubmoduleSiblingDotSlashAssertion() {
   });
 }
 
+// Computed / non-literal source forms (Codex adversarial review, S338). The
+// directory target is recoverable via string-resolution (const-bound + concat)
+// or the static template prefix, even when the filename is dynamic. Both RED
+// forms must fail; an unrelated computed dynamic import must NOT (no
+// false-positive on legitimate Next.js lazy-loading).
+function runLawDynamicsSubmoduleComputedAssertion() {
+  cleanup();
+
+  // [A] template literal with a dynamic filename but static './dynamics/' prefix
+  write(tempRoot, 'lib/services/probe-tmpl.js', `
+    const n = 'http';
+    export async function p() { return import(\`./dynamics/\${n}.js\`); }
+  `);
+
+  // [B] string-concat require with a const-bound './dynamics/' prefix
+  write(tempRoot, 'lib/services/probe-concat.js', `
+    const b = './dynamics/';
+    module.exports = require(b + 'http.js');
+  `);
+
+  expectRed('computed template/concat dynamics submodule sources fail', (output) => {
+    expect(output.includes('lib/services/probe-tmpl.js'), output);
+    expect(output.includes('lib/services/probe-concat.js'), output);
+    expect(output.includes('dynamics-submodule-import'), output);
+  });
+}
+
+function runLawDynamicsSubmoduleComputedGreenAssertion() {
+  cleanup();
+
+  // GREEN control: a legitimate computed dynamic import NOT targeting dynamics/
+  // (the Next.js lazy-load shape). Must stay unflagged — no false positive.
+  write(tempRoot, 'lib/services/probe-widget.js', `
+    const n = 'x';
+    export async function p() { return import(\`./widgets/\${n}.js\`); }
+  `);
+
+  expectGreen('unrelated computed dynamic import is not flagged');
+}
+
 function runLawDynamicsSubmoduleExemptGreenAssertion() {
   cleanup();
 
@@ -837,6 +877,8 @@ function runMode(mode) {
     runLawDynamicsSubmoduleRouteMatrixAssertion();
     runLawDynamicsSubmoduleLibMatrixAssertion();
     runLawDynamicsSubmoduleSiblingDotSlashAssertion();
+    runLawDynamicsSubmoduleComputedAssertion();
+    runLawDynamicsSubmoduleComputedGreenAssertion();
     runLawDynamicsSubmoduleExemptGreenAssertion();
     runLiveParseAssertion();
     return;
@@ -870,6 +912,8 @@ function runMode(mode) {
   if (mode === 'dynamics-submodule-route') return runLawDynamicsSubmoduleRouteMatrixAssertion();
   if (mode === 'dynamics-submodule-lib') return runLawDynamicsSubmoduleLibMatrixAssertion();
   if (mode === 'dynamics-submodule-sibling') return runLawDynamicsSubmoduleSiblingDotSlashAssertion();
+  if (mode === 'dynamics-submodule-computed') return runLawDynamicsSubmoduleComputedAssertion();
+  if (mode === 'dynamics-submodule-computed-green') return runLawDynamicsSubmoduleComputedGreenAssertion();
   if (mode === 'dynamics-submodule-exempt-green') return runLawDynamicsSubmoduleExemptGreenAssertion();
   throw new Error(`unknown --mode ${mode}`);
 }
