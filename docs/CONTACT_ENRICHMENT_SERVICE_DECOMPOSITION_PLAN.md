@@ -3,7 +3,7 @@ title: ContactEnrichmentService Decomposition Plan
 domain: architecture
 kind: plan
 status: draft
-summary: "DRAFT (S336): plan to decompose ContactEnrichmentService (1,776 L) into lib/services/contact-enrichment/*.js modules behind a thin facade. Behavior-freeze."
+summary: "IN PROGRESS (S336): decompose ContactEnrichmentService (1,776 L) into lib/services/contact-enrichment/*.js behind a thin facade. Stage 0 done; behavior-freeze."
 canonical: true
 owner: product-engineering
 related:
@@ -15,7 +15,8 @@ related:
 
 # ContactEnrichmentService Decomposition Plan
 
-**Status: DRAFT (S336) — authored, not yet Codex-reviewed, not executed.** This applies the exact
+**Status: IN PROGRESS (S336) — plan authored + 2 Codex review rounds folded; Stage 0 EXECUTED
+(`3f5c0fb8`); Stages 1–10 pending.** This applies the exact
 cadence proven on the DiscoveryService decomposition (S335, `docs/DISCOVERY_SERVICE_DECOMPOSITION_PLAN.md`):
 strategy chosen up front (facade + extracted modules), then leaf-first staged extraction, each cluster
 characterization-covered (baselined green pre-extraction, mutation-proven) BEFORE the code moves, each
@@ -116,9 +117,35 @@ An internal self-call scan (`this.X(` / `ContactEnrichmentService.X(`) [VERIFIED
 driver) and `_finalize` (58 L, the post-tier finalize/persist hub) — call the leaf helpers, and almost
 no helper calls another more than one hop deep. The busiest edges are `_addContactLead` (6 call sites),
 `_cleanInstitution` (4), `_addInstitutionDomain` (4), `_finalize` (3). No mutual dependence surfaced →
-the cluster graph is expected to be an **acyclic DAG**, so leaf-first extraction is safe. **This must be
-confirmed by the mechanical per-method call-graph in Stage 0** (the discovery round-1 BLOCKER was an
-incomplete dependency column derived by eye).
+the cluster graph is expected to be an **acyclic DAG**, so leaf-first extraction is safe.
+
+### VERIFIED mechanical call graph (Stage 0, EXECUTED) — this SUPERSEDES the sketch `Depends on` column
+
+A mechanical per-method analyzer (brace-matched method bodies → sibling `this.`/`ContactEnrichmentService.`
+self-calls + tracked imported/const/dynamic-import identifiers, aggregated to the plan's module map) was
+run over the file [VERIFIED via ce-callgraph analyzer, S336]. Result — **the graph is an acyclic DAG,
+confirming leaf-first is safe** (Codex round-2's "regenerate before Stage 1" fix, done). Authoritative
+per-module dependencies (module edges = a method calling a sibling in another module):
+
+| Module | Module edges (→) | Imported/const identifiers | Dyn imports |
+|--------|------------------|----------------------------|-------------|
+| `identity-anchor` | (none — leaf) | `ORCIDService`, `normalizeOrcid` | — |
+| `domain-evidence` | (none — leaf) | `ContactParser`, `OpenAlexService`, `mayPersistIdentity`, `normalizeOrcid` | — |
+| `openalex-metrics` | (none — leaf) | `OpenAlexService`, `isOpenAlexAuthorAccepted`, `normalizeOrcid` | — |
+| `search-tiers` | (none — leaf) | `ContactParser`, `getModelForApp`, `CLAUDE_WEB_SEARCH_SCHEMA` | `ai-payload-boundary`, `llm-client`, `ai-output-schema` |
+| `persistence` | (none — leaf) | `ContactParser`, `EXPLICIT_EMAIL_PERSIST_SOURCES`, `RESOLVER_SOURCED_FIELDS`, `mayPersistIdentity`, `potentialReviewerAdapter`, `researcherAdapter`, `withDalContext` | — |
+| `cost` | (none — leaf) | `COSTS` | — |
+| `email-adjudication` | → `domain-evidence` (`_emailDomainRelatedToAny`) | `SEARCH_EMAIL_SOURCES` | — |
+| `page-email` | → `domain-evidence` (`_domainRelated`, `_emailDomain`) | `ContactParser`, `SEARCH_EMAIL_SOURCES`, `abortError`, `hostWithinDomain`, `safeFetchInstitutionPage` | — |
+| `tiers` | → `identity-anchor`, `domain-evidence`, `email-adjudication`, `openalex-metrics`, `page-email`, `persistence`, `search-tiers` | `ContactParser`, `ORCIDService`, `SerpContactService`, `evidenceFromEnrichment`, `mayPersistIdentity`, `resolveIdentity` | — |
+| `facade` (`enrichCandidates`) | → `tiers` (`enrichCandidate`) | `COSTS`, `abortError`, `isDeadlineAbort`, `summarizeContactOutcomes` | — |
+
+**Topological order (leaf → root):** `constants`/`abort` → { `identity-anchor`, `domain-evidence`,
+`openalex-metrics`, `search-tiers`, `persistence`, `cost` } → { `email-adjudication`, `page-email` } →
+`tiers` → `facade`. The mechanical run confirmed the R1/R2 hand-corrections AND surfaced two the by-eye
+table still had wrong: `openalex-metrics` also uses `normalizeOrcid`, and `email-adjudication` does NOT
+use `EXPLICIT_EMAIL_PERSIST_SOURCES` (only `persistence` does, via `_fieldPersistAllowed`). The sketch
+`Depends on` column in the layout table below is now **historical** — use THIS table.
 
 ## Target module layout (DESIGN SKETCH)
 
@@ -274,10 +301,17 @@ Cadence per stage: **trace → land characterization coverage (baseline green pr
 mutation-prove it discriminates) → extract one cluster → run suite + touched gates → fresh-context Codex
 review → commit.** Leaf modules first so the facade delegates incrementally and the DAG never breaks.
 
-- **Stage 0 — `constants.js` + `abort.js` + facade wiring + mechanical call-graph.** Extract the pure
-  constants and the two abort helpers; wire the facade to `require` them. **Also run the per-method
-  call-graph script and replace the "Depends on" sketch above with its verified output** (this is the
-  discovery-round-1 lesson). No method bodies move yet. Gate: full suite + touched gates green.
+- **Stage 0 — `constants.js` + `abort.js` + facade wiring + mechanical call-graph. ✅ EXECUTED (S336,
+  `3f5c0fb8`).** Extracted `CLAUDE_WEB_SEARCH_SCHEMA`/`SEARCH_EMAIL_SOURCES`/`EXPLICIT_EMAIL_PERSIST_SOURCES`/
+  `COSTS` to `lib/services/contact-enrichment/constants.js` and `abortError`/`isDeadlineAbort` to
+  `lib/services/contact-enrichment/abort.js` (verbatim); facade `require`s both and re-exposes
+  `ContactEnrichmentService.COSTS`. No method bodies moved. Ran the mechanical call-graph and replaced the
+  sketch dependency column with the VERIFIED table above (acyclic DAG confirmed). Verified: module loads,
+  `COSTS` static identity-equal, values intact; 11 covering suites / 181 tests green; eslint clean; touched
+  gates green (`prompt-injection-tagging`, `dataverse-access-layer`, `route-service-boundary`,
+  `dynamics-context-boundary`, `doc-symbol-refs`, `atlas`, `agent-wiki`). [RECHECKED after
+  lib/services/contact-enrichment/constants.js + abort.js + contact-enrichment-service.js change: this note
+  matches the committed Stage 0 state (`3f5c0fb8`).]
 - **Stage 1 — `identity-anchor.js`** (leaf; 9 methods). Characterize the untested ones first.
 - **Stage 2 — `domain-evidence.js`** (depends on Stage 1).
 - **Stage 3 — `email-adjudication.js`** (depends on domain-evidence; heavily test-pinned — largely
