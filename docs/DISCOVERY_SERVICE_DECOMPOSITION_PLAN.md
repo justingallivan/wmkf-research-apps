@@ -1,0 +1,214 @@
+---
+title: DiscoveryService Decomposition Plan
+domain: architecture
+kind: plan
+status: draft
+summary: "Decompose the 2,348-line DiscoveryService god-class into cohesive lib/services/discovery/*.js modules behind a thin delegating facade. Behavior-freeze."
+canonical: true
+owner: product-engineering
+related:
+  - docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md
+  - docs/agent-wiki/topics/reviewer-origination.md
+  - docs/CI_GATES_REFERENCE.md
+---
+
+# DiscoveryService Decomposition Plan
+
+**Status: DRAFT — pre-implementation, awaiting fresh-context Codex review. NO CODE WRITTEN.**
+
+All material claims below are grounded in artifacts produced THIS session — the mechanically-computed
+internal call graph (a script over `lib/services/discovery-service.js`), a `grep -a` whole-repo caller
+inventory, and reads of the file source — each cited inline as `[VERIFIED via …]`. Per-module
+line-size targets in the layout table are forward estimates for code that does not yet exist, marked
+there accordingly.
+
+## Objective
+
+`lib/services/discovery-service.js` is a 2,348-line static-method god-class (`DiscoveryService`,
+54 methods) [VERIFIED via lib/services/discovery-service.js:30,2348] — the largest service in
+`lib/services/` and the #1 refactor candidate carried since S331. This plan decomposes it into a set
+of cohesive, single-responsibility modules under `lib/services/discovery/`, with
+`discovery-service.js` reduced to a **thin facade** that delegates to them.
+
+**Chosen strategy (owner-approved, S335): Facade + extracted modules.** `DiscoveryService` keeps its
+full static surface; every `DiscoveryService.method()` call site — 2 production callers, 12 scripts,
+8 test files — keeps working **unchanged**. This is a **behavior-freeze** refactor: pure code motion,
+zero semantic change. The existing test suite is the safety net, same as the Stage-2 behavior-freeze
+that extracted `lib/dataverse/core/odata.js`.
+
+**Explicitly out of scope for this plan** (separate follow-ups): `contact-enrichment-service.js`
+(1,776 L) decomposition, and the flat-`lib/services` domain-fold. This plan is discovery-only.
+
+## Why a facade (not a call-site rewrite)
+
+The full external surface is broad and reaches deep into "internal" methods, so a facade is the
+low-churn, low-risk path. The caller inventory below is [VERIFIED via grep -a whole-repo, S335]:
+
+- **Production callers (2):**
+  - `pages/api/reviewer-finder/discover.js` — `discover`, `pubMedVerificationContract`,
+    `checkCoauthorshipsForCandidates`, `rankAllCandidates`
+  - `lib/services/workbench/enrich-recommended-service.js` — `pubMedVerificationContract`,
+    `isClearlyNonBiomedicalVerifierArea`, `verifyClaudeSuggestions`,
+    `checkCoauthorshipsForCandidates`, `countRecentPublications`, `YEARS_LOOKBACK`
+- **Scripts (12 files** [VERIFIED via grep -rla scripts/, S335]**)** reach into internal methods
+  directly: `generateNameVariants`, `buildAuthorQuery`, `buildDisambiguatedAuthorQuery`,
+  `filterToMatchingAuthorMultiVariant`, `extractBestAffiliationMultiVariant`, `calculateExpertiseMatch`,
+  `filterByExpertiseRelevance`, plus the entry points. (`debug-reviewer-finder.js`, `test-*.js`,
+  `probe-*.mjs`, `profile-*.mjs`, `smoke-discover-dispositions.mjs`, `trace-reviewer-provenance.mjs`.)
+- **Tests (8 files)** pin many methods by name AND mutate a static prop (see Constraint C1).
+
+Because scripts and tests pin methods **by name on the class**, the facade must delegate the **entire
+public (non-underscore) surface** — not just the route entry points. Underscore-prefixed methods
+(`_isPreprintPublication`, `_affiliationWeightsMap`, `_recencyWeightedAffiliation`) are verified to
+have **zero external references** [VERIFIED via grep -a `*.js`/`*.mjs`, excluding `.next/` and the
+file itself, S335] and become module-private functions.
+
+## Verified internal call graph (behavior-freeze input)
+
+Computed mechanically from the source (each method's body scanned for `this.`/`DiscoveryService.`
+self-calls, static-prop reads, and external-service references) [VERIFIED via call-graph script over
+lib/services/discovery-service.js, S335]. The graph is an **acyclic DAG** — no method cluster
+mutually depends on another, so leaf-first extraction is safe.
+
+Base layer: **constants**. `name-matching` → `affiliation`. `verification` and the `discover`
+orchestrator are the top hubs that depend on most other modules; nothing depends on them.
+
+## Target module layout
+
+`lib/services/discovery/` (13 modules) + the facade. The `~L` column holds `[ASSUMED]` forward
+estimates from the current method sizes; the design goal is **no module over ~300 lines** (down
+from 2,348).
+
+| # | Module | Methods (moved from the class) | Depends on | ~L |
+|---|--------|--------------------------------|-----------|----|
+| 1 | `constants.js` | `MIN_PUBLICATIONS`, `YEARS_LOOKBACK`, `COAUTHOR_COI_STRONG_MIN`, `VERIFICATION_STATUSES`, `VERIFICATION_SKIPPED_REASON`, `TRACK_B_IDENTITY_RESOLUTION_LIMIT`, `TRACK_B_ENABLED`, `NICKNAME_MAP` | — | 60 |
+| 2 | `name-matching.js` | `normalizeNameForMatch`, `firstNamesEquivalent`, `nameMatchEvidence`, `namesMatch`, `evaluateNameEvidence`, `generateNameVariants`, `filterToMatchingAuthor`, `filterToMatchingAuthorMultiVariant` | constants (`NICKNAME_MAP`) | 230 |
+| 3 | `affiliation.js` | `normalizeAffiliationForComparison`, `_affiliationWeightsMap`, `_recencyWeightedAffiliation`, `extractBestAffiliation`, `collectAffiliationHistory`, `extractBestAffiliationMultiVariant` | name-matching | 140 |
+| 4 | `research-area.js` | `isClearlyBiomedicalResearchArea`, `isPhysicalOrEngineeringResearchArea`, `isClearlyNonBiomedicalVerifierArea`, `articlesLookBiomedicalOrClinical`, `evaluateCrossFieldNamesakeGuard`, `isCrossFieldDiscoveredContamination` | — | 70 |
+| 5 | `match-signals.js` | `filterByExpertiseRelevance`, `calculateExpertiseMatch`, `checkExpertiseMismatch`, `checkInstitutionMismatch` | — | 290 |
+| 6 | `provenance.js` | `normalizeSuggestionSource`, `provenanceOriginForVerifiedSuggestion`, `provenanceOriginForUnverifiedSuggestion`, `provenanceOriginForSpineSuggestion`, `mapSpineVerificationResult`, `unverifiedSuggestion`, `evaluateVerificationIncoherence` | constants, `reviewer-provenance` util, `ContactParser` | 200 |
+| 7 | `publications.js` | `_isPreprintPublication`, `dedupePublicationsByTitle`, `backfillOpenAlexPublications`, `countRecentPublications` | constants (`YEARS_LOOKBACK`), `OpenAlexService`, `chunk` | 110 |
+| 8 | `pubmed-query.js` | `buildAuthorQuery`, `buildDisambiguatedAuthorQuery` | constants (`YEARS_LOOKBACK`) | 50 |
+| 9 | `literature-search.js` | `searchPubMed`, `searchArXiv`, `searchBioRxiv`, `searchChemRxiv` | constants, `PubMedService`/`ArXivService`/`BioRxivService`/`ChemRxivService`, `reviewer-provenance` | 250 |
+| 10 | `track-b-identity.js` | `resolveTrackBIdentities`, `mapTrackBIdentityResult`, `mergeTrackBWithNeedsReviewBySharedOrcid`, `partitionByPublicationBar` | constants (`MIN_PUBLICATIONS` via pass-through), `ReviewerWorkAuthorResolver`, `reviewer-provenance` | 130 |
+| 11 | `coauthor-coi.js` | `gradeCoauthorCOI`, `checkCoauthorHistory`, `toPubMedAuthorFormat`, `checkCoauthorshipsForCandidates` | constants (`COAUTHOR_COI_STRONG_MIN`), `PubMedService` | 160 |
+| 12 | `verification.js` | `verifyClaudeSuggestions`, `pubMedVerificationContract`, `suggestionVerifierRouting` | name-matching, affiliation, match-signals, provenance, publications, pubmed-query, research-area, constants | 300 |
+| 13 | `ranking.js` | `rankAllCandidates` | publications (`countRecentPublications`), `DeduplicationService` | 40 |
+| — | `discovery-service.js` (**facade**) | `discover` orchestrator + all static props + the delegating static methods | all of the above | ~350 |
+
+The delegating wrappers number **50** = 54 total methods − 3 underscore-private − `discover` (which
+the facade implements directly) [VERIFIED via call-graph method enumeration, S335].
+
+**Note on granularity.** The owner-approved sketch listed 6 illustrative modules
+(`literature-search`, `name-matching`, `affiliation`, `verification`, `track-b-identity`, `ranking`,
+with "…"). This is the sized-out version: keeping any single module under ~300 L requires splitting
+the "verification" cluster's helpers (`provenance`, `research-area`, `match-signals`, `pubmed-query`)
+and the publications/coauthor clusters into their own files. If a coarser layout is preferred, the
+obvious consolidations are: fold `pubmed-query` → `name-matching` or `literature-search`; fold
+`research-area` → `verification`; fold `coauthor-coi` → `verification`. **Open question for review
+(Q1): 13 modules vs. a coarser layout (roughly 8)?**
+
+## Behavior-preservation constraints (the risk surface)
+
+These are the non-mechanical parts — where a naive cut-and-paste would silently change behavior.
+
+- **C1 — Runtime-mutated static (`MIN_PUBLICATIONS`).** `tests/unit/discovery-verification-status.test.js`
+  does `DiscoveryService.MIN_PUBLICATIONS = 3` before calling `verifyClaudeSuggestions`, then restores
+  it [VERIFIED via tests/unit/discovery-verification-status.test.js:63-64,72]. Two methods read it:
+  `verifyClaudeSuggestions` and `partitionByPublicationBar` [VERIFIED via call-graph script, S335].
+  **Requirement:** the facade keeps `MIN_PUBLICATIONS` as a live static property, and its delegating
+  wrappers pass the *current* value into the extracted functions — e.g.
+  `static partitionByPublicationBar(c) { return partitionByPublicationBar(c, this.MIN_PUBLICATIONS); }`
+  and the extracted `partitionByPublicationBar(candidates, minPublications)` takes it as a parameter.
+  A module that `require`s a frozen constant instead would break the test's mutation and any runtime
+  override. `MIN_PUBLICATIONS` is the **only** static the tests mutate [VERIFIED via grep for
+  `DiscoveryService.<STATIC> =` assignments in tests/, S335]; the others (`TRACK_B_ENABLED`,
+  `YEARS_LOOKBACK`, etc.) are read-only and can be plain `require`s from `constants.js` — but they
+  must ALSO remain readable as `DiscoveryService.YEARS_LOOKBACK` (a production caller reads it) so the
+  facade re-exposes every constant as a static prop.
+- **C2 — Full facade surface.** Every non-underscore method must remain callable as
+  `DiscoveryService.foo` (scripts + tests pin them). The facade delegates all public non-`discover`
+  methods and re-exposes all 8 static constants. Underscore methods stay private (verified no external
+  refs).
+- **C3 — `this` / `DiscoveryService` self-references.** The `discover` orchestrator (stays on the
+  facade) calls sub-methods via both `this.foo()` and `DiscoveryService.foo()`
+  [VERIFIED via discovery-service.js:166-375]. Those keep resolving through the facade's delegating
+  wrappers. Inside a moved cluster, `this.helper()` / `DiscoveryService.helper()` self-calls become
+  direct imported-function calls (`helper()` from the sibling module). This rewrite is the main
+  mechanical care-point.
+- **C4 — Module system.** The file is CommonJS (`require` / `module.exports = { DiscoveryService }`)
+  [VERIFIED via discovery-service.js:11-21,2347]. One production caller uses ESM
+  (`import { DiscoveryService } from '.../discovery-service'`) [VERIFIED via
+  workbench/enrich-recommended-service.js import, S335] — interop already works via the default/named
+  bridge, so **the facade stays CommonJS** and the new modules are CommonJS too (matches the rest of
+  `lib/services/`). No `.mjs`, no ESM conversion.
+- **C5 — Shared external singletons.** `PubMedService`, `OpenAlexService`, the rxiv services,
+  `DeduplicationService`, `reviewer-provenance`, `ContactParser`, `ReviewerWorkAuthorResolver` are
+  imported by multiple target modules. Each module imports what it needs directly; no shared-state
+  concerns (these are stateless static services).
+- **C6 — No new gate violations.** `check:dataverse-access-layer`, `check:route-service-boundary`,
+  `check:atlas`, `check:doc-symbol-refs`, `check:doc-currency` all scan `lib/services`. Moving code
+  within `lib/services/discovery/` must not trip them; the doc-symbol-ref and atlas gates in
+  particular reference `lib/services/discovery-service.js` paths that will still exist (facade stays).
+  New module paths get no new Atlas rows (no new data ownership — pure code motion). **Verify each
+  stage against the touched gates**, per CLAUDE.md rule 4.
+
+## Staging (leaf-first, each stage independently green + reviewed)
+
+Same cadence proven on site-33: **trace → extract one cluster → run suite → fresh-context Codex
+review → commit**. Leaf modules first so the facade delegates incrementally and the DAG never breaks.
+
+- **Stage 0 — `constants.js` + facade wiring.** Extract the 8 statics to `constants.js`; the class
+  re-exposes them as static props (`static MIN_PUBLICATIONS = C.MIN_PUBLICATIONS;` etc.). No method
+  bodies move yet. Proves the constant-passthrough contract (C1) before anything depends on it.
+- **Stage 1 — `name-matching.js`** (pure leaf). Highest-fanout helper cluster; extracting it first
+  de-risks affiliation + verification.
+- **Stage 2 — `affiliation.js`** (depends on Stage 1).
+- **Stage 3 — independent leaves, one commit each (or grouped):** `research-area.js`,
+  `match-signals.js`, `provenance.js`, `publications.js`, `pubmed-query.js`. None depend on each other.
+- **Stage 4 — mid-tier:** `literature-search.js`, `track-b-identity.js`, `coauthor-coi.js`,
+  `ranking.js`.
+- **Stage 5 — `verification.js`** (the hub; depends on Stages 1–4). The 272-line
+  `verifyClaudeSuggestions` is the single most delicate move — extract last, with the constant
+  pass-through (C1) and the `this.`→import rewrite (C3) under the most scrutiny.
+- **Stage 6 — facade finalization.** `discovery-service.js` now holds only `discover` + static props
+  + delegations. Confirm the target line count, confirm the full public surface still resolves, final
+  full-suite run + fresh review.
+
+Stages 3 and 4 may each be split into per-module commits if a review round wants finer granularity.
+
+## Test / safety net
+
+- **Existing coverage (the primary net):** 6 unit suites + 1 integration suite already pin
+  affiliation, dedup, Track-B identity/merge/partition, COI grading, ranking, cross-field
+  contamination, verification routing, suggestion normalization, and `pubMedVerificationContract`
+  [VERIFIED via test-file inventory, S335]. These run unchanged after each stage — a green suite proves
+  the code motion was faithful.
+- **Coverage gaps to characterize BEFORE moving (site-33 lesson — mutation-prove discrimination):**
+  `checkInstitutionMismatch` (139 L, no direct unit test), `nameMatchEvidence`/`evaluateNameEvidence`,
+  the four `search*` methods (dormant Track-B, `TRACK_B_ENABLED=false` — low risk but zero coverage),
+  and `checkExpertiseMismatch`. **Open question (Q2):** add targeted characterization tests for these
+  before their stage, or accept the existing integration coverage as sufficient given pure code motion?
+- **Gates:** run the touched gates listed in C6 at each stage; full `npm test` before Stages 5/6 commit.
+- **Per-stage fresh-context Codex review** on the shipped diff (`reference-codex-detached-exec-protocol.md`).
+
+## Open questions for review
+
+1. **Module granularity:** 13 modules (max ~300 L target) as tabled, or consolidate to a coarser
+   layout (roughly 8 modules)?
+2. **Characterization gaps (C-gap list):** pre-write characterization tests for the 4 uncovered
+   clusters, or rely on the existing integration test + the pure-code-motion invariant?
+3. **`gradeCoauthorCOI` placement:** tabled under `coauthor-coi.js` (its only caller,
+   `checkCoauthorshipsForCandidates`, lives there) but it's also conceptually a Track-B COI grade —
+   is `coauthor-coi.js` the right home, or `track-b-identity.js`?
+4. **Facade delegation style:** explicit hand-written wrappers (one per method, most readable and
+   greppable) vs. a programmatic `Object.assign`/loop that wires delegations from a manifest (less
+   boilerplate, but hides the surface from grep and static analysis). Recommendation: **explicit
+   wrappers** — the whole point is legibility, and the gates grep for method names.
+
+## Non-goals / do-not-touch
+
+- No semantic change to any discovery behavior — this is code motion only.
+- No change to the 2 production callers, the 12 scripts, or the 8 test files' call sites.
+- No ESM conversion; no change to `TRACK_B_ENABLED` (stays `false`, dormant).
+- `contact-enrichment-service.js` and the `lib/services` domain-fold remain separate future work.
