@@ -102,7 +102,10 @@ from 2,348).
 The delegating wrappers number **50** = 54 total methods − 3 underscore-private − `discover` (which
 the facade implements directly) [VERIFIED via call-graph method enumeration, S335].
 
-> [RECHECKED after lib/services/discovery/{constants,name-matching,affiliation,research-area,pubmed-query,match-signals,provenance,publications}.js change:
+> [RECHECKED after lib/services/discovery/constants.js, lib/services/discovery/name-matching.js,
+> lib/services/discovery/affiliation.js, lib/services/discovery/research-area.js,
+> lib/services/discovery/pubmed-query.js, lib/services/discovery/match-signals.js,
+> lib/services/discovery/provenance.js, lib/services/discovery/publications.js change:
 > the module-layout table above is the FORWARD DESIGN for all 13 target modules. The 8 rows now
 > extracted (Stages 0–3) match their committed source; the per-stage notes below carry the
 > executed-state recheck (module path, method list, and Codex verdict per stage). Rows for the 5
