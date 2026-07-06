@@ -287,7 +287,12 @@ review → commit**. Leaf modules first so the facade delegates incrementally an
   the `MIN_PUBLICATIONS`-mutating `discovery-verification-status.test.js` goes red). No require cycle
   (nothing the hub imports imports it back). Existing `discovery-verification-status.test.js` is the
   net (19 cases incl. the mutation, routing, contract). 204 tests green; touched gates green; facade
-  962 → 682 L (**2,348 → 682 overall, ~71%**). [RECHECKED after lib/services/discovery/verification.js change: this note describes the committed Stage 5 state — the module exports the 3 functions and the facade delegates each, passing this.MIN_PUBLICATIONS.]
+  962 → 682 L (**2,348 → 682 overall, ~71%**). **Stage 5 Codex review round 1 (`15b9cebd` vs
+  `859a8bad`): CHANGES-REQUIRED — one [medium]:** the `minPublications = MIN_PUBLICATIONS` *default
+  param* masked an explicit-`undefined` override (if the static were `undefined`, the pre-extraction
+  body read `undefined`; the extracted body silently substituted the constant). Fixed by **removing the
+  default** so the param mirrors `this.MIN_PUBLICATIONS` exactly (facade is the only caller — verified
+  no other importer). 204 tests still green post-fix. [RECHECKED after lib/services/discovery/verification.js change: this note describes the committed Stage 5 state — the module exports the 3 functions and the facade delegates each, passing this.MIN_PUBLICATIONS with no default-param substitution.]
 - **Stage 6 — facade finalization.** `discovery-service.js` now holds only `discover` + static props
   + delegations. Confirm the target line count, confirm the full public surface still resolves, final
   full-suite run + fresh review.
