@@ -3,7 +3,7 @@ title: ContactEnrichmentService Decomposition Plan
 domain: architecture
 kind: plan
 status: draft
-summary: "IN PROGRESS (S336): ContactEnrichmentService (1,776 L) → lib/services/contact-enrichment/*.js behind a facade. Stage 0 + Checkpoint A done; behavior-freeze."
+summary: "IN PROGRESS (S337): ContactEnrichmentService (1,776 L) → lib/services/contact-enrichment/*.js behind a facade. Checkpoints A + B done; behavior-freeze."
 canonical: true
 owner: product-engineering
 related:
@@ -15,8 +15,9 @@ related:
 
 # ContactEnrichmentService Decomposition Plan
 
-**Status: IN PROGRESS (S336) — plan authored + 3 Codex review rounds folded; Stage 0 + Checkpoint A
-(Stages 1, 2, 4, 7) EXECUTED; Checkpoint A2 (Stage 6) + B (3, 5) + C (8) + D (9, 10) pending.** This applies the exact
+**Status: IN PROGRESS (S337) — plan authored + 3 Codex review rounds folded; Stage 0 + Checkpoint A
+(Stages 1, 2, 4, 7) + Checkpoint A2 (Stage 6) + Checkpoint B (Stages 3, 5) EXECUTED; Checkpoint C (8) +
+D (9, 10) pending.** This applies the exact
 cadence proven on the DiscoveryService decomposition (S335, `docs/DISCOVERY_SERVICE_DECOMPOSITION_PLAN.md`):
 strategy chosen up front (facade + extracted modules), then leaf-first staged extraction, each cluster
 characterization-covered (baselined green pre-extraction, mutation-proven) BEFORE the code moves, each
@@ -336,15 +337,33 @@ modules first so the facade delegates incrementally and the DAG never breaks. Th
   cases for the 10 pure helpers (`_buildInstitutionDomainEvidence` already covered by contact-leads-slice2a);
   baselined + mutation-proven. 13 suites / 225 tests green; eslint + gates green.
   [RECHECKED after lib/services/contact-enrichment/domain-evidence.js change: matches committed Stage 2 (`91618142`).]
-- **Stage 3 — `email-adjudication.js`** (depends on domain-evidence; heavily test-pinned — largely
-  already covered). Checkpoint B.
+- **Stage 3 — `email-adjudication.js`. ✅ EXECUTED (S337, `f0a62415`).** 5 helpers
+  (`_markEmailContested`, `_readjudicateNameMismatchRejectedEmail`, `_addContactLead`,
+  `_collectContactLeads`, `_validateEmailAgainstVerifiedDomain`) moved verbatim; self-calls → direct;
+  facade delegates all 5. Already had direct characterization coverage (contact-leads-slice2a,
+  contact-enrichment-affiliation-pin) baselined green pre-extraction; mutation-proven by breaking
+  `_markEmailContested`'s `emailPersistAllowed` assignment (3 failures). 175 covering tests green;
+  eslint + `check:doc-symbol-refs` green. Checkpoint B.
+  [RECHECKED after lib/services/contact-enrichment/email-adjudication.js change: matches committed Stage 3 (`f0a62415`).]
 - **Stage 4 — `openalex-metrics.js` (independent leaf). ✅ EXECUTED (S336, `efeadc97`).** 2 methods moved
   verbatim (with the method JSDoc); `this._buildOpenAlexAuthorDto` self-calls → direct; facade delegates
   both. Removed the now-dead facade imports `OpenAlexService`/`normalizeOrcid`/`isOpenAlexAuthorAccepted`.
   Added direct pins for `_buildOpenAlexAuthorDto` + the no-anchor skip; resolved-anchor paths stay covered
   by contact-enrichment-scholar-metrics (mutation-proven). 14 suites / 228 tests green; eslint + gates green.
   [RECHECKED after lib/services/contact-enrichment/openalex-metrics.js change: matches committed Stage 4 (`efeadc97`).]
-- **Stage 5 — `page-email.js`** (depends on domain-evidence).
+- **Stage 5 — `page-email.js`. ✅ EXECUTED (S337, `df1afa79`).** 9 helpers
+  (`_normForNameMatch`, `_parseCandidateName`, `_emailDomainRelated`, `_windowNamesCandidate`,
+  `_personalPageSlug`, `_slugNamesCandidate`, `_selectGroundedEmail`, `_orderCandidateUrls`,
+  `_attachEmailFromResolvedPage`) moved verbatim; self-calls → direct; facade delegates all 9. C11
+  confirmed: the `process.env.REVIEWER_PAGE_EMAIL_TIER_ENABLED` read stayed inline in
+  `attachEmailFromResolvedPage`'s body (not hoisted). C13 paths rewritten for the new depth
+  (`../utils/contact-parser` → `../../utils/contact-parser`, `../utils/safe-fetch.js` →
+  `../../utils/safe-fetch.js`; domain-evidence/constants/abort stay same-directory requires). Already
+  had direct characterization coverage (resolved-page-email-grounding, resolved-page-email-tier-service)
+  baselined green pre-extraction; mutation-proven by neutralizing the adjacency/ownerMatch guard in
+  `_selectGroundedEmail` (4 failures). 175 covering tests green; eslint + `check:doc-symbol-refs` green.
+  Completes Checkpoint B.
+  [RECHECKED after lib/services/contact-enrichment/page-email.js change: matches committed Stage 5 (`df1afa79`).]
 - **Stage 6 — `search-tiers.js`** (Tier-3 LLM + scholar URL). **Not a low-risk leaf — gets its own
   review (Checkpoint A2).** Carries the C6 A7 marker AND, in the same commit, updates the
   `check-prompt-injection-tagging.js` registry `callSiteFiles` to the new path; keeps all three dynamic
@@ -387,7 +406,8 @@ diffs*. Order respects the verified DAG (leaves → dependents → tiers → fac
   review every dynamic-import string path rewrite from the new subdirectory.
 - **Checkpoint B — domain-evidence dependents (one combined Codex review):** Stages **3
   `email-adjudication`, 5 `page-email`**. Both depend only on `domain-evidence` (committed in A). Heavily
-  test-pinned (largely already covered). C11's env-flag-not-hoisted rule lives in Stage 5.
+  test-pinned (largely already covered). C11's env-flag-not-hoisted rule lives in Stage 5. **Both stages
+  EXECUTED (S337, `f0a62415`/`df1afa79`); the combined Codex review over this batch is still pending.**
 - **Checkpoint C — `persistence.js` (Stage 8), dedicated per-stage review.** The DAL write unit (C5).
   Reviewed alone with the three LAW gates as the focus; not batched.
 - **Checkpoint D — `tiers.js` (Stage 9) + facade finalize (Stage 10), dedicated per-stage review.** The
