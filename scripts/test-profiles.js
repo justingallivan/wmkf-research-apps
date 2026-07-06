@@ -25,6 +25,9 @@ if (fs.existsSync(envPath)) {
   console.log('Loaded environment variables from .env.local');
 }
 
+const { enterDynamicsBypassForScript } = require('../lib/services/dynamics-context');
+enterDynamicsBypassForScript('test-profiles');
+
 const { DatabaseService } = require('../lib/services/database-service');
 
 async function test() {

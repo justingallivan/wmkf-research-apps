@@ -38,9 +38,18 @@ export default async function handler(req, res) {
   const { profileId } = access;
 
   try {
-    if (req.method === 'GET') return await handleGet(req, res, profileId);
-    if (req.method === 'PUT') return await handlePut(req, res, profileId);
-    if (req.method === 'DELETE') return await handleDelete(req, res, profileId);
+    if (req.method === 'GET') {
+      return await withDalContext('prompt-override-prefs', () =>
+        handleGet(req, res, profileId));
+    }
+    if (req.method === 'PUT') {
+      return await withDalContext('prompt-override-prefs', () =>
+        handlePut(req, res, profileId));
+    }
+    if (req.method === 'DELETE') {
+      return await withDalContext('prompt-override-prefs', () =>
+        handleDelete(req, res, profileId));
+    }
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
     console.error('[reviewer-finder/prompt-override] error:', err);

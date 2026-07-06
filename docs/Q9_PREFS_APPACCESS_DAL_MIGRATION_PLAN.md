@@ -10,6 +10,7 @@ owner: product-engineering
 related:
   - docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md
   - lib/services/dataverse-prefs-service.js
+  - lib/dataverse/adapters/user-preference.js
   - lib/services/dataverse-app-access-service.js
   - lib/services/dynamics-service.js
   - lib/dataverse/core/entity-registry.js
@@ -17,8 +18,10 @@ related:
 
 # Q9 Migration Plan — prefs + app-access onto the DAL (adapters → DynamicsService)
 
-**Status:** PLAN ONLY — no product code changed. Authored 2026-07-06 (Fable) against live `main`
-(@478d0d20); Claude-reviewed + pillar claims verified against source (S339); promoted to durable doc.
+**Status:** IMPLEMENTATION STARTED — Stages 1, 2.5, and 3 completed on
+`codex/q9-prefs-appaccess`; Stage 4 app-access transport migration is deferred. Authored
+2026-07-06 (Fable) against live `main` (@478d0d20); Claude-reviewed + pillar claims verified
+against source (S339); promoted to durable doc.
 **Owner decision:** Q9 (DAL plan Stage 9, `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md:446-448`) is now
 **MIGRATE** — move `wmkf_appuserpreferences` and `wmkf_appuserappaccesses` off the unguarded
 `lib/dataverse/client.js` transport into adapters routed through `DynamicsService`, overriding the
@@ -41,7 +44,7 @@ Every claim below was re-probed against the live tree this session unless marked
 
 ## 1. Preconditions / probes (verified state)
 
-### 1.1 The two services today
+### 1.1 The two services at plan baseline
 
 | Fact | Evidence |
 |---|---|
@@ -201,7 +204,10 @@ Dataverse services. The migration swaps the two services' *internals*; no route 
   `wmkf_appsystemsettings` (Wave 3) + `wmkf_appgrantcycles` (Wave 6) + identity-map reads. Flip
   `DATAVERSE_DAL_UNIVERSAL` to `warn`→`on` for that tail on the same schedule, or leave until
   those waves land? (This plan only *requires* `warn`.)
-- **OQ-4:** Pin-test rewrite consent per 1.4.4 (S331 ruling artifact).
+- **OQ-4 — CLOSED by Q9 Stage 3 implementation:** Pin-test rewrite consent per 1.4.4 (S331 ruling
+  artifact). The prefs pin moved from service-local `findRow(mockClient, ...)` to adapter-level
+  `findByOwnerAndKey(...)`, with the test now asserting `TypeError` plus zero
+  `DynamicsService.queryRecords` calls.
 - **OQ-5 — RESOLVED (2026-07-06/S339): option (a) — add a bounded admin-list primitive to
   DynamicsService.** `listAllGrantsForAdmin` is an unfiltered full-entity pull that no current
   read primitive supports (`queryRecords` throws on unfiltered `>25`; `queryAllRecords` requires a
@@ -562,5 +568,15 @@ change needed (client.js path has no context requirement; `warn` flag tolerates 
   (warn window) and OQ-4 (S331 pin-test consent) remain execution-time confirmations, not
   blockers. Per owner: **no further Codex review before build; Codex reviews the implementation
   after the build.** Next actor: build executor, starting Stage 1.
+- **2026-07-06 — Codex implementation branch `codex/q9-prefs-appaccess`: Stages 1, 2.5, and 3
+  completed; Stage 4 deferred.** Stage 1 wrapped the app-access, user-preferences,
+  prompt-override, nextauth default-grant, and reviewer-prompt override-read entry points in
+  trusted DAL context. Stage 2.5 added `enterDynamicsBypassForScript` bootstraps to the five live
+  Q9 scripts before any transport swap. Stage 3 migrated prefs internals to
+  `lib/dataverse/adapters/user-preference.js`, registered `wmkf_appuserpreferences`, kept
+  encryption/fallback contracts in the service, used filtered paginated `queryAllRecords` for
+  `listByOwner`, and closed OQ-4 by moving the guarded-swap pin to the adapter. Ownership boundary:
+  `lib/services/dynamics-service.js`, `tests/unit/dynamics-service-count.test.js`, the app-access
+  transport swap, and the Stage 4 admin-list primitive were intentionally left untouched.
 
 No decomposition checkpoint is a prerequisite; only avoid interleaving commits with it.

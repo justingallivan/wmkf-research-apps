@@ -16,6 +16,8 @@
 
 const { loadEnvLocal } = require('../lib/dataverse/client');
 loadEnvLocal();
+const { enterDynamicsBypassForScript } = require('../lib/services/dynamics-context');
+enterDynamicsBypassForScript('test-wave1-flag-dispatch');
 
 // Must set the flag BEFORE requiring DatabaseService so the lazy loader
 // captures the right thing — except actually the dispatch is at call time,

@@ -321,7 +321,8 @@ export const authOptions = {
  */
 async function grantDefaultApps(profileId) {
   try {
-    await grantApps(profileId, DEFAULT_APP_GRANTS, null);
+    await withDalContext('staff-signin-default-grants', () =>
+      grantApps(profileId, DEFAULT_APP_GRANTS, null));
   } catch (error) {
     console.error('Error granting default apps:', error);
     // Non-fatal — user can still sign in

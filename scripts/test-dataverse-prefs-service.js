@@ -20,6 +20,8 @@
 
 const { loadEnvLocal } = require('../lib/dataverse/client');
 loadEnvLocal();
+const { enterDynamicsBypassForScript } = require('../lib/services/dynamics-context');
+enterDynamicsBypassForScript('test-dataverse-prefs-service');
 
 const prefs = require('../lib/services/dataverse-prefs-service');
 

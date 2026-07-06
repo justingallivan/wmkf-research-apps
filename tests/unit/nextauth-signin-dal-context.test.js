@@ -19,6 +19,7 @@ jest.mock('next-auth', () => jest.fn(() => ({})));
 jest.mock('next-auth/providers/azure-ad', () => jest.fn(() => ({})));
 
 const { sql } = require('@vercel/postgres');
+const { grantApps } = require('../../lib/services/app-access-service');
 const { reconcileProfile } = require('../../lib/services/dynamics-identity-service');
 const { hasTrustedDalContext } = require('../../lib/dataverse/core/context');
 const { authOptions } = require('../../pages/api/auth/[...nextauth].js');
@@ -36,9 +37,12 @@ describe('nextauth signIn DAL context (S333 characterization, sites 31-32)', () 
   });
 
   test('new-profile branch: reconcileProfile runs inside a trusted context', async () => {
-    const seen = { inside: null };
+    const seen = { grantInside: null, reconcileInside: null };
+    grantApps.mockImplementation(async () => {
+      seen.grantInside = hasTrustedDalContext();
+    });
     reconcileProfile.mockImplementation(async () => {
-      seen.inside = hasTrustedDalContext();
+      seen.reconcileInside = hasTrustedDalContext();
     });
     // Sequence: existingByAzureId (empty) -> unlinkedProfiles (empty) -> INSERT new
     sql
@@ -56,15 +60,20 @@ describe('nextauth signIn DAL context (S333 characterization, sites 31-32)', () 
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(ok).toBe(true);
+    expect(grantApps).toHaveBeenCalledWith('profile-1', expect.any(Array), null);
+    expect(seen.grantInside).toBe(true);
     expect(reconcileProfile).toHaveBeenCalledWith('profile-1', { silent: true });
-    expect(seen.inside).toBe(true);
+    expect(seen.reconcileInside).toBe(true);
     expect(hasTrustedDalContext()).toBe(false);
   });
 
   test('unlinked-profile branch: reconcileProfile runs inside a trusted context', async () => {
-    const seen = { inside: null };
+    const seen = { grantInside: null, reconcileInside: null };
+    grantApps.mockImplementation(async () => {
+      seen.grantInside = hasTrustedDalContext();
+    });
     reconcileProfile.mockImplementation(async () => {
-      seen.inside = hasTrustedDalContext();
+      seen.reconcileInside = hasTrustedDalContext();
     });
     // Sequence: existingByAzureId (empty) -> unlinkedProfiles (match) -> INSERT temp
     sql
@@ -81,8 +90,10 @@ describe('nextauth signIn DAL context (S333 characterization, sites 31-32)', () 
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(ok).toBe(true);
+    expect(grantApps).toHaveBeenCalledWith('temp-profile-1', expect.any(Array), null);
+    expect(seen.grantInside).toBe(true);
     expect(reconcileProfile).toHaveBeenCalledWith('temp-profile-1', { silent: true });
-    expect(seen.inside).toBe(true);
+    expect(seen.reconcileInside).toBe(true);
     expect(hasTrustedDalContext()).toBe(false);
   });
 });

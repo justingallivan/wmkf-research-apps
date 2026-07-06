@@ -82,6 +82,11 @@ jest.mock('../../lib/services/dynamics-explorer-taxonomy', () => ({
 
 jest.mock('../../lib/services/dynamics-context', () => ({
   withDynamicsContext: jest.fn((ctx, fn) => fn()),
+  bypassDynamicsRestrictions: jest.fn((labelOrFn, maybeFn) => {
+    const fn = typeof labelOrFn === 'function' ? labelOrFn : maybeFn;
+    return fn();
+  }),
+  getDynamicsContext: jest.fn(() => ({ restrictions: [], requestId: 'test' })),
 }));
 
 jest.mock('../../lib/services/graph-service', () => ({
