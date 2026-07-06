@@ -309,9 +309,10 @@ review → commit.** Leaf modules first so the facade delegates incrementally an
   sketch dependency column with the VERIFIED table above (acyclic DAG confirmed). Verified: module loads,
   `COSTS` static identity-equal, values intact; 11 covering suites / 181 tests green; eslint clean; touched
   gates green (`prompt-injection-tagging`, `dataverse-access-layer`, `route-service-boundary`,
-  `dynamics-context-boundary`, `doc-symbol-refs`, `atlas`, `agent-wiki`). [RECHECKED after
-  lib/services/contact-enrichment/constants.js + abort.js + contact-enrichment-service.js change: this note
-  matches the committed Stage 0 state (`3f5c0fb8`).]
+  `dynamics-context-boundary`, `doc-symbol-refs`, `atlas`, `agent-wiki`).
+  [RECHECKED after lib/services/contact-enrichment/constants.js change: matches committed Stage 0 (`3f5c0fb8`).]
+  [RECHECKED after lib/services/contact-enrichment/abort.js change: matches committed Stage 0 (`3f5c0fb8`).]
+  [RECHECKED after lib/services/contact-enrichment-service.js change: facade re-exposes `COSTS`; requires both new modules; matches committed Stage 0 (`3f5c0fb8`).]
 - **Stage 1 — `identity-anchor.js`** (leaf; 9 methods). Characterize the untested ones first.
 - **Stage 2 — `domain-evidence.js`** (depends on Stage 1).
 - **Stage 3 — `email-adjudication.js`** (depends on domain-evidence; heavily test-pinned — largely
