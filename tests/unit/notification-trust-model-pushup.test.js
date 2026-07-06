@@ -17,6 +17,11 @@ const mockSql = jest.fn();
 const mockVerifyInternalCall = jest.fn();
 const mockOnboardReviewer = jest.fn();
 const mockValidateOnboardInput = jest.fn();
+const mockDrainReviewerAcceptanceJobs = jest.fn();
+const mockWriteReviewFiles = jest.fn();
+const mockVerifySuggestionToken = jest.fn();
+const mockCheckRateLimit = jest.fn();
+const mockRecordTokenOutcome = jest.fn();
 const mockVerifyCronSecret = jest.fn();
 const mockRunHealthChecks = jest.fn();
 const mockGrantApps = jest.fn();
@@ -121,6 +126,22 @@ jest.mock('../../lib/bill/internal-call-auth', () => ({ verifyInternalCall: mock
 jest.mock('../../lib/bill/onboard-reviewer-service', () => ({
   onboardReviewer: mockOnboardReviewer,
   validateOnboardInput: mockValidateOnboardInput,
+}));
+jest.mock('../../lib/services/reviewer-acceptance-drain', () => {
+  const actual = jest.requireActual('../../lib/services/reviewer-acceptance-drain');
+  return { ...actual, drainReviewerAcceptanceJobs: mockDrainReviewerAcceptanceJobs };
+});
+jest.mock('../../lib/services/review-upload', () => {
+  const actual = jest.requireActual('../../lib/services/review-upload');
+  return { ...actual, writeReviewFiles: mockWriteReviewFiles };
+});
+jest.mock('../../lib/external/verify-suggestion-token', () => {
+  const actual = jest.requireActual('../../lib/external/verify-suggestion-token');
+  return { ...actual, verifySuggestionToken: mockVerifySuggestionToken };
+});
+jest.mock('../../lib/external/rate-limit', () => ({
+  checkRateLimit: mockCheckRateLimit,
+  recordTokenOutcome: mockRecordTokenOutcome,
 }));
 jest.mock('../../lib/utils/cron-auth', () => ({ verifyCronSecret: mockVerifyCronSecret }));
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: mockRequireAppAccess }));
@@ -237,8 +258,11 @@ const secretCheckHandler = require('../../pages/api/cron/secret-check').default;
 const granteeRemindersHandler = require('../../pages/api/cron/grantee-deliverable-reminders').default;
 const reviewThankyousHandler = require('../../pages/api/cron/send-review-thankyous').default;
 const reviewerRemindersHandler = require('../../pages/api/cron/reviewer-reminders').default;
+const drainHandler = require('../../pages/api/cron/drain-reviewer-acceptances').default;
 const sendReviewReminderHandler = require('../../pages/api/review-manager/send-review-reminder').default;
 const withdrawSufficientHandler = require('../../pages/api/review-manager/withdraw-sufficient').default;
+const staffUploadHandler = require('../../pages/api/review-manager/upload-review').default;
+const externalUploadHandler = require('../../pages/api/external/review/[token]/upload').default;
 const attachHandler = require('../../pages/api/intake/draft/attach').default;
 const MaintenanceService = require('../../lib/services/maintenance-service');
 const { writeReviewFiles } = require('../../lib/services/review-upload');
@@ -334,6 +358,35 @@ function makeRawReq(body) {
   const req = Readable.from([Buffer.from(JSON.stringify(body))]);
   req.method = 'POST';
   req.headers = {};
+  return req;
+}
+
+function makeMultipartReq({ fields = {}, file = {}, query = {} } = {}) {
+  const boundary = '----wmkf-test-boundary';
+  const chunks = [];
+  for (const [name, value] of Object.entries(fields)) {
+    chunks.push(
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="${name}"\r\n\r\n` +
+      `${value}\r\n`,
+    );
+  }
+  chunks.push(
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="files"; filename="${file.filename || 'review.pdf'}"\r\n` +
+    `Content-Type: ${file.mimeType || 'application/pdf'}\r\n\r\n`,
+  );
+  chunks.push(file.buffer || PDF_BYTES);
+  chunks.push(`\r\n--${boundary}--\r\n`);
+
+  const body = Buffer.concat(chunks.map((chunk) => (Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))));
+  const req = Readable.from([body]);
+  req.method = 'POST';
+  req.query = query;
+  req.headers = {
+    'content-type': `multipart/form-data; boundary=${boundary}`,
+    'content-length': String(body.length),
+  };
   return req;
 }
 
@@ -477,6 +530,27 @@ beforeEach(() => {
   jest.clearAllMocks();
   DynamicsService.clearCaches();
   mockDynamicsFetch();
+
+  mockDrainReviewerAcceptanceJobs.mockReset();
+  mockWriteReviewFiles.mockReset();
+  mockWriteReviewFiles.mockImplementation((...args) => (
+    jest.requireActual('../../lib/services/review-upload').writeReviewFiles(...args)
+  ));
+  mockVerifySuggestionToken.mockReset();
+  mockVerifySuggestionToken.mockResolvedValue({
+    ok: true,
+    payload: { ops: ['upload_review'] },
+    suggestion: {
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      wmkf_reviewreceivedat: null,
+    },
+    request: { akoya_requestid: REQUEST_ID, akoya_requestnum: '1001' },
+    reviewer: null,
+  });
+  mockCheckRateLimit.mockReset();
+  mockCheckRateLimit.mockResolvedValue({ ok: true });
+  mockRecordTokenOutcome.mockReset();
+  mockRecordTokenOutcome.mockResolvedValue(undefined);
 
   mockAlertService.createAlert.mockImplementation(async (args) => ({ id: 'alert-1', ...args }));
   mockAlertService.autoResolve.mockResolvedValue(0);
@@ -1015,6 +1089,31 @@ describe('notification trust-model Stage 2 pushed-up wrappers', () => {
     });
   });
 
+  test('sites 10b, 13, and 11-acceptance - drain cron handler establishes cron-drain-reviewer-acceptances context', async () => {
+    let trustedAtDrain = null;
+    mockDrainReviewerAcceptanceJobs.mockImplementation(async () => {
+      trustedAtDrain = hasTrustedDalContext();
+      return {
+        claimed: 0,
+        completed: 0,
+        cancelled: 0,
+        failed: 0,
+        retried: 0,
+        errors: [],
+      };
+    });
+    jest.spyOn(MaintenanceService, 'startRun').mockResolvedValue('run-1');
+    jest.spyOn(MaintenanceService, 'completeRun').mockResolvedValue(undefined);
+
+    const res = makeRes();
+    await drainHandler({ method: 'GET', headers: {}, query: {} }, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ ok: true, claimed: 0, completed: 0, failed: 0 });
+    expect(mockDrainReviewerAcceptanceJobs).toHaveBeenCalledWith({ limit: 5, lockSeconds: 300 });
+    expect(trustedAtDrain).toBe(true);
+  });
+
   test('site 11 - grantee deliverable reminder default alert inherits grantee-deliverable-reminders-cron context', async () => {
     // Form A: drive the REAL cron handler so the wrap it establishes is what
     // provides the context — this guards the handler's own withDalContext, not
@@ -1059,6 +1158,46 @@ describe('notification trust-model already-covered characterization sites', () =
       writeReviewFiles({ ...args, opts: { source: 'reviewer_self_token', performedBy: null } }),
     )).resolves.toMatchObject({ ok: false, reason: 'infected' });
     expectTrustedNotify(seen, { type: 'virus_detection_reviewer', source: 'review-upload' });
+  });
+
+  test('site 12 - upload handlers establish trusted context before writeReviewFiles', async () => {
+    const seen = [];
+    mockWriteReviewFiles.mockImplementation(async (args) => {
+      seen.push({
+        source: args.opts.source,
+        suggestionId: args.suggestionId,
+        trusted: hasTrustedDalContext(),
+      });
+      return {
+        ok: true,
+        folder: 'Reviews/Test',
+        files: args.files.map((file) => ({ name: file.filename, size: file.buffer.length })),
+      };
+    });
+
+    const staffRes = makeRes();
+    await staffUploadHandler(
+      makeMultipartReq({ fields: { suggestionId: SUGGESTION_ID } }),
+      staffRes,
+    );
+
+    expect(staffRes.statusCode).toBe(200);
+    expect(staffRes.body).toMatchObject({ ok: true, folder: 'Reviews/Test' });
+
+    const externalRes = makeRes();
+    await externalUploadHandler(
+      makeMultipartReq({ query: { token: 'review-token' } }),
+      externalRes,
+    );
+
+    expect(externalRes.statusCode).toBe(200);
+    expect(externalRes.body).toMatchObject({ ok: true, folder: 'Reviews/Test' });
+    expect(mockVerifySuggestionToken).toHaveBeenCalledWith('review-token');
+    expect(mockRecordTokenOutcome).toHaveBeenCalledWith(expect.anything(), 'review-token', true);
+    expect(seen).toEqual([
+      { source: 'staff_upload', suggestionId: SUGGESTION_ID, trusted: true },
+      { source: 'reviewer_self_token', suggestionId: SUGGESTION_ID, trusted: true },
+    ]);
   });
 
   test('site 13 - reviewer acceptance drain alert inherits cron-drain-reviewer-acceptances context', async () => {
@@ -1127,5 +1266,21 @@ describe('notification trust-model already-covered characterization sites', () =
     )).resolves.toMatchObject({ scanned: 1, errors: 1 });
 
     expectTrustedNotify(seen, { type: 'bill_resume_misconfigured', source: 'bill/onboarding-resume' });
+  });
+
+  test('site 22 - maintenance handler establishes bill-onboarding-resume context before sweepBillOnboarding', async () => {
+    mockDefaultMaintenanceRun();
+    let trustedAtSweep = null;
+    MaintenanceService.sweepBillOnboarding.mockImplementation(async () => {
+      trustedAtSweep = hasTrustedDalContext();
+      return { resumed: 0, scanned: 0, errors: 0 };
+    });
+
+    const res = makeRes();
+    await maintenanceHandler({ method: 'GET', headers: {}, query: {} }, res);
+
+    expect(res.body.results.billOnboardingResume).toEqual({ resumed: 0, scanned: 0, errors: 0 });
+    expect(MaintenanceService.sweepBillOnboarding).toHaveBeenCalledTimes(1);
+    expect(trustedAtSweep).toBe(true);
   });
 });

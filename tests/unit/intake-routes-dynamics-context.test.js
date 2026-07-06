@@ -212,26 +212,26 @@ describe('staff sign-in reconcileProfile is wrapped', () => {
   });
 });
 
-describe('notification email transport is wrapped', () => {
-  // Codex S191 found that NotificationService.sendAdminEmail →
-  // DynamicsService.createAndSendEmail → resolveSystemUser →
-  // queryRecords('systemusers') was unwrapped, breaking notifyNewUser
-  // from the sign-in callback.
+describe('notification email transport no longer self-wraps (S334 site-33 push-up)', () => {
+  // History: Codex S191 found NotificationService.sendAdminEmail →
+  // DynamicsService.createAndSendEmail was unwrapped, breaking notifyNewUser
+  // from the sign-in callback; S333 wrapped it with withDalContext('notification-email').
   //
-  // S333 bypass-strip Stage 2: the wrapper is now the sanctioned
-  // `withDalContext` (behavior-identical to the retired
-  // `bypassDynamicsRestrictions`, same label); the shape assertion tracks
-  // the rename.
-  test('source wraps DynamicsService.createAndSendEmail in a trusted DAL context', () => {
+  // S334 site-33 push-up (docs/NOTIFICATION_TRUST_MODEL_PLAN.md Stage 3): that
+  // internal wrap was REMOVED once every entry point reaching the email branch
+  // establishes its own trusted context (Stages 1-2). sendAdminEmail now ASSUMES
+  // an ambient context and createAndSendEmail's assertTrustedDalContext enforces
+  // it (fail-closed). Same pattern as the retired 'drain-recover-request-created'
+  // local wrap below — assert the wrap is gone and the direct call remains.
+  test('source no longer wraps createAndSendEmail in its own notification-email context', () => {
     const fs = require('fs');
     const path = require('path');
     const src = fs.readFileSync(
       path.join(__dirname, '../../lib/services/notification-service.js'),
       'utf8'
     );
-    expect(src).toMatch(
-      /withDalContext\(\s*['"]notification-email['"][^]*?DynamicsService\.createAndSendEmail\s*\(/
-    );
+    expect(src).not.toMatch(/withDalContext\(\s*['"]notification-email['"]/);
+    expect(src).toMatch(/DynamicsService\.createAndSendEmail\s*\(/);
     expect(src).not.toMatch(/bypassDynamicsRestrictions/);
   });
 });
