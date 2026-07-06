@@ -102,15 +102,15 @@ from 2,348).
 The delegating wrappers number **50** = 54 total methods − 3 underscore-private − `discover` (which
 the facade implements directly) [VERIFIED via call-graph method enumeration, S335].
 
-> [RECHECKED after lib/services/discovery/constants.js, lib/services/discovery/name-matching.js,
-> lib/services/discovery/affiliation.js, lib/services/discovery/research-area.js,
-> lib/services/discovery/pubmed-query.js, lib/services/discovery/match-signals.js,
-> lib/services/discovery/provenance.js, lib/services/discovery/publications.js change:
-> the module-layout table above is the FORWARD DESIGN for all 13 target modules. The 8 rows now
-> extracted (Stages 0–3) match their committed source; the per-stage notes below carry the
-> executed-state recheck (module path, method list, and Codex verdict per stage). Rows for the 5
-> not-yet-extracted modules (`literature-search`, `track-b-identity`, `coauthor-coi`, `verification`,
-> `ranking`) remain design targets for Stages 4–6.] The facade also
+> The module-layout table above is the FORWARD DESIGN for all 13 target modules; the 8 rows now
+> extracted (Stages 0–3) match their committed source and the per-stage notes below carry the
+> executed-state recheck (path, method list, Codex verdict). The 5 not-yet-extracted rows
+> (`literature-search`, `track-b-identity`, `coauthor-coi`, `verification`, `ranking`) remain Stage 4–6
+> design targets.
+>
+> [RECHECKED after lib/services/discovery/constants.js lib/services/discovery/name-matching.js lib/services/discovery/affiliation.js lib/services/discovery/research-area.js lib/services/discovery/pubmed-query.js lib/services/discovery/match-signals.js lib/services/discovery/provenance.js lib/services/discovery/publications.js change: all 8 extracted modules match their committed source per the per-stage notes below.]
+
+The facade also
 re-exposes **all 10 static class properties** (C2) — including the two OpenAlex-backfill statics an
 external test reads directly (C1).
 
