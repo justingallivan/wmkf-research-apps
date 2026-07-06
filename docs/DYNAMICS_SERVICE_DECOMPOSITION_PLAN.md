@@ -16,7 +16,7 @@ related:
 
 # DynamicsService Decomposition Plan
 
-**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stage 1 (`auth.js`) EXECUTED (S339); Stages 2–3 + Checkpoint A batched review pending; Checkpoints B–F pending.** This applies the exact cadence proven on the
+**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stages 1 (`auth.js`) + 2 (`restrictions.js`) EXECUTED (S339); Stage 3 (`annotations.js`) + Checkpoint A batched review pending; Checkpoints B–F pending.** This applies the exact cadence proven on the
 DiscoveryService decomposition (S335) and the ContactEnrichmentService decomposition (S336):
 strategy chosen up front (facade + extracted modules), leaf-first staged extraction, each cluster
 characterization-covered (baselined green pre-extraction, mutation-proven) BEFORE the code moves,
@@ -392,6 +392,22 @@ touched gates → commit. Leaf-first per the DAG.
   - [RECHECKED after lib/services/dynamics/auth.js create: S339 — verbatim `getAccessToken` + `tokenCache` + new `resetTokenCache`; deps http/constants/service-error; semgrep token-audit 0 findings; suite 4957/4957]
   - [RECHECKED after lib/services/dynamics-service.js change: S339 — facade rewired (`getAccessToken` delegate + `resetTokenCache` in `clearCaches`), behavior-freeze; no stray `tokenCache` ref; suite green]
   - Note: this extraction shifts `dynamics-service.js` line numbers below the old auth block up by ~48; the Q9 plan's `dynamics-service.js` line citations (method-name-anchored) are reconciled at the Q9 worktree merge, not mid-flight.
+- **Checkpoint A Stage 2 — `restrictions.js`. EXECUTED S339.** `resolveLogicalName` +
+  `checkRestriction` (both static, `this`-free) moved verbatim to
+  `lib/services/dynamics/restrictions.js`, together with the two module-private `$expand` parsers
+  (`splitExpandSegments`, `parseExpandSegment`) used only by `checkRestriction`. Facade keeps both
+  as thin delegating wrappers (internal `this.` + external `DynamicsService.` calls unchanged); its
+  now-orphaned imports dropped (`getDynamicsContext` from dynamics-context, `ENTITY_SET_TO_LOGICAL`
+  from constants — both were used only by this cluster). Characterization added FIRST
+  (`tests/unit/dynamics-service-checkrestriction.test.js`: fail-closed no-context throw, table +
+  field denials, `$expand` table + nested-`$select` field denials, requestId-mismatch warn,
+  `resolveLogicalName` mapping) — green pre- and post-extraction. Verified: full suite
+  **4965/4965**; `check:dynamics-context-boundary` + self-test green (600 files, 0 violations —
+  `restrictions.js` imports `getDynamicsContext`, a read, not `bypassDynamicsRestrictions`, so the
+  boundary gate is satisfied); `check:dataverse-access-layer` green. **Checkpoint A batched review
+  still pending** — after Stage 3.
+  - [RECHECKED after lib/services/dynamics/restrictions.js create: S339 — verbatim `resolveLogicalName` + `checkRestriction` + private expand parsers; deps constants/dynamics-context; suite 4965/4965; context-boundary gate green]
+  - [RECHECKED after lib/services/dynamics-service.js change: S339 — facade rewired (both wrappers delegate; `getDynamicsContext`/`ENTITY_SET_TO_LOGICAL` imports removed), no stray refs, behavior-freeze; suite green]
 - **Checkpoint A — leaf batch. BATCHED review.** Stage 1 `auth.js` (+ `resetTokenCache`, C4/C14;
   add characterization for token caching/expiry/missing-env non-transient error), Stage 2
   `restrictions.js` (C3; add characterization for no-context throw, table/field/expand restriction
