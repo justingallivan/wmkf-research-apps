@@ -73,10 +73,12 @@ bypasses were found and closed** before any further extraction.
 
 ### Owner Decision Needed
 
-1. **DAL Stage 9 owner questions Q1–Q9** (`docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` Stage 9).
-   Most load-bearing: **Q9** — migrate prefs/app-access into a DAL wave (adapters → DynamicsService,
-   thus guarded) vs. leave them on `client.js` behind the standing transport guard. Default recommended:
-   leave them (tiny app-config; adapter churn for no coverage gain once the transport guard exists).
+1. **DAL Stage 9 owner questions Q1–Q9 — RESOLVED S339** (`docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`
+   "Owner decisions Q1–Q9"). Defaults adopted on Q1–Q8; **Q9 reversed to MIGRATE** prefs/app-access
+   into a DAL wave (adapters → DynamicsService) for the single-transport end-state. Consequence: the
+   Q4/step-2 context wrap is now a hard prerequisite of the transport swap (DynamicsService reads throw
+   on missing context; `listAppKeysForUser` + `grantDefaultApps` are on the auth hot path). Staged
+   migration plan drafted separately (Fable, S339) → pending Claude/owner review before execution.
 
 ### Do Not Reopen Without New Decision
 

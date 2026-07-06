@@ -427,25 +427,47 @@ Flag `DATAVERSE_DAL_UNIVERSAL` ∈ `off | warn | on` (default `off`).
 steps 1–2 (`client.js` + entry wraps) are disjoint from the decomposition and
 may proceed independently — step 1 already has.
 
-### Open owner decisions (Q1–Q9; defaults noted)
+### Owner decisions Q1–Q9 (RESOLVED 2026-07-06, S339)
 
-- **Q1 flag shape** — new `DATAVERSE_DAL_UNIVERSAL` vs extend the proven
-  `DATAVERSE_DAL_ENFORCEMENT`. *Default: new flag (implemented S338).*
-- **Q2 `searchRecords` no-entities** — assert context, AND reject org-wide
-  search when the context carries non-empty restrictions.
-- **Q3 scripts** — shared bootstrap helper calling `enterDynamicsBypassForScript`.
-- **Q4 auth as trust root** — `withDalContext('auth-…')` inside the auth
-  lookups (self-certifying; NextAuth already does this).
-- **Q5 health-checker** — wrap the two callers vs a documented liveness
-  exemption. *Default: wrap.*
-- **Q6 metadata reads** — include under the guard for uniformity.
-- **Q7 flag end-game** — fold `DATAVERSE_DAL_UNIVERSAL` + `DATAVERSE_DAL_ENFORCEMENT`
-  into one unconditional posture at closeout (with the planned legacy
-  `bypassDynamicsRestrictions` strip).
-- **Q8 sequencing** — *Default: warn shipped now; enforce after warn observation.*
-- **Q9 prefs/app-access** — migrate into a wave (adapters) vs leave on
-  `client.js` behind the standing guard. *Default: leave — tiny app-config;
-  adapter migration is churn for no coverage gain once the transport guard exists.*
+Owner reviewed all nine; **defaults adopted on Q1–Q8, Q9 reversed to migrate.**
+
+- **Q1 flag shape** — **RESOLVED: new `DATAVERSE_DAL_UNIVERSAL`** (implemented
+  S338). Decouples the universal-guard rollout from the `DATAVERSE_DAL_ENFORCEMENT`
+  flip so the delicate sign-in path can flip independently. Do not re-litigate.
+- **Q2 `searchRecords` no-entities** — **RESOLVED: assert context AND reject
+  org-wide search when the context carries non-empty restrictions.** Precondition:
+  census the current no-entity `searchRecords` callers before enforcing, so any
+  legitimate wide search gets an explicit exemption rather than a surprise throw.
+- **Q3 scripts** — **RESOLVED: shared bootstrap helper calling
+  `enterDynamicsBypassForScript`.** `check:dynamics-context-boundary` already
+  fences bypass to scripts; centralizing it is one auditable code path vs. scattered
+  context-less script calls.
+- **Q4 auth as trust root** — **RESOLVED: `withDalContext('auth-…')` inside the
+  auth lookups** (self-certifying; NextAuth already does this via
+  `staff-signin-reconcile`; not circular — `withDalContext` labels a scope, performs
+  no auth). This is the substantive gap-closer for the S338 context-less census and
+  is now also a **hard prerequisite of Q9** (see below).
+- **Q5 health-checker** — **RESOLVED: wrap the two callers** (no liveness
+  exemption). Two lines beats a permanent census-gate carve-out.
+- **Q6 metadata reads** — **RESOLVED: include under the guard** for uniformity;
+  "everything through the transport is guarded" is a simpler invariant than one with
+  a metadata carve-out.
+- **Q7 flag end-game** — **RESOLVED: fold `DATAVERSE_DAL_UNIVERSAL` +
+  `DATAVERSE_DAL_ENFORCEMENT` into one unconditional posture at closeout** (with the
+  legacy `bypassDynamicsRestrictions` strip). Only once BOTH are enforced in prod and
+  stable — premature folding loses the independent rollback lever.
+- **Q8 sequencing** — **RESOLVED: warn → wrap → enforce.** Warn shipped S338; wrap
+  the entry points (Q4/step 2) BEFORE flipping to `on`. All 8 entry points are
+  context-less today, so flipping before wrapping WILL throw on sign-in.
+- **Q9 prefs/app-access** — **RESOLVED (reversed from default): MIGRATE into a
+  wave** (adapters → DynamicsService), NOT leave on `client.js`. Owner chose the
+  single-transport end-state (`client.js` fully retirable) over the tail-coverage
+  default. **Consequence:** because DynamicsService reads throw on missing context
+  and two entry points are on the auth hot path (`listAppKeysForUser` via
+  `lib/utils/auth.js`; `grantDefaultApps` on sign-in), the Q4/step-2 context wrap is
+  a HARD PREREQUISITE of the transport swap — wrap each caller before moving it, or
+  it throws in production. Detailed staged migration plan tracked separately
+  (S339 Fable draft → owner/Claude review before execution).
 
 ---
 
@@ -733,6 +755,15 @@ Drift found → this doc is edited BEFORE the next stage starts.
   (warn-mode `DATAVERSE_DAL_UNIVERSAL` guard, default off) shipped (commit `5a16f36`);
   wrap-entry-points + enforce deferred pending warn observation, DynamicsService-side after
   decomposition Checkpoint F. Q1–Q9 open for owner.
+- 2026-07-06 (S339): **Owner resolved Q1–Q9** (see "Owner decisions Q1–Q9" above).
+  Defaults adopted on Q1–Q8; **Q9 reversed from the "leave them" default to MIGRATE**
+  prefs/app-access into a DAL wave (adapters → DynamicsService), targeting the
+  single-transport end-state (`client.js` fully retirable). Consequence recorded: the
+  Q4/step-2 context wrap is now a hard prerequisite of the transport swap because
+  DynamicsService reads throw on missing context and two entry points
+  (`listAppKeysForUser`, `grantDefaultApps`) are on the auth hot path. Staged migration
+  plan drafted separately (Fable) for owner/Claude review before any execution; no
+  product code changed this session.
 
 ## Appendix A — Census (Stage 0 baseline → Stage 8 final)
 
