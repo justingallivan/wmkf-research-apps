@@ -429,6 +429,14 @@ may proceed independently — step 1 already has.
 
 ### Owner decisions Q1–Q9 (RESOLVED 2026-07-06, S339)
 
+> **[STALE-ACCEPTED: lib/services/dynamics-service.js — line numbers only]** and
+> **[STALE-ACCEPTED: lib/services/dynamics/auth.js — not referenced here]**: the parallel
+> DynamicsService decomposition (Checkpoint A Stage 1, S339) extracted `auth.js` and shifted
+> `dynamics-service.js` lines ~48 up. This plan references `dynamics-service.js` by
+> method/assert-site (e.g. `assertTrustedDalContext` write sites), not brittle line numbers, so it
+> stays valid; and every `auth.js` here is `lib/utils/auth.js`, not the extracted
+> `lib/services/dynamics/auth.js`. Reconciled at the decomposition's Checkpoint F sweep.
+
 Owner reviewed all nine; **defaults adopted on Q1–Q8, Q9 reversed to migrate.**
 
 - **Q1 flag shape** — **RESOLVED: new `DATAVERSE_DAL_UNIVERSAL`** (implemented
