@@ -217,7 +217,9 @@ review → commit**. Leaf modules first so the facade delegates incrementally an
   wrapper param renamed `affiliationString` to avoid shadowing the imported module). The 3 public
   methods were already covered; per Q2 added 6 characterization cases for the untested
   `normalizeAffiliationForComparison` regex branches (baselined green, mutation-proven). Post-extraction:
-  10 suites / 156 tests green; touched gates green; facade 2,135 → 2,029 L. [RECHECKED after
+  10 suites / 156 tests green; touched gates green; facade 2,135 → 2,029 L. Fresh-context Codex review
+  of the diff (`4dea718a` vs `b7fb6be1`): SATISFIED, no material findings (body-identical, hoisting,
+  shadowing, dep graph, characterization all checked). [RECHECKED after
   lib/services/discovery/affiliation.js change: this note describes the committed Stage 2 state — the
   module exports the 6 functions and the facade delegates each.]
 - **Stage 3 — independent leaves, one commit each (or grouped):** `research-area.js`,
