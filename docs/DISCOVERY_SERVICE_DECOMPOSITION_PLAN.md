@@ -14,9 +14,10 @@ related:
 
 # DiscoveryService Decomposition Plan
 
-**Status: STAGES 0–2 EXECUTED (S335) — plan approved via two Codex adversarial-review rounds;
-`constants.js` + `name-matching.js` + `affiliation.js` extracted behind the facade. Stages 3–6
-pending. See stage notes.**
+**Status: STAGES 0–3 EXECUTED (S335) — plan approved via two Codex adversarial-review rounds; 8
+modules extracted behind the facade (`constants`, `name-matching`, `affiliation`, `research-area`,
+`pubmed-query`, `match-signals`, `provenance`, `publications`); facade 2,348 → 1,455 L. Stages 4–6
+pending (Stage 3 Codex review next). See stage notes.**
 
 All material claims below are grounded in artifacts produced THIS session — the mechanically-computed
 internal call graph (a script over `lib/services/discovery-service.js`), a `grep -a` whole-repo caller
@@ -231,10 +232,22 @@ review → commit**. Leaf modules first so the facade delegates incrementally an
   (2 methods: `buildAuthorQuery`, `buildDisambiguatedAuthorQuery`, `YEARS_LOOKBACK` from `./constants`).
   Added characterization suites `tests/unit/discovery-research-area.test.js` (11 cases) +
   `tests/unit/discovery-pubmed-query.test.js` (3 cases), baselined green + mutation-proven; 12 suites /
-  167 tests green; touched gates green; facade 2,029 → 1,967 L. **Batch 2 pending:** `match-signals.js`,
-  `provenance.js`, `publications.js`. Stage 3 Codex review runs once the batches land. [RECHECKED after
-  lib/services/discovery/research-area.js + lib/services/discovery/pubmed-query.js change: this note
-  describes the committed batch-1 state — each module exports its functions and the facade delegates.]
+  167 tests green; touched gates green; facade 2,029 → 1,967 L.
+  **Batch 2 ✅ EXECUTED (S335):** `match-signals.js` (4 pure methods: `filterByExpertiseRelevance`,
+  `calculateExpertiseMatch`, `checkInstitutionMismatch`, `checkExpertiseMismatch`), `provenance.js`
+  (7 methods: `normalizeSuggestionSource`, `provenanceOriginForVerifiedSuggestion`,
+  `provenanceOriginForUnverifiedSuggestion`, `provenanceOriginForSpineSuggestion`,
+  `mapSpineVerificationResult`, `unverifiedSuggestion`, `evaluateVerificationIncoherence`), and
+  `publications.js` (4 methods: `_isPreprintPublication`, `dedupePublicationsByTitle`,
+  `backfillOpenAlexPublications`, `countRecentPublications`). Added characterization suites
+  `discovery-match-signals.test.js` (16 cases) + `discovery-provenance.test.js` (8 cases) for the
+  untested clusters (baselined green + mutation-proven); `publications` relied on existing
+  `discovery-openalex-publications.test.js`. Facade wrappers `dedupePublicationsByTitle(pubs)` and
+  `checkExpertiseMismatch(pubs)` renamed their param to avoid shadowing the `publications` import.
+  14 suites / 190 tests green; touched gates green; facade 1,967 → 1,455 L (**2,348 → 1,455 overall,
+  ~38%**). [RECHECKED after lib/services/discovery/match-signals.js + provenance.js + publications.js
+  change: this note describes the committed batch-2 state — each module exports its functions and the
+  facade delegates each.]
 - **Stage 4 — mid-tier:** `literature-search.js`, `track-b-identity.js`, `coauthor-coi.js`,
   `ranking.js`.
 - **Stage 5 — `verification.js`** (the hub; depends on Stages 1–4). The 272-line
