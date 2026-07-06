@@ -88,8 +88,8 @@ Read call sites (these become the HARD constraint post-swap — reads throw unco
 | R4 | `pages/api/user-preferences.js:48,:59` | `getUserPreferences` | BARE |
 | R5 | `pages/api/reviewer-finder/prompt-override.js:66` | `getUserPreferences` | BARE (outside the `:54` wrap) |
 | R6 | `lib/services/email-signature.js:78` | `getUserPreferences` (`.catch(() => ({}))`) | **caller-owned; 6 transitive entry points** (grep): `pages/api/workbench/grantee-deliverables/preview-invite.js`, `lib/services/review-manager/withdraw-sufficient-service.js`, `lib/services/reviewer-reminder-sweep.js`, `lib/services/workbench/grantee-deliverables/send-invite-service.js`, `lib/services/reviewer-acceptance-email.js`, `lib/services/cron/grantee-deliverable-reminders-service.js`. Several of their routes are in the `withDalContext` caller list (e.g. withdraw-sufficient, send-emails), **but per-site coverage is `[UNVERIFIED]` — Stage 1 must verify each of the 6 transitively.** |
-| R7 | `lib/services/reviewer-prompt-resolver.js:58` | `getUserPreferences` | caller-owned; consumers `claude-reviewer-service.js`, `prompt-store.js` → reviewer-finder routes (discover.js etc. carry `withDalContext`) — per-site coverage `[UNVERIFIED]`, same Stage-1 verification |
-| R8 | `scripts/test-dataverse-prefs-service.js`, `scripts/test-dataverse-app-access-and-settings.js` | live probe scripts | **No `enterDynamicsBypassForScript`** today (grep empty) — they work only because client.js is unguarded. Post-swap they must bootstrap a script bypass (Q3 pattern) or they break. |
+| R7 | `lib/services/reviewer-prompt-resolver.js:58` (`readUserOverride`) | `getUserPreferences` | **BARE — CONFIRMED (S339, Codex P1)** `[VERIFIED via source]`. The resolver's only `withDalContext` scopes **just** `fetchCurrentPrompt` (`:91-92`) and CLOSES before `readUserOverride` runs at `:103`; `readUserOverride` reads prefs at `:58` inside `try{…}catch{return null}` (`:57-67`). Both consuming routes call the service OUTSIDE context: `pages/api/reviewer-finder/analyze.js:212` (`analyzeProposal`; its `withDalContext` at `:182` is a different scope, closed) and `pages/api/reviewer-finder/discover.js:496` (`generateDiscoveredReasoning`; wraps at `:182`/`:413` are unrelated, closed). **Post-swap the override read throws → caught → `null` → per-user prompt overrides SILENTLY stop applying.** Fix in Stage 1h. |
+| R8 | **Full script census (S339, Codex P2 — rebuilt repo-wide):** 5 LIVE + 1 archived script call these services, NONE with a script bypass `[VERIFIED via grep scripts/ + per-file context check]`: `scripts/test-dataverse-prefs-service.js`, `scripts/test-dataverse-app-access-and-settings.js`, `scripts/test-profiles.js:57,67,72,77-78`, `scripts/test-wave1-flag-dispatch.js:78-79,99-104,140-150,177-194`, `scripts/cleanup-concept-evaluator-grants.js:55,77,92`; plus archived `scripts/archive/backfill-app-access.js` (not run — retire-in-place, note only). | live/probe/cleanup scripts | **No `enterDynamicsBypassForScript` in ANY** (verified). They work only because client.js is unguarded. Post-swap, missing context → service try/catch → `{}`/`null`/`false`/`[]`; the cleanup script would falsely report "nothing to clean." **Convert/retire each BEFORE its entity's Stage 3/4 swap — see Stage 2.5, not Stage 5.** |
 | R9 | `getDecryptedApiKey` / `hasPreference` | — | zero live callers (dormant); tests/scripts only |
 
 Facade layering (unchanged by this migration): routes → `lib/services/database-service.js:458-495`
@@ -206,11 +206,15 @@ Stage 1  Context wraps (Q4 + all entry points)   │
   1d  app-access.js handler wraps                │
   1e  prompt-override.js scope extension         │
   1f  read-side warn probes added to services    │
-  1g  verify 6 email-signature + 2 prompt-resolver transitive paths
+  1g  verify 6 email-signature transitive paths  │
+  1h  reviewer-prompt-resolver override wrap    ◄─┴── CONFIRMED bare (Codex P1); +overrideUsed test
         │
         ▼
 Stage 2  DATAVERSE_DAL_UNIVERSAL=warn in preview→prod; observe clean window (OQ-2)
-        │
+        │   (exercise incl. a prompt-override user's analyze+discover run — the 1h path)
+        ▼
+Stage 2.5  Script bypass conversion (5 live R8 scripts → enterDynamicsBypassForScript / retire)
+        │   per entity, BEFORE its swap (Codex P2)
         ▼
 Stage 3  PREFS wave  (characterize → adapter → swap → gates → deploy → live-verify)
         │   (prefs first: OFF the auth hot path; proves the pattern)
@@ -218,7 +222,7 @@ Stage 3  PREFS wave  (characterize → adapter → swap → gates → deploy →
 Stage 4  APP-ACCESS wave (same shape; auth hot path — only after prefs proven in prod)
         │
         ▼
-Stage 5  Closeout: probe scripts, docs/wiki/plan reconcile, warn-flag posture (OQ-3)
+Stage 5  Closeout: confirm R8 scripts converted, docs/wiki/plan reconcile, warn-flag posture (OQ-3)
 ```
 
 Hard orderings, stated per entry point:
@@ -227,9 +231,10 @@ Hard orderings, stated per entry point:
   inside a trusted context before the function it calls moves to DynamicsService. The reads make
   this absolute: `checkRestriction` throws with no flag to soften it (`dynamics-service.js:183+`).
 - **R1 (`requireAppAccess`) must land before Stage 4** — it is the only context source for the
-  `listAppKeysForUser` hot path. It also must land before Stage 3 IF any prefs read is reached
-  from inside `requireAppAccess`-gated flows without their own wrap (it isn't — prefs reads all
-  have their own entry wraps in 1c/1e — but 1a lands first anyway, in the same stage).
+  `listAppKeysForUser` hot path. Separately, **all prefs READ paths (1c/1e route wraps + 1g
+  email-signature + 1h reviewer-prompt-resolver) must land before Stage 3** — the reviewer-finder
+  override read (1h) was CONFIRMED bare (Codex P1), so "prefs reads all have their own wrap" was
+  FALSE as originally written; 1h closes it. 1a still lands first in Stage 1 regardless.
 - **W1 (`grantDefaultApps`) must land before Stage 4** — first-sign-in grant path.
 - Stage 3 and Stage 4 are **separable and independently shippable/revertible**; prefs first
   because its blast radius is bounded (prefs UI, email signature block, prompt overrides — all
@@ -282,24 +287,51 @@ Each commit: wrap + a `*-dal-context` test proving the call now executes inside 
   `dal-universal-guard.test.js` for the new labels. (The write asserts at prefs
   `:85,:125,:140` / app-access `:101,:132` stay where they are until Stage 3/4 removes them
   with the transport.)
-- **1g transitive verification (no code unless a gap is found)** — for each of the 6
-  `email-signature.js` consumers and 2 `reviewer-prompt-resolver.js` consumers (list in 1.3
-  R6/R7): trace route/cron entry → confirm the prefs read executes inside an existing
-  `withDalContext`/`bypassDynamicsRestrictions` scope. Any bare path gets a wrap at ITS entry
-  point (own commit). Crons must be inside their `verifyCronSecret`-then-context pattern.
-  Record the per-site verdicts in the stage log — this list is the read-coverage proof Stage 3
-  depends on.
+- **1g transitive verification (no code unless a gap is found)** — for the 6
+  `email-signature.js` consumers (list in 1.3 R6): trace route/cron entry → confirm the prefs
+  read executes inside an existing `withDalContext`/`bypassDynamicsRestrictions` scope. Any bare
+  path gets a wrap at ITS entry point (own commit). Crons must be inside their
+  `verifyCronSecret`-then-context pattern. Record the per-site verdicts in the stage log — this
+  list is the read-coverage proof Stage 3 depends on. (The `reviewer-prompt-resolver` path is no
+  longer `[UNVERIFIED]` — it was traced and CONFIRMED bare; its fix is 1h below.)
+- **1h reviewer-prompt-resolver override read — CONFIRMED BARE, concrete fix (S339, Codex P1).**
+  `readUserOverride` (`lib/services/reviewer-prompt-resolver.js:55-68`) reads prefs OUTSIDE any DAL
+  context (the module's `withDalContext` at `:91-92` scopes only `fetchCurrentPrompt` and closes
+  before the override read at `:103`; both routes — `analyze.js:212`, `discover.js:496` — call the
+  service outside context). Fix at the **service layer** per the module's own documented ownership
+  ("The resolver owns the `withDalContext` wrap for its Dataverse fetch", `:20-21`): wrap the
+  override read too —
+  `withDalContext('reviewer-prompt-override-read', () => readUserOverride(userProfileId, promptName))`
+  (or widen a single wrap to cover both the `fetchCurrentPrompt` and override reads). Do NOT push
+  the wrap into the two routes (leaves the service unsafe for any future caller). **Test:** extend
+  the resolver's suite to assert `overrideUsed: true` (and the stale-override branch) still resolve
+  AFTER the prefs transport swap — i.e. mock DynamicsService with an ALS check that throws when
+  unwrapped, proving the wrap is load-bearing. Also add reviewer-finder `analyze`/`discover` to the
+  Stage 2 warn-mode exercise list (below). This commit lands in Stage 1 (inert with the flag off,
+  correct under both transports).
 
 Gates for Stage 1: `check:dynamics-context-boundary` (+ self-test), full jest suite. No census
 change expected (transport untouched).
 
 ### Stage 2 — Warn-mode observation (no code)
 Set `DATAVERSE_DAL_UNIVERSAL=warn` in preview, exercise: fresh sign-in (new profile), prefs
-save/load, admin grant/revoke, prompt-override save, one review-email render (signature path),
-cron tick. Then prod, observe OQ-2 window. **Exit criterion: zero `[dal-universal]` lines.** Any
-line = a missed path; fix its wrap (return to Stage 1) before proceeding. Leave the flag at
-`warn` through Stages 3–4 (it keeps observing the not-yet-migrated entity while the first one
-migrates).
+save/load, admin grant/revoke, prompt-override save, **a reviewer-finder `analyze` AND `discover`
+run BY A USER WHO HAS A SAVED PROMPT OVERRIDE** (exercises the 1h path — confirms
+`overrideUsed:true` and no `[dal-universal]`/`Restrictions not initialized` line), one review-email
+render (signature path), cron tick. Then prod, observe OQ-2 window. **Exit criterion: zero
+`[dal-universal]` lines.** Any line = a missed path; fix its wrap (return to Stage 1) before
+proceeding. Leave the flag at `warn` through Stages 3–4 (it keeps observing the not-yet-migrated
+entity while the first one migrates).
+
+### Stage 2.5 — Script bypass conversion (BEFORE any transport swap; S339, Codex P2)
+The 5 live scripts in 1.3 R8 read/write these services with NO trusted context and work ONLY
+because client.js is unguarded today. Post-swap they silently degrade (missing context → caught →
+falsy), and `cleanup-concept-evaluator-grants.js` would falsely report "nothing to clean." Before
+Stage 3 touches prefs and before Stage 4 touches app-access, for EACH script that calls the
+entity about to move: add an `enterDynamicsBypassForScript` bootstrap (Q3 shared-helper pattern,
+`scripts/`-only per `check:dynamics-context-boundary`) or retire the script. Archived
+`scripts/archive/backfill-app-access.js` is not run — leave in place, note only. Checklist item in
+each swap stage; do not defer to Stage 5.
 
 ### Stage 3 — Prefs wave (order: characterize → adapter → swap → gates → deploy → verify)
 1. **Characterization tests first** (must pass against CURRENT code): mock
@@ -349,9 +381,8 @@ logic, not adapter transport). Extra rigor for the hot path:
   both transports; the interim client.js path has no context requirement).
 
 ### Stage 5 — Closeout
-- Convert `scripts/test-dataverse-prefs-service.js` + `scripts/test-dataverse-app-access-and-settings.js`
-  to bootstrap `enterDynamicsBypassForScript` (Q3 shape) — or retire them if the characterization
-  suites supersede them (owner call; they are live-org probes, likely keep).
+- Script bypass conversion is DONE in Stage 2.5 (moved earlier per Codex P2) — Stage 5 only
+  confirms every R8 script is converted/retired and re-runs the R8 census to prove none regressed.
 - Durable-docs reconcile (`.claude/rules/durable-docs.md` / `/sweep`): DAL plan Q9 decision +
   Stage 9 gap-detail (the "in NO wave" and census claims at `:371-380` become historical), stage
   log entry; `docs/agent-wiki/topics/dataverse-dynamics.md` (client.js write surface shrinks;
@@ -389,10 +420,11 @@ adapter attribution with zero new violations.
 | **Auth-path silent lockout** (highest) | post-swap missing context → `checkRestriction` throw → caught → `[]` → every user "Access Not Available"; NOT a 500, so no error-rate alarm | Stage-1 wrap of `requireAppAccess` lands first and is warn-observed (Stage 2) against the SAME ALS predicate DynamicsService uses; app-access swapped LAST (Stage 4) after prefs proves the pattern; explicit log-scan trigger on `[dataverse-app-access]` error lines; single-commit revert |
 | ~~Sandbox-URL repoint~~ **RESOLVED** | services' `SANDBOX \|\| URL` fallback vs DynamicsService's `DYNAMICS_URL` | **CLOSED S339: no `DYNAMICS_SANDBOX_URL` in any Vercel env `[VERIFIED via vercel env ls]` → fallback is dead code, swap URL-neutral.** Delete the dead fallback during each swap |
 | Ownership-binding regression | different create path | bind keys pass through `createRecord` body verbatim (`dynamics-service.js:758-763` [VERIFIED]); characterization asserts body bytes; never pass `actingUserSystemId` |
-| Missed read path (email-signature/prompt-resolver transitive callers, crons) | reads throw unconditionally | Stage 1g per-site verification with recorded verdicts; Stage-2 warn logs from the 1f read probes catch anything the static trace missed |
+| **Prompt-override silently stops applying** (Codex P1, CONFIRMED) | `reviewer-prompt-resolver` override read is bare → post-swap throws → caught → `null` → `overrideUsed:false`, no error | **1h** wraps the read at the service layer + an `overrideUsed:true`-survives-swap test; analyze/discover added to the Stage-2 warn exercise |
+| Missed read path (email-signature transitive callers, crons) | reads throw unconditionally | Stage 1g per-site verification with recorded verdicts; Stage-2 warn logs from the 1f read probes catch anything the static trace missed |
 | Pin-test erosion (S331 ruling) | `findRow` signature change | behavior-level pin re-established at adapter level (TypeError + zero transport calls); owner flagged (OQ-4) |
 | Prod throw via warn→on mis-sequencing | write asserts sit OUTSIDE try blocks | this plan never flips `DATAVERSE_DAL_UNIVERSAL=on`; it stays `warn` (observability) and real enforcement arrives via the transport swap, whose throws land INSIDE the service try/catch preserving falsy contracts |
-| Probe scripts break post-swap | no script bypass today | Stage 5 conversion (Q3 pattern); scripts are operator-run, not prod paths |
+| Scripts break/lie post-swap (Codex P2, CONFIRMED) | 5 live scripts have no script bypass; cleanup script would falsely report "nothing to clean" | **Stage 2.5** converts/retires each per entity BEFORE its swap (Q3 pattern); full R8 census rebuilt repo-wide |
 
 **Rollback story per stage:** Stage 1 wraps are inert without the flag and correct under both
 transports — never rolled back. Stage 3/4 swaps are each ONE commit touching one service + one
@@ -422,17 +454,46 @@ change needed (client.js path has no context requirement; `warn` flag tolerates 
 1. ~~Probe `DYNAMICS_SANDBOX_URL`~~ **DONE (S339): absent from all Vercel envs `[VERIFIED via
    vercel env ls]` → swap is URL-neutral, dead fallback removed during each swap.**
 2. Wrap all context roots first — `requireAppAccess`'s `listAppKeysForUser` lookup (Q4),
-   nextauth `grantDefaultApps`, `user-preferences.js`, `app-access.js`, `prompt-override.js` —
-   one commit per file, each with a dal-context test; add warn-mode read probes to the five
-   read functions; verify the 8 transitive prefs-read paths.
+   nextauth `grantDefaultApps`, `user-preferences.js`, `app-access.js`, `prompt-override.js`, and
+   the **reviewer-prompt-resolver override read (1h — Codex P1, confirmed bare)** — one commit per
+   file, each with a dal-context/`overrideUsed` test; add warn-mode read probes to the five read
+   functions; verify the 6 email-signature transitive paths.
 3. Flip `DATAVERSE_DAL_UNIVERSAL=warn` (preview→prod) and hold until logs are clean, because
-   post-swap a context gap is a SILENT access denial (caught → falsy), not a crash.
-4. Migrate PREFS first (off the auth hot path; bounded blast radius): characterization tests →
+   post-swap a context gap is a SILENT access denial (caught → falsy), not a crash. Exercise a
+   prompt-override user's analyze+discover (the 1h path) in the warn window.
+4. **Convert/retire the 5 live R8 scripts** to `enterDynamicsBypassForScript` per entity BEFORE
+   its swap (Stage 2.5 — Codex P2), else they silently degrade / mis-report post-swap.
+5. Migrate PREFS first (off the auth hot path; bounded blast radius): characterization tests →
    `adapters/user-preference.js` + registry entry → swap service internals keeping API,
    try/catch falsy contract, encryption, and the S331 non-string pin (moved to adapter level).
-5. Soak, then migrate APP-ACCESS the same way, with preview sign-in E2E and live log watch;
+6. Soak, then migrate APP-ACCESS the same way, with preview sign-in E2E and live log watch;
    rollback is a one-commit revert per wave (wraps are transport-agnostic and stay).
-6. Close out: script bypass bootstrap, census re-snapshot, durable-docs sweep (DAL plan Q9 +
+7. Close out: confirm R8 scripts converted, census re-snapshot, durable-docs sweep (DAL plan Q9 +
    Stage 9 text, wiki, dynamics-context.js header), leave `warn` standing for the client.js tail.
+
+---
+
+## Review log
+
+- **2026-07-06 (S339) — Fable draft, Claude-verified, P-1 probed.** Plan authored (Fable) against
+  `main`; Claude verified the three pillar claims against source (`checkRestriction` unconditional
+  throw `dynamics-service.js:188-190`; both entities absent from `KNOWN_ENTITY_SETS`; no
+  allowlist file → LAW mode) and probed P-1 (`vercel env ls` → no `DYNAMICS_SANDBOX_URL` in any
+  env; swap URL-neutral). Promoted to this durable doc.
+- **2026-07-06 (S339) — Codex adversarial review: REFUTED-as-written → patched.** Two findings,
+  both verified against source by Claude before folding in:
+  - **P1 (high) CONFIRMED** — the reviewer-finder prompt-override read (`reviewer-prompt-resolver.js`
+    `readUserOverride`, prefs read at `:58`) runs OUTSIDE DAL context: the module's `withDalContext`
+    (`:91-92`) scopes only `fetchCurrentPrompt` and closes before the override read at `:103`; both
+    routes (`analyze.js:212`, `discover.js:496`) call the service outside context. Post-swap →
+    silent loss of per-user overrides. Fix: **new Stage 1h** (service-layer wrap + `overrideUsed`
+    test); analyze/discover added to the Stage-2 warn exercise. The plan's prior "prefs reads all
+    have their own wrap" claim was false; corrected.
+  - **P2 (medium) CONFIRMED** — script census was incomplete. Rebuilt repo-wide: **5 live scripts**
+    (`test-dataverse-prefs-service`, `test-dataverse-app-access-and-settings`, `test-profiles`,
+    `test-wave1-flag-dispatch`, `cleanup-concept-evaluator-grants`) + 1 archived, NONE with a
+    script bypass. Fix: **new Stage 2.5** converts/retires each per entity BEFORE its swap (was
+    deferred to Stage 5).
+  - Re-review requested from Codex over the patched plan.
 
 No decomposition checkpoint is a prerequisite; only avoid interleaving commits with it.
