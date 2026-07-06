@@ -247,7 +247,9 @@ review → commit**. Leaf modules first so the facade delegates incrementally an
   14 suites / 190 tests green; touched gates green; facade 1,967 → 1,455 L (**2,348 → 1,455 overall,
   ~38%**). [RECHECKED after lib/services/discovery/match-signals.js + provenance.js + publications.js
   change: this note describes the committed batch-2 state — each module exports its functions and the
-  facade delegates each.]
+  facade delegates each.] **Stage 3 Codex review (both batches, `dcfb8483..5e112eb9`): SATISFIED, no
+  material findings** — all 23 methods verified body-identical, facade surface intact, statics still
+  exposed, no require cycle, old-vs-new runtime samples matched.
 - **Stage 4 — mid-tier:** `literature-search.js`, `track-b-identity.js`, `coauthor-coi.js`,
   `ranking.js`.
 - **Stage 5 — `verification.js`** (the hub; depends on Stages 1–4). The 272-line
