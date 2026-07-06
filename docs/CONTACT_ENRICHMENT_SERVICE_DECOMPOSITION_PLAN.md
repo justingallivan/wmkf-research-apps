@@ -294,6 +294,17 @@ is already extracted and green. The alternative (Q1-A: keep the orchestrator who
   can't corrupt the evidence basis). When `_finalize` moves to `tiers.js`, this exact order must be
   preserved — C9 covers `_finalize`'s *arguments*, C12 covers its *internal step order*. Stage 9's
   characterization must assert the order (e.g. spy call-order on the step methods), not just the outputs.
+- **C13 — Relative-import path rewrites when moving into the subdirectory (round-3).** Every module
+  moves from `lib/services/` into `lib/services/contact-enrichment/`, one level deeper — so every
+  relative `require`/`import` path in the moved code shifts: `./foo` → `../foo`, `../utils/foo` →
+  `../../utils/foo`. A wrong static `require` path throws at load and the suite catches it, but the
+  **dynamic `import()` *string* paths in `claudeWebSearch`** (`'../utils/ai-payload-boundary.js'`,
+  `'./llm-client.js'`, `'../utils/ai-output-schema.js'` [VERIFIED via :1645,1660,1722]) are only
+  evaluated when that Tier-3 code path runs — a stale string may pass unit tests that never hit the live
+  search. **Requirement:** when a module moves, rewrite all its relative paths for the new depth, and for
+  `search-tiers.js` specifically verify each dynamic-import string resolves from the new location (grep
+  the moved file for `import(`/`require(` and confirm each path). This is why Stage 6 gets its own
+  review checkpoint (A2).
 
 ## Staging (leaf-first, each stage independently green)
 
@@ -321,9 +332,11 @@ modules first so the facade delegates incrementally and the DAG never breaks. Th
   already covered).
 - **Stage 4 — `openalex-metrics.js`** (independent leaf).
 - **Stage 5 — `page-email.js`** (depends on domain-evidence).
-- **Stage 6 — `search-tiers.js`** (Tier-3 LLM + scholar URL). Carries the C6 A7 marker AND, in the same
-  commit, updates the `check-prompt-injection-tagging.js` registry `callSiteFiles` to the new path; keeps
-  all three dynamic ESM imports (C11); then run `check:prompt-injection-tagging`.
+- **Stage 6 — `search-tiers.js`** (Tier-3 LLM + scholar URL). **Not a low-risk leaf — gets its own
+  review (Checkpoint A2).** Carries the C6 A7 marker AND, in the same commit, updates the
+  `check-prompt-injection-tagging.js` registry `callSiteFiles` to the new path; keeps all three dynamic
+  ESM imports (C11) with their string paths rewritten for the new depth (C13); then run
+  `check:prompt-injection-tagging`.
 - **Stage 7 — `cost.js`** (trivial leaf).
 - **Stage 8 — `persistence.js`** (the DAL write unit; C5). **Highest scrutiny + the three LAW gates.**
   Land last of the leaves so the write path moves as an isolated, independently reviewed step.
@@ -345,12 +358,17 @@ stage. Every stage still lands its own characterization coverage, green suite, t
 diffs*. Order respects the verified DAG (leaves → dependents → tiers → facade).
 
 - **Checkpoint A — leaf batch (one combined Codex review):** Stages **1 `identity-anchor`,
-  2 `domain-evidence`, 4 `openalex-metrics`, 6 `search-tiers`, 7 `cost`**. All are DAG leaves (no
-  inter-module method edges except into already-committed modules) and low-risk *motion* — pure/compute
-  helpers plus stateless external-service calls. Commit each stage separately, then one review over the
-  combined diff. **Caveat:** Stage 6 `search-tiers` carries C6 (A7 registry `callSiteFiles` update in the
-  same commit) + C11 (preserve 3 dynamic ESM imports); flag both explicitly in the batch-A review brief
-  so they get individual attention even inside the batch.
+  2 `domain-evidence`, 4 `openalex-metrics`, 7 `cost`**. All are DAG leaves (no inter-module method edges
+  except into already-committed modules) and low-risk *motion* — pure/compute helpers plus stateless
+  external-service calls. Commit each stage separately, then one review over the combined diff.
+  (**Stage 6 pulled OUT of this batch** per round-3 BLOCKER — see A2.)
+- **Checkpoint A2 — `search-tiers.js` (Stage 6), DEDICATED review (round-3 BLOCKER fix).** NOT a
+  low-risk leaf: it carries C6 (the A7 gate registry `callSiteFiles` must move to the new path in the
+  same commit — the gate is file-level marker-presence only, so a batched review could mask a bad move),
+  C11 (3 CJS→ESM dynamic `import()`s), the Tier-3 LLM prompt hardening, AND the relative-import path
+  rewrites of C13. Reviewed alone: confirm the registry points at
+  `lib/services/contact-enrichment/search-tiers.js`, run `check:prompt-injection-tagging`, and explicitly
+  review every dynamic-import string path rewrite from the new subdirectory.
 - **Checkpoint B — domain-evidence dependents (one combined Codex review):** Stages **3
   `email-adjudication`, 5 `page-email`**. Both depend only on `domain-evidence` (committed in A). Heavily
   test-pinned (largely already covered). C11's env-flag-not-hoisted rule lives in Stage 5.
@@ -360,9 +378,10 @@ diffs*. Order respects the verified DAG (leaves → dependents → tiers → fac
   highest-risk cut (C9 tier control-flow, C10 spyable dispatch, C12 `_finalize` step order). Reviewed
   alone with the tier control-flow diff as the focus; Stage 10 cleanup folds into the same review.
 
-Rationale: batches A+B move ~40 low-risk helper methods behind two combined reviews; C and D isolate the
-two stages that can actually corrupt durable state or change tier control flow. If any batch review
-returns a BLOCKER, that batch converges (fold → re-review) before the next checkpoint starts.
+Rationale: batches A+B move the ~36 low-risk helper methods behind two combined reviews; A2, C, and D
+isolate the three stages that can actually mishandle a security gate (A2), corrupt durable state (C), or
+change tier control flow (D). If any review returns a BLOCKER, that checkpoint converges (fold →
+re-review) before the next one starts.
 
 ## Open questions
 
