@@ -146,7 +146,8 @@ describe('onboardReviewer — BILL_ENABLED=false fallback', () => {
     expect(deps.contacts.getBillingFieldsById).not.toHaveBeenCalled();
     expect(notifyCalls).toHaveLength(1);
     expect(notifyCalls[0].type).toBe('bill_manual_onboarding');
-    expect(notifyCalls[0].emailAdmins).toBe(true);
+    expect(notifyCalls[0].severity).toBe('warning');
+    expect(notifyCalls[0].emailAdmins).not.toBe(true);
   });
 });
 
