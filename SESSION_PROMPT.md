@@ -1,84 +1,75 @@
-# Session 334 Prompt: Notification trust-model plan — revised, needs re-review before execution
+# Session 335 Prompt: Notification site-33 CLOSED — next up, service-decomposition refactors
 
-## Session 333 Summary
+## Session 334 Summary
 
-Continuation of the S333 bypass-strip campaign session. Prior work in this session (Stages 0-4 of
-`docs/BYPASS_STRIP_PLAN.md`, including the Stage 4 fresh-context review) is already committed
-(`367ee56c`…`03172f33`) and confirmed closed — see "Do Not Reopen" below. This summary covers only
-the new work: drafting and then revising the site-33 follow-on plan.
+Drove the site-33 notification trust-model push-up (`docs/NOTIFICATION_TRUST_MODEL_PLAN.md`) from
+`status: draft, needs re-review` all the way to **fully executed and closed** across three stages, each
+under its own fresh-context Codex adversarial review. The through-line lesson: the plan's original
+caller census was built with literal `grep` and had **three silent blind spots** — a binary-flagged file,
+a `.call` local alias, and a dynamic `import()` — that hid 3 real callers. Re-closed the census at **23**
+verified three independent ways (`grep -a` union, whole-repo sweep, CodeGraph caller query).
 
 ### What Was Completed
 
-1. **`docs/NOTIFICATION_TRUST_MODEL_PLAN.md` drafted (`123b0538`)** — the site-33 follow-on the owner
-   asked for explicitly ("I don't like to leave things dangling... write a plan for the site-33 work
-   and have codex review it"), auditing `NotificationService.notify()`'s full caller fan-out (the one
-   site Stage 4 deliberately left un-pushed-up). First-draft census: 21 real callers, 8 NEVER-REACHES,
-   13 REACHES (7 single-hop, 2 likely-already-covered, 2 multi-hop deferred to Stage 2, 1 believed
-   caller-less STOP-AND-ASK).
+1. **Startup red gate fixed** — `check:memory-router` was red (`feedback-dont-tune-against-hook-source.md`
+   missing a `status:` key). Added `status: active` (`3aa3ac9`).
 
-2. **Codex adversarial review of the draft returned NEEDS REWORK** (run via the detached `codex exec`
-   protocol, `.claude-memory/reference-codex-detached-exec-protocol.md`) — relayed verbatim per house
-   rule. Seven findings, the two most material: (a) the census missed a 22nd real caller —
-   `lib/services/maintenance-service.js` assigns `NotificationService.notify` to a local and invokes it
-   via `.call(...)`, which a literal-callsite grep can't see; (b) row #16 (`lib/utils/migration-drift.js`)
-   was wrongly declared dead code with no caller — it is live, exported, and invoked on every server
-   cold start by `instrumentation.js`'s `register()` hook via a dynamic `import()`, which the same
-   literal-grep census also missed. No `withDalContext` wraps that cold-start path anywhere.
+2. **Census re-closed at 23 + plan cleaned** (`02d3cd9`) — Codex's Stage 0 STOP-on-drift caught
+   `pages/api/cron/pricing-refresh.js` (a binary-flagged file grep silently dropped). Verified NEVER-REACHES,
+   so Stage 1 scope was unchanged. Recorded the grep-blind-spots lesson in memory (`7d77121`, folded into
+   `feedback-symbol-consumer-fanout.md`).
 
-3. **Plan revised (`5cafe673`)** after independently re-verifying the load-bearing findings against
-   source myself (read `instrumentation.js`, grepped `migration-drift.js`'s export and
-   `maintenance-service.js`'s `notify` indirection directly — did not just trust the review). Census
-   corrected to 22 callers / 8 NEVER-REACHES / 14 REACHES; row #16 rewritten (live cold-start code, not
-   dead code); row #15's caller graph corrected (`instrumentation.js` + `auth-bypass-check.js`, not
-   `migration-drift.js`); new row #22 added for the `maintenance-service.js` caller (confirmed already
-   covered by an existing wrap); row #10 expanded to its actual four email-reaching call sites; row
-   #11's `[NOT-READ]` list reframed as an unverified grep hit list, not a caller graph. Stage 1 scope
-   grew from 7 to 9 code-change sites; the shared `'notification-email'` wrapper's removal condition now
-   requires all twelve REACHES sites covered, not seven. Doc still `status: draft`, **NOT executed, NOT
-   re-reviewed after this revision**.
+3. **Stage 1 — 9 single-hop push-ups** (`23cff83`): `withDalContext` added at #9,14,15,16,17,18,19,20,21
+   + a 14-test characterization suite (`tests/unit/notification-trust-model-pushup.test.js`). Reviewed;
+   also mutation-proved the tests discriminate, and recorded the scope-widen at the two monitor sites
+   (`0a179ef`).
 
-4. **Process note for future sessions**: mid-session, two attempts to hand the revision work to a
-   `codex:codex-rescue` subagent were correctly blocked by `.claude/hooks/pre-review-delegation-trace-guard.js`
-   (rewording the same delegation with `[INTENTIONAL-RESCUE: ...]` justification to slip past a
-   review-shaped-prompt guard reads as tunneling around a denial, not resolving it). The actual fix
-   didn't need Codex to author anything — verifying the findings against source and writing the
-   revision directly was faster and kept the plan's own hooks (scope-claim, design-doc-assertion) in
-   force on the new content. Don't reach for rescue delegation reflexively when you already have
-   everything needed to act directly.
+4. **Stage 2 — multi-hop #10/#11** (`ff1da81` scope, `1b69d4f` code): traced both fan-outs (CodeGraph +
+   `grep -a`); collapsed to **1 new wrap** (`onboard-reviewer.js:81`) + coverage — everything else already
+   covered by existing route/cron wraps. Reviewed.
+
+5. **Stage 3 — removed the shared net** (`5fa8522` + `a1f13af` test upgrades, `5d685c7` removal): upgraded
+   **all 10 already-covered characterization tests to handler-driven** (each mutation-proven — neutralize
+   the handler wrap → guard goes red), then removed `withDalContext('notification-email', ...)` from
+   `sendAdminEmail`. It now assumes an ambient trusted context; `createAndSendEmail`'s
+   `assertTrustedDalContext` is the sole fail-closed backstop (proven by the real-`DynamicsService`
+   no-context negative control). Realigned 2 pre-existing tests that pinned the old self-establish contract.
+   Fresh-context Codex review: **SATISFIED, no findings**.
+
+Three fresh-context Codex reviews across the arc: the two on shipped code returned only P2 doc-consistency
+items (fixed in `0a10400`, `9d3c926`); the final removal review found nothing. Full suite **428/4770 green**.
 
 ### Commits
-- `123b0538` - docs: draft NotificationService trust-model push-up plan (S333 site-33)
-- `5cafe673` - docs: fold Codex NEEDS-REWORK findings into notification trust-model plan
+- `3aa3ac9` fix: memory-router gate (status:active)
+- `02d3cd9` docs: clean plan + re-close census at 23 (three-way verified)
+- `23cff83` feat(dal): Stage 1 push-ups (9 sites) · `5bdf121` docs · `0a179ef` docs (scope-widen + mutation-proof)
+- `7d77121` memory: caller-census grep blind spots → grep -a + CodeGraph
+- `ff1da81` docs: trace + scope Stage 2 · `1b69d4f` feat(dal): Stage 2 push-ups (#10/#11) · `96d12c0` docs
+- `a1f13af` docs+test: S1/S2 review verdict + grantee handler-guard POC · `5fa8522` test: 5 Form-A conversions · `0a10400` docs: reconcile after S3-review P2
+- `5d685c7` feat(dal): remove shared notification-email wrapper — site 33 closed · `9d3c926` docs: mark Stage 3 done
 
 ## Next Items
 
 ### Verified Open
 
-1. **`docs/NOTIFICATION_TRUST_MODEL_PLAN.md` needs a re-review before any execution decision.**
-   Evidence: the plan's own Stage Log (`docs/NOTIFICATION_TRUST_MODEL_PLAN.md`, both 2026-07-05
-   entries) and Execution-status line — still `draft`, "REVIEWED ONCE — NEEDS REWORK findings folded
-   in, NOT RE-REVIEWED." Next step: either run another Codex adversarial review of this revision (same
-   detached-`codex exec` protocol as before, or ask the owner to run `/codex:adversarial-review --wait`
-   themselves since this repo commits directly to `main` and `/codex:review`'s default diff-vs-main
-   target doesn't fit), or get explicit owner sign-off to execute as-is. Do not begin Stage 0/1 work
-   without one of those two.
-
-2. **Research-first refactor candidates (carried from S331-332, not yet started)** — oversized
-   `discovery-service.js` (2,347 lines) / `contact-enrichment-service.js` (1,776 lines) decomposition;
-   flat `lib/services` domain-fold (needs a CodeGraph pass first). Same plan→review→execute cadence.
-   Evidence: `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md` closing notes; not re-verified this session.
+1. **Service-decomposition refactors (carried S331-332, not started).**
+   Evidence: `git wc -l` this session — `lib/services/discovery-service.js` (2,348 lines) and
+   `lib/services/contact-enrichment-service.js` (1,776 lines), both still oversized;
+   `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md` closing notes. Decompose each; also the flat `lib/services`
+   domain-fold (needs a CodeGraph pass first). Same plan→trace→execute→fresh-review cadence that worked
+   for site-33 — and use `grep -a` + CodeGraph for any caller census, not literal grep (this session's
+   lesson: `feedback-symbol-consumer-fanout.md`).
 
 ### Backlog (small, owner-priority when convenient)
 
-1. **`pages/api/app-access.js` swallows service errors** (`:88`/`:105` return success even when the
-   service returns `{ error }`) — pre-existing, surfaced by an earlier refactor's closing review (P3).
-   Fix = route returns an error status. Not re-verified this session.
-2. **1b-15 `check-coverage-self-test.js` ↔ atlas gate race** over the shared
-   `lib/services/atlas_selftest_tmp` dir — documented wart, excluded from the fixture-helper adoption; a
-   real fix needs a dedicated fixture path. Not re-verified this session.
-3. **pg `sslmode=verify-full`** — the `(node:4)` cron stderr warning asks for an explicit
-   `sslmode=verify-full` in the connection string before pg v9. One-line env change + redeploy;
-   behavior today is already verify-full. Not re-verified this session.
+1. **`pages/api/app-access.js` swallows service errors** (P3, pre-existing).
+   Evidence: still returns `res.json({ success: true })` on the grant path (`:91`) and `res.json({ success: true })`
+   at `:25` regardless of a service `{ error }`. NOTE: line numbers shifted from the old `:88/:105` — re-locate
+   before fixing. Fix = route returns an error status when the service reports one.
+2. **1b-15 atlas-gate ↔ `check-coverage-self-test.js` race** over the shared `lib/services/atlas_selftest_tmp`
+   dir — documented wart; a real fix needs a dedicated fixture path. Not re-verified this session.
+3. **pg `sslmode=verify-full`** — `(node:4)` cron stderr warning wants an explicit `sslmode=verify-full`
+   in the connection string before pg v9. One-line env change + redeploy. Not re-verified this session.
 
 ### Parked
 
@@ -87,37 +78,38 @@ the new work: drafting and then revising the site-33 follow-on plan.
 
 ### Do Not Reopen Without New Decision
 
-1. **`docs/BYPASS_STRIP_PLAN.md` Stages 0-4: CLOSED.** Mechanical strip (52 sites) + trust-model
-   tightening (10 of 11 candidate sites) both landed; a second fresh-context Codex adversarial review
-   of the Stage 4 diff (`367ee56c..HEAD`) returned SATISFIED with no findings (`03172f33`). Site 33
-   (`notification-service.js`) was the one deliberate exception — see the `NOTIFICATION_TRUST_MODEL_PLAN.md`
-   item above; do not reopen the bypass-strip campaign itself, only the site-33 follow-on plan.
-2. **Chunk-loop gate + security-gate walk consolidation: DECLINED** (S332, recorded in the
-   CHUNK/GATE_SCRIPT Stage Logs).
-3. **Do not re-add CodeQL** (`180e9046`, `198fbd97`).
-4. **Do not delete `lib/services/anthropic-admin.js`** (pricing cron imports).
-5. **Client-side export remains the decision** until a Power Automate flow exists
+1. **Notification site-33 (`NOTIFICATION_TRUST_MODEL_PLAN.md`): CLOSED.** All three stages executed and
+   independently reviewed; the shared `notification-email` wrapper is removed; census closed at 23.
+   Evidence: plan Execution-status line + Stage Log (2026-07-05 entries); commit `5d685c7`. The code comment
+   at `notification-service.js:171` warns against re-adding an internal wrap — heed it.
+2. **`docs/BYPASS_STRIP_PLAN.md` Stages 0-4: CLOSED** (site 33 was its one deferred exception, now also closed).
+3. **Chunk-loop gate + security-gate walk consolidation: DECLINED** (S332).
+4. **Do not re-add CodeQL** (`180e9046`, `198fbd97`).
+5. **Do not delete `lib/services/anthropic-admin.js`** (pricing cron imports).
+6. **Client-side export remains the decision** until a Power Automate flow exists
    (`docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md` decision 4).
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/NOTIFICATION_TRUST_MODEL_PLAN.md` | Site-33 follow-on plan; drafted, reviewed once (NEEDS REWORK), revised, not yet re-reviewed or executed. |
-| `docs/BYPASS_STRIP_PLAN.md` | CLOSED campaign record (Stages 0-4); full Stage Log, both Codex review rounds. |
-| `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md` | Closed campaign record + drain-defect post-mortem. |
-| `.claude-memory/reference-codex-detached-exec-protocol.md` | How to run Codex reviews without hangs/pair-kills. |
-| `.claude/hooks/pre-review-delegation-trace-guard.js` | Blocks review-shaped Codex delegation from using `codex-rescue`; do not reword prompts to slip past it — resolve directly or ask the owner. |
+| `docs/NOTIFICATION_TRUST_MODEL_PLAN.md` | CLOSED site-33 record — full Stage Log + all three Codex review rounds. |
+| `tests/unit/notification-trust-model-pushup.test.js` | 25-test handler-driven characterization suite (10 already-covered guards + negative control). |
+| `lib/services/notification-service.js` | `sendAdminEmail` now assumes ambient DAL context (`:171` comment). |
+| `docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md` | Closed campaign record; source of the refactor-candidate backlog. |
+| `.claude-memory/feedback-symbol-consumer-fanout.md` | Caller-census grep blind spots (binary / `.call` / dynamic-import) → use `grep -a` + CodeGraph. |
+| `.claude-memory/reference-codex-detached-exec-protocol.md` | How to run detached read-only Codex reviews (used 3× this session, no failures). |
 
 ## Testing
 
 ```bash
-# Doc gates touched this session
-npm run check:docs-catalog
-npm run check:doc-currency
-npm run check:agent-wiki
-npm run check:fact-consistency
+# Site-33 suite (10 handler-driven guards + negative control)
+npx jest tests/unit/notification-trust-model-pushup.test.js
 
-# Full suite (verify current count before relying on it — not re-run this session)
+# Boundary gates touched this arc
+npm run check:dynamics-context-boundary && npm run check:dynamics-context-boundary:self-test
+npm run check:route-service-boundary && npm run check:route-service-boundary:self-test
+
+# Full suite (was 428 suites / 4770 tests green end of S334)
 npm test
 ```
