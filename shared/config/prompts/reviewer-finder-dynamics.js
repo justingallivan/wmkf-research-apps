@@ -47,10 +47,11 @@
 // reviewer-finder.analyze
 // ────────────────────────────────────────────────────────────────────────────
 // One Claude call produces two sections:
-//   PART 1: PROPOSAL METADATA (TITLE, PI, KEYWORDS, ABSTRACT, ...)
+//   PART 1: SCIENTIFIC ANALYSIS (PRIMARY/SECONDARY_RESEARCH_AREA, methodologies, keywords)
 //   PART 2: REVIEWER SUGGESTIONS (NAME/INSTITUTION/EXPERTISE/...)
-// (PART 3 database search queries removed S253 — Track-B-only consumer, archived off S248.
-//  Kept byte-identical to createAnalysisPrompt; the composer test guards parity.)
+// Administrative metadata (title, PI, co-PIs, institution, abstract) is sourced from
+// Dataverse and injected by the composer — the model no longer extracts it (S339).
+// (PART 3 database search queries removed S253 — Track-B-only consumer, archived off S248.)
 // Output is delimited text, not JSON. Route parses via parseAnalysisResponse.
 
 export const ANALYZE_SYSTEM_PROMPT = '';
@@ -58,7 +59,6 @@ export const ANALYZE_SYSTEM_PROMPT = '';
 export const ANALYZE_USER_PROMPT_TEMPLATE = `You are an expert at identifying qualified peer reviewers for scientific research proposals. Analyze this proposal and provide structured output for a reviewer discovery system.
 
 {{additional_notes_block}}
-{{excluded_names_block}}
 
 **YOUR TASK:**
 
@@ -66,21 +66,16 @@ Analyze this proposal and provide TWO types of output:
 
 ---
 
-## PART 1: PROPOSAL METADATA
+## PART 1: SCIENTIFIC ANALYSIS
 
-Extract key information from the proposal. The cover page typically contains "Project Leader", "Co-Principal Investigators", and "Program" fields.
+The proposal's administrative metadata (title, program, principal investigator, co-investigators, institution, abstract) is supplied separately from the request record — do NOT extract, infer, or restate it from the proposal text.
 
-TITLE: [Complete proposal title]
-PROGRAM_AREA: [The Keck Foundation program. Look for "Program:" on the cover page. Must be one of: "Science and Engineering Research Program" or "Medical Research Program". If not found or unclear, write "Not specified"]
-PRINCIPAL_INVESTIGATOR: [The Project Leader / PI - extract ONE name only from the "Project Leader" field on the cover page. Example: "Dr. Jane Smith" or "John Doe". If not found, write "Not specified"]
-CO_INVESTIGATORS: [Names from "Co-Principal Investigators" field on cover page, comma-separated. Include full names (e.g., "Dr. Jane Smith, Dr. John Doe"). If none listed or field is empty, write "None"]
-CO_INVESTIGATOR_COUNT: [Number of Co-Investigators as a digit, e.g., "0", "1", "2", "3". Must match the number of names in CO_INVESTIGATORS. If none, write "0"]
-AUTHOR_INSTITUTION: [University or organization name of the PI from cover page, or "Not specified"]
+Extract only the scientific search context needed for reviewer discovery:
+
 PRIMARY_RESEARCH_AREA: [Main scientific discipline]
 SECONDARY_AREAS: [Comma-separated list of related fields]
 KEY_METHODOLOGIES: [Main techniques/approaches used]
 KEYWORDS: [5-8 specific technical terms for database searching]
-ABSTRACT: [The proposal abstract. Extract verbatim if present, otherwise write a 2-3 sentence summary of the proposed research]
 
 ---
 
@@ -96,7 +91,7 @@ Suggest {{reviewer_count}} potential expert reviewers. For each, provide detaile
 **IMPORTANT CRITERIA:**
 - Must be established researchers (professors, senior scientists, PIs)
 - Must have relevant expertise to evaluate this proposal
-- Prefer researchers at a different institution than the author (same-institution conflicts are screened automatically)
+- Never suggest anyone listed in the EXCLUSIONS block above (the proposal's own investigators and the applicant institution) — those are hard exclusions, not preferences. Same-institution conflicts are also screened downstream.
 - PRIORITIZE researchers currently active and publishing in the proposal's area, at any career stage — strong, currently-active senior researchers are wanted, not just mid-career. Recent in-area activity matters more than career stage or cumulative fame: favor people doing this work now over those whose contributions are mainly historical. Eminent figures (field founders, Nobel laureates, emeritus) are welcome when they are a genuinely strong fit; just don't let them crowd out the list.
 - For interdisciplinary work, cover all major areas
 
