@@ -14,11 +14,9 @@ related:
 
 # DiscoveryService Decomposition Plan
 
-**Status: STAGES 0–4 EXECUTED (S335) — plan approved via two Codex adversarial-review rounds; 12
-modules extracted behind the facade (`constants`, `name-matching`, `affiliation`, `research-area`,
-`pubmed-query`, `match-signals`, `provenance`, `publications`, `track-b-identity`, `coauthor-coi`,
-`literature-search`, `ranking`); facade 2,348 → 962 L (~59%). Stages 5–6 pending (Stage 4 Codex review
-next; Stage 5 `verification.js` is the delicate hub). See stage notes.**
+**Status: STAGES 0–5 EXECUTED (S335) — plan approved via two Codex adversarial-review rounds; all 13
+modules extracted behind the facade; facade 2,348 → 682 L (~71%). Only Stage 6 (facade finalization +
+unused-import cleanup) remains. See stage notes.**
 
 All material claims below are grounded in artifacts produced THIS session — the mechanically-computed
 internal call graph (a script over `lib/services/discovery-service.js`), a `grep -a` whole-repo caller
@@ -277,9 +275,19 @@ review → commit**. Leaf modules first so the facade delegates incrementally an
   bodies identical, C1 pass-through / Q3 placement / lazy-require paths / author selection / ranking /
   Track-B mapping / surface / no-cycle all held (eslint clean).
   [RECHECKED after lib/services/discovery/track-b-identity.js lib/services/discovery/coauthor-coi.js lib/services/discovery/literature-search.js lib/services/discovery/ranking.js change: this note describes the committed Stage 4 state — each module exports its functions and the facade delegates each.]
-- **Stage 5 — `verification.js`** (the hub; depends on Stages 1–4). The 272-line
-  `verifyClaudeSuggestions` is the single most delicate move — extract last, with the constant
-  pass-through (C1) and the `this.`→import rewrite (C3) under the most scrutiny.
+- **Stage 5 — `verification.js` (the hub; depends on Stages 1–4). ✅ EXECUTED (S335).** Moved
+  `verifyClaudeSuggestions` (the 272-line Track-A hub), `pubMedVerificationContract`, and
+  `suggestionVerifierRouting` to `lib/services/discovery/verification.js`. The 20+ `this.X` self-calls
+  became direct imported-function calls across 7 sibling modules (name-matching, pubmed-query,
+  match-signals, affiliation, publications, research-area, provenance) + `ReviewerIdentityEvidence` /
+  `PubMedService` / `withReviewerProvenance`; `DEBUG`/`PUBMED_DELAY`/`VERIFICATION_STATUSES`/
+  `VERIFICATION_SKIPPED_REASON` from `./constants`. **C1:** `verifyClaudeSuggestions` takes
+  `minPublications` as a 4th param (default = the constant) and the facade wrapper passes
+  `this.MIN_PUBLICATIONS`, so a runtime override still applies — mutation-proven (force the param high →
+  the `MIN_PUBLICATIONS`-mutating `discovery-verification-status.test.js` goes red). No require cycle
+  (nothing the hub imports imports it back). Existing `discovery-verification-status.test.js` is the
+  net (19 cases incl. the mutation, routing, contract). 204 tests green; touched gates green; facade
+  962 → 682 L (**2,348 → 682 overall, ~71%**). [RECHECKED after lib/services/discovery/verification.js change: this note describes the committed Stage 5 state — the module exports the 3 functions and the facade delegates each, passing this.MIN_PUBLICATIONS.]
 - **Stage 6 — facade finalization.** `discovery-service.js` now holds only `discover` + static props
   + delegations. Confirm the target line count, confirm the full public surface still resolves, final
   full-suite run + fresh review.
