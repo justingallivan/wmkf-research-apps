@@ -25,6 +25,8 @@
 // Use the canonical env loader so quoting edge-cases in .env.local are
 // handled the same way every dispatch-touching script handles them.
 require('../lib/dataverse/client').loadEnvLocal();
+const { enterDynamicsBypassForScript } = require('../lib/services/dynamics-context');
+enterDynamicsBypassForScript('cleanup-concept-evaluator-grants');
 
 const DRY = process.argv.includes('--dry-run');
 const EXECUTE = process.argv.includes('--execute');
