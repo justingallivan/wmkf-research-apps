@@ -65,7 +65,36 @@ test('requireAppAccess wraps listAppKeysForUser in trusted DAL context', async (
   );
 
   expect(access).toMatchObject({ profileId: 42 });
-  expect(listAppKeysForUser).toHaveBeenCalledWith(42);
+  expect(listAppKeysForUser).toHaveBeenCalledWith(42, { throwOnError: true });
   expect(seen.inside).toBe(true);
   expect(hasTrustedDalContext()).toBe(false);
+});
+
+test('requireAppAccess fails closed (503) and does not cache when the grant lookup errors', async () => {
+  listAppKeysForUser.mockRejectedValue(new Error('Dataverse 503'));
+  const res = mockRes();
+
+  const access = await requireAppAccess(
+    { method: 'GET', headers: {} },
+    res,
+    'dynamics-explorer',
+  );
+
+  // Denied via a retryable 503 rather than a cached empty grant set.
+  expect(access).toBeNull();
+  expect(res.statusCode).toBe(503);
+
+  // The error result must NOT be cached: a recovered next request re-queries
+  // and succeeds instead of serving a stale empty set for the full TTL.
+  listAppKeysForUser.mockResolvedValue(['dynamics-explorer']);
+  sql
+    .mockResolvedValueOnce({ rows: [{ is_active: true }] })
+    .mockResolvedValueOnce({ rows: [] });
+  const retry = await requireAppAccess(
+    { method: 'GET', headers: {} },
+    mockRes(),
+    'dynamics-explorer',
+  );
+  expect(retry).toMatchObject({ profileId: 42 });
+  expect(listAppKeysForUser).toHaveBeenCalledTimes(2);
 });

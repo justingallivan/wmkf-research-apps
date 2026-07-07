@@ -32,3 +32,26 @@ test("buildMap doubles single quotes in the internalemailaddress filter", async 
   await resolveProfileToSystemUser(2);
   expect(get.mock.calls[0][0]).toContain("internalemailaddress eq 'o''brien@example.com'");
 });
+
+test('buildMap propagates non-2xx systemusers lookup errors without caching a partial map', async () => {
+  get.mockResolvedValueOnce({ ok: false, status: 503 });
+
+  await expect(resolveProfileToSystemUser(2)).rejects.toThrow(
+    'Dataverse systemusers lookup failed with status 503',
+  );
+  expect(sql).toHaveBeenCalledTimes(1);
+  expect(get).toHaveBeenCalledTimes(1);
+
+  get.mockResolvedValueOnce({
+    ok: true,
+    body: { value: [{ systemuserid: 'S2', fullname: 'Recovered User' }] },
+  });
+
+  await expect(resolveProfileToSystemUser(2)).resolves.toEqual({
+    systemuserid: 'S2',
+    fullname: 'Recovered User',
+    remappedFromId: null,
+  });
+  expect(sql).toHaveBeenCalledTimes(2);
+  expect(get).toHaveBeenCalledTimes(2);
+});
