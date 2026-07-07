@@ -285,6 +285,48 @@ Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
     gates on `isExternalReviewUrl(url) && reviewButtonLabel`).
   (The `hold` + `finalize` templates were **REMOVED in S279** along with the rest of
   the hold path — see `project-reviewer-hold-step-decouple`.)
+- **Invitation send-safety semantics (S340, `send-emails.js`).** First-external-send hardening,
+  invitation templateType only: (1) `wmkf_invited`/`emailSentAt`/`respondReminderSentAt` is stamped
+  INLINE per-recipient right after each successful send (not a post-loop pass), so a mid-batch
+  timeout can't leave sent invites unstamped and exposed to a duplicate re-send via the
+  `shouldSkipDuplicateInvitation` guard. (2) A send that THROWS goes to a new `unconfirmed[]` bucket
+  + `email_unconfirmed` SSE event ("possibly sent — verify before retry"), never `failed[]`, because
+  a thrown SendEmail may still have dispatched. (3) A successful send whose inline stamp fails is
+  recorded `inviteRecorded:false` on the sent record (surfaced, not a scrolling warning). (4) A
+  send-time body-integrity gate skips an invitation whose body lacks a `/external/review/` secure
+  link (`missing_secure_link`) or carries an unresolved `{{token}}` (`unresolved_placeholder`) rather
+  than ship a broken first-contact email. `InviteEmailModal` renders the "verify before retry" set
+  and lists who was sent/failed/skipped; a terminal error no longer shows green success. Re-sendable
+  templateTypes (materials/followup/thankyou) keep their prior `failed[]` + post-loop-stamp semantics.
+  Rendering quality (also S340, `lib/utils/email-generator.js`): the greeting drops trailing
+  name suffixes (Jr./Sr./III/PhD/MD) for the surname and falls back to "Dear Reviewer" on an empty
+  name; `{{proposalAbstract}}` is soft-unwrapped (`softUnwrapProse`) so a fixed-column hard-wrapped
+  abstract reflows to the email width instead of rendering a `<br>` at every stored newline. The
+  unwrap is calibrated against 40 real abstracts (S340): it joins only lines that look auto-wrapped
+  (long + not ending at a sentence/clause boundary), so single-newline paragraph separators and
+  short header lines are PRESERVED, not merged; blank-line paragraph breaks always stay.
+  `proposalDetails` is NOT unwrapped — its single newlines are intentional. Detector + reflow now
+  live in `lib/utils/abstract-format.js` (`hasAbstractWrapArtifacts` / `reflowAbstract`).
+- **Abstract-edit gate (S340).** `render-emails` surfaces per-draft `abstractFlagged` +
+  `currentAbstract` + `reflowedAbstract` + `requestId`. **The flag is `abstractNeedsReflow` — true
+  exactly when the reflow would change the stored text** (not merely "has a mid-sentence newline"),
+  so the banner's "auto-cleaned for these emails" claim always holds and a header-style intentional
+  break is not flagged. When flagged, `InviteEmailModal` shows a non-blocking amber banner with an
+  "Edit abstract" editor (seeded with the reflowed text). Save requires a `window.confirm` (durable,
+  no undo — mirrors the send path) and **clears per-recipient body/subject overrides** (`setEdits({})`)
+  so a manually-edited draft can't keep the pre-fix abstract; it then POSTs
+  `/api/review-manager/update-abstract` → overwrites the canonical `wmkf_abstract` on `akoya_request`
+  via `updateById` (auth `requireAppAccess('review-manager','reviewers')`, GUID-validated requestId,
+  trusted DAL context, PD attribution; optimistic compare-and-set — the modal posts the
+  `expectedCurrent` abstract it rendered from and the service 409s if the live `wmkf_abstract`
+  changed since, targeted on the abstract field so an unrelated concurrent write to the request
+  does not spuriously conflict), then
+  re-renders (flag clears). `wmkf_abstract` is GoApply write-once (NOT re-synced), so a PD edit is
+  durable and fixes these reviewer invites plus any later read that starts from `wmkf_abstract`. It
+  does NOT retroactively rewrite an already-generated derived version (`wmkf_abstractformatted`/
+  `wmkf_abstractapproved`, consumed by grantee/board exports via `grantee-document-assembly.js`),
+  which live behind their own approval-status gates. The reflow remains the send-time safety net for
+  un-edited flagged abstracts.
 - All four templates are sendable: `invitation` (first contact, via ReviewerInvitePanel →
   `InviteEmailModal`, hardcoded `templateType:'invitation'`) and
   `materials`/`followup`/`thankyou` (via `ReviewerManagePanel`). The reviewer onboards
