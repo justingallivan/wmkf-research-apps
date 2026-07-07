@@ -64,10 +64,34 @@ function reviewerIdFieldsOutsideDeclaration(value) {
       return;
     }
     for (const [key, child] of Object.entries(node)) {
-      if (key === 'referencedReviewers') continue;
+      if (key === 'referencedReviewers' || key === 'referencedContacts') continue;
       if (
         key.toLowerCase().endsWith('reviewerid')
         && key !== 'reviewerContactId'
+        && typeof child === 'string'
+        && GUID_RE.test(child)
+      ) {
+        ids.add(child);
+      }
+      visit(child);
+    }
+  };
+  visit(value);
+  return [...ids].sort();
+}
+
+function contactIdFieldsOutsideDeclaration(value) {
+  const ids = new Set();
+  const visit = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      for (const item of node) visit(item);
+      return;
+    }
+    for (const [key, child] of Object.entries(node)) {
+      if (key === 'referencedContacts') continue;
+      if (
+        key.toLowerCase().endsWith('contactid')
         && typeof child === 'string'
         && GUID_RE.test(child)
       ) {
@@ -87,10 +111,20 @@ function referencedReviewerIds(outcome) {
     .sort();
 }
 
-function expectDeclaredReviewerIds(outcome, expectedRefs) {
+function referencedContactIds(outcome) {
+  return (outcome.referencedContacts || [])
+    .map((entry) => entry.contactId)
+    .filter(Boolean)
+    .sort();
+}
+
+function expectDeclaredIds(outcome, expectedReviewerRefs, expectedContactRefs) {
   expect(Array.isArray(outcome.referencedReviewers)).toBe(true);
   expect(referencedReviewerIds(outcome)).toEqual(reviewerIdFieldsOutsideDeclaration(outcome));
-  expect(outcome.referencedReviewers).toEqual(expectedRefs);
+  expect(outcome.referencedReviewers).toEqual(expectedReviewerRefs);
+  expect(Array.isArray(outcome.referencedContacts)).toBe(true);
+  expect(referencedContactIds(outcome)).toEqual(contactIdFieldsOutsideDeclaration(outcome));
+  expect(outcome.referencedContacts).toEqual(expectedContactRefs);
 }
 
 beforeEach(() => {
@@ -115,7 +149,7 @@ describe('lookupReviewerIdentity referencedReviewers invariant', () => {
     const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: null });
 
     expect(out.outcome).toBe('confident');
-    expectDeclaredReviewerIds(out, [{ reviewerId: REVIEWER_A, affiliation: 'Applicant University', viaNameMatch: false }]);
+    expectDeclaredIds(out, [{ reviewerId: REVIEWER_A, affiliation: 'Applicant University', viaNameMatch: false }], []);
   });
 
   test('confident contact-only outcome declares an empty reviewer set', async () => {
@@ -128,14 +162,14 @@ describe('lookupReviewerIdentity referencedReviewers invariant', () => {
     const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: null });
 
     expect(out.outcome).toBe('confident');
-    expectDeclaredReviewerIds(out, []);
+    expectDeclaredIds(out, [], [{ contactId: CONTACT_A, viaNameMatch: false }]);
   });
 
-  test('candidates outcome declares every reviewer-source candidate and no contact-only candidate', async () => {
+  test('candidates outcome declares every reviewer-source candidate and every contact id candidate', async () => {
     potentialReviewerAdapter.findByEmailCandidates.mockResolvedValueOnce({
       ambiguous: true,
       rows: [
-        reviewerRow(REVIEWER_A, { wmkf_primaryaffiliation: 'Applicant University' }),
+        reviewerRow(REVIEWER_A, { wmkf_primaryaffiliation: 'Applicant University', _wmkf_contact_value: CONTACT_B }),
         reviewerRow(REVIEWER_B, { wmkf_primaryaffiliation: 'Different University' }),
       ],
     });
@@ -147,9 +181,12 @@ describe('lookupReviewerIdentity referencedReviewers invariant', () => {
     const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: null });
 
     expect(out.outcome).toBe('candidates');
-    expectDeclaredReviewerIds(out, [
+    expectDeclaredIds(out, [
       { reviewerId: REVIEWER_A, affiliation: 'Applicant University', viaNameMatch: false },
       { reviewerId: REVIEWER_B, affiliation: 'Different University', viaNameMatch: false },
+    ], [
+      { contactId: CONTACT_B, viaNameMatch: false },
+      { contactId: CONTACT_A, viaNameMatch: false },
     ]);
   });
 
@@ -157,13 +194,31 @@ describe('lookupReviewerIdentity referencedReviewers invariant', () => {
     potentialReviewerAdapter.searchByName.mockResolvedValueOnce([
       reviewerRow(REVIEWER_A, { wmkf_primaryaffiliation: 'Applicant University' }),
     ]);
+    contactAdapter.searchByName.mockResolvedValueOnce([
+      contactRow(CONTACT_A),
+    ]);
 
     const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: null, orcid: null });
 
     expect(out.outcome).toBe('candidates');
-    expectDeclaredReviewerIds(out, [
+    expectDeclaredIds(out, [
       { reviewerId: REVIEWER_A, affiliation: 'Applicant University', viaNameMatch: true },
+    ], [
+      { contactId: CONTACT_A, viaNameMatch: true },
     ]);
+  });
+
+  test('email mismatch conflict declares contactId', async () => {
+    contactAdapter.findByEmailCandidates.mockResolvedValueOnce({
+      one: true,
+      id: CONTACT_A,
+      row: contactRow(CONTACT_A, { emailaddress1: 'crm@example.edu' }),
+    });
+
+    const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'typed@example.edu', orcid: null });
+
+    expect(out).toMatchObject({ outcome: 'conflict', reason: 'email_mismatch' });
+    expectDeclaredIds(out, [], [{ contactId: CONTACT_A, viaNameMatch: false }]);
   });
 
   test('reviewer/contact split conflict declares reviewerId but not reviewerContactId', async () => {
@@ -181,7 +236,12 @@ describe('lookupReviewerIdentity referencedReviewers invariant', () => {
     const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: null, orcid: ORCID });
 
     expect(out).toMatchObject({ outcome: 'conflict', reason: 'orcid_email_split' });
-    expectDeclaredReviewerIds(out, [{ reviewerId: REVIEWER_A, affiliation: null, viaNameMatch: false }]);
+    expectDeclaredIds(out, [
+      { reviewerId: REVIEWER_A, affiliation: null, viaNameMatch: false },
+    ], [
+      { contactId: CONTACT_B, viaNameMatch: false },
+      { contactId: CONTACT_A, viaNameMatch: false },
+    ]);
   });
 
   test('reverse-link conflict declares existingReviewerId', async () => {
@@ -197,7 +257,32 @@ describe('lookupReviewerIdentity referencedReviewers invariant', () => {
     const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: null });
 
     expect(out).toMatchObject({ outcome: 'conflict', reason: 'contact_linked_elsewhere' });
-    expectDeclaredReviewerIds(out, [{ reviewerId: REVIEWER_B, affiliation: null, viaNameMatch: false }]);
+    expectDeclaredIds(out, [
+      { reviewerId: REVIEWER_B, affiliation: null, viaNameMatch: false },
+    ], [
+      { contactId: CONTACT_A, viaNameMatch: false },
+    ]);
+  });
+
+  test('ORCID/email contact split conflict declares both contact ids', async () => {
+    contactAdapter.findByOrcidCandidates.mockResolvedValueOnce({
+      one: true,
+      id: CONTACT_A,
+      row: contactRow(CONTACT_A, { wmkf_orcid: ORCID, emailaddress1: 'ada@example.edu' }),
+    });
+    contactAdapter.findByEmailCandidates.mockResolvedValueOnce({
+      one: true,
+      id: CONTACT_B,
+      row: contactRow(CONTACT_B, { emailaddress1: 'ada@example.edu' }),
+    });
+
+    const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: ORCID });
+
+    expect(out).toMatchObject({ outcome: 'conflict', reason: 'orcid_email_split' });
+    expectDeclaredIds(out, [], [
+      { contactId: CONTACT_A, viaNameMatch: false },
+      { contactId: CONTACT_B, viaNameMatch: false },
+    ]);
   });
 
   test('ORCID/email reviewer split declares both reviewer ids', async () => {
@@ -215,16 +300,16 @@ describe('lookupReviewerIdentity referencedReviewers invariant', () => {
     const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: ORCID });
 
     expect(out).toMatchObject({ outcome: 'conflict', reason: 'orcid_email_split' });
-    expectDeclaredReviewerIds(out, [
+    expectDeclaredIds(out, [
       { reviewerId: REVIEWER_A, affiliation: null, viaNameMatch: false },
       { reviewerId: REVIEWER_B, affiliation: null, viaNameMatch: false },
-    ]);
+    ], []);
   });
 
   test('none outcome declares an empty reviewer set', async () => {
     const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: null, orcid: null });
 
     expect(out.outcome).toBe('none');
-    expectDeclaredReviewerIds(out, []);
+    expectDeclaredIds(out, [], []);
   });
 });

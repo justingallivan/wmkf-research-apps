@@ -718,3 +718,41 @@ save-time institution-COI completeness gaps in the §15/§16 gate.
 Regression coverage covers PI failure rejection, clean no-PI save, contact-only same-institution rejection,
 different-institution save+link, contact institution fetch-error rejection, no-institution save+link,
 parent-account same-institution rejection, and reviewer+contact divergent contact-institution rejection.
+
+## 18. Conflict-carried contact institutions and direct analyze script callers (2026-07-07)
+
+Status: IMPLEMENTED (branch `codex/reviewer-coi-build`). A confirming adversarial review found that §17's
+contact-institution screen was still scoped to the exact contact-link predicate, so `conflict` outcomes that
+carried CRM contact ids were not screened before the reviewer write. The producer/consumer contract now
+matches the §15 reframe for contacts as well as reviewers: `lookupReviewerIdentity` returns additive
+`referencedContacts: [{ contactId, viaNameMatch }]` on every `confident`, `candidates`, `conflict`, and
+`none` outcome.
+
+The producer declares contact ids at the same construction points as `referencedReviewers`: confident exact
+matches declare `match.contactId` with `viaNameMatch:false`; candidates declare every candidate `contactId`
+from contact-source rows and reviewer/linked rows, with name-search references marked `viaNameMatch:true` and
+sticky-strong dedupe clearing that flag when any exact email/ORCID/link reference also surfaces the id; conflict
+details declare `contactId`, `orcidContactId`, `emailContactId`, and `reviewerContactId`; none declares an
+empty set. The invariant test now deep-scans representative lookup outcomes for every contact-id-shaped GUID
+outside `referencedContacts` and asserts exact set equality, including `email_mismatch`,
+contact/contact `orcid_email_split`, and reviewer/contact split cases.
+
+The save choke point now screens `contactMatch.referencedContacts` uniformly before any potential-reviewer,
+researcher, suggestion, roster, or contact-link write. It skips only `viaNameMatch:true` weak namesakes,
+dedupes contact ids, loads each remaining contact's `adx_organizationname`, falls back to the parent account
+`name` when `_parentcustomerid_value` is present, and runs those institutions through the existing
+`recomputeInstitutionCOI` matcher. A fetch error on either contact or parent account rejects before writes with
+`decisionSource:'reviewer_contact_institution_lookup_failed'`; a same-institution contact institution rejects
+with the existing recompute source `decisionSource:'server_reviewer_identity_affiliation'`. A contact that
+loads but has no determinable institution remains a narrowed residual and contributes no affiliation.
+`shouldLinkMatchedContact` remains only the link decision, so conflict outcomes are screened but still save
+unlinked when the screened contact institution is non-conflicting.
+
+The same review found two read-only analyze scripts that called `ClaudeReviewerService.analyzeProposal` for
+search analysis without the request context now required by `composeAnalyzePrompt`. Both scripts already run
+against a resolved request, so they now load the same real Dataverse request context as the production analyze
+route via `loadReviewerRequestContext(requestId)` and pass it to `analyzeProposal`: `trace-reviewer-provenance`
+uses `rec.akoya_requestid`, and `validate-reviewer-analyze` uses its resolved `requestId`. No composer bypass
+or script-only opt-out was added; the fail-closed default for search prompts without `requestContext` remains
+unchanged. A script smoke test mocks the LLM transport and proves both direct script option builders compose
+through `analyzeProposal` without the `requestContext is required` throw.

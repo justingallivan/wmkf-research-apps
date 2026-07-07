@@ -13,12 +13,27 @@
  *   --request 1002794 [--reviewer-count 12] [--pubmed]
  */
 import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 function loadEnvLocal() { try { const env = readFileSync(new URL('../.env.local', import.meta.url), 'utf8'); for (const l of env.split('\n')) { const m = l.match(/^([A-Z0-9_]+)=(.*)$/); if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].trim().replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1'); } } catch {} }
 loadEnvLocal();
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const args = (() => { const o = { request: null, reviewerCount: 12, pubmed: false }; const a = process.argv.slice(2); for (let i = 0; i < a.length; i++) { if (a[i] === '--request') o.request = a[++i]; else if (a[i] === '--reviewer-count') o.reviewerCount = parseInt(a[++i], 10) || 12; else if (a[i] === '--pubmed') o.pubmed = true; } return o; })();
-if (!args.request) { console.log('Usage: --request <requestNum|guid> [--reviewer-count N] [--pubmed]'); process.exit(2); }
+if (!args.request && isCliEntrypoint()) { console.log('Usage: --request <requestNum|guid> [--reviewer-count N] [--pubmed]'); process.exit(2); }
+
+export function buildTraceAnalyzeOptions({ args: runArgs, requestContext }) {
+  return {
+    reviewerCount: runArgs.reviewerCount,
+    temperature: 0.3,
+    excludedNames: [],
+    userProfileId: null,
+    requestContext,
+  };
+}
+
+function isCliEntrypoint() {
+  return import.meta.url === pathToFileURL(process.argv[1] || '').href;
+}
 
 // proposal-file helpers (copied from eval-orcid-spine-constrained.mjs)
 const SEP = '(?:^|[\\s_\\-])', SEP_END = '(?:[\\s_\\-]|$)'; const wordRe = (w) => new RegExp(`${SEP}${w}${SEP_END}`, 'i');
@@ -35,6 +50,7 @@ async function main() {
   const { ClaudeReviewerService } = await import('../lib/services/claude-reviewer-service.js');
   const { DiscoveryService } = await import('../lib/services/discovery-service.js');
   const { DeduplicationService } = await import('../lib/services/deduplication-service.js');
+  const { loadReviewerRequestContext } = await import('../lib/services/reviewer-request-context.js');
   const prov = await import('../lib/utils/reviewer-provenance.js');
   enterDynamicsBypassForScript('trace-reviewer-provenance'); await loadModelOverrides();
 
@@ -44,6 +60,7 @@ async function main() {
   if (GUID_RE.test(reqArg)) rec = await DynamicsService.getRecord('akoya_requests', reqArg, { select: 'akoya_requestid,akoya_requestnum,akoya_title' });
   else { const { records } = await DynamicsService.queryRecords('akoya_requests', { select: 'akoya_requestid,akoya_requestnum,akoya_title', filter: `akoya_requestnum eq '${reqArg}'`, top: 1 }); rec = records?.[0]; }
   if (!rec) { console.error(`req ${reqArg}: not found`); process.exit(1); }
+  const requestContext = await loadReviewerRequestContext(rec.akoya_requestid);
 
   const buckets = await getRequestSharePointBuckets(rec.akoya_requestid, rec.akoya_requestnum); const seen = new Set(); const files = [];
   for (const b of buckets) { let raw = []; try { raw = await GraphService.listFiles(b.library, b.folder, { recursive: true }); } catch {} for (const f of raw) { const folder = f.folder || b.folder; const k = `${b.library}::${folder}::${f.name}`; if (seen.has(k)) continue; seen.add(k); files.push({ name: f.name, library: b.library, folder, classification: classifyFile(f.name) }); } }
@@ -54,7 +71,11 @@ async function main() {
   if (!text || text.trim().length < 100) { console.error(`req ${rec.akoya_requestnum}: text too short`); process.exit(1); }
 
   // 2. Analyze
-  const analysis = await ClaudeReviewerService.analyzeProposal(text, process.env.CLAUDE_API_KEY, { reviewerCount: args.reviewerCount, temperature: 0.3, excludedNames: [], userProfileId: null });
+  const analysis = await ClaudeReviewerService.analyzeProposal(
+    text,
+    process.env.CLAUDE_API_KEY,
+    buildTraceAnalyzeOptions({ args, requestContext }),
+  );
   if (!analysis?.success) { console.error(`analyze failed: ${analysis?.status}`); process.exit(1); }
   const field = analysis.proposalInfo?.primaryResearchArea || '';
   const suggestions = analysis.reviewerSuggestions || [];
@@ -121,4 +142,4 @@ async function main() {
   console.log(`\nUI GROUP histogram (all buckets): ${JSON.stringify(groupHist)}`);
   console.log(`(The user saw ONLY "literature_retrieved". Compare.)`);
 }
-main().catch((e) => { console.error('\nfailed:', e.stack || e.message); process.exit(1); });
+if (isCliEntrypoint()) main().catch((e) => { console.error('\nfailed:', e.stack || e.message); process.exit(1); });

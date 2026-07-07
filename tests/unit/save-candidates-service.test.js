@@ -452,6 +452,7 @@ test('confident contact-only email match at the applicant institution fails COI 
   lookupReviewerIdentity.mockResolvedValueOnce({
     outcome: 'confident',
     referencedReviewers: [],
+    referencedContacts: [{ contactId: 'CONTACT-APPLICANT', viaNameMatch: false }],
     match: {
       reviewerId: null,
       contactId: 'CONTACT-APPLICANT',
@@ -499,6 +500,7 @@ test('confident contact-only different-institution match saves and links', async
   lookupReviewerIdentity.mockResolvedValueOnce({
     outcome: 'confident',
     referencedReviewers: [],
+    referencedContacts: [{ contactId: 'CONTACT-SAFE', viaNameMatch: false }],
     match: {
       reviewerId: null,
       contactId: 'CONTACT-SAFE',
@@ -540,6 +542,7 @@ test('confident contact institution lookup failure rejects fail-closed before li
   lookupReviewerIdentity.mockResolvedValueOnce({
     outcome: 'confident',
     referencedReviewers: [],
+    referencedContacts: [{ contactId: 'CONTACT-DOWN', viaNameMatch: false }],
     match: {
       reviewerId: null,
       contactId: 'CONTACT-DOWN',
@@ -579,10 +582,130 @@ test('confident contact institution lookup failure rejects fail-closed before li
   warn.mockRestore();
 });
 
+test('email-mismatch conflict contact at the applicant institution fails COI before write', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'conflict',
+    reason: 'email_mismatch',
+    details: { contactId: 'CONTACT-CONFLICT-APPLICANT' },
+    referencedReviewers: [],
+    referencedContacts: [{ contactId: 'CONTACT-CONFLICT-APPLICANT', viaNameMatch: false }],
+  });
+  contactAdapter.getInstitutionById.mockResolvedValueOnce({
+    contactid: 'CONTACT-CONFLICT-APPLICANT',
+    adx_organizationname: 'Applicant University',
+  });
+  potentialReviewerAdapter.getByEmail.mockResolvedValueOnce(null);
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Conflict Contact Applicant',
+      email: 'conflict-contact@example.edu',
+      affiliation: 'Different University',
+    }],
+  }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    rejectedInstitutionCOI: 1,
+    errors: [{
+      name: 'Dr Conflict Contact Applicant',
+      code: 'institution_coi',
+      serverRecomputed: true,
+      decisionSource: 'server_reviewer_identity_affiliation',
+    }],
+  });
+  expect(contactAdapter.getInstitutionById).toHaveBeenCalledWith('CONTACT-CONFLICT-APPLICANT');
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
+  expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+  warn.mockRestore();
+});
+
+test('email-mismatch conflict contact at a different institution saves without linking', async () => {
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'conflict',
+    reason: 'email_mismatch',
+    details: { contactId: 'CONTACT-CONFLICT-SAFE' },
+    referencedReviewers: [],
+    referencedContacts: [{ contactId: 'CONTACT-CONFLICT-SAFE', viaNameMatch: false }],
+  });
+  contactAdapter.getInstitutionById.mockResolvedValueOnce({
+    contactid: 'CONTACT-CONFLICT-SAFE',
+    adx_organizationname: 'Different University',
+  });
+  potentialReviewerAdapter.getByEmail.mockResolvedValueOnce(null);
+
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Conflict Contact Safe',
+      email: 'conflict-safe@example.edu',
+      affiliation: 'Different University',
+    }],
+  });
+
+  expect(out).toMatchObject({
+    success: true,
+    savedCount: 1,
+    savedNames: ['Dr Conflict Contact Safe'],
+  });
+  expect(contactAdapter.getInstitutionById).toHaveBeenCalledWith('CONTACT-CONFLICT-SAFE');
+  expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledTimes(1);
+  expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
+});
+
+test('conflict contact institution lookup failure rejects fail-closed before write', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'conflict',
+    reason: 'orcid_email_split',
+    details: { orcidContactId: 'CONTACT-CONFLICT-DOWN' },
+    referencedReviewers: [],
+    referencedContacts: [{ contactId: 'CONTACT-CONFLICT-DOWN', viaNameMatch: false }],
+  });
+  contactAdapter.getInstitutionById.mockRejectedValueOnce(new Error('contact read down'));
+  potentialReviewerAdapter.getByEmail.mockResolvedValueOnce(null);
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Conflict Contact Down',
+      email: 'conflict-down@example.edu',
+      orcid: '0000-0002-1825-0097',
+      affiliation: 'Different University',
+    }],
+  }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    rejectedInstitutionCOI: 1,
+    errors: [{
+      name: 'Dr Conflict Contact Down',
+      code: 'institution_coi',
+      serverRecomputed: true,
+      decisionSource: 'reviewer_contact_institution_lookup_failed',
+    }],
+  });
+  expect(contactAdapter.getInstitutionById).toHaveBeenCalledWith('CONTACT-CONFLICT-DOWN');
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
+  expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+  warn.mockRestore();
+});
+
 test('confident contact with no CRM institution signal saves and links', async () => {
   lookupReviewerIdentity.mockResolvedValueOnce({
     outcome: 'confident',
     referencedReviewers: [],
+    referencedContacts: [{ contactId: 'CONTACT-NO-INSTITUTION', viaNameMatch: false }],
     match: {
       reviewerId: null,
       contactId: 'CONTACT-NO-INSTITUTION',
@@ -621,6 +744,7 @@ test('confident contact with parent-account institution at the applicant institu
   lookupReviewerIdentity.mockResolvedValueOnce({
     outcome: 'confident',
     referencedReviewers: [],
+    referencedContacts: [{ contactId: 'CONTACT-PARENT', viaNameMatch: false }],
     match: {
       reviewerId: null,
       contactId: 'CONTACT-PARENT',
@@ -661,6 +785,7 @@ test('confident reviewer+contact linked match also screens divergent contact ins
     referencedReviewers: [
       { reviewerId: 'PID-SAFE', affiliation: 'Different University', viaNameMatch: false },
     ],
+    referencedContacts: [{ contactId: 'CONTACT-DIVERGENT', viaNameMatch: false }],
     match: {
       reviewerId: 'PID-SAFE',
       contactId: 'CONTACT-DIVERGENT',

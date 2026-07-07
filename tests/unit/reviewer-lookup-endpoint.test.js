@@ -155,6 +155,6 @@ describe('outcomes', () => {
   it('returns none when no key or name match exists', async () => {
     const r = res();
     await handler(post({ name: 'Nobody Atall' }), r);
-    expect(r.body).toEqual({ outcome: 'none', referencedReviewers: [] });
+    expect(r.body).toEqual({ outcome: 'none', referencedReviewers: [], referencedContacts: [] });
   });
 });
