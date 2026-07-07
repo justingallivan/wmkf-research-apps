@@ -14,8 +14,13 @@ summary: "Implemented F2/F4 save-time institution COI recompute and fail-closed 
 > Implementation note: `save-candidates-service.js` now loads `loadCoiContext(...,
 > includeCoPIs:false, requireCompleteInstitutions:true)`, calls `lookupReviewerIdentity` before the
 > COI gate and before upsert, recomputes `DeduplicationService.institutionCOIDecision` using payload
-> affiliation signals plus server-known CRM affiliation from `lookupReviewerIdentity`, and fails
-> closed with 503 when complete applicant institution context is unavailable.
+> affiliation signals plus server-known CRM affiliation from the reviewer persistence will REUSE, and
+> fails closed with 503 when complete applicant institution context is unavailable.
+> [RECHECKED after lib/services/reviewer-finder/save-candidates-service.js change: the CRM-affiliation
+> source was hardened post-build — it now reads the confident match AND the ambiguous `candidates`
+> outcome (plus a `getByEmail` fallback on lookup error), not only `outcome==='confident'`. §11 is the
+> authoritative description of the save-time recompute; treat any earlier "confident"-only phrasing in
+> §3.3 as superseded by §11.]
 > All `file:line` citations were verified by reading the working tree on 2026-07-06. NOTE:
 > `lib/services/reviewer-request-context.js` citations refer to the **uncommitted working-tree
 > version** (the in-flight chunk-1 `applicantInstitutionNames` change) — see §8 Stage 0.
