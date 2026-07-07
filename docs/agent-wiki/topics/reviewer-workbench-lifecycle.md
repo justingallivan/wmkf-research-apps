@@ -319,8 +319,11 @@ Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
   via `updateById` (auth `requireAppAccess('review-manager','reviewers')`, GUID-validated requestId,
   trusted DAL context, PD attribution; last-write-wins like the campaign-config sibling), then
   re-renders (flag clears). `wmkf_abstract` is GoApply write-once (NOT re-synced), so a PD edit is
-  durable and corrects the abstract everywhere it is consumed (invites, board write-ups, exports).
-  The reflow remains the send-time safety net for un-edited flagged abstracts.
+  durable and fixes these reviewer invites plus any later read that starts from `wmkf_abstract`. It
+  does NOT retroactively rewrite an already-generated derived version (`wmkf_abstractformatted`/
+  `wmkf_abstractapproved`, consumed by grantee/board exports via `grantee-document-assembly.js`),
+  which live behind their own approval-status gates. The reflow remains the send-time safety net for
+  un-edited flagged abstracts.
 - All four templates are sendable: `invitation` (first contact, via ReviewerInvitePanel →
   `InviteEmailModal`, hardcoded `templateType:'invitation'`) and
   `materials`/`followup`/`thankyou` (via `ReviewerManagePanel`). The reviewer onboards

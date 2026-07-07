@@ -263,9 +263,10 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     // resets manual email edits, since we drop per-recipient body overrides
     // below so the corrected abstract reaches every draft.
     const ok = window.confirm(
-      'Update this proposal’s abstract of record? This overwrites the stored '
-      + 'abstract used everywhere it appears (invites, board write-ups, exports), '
-      + 'cannot be undone, and resets any manual edits you have made to these emails.'
+      'Update this proposal’s source abstract? This overwrites the applicant '
+      + 'abstract of record used for these reviewer invites, cannot be undone, and '
+      + 'resets any manual edits you have made to these emails. It does not rewrite '
+      + 'a grantee/board version that was already generated from the old text.'
     );
     if (!ok) return;
     setAbstractSaving(true);
@@ -460,8 +461,8 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                   <p className="text-sm font-medium text-amber-900">Abstract has hard line breaks</p>
                   <p className="mt-1 text-xs text-amber-800">
                     This proposal&rsquo;s abstract has hard line breaks (it was pasted with fixed-width wrapping).
-                    It&rsquo;s been auto-cleaned for these emails, but you can fix the source abstract so it&rsquo;s
-                    corrected everywhere it appears.
+                    It&rsquo;s been auto-cleaned for these emails, but you can fix the source abstract so future
+                    reads start from clean text.
                   </p>
                   <button
                     type="button"
