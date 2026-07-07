@@ -14,6 +14,47 @@ summary: "Project-wide audit of Anthropic prompt-cache usage across all 36 LLM c
 > as low. Every claim below carries the auditor's `file:line` citation; re-verify against
 > live source before implementing (files may have moved).
 
+## 0. Implementation status (2026-07-07, remediation session — branch, PENDING OWNER REVIEW)
+
+Shipped the root shared-helper fix plus the two clean high-value consumers; the
+Executor's full restructure and the conditional R5 items are left for owner decision.
+
+- **R1 — DONE (shared helper; needs the security review below before merge).**
+  `wrapUntrustedContent` (`lib/utils/ai-payload-boundary.js`) now accepts an optional
+  stable `nonce`; default behavior is unchanged (fresh `randomBytes` per call). New
+  export `deriveStableNonce(...parts)` computes an HMAC keyed by `UNTRUSTED_NONCE_SECRET`
+  (falling back to the already-present `NEXTAUTH_SECRET`) over the identity parts, so the
+  nonce is deterministic-yet-unpredictable to the untrusted-content author. If NO server
+  secret is set it returns `null` and the caller falls back to the random nonce — never a
+  predictable unkeyed hash (fail-safe). A malformed caller nonce is likewise ignored.
+- **R2 — ALREADY SATISFIED (audit was stale on this point).** `LLMClient._buildBody`
+  already passes `opts.system` through verbatim, including a structured block array with
+  `cache_control`; the two marked sites already rely on that. No LLMClient change was
+  needed.
+- **R3 — DONE.** `pages/api/qa.js` now derives per-proposal / per-summary stable nonces
+  (`deriveStableNonce`), so multi-turn Q&A against one proposal reuses a byte-identical
+  cached system prefix and the existing `qa.js` marker starts producing real reads.
+- **R4 — PARTIAL (owner decision on the rest).** The Executor
+  (`lib/services/execute-prompt.js` `applyVariableBoundaries`) now derives a stable nonce
+  keyed on `(promptName, variableName, value)`, so an *identical* rerun (same prompt
+  version + same document) reproduces a byte-identical marked system prompt and can hit —
+  strictly no worse than before for unique documents. The full cross-document win still
+  needs the Phase 2 prompt-seed template/variable split (`composeMessages` still
+  interpolates per-request variables into the system template ahead of the marker); that
+  schema work is NOT done here.
+- **R5 — NOT DONE (verify-then-fix; left for owner).** `composeScorePrompt` and
+  `process-phase-i-writeup` both require confirming the ≥4096-token Opus prefix floor and
+  real repeat-within-TTL usage first.
+- **R6 — MOOT.** R1+R3 shipped and the Executor marker is now stable-nonce-backed
+  (net-neutral-to-positive), so neither net-negative marker is removed.
+
+**Security review still required before merge (R1):** confirm that a nonce which is stable
+across turns/reruns but keyed by a server secret does not weaken the A7 injection boundary —
+the applicant authors the proposal but cannot compute the HMAC without the secret, so they
+cannot forge a matching close sentinel even knowing the nonce repeats. `deriveStableNonce`
+keys on the content itself, so distinct documents never share a nonce. Verified: full
+`npm test` (5133 passing), `check:prompt-injection-tagging` + self-test green.
+
 ## 1. Executive summary
 
 The low hit rate is **structural, not incidental**, and has three root causes:

@@ -17,6 +17,7 @@ import {
   QA_PROPOSAL_CONTEXT_MAX_CHARS,
   QA_SUMMARY_MAX_CHARS,
   wrapUntrustedContent,
+  deriveStableNonce,
 } from '../../lib/utils/ai-payload-boundary';
 
 export const config = {
@@ -67,12 +68,21 @@ export default async function handler(req, res) {
 
     const userProfileId = access.profileId;
 
+    // Prompt caching: Q&A is multi-turn against ONE proposal+summary that lead
+    // the (cache_control-marked) system prompt. A fresh per-call nonce would put
+    // unique bytes at the front and defeat prefix caching, so derive a nonce
+    // that is stable for this proposal/summary across the conversation's turns
+    // (keyed by a server secret — see deriveStableNonce). Different content
+    // yields a different nonce; if no server secret is configured this is null
+    // and wrapUntrustedContent falls back to a per-call random nonce (safe, but
+    // uncached). The two nonces stay distinct because their source tag differs.
     const proposalPayload = wrapUntrustedContent({
       text: proposalText || '',
       source: 'qa.system.proposalText',
       dataClass: DATA_CLASSES.PROPOSAL_TEXT,
       maxChars: QA_PROPOSAL_CONTEXT_MAX_CHARS,
       label: 'research proposal',
+      nonce: deriveStableNonce('qa.system.proposalText', filename || '', proposalText || ''),
     });
     const summaryPayload = wrapUntrustedContent({
       text: summaryText || '',
@@ -80,6 +90,7 @@ export default async function handler(req, res) {
       dataClass: DATA_CLASSES.PROPOSAL_TEXT,
       maxChars: QA_SUMMARY_MAX_CHARS,
       label: 'generated summary',
+      nonce: deriveStableNonce('qa.system.summaryText', filename || '', summaryText || ''),
     });
     sendEvent('payload_boundary', {
       message: proposalPayload.metadata.truncated
