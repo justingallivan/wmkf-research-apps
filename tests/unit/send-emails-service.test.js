@@ -170,6 +170,22 @@ describe('send-emails-service — event order, mixed batch', () => {
   });
 });
 
+describe('send-emails-service — duplicate suggestionId dedup', () => {
+  test('a repeated suggestionId in one batch sends ONCE (no double-invite to a real reviewer)', async () => {
+    const emitted = await run({ drafts: [draft(SUG_OK), draft(SUG_OK)], templateType: 'invitation' });
+    expect(names(emitted)).not.toContain('error');
+    // The duplicate is dropped before hydration and the send loop.
+    expect(findById).toHaveBeenCalledTimes(1);
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    // total (starting progress) and the result reflect the deduped batch.
+    const startTotal = emitted.find((e) => e.event === 'progress' && e.data.stage === 'starting')?.data.total;
+    expect(startTotal).toBe(1);
+    const r = resultOf(emitted);
+    expect(r.sent.map((s) => s.suggestionId)).toEqual([SUG_OK]);
+    expect(r.stats).toMatchObject({ sent: 1, total: 1 });
+  });
+});
+
 describe('send-emails-service — lifecycle-after-send ordering', () => {
   test('createAndSendEmail is invoked BEFORE updateLifecycle for the same recipient', async () => {
     await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
