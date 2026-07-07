@@ -245,7 +245,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md](REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md) | plan | active |  | Implemented F2/F4 save-time institution COI recompute and fail-closed applicant-alias context. |  |
+| [REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md](REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md) | plan | active |  | Implemented F2/F4 save-time institution COI recompute, fail-closed applicant-alias context, and recorder-stamped identity declarations. |  |
 
 ## reviewer-workbench
 

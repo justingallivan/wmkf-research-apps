@@ -3,7 +3,7 @@ title: Reviewer Finder — Save-Time Institution-COI Server Recompute (F2 + F4)
 domain: reviewer-origination
 kind: plan
 status: active
-summary: "Implemented F2/F4 save-time institution COI recompute and fail-closed applicant-alias context."
+summary: "Implemented F2/F4 save-time institution COI recompute, fail-closed applicant-alias context, and recorder-stamped identity declarations."
 ---
 
 # Reviewer Finder — Save-Time Institution-COI Server Recompute (F2 + F4) — Implemented Plan
@@ -613,11 +613,10 @@ and a no-email candidate whose identity lookup THREW was screened on payload onl
 Status: IMPLEMENTED (branch `codex/reviewer-coi-build`). The save-time institution-COI gate is reframed away
 from branch-by-branch parsing of lookup outcomes. The identity lookup producer now returns an additive
 `referencedReviewers: [{ reviewerId, affiliation }]` field on every `confident`, `candidates`, `conflict`,
-and `none` outcome. The field is populated beside each outcome constructor: reviewer-sourced confident and
-candidate outcomes carry in-hand CRM affiliation, contact-only outcomes carry an empty reviewer set, and
-conflicts declare only potential-reviewer ids (`reviewerId`, `existingReviewerId`, `orcidReviewerId`,
-`emailReviewerId`) with `affiliation:null`; `reviewerContactId` remains treated as a contact id, not a
-reviewer id.
+and `none` outcome. This section describes the original §15 constructor-side implementation; §19 supersedes
+the producer mechanics. The live implementation now stamps `referencedReviewers` and `referencedContacts`
+once from a discovery recorder at `lookupReviewerIdentity`'s public exit, not beside outcome constructors or
+from conflict-detail key scans.
 
 The save service now screens through one choke point before any potential-reviewer, researcher, suggestion,
 or roster write. For every non-seed email path it reads the `getByEmail` reuse target once and threads that
@@ -643,9 +642,9 @@ Regression coverage includes the email `orcid_email_split` conflict where `orcid
 `getById` to the applicant institution while `getByEmail` is null, the email lookup-throw fail-closed case,
 the existing single-read `upsertByEmail({ existing })` threading, the no-email linked/conflict/lookup-throw
 matrix, seed-anchor reuse, partial-success envelopes, and a producer invariant test. The invariant test
-deep-scans each representative lookup outcome outside the `referencedReviewers` declaration for reviewer-id
-fields and asserts exact set equality with the declared reviewer ids, including a fixture proving
-`reviewerContactId` is not treated as a reviewer id.
+originally deep-scanned each representative lookup outcome outside the `referencedReviewers` declaration for
+reviewer-id fields; §19 supersedes that output-side exact-equality test with an input-side adapter-fixture
+invariant.
 
 Accepted residuals outside this layer:
 
@@ -662,8 +661,8 @@ Accepted residuals outside this layer:
 Status: IMPLEMENTED (branch `codex/reviewer-coi-build`). A confirming adversarial review of the §15 branch
 returned two verified findings, both now fixed.
 [RECHECKED after lib/services/reviewer-identity-lookup.js change: the `viaNameMatch` producer field added
-this session is described below and lives in the `referencedReviewers` factories at
-reviewer-identity-lookup.js:95-166; the §15 producer description remains accurate as amended here.]
+this session is described below. §19 supersedes the factory-level implementation detail: `viaNameMatch` is now
+derived from the discovery recorder's per-id signal set at the single `lookupReviewerIdentity` exit.]
 
 - **[high] Top-up LLM prompt bypassed the A7 boundary.** The decoupled Part-2 reviewer top-up
   (`_topUpReviewerSuggestions` / `buildTopUpPrompt` in `claude-reviewer-service.js`) interpolated the
@@ -728,14 +727,12 @@ matches the §15 reframe for contacts as well as reviewers: `lookupReviewerIdent
 `referencedContacts: [{ contactId, viaNameMatch }]` on every `confident`, `candidates`, `conflict`, and
 `none` outcome.
 
-The producer declares contact ids at the same construction points as `referencedReviewers`: confident exact
-matches declare `match.contactId` with `viaNameMatch:false`; candidates declare every candidate `contactId`
-from contact-source rows and reviewer/linked rows, with name-search references marked `viaNameMatch:true` and
-sticky-strong dedupe clearing that flag when any exact email/ORCID/link reference also surfaces the id; conflict
-details declare `contactId`, `orcidContactId`, `emailContactId`, and `reviewerContactId`; none declares an
-empty set. The invariant test now deep-scans representative lookup outcomes for every contact-id-shaped GUID
-outside `referencedContacts` and asserts exact set equality, including `email_mismatch`,
-contact/contact `orcid_email_split`, and reviewer/contact split cases.
+The original producer declared contact ids at the same construction points as `referencedReviewers`: confident
+exact matches declared `match.contactId`; candidates declared candidate `contactId` values; conflict details
+declared `contactId`, `orcidContactId`, `emailContactId`, and `reviewerContactId`; none declared an empty set.
+§19 supersedes that implementation detail. The live producer records every adapter fetch and derives contact
+declarations from the accumulator, and the invariant test now asserts declarations against mocked adapter
+inputs rather than exact equality with ids visible inside the returned outcome shape.
 
 The save choke point now screens `contactMatch.referencedContacts` uniformly before any potential-reviewer,
 researcher, suggestion, roster, or contact-link write. It skips only `viaNameMatch:true` weak namesakes,
@@ -756,3 +753,68 @@ uses `rec.akoya_requestid`, and `validate-reviewer-analyze` uses its resolved `r
 or script-only opt-out was added; the fail-closed default for search prompts without `requestContext` remains
 unchanged. A script smoke test mocks the LLM transport and proves both direct script option builders compose
 through `analyzeProposal` without the `requestContext is required` throw.
+
+## 19. Discovery-recorder reframe for save-time COI declarations (2026-07-07)
+
+Status: IMPLEMENTED (branch `codex/reviewer-coi-build`). A structural follow-up closed the remaining
+whack-a-mole class in `lookupReviewerIdentity`: constructor-computed declarations were still a function of the
+linking outcome shape, not a total function of every adapter row the lookup fetched. Any early return in
+`lookup()` or `evaluateKey()` could therefore discard a COI discovery even when linking behavior was correct,
+and the old invariant test only compared declared ids with ids still visible inside the returned outcome.
+
+The producer now separates linking from COI enumeration:
+
+- `lookupReviewerIdentity` creates a per-call discovery accumulator and recording adapter wrappers for the
+  potential-reviewer and contact adapters.
+- Every lookup fetch records rows at fetch time with a signal tag: ORCID, email, name, or linked
+  (`findByContactId`). Candidate-result shapes record `{ one, row }` and `{ ambiguous, rows }`; name search
+  records the returned row arrays; `findByContactId` records its single linked reviewer row when present.
+- Reviewer rows also record their `_wmkf_contact_value` as a contact discovery under the same signal, matching
+  the existing reviewer-candidate `contactId` contract.
+- Outcome constructors now return only the linking payload (`outcome`, `match`, `candidates`, `reason`,
+  `details`). They do not compute `referencedReviewers` or `referencedContacts`.
+- The only declaration exit is `lookupReviewerIdentity`: after `lookup()` returns, it stamps
+  `referencedReviewers` and `referencedContacts` from the accumulator.
+
+Stamping semantics:
+
+- `referencedReviewers` has one entry per discovered reviewer id:
+  `{ reviewerId, affiliation, viaNameMatch }`.
+- Reviewer `affiliation` comes from the recorded row's `wmkf_primaryaffiliation ||
+  wmkf_organizationname || null`.
+- `referencedContacts` has one entry per discovered contact id: `{ contactId, viaNameMatch }`.
+- `viaNameMatch` is true only when that id was surfaced solely by the fallback name search. If any ORCID,
+  email, or linked fetch also surfaced the id, sticky-strong semantics make `viaNameMatch:false`.
+
+This deletes the conflict-detail key allowlist (`CONFLICT_REVIEWER_ID_KEYS`,
+`CONFLICT_CONTACT_ID_KEYS`) and the old `referenced*FromCandidates` /
+`referenced*FromConflictDetails` constructor helpers. Conflict details remain byte-identical for staff review
+and linking decisions, but COI declarations no longer depend on which detail keys a conflict happened to carry.
+
+The invariant test is inverted to the input side. `tests/unit/reviewer-identity-lookup.test.js` now derives
+expected declarations from the mocked adapter responses themselves, then asserts the returned declarations
+match that fixture-derived set. The older output deep-scan remains only as a subset check: every id still
+visible in the returned outcome must be declared, but declarations may legitimately include fetched ids that the
+linking outcome did not embed. Regression fixtures reproduce and close the live bypasses by construction:
+
+- Finding 7: a non-confident ORCID outcome plus an exact email contact still declares the email contact.
+- Finding B: email ambiguity no longer drops a confident ORCID reviewer discovery.
+- Finding C: a `.one` result on one store is still declared when the other store is ambiguous.
+- Finding D: an `email_mismatch` conflict still declares the ORCID reviewer row already fetched in hand.
+
+`screenCandidateInstitutionCOI` is unchanged. It already screens `referencedReviewers` and
+`referencedContacts`, skips only `viaNameMatch:true` weak namesakes, resolves missing reviewer/contact
+institutions fail-closed, and rejects before any potential-reviewer, contact-link, researcher, suggestion, or
+roster write. The save-level regressions for 7/B/C/D therefore use the existing choke point and assert zero
+writes when the newly declared id belongs to the applicant institution.
+
+Preserved residuals (deliberate distrusted-signal policy, not fixed by this reframe):
+
+- `pdConfirmed` / `blockByIdentity` rows still null the lookup ORCID. An ORCID the resolver could not tie to
+  this person is not used for discovery or persistence.
+- `contactBlocked` rows still null the candidate email before lookup. Email-only identities remain unscreened
+  when that email was explicitly distrusted for the row.
+- Name-only fallback hits still remain `viaNameMatch:true` and are skipped by the save screen to avoid
+  rejecting distinct people who share a name with an applicant-institution reviewer.
+- Direct analyze-script `requestContext` coverage is out of this identity-declaration class and remains governed
+  by the separate script-caller work described in §18 and follow-up audits.

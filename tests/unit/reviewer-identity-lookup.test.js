@@ -2,8 +2,8 @@
  * @jest-environment node
  *
  * Producer contract for lib/services/reviewer-identity-lookup.js: every lookup
- * outcome declares the complete reviewer identity set it references so save-time
- * COI screening does not rediscover branch-specific shapes.
+ * outcome declares the complete reviewer identity set surfaced by adapter inputs
+ * so save-time COI screening cannot lose rows hidden by branch-specific shapes.
  */
 
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
@@ -53,6 +53,73 @@ function contactRow(id, overrides = {}) {
     statecode: 0,
     ...overrides,
   };
+}
+
+function fixtureRows(result) {
+  if (!result) return [];
+  if (Array.isArray(result)) return result.filter(Boolean);
+  if (result.none) return [];
+  if (result.one) return result.row ? [result.row] : [];
+  if (result.ambiguous) return Array.isArray(result.rows) ? result.rows.filter(Boolean) : [];
+  return typeof result === 'object' ? [result] : [];
+}
+
+function affiliationFromReviewerRow(row) {
+  return row?.wmkf_primaryaffiliation || row?.wmkf_organizationname || null;
+}
+
+function nameOnly(signals) {
+  return signals.size > 0 && [...signals].every((signal) => signal === 'name');
+}
+
+function addExpected(map, id, signal, row = null) {
+  const clean = typeof id === 'string' ? id.trim() : '';
+  if (!clean) return;
+  const key = clean.toLowerCase();
+  let entry = map.get(key);
+  if (!entry) {
+    entry = { id: clean, row: null, signals: new Set() };
+    map.set(key, entry);
+  }
+  entry.signals.add(signal);
+  if (row && (!entry.row || (!affiliationFromReviewerRow(entry.row) && affiliationFromReviewerRow(row)))) {
+    entry.row = row;
+  }
+}
+
+function expectedRefsFromFixtures(fixtures = []) {
+  const reviewers = new Map();
+  const contacts = new Map();
+  for (const { entity, signal, result } of fixtures) {
+    for (const row of fixtureRows(result)) {
+      if (entity === 'reviewer') {
+        addExpected(reviewers, row.wmkf_potentialreviewersid, signal, row);
+        addExpected(contacts, row._wmkf_contact_value, signal);
+      }
+      if (entity === 'contact') addExpected(contacts, row.contactid, signal, row);
+    }
+  }
+  return {
+    referencedReviewers: [...reviewers.values()].map((entry) => ({
+      reviewerId: entry.id,
+      affiliation: affiliationFromReviewerRow(entry.row),
+      viaNameMatch: nameOnly(entry.signals),
+    })),
+    referencedContacts: [...contacts.values()].map((entry) => ({
+      contactId: entry.id,
+      viaNameMatch: nameOnly(entry.signals),
+    })),
+  };
+}
+
+function reviewerFixture(fixtures, signal, result) {
+  fixtures.push({ entity: 'reviewer', signal, result });
+  return result;
+}
+
+function contactFixture(fixtures, signal, result) {
+  fixtures.push({ entity: 'contact', signal, result });
+  return result;
 }
 
 function reviewerIdFieldsOutsideDeclaration(value) {
@@ -120,11 +187,20 @@ function referencedContactIds(outcome) {
 
 function expectDeclaredIds(outcome, expectedReviewerRefs, expectedContactRefs) {
   expect(Array.isArray(outcome.referencedReviewers)).toBe(true);
-  expect(referencedReviewerIds(outcome)).toEqual(reviewerIdFieldsOutsideDeclaration(outcome));
+  for (const id of reviewerIdFieldsOutsideDeclaration(outcome)) {
+    expect(referencedReviewerIds(outcome)).toContain(id);
+  }
   expect(outcome.referencedReviewers).toEqual(expectedReviewerRefs);
   expect(Array.isArray(outcome.referencedContacts)).toBe(true);
-  expect(referencedContactIds(outcome)).toEqual(contactIdFieldsOutsideDeclaration(outcome));
+  for (const id of contactIdFieldsOutsideDeclaration(outcome)) {
+    expect(referencedContactIds(outcome)).toContain(id);
+  }
   expect(outcome.referencedContacts).toEqual(expectedContactRefs);
+}
+
+function expectDeclaredFixtureRefs(outcome, fixtures = []) {
+  const expected = expectedRefsFromFixtures(fixtures);
+  expectDeclaredIds(outcome, expected.referencedReviewers, expected.referencedContacts);
 }
 
 beforeEach(() => {
@@ -140,176 +216,273 @@ beforeEach(() => {
 
 describe('lookupReviewerIdentity referencedReviewers invariant', () => {
   test('confident reviewer outcome declares its reviewer id and in-hand affiliation', async () => {
-    potentialReviewerAdapter.findByEmailCandidates.mockResolvedValueOnce({
+    const fixtures = [];
+    potentialReviewerAdapter.findByEmailCandidates.mockResolvedValueOnce(reviewerFixture(fixtures, 'email', {
       one: true,
       id: REVIEWER_A,
       row: reviewerRow(REVIEWER_A),
-    });
+    }));
 
     const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: null });
 
     expect(out.outcome).toBe('confident');
-    expectDeclaredIds(out, [{ reviewerId: REVIEWER_A, affiliation: 'Applicant University', viaNameMatch: false }], []);
+    expectDeclaredFixtureRefs(out, fixtures);
   });
 
   test('confident contact-only outcome declares an empty reviewer set', async () => {
-    contactAdapter.findByEmailCandidates.mockResolvedValueOnce({
+    const fixtures = [];
+    contactAdapter.findByEmailCandidates.mockResolvedValueOnce(contactFixture(fixtures, 'email', {
       one: true,
       id: CONTACT_A,
       row: contactRow(CONTACT_A),
-    });
+    }));
 
     const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: null });
 
     expect(out.outcome).toBe('confident');
-    expectDeclaredIds(out, [], [{ contactId: CONTACT_A, viaNameMatch: false }]);
+    expectDeclaredFixtureRefs(out, fixtures);
   });
 
   test('candidates outcome declares every reviewer-source candidate and every contact id candidate', async () => {
-    potentialReviewerAdapter.findByEmailCandidates.mockResolvedValueOnce({
+    const fixtures = [];
+    potentialReviewerAdapter.findByEmailCandidates.mockResolvedValueOnce(reviewerFixture(fixtures, 'email', {
       ambiguous: true,
       rows: [
         reviewerRow(REVIEWER_A, { wmkf_primaryaffiliation: 'Applicant University', _wmkf_contact_value: CONTACT_B }),
         reviewerRow(REVIEWER_B, { wmkf_primaryaffiliation: 'Different University' }),
       ],
-    });
-    contactAdapter.findByEmailCandidates.mockResolvedValueOnce({
+    }));
+    contactAdapter.findByEmailCandidates.mockResolvedValueOnce(contactFixture(fixtures, 'email', {
       ambiguous: true,
       rows: [contactRow(CONTACT_A)],
-    });
-
-    const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: null });
-
-    expect(out.outcome).toBe('candidates');
-    expectDeclaredIds(out, [
-      { reviewerId: REVIEWER_A, affiliation: 'Applicant University', viaNameMatch: false },
-      { reviewerId: REVIEWER_B, affiliation: 'Different University', viaNameMatch: false },
-    ], [
-      { contactId: CONTACT_B, viaNameMatch: false },
-      { contactId: CONTACT_A, viaNameMatch: false },
-    ]);
-  });
-
-  test('name-search fallback candidates are declared with viaNameMatch:true', async () => {
-    potentialReviewerAdapter.searchByName.mockResolvedValueOnce([
-      reviewerRow(REVIEWER_A, { wmkf_primaryaffiliation: 'Applicant University' }),
-    ]);
-    contactAdapter.searchByName.mockResolvedValueOnce([
-      contactRow(CONTACT_A),
-    ]);
-
-    const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: null, orcid: null });
-
-    expect(out.outcome).toBe('candidates');
-    expectDeclaredIds(out, [
-      { reviewerId: REVIEWER_A, affiliation: 'Applicant University', viaNameMatch: true },
-    ], [
-      { contactId: CONTACT_A, viaNameMatch: true },
-    ]);
-  });
-
-  test('email mismatch conflict declares contactId', async () => {
-    contactAdapter.findByEmailCandidates.mockResolvedValueOnce({
-      one: true,
-      id: CONTACT_A,
-      row: contactRow(CONTACT_A, { emailaddress1: 'crm@example.edu' }),
-    });
-
-    const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'typed@example.edu', orcid: null });
-
-    expect(out).toMatchObject({ outcome: 'conflict', reason: 'email_mismatch' });
-    expectDeclaredIds(out, [], [{ contactId: CONTACT_A, viaNameMatch: false }]);
-  });
-
-  test('reviewer/contact split conflict declares reviewerId but not reviewerContactId', async () => {
-    potentialReviewerAdapter.findByOrcidCandidates.mockResolvedValueOnce({
-      one: true,
-      id: REVIEWER_A,
-      row: reviewerRow(REVIEWER_A, { wmkf_orcid: ORCID, _wmkf_contact_value: CONTACT_A }),
-    });
-    contactAdapter.findByOrcidCandidates.mockResolvedValueOnce({
-      one: true,
-      id: CONTACT_B,
-      row: contactRow(CONTACT_B, { wmkf_orcid: ORCID }),
-    });
-
-    const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: null, orcid: ORCID });
-
-    expect(out).toMatchObject({ outcome: 'conflict', reason: 'orcid_email_split' });
-    expectDeclaredIds(out, [
-      { reviewerId: REVIEWER_A, affiliation: null, viaNameMatch: false },
-    ], [
-      { contactId: CONTACT_B, viaNameMatch: false },
-      { contactId: CONTACT_A, viaNameMatch: false },
-    ]);
-  });
-
-  test('reverse-link conflict declares existingReviewerId', async () => {
-    contactAdapter.findByEmailCandidates.mockResolvedValueOnce({
-      one: true,
-      id: CONTACT_A,
-      row: contactRow(CONTACT_A),
-    });
-    potentialReviewerAdapter.findByContactId.mockResolvedValueOnce(reviewerRow(REVIEWER_B, {
-      _wmkf_contact_value: CONTACT_A,
     }));
 
     const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: null });
 
+    expect(out.outcome).toBe('candidates');
+    expectDeclaredFixtureRefs(out, fixtures);
+  });
+
+  test('name-search fallback candidates are declared with viaNameMatch:true', async () => {
+    const fixtures = [];
+    potentialReviewerAdapter.searchByName.mockResolvedValueOnce(reviewerFixture(fixtures, 'name', [
+      reviewerRow(REVIEWER_A, { wmkf_primaryaffiliation: 'Applicant University' }),
+    ]));
+    contactAdapter.searchByName.mockResolvedValueOnce(contactFixture(fixtures, 'name', [
+      contactRow(CONTACT_A),
+    ]));
+
+    const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: null, orcid: null });
+
+    expect(out.outcome).toBe('candidates');
+    expectDeclaredFixtureRefs(out, fixtures);
+  });
+
+  test('email mismatch conflict declares contactId', async () => {
+    const fixtures = [];
+    contactAdapter.findByEmailCandidates.mockResolvedValueOnce(contactFixture(fixtures, 'email', {
+      one: true,
+      id: CONTACT_A,
+      row: contactRow(CONTACT_A, { emailaddress1: 'crm@example.edu' }),
+    }));
+
+    const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'typed@example.edu', orcid: null });
+
+    expect(out).toMatchObject({ outcome: 'conflict', reason: 'email_mismatch' });
+    expectDeclaredFixtureRefs(out, fixtures);
+  });
+
+  test('reviewer/contact split conflict declares reviewer and linked contact discoveries', async () => {
+    const fixtures = [];
+    potentialReviewerAdapter.findByOrcidCandidates.mockResolvedValueOnce(reviewerFixture(fixtures, 'orcid', {
+      one: true,
+      id: REVIEWER_A,
+      row: reviewerRow(REVIEWER_A, { wmkf_orcid: ORCID, _wmkf_contact_value: CONTACT_A }),
+    }));
+    contactAdapter.findByOrcidCandidates.mockResolvedValueOnce(contactFixture(fixtures, 'orcid', {
+      one: true,
+      id: CONTACT_B,
+      row: contactRow(CONTACT_B, { wmkf_orcid: ORCID }),
+    }));
+
+    const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: null, orcid: ORCID });
+
+    expect(out).toMatchObject({ outcome: 'conflict', reason: 'orcid_email_split' });
+    expectDeclaredFixtureRefs(out, fixtures);
+  });
+
+  test('reverse-link conflict declares existingReviewerId', async () => {
+    const fixtures = [];
+    contactAdapter.findByEmailCandidates.mockResolvedValueOnce(contactFixture(fixtures, 'email', {
+      one: true,
+      id: CONTACT_A,
+      row: contactRow(CONTACT_A),
+    }));
+    potentialReviewerAdapter.findByContactId.mockResolvedValueOnce(reviewerFixture(fixtures, 'linked', reviewerRow(REVIEWER_B, {
+      _wmkf_contact_value: CONTACT_A,
+    })));
+
+    const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: null });
+
     expect(out).toMatchObject({ outcome: 'conflict', reason: 'contact_linked_elsewhere' });
-    expectDeclaredIds(out, [
-      { reviewerId: REVIEWER_B, affiliation: null, viaNameMatch: false },
-    ], [
-      { contactId: CONTACT_A, viaNameMatch: false },
-    ]);
+    expectDeclaredFixtureRefs(out, fixtures);
   });
 
   test('ORCID/email contact split conflict declares both contact ids', async () => {
-    contactAdapter.findByOrcidCandidates.mockResolvedValueOnce({
+    const fixtures = [];
+    contactAdapter.findByOrcidCandidates.mockResolvedValueOnce(contactFixture(fixtures, 'orcid', {
       one: true,
       id: CONTACT_A,
       row: contactRow(CONTACT_A, { wmkf_orcid: ORCID, emailaddress1: 'ada@example.edu' }),
-    });
-    contactAdapter.findByEmailCandidates.mockResolvedValueOnce({
+    }));
+    contactAdapter.findByEmailCandidates.mockResolvedValueOnce(contactFixture(fixtures, 'email', {
       one: true,
       id: CONTACT_B,
       row: contactRow(CONTACT_B, { emailaddress1: 'ada@example.edu' }),
-    });
+    }));
 
     const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: ORCID });
 
     expect(out).toMatchObject({ outcome: 'conflict', reason: 'orcid_email_split' });
-    expectDeclaredIds(out, [], [
-      { contactId: CONTACT_A, viaNameMatch: false },
-      { contactId: CONTACT_B, viaNameMatch: false },
-    ]);
+    expectDeclaredFixtureRefs(out, fixtures);
   });
 
   test('ORCID/email reviewer split declares both reviewer ids', async () => {
-    potentialReviewerAdapter.findByOrcidCandidates.mockResolvedValueOnce({
+    const fixtures = [];
+    potentialReviewerAdapter.findByOrcidCandidates.mockResolvedValueOnce(reviewerFixture(fixtures, 'orcid', {
       one: true,
       id: REVIEWER_A,
       row: reviewerRow(REVIEWER_A, { wmkf_orcid: ORCID }),
-    });
-    potentialReviewerAdapter.findByEmailCandidates.mockResolvedValueOnce({
+    }));
+    potentialReviewerAdapter.findByEmailCandidates.mockResolvedValueOnce(reviewerFixture(fixtures, 'email', {
       one: true,
       id: REVIEWER_B,
       row: reviewerRow(REVIEWER_B),
-    });
+    }));
 
     const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: ORCID });
 
     expect(out).toMatchObject({ outcome: 'conflict', reason: 'orcid_email_split' });
-    expectDeclaredIds(out, [
-      { reviewerId: REVIEWER_A, affiliation: null, viaNameMatch: false },
-      { reviewerId: REVIEWER_B, affiliation: null, viaNameMatch: false },
-    ], []);
+    expectDeclaredFixtureRefs(out, fixtures);
+  });
+
+  test('finding 7: exact email contact stays declared after non-confident ORCID outcome', async () => {
+    const fixtures = [];
+    potentialReviewerAdapter.findByOrcidCandidates.mockResolvedValueOnce(reviewerFixture(fixtures, 'orcid', {
+      one: true,
+      id: REVIEWER_A,
+      row: reviewerRow(REVIEWER_A, {
+        wmkf_name: 'Grace Hopper',
+        wmkf_orcid: ORCID,
+        wmkf_primaryaffiliation: 'Different University',
+      }),
+    }));
+    contactAdapter.findByEmailCandidates.mockResolvedValueOnce(contactFixture(fixtures, 'email', {
+      one: true,
+      id: CONTACT_A,
+      row: contactRow(CONTACT_A, { emailaddress1: 'ada@example.edu' }),
+    }));
+
+    const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: ORCID });
+
+    expect(out.outcome).toBe('candidates');
+    expect(referencedContactIds(out)).toContain(CONTACT_A);
+    expectDeclaredFixtureRefs(out, fixtures);
+  });
+
+  test('finding B: email ambiguity does not drop a confident ORCID reviewer discovery', async () => {
+    const fixtures = [];
+    potentialReviewerAdapter.findByOrcidCandidates.mockResolvedValueOnce(reviewerFixture(fixtures, 'orcid', {
+      one: true,
+      id: REVIEWER_A,
+      row: reviewerRow(REVIEWER_A, { wmkf_orcid: ORCID }),
+    }));
+    contactAdapter.findByEmailCandidates.mockResolvedValueOnce(contactFixture(fixtures, 'email', {
+      ambiguous: true,
+      count: 2,
+      rows: [
+        contactRow(CONTACT_A, { emailaddress1: 'ada@example.edu' }),
+        contactRow(CONTACT_B, { emailaddress1: 'ada@example.edu' }),
+      ],
+    }));
+
+    const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: ORCID });
+
+    expect(out.outcome).toBe('candidates');
+    expect(referencedReviewerIds(out)).toContain(REVIEWER_A);
+    expectDeclaredFixtureRefs(out, fixtures);
+  });
+
+  test('finding C: contact .one stays declared beside ambiguous reviewer rows', async () => {
+    const fixtures = [];
+    potentialReviewerAdapter.findByEmailCandidates.mockResolvedValueOnce(reviewerFixture(fixtures, 'email', {
+      ambiguous: true,
+      count: 2,
+      rows: [
+        reviewerRow(REVIEWER_A),
+        reviewerRow(REVIEWER_B, { wmkf_primaryaffiliation: 'Different University' }),
+      ],
+    }));
+    contactAdapter.findByEmailCandidates.mockResolvedValueOnce(contactFixture(fixtures, 'email', {
+      one: true,
+      id: CONTACT_A,
+      row: contactRow(CONTACT_A),
+    }));
+
+    const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: null });
+
+    expect(out.outcome).toBe('candidates');
+    expect(referencedContactIds(out)).toContain(CONTACT_A);
+    expectDeclaredFixtureRefs(out, fixtures);
+  });
+
+  test('finding C: reviewer .one stays declared beside ambiguous contact rows', async () => {
+    const fixtures = [];
+    potentialReviewerAdapter.findByEmailCandidates.mockResolvedValueOnce(reviewerFixture(fixtures, 'email', {
+      one: true,
+      id: REVIEWER_A,
+      row: reviewerRow(REVIEWER_A),
+    }));
+    contactAdapter.findByEmailCandidates.mockResolvedValueOnce(contactFixture(fixtures, 'email', {
+      ambiguous: true,
+      count: 2,
+      rows: [
+        contactRow(CONTACT_A),
+        contactRow(CONTACT_B),
+      ],
+    }));
+
+    const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: null });
+
+    expect(out.outcome).toBe('candidates');
+    expect(referencedReviewerIds(out)).toContain(REVIEWER_A);
+    expectDeclaredFixtureRefs(out, fixtures);
+  });
+
+  test('finding D: ORCID email_mismatch conflict still declares the ORCID reviewer discovery', async () => {
+    const fixtures = [];
+    potentialReviewerAdapter.findByOrcidCandidates.mockResolvedValueOnce(reviewerFixture(fixtures, 'orcid', {
+      one: true,
+      id: REVIEWER_A,
+      row: reviewerRow(REVIEWER_A, { wmkf_orcid: ORCID }),
+    }));
+    contactAdapter.findByOrcidCandidates.mockResolvedValueOnce(contactFixture(fixtures, 'orcid', {
+      one: true,
+      id: CONTACT_A,
+      row: contactRow(CONTACT_A, { wmkf_orcid: ORCID, emailaddress1: 'old@example.edu' }),
+    }));
+
+    const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'new@example.edu', orcid: ORCID });
+
+    expect(out).toMatchObject({ outcome: 'conflict', reason: 'email_mismatch' });
+    expect(referencedReviewerIds(out)).toContain(REVIEWER_A);
+    expectDeclaredFixtureRefs(out, fixtures);
   });
 
   test('none outcome declares an empty reviewer set', async () => {
     const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: null, orcid: null });
 
     expect(out.outcome).toBe('none');
-    expectDeclaredIds(out, [], []);
+    expectDeclaredFixtureRefs(out, []);
   });
 });
