@@ -555,3 +555,20 @@ found a residual fail-open in the save-time recompute and it was fixed in the sa
   `getByEmail` read failure throws to the per-candidate catch (fail-closed). Regression tests:
   email-reuse reject, non-confident (`linked`) reject with no write, and the lookup-throw-still-saves
   path (getByEmail → null → saves). Full suite green (5002).
+
+## 12. TOCTOU close — single-read reuse (2026-07-06)
+
+Status: IMPLEMENTED (branch `codex/reviewer-coi-build`). A further adversarial review found the §11
+gate still read the reuse target via `getByEmail` while `upsertByEmail` performed its OWN second
+`getByEmail`, so a concurrent create/re-affiliation between the two reads could make the write reuse a
+same-institution reviewer the gate never evaluated.
+
+- **Fix:** `potentialReviewerAdapter.upsertByEmail(payload, { existing })` now accepts the caller's
+  already-fetched row: a truthy `existing` is reused after an email-match assertion (fail-closed on
+  mismatch), `existing: null` is a CHECKED MISS (create without a second read), and omitting `existing`
+  preserves the original internal-`getByEmail` behavior for other callers. `save-candidates-service.js`
+  fetches the reuse target ONCE (`resolveServerReuseAffiliations` → `{ affiliations, existing }`),
+  evaluates COI against it, and threads that SAME row into `upsertByEmail`. Additive return key
+  `reusedAffiliation`; `{ id, created }` contract unchanged for the other callers
+  (`contact-enrichment/persistence.js`, backfill/e2e scripts). Tests: adapter single-read (no second
+  query when `existing` provided) + service threading/reuse. Full suite green (5006).

@@ -46,6 +46,7 @@ jest.mock('../../lib/services/notification-service', () => ({
 }));
 
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
+const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity-lookup');
 const { loadCoiContext } = require('../../lib/services/reviewer-request-context');
@@ -159,6 +160,70 @@ test('clean full success: 200 payload with NO rejected*/errors keys (undefined-v
   });
 });
 
+test('threads the gate-fetched email reuse row into upsertByEmail on a safe reuse', async () => {
+  const existingReviewer = {
+    wmkf_potentialreviewersid: 'PID-SAFE',
+    wmkf_emailaddress: 'safe@example.edu',
+    wmkf_primaryaffiliation: 'Different University',
+  };
+  potentialReviewerAdapter.getByEmail.mockResolvedValueOnce(existingReviewer);
+  potentialReviewerAdapter.upsertByEmail.mockResolvedValueOnce({
+    id: 'PID-SAFE',
+    created: false,
+    reusedAffiliation: 'Different University',
+  });
+
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Safe Reuse',
+      email: 'safe@example.edu',
+      affiliation: 'Different University',
+    }],
+  });
+
+  expect(out.savedCount).toBe(1);
+  expect(potentialReviewerAdapter.getByEmail).toHaveBeenCalledTimes(1);
+  expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledWith(
+    expect.objectContaining({
+      name: 'Dr Safe Reuse',
+      email: 'safe@example.edu',
+    }),
+    { actingUserSystemId: BASE.actingUserSystemId, existing: existingReviewer },
+  );
+  expect(researcherAdapter.upsertByPotentialReviewer).toHaveBeenCalledWith(
+    'PID-SAFE',
+    expect.objectContaining({ name: 'Dr Safe Reuse' }),
+    { actingUserSystemId: BASE.actingUserSystemId },
+  );
+  expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalledWith(
+    expect.objectContaining({ potentialReviewerId: 'PID-SAFE' }),
+    { actingUserSystemId: BASE.actingUserSystemId },
+  );
+});
+
+test('threads a checked email miss into upsertByEmail so the write path cannot re-read a drifted row', async () => {
+  potentialReviewerAdapter.getByEmail.mockResolvedValueOnce(null);
+
+  await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Checked Miss',
+      email: 'miss@example.edu',
+      affiliation: 'Different University',
+    }],
+  });
+
+  expect(potentialReviewerAdapter.getByEmail).toHaveBeenCalledTimes(1);
+  expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledWith(
+    expect.objectContaining({
+      name: 'Dr Checked Miss',
+      email: 'miss@example.edu',
+    }),
+    { actingUserSystemId: BASE.actingUserSystemId, existing: null },
+  );
+});
+
 test('mixed partial success: saved rows kept, rejected/failed rows accumulate their conditional keys', async () => {
   potentialReviewerAdapter.upsertByEmail.mockImplementation(async ({ name }) => {
     if (name === 'Dr Fails') throw new Error('adapter down');
@@ -208,7 +273,7 @@ test('a late per-candidate failure (suggestion upsert) does not abort the batch 
 
 test('server recomputes institution COI from the reused reviewer CRM affiliation (getByEmail) before any save write', async () => {
   const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-  // The write reuses an existing reviewer by email (upsertByEmail → getByEmail);
+  // The write would reuse an existing reviewer by email (upsertByEmail { existing });
   // the gate evaluates THAT reuse target's CRM affiliation, not the payload's.
   potentialReviewerAdapter.getByEmail.mockResolvedValueOnce({
     wmkf_potentialreviewersid: 'PID-EXISTING',
@@ -246,6 +311,7 @@ test('server recomputes institution COI from the reused reviewer CRM affiliation
     orcid: null,
   });
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
   expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
   expect(warn).toHaveBeenCalledWith(
     '[save-candidates] server_recomputed_institution_coi_rejected',
@@ -295,6 +361,7 @@ test('non-confident lookup shape (linked/conflict/none) still fails COI via the 
   });
   expect(potentialReviewerAdapter.getByEmail).toHaveBeenCalledWith('ambiguous@example.edu');
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
   expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
   warn.mockRestore();
 });
