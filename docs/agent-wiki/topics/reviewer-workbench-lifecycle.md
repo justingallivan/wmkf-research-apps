@@ -298,6 +298,15 @@ Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
   than ship a broken first-contact email. `InviteEmailModal` renders the "verify before retry" set
   and lists who was sent/failed/skipped; a terminal error no longer shows green success. Re-sendable
   templateTypes (materials/followup/thankyou) keep their prior `failed[]` + post-loop-stamp semantics.
+  Rendering quality (also S340, `lib/utils/email-generator.js`): the greeting drops trailing
+  name suffixes (Jr./Sr./III/PhD/MD) for the surname and falls back to "Dear Reviewer" on an empty
+  name; `{{proposalAbstract}}` is soft-unwrapped (`softUnwrapProse`) so a fixed-column hard-wrapped
+  abstract reflows to the email width instead of rendering a `<br>` at every stored newline. The
+  unwrap is calibrated against 40 real abstracts (S340): it joins only lines that look auto-wrapped
+  (long + not ending at a sentence/clause boundary), so single-newline paragraph separators and
+  short header lines are PRESERVED, not merged; blank-line paragraph breaks always stay.
+  `proposalDetails` is NOT unwrapped — its single newlines are intentional. (Origin of the stored
+  newlines is upstream Akoya, not this repo — no `wmkf_abstract` writer exists here.)
 - All four templates are sendable: `invitation` (first contact, via ReviewerInvitePanel →
   `InviteEmailModal`, hardcoded `templateType:'invitation'`) and
   `materials`/`followup`/`thankyou` (via `ReviewerManagePanel`). The reviewer onboards
