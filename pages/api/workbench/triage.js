@@ -16,7 +16,7 @@
  * call → result/error→HTTP mapping.
  */
 
-import { requireAppAccess } from '../../../lib/utils/auth';
+import { requireAppAccess, actorRefFromSession } from '../../../lib/utils/auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { isGuid } from '../../../lib/utils/guid';
 import { isValidTriageValue } from '../../../shared/config/triageStatus';
@@ -56,7 +56,10 @@ export default async function handler(req, res) {
         requestId,
         triageValue,
         profileId: access.profileId,
-        callerSystemId: access.session?.user?.dynamicsSystemuserId || null,
+        // Mint the branded write-actor from the session (Invariant-Map #10) —
+        // the sole sanctioned source of setTriageStatus's ActorRef. Runtime-
+        // identical to the prior `session?.user?.dynamicsSystemuserId || null`.
+        callerSystemId: actorRefFromSession(access.session),
       });
       return res.status(200).json(body);
     } catch (error) {
