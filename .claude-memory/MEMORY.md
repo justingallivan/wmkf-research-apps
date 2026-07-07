@@ -27,7 +27,7 @@
 ## Working Norms
 - Git/branch/main: feedback-verify-branch-before-git-action.md; project-commit-directly-to-main.md
 - Reviewer preferences: feedback-prioritize-contact-recall-over-identity-precision.md; feedback-manual-affiliation-edit-no-coi-recheck.md
-- Completion posture: feedback-thoroughness-default.md; feedback-drive-to-completion.md; feedback-truncation-is-breakage-not-completion.md; feedback-first-time-correctness-over-rework.md; feedback-real-fix-not-design-note.md; feedback-self-review-before-delegating-review.md; feedback-dont-self-certify-convergence.md
+- Completion posture: feedback-thoroughness-default.md; feedback-drive-to-completion.md; feedback-truncation-is-breakage-not-completion.md; feedback-first-time-correctness-over-rework.md; feedback-real-fix-not-design-note.md; feedback-self-review-before-delegating-review.md; feedback-dont-self-certify-convergence.md; feedback-escalate-aggregate-scope-not-step-size.md
 - Refactor / behavior-freeze extraction: feedback-behavior-freeze-passthrough-no-default.md; ../docs/DISCOVERY_SERVICE_DECOMPOSITION_PLAN.md (facade+modules decomposition playbook)
 - Tone / user context: feedback-no-performative-contrition.md; feedback-no-time-pressure-commentary.md; feedback-stakeholder-email-tone.md; feedback-review-panel-tone.md
 - React / memory lookup / handoff summary: feedback-profile-context-runtime-bugs.md; feedback-check-memory-before-asking-user.md; feedback-dont-resurface-parked-items.md

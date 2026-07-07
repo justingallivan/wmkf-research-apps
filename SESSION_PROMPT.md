@@ -1,135 +1,119 @@
-# Session 339 Prompt: DynamicsService decomposition — Stage 0 DONE, start Checkpoint A
+# Session 340 Prompt: Fable orchestration — Closeable-Class Invariant Map, then the execution queue
 
-## Session 338 Summary
+## Session 339 Summary
 
-Executed **Stage 0** of the DynamicsService decomposition (the first real code motion) and,
-as a side-thread, discovered + partially closed a live DAL enforcement gap and landed its
-remediation plan. Two independent Codex adversarial reviews ran; **three distinct security-gate
-bypasses were found and closed** before any further extraction.
+Two independent streams landed on `main` this session:
 
-### What Was Completed
+- **Stream A — the *planned* S339 work, executed in a parallel worktree/agent:** DynamicsService
+  decomposition **Checkpoint A COMPLETE** (`auth.js`, `restrictions.js`, `annotations.js` extracted
+  behavior-freeze; batched Codex review PASSED — `abc77d75`), and the **Q9 prefs/app-access DAL migration
+  landed** (PR #49 `c0fea717`, Stages 1/2.5/3). **Checkpoint B (read path) is now unblocked.**
+- **Stream B — this session (a detour the owner initiated, then drove to completion):** server-side
+  reviewer-finder save-time **institution-COI enforcement**, from the chunk-1 analyze-prompt fix through a
+  structural reframe that closes the bypass class *by construction*; merged to `main` and deployed. Plus the
+  parked `codex/minor-fixes` branch merged, and a Fable orchestration brief authored.
 
-1. **DynamicsService decomposition plan landed + hardened** (`0c2029f`, `609ac6e`). Recovered the
-   full S337 Fable-authored plan from the transcript; a `/codex:adversarial-review` returned
-   SOUND-WITH-FIXES (C1 static-property gap + named-import bypass), both folded in pre-build.
+### What Was Completed (Stream B)
 
-2. **Stage 0 EXECUTED — behavior-freeze** (`f65966f` + follow-ups). `constants.js` (48 L) + `http.js`
-   (42 L) extracted verbatim from `dynamics-service.js` into `lib/services/dynamics/`; facade −56 L
-   (static `buildHeaders` delegate + `fetchWithTimeout` import; `tokenCache`/`schemaCache` left in
-   place). Both LAW gates extended **fail-closed** on `lib/services/dynamics/*`. Three bypasses closed
-   under review: (a) named-import (alias-gated), (b) relative-import (raw-substring → resolution-based
-   `isDynamicsSubmoduleTarget`), (c) computed/template-literal source (`matchesDynamicSource`). Second
-   DEDICATED `/codex:adversarial-review` returned the (c) BLOCKER; fixed (`2240ec4`). Full suite
-   4945/4945, unchanged from baseline.
+1. **Reviewer-finder save-time institution-COI enforcement — merged `a1d3049f`, deploy READY (prod).**
+   Chunk-1 prompt fix (deterministic exclusion block, scientific-only PART 1, applicant institution name
+   variants, A7-wrapped decoupled top-up) + F2/F4 server recompute + ~6 adversarial-review hardening cycles +
+   a Fable structural **discovery-recorder reframe** (`4070728`) that makes the referenced-identity declaration
+   a total function of every adapter row fetched, so no lookup branch can drop a discovery. Closes the "server
+   can discover a candidate is at the applicant/PI institution but writes it unscreened" class. PI-resolver
+   outage now a retryable 503; request-context errors keep 400/404. Docs: `docs/REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md` §§1-20.
+2. **`codex/minor-fixes` merged — `61fe97bc`, deploying (prod).** Campaign timeline defaults (+ route/admin UI),
+   honorarium require-state for US/CA payment addresses (shared validator; accept UI already collects it), bill
+   onboarding-warning email suppression, prefs fixture. Fixed the parked blocker (stale external-review address
+   fixtures — added `state`; a fixture fix, not a rule change).
+3. **Fable orchestration brief — `683a7ed`.** `docs/INVARIANT_MAP_ORCHESTRATION_BRIEF.md`: the primary next
+   objective (below).
+4. **Branch cleanup.** Deleted merged local + remote `codex/reviewer-coi-build`, `codex/minor-fixes`, local
+   `codex/q9-prefs-appaccess`; parked `~/Code/WMKF_Apps-codex` on `codex/parked` with skeleton intact.
 
-3. **Plan DAG table corrected mechanically** (`cb007cf`). Ran the deferred per-method call-graph scan
-   (`scratchpad/dag-scan.js`, `@babel/parser`) now, not at Checkpoint C. Graph is ACYCLIC; hand-built
-   table was wrong — `auth` is NOT a leaf (`getAccessToken` → `fetchWithTimeout`, `auth → http`), and
-   `→ http` edges on `schema`/`read-ops`/`email` were omitted. Extraction order unaffected (http
-   already out). Confirmed zero `this` in nested non-arrow functions (C1 svc-dispatch is safe).
-
-4. **Live DAL gap found + warn-mode guard shipped** (`5a16f36`). `lib/dataverse/client.js` is a
-   parallel **unguarded** Dataverse write transport; `wmkf_appuserpreferences` (prefs) +
-   `wmkf_appuserappaccesses` (app-access) write through it, are in **no** DAL-migration wave, and a
-   census found **all 8 write entry points run with no trusted context today** — including
-   `grantDefaultApps` on every new staff sign-in. Shipped a `DATAVERSE_DAL_UNIVERSAL` (`off|warn|on`,
-   **default off**) `assertDataverseAccess()` guard on the 5 prefs/app-access write functions —
-   observability only, zero live behavior change.
-
-5. **DAL migration plan Stage 9 capstone** (`842c66a`). Folded the reconciled universal-guard design
-   in as the migration's capstone (not a competing plan). Converged design (after Lead pushback on the
-   Fable draft): the **DynamicsService Dataverse-fetch guard is the permanent keystone** (18/18
-   adapters route through DynamicsService, 0 through client.js — VERIFIED); `client.js` is
-   tail-coverage. Q1–Q9 open for owner.
-
-6. **Doc reconciliations** (`426463c`, `92dbe0c`): corrected the stale agent-wiki
-   `assertTrustedDalContext` count 5→8 (5 entity-write + 3 email-write; +1 in `core/changeset.js:97`
-   = 9 system-wide) and the decomposition plan's Checkpoint F note that referenced it.
-
-### Commits (13 this session, `f3ab803`…`92dbe0c`, all on `main`)
-`f3ab803` `0c2029f` `609ac6e` `f65966f` `71f9d02` `793ea52` `2240ec4` `cb007cf` `5a16f36` `556811d`
-`842c66a` `426463c` `92dbe0c`.
+### Commits (Stream B, selected)
+- `683a7ed` docs: Fable orchestration brief (invariant map + queue)
+- `61fe97bc` Merge codex/minor-fixes
+- `a1d3049f` Merge reviewer-finder save-time institution-COI enforcement
+- `4070728` refactor(reviewer-finder): discovery-recorder reframe (§19)
+- `f324a503` refactor(reviewer-finder): close save-COI class by construction (§15)
+- `0630c279` feat(reviewer-finder): F2 server-side institution-COI recompute at save
 
 ## Next Items
 
 ### Verified Open
 
-1. **DynamicsService decomposition — Checkpoint A (auth/restrictions/annotations, BATCHED review).**
-   Evidence: `lib/services/dynamics/` contains only `constants.js` + `http.js` (Stage 0); Checkpoints
-   A–F pending per `docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md` status header. This is the main
-   thread. Three leaf extractions, each behavior-freeze (characterize → extract verbatim under C1
-   svc-dispatch → gates + suite → commit): Stage 1 `auth.js` (`getAccessToken`+`tokenCache`+
-   `resetTokenCache`; uses corrected DAG edge `auth → http`; C4/C14), Stage 2 `restrictions.js` (C3),
-   Stage 3 `annotations.js`. Then one fresh-context adversarial review over the batch. Gates:
-   `check:dataverse-access-layer`, `check:dynamics-context-boundary`, semgrep token-audit.
+1. **PRIMARY — Fable orchestration: the Closeable-Class Invariant Map.**
+   Evidence: `docs/INVARIANT_MAP_ORCHESTRATION_BRIEF.md` (`683a7ed`). The owner gives Fable a **charter at
+   session start** (charter governs; the brief scopes). Produce the evidence-backed map — every
+   security/correctness surface classified on the enforcement ladder (impossible-by-construction > fail-closed
+   gate > advisory gate > review), with the smallest structural move that lifts each toward rung 1, ranked by
+   blast radius, implementable by a later session. Fable directs; subagents execute. Worked example: the COI
+   discovery-recorder story.
 
-2. **DAL Stage 9 — enforcement (warn → wrap → enforce).** Evidence:
-   `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` Stage 9. Step 1 (warn) DONE (`5a16f36`). Remaining:
-   set `DATAVERSE_DAL_UNIVERSAL=warn` in an environment to observe real traffic, then **wrap the 8
-   prefs/app-access write entry points in `withDalContext`** (delicate: the sign-in `grantDefaultApps`
-   path; `lib/utils/auth.js` `requireAppAccess` establishes no context), then flip to `on`. The
-   DynamicsService-side keystone (Dataverse-fetch guard in `dynamics/http.js`) runs strictly AFTER
-   decomposition Checkpoint F.
+2. **Execution queue (after the map; owner priority order — let the map's ranking override):**
+   a. **Project-wide prompt-caching audit + standardized remediation.** Evidence:
+      `.claude-memory/project-cache-hit-rate-review.md` (Anthropic flagged low cache-hit rate). Holistic, from
+      `lib/services/llm-client.js` consumers.
+   b. **Holistic prod-safety review of everything that shipped today** — reviewer-finder COI (`a1d3049f`), Q9
+      prefs/app-access DAL (PR #49, auth hot path), DynamicsService Checkpoint A. All security/correctness-
+      critical, only incremental/diff review so far.
+   c. **DynamicsService decomposition Checkpoint B (read path).** Evidence: `abc77d75` ("Checkpoint B
+      unblocked"); `docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md`. B carries the token/schema cache seam.
 
 ### Owner Decision Needed
 
-1. **DAL Stage 9 owner questions Q1–Q9 — RESOLVED S339** (`docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`
-   "Owner decisions Q1–Q9"). Defaults adopted on Q1–Q8; **Q9 reversed to MIGRATE** prefs/app-access
-   into a DAL wave (adapters → DynamicsService) for the single-transport end-state. Consequence: the
-   Q4/step-2 context wrap is now a hard prerequisite of the transport swap (DynamicsService reads throw
-   on missing context; `listAppKeysForUser` + `grantDefaultApps` are on the auth hot path). Staged
-   migration plan `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md` is **EXECUTION-READY** (S339):
-   Fable draft, Claude-verified, TWO Codex adversarial rounds (REFUTED→patched→SOUND-WITH-FIXES),
-   all blockers resolved — P-1 cleared (`vercel env ls`), OQ-1 closed, OQ-5 resolved (add a bounded
-   admin-list primitive for `listAllGrantsForAdmin`; full `client.js` retirement). Owner ruling: no
-   further Codex review before build; **Codex reviews the implementation after the build.** Next
-   actor: build executor, starting Stage 1 (context wraps incl. the confirmed 1h resolver fix).
+1. **Fable retirement (last-night access).** Owner is handing Fable the invariant-map brief + a charter this
+   session. No decision for the next actor — context only.
 
-### Do Not Reopen Without New Decision
+### Parked
 
-1. **Stage 0: COMPLETE (S338).** `constants.js`+`http.js` extracted; both LAW gates fail-closed with
-   3 bypasses closed; doubly adversarially reviewed. Do not re-extract these two; extend in place.
-   Evidence: plan Stage-0 EXECUTED note + commits `f65966f`…`2240ec4`.
-2. **DynamicsService plan decisions Q1–Q4 stand** (12 modules / full-surface facade / co-locate cache
-   seam / resolution-based gate matchers). Do not re-litigate without a new owner decision.
-3. **Universal-guard design converged (S338):** DynamicsService transport = permanent keystone;
-   `client.js` = tail-coverage (interim for wave-tracked entities, standing for untracked
-   prefs/app-access). Do not re-open the "guard client.js as the universal transport" framing — it was
-   refuted (adapters route through DynamicsService, client.js is being retired per-entity).
+1. **Spec-audit design-docs recovery** (work computer). Evidence: `project-spec-audit-docs-recovery-parked.md`.
+2. **Product/UX owner asks:** review-output formatting (`project-review-output-formatting.md`), campaign-
+   settings UX revisit (`project-campaign-settings-ux-revisit.md`). Not orchestrator-shaped.
 
 ### Verify Before Acting
 
-1. **Warn-mode guard is default-OFF (dormant).** `DATAVERSE_DAL_UNIVERSAL` unset = no-op. It does NOT
-   currently protect the prefs/app-access writes — it only makes the guard available. Enabling `on`
-   before wrapping the 8 entry points WILL throw on new-user sign-in + prefs/app-access routes (census
-   confirmed all 8 are context-less). Wrap first, enforce second.
+1. **`main` moved ~5 commits under this session (Stream A: DAL/dynamics) in parallel.** Any mental model built
+   on pre-detour `main` is stale — `/start` (pull) and re-read `docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md`
+   before touching Checkpoint B.
+2. **DAL Stage 9 enforcement status moved.** The Q9 migration (PR #49) touched the prefs/app-access write entry
+   points Stage 9 was going to wrap; re-verify what is already `withDalContext`-wrapped before scoping the
+   warn→wrap→enforce work. Evidence: `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` Stage 9.
+3. **Reviewer-finder COI shipped to prod with heavy-but-incremental review + one structural reframe.** Treat as
+   "shipped, pending the whole-system review" (queue item 2b), not as fully independently validated end-to-end.
+
+### Do Not Reopen Without New Decision
+
+1. **Reviewer-finder save-COI enforcement architecture** (discovery-recorder + single save-time choke point +
+   input-side invariant test). Evidence: `docs/REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md` §§15-20; `f324a503`,
+   `4070728`. Closed the bypass class by construction across ~6 review cycles; do not re-litigate the design
+   without new evidence — extend it.
+2. **Honorarium require-state on external-review accept is intended.** Evidence: `lib/external/required-address.js`
+   header (accept guard + honorarium backfill must enforce the SAME completeness); `Stage2aView` collects it;
+   `61fe97bc`. The address-fixture updates were stale-fixture fixes, not a behavior change to relitigate.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `lib/services/dynamics-service.js` | The facade (post-Stage-0, ~1,672 L). Next: Checkpoint A extracts auth/restrictions/annotations. |
-| `lib/services/dynamics/constants.js`, `http.js` | The two Stage-0 leaf modules (extracted verbatim). |
-| `scripts/check-dataverse-access-layer.js` | LAW gate; `auditDynamicsSubmoduleImports` + `isDynamicsSubmoduleTarget` + `matchesDynamicSource` are the S338 fail-closed pass. |
-| `lib/services/dynamics-context.js` | `assertTrustedDalContext` (8 write asserts) + the new `assertDataverseAccess` (`DATAVERSE_DAL_UNIVERSAL`). |
-| `lib/services/dataverse-prefs-service.js`, `dataverse-app-access-service.js` | The warn-guarded client.js write services (prefs/app-access). |
-| `docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md` | The decomposition plan (Stage 0 EXECUTED; A–F pending; corrected DAG). |
-| `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` | DAL migration; **Stage 9** = universal-guard capstone + Q1–Q9. |
-| `scratchpad/dag-scan.js` | Re-runnable per-method call-graph verifier (re-run before Checkpoint C/D). |
+| `docs/INVARIANT_MAP_ORCHESTRATION_BRIEF.md` | **The Fable brief** — primary next objective + execution queue |
+| `docs/REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md` | Save-time COI plan §§1-20 (F2/F4 → recorder reframe) |
+| `lib/services/reviewer-identity-lookup.js` | Producer: discovery recorder + single-exit `referenced*` stamping |
+| `lib/services/reviewer-finder/save-candidates-service.js` | The save-time COI choke point (consumer) |
+| `lib/external/required-address.js` | Shared address-completeness validator (accept guard + honorarium backfill) |
+| `docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md` | Decomposition plan — Checkpoint A done, B (read path) next |
+| `.claude-memory/project-cache-hit-rate-review.md` | Prompt-caching audit context (queue item 2a) |
 
 ## Testing
 
 ```bash
-# Decomposition covering suites (baseline before/after each Checkpoint-A stage) + the LAW gates
-npx jest tests/unit/dal-enforcement.test.js tests/unit/dynamics-service-count.test.js \
-  tests/unit/dynamics-service-caller-id.test.js tests/unit/adapters-caller-id.test.js \
-  tests/unit/reviewer-adapters-writeback.test.js
-npm run check:dataverse-access-layer && npm run check:dataverse-access-layer:self-test \
-  && npm run check:route-service-boundary && npm run check:dynamics-context-boundary
-
-# DAL-universal warn-guard
-npx jest tests/unit/dal-universal-guard.test.js
-
-# Full suite
-npm test
+# Full suite + the gates most relevant to what shipped this session
+npm test                                   # baseline (was 5082 green at S339 wind-down)
+npm run lint                               # 0 errors expected
+npm run check:dataverse-access-layer && npm run check:dataverse-access-layer:self-test
+npm run check:trust-boundary-guid && npm run check:trust-boundary-guid:self-test
+npm run check:prompt-injection-tagging && npm run check:prompt-injection-tagging:self-test
+npm run check:api-routes && npm run check:api-routes:self-test
+npm run check:docs-catalog
 ```

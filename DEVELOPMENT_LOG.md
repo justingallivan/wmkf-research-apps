@@ -10,6 +10,17 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Reviewer-finder save-time institution-COI enforced server-side; "close the class by construction" pattern + invariant-map charter (Session 339)
+
+**Milestone:** The reviewer-finder save boundary moved from trusting client COI flags to authoritative server-side institution-COI enforcement, shipped to prod. After ~6 adversarial-review cycles each closing a real same-institution bypass, a Fable structural reframe ended the whack-a-mole: a *discovery recorder* makes the referenced-identity declaration a total function of every adapter row fetched (no lookup branch can drop a discovery) and the invariant test was inverted to assert against adapter *inputs* — closing the bypass class by construction. The pattern was codified into a Fable orchestration brief: produce a whole-system "closeable-class invariant map" (enforcement ladder: impossible-by-construction > fail-closed gate > advisory gate > review), ranked by blast radius.
+**Sessions:** 339.
+**Ship state:**
+- Reviewer-finder COI arc merged `a1d3049f` (deploy READY); `codex/minor-fixes` merged `61fe97bc`; suite 5082 green, all relevant gates green.
+- PI-resolver outage → retryable 503; request-context errors keep 400/404; contact + conflict-carried institutions now screened.
+- Parallel stream (separate agent) landed DynamicsService Checkpoint A + the Q9 prefs/app-access DAL migration (PR #49) on the same `main`.
+**Why it matters:** a security-critical gate is now correct by construction rather than defended review-by-review, and the reusable pattern + invariant-map brief redirect future hardening from bug-hunting toward closing whole classes.
+**Pointers:** `docs/REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md` §§1-20; `docs/INVARIANT_MAP_ORCHESTRATION_BRIEF.md`; commits `f324a503`, `4070728`, `a1d3049f`.
+
 ## July 2026 — Three reviewed refactor consolidations closed + escape-law gate + bypass-strip campaign scoped (Sessions 331–332)
 
 **Milestone:** Three full plan→adversarial-Codex-review→amend→execute→closing-review cycles completed in one run: OData escape consolidation (12 sites onto `odata.escape`, PASS-WITH-FINDINGS close), array-chunk consolidation (new `lib/utils/chunk.js`, 17 mechanical swaps, SATISFIED after a two-round converge), and gate-script scaffold consolidation (new `scripts/lib/selftest-fixture.js` disposer helper adopted by 18 self-tests + `scripts/lib/walk-files.js` adopted by the 6 byte-identical markdown gates, SATISFIED with zero findings under a byte-identical census+verdict bar). Owner rulings recorded: odata escape-law gate BUILT (`check:odata-escape`, 565 files green); chunk-loop and security-gate-walk gates DECLINED. The next campaign — stripping all 52 functional `bypassDynamicsRestrictions` scopes onto `withDalContext` — is scoped, adversarially reviewed, and folded (`docs/BYPASS_STRIP_PLAN.md`), including a review-caught P0: two default-parameter bypass aliases invisible to call-site greps.
