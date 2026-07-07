@@ -17,8 +17,7 @@
  * `parseDiscoveredReasoningResponse` stay in `reviewer-finder.js`.
  *
  * Because `reviewer-finder.js` is the runtime FALLBACK, this file and it must be
- * kept in sync (a byte-parity test guards the drift). Both currently carry the
- * S222 bioRxiv PART-3 fix.
+ * kept in sync with the parser/composer contract tests.
  *
  * A7 BOUNDARY IS CODE-OWNED, NOT IN THIS BODY
  * ──────────────────────────────────────────────────────────────────────────
@@ -34,8 +33,10 @@
  * before interpolation (the Executor's declarative-var contract doesn't render
  * conditionals, and the service mirrors that):
  *   - `additional_notes_block` — either "" or "**ADDITIONAL CONTEXT FROM USER:**\n<text>\n"
- *   - `excluded_names_block`   — either "" or "\n**EXCLUDED NAMES (conflicts of interest - do NOT suggest these):**\n<csv>\n"
  *   - `proposal_text`          — caller pre-truncates + wraps as untrusted before filling
+ *
+ * Hard reviewer/person/institution exclusions are code-owned and prepended by
+ * `composeAnalyzePrompt`, not editable-body placeholders.
  *
  * The seeded rows keep `parseMode: "raw"` (single `response_text`,
  * `target.kind: "none"`) so the Executor contract stays valid for tooling, but

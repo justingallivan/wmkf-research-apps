@@ -20,7 +20,7 @@ import {
 
 const ANALYZE = 'reviewer-finder.analyze';
 const SCORE = 'reviewer-finder.score-candidates';
-const ANALYZE_VARS = ['proposal_text', 'additional_notes_block', 'excluded_names_block', 'reviewer_count'];
+const ANALYZE_VARS = ['proposal_text', 'additional_notes_block', 'reviewer_count'];
 const SCORE_VARS = ['proposal_summary', 'candidates_list'];
 
 describe('golden: shipped templates satisfy their own contracts', () => {

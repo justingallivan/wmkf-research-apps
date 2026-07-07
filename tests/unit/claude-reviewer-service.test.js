@@ -54,6 +54,19 @@ function analysisResponse({ title = 'Example', reviewers = [], queries = ['cell 
   return [...metadata, ...reviewerBlocks, ...queryLines].join('\n');
 }
 
+function part2Response(reviewers = []) {
+  return reviewers.flatMap((reviewer, index) => [
+    'REVIEWER:',
+    `NAME: ${reviewer.name || `Dr. Reviewer ${index + 1}`}`,
+    `INSTITUTION: ${reviewer.institution || 'Example Institute'}`,
+    `EXPERTISE: ${reviewer.expertise || 'systems biology, imaging'}`,
+    `SENIORITY: ${reviewer.seniority || 'Mid-career'}`,
+    `REASONING: ${reviewer.reasoning || 'Relevant expertise for this proposal.'}`,
+    `SOURCE: ${reviewer.source || 'Known expert'}`,
+    '',
+  ]).join('\n');
+}
+
 const reviewer = (name) => ({ name });
 const completeReviewer = (name) => ({
   name,
@@ -61,6 +74,17 @@ const completeReviewer = (name) => ({
   expertiseAreas: ['systems biology', 'imaging'],
   reasoning: 'Active expert on the proposal topic.',
 });
+const REQUEST_CONTEXT = {
+  title: 'Dataverse Title',
+  programArea: 'Science and Engineering Research Program',
+  principalInvestigator: 'Dr. Ada Lovelace',
+  proposalAuthors: 'Dr. Ada Lovelace',
+  coInvestigators: 'None',
+  coInvestigatorCount: '0',
+  authorInstitution: 'Example University',
+  applicantInstitutionNames: ['Example University'],
+  abstract: 'Example abstract',
+};
 
 describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
   let originalCallLLM;
@@ -71,6 +95,15 @@ describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
 
   afterEach(() => {
     ClaudeReviewerService._callLLM = originalCallLLM;
+  });
+
+  test('search analysis fails closed without request context before calling the model', async () => {
+    ClaudeReviewerService._callLLM = jest.fn();
+
+    await expect(ClaudeReviewerService.analyzeProposal('A useful proposal body'.repeat(20), 'sk-ant-test', {
+      reviewerCount: 1,
+    })).rejects.toThrow('requestContext is required');
+    expect(ClaudeReviewerService._callLLM).not.toHaveBeenCalled();
   });
 
   test('caps proposal text before creating the Claude prompt and emits boundary metadata', async () => {
@@ -114,6 +147,7 @@ describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
       onProgress: event => progressEvents.push(event),
       userProfileId: 123,
       reviewerCount: 1,
+      requestContext: REQUEST_CONTEXT,
     });
 
     const boundaryEvent = progressEvents.find(event => event.status === 'payload_boundary');
@@ -140,7 +174,8 @@ describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
     }));
 
     const result = await ClaudeReviewerService.analyzeProposal('A useful proposal body'.repeat(20), 'sk-ant-test', {
-      reviewerCount: 6,
+      reviewerCount: 3,
+      requestContext: REQUEST_CONTEXT,
     });
 
     expect(ClaudeReviewerService._callLLM).toHaveBeenCalledTimes(2);
@@ -170,7 +205,8 @@ describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
       });
 
     const result = await ClaudeReviewerService.analyzeProposal('A useful proposal body'.repeat(20), 'sk-ant-test', {
-      reviewerCount: 6,
+      reviewerCount: 3,
+      requestContext: REQUEST_CONTEXT,
     });
 
     expect(ClaudeReviewerService._callLLM).toHaveBeenCalledTimes(2);
@@ -196,7 +232,8 @@ describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
       });
 
     const result = await ClaudeReviewerService.analyzeProposal('A useful proposal body'.repeat(20), 'sk-ant-test', {
-      reviewerCount: 6,
+      reviewerCount: 3,
+      requestContext: REQUEST_CONTEXT,
     });
 
     expect(result.success).toBe(true);
@@ -214,10 +251,66 @@ describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
 
     const result = await ClaudeReviewerService.analyzeProposal('A useful proposal body'.repeat(20), 'sk-ant-test', {
       reviewerCount: 1,
+      requestContext: REQUEST_CONTEXT,
     });
 
     expect(result.success).toBe(true);
     expect(ClaudeReviewerService._callLLM).toHaveBeenCalledTimes(1);
+  });
+
+  test('valid short result gets one decoupled Part-2 top-up, not a repair retry', async () => {
+    const progressEvents = [];
+    ClaudeReviewerService._callLLM = jest
+      .fn()
+      .mockResolvedValueOnce({
+        text: analysisResponse({
+          reviewers: [
+            completeReviewer('Dr. One Reviewer'),
+            completeReviewer('Dr. Two Reviewer'),
+            completeReviewer('Dr. Three Reviewer'),
+          ],
+          queries: [],
+        }),
+        usedFallback: false,
+        model: 'claude-test',
+        stopReason: 'end_turn',
+      })
+      .mockResolvedValueOnce({
+        text: part2Response([
+          { name: 'Dr. One Reviewer' },
+          { name: 'Dr. Applicant Conflict', institution: 'Example University' },
+          { name: 'Dr. Four Reviewer' },
+          { name: 'Dr. Five Reviewer' },
+          { name: 'Dr. Six Reviewer' },
+        ]),
+        usedFallback: false,
+        model: 'claude-test',
+        stopReason: 'end_turn',
+      });
+
+    const result = await ClaudeReviewerService.analyzeProposal('A useful proposal body'.repeat(20), 'sk-ant-test', {
+      reviewerCount: 6,
+      requestContext: REQUEST_CONTEXT,
+      onProgress: event => progressEvents.push(event),
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.reviewerSuggestions.map(r => r.name)).toEqual([
+      'Dr. One Reviewer',
+      'Dr. Two Reviewer',
+      'Dr. Three Reviewer',
+      'Dr. Four Reviewer',
+      'Dr. Five Reviewer',
+      'Dr. Six Reviewer',
+    ]);
+    expect(ClaudeReviewerService._callLLM).toHaveBeenCalledTimes(2);
+    const topUpPrompt = ClaudeReviewerService._callLLM.mock.calls[1][0].prompt;
+    expect(topUpPrompt).toContain('Suggest exactly 3 additional reviewers');
+    expect(topUpPrompt).toContain('Do NOT repeat anyone already listed: Dr. One Reviewer, Dr. Two Reviewer, Dr. Three Reviewer.');
+    expect(topUpPrompt).toContain('EXCLUSIONS - HARD CONSTRAINTS');
+    expect(topUpPrompt).not.toContain('REPAIR INSTRUCTIONS');
+    expect(result.topUp).toMatchObject({ attempted: true, requestedAdditional: 3, acceptedAdditional: 3, shortfall: 0 });
+    expect(progressEvents.map(e => e.status)).toContain('top_up_complete');
   });
 
   test('request context slims metadata inference and overwrites parsed proposalInfo', async () => {
@@ -310,6 +403,27 @@ describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
     expect(validation.issues.filter(i => i.severity !== 'warning')).toHaveLength(0);
   });
 
+  test('same-institution suggestions are sanitized with the COI institution matcher', () => {
+    const validation = validateReviewerAnalysis({
+      proposalInfo: { title: 'Example' },
+      reviewerSuggestions: [
+        completeReviewer('Dr. Aaa One'),
+        { ...completeReviewer('Dr. Applicant Match'), suggestedInstitution: 'Example University' },
+        completeReviewer('Dr. Bbb Two'),
+        completeReviewer('Dr. Ccc Three'),
+      ],
+      searchQueries: { pubmed: ['topic query'] },
+    }, { reviewerCount: 3, excludedInstitutions: ['Example University'] });
+
+    expect(validation.valid).toBe(true);
+    expect(validation.sanitizedResult.reviewerSuggestions.map(r => r.name)).toEqual([
+      'Dr. Aaa One',
+      'Dr. Bbb Two',
+      'Dr. Ccc Three',
+    ]);
+    expect(validation.issues.find(i => i.code === 'excluded_reviewer_institution')?.severity).toBe('warning');
+  });
+
   test('an incomplete reviewer is a warning excluded from the floor, not a hard failure', () => {
     const validation = validateReviewerAnalysis({
       proposalInfo: { title: 'Example' },
@@ -389,6 +503,7 @@ describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
 
     const result = await ClaudeReviewerService.analyzeProposal('A useful proposal body'.repeat(20), 'sk-ant-test', {
       reviewerCount: 5,
+      requestContext: REQUEST_CONTEXT,
     });
 
     expect(result.success).toBe(true);
@@ -425,6 +540,7 @@ describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
     const result = await ClaudeReviewerService.analyzeProposal('A useful proposal body'.repeat(20), 'sk-ant-test', {
       reviewerCount: 6,
       deadlineAt: Date.now() + 1000,
+      requestContext: REQUEST_CONTEXT,
     });
 
     expect(result.success).toBe(false);
