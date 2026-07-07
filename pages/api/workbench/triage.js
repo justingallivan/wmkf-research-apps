@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * API: /api/workbench/triage
  *
@@ -16,7 +17,7 @@
  * call → result/error→HTTP mapping.
  */
 
-import { requireAppAccess } from '../../../lib/utils/auth';
+import { requireAppAccess, actorRefFromSession } from '../../../lib/utils/auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { isGuid } from '../../../lib/utils/guid';
 import { isValidTriageValue } from '../../../shared/config/triageStatus';
@@ -27,6 +28,10 @@ export const config = {
   api: { bodyParser: { sizeLimit: '8kb' } },
 };
 
+/**
+ * @param {import('next').NextApiRequest} req
+ * @param {import('next').NextApiResponse} res
+ */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -56,7 +61,10 @@ export default async function handler(req, res) {
         requestId,
         triageValue,
         profileId: access.profileId,
-        callerSystemId: access.session?.user?.dynamicsSystemuserId || null,
+        // Mint the branded write-actor from the session (Invariant-Map #10) —
+        // the sole sanctioned source of setTriageStatus's ActorRef. Runtime-
+        // identical to the prior `session?.user?.dynamicsSystemuserId || null`.
+        callerSystemId: actorRefFromSession(access.session),
       });
       return res.status(200).json(body);
     } catch (error) {
@@ -66,7 +74,7 @@ export default async function handler(req, res) {
       console.error('workbench triage error:', error);
       return res.status(500).json({
         error: 'Failed to set triage status',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+        details: process.env.NODE_ENV === 'development' && error instanceof Error ? error.message : undefined,
       });
     }
   });

@@ -9,6 +9,9 @@
 jest.mock('../../lib/utils/auth', () => ({
   requireAppAccess: jest.fn(),
   getUserRole: jest.fn(async () => 'read_only'),
+  // The route mints the branded write-actor via this helper (Invariant-Map #10);
+  // faithful passthrough matching the real actorRefFromSession contract.
+  actorRefFromSession: (session) => session?.user?.dynamicsSystemuserId || null,
 }));
 
 jest.mock('../../lib/services/dynamics-context', () => ({

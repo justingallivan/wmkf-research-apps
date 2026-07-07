@@ -467,6 +467,12 @@ touched gates → commit. Leaf-first per the DAG.
   plan's status header, `/sweep` the fact-level restatements (the agent-wiki assert-site count was
   corrected 5→8 in `docs/agent-wiki/topics/dataverse-dynamics.md` S338, commit `426463c` — 8 in
   dynamics-service.js + 1 in `core/changeset.js:97`; re-verify at finalize).
+  - **TS gate follow-up (from S342, `docs/TYPESCRIPT_OPTION_ASSESSMENT.md`).** Checkpoint B turned
+    the facade's read selectors into thin `...args` forwarding wrappers, which erase the branded
+    `Guid` signature before a call reaches `read-ops.js` — so the `check:types` gate enforces the
+    brand only at the module boundary today. At facade finalize, give each `...args` wrapper its
+    real typed signature (and `// @ts-check` the facade), then add `dynamics-service.js` to
+    `tsconfig.check.json` `include` so the `Guid` brand bites callers through the facade end-to-end.
 
 If any checkpoint review returns a BLOCKER, that checkpoint converges (fold → re-review) before the
 next begins.
