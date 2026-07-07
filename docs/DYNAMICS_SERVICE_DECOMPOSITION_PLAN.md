@@ -16,7 +16,7 @@ related:
 
 # DynamicsService Decomposition Plan
 
-**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stages 1 (`auth.js`) + 2 (`restrictions.js`) + 3 (`annotations.js`) all EXECUTED + BATCHED adversarial review PASSED (S339, verdict SOUND/approve — "could not refute the behavior-freeze", no material findings, base `d4463548..HEAD`); Checkpoint B (read path) is now UNBLOCKED; Checkpoints B–F pending.** This applies the exact cadence proven on the
+**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stages 1 (`auth.js`) + 2 (`restrictions.js`) + 3 (`annotations.js`) all EXECUTED + BATCHED adversarial review PASSED (S339, verdict SOUND/approve — "could not refute the behavior-freeze", no material findings, base `d4463548..HEAD`); Checkpoint B Stages 4 (`schema.js`) + 5 (`read-ops.js`) EXECUTED + BATCHED adversarial review PASSED (S341, Codex behavior-freeze verified; merged to main S342, commit `daac9761`); Checkpoints C–F pending.** This applies the exact cadence proven on the
 DiscoveryService decomposition (S335) and the ContactEnrichmentService decomposition (S336):
 strategy chosen up front (facade + extracted modules), leaf-first staged extraction, each cluster
 characterization-covered (baselined green pre-extraction, mutation-proven) BEFORE the code moves,
@@ -432,7 +432,7 @@ touched gates → commit. Leaf-first per the DAG.
   annotation suffix mapping). Gates: `check:dataverse-access-layer`,
   `check:dynamics-context-boundary` (restrictions imports `getDynamicsContext`), semgrep token-audit
   (C14).
-- **Checkpoint B — read path. BATCHED review.** Stage 4 `schema.js` (C4 `schemaCache` +
+- **Checkpoint B — read path. EXECUTED S341 + BATCHED review PASSED (Codex behavior-freeze verified); merged to main S342 (`daac9761`).** Stage 4 `schema.js` (C4 `schemaCache` +
   `fieldPromises` in-flight dedupe — characterize the dedupe and TTL paths; `dynamics-service-count`
   + adapter suites cover the rest), Stage 5 `read-ops.js` (85+ spy sites are the de-facto
   characterization; add direct pins for `countRecords` countdistinct fallback semantics `:526-556`,
