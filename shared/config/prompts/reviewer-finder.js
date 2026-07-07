@@ -28,6 +28,7 @@ import {
 import { interpolate } from '../../../lib/services/prompt-store';
 import { SCORE_CANDIDATES_USER_PROMPT_TEMPLATE } from './reviewer-finder-dynamics';
 import { normalizeReviewerName, buildExcludedSet } from '../../../lib/utils/reviewer-name-match';
+import { DeduplicationService } from '../../../lib/services/deduplication-service';
 import { DEFAULT_REVIEWER_COUNT } from '../reviewerFinderPreferences';
 
 // Cap for the Stage 2 candidate block (U-EXT). Generous — a batch of
@@ -436,6 +437,95 @@ function hasReviewerDetail(suggestion) {
   ].some(v => String(v || '').trim().length > 2 && !isPlaceholderValue(v));
 }
 
+function suggestionInstitutionValues(suggestion) {
+  return [
+    suggestion?.suggestedInstitution,
+    suggestion?.institution,
+    suggestion?.affiliation,
+    suggestion?.primaryAffiliation,
+    suggestion?.contactEnrichment?.affiliation,
+  ].map(v => String(v || '').trim()).filter(Boolean);
+}
+
+function findExcludedInstitutionMatch(suggestion, excludedInstitutions) {
+  const institutions = Array.isArray(excludedInstitutions) ? excludedInstitutions : [];
+  if (!institutions.length) return null;
+  for (const candidateInstitution of suggestionInstitutionValues(suggestion)) {
+    for (const excludedInstitution of institutions) {
+      if (DeduplicationService.institutionsMatchForCOI(candidateInstitution, excludedInstitution)) {
+        return { candidateInstitution, excludedInstitution };
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Proposal-info-independent sanitizer for reviewer suggestion lists. Drops
+ * placeholders, exact excluded names, same-institution suggestions, incomplete
+ * entries, and duplicate names while preserving the complete duplicate when it
+ * replaces an earlier incomplete entry.
+ */
+export function sanitizeReviewerSuggestions(result, opts = {}) {
+  const {
+    excludedNames = [],
+    excludedInstitutions = [],
+  } = opts;
+  const originalSuggestions = Array.isArray(result?.reviewerSuggestions) ? result.reviewerSuggestions : [];
+  const placeholderSuggestions = originalSuggestions.filter(isPlaceholderSuggestion);
+  const nonPlaceholder = originalSuggestions.filter(s => !isPlaceholderSuggestion(s));
+
+  const excludedSet = buildExcludedSet(excludedNames);
+  const seen = new Map();
+  const duplicateNames = [];
+  const excludedMatches = [];
+  const institutionMatches = [];
+  const incompleteSuggestions = [];
+  const deduped = [];
+
+  for (const suggestion of nonPlaceholder) {
+    const normalized = normalizeReviewerName(suggestion?.name);
+    if (normalized && excludedSet.has(normalized)) { excludedMatches.push(suggestion.name); continue; }
+    const institutionMatch = findExcludedInstitutionMatch(suggestion, excludedInstitutions);
+    if (institutionMatch) {
+      institutionMatches.push({
+        name: suggestion?.name,
+        candidateInstitution: institutionMatch.candidateInstitution,
+        excludedInstitution: institutionMatch.excludedInstitution,
+      });
+      continue;
+    }
+    if (!hasReviewerDetail(suggestion)) incompleteSuggestions.push(suggestion);
+    if (normalized && seen.has(normalized)) {
+      duplicateNames.push(suggestion.name);
+      const existingIndex = seen.get(normalized);
+      if (!hasReviewerDetail(deduped[existingIndex]) && hasReviewerDetail(suggestion)) {
+        deduped[existingIndex] = suggestion;
+      }
+      continue;
+    }
+    if (normalized) seen.set(normalized, deduped.length);
+    deduped.push(suggestion);
+  }
+  const usable = deduped.filter(hasReviewerDetail);
+
+  return {
+    sanitizedResult: {
+      ...(result || {}),
+      proposalInfo: result?.proposalInfo || {},
+      reviewerSuggestions: usable,
+      searchQueries: result?.searchQueries || { pubmed: [], arxiv: [], biorxiv: [], chemrxiv: [] },
+    },
+    usable,
+    originalSuggestions,
+    placeholderSuggestions,
+    duplicateNames,
+    excludedMatches,
+    institutionMatches,
+    incompleteSuggestions,
+  };
+}
+
 /**
  * Rich, mode-aware Stage-1 analysis validation.
  *
@@ -452,54 +542,31 @@ export function validateReviewerAnalysis(result, opts = {}) {
     reviewerCount = DEFAULT_REVIEWER_COUNT,
     stopReason = null,
     excludedNames = [],
+    excludedInstitutions = [],
     analysisPurpose = 'search',
   } = opts;
   const issues = [];
-  const originalSuggestions = Array.isArray(result?.reviewerSuggestions) ? result.reviewerSuggestions : [];
-  const placeholderSuggestions = originalSuggestions.filter(isPlaceholderSuggestion);
-  const nonPlaceholder = originalSuggestions.filter(s => !isPlaceholderSuggestion(s));
+  const sanitization = sanitizeReviewerSuggestions(result, { excludedNames, excludedInstitutions });
+  const {
+    originalSuggestions,
+    placeholderSuggestions,
+    duplicateNames,
+    excludedMatches,
+    institutionMatches,
+    incompleteSuggestions,
+    usable,
+    sanitizedResult,
+  } = sanitization;
 
   const isSearch = analysisPurpose !== 'proposal_info';
   const requested = Number.isFinite(Number(reviewerCount)) ? Math.max(0, Number(reviewerCount)) : DEFAULT_REVIEWER_COUNT;
   const suggestionFloor = Math.min(requested, Math.max(3, Math.ceil(requested / 2)));
 
-  // Sanitize quality issues out of the surfaced list rather than hard-failing on
-  // them. Duplicates, excluded names, placeholders, and incomplete entries are
-  // DROPPED from the payload; incomplete entries still get a non-blocking warning
-  // and do NOT count toward the suggestion floor. If a duplicate name first appears
-  // as incomplete and later appears complete, keep the complete version.
-  const excludedSet = buildExcludedSet(excludedNames);
-  const seen = new Map();
-  const duplicateNames = [];
-  const excludedMatches = [];
-  const incompleteSuggestions = [];
-  const deduped = [];
-  for (const suggestion of nonPlaceholder) {
-    const normalized = normalizeReviewerName(suggestion?.name);
-    if (normalized && excludedSet.has(normalized)) { excludedMatches.push(suggestion.name); continue; }
-    if (!hasReviewerDetail(suggestion)) incompleteSuggestions.push(suggestion);
-    if (normalized && seen.has(normalized)) {
-      duplicateNames.push(suggestion.name);
-      const existingIndex = seen.get(normalized);
-      if (!hasReviewerDetail(deduped[existingIndex]) && hasReviewerDetail(suggestion)) {
-        deduped[existingIndex] = suggestion;
-      }
-      continue;
-    }
-    if (normalized) seen.set(normalized, deduped.length);
-    deduped.push(suggestion);
-  }
-  const usable = deduped.filter(hasReviewerDetail);
-
-  const sanitizedResult = {
-    ...(result || {}),
-    proposalInfo: result?.proposalInfo || {},
-    reviewerSuggestions: usable,
-    searchQueries: result?.searchQueries || { pubmed: [], arxiv: [], biorxiv: [], chemrxiv: [] },
-  };
   const title = String(sanitizedResult.proposalInfo?.title || '').trim();
 
-  if (!title && originalSuggestions.length === 0) {
+  if (isSearch && originalSuggestions.length === 0) {
+    addIssue(issues, 'empty_parse_failure', 'No reviewer suggestions were parsed from the analysis response.');
+  } else if (!title && originalSuggestions.length === 0) {
     addIssue(issues, 'empty_parse_failure', 'No proposal title or reviewer suggestions were parsed from the analysis response.');
   } else if (!title) {
     addIssue(issues, 'missing_title', 'Missing proposal title.');
@@ -538,6 +605,10 @@ export function validateReviewerAnalysis(result, opts = {}) {
   if (excludedMatches.length > 0) {
     addIssue(issues, 'excluded_reviewer_name', `Excluded reviewer${excludedMatches.length === 1 ? '' : 's'} dropped: ${excludedMatches.join(', ')}.`, 'warning');
   }
+  if (institutionMatches.length > 0) {
+    const names = institutionMatches.map(match => match.name || match.candidateInstitution).filter(Boolean);
+    addIssue(issues, 'excluded_reviewer_institution', `Reviewer suggestion${institutionMatches.length === 1 ? '' : 's'} affiliated with excluded institution${institutionMatches.length === 1 ? '' : 's'} dropped: ${names.join(', ')}.`, 'warning');
+  }
 
   if (stopReason === 'max_tokens') {
     addIssue(issues, 'truncated_response', 'The model stopped because it reached the max token limit.');
@@ -551,5 +622,15 @@ export function validateReviewerAnalysis(result, opts = {}) {
     sanitizedResult,
     suggestionFloor,
     placeholderCount: placeholderSuggestions.length,
+    sanitization: {
+      droppedNames: [
+        ...placeholderSuggestions.map(suggestion => suggestion?.name).filter(Boolean),
+        ...incompleteSuggestions.map(suggestion => suggestion?.name).filter(Boolean),
+        ...duplicateNames.filter(Boolean),
+        ...excludedMatches.filter(Boolean),
+        ...institutionMatches.map(match => match.name).filter(Boolean),
+      ],
+      excludedInstitutionMatches: institutionMatches,
+    },
   };
 }

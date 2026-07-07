@@ -21,6 +21,7 @@
  *   flags: --reviewer-count N (default 12), --temperature T (default 0.3)
  */
 import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 function loadEnvLocal() {
   try {
@@ -50,9 +51,22 @@ function parseArgs(argv) {
   return out;
 }
 const args = parseArgs(process.argv.slice(2));
-if (args.help || args.requests.length === 0) {
+function isCliEntrypoint() {
+  return import.meta.url === pathToFileURL(process.argv[1] || '').href;
+}
+if ((args.help || args.requests.length === 0) && isCliEntrypoint()) {
   console.log('Usage: node scripts/probe-scoring-delta.mjs --request <num|GUID> [--request <num> ...] [--reviewer-count N] [--temperature T]');
   process.exit(args.help ? 0 : 2);
+}
+
+export function buildProbeScoringDeltaAnalyzeOptions({ args: runArgs, requestContext }) {
+  return {
+    reviewerCount: runArgs.reviewerCount,
+    temperature: runArgs.temperature,
+    excludedNames: [],
+    userProfileId: null,
+    requestContext,
+  };
 }
 
 // ── proposal-file helpers (copied from validate-reviewer-analyze.mjs) ──
@@ -119,7 +133,7 @@ function oldScore(r, kw) {
 }
 
 async function runRequest(requestArg, ctx) {
-  const { DynamicsService, GraphService, getRequestSharePointBuckets, loadModelOverrides, ClaudeReviewerService, DiscoveryService, scoreRelevance } = ctx;
+  const { DynamicsService, GraphService, getRequestSharePointBuckets, loadModelOverrides, ClaudeReviewerService, DiscoveryService, scoreRelevance, loadReviewerRequestContext } = ctx;
   const select = 'akoya_requestid,akoya_requestnum,akoya_title';
   let rec;
   if (GUID_RE.test(requestArg)) rec = await DynamicsService.getRecord('akoya_requests', requestArg, { select });
@@ -129,6 +143,7 @@ async function runRequest(requestArg, ctx) {
     rec = records[0];
   }
   const requestId = rec.akoya_requestid;
+  const requestContext = await loadReviewerRequestContext(requestId);
   console.log('\n' + '━'.repeat(90));
   console.log(`REQUEST ${rec.akoya_requestnum} — ${rec.akoya_title || '(untitled)'}`);
   console.log('━'.repeat(90));
@@ -157,9 +172,11 @@ async function runRequest(requestArg, ctx) {
 
   // analyze
   await loadModelOverrides();
-  const analysis = await ClaudeReviewerService.analyzeProposal(text, process.env.CLAUDE_API_KEY, {
-    reviewerCount: args.reviewerCount, temperature: args.temperature, excludedNames: [], userProfileId: null,
-  });
+  const analysis = await ClaudeReviewerService.analyzeProposal(
+    text,
+    process.env.CLAUDE_API_KEY,
+    buildProbeScoringDeltaAnalyzeOptions({ args, requestContext }),
+  );
   if (!analysis.success) { console.error('  Analyze failed:', analysis.status || analysis); return; }
   const proposalKeywords = (analysis.proposalInfo?.keywords || '').split(',').map((k) => k.trim()).filter(Boolean);
 
@@ -215,8 +232,9 @@ async function main() {
   const { ClaudeReviewerService } = await import('../lib/services/claude-reviewer-service.js');
   const { DiscoveryService } = await import('../lib/services/discovery-service.js');
   const { scoreRelevance } = await import('../lib/utils/relevance-score.js');
+  const { loadReviewerRequestContext } = await import('../lib/services/reviewer-request-context.js');
   enterDynamicsBypassForScript('probe-scoring-delta');
-  const ctx = { DynamicsService, GraphService, getRequestSharePointBuckets, loadModelOverrides, ClaudeReviewerService, DiscoveryService, scoreRelevance };
+  const ctx = { DynamicsService, GraphService, getRequestSharePointBuckets, loadModelOverrides, ClaudeReviewerService, DiscoveryService, scoreRelevance, loadReviewerRequestContext };
 
   const results = [];
   for (const r of args.requests) {
@@ -238,4 +256,6 @@ async function main() {
   console.log(`  Track-B candidates: ${bCands.length} — delta values seen: ${[...new Set(bCands.map((s) => s.delta))].join(', ') || '(none)'}`);
   console.log(`  total Track-A→B crossovers: ${results.reduce((n, r) => n + r.crossovers, 0)}`);
 }
-main().catch((e) => { console.error('\nprobe-scoring-delta failed:', e.message); process.exit(1); });
+if (isCliEntrypoint()) {
+  main().catch((e) => { console.error('\nprobe-scoring-delta failed:', e.message); process.exit(1); });
+}

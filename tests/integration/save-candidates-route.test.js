@@ -25,7 +25,14 @@ jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: {} })
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   upsertByEmail: jest.fn(async () => ({ id: 'PID-1' })),
   getById: jest.fn(async () => ({ wmkf_primaryaffiliation: 'MIT' })),
+  getByEmail: jest.fn(async () => null),
   setContactLink: jest.fn(async () => ({ action: 'link' })),
+}));
+jest.mock('../../lib/dataverse/adapters/contact', () => ({
+  getInstitutionById: jest.fn(async () => null),
+}));
+jest.mock('../../lib/dataverse/adapters/account', () => ({
+  getById: jest.fn(async () => null),
 }));
 jest.mock('../../lib/dataverse/adapters/researcher', () => ({
   upsertByPotentialReviewer: jest.fn(async () => ({ id: 'PID-1' })),
@@ -42,6 +49,12 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
 jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
   lookupReviewerIdentity: jest.fn(async () => ({ outcome: 'none' })),
 }));
+jest.mock('../../lib/services/reviewer-request-context', () => ({
+  loadCoiContext: jest.fn(async () => ({
+    applicantInstitutionContext: { state: 'complete', names: ['Applicant University'] },
+    institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
+  })),
+}));
 jest.mock('../../lib/services/notification-service', () => ({
   __esModule: true,
   default: { notify: jest.fn(async () => ({ id: 'alert-1' })) },
@@ -51,6 +64,7 @@ const { requireAppAccess } = require('../../lib/utils/auth');
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
 const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
+const { loadCoiContext } = require('../../lib/services/reviewer-request-context');
 
 function mockRes() {
   const res = {};
@@ -75,6 +89,11 @@ beforeEach(() => {
   potentialReviewerAdapter.upsertByEmail.mockResolvedValue({ id: 'PID-1' });
   researcherAdapter.upsertByPotentialReviewer.mockResolvedValue({ id: 'PID-1' });
   reviewerSuggestionAdapter.upsert.mockResolvedValue({ id: 'S1' });
+  loadCoiContext.mockResolvedValue({
+    applicantInstitutionContext: { state: 'complete', names: ['Applicant University'] },
+    piResolution: { state: 'ok', reason: null },
+    institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
+  });
 });
 
 test('wrong method (GET) → 405', async () => {
@@ -193,4 +212,44 @@ test('500 envelope pinned exactly when every candidate fails a non-identity adap
     totalRequested: 1,
     errors: [{ name: 'Dr Fails', error: 'Dataverse write failed' }],
   });
+});
+
+test.each([
+  [400, 'requestId is not a valid GUID'],
+  [404, 'Request REQ-404 was not found'],
+])('request-context statusCode %i is returned through the service error contract', async (statusCode, message) => {
+  const sourceError = new Error(message);
+  sourceError.statusCode = statusCode;
+  loadCoiContext.mockRejectedValueOnce(sourceError);
+  const req = {
+    method: 'POST',
+    body: { requestId: 'REQ-1', candidates: [{ name: 'Dr Context', email: 'context@example.edu' }] },
+  };
+  const res = mockRes();
+  await handler(req, res);
+
+  expect(res.statusCode).toBe(statusCode);
+  expect(res.body).toEqual({ error: message });
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+});
+
+test('request-context plain error without statusCode still uses the route 500 envelope', async () => {
+  const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  loadCoiContext.mockRejectedValueOnce(new Error('context loader exploded'));
+  const req = {
+    method: 'POST',
+    body: { requestId: 'REQ-1', candidates: [{ name: 'Dr Context', email: 'context@example.edu' }] },
+  };
+  const res = mockRes();
+  await handler(req, res);
+
+  expect(res.statusCode).toBe(500);
+  expect(res.body).toMatchObject({
+    error: 'Failed to save candidates',
+    timestamp: expect.any(String),
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+  errorSpy.mockRestore();
 });

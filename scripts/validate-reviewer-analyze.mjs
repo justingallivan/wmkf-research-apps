@@ -178,6 +178,17 @@ function fail(message, exitCode = 2, extra = {}) {
   throw err;
 }
 
+export function buildValidateAnalyzeOptions({ args: runArgs, requestContext, onProgress = () => {} }) {
+  return {
+    reviewerCount: runArgs.reviewerCount,
+    temperature: runArgs.temperature,
+    excludedNames: runArgs.excluded,
+    userProfileId: null, // script context -> admin Dataverse default -> code fallback (no per-user override)
+    requestContext,
+    onProgress,
+  };
+}
+
 function writeJsonArtifact(filePath, artifact) {
   if (!filePath) return null;
   const abs = resolvePath(filePath);
@@ -323,6 +334,7 @@ async function main() {
   const { getRequestSharePointBuckets } = await import('../lib/utils/sharepoint-buckets.js');
   const { loadModelOverrides } = await import('../lib/services/model-override-loader.js');
   const { ClaudeReviewerService } = await import('../lib/services/claude-reviewer-service.js');
+  const { loadReviewerRequestContext } = await import('../lib/services/reviewer-request-context.js');
 
   if (!process.env.CLAUDE_API_KEY) {
     fail('CLAUDE_API_KEY not set (check .env.local).', 2, { stage: 'env' });
@@ -357,6 +369,7 @@ async function main() {
   console.log(`REQUEST  ${requestNumber}  (${requestId})`);
   console.log(`TITLE    ${rec.akoya_title || '(untitled)'}`);
   console.log('━'.repeat(72));
+  const requestContext = await loadReviewerRequestContext(requestId);
 
   // ── 2. List SharePoint files (READ-ONLY) ──
   const buckets = await getRequestSharePointBuckets(requestId, requestNumber);
@@ -454,18 +467,16 @@ async function main() {
 
   const progressEvents = [];
   runState.progressEvents = progressEvents;
-  const result = await ClaudeReviewerService.analyzeProposal(text, process.env.CLAUDE_API_KEY, {
-    reviewerCount: args.reviewerCount,
-    temperature: args.temperature,
-    excludedNames: args.excluded,
-    userProfileId: null, // script context → admin Dataverse default → code fallback (no per-user override)
+  const result = await ClaudeReviewerService.analyzeProposal(text, process.env.CLAUDE_API_KEY, buildValidateAnalyzeOptions({
+    args,
+    requestContext,
     onProgress: (p) => {
       progressEvents.push(p);
       if (p.status === 'prompt_resolved' || p.status === 'fallback' || p.status === 'payload_boundary') {
         console.log(`  · ${p.message}`);
       }
     },
-  });
+  }));
 
   if (!result.success) {
     console.error('Analyze failed:', result);

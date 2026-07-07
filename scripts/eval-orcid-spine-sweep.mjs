@@ -23,6 +23,7 @@
  *     --requests 1002794,1002896,1002959,1003005,1003020,1003024,1003075 [--reviewer-count 12]
  */
 import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 function loadEnvLocal() {
   try {
     const env = readFileSync(new URL('../.env.local', import.meta.url), 'utf8');
@@ -49,8 +50,21 @@ function parseArgs(argv) {
   return out;
 }
 const args = parseArgs(process.argv.slice(2));
-if (args.help || args.requests.length === 0) {
+function isCliEntrypoint() {
+  return import.meta.url === pathToFileURL(process.argv[1] || '').href;
+}
+if ((args.help || args.requests.length === 0) && isCliEntrypoint()) {
   console.log('Usage: --requests <n1,n2,...> [--reviewer-count N]'); process.exit(args.help ? 0 : 2);
+}
+
+export function buildOrcidSpineSweepAnalyzeOptions({ args: runArgs, requestContext }) {
+  return {
+    reviewerCount: runArgs.reviewerCount,
+    temperature: 0.3,
+    excludedNames: [],
+    userProfileId: null,
+    requestContext,
+  };
 }
 
 // ---- proposal-file helpers (from validate-reviewer-analyze.mjs) ----
@@ -120,6 +134,7 @@ async function main() {
   const { getRequestSharePointBuckets } = await import('../lib/utils/sharepoint-buckets.js');
   const { loadModelOverrides } = await import('../lib/services/model-override-loader.js');
   const { ClaudeReviewerService } = await import('../lib/services/claude-reviewer-service.js');
+  const { loadReviewerRequestContext } = await import('../lib/services/reviewer-request-context.js');
   enterDynamicsBypassForScript('eval-orcid-spine-sweep');
   await loadModelOverrides();
 
@@ -131,6 +146,9 @@ async function main() {
       else { const { records } = await DynamicsService.queryRecords('akoya_requests', { select: 'akoya_requestid,akoya_requestnum,akoya_title', filter: `akoya_requestnum eq '${reqArg}'`, top: 1 }); rec = records?.[0]; }
     } catch (e) { console.error(`req ${reqArg}: resolve error ${e.message}`); continue; }
     if (!rec) { console.error(`req ${reqArg}: not found`); continue; }
+    let requestContext;
+    try { requestContext = await loadReviewerRequestContext(rec.akoya_requestid); }
+    catch (e) { console.error(`req ${rec.akoya_requestnum}: request context ${e.message}`); continue; }
 
     // download + parse proposal
     let text = null;
@@ -147,7 +165,7 @@ async function main() {
     if (!text || text.trim().length < 100) { console.error(`req ${rec.akoya_requestnum}: proposal text too short — skip`); continue; }
 
     let analysis;
-    try { analysis = await ClaudeReviewerService.analyzeProposal(text, process.env.CLAUDE_API_KEY, { reviewerCount: args.reviewerCount, temperature: 0.3, excludedNames: [], userProfileId: null }); }
+    try { analysis = await ClaudeReviewerService.analyzeProposal(text, process.env.CLAUDE_API_KEY, buildOrcidSpineSweepAnalyzeOptions({ args, requestContext })); }
     catch (e) { console.error(`req ${rec.akoya_requestnum}: analyze error ${e.message}`); continue; }
     if (!analysis?.success) { console.error(`req ${rec.akoya_requestnum}: analyze ${analysis?.status || 'failed'} — skip`); continue; }
     const field = analysis.proposalInfo?.primaryResearchArea || '(unknown)';
@@ -195,4 +213,6 @@ async function main() {
     console.log(`  ${r.name} (${r.field}) count=${r.oaCount} ${r.cls} oaOrcid=${r.oaOrcid || '-'} odOrcid=${r.odOrcid || '-'} oaInst="${r.oaInst || '-'}" claimed="${r.claimedInst || '-'}"`);
   }
 }
-main().catch((e) => { console.error('\neval-orcid-spine-sweep failed:', e.message); process.exit(1); });
+if (isCliEntrypoint()) {
+  main().catch((e) => { console.error('\neval-orcid-spine-sweep failed:', e.message); process.exit(1); });
+}

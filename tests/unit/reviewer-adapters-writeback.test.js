@@ -278,6 +278,64 @@ describe('potential-reviewer.wmkf_name whitespace normalization', () => {
     expect(create.mock.calls[0][1].wmkf_name).toBe('Jane Doe');
   });
 
+  test('upsertByEmail reuses a provided existing row without querying by email', async () => {
+    const existing = {
+      wmkf_potentialreviewersid: 'pr-existing',
+      wmkf_emailaddress: 'EXISTING@example.edu',
+      wmkf_name: null,
+      wmkf_primaryaffiliation: 'Existing University',
+    };
+    const query = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
+      records: [{
+        wmkf_potentialreviewersid: 'pr-drifted',
+        wmkf_emailaddress: 'existing@example.edu',
+        wmkf_primaryaffiliation: 'Applicant University',
+      }],
+    });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    const create = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue({ wmkf_potentialreviewersid: 'pr-new' });
+
+    const out = await upsertPotentialReviewerByEmail(
+      { name: 'Existing Person', email: ' existing@example.edu ', affiliation: 'New University' },
+      { actingUserSystemId: 'user-1', existing },
+    );
+
+    expect(query).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledWith('wmkf_potentialreviewerses', 'pr-existing', expect.objectContaining({
+      wmkf_name: 'Existing Person',
+    }), { actingUserSystemId: 'user-1' });
+    expect(update.mock.calls[0][2].wmkf_primaryaffiliation).toBeUndefined();
+    expect(out).toEqual({
+      id: 'pr-existing',
+      created: false,
+      reusedAffiliation: 'Existing University',
+    });
+  });
+
+  test('upsertByEmail treats existing:null as a checked miss and does not query by email', async () => {
+    const query = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
+      records: [{
+        wmkf_potentialreviewersid: 'pr-drifted',
+        wmkf_emailaddress: 'miss@example.edu',
+        wmkf_primaryaffiliation: 'Applicant University',
+      }],
+    });
+    const create = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue({ wmkf_potentialreviewersid: 'pr-new' });
+
+    const out = await upsertPotentialReviewerByEmail(
+      { name: 'Checked Miss', email: 'miss@example.edu', affiliation: 'Different University' },
+      { actingUserSystemId: 'user-1', existing: null },
+    );
+
+    expect(query).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalledWith('wmkf_potentialreviewerses', expect.objectContaining({
+      wmkf_emailaddress: 'miss@example.edu',
+      wmkf_primaryaffiliation: 'Different University',
+    }), { actingUserSystemId: 'user-1' });
+    expect(out).toEqual({ id: 'pr-new', created: true, reusedAffiliation: null });
+  });
+
   test('update normalizes wmkf_name (empty existing → written clean)', async () => {
     jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({}); // no existing value → a real diff
     const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);

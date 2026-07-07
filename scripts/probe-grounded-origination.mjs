@@ -56,6 +56,7 @@
  *       [--blinded-sheet <dir>] [--arm1-cap 20] [--g1-top 15]
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 function loadEnvLocal() {
   try {
@@ -96,9 +97,23 @@ function parseArgs(argv) {
 }
 
 const args = parseArgs(process.argv.slice(2));
-if (args.help || !args.request) {
+function isCliEntrypoint() {
+  return import.meta.url === pathToFileURL(process.argv[1] || '').href;
+}
+if ((args.help || !args.request) && isCliEntrypoint()) {
   console.log('Usage: node scripts/probe-grounded-origination.mjs --request <num|GUID> [--file-key "..."] [--list-files] [--reviewer-count N] [--years 5] [--per-facet 25] [--max-dois 80]');
   process.exit(args.help ? 0 : 2);
+}
+
+export function buildGroundedOriginationAnalyzeOptions({ args: runArgs, requestContext, onProgress = () => {} }) {
+  return {
+    reviewerCount: runArgs.reviewerCount,
+    temperature: 0.3,
+    excludedNames: [],
+    userProfileId: null,
+    requestContext,
+    onProgress,
+  };
 }
 
 const fileKeyOf = (f) => `${f.library}::${f.folder}::${f.name}`;
@@ -235,6 +250,7 @@ async function main() {
   const { DeduplicationService } = await import('../lib/services/deduplication-service.js');
   const { deriveProposalAuthorNames } = await import('../lib/utils/proposal-authors.js');
   const { provenanceKindOf, buildReviewerProvenance } = await import('../lib/utils/reviewer-provenance.js');
+  const { loadReviewerRequestContext } = await import('../lib/services/reviewer-request-context.js');
 
   if (!process.env.CLAUDE_API_KEY) { console.error('CLAUDE_API_KEY not set (.env.local).'); process.exit(2); }
 
@@ -252,6 +268,7 @@ async function main() {
     rec = records[0];
   }
   const requestId = rec.akoya_requestid;
+  const requestContext = await loadReviewerRequestContext(requestId);
   const line = '─'.repeat(78);
   console.log('━'.repeat(78));
   console.log(`REQUEST  ${rec.akoya_requestnum}  ·  ${rec.akoya_title || '(untitled)'}`);
@@ -317,9 +334,11 @@ async function main() {
   // 3. Analyze (real LLM) — gives PART 1 keywords, PART 3 queries, PART 2 suggestions.
   await loadModelOverrides();
   console.log('Analyzing proposal (real LLM)…');
-  const analysis = await ClaudeReviewerService.analyzeProposal(text, process.env.CLAUDE_API_KEY, {
-    reviewerCount: args.reviewerCount, temperature: 0.3, excludedNames: [], userProfileId: null, onProgress: () => {},
-  });
+  const analysis = await ClaudeReviewerService.analyzeProposal(
+    text,
+    process.env.CLAUDE_API_KEY,
+    buildGroundedOriginationAnalyzeOptions({ args, requestContext }),
+  );
   if (!analysis.success) { console.error('Analyze failed:', analysis); process.exit(1); }
   const proposalAuthors = deriveProposalAuthorNames(analysis.proposalInfo);
 
@@ -532,4 +551,6 @@ ${rows}
   console.log(line);
 }
 
-main().catch((err) => { console.error('\nprobe-grounded-origination failed:', err.stack || err.message); process.exit(1); });
+if (isCliEntrypoint()) {
+  main().catch((err) => { console.error('\nprobe-grounded-origination failed:', err.stack || err.message); process.exit(1); });
+}

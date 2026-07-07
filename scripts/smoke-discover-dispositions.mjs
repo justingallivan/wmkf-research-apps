@@ -24,6 +24,7 @@
  *   node --import ./scripts/lib/use-extensionless.mjs scripts/smoke-discover-dispositions.mjs --request 1002852 --file-key "lib::folder::name"
  */
 import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 function loadEnvLocal() {
   try {
@@ -56,9 +57,23 @@ function parseArgs(argv) {
 }
 
 const args = parseArgs(process.argv.slice(2));
-if (args.help || !args.request) {
+function isCliEntrypoint() {
+  return import.meta.url === pathToFileURL(process.argv[1] || '').href;
+}
+if ((args.help || !args.request) && isCliEntrypoint()) {
   console.log('Usage: node scripts/smoke-discover-dispositions.mjs --request <num|GUID> [--list-files] [--file-key "lib::folder::name"] [--reviewer-count N]');
   process.exit(args.help ? 0 : 2);
+}
+
+export function buildSmokeDiscoverDispositionsAnalyzeOptions({ args: runArgs, requestContext, onProgress = () => {} }) {
+  return {
+    reviewerCount: runArgs.reviewerCount,
+    temperature: 0.3,
+    excludedNames: [],
+    userProfileId: null,
+    requestContext,
+    onProgress,
+  };
 }
 
 const fileKeyOf = (f) => `${f.library}::${f.folder}::${f.name}`;
@@ -106,6 +121,7 @@ async function main() {
   const { DiscoveryService } = await import('../lib/services/discovery-service.js');
   const { DeduplicationService } = await import('../lib/services/deduplication-service.js');
   const { deriveProposalAuthorNames } = await import('../lib/utils/proposal-authors.js');
+  const { loadReviewerRequestContext } = await import('../lib/services/reviewer-request-context.js');
 
   if (!process.env.CLAUDE_API_KEY) { console.error('CLAUDE_API_KEY not set (.env.local).'); process.exit(2); }
 
@@ -123,6 +139,7 @@ async function main() {
     rec = records[0];
   }
   const requestId = rec.akoya_requestid;
+  const requestContext = await loadReviewerRequestContext(requestId);
   console.log('━'.repeat(76));
   console.log(`REQUEST  ${rec.akoya_requestnum}  ·  ${rec.akoya_title || '(untitled)'}`);
   console.log('━'.repeat(76));
@@ -157,9 +174,11 @@ async function main() {
   await loadModelOverrides();
   const log = (p) => { if (['prompt_resolved', 'fallback', 'identity_resolving', 'coi_check', 'discovery'].includes(p.status) || p.stage === 'filtering') process.stdout.write('.'); };
   console.log('Analyzing proposal…');
-  const analysis = await ClaudeReviewerService.analyzeProposal(text, process.env.CLAUDE_API_KEY, {
-    reviewerCount: args.reviewerCount, temperature: 0.3, excludedNames: [], userProfileId: null, onProgress: () => {},
-  });
+  const analysis = await ClaudeReviewerService.analyzeProposal(
+    text,
+    process.env.CLAUDE_API_KEY,
+    buildSmokeDiscoverDispositionsAnalyzeOptions({ args, requestContext }),
+  );
   if (!analysis.success) { console.error('Analyze failed:', analysis); process.exit(1); }
 
   // 4. Discover (real DB/scholarly APIs) — Fix #1 (low-pub partition) happens here.
@@ -281,4 +300,6 @@ async function main() {
   console.log(line);
 }
 
-main().catch((err) => { console.error('\nsmoke-discover-dispositions failed:', err.stack || err.message); process.exit(1); });
+if (isCliEntrypoint()) {
+  main().catch((err) => { console.error('\nsmoke-discover-dispositions failed:', err.stack || err.message); process.exit(1); });
+}

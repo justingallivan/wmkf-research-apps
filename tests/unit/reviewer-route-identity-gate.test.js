@@ -23,7 +23,14 @@ jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: {} })
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   upsertByEmail: jest.fn(async () => ({ id: 'PID-1' })),
   getById: jest.fn(async () => ({ wmkf_primaryaffiliation: 'MIT' })),
+  getByEmail: jest.fn(async () => null),
   setContactLink: jest.fn(async () => ({ action: 'link' })),
+}));
+jest.mock('../../lib/dataverse/adapters/contact', () => ({
+  getInstitutionById: jest.fn(async () => null),
+}));
+jest.mock('../../lib/dataverse/adapters/account', () => ({
+  getById: jest.fn(async () => null),
 }));
 jest.mock('../../lib/dataverse/adapters/researcher', () => ({
   upsertByPotentialReviewer: jest.fn(async () => ({ id: 'PID-1' })),
@@ -52,7 +59,10 @@ jest.mock('../../lib/services/discovery-service', () => ({
   },
 }));
 jest.mock('../../lib/services/deduplication-service', () => ({
-  DeduplicationService: { markInstitutionCOI: jest.fn((cands) => cands) },
+  DeduplicationService: {
+    markInstitutionCOI: jest.fn((cands) => cands),
+    institutionCOIDecision: jest.fn(() => null),
+  },
 }));
 jest.mock('../../lib/services/contact-enrichment-service', () => ({
   ContactEnrichmentService: { enrichCandidates: jest.fn() },
@@ -64,6 +74,13 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
 jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
   lookupReviewerIdentity: jest.fn(async () => ({ outcome: 'none' })),
 }));
+jest.mock('../../lib/services/reviewer-request-context', () => ({
+  loadReviewerRequestContext: jest.fn(async () => ({})),
+  loadCoiContext: jest.fn(async () => ({
+    applicantInstitutionContext: { state: 'complete', names: ['Applicant University'] },
+    institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
+  })),
+}));
 jest.mock('../../lib/services/notification-service', () => ({
   __esModule: true,
   default: { notify: jest.fn(async () => ({ id: 'alert-1' })) },
@@ -71,6 +88,8 @@ jest.mock('../../lib/services/notification-service', () => ({
 
 const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
+const contactAdapter = require('../../lib/dataverse/adapters/contact');
+const accountAdapter = require('../../lib/dataverse/adapters/account');
 const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const rosterStore = require('../../lib/services/reviewer-roster-store');
 const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity-lookup');
@@ -106,6 +125,8 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     jest.clearAllMocks();
     reviewerSuggestionAdapter.upsert.mockResolvedValue({ id: 'S1' });
     rosterStore.stampSuggestionAnchor.mockResolvedValue({ updated: 1 });
+    contactAdapter.getInstitutionById.mockResolvedValue(null);
+    accountAdapter.getById.mockResolvedValue(null);
     lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
     NotificationService.notify.mockResolvedValue({ id: 'alert-1' });
   });
@@ -385,7 +406,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(NotificationService.notify).not.toHaveBeenCalled();
   });
 
-  test('lookup throws → still saves without link or batch error', async () => {
+  test('email lookup throws → rejects fail-closed before writes', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       lookupReviewerIdentity.mockRejectedValueOnce(new Error('lookup down'));
@@ -393,10 +414,23 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
       const res = mockRes();
       await handler(req, res);
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body).toMatchObject({ success: true, savedCount: 1, savedNames: ['Dr Lookup Down'] });
-      expect(res.body.errors).toBeUndefined();
+      expect(res.statusCode).toBe(422);
+      expect(res.body).toMatchObject({
+        success: false,
+        savedCount: 0,
+        rejectedInstitutionCOI: 1,
+        errors: [{
+          name: 'Dr Lookup Down',
+          code: 'institution_coi',
+          serverRecomputed: true,
+          decisionSource: 'reviewer_identity_lookup_failed',
+        }],
+      });
+      expect(potentialReviewerAdapter.getByEmail).not.toHaveBeenCalled();
+      expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
       expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
+      expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
+      expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
     } finally {
       warn.mockRestore();
     }

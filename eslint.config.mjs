@@ -42,6 +42,7 @@ const eslintConfig = defineConfig([
     'node_modules/**',
     'coverage/**',
     'public/**',
+    '.claude/worktrees/**',
   ]),
 ])
 
