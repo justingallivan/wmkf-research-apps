@@ -28,6 +28,9 @@ import {
   requireSuperuser,
   isAuthRequired,
 } from '../../../lib/utils/auth';
+import { listAppKeysForUser } from '../../../lib/services/app-access-service';
+
+const defaultListAppKeysForUser = listAppKeysForUser.getMockImplementation();
 
 // Clear the in-memory app-access cache between every test
 beforeEach(() => {
@@ -485,6 +488,24 @@ describe('requireAppAccess', () => {
 
     expect(result).toBeNull();
     expect(res.status).toHaveBeenCalledWith(503);
+  });
+
+  it('allows an active superuser before loading app grants when Dataverse app access is unavailable', async () => {
+    mockAuthenticatedUser(12, [], { isSuperuser: true });
+    listAppKeysForUser.mockClear();
+    listAppKeysForUser.mockImplementation(() =>
+      Promise.reject(new Error('Dataverse app access unavailable')));
+
+    try {
+      const res = createMockRes();
+      const result = await requireAppAccess(createMockReq(), res, 'reviewer-finder');
+
+      expect(result).toMatchObject({ profileId: 12 });
+      expect(res.status).not.toHaveBeenCalled();
+      expect(listAppKeysForUser).not.toHaveBeenCalled();
+    } finally {
+      listAppKeysForUser.mockImplementation(defaultListAppKeysForUser);
+    }
   });
 });
 
