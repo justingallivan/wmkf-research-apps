@@ -63,6 +63,7 @@ related:
 | [STRATEGY.md](STRATEGY.md) | plan | active |  | Last updated: 2026-05-08 (previously 2026-03-12) — living document, updated as things evolve. | 2026-07-02 |
 | [SYSTEM_MODEL.md](SYSTEM_MODEL.md) | source-of-truth | canonical | yes | The model has one organizing principle, two orthogonal axes, and a small set of layers. Get those and the rest follows. | 2026-07-02 |
 | [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md) | spec | historical |  | _Concept Evaluator was retired 2026-04-25 (Session 110) — page/API/prompt archived to /_archived. Removed from this suite list; retained only as... | 2026-07-02 |
+| [TYPESCRIPT_OPTION_ASSESSMENT.md](TYPESCRIPT_OPTION_ASSESSMENT.md) | decision | draft |  | Whether/how to adopt TypeScript, the lever behind the Invariant Map's rung-1 finding. Recommends a scoped checkJs gate on the selector core, not file renames. |  |
 | [WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md](WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md) | plan | active |  | Status: spec / pre-design (S258, 2026-06-14). Input to the Codex design loop. | 2026-07-02 |
 | [WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md](WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md) | plan | active |  | v4 (2026-06-15): Codex review round 3 folded in. | 2026-07-02 |
 
