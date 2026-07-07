@@ -115,7 +115,7 @@ describe('lookupReviewerIdentity referencedReviewers invariant', () => {
     const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: null });
 
     expect(out.outcome).toBe('confident');
-    expectDeclaredReviewerIds(out, [{ reviewerId: REVIEWER_A, affiliation: 'Applicant University' }]);
+    expectDeclaredReviewerIds(out, [{ reviewerId: REVIEWER_A, affiliation: 'Applicant University', viaNameMatch: false }]);
   });
 
   test('confident contact-only outcome declares an empty reviewer set', async () => {
@@ -148,8 +148,21 @@ describe('lookupReviewerIdentity referencedReviewers invariant', () => {
 
     expect(out.outcome).toBe('candidates');
     expectDeclaredReviewerIds(out, [
-      { reviewerId: REVIEWER_A, affiliation: 'Applicant University' },
-      { reviewerId: REVIEWER_B, affiliation: 'Different University' },
+      { reviewerId: REVIEWER_A, affiliation: 'Applicant University', viaNameMatch: false },
+      { reviewerId: REVIEWER_B, affiliation: 'Different University', viaNameMatch: false },
+    ]);
+  });
+
+  test('name-search fallback candidates are declared with viaNameMatch:true', async () => {
+    potentialReviewerAdapter.searchByName.mockResolvedValueOnce([
+      reviewerRow(REVIEWER_A, { wmkf_primaryaffiliation: 'Applicant University' }),
+    ]);
+
+    const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: null, orcid: null });
+
+    expect(out.outcome).toBe('candidates');
+    expectDeclaredReviewerIds(out, [
+      { reviewerId: REVIEWER_A, affiliation: 'Applicant University', viaNameMatch: true },
     ]);
   });
 
@@ -168,7 +181,7 @@ describe('lookupReviewerIdentity referencedReviewers invariant', () => {
     const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: null, orcid: ORCID });
 
     expect(out).toMatchObject({ outcome: 'conflict', reason: 'orcid_email_split' });
-    expectDeclaredReviewerIds(out, [{ reviewerId: REVIEWER_A, affiliation: null }]);
+    expectDeclaredReviewerIds(out, [{ reviewerId: REVIEWER_A, affiliation: null, viaNameMatch: false }]);
   });
 
   test('reverse-link conflict declares existingReviewerId', async () => {
@@ -184,7 +197,7 @@ describe('lookupReviewerIdentity referencedReviewers invariant', () => {
     const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: null });
 
     expect(out).toMatchObject({ outcome: 'conflict', reason: 'contact_linked_elsewhere' });
-    expectDeclaredReviewerIds(out, [{ reviewerId: REVIEWER_B, affiliation: null }]);
+    expectDeclaredReviewerIds(out, [{ reviewerId: REVIEWER_B, affiliation: null, viaNameMatch: false }]);
   });
 
   test('ORCID/email reviewer split declares both reviewer ids', async () => {
@@ -203,8 +216,8 @@ describe('lookupReviewerIdentity referencedReviewers invariant', () => {
 
     expect(out).toMatchObject({ outcome: 'conflict', reason: 'orcid_email_split' });
     expectDeclaredReviewerIds(out, [
-      { reviewerId: REVIEWER_A, affiliation: null },
-      { reviewerId: REVIEWER_B, affiliation: null },
+      { reviewerId: REVIEWER_A, affiliation: null, viaNameMatch: false },
+      { reviewerId: REVIEWER_B, affiliation: null, viaNameMatch: false },
     ]);
   });
 

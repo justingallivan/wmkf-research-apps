@@ -655,3 +655,35 @@ Accepted residuals outside this layer:
   affiliations Dataverse currently exposes.
 - Identities the lookup never surfaces, such as a wrong name with no email or ORCID signal, remain outside
   this save-time identity set and depend on upstream identity-resolution quality.
+
+## 16. Post-§15 adversarial findings closed (2026-07-06)
+
+Status: IMPLEMENTED (branch `codex/reviewer-coi-build`). A confirming adversarial review of the §15 branch
+returned two verified findings, both now fixed.
+
+- **[high] Top-up LLM prompt bypassed the A7 boundary.** The decoupled Part-2 reviewer top-up
+  (`_topUpReviewerSuggestions` / `buildTopUpPrompt` in `claude-reviewer-service.js`) interpolated the
+  proposal context (`createProposalSummary(result.proposalInfo)`, an LLM/proposal-derived value) directly
+  into the prompt with no `wrapUntrustedContent`, no `buildUntrustedContentPreamble`, and no
+  `ANALYZE_INTEGRITY_BLOCK` — unlike the main analyze path. Because the top-up fires precisely when the first
+  pass under-produced, the missing anti-fabrication integrity block was the highest-risk omission. Fix: the
+  top-up now wraps the proposal context in untrusted sentinels, names its nonce via the untrusted-content
+  preamble, and appends the trusted integrity block. Regression: the existing top-up test asserts the
+  preamble/sentinel/integrity markers, and a new test asserts the proposal context lives only inside the
+  sentinels.
+
+- **[medium] Name-only namesakes could falsely trigger save-time institution COI.** The §15 choke point
+  screened every `referencedReviewers` entry, including fallback name-search candidates (`matchKey:'name'`).
+  A candidate with a new safe email and safe affiliation could be rejected `institution_coi` merely for
+  sharing a name with an existing applicant-institution reviewer — even though persistence would create a
+  new reviewer and never reuse that namesake. (This was pre-existing behavior preserved from the earlier
+  `collectLookupAffiliations`, not introduced by §15.) Fix: the producer now declares a `viaNameMatch`
+  boolean on each `referencedReviewers` entry (true only for `matchKey:'name'` references, and cleared —
+  "sticky-strong" — if any exact email/ORCID/link reference also surfaces the same id). The save choke point
+  skips `viaNameMatch` entries. The candidate's own payload affiliation and the actual `getByEmail` reuse
+  target stay screened, so this removes the false positive without reopening the §15 bypass class. Residual:
+  a candidate with no payload affiliation, no email, and only a name-search match to an applicant-institution
+  namesake now saves as a new reviewer — an accepted trade for not hard-blocking distinct people on common
+  names; upstream identity resolution owns that ambiguity. Regression: a name-only namesake at the applicant
+  institution saves, while an exact (`viaNameMatch:false`) reference at the applicant institution still fails
+  COI even with no email reuse target.

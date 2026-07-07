@@ -325,6 +325,62 @@ test('server recomputes institution COI from the reused reviewer CRM affiliation
   warn.mockRestore();
 });
 
+test('name-only namesake at the applicant institution does NOT block a distinct new reviewer (viaNameMatch excluded)', async () => {
+  // The lookup surfaced a same-name existing reviewer at the applicant institution
+  // via a fallback NAME search only (viaNameMatch:true). Persistence creates a NEW
+  // reviewer (new email → getByEmail null, no reuse) and never reuses the namesake,
+  // so its CRM affiliation must NOT trigger a false institution COI.
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'candidates',
+    candidates: [
+      { source: 'reviewer', matchKey: 'name', reviewerId: 'PID-NAMESAKE', context: { affiliation: 'Applicant University' } },
+    ],
+    referencedReviewers: [
+      { reviewerId: 'PID-NAMESAKE', affiliation: 'Applicant University', viaNameMatch: true },
+    ],
+  });
+  potentialReviewerAdapter.getByEmail.mockResolvedValueOnce(null);
+
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [{ name: 'Dr Namesake', email: 'new@safe.edu', affiliation: 'Safe University' }],
+  });
+
+  expect(out.success).toBe(true);
+  expect(out.savedCount).toBe(1);
+  expect(out.savedNames).toEqual(['Dr Namesake']);
+  expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledTimes(1);
+  // The weak namesake id is not a reuse/link target — it was never read by id.
+  expect(potentialReviewerAdapter.getById).not.toHaveBeenCalled();
+});
+
+test('an EXACT (viaNameMatch:false) referenced reviewer at the applicant institution still fails COI even with no email reuse target', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  // A strong identity reference (email/ORCID/link, viaNameMatch:false) is a real
+  // reuse/link target and must stay screened — the fix narrows ONLY weak namesakes.
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'candidates',
+    candidates: [
+      { source: 'reviewer', matchKey: 'email', reviewerId: 'PID-EMAILMATCH', context: { affiliation: 'Applicant University' } },
+    ],
+    referencedReviewers: [
+      { reviewerId: 'PID-EMAILMATCH', affiliation: 'Applicant University', viaNameMatch: false },
+    ],
+  });
+  potentialReviewerAdapter.getByEmail.mockResolvedValueOnce(null);
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{ name: 'Dr Strong', email: 'strong@example.edu', affiliation: 'Safe University' }],
+  }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({ savedCount: 0, rejectedInstitutionCOI: 1 });
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  warn.mockRestore();
+});
+
 test('non-confident lookup shape (linked/conflict/none) still fails COI via the email reuse target — no write', async () => {
   const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
   // A non-confident outcome (here 'candidates' with a `source:'linked'` row, the exact

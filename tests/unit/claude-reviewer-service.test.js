@@ -309,8 +309,61 @@ describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
     expect(topUpPrompt).toContain('Do NOT repeat anyone already listed: Dr. One Reviewer, Dr. Two Reviewer, Dr. Three Reviewer.');
     expect(topUpPrompt).toContain('EXCLUSIONS - HARD CONSTRAINTS');
     expect(topUpPrompt).not.toContain('REPAIR INSTRUCTIONS');
+    // A7: the top-up pass carries the same injection boundary as the main analyze
+    // prompt — untrusted-content preamble, sentinel-wrapped proposal context, and
+    // the trusted anti-fabrication integrity block.
+    expect(topUpPrompt).toContain('UNTRUSTED CONTENT RULES:');
+    expect(topUpPrompt).toContain('[[WMKF-UNTRUSTED-CONTENT nonce=');
+    expect(topUpPrompt).toContain('REVIEWER INTEGRITY (TRUSTED SYSTEM-OWNED BLOCK):');
     expect(result.topUp).toMatchObject({ attempted: true, requestedAdditional: 3, acceptedAdditional: 3, shortfall: 0 });
     expect(progressEvents.map(e => e.status)).toContain('top_up_complete');
+  });
+
+  test('top-up proposal context is sentinel-wrapped as untrusted, with the integrity block', async () => {
+    ClaudeReviewerService._callLLM = jest
+      .fn()
+      .mockResolvedValueOnce({
+        text: analysisResponse({
+          reviewers: [
+            completeReviewer('Dr. One Reviewer'),
+            completeReviewer('Dr. Two Reviewer'),
+            completeReviewer('Dr. Three Reviewer'),
+          ],
+          queries: [],
+        }),
+        usedFallback: false,
+        model: 'claude-test',
+        stopReason: 'end_turn',
+      })
+      .mockResolvedValueOnce({
+        text: part2Response([
+          { name: 'Dr. Four Reviewer' },
+          { name: 'Dr. Five Reviewer' },
+          { name: 'Dr. Six Reviewer' },
+        ]),
+        usedFallback: false,
+        model: 'claude-test',
+        stopReason: 'end_turn',
+      });
+
+    await ClaudeReviewerService.analyzeProposal('A useful proposal body'.repeat(20), 'sk-ant-test', {
+      reviewerCount: 6,
+      requestContext: REQUEST_CONTEXT,
+      onProgress: () => {},
+    });
+
+    const topUpPrompt = ClaudeReviewerService._callLLM.mock.calls[1][0].prompt;
+    // Match the REAL wrapped block by its 24-hex nonce (not the preamble's
+    // descriptive `nonce=...` rule text) and assert the proposal context — which is
+    // LLM/proposal-derived — lives ONLY inside the sentinels, never as raw prompt
+    // text the model could treat as instructions.
+    const wrap = topUpPrompt.match(
+      /\[\[WMKF-UNTRUSTED-CONTENT nonce=[0-9a-f]{24}[^\]]*\]\]\n([\s\S]*?)\n\[\[\/WMKF-UNTRUSTED-CONTENT nonce=[0-9a-f]{24}\]\]/,
+    );
+    expect(wrap).not.toBeNull();
+    expect(wrap[1]).toContain('Dataverse Title');
+    expect(topUpPrompt).toContain('UNTRUSTED CONTENT RULES:');
+    expect(topUpPrompt).toContain('REVIEWER INTEGRITY (TRUSTED SYSTEM-OWNED BLOCK):');
   });
 
   test('request context slims metadata inference and overwrites parsed proposalInfo', async () => {
