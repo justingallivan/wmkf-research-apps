@@ -553,8 +553,9 @@ found a residual fail-open in the save-time recompute and it was fixed in the sa
   version still fell open for `linked`/`conflict` shapes. `recomputeInstitutionCOI` evaluates the
   payload affiliation then each server affiliation; any non-null decision rejects before any write; a
   `getByEmail` read failure throws to the per-candidate catch (fail-closed). Regression tests:
-  email-reuse reject, non-confident (`linked`) reject with no write, and the lookup-throw-still-saves
-  path (getByEmail → null → saves). Full suite green (5002).
+  email-reuse reject, non-confident (`linked`) reject with no write, and the then-existing
+  lookup-throw-still-saves path (later superseded by §15's uniform fail-closed posture). Full suite green
+  (5002).
 
 ## 12. TOCTOU close — single-read reuse (2026-07-06)
 
@@ -602,6 +603,55 @@ and a no-email candidate whose identity lookup THREW was screened on payload onl
   id); for the no-email/no-seed path those are resolved via `getById(reviewerId)` and screened, with a
   `getById` error/miss → reject pre-write (`institution_coi`, `serverRecomputed`). And a no-email/no-seed
   candidate whose lookup THREW (`contactMatch === null`) is rejected fail-closed
-  (`decisionSource:'reviewer_identity_lookup_failed'`). The email path (`getByEmail` + `existing`) and
-  seed-anchor path are unchanged; an `{outcome:'none'}` no-email candidate with a non-conflicting payload
-  affiliation still saves (no over-rejection). Full suite green (5012).
+  (`decisionSource:'reviewer_identity_lookup_failed'`). At this stage the email path (`getByEmail` +
+  `existing`) and seed-anchor path were unchanged; §15 replaces that asymmetry with the shared screening
+  choke point. An `{outcome:'none'}` no-email candidate with a non-conflicting payload affiliation still
+  saves (no over-rejection). Full suite green (5012).
+
+## 15. Producer-declared reviewer identities and single save-time screening choke point (2026-07-06)
+
+Status: IMPLEMENTED (branch `codex/reviewer-coi-build`). The save-time institution-COI gate is reframed away
+from branch-by-branch parsing of lookup outcomes. The identity lookup producer now returns an additive
+`referencedReviewers: [{ reviewerId, affiliation }]` field on every `confident`, `candidates`, `conflict`,
+and `none` outcome. The field is populated beside each outcome constructor: reviewer-sourced confident and
+candidate outcomes carry in-hand CRM affiliation, contact-only outcomes carry an empty reviewer set, and
+conflicts declare only potential-reviewer ids (`reviewerId`, `existingReviewerId`, `orcidReviewerId`,
+`emailReviewerId`) with `affiliation:null`; `reviewerContactId` remains treated as a contact id, not a
+reviewer id.
+
+The save service now screens through one choke point before any potential-reviewer, researcher, suggestion,
+or roster write. For every non-seed email path it reads the `getByEmail` reuse target once and threads that
+same `existing` row into `upsertByEmail`. It then builds one identity set from that reuse target plus
+`contactMatch.referencedReviewers`, resolves missing affiliations through `getById`, rejects on lookup
+failure, `getById` throw, or missing reviewer row, and runs the existing `recomputeInstitutionCOI` /
+`DeduplicationService.institutionCOIDecision` matcher across the payload and all server affiliations. The
+`{ outcome:'none' }` path still has an empty identity set and saves when the payload itself is not
+same-institution.
+
+This closes both live bypasses by construction:
+
+- Email `orcid_email_split` and other conflict outcomes no longer depend on the save consumer parsing
+  conflict-detail key names or entering a no-email-only `getById` branch. If the producer references a
+  reviewer id, that id is in `referencedReviewers` and the single choke point resolves/screens it regardless
+  of email presence.
+- Email lookup throws now fail closed with
+  `decisionSource:'reviewer_identity_lookup_failed'` before the `getByEmail` reuse check can save an
+  unscreened reviewer. This is the intended behavior change; the former "lookup throws -> still saves" test
+  has been updated to assert the 422 institution-COI envelope and zero writes.
+
+Regression coverage includes the email `orcid_email_split` conflict where `orcidReviewerId` resolves by
+`getById` to the applicant institution while `getByEmail` is null, the email lookup-throw fail-closed case,
+the existing single-read `upsertByEmail({ existing })` threading, the no-email linked/conflict/lookup-throw
+matrix, seed-anchor reuse, partial-success envelopes, and a producer invariant test. The invariant test
+deep-scans each representative lookup outcome outside the `referencedReviewers` declaration for reviewer-id
+fields and asserts exact set equality with the declared reviewer ids, including a fixture proving
+`reviewerContactId` is not treated as a reviewer id.
+
+Accepted residuals outside this layer:
+
+- Contact-entity affiliations that the lookup does not select remain out of scope for save-time screening;
+  this layer screens potential-reviewer CRM affiliation and payload/enrichment institution signals.
+- Stale or incomplete CRM affiliations can still affect the matcher; this gate can only enforce against the
+  affiliations Dataverse currently exposes.
+- Identities the lookup never surfaces, such as a wrong name with no email or ORCID signal, remain outside
+  this save-time identity set and depend on upstream identity-resolution quality.

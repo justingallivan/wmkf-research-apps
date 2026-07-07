@@ -396,7 +396,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(NotificationService.notify).not.toHaveBeenCalled();
   });
 
-  test('lookup throws → still saves without link or batch error', async () => {
+  test('email lookup throws → rejects fail-closed before writes', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       lookupReviewerIdentity.mockRejectedValueOnce(new Error('lookup down'));
@@ -404,10 +404,23 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
       const res = mockRes();
       await handler(req, res);
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body).toMatchObject({ success: true, savedCount: 1, savedNames: ['Dr Lookup Down'] });
-      expect(res.body.errors).toBeUndefined();
+      expect(res.statusCode).toBe(422);
+      expect(res.body).toMatchObject({
+        success: false,
+        savedCount: 0,
+        rejectedInstitutionCOI: 1,
+        errors: [{
+          name: 'Dr Lookup Down',
+          code: 'institution_coi',
+          serverRecomputed: true,
+          decisionSource: 'reviewer_identity_lookup_failed',
+        }],
+      });
+      expect(potentialReviewerAdapter.getByEmail).not.toHaveBeenCalled();
+      expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
       expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
+      expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
+      expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
     } finally {
       warn.mockRestore();
     }
