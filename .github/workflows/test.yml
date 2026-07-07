@@ -50,6 +50,10 @@ jobs:
       - run: npm run check:scaffolding-tokens:self-test
       - run: npm run check:harness-framing
       - run: npm run check:harness-framing:self-test
+      # Scoped tsc --noEmit over the JSDoc-annotated GUID-selector core
+      # (tsconfig.check.json include list). Standalone gate — deliberately
+      # decoupled from `next build` (no root tsconfig.json, no .ts files).
+      - run: npm run check:types
       # Build re-runs prebuild (build-migrations-manifest); then assert the
       # committed manifest is in sync. Catches "added a migration but forgot
       # to regenerate the manifest" before it reaches prod.

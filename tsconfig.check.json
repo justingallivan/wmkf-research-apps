@@ -1,0 +1,35 @@
+{
+  // Standalone type-check gate ONLY (`npm run check:types`). This file is
+  // deliberately NOT named tsconfig.json: Next auto-detects a root
+  // tsconfig.json (or any .ts file) and injects a build-time type-check into
+  // `next build`, coupling this gate to the Vercel deploy. Keep the repo root
+  // free of tsconfig.json and keep every checked file a `.js` — five check:*
+  // gates filter to .js/.mjs and would silently fail-open on a renamed .ts
+  // file. See docs/TYPESCRIPT_OPTION_ASSESSMENT.md §0/§3(a)/§5.
+  "compilerOptions": {
+    "allowJs": true,
+    // checkJs stays false: with checkJs:true tsc also error-checks every
+    // TRANSITIVELY IMPORTED .js file (service-error, dynamics/http, ...),
+    // dragging dozens of out-of-scope files into the gate. Instead each
+    // in-scope file opts in via a `// @ts-check` pragma; imports are still
+    // loaded for type info (the Guid brand flows across files) but only
+    // pragma'd files can fail the gate. Extend the gate by adding the pragma
+    // to a file AND listing it in `include` below.
+    "checkJs": false,
+    "noEmit": true,
+    "strict": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "es2022",
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  // Scope: ONLY the annotated GUID-selector core (Phase 0). Transitive
+  // imports are loaded for type info but files outside this list are not
+  // part of the gate's error surface (see exclude-by-omission + pragmas).
+  "include": [
+    "lib/utils/guid.js",
+    "lib/dataverse/core/changeset.js",
+    "lib/services/dynamics-service.js"
+  ]
+}
