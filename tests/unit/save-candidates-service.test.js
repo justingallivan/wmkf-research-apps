@@ -19,6 +19,12 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   getByEmail: jest.fn(async () => null),
   setContactLink: jest.fn(async () => ({ action: 'link' })),
 }));
+jest.mock('../../lib/dataverse/adapters/contact', () => ({
+  getInstitutionById: jest.fn(async () => null),
+}));
+jest.mock('../../lib/dataverse/adapters/account', () => ({
+  getById: jest.fn(async () => null),
+}));
 jest.mock('../../lib/dataverse/adapters/researcher', () => ({
   upsertByPotentialReviewer: jest.fn(async () => ({ id: 'PID-1' })),
   writeIdentityDecision: jest.fn(async () => undefined),
@@ -46,6 +52,8 @@ jest.mock('../../lib/services/notification-service', () => ({
 }));
 
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
+const contactAdapter = require('../../lib/dataverse/adapters/contact');
+const accountAdapter = require('../../lib/dataverse/adapters/account');
 const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity-lookup');
@@ -59,10 +67,13 @@ beforeEach(() => {
   potentialReviewerAdapter.getByEmail.mockResolvedValue(null);
   potentialReviewerAdapter.getById.mockResolvedValue({ wmkf_primaryaffiliation: 'MIT' });
   potentialReviewerAdapter.upsertByEmail.mockResolvedValue({ id: 'PID-1' });
+  contactAdapter.getInstitutionById.mockResolvedValue(null);
+  accountAdapter.getById.mockResolvedValue(null);
   reviewerSuggestionAdapter.upsert.mockResolvedValue({ id: 'S1' });
   lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
   loadCoiContext.mockResolvedValue({
     applicantInstitutionContext: { state: 'complete', names: ['Applicant University'] },
+    piResolution: { state: 'ok', reason: null },
     institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
   });
 });
@@ -159,6 +170,61 @@ test('clean full success: 200 payload with NO rejected*/errors keys (undefined-v
     savedNames: ['Dr X'],
     totalRequested: 1,
   });
+});
+
+test('failed PI resolution rejects fail-closed before writes', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  loadCoiContext.mockResolvedValueOnce({
+    applicantInstitutionContext: { state: 'complete', names: ['Applicant University'] },
+    piResolution: { state: 'failed', reason: 'contact_read_failed', error: 'contact read down' },
+    institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
+  });
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{ name: 'Dr PI Unscreened', email: 'pi-safe@example.edu', affiliation: 'Different University' }],
+  }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    rejectedInstitutionCOI: 1,
+    errors: [{
+      name: 'Dr PI Unscreened',
+      code: 'institution_coi',
+      serverRecomputed: true,
+      decisionSource: 'reviewer_pi_institution_unresolved',
+    }],
+  });
+  expect(potentialReviewerAdapter.getByEmail).not.toHaveBeenCalled();
+  expect(contactAdapter.getInstitutionById).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
+  expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+  warn.mockRestore();
+});
+
+test('clean no-PI resolution state still saves a safe candidate', async () => {
+  loadCoiContext.mockResolvedValueOnce({
+    applicantInstitutionContext: { state: 'complete', names: ['Applicant University'] },
+    piResolution: { state: 'ok', reason: 'no_project_leader' },
+    institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
+  });
+
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [{ name: 'Dr No PI', email: 'nopi@example.edu', affiliation: 'Different University' }],
+  });
+
+  expect(out).toMatchObject({
+    success: true,
+    savedCount: 1,
+    savedNames: ['Dr No PI'],
+    totalRequested: 1,
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledTimes(1);
 });
 
 test('threads the gate-fetched email reuse row into upsertByEmail on a safe reuse', async () => {
@@ -378,6 +444,260 @@ test('an EXACT (viaNameMatch:false) referenced reviewer at the applicant institu
   expect(err.httpStatus).toBe(422);
   expect(err.body).toMatchObject({ savedCount: 0, rejectedInstitutionCOI: 1 });
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  warn.mockRestore();
+});
+
+test('confident contact-only email match at the applicant institution fails COI before link/write', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'confident',
+    referencedReviewers: [],
+    match: {
+      reviewerId: null,
+      contactId: 'CONTACT-APPLICANT',
+      matchKey: 'email',
+      nameConsistent: true,
+      context: { affiliation: null },
+    },
+  });
+  contactAdapter.getInstitutionById.mockResolvedValueOnce({
+    contactid: 'CONTACT-APPLICANT',
+    adx_organizationname: 'Applicant University',
+  });
+  potentialReviewerAdapter.getByEmail.mockResolvedValueOnce(null);
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Contact Applicant',
+      email: 'contact-applicant@example.edu',
+      affiliation: 'Different University',
+    }],
+  }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    rejectedInstitutionCOI: 1,
+    errors: [{
+      name: 'Dr Contact Applicant',
+      code: 'institution_coi',
+      serverRecomputed: true,
+      decisionSource: 'server_reviewer_identity_affiliation',
+    }],
+  });
+  expect(contactAdapter.getInstitutionById).toHaveBeenCalledWith('CONTACT-APPLICANT');
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
+  expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+  warn.mockRestore();
+});
+
+test('confident contact-only different-institution match saves and links', async () => {
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'confident',
+    referencedReviewers: [],
+    match: {
+      reviewerId: null,
+      contactId: 'CONTACT-SAFE',
+      matchKey: 'email',
+      nameConsistent: true,
+      context: { affiliation: null },
+    },
+  });
+  contactAdapter.getInstitutionById.mockResolvedValueOnce({
+    contactid: 'CONTACT-SAFE',
+    adx_organizationname: 'Different University',
+  });
+  potentialReviewerAdapter.getByEmail.mockResolvedValueOnce(null);
+
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Contact Safe',
+      email: 'contact-safe@example.edu',
+      affiliation: 'Different University',
+    }],
+  });
+
+  expect(out).toMatchObject({
+    success: true,
+    savedCount: 1,
+    savedNames: ['Dr Contact Safe'],
+  });
+  expect(contactAdapter.getInstitutionById).toHaveBeenCalledWith('CONTACT-SAFE');
+  expect(potentialReviewerAdapter.setContactLink).toHaveBeenCalledWith(
+    'PID-1',
+    'CONTACT-SAFE',
+    { actingUserSystemId: BASE.actingUserSystemId },
+  );
+});
+
+test('confident contact institution lookup failure rejects fail-closed before link/write', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'confident',
+    referencedReviewers: [],
+    match: {
+      reviewerId: null,
+      contactId: 'CONTACT-DOWN',
+      matchKey: 'email',
+      nameConsistent: true,
+      context: { affiliation: null },
+    },
+  });
+  contactAdapter.getInstitutionById.mockRejectedValueOnce(new Error('contact read down'));
+  potentialReviewerAdapter.getByEmail.mockResolvedValueOnce(null);
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Contact Down',
+      email: 'contact-down@example.edu',
+      affiliation: 'Different University',
+    }],
+  }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    rejectedInstitutionCOI: 1,
+    errors: [{
+      name: 'Dr Contact Down',
+      code: 'institution_coi',
+      serverRecomputed: true,
+      decisionSource: 'reviewer_contact_institution_lookup_failed',
+    }],
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
+  expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+  warn.mockRestore();
+});
+
+test('confident contact with no CRM institution signal saves and links', async () => {
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'confident',
+    referencedReviewers: [],
+    match: {
+      reviewerId: null,
+      contactId: 'CONTACT-NO-INSTITUTION',
+      matchKey: 'email',
+      nameConsistent: true,
+      context: { affiliation: null },
+    },
+  });
+  contactAdapter.getInstitutionById.mockResolvedValueOnce({
+    contactid: 'CONTACT-NO-INSTITUTION',
+    adx_organizationname: ' ',
+    _parentcustomerid_value: null,
+  });
+  potentialReviewerAdapter.getByEmail.mockResolvedValueOnce(null);
+
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Contact No Institution',
+      email: 'contact-none@example.edu',
+      affiliation: 'Different University',
+    }],
+  });
+
+  expect(out.savedCount).toBe(1);
+  expect(accountAdapter.getById).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.setContactLink).toHaveBeenCalledWith(
+    'PID-1',
+    'CONTACT-NO-INSTITUTION',
+    { actingUserSystemId: BASE.actingUserSystemId },
+  );
+});
+
+test('confident contact with parent-account institution at the applicant institution fails COI', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'confident',
+    referencedReviewers: [],
+    match: {
+      reviewerId: null,
+      contactId: 'CONTACT-PARENT',
+      matchKey: 'email',
+      nameConsistent: true,
+      context: { affiliation: null },
+    },
+  });
+  contactAdapter.getInstitutionById.mockResolvedValueOnce({
+    contactid: 'CONTACT-PARENT',
+    adx_organizationname: ' ',
+    _parentcustomerid_value: 'ACCOUNT-APPLICANT',
+  });
+  accountAdapter.getById.mockResolvedValueOnce({ name: 'Applicant University' });
+  potentialReviewerAdapter.getByEmail.mockResolvedValueOnce(null);
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Contact Parent',
+      email: 'contact-parent@example.edu',
+      affiliation: 'Different University',
+    }],
+  }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(accountAdapter.getById).toHaveBeenCalledWith('ACCOUNT-APPLICANT', { select: 'name' });
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
+  warn.mockRestore();
+});
+
+test('confident reviewer+contact linked match also screens divergent contact institution', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'confident',
+    referencedReviewers: [
+      { reviewerId: 'PID-SAFE', affiliation: 'Different University', viaNameMatch: false },
+    ],
+    match: {
+      reviewerId: 'PID-SAFE',
+      contactId: 'CONTACT-DIVERGENT',
+      matchKey: 'email',
+      nameConsistent: true,
+      context: { affiliation: 'Different University' },
+    },
+  });
+  contactAdapter.getInstitutionById.mockResolvedValueOnce({
+    contactid: 'CONTACT-DIVERGENT',
+    adx_organizationname: 'Applicant University',
+  });
+  potentialReviewerAdapter.getByEmail.mockResolvedValueOnce(null);
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Divergent Contact',
+      email: 'divergent@example.edu',
+      affiliation: 'Different University',
+    }],
+  }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    rejectedInstitutionCOI: 1,
+    errors: [{
+      name: 'Dr Divergent Contact',
+      code: 'institution_coi',
+      serverRecomputed: true,
+      decisionSource: 'server_reviewer_identity_affiliation',
+    }],
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
   warn.mockRestore();
 });
 

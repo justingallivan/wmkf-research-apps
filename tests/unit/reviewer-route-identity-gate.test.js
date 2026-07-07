@@ -26,6 +26,12 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   getByEmail: jest.fn(async () => null),
   setContactLink: jest.fn(async () => ({ action: 'link' })),
 }));
+jest.mock('../../lib/dataverse/adapters/contact', () => ({
+  getInstitutionById: jest.fn(async () => null),
+}));
+jest.mock('../../lib/dataverse/adapters/account', () => ({
+  getById: jest.fn(async () => null),
+}));
 jest.mock('../../lib/dataverse/adapters/researcher', () => ({
   upsertByPotentialReviewer: jest.fn(async () => ({ id: 'PID-1' })),
   writeIdentityDecision: jest.fn(async () => undefined),
@@ -82,6 +88,8 @@ jest.mock('../../lib/services/notification-service', () => ({
 
 const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
+const contactAdapter = require('../../lib/dataverse/adapters/contact');
+const accountAdapter = require('../../lib/dataverse/adapters/account');
 const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const rosterStore = require('../../lib/services/reviewer-roster-store');
 const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity-lookup');
@@ -117,6 +125,8 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     jest.clearAllMocks();
     reviewerSuggestionAdapter.upsert.mockResolvedValue({ id: 'S1' });
     rosterStore.stampSuggestionAnchor.mockResolvedValue({ updated: 1 });
+    contactAdapter.getInstitutionById.mockResolvedValue(null);
+    accountAdapter.getById.mockResolvedValue(null);
     lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
     NotificationService.notify.mockResolvedValue({ id: 'alert-1' });
   });

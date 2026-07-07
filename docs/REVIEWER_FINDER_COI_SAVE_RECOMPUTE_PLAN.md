@@ -649,8 +649,9 @@ fields and asserts exact set equality with the declared reviewer ids, including 
 
 Accepted residuals outside this layer:
 
-- Contact-entity affiliations that the lookup does not select remain out of scope for save-time screening;
-  this layer screens potential-reviewer CRM affiliation and payload/enrichment institution signals.
+- Contact-linked candidates are now screened against the contact's CRM institution before link/write (§17).
+  Narrow residual: contacts with no CRM institution data — no `adx_organizationname` and no resolvable
+  `_parentcustomerid_value` parent account — contribute no affiliation to the matcher.
 - Stale or incomplete CRM affiliations can still affect the matcher; this gate can only enforce against the
   affiliations Dataverse currently exposes.
 - Identities the lookup never surfaces, such as a wrong name with no email or ORCID signal, remain outside
@@ -660,6 +661,9 @@ Accepted residuals outside this layer:
 
 Status: IMPLEMENTED (branch `codex/reviewer-coi-build`). A confirming adversarial review of the §15 branch
 returned two verified findings, both now fixed.
+[RECHECKED after lib/services/reviewer-identity-lookup.js change: the `viaNameMatch` producer field added
+this session is described below and lives in the `referencedReviewers` factories at
+reviewer-identity-lookup.js:95-166; the §15 producer description remains accurate as amended here.]
 
 - **[high] Top-up LLM prompt bypassed the A7 boundary.** The decoupled Part-2 reviewer top-up
   (`_topUpReviewerSuggestions` / `buildTopUpPrompt` in `claude-reviewer-service.js`) interpolated the
@@ -687,3 +691,30 @@ returned two verified findings, both now fixed.
   names; upstream identity resolution owns that ambiguity. Regression: a name-only namesake at the applicant
   institution saves, while an exact (`viaNameMatch:false`) reference at the applicant institution still fails
   COI even with no email reuse target.
+
+## 17. Save-time PI-resolution and contact-institution completeness closures (2026-07-07)
+
+Status: IMPLEMENTED (branch `codex/reviewer-coi-build`). A follow-up implementation closed the two remaining
+save-time institution-COI completeness gaps in the §15/§16 gate.
+
+- **PI-resolution failure now fails closed at save.** `loadCoiContext` returns an additive
+  `piResolution: { state, reason, error? }` field without changing `piIdentity` or `institutionEntries`.
+  Resolver read failures (`request_read_failed`, `contact_read_failed`, any returned error-bearing reason, or
+  a thrown non-abort error recorded as `pi_resolve_threw`) set `state:'failed'`. Clean no-PI/no-usable-PI
+  states (`no_project_leader`, `no_orcid`, `orcid_malformed`, `no_request_id`, and other non-error abstentions)
+  stay `state:'ok'`; `resolvePi:false` is also `ok`. The save service threads `piResolution` into
+  `screenCandidateInstitutionCOI`, which rejects every candidate reaching that screen before any Dataverse
+  write with `decisionSource:'reviewer_pi_institution_unresolved'` when PI resolution failed.
+
+- **Exact contact links now screen the contact's institution before link/write.** The save screen mirrors the
+  exact `setContactLink` predicate: `contactMatch.outcome === 'confident'`, a `contactId` is present, and
+  `matchKey` is `email` or `orcid`. For that contact it calls `contactAdapter.getInstitutionById(contactId)`,
+  screens trimmed `adx_organizationname`, and, when that is empty but `_parentcustomerid_value` is present,
+  resolves the parent account name through the existing account adapter and screens that name. A contact or
+  parent-account fetch error rejects fail-closed with
+  `decisionSource:'reviewer_contact_institution_lookup_failed'`. A contact with no determinable CRM institution
+  contributes no affiliation and may still save/link; that is the narrowed residual in §15.
+
+Regression coverage covers PI failure rejection, clean no-PI save, contact-only same-institution rejection,
+different-institution save+link, contact institution fetch-error rejection, no-institution save+link,
+parent-account same-institution rejection, and reviewer+contact divergent contact-institution rejection.

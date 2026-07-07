@@ -28,6 +28,12 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   getByEmail: jest.fn(async () => null),
   setContactLink: jest.fn(async () => ({ action: 'link' })),
 }));
+jest.mock('../../lib/dataverse/adapters/contact', () => ({
+  getInstitutionById: jest.fn(async () => null),
+}));
+jest.mock('../../lib/dataverse/adapters/account', () => ({
+  getById: jest.fn(async () => null),
+}));
 jest.mock('../../lib/dataverse/adapters/researcher', () => ({
   upsertByPotentialReviewer: jest.fn(async () => ({ id: 'PID-1' })),
   writeIdentityDecision: jest.fn(async () => undefined),

@@ -214,6 +214,79 @@ describe('reviewer request context', () => {
     ]);
   });
 
+  test('save-time COI context marks PI read failures as failed resolution state', async () => {
+    resolveProposalPI.mockResolvedValue({
+      resolved: false,
+      reason: 'contact_read_failed',
+      error: 'contact read down',
+    });
+    getRecord.mockResolvedValueOnce({
+      akoya_requestid: REQUEST_ID,
+      _akoya_applicantid_value_formatted: 'Formatted Applicant University',
+    });
+
+    const context = await loadCoiContext(REQUEST_ID);
+
+    expect(context.piResolution).toEqual({
+      state: 'failed',
+      reason: 'contact_read_failed',
+      error: 'contact read down',
+    });
+    expect(context.institutionEntries).toEqual([
+      { identity: 'Formatted Applicant University', display: 'Formatted Applicant University' },
+    ]);
+  });
+
+  test('save-time COI context treats clean no-PI as ok resolution state', async () => {
+    resolveProposalPI.mockResolvedValue({ resolved: false, reason: 'no_project_leader' });
+    getRecord.mockResolvedValueOnce({
+      akoya_requestid: REQUEST_ID,
+      _akoya_applicantid_value_formatted: 'Formatted Applicant University',
+    });
+
+    const context = await loadCoiContext(REQUEST_ID);
+
+    expect(context.piResolution).toEqual({
+      state: 'ok',
+      reason: 'no_project_leader',
+    });
+  });
+
+  test('save-time COI context marks thrown non-abort PI resolution as failed state', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    resolveProposalPI.mockRejectedValue(new Error('resolver exploded'));
+    getRecord.mockResolvedValueOnce({
+      akoya_requestid: REQUEST_ID,
+      _akoya_applicantid_value_formatted: 'Formatted Applicant University',
+    });
+
+    const context = await loadCoiContext(REQUEST_ID);
+
+    expect(context.piIdentity).toBeNull();
+    expect(context.piResolution).toEqual({
+      state: 'failed',
+      reason: 'pi_resolve_threw',
+      error: 'resolver exploded',
+    });
+    warnSpy.mockRestore();
+  });
+
+  test('save-time COI context marks disabled PI resolution as ok and does not call resolver', async () => {
+    getRecord.mockResolvedValueOnce({
+      akoya_requestid: REQUEST_ID,
+      _akoya_applicantid_value_formatted: 'Formatted Applicant University',
+    });
+
+    const context = await loadCoiContext(REQUEST_ID, { resolvePi: false });
+
+    expect(resolveProposalPI).not.toHaveBeenCalled();
+    expect(context.piIdentity).toBeNull();
+    expect(context.piResolution).toEqual({
+      state: 'ok',
+      reason: 'not_requested',
+    });
+  });
+
   test('save-time COI context fails closed when applicant account variants cannot be fetched', async () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     getRecord
