@@ -217,6 +217,23 @@ async function installInviteMocks(context, baseURL, {
       body: JSON.stringify({ success: true, requestId: REQUEST_ID, config: campaignState }),
     });
   });
+  await context.route('**/api/review-manager/campaign-timeline-defaults', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        key: 'reviewer.campaign_timeline_defaults',
+        timeline: {
+          cycleLabel: 'J26',
+          inviteStartDate: '2026-06-17',
+          respondOffsetDays: 14,
+          proposalReleaseDate: '2026-07-08',
+          reviewDueDate: '2026-08-05',
+        },
+        isDefault: false,
+        malformed: false,
+      }),
+    }));
   await context.route('**/api/review-manager/withdraw-sufficient', (route) => {
     const body = route.request().postDataJSON();
     withdrawBodies.push(body);
@@ -349,11 +366,13 @@ test.describe('Program Director reviewer invitation flow', () => {
     // Workbench sub-tab header "Invite Reviewers (1)" (ReviewerInvitePanel)
     // behind the modal → strict-mode violation.
     await expect(page.getByText('Invite reviewers (1)', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: /reviewer campaign timeline/i }).click();
     await expect(page.getByLabel('Days to respond')).toHaveValue('10');
-    await expect(page.getByLabel('Review due date')).toHaveValue('2026-07-22');
+    await expect(page.getByLabel('Reviews due')).toHaveValue('2026-07-22');
+    await expect(page.getByLabel('Proposals released to reviewers')).toHaveValue('2026-07-08');
     await page.getByLabel('Days to respond').fill('10');
-    await page.getByLabel(/Proposal delivered on/i).fill('2026-07-08');
-    await page.getByLabel('Review due date').fill('2026-07-22');
+    await page.getByLabel('Proposals released to reviewers').fill('2026-07-08');
+    await page.getByLabel('Reviews due').fill('2026-07-22');
 
     page.once('dialog', async (dialog) => {
       expect(dialog.message()).toContain('Send 1 invitation now via Dynamics?');

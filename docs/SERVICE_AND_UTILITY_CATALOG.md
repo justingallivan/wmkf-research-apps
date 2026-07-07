@@ -64,6 +64,7 @@ If you're touching a service or utility, read its header before this catalog. If
 ### Reviewer / honorarium
 
 - **`review-upload.js`** — Shared `writeReviewFiles` core for staff + reviewer-self upload paths; SharePoint write + Dataverse PATCH + rollback.
+- **`reviewer-campaign-timeline.js`** — Dataverse `wmkf_appsystemsettings` reader/writer for current-cycle reviewer invitation timeline defaults (`reviewer.campaign_timeline_defaults`); admin-editable, read by `InviteEmailModal` before request-level campaign config.
 - **`external-token.js`** — HS256 HMAC JWT primitive for external-reviewer magic links; hash-only storage for cheap revocation. 32+ char `EXTERNAL_LINK_SECRET`; rotation supported via `EXTERNAL_LINK_SECRET_PREVIOUS`.
 
 ### Multi-LLM panel (Virtual Review Panel)

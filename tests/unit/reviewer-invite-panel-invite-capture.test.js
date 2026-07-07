@@ -53,6 +53,19 @@ beforeEach(() => {
   jest.spyOn(window, 'confirm').mockReturnValue(true);
   global.fetch.mockImplementation(async (url) => {
     if (String(url).startsWith('/api/user-preferences')) return mockJson({});
+    if (url === '/api/review-manager/campaign-timeline-defaults') {
+      return mockJson({
+        timeline: {
+          cycleLabel: 'D26',
+          inviteStartDate: '2026-06-17',
+          respondOffsetDays: 14,
+          proposalReleaseDate: '2026-07-08',
+          reviewDueDate: '2026-08-05',
+        },
+        isDefault: false,
+        malformed: false,
+      });
+    }
     if (String(url).startsWith('/api/review-manager/campaign-config')) {
       return mockJson({ config: { respondOffsetDays: 7, reviewDueDate: '2026-07-22' } });
     }
@@ -103,15 +116,18 @@ describe('ReviewerInvitePanel invitation capture rehearsal', () => {
     fireEvent.click(screen.getByRole('button', { name: /send invitation \(1\)/i }));
 
     await screen.findByDisplayValue('Invitation');
-    await waitFor(() => expect(screen.getByLabelText('Review due date')).toHaveValue('2026-07-22'));
+    expect(screen.queryByLabelText('Reviews due')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /reviewer campaign timeline/i }));
+    await waitFor(() => expect(screen.getByLabelText('Reviews due')).toHaveValue('2026-07-22'));
     expect(screen.getByLabelText('Days to respond')).toHaveValue(7);
+    expect(screen.getByLabelText('Proposals released to reviewers')).toHaveValue('2026-07-08');
     // Reviewer-engagement Phase 1: respond-by is now a "days to respond" offset, not a
     // fixed date. The respond-by date in the email is computed as today + offset, so it
     // can't be asserted as a fixed string here — the campaignConfig payload below is the
     // durable contract. Proposal-delivery and review-due stay fixed dates.
     fireEvent.change(screen.getByLabelText('Days to respond'), { target: { value: '10' } });
-    fireEvent.change(screen.getByLabelText(/Proposal delivered on/i), { target: { value: '2026-07-08' } });
-    fireEvent.change(screen.getByLabelText('Review due date'), { target: { value: '2026-07-22' } });
+    fireEvent.change(screen.getByLabelText('Proposals released to reviewers'), { target: { value: '2026-07-08' } });
+    fireEvent.change(screen.getByLabelText('Reviews due'), { target: { value: '2026-07-22' } });
     const sendButton = await screen.findByRole('button', { name: /send 1 invitation/i });
     await waitFor(() => expect(sendButton).toBeEnabled());
     fireEvent.click(sendButton);

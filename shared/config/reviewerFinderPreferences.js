@@ -26,9 +26,9 @@ export const PREFERENCE_KEYS = {
   EMAIL_TEMPLATE: 'reviewer_finder_email_template',
   CURRENT_CYCLE_ID: 'reviewer_finder_current_cycle_id',
   // Sticky review-process values last used when inviting reviewers. Stored as a
-  // JSON string { respondOffsetDays, proposalSendDate, reviewDueDate }. Request
-  // campaign config overrides respondOffsetDays/reviewDueDate when present;
-  // proposalSendDate remains email-only scratch. See InviteEmailModal.
+  // JSON string { respondOffsetDays, proposalSendDate, reviewDueDate }. Admin
+  // cycle defaults now override this sticky value, and request campaign config
+  // then overrides respondOffsetDays/reviewDueDate when present. See InviteEmailModal.
   INVITE_TIMING: 'reviewer_invite_timing',
   // Per-user reviewer email templates, keyed by type:
   //   { invitation, materials, followup, thankyou } → { subject, body }.
