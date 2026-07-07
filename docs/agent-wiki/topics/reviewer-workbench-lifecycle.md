@@ -305,8 +305,22 @@ Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
   unwrap is calibrated against 40 real abstracts (S340): it joins only lines that look auto-wrapped
   (long + not ending at a sentence/clause boundary), so single-newline paragraph separators and
   short header lines are PRESERVED, not merged; blank-line paragraph breaks always stay.
-  `proposalDetails` is NOT unwrapped — its single newlines are intentional. (Origin of the stored
-  newlines is upstream Akoya, not this repo — no `wmkf_abstract` writer exists here.)
+  `proposalDetails` is NOT unwrapped — its single newlines are intentional. Detector + reflow now
+  live in `lib/utils/abstract-format.js` (`hasAbstractWrapArtifacts` / `reflowAbstract`).
+- **Abstract-edit gate (S340).** `render-emails` surfaces per-draft `abstractFlagged` +
+  `currentAbstract` + `reflowedAbstract` + `requestId`. **The flag is `abstractNeedsReflow` — true
+  exactly when the reflow would change the stored text** (not merely "has a mid-sentence newline"),
+  so the banner's "auto-cleaned for these emails" claim always holds and a header-style intentional
+  break is not flagged. When flagged, `InviteEmailModal` shows a non-blocking amber banner with an
+  "Edit abstract" editor (seeded with the reflowed text). Save requires a `window.confirm` (durable,
+  no undo — mirrors the send path) and **clears per-recipient body/subject overrides** (`setEdits({})`)
+  so a manually-edited draft can't keep the pre-fix abstract; it then POSTs
+  `/api/review-manager/update-abstract` → overwrites the canonical `wmkf_abstract` on `akoya_request`
+  via `updateById` (auth `requireAppAccess('review-manager','reviewers')`, GUID-validated requestId,
+  trusted DAL context, PD attribution; last-write-wins like the campaign-config sibling), then
+  re-renders (flag clears). `wmkf_abstract` is GoApply write-once (NOT re-synced), so a PD edit is
+  durable and corrects the abstract everywhere it is consumed (invites, board write-ups, exports).
+  The reflow remains the send-time safety net for un-edited flagged abstracts.
 - All four templates are sendable: `invitation` (first contact, via ReviewerInvitePanel →
   `InviteEmailModal`, hardcoded `templateType:'invitation'`) and
   `materials`/`followup`/`thankyou` (via `ReviewerManagePanel`). The reviewer onboards

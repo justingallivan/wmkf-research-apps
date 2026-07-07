@@ -123,6 +123,10 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const [progress, setProgress] = useState({ current: 0, total: 0, message: 'Rendering previews…' });
   const [results, setResults] = useState({ sent: [], failed: [], skipped: [], unconfirmed: [] });
   const [confirmedLowConfidenceIds, setConfirmedLowConfidenceIds] = useState({});
+  const [abstractEditorOpen, setAbstractEditorOpen] = useState(false);
+  const [abstractDraft, setAbstractDraft] = useState('');
+  const [abstractSaving, setAbstractSaving] = useState(false);
+  const [abstractError, setAbstractError] = useState(null);
 
   // Stable across renders (candidates is a fresh array each parent render, so a
   // raw .map() would give renderPreviews a new identity every render and the
@@ -244,8 +248,50 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   });
   const drafts = rawDrafts.map(draftView);
 
+  // Single-proposal modal — abstract fields agree across all drafts, so the first
+  // flagged draft (if any) speaks for the whole batch. flagged.reflowedAbstract
+  // seeds the editor; flagged.requestId is the write target for the save.
+  const flaggedAbstract = rawDrafts.find((d) => d.abstractFlagged === true) || null;
+
   const updateEdit = (suggestionId, field, value) =>
     setEdits((prev) => ({ ...prev, [suggestionId]: { ...prev[suggestionId], [field]: value } }));
+
+  const handleSaveAbstract = async () => {
+    if (!flaggedAbstract || !abstractDraft.trim()) return;
+    // Overwriting the canonical abstract of record is durable and cannot be
+    // undone; confirm it (mirrors the send path's confirm). Warn that it also
+    // resets manual email edits, since we drop per-recipient body overrides
+    // below so the corrected abstract reaches every draft.
+    const ok = window.confirm(
+      'Update this proposal’s abstract of record? This overwrites the stored '
+      + 'abstract used everywhere it appears (invites, board write-ups, exports), '
+      + 'cannot be undone, and resets any manual edits you have made to these emails.'
+    );
+    if (!ok) return;
+    setAbstractSaving(true);
+    setAbstractError(null);
+    try {
+      const res = await fetch('/api/review-manager/update-abstract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: flaggedAbstract.requestId, abstract: abstractDraft }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to save abstract');
+      }
+      setAbstractEditorOpen(false);
+      // Drop per-recipient subject/body overrides: a manual body edit would else
+      // keep the pre-fix abstract on that recipient's email, contradicting "fixed
+      // everywhere". The re-render below reseeds every draft from the new abstract.
+      setEdits({});
+      renderPreviews(); // re-fetch so drafts/abstractFlagged reflect the fixed abstract
+    } catch (e) {
+      setAbstractError(e.message);
+    } finally {
+      setAbstractSaving(false);
+    }
+  };
 
   const sendable = drafts.filter((d) => !d.skipped && d.candidateEmail);
   const capturedSent = results.sent.filter((r) => r.capturedEmail);
@@ -408,6 +454,69 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                   </div>
                 )}
               </div>
+
+              {flaggedAbstract && !abstractEditorOpen && (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-sm font-medium text-amber-900">Abstract has hard line breaks</p>
+                  <p className="mt-1 text-xs text-amber-800">
+                    This proposal&rsquo;s abstract has hard line breaks (it was pasted with fixed-width wrapping).
+                    It&rsquo;s been auto-cleaned for these emails, but you can fix the source abstract so it&rsquo;s
+                    corrected everywhere it appears.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAbstractDraft(flaggedAbstract.reflowedAbstract || '');
+                      setAbstractError(null);
+                      setAbstractEditorOpen(true);
+                    }}
+                    className="mt-2 px-3 py-1.5 text-xs font-medium text-amber-900 bg-amber-100 border border-amber-300 rounded-lg hover:bg-amber-200"
+                  >
+                    Edit abstract
+                  </button>
+                </div>
+              )}
+
+              {abstractEditorOpen && (
+                <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <p className="text-sm font-medium text-gray-900">Edit abstract</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    We reflowed the wrapped text — add a blank line between paragraphs if needed. This updates the
+                    proposal&rsquo;s abstract of record (used everywhere it appears, not just this email).
+                  </p>
+                  <textarea
+                    className="mt-2 w-full text-xs border border-gray-300 rounded px-2 py-1 font-mono resize-y min-h-[12rem]"
+                    rows={12}
+                    value={abstractDraft}
+                    onChange={(e) => setAbstractDraft(e.target.value)}
+                  />
+                  {abstractError && <p className="mt-1 text-xs text-red-700">{abstractError}</p>}
+                  <div className="mt-2 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveAbstract}
+                      disabled={abstractSaving || !abstractDraft.trim()}
+                      className="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {abstractSaving ? 'Saving…' : 'Save abstract'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setAbstractEditorOpen(false); setAbstractError(null); }}
+                      className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAbstractDraft(flaggedAbstract?.currentAbstract || '')}
+                      className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      Revert to original
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {rawDrafts.length === 0 && !error ? (
                 <p className="text-sm text-gray-500">{progress.message}</p>
