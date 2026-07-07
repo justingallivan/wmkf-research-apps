@@ -52,6 +52,14 @@ function addDaysToTodayYmd(days) {
   return `${y}-${m}-${d}`;
 }
 
+// Friendly text for the skip reasons the server emits; falls back to the raw
+// reason string for anything not called out here.
+function skipReasonLabel(reason) {
+  if (reason === 'missing_secure_link') return 'missing secure link';
+  if (reason === 'unresolved_placeholder') return 'unfilled {{field}}';
+  return reason;
+}
+
 function normalizeOffsetInput(value) {
   if (value === '') return '';
   const n = Number(value);
@@ -113,7 +121,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const [templateLoaded, setTemplateLoaded] = useState(false); // gate the first render until the template load settles (see renderPreviews) — the initial `template` is the EMPTY skeleton
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState({ current: 0, total: 0, message: 'Rendering previews…' });
-  const [results, setResults] = useState({ sent: [], failed: [], skipped: [] });
+  const [results, setResults] = useState({ sent: [], failed: [], skipped: [], unconfirmed: [] });
   const [confirmedLowConfidenceIds, setConfirmedLowConfidenceIds] = useState({});
 
   // Stable across renders (candidates is a fresh array each parent render, so a
@@ -241,6 +249,13 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
 
   const sendable = drafts.filter((d) => !d.skipped && d.candidateEmail);
   const capturedSent = results.sent.filter((r) => r.capturedEmail);
+  // Sent, but the "invited" bookkeeping write failed (inviteRecorded === false) — the
+  // email went out, so this is neither a clean success nor a failure. Route it into the
+  // same "verify before retry" bucket as email_unconfirmed rather than the plain sent list,
+  // since re-inviting without checking Dynamics risks a double-send.
+  const confirmedSent = results.sent.filter((r) => !r.capturedEmail && r.inviteRecorded !== false);
+  const unconfirmedSent = results.sent.filter((r) => !r.capturedEmail && r.inviteRecorded === false);
+  const verifyBeforeRetry = [...results.unconfirmed, ...unconfirmedSent];
   // Slice G — recipients whose email isn't anchored to the resolved identity (manual entry,
   // affiliation-derived, unknown source, or a search email on an unconfirmed identity). They
   // are still sendable, but staff must consciously confirm before inviting (guards the S234
@@ -275,7 +290,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     setStep('sending');
     setProgress({ current: 0, total: sendable.length, message: 'Sending…' });
     setError(null);
-    setResults({ sent: [], failed: [], skipped: [] });
+    setResults({ sent: [], failed: [], skipped: [], unconfirmed: [] });
     persistTiming(); // remember the dates for next time (best-effort, non-blocking)
     try {
       const res = await fetch('/api/review-manager/send-emails', {
@@ -308,16 +323,29 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
         }),
       });
       let final = null;
+      let sawTerminalError = false;
       await readSseStream(res, ({ event, data }) => {
-        if (event === 'error') { setError(data?.message || 'Send failed'); return; }
+        if (event === 'error') { sawTerminalError = true; setError(data?.message || 'Send failed'); return; }
         if (event === 'progress') setProgress((p) => ({ ...p, ...data }));
         else if (event === 'email_sent') setResults((r) => ({ ...r, sent: [...r.sent, data] }));
         else if (event === 'email_failed') setResults((r) => ({ ...r, failed: [...r.failed, data] }));
+        else if (event === 'email_unconfirmed') setResults((r) => ({ ...r, unconfirmed: [...r.unconfirmed, data] }));
         else if (event === 'result') final = data;
       });
-      if (final) setResults({ sent: final.sent || [], failed: final.failed || [], skipped: final.skipped || [] });
-      setStep('sent');
-      if (onSent) onSent();
+      if (final) {
+        setResults({
+          sent: final.sent || [],
+          failed: final.failed || [],
+          skipped: final.skipped || [],
+          unconfirmed: final.unconfirmed || [],
+        });
+      }
+      if (sawTerminalError) {
+        setStep('error');
+      } else {
+        setStep('sent');
+        if (onSent) onSent();
+      }
     } catch (e) {
       setError(e.message);
       setStep('error');
@@ -468,7 +496,22 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                   </p>
                 </div>
               ) : (
-                <p className="text-green-700">Sent {results.sent.length} invitation(s).</p>
+                step !== 'error' && confirmedSent.length > 0 && (
+                  <p className="text-green-700">
+                    Sent {confirmedSent.length}: {confirmedSent.map((r) => r.candidateName || '?').join(', ')}
+                  </p>
+                )
+              )}
+              {verifyBeforeRetry.length > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
+                  <p className="font-medium">Possibly sent — verify before retrying</p>
+                  <p className="mt-1 text-xs text-amber-800">
+                    These emails may have already gone out. Check Dynamics before re-inviting to avoid a double-send.
+                  </p>
+                  <p className="mt-2 text-xs">
+                    {verifyBeforeRetry.map((r) => `${r.candidateName || '?'}${r.error ? ` (${r.error})` : ''}`).join(', ')}
+                  </p>
+                </div>
               )}
               {capturedSent.length > 0 && (
                 <div className="space-y-2">
@@ -494,7 +537,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
               )}
               {results.skipped.length > 0 && (
                 <p className="text-amber-700">
-                  Skipped {results.skipped.length}: {results.skipped.map((s) => `${s.candidateName || '?'} (${s.reason})`).join(', ')}
+                  Skipped {results.skipped.length}: {results.skipped.map((s) => `${s.candidateName || '?'} (${skipReasonLabel(s.reason)})`).join(', ')}
                 </p>
               )}
               {results.failed.length > 0 && (

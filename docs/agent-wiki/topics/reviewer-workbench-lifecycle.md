@@ -285,6 +285,19 @@ Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
     gates on `isExternalReviewUrl(url) && reviewButtonLabel`).
   (The `hold` + `finalize` templates were **REMOVED in S279** along with the rest of
   the hold path — see `project-reviewer-hold-step-decouple`.)
+- **Invitation send-safety semantics (S340, `send-emails.js`).** First-external-send hardening,
+  invitation templateType only: (1) `wmkf_invited`/`emailSentAt`/`respondReminderSentAt` is stamped
+  INLINE per-recipient right after each successful send (not a post-loop pass), so a mid-batch
+  timeout can't leave sent invites unstamped and exposed to a duplicate re-send via the
+  `shouldSkipDuplicateInvitation` guard. (2) A send that THROWS goes to a new `unconfirmed[]` bucket
+  + `email_unconfirmed` SSE event ("possibly sent — verify before retry"), never `failed[]`, because
+  a thrown SendEmail may still have dispatched. (3) A successful send whose inline stamp fails is
+  recorded `inviteRecorded:false` on the sent record (surfaced, not a scrolling warning). (4) A
+  send-time body-integrity gate skips an invitation whose body lacks a `/external/review/` secure
+  link (`missing_secure_link`) or carries an unresolved `{{token}}` (`unresolved_placeholder`) rather
+  than ship a broken first-contact email. `InviteEmailModal` renders the "verify before retry" set
+  and lists who was sent/failed/skipped; a terminal error no longer shows green success. Re-sendable
+  templateTypes (materials/followup/thankyou) keep their prior `failed[]` + post-loop-stamp semantics.
 - All four templates are sendable: `invitation` (first contact, via ReviewerInvitePanel →
   `InviteEmailModal`, hardcoded `templateType:'invitation'`) and
   `materials`/`followup`/`thankyou` (via `ReviewerManagePanel`). The reviewer onboards

@@ -23,10 +23,11 @@
  * SSE events (full vocabulary pinned by
  * tests/integration/send-emails-route.test.js):
  *   - progress { stage, message, current?, total? }
- *   - email_sent { suggestionId, candidateName, candidateEmail, emailId, contactPromoted? }
+ *   - email_sent { suggestionId, candidateName, candidateEmail, emailId, contactPromoted?, inviteRecorded? }
  *   - email_failed { suggestionId, candidateName, candidateEmail, error }
- *   - result { sent, failed, skipped, stats }
- *   - complete { message, sent, failed }
+ *   - email_unconfirmed { suggestionId, candidateName, candidateEmail, error } — invitation "possibly sent, verify"
+ *   - result { sent, failed, skipped, unconfirmed, stats }
+ *   - complete { message, sent, failed, skipped, unconfirmed }
  *   - error { message } — terminal; no result/complete follows
  *
  * Data boundary: staff-shared. Any `review-manager` user can send to any

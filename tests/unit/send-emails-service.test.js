@@ -112,7 +112,10 @@ async function run(requestBody) {
 }
 const names = (emitted) => emitted.map((e) => e.event);
 const resultOf = (emitted) => emitted.find((e) => e.event === 'result')?.data;
-const draft = (id) => ({ suggestionId: id, subject: 'S', body: 'B' });
+// Body carries a secure-review link by default so invitation-templateType
+// drafts clear the body-integrity gate (missing_secure_link / unresolved_placeholder)
+// and exercise the real send path — tests of the gate itself override body.
+const draft = (id) => ({ suggestionId: id, subject: 'S', body: 'B https://reviews.example.org/external/review/tok-1' });
 
 describe('send-emails-service — fail-closed templateType', () => {
   test('unknown templateType: ONE error event, resolves, no result/complete, no adapter work', async () => {
@@ -152,12 +155,15 @@ describe('send-emails-service — event order, mixed batch', () => {
     expect(seq.slice(-2)).toEqual(['result', 'complete']);
     const stages = emitted.filter((e) => e.event === 'progress').map((e) => e.data.stage);
     expect(stages.slice(0, 4)).toEqual(['starting', 'resolving_recipients', 'fetching_attachments', 'sending']);
-    expect(stages).toContain('updating_lifecycle');
+    // Pure-invitation batch: the invitation lifecycle stamp now runs INLINE in the
+    // send loop, so the post-loop 'updating_lifecycle' pass never fires.
+    expect(stages).not.toContain('updating_lifecycle');
     expect(seq.indexOf('email_sent')).toBeLessThan(seq.indexOf('result'));
     expect(seq.indexOf('email_failed')).toBeLessThan(seq.indexOf('result'));
 
     const r = resultOf(emitted);
-    expect(r.stats).toMatchObject({ sent: 1, failed: 1, skipped: 1, total: 3 });
+    expect(r.stats).toMatchObject({ sent: 1, failed: 1, skipped: 1, unconfirmed: 0, total: 3 });
+    expect(r.unconfirmed).toEqual([]);
     expect(r.sent.map((s) => s.suggestionId)).toEqual([SUG_OK]);
     expect(r.skipped.map((s) => ({ id: s.suggestionId, reason: s.reason }))).toEqual([{ id: SUG_NO_EMAIL, reason: 'no_email' }]);
     expect(r.failed.map((f) => f.suggestionId)).toEqual([SUG_MISSING]);
@@ -178,23 +184,116 @@ describe('send-emails-service — lifecycle-after-send ordering', () => {
     );
   });
 
-  test('a send-time failure never reaches the lifecycle write; batch ends result -> complete', async () => {
+  test('an invitation send-time failure lands in unconfirmed[] (not failed[]) via email_unconfirmed; batch ends result -> complete', async () => {
+    // A throw from createAndSendEmail may have dispatched before failing, so an
+    // invitation is recorded as "possibly sent" rather than plain failed — a blind
+    // retry would risk double-emailing a real external reviewer.
     createAndSendEmail.mockImplementationOnce(async () => { throw new Error('boom'); });
     const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
     expect(updateLifecycle).not.toHaveBeenCalled();
     expect(names(emitted)).not.toContain('error');
+    expect(names(emitted)).not.toContain('email_failed');
+    expect(names(emitted)).toContain('email_unconfirmed');
     expect(names(emitted).slice(-2)).toEqual(['result', 'complete']);
-    expect(resultOf(emitted).failed[0].error).toBe('boom');
+    const r = resultOf(emitted);
+    expect(r.failed).toEqual([]);
+    expect(r.unconfirmed).toHaveLength(1);
+    expect(r.unconfirmed[0]).toMatchObject({ suggestionId: SUG_OK, error: 'boom' });
+    expect(r.stats).toMatchObject({ sent: 0, failed: 0, unconfirmed: 1 });
   });
 
-  test('a lifecycle-write failure after a successful send is a progress warning, never terminal', async () => {
+  test('a non-invitation send-time failure still lands in failed[] via email_failed (unchanged)', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    createAndSendEmail.mockImplementationOnce(async () => { throw new Error('boom'); });
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+    expect(names(emitted)).not.toContain('email_unconfirmed');
+    expect(names(emitted)).toContain('email_failed');
+    const r = resultOf(emitted);
+    expect(r.unconfirmed).toEqual([]);
+    expect(r.failed).toHaveLength(1);
+    expect(r.failed[0]).toMatchObject({ suggestionId: SUG_OK, error: 'boom' });
+  });
+
+  test('an invitation lifecycle-stamp failure after a successful send is non-terminal: sent[] carries inviteRecorded: false, no post-loop lifecycle pass', async () => {
     updateLifecycle.mockImplementationOnce(async () => { throw new Error('patch failed'); });
     const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
     expect(names(emitted)).not.toContain('error');
-    expect(resultOf(emitted).stats.sent).toBe(1);
-    expect(emitted.some((e) => e.event === 'progress'
-      && e.data.stage === 'updating_lifecycle'
-      && /lifecycle update failed/.test(e.data.message))).toBe(true);
+    // Inline stamp failure is logged (console.error), not a progress warning, and
+    // the pure-invitation batch never reaches the post-loop 'updating_lifecycle' pass.
+    expect(emitted.some((e) => e.event === 'progress' && e.data.stage === 'updating_lifecycle')).toBe(false);
+    const r = resultOf(emitted);
+    expect(r.stats.sent).toBe(1);
+    expect(r.sent[0]).toMatchObject({ suggestionId: SUG_OK, inviteRecorded: false });
+    expect(names(emitted).slice(-2)).toEqual(['result', 'complete']);
+  });
+
+  test('non-invitation sent records do not carry an inviteRecorded key', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+    const r = resultOf(emitted);
+    expect(r.sent[0]).not.toHaveProperty('inviteRecorded');
+  });
+});
+
+describe('send-emails-service — invitation body-integrity gate', () => {
+  test('an invitation with no secure link is skipped missing_secure_link and never sent', async () => {
+    const emitted = await run({
+      drafts: [{ suggestionId: SUG_OK, subject: 'S', body: 'No link here.' }],
+      templateType: 'invitation',
+    });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    const r = resultOf(emitted);
+    expect(r.skipped).toEqual([
+      { suggestionId: SUG_OK, candidateName: 'Dr. Reviewer', candidateEmail: 'rev@example.org', reason: 'missing_secure_link' },
+    ]);
+  });
+
+  test('an invitation with an unresolved {{token}} is skipped unresolved_placeholder and never sent', async () => {
+    const emitted = await run({
+      drafts: [{
+        suggestionId: SUG_OK,
+        subject: 'S',
+        body: 'Link: https://reviews.example.org/external/review/tok-1 Hi {{firstName}}',
+      }],
+      templateType: 'invitation',
+    });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    const r = resultOf(emitted);
+    expect(r.skipped[0]).toMatchObject({ suggestionId: SUG_OK, reason: 'unresolved_placeholder' });
+  });
+
+  test('the body-integrity gate does not apply to non-invitation templateTypes', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    const emitted = await run({
+      drafts: [{ suggestionId: SUG_OK, subject: 'S', body: 'No link here.' }],
+      templateType: 'materials',
+    });
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(resultOf(emitted).sent).toHaveLength(1);
+  });
+});
+
+describe('send-emails-service — complete event message wording', () => {
+  test('unconfirmed count appends "; N possibly sent (verify before retry)"; skipped wording drops "(no email)"', async () => {
+    SUGGESTIONS = {
+      [SUG_OK]: suggestion(SUG_OK),
+      [SUG_NO_EMAIL]: suggestion(SUG_NO_EMAIL),
+    };
+    PERSONS = {
+      [`person-${SUG_OK}`]: person(`person-${SUG_OK}`),
+      [`person-${SUG_NO_EMAIL}`]: person(`person-${SUG_NO_EMAIL}`, { wmkf_emailaddress: null }),
+    };
+    createAndSendEmail.mockImplementationOnce(async () => { throw new Error('boom'); });
+    const emitted = await run({
+      drafts: [draft(SUG_OK), draft(SUG_NO_EMAIL)],
+      templateType: 'invitation',
+    });
+    const complete = emitted.find((e) => e.event === 'complete').data;
+    expect(complete.unconfirmed).toBe(1);
+    expect(complete.message).toContain('; 1 possibly sent (verify before retry)');
+    expect(complete.message).toContain('; 1 skipped');
+    expect(complete.message).not.toContain('skipped (no email)');
   });
 });
 

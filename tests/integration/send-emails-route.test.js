@@ -182,7 +182,10 @@ async function run(body) {
   await handler(req, res);
   return res;
 }
-const draft = (id = SUG_1) => ({ suggestionId: id, subject: 'S', body: 'B' });
+// Body carries a secure-review link by default so invitation-templateType
+// drafts clear the body-integrity gate (missing_secure_link / unresolved_placeholder)
+// and exercise the real send path — tests of the gate itself override body.
+const draft = (id = SUG_1) => ({ suggestionId: id, subject: 'S', body: 'B https://reviews.example.org/external/review/tok-1' });
 
 describe('send-emails — reviewer portal HTML links', () => {
   test('refuses to send when the outgoing subject/body contains the internal request number', async () => {
@@ -190,7 +193,7 @@ describe('send-emails — reviewer portal HTML links', () => {
       drafts: [{
         suggestionId: SUG_1,
         subject: 'Review request REQ-001',
-        body: 'Please review this proposal.',
+        body: 'Please review this proposal. https://reviews.example.org/external/review/tok-1',
       }],
       templateType: 'invitation',
     });
@@ -258,7 +261,7 @@ describe('send-emails — reviewer portal HTML links', () => {
       drafts: [{
         suggestionId: SUG_1,
         subject: 'S',
-        body: 'Read more: https://example.org/info',
+        body: 'Read more: https://example.org/info\nSecure link: https://reviews.example.org/external/review/tok-1',
       }],
       templateType: 'invitation',
     });
@@ -488,6 +491,31 @@ describe('send-emails — pre-loop fail-closed guards (SSE error terminal sequen
   });
 });
 
+describe('send-emails — invitation body-integrity gate (missing_secure_link / unresolved_placeholder)', () => {
+  test('an invitation with no secure link is skipped missing_secure_link and never sent', async () => {
+    const res = await run({
+      drafts: [{ suggestionId: SUG_1, subject: 'S', body: 'No link here.' }],
+      templateType: 'invitation',
+    });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    expect(resultOf(res).skipped[0]).toMatchObject({ suggestionId: SUG_1, reason: 'missing_secure_link' });
+  });
+
+  test('an invitation with an unresolved {{token}} is skipped unresolved_placeholder and never sent', async () => {
+    const res = await run({
+      drafts: [{
+        suggestionId: SUG_1,
+        subject: 'S',
+        body: 'Link: https://reviews.example.org/external/review/tok-1 Hi {{firstName}}',
+      }],
+      templateType: 'invitation',
+    });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(resultOf(res).skipped[0]).toMatchObject({ suggestionId: SUG_1, reason: 'unresolved_placeholder' });
+  });
+});
+
 describe('send-emails — pre-stream 4xx (before SSE headers are ever written)', () => {
   test('wrong method (GET) returns a plain 405 with Allow-less JSON body, never SSE', async () => {
     const req = createMockReq({ method: 'GET', query: {}, body: {} });
@@ -510,7 +538,7 @@ describe('send-emails — full SSE event vocabulary and ordering (Stage 2b pre-e
   const SUG_SKIP = 'a4444444-4444-4444-8444-444444444444';
   const SUG_SENDFAIL = 'd5555555-5555-4555-8555-555555555555';
 
-  test('event name sequence is exactly: progress(starting) -> progress(resolving_recipients) -> progress(fetching_attachments) -> progress(sending) -> per-recipient interleaved progress/email_sent/email_failed -> progress(updating_lifecycle) -> result -> complete', async () => {
+  test('event name sequence is exactly: progress(starting) -> progress(resolving_recipients) -> progress(fetching_attachments) -> progress(sending) -> per-recipient interleaved progress/email_sent/email_unconfirmed -> result -> complete', async () => {
     SUGGESTIONS = {
       [SUG_1]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_1 }),
       [SUG_SKIP]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_SKIP, _wmkf_potentialreviewer_value: 'pr-skip' }),
@@ -546,22 +574,25 @@ describe('send-emails — full SSE event vocabulary and ordering (Stage 2b pre-e
     expect(seq.slice(0, 4)).toEqual(['progress', 'progress', 'progress', 'progress']);
     // Terminal suffix: result then complete, always in that order and always last.
     expect(seq.slice(-2)).toEqual(['result', 'complete']);
-    // Per-recipient events present exactly once each, in emission order.
+    // Per-recipient events present exactly once each, in emission order. A send-time
+    // throw on an INVITATION lands in unconfirmed[] via email_unconfirmed, not failed[]
+    // via email_failed — a blind retry could double-email a real external reviewer.
     expect(seq).toContain('email_sent');
-    expect(seq).toContain('email_failed');
+    expect(seq).not.toContain('email_failed');
+    expect(seq).toContain('email_unconfirmed');
     expect(seq.indexOf('email_sent')).toBeLessThan(seq.indexOf('result'));
-    expect(seq.indexOf('email_failed')).toBeLessThan(seq.indexOf('result'));
-    // 'updating_lifecycle' progress frame (only emitted because markAsSent + sent.length>0)
-    // must fall between the per-recipient events and the terminal result/complete pair.
+    expect(seq.indexOf('email_unconfirmed')).toBeLessThan(seq.indexOf('result'));
+    // Pure-invitation batch: the invitation lifecycle stamp runs INLINE in the send
+    // loop, so the post-loop 'updating_lifecycle' pass never fires.
     const progressStages = events(res).filter((e) => e.event === 'progress').map((e) => e.data.stage);
     expect(progressStages.slice(0, 4)).toEqual(['starting', 'resolving_recipients', 'fetching_attachments', 'sending']);
-    expect(progressStages).toContain('updating_lifecycle');
-    expect(progressStages.indexOf('updating_lifecycle')).toBeGreaterThan(progressStages.lastIndexOf('sending') - 1);
+    expect(progressStages).not.toContain('updating_lifecycle');
 
     const r = resultOf(res);
-    expect(r.stats).toMatchObject({ sent: 1, failed: 1, skipped: 1, total: 3 });
+    expect(r.stats).toMatchObject({ sent: 1, failed: 0, unconfirmed: 1, skipped: 1, total: 3 });
     expect(r.sent.map((s) => s.suggestionId)).toEqual([SUG_1]);
-    expect(r.failed.map((f) => f.suggestionId)).toEqual([SUG_SENDFAIL]);
+    expect(r.failed).toEqual([]);
+    expect(r.unconfirmed.map((f) => f.suggestionId)).toEqual([SUG_SENDFAIL]);
     expect(r.skipped.map((s) => s.suggestionId)).toEqual([SUG_SKIP]);
   });
 });
@@ -577,18 +608,31 @@ describe('send-emails — lifecycle-after-send ordering (Stage 2b pre-extraction
     expect(sendOrder).toBeLessThan(lifecycleOrder);
   });
 
-  test('a send-time failure never reaches the lifecycle write for that recipient', async () => {
+  test('a send-time failure never reaches the lifecycle write for that recipient (invitation → unconfirmed, not failed)', async () => {
     createAndSendEmail.mockImplementationOnce(async () => { throw new Error('boom'); });
     const res = await run({ drafts: [draft()], templateType: 'invitation' });
 
     expect(updateLifecycle).not.toHaveBeenCalled();
-    expect(resultOf(res).failed).toHaveLength(1);
+    expect(resultOf(res).failed).toHaveLength(0);
+    expect(resultOf(res).unconfirmed).toHaveLength(1);
     expect(resultOf(res).sent).toHaveLength(0);
+  });
+
+  test('a lifecycle-stamp failure after a successful invitation send: sent[] carries inviteRecorded: false, batch still completes', async () => {
+    updateLifecycle.mockImplementationOnce(async () => { throw new Error('patch failed'); });
+    const res = await run({ drafts: [draft()], templateType: 'invitation' });
+
+    const seq = events(res).map((e) => e.event);
+    expect(seq).not.toContain('error');
+    expect(seq.slice(-2)).toEqual(['result', 'complete']);
+    const r = resultOf(res);
+    expect(r.stats.sent).toBe(1);
+    expect(r.sent[0]).toMatchObject({ suggestionId: SUG_1, inviteRecorded: false });
   });
 });
 
 describe('send-emails — mid-stream failure sequence (real send-time exception, not a missing-row/skip failure)', () => {
-  test('a send-time exception for one recipient in a multi-recipient batch: email_failed fires, batch continues, terminal sequence is still result -> complete (never error)', async () => {
+  test('a send-time exception for one invitation recipient in a multi-recipient batch: email_unconfirmed fires (not email_failed), batch continues, terminal sequence is still result -> complete (never error)', async () => {
     const freshId = 'e6666666-6666-4666-8666-666666666666';
     SUGGESTIONS = {
       [SUG_1]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_1 }),
@@ -605,9 +649,25 @@ describe('send-emails — mid-stream failure sequence (real send-time exception,
     const seq = events(res).map((e) => e.event);
 
     expect(seq).not.toContain('error');
+    expect(seq).not.toContain('email_failed');
     expect(seq.slice(-2)).toEqual(['result', 'complete']);
     const r = resultOf(res);
-    expect(r.stats).toMatchObject({ sent: 1, failed: 1, total: 2 });
-    expect(events(res).find((e) => e.event === 'email_failed').data.error).toBe('transient Dynamics failure');
+    expect(r.stats).toMatchObject({ sent: 1, failed: 0, unconfirmed: 1, total: 2 });
+    expect(events(res).find((e) => e.event === 'email_unconfirmed').data.error).toBe('transient Dynamics failure');
+  });
+
+  test('a send-time exception for a non-invitation recipient still fires email_failed (unchanged)', async () => {
+    CYCLE_CODE = null;
+    CYCLE_CONFIG = null;
+    SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_1, wmkf_accepted: true }) };
+    createAndSendEmail.mockImplementationOnce(async () => { throw new Error('transient Dynamics failure'); });
+
+    const res = await run({ drafts: [draft(SUG_1)], templateType: 'materials' });
+    const seq = events(res).map((e) => e.event);
+
+    expect(seq).not.toContain('email_unconfirmed');
+    expect(seq).toContain('email_failed');
+    const r = resultOf(res);
+    expect(r.stats).toMatchObject({ sent: 0, failed: 1, unconfirmed: 0 });
   });
 });
