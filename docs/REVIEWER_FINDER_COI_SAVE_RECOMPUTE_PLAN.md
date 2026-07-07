@@ -3,7 +3,7 @@ title: Reviewer Finder — Save-Time Institution-COI Server Recompute (F2 + F4)
 domain: reviewer-origination
 kind: plan
 status: active
-summary: "Implemented F2/F4 save-time institution COI recompute, fail-closed applicant-alias context, and recorder-stamped identity declarations."
+summary: "Implemented save-time institution COI recompute with fail-closed context, retryable PI lookup failures, and 7/7 analyze-script request-context coverage."
 ---
 
 # Reviewer Finder — Save-Time Institution-COI Server Recompute (F2 + F4) — Implemented Plan
@@ -696,14 +696,17 @@ derived from the discovery recorder's per-id signal set at the single `lookupRev
 Status: IMPLEMENTED (branch `codex/reviewer-coi-build`). A follow-up implementation closed the two remaining
 save-time institution-COI completeness gaps in the §15/§16 gate.
 
-- **PI-resolution failure now fails closed at save.** `loadCoiContext` returns an additive
+- **PI-resolution failure originally failed closed per candidate at save; superseded by §20's
+  retryable whole-request 503.** `loadCoiContext` returns an additive
   `piResolution: { state, reason, error? }` field without changing `piIdentity` or `institutionEntries`.
   Resolver read failures (`request_read_failed`, `contact_read_failed`, any returned error-bearing reason, or
   a thrown non-abort error recorded as `pi_resolve_threw`) set `state:'failed'`. Clean no-PI/no-usable-PI
   states (`no_project_leader`, `no_orcid`, `orcid_malformed`, `no_request_id`, and other non-error abstentions)
   stay `state:'ok'`; `resolvePi:false` is also `ok`. The save service threads `piResolution` into
-  `screenCandidateInstitutionCOI`, which rejects every candidate reaching that screen before any Dataverse
-  write with `decisionSource:'reviewer_pi_institution_unresolved'` when PI resolution failed.
+  `screenCandidateInstitutionCOI` in the historical §17 implementation, which rejected every candidate
+  reaching that screen before any Dataverse write with
+  `decisionSource:'reviewer_pi_institution_unresolved'` when PI resolution failed. The live implementation now
+  throws before the per-candidate loop and no longer emits that decision source.
 
 - **Exact contact links now screen the contact's institution before link/write.** The save screen mirrors the
   exact `setContactLink` predicate: `contactMatch.outcome === 'confident'`, a `contactId` is present, and
@@ -818,3 +821,47 @@ Preserved residuals (deliberate distrusted-signal policy, not fixed by this refr
   rejecting distinct people who share a name with an applicant-institution reviewer.
 - Direct analyze-script `requestContext` coverage is out of this identity-declaration class and remains governed
   by the separate script-caller work described in §18 and follow-up audits.
+
+## 20. Save-time PI failure and analyze-script tail closures (2026-07-07)
+
+Status: IMPLEMENTED (branch `codex/reviewer-coi-build`). This section supersedes §17's per-candidate
+PI-resolution failure shape and completes the script-caller follow-up noted in §19.
+
+- **PI-resolution read failures are retryable whole-request failures, not institution COI.**
+  `saveCandidates` normalizes `loadCoiContext` first, then checks `coiContext.piResolution` immediately after
+  the batch COI context loads and before the per-candidate loop. When `piResolution.state === 'failed'`, the
+  service throws `SaveCandidatesError` with HTTP 503, `retryable:true`,
+  `code:'pi_institution_lookup_unavailable'`, and the resolver failure `reason`. Because this throw happens
+  before the loop, no potential-reviewer, researcher, suggestion, roster, or contact-link write can occur.
+  `screenCandidateInstitutionCOI` no longer accepts `piResolution` and the old
+  `reviewer_pi_institution_unresolved` / per-candidate `institution_coi` path has been removed from live code.
+
+- **Request-context 400/404 errors are normalized in the save service.** `loadReviewerRequestContext` still
+  throws plain `Error` instances with numeric `.statusCode` for missing/invalid request ids. `saveCandidates`
+  now wraps only the `loadCoiContext` call: existing `ServiceHttpError` values are rethrown as-is, known
+  `.statusCode` errors become `SaveCandidatesError` with the same HTTP status and `{ error: message }`, and
+  plain errors without `.statusCode` remain unexpected so the unchanged route shell still returns its generic
+  500 envelope. The route is deliberately not a blanket `.statusCode` trust boundary.
+
+- **Direct analyze-script sweep is now 7/7.** The two already-migrated scripts still pass real request context:
+  `trace-reviewer-provenance.mjs` uses `rec.akoya_requestid`, and `validate-reviewer-analyze.mjs` uses its
+  resolved `requestId`. The remaining five direct `ClaudeReviewerService.analyzeProposal` callers now follow
+  the same real-context path:
+  `probe-grounded-origination.mjs`, `smoke-discover-dispositions.mjs`,
+  `eval-orcid-spine-sweep.mjs`, `eval-orcid-spine-constrained.mjs`, and
+  `probe-scoring-delta.mjs` all resolve a request id/number, call
+  `loadReviewerRequestContext(requestId)`, and pass the returned `requestContext` through exported option
+  builders. No `proposal_info` script-safe bypass was needed for these five because each script runs against
+  a real request.
+
+- **PI-resolution timeout hardening was skipped.** `loadCoiContext` already accepts `signal`, but the save route
+  and save service have no existing `signal` / `deadlineAt` / `AbortController` pattern to thread through
+  cleanly. No new timeout subsystem was introduced in this tail fix.
+
+Regression coverage:
+`tests/unit/save-candidates-service.test.js` asserts PI failure returns the retryable non-COI 503 with zero
+writes, status-code 400/404 context errors become `SaveCandidatesError`, applicant-context `ServiceHttpError`
+503 is preserved, and plain no-status errors remain unexpected. `tests/integration/save-candidates-route.test.js`
+pins the route-visible 400/404 and 500 shapes. `tests/unit/reviewer-analyze-script-callers.test.js` imports all
+seven direct script option builders and proves each composes through `analyzeProposal` without the
+`requestContext is required` throw.

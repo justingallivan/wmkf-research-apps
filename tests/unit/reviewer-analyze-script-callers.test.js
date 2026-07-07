@@ -19,6 +19,11 @@ jest.mock('../../lib/services/reviewer-prompt-resolver.js', () => {
 });
 
 import { ClaudeReviewerService } from '../../lib/services/claude-reviewer-service.js';
+import { buildOrcidSpineConstrainedAnalyzeOptions } from '../../scripts/eval-orcid-spine-constrained.mjs';
+import { buildOrcidSpineSweepAnalyzeOptions } from '../../scripts/eval-orcid-spine-sweep.mjs';
+import { buildGroundedOriginationAnalyzeOptions } from '../../scripts/probe-grounded-origination.mjs';
+import { buildProbeScoringDeltaAnalyzeOptions } from '../../scripts/probe-scoring-delta.mjs';
+import { buildSmokeDiscoverDispositionsAnalyzeOptions } from '../../scripts/smoke-discover-dispositions.mjs';
 import { buildTraceAnalyzeOptions } from '../../scripts/trace-reviewer-provenance.mjs';
 import { buildValidateAnalyzeOptions } from '../../scripts/validate-reviewer-analyze.mjs';
 
@@ -79,6 +84,11 @@ describe('reviewer analyze script callers', () => {
   });
 
   test.each([
+    ['eval-orcid-spine-constrained', buildOrcidSpineConstrainedAnalyzeOptions({ args: { reviewerCount: 1 }, requestContext: REQUEST_CONTEXT })],
+    ['eval-orcid-spine-sweep', buildOrcidSpineSweepAnalyzeOptions({ args: { reviewerCount: 1 }, requestContext: REQUEST_CONTEXT })],
+    ['probe-grounded-origination', buildGroundedOriginationAnalyzeOptions({ args: { reviewerCount: 1 }, requestContext: REQUEST_CONTEXT })],
+    ['probe-scoring-delta', buildProbeScoringDeltaAnalyzeOptions({ args: { reviewerCount: 1, temperature: 0.3 }, requestContext: REQUEST_CONTEXT })],
+    ['smoke-discover-dispositions', buildSmokeDiscoverDispositionsAnalyzeOptions({ args: { reviewerCount: 1 }, requestContext: REQUEST_CONTEXT })],
     ['trace-reviewer-provenance', buildTraceAnalyzeOptions({ args: { reviewerCount: 1 }, requestContext: REQUEST_CONTEXT })],
     ['validate-reviewer-analyze', buildValidateAnalyzeOptions({ args: { reviewerCount: 1, temperature: 0.3, excluded: [] }, requestContext: REQUEST_CONTEXT })],
   ])('%s passes requestContext through direct analyzeProposal calls', async (_scriptName, options) => {

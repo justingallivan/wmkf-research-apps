@@ -22,13 +22,27 @@
  *   --requests 1002794,1002896,1002959,1003005,1003020,1003024,1003075
  */
 import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 function loadEnvLocal() { try { const env = readFileSync(new URL('../.env.local', import.meta.url), 'utf8'); for (const l of env.split('\n')) { const m = l.match(/^([A-Z0-9_]+)=(.*)$/); if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].trim().replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1'); } } catch {} }
 loadEnvLocal();
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAILTO = process.env.OPENALEX_POLITE_MAILTO || ''; // polite pool only if a real mailbox is configured
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const args = (() => { const o = { requests: [], reviewerCount: 12 }; const a = process.argv.slice(2); for (let i = 0; i < a.length; i++) { if (a[i] === '--requests') o.requests = a[++i].split(',').map((s) => s.trim()).filter(Boolean); else if (a[i] === '--reviewer-count') o.reviewerCount = parseInt(a[++i], 10) || 12; } return o; })();
-if (!args.requests.length) { console.log('Usage: --requests <n1,n2,...>'); process.exit(2); }
+function isCliEntrypoint() {
+  return import.meta.url === pathToFileURL(process.argv[1] || '').href;
+}
+if (!args.requests.length && isCliEntrypoint()) { console.log('Usage: --requests <n1,n2,...>'); process.exit(2); }
+
+export function buildOrcidSpineConstrainedAnalyzeOptions({ args: runArgs, requestContext }) {
+  return {
+    reviewerCount: runArgs.reviewerCount,
+    temperature: 0.3,
+    excludedNames: [],
+    userProfileId: null,
+    requestContext,
+  };
+}
 
 // proposal-file helpers
 const SEP = '(?:^|[\\s_\\-])', SEP_END = '(?:[\\s_\\-]|$)'; const wordRe = (w) => new RegExp(`${SEP}${w}${SEP_END}`, 'i');
@@ -86,6 +100,7 @@ async function main() {
   const { getRequestSharePointBuckets } = await import('../lib/utils/sharepoint-buckets.js');
   const { loadModelOverrides } = await import('../lib/services/model-override-loader.js');
   const { ClaudeReviewerService } = await import('../lib/services/claude-reviewer-service.js');
+  const { loadReviewerRequestContext } = await import('../lib/services/reviewer-request-context.js');
   enterDynamicsBypassForScript('eval-orcid-spine-constrained'); await loadModelOverrides();
 
   const rows = [];
@@ -93,6 +108,7 @@ async function main() {
     let rec;
     try { if (GUID_RE.test(reqArg)) rec = await DynamicsService.getRecord('akoya_requests', reqArg, { select: 'akoya_requestid,akoya_requestnum,akoya_title' }); else { const { records } = await DynamicsService.queryRecords('akoya_requests', { select: 'akoya_requestid,akoya_requestnum,akoya_title', filter: `akoya_requestnum eq '${reqArg}'`, top: 1 }); rec = records?.[0]; } } catch (e) { console.error(`req ${reqArg}: ${e.message}`); continue; }
     if (!rec) { console.error(`req ${reqArg}: not found`); continue; }
+    let requestContext; try { requestContext = await loadReviewerRequestContext(rec.akoya_requestid); } catch (e) { console.error(`req ${rec.akoya_requestnum}: request context ${e.message}`); continue; }
     let text = null;
     try {
       const buckets = await getRequestSharePointBuckets(rec.akoya_requestid, rec.akoya_requestnum); const seen = new Set(); const files = [];
@@ -102,7 +118,7 @@ async function main() {
       if ((dl.mimeType || '').includes('pdf') || /\.pdf$/i.test(picked.name)) { const pp = (await import('pdf-parse')).default; text = (await pp(dl.buffer)).text; } else if (/\.txt$/i.test(picked.name)) text = dl.buffer.toString('utf8');
     } catch (e) { console.error(`req ${rec.akoya_requestnum}: ${e.message}`); continue; }
     if (!text || text.trim().length < 100) { console.error(`req ${rec.akoya_requestnum}: text too short`); continue; }
-    let analysis; try { analysis = await ClaudeReviewerService.analyzeProposal(text, process.env.CLAUDE_API_KEY, { reviewerCount: args.reviewerCount, temperature: 0.3, excludedNames: [], userProfileId: null }); } catch (e) { console.error(`req ${rec.akoya_requestnum}: analyze ${e.message}`); continue; }
+    let analysis; try { analysis = await ClaudeReviewerService.analyzeProposal(text, process.env.CLAUDE_API_KEY, buildOrcidSpineConstrainedAnalyzeOptions({ args, requestContext })); } catch (e) { console.error(`req ${rec.akoya_requestnum}: analyze ${e.message}`); continue; }
     if (!analysis?.success) { console.error(`req ${rec.akoya_requestnum}: analyze ${analysis?.status}`); continue; }
     const field = analysis.proposalInfo?.primaryResearchArea || '';
     console.log(`\n# ${rec.akoya_requestnum}  ${field}`);
@@ -145,4 +161,6 @@ async function main() {
   console.log(`  still asserted rank-1 match                : ${naiveWrong.filter((r) => r.outcome !== 'ABSTAIN' && r.selRank === 1).length}`);
   console.log(`\n(Confident-wrong shrinks if naive-wrong cases convert to ABSTAIN or rank>1 recovery.)`);
 }
-main().catch((e) => { console.error('\nfailed:', e.message); process.exit(1); });
+if (isCliEntrypoint()) {
+  main().catch((e) => { console.error('\nfailed:', e.message); process.exit(1); });
+}

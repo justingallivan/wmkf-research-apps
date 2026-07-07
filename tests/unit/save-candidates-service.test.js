@@ -58,6 +58,7 @@ const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity-lookup');
 const { loadCoiContext } = require('../../lib/services/reviewer-request-context');
+const { ServiceHttpError } = require('../../lib/services/service-http-error');
 const { saveCandidates, SaveCandidatesError } = require('../../lib/services/reviewer-finder/save-candidates-service');
 
 const BASE = { requestId: 'REQ-1', actingUserSystemId: 'SYS-1' };
@@ -173,7 +174,6 @@ test('clean full success: 200 payload with NO rejected*/errors keys (undefined-v
 });
 
 test('failed PI resolution rejects fail-closed before writes', async () => {
-  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
   loadCoiContext.mockResolvedValueOnce({
     applicantInstitutionContext: { state: 'complete', names: ['Applicant University'] },
     piResolution: { state: 'failed', reason: 'contact_read_failed', error: 'contact read down' },
@@ -186,24 +186,78 @@ test('failed PI resolution rejects fail-closed before writes', async () => {
   }).catch((e) => e);
 
   expect(err).toBeInstanceOf(SaveCandidatesError);
-  expect(err.httpStatus).toBe(422);
-  expect(err.body).toMatchObject({
-    savedCount: 0,
-    rejectedInstitutionCOI: 1,
-    errors: [{
-      name: 'Dr PI Unscreened',
-      code: 'institution_coi',
-      serverRecomputed: true,
-      decisionSource: 'reviewer_pi_institution_unresolved',
-    }],
+  expect(err.httpStatus).toBe(503);
+  expect(err.body).toEqual({
+    error: 'Could not verify institution conflicts right now (PI institution lookup temporarily unavailable). Please retry.',
+    code: 'pi_institution_lookup_unavailable',
+    retryable: true,
+    reason: 'contact_read_failed',
+    requestId: BASE.requestId,
   });
+  expect(err.body.error).not.toMatch(/COI|at the PI.?s institution/i);
   expect(potentialReviewerAdapter.getByEmail).not.toHaveBeenCalled();
   expect(contactAdapter.getInstitutionById).not.toHaveBeenCalled();
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
   expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
   expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
   expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
-  warn.mockRestore();
+});
+
+test.each([
+  [400, 'requestId is not a valid GUID'],
+  [404, 'Request REQ-404 was not found'],
+])('loadCoiContext statusCode %i is normalized to SaveCandidatesError before writes', async (statusCode, message) => {
+  const sourceError = new Error(message);
+  sourceError.statusCode = statusCode;
+  loadCoiContext.mockRejectedValueOnce(sourceError);
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{ name: 'Dr Context', email: 'context@example.edu', affiliation: 'Different University' }],
+  }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(statusCode);
+  expect(err.body).toEqual({ error: message });
+  expect(potentialReviewerAdapter.getByEmail).not.toHaveBeenCalled();
+  expect(contactAdapter.getInstitutionById).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+});
+
+test('loadCoiContext ServiceHttpError is preserved as-is before writes', async () => {
+  const sourceError = new ServiceHttpError('Applicant institution context is unavailable', {
+    httpStatus: 503,
+    body: { error: 'Applicant institution context is unavailable', retryable: true },
+  });
+  loadCoiContext.mockRejectedValueOnce(sourceError);
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{ name: 'Dr Applicant Context', email: 'applicant-context@example.edu' }],
+  }).catch((e) => e);
+
+  expect(err).toBe(sourceError);
+  expect(potentialReviewerAdapter.getByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+});
+
+test('loadCoiContext plain error without statusCode remains unexpected for the route 500 path', async () => {
+  const sourceError = new Error('context loader exploded');
+  loadCoiContext.mockRejectedValueOnce(sourceError);
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{ name: 'Dr Plain Context', email: 'plain-context@example.edu' }],
+  }).catch((e) => e);
+
+  expect(err).toBe(sourceError);
+  expect(err).not.toBeInstanceOf(SaveCandidatesError);
+  expect(potentialReviewerAdapter.getByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
 });
 
 test('clean no-PI resolution state still saves a safe candidate', async () => {
