@@ -275,10 +275,20 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
       const res = await fetch('/api/review-manager/update-abstract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId: flaggedAbstract.requestId, abstract: abstractDraft }),
+        // expectedCurrent = the abstract this editor was seeded from; the service
+        // rejects (409) if someone else rewrote it since, so we never silently
+        // clobber a newer edit.
+        body: JSON.stringify({
+          requestId: flaggedAbstract.requestId,
+          abstract: abstractDraft,
+          expectedCurrent: flaggedAbstract.currentAbstract,
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
+        // On a concurrent-edit conflict, reload so the editor reseeds from the
+        // now-current abstract before the PD re-applies their fix.
+        if (res.status === 409) renderPreviews();
         throw new Error(data.error || 'Failed to save abstract');
       }
       setAbstractEditorOpen(false);

@@ -317,7 +317,10 @@ Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
   so a manually-edited draft can't keep the pre-fix abstract; it then POSTs
   `/api/review-manager/update-abstract` → overwrites the canonical `wmkf_abstract` on `akoya_request`
   via `updateById` (auth `requireAppAccess('review-manager','reviewers')`, GUID-validated requestId,
-  trusted DAL context, PD attribution; last-write-wins like the campaign-config sibling), then
+  trusted DAL context, PD attribution; optimistic compare-and-set — the modal posts the
+  `expectedCurrent` abstract it rendered from and the service 409s if the live `wmkf_abstract`
+  changed since, targeted on the abstract field so an unrelated concurrent write to the request
+  does not spuriously conflict), then
   re-renders (flag clears). `wmkf_abstract` is GoApply write-once (NOT re-synced), so a PD edit is
   durable and fixes these reviewer invites plus any later read that starts from `wmkf_abstract`. It
   does NOT retroactively rewrite an already-generated derived version (`wmkf_abstractformatted`/

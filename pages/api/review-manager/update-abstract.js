@@ -2,14 +2,18 @@
  * Review Manager — update a proposal's abstract of record.
  *
  * POST /api/review-manager/update-abstract
- *   body: { requestId: <GUID>, abstract: <string> }
+ *   body: { requestId: <GUID>, abstract: <string>, expectedCurrent?: <string> }
  *   → { success: true, requestId, abstract }
  *
  * A program director edits the canonical `wmkf_abstract` on `akoya_requests`
  * from the invite flow when the stored abstract is a hard-wrapped block that
  * would render with stray line breaks (see lib/utils/abstract-format.js). The
  * field is written once by GoApply at submission and is not re-synced, so the
- * edit is durable and corrects the abstract everywhere it is consumed.
+ * edit is durable and fixes these reviewer invites plus any later read that
+ * starts from `wmkf_abstract`; it does NOT retroactively rewrite an
+ * already-generated derived version (`wmkf_abstractformatted`/`wmkf_abstractapproved`).
+ * `expectedCurrent` (the text the editor was seeded from) makes the save an
+ * optimistic compare-and-set — a concurrent edit yields 409.
  *
  * Thin route shell (Route→Service Consolidation Plan): method dispatch → auth
  * guard → input validation → withDalContext → one service call → result/error→
@@ -49,9 +53,14 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'abstract string is required' });
   }
 
+  // Optional optimistic-concurrency token: the abstract text the editor was
+  // seeded from. Forwarded only when the client sends a string; a non-string
+  // (absent) simply skips the compare-and-set in the service.
+  const expectedCurrent = typeof req.body?.expectedCurrent === 'string' ? req.body.expectedCurrent : undefined;
+
   return withDalContext('review-manager-update-abstract', async () => {
     try {
-      const result = await updateAbstract({ requestId, abstract, actingUserSystemId });
+      const result = await updateAbstract({ requestId, abstract, expectedCurrent, actingUserSystemId });
       return res.status(200).json(result);
     } catch (error) {
       if (error instanceof ServiceHttpError) {
