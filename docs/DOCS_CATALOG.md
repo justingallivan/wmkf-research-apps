@@ -37,6 +37,7 @@ related:
 |---|---|---|---|---|---|
 | [BYPASS_STRIP_PLAN.md](BYPASS_STRIP_PLAN.md) | plan | active | yes | Converted 52 bypass scopes to withDalContext; bypass-shape law built; Stage 4 tightening executed for 10/11 sites (site 33 deferred). S333. |  |
 | [CHUNK_CONSOLIDATION_PLAN.md](CHUNK_CONSOLIDATION_PLAN.md) | plan | active | yes | Consolidate array-chunking loops onto lib/utils/chunk.js: 17 mechanical swaps, 4 index-using left with comment, 1 sibling leave. Stages 0-2 complete. | 2026-07-05 |
+| [CLOSEABLE_CLASS_INVARIANT_MAP.md](CLOSEABLE_CLASS_INVARIANT_MAP.md) | plan | active |  | Security/correctness classes on the enforcement ladder, the tested move that lifts each, and a ranked queue. Headline: in plain JS, rung 1 is rarely reachable. |  |
 | [CONTACT_ENRICHMENT_SERVICE_DECOMPOSITION_PLAN.md](CONTACT_ENRICHMENT_SERVICE_DECOMPOSITION_PLAN.md) | plan | active | yes | DONE (S337): ContactEnrichmentService (1,776 L) split into lib/services/contact-enrichment/*.js behind a facade. All 10 stages executed; some reviews pending. |  |
 | [DIAGRAM_BEHAVIORAL_FLOW.md](DIAGRAM_BEHAVIORAL_FLOW.md) | spec | active |  | This sequence diagram traces a concrete execution path (e.g., /api/process-phase-i), showing how services interact during an AI analysis task. | 2026-07-02 |
 | [DIAGRAM_DATA_ENGINE.md](DIAGRAM_DATA_ENGINE.md) | spec | active |  | This pipeline visualization focuses on the internal data complexities, specifically the OData parser and identity merging required for Dataverse. | 2026-07-02 |
@@ -173,6 +174,12 @@ related:
 | [INTAKE_PORTAL_ITEM_6_QUICK_PROBE.md](INTAKE_PORTAL_ITEM_6_QUICK_PROBE.md) | history | historical |  | Purpose: Fast-path test for Connor to prove or disprove the Option A mechanics with one diagnostic flow, then one filtered replay. | 2026-07-02 |
 | [INTAKE_PORTAL_SCHEMA_CHANGES.md](INTAKE_PORTAL_SCHEMA_CHANGES.md) | history | active |  | Conventions: - One section per change batch, newest first. | 2026-07-02 |
 | [INTAKE_PORTAL_SLICE0_FIELD_REVIEW.md](INTAKE_PORTAL_SLICE0_FIELD_REVIEW.md) | audit | active |  | Plus: option-set extension on wmkf_apprequestperson.wmkf_role (existing 2 values → 5; ships via standalone idempotent script, not as a wave entry). | 2026-07-02 |
+
+## llm-platform
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [PROMPT_CACHING_AUDIT.md](PROMPT_CACHING_AUDIT.md) | plan | active |  | Project-wide audit of Anthropic prompt-cache usage across all 36 LLM call sites: root causes of the low cache-hit rate and the ordered remediation plan. |  |
 
 ## prompt-executor
 
