@@ -141,6 +141,31 @@ const CASES = [
     files: { 'pages/api/r.js': H("const { requestGuid } = req.body || {};\nreturn executePrompt({ ['requestId']: requestGuid, promptName: 'p' });") },
   },
   {
+    name: 'value-alias of import (const run = ep; run({ requestId })) unguarded → fail',
+    expect: 'fail', flag: 'pages/api/r.js',
+    files: { 'pages/api/r.js': "import { executePrompt as ep } from '../../lib/services/execute-prompt';\n" + H("const run = ep;\nconst { requestGuid } = req.body || {};\nreturn run({ requestId: requestGuid });") },
+  },
+  {
+    name: 'guarded explicit requestId AFTER spread of req.body → pass (override, no false positive)',
+    expect: 'pass',
+    files: { 'pages/api/r.js': H("const { requestGuid } = req.body || {};\nif (!isGuid(requestGuid)) return res.status(400).end();\nreturn executePrompt({ ...req.body, requestId: requestGuid });") },
+  },
+  {
+    name: 'spread AFTER explicit requestId (spread wins) → fail',
+    expect: 'fail', flag: 'pages/api/r.js',
+    files: { 'pages/api/r.js': H("const { requestGuid } = req.body || {};\nif (!isGuid(requestGuid)) return res.status(400).end();\nreturn executePrompt({ requestId: requestGuid, ...req.body });") },
+  },
+  {
+    name: 'spread of a tainted alias ({ ...payload }) unguarded → fail',
+    expect: 'fail', flag: 'pages/api/r.js',
+    files: { 'pages/api/r.js': H("const payload = req.body || {};\nreturn executePrompt({ ...payload });") },
+  },
+  {
+    name: 'CommonJS require-destructure alias → pass (documented residual limit)',
+    expect: 'pass',
+    files: { 'pages/api/r.js': "const { executePrompt: ep } = require('../../lib/services/execute-prompt');\n" + H("const { requestGuid } = req.body || {};\nreturn ep({ requestId: requestGuid });") },
+  },
+  {
     name: 'sink only in a comment / string → pass (AST, not text)',
     expect: 'pass',
     files: { 'pages/api/r.js': H("// getRecord('akoya_requests', requestId) would be unsafe\nreturn res.json({ doc: \"call getRecord(set, id) carefully\" });") },
