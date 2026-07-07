@@ -48,7 +48,7 @@ jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
     queryRecords: jest.fn(async () => ({ records: [promptRow] })),
     getRecord: jest.fn(async (entitySet, id) => {
-      if (entitySet === 'akoya_requests' && id === 'req-1') return REQUEST_ROW;
+      if (entitySet === 'akoya_requests' && id === '11111111-1111-1111-1111-111111111111') return REQUEST_ROW;
       return null;
     }),
     createRecord: jest.fn(async (entitySet, payload, opts) => {
@@ -83,7 +83,7 @@ const ACTING_GUID = '00000000-0000-0000-0000-000000000abc';
 // The request row supplies the ETag; always-overwrite avoids populated-guard
 // conflicts so a clean single-field write lands.
 const REQUEST_ROW = {
-  akoya_requestid: 'req-1',
+  akoya_requestid: '11111111-1111-1111-1111-111111111111',
   akoya_requestnum: '1000000',
   _etag: 'W/"00000001"',
   modifiedon: '2026-05-10T00:00:00Z',
@@ -128,7 +128,7 @@ async function run({ actingUserSystemId } = {}) {
   setClaudeJson({ summary: 'S' });
   const args = {
     promptName: 'test.impersonation',
-    requestId: 'req-1',
+    requestId: '11111111-1111-1111-1111-111111111111',
     runSource: 'Vercel Test',
     overrideVariables: { x: 'value' },
   };

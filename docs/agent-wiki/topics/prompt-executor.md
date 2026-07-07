@@ -37,6 +37,12 @@ reviewer-finder prompt migration.
 - Use `lib/services/llm-client.js` for provider calls.
 - Use `lib/services/execute-prompt.js` for shared Executor behavior.
 - Prompt claims must trace resolver, composer, runtime caller, fallback behavior, and tests.
+- **requestId trust-boundary chokepoint:** `executePrompt` interpolates `requestId` into a raw
+  Dataverse key predicate via `grantRequestAdapter.getById/updateById` → `akoya_requests(${id})`.
+  It rejects a non-GUID `requestId` up front (`isGuid`), so a route forwarding a client id without
+  its own guard (the `summarize-v2` class) cannot reach the selector. `check:trust-boundary-guid`
+  treats `executePrompt({ requestId })` as an object-arg sink, so route-edge validation is still
+  required and enforced in CI; this is defense-in-depth, not a replacement.
 - **Model-aware request building (S286):** `llm-client._buildBody` OMITS the `temperature`
   param for models that reject it (Opus 4.8 — the API 400s with "`temperature` is
   deprecated for this model"); `modelSupportsTemperature()` gates it. When adding an

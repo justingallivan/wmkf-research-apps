@@ -106,6 +106,16 @@ const CASES = [
     files: { 'pages/api/r.js': H("const { proposalId } = req.body || {};\nreturn adapter.findByRequest(proposalId);") },
   },
   {
+    name: 'executePrompt({ requestId }) from req.body, unguarded → fail (object-arg sink)',
+    expect: 'fail', flag: 'pages/api/r.js',
+    files: { 'pages/api/r.js': H("const { requestGuid } = req.body || {};\nreturn executePrompt({ promptName: 'p', runSource: 'X', requestId: requestGuid });") },
+  },
+  {
+    name: 'executePrompt({ requestId }) isGuid-guarded → pass (object-arg sink)',
+    expect: 'pass',
+    files: { 'pages/api/r.js': H("const { requestGuid } = req.body || {};\nif (!isGuid(requestGuid)) return res.status(400).end();\nreturn executePrompt({ promptName: 'p', runSource: 'X', requestId: requestGuid });") },
+  },
+  {
     name: 'sink only in a comment / string → pass (AST, not text)',
     expect: 'pass',
     files: { 'pages/api/r.js': H("// getRecord('akoya_requests', requestId) would be unsafe\nreturn res.json({ doc: \"call getRecord(set, id) carefully\" });") },

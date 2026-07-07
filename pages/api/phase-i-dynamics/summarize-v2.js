@@ -25,6 +25,7 @@ import { logUsage } from '../../../lib/utils/usage-logger';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { loadFile } from '../../../lib/utils/file-loader';
 import { executePrompt } from '../../../lib/services/execute-prompt';
+import { isGuid } from '../../../lib/utils/guid';
 
 const APP_KEY = 'batch-phase-i-summaries';
 const PROMPT_NAME = 'phase-i.summary';
@@ -56,6 +57,10 @@ export default async function handler(req, res) {
   } = req.body || {};
 
   if (!requestGuid) return res.status(400).json({ error: 'requestGuid is required' });
+  // Client-supplied id reaches a raw Dataverse key predicate via executePrompt →
+  // grantRequestAdapter → DynamicsService.getRecord/updateRecord. Validate at the
+  // route edge (trust-boundary contract; mirrors synthesize-reviews.js).
+  if (!isGuid(requestGuid)) return res.status(400).json({ error: 'requestGuid must be a valid GUID' });
   if (!fileRef) return res.status(400).json({ error: 'fileRef is required' });
 
   let fileLoad;

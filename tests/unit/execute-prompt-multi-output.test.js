@@ -105,7 +105,7 @@ function setClaudeJson(obj) {
 // The request row supplies the ETag and seed populated-state. Always-overwrite
 // guard avoids "populated" conflicts so we exercise the persist path cleanly.
 const REQUEST_ROW = {
-  akoya_requestid: 'req-1',
+  akoya_requestid: '11111111-1111-1111-1111-111111111111',
   akoya_requestnum: '1000000',
   _etag: 'W/"00000001"',
   modifiedon: '2026-05-10T00:00:00Z',
@@ -118,13 +118,13 @@ async function run(outputs, parsedOutput) {
   // one — tests that need jsonPath memo reads set it before calling run().
   if (getRecordImpl === DEFAULT_GET_RECORD) {
     getRecordImpl = async (entitySet, id) => {
-      if (entitySet === 'akoya_requests' && id === 'req-1') return REQUEST_ROW;
+      if (entitySet === 'akoya_requests' && id === '11111111-1111-1111-1111-111111111111') return REQUEST_ROW;
       return null;
     };
   }
   return executePrompt({
     promptName: 'test.multi-output',
-    requestId: 'req-1',
+    requestId: '11111111-1111-1111-1111-111111111111',
     runSource: 'Vercel Test',
     overrideVariables: { x: 'value' },
   });
@@ -160,7 +160,7 @@ describe('persistOutputs — multi-output PATCH coalescing', () => {
     // Existing memo has unrelated keys we should preserve. Persist-path calls
     // getRecord with `{ select: field }`; the request-row fetch is sourceless.
     getRecordImpl = async (entitySet, id, opts) => {
-      if (entitySet !== 'akoya_requests' || id !== 'req-1') return null;
+      if (entitySet !== 'akoya_requests' || id !== '11111111-1111-1111-1111-111111111111') return null;
       if (opts && opts.select) {
         return { wmkf_ai_dataextract: JSON.stringify({ existingKey: 'preserved' }) };
       }
@@ -185,7 +185,7 @@ describe('persistOutputs — multi-output PATCH coalescing', () => {
     ];
 
     getRecordImpl = async (entitySet, id, opts) => {
-      if (entitySet !== 'akoya_requests' || id !== 'req-1') return null;
+      if (entitySet !== 'akoya_requests' || id !== '11111111-1111-1111-1111-111111111111') return null;
       if (opts && opts.select) return { wmkf_ai_dataextract: null };
       return REQUEST_ROW;
     };
@@ -286,10 +286,10 @@ describe('parseClaudeOutput — validationSchema (A7 step 3)', () => {
     promptRow = buildSchemaPromptRow(validationSchema);
     setClaudeJson(claudeOutput);
     getRecordImpl = async (entitySet, id) =>
-      (entitySet === 'akoya_requests' && id === 'req-1') ? REQUEST_ROW : null;
+      (entitySet === 'akoya_requests' && id === '11111111-1111-1111-1111-111111111111') ? REQUEST_ROW : null;
     return executePrompt({
       promptName: 'test.validation-schema',
-      requestId: 'req-1',
+      requestId: '11111111-1111-1111-1111-111111111111',
       runSource: 'Vercel Test',
       overrideVariables: { x: 'value' },
     });

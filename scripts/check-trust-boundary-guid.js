@@ -23,6 +23,9 @@
  *   Sinks (id-arg position):
  *     DynamicsService.getRecord/updateRecord/deleteRecord  → arg 1
  *     adapter findById/updateLifecycle/softDelete/findByRequest/bulkUpdateByRequest → arg 0
+ *   Object-argument sinks (id is a named property of the first-arg object):
+ *     executePrompt({ requestId })  → forwards requestId raw to getById/updateById
+ *       inside the Executor, reaching the same `akoya_requests(${id})` predicate.
  *   Recognized guards (must name the same taint-root):
  *     isGuid(x) · allGuids(x) · guidToFolderSuffix(x)
  *     <GUID-ish>.test(x)            (object identifier matching /GUID|UUID/i, e.g. GUID_RE.test, GUID_PATTERN.test)
@@ -95,6 +98,15 @@ const SINKS = new Map([
   ['softDelete', 0],
   ['findByRequest', 0],
   ['bulkUpdateByRequest', 0],
+]);
+
+// Object-argument sinks: the record-id is a NAMED property of the first-arg
+// object, not a positional argument. executePrompt({ requestId }) forwards
+// requestId RAW to grantRequestAdapter.getById/updateById inside the Executor →
+// the same `akoya_requests(${id})` key predicate, so a route handing it a
+// client-supplied id must GUID-validate exactly as for a direct getRecord call.
+const OBJECT_ARG_SINKS = new Map([
+  ['executePrompt', 'requestId'],
 ]);
 
 const GUARD_FN_NAMES = new Set(['isGuid', 'allGuids', 'guidToFolderSuffix']);
@@ -275,12 +287,27 @@ function analyze(ast) {
         }
       }
 
-      // Sink.
+      // Sink (positional id arg).
       if (cn && SINKS.has(cn)) {
         const idx = SINKS.get(cn);
         const argNode = node.arguments && node.arguments[idx];
         if (argNode) {
           sinkUses.push({ name: cn, argNode, argRoot: rootName(argNode), inlineReq: containsReqAccess(argNode) });
+        }
+      }
+      // Sink (id as a named property of the first-arg object, e.g.
+      // executePrompt({ requestId })). The property VALUE is the id expression.
+      if (cn && OBJECT_ARG_SINKS.has(cn)) {
+        const propName = OBJECT_ARG_SINKS.get(cn);
+        const argNode = node.arguments && node.arguments[0];
+        if (argNode && argNode.type === 'ObjectExpression') {
+          for (const p of argNode.properties || []) {
+            if (p.type === 'ObjectProperty' && !p.computed && p.key
+                && ((p.key.type === 'Identifier' && p.key.name === propName)
+                    || (p.key.type === 'StringLiteral' && p.key.value === propName))) {
+              sinkUses.push({ name: cn, argNode: p.value, argRoot: rootName(p.value), inlineReq: containsReqAccess(p.value) });
+            }
+          }
         }
       }
     }
