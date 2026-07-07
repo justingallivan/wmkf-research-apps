@@ -526,3 +526,22 @@ fail-closed on incomplete context (F4). The two layers deliberately share their 
 `DeduplicationService.institutionCOIDecision`) so they cannot drift in policy, but differ in
 failure posture: upstream fails open (UX), save fails closed (enforcement). Chunk-1/v4 work should
 cross-reference this doc, and vice versa, when either ships.
+
+## 11. Post-build adversarial hardening (2026-07-06)
+
+Status: IMPLEMENTED (branch `codex/reviewer-coi-build`). An adversarial review of the built diff
+found a residual fail-open in the save-time recompute and it was fixed in the same branch:
+
+- **Finding:** the recompute originally read the reused reviewer's CRM affiliation only when
+  `lookupReviewerIdentity` returned `outcome === 'confident'`. But `upsertByEmail` reuses an
+  existing potential reviewer purely by email (`potential-reviewer.js:235-248`), and the lookup can
+  return `outcome: 'candidates'` (ambiguous) carrying that reviewer's affiliation
+  (`reviewer-identity-lookup.js:49-77`). A flag-less payload that omitted/falsified affiliation, or
+  a transient lookup failure, could still save a same-institution existing reviewer.
+- **Fix (`save-candidates-service.js`):** `resolveServerReuseAffiliations(contactMatch, candidateEmail)`
+  now collects CRM affiliation from BOTH the confident match AND every reviewer-source `candidates`
+  entry, and falls back to a direct `getByEmail` ONLY when the lookup threw (`contactMatch === null`).
+  `recomputeInstitutionCOI` evaluates the payload affiliation then each server affiliation; any
+  non-null decision rejects before any write. Regression tests: confident-match reject, ambiguous
+  `candidates` reject with no write, and the pre-existing lookup-throw-still-saves path (getByEmail
+  → null → saves). Full suite green (5002).

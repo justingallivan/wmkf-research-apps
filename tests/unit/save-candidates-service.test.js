@@ -16,6 +16,7 @@
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   upsertByEmail: jest.fn(async () => ({ id: 'PID-1' })),
   getById: jest.fn(async () => ({ wmkf_primaryaffiliation: 'MIT' })),
+  getByEmail: jest.fn(async () => null),
   setContactLink: jest.fn(async () => ({ action: 'link' })),
 }));
 jest.mock('../../lib/dataverse/adapters/researcher', () => ({
@@ -54,6 +55,7 @@ const BASE = { requestId: 'REQ-1', actingUserSystemId: 'SYS-1' };
 
 beforeEach(() => {
   jest.clearAllMocks();
+  potentialReviewerAdapter.getByEmail.mockResolvedValue(null);
   potentialReviewerAdapter.upsertByEmail.mockResolvedValue({ id: 'PID-1' });
   reviewerSuggestionAdapter.upsert.mockResolvedValue({ id: 'S1' });
   lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
@@ -255,5 +257,42 @@ test('server recomputes institution COI with CRM reviewer affiliation before any
       decisionSource: 'server_reviewer_identity_affiliation',
     }),
   );
+  warn.mockRestore();
+});
+
+test('ambiguous (non-confident) candidates outcome still fails COI on a same-institution reviewer — no write', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  // Non-confident 'candidates' outcome: the write would still reuse an existing
+  // reviewer by email, so the gate must evaluate the reviewer-source candidates'
+  // CRM affiliation, not only the 'confident' match.
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'candidates',
+    candidates: [
+      { source: 'reviewer', matchKey: 'email', reviewerId: 'PID-EXISTING', context: { affiliation: 'Applicant University' } },
+      { source: 'reviewer', matchKey: 'name', reviewerId: 'PID-OTHER', context: { affiliation: 'Somewhere Else' } },
+    ],
+  });
+
+  const err = await saveCandidates({
+    ...BASE,
+    // No COI flags, payload affiliation deliberately omitted — only the trusted
+    // CRM candidate row exposes the same-institution conflict.
+    candidates: [{ name: 'Dr Ambiguous', email: 'ambiguous@example.edu' }],
+  }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    rejectedInstitutionCOI: 1,
+    errors: [{
+      name: 'Dr Ambiguous',
+      code: 'institution_coi',
+      serverRecomputed: true,
+      decisionSource: 'server_reviewer_identity_affiliation',
+    }],
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
   warn.mockRestore();
 });
