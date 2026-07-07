@@ -54,28 +54,39 @@ streams landed on `main`.
    in the live UI. Flow: `InviteEmailModal` → `/api/review-manager/render-emails` →
    `/api/review-manager/send-emails`. Note the Azure redirect block hit earlier when running locally.
 
-2. **Prod-safety review of everything that shipped (queue item, now larger).** Evidence:
-   `.claude-memory/` + this session's merges. Covers reviewer-finder COI (S339 `a1d3049f`), Q9
-   prefs/app-access DAL (PR #49), and now the reviewer-invite stack (PR #52) — all
-   security/correctness-critical, only diff-level review so far. Good background-agent candidate.
+2. **Prod-safety review — DONE (S340 background agent).** Verdict: no confirmed HIGH/MEDIUM across
+   reviewer-finder COI (`a1d3049f`), Q9 prefs/app-access DAL (PR #49), reviewer-invite stack (PR #52).
+   One LOW **already fixed on main** (`90c15e38`, drafts dedup-by-suggestionId). Full write-up:
+   `scratchpad/prod-safety-review.md` (session-local — copy anything worth keeping into a durable doc).
+   The COI "closed by construction" claim survived three refutation attempts.
 
-3. **DynamicsService decomposition Checkpoint B (read path).** Evidence: `abc77d75`;
-   `docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md`. B carries the token/schema cache seam. Unblocked.
+### Branches Awaiting Owner Review/Merge (S340 background agents; unpushed, in worktrees)
+
+1. **`refactor/dynamics-checkpoint-b` (`daac9761`) — DynamicsService Checkpoint B (read path).**
+   Behavior-freeze extraction into `lib/services/dynamics/schema.js` + `read-ops.js`; facade 1503→981 L.
+   Full suite 5128/5128; cache-seam lifecycle traced; `clearCaches` Q3 seam now complete. **Pending: the
+   plan's BATCHED Codex adversarial review** (not run) and the plan-doc status update (blocked in-worktree
+   by `plan-named-source-read-guard`; land it at merge). `docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md`.
+2. **`fix/prompt-cache-remediation` (`35b089f`) — prompt-cache hit-rate fixes.** R1 stable-nonce option in
+   `wrapUntrustedContent` (`deriveStableNonce`, HMAC-keyed), R3 `qa.js` per-proposal nonce (biggest win),
+   R4-partial in `execute-prompt.js`; R4-full/R5 deferred. Suite 5133 green. ⚠️ **R1 changes the A7
+   untrusted-content boundary (random→stable nonce) — get an adversarial/Codex sign-off BEFORE merge**;
+   the agent flagged it and could not self-verify. `docs/PROMPT_CACHING_AUDIT.md` (status section updated).
+3. **`fix/app-access-cache-fail-open` (2 commits) — post-release LOW.** `f9ce0473` fail-closed on
+   app-grant lookup error + `d8dc65ab` invariant-map §6 marker. Deliberately held for after the release.
 
 ### Owner Decision Needed
 
-1. **Merge `fix/app-access-cache-fail-open`.** Evidence: branch is 2 commits ahead of `main`
-   (`f9ce0473` fail-closed on app-grant lookup error + `d8dc65ab` invariant-map §6 marker), NOT merged.
-   The confirmed LOW from the S340 prod-safety pass; deliberately held for after the release. Owner's
-   deploy decision.
+1. **TypeScript direction (assessment landed `docs/TYPESCRIPT_OPTION_ASSESSMENT.md`, committed `7a48c0fa`).**
+   Recommends the TS type-*checker* (`checkJs` + JSDoc branded types), NOT `.ts` renames (which would
+   fail-open five `.js`-filtered check gates). First slice: brand `Guid` in `lib/utils/guid.js` + ~6
+   selectors + `tsconfig.check.json`. Decide whether to pursue Phase 0.
 
 ### Parked
 
 1. **Spec-audit design-docs recovery** (work computer). Evidence: `project-spec-audit-docs-recovery-parked.md`.
 2. **Product/UX owner asks:** review-output formatting (`project-review-output-formatting.md`),
    campaign-settings UX revisit (`project-campaign-settings-ux-revisit.md`).
-3. **Project-wide prompt-caching remediation.** Evidence: `docs/PROMPT_CACHING_AUDIT.md` (audit landed
-   via PR #50); the *remediation* pass is not yet done. `.claude-memory/project-cache-hit-rate-review.md`.
 
 ### Verify Before Acting
 
