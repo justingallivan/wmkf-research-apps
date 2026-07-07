@@ -1,131 +1,122 @@
-# Session 341 Prompt: Resume reviewer-invite UI/test-email validation (first real external send)
+# Session 342 Prompt: Merge the S341 branch backlog; resume reviewer-invite send-side validation
 
-## Session 340 Summary
+## Session 341 Summary
 
-Planned as Fable invariant-map orchestration; the owner detoured the whole session into
-**reviewer-invite release prep** for the first real external send (a twice-a-year event). Both
-streams landed on `main`.
+Planned as reviewer-invite UI/test-email validation. That happened partially (read-only dry
+run), but the session became a **multi-agent review + hardening sprint** whose headline outcome
+was a **live security fix shipped to prod**. Ran a large background fleet (Codex reviews of the
+three S340 branches + Fable TS Phase 0/1) and, from a Codex finding, traced and closed a real
+injection/IDOR surface on `main`.
 
-- **Stream A — Fable orchestration (early, before the detour):** the Closeable-Class Invariant Map
-  and the prompt-caching audit shipped via **PR #50 (`7ca5067a`, MERGED)** —
-  `docs/CLOSEABLE_CLASS_INVARIANT_MAP.md`, `docs/PROMPT_CACHING_AUDIT.md`.
-- **Stream B — reviewer-invite first-external-send hardening (the detour, driven to completion and
-  deployed):** shipped via **PR #52 (`8d1efba2`, MERGED)**, which subsumed PR #51 (its two commits are
-  the base of #52). Merge to `main` triggered a **production Vercel deploy** of the whole stack.
+### What Was Completed
 
-### What Was Completed (Stream B)
+1. **SHIPPED TO PROD — requestId trust-boundary fix (3 commits, merged + deployed).** A Codex
+   review of the Fable TS Phase-0 branch surfaced that `pages/api/phase-i-dynamics/summarize-v2.js`
+   passed `req.body.requestGuid` with only a truthy check → `executePrompt` → `grantRequestAdapter.getById/updateById`
+   → `DynamicsService.getRecord/updateRecord` raw `akoya_requests(${id})` key predicate (an
+   authenticated over-fetch/IDOR/OData-injection surface). Fan-out audited all 6 `executePrompt`
+   callers — only `summarize-v2` was vulnerable (`synthesize-reviews` already guards; three services
+   pass no requestId). Fix has three layers: route-edge `isGuid`; a chokepoint `isGuid` in
+   `executePrompt`; and `check-trust-boundary-guid` now models `executePrompt({ requestId })` as an
+   object-arg sink (resolving import + value aliases, prebuilt-args objects, spread/computed keys).
+   Two Codex re-reviews (found + fixed a gate false-positive on guarded spread-override). Full suite
+   **5133/5133** + build green. Deploy **Ready** on prod (verified via `vercel inspect`; branded
+   domains aliased). Commits `8a68dc39`, `a7d82dee`, `26402548`.
+2. **Reviewer-invite read-only dry run (browser, capture mode).** Validated in the live workbench
+   on Request #1002794: abstract-edit gate flagging ("hard line breaks"), abstract reflow (clean
+   prose), greeting/secure-link/timeline-token render. GIF exported. **Lesson captured:** capture
+   mode blocks email only — the preview still mints+stores a Dataverse token; send still stamps the
+   lifecycle. See `reviewer-invite-capture-mode-not-full-sandbox.md`. (Left one orphan preview token
+   on a real suggestion to self-heal — do not chase.)
+3. **app-access-cache-fail-open — Codex found 2 real findings, fixed + verified + committed** (on the
+   branch, unmerged). HIGH: `dataverse-identity-map.js` cached a partial map on a non-2xx systemusers
+   lookup (cache poisoning still reachable); MEDIUM: `requireAppAccess` 503'd on grant lookup before
+   the superuser bypass (superuser lockout). Both fixed per Codex's recs; 44 tests green. Commits
+   `418841e6`, `c852e2c5`.
+4. **Fable TS Phase 0 + Phase 1 built** (owner decided YES on the TS direction this session, previously
+   an open decision). Phase 0 = branded `Guid` gate over the selector core; Phase 1 = branded
+   `ActorRef` (brands `dynamicsSystemuserId`, minted only in `lib/utils/actor-ref.js`; auth.js pure
+   re-export) + `#15` enum exhaustiveness. Verified by me and Codex. Both blocked on **call-site
+   coverage** (the gate checks the sink signature, not the routes that call it — the same class the
+   security fix above demonstrated end-to-end). Branch `worktree-agent-a837ad34b596771a7`, commits
+   `4b36bb7d`, `e6b37f66`, `bd014d81`, `d6e6cb4e`.
 
-1. **First-external-send safety** (`53f0abf1`) — inline invitation stamping, `unconfirmed[]` bucket +
-   `email_unconfirmed` event, `inviteRecorded` flag, and a body-integrity gate (missing secure link /
-   unresolved placeholder blocks the send). New "possibly sent — verify" state on retry.
-2. **Abstract reflow** (`84f859c1`) — `lib/utils/abstract-format.js` detects/reflows hard-wrapped
-   `wmkf_abstract` blocks so emails don't render stray `<br>`s; intentional paragraph breaks preserved.
-   Calibrated against ~200 real abstracts (read-only probe).
-3. **Abstract-edit gate** (`b98523d5`) — render flags a hard-wrapped abstract; PD edits the canonical
-   `wmkf_abstract` in Dataverse from the invite modal. New route
-   `POST /api/review-manager/update-abstract` + `update-abstract-service.js`.
-4. **Codex adversarial review of the abstract-edit gate → 2 findings, BOTH FIXED:**
-   - Finding 1 (`71678689`): the save only patches `wmkf_abstract`; grantee/board exports read
-     `wmkf_abstractapproved ?? wmkf_abstractformatted` with no fallback. Copy/docs no longer claim the
-     edit reaches "board write-ups, exports" — it fixes invites + any later read from `wmkf_abstract`.
-   - Finding 2 (`2f30407d`): last-write-wins → **optimistic compare-and-set**. Modal posts the
-     `expectedCurrent` it rendered from; service 409s if the live abstract changed since. Targeted on
-     the abstract field (not a row-version If-Match) so an unrelated concurrent write doesn't spuriously
-     conflict.
-
-### Commits
-- `8d1efba2` Merge PR #52 (the stack)
-- `2f30407d` optimistic compare-and-set on abstract edit (Codex finding 2)
-- `71678689` narrow abstract-edit claim to what the write actually does (Codex finding 1)
-- `b98523d5` abstract-gate adversarial-review fixes (flag/reflow consistency, save confirm, stale body)
-- `84f859c1` reflow hard-wrapped abstract, preserving intentional breaks
-- `53f0abf1` harden first-external-send safety
+### Commits (merged to main this session)
+- `26402548` trust-boundary gate: fix spread false-positive + value-alias FN (2nd Codex round)
+- `a7d82dee` harden trust-boundary gate: resolve executePrompt aliases + prebuilt-args (Codex finding)
+- `8a68dc39` fix(security): GUID-validate client requestId before the Dataverse selector via executePrompt
 
 ## Next Items
 
 ### Verified Open
 
-1. **PRIMARY — Resume the reviewer-invite UI / test-email validation.**
-   Evidence: this was the in-flight work when the owner spotted the abstract line-break bug and pivoted
-   the whole session. The safety fixes are now shipped, so the original task returns: walk the invite
-   send UX end-to-end for the first real external send — preview/test-send in `capture` mode
-   (`REVIEWER_EMAIL_DELIVERY_MODE=capture`, blocked in Vercel prod), confirm greeting/link/abstract
-   render correctly, exercise the new "possibly sent — verify" retry state and the abstract-edit gate
-   in the live UI. Flow: `InviteEmailModal` → `/api/review-manager/render-emails` →
-   `/api/review-manager/send-emails`. Note the Azure redirect block hit earlier when running locally.
-
-2. **Prod-safety review — DONE (S340 background agent).** Verdict: no confirmed HIGH/MEDIUM across
-   reviewer-finder COI (`a1d3049f`), Q9 prefs/app-access DAL (PR #49), reviewer-invite stack (PR #52).
-   One LOW **already fixed on main** (`90c15e38`, drafts dedup-by-suggestionId). Full write-up:
-   `scratchpad/prod-safety-review.md` (session-local — copy anything worth keeping into a durable doc).
-   The COI "closed by construction" claim survived three refutation attempts.
-
-### Branches Awaiting Owner Review/Merge (S340 background agents; unpushed, in worktrees)
-
-1. **`refactor/dynamics-checkpoint-b` (`daac9761`) — DynamicsService Checkpoint B (read path).**
-   Behavior-freeze extraction into `lib/services/dynamics/schema.js` + `read-ops.js`; facade 1503→981 L.
-   Full suite 5128/5128; cache-seam lifecycle traced; `clearCaches` Q3 seam now complete. **Pending: the
-   plan's BATCHED Codex adversarial review** (not run) and the plan-doc status update (blocked in-worktree
-   by `plan-named-source-read-guard`; land it at merge). `docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md`.
-2. **`fix/prompt-cache-remediation` (`35b089f`) — prompt-cache hit-rate fixes.** R1 stable-nonce option in
-   `wrapUntrustedContent` (`deriveStableNonce`, HMAC-keyed), R3 `qa.js` per-proposal nonce (biggest win),
-   R4-partial in `execute-prompt.js`; R4-full/R5 deferred. Suite 5133 green. ⚠️ **R1 changes the A7
-   untrusted-content boundary (random→stable nonce) — get an adversarial/Codex sign-off BEFORE merge**;
-   the agent flagged it and could not self-verify. `docs/PROMPT_CACHING_AUDIT.md` (status section updated).
-3. **`fix/app-access-cache-fail-open` (2 commits) — post-release LOW.** `f9ce0473` fail-closed on
-   app-grant lookup error + `d8dc65ab` invariant-map §6 marker. Deliberately held for after the release.
+1. **Merge the four pending branches (owner's batch item; each is a prod deploy — sequence them).**
+   Evidence: `git branch` shows all four; each verified this session.
+   - `refactor/dynamics-checkpoint-b` (`daac9761`) — ✅ Codex-clean (behavior-freeze verified). Land the
+     plan-doc status update at merge (was blocked in-worktree).
+   - `fix/prompt-cache-remediation` (`35b089f4`) — ✅ Codex-approved (A7 nonce safe). **Run
+     `tests/unit/utils/ai-payload-boundary.test.js` in a writable env first** (Codex sandbox couldn't).
+   - `fix/app-access-cache-fail-open` (`c852e2c5`) — fixed + verified this session; ready.
+   - `worktree-agent-a837ad34b596771a7` (Fable TS, `d6e6cb4e`) — see item 2 before merge.
+2. **Fable TS follow-ups before/at merge.** Evidence: Fable report + Codex Phase-0/1 reviews.
+   (a) Fold `tsconfig.check-phase1.json` into `tsconfig.check.json` + add a `check:types` (or
+   `:phase1`) npm script + CI line, delete the phase-1 config — the Phase-1 gate is NOT wired into
+   CI yet (Fable left it separate to avoid touching frozen Phase-0 files). (b) Extend branded-type
+   coverage to the call-site routes (add `@ts-check` to the routes that call the branded selectors/
+   `setTriageStatus`), which is what turns the gate from sink-only into real end-to-end enforcement.
+3. **Resume reviewer-invite send-side validation (the original S341 primary — only the read-only half
+   is done).** Evidence: S341 dry run covered preview/flagging/reflow only. Still unexercised:
+   capture-send + the "possibly sent — verify" retry state, and the abstract-edit save + 409
+   compare-and-set. Requires a **throwaway reviewer suggestion + proposal** (capture is NOT a full
+   sandbox — see the memory), or accept lifecycle writes on a test record.
 
 ### Owner Decision Needed
 
-1. **TypeScript direction (assessment landed `docs/TYPESCRIPT_OPTION_ASSESSMENT.md`, committed `7a48c0fa`).**
-   Recommends the TS type-*checker* (`checkJs` + JSDoc branded types), NOT `.ts` renames (which would
-   fail-open five `.js`-filtered check gates). First slice: brand `Guid` in `lib/utils/guid.js` + ~6
-   selectors + `tsconfig.check.json`. Decide whether to pursue Phase 0.
+1. **Deploy sequencing / timing for the four branches during the first-external-send window.**
+   Evidence: this session held them deliberately; the security fix was merged alone. Decide order and
+   whether to batch or space the deploys.
 
 ### Parked
 
-1. **Spec-audit design-docs recovery** (work computer). Evidence: `project-spec-audit-docs-recovery-parked.md`.
-2. **Product/UX owner asks:** review-output formatting (`project-review-output-formatting.md`),
-   campaign-settings UX revisit (`project-campaign-settings-ux-revisit.md`).
+1. Spec-audit design-docs recovery (work computer). Evidence: `project-spec-audit-docs-recovery-parked.md`.
+2. Product/UX owner asks: review-output formatting (`project-review-output-formatting.md`), campaign-settings
+   UX revisit (`project-campaign-settings-ux-revisit.md`).
+3. Project-wide prompt-cache-hit audit. Evidence: `project-cache-hit-rate-review.md`.
 
 ### Verify Before Acting
 
-1. **`main` deployed to prod this session (PR #52).** Confirm the Vercel prod build went green before
-   colleagues start real sends — `/start` should surface deploy status; use `get_deployment` /
-   inspect, not assumption. First real external-send path.
-2. **Capture mode is the ONLY safe way to exercise sends locally.** `REVIEWER_EMAIL_DELIVERY_MODE=capture`
-   prevents real delivery and is blocked in Vercel prod. Verify it's set before any test send.
+1. **Branded-type "no-ship" from Codex on Fable Phase 0/1 is a CALL-SITE-COVERAGE point, not a code
+   defect.** Evidence: both Codex reviews CONFIRMED the code correct (auth re-export pure, mint from
+   session, exhaustiveness real); the block is that routes calling the branded sinks aren't `@ts-check`'d,
+   so tsc can't prove end-to-end. Extend coverage (item 2b); do NOT relitigate the design.
 
 ### Do Not Reopen Without New Decision
 
-1. **Abstract-edit reaches source + invites only, NOT already-generated derived versions.** Evidence:
-   `71678689`; `grantee-document-assembly.js:127-132` reads `wmkf_abstractapproved ?? wmkf_abstractformatted`.
-   This is intended and documented — do not "fix" it by regenerating derived fields (they sit behind
-   their own approval-status gates).
-2. **Abstract-edit concurrency = targeted value compare-and-set, not If-Match.** Evidence: `2f30407d`;
-   `update-abstract-service.js` header. If-Match would 412 on unrelated concurrent writes to the same
-   request (e.g. the invite "invited" stamp). Extend, don't relitigate.
+1. **TypeScript direction: DECIDED (yes) and built this session.** Evidence: Fable Phase 0/1 branch;
+   `docs/TYPESCRIPT_OPTION_ASSESSMENT.md`. It's the scoped `checkJs` + JSDoc-branded-types gate on `.js`
+   files — NOT `.ts` renames (would fail-open five gates). Don't re-open the checker-vs-rename question.
+2. **ActorRef brands `dynamicsSystemuserId`, minted only in `lib/utils/actor-ref.js`.** Evidence:
+   `e6b37f66` doc-comment (owner-vetoable). Extend, don't relitigate, unless vetoing the design.
+3. **The S341 dry-run orphan token** on a real suggestion is left to self-heal. Evidence: memory
+   `reviewer-invite-capture-mode-not-full-sandbox`. Do not "clean it up."
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `shared/components/reviewers/InviteEmailModal.js` | Invite send UX + abstract-edit gate (the resume target) |
-| `lib/services/review-manager/render-emails-service.js` | Draft assembly; surfaces `abstractFlagged`/`currentAbstract`/`reflowedAbstract` |
-| `lib/services/review-manager/send-emails-service.js` | Send path; `unconfirmed[]` bucket, body-integrity gate, `inviteRecorded` |
-| `lib/services/review-manager/update-abstract-service.js` | Canonical `wmkf_abstract` write + compare-and-set 409 |
-| `pages/api/review-manager/update-abstract.js` | Thin route shell for the abstract edit |
-| `lib/utils/abstract-format.js` | Hard-wrap detect/reflow (`abstractNeedsReflow`, `reflowAbstract`) |
-| `docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md` | Checkpoint B (read path) next |
+| `pages/api/phase-i-dynamics/summarize-v2.js` | Route-edge `isGuid` guard (shipped); Batch Phase I Summaries staff tool |
+| `lib/services/execute-prompt.js` | `requestId` GUID chokepoint (shipped) — every prompt-executor caller funnels through it |
+| `scripts/check-trust-boundary-guid.js` | Gate now models `executePrompt({ requestId })` object-arg sink; residual limits documented |
+| `lib/utils/actor-ref.js` | Fable Phase-1 branded `ActorRef` mint (branch only) |
+| `tsconfig.check-phase1.json` | Fable Phase-1 checkJs config — NOT wired into CI yet (fold into main config) |
+| `docs/TYPESCRIPT_OPTION_ASSESSMENT.md` | The TS decision + phasing (Phase 0/1 built, Phase 2 = future) |
 
 ## Testing
 
 ```bash
-npm test                                   # baseline; update-abstract-service + send-emails suites green this session
-npm run lint
-npm run check:agent-wiki
-npm run check:route-service-boundary && npm run check:route-lifecycle-auth
-npm run check:api-routes && npm run check:api-routes:self-test
-# Local invite UX walkthrough (PRIMARY next task):
-#   REVIEWER_EMAIL_DELIVERY_MODE=capture npm run dev   # capture prevents real sends; blocked in prod
+npm test                                                  # full suite (5133 green as of S341)
+npm run build
+npm run check:trust-boundary-guid && npm run check:trust-boundary-guid:self-test   # 28 cases
+# Reviewer-invite local walkthrough (send-side still to do; use a THROWAWAY record):
+#   REVIEWER_EMAIL_DELIVERY_MODE=capture npm run dev   # capture blocks email, NOT Dataverse writes
 ```
