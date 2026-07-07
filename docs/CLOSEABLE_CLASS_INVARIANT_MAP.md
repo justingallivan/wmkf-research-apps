@@ -197,10 +197,24 @@ Standalone enough for a future session to execute:
 
 ## 6. Adjacent confirmed finding (from the S339 prod-safety review, same session)
 
-Not a map class but relevant to #1's surface: `lib/services/dataverse-app-access-service.js:59`
-— `listAppKeysForUser` swallows a transient Dataverse error and returns `[]`, which
-`requireAppAccess` (`lib/utils/auth.js:271`) caches for 2 minutes, locking a legitimate
-non-superuser out of all apps for up to 2 min per warm instance. **LOW, pre-existing** (dates
-to the May Wave-1 Dataverse flip, not a S339 regression), double-verified. Fix mirrors the
-fail-closed 503 path at `auth.js:291-295` (rethrow / don't-cache-on-error). Fold into the #1
-work since it's the same file/surface.
+Not a map class but relevant to #1's surface: `lib/services/dataverse-app-access-service.js`
+— `listAppKeysForUser` swallowed a transient Dataverse error and returned `[]`, which
+`requireAppAccess` cached for 2 minutes, locking a legitimate non-superuser out of all apps
+for up to 2 min per warm instance. **LOW, pre-existing** (dates to the May Wave-1 Dataverse
+flip, not a S339 regression), double-verified.
+
+**Fixed on S340 branch `fix/app-access-cache-fail-open`, commit `f9ce047`:** threading an
+opt-in `throwOnError` through the app-access service so the auth hot path distinguishes "no
+grants" from "lookup failed"; on failure `requireAppAccess` now returns a retryable 503 without
+caching (mirrors the `is_active`/roles fail-closed path). The display-only caller
+(`pages/api/app-access.js`) keeps the graceful `[]`-on-error default; regression test in
+`tests/unit/require-app-access-dal-context.test.js`. Not yet merged to `main` at time of
+writing — the finding above still describes live `main` until this branch lands.
+
+<!--
+[RECHECKED after lib/services/dataverse-app-access-service.js change: throwOnError added at dataverse-app-access-service.js catch, listAppKeysForUser]
+[RECHECKED after lib/services/app-access-service.js change: options passthrough at app-access-service.js listAppKeysForUser]
+[RECHECKED after lib/utils/auth.js change: fail-closed 503 + no-cache in requireAppAccess grant-load block]
+-->
+This §6 finding is the only place these paths carry a state claim tied to the fix; the §1/§2
+mentions are structural (guard locations), unaffected by the fix.
