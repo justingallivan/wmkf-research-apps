@@ -29,11 +29,12 @@ import PolicyAckModal from './PolicyAckModal';
 import { COUNTRIES } from '../../config/countries';
 
 // Payment-address fields the reviewer must complete to receive the honorarium.
-// line2 + state stay optional (many countries have no sub-national state, and
-// the downstream BILL contract treats both as optional). Mirrors the server's
-// validateAddress field set in respond.js. Phone is required this cycle so staff
-// have a contact number for manual honorarium payment (BILL onboarding deferred).
+// line2 stays optional. State/province is required for US/Canada and optional
+// elsewhere. Mirrors the server's required-address helper in
+// lib/external/required-address.js. Phone is required this cycle so staff have a
+// contact number for manual honorarium payment (BILL onboarding deferred).
 export const REQUIRED_ADDRESS_FIELDS = ['line1', 'city', 'postalCode', 'country', 'phone'];
+export const STATE_REQUIRED_COUNTRIES = ['US', 'CA'];
 
 // Server-side address fields that can be flagged inline when /respond rejects
 // a value (keys match respond.js ADDRESS_MAX exactly).
@@ -81,8 +82,13 @@ export function buildSubmitContactEdits({ contact, prefill = {}, boardIdentity }
  * <select> only ever emits valid ISO-2 codes — server requires length === 2.
  */
 export function missingAddressFields(address) {
-  return REQUIRED_ADDRESS_FIELDS.filter((k) => {
-    const v = (address[k] || '').trim();
+  const a = address && typeof address === 'object' ? address : {};
+  const country = (a.country || '').trim().toUpperCase();
+  const required = STATE_REQUIRED_COUNTRIES.includes(country)
+    ? [...REQUIRED_ADDRESS_FIELDS, 'state']
+    : REQUIRED_ADDRESS_FIELDS;
+  return required.filter((k) => {
+    const v = (a[k] || '').trim();
     if (!v) return true;
     if (k === 'country' && !/^[A-Za-z]{2}$/.test(v)) return true;
     return false;
@@ -179,11 +185,12 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
   }
 
   function updateAddressField(name, value) {
-    setAddress((a) => ({ ...a, [name]: value }));
-    // Clear a field's error indicator as soon as the reviewer types into it.
-    if (value && value.trim()) {
-      setAddressErrors((errs) => errs.filter((k) => k !== name));
-    }
+    const next = { ...address, [name]: value };
+    setAddress(next);
+    // Clear field error indicators as soon as the current address would satisfy
+    // them; changing country can make state/province optional again.
+    const stillMissing = new Set(missingAddressFields(next));
+    setAddressErrors((errs) => errs.filter((k) => stillMissing.has(k)));
   }
 
   function updateIdentityField(name, value) {
@@ -549,6 +556,7 @@ function Field({ label, value, onChange, type = 'text', placeholder, disabled, f
 
 function AddressCard({ address, errors, onUpdate, disabled, prefilled }) {
   const hasError = (k) => errors.includes(k);
+  const stateRequired = STATE_REQUIRED_COUNTRIES.includes((address.country || '').trim().toUpperCase());
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-6">
       <h3 className="text-base font-semibold text-gray-900">Honorarium payment address</h3>
@@ -573,8 +581,10 @@ function AddressCard({ address, errors, onUpdate, disabled, prefilled }) {
           errorMessage="City is required."
         />
         <Field
-          name="state" label="State / Province (optional)" value={address.state} onChange={(v) => onUpdate('state', v)}
-          disabled={disabled}
+          name="state" label="State / Province" value={address.state} onChange={(v) => onUpdate('state', v)}
+          disabled={disabled} required={stateRequired} error={hasError('state')}
+          errorMessage="State or province is required for US and Canadian addresses."
+          hint={stateRequired ? undefined : 'Optional outside the United States and Canada.'}
         />
         <Field
           name="postalCode" label="Postal code" value={address.postalCode} onChange={(v) => onUpdate('postalCode', v)}

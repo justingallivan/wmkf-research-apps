@@ -84,7 +84,7 @@ Status codes:
 - `reused_existing` — contact.wmkf_billcomid already populated; skipped vendor-create; ran search+invite+writeback
 - `no_match` — vendor created (or reused), network search returned **0** results; `wmkf_exisitngbillcomaccount = "No"` written; no invitation sent
 - `ambiguous_match` — vendor created (or reused), network search returned **≥2** results; `wmkf_exisitngbillcomaccount = "No"` written; no invitation sent; **warning alert emitted with redacted summary of all results so Steph can confirm by hand** (per umbrella plan failure-modes table)
-- `alert_only` — `BILL_ENABLED=false` fallback mode: skipped all BILL calls, emailed ops with manual-onboarding payload
+- `alert_only` — `BILL_ENABLED=false` fallback mode: skipped all BILL calls and logged a warning dashboard alert with the manual-onboarding payload
 - `bill_unavailable` — BILL returned auth / rate-limit / 5xx; honorarium row stands, alert was emitted. Body's `error.phase` indicates **which** phase failed (`vendor_create` / `network_search` / `network_invite`) so the alert and caller can reason about whether contact.wmkf_billcomid was already written.
 - `partial` — BILL side completed but at least one Dataverse PATCH failed; alert was emitted with which writes succeeded
 
@@ -159,8 +159,7 @@ Re-read contact, see wmkf_billcomid is populated. Skip step 3+4. Otherwise ident
 2. NotificationService.notify({
      type: 'bill_manual_onboarding',
      severity: 'warning',
-     emailAdmins: true,
-     category: 'spend',  // routes to ops; falls back to superusers
+     category: 'spend',
      title: `Manual BILL onboarding needed: ${reviewerName}`,
      message: 'BILL integration is disabled; ops must onboard this reviewer manually.',
      metadata: { honorariumRequestId, reviewerContactId, reviewerName, address, email, phone },
@@ -220,7 +219,7 @@ We deliberately do NOT track idempotency keys server-side. The honorariumRequest
 |------------------------------------------|----------------------------------------------------|--------------------------|----------------------|
 | Internal-sig invalid / timestamp skew    | 401                                                | Programmer error         | severity=error       |
 | Body validation fails                    | 400                                                | Programmer error         | None (caller's bug)  |
-| `BILL_ENABLED=false`                     | 200, `status: 'alert_only'`                        | success                  | warning (manual TODO)|
+| `BILL_ENABLED=false`                     | 200, `status: 'alert_only'`                        | success                  | warning dashboard alert (manual TODO; no email) |
 | BILL auth (`BDC_1109` exhausted)         | 200, `status: 'bill_unavailable'`, phase tag       | logs + continues         | **critical**         |
 | BILL rate-limited (`BDC_1144`)           | 200, `status: 'bill_unavailable'`, phase tag       | logs + continues         | error                |
 | BILL 5xx                                 | 200, `status: 'bill_unavailable'`, phase tag       | logs + continues         | error                |
@@ -271,7 +270,7 @@ Probe script: `scripts/probe-bill-option-set-values.js` (new, throwaway). Output
 3. **Is per-request nonce tracking overkill for inline same-origin?** Could simplify to "HMAC over (timestamp + body)" with ±5min window check, no nonce store.
 4. **Should I split the service module further** — one file for "BILL side" (create vendor + search + invite) and one for "Dataverse side" (PATCH contact + PATCH akoya_request)? Or is 250 LOC in one file fine?
 5. **What's the right severity for "Dataverse PATCH failed after BILL succeeded"?** Argued for `warning` because honorarium row exists and ops has the payload, but could be `error` since BILL state is now ahead of Dataverse state.
-6. **`BILL_ENABLED=false` payload to the alert** — is `metadata: { ...address, email, phone }` PII-safe? Goes to the ops inbox which is internal, but tracked-secrets / redaction posture should be confirmed against the [[project-virus-scanning-it-context]] approach (internal alerts for ops; no per-detection escalation needed).
+6. **`BILL_ENABLED=false` payload to the alert** — is `metadata: { ...address, email, phone }` PII-safe? Logged to the internal admin dashboard as a warning; tracked-secrets / redaction posture should be confirmed against the [[project-virus-scanning-it-context]] approach (internal alerts for ops; no per-detection escalation needed).
 7. **Is "alert + continue" the right pattern when the contact PATCH fails but vendor-create succeeded?** The contact.wmkf_billcomid we just got from BILL is now orphaned client-side until the next call. We could retry the PATCH once before alerting.
 
 ## Out of scope (will land in later chunks)

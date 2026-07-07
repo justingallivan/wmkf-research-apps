@@ -16,7 +16,7 @@ related:
 
 # API Route Security Matrix
 
-Last updated: 2026-07-05
+Last updated: 2026-07-06
 
 > **Route→Service consolidation (Stage 7, 2026-07-05):** the business logic of
 > the `pages/api` routes now lives in per-domain `lib/services/<domain>/`
@@ -161,6 +161,7 @@ There are no open findings from the initial matrix pass as of this update. New f
 | `/api/qa` | POST | App | `requireAppAccess('phase-ii-writeup', 'batch-proposal-summaries')` | Request payload | Writes `api_usage_log` (PG) via llm-client | Low | AI payload review. |
 | `/api/refine` | POST | App | `requireAppAccess('phase-ii-writeup', 'batch-proposal-summaries')` | Request payload | Writes `api_usage_log` (PG) via llm-client | Low | AI payload review. |
 | `/api/review-manager/campaign-config` | GET, POST | App | `requireAppAccess('review-manager', 'reviewers')` | `requestId` GUID-validated before it becomes an `akoya_requests` selector | Reads/writes reviewer-engagement campaign-config columns on `akoya_request` (DV: `wmkf_respondoffsetdays`, `wmkf_reviewduedate`, reminder enabled/lead pairs, `wmkf_desiredcount`); `wmkf_quotanotifiedat` is read-only | Low | Per-request reviewer campaign config (Phase 1, S275). Editable-later surface for the config first written by send-emails on first invite. |
+| `/api/review-manager/campaign-timeline-defaults` | GET, PUT | App (GET) / Superuser (PUT) | `requireAppAccess('review-manager', 'reviewers')` (GET); `requireSuperuser` (PUT) | Staff-shared review-manager access (GET); global admin (PUT) | Reads/writes `reviewer.campaign_timeline_defaults` JSON in `wmkf_appsystemsettings` (DV) via `lib/services/reviewer-campaign-timeline.js` | Low | Current-cycle reviewer invitation timeline defaults. InviteEmailModal reads them fresh on open; `/admin` writes them from the Reviewer Campaign Timeline card. Request-level campaign config still wins for response offset and review due date. |
 | `/api/review-manager/download-review` | GET | App | `requireAppAccess('review-manager', 'reviewers')` | Staff-shared review-manager access | Reads Dataverse + SharePoint | Low | Boundary documented inline; tighten to PD-only only if policy changes. |
 | `/api/review-manager/materials-preflight` | GET | App | `requireAppAccess('review-manager', 'reviewers')` | `requestId` GUID-validated before it becomes an `akoya_requests` selector | Reads Dataverse (`akoya_requests`) + SharePoint via Graph (`lib/external/reviewer-materials.js`'s `listReviewerMaterials`, shared with the external portal's `context.js`) | Low | Warns the PD before a "materials" release email send when the reviewer-visible SharePoint download folder is empty. Returns `{ok:true,fileCount}` or a sanitized `{ok:false,reason}` — never raw Graph/Dataverse error text. `ReviewerManagePanel`'s EmailModal fetches this fresh whenever it opens on/switches to the 'materials' template. |
 | `/api/review-manager/mark-received-no-file` | POST | App | `requireAppAccess('review-manager', 'reviewers')` | Staff-shared review-manager access | Updates `wmkf_appreviewersuggestion` (DV) | Medium | Token/review lifecycle action. |

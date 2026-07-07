@@ -27,6 +27,9 @@ beforeEach(() => {
   jest.spyOn(window, 'confirm').mockReturnValue(true);
   global.fetch.mockImplementation(async (url, options = {}) => {
     if (String(url).startsWith('/api/user-preferences')) return mockJson({});
+    if (url === '/api/review-manager/campaign-timeline-defaults') {
+      return mockJson({ timeline: {}, isDefault: true, malformed: false });
+    }
     if (url === '/api/review-manager/render-emails') return mockJson({ drafts: [draft] });
     if (url === '/api/review-manager/send-emails') return { ok: true, body: { getReader: () => ({ read: jest.fn() }) } };
     throw new Error(`Unexpected fetch: ${url}`);

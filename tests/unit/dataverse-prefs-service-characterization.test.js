@@ -38,7 +38,7 @@ function ownerAndKeyFilter(key) {
 }
 
 beforeEach(() => {
-  process.env.USER_PREFS_ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+  process.env.USER_PREFS_ENCRYPTION_KEY = 'test-fixture-user-prefs-encryption-key';
   delete process.env.DYNAMICS_SANDBOX_URL;
   delete process.env.DATAVERSE_DAL_UNIVERSAL;
   jest.clearAllMocks();

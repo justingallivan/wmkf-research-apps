@@ -139,7 +139,7 @@ describe('applyReviewerResponse', () => {
     action: 'accept',
     policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true },
     boardIdentity: { academicRank: 'Prof', primaryDepartment: 'Chem', mainInstitution: 'MIT' },
-    address: { line1: '1 St', city: 'Town', postalCode: '94000', country: 'US', phone: '+1 555 0100' },
+    address: { line1: '1 St', city: 'Town', postalCode: '94000', state: 'NY', country: 'US', phone: '+1 555 0100' },
   });
 
   it('drain contract: stages accept_pending BEFORE the PATCH, marks queued after, returns the job id', async () => {

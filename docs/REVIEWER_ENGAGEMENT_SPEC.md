@@ -9,6 +9,8 @@ cataloged: 2026-07-02
 owner: product-engineering
 related:
   - pages/api/review-manager/campaign-config.js
+  - pages/api/review-manager/campaign-timeline-defaults.js
+  - lib/services/reviewer-campaign-timeline.js
   - lib/external/reviewer-token-ttl.js
   - lib/services/review-upload.js
   - pages/api/cron/reviewer-reminders.js
@@ -44,7 +46,7 @@ A reviewer is invited, **accepts (or declines) the offer with full onboarding at
 | 2.8 | Proposal/materials are sent **manually** today (no auto-send, no release action, no cron). | `[verified]` no cron in `pages/api/cron/` sends materials; materials send is the manual ReviewerManagePanel "Materials" path |
 | 2.9 | `withdrawn_sufficient` (responseType `100000003`) has a portal "no longer needed" view + a respond guard. At spec time **nothing wrote it**; **Phase 4 added the writer** (`POST /api/review-manager/withdraw-sufficient`, §3.C). | view `[verified context.js]` `view='withdrawn-sufficient'`; guard `[verified respond.js]` 409 `withdrawn_sufficient`; writer now `lib/dataverse/adapters/reviewer-suggestion.js::updateLifecycle` via the withdraw-sufficient route |
 | 2.10 | `sweep-stale-invites` closes non-responders to `no_response` **after the meeting date** (not respond-by). | `[verified pages/api/cron/sweep-stale-invites.js]`, `[verified lib/services/reviewer-suggestion-sweep.js]` |
-| 2.11 | Invite timing is now split: `respondOffsetDays` and `reviewDueDate` are request-level campaign config once set, while `proposalSendDate` remains email-only scratch/sticky preference text. The invite modal hydrates request campaign values so it does not show stale per-user due dates; timing tokens are still client-substituted and line-dropped when blank. | `[verified InviteEmailModal.js]` `PREFERENCE_KEYS.INVITE_TIMING`, `campaign-config` fetch, `applyTiming`; request fields in §3.E/§4 |
+| 2.11 | Invite timing is now split: admin cycle defaults (`reviewer.campaign_timeline_defaults`) pre-fill the modal, `respondOffsetDays` and `reviewDueDate` become request-level campaign config once set, and `proposalSendDate` remains email-only invitation copy. The invite modal overlays request campaign values last so it does not show stale per-user or cycle-default due dates; timing tokens are still client-substituted and line-dropped when blank. | `[verified InviteEmailModal.js]` `campaign-timeline-defaults` fetch, `PREFERENCE_KEYS.INVITE_TIMING`, `campaign-config` fetch, `applyTiming`; request fields in §3.E/§4 |
 
 ---
 
@@ -94,7 +96,7 @@ No JWT "extension" (a signed JWT can't be extended in place; the raw token isn't
 Persist, on the request, what the cron and quota logic need (today these are throwaway `[verified §2.11]`):
 - `respondOffsetDays` (default 7), `reviewDueDate` (fixed), `respondReminderEnabled` + `respondReminderLeadDays`, `reviewDueReminderEnabled` + `reviewDueReminderLeadDays`, `desiredCount`, `quotaNotifiedAt`.
 - Written on first invite-batch send; **editable later** from the Reviewers tab; read live by the cron. Edits apply going forward, not retroactively. `[DECISION #7]`
-- **Panel change:** the respond-by input becomes **"days to respond" (offset)**, not a fixed date `[DECISION — fixes the multi-wave bug where a fixed day-0 date shortchanges later waves]`; review-due stays a fixed date; proposal-delivery stays informational email text only (no reminder — `[DECISION]` dropped).
+- **Panel change:** the respond-by input becomes **"days to respond" (offset)**, not a fixed date `[DECISION — fixes the multi-wave bug where a fixed day-0 date shortchanges later waves]`; review-due stays a fixed date; proposal-delivery stays informational email text only (no reminder — `[DECISION]` dropped). As of 2026-07-06, `/admin` also stores current-cycle defaults (invitation start, response offset, proposal release, review due) in `wmkf_appsystemsettings` key `reviewer.campaign_timeline_defaults`; `InviteEmailModal` uses them before request-level overrides and renders the timeline editor collapsed by default.
 - Multi-wave / Re-invite: a new wave is a normal first-time invite (its own `emailSentAt`); a Re-invite re-mints (review-due cap), re-stamps `emailSentAt`, and **clears `wmkf_respondremindersentat`**; request-level config is untouched. `[DECISION #6]`
 - **No manual "Re-invite already-invited" UI affordance (`[DECISION]` Justin, S277).** The automated respond-by reminder (§3.B, Phase 3 LIVE) is the nudge for invited non-responders, so the Candidates-panel button was removed (`shared/components/reviewers/ReviewerInvitePanel.js`, formerly `CandidatesPanel.js`). The server-side `allowResend` re-mint + marker-clear contract (lines above, §2.5, §4) is **retained** for programmatic re-mint paths (e.g. `regenerate-token`); a new wave still goes out as a normal first-time invite via "Send invitation" on not-invited rows.
 

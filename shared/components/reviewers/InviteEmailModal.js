@@ -8,13 +8,12 @@
  *   (templateType:'invitation' → sets invited+emailSentAt, no status bump;
  *   skips already-invited unless allowResend).
  *
- * Review-process timeline (this last two-phase cycle): the PD enters three dates
- * — respond-by, proposal-delivery, review-due — that appear in the invitation
- * body. They are interpolated CLIENT-SIDE here (not via render-emails) so a blank
- * date drops its line instead of leaking a literal {{token}} into a real email,
- * and so editing a draft doesn't require re-fetching the preview. The dates are
- * persisted as sticky per-user defaults (PREFERENCE_KEYS.INVITE_TIMING) and
- * pre-fill next time.
+ * Review-process timeline: respond-by, proposal-delivery, and review-due values
+ * appear in the invitation body. They are interpolated CLIENT-SIDE here (not via
+ * render-emails) so a blank date drops its line instead of leaking a literal
+ * {{token}} into a real email, and so editing a draft doesn't require re-fetching
+ * the preview. Load order is built-in defaults → per-user sticky values →
+ * admin cycle defaults → request campaign config; more specific values win.
  *
  * Props:
  *   - requestId   : current akoya_request GUID; used to load request campaign settings
@@ -53,6 +52,12 @@ function addDaysToTodayYmd(days) {
   return `${y}-${m}-${d}`;
 }
 
+function normalizeOffsetInput(value) {
+  if (value === '') return '';
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : '';
+}
+
 // Resolve each client-side timing token to its display string. respond-by comes
 // from the offset (today + N days); the other two are fixed dates. These are NOT
 // server placeholders — render-emails leaves them literal and we substitute here.
@@ -62,6 +67,17 @@ function timingTokenValues(timing) {
     '{{proposalDelivery}}': formatDate(timing.proposalSendDate),
     '{{reviewDue}}': formatDate(timing.reviewDueDate),
   };
+}
+
+function timingSummary(timing) {
+  const items = [];
+  const respondBy = formatDate(addDaysToTodayYmd(timing.respondOffsetDays));
+  if (respondBy) items.push(`Respond by ${respondBy}`);
+  const proposalDelivery = formatDate(timing.proposalSendDate);
+  if (proposalDelivery) items.push(`Proposals ${proposalDelivery}`);
+  const reviewDue = formatDate(timing.reviewDueDate);
+  if (reviewDue) items.push(`Reviews due ${reviewDue}`);
+  return items.join(' · ') || 'No timeline dates set';
 }
 
 // Substitute the timing tokens with formatted dates. A line whose token has no
@@ -92,6 +108,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const [rawDrafts, setRawDrafts] = useState([]); // from render-emails, timing tokens still literal
   const [edits, setEdits] = useState({}); // suggestionId -> { subject?, body? } user overrides
   const [timing, setTiming] = useState({ respondOffsetDays: 7, proposalSendDate: '', reviewDueDate: '' });
+  const [timelineOpen, setTimelineOpen] = useState(false);
   const [template, setTemplate] = useState(EMPTY_TEMPLATES.invitation); // resolved invitation template (admin default + per-PD override), loaded on open
   const [templateLoaded, setTemplateLoaded] = useState(false); // gate the first render until the template load settles (see renderPreviews) — the initial `template` is the EMPTY skeleton
   const [error, setError] = useState(null);
@@ -106,9 +123,10 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const suggestionIds = useMemo(() => (idsKey ? idsKey.split(',') : []), [idsKey]);
 
   // On open: load the user's invitation template + sticky timing defaults, then
-  // overlay request-level campaign config for the fields that are shared with
-  // Campaign settings. This keeps stale per-user defaults from showing a
-  // different review due date than the request's campaign config.
+  // overlay admin cycle defaults, then request-level campaign config for the
+  // fields that are shared with Campaign settings. This keeps stale per-user
+  // defaults from showing a different review due date than the admin/request
+  // source of truth.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -125,6 +143,16 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
           if (typeof parsed.reviewDueDate === 'string') nextTiming.reviewDueDate = parsed.reviewDueDate;
         }
       } catch { /* sticky defaults are best-effort */ }
+      try {
+        const res = await fetch('/api/review-manager/campaign-timeline-defaults');
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.timeline && data.isDefault !== true) {
+          const d = data.timeline;
+          nextTiming.respondOffsetDays = d.respondOffsetDays == null ? '' : d.respondOffsetDays;
+          nextTiming.proposalSendDate = d.proposalReleaseDate || '';
+          nextTiming.reviewDueDate = d.reviewDueDate || '';
+        }
+      } catch { /* admin cycle defaults are best-effort for preview hydration */ }
       if (requestId) {
         try {
           const res = await fetch(`/api/review-manager/campaign-config?requestId=${encodeURIComponent(requestId)}`);
@@ -312,30 +340,45 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
           {step === 'preview' && (
             <>
               <div className="mb-4 border border-gray-200 rounded-lg p-3 bg-gray-50">
-                <p className="text-xs font-medium text-gray-700 mb-2">Reviewer campaign timeline</p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <label className="text-xs text-gray-600">
-                    Days to respond
-                    <input type="number" min="0" step="1" value={timing.respondOffsetDays}
-                      onChange={(e) => setTiming((t) => ({ ...t, respondOffsetDays: e.target.value === '' ? '' : Math.max(0, Math.floor(Number(e.target.value))) }))}
-                      className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
-                  </label>
-                  <label className="text-xs text-gray-600">
-                    Proposal delivered on (email only)
-                    <input type="date" value={timing.proposalSendDate}
-                      onChange={(e) => setTiming((t) => ({ ...t, proposalSendDate: e.target.value }))}
-                      className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
-                  </label>
-                  <label className="text-xs text-gray-600">
-                    Review due date
-                    <input type="date" value={timing.reviewDueDate}
-                      onChange={(e) => setTiming((t) => ({ ...t, reviewDueDate: e.target.value }))}
-                      className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
-                  </label>
-                </div>
-                <p className="text-[11px] text-gray-400 mt-2">
-                  Days to respond and review due date are the same request-level campaign settings shown in Campaign settings. Proposal delivered on is email-only copy for this invitation. A blank field omits its line.
-                </p>
+                <button
+                  type="button"
+                  onClick={() => setTimelineOpen((open) => !open)}
+                  aria-expanded={timelineOpen}
+                  className="w-full text-left"
+                >
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-medium text-gray-700">Reviewer campaign timeline</span>
+                    <span className="text-xs text-gray-500">{timelineOpen ? 'Collapse' : 'Edit'}</span>
+                  </span>
+                  <span className="mt-1 block text-xs text-gray-500">{timingSummary(timing)}</span>
+                </button>
+                {timelineOpen && (
+                  <div className="mt-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <label className="text-xs text-gray-600">
+                        Days to respond
+                        <input type="number" min="0" step="1" value={timing.respondOffsetDays}
+                          onChange={(e) => setTiming((t) => ({ ...t, respondOffsetDays: normalizeOffsetInput(e.target.value) }))}
+                          className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
+                      </label>
+                      <label className="text-xs text-gray-600">
+                        Proposals released to reviewers
+                        <input type="date" value={timing.proposalSendDate}
+                          onChange={(e) => setTiming((t) => ({ ...t, proposalSendDate: e.target.value }))}
+                          className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
+                      </label>
+                      <label className="text-xs text-gray-600">
+                        Reviews due
+                        <input type="date" value={timing.reviewDueDate}
+                          onChange={(e) => setTiming((t) => ({ ...t, reviewDueDate: e.target.value }))}
+                          className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
+                      </label>
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-2">
+                      Days to respond and reviews due are request-level campaign settings when saved. Proposal release is email-only copy for this invitation. A blank field omits its line.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {rawDrafts.length === 0 && !error ? (
