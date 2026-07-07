@@ -4,6 +4,7 @@ description: "In a review→fix loop, \"done\" is proven by a clean review, not 
 metadata: 
   node_type: memory
   type: feedback
+  status: active
   originSessionId: 0a631ca0-29ca-4f6c-913a-f551fb1ced7d
 ---
 

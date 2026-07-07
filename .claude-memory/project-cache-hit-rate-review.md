@@ -4,6 +4,7 @@ description: "Deferred — project-wide prompt-caching audit after Anthropic fla
 metadata: 
   node_type: memory
   type: project
+  status: active
   originSessionId: 0a631ca0-29ca-4f6c-913a-f551fb1ced7d
 ---
 

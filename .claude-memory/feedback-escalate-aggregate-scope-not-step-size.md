@@ -4,6 +4,7 @@ description: "When a not-in-plan task grows through many cycles, escalate the ag
 metadata: 
   node_type: memory
   type: feedback
+  status: active
   originSessionId: 0a631ca0-29ca-4f6c-913a-f551fb1ced7d
 ---
 
@@ -13,7 +14,7 @@ called "small / the tail," never owning that the **sum** had become a major unpl
 
 **Why:** each individual fix genuinely was small and real, so "small" was true step-by-step. But
 the aggregate had drifted far from the session's actual objective (which was not even reviewer-finder
-— see the handoff), and I kept saying "one more" instead of surfacing the disproportion. Framing the
+— see the handoff), and per-step "one more" framing never surfaced that disproportion. Framing the
 next step honestly is not the same as flagging that the whole detour is now oversized.
 
 **How to apply:** track cumulative cost against the original objective, not just per-step size. When a
