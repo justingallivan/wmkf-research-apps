@@ -206,15 +206,13 @@ test('a late per-candidate failure (suggestion upsert) does not abort the batch 
   expect(out.errors).toEqual([{ name: 'Dr Second', error: 'suggestion write failed' }]);
 });
 
-test('server recomputes institution COI with CRM reviewer affiliation before any save write', async () => {
+test('server recomputes institution COI from the reused reviewer CRM affiliation (getByEmail) before any save write', async () => {
   const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-  lookupReviewerIdentity.mockResolvedValueOnce({
-    outcome: 'confident',
-    match: {
-      contactId: 'CONTACT-1',
-      matchKey: 'email',
-      context: { affiliation: 'Applicant University' },
-    },
+  // The write reuses an existing reviewer by email (upsertByEmail → getByEmail);
+  // the gate evaluates THAT reuse target's CRM affiliation, not the payload's.
+  potentialReviewerAdapter.getByEmail.mockResolvedValueOnce({
+    wmkf_potentialreviewersid: 'PID-EXISTING',
+    wmkf_primaryaffiliation: 'Applicant University',
   });
 
   const err = await saveCandidates({
@@ -260,23 +258,26 @@ test('server recomputes institution COI with CRM reviewer affiliation before any
   warn.mockRestore();
 });
 
-test('ambiguous (non-confident) candidates outcome still fails COI on a same-institution reviewer — no write', async () => {
+test('non-confident lookup shape (linked/conflict/none) still fails COI via the email reuse target — no write', async () => {
   const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-  // Non-confident 'candidates' outcome: the write would still reuse an existing
-  // reviewer by email, so the gate must evaluate the reviewer-source candidates'
-  // CRM affiliation, not only the 'confident' match.
+  // A non-confident outcome (here 'candidates' with a `source:'linked'` row, the exact
+  // shape earlier missed): the write would still reuse the existing reviewer by email,
+  // so the gate reads getByEmail's CRM affiliation regardless of the lookup shape.
   lookupReviewerIdentity.mockResolvedValueOnce({
     outcome: 'candidates',
     candidates: [
-      { source: 'reviewer', matchKey: 'email', reviewerId: 'PID-EXISTING', context: { affiliation: 'Applicant University' } },
-      { source: 'reviewer', matchKey: 'name', reviewerId: 'PID-OTHER', context: { affiliation: 'Somewhere Else' } },
+      { source: 'linked', matchKey: 'name', reviewerId: 'PID-EXISTING', context: { affiliation: 'Applicant University' } },
     ],
+  });
+  potentialReviewerAdapter.getByEmail.mockResolvedValueOnce({
+    wmkf_potentialreviewersid: 'PID-EXISTING',
+    wmkf_primaryaffiliation: 'Applicant University',
   });
 
   const err = await saveCandidates({
     ...BASE,
     // No COI flags, payload affiliation deliberately omitted — only the trusted
-    // CRM candidate row exposes the same-institution conflict.
+    // reused-reviewer CRM row exposes the same-institution conflict.
     candidates: [{ name: 'Dr Ambiguous', email: 'ambiguous@example.edu' }],
   }).catch((e) => e);
 
@@ -292,6 +293,7 @@ test('ambiguous (non-confident) candidates outcome still fails COI on a same-ins
       decisionSource: 'server_reviewer_identity_affiliation',
     }],
   });
+  expect(potentialReviewerAdapter.getByEmail).toHaveBeenCalledWith('ambiguous@example.edu');
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
   expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
   warn.mockRestore();

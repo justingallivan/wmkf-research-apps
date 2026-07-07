@@ -25,6 +25,7 @@ jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: {} })
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   upsertByEmail: jest.fn(async () => ({ id: 'PID-1' })),
   getById: jest.fn(async () => ({ wmkf_primaryaffiliation: 'MIT' })),
+  getByEmail: jest.fn(async () => null),
   setContactLink: jest.fn(async () => ({ action: 'link' })),
 }));
 jest.mock('../../lib/dataverse/adapters/researcher', () => ({

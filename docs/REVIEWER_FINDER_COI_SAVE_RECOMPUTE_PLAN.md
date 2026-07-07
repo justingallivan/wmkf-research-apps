@@ -17,10 +17,11 @@ summary: "Implemented F2/F4 save-time institution COI recompute and fail-closed 
 > affiliation signals plus server-known CRM affiliation from the reviewer persistence will REUSE, and
 > fails closed with 503 when complete applicant institution context is unavailable.
 > [RECHECKED after lib/services/reviewer-finder/save-candidates-service.js change: the CRM-affiliation
-> source was hardened post-build — it now reads the confident match AND the ambiguous `candidates`
-> outcome (plus a `getByEmail` fallback on lookup error), not only `outcome==='confident'`. §11 is the
-> authoritative description of the save-time recompute; treat any earlier "confident"-only phrasing in
-> §3.3 as superseded by §11.]
+> source was hardened post-build to match the EXACT reviewer identity persistence reuses — `getByEmail`
+> for the email-reuse path (no seed anchor) and the confident anchor lookup for a seed anchor —
+> INDEPENDENT of the identity-lookup shape (confident/candidates/linked/conflict/none/thrown). §11 is
+> the authoritative description of the save-time recompute; treat any earlier "confident"-only or
+> lookup-shape phrasing in §3.3 as superseded by §11.]
 > All `file:line` citations were verified by reading the working tree on 2026-07-06. NOTE:
 > `lib/services/reviewer-request-context.js` citations refer to the **uncommitted working-tree
 > version** (the in-flight chunk-1 `applicantInstitutionNames` change) — see §8 Stage 0.
@@ -543,10 +544,14 @@ found a residual fail-open in the save-time recompute and it was fixed in the sa
   return `outcome: 'candidates'` (ambiguous) carrying that reviewer's affiliation
   (`reviewer-identity-lookup.js:49-77`). A flag-less payload that omitted/falsified affiliation, or
   a transient lookup failure, could still save a same-institution existing reviewer.
-- **Fix (`save-candidates-service.js`):** `resolveServerReuseAffiliations(contactMatch, candidateEmail)`
-  now collects CRM affiliation from BOTH the confident match AND every reviewer-source `candidates`
-  entry, and falls back to a direct `getByEmail` ONLY when the lookup threw (`contactMatch === null`).
-  `recomputeInstitutionCOI` evaluates the payload affiliation then each server affiliation; any
-  non-null decision rejects before any write. Regression tests: confident-match reject, ambiguous
-  `candidates` reject with no write, and the pre-existing lookup-throw-still-saves path (getByEmail
-  → null → saves). Full suite green (5002).
+- **Fix (`save-candidates-service.js`):** `resolveServerReuseAffiliations({ contactMatch, candidateEmail,
+  hasSeedAnchor })` resolves the CRM affiliation of the EXACT reviewer persistence will reuse:
+  `getByEmail(candidateEmail)` for the email-reuse path (no seed anchor — the same key `upsertByEmail`
+  uses), or the confident anchor lookup for a seed anchor. This is INDEPENDENT of the identity-lookup
+  shape, so every non-confident outcome (`candidates`, `source:'linked'`, `conflict`, `none`, or a
+  thrown lookup) is covered — a review had shown the earlier confident/`source:'reviewer'`-only
+  version still fell open for `linked`/`conflict` shapes. `recomputeInstitutionCOI` evaluates the
+  payload affiliation then each server affiliation; any non-null decision rejects before any write; a
+  `getByEmail` read failure throws to the per-candidate catch (fail-closed). Regression tests:
+  email-reuse reject, non-confident (`linked`) reject with no write, and the lookup-throw-still-saves
+  path (getByEmail → null → saves). Full suite green (5002).
