@@ -245,7 +245,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md](REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md) | plan | draft |  | Plan: recompute institution COI server-side in save-candidates (fail-closed on incomplete applicant-alias context) instead of trusting client flags (F2+F4). |  |
+| [REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md](REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md) | plan | active |  | Implemented F2/F4 save-time institution COI recompute and fail-closed applicant-alias context. |  |
 
 ## reviewer-workbench
 

@@ -12,8 +12,16 @@ jest.mock('../../lib/services/proposal-participants.js', () => ({
   fetchCoPIs: (...a) => fetchCoPIs(...a),
 }));
 
+const resolveProposalPI = jest.fn(async () => ({ resolved: false, reason: 'no_orcid' }));
+const piInstitutions = jest.fn(() => []);
+jest.mock('../../lib/services/proposal-pi-identity.js', () => ({
+  resolveProposalPI: (...a) => resolveProposalPI(...a),
+  piInstitutions: (...a) => piInstitutions(...a),
+}));
+
 import {
   formatTrustedRequestMetadata,
+  loadCoiContext,
   loadReviewerRequestContext,
   mergeRequestContextIntoAnalysisResult,
   projectReviewerRequestContext,
@@ -24,6 +32,8 @@ const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 beforeEach(() => {
   jest.clearAllMocks();
   fetchCoPIs.mockResolvedValue([]);
+  resolveProposalPI.mockResolvedValue({ resolved: false, reason: 'no_orcid' });
+  piInstitutions.mockReturnValue([]);
 });
 
 describe('reviewer request context', () => {
@@ -113,6 +123,118 @@ describe('reviewer request context', () => {
       coInvestigators: 'Dr. Co A',
       abstract: 'Request abstract',
     });
+  });
+
+  test('applicant account fetch failure warns and falls back to formatted institution names', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    getRecord
+      .mockResolvedValueOnce({
+        akoya_requestid: REQUEST_ID,
+        akoya_title: 'Request Title',
+        wmkf_abstract: 'Request abstract',
+        _akoya_applicantid_value: '22222222-2222-4222-8222-222222222222',
+        _akoya_applicantid_value_formatted: 'Applicant University',
+        wmkf_organizationname: 'Applicant U',
+        _wmkf_projectleader_value_formatted: 'Dr. PI',
+      })
+      .mockRejectedValueOnce(new Error('account read failed'))
+      .mockRejectedValueOnce(new Error('account read failed'));
+
+    const context = await loadReviewerRequestContext(REQUEST_ID);
+
+    expect(context.applicantInstitutionNames).toEqual(['Applicant University', 'Applicant U']);
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[reviewer-request-context] applicant_account_variant_fetch_failed',
+      expect.objectContaining({
+        requestId: REQUEST_ID,
+        applicantId: '22222222-2222-4222-8222-222222222222',
+        attempts: 2,
+        error: 'account read failed',
+      }),
+    );
+    warnSpy.mockRestore();
+  });
+
+  test('save-time COI context skips Co-PI reads and includes complete applicant variants', async () => {
+    fetchCoPIs.mockRejectedValue(new Error('Co-PI read failed'));
+    resolveProposalPI.mockResolvedValue({
+      resolved: true,
+      currentAffiliation: 'PI University',
+    });
+    piInstitutions.mockReturnValue([{ name: 'PI University' }]);
+    getRecord
+      .mockResolvedValueOnce({
+        akoya_requestid: REQUEST_ID,
+        akoya_title: 'Request Title',
+        wmkf_abstract: 'Request abstract',
+        _akoya_applicantid_value: '22222222-2222-4222-8222-222222222222',
+        _akoya_applicantid_value_formatted: 'Applicant University',
+        wmkf_organizationname: 'Applicant U',
+        _wmkf_projectleader_value_formatted: 'Dr. PI',
+      })
+      .mockResolvedValueOnce({
+        name: 'Applicant University',
+        akoya_aka: 'Applicant U',
+        wmkf_legalname: 'Applicant University Legal Name',
+      });
+
+    const context = await loadCoiContext(REQUEST_ID);
+
+    expect(fetchCoPIs).not.toHaveBeenCalled();
+    expect(resolveProposalPI).toHaveBeenCalledWith(REQUEST_ID, { signal: undefined });
+    expect(context.applicantInstitutionContext).toMatchObject({
+      state: 'complete',
+      applicantAccountId: '22222222-2222-4222-8222-222222222222',
+      names: ['Applicant University', 'Applicant U', 'Applicant University Legal Name'],
+    });
+    expect(context.requestContext.coInvestigators).toBe('None');
+    expect(context.institutionEntries).toEqual([
+      { identity: 'Applicant University', display: 'Applicant University' },
+      { identity: 'Applicant U', display: 'Applicant U' },
+      { identity: 'Applicant University Legal Name', display: 'Applicant University Legal Name' },
+      { identity: { name: 'PI University' }, display: 'PI University' },
+    ]);
+  });
+
+  test('save-time COI context treats absent applicant lookup as complete when formatted names exist', async () => {
+    getRecord.mockResolvedValueOnce({
+      akoya_requestid: REQUEST_ID,
+      _akoya_applicantid_value_formatted: 'Formatted Applicant University',
+    });
+
+    const context = await loadCoiContext(REQUEST_ID);
+
+    expect(context.applicantInstitutionContext).toMatchObject({
+      state: 'complete',
+      applicantAccountId: null,
+      names: ['Formatted Applicant University'],
+    });
+    expect(context.institutionEntries).toEqual([
+      { identity: 'Formatted Applicant University', display: 'Formatted Applicant University' },
+    ]);
+  });
+
+  test('save-time COI context fails closed when applicant account variants cannot be fetched', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    getRecord
+      .mockResolvedValueOnce({
+        akoya_requestid: REQUEST_ID,
+        _akoya_applicantid_value: '22222222-2222-4222-8222-222222222222',
+        _akoya_applicantid_value_formatted: 'Applicant University',
+      })
+      .mockRejectedValueOnce(new Error('account read failed'))
+      .mockRejectedValueOnce(new Error('account read failed'));
+
+    await expect(loadCoiContext(REQUEST_ID)).rejects.toMatchObject({
+      httpStatus: 503,
+      code: 'applicant_institution_context_unavailable',
+      body: expect.objectContaining({
+        code: 'applicant_institution_context_unavailable',
+        requestId: REQUEST_ID,
+      }),
+    });
+    expect(resolveProposalPI).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   test('request not found → 404', async () => {

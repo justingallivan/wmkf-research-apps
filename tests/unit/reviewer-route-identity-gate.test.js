@@ -52,7 +52,10 @@ jest.mock('../../lib/services/discovery-service', () => ({
   },
 }));
 jest.mock('../../lib/services/deduplication-service', () => ({
-  DeduplicationService: { markInstitutionCOI: jest.fn((cands) => cands) },
+  DeduplicationService: {
+    markInstitutionCOI: jest.fn((cands) => cands),
+    institutionCOIDecision: jest.fn(() => null),
+  },
 }));
 jest.mock('../../lib/services/contact-enrichment-service', () => ({
   ContactEnrichmentService: { enrichCandidates: jest.fn() },
@@ -63,6 +66,13 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
 }));
 jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
   lookupReviewerIdentity: jest.fn(async () => ({ outcome: 'none' })),
+}));
+jest.mock('../../lib/services/reviewer-request-context', () => ({
+  loadReviewerRequestContext: jest.fn(async () => ({})),
+  loadCoiContext: jest.fn(async () => ({
+    applicantInstitutionContext: { state: 'complete', names: ['Applicant University'] },
+    institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
+  })),
 }));
 jest.mock('../../lib/services/notification-service', () => ({
   __esModule: true,

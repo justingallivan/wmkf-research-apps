@@ -27,6 +27,12 @@ related:
 > rendered reasoning. Prod Dataverse `analyze` row reseed is Justin's step
 > (`seed-reviewer-finder-prompts.js --execute --only=analyze`). This whole doc is now historical
 > design rationale.
+> Save-boundary F2/F4 follow-up (implemented 2026-07-06): the durable save gate no longer relies
+> only on client/enrichment flags. `save-candidates-service.js` recomputes institution COI from
+> trusted request/applicant/PI context, includes server-known CRM reviewer affiliation from
+> `lookupReviewerIdentity`, and fails closed when complete applicant institution context is
+> unavailable. Current contract owner: `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` §5; plan:
+> `docs/REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md`.
 > Author: Claude (S240, 2026-06-10). Builds on Chunk 1 (shipped, `b19b3b9`).
 > Policy: [[project-reviewer-coi-rely-on-self-disclosure]] (Justin S240). Prior design +
 > Chunk-1 context: `docs/REVIEWER_FINDER_PI_IDENTITY_WIREIN_PLAN.md` §9.

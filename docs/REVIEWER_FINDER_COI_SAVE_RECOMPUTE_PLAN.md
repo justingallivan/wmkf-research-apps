@@ -2,24 +2,28 @@
 title: Reviewer Finder — Save-Time Institution-COI Server Recompute (F2 + F4)
 domain: reviewer-origination
 kind: plan
-status: draft
-summary: "Plan: recompute institution COI server-side in save-candidates (fail-closed on incomplete applicant-alias context) instead of trusting client flags (F2+F4)."
+status: active
+summary: "Implemented F2/F4 save-time institution COI recompute and fail-closed applicant-alias context."
 ---
 
-# Reviewer Finder — Save-Time Institution-COI Server Recompute (F2 + F4) — Implementation Plan
+# Reviewer Finder — Save-Time Institution-COI Server Recompute (F2 + F4) — Implemented Plan
 
-> Author: Claude (senior-architect pass, 2026-07-06). Status: PLANNED — no code changed by this doc.
+> Author: Claude (senior-architect pass, 2026-07-06). Status: IMPLEMENTED 2026-07-06.
 > Addresses adversarial-review findings **F2** (client-flag-driven save COI gate is bypassable) and
 > **F4** (swallowed applicant-alias fetch silently weakens every hard COI check).
+> Implementation note: `save-candidates-service.js` now loads `loadCoiContext(...,
+> includeCoPIs:false, requireCompleteInstitutions:true)`, calls `lookupReviewerIdentity` before the
+> COI gate and before upsert, recomputes `DeduplicationService.institutionCOIDecision` using payload
+> affiliation signals plus server-known CRM affiliation from `lookupReviewerIdentity`, and fails
+> closed with 503 when complete applicant institution context is unavailable.
 > All `file:line` citations were verified by reading the working tree on 2026-07-06. NOTE:
 > `lib/services/reviewer-request-context.js` citations refer to the **uncommitted working-tree
 > version** (the in-flight chunk-1 `applicantInstitutionNames` change) — see §8 Stage 0.
 >
-> **Pre-implementation requirement:** local `main` is behind `origin/main` (five commits at
-> writing time [DERIVED-FROM: `git rev-list --left-right --count main...origin/main` → `0 5`,
-> probe run 2026-07-06; independent of any other count in this doc]). Implementation must rebase
-> onto latest `origin/main` first, and re-verify every line citation below after the rebase and
-> after the in-flight `reviewer-request-context.js` change lands.
+> **Historical pre-implementation note:** at plan-writing time local `main` was behind
+> `origin/main` (five commits by `git rev-list --left-right --count main...origin/main` → `0 5`,
+> probe run 2026-07-06). The implementation pass ran on the rebased feature branch named in the
+> task handoff and re-verified the relied-on anchors against current source before editing.
 
 ---
 
@@ -402,9 +406,9 @@ stages are slot/UX optimizations, the save is the enforcement boundary (§10).
    `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` must be reconciled when this ships
    (durable-docs rule), plus the stale "Authoritative" comment at
    `save-candidates-service.js:212-221` itself.
-7. **Working-tree dependency.** §2/§5 build on the *uncommitted* chunk-1 change to
-   `reviewer-request-context.js`. If that change is reworked before landing, Stages 1-2 must be
-   re-based on its final form.
+7. **Working-tree dependency.** §2/§5 originally built on the chunk-1
+   `reviewer-request-context.js` applicant-institution alias work. The 2026-07-06 implementation
+   folded that dependency into the same branch before adding F2/F4 save-time recompute.
 8. **Promotion path has no server recompute** (out of scope; D3 flag-not-drop is deliberate).
    Revisit only as an explicit policy decision with Justin.
 9. **PI at a different institution than the applicant, with the external tier down.** In that
@@ -415,43 +419,45 @@ stages are slot/UX optimizations, the save is the enforcement boundary (§10).
 ## 8. Staged implementation steps (each independently testable)
 
 **Stage 0 — rebase + land the dependency.**
-- Rebase onto latest `origin/main` (local main is behind, see header).
-- The `applicantInstitutionNames` change to `reviewer-request-context.js` is currently
-  **uncommitted working-tree state** [VERIFIED via `git status`/`git diff`, 2026-07-06], with
-  sibling changes in `reviewer-prompt-composer.js` and
-  `shared/config/prompts/reviewer-finder-dynamics.js`. It must be committed (by its owning
-  session) before Stage 1 starts. Re-verify all line citations after.
-- Files: none (git only).
+- Status: complete before the F2/F4 implementation pass on branch `codex/reviewer-coi-build`.
+- The `applicantInstitutionNames` dependency now lives in `lib/services/reviewer-request-context.js`
+  alongside the typed `applicantInstitutionContext` used by `loadCoiContext`.
 
 **Stage 1 — F4 typed state + retry (no behavior change for existing consumers).**
 - `lib/services/reviewer-request-context.js`: add `applicantInstitutionContext { state, names,
   applicantAccountId, fetchError }` to the projection; single retry on account-fetch failure;
   keep `applicantInstitutionNames` unchanged for existing consumers.
-- Tests: extend `tests/unit/reviewer-request-context.test.js` [VERIFIED file exists] — complete
-  (account fetched), complete (no applicant lookup), fallback (fetch throws twice),
-  retry-success (throws once then succeeds).
+- Status: implemented 2026-07-06.
+- Tests: extended `tests/unit/reviewer-request-context.test.js` for account fetch fallback,
+  save-time complete context with account aliases, complete context with no applicant lookup, and
+  fail-closed fallback when complete institutions are required.
 - Gates: `npm test`, `npm run lint`.
 
 **Stage 2 — `loadCoiContext`.**
 - `lib/services/reviewer-request-context.js`: new export per §3.2 (composes
   `loadReviewerRequestContext` + `resolveProposalPI` + `piInstitutions`; builds
   `institutionEntries`; `requireCompleteInstitutions` implements §5.2 rules 2-4).
-- Tests: new `tests/unit/reviewer-coi-context.test.js` — union content (alias strings + PI
-  objects, deduped), fail-open on PI-resolver error, 503-shaped throw on fallback state with
-  `requireCompleteInstitutions`, 400 on non-GUID requestId, abort propagation.
+- Status: implemented 2026-07-06.
+- Tests: covered in `tests/unit/reviewer-request-context.test.js`; `institutionEntries` are emitted
+  as `{ identity, display }` wrappers consumed by `DeduplicationService.institutionCOIDecision`.
 - Gates: `npm test`, `npm run lint`, `npm run check:trust-boundary-guid` + self-test
   (sequentially).
 
 **Stage 3 — save-path recompute (the F2 fix).**
 - `lib/services/reviewer-finder/save-candidates-service.js`: batch-level `loadCoiContext` call +
-  entry wrapping before `:184`; gate replacement at `:222-232` per §3.3; rewrite the stale
-  `:212-221` comment; additive `serverRecomputed` key on the error row.
+  save-time institution recompute per §3.3; `lookupReviewerIdentity` runs before the COI gate and
+  before upsert; server-known CRM affiliation participates in the recompute; stale gate-order
+  comments were updated; server-recomputed COI error rows carry additive `serverRecomputed`,
+  `decisionSource`, and `institutionCOIDetails`.
 - `pages/api/reviewer-finder/save-candidates.js`: no code change expected (ServiceHttpError
   mapping already handles 503 [VERIFIED via :65-67]); confirm only.
-- Tests: extend `tests/unit/save-candidates-service.test.js` (per §9).
-- Docs in the same change: `docs/API_ROUTE_SECURITY_MATRIX.md:189` row;
+- Status: implemented 2026-07-06.
+- Tests: extended `tests/unit/save-candidates-service.test.js`,
+  `tests/integration/save-candidates-route.test.js`, and
+  `tests/unit/reviewer-route-identity-gate.test.js` mocks/coverage.
+- Docs in the same change: `docs/API_ROUTE_SECURITY_MATRIX.md` row;
   `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`; chunk-2 design cross-ref; this plan's status →
-  shipped.
+  implemented.
 - Gates: `npm test`, `npm run lint`, `npm run check:api-routes`, `npm run build`.
 
 **Stage 4 (follow-up, separate change, optional) — centralize consumers.**

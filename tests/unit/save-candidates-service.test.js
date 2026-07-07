@@ -33,6 +33,12 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
 jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
   lookupReviewerIdentity: jest.fn(async () => ({ outcome: 'none' })),
 }));
+jest.mock('../../lib/services/reviewer-request-context', () => ({
+  loadCoiContext: jest.fn(async () => ({
+    applicantInstitutionContext: { state: 'complete', names: ['Applicant University'] },
+    institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
+  })),
+}));
 jest.mock('../../lib/services/notification-service', () => ({
   __esModule: true,
   default: { notify: jest.fn(async () => ({ id: 'alert-1' })) },
@@ -40,6 +46,8 @@ jest.mock('../../lib/services/notification-service', () => ({
 
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
 const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
+const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity-lookup');
+const { loadCoiContext } = require('../../lib/services/reviewer-request-context');
 const { saveCandidates, SaveCandidatesError } = require('../../lib/services/reviewer-finder/save-candidates-service');
 
 const BASE = { requestId: 'REQ-1', actingUserSystemId: 'SYS-1' };
@@ -48,6 +56,11 @@ beforeEach(() => {
   jest.clearAllMocks();
   potentialReviewerAdapter.upsertByEmail.mockResolvedValue({ id: 'PID-1' });
   reviewerSuggestionAdapter.upsert.mockResolvedValue({ id: 'S1' });
+  lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
+  loadCoiContext.mockResolvedValue({
+    applicantInstitutionContext: { state: 'complete', names: ['Applicant University'] },
+    institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
+  });
 });
 
 test('422 SaveCandidatesError with the full body (both rejected counts always present) when ALL rows are rejected', async () => {
@@ -189,4 +202,58 @@ test('a late per-candidate failure (suggestion upsert) does not abort the batch 
   expect(out.savedCount).toBe(1);
   expect(out.savedNames).toEqual(['Dr First']);
   expect(out.errors).toEqual([{ name: 'Dr Second', error: 'suggestion write failed' }]);
+});
+
+test('server recomputes institution COI with CRM reviewer affiliation before any save write', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'confident',
+    match: {
+      contactId: 'CONTACT-1',
+      matchKey: 'email',
+      context: { affiliation: 'Applicant University' },
+    },
+  });
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr CRM Affiliation',
+      email: 'crm@example.edu',
+      affiliation: 'Different University',
+    }],
+  }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    rejectedInstitutionCOI: 1,
+    errors: [{
+      name: 'Dr CRM Affiliation',
+      code: 'institution_coi',
+      serverRecomputed: true,
+      decisionSource: 'server_reviewer_identity_affiliation',
+      institutionCOIDetails: expect.objectContaining({
+        piInstitution: 'Applicant University',
+        reviewerInstitution: 'Applicant University',
+      }),
+    }],
+  });
+  expect(lookupReviewerIdentity).toHaveBeenCalledWith({
+    name: 'Dr CRM Affiliation',
+    email: 'crm@example.edu',
+    orcid: null,
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+  expect(warn).toHaveBeenCalledWith(
+    '[save-candidates] server_recomputed_institution_coi_rejected',
+    expect.objectContaining({
+      requestId: BASE.requestId,
+      candidateName: 'Dr CRM Affiliation',
+      decisionSource: 'server_reviewer_identity_affiliation',
+    }),
+  );
+  warn.mockRestore();
 });

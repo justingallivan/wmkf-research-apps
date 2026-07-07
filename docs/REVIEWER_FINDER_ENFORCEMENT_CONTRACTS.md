@@ -19,7 +19,7 @@ related:
 **Status:** MAINTAINED current-state reference (owns the live behavioral guarantees below).
 **Owner:** reviewer-finder.
 **Created:** 2026-06-13 (S253).
-**Last verified:** 2026-07-03 (S321 + Contract 5 follow-up through Phase C) — contracts 3, 5, and 7 re-verified against the S321 gating-redesign implementation and institution-COI precision/flag-not-drop follow-up; others last traced 2026-06-13 (S253). See `[VERIFIED]` tags per section.
+**Last verified:** 2026-07-06 (save-time institution-COI F2/F4 recompute) — contract 5 re-verified against the server-side save recompute, applicant-alias fail-closed context, and `lookupReviewerIdentity` ordering; contracts 3 and 7 last re-verified 2026-07-03 (S321 + Contract 5 follow-up through Phase C); others last traced 2026-06-13 (S253). See `[VERIFIED]` tags per section.
 
 > **What this doc is.** The single maintained home for the Reviewer Finder feature's
 > *live* fail-closed enforcement contracts — the hard blocks, force-nulls, and
@@ -159,7 +159,7 @@ contradiction only; returns false if either name is initial-only).
 
 ---
 
-## 5. S240 current-institution COI — default hard drop + durable gate `[VERIFIED 2026-07-03]`
+## 5. S240 current-institution COI — default hard drop + durable gate `[VERIFIED 2026-07-06]`
 
 **Contract.** Current same-institution affiliation (reviewer at a proposal-PI institution) is a
 foundation POLICY conflict, **hard-dropped by default on BOTH discovery tracks** and
@@ -184,21 +184,31 @@ foundation POLICY conflict, **hard-dropped by default on BOTH discovery tracks**
   first when both sides carry ids, keeps exact-normalized / abbreviation-expanded / exact key-word
   equality, and uses only narrow same-system campus qualifier containment. It does not use bare
   substring containment or broad subset matching for COI.
-- **Save (authoritative).** `save-candidates.js:150-160` HARD-REJECTS a row with
-  `hasInstitutionCOI` OR a post-enrichment `contactEnrichment.coiRecomputed && hasInstitutionCOI`,
-  incrementing `rejectedInstitutionCOI` (`:116`). Enrichment runs AFTER the discovery drop and can
-  promote a current affiliation matching a PI institution, so the durable boundary re-checks —
-  independent of whether the client promoted the flag. Phase C does NOT add a waiver or override.
-  422 if the whole batch is COI/unresolved (`:305-316`).
+- **Save (authoritative).** `lib/services/reviewer-finder/save-candidates-service.js` loads
+  `loadCoiContext(requestId, { includeCoPIs:false, requireCompleteInstitutions:true })` before the
+  candidate loop, so save-time COI screening uses trusted request/applicant/PI institution context
+  and fails closed with a 503 `ServiceHttpError` if a valid applicant-account alias set cannot be
+  loaded after retry. The save path computes persisted contact fields, calls
+  `lookupReviewerIdentity`, then HARD-REJECTS before any `wmkf_potentialreviewer`,
+  researcher-overlay, or suggestion upsert when any of these are true: client top-level
+  `hasInstitutionCOI`, post-enrichment `contactEnrichment.coiRecomputed &&
+  contactEnrichment.hasInstitutionCOI`, or a fresh server recompute via
+  `DeduplicationService.institutionCOIDecision`. The recompute evaluates payload affiliation
+  signals and, when `lookupReviewerIdentity` returns a confident match, the server-known CRM
+  reviewer affiliation from `match.context.affiliation`. Rejections increment
+  `rejectedInstitutionCOI`; 422 still applies when the whole batch is COI/unresolved.
 - **Retired.** Historical / former-shared institution COI is RETIRED — `markInstitutionCOI` is
   current-affiliation only; `institutionCOIDetails.historical` is gone. `affiliationHistory` is
   still produced but COI-inert (deferred dead-code). The SOFT flag survives only on the
   applicant-recommended (`enrich-recommended.js`, flag-not-drop) and post-enrichment
   (`enrich-contacts.js`) paths.
 
-**Enforcement points.** `save-candidates.js:116, 150-160, 305-316` · `discover.js`
-(`partitionConflicts` + `recordCoiDropped`) · `DiscoveryService.discover()` (`partitionConflicts`) ·
-`lib/services/deduplication-service.js` (`institutionsMatchForCOI`) ·
+**Enforcement points.** `lib/services/reviewer-finder/save-candidates-service.js`
+(`loadCoiContext`, `lookupReviewerIdentity`, `recomputeInstitutionCOI`, `rejectedInstitutionCOI`) ·
+`lib/services/reviewer-request-context.js` (`loadCoiContext`, applicant-alias retry/fail-closed,
+Co-PI reads skipped for save-time COI context) · `discover.js` (`partitionConflicts` +
+`recordCoiDropped`) · `DiscoveryService.discover()` (`partitionConflicts`) ·
+`lib/services/deduplication-service.js` (`institutionCOIDecision`, `institutionsMatchForCOI`) ·
 `lib/services/reviewer-roster-store.js` (`recordCoiDropped`).
 
 > **This contract previously had no documentary home outside the agent wiki** — the

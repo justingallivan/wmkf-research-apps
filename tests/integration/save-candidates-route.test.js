@@ -42,6 +42,12 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
 jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
   lookupReviewerIdentity: jest.fn(async () => ({ outcome: 'none' })),
 }));
+jest.mock('../../lib/services/reviewer-request-context', () => ({
+  loadCoiContext: jest.fn(async () => ({
+    applicantInstitutionContext: { state: 'complete', names: ['Applicant University'] },
+    institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
+  })),
+}));
 jest.mock('../../lib/services/notification-service', () => ({
   __esModule: true,
   default: { notify: jest.fn(async () => ({ id: 'alert-1' })) },
