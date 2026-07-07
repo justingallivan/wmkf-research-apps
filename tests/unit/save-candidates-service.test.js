@@ -365,3 +365,41 @@ test('non-confident lookup shape (linked/conflict/none) still fails COI via the 
   expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
   warn.mockRestore();
 });
+
+test('email-less candidate with a confident ORCID match to a same-institution reviewer fails COI — no write', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  // No email → the write would CREATE a new reviewer (upsertByEmail with email:null
+  // skips reuse), but the confident ORCID match exposes the existing reviewer's CRM
+  // affiliation; the gate must evaluate it regardless of the missing email.
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'confident',
+    match: {
+      reviewerId: 'PID-ORCID',
+      matchKey: 'orcid',
+      context: { affiliation: 'Applicant University' },
+    },
+  });
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{ name: 'Dr NoEmail', orcid: '0000-0002-1825-0097' }],
+  }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    rejectedInstitutionCOI: 1,
+    errors: [{
+      name: 'Dr NoEmail',
+      code: 'institution_coi',
+      serverRecomputed: true,
+      decisionSource: 'server_reviewer_identity_affiliation',
+    }],
+  });
+  expect(potentialReviewerAdapter.getByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+  warn.mockRestore();
+});

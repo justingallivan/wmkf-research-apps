@@ -572,3 +572,17 @@ same-institution reviewer the gate never evaluated.
   `reusedAffiliation`; `{ id, created }` contract unchanged for the other callers
   (`contact-enrichment/persistence.js`, backfill/e2e scripts). Tests: adapter single-read (no second
   query when `existing` provided) + service threading/reuse. Full suite green (5006).
+
+## 13. Email-less confident-match close (2026-07-06)
+
+Status: IMPLEMENTED (branch `codex/reviewer-coi-build`). A final whole-branch review found the
+exact-reuse refactor (§11) had scoped affiliation resolution behind `if (candidateEmail)`, so a NO-EMAIL
+candidate with a confident ORCID/name match to an existing same-institution reviewer was recomputed with
+no server affiliation and saved (the write CREATEs a new reviewer for an email-less candidate).
+
+- **Fix:** `resolveServerReuseAffiliations` now ALWAYS evaluates `collectLookupAffiliations(contactMatch)`
+  (the identity lookup's CRM affiliation — confident match incl. ORCID/name on an email-less candidate,
+  plus reviewer-source `candidates`) on every path, IN ADDITION to the `getByEmail` reuse-target
+  affiliation on the email path (still threaded via `existing` for single-read atomicity). Regression
+  test: a no-email ORCID-confident same-institution match is rejected with zero potential-reviewer/
+  researcher/suggestion writes. Full suite green (5007).
