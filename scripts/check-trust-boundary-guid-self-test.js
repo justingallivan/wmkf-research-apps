@@ -116,6 +116,31 @@ const CASES = [
     files: { 'pages/api/r.js': H("const { requestGuid } = req.body || {};\nif (!isGuid(requestGuid)) return res.status(400).end();\nreturn executePrompt({ promptName: 'p', runSource: 'X', requestId: requestGuid });") },
   },
   {
+    name: 'aliased import ep({ requestId }) unguarded → fail (object-arg alias)',
+    expect: 'fail', flag: 'pages/api/r.js',
+    files: { 'pages/api/r.js': "import { executePrompt as ep } from '../../lib/services/execute-prompt';\n" + H("const { requestGuid } = req.body || {};\nreturn ep({ promptName: 'p', runSource: 'X', requestId: requestGuid });") },
+  },
+  {
+    name: 'prebuilt args object executePrompt(args) unguarded → fail (object-arg prebuilt)',
+    expect: 'fail', flag: 'pages/api/r.js',
+    files: { 'pages/api/r.js': H("const { requestGuid } = req.body || {};\nconst args = { promptName: 'p', runSource: 'X', requestId: requestGuid };\nreturn executePrompt(args);") },
+  },
+  {
+    name: 'prebuilt args object, isGuid-guarded → pass (object-arg prebuilt)',
+    expect: 'pass',
+    files: { 'pages/api/r.js': H("const { requestGuid } = req.body || {};\nif (!isGuid(requestGuid)) return res.status(400).end();\nconst args = { requestId: requestGuid };\nreturn executePrompt(args);") },
+  },
+  {
+    name: 'spread of req.body into executePrompt → fail (object-arg spread)',
+    expect: 'fail', flag: 'pages/api/r.js',
+    files: { 'pages/api/r.js': H("return executePrompt({ ...req.body, promptName: 'p', runSource: 'X' });") },
+  },
+  {
+    name: 'computed string key executePrompt({ [\"requestId\"]: x }) unguarded → fail',
+    expect: 'fail', flag: 'pages/api/r.js',
+    files: { 'pages/api/r.js': H("const { requestGuid } = req.body || {};\nreturn executePrompt({ ['requestId']: requestGuid, promptName: 'p' });") },
+  },
+  {
     name: 'sink only in a comment / string → pass (AST, not text)',
     expect: 'pass',
     files: { 'pages/api/r.js': H("// getRecord('akoya_requests', requestId) would be unsafe\nreturn res.json({ doc: \"call getRecord(set, id) carefully\" });") },

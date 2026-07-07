@@ -26,6 +26,11 @@
  *   Object-argument sinks (id is a named property of the first-arg object):
  *     executePrompt({ requestId })  → forwards requestId raw to getById/updateById
  *       inside the Executor, reaching the same `akoya_requests(${id})` predicate.
+ *     Resolved shapes: import alias (`import { executePrompt as ep }; ep({…})`),
+ *     a prebuilt args object (`const args = { requestId }; executePrompt(args)`),
+ *     a string-literal or computed-string key (`{ 'requestId' }`/`{ ['requestId'] }`),
+ *     and a spread of req.query/req.body into the object (flagged — an id may
+ *     arrive tainted through it).
  *   Recognized guards (must name the same taint-root):
  *     isGuid(x) · allGuids(x) · guidToFolderSuffix(x)
  *     <GUID-ish>.test(x)            (object identifier matching /GUID|UUID/i, e.g. GUID_RE.test, GUID_PATTERN.test)
@@ -59,6 +64,11 @@
  *     still satisfies a human reviewer; the gate simply won't flag it). Same
  *     boundary class as check-model-override-warming.
  *   - A request object named other than `req` is not recognized as a taint source.
+ *   - Object-arg sink (executePrompt): a first arg that is not an in-file object
+ *     literal (a function param, a call return, a reassigned var) or a dynamic
+ *     computed key is undecidable here and not flagged; the executePrompt runtime
+ *     chokepoint (isGuid on requestId) is the backstop for those. Positional sinks
+ *     (getRecord etc.) do NOT resolve import aliases (pre-existing literal-name limit).
  *   - Validation is presence-based within the file, not control-flow-ordered
  *     (validating a var AFTER its sink use — a nonsensical, unobserved pattern —
  *     would read as guarded).
@@ -217,6 +227,29 @@ function patternNames(id, out = []) {
   return out;
 }
 
+// Scan the first-arg ObjectExpression of an object-arg sink for the id-bearing
+// property (e.g. requestId) and push a sinkUse. Handles a plain key, a string-
+// literal key (incl. computed `{ ['requestId']: x }`), and a spread of
+// req.query/req.body (an id can arrive tainted via the spread with no named root
+// to guard → always a violation, mirroring an inline req.* sink arg).
+function scanObjectArgSink(objExpr, propName, cn, sinkUses) {
+  for (const p of objExpr.properties || []) {
+    if (p.type === 'SpreadElement' || p.type === 'SpreadProperty' || p.type === 'ExperimentalSpreadProperty') {
+      if (p.argument && containsReqAccess(p.argument)) {
+        sinkUses.push({ name: cn, argNode: p.argument, argRoot: null, inlineReq: true });
+      }
+      continue;
+    }
+    if (p.type !== 'ObjectProperty' || !p.key) continue;
+    const keyMatches =
+      (!p.computed && p.key.type === 'Identifier' && p.key.name === propName) ||
+      (p.key.type === 'StringLiteral' && p.key.value === propName); // 'requestId' or ['requestId']
+    if (keyMatches) {
+      sinkUses.push({ name: cn, argNode: p.value, argRoot: rootName(p.value), inlineReq: containsReqAccess(p.value) });
+    }
+  }
+}
+
 function analyze(ast) {
   const baseTainted = new Set();                 // names bound directly from req.query/req.body
   const aliasEdges = [];                          // { targets:[], source } value aliases
@@ -224,12 +257,29 @@ function analyze(ast) {
   const sinkUses = [];                            // { name(sink), argNode, argRoot, inlineReq }
   const guardRoots = new Set();                   // taint-roots named by a recognized guard
   const guardMemberRoots = [];                    // { paramRoot } for guard on P.member (P maybe a callback param)
+  const objectBindings = new Map();               // varName → ObjectExpression init (prebuilt args object)
+  const objectArgSinkAliases = new Map();         // local import alias → propName (import { executePrompt as ep })
+  const objectArgSinkCalls = [];                  // { cn, propName, argNode } resolved AFTER the walk
 
   (function rec(node) {
     if (!node || typeof node.type !== 'string') return;
 
+    // Import-alias resolution for object-arg sinks: `import { executePrompt as ep }`
+    // makes `ep` a sink callee. (Positional sinks retain the literal-name limit.)
+    if (node.type === 'ImportDeclaration') {
+      for (const spec of node.specifiers || []) {
+        if (spec.type !== 'ImportSpecifier' || !spec.imported) continue;
+        const importedName = spec.imported.type === 'Identifier' ? spec.imported.name : spec.imported.value;
+        if (OBJECT_ARG_SINKS.has(importedName)) objectArgSinkAliases.set(spec.local.name, OBJECT_ARG_SINKS.get(importedName));
+      }
+    }
+
     // ── taint sources & aliases ──────────────────────────────────────────
     if (node.type === 'VariableDeclarator' && node.init) {
+      // A prebuilt args object: `const args = { requestId: … }` → executePrompt(args).
+      if (node.init.type === 'ObjectExpression' && node.id.type === 'Identifier') {
+        objectBindings.set(node.id.name, node.init);
+      }
       if (containsReqAccess(node.init)) {
         for (const n of patternNames(node.id)) baseTainted.add(n);
       } else {
@@ -296,19 +346,13 @@ function analyze(ast) {
         }
       }
       // Sink (id as a named property of the first-arg object, e.g.
-      // executePrompt({ requestId })). The property VALUE is the id expression.
-      if (cn && OBJECT_ARG_SINKS.has(cn)) {
-        const propName = OBJECT_ARG_SINKS.get(cn);
+      // executePrompt({ requestId })). Resolve the callee through import aliases;
+      // defer the property scan until after the walk so a prebuilt-args object
+      // (first arg is an Identifier bound to a `const args = {…}`) can be resolved.
+      const objSinkProp = (cn && OBJECT_ARG_SINKS.get(cn)) ?? (cn && objectArgSinkAliases.get(cn));
+      if (objSinkProp) {
         const argNode = node.arguments && node.arguments[0];
-        if (argNode && argNode.type === 'ObjectExpression') {
-          for (const p of argNode.properties || []) {
-            if (p.type === 'ObjectProperty' && !p.computed && p.key
-                && ((p.key.type === 'Identifier' && p.key.name === propName)
-                    || (p.key.type === 'StringLiteral' && p.key.value === propName))) {
-              sinkUses.push({ name: cn, argNode: p.value, argRoot: rootName(p.value), inlineReq: containsReqAccess(p.value) });
-            }
-          }
-        }
+        if (argNode) objectArgSinkCalls.push({ cn, propName: objSinkProp, argNode });
       }
     }
 
@@ -319,6 +363,18 @@ function analyze(ast) {
       else if (v && typeof v.type === 'string') rec(v);
     }
   })(ast.program);
+
+  // Resolve object-arg sink calls now that import aliases + object-literal
+  // bindings are fully collected (order-independent). A prebuilt `const args =
+  // {…}` first arg is resolved against objectBindings; an unresolvable first arg
+  // (function param, call return, reassigned var) is undecidable here — a
+  // documented residual limit, left to the executePrompt runtime chokepoint.
+  for (const call of objectArgSinkCalls) {
+    let obj = null;
+    if (call.argNode.type === 'ObjectExpression') obj = call.argNode;
+    else if (call.argNode.type === 'Identifier') obj = objectBindings.get(call.argNode.name) || null;
+    if (obj) scanObjectArgSink(obj, call.propName, call.cn, sinkUses);
+  }
 
   // Source graph: name → set of names it derives from (alias + iterable edges).
   // Multi-valued because a name can be bound in more than one place (e.g. a `id`
