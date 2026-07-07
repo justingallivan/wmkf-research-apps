@@ -586,3 +586,22 @@ no server affiliation and saved (the write CREATEs a new reviewer for an email-l
   affiliation on the email path (still threaded via `existing` for single-read atomicity). Regression
   test: a no-email ORCID-confident same-institution match is rejected with zero potential-reviewer/
   researcher/suggestion writes. Full suite green (5007).
+
+## 14. No-email path hardening (2026-07-06)
+
+Status: IMPLEMENTED (branch `codex/reviewer-coi-build`). A whole-branch review found the no-email
+candidate path (which CREATEs a new reviewer and has no `getByEmail` reuse target) still fell open in two
+ways: `collectLookupAffiliations` only read `source:'reviewer'` candidates (dropping `source:'linked'`),
+and a no-email candidate whose identity lookup THREW was screened on payload only.
+
+- **Fix (principled, not shape-by-shape):** `collectLookupAffiliations` now reads `context.affiliation`
+  from EVERY candidate (contact-source is null-safe), so any reviewer-carrying shape (`reviewer`/`linked`)
+  is screened without a source allowlist. `collectLookupReviewerIdsMissingAffiliation` gathers reviewer
+  IDs the lookup surfaces WITHOUT an affiliation (confident/candidates without `context.affiliation`, and
+  `conflict.details` keys matching `/reviewerid$/i` — excluding `reviewerContactId`, which is a contact
+  id); for the no-email/no-seed path those are resolved via `getById(reviewerId)` and screened, with a
+  `getById` error/miss → reject pre-write (`institution_coi`, `serverRecomputed`). And a no-email/no-seed
+  candidate whose lookup THREW (`contactMatch === null`) is rejected fail-closed
+  (`decisionSource:'reviewer_identity_lookup_failed'`). The email path (`getByEmail` + `existing`) and
+  seed-anchor path are unchanged; an `{outcome:'none'}` no-email candidate with a non-conflicting payload
+  affiliation still saves (no over-rejection). Full suite green (5012).

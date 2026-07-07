@@ -57,6 +57,7 @@ const BASE = { requestId: 'REQ-1', actingUserSystemId: 'SYS-1' };
 beforeEach(() => {
   jest.clearAllMocks();
   potentialReviewerAdapter.getByEmail.mockResolvedValue(null);
+  potentialReviewerAdapter.getById.mockResolvedValue({ wmkf_primaryaffiliation: 'MIT' });
   potentialReviewerAdapter.upsertByEmail.mockResolvedValue({ id: 'PID-1' });
   reviewerSuggestionAdapter.upsert.mockResolvedValue({ id: 'S1' });
   lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
@@ -364,6 +365,191 @@ test('non-confident lookup shape (linked/conflict/none) still fails COI via the 
   expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
   expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
   warn.mockRestore();
+});
+
+test('email-less candidate with linked ORCID candidate at applicant institution fails COI — no write', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'candidates',
+    candidates: [
+      {
+        source: 'linked',
+        matchKey: 'orcid',
+        reviewerId: 'PID-LINKED',
+        context: { affiliation: 'Applicant University' },
+      },
+    ],
+  });
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{ name: 'Dr Linked NoEmail', orcid: '0000-0002-1825-0097' }],
+  }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    rejectedInstitutionCOI: 1,
+    errors: [{
+      name: 'Dr Linked NoEmail',
+      code: 'institution_coi',
+      serverRecomputed: true,
+      decisionSource: 'server_reviewer_identity_affiliation',
+    }],
+  });
+  expect(potentialReviewerAdapter.getByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.getById).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
+  expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+  warn.mockRestore();
+});
+
+test('email-less candidate with conflict reviewerId at applicant institution fails COI via getById — no write', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'conflict',
+    reason: 'contact_linked_elsewhere',
+    details: { reviewerId: 'PID-CONFLICT' },
+  });
+  potentialReviewerAdapter.getById.mockResolvedValueOnce({
+    wmkf_potentialreviewersid: 'PID-CONFLICT',
+    wmkf_primaryaffiliation: 'Applicant University',
+  });
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{ name: 'Dr Conflict NoEmail', orcid: '0000-0002-1825-0097' }],
+  }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    rejectedInstitutionCOI: 1,
+    errors: [{
+      name: 'Dr Conflict NoEmail',
+      code: 'institution_coi',
+      serverRecomputed: true,
+      decisionSource: 'server_reviewer_identity_affiliation',
+    }],
+  });
+  expect(potentialReviewerAdapter.getById).toHaveBeenCalledWith('PID-CONFLICT');
+  expect(potentialReviewerAdapter.getByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
+  expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+  warn.mockRestore();
+});
+
+test('email-less candidate with conflict reviewerId getById failure fails closed — no write', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'conflict',
+    reason: 'contact_linked_elsewhere',
+    details: { reviewerId: 'PID-CONFLICT' },
+  });
+  potentialReviewerAdapter.getById.mockRejectedValueOnce(new Error('reviewer read down'));
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{ name: 'Dr Conflict Lookup Down', orcid: '0000-0002-1825-0097' }],
+  }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    rejectedInstitutionCOI: 1,
+    errors: [{
+      name: 'Dr Conflict Lookup Down',
+      code: 'institution_coi',
+      serverRecomputed: true,
+      decisionSource: 'reviewer_identity_affiliation_lookup_failed',
+    }],
+  });
+  expect(potentialReviewerAdapter.getById).toHaveBeenCalledWith('PID-CONFLICT');
+  expect(potentialReviewerAdapter.getByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
+  expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+  warn.mockRestore();
+});
+
+test('email-less candidate whose identity lookup throws fails closed before writes', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  lookupReviewerIdentity.mockRejectedValueOnce(new Error('lookup down'));
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{ name: 'Dr Lookup Throws', orcid: '0000-0002-1825-0097' }],
+  }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    rejectedInstitutionCOI: 1,
+    errors: [{
+      name: 'Dr Lookup Throws',
+      code: 'institution_coi',
+      serverRecomputed: true,
+      decisionSource: 'reviewer_identity_lookup_failed',
+    }],
+  });
+  expect(potentialReviewerAdapter.getByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.getById).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
+  expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+  warn.mockRestore();
+});
+
+test('email-less candidate with no lookup match and non-conflicting payload affiliation saves', async () => {
+  lookupReviewerIdentity.mockResolvedValueOnce({ outcome: 'none' });
+
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr NoEmail Safe',
+      affiliation: 'Different University',
+      expertise: 'Safe science',
+    }],
+  });
+
+  expect(out).toMatchObject({
+    success: true,
+    savedCount: 1,
+    savedNames: ['Dr NoEmail Safe'],
+    totalRequested: 1,
+  });
+  expect(potentialReviewerAdapter.getByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.getById).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledWith(
+    expect.objectContaining({
+      name: 'Dr NoEmail Safe',
+      email: null,
+      affiliation: 'Different University',
+    }),
+    { actingUserSystemId: BASE.actingUserSystemId, existing: null },
+  );
+  expect(researcherAdapter.upsertByPotentialReviewer).toHaveBeenCalledWith(
+    'PID-1',
+    expect.objectContaining({
+      name: 'Dr NoEmail Safe',
+      affiliation: 'Different University',
+    }),
+    { actingUserSystemId: BASE.actingUserSystemId },
+  );
+  expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalledWith(
+    expect.objectContaining({ potentialReviewerId: 'PID-1' }),
+    { actingUserSystemId: BASE.actingUserSystemId },
+  );
 });
 
 test('email-less candidate with a confident ORCID match to a same-institution reviewer fails COI — no write', async () => {
