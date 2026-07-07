@@ -439,6 +439,10 @@ touched gates → commit. Leaf-first per the DAG.
   `queryAllRecords` 5000-cap/paging `:671-677`, `aggregateRecords` op allowlist `:571-574`,
   `searchRecords` normalization `:741-756`). Gates: `check:dataverse-access-layer`,
   `check:route-service-boundary`, `check:odata-escape`.
+  [RECHECKED after lib/services/dynamics/read-ops.js change: S342 added `// @ts-check` + JSDoc
+  branded-`Guid` annotations for the `check:types` gate (getRecord `recordId`) plus one
+  behavior-preserving guard tweak in `aggregateRecords` — the extraction/behavior claims above
+  remain accurate; see the TS gate follow-up under Checkpoint F and `docs/TYPESCRIPT_OPTION_ASSESSMENT.md`.]
 - **Checkpoint C — `write-core.js` (Stage 6). DEDICATED review.** The DAL entity-write core: 4
   `assertTrustedDalContext` sites (C2), impersonation fallback (C12), 412/ETag contracts (C13),
   `updateIfEmpty` read-modify-write discriminated results (`:875-915`). Baseline:
