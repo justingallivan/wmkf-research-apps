@@ -1,0 +1,20 @@
+{
+  // Phase-1 type-check gate (Invariant-Map #10 ActorRef + #15 enum
+  // exhaustiveness). SEPARATE from tsconfig.check.json ON PURPOSE: that file
+  // (and package.json + .github/workflows/test.yml) is frozen under the parallel
+  // Phase-0 adversarial review, so Phase 1 must not edit it and risk a merge
+  // conflict. This config `extends` it (inheriting the identical strict/checkJs
+  // compilerOptions) and only adds the Phase-1 files to `include`.
+  //
+  // FOLLOW-UP (for whoever unfreezes the Phase-0 files): fold this `include`
+  // list into tsconfig.check.json, point `check:types` at the union, delete this
+  // file. Until then run BOTH: `tsc -p tsconfig.check.json` (Phase 0) and
+  // `tsc -p tsconfig.check-phase1.json` (Phase 1). See
+  // docs/TYPESCRIPT_OPTION_ASSESSMENT.md §5.
+  "extends": "./tsconfig.check.json",
+  "include": [
+    "lib/utils/actor-ref.js",
+    "lib/services/workbench/triage-service.js",
+    "lib/services/reviewer-rollup.js"
+  ]
+}
