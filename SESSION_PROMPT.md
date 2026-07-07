@@ -1,119 +1,120 @@
-# Session 340 Prompt: Fable orchestration — Closeable-Class Invariant Map, then the execution queue
+# Session 341 Prompt: Resume reviewer-invite UI/test-email validation (first real external send)
 
-## Session 339 Summary
+## Session 340 Summary
 
-Two independent streams landed on `main` this session:
+Planned as Fable invariant-map orchestration; the owner detoured the whole session into
+**reviewer-invite release prep** for the first real external send (a twice-a-year event). Both
+streams landed on `main`.
 
-- **Stream A — the *planned* S339 work, executed in a parallel worktree/agent:** DynamicsService
-  decomposition **Checkpoint A COMPLETE** (`auth.js`, `restrictions.js`, `annotations.js` extracted
-  behavior-freeze; batched Codex review PASSED — `abc77d75`), and the **Q9 prefs/app-access DAL migration
-  landed** (PR #49 `c0fea717`, Stages 1/2.5/3). **Checkpoint B (read path) is now unblocked.**
-- **Stream B — this session (a detour the owner initiated, then drove to completion):** server-side
-  reviewer-finder save-time **institution-COI enforcement**, from the chunk-1 analyze-prompt fix through a
-  structural reframe that closes the bypass class *by construction*; merged to `main` and deployed. Plus the
-  parked `codex/minor-fixes` branch merged, and a Fable orchestration brief authored.
+- **Stream A — Fable orchestration (early, before the detour):** the Closeable-Class Invariant Map
+  and the prompt-caching audit shipped via **PR #50 (`7ca5067a`, MERGED)** —
+  `docs/CLOSEABLE_CLASS_INVARIANT_MAP.md`, `docs/PROMPT_CACHING_AUDIT.md`.
+- **Stream B — reviewer-invite first-external-send hardening (the detour, driven to completion and
+  deployed):** shipped via **PR #52 (`8d1efba2`, MERGED)**, which subsumed PR #51 (its two commits are
+  the base of #52). Merge to `main` triggered a **production Vercel deploy** of the whole stack.
 
 ### What Was Completed (Stream B)
 
-1. **Reviewer-finder save-time institution-COI enforcement — merged `a1d3049f`, deploy READY (prod).**
-   Chunk-1 prompt fix (deterministic exclusion block, scientific-only PART 1, applicant institution name
-   variants, A7-wrapped decoupled top-up) + F2/F4 server recompute + ~6 adversarial-review hardening cycles +
-   a Fable structural **discovery-recorder reframe** (`4070728`) that makes the referenced-identity declaration
-   a total function of every adapter row fetched, so no lookup branch can drop a discovery. Closes the "server
-   can discover a candidate is at the applicant/PI institution but writes it unscreened" class. PI-resolver
-   outage now a retryable 503; request-context errors keep 400/404. Docs: `docs/REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md` §§1-20.
-2. **`codex/minor-fixes` merged — `61fe97bc`, deploying (prod).** Campaign timeline defaults (+ route/admin UI),
-   honorarium require-state for US/CA payment addresses (shared validator; accept UI already collects it), bill
-   onboarding-warning email suppression, prefs fixture. Fixed the parked blocker (stale external-review address
-   fixtures — added `state`; a fixture fix, not a rule change).
-3. **Fable orchestration brief — `683a7ed`.** `docs/INVARIANT_MAP_ORCHESTRATION_BRIEF.md`: the primary next
-   objective (below).
-4. **Branch cleanup.** Deleted merged local + remote `codex/reviewer-coi-build`, `codex/minor-fixes`, local
-   `codex/q9-prefs-appaccess`; parked `~/Code/WMKF_Apps-codex` on `codex/parked` with skeleton intact.
+1. **First-external-send safety** (`53f0abf1`) — inline invitation stamping, `unconfirmed[]` bucket +
+   `email_unconfirmed` event, `inviteRecorded` flag, and a body-integrity gate (missing secure link /
+   unresolved placeholder blocks the send). New "possibly sent — verify" state on retry.
+2. **Abstract reflow** (`84f859c1`) — `lib/utils/abstract-format.js` detects/reflows hard-wrapped
+   `wmkf_abstract` blocks so emails don't render stray `<br>`s; intentional paragraph breaks preserved.
+   Calibrated against ~200 real abstracts (read-only probe).
+3. **Abstract-edit gate** (`b98523d5`) — render flags a hard-wrapped abstract; PD edits the canonical
+   `wmkf_abstract` in Dataverse from the invite modal. New route
+   `POST /api/review-manager/update-abstract` + `update-abstract-service.js`.
+4. **Codex adversarial review of the abstract-edit gate → 2 findings, BOTH FIXED:**
+   - Finding 1 (`71678689`): the save only patches `wmkf_abstract`; grantee/board exports read
+     `wmkf_abstractapproved ?? wmkf_abstractformatted` with no fallback. Copy/docs no longer claim the
+     edit reaches "board write-ups, exports" — it fixes invites + any later read from `wmkf_abstract`.
+   - Finding 2 (`2f30407d`): last-write-wins → **optimistic compare-and-set**. Modal posts the
+     `expectedCurrent` it rendered from; service 409s if the live abstract changed since. Targeted on
+     the abstract field (not a row-version If-Match) so an unrelated concurrent write doesn't spuriously
+     conflict.
 
-### Commits (Stream B, selected)
-- `683a7ed` docs: Fable orchestration brief (invariant map + queue)
-- `61fe97bc` Merge codex/minor-fixes
-- `a1d3049f` Merge reviewer-finder save-time institution-COI enforcement
-- `4070728` refactor(reviewer-finder): discovery-recorder reframe (§19)
-- `f324a503` refactor(reviewer-finder): close save-COI class by construction (§15)
-- `0630c279` feat(reviewer-finder): F2 server-side institution-COI recompute at save
+### Commits
+- `8d1efba2` Merge PR #52 (the stack)
+- `2f30407d` optimistic compare-and-set on abstract edit (Codex finding 2)
+- `71678689` narrow abstract-edit claim to what the write actually does (Codex finding 1)
+- `b98523d5` abstract-gate adversarial-review fixes (flag/reflow consistency, save confirm, stale body)
+- `84f859c1` reflow hard-wrapped abstract, preserving intentional breaks
+- `53f0abf1` harden first-external-send safety
 
 ## Next Items
 
 ### Verified Open
 
-1. **PRIMARY — Fable orchestration: the Closeable-Class Invariant Map.**
-   Evidence: `docs/INVARIANT_MAP_ORCHESTRATION_BRIEF.md` (`683a7ed`). The owner gives Fable a **charter at
-   session start** (charter governs; the brief scopes). Produce the evidence-backed map — every
-   security/correctness surface classified on the enforcement ladder (impossible-by-construction > fail-closed
-   gate > advisory gate > review), with the smallest structural move that lifts each toward rung 1, ranked by
-   blast radius, implementable by a later session. Fable directs; subagents execute. Worked example: the COI
-   discovery-recorder story.
+1. **PRIMARY — Resume the reviewer-invite UI / test-email validation.**
+   Evidence: this was the in-flight work when the owner spotted the abstract line-break bug and pivoted
+   the whole session. The safety fixes are now shipped, so the original task returns: walk the invite
+   send UX end-to-end for the first real external send — preview/test-send in `capture` mode
+   (`REVIEWER_EMAIL_DELIVERY_MODE=capture`, blocked in Vercel prod), confirm greeting/link/abstract
+   render correctly, exercise the new "possibly sent — verify" retry state and the abstract-edit gate
+   in the live UI. Flow: `InviteEmailModal` → `/api/review-manager/render-emails` →
+   `/api/review-manager/send-emails`. Note the Azure redirect block hit earlier when running locally.
 
-2. **Execution queue (after the map; owner priority order — let the map's ranking override):**
-   a. **Project-wide prompt-caching audit + standardized remediation.** Evidence:
-      `.claude-memory/project-cache-hit-rate-review.md` (Anthropic flagged low cache-hit rate). Holistic, from
-      `lib/services/llm-client.js` consumers.
-   b. **Holistic prod-safety review of everything that shipped today** — reviewer-finder COI (`a1d3049f`), Q9
-      prefs/app-access DAL (PR #49, auth hot path), DynamicsService Checkpoint A. All security/correctness-
-      critical, only incremental/diff review so far.
-   c. **DynamicsService decomposition Checkpoint B (read path).** Evidence: `abc77d75` ("Checkpoint B
-      unblocked"); `docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md`. B carries the token/schema cache seam.
+2. **Prod-safety review of everything that shipped (queue item, now larger).** Evidence:
+   `.claude-memory/` + this session's merges. Covers reviewer-finder COI (S339 `a1d3049f`), Q9
+   prefs/app-access DAL (PR #49), and now the reviewer-invite stack (PR #52) — all
+   security/correctness-critical, only diff-level review so far. Good background-agent candidate.
+
+3. **DynamicsService decomposition Checkpoint B (read path).** Evidence: `abc77d75`;
+   `docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md`. B carries the token/schema cache seam. Unblocked.
 
 ### Owner Decision Needed
 
-1. **Fable retirement (last-night access).** Owner is handing Fable the invariant-map brief + a charter this
-   session. No decision for the next actor — context only.
+1. **Merge `fix/app-access-cache-fail-open`.** Evidence: branch is 2 commits ahead of `main`
+   (`f9ce0473` fail-closed on app-grant lookup error + `d8dc65ab` invariant-map §6 marker), NOT merged.
+   The confirmed LOW from the S340 prod-safety pass; deliberately held for after the release. Owner's
+   deploy decision.
 
 ### Parked
 
 1. **Spec-audit design-docs recovery** (work computer). Evidence: `project-spec-audit-docs-recovery-parked.md`.
-2. **Product/UX owner asks:** review-output formatting (`project-review-output-formatting.md`), campaign-
-   settings UX revisit (`project-campaign-settings-ux-revisit.md`). Not orchestrator-shaped.
+2. **Product/UX owner asks:** review-output formatting (`project-review-output-formatting.md`),
+   campaign-settings UX revisit (`project-campaign-settings-ux-revisit.md`).
+3. **Project-wide prompt-caching remediation.** Evidence: `docs/PROMPT_CACHING_AUDIT.md` (audit landed
+   via PR #50); the *remediation* pass is not yet done. `.claude-memory/project-cache-hit-rate-review.md`.
 
 ### Verify Before Acting
 
-1. **`main` moved ~5 commits under this session (Stream A: DAL/dynamics) in parallel.** Any mental model built
-   on pre-detour `main` is stale — `/start` (pull) and re-read `docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md`
-   before touching Checkpoint B.
-2. **DAL Stage 9 enforcement status moved.** The Q9 migration (PR #49) touched the prefs/app-access write entry
-   points Stage 9 was going to wrap; re-verify what is already `withDalContext`-wrapped before scoping the
-   warn→wrap→enforce work. Evidence: `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` Stage 9.
-3. **Reviewer-finder COI shipped to prod with heavy-but-incremental review + one structural reframe.** Treat as
-   "shipped, pending the whole-system review" (queue item 2b), not as fully independently validated end-to-end.
+1. **`main` deployed to prod this session (PR #52).** Confirm the Vercel prod build went green before
+   colleagues start real sends — `/start` should surface deploy status; use `get_deployment` /
+   inspect, not assumption. First real external-send path.
+2. **Capture mode is the ONLY safe way to exercise sends locally.** `REVIEWER_EMAIL_DELIVERY_MODE=capture`
+   prevents real delivery and is blocked in Vercel prod. Verify it's set before any test send.
 
 ### Do Not Reopen Without New Decision
 
-1. **Reviewer-finder save-COI enforcement architecture** (discovery-recorder + single save-time choke point +
-   input-side invariant test). Evidence: `docs/REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md` §§15-20; `f324a503`,
-   `4070728`. Closed the bypass class by construction across ~6 review cycles; do not re-litigate the design
-   without new evidence — extend it.
-2. **Honorarium require-state on external-review accept is intended.** Evidence: `lib/external/required-address.js`
-   header (accept guard + honorarium backfill must enforce the SAME completeness); `Stage2aView` collects it;
-   `61fe97bc`. The address-fixture updates were stale-fixture fixes, not a behavior change to relitigate.
+1. **Abstract-edit reaches source + invites only, NOT already-generated derived versions.** Evidence:
+   `71678689`; `grantee-document-assembly.js:127-132` reads `wmkf_abstractapproved ?? wmkf_abstractformatted`.
+   This is intended and documented — do not "fix" it by regenerating derived fields (they sit behind
+   their own approval-status gates).
+2. **Abstract-edit concurrency = targeted value compare-and-set, not If-Match.** Evidence: `2f30407d`;
+   `update-abstract-service.js` header. If-Match would 412 on unrelated concurrent writes to the same
+   request (e.g. the invite "invited" stamp). Extend, don't relitigate.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/INVARIANT_MAP_ORCHESTRATION_BRIEF.md` | **The Fable brief** — primary next objective + execution queue |
-| `docs/REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md` | Save-time COI plan §§1-20 (F2/F4 → recorder reframe) |
-| `lib/services/reviewer-identity-lookup.js` | Producer: discovery recorder + single-exit `referenced*` stamping |
-| `lib/services/reviewer-finder/save-candidates-service.js` | The save-time COI choke point (consumer) |
-| `lib/external/required-address.js` | Shared address-completeness validator (accept guard + honorarium backfill) |
-| `docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md` | Decomposition plan — Checkpoint A done, B (read path) next |
-| `.claude-memory/project-cache-hit-rate-review.md` | Prompt-caching audit context (queue item 2a) |
+| `shared/components/reviewers/InviteEmailModal.js` | Invite send UX + abstract-edit gate (the resume target) |
+| `lib/services/review-manager/render-emails-service.js` | Draft assembly; surfaces `abstractFlagged`/`currentAbstract`/`reflowedAbstract` |
+| `lib/services/review-manager/send-emails-service.js` | Send path; `unconfirmed[]` bucket, body-integrity gate, `inviteRecorded` |
+| `lib/services/review-manager/update-abstract-service.js` | Canonical `wmkf_abstract` write + compare-and-set 409 |
+| `pages/api/review-manager/update-abstract.js` | Thin route shell for the abstract edit |
+| `lib/utils/abstract-format.js` | Hard-wrap detect/reflow (`abstractNeedsReflow`, `reflowAbstract`) |
+| `docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md` | Checkpoint B (read path) next |
 
 ## Testing
 
 ```bash
-# Full suite + the gates most relevant to what shipped this session
-npm test                                   # baseline (was 5082 green at S339 wind-down)
-npm run lint                               # 0 errors expected
-npm run check:dataverse-access-layer && npm run check:dataverse-access-layer:self-test
-npm run check:trust-boundary-guid && npm run check:trust-boundary-guid:self-test
-npm run check:prompt-injection-tagging && npm run check:prompt-injection-tagging:self-test
+npm test                                   # baseline; update-abstract-service + send-emails suites green this session
+npm run lint
+npm run check:agent-wiki
+npm run check:route-service-boundary && npm run check:route-lifecycle-auth
 npm run check:api-routes && npm run check:api-routes:self-test
-npm run check:docs-catalog
+# Local invite UX walkthrough (PRIMARY next task):
+#   REVIEWER_EMAIL_DELIVERY_MODE=capture npm run dev   # capture prevents real sends; blocked in prod
 ```
