@@ -28,6 +28,15 @@
  * qa.js, refine.js) migrate to executePrompt(), the legacy generators
  * become unused and can be deleted.
  *
+ * SUNSET S344 (2026-07-08): the Phase-0-to-Executor migration this file was
+ * staged for is NOT happening for these apps. `phase-ii-writeup` and
+ * `batch-proposal-summaries` are now sunset-candidates (PDF-upload format
+ * retired; see APP_LIFECYCLE_REGISTRY). The `phase-ii.extract-structured`
+ * template below is retained only as the reference for the planned
+ * Dataverse-native migration (source admin fields from `akoya_request`
+ * instead of inferring them from the PDF) — see docs/PROMPT_LEGACY_AUDIT.md.
+ * These rows remain viewable/editable in /admin but drive nothing.
+ *
  * SYSTEM VS USER PLACEMENT (PHASE 0 COMPROMISE)
  * ──────────────────────────────────────────────────────────────────────────
  * Per Phase 0 contract, every variable declares placement: "user". In
@@ -122,7 +131,8 @@ Research Proposal Text:
 Write in a neutral, factual tone. Avoid promotional language or unnecessary adjectives. State information directly and let the science speak for itself.`;
 
 // ────────────────────────────────────────────────────────────────────────────
-// phase-ii.extract-structured
+// phase-ii.extract-structured — SUNSET S344 (retained as DV-native migration
+// reference; see file header + docs/PROMPT_LEGACY_AUDIT.md). Drives nothing.
 // ────────────────────────────────────────────────────────────────────────────
 
 export const EXTRACT_SYSTEM_PROMPT = '';

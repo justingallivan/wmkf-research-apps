@@ -18,6 +18,24 @@ related:
 
 # AI Prompt Legacy Audit — Redundant Extraction & Promise-Gaps
 
+> **Disposition (S344, 2026-07-08).** The owner chose to **sunset the four
+> PDF-upload document-processing apps** — `phase-ii-writeup`,
+> `batch-proposal-summaries`, `batch-phase-i-summaries`, and `phase-i-writeup` —
+> rather than re-scope them in place. They are no longer used in their current
+> (PDF-upload) format. All four were removed from `APP_REGISTRY` (out of
+> nav / home / admin grant UI) and recorded as `status: 'sunset-candidate'` in
+> `APP_LIFECYCLE_REGISTRY` (`shared/config/appRegistry.js`); their pages + API
+> routes (`/api/process`, `/api/process-phase-i`, `/api/process-phase-i-writeup`)
+> remain routable and the code is **retained, not archived**, as the reference
+> for a planned Dataverse-native migration (e.g. Phase I writeup elements moving
+> into the Request Workbench, an unbuilt feature). The shared
+> `createStructuredDataExtractionPrompt` generator (the former
+> `phase-ii.extract-structured` prompt) and the dormant `phase-ii.*` Phase-0 rows
+> carry `@deprecated`/sunset markers. The "re-scope in place" recommendations
+> below are therefore superseded by this sunset decision; the analysis of *what*
+> each prompt over-infers still guides the eventual DV-native rebuild. Confirmed
+> not reachable from the reviewer workbench.
+
 **Task:** S343 owner ask. Evaluate every AI prompt on two axes — (1) *doing too much*
 (extracting/inferring admin facts Dataverse now owns authoritatively) and (2) *delivering
 on its promise* (right questions, output consumed, no gaps). Read-only; no prompt/code/data

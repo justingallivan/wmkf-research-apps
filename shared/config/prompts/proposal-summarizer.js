@@ -98,6 +98,13 @@ Write in a neutral, factual tone. Avoid promotional language or unnecessary adje
  * preamble and places the wrapped block last. When `nonces` is empty (a caller
  * not yet migrated) the preamble is omitted and behavior is unchanged.
  *
+ * @deprecated Sunset S344 (2026-07-08). This structured-extraction prompt (the
+ *   former `phase-ii.extract-structured` surface) infers admin fields the app now
+ *   owns in Dataverse; the four PDF-upload apps that call it (batch-phase-i-summaries,
+ *   batch-proposal-summaries, phase-i-writeup, phase-ii-writeup) are sunset-candidates
+ *   (see APP_LIFECYCLE_REGISTRY). Retained, not deleted: it is the reference for the
+ *   planned Dataverse-native migration (source these fields from `akoya_request`
+ *   instead of the PDF). Do not add new callers. See docs/PROMPT_LEGACY_AUDIT.md.
  * @param {string} text - The proposal text (bounded, or wrapped when migrated)
  * @param {string} filename - The filename (may contain institution hints)
  * @param {string[]} nonces - Sentinel nonce(s) in play, for the preamble

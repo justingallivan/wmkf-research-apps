@@ -1,3 +1,8 @@
+// SUNSET S344 (2026-07-08): backs the sunset-candidate app `phase-i-writeup`
+// (PDF-upload, no longer used in current format). Route is intentionally LEFT
+// ROUTABLE; code retained as the direct reference for the planned Dataverse-native
+// Phase I writeup feature in the Request Workbench (unbuilt). Do not add new
+// callers. See APP_LIFECYCLE_REGISTRY + docs/PROMPT_LEGACY_AUDIT.md.
 import pdf from 'pdf-parse';
 import { BASE_CONFIG, getModelForApp, loadModelOverrides } from '../../shared/config';
 import { createPhaseIWriteupPrompt } from '../../shared/config/prompts/phase-i-writeup';

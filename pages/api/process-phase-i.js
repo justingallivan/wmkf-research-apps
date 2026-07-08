@@ -1,3 +1,7 @@
+// SUNSET S344 (2026-07-08): backs the sunset-candidate app `batch-phase-i-summaries`
+// (PDF-upload, no longer used in current format). Route is intentionally LEFT
+// ROUTABLE; code retained as the reference for a planned Dataverse-native
+// migration. Do not add new callers. See APP_LIFECYCLE_REGISTRY + docs/PROMPT_LEGACY_AUDIT.md.
 import pdf from 'pdf-parse';
 import { BASE_CONFIG, KECK_GUIDELINES, getModelForApp, loadModelOverrides } from '../../shared/config';
 import { createPhaseISummarizationPrompt } from '../../shared/config/prompts/phase-i-summaries';

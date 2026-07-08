@@ -111,13 +111,18 @@ naming-debt. (Folded from the S290 Codex adversarial review.)
 - `deprecated` — retired; fields `deprecatedAt`, `archivedTo`, `successorKey`/reason,
   grants-retained flag. (Concept Evaluator.) [VERIFIED: `_archived/README.md:15-17`]
 - `direct-url-test` / `sunset-candidate` — not navigable but still routable, pending a
-  usage decision (`phase-i-dynamics`, `test-email`).
+  usage decision (`phase-i-dynamics`, `test-email`; and, from S344 2026-07-08, the four
+  sunset PDF-upload document-processing apps `batch-phase-i-summaries`,
+  `batch-proposal-summaries`, `phase-i-writeup`, `phase-ii-writeup` — code retained for a
+  planned Dataverse-native migration, routes left routable). [VERIFIED: `appRegistry.js`
+  `APP_LIFECYCLE_REGISTRY`]
 - `borrowed-live-infra` — for route namespaces whose owner app is now `reviewers`.
 
 **Consumer behavior:** navigation/home/grants/`ALL_APP_KEYS` keep reading `APP_REGISTRY`
 only. [VERIFIED: `appRegistry.js:161-168`] Docs/CI read the lifecycle map to explain
 historical keys and block stale claims. `scripts/lib/canonical-facts.js` derives
-`APP_REGISTRY.length` (currently **16**) from the array literal — do not hand-write the
+`APP_REGISTRY.length` (currently **12**, after the S344 sunset of the four PDF-upload
+apps) from the array literal — do not hand-write the
 count, and don't change that deriver unless intentionally changing the active-app fact.
 [VERIFIED via `scripts/lib/canonical-facts.js:81-115` — it locates the exact `APP_REGISTRY`
 export identifier before counting elements, so it's robust to a second export. NOTE: a bare

@@ -21,24 +21,14 @@ export const APP_REGISTRY = [
     categories: ['concepts'],
     features: ['3 AI Perspectives', 'Consensus Analysis', 'Disagreement Resolution', 'Framework Selection'],
   },
-  {
-    key: 'batch-phase-i-summaries',
-    name: 'Batch Phase I Summaries',
-    href: '/batch-phase-i-summaries',
-    icon: '📑',
-    description: 'Process multiple Phase I proposals simultaneously with customizable summary length',
-    categories: ['phase-i'],
-    features: ['Batch Processing', 'Phase I Specific', 'Custom Length', 'Bulk Export'],
-  },
-  {
-    key: 'batch-proposal-summaries',
-    name: 'Batch Phase II Summaries',
-    href: '/batch-proposal-summaries',
-    icon: '📑',
-    description: 'Process multiple Phase II proposals simultaneously with customizable summary length',
-    categories: ['phase-ii'],
-    features: ['Batch Processing', 'Custom Length', 'Multi-File Upload', 'Bulk Export'],
-  },
+  // Sunset 2026-07-08 (S344): batch-phase-i-summaries, batch-proposal-summaries,
+  // phase-i-writeup, and phase-ii-writeup are no longer used in their current
+  // (PDF-upload) format. Removed from APP_REGISTRY so they leave nav/home/admin
+  // grant UI; pages + API routes remain routable and the code is intentionally
+  // retained as the reference for a planned Dataverse-native migration (e.g.
+  // Phase I writeup elements moving into the Request Workbench). See
+  // APP_LIFECYCLE_REGISTRY (status: sunset-candidate) below and
+  // docs/PROMPT_LEGACY_AUDIT.md.
   {
     key: 'funding-gap-analyzer',
     name: 'Funding Analysis',
@@ -47,24 +37,6 @@ export const APP_REGISTRY = [
     description: 'Analyze federal funding landscapes for research proposals using NSF, NIH, and USAspending.gov data',
     categories: ['phase-i', 'phase-ii'],
     features: ['NSF Awards API', 'NIH RePORTER', 'USAspending.gov', 'Funding Gap Analysis'],
-  },
-  {
-    key: 'phase-i-writeup',
-    name: 'Create Phase I Writeup Draft',
-    href: '/phase-i-writeup',
-    icon: '✍️',
-    description: 'Generate Keck Foundation Phase I writeup drafts with standardized formatting',
-    categories: ['phase-i'],
-    features: ['PDF Analysis', '1-Page Format', 'Institution Detection', 'Export Options'],
-  },
-  {
-    key: 'phase-ii-writeup',
-    name: 'Create Phase II Writeup Draft',
-    href: '/phase-ii-writeup',
-    icon: '✍️',
-    description: 'Generate Keck Foundation Phase II writeup drafts with standardized formatting',
-    categories: ['phase-ii'],
-    features: ['PDF Analysis', 'Claude AI Drafts', 'Q&A Chat', 'Export Options'],
   },
   {
     key: 'reviewers',
@@ -246,6 +218,66 @@ export const APP_LIFECYCLE_REGISTRY = {
     pagePath: '/test-email',
     notes: 'Live test surface (/test-email + /api/test-email). NOT an orphan; do not archive.',
     lastVerified: '2026-06-26',
+  },
+  // Sunset S344 (2026-07-08): the four PDF-upload document-processing apps are no
+  // longer used in their current format. Removed from APP_REGISTRY (out of nav /
+  // home / admin grant UI) but pages + API routes are intentionally LEFT ROUTABLE
+  // and the code is retained as the reference for a planned Dataverse-native
+  // migration (e.g. Phase I writeup elements → Request Workbench, an unbuilt
+  // feature). NOT 'deprecated' — nothing was archived to _archived/. Existing
+  // user_app_access grants are retained (honored on read by requireAppAccess;
+  // only NEW grants are blocked since the keys left ALL_APP_KEYS). The structured
+  // extraction all four share (proposal-summarizer.createStructuredDataExtractionPrompt,
+  // formerly the phase-ii.extract-structured prompt) is the surface the S343
+  // prompt-legacy audit flagged for Dataverse-native re-scope — see
+  // docs/PROMPT_LEGACY_AUDIT.md.
+  'batch-phase-i-summaries': {
+    name: 'Batch Phase I Summaries',
+    status: 'sunset-candidate',
+    successorKey: null,
+    sunsetAt: '2026-07-08',
+    pagePath: '/batch-phase-i-summaries',
+    apiRoute: '/api/process-phase-i',
+    grantsRetained: true,
+    notes:
+      'Sunset S344. PDF-upload batch Phase I summarizer. Page + /api/process-phase-i retained/routable; code kept for Dataverse-native migration. Shares createStructuredDataExtractionPrompt.',
+    lastVerified: '2026-07-08',
+  },
+  'batch-proposal-summaries': {
+    name: 'Batch Phase II Summaries',
+    status: 'sunset-candidate',
+    successorKey: null,
+    sunsetAt: '2026-07-08',
+    pagePath: '/batch-proposal-summaries',
+    apiRoute: '/api/process',
+    grantsRetained: true,
+    notes:
+      'Sunset S344. PDF-upload batch Phase II summarizer. Page + /api/process retained/routable (/api/process is also used by phase-ii-writeup). Code kept for Dataverse-native migration. Shares createStructuredDataExtractionPrompt.',
+    lastVerified: '2026-07-08',
+  },
+  'phase-i-writeup': {
+    name: 'Create Phase I Writeup Draft',
+    status: 'sunset-candidate',
+    successorKey: null,
+    sunsetAt: '2026-07-08',
+    pagePath: '/phase-i-writeup',
+    apiRoute: '/api/process-phase-i-writeup',
+    grantsRetained: true,
+    notes:
+      'Sunset S344. PDF-upload Phase I writeup drafter. Page + /api/process-phase-i-writeup retained/routable; code kept as the direct reference for the planned Dataverse-native Phase I writeup feature in the Request Workbench (unbuilt). Shares createStructuredDataExtractionPrompt.',
+    lastVerified: '2026-07-08',
+  },
+  'phase-ii-writeup': {
+    name: 'Create Phase II Writeup Draft',
+    status: 'sunset-candidate',
+    successorKey: null,
+    sunsetAt: '2026-07-08',
+    pagePath: '/phase-ii-writeup',
+    apiRoute: '/api/process',
+    grantsRetained: true,
+    notes:
+      'Sunset S344. PDF-upload Phase II writeup drafter. Page + /api/process retained/routable (/api/process is shared with batch-proposal-summaries). Code kept for Dataverse-native migration. Shares createStructuredDataExtractionPrompt.',
+    lastVerified: '2026-07-08',
   },
 };
 
