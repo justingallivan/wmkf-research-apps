@@ -1,63 +1,75 @@
-# Session 346 Prompt: Resume reviewer-invite send-side validation
+# Session 347 Prompt: Reviewer-invite abstract-edit gate (live) or next priority
 
-## Session 345 Summary
+## Session 346 Summary
 
-Dynamics-decomposition session. Closed out **Checkpoints C, D, E, F** — the entire remainder of
-`docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md`. The plan is now **COMPLETE**: `dynamics-service.js`
-went from 1,728 L to a 479 L thin facade delegating to 11 modules under `lib/services/dynamics/`.
-Every checkpoint had characterization-first coverage, mutation-proofs on the load-bearing
-invariants, and either a DEDICATED Codex adversarial review (C/D/E) or an equivalent batched
-verification (F, lower-risk).
+QA/verification session (no code changes) — closed out the long-carried
+"resume reviewer-invite send-side validation" item (S341–S345) by finding and
+fixing the actual root cause: local dev auth was silently misconfigured in
+three separate ways, each producing a symptom that looked unrelated to auth.
 
 ### What Was Completed
 
-1. **Checkpoint C — `write-core.js` (Stage 6)** (`c350a27f`, review `8bbead47`). DAL entity-write
-   core: `_withCallerId`, `_writeFetch`, `createRecord`, `updateRecord`, `updateIfEmpty`,
-   `deleteRecord`, `disassociate`. New characterization test (12 tests) pinned `updateIfEmpty`'s
-   5 discriminated outcomes + plain-Error/`.status` shapes — mutation-proven, green pre/post.
-   Codex adversarial review: `approve`, no material findings.
-2. **Checkpoint D — `changeset.js` (Stage 7, highest-risk)** (`8d08b57f`, review `e7280940`).
-   `executeChangeset` + 8 private `$batch` builders/parsers moved as one unit. The pre-existing
-   17-test suite served as the C11 characterization baseline — **mutation-proven this session**
-   (weakening the under-count guard, and moving the DAL assert before input validation, both
-   correctly break tests). Codex: `approve`, byte-identity comparison confirmed no drift.
-3. **Checkpoint E — `email.js` (Stage 8, CI-blind-spot)** (`8a97f54f`, review `90622fce`).
-   `resolveSystemUser`, `createEmailActivity`, `addEmailAttachment`, `sendEmail`,
-   `createAndSendEmail`. These 3 writes are `NON_ENTITY_TRANSPORT_METHODS` — exempt from the
-   static access-layer gate, so the runtime assert is the *only* enforcement; a dropped assert
-   would be CI-invisible. Codex independently re-verified assert-first placement, the C9
-   call-time env read, the sequential attachment loop, and the frozen unescaped `resolveSystemUser`
-   filter (C7 — deliberately NOT fixed) by exact line number; all disconfirming-checked before
-   landing in the plan doc. Verdict: `approve`.
-4. **Checkpoint F — `ai-run.js` + facade finalize (Stages 9–10)** (`7807e3ce`). Moved
-   `AI_RUN_TASK_TYPES`/`AI_RUN_STATUSES`/`logAiRun`/`_truncateForMemo`. This is the C1 "known
-   trap": `logAiRun` reads the picklist maps as static-property accesses (not calls), so the
-   facade had to re-expose them as its own statics — dropping that would silently break every
-   call. New characterization (7 tests, none existed before) pinned facade-static resolution,
-   unknown-taskType/status throws, and marker math — mutation-proven (forcing the trap condition
-   correctly fails the test). Facade finalize: dropped 3 dead imports, updated the plan's status
-   header/frontmatter to reflect completion, regenerated `docs/DOCS_CATALOG.md`.
+1. **Diagnosed the local dev-auth gap.** `.env.local` was missing
+   `AZURE_AD_CLIENT_ID/SECRET`, `AZURE_AD_TENANT_ID`, `NEXTAUTH_URL`,
+   `NEXTAUTH_SECRET` entirely (a prior memory claiming these already existed
+   was stale — corrected). Owner added the Azure AD/NextAuth values.
+2. **Found and fixed the "wrong user, no sign-out button" symptom.**
+   Root cause: `AUTH_REQUIRED` was unset. `lib/utils/auth.js`/`auth-policy.js`
+   treat `AUTH_REQUIRED` as a **fail-open kill switch** — unless it is the
+   literal string `'true'`, Azure AD sign-in is skipped entirely and the
+   dev-only `ProfileSelector` silently lets you pick any existing Postgres
+   `user_profiles` row (a real staffer's profile), which looks exactly like a
+   session/cookie bug but isn't. Set `AUTH_REQUIRED=true` in `.env.local` —
+   this fixed it immediately (real Azure AD sign-in now required).
+3. **Fixed `missing_secure_link` invite-send skips.** Root cause:
+   `EXTERNAL_LINK_SECRET` (needed to mint the reviewer accept/decline JWT) was
+   absent locally (a known S308 dead-end). Verified via source
+   (`lib/services/external-token.js`) that it's a purely internal HMAC
+   sign+verify key, never shared externally — generated a throwaway 32+ char
+   local-only value, which is safe and sufficient for local testing.
+4. **Verified the invite send flow live, end-to-end, in the browser**, using
+   the existing `scripts/smoke-test-candidate.mjs` throwaway-candidate helper
+   on test request 1002788: preview render (subject/body/greeting) →
+   capture-mode send (`REVIEWER_EMAIL_DELIVERY_MODE=capture`) → `wmkf_invited`
+   lifecycle stamp → real minted token → external reviewer portal page
+   render. All worked cleanly. Did NOT click Accept (would fire the live
+   honorarium/Bill.com automation regardless of local origin).
+5. **Deferred the abstract-edit gate + 409 compare-and-set** (owner's call) —
+   request 1002788's abstract isn't hard-wrapped so the gate never triggers
+   there. Confirmed instead via existing unit coverage: `send-emails-service.test.js`
+   + `update-abstract-service.test.js`, 28/28 passing — this also covers the
+   "possibly sent — verify" retry state, which capture mode can never reach
+   live (in capture mode `capturedEmail` is always set, so a send can never
+   land in the `unconfirmedSent`/`unconfirmed` UI buckets by construction).
+6. **Cleaned up**: smoke-test candidate torn down (Dataverse person +
+   suggestion deleted, state file cleared), dev server stopped.
+7. **Reconciled docs/memory** — corrected the stale "Azure creds already in
+   .env.local" claim, added `project-local-dev-auth-setup.md`, updated
+   `docs/agent-wiki/topics/{dev-environment,external-reviewer-portal}.md` so
+   this local-auth gap isn't rediscovered next session.
 
-Verified throughout: full suite **5197/5197** (was 5178 at S344 start), build green, ALL FIVE
-LAW gates + self-tests + `check:types` + the full doc/memory gate set green at every commit.
+Left in `.env.local` (gitignored, not committed): `AUTH_REQUIRED=true` and a
+throwaway `EXTERNAL_LINK_SECRET` — keep both for future local testing.
 
 ### Commits (all on main, pushed)
-- `c350a27f` write-core.js · `8bbead47` C review recorded
-- `8d08b57f` changeset.js · `e7280940` D review recorded
-- `8a97f54f` email.js · `90622fce` E review recorded
-- `7807e3ce` ai-run.js + facade finalize (Checkpoint F, plan marked complete)
+- `5b1fc59a` docs(memory): document local dev-auth setup gap found during S346 invite QA
 
 ## Next Items
 
 ### Verified Open
 
-1. **Resume reviewer-invite send-side validation** (carried S341–S345 — still only the
-   read-only half is done). Evidence: `git log 64ab81a5..HEAD` still has no send-path commits
-   (re-verified S345 — this session's work was entirely on the Dynamics decomposition, unrelated
-   surface); `reviewer-invite-capture-mode-not-full-sandbox.md`. Unexercised: capture-send +
-   "possibly sent — verify" retry state, abstract-edit save + 409 compare-and-set. Requires a
-   THROWAWAY reviewer suggestion + proposal (capture blocks email only — still mints Dataverse
-   tokens + stamps lifecycle).
+1. **Abstract-edit gate + 409 compare-and-set — still UI-unverified** (unit-tested
+   only). Evidence: `tests/unit/update-abstract-service.test.js` (409 logic);
+   `shared/components/reviewers/InviteEmailModal.js:469-530` (the gate UI).
+   To exercise live: find/pick a REAL request whose stored `wmkf_abstract` is
+   hard-wrapped (S340 calibrated against ~200 real abstracts, so they exist),
+   open its invite modal read-only-ish (don't send to a real reviewer), trigger
+   the amber "Abstract has hard line breaks" banner, edit + save, and to force
+   the 409 specifically: race it by POSTing a change to
+   `/api/review-manager/update-abstract` with a stale `expectedCurrent` right
+   before clicking Save in the modal. Do NOT use the smoke-test candidate for
+   this — it needs a REAL request with a real hard-wrapped abstract, not the
+   dedicated 1002788 test request (whose abstract isn't wrapped).
 
 ### Owner Decision Needed
 
@@ -71,7 +83,7 @@ LAW gates + self-tests + `check:types` + the full doc/memory gate set green at e
    decision. (Carried, unchanged.)
 3. **How far to push the TS `check:types` gate.** Evidence: `docs/TYPESCRIPT_OPTION_ASSESSMENT.md`.
    Optional ratcheting beyond the closed 2-route untrusted surface — the DynamicsService facade
-   is now fully `// @ts-check`'d as of this decomposition. (Carried, unchanged.)
+   is fully `// @ts-check`'d as of S345. (Carried, unchanged.)
 
 ### Parked
 
@@ -86,10 +98,9 @@ LAW gates + self-tests + `check:types` + the full doc/memory gate set green at e
 ### Do Not Reopen Without New Decision
 
 1. **DynamicsService decomposition is COMPLETE** (S345, all 6 checkpoints). Evidence:
-   `docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md` status header + frontmatter (`status: active`,
-   summary marked DONE). `dynamics-service.js` is now a 479 L thin facade over
-   `lib/services/dynamics/*.js` (11 modules) — this is the intended end-state, not a
-   partially-done refactor. Do not re-inline the modules "for simplicity."
+   `docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md` status header + frontmatter. `dynamics-service.js`
+   is now a 479 L thin facade over `lib/services/dynamics/*.js` (11 modules) — this is the intended
+   end-state, not a partially-done refactor. Do not re-inline the modules "for simplicity."
 2. **Peer-review Executor migration is SHIPPED** (S344, `1559e8dc`/`4dd5c84b`). Evidence:
    `project-peer-review-executor-migration.md`, `docs/PEER_REVIEW_EXECUTOR_MIGRATION_PLAN.md`. The
    legacy generators are ROLLBACK-ONLY, not the live path; don't "restore" them as the source.
@@ -98,6 +109,10 @@ LAW gates + self-tests + `check:types` + the full doc/memory gate set green at e
    superusers can't browser-load them (documented + accepted) — don't re-add keys to `ALL_APP_KEYS`.
 4. **"Remove entirely" two-step is by design** (S343). Don't add a one-click permanent-delete on
    active reviewers without an owner decision (see Owner Decision #1).
+5. **Local dev auth is now correctly configured** (S346) — `AUTH_REQUIRED=true` +
+   `EXTERNAL_LINK_SECRET` are set in `.env.local`. Don't re-diagnose the
+   "wrong user"/`missing_secure_link` symptoms as new bugs; see
+   `project-local-dev-auth-setup.md` first if they recur.
 
 ### Verify Before Acting
 
@@ -110,24 +125,23 @@ LAW gates + self-tests + `check:types` + the full doc/memory gate set green at e
 
 | File | Purpose |
 |------|---------|
-| `lib/services/dynamics-service.js` | Now a 479 L thin facade — all 33 static methods delegate to `lib/services/dynamics/*.js` |
-| `lib/services/dynamics/write-core.js` | DAL entity-write core (createRecord/updateRecord/updateIfEmpty/deleteRecord/disassociate) |
-| `lib/services/dynamics/changeset.js` | Atomic `$batch` changeset (executeChangeset + parser/builders) |
-| `lib/services/dynamics/email.js` | CRM email pipeline (resolveSystemUser/createEmailActivity/addEmailAttachment/sendEmail/createAndSendEmail) |
-| `lib/services/dynamics/ai-run.js` | AI run audit logging (logAiRun, picklist maps) |
-| `docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md` | The full decomposition plan — now marked complete, all checkpoint evidence + review verdicts recorded |
-| `tests/unit/dynamics-service-write-core.test.js` | New (S345) — write-core characterization |
-| `tests/unit/dynamics-service-ai-run.test.js` | New (S345) — ai-run characterization incl. the C1 static-property trap |
+| `shared/components/reviewers/InviteEmailModal.js` | Invite preview→send UX + abstract-edit gate (S347 resume target) |
+| `lib/services/review-manager/send-emails-service.js` | Send path; body-integrity gate, capture-mode branch, `inviteRecorded`/`unconfirmed` |
+| `lib/services/review-manager/update-abstract-service.js` | Canonical `wmkf_abstract` write + 409 compare-and-set |
+| `lib/services/external-token.js` | `EXTERNAL_LINK_SECRET`-based HMAC JWT mint/verify for reviewer portal links |
+| `scripts/smoke-test-candidate.mjs` | Throwaway reviewer candidate create/cleanup on test request 1002788 |
+| `.claude-memory/project-local-dev-auth-setup.md` | New — the 3-part local dev-auth checklist (Azure AD vars, `AUTH_REQUIRED=true`, `EXTERNAL_LINK_SECRET`) |
+| `docs/agent-wiki/topics/external-reviewer-portal.md` | Updated — local capture-mode testing is now unblocked; S308 procedure note revised |
 
 ## Testing
 
 ```bash
-npm test                                                  # full suite (5197 green as of S345)
-npm run build
-npm run check:dataverse-access-layer && npm run check:route-service-boundary \
-  && npm run check:dynamics-context-boundary && npm run check:odata-escape \
-  && npm run check:trust-boundary-guid                    # ALL FIVE LAW gates
-npm run check:types                                       # DynamicsService facade is fully @ts-check'd
-# Reviewer-invite send-side (still to do; THROWAWAY record):
-#   REVIEWER_EMAIL_DELIVERY_MODE=capture npm run dev   # capture blocks email, NOT Dataverse writes
+npm test                                                  # full suite, no code changes this session
+npm run check:agent-wiki && npm run check:memory-router   # both green after S346 doc/memory reconcile
+# Local reviewer-invite testing (now working):
+#   REVIEWER_EMAIL_DELIVERY_MODE=capture npm run dev
+#   node scripts/smoke-test-candidate.mjs create <throwaway-email> [requestNum]
+#   node scripts/smoke-test-candidate.mjs cleanup
+# .env.local must have: AZURE_AD_CLIENT_ID/SECRET, AZURE_AD_TENANT_ID, NEXTAUTH_URL,
+# NEXTAUTH_SECRET, AUTH_REQUIRED=true, EXTERNAL_LINK_SECRET (32+ chars, throwaway OK locally)
 ```
