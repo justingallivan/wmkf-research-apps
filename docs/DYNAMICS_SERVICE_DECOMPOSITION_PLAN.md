@@ -16,7 +16,7 @@ related:
 
 # DynamicsService Decomposition Plan
 
-**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stages 1 (`auth.js`) + 2 (`restrictions.js`) + 3 (`annotations.js`) all EXECUTED + BATCHED adversarial review PASSED (S339, verdict SOUND/approve — "could not refute the behavior-freeze", no material findings, base `d4463548..HEAD`); Checkpoint B Stages 4 (`schema.js`) + 5 (`read-ops.js`) EXECUTED + BATCHED adversarial review PASSED (S341, Codex behavior-freeze verified; merged to main S342, commit `daac9761`); Checkpoint C Stage 6 (`write-core.js`) EXECUTED + DEDICATED adversarial review PASSED (S345, Codex verdict `approve`, "no material findings" — behavior-equivalent modulo the `this.`→`svc.` rewrite, 4 mutators still assert-first, impersonation fallback + 412/ETag/plain-error paths intact); Checkpoint D Stage 7 (`changeset.js`) EXECUTED + DEDICATED adversarial review PASSED (S345, Codex verdict `approve`, "no material findings" — byte-identity comparison confirmed the 8 helpers identical to parent, executeChangeset only C1 + static→function, C2 ordering + all C11 semantics intact); Checkpoints E–F pending.** This applies the exact cadence proven on the
+**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stages 1 (`auth.js`) + 2 (`restrictions.js`) + 3 (`annotations.js`) all EXECUTED + BATCHED adversarial review PASSED (S339, verdict SOUND/approve — "could not refute the behavior-freeze", no material findings, base `d4463548..HEAD`); Checkpoint B Stages 4 (`schema.js`) + 5 (`read-ops.js`) EXECUTED + BATCHED adversarial review PASSED (S341, Codex behavior-freeze verified; merged to main S342, commit `daac9761`); Checkpoint C Stage 6 (`write-core.js`) EXECUTED + DEDICATED adversarial review PASSED (S345, Codex verdict `approve`, "no material findings" — behavior-equivalent modulo the `this.`→`svc.` rewrite, 4 mutators still assert-first, impersonation fallback + 412/ETag/plain-error paths intact); Checkpoint D Stage 7 (`changeset.js`) EXECUTED + DEDICATED adversarial review PASSED (S345, Codex verdict `approve`, "no material findings" — byte-identity comparison confirmed the 8 helpers identical to parent, executeChangeset only C1 + static→function, C2 ordering + all C11 semantics intact); Checkpoint E Stage 8 (`email.js`) CODE-COMPLETE S345 (DEDICATED review pending); Checkpoint F pending.** This applies the exact cadence proven on the
 DiscoveryService decomposition (S335) and the ContactEnrichmentService decomposition (S336):
 strategy chosen up front (facade + extracted modules), leaf-first staged extraction, each cluster
 characterization-covered (baselined green pre-extraction, mutation-proven) BEFORE the code moves,
@@ -504,13 +504,27 @@ touched gates → commit. Leaf-first per the DAG.
   validation still precedes `assertTrustedDalContext` (C2), the C11 failure/confirmation/Content-ID/
   CRLF/non-surfaced-header semantics are preserved, imports resolve, and the facade wrapper forwards
   operations/options unchanged. **→ Checkpoint E (`email.js`) is UNBLOCKED.**
-- **Checkpoint E — `email.js` (Stage 8). DEDICATED review.** These three methods are exempt from the
-  static access-layer gate as `NON_ENTITY_TRANSPORT_METHODS` (`check-dataverse-access-layer.js:106`),
-  so **the runtime `assertTrustedDalContext` asserts (`:1232,:1304,:1340`) are the ONLY enforcement
-  on this surface — a dropped assert would be CI-invisible.** Review confirms assert-first placement
-  post-move, the `createAndSendEmail` impersonation precheck (`:1366`), sequential attachment loop
-  (`:1373-1376`), and the frozen unescaped `resolveSystemUser` filter (C7 note). Gates:
-  `check:dataverse-access-layer`, `check:dynamics-context-boundary`.
+- **Checkpoint E — `email.js` (Stage 8). CODE-COMPLETE S345; DEDICATED review PENDING.** These three
+  methods are exempt from the static access-layer gate as `NON_ENTITY_TRANSPORT_METHODS`
+  (`check-dataverse-access-layer.js:106`), so **the runtime `assertTrustedDalContext` asserts are the
+  ONLY enforcement on this surface — a dropped assert would be CI-invisible.** `resolveSystemUser`,
+  `createEmailActivity`, `addEmailAttachment`, `sendEmail`, `createAndSendEmail` moved verbatim to
+  `lib/services/dynamics/email.js` (232 L) with the C1 svc-dispatch rewrite (`svc.getAccessToken`,
+  `svc.buildHeaders`, `svc._withCallerId`, `svc._writeFetch`, `svc.queryRecords`,
+  `svc.resolveEntitySetName`, and the composed `svc.createEmailActivity`/`svc.addEmailAttachment`/
+  `svc.sendEmail`). Facade keeps 5 thin delegating wrappers and drops the now fully-orphaned
+  `assertTrustedDalContext` import (all 8 call sites have now left the facade — 4 to write-core.js
+  Checkpoint C, 3 email + `executeChangeset` to changeset.js/email.js here). Preserved byte-identically:
+  assert-first placement in the 3 write methods (C2); the `createAndSendEmail` impersonation precheck
+  (`noFallback && actingUserSystemId && !DYNAMICS_IMPERSONATION_ENABLED` throw) with its C9 call-time
+  env read (not hoisted); the sequential (not parallel) attachment loop; the plain-Error/interpolated-
+  status-text shapes (C13); and the frozen unescaped `resolveSystemUser` OData filter (C7 — NOT fixed).
+  Facade 641→515 L. Verified: C1 guard (zero body `this.`); email/caller-id/dal-enforcement suites
+  green pre- and post-move; full suite **5190/5190**; build green; ALL FIVE LAW gates + self-tests +
+  `check:types` green (`check:dynamics-context-boundary` 615 files, 0 violations).
+  - [RECHECKED after lib/services/dynamics/email.js change: S345 — verbatim `resolveSystemUser`/`createEmailActivity`/`addEmailAttachment`/`sendEmail`/`createAndSendEmail` (C1 svc-rewrite); deps dynamics-context only (network reached via `svc`); 3 assert sites first-statement; C7 filter frozen; C9 env read not hoisted; zero body `this.`]
+  - [RECHECKED after lib/services/dynamics-service.js change: S345 — facade rewired (5 delegating wrappers pass `this`), now fully-orphaned `assertTrustedDalContext` import dropped, behavior-freeze; no stray refs; suite green]
+  - **DEDICATED adversarial review PENDING** (Codex behavior-freeze verification, per the plan's Checkpoint-E review mode — the NON_ENTITY_TRANSPORT_METHODS CI-blind-spot makes this review the only check on assert placement). Gates confirmed green pre-review: `check:dataverse-access-layer`, `check:dynamics-context-boundary`.
 - **Checkpoint F — `ai-run.js` (Stage 9) + facade finalize (Stage 10). BATCHED review.** `logAiRun`
   picklist maps + retention plumbing (characterize truncation marker math `:1194-1198` and
   unknown-taskType/status throws); then dead-import cleanup, confirm facade ≈260 L, full suite +
