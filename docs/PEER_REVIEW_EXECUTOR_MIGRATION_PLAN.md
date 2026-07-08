@@ -20,6 +20,22 @@ related:
 
 # Peer-Review Summarizer → Executor Migration Plan
 
+## Status: IMPLEMENTED + VERIFIED (S344, 2026-07-08)
+
+Shipped. `process-peer-reviews.js` now calls `executePrompt()` for both the
+analyze and questions passes; the `peer-review-summarizer.*` rows were re-seeded
+with the `a7_preamble` variable (required, no default) + `{{a7_preamble}}` system
+prompt and published (`--execute`, verified). Verification:
+- **Content parity: byte-identical.** A scratchpad harness proved the row
+  templates interpolated with route variables equal the legacy generator bodies
+  exactly (caught + fixed a 1-char trailing-space drift in the generator).
+- **E2E smoke: real Claude call passed.** `executePrompt` returned
+  `parsed.response_text` (string), preamble landed in `system` (systemChars=720),
+  model `claude-sonnet-5`, `runId` written; output preserved OUTPUT 1/2 + review
+  count + `<u>Name</u>` reviewer details.
+- **Model/params parity:** row `sonnet`/2500/16384/0.3 == `baseConfig`.
+- Full `npm test` (5176), `npm run build`, and surface gates green.
+
 ## Review outcome (Codex adversarial design review, S344 — SOUND-WITH-CHANGES)
 
 Two HIGH findings, both **verified against code** and folded in below:

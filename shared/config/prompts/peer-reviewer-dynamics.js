@@ -15,10 +15,13 @@
  *
  * SOURCE OF TRUTH RECONCILIATION
  * ──────────────────────────────────────────────────────────────────────────
- * Live route (`pages/api/process-peer-reviews.js`) still imports the
- * function-based generators in `peer-reviewer.js`. That file is unchanged;
- * post-cycle route refactor will switch to `executePrompt('peer-review-
- * summarizer.analyze', ...)` and the legacy generators can be deleted.
+ * WIRED S344 (2026-07-08): `pages/api/process-peer-reviews.js` now runs these
+ * rows via `executePrompt('peer-review-summarizer.analyze'|'.questions', ...)`
+ * — the templates below ARE the live execution source, and staff /admin edits
+ * take effect. The function generators in `peer-reviewer.js` are retained only
+ * as the rollback path (revert the route diff); do not delete them. The route
+ * still owns per-review A7 wrapping and passes the preamble via `a7_preamble`.
+ * See docs/PEER_REVIEW_EXECUTOR_MIGRATION_PLAN.md.
  *
  * VARIABLE CONVENTIONS
  * ──────────────────────────────────────────────────────────────────────────
@@ -29,6 +32,15 @@
  *                                  summary_length_suffix in phase-i.summary
  *   - `{{reviews_block}}`        — caller-built joined string in the form:
  *                                  "**Review 1:**\n<text>\n\n---\n**Review 2:**\n..."
+ *   - `{{a7_preamble}}`          — A7 untrusted-content preamble, caller-built
+ *                                  from the per-review nonces (S344). Placed in
+ *                                  the SYSTEM block (below) so it leads the
+ *                                  hardening instructions. `reviews_block` is
+ *                                  passed as already-wrapped text (route owns the
+ *                                  per-review nonce wrapping), so the Executor
+ *                                  does NOT re-wrap or auto-inject a preamble —
+ *                                  the route MUST supply this. Seeded as
+ *                                  required:true (fail closed).
  *
  * PARSEMODE: RAW
  * ──────────────────────────────────────────────────────────────────────────
@@ -42,7 +54,10 @@
 // One Claude call produces two markdown sections (OUTPUT 1 - SUMMARY,
 // OUTPUT 2 - QUESTIONS). Route splits on "**OUTPUT 2 - QUESTIONS:**" markers.
 
-export const ANALYZE_SYSTEM_PROMPT = '';
+// A7 preamble (built by the route from the per-review nonces) lands here. See
+// the header note on {{a7_preamble}}; composeMessages interpolates {{var}} in
+// the system block.
+export const ANALYZE_SYSTEM_PROMPT = '{{a7_preamble}}';
 
 export const ANALYZE_USER_PROMPT_TEMPLATE = `Please analyze these peer review documents and provide a comprehensive summary in markdown format. I will provide you with {{review_count}} peer review document(s).
 
@@ -84,7 +99,7 @@ Please provide both outputs as separate markdown sections.`;
 // Fallback questions-extraction call. Live route makes this when the analyze
 // pass either skipped questions or produced <50 chars of questions content.
 
-export const QUESTIONS_SYSTEM_PROMPT = '';
+export const QUESTIONS_SYSTEM_PROMPT = '{{a7_preamble}}';
 
 export const QUESTIONS_USER_PROMPT_TEMPLATE = `Please extract all questions, concerns, issues, and points requiring clarification that were raised by the peer reviewers in these {{review_count}} review document(s).
 

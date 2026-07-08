@@ -97,6 +97,19 @@ const analyzeRow = {
         cacheable: true,
         placement: 'user',
       },
+      {
+        name: 'a7_preamble',
+        // A7 untrusted-content preamble, built by the route from the per-review
+        // nonces (S344). reviews_block is passed already-wrapped, so the Executor
+        // does NOT auto-inject a preamble — the route must. required:true with NO
+        // default so a missing preamble fails closed (execute-prompt.js resolveOne
+        // throws) instead of silently dropping A7. Interpolated into the system
+        // prompt ({{a7_preamble}}). See peer-reviewer-dynamics.js header.
+        source: { kind: 'override' },
+        required: true,
+        cacheable: false,
+        placement: 'user',
+      },
     ],
   },
   outputSchema: {
@@ -136,6 +149,16 @@ const questionsRow = {
         source: { kind: 'override' },
         required: true,
         cacheable: true,
+        placement: 'user',
+      },
+      {
+        name: 'a7_preamble',
+        // A7 untrusted-content preamble (route-built from per-review nonces, S344).
+        // required:true / no default → fail closed if omitted. Interpolated into
+        // the system prompt. See analyze row + peer-reviewer-dynamics.js header.
+        source: { kind: 'override' },
+        required: true,
+        cacheable: false,
         placement: 'user',
       },
     ],

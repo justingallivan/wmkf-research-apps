@@ -197,14 +197,17 @@ All Executor/Dataverse-native rows except the Phase II set: `reviewer-finder.ana
   fallback is "byte-in-sync with the code generators in reviewer-finder.js" but it actually
   imports the slimmed `-dynamics` body — the comment is stale. Prefer live/`-dynamics`; treat
   `reviewer-finder.js::createAnalysisPrompt` as legacy.
-- **[VERIFIED via file] Phase II / peer-review live path is the code generators, not the rows.**
-  `phase-ii-dynamics.js` and `peer-reviewer-dynamics.js` self-document as **dormant Phase-0
-  storage**; the live routes (`process.js`, `qa.js`, `refine.js`, `process-peer-reviews.js`)
-  import the function generators in `proposal-summarizer.js` / `peer-reviewer.js`. So the live
-  `wmkf_ai_prompt` rows for `phase-ii.*` and `peer-review-summarizer.*` are **viewable/editable
-  in the admin panel but not yet the execution source** — editing them there won't change
-  behavior until the routes migrate to `executePrompt()`. Flag for the owner: the admin panel
-  shows prompts that don't (yet) drive those two apps.
+- **Phase II vs peer-review — DIVERGED S344 (2026-07-08).**
+  - **`peer-review-summarizer.*` is now WIRED [VERIFIED via e2e].** `process-peer-reviews.js`
+    runs `executePrompt('peer-review-summarizer.analyze'|'.questions')`; the `peer-reviewer-dynamics.js`
+    templates are the live execution source and staff /admin edits take effect. Content-parity
+    with the old generators was proven byte-identical; per-review A7 wrapping is route-owned
+    (preamble → `a7_preamble` → system block). Code generators kept only for rollback. See
+    `docs/PEER_REVIEW_EXECUTOR_MIGRATION_PLAN.md`.
+  - **`phase-ii.*` rows stay dormant.** Those apps (`phase-ii-writeup`, `batch-proposal-summaries`)
+    were sunset S344 (not wired); `process.js` still uses the code generators in
+    `proposal-summarizer.js`. The `phase-ii.*` `wmkf_ai_prompt` rows remain viewable/editable in
+    `/admin` but drive nothing.
 - **[ASSUMED] Live status of `phase-i-writeup` and the legacy `phase-i-summaries` batch path.**
   I did not trace their current UI entry points end-to-end; the re-scope/retire recommendation
   for `phase-i-writeup.js` is contingent on confirming it's still user-reachable.

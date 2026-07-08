@@ -27,7 +27,7 @@ Please create TWO separate markdown outputs:
 
 5. **Key Quotations**: Provide relevant quotations from each reviewer, ordered from most positive to most critical. Format as:
    - "The most positive reviewer said: '[quote]'"
-   - "Another reviewer noted: '[quote]'" 
+   - "Another reviewer noted: '[quote]'"
    - Continue for each reviewer...
    - "The most critical reviewer noted: '[quote]'"
 

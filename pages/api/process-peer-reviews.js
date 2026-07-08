@@ -1,9 +1,15 @@
+// S344: prompt text is sourced from the peer-review-summarizer.analyze/.questions
+// wmkf_ai_prompt rows via the shared Executor (executePrompt) so staff /admin
+// edits take effect. The legacy generators in shared/config/prompts/peer-reviewer.js
+// remain exported for rollback (git revert this route). Per-review A7 wrapping +
+// the preamble stay route-owned (Executor receives already-wrapped reviews_block +
+// the preamble as a7_preamble). See docs/PEER_REVIEW_EXECUTOR_MIGRATION_PLAN.md.
 import pdf from 'pdf-parse';
 import mammoth from 'mammoth';
-import { BASE_CONFIG, getModelForApp, loadModelOverrides } from '../../shared/config';
-import { createPeerReviewAnalysisPrompt, createPeerReviewQuestionsPrompt } from '../../shared/config/prompts/peer-reviewer';
+import { BASE_CONFIG, loadModelOverrides } from '../../shared/config';
 import { requireAppAccess } from '../../lib/utils/auth';
-import { LLMClient } from '../../lib/services/llm-client';
+import { executePrompt } from '../../lib/services/execute-prompt';
+import { logUsage } from '../../lib/utils/usage-logger';
 import { nextRateLimiter } from '../../shared/api/middleware/rateLimiter';
 import { safeFetch } from '../../lib/utils/safe-fetch';
 import {
@@ -146,7 +152,7 @@ export default async function handler(req, res) {
     })}\n\n`);
 
     // Generate comprehensive analysis
-    const analysisResult = await analyzePeerReviews(reviewTexts, apiKey, userProfileId);
+    const analysisResult = await analyzePeerReviews(reviewTexts, userProfileId);
 
     // Log the results for debugging
     console.log('Analysis completed, summary length:', analysisResult?.summary?.length || 0);
@@ -190,7 +196,39 @@ export default async function handler(req, res) {
   }
 }
 
-async function analyzePeerReviews(reviewTexts, apiKey, userProfileId) {
+// Fail-closed A7 guard: the Executor does NOT auto-wrap reviews_block (it's
+// passed already-wrapped), so the route MUST supply a preamble covering every
+// per-review nonce. Throw rather than send review content with no hardening.
+function assertPreambleCoversNonces(preamble, nonces) {
+  if (!preamble || !preamble.trim()) {
+    throw new Error('A7 preamble empty — refusing to send unwrapped review content to the model');
+  }
+  for (const nonce of nonces) {
+    if (!preamble.includes(nonce)) {
+      throw new Error(`A7 preamble is missing review nonce ${nonce} — refusing to send`);
+    }
+  }
+}
+
+// Mirror the appName-based usage logging the route got for free from LLMClient
+// before the Executor migration; executePrompt's internal client passes no
+// appName, so api_usage_log would otherwise lose this app. (Executor also writes
+// a wmkf_ai_run row per call.)
+function logPeerReviewUsage(result, userProfileId) {
+  logUsage({
+    userProfileId,
+    appName: 'peer-review-summarizer',
+    model: result?.meta?.modelUsed,
+    inputTokens: result?.usage?.input_tokens || 0,
+    outputTokens: result?.usage?.output_tokens || 0,
+    cacheCreationTokens: result?.usage?.cache_creation_input_tokens || 0,
+    cacheReadTokens: result?.usage?.cache_read_input_tokens || 0,
+    latencyMs: 0,
+    status: 'success',
+  });
+}
+
+async function analyzePeerReviews(reviewTexts, userProfileId) {
   try {
     console.log('Starting analysis with', reviewTexts.length, 'review texts');
     
@@ -228,20 +266,30 @@ async function analyzePeerReviews(reviewTexts, apiKey, userProfileId) {
     const reviewNonces = wrappedReviews.map((w) => w.nonce);
     const preamble = buildUntrustedContentPreamble(reviewNonces);
 
-    // Generate comprehensive analysis
-    const analysisPrompt = `${preamble}\n\n${createPeerReviewAnalysisPrompt(wrappedTexts)}`;
+    // Route owns A7: the reviews are wrapped per-review above; the Executor
+    // receives the already-wrapped block verbatim (reviews_block) plus the
+    // preamble (a7_preamble → interpolated into the row's system prompt).
+    const reviewsBlock = wrappedTexts
+      .map((t, i) => `**Review ${i + 1}:**\n${t}\n\n---\n`)
+      .join('');
+    assertPreambleCoversNonces(preamble, reviewNonces);
 
-    const claude = new LLMClient({
-      apiKey,
-      model: getModelForApp('peer-review-summarizer'),
-      appName: 'peer-review-summarizer',
-      userProfileId,
+    // Generate comprehensive analysis via the Executor. Prompt text lives in the
+    // peer-review-summarizer.analyze row (staff-editable); parseMode:raw → the
+    // model text is returned as parsed.response_text.
+    const analyzeResult = await executePrompt({
+      promptName: 'peer-review-summarizer.analyze',
+      overrideVariables: {
+        review_count: String(validTexts.length),
+        review_count_suffix: validTexts.length > 1 ? 's' : '',
+        reviews_block: reviewsBlock,
+        a7_preamble: preamble,
+      },
+      runSource: 'Vercel Interactive',
+      forceOverwrite: true, // outputs are kind:none — no guarded targets, so no-op
     });
-    const { text: analysisText } = await claude.complete({
-      messages: [{ role: 'user', content: analysisPrompt }],
-      maxTokens: BASE_CONFIG.MODEL_PARAMS.REFINEMENT_MAX_TOKENS,
-      temperature: BASE_CONFIG.MODEL_PARAMS.SUMMARIZATION_TEMPERATURE,
-    });
+    logPeerReviewUsage(analyzeResult, userProfileId);
+    const analysisText = analyzeResult.parsed?.response_text || '';
     console.log('Raw Claude response length:', analysisText.length);
     console.log('First 500 chars:', analysisText.substring(0, 500));
 
@@ -311,14 +359,18 @@ async function analyzePeerReviews(reviewTexts, apiKey, userProfileId) {
     if (!questions || questions.length < 50) {
       console.log('Questions not found or too short, making separate request...');
       try {
-        const questionsPrompt = `${preamble}\n\n${createPeerReviewQuestionsPrompt(wrappedTexts)}`;
-
-        const { text: rawQuestions } = await claude.complete({
-          messages: [{ role: 'user', content: questionsPrompt }],
-          maxTokens: BASE_CONFIG.MODEL_PARAMS.DEFAULT_MAX_TOKENS,
-          temperature: BASE_CONFIG.MODEL_PARAMS.SUMMARIZATION_TEMPERATURE,
+        const questionsResult = await executePrompt({
+          promptName: 'peer-review-summarizer.questions',
+          overrideVariables: {
+            review_count: String(validTexts.length),
+            reviews_block: reviewsBlock,
+            a7_preamble: preamble,
+          },
+          runSource: 'Vercel Interactive',
+          forceOverwrite: true,
         });
-        let questionsContent = rawQuestions.trim();
+        logPeerReviewUsage(questionsResult, userProfileId);
+        let questionsContent = (questionsResult.parsed?.response_text || '').trim();
         {
 
           // Clean up any partial headers that might be at the beginning
