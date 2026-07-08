@@ -38,6 +38,21 @@ const REQUEST_ID = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
 const PR_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const SUGGESTION_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
+const ENGAGEMENT_STAMP_RESET_PAYLOAD = {
+  wmkf_invited: false,
+  wmkf_emailsentat: null,
+  wmkf_respondremindersentat: null,
+  wmkf_remindersentat: null,
+  wmkf_remindercount: null,
+  wmkf_materialssentat: null,
+  wmkf_reviewreceivedat: null,
+  wmkf_responsereceivedat: null,
+  wmkf_thankyousentat: null,
+  wmkf_completedat: null,
+  wmkf_withdrawnsufficientat: null,
+  wmkf_proposalfirstaccessed: null,
+};
+
 let original;
 beforeEach(() => {
   original = {
@@ -89,11 +104,9 @@ describe('restore scope guard (Codex S285 review High)', () => {
     const patched = DynamicsService.updateRecord.mock.calls.find((c) => c[2] && 'wmkf_selected' in c[2]);
     expect(patched).toBeTruthy();
     expect(patched[2].wmkf_selected).toBe(true);
-    // S343 fresh start: the stale invite stamps are cleared so the restored row
-    // reads "Not invited" and can be invited again (new live token on invite).
-    expect(patched[2].wmkf_invited).toBe(false);
-    expect(patched[2].wmkf_emailsentat).toBeNull();
-    expect(patched[2].wmkf_respondremindersentat).toBeNull();
+    // S343 fresh start: the stale engagement stamps are cleared so the restored
+    // row can be invited, reminded, reviewed, and thanked from a clean lifecycle.
+    expect(patched[2]).toMatchObject(ENGAGEMENT_STAMP_RESET_PAYLOAD);
     // TOCTOU guard: the write is conditional on the row read by the scope check.
     expect(patched[3]).toMatchObject({ ifMatch: 'W/"42"' });
   });
