@@ -16,7 +16,7 @@ related:
 
 # DynamicsService Decomposition Plan
 
-**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stages 1 (`auth.js`) + 2 (`restrictions.js`) + 3 (`annotations.js`) all EXECUTED + BATCHED adversarial review PASSED (S339, verdict SOUND/approve — "could not refute the behavior-freeze", no material findings, base `d4463548..HEAD`); Checkpoint B Stages 4 (`schema.js`) + 5 (`read-ops.js`) EXECUTED + BATCHED adversarial review PASSED (S341, Codex behavior-freeze verified; merged to main S342, commit `daac9761`); Checkpoint C Stage 6 (`write-core.js`) CODE-COMPLETE S345 (DEDICATED review pending); Checkpoints D–F pending.** This applies the exact cadence proven on the
+**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stages 1 (`auth.js`) + 2 (`restrictions.js`) + 3 (`annotations.js`) all EXECUTED + BATCHED adversarial review PASSED (S339, verdict SOUND/approve — "could not refute the behavior-freeze", no material findings, base `d4463548..HEAD`); Checkpoint B Stages 4 (`schema.js`) + 5 (`read-ops.js`) EXECUTED + BATCHED adversarial review PASSED (S341, Codex behavior-freeze verified; merged to main S342, commit `daac9761`); Checkpoint C Stage 6 (`write-core.js`) EXECUTED + DEDICATED adversarial review PASSED (S345, Codex verdict `approve`, "no material findings" — behavior-equivalent modulo the `this.`→`svc.` rewrite, 4 mutators still assert-first, impersonation fallback + 412/ETag/plain-error paths intact); Checkpoints D–F pending.** This applies the exact cadence proven on the
 DiscoveryService decomposition (S335) and the ContactEnrichmentService decomposition (S336):
 strategy chosen up front (facade + extracted modules), leaf-first staged extraction, each cluster
 characterization-covered (baselined green pre-extraction, mutation-proven) BEFORE the code moves,
@@ -469,9 +469,13 @@ touched gates → commit. Leaf-first per the DAG.
   - [RECHECKED after lib/services/dynamics/write-core.js change: S345 — verbatim `_withCallerId`/`_writeFetch`/`createRecord`/`updateRecord`/`updateIfEmpty`/`deleteRecord`/`disassociate`; deps http/constants/dynamics-context/service-error; 4 assert sites first-statement; zero body `this.`; suite 5190/5190]
   - [RECHECKED after lib/services/dynamics-service.js change: S345 — facade rewired (7 delegating wrappers pass `this`; `_withCallerId`/`_writeFetch` svc-less per Q2), orphaned `fetchWithTimeout`/`API_TIMEOUT` imports dropped, behavior-freeze; no stray refs; suite green]
   - [RECHECKED after docs/agent-wiki/topics/dataverse-dynamics.md change: S345 — assert-site file attribution reconciled (4 entity mutators now in write-core.js; executeChangeset + 3 email remain in dynamics-service.js; total still 9); check:agent-wiki green]
-  - **DEDICATED adversarial review PENDING** (Codex behavior-freeze verification, per the plan's Checkpoint-C review mode). Gates confirmed green pre-review: ALL FIVE — `check:dataverse-access-layer`,
-  `check:route-service-boundary`, `check:dynamics-context-boundary`, `check:odata-escape`,
-  `check:trust-boundary-guid`.
+  - **DEDICATED adversarial review PASSED (S345, Codex).** Verdict `approve`, "no material findings":
+  independently confirmed the moved bodies are behavior-equivalent modulo the planned `this.`→`svc.`
+  rewrite, all 4 direct mutators still `assertTrustedDalContext` first, impersonation 403-fallback
+  intact, and the 412/ETag/plain-error paths preserved. Gates green pre-review: ALL FIVE —
+  `check:dataverse-access-layer`, `check:route-service-boundary`, `check:dynamics-context-boundary`,
+  `check:odata-escape`, `check:trust-boundary-guid`. **→ Checkpoint D (`changeset.js`, the
+  highest-risk cluster) is UNBLOCKED.**
 - **Checkpoint D — `changeset.js` (Stage 7). DEDICATED review — the highest-risk cluster**
   (mirrors ContactEnrichment's isolated `tiers.js`). C11 characterization suite lands and is
   mutation-proven BEFORE the move; review focuses on byte-identical parser/builder bodies, the
