@@ -35,9 +35,12 @@ They were PDF-email-era holdovers: a modern review is structured answer-snapshot
 rich-text answers (it renders picklist/string only). **Routes + services are RETAINED
 server-side** (unchanged), for a planned dedicated staff "manual review rescue" tool
 that must mirror the FULL `ReviewAuthoringForm` (incl. rich-text) — see
-[[project-staff-review-rescue-tool]]. Side effect: `shared/components/external/ReviewFormFields.js` is now
-**orphaned** (no importer) — leave it (a rescue-tool candidate), don't treat its removal
-as required. [VERIFIED via `ReviewerManagePanel.js` (S347) + route files still present.]
+[[project-staff-review-rescue-tool]]. `shared/components/external/ReviewFormFields.js` was **deleted (S347)** —
+the legacy uncontrolled string+picklist renderer (no rich-text) was orphaned by this
+removal, had zero importers, and couldn't render the
+rich-text answers the rescue tool needs, so the rescue tool should reuse the full
+`ReviewAuthoringForm`, not this. Its dep `lib/external/review-form-schema.js` stays
+(still used by 10+ files). [VERIFIED via `ReviewerManagePanel.js` (S347) + route files still present.]
 - **Hardened (Codex P0-1, S302):** the reviewer-token upload path
   (`opts.source === 'reviewer_self_token'`) now **409s once `wmkf_reviewreceivedat`
   is set**, so the dormant-but-reachable route can't overwrite a completed in-browser

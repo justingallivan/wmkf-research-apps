@@ -21,9 +21,9 @@ Track Reviewers panel**. This is that action item.
   parent ratings/affiliation/`wmkf_reviewreceivedat` PATCH), NOT a file. So the rescue
   tool must let staff enter the **full structured review** — the 3 rating radios + the
   **rich-text narrative answers** — mirroring `ReviewAuthoringForm` and the live
-  staff-editable question set (`getActiveQuestionSet`). The old
-  `shared/components/external/ReviewFormFields.js` only renders picklist/string (NO
-  rich-text), so it is **insufficient** on its own — do not just re-surface it.
+  staff-editable question set (`getActiveQuestionSet`). NB the old
+  `shared/components/external/ReviewFormFields.js` was **deleted (S347)** — it only rendered
+  picklist/string (NO rich-text), so it was insufficient anyway; do not resurrect it.
 - **Backend already exists** (retained by design): the write path is
   `/api/review-manager/mark-received-no-file` (structured, no file) and
   `/api/review-manager/upload-review` (file). Prefer routing a full structured entry
@@ -33,9 +33,10 @@ Track Reviewers panel**. This is that action item.
   as-is (it currently omits rich-text at the UI layer only).
 - **Location:** off the Track Reviewers panel. Candidate homes: an admin/superuser
   surface, or the Reviews tab. Owner to confirm placement at build time.
-- **Orphaned asset:** `ReviewFormFields.js` has no importer after S347 — it's a
-  candidate for reuse (partial) or deletion; decide during this build, don't delete
-  speculatively.
+- **`ReviewFormFields.js` was deleted (S347)** — it was the legacy uncontrolled
+  string+picklist renderer with no rich-text, so it couldn't serve this tool anyway.
+  Build the rescue UI on the full `ReviewAuthoringForm` (controlled + `RichReviewEditor`
+  + `getActiveQuestionSet`), not a resurrected `ReviewFormFields`.
 
 ## Why not just keep the panel buttons
 

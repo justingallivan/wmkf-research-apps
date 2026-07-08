@@ -114,7 +114,8 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   holdovers — a modern review is structured `wmkf_appreviewanswer` data via `/submit`, not a file,
   and `ReviewFormFields` only renders picklist/string (no rich-text). **Routes + services are
   RETAINED unchanged** for a planned dedicated staff "manual review rescue" tool that must mirror
-  the full `ReviewAuthoringForm` (incl. rich-text). `ReviewFormFields.js` is now orphaned but kept.
+  the full `ReviewAuthoringForm` (incl. rich-text). The legacy `ReviewFormFields.js` renderer
+  (string+picklist only, no rich-text) was orphaned by this removal and **deleted (S347)**.
   Memory `project-reviewer-upload-dormant-not-deleted`.
 - **The review question SET is staff-editable (Dataverse `wmkf_reviewquestion`), not hardcoded — Phases A+B+C LIVE (S303–S304).**
   `lib/external/review-question-fetcher.js::getActiveQuestionSet()` (cached, single-flight,
@@ -132,7 +133,7 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   legacy `validateReviewForm` paths stay on the static default until Phase D. (The staff
   `ReviewFormFields` upload surface that also used the static default was **removed from
   `ReviewerManagePanel` in S347** — see the staff-side removal note below; `ReviewFormFields.js`
-  is now orphaned but retained.) **Phase C (S304): superuser editor** at `/admin` →
+  was then deleted (S347) as orphaned.) **Phase C (S304): superuser editor** at `/admin` →
   `ReviewQuestionsSection` → `pages/api/admin/review-questions.js`: add/edit/drag-reorder/remove the set;
   the route diffs by row id (`lib/admin/review-question-save.js`) and applies ONE atomic
   `executeChangeset` (create/update/soft-delete), enforces key-immutability + `questionSetVersion`
