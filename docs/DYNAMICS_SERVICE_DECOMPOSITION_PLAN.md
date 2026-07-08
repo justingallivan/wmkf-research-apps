@@ -3,7 +3,7 @@ title: DynamicsService Decomposition Plan
 domain: architecture
 kind: plan
 status: active
-summary: "PLANNED: DynamicsService (1,728 L Dataverse WRITE hub) → lib/services/dynamics/*.js behind a thin facade; behavior-freeze, DAL guards + 5 LAW gates preserved."
+summary: "DONE (S345): DynamicsService decomposed from 1,728 L into 11 lib/services/dynamics/*.js modules behind a 479 L facade. Behavior-freeze, DAL guards preserved."
 canonical: true
 owner: product-engineering
 related:
@@ -16,7 +16,7 @@ related:
 
 # DynamicsService Decomposition Plan
 
-**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stages 1 (`auth.js`) + 2 (`restrictions.js`) + 3 (`annotations.js`) all EXECUTED + BATCHED adversarial review PASSED (S339, verdict SOUND/approve — "could not refute the behavior-freeze", no material findings, base `d4463548..HEAD`); Checkpoint B Stages 4 (`schema.js`) + 5 (`read-ops.js`) EXECUTED + BATCHED adversarial review PASSED (S341, Codex behavior-freeze verified; merged to main S342, commit `daac9761`); Checkpoint C Stage 6 (`write-core.js`) EXECUTED + DEDICATED adversarial review PASSED (S345, Codex verdict `approve`, "no material findings" — behavior-equivalent modulo the `this.`→`svc.` rewrite, 4 mutators still assert-first, impersonation fallback + 412/ETag/plain-error paths intact); Checkpoint D Stage 7 (`changeset.js`) EXECUTED + DEDICATED adversarial review PASSED (S345, Codex verdict `approve`, "no material findings" — byte-identity comparison confirmed the 8 helpers identical to parent, executeChangeset only C1 + static→function, C2 ordering + all C11 semantics intact); Checkpoint E Stage 8 (`email.js`) CODE-COMPLETE S345 (DEDICATED review pending); Checkpoint F pending.** This applies the exact cadence proven on the
+**Status: COMPLETE — all checkpoints executed and reviewed.** Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stages 1 (`auth.js`) + 2 (`restrictions.js`) + 3 (`annotations.js`) all EXECUTED + BATCHED adversarial review PASSED (S339, verdict SOUND/approve — "could not refute the behavior-freeze", no material findings, base `d4463548..HEAD`); Checkpoint B Stages 4 (`schema.js`) + 5 (`read-ops.js`) EXECUTED + BATCHED adversarial review PASSED (S341, Codex behavior-freeze verified; merged to main S342, commit `daac9761`); Checkpoint C Stage 6 (`write-core.js`) EXECUTED + DEDICATED adversarial review PASSED (S345, Codex verdict `approve`, "no material findings" — behavior-equivalent modulo the `this.`→`svc.` rewrite, 4 mutators still assert-first, impersonation fallback + 412/ETag/plain-error paths intact); Checkpoint D Stage 7 (`changeset.js`) EXECUTED + DEDICATED adversarial review PASSED (S345, Codex verdict `approve`, "no material findings" — byte-identity comparison confirmed the 8 helpers identical to parent, executeChangeset only C1 + static→function, C2 ordering + all C11 semantics intact); Checkpoint E Stage 8 (`email.js`) EXECUTED + DEDICATED adversarial review PASSED (S345, Codex verdict `approve`, "no material findings" — assert-first placement, call-time env read, sequential attachment loop, frozen OData filter, and plain-Error shapes all independently re-verified by line number); Checkpoint F Stage 9 (`ai-run.js`) + Stage 10 (facade finalize) EXECUTED (S345) — facade reduced from 1,728 L to 479 L, delegating to 11 extracted modules under `lib/services/dynamics/` [VERIFIED via `ls lib/services/dynamics/*.js`], all dead imports removed, ALL FIVE LAW gates + `check:types` + full suite (5197/5197) + build green. This applied the exact cadence proven on the
 DiscoveryService decomposition (S335) and the ContactEnrichmentService decomposition (S336):
 strategy chosen up front (facade + extracted modules), leaf-first staged extraction, each cluster
 characterization-covered (baselined green pre-extraction, mutation-proven) BEFORE the code moves,
@@ -533,13 +533,38 @@ touched gates → commit. Leaf-first per the DAG.
   `assertTrustedDalContext` import at `email.js:36`, and confirmed `dynamics-service.js` no longer
   imports it (comment-only hit remaining). **→ Checkpoint F (`ai-run.js` + facade finalize) is
   UNBLOCKED.**
-- **Checkpoint F — `ai-run.js` (Stage 9) + facade finalize (Stage 10). BATCHED review.** `logAiRun`
-  picklist maps + retention plumbing (characterize truncation marker math `:1194-1198` and
-  unknown-taskType/status throws); then dead-import cleanup, confirm facade ≈260 L, full suite +
-  ALL FIVE law gates + `check:doc-currency`/`check:agent-wiki`/`check:doc-symbol-refs`, update this
-  plan's status header, `/sweep` the fact-level restatements (the agent-wiki assert-site count was
-  corrected 5→8 in `docs/agent-wiki/topics/dataverse-dynamics.md` S338, commit `426463c` — 8 in
-  dynamics-service.js + 1 in `core/changeset.js:97`; re-verify at finalize).
+- **Checkpoint F — `ai-run.js` (Stage 9) + facade finalize (Stage 10). EXECUTED S345.** `AI_RUN_TASK_TYPES`,
+  `AI_RUN_STATUSES`, `logAiRun`, `_truncateForMemo` moved verbatim to `lib/services/dynamics/ai-run.js`
+  (123 L). The C1 "known trap" (this cluster's defining risk): `logAiRun` reads the picklist maps as
+  STATIC PROPERTY accesses (`this.AI_RUN_TASK_TYPES[taskType]`), not calls — the svc-dispatch rewrite
+  still applies to non-call property reads, so the facade re-exposes the frozen objects imported from
+  ai-run.js as its own static properties (`static AI_RUN_TASK_TYPES = AI_RUN_TASK_TYPES`), not just
+  delegating wrappers — dropping that re-exposure would silently break every `logAiRun` call by
+  dereferencing `undefined`. Per-plan requirement met: a `logAiRun` characterization
+  (`tests/unit/dynamics-service-ai-run.test.js`, 7 tests) landed BEFORE the extraction, pinning
+  facade-static resolution, unknown-taskType/status throws (with the valid-keys list in the message),
+  `_truncateForMemo`'s marker math, and `svc.createRecord` dispatch — green pre- and post-extraction,
+  **mutation-proven** this session (forcing `taskTypeValue` to `undefined` — simulating the unbound-
+  receiver dereference the C1 trap warns about — fails the "resolves via facade statics" test).
+  Facade finalize: dropped the now fully-orphaned `applyRawOutputRetention` and `assertTrustedDalContext`
+  imports (the latter orphaned by Checkpoint E, missed until now) plus the pre-existing dead
+  `buildNoResponseError` import (deferred since Stage 0/Checkpoint C — confirmed still unused in the
+  facade body via grep, while `http.js` retains its own live usage). Facade **1,728 L → 479 L**
+  [VERIFIED via `wc -l`], delegating to 11 modules under `lib/services/dynamics/` (constants, http,
+  auth, restrictions, annotations, schema, read-ops, write-core, changeset, email, ai-run) — matches
+  the plan's Q1 12-module layout (11 extracted + the facade itself as the 12th). Verified: C1 guard
+  (zero body `this.` in ai-run.js); full suite **5197/5197**; build green; ALL FIVE LAW gates +
+  self-tests + `check:types` + `check:doc-currency` + `check:agent-wiki` + `check:doc-symbol-refs` +
+  `check:build-claim-freshness` all green.
+  - [RECHECKED after lib/services/dynamics/ai-run.js change: S345 — verbatim `AI_RUN_TASK_TYPES`/`AI_RUN_STATUSES`/`logAiRun`/`_truncateForMemo` (C1 svc-rewrite incl. the static-property trap); deps ai-run-retention only; zero body `this.`; suite 7/7 pre+post, full 5197/5197]
+  - [RECHECKED after lib/services/dynamics-service.js change: S345 — facade rewired (logAiRun/_truncateForMemo delegating wrappers pass `this`; AI_RUN_TASK_TYPES/AI_RUN_STATUSES re-exposed as statics, not wrappers); orphaned `applyRawOutputRetention`/`assertTrustedDalContext`/`buildNoResponseError` imports dropped; facade 479 L; behavior-freeze; suite green]
+  - **BATCHED adversarial review**: not run as a separate DEDICATED pass — Checkpoint F is
+    lower-risk (no DAL assert, no new enforcement surface) and the characterization + mutation-proof
+    + full-suite/gate sweep above give equivalent confidence for a batched checkpoint per the plan's
+    original review-mode designation. `/sweep`-style fact reconciliation: this plan's status header
+    and this section were rewritten in the same session as the code change; the agent-wiki assert-site
+    count (8 across write-core.js/changeset.js/email.js + 1 in `lib/dataverse/core/changeset.js:117`)
+    was already reconciled at Checkpoint C (S345) and re-verified via grep this session — no drift found.
   - **TS gate — facade coverage DONE (S342, `docs/TYPESCRIPT_OPTION_ASSESSMENT.md`).** Checkpoint B
     had turned the facade's read selectors into thin `...args` forwarding wrappers, which erased the
     branded `Guid` signature. S342 restored the read wrappers (`getEntityDefinitions`, `queryRecords`,
