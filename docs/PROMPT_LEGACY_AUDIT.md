@@ -131,7 +131,7 @@ tool with no request binding → extraction currently *necessary*; redundancy is
 | **funding-gap-analyzer.js** (`createFundingExtractionPrompt`, code, upload) | Extract PI/institution/state → query NSF/NIH/USAspending | **Latent:** PI, institution, state (→ `akoya_request` + account). But the app is explicitly a lookup keyed on those, and it *infers state from institution knowledge* (analytical). | No. | Fine for its federal-funding-gap purpose. | **Leave.** |
 | **phase-i-writeup.js** (`createPhaseIWriteupPrompt`, code, legacy upload) | Older single-writeup path w/ heavy institution-name-validation rules | **Latent + notable:** an entire block forces the model to extract and *not abbreviate* the institution name (`phase-i-writeup.js:40-62`) — the exact fragile inference `akoya_applicantid` would make trivial. PI extraction too. | No. | The anti-abbreviation gymnastics are a smell: this is a lookup masquerading as extraction. | **Re-scope/retire** — confirm whether `phase-i-writeup` is still a live surface; if so, bind requestId and delete the institution-validation block. Superseded in spirit by `phase-i.summary` (Executor). |
 | **phase-i-summaries.js** (`createPhaseISummarizationPrompt`, code) | Batch Phase I summary (same 4-bullet shape as live `phase-i.summary`) | No — like `phase-i.summary`, explicitly excludes names/affiliations from prose. | N/A. | Good. | **Leave** (consider consolidating with the Executor `phase-i.summary` row to avoid two copies). |
-| **peer-review-summarizer.analyze** / **.questions** (live rows; live path = `peer-reviewer.js`) | Summarize submitted peer-review docs; extract questions | No `akoya_request` extraction. It *does* ask the model to read reviewer names/affiliations off the review docs — but those are the review documents, not proposal admin metadata. | N/A. | Good. Note: `peer-reviewer.js` also defines `createThemeSynthesisPrompt` + `createActionItemsPrompt` that are **dead code** (never imported — confirmed in `peer-reviewer-dynamics.js` header). | **Leave** the two live prompts; **retire** the two dead generators. |
+| **peer-review-summarizer.analyze** / **.questions** (live rows; live path = `peer-reviewer.js`) | Summarize submitted peer-review docs; extract questions | No `akoya_request` extraction. It *does* ask the model to read reviewer names/affiliations off the review docs — but those are the review documents, not proposal admin metadata. | N/A. | Good. (`peer-reviewer.js` also defined two dead generators `createThemeSynthesisPrompt` + `createActionItemsPrompt` — **removed S344**.) | **Leave** the two live prompts. Dead generators **retired S344**. Note the admin-panel rows are dormant (below). |
 | **integrity-screener.js** (code, Haiku) | Screen PubPeer/news for a named applicant | No. Takes `name` + `institution` as *structured inputs* (already resolved upstream) — the correct pattern. | N/A. | Well-scoped; name-commonality caution is good. | **Leave.** |
 | **email-reviewer.js** (`createPersonalizationPrompt`, code) | Personalize a reviewer invite | No extraction; consumes candidate + proposal title/PI as untrusted context. | N/A. | Fine. | **Leave.** |
 | **literature-analyzer.js** (code) | Analyze uploaded papers (not proposals) | No proposal-admin overlap (paper abstracts are the papers'). | N/A. | Fine. | **Leave.** |
@@ -167,8 +167,10 @@ those three consumers; ASSUMED for write paths I did not exhaustively trace — 
 extraction-consumer write-path audit is the confirming follow-up.]**
 
 ### Promise-gaps (axis 2) worth a look
-- **Dead prompt generators:** `peer-reviewer.js::createThemeSynthesisPrompt` and
-  `createActionItemsPrompt` are defined but never imported — retire or wire up.
+- **Dead prompt generators:** ~~`peer-reviewer.js::createThemeSynthesisPrompt` and
+  `createActionItemsPrompt` are defined but never imported — retire or wire up.~~
+  **DONE S344 (2026-07-08):** both removed as dead code (zero call sites), along with
+  their barrel re-exports; live generators + `extractReviewerInfo` untouched.
 - **Two Phase-I copies:** `phase-i.summary` (Executor row) and `phase-i-summaries.js` (code)
   carry the same 4-bullet contract — a consolidation/drift risk, not a bug.
 - No prompt was found asking materially *too little* for its stated purpose; the corpus's
