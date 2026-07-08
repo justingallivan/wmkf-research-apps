@@ -16,7 +16,7 @@ related:
 
 # DynamicsService Decomposition Plan
 
-**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stages 1 (`auth.js`) + 2 (`restrictions.js`) + 3 (`annotations.js`) all EXECUTED + BATCHED adversarial review PASSED (S339, verdict SOUND/approve — "could not refute the behavior-freeze", no material findings, base `d4463548..HEAD`); Checkpoint B Stages 4 (`schema.js`) + 5 (`read-ops.js`) EXECUTED + BATCHED adversarial review PASSED (S341, Codex behavior-freeze verified; merged to main S342, commit `daac9761`); Checkpoint C Stage 6 (`write-core.js`) EXECUTED + DEDICATED adversarial review PASSED (S345, Codex verdict `approve`, "no material findings" — behavior-equivalent modulo the `this.`→`svc.` rewrite, 4 mutators still assert-first, impersonation fallback + 412/ETag/plain-error paths intact); Checkpoints D–F pending.** This applies the exact cadence proven on the
+**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stages 1 (`auth.js`) + 2 (`restrictions.js`) + 3 (`annotations.js`) all EXECUTED + BATCHED adversarial review PASSED (S339, verdict SOUND/approve — "could not refute the behavior-freeze", no material findings, base `d4463548..HEAD`); Checkpoint B Stages 4 (`schema.js`) + 5 (`read-ops.js`) EXECUTED + BATCHED adversarial review PASSED (S341, Codex behavior-freeze verified; merged to main S342, commit `daac9761`); Checkpoint C Stage 6 (`write-core.js`) EXECUTED + DEDICATED adversarial review PASSED (S345, Codex verdict `approve`, "no material findings" — behavior-equivalent modulo the `this.`→`svc.` rewrite, 4 mutators still assert-first, impersonation fallback + 412/ETag/plain-error paths intact); Checkpoint D Stage 7 (`changeset.js`) CODE-COMPLETE S345 (DEDICATED review pending); Checkpoints E–F pending.** This applies the exact cadence proven on the
 DiscoveryService decomposition (S335) and the ContactEnrichmentService decomposition (S336):
 strategy chosen up front (facade + extracted modules), leaf-first staged extraction, each cluster
 characterization-covered (baselined green pre-extraction, mutation-proven) BEFORE the code moves,
@@ -476,13 +476,29 @@ touched gates → commit. Leaf-first per the DAG.
   `check:dataverse-access-layer`, `check:route-service-boundary`, `check:dynamics-context-boundary`,
   `check:odata-escape`, `check:trust-boundary-guid`. **→ Checkpoint D (`changeset.js`, the
   highest-risk cluster) is UNBLOCKED.**
-- **Checkpoint D — `changeset.js` (Stage 7). DEDICATED review — the highest-risk cluster**
-  (mirrors ContactEnrichment's isolated `tiers.js`). C11 characterization suite lands and is
-  mutation-proven BEFORE the move; review focuses on byte-identical parser/builder bodies, the
-  validate-then-assert order (C2), and the fail-closed `allConfirmed` guard. 77 external
-  `executeChangeset` refs (reviewer submit flow among them) make this the one stage where a subtle
-  parser drift corrupts durable state silently. Gates: `check:dataverse-access-layer`,
-  `check:dynamics-context-boundary`.
+- **Checkpoint D — `changeset.js` (Stage 7). CODE-COMPLETE S345; DEDICATED review PENDING — the
+  highest-risk cluster** (mirrors ContactEnrichment's isolated `tiers.js`). `executeChangeset` + the
+  8 module-private `$batch` builders/parsers (`BATCH_CRLF`, `buildChangesetOp`,
+  `buildChangesetBatchBody`, `extractBoundary`, `splitHeadersAndBody`, `splitMultipart`,
+  `parseEmbeddedHttp`, `collectHttpParts`, `parseBatchResponse`) moved as ONE unit to
+  `lib/services/dynamics/changeset.js` (329 L). `executeChangeset` gained the C1 svc-dispatch rewrite
+  (`svc.getAccessToken`/`svc._withCallerId`/`svc._writeFetch`); the 8 helpers carry no `this` and
+  moved byte-for-byte (module-private, not exported). Facade keeps a thin delegating wrapper (77
+  external refs unchanged) and drops the now-orphaned `randomUUID`/`buildServiceError` imports
+  (`buildNoResponseError` remains the pre-existing import-only orphan, deferred to facade-finalize).
+  The C11 invariants are byte-identical: validate-then-assert order (C2), the `failed`-op status
+  preference, the fail-closed `allConfirmed` under-count guard, Content-ID 1-based, CRLF body,
+  non-surfaced `OData-EntityId`. The pre-existing `dynamics-service-changeset.test.js` (17 tests) IS
+  the C11 suite — green pre- and post-move; **mutation-proven** this session (weakening the
+  under-count guard fails the "under-counts" test; moving the DAL assert before validation fails 3/4
+  input-validation tests → confirms C2 ordering bites). Facade 907→641 L. Verified: C1 guard (zero
+  body `this.`); full suite **5190/5190**; build green; ALL FIVE LAW gates + self-tests + `check:types`
+  green (`check:dynamics-context-boundary` 614 files, 0 violations — changeset.js imports
+  `assertTrustedDalContext`, a read, not a bypass; access-layer recognizes it as an exempt dynamics
+  submodule).
+  - [RECHECKED after lib/services/dynamics/changeset.js change: S345 — verbatim `executeChangeset` (C1 svc-rewrite) + 8 private builders/parsers; deps crypto/dynamics-context/service-error; assert-after-validation preserved; zero body `this.`; suite 17/17, full 5190/5190]
+  - [RECHECKED after lib/services/dynamics-service.js change: S345 — facade rewired (executeChangeset delegating wrapper passes `this`), private $batch block removed, orphaned `randomUUID`/`buildServiceError` imports dropped, behavior-freeze; no stray refs; suite green]
+  - **DEDICATED adversarial review PENDING** (Codex behavior-freeze verification, per the plan's Checkpoint-D review mode). Gates confirmed green pre-review: ALL FIVE.
 - **Checkpoint E — `email.js` (Stage 8). DEDICATED review.** These three methods are exempt from the
   static access-layer gate as `NON_ENTITY_TRANSPORT_METHODS` (`check-dataverse-access-layer.js:106`),
   so **the runtime `assertTrustedDalContext` asserts (`:1232,:1304,:1340`) are the ONLY enforcement
