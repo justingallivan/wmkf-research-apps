@@ -303,7 +303,7 @@ related:
 | [REVIEWER_GATING_STRATEGY_REDESIGN.md](REVIEWER_GATING_STRATEGY_REDESIGN.md) | spec | active |  | Per-gate over-gating verdict + redesign recovering or surfacing all 5 Cause #2 email misses without opening a wrong-person send path. | 2026-07-03 |
 | [REVIEWER_GATING_STRATEGY_REVIEW_PROMPT.md](REVIEWER_GATING_STRATEGY_REVIEW_PROMPT.md) | draft | active |  | Brief for a fresh reviewing LLM: assess whether reviewer-finder fail-closed gates over-gate or fire at the wrong stage/input, and produce a redesign doc. | 2026-07-03 |
 | [REVIEWER_REFERRAL_SEEDING_DESIGN.md](REVIEWER_REFERRAL_SEEDING_DESIGN.md) | plan | active |  | Implemented build plan: guarantee externally-referred seed names into the reviewer pool (seed-only, folded-in); relabel two existing kinds, no new enum. | 2026-07-02 |
-| [REVIEWER_REMOVE_ENTIRELY_BUILD_PLAN.md](REVIEWER_REMOVE_ENTIRELY_BUILD_PLAN.md) | plan | draft |  | PD self-service permanent removal of an early-stage reviewer engagement, atomic Dataverse changeset + pre-delete audit, cascading to honorarium + review_drafts. |  |
+| [REVIEWER_REMOVE_ENTIRELY_BUILD_PLAN.md](REVIEWER_REMOVE_ENTIRELY_BUILD_PLAN.md) | plan | active |  | PD self-service permanent removal of an early-stage reviewer engagement, atomic Dataverse changeset + pre-delete audit, cascading to honorarium + review_drafts. |  |
 
 ## security-auth
 

@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-02
+last_verified: 2026-07-07
 stale_after_days: 90
 owner: finance-ops
 source_files:
@@ -42,7 +42,9 @@ but the portal is now the planned sole creator of reviewer honorarium
 `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` as the current source of truth for
 the no-BILL cycle. **This posture WENT LIVE in Production 2026-07-02** (GUIDs set,
 `HONORARIUM_ONBOARDING_DEFERRED` removed from Production / kept `true` on Preview,
-BILL still deferred, prod redeployed). The clean go-live posture is:
+BILL still deferred, prod redeployed) — honorarium-ON / BILL-off is the live
+posture, not a plan; a real honorarium `akoya_request` was created
+`[VERIFIED via #1003172, 2026-07-06]`. The clean go-live posture is:
 
 - set the three honorarium discriminator GUIDs;
 - unset `HONORARIUM_ONBOARDING_DEFERRED` so `ensureHonorariumOnboarding()` mints

@@ -31,6 +31,7 @@ import { useRef, useState } from 'react';
 import { Card } from '../Layout';
 import InviteEmailModal from './InviteEmailModal';
 import CandidateEditModal from './CandidateEditModal';
+import RemoveEntirelyModal from './RemoveEntirelyModal';
 import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../lib/utils/scholar-url';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 
@@ -77,6 +78,7 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
   const [withdrawing, setWithdrawing] = useState(false);
   const [restoringId, setRestoringId] = useState(null);
   const [showRemoved, setShowRemoved] = useState(false);
+  const [removeEntirelyTarget, setRemoveEntirelyTarget] = useState(null); // candidate row | null
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
   const exportingRef = useRef(false);
@@ -483,15 +485,25 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
                       {c.affiliation && <p className="text-xs text-gray-400 truncate">{c.affiliation}</p>}
                     </div>
                     {canManage && (
-                      <button
-                        type="button"
-                        onClick={() => restoreCandidate(c)}
-                        disabled={restoringId === c.suggestionId}
-                        className="text-xs font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50 whitespace-nowrap"
-                        title="Restore this candidate to the list above"
-                      >
-                        {restoringId === c.suggestionId ? 'Restoring…' : 'Restore'}
-                      </button>
+                      <span className="flex items-center gap-3 flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => restoreCandidate(c)}
+                          disabled={restoringId === c.suggestionId}
+                          className="text-xs font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50 whitespace-nowrap"
+                          title="Restore this candidate to the list above"
+                        >
+                          {restoringId === c.suggestionId ? 'Restoring…' : 'Restore'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRemoveEntirelyTarget(c)}
+                          className="text-xs font-medium text-red-600 hover:text-red-800 whitespace-nowrap"
+                          title="Permanently delete this engagement (cannot be restored)"
+                        >
+                          Remove entirely
+                        </button>
+                      </span>
                     )}
                   </li>
                 ))}
@@ -509,6 +521,14 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
           allowResend={modal.allowResend}
           onClose={() => setModal(null)}
           onSent={afterSent}
+        />
+      )}
+
+      {removeEntirelyTarget && (
+        <RemoveEntirelyModal
+          candidate={removeEntirelyTarget}
+          onClose={() => setRemoveEntirelyTarget(null)}
+          onRemoved={() => { if (onRefresh) onRefresh(); }}
         />
       )}
 
