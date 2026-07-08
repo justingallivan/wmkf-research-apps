@@ -16,7 +16,7 @@ related:
 
 # DynamicsService Decomposition Plan
 
-**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stages 1 (`auth.js`) + 2 (`restrictions.js`) + 3 (`annotations.js`) all EXECUTED + BATCHED adversarial review PASSED (S339, verdict SOUND/approve — "could not refute the behavior-freeze", no material findings, base `d4463548..HEAD`); Checkpoint B Stages 4 (`schema.js`) + 5 (`read-ops.js`) EXECUTED + BATCHED adversarial review PASSED (S341, Codex behavior-freeze verified; merged to main S342, commit `daac9761`); Checkpoint C Stage 6 (`write-core.js`) EXECUTED + DEDICATED adversarial review PASSED (S345, Codex verdict `approve`, "no material findings" — behavior-equivalent modulo the `this.`→`svc.` rewrite, 4 mutators still assert-first, impersonation fallback + 412/ETag/plain-error paths intact); Checkpoint D Stage 7 (`changeset.js`) CODE-COMPLETE S345 (DEDICATED review pending); Checkpoints E–F pending.** This applies the exact cadence proven on the
+**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stages 1 (`auth.js`) + 2 (`restrictions.js`) + 3 (`annotations.js`) all EXECUTED + BATCHED adversarial review PASSED (S339, verdict SOUND/approve — "could not refute the behavior-freeze", no material findings, base `d4463548..HEAD`); Checkpoint B Stages 4 (`schema.js`) + 5 (`read-ops.js`) EXECUTED + BATCHED adversarial review PASSED (S341, Codex behavior-freeze verified; merged to main S342, commit `daac9761`); Checkpoint C Stage 6 (`write-core.js`) EXECUTED + DEDICATED adversarial review PASSED (S345, Codex verdict `approve`, "no material findings" — behavior-equivalent modulo the `this.`→`svc.` rewrite, 4 mutators still assert-first, impersonation fallback + 412/ETag/plain-error paths intact); Checkpoint D Stage 7 (`changeset.js`) EXECUTED + DEDICATED adversarial review PASSED (S345, Codex verdict `approve`, "no material findings" — byte-identity comparison confirmed the 8 helpers identical to parent, executeChangeset only C1 + static→function, C2 ordering + all C11 semantics intact); Checkpoints E–F pending.** This applies the exact cadence proven on the
 DiscoveryService decomposition (S335) and the ContactEnrichmentService decomposition (S336):
 strategy chosen up front (facade + extracted modules), leaf-first staged extraction, each cluster
 characterization-covered (baselined green pre-extraction, mutation-proven) BEFORE the code moves,
@@ -498,7 +498,12 @@ touched gates → commit. Leaf-first per the DAG.
   submodule).
   - [RECHECKED after lib/services/dynamics/changeset.js change: S345 — verbatim `executeChangeset` (C1 svc-rewrite) + 8 private builders/parsers; deps crypto/dynamics-context/service-error; assert-after-validation preserved; zero body `this.`; suite 17/17, full 5190/5190]
   - [RECHECKED after lib/services/dynamics-service.js change: S345 — facade rewired (executeChangeset delegating wrapper passes `this`), private $batch block removed, orphaned `randomUUID`/`buildServiceError` imports dropped, behavior-freeze; no stray refs; suite green]
-  - **DEDICATED adversarial review PENDING** (Codex behavior-freeze verification, per the plan's Checkpoint-D review mode). Gates confirmed green pre-review: ALL FIVE.
+  - **DEDICATED adversarial review PASSED (S345, Codex).** Verdict `approve`, "no material findings":
+  a byte-identity comparison confirmed the 8 private helpers + `BATCH_CRLF` are identical to the
+  parent, `executeChangeset` normalizes to only the static→function + `this.`→`svc.` rewrites,
+  validation still precedes `assertTrustedDalContext` (C2), the C11 failure/confirmation/Content-ID/
+  CRLF/non-surfaced-header semantics are preserved, imports resolve, and the facade wrapper forwards
+  operations/options unchanged. **→ Checkpoint E (`email.js`) is UNBLOCKED.**
 - **Checkpoint E — `email.js` (Stage 8). DEDICATED review.** These three methods are exempt from the
   static access-layer gate as `NON_ENTITY_TRANSPORT_METHODS` (`check-dataverse-access-layer.js:106`),
   so **the runtime `assertTrustedDalContext` asserts (`:1232,:1304,:1340`) are the ONLY enforcement
