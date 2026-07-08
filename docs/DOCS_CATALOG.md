@@ -200,6 +200,12 @@ related:
 | [VIRTUAL_REVIEW_PANEL.md](VIRTUAL_REVIEW_PANEL.md) | spec | active | yes | Thin design / operations reference for the Virtual Review Panel app. Created S191 to receive content extracted from CLAUDE.md so the table-row... | 2026-07-02 |
 | [WORKFLOW_CHAINING_DESIGN.md](WORKFLOW_CHAINING_DESIGN.md) | spec | active | yes | Status: Design principle — extracted from Session 100 discussion of prompt storage migration. | 2026-07-02 |
 
+## prompts
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [PROMPT_LEGACY_AUDIT.md](PROMPT_LEGACY_AUDIT.md) | audit | draft |  | Per-prompt eval of the wmkf_ai_prompt corpus: which asks are now Dataverse-authoritative (redundant/crash-risk) and which prompts have promise-gaps. | 2026-07-07 |
+
 ## repo-hygiene
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
