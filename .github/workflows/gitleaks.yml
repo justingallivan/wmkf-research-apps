@@ -9,6 +9,11 @@ jobs:
   gitleaks:
     name: Gitleaks
     runs-on: ubuntu-latest
+    # Skip on Dependabot PRs: GitHub runs them with a read-only GITHUB_TOKEN, so
+    # gitleaks-action 403s ("Resource not accessible by integration") on its API
+    # write-back — a false failure on every bot PR. A dependency/lockfile bump
+    # introduces no source secrets, and Trivy's CVE scan already covers those PRs.
+    if: github.actor != 'dependabot[bot]'
     steps:
       - uses: actions/checkout@v5
         with:
