@@ -26,7 +26,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Card, Button } from '../Layout';
-import ReviewFormFields from '../external/ReviewFormFields';
 import { STATUS_PIPELINE, getStatusInfo, filterByMode } from './reviewer-modes';
 import { EMPTY_TEMPLATES, loadEmailTemplates, saveEmailTemplates } from './email-template-store';
 
@@ -83,17 +82,16 @@ export function TokenStateBadge({ state, expiresAt, firstAccessedAt }) {
 
 const MENU_WIDTH = 224; // w-56
 
-export function TokenActionsMenu({ reviewer, onRegenerate, onRevoke, onMarkReceivedNoFile, onRemove }) {
+export function TokenActionsMenu({ reviewer, onRegenerate, onRevoke, onRemove }) {
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState(null); // { left, top } in viewport px, or null
   const btnRef = useRef(null);
   const menuRef = useRef(null);
 
   const isActive = reviewer.tokenState === 'active';
-  const hasReview = !!(reviewer.reviewReceivedAt);
-  // 1 (regenerate) + revoke? + mark-received? + remove? — drives the upward-flip
-  // height estimate so the portalled menu never opens off-screen.
-  const itemCount = 1 + (isActive ? 1 : 0) + (!hasReview ? 1 : 0) + (onRemove ? 1 : 0);
+  // 1 (regenerate) + revoke? + remove? — drives the upward-flip height estimate
+  // so the portalled menu never opens off-screen.
+  const itemCount = 1 + (isActive ? 1 : 0) + (onRemove ? 1 : 0);
 
   // Position the menu in viewport coords, flipping upward when there isn't room
   // below. Rendered in a portal (see below) so it escapes the table card's
@@ -162,14 +160,6 @@ export function TokenActionsMenu({ reviewer, onRegenerate, onRevoke, onMarkRecei
               className="w-full text-left px-3 py-2 hover:bg-gray-50 text-red-700"
             >
               Revoke link
-            </button>
-          )}
-          {!hasReview && (
-            <button
-              onClick={() => { setOpen(false); onMarkReceivedNoFile(); }}
-              className="w-full text-left px-3 py-2 hover:bg-gray-50"
-            >
-              Mark received (no file)
             </button>
           )}
           {onRemove && (
@@ -1043,150 +1033,6 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
   );
 }
 
-// ─── Review Upload Modal ────────────────────────────────────────────────────
-
-function UploadReviewModal({ isOpen, onClose, reviewer, onUploaded }) {
-  const formRef = useRef(null);
-  const [uploading, setUploading] = useState(false);
-  const [errors, setErrors] = useState(null);
-  const [infectedDetail, setInfectedDetail] = useState(null);
-
-  if (!isOpen || !reviewer) return null;
-
-  const prefill = {
-    affiliation: reviewer.reviewerAffiliation || reviewer.affiliation || '',
-    impact: reviewer.reviewerImpact ?? null,
-    risk: reviewer.reviewerRisk ?? null,
-    overallRating: reviewer.reviewerOverallRating ?? null,
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setErrors(null);
-    setInfectedDetail(null);
-
-    const formData = new FormData(formRef.current);
-    formData.append('suggestionId', reviewer.suggestionId);
-
-    const fileEntries = formData.getAll('files').filter(f => f && f.size > 0);
-    if (fileEntries.length === 0) {
-      setErrors(['Please attach at least one file.']);
-      return;
-    }
-
-    setUploading(true);
-    try {
-      const response = await fetch('/api/review-manager/upload-review', {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.ok) {
-        if (data.reason === 'infected') {
-          setInfectedDetail(Array.isArray(data.errors) ? data.errors : []);
-        } else {
-          setErrors(data.errors || [data.reason || 'Upload failed.']);
-        }
-        return;
-      }
-      if (onUploaded) onUploaded(reviewer.suggestionId, data);
-      onClose();
-    } catch (err) {
-      setErrors([err.message || 'Network error.']);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const reviewOnFile = !!reviewer.reviewSharePointFolder;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10">
-          <h2 className="text-lg font-semibold text-gray-900">Upload Review</h2>
-          <p className="text-sm text-gray-500 mt-1">for {reviewer.name}</p>
-        </div>
-
-        <form ref={formRef} onSubmit={handleSubmit} className="p-6 space-y-5">
-          {reviewOnFile && (
-            <div className="p-3 bg-yellow-50 rounded-lg">
-              <p className="text-sm text-yellow-800">
-                A review is already on file
-                {reviewer.reviewFilename ? <> (<strong>{reviewer.reviewFilename}</strong>)</> : null}.
-                Uploading replaces it.
-              </p>
-            </div>
-          )}
-
-          <div>
-            <label htmlFor="rm-files" className="block text-sm font-semibold text-gray-900">
-              Review file(s) <span className="text-red-600">*</span>
-            </label>
-            <p className="text-xs text-gray-500 mt-1">
-              Up to 5 files. PDF, DOCX, or DOC. Max 25 MB each.
-            </p>
-            <input
-              id="rm-files"
-              name="files"
-              type="file"
-              accept=".pdf,.doc,.docx"
-              multiple
-              required
-              disabled={uploading}
-              className="mt-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
-            />
-          </div>
-
-          <ReviewFormFields initialValues={prefill} disabled={uploading} idPrefix="rm" />
-
-          {errors && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
-              <p className="font-semibold">Please fix the following:</p>
-              <ul className="list-disc list-inside mt-1 space-y-0.5">
-                {errors.map((err, i) => (<li key={i}>{err}</li>))}
-              </ul>
-            </div>
-          )}
-
-          {infectedDetail && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-900 space-y-2">
-              <p className="font-semibold">Virus scanner rejected the file</p>
-              <p>
-                The uploaded file was flagged as potentially malicious and was not stored.
-                The review-form fields above are preserved — replace just the file and try again.
-                The Program Director on this proposal has been notified automatically.
-              </p>
-              {infectedDetail.length > 0 && (
-                <details>
-                  <summary className="cursor-pointer text-red-800 underline">Detection detail</summary>
-                  <ul className="list-disc list-inside mt-1 space-y-0.5">
-                    {infectedDetail.map((err, i) => (<li key={i}>{err}</li>))}
-                  </ul>
-                </details>
-              )}
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={uploading}
-              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
-            >
-              Cancel
-            </button>
-            <Button type="submit" disabled={uploading}>
-              {uploading ? 'Uploading…' : 'Upload'}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 // ─── Status Dropdown ──────────────────────────────────────────────────────
 
 function StatusDropdown({ currentStatus, onChange }) {
@@ -1223,7 +1069,6 @@ export default function ReviewerManagePanel({
 }) {
   const [selectedReviewers, setSelectedReviewers] = useState(new Set());
   const [emailModalOpen, setEmailModalOpen] = useState(false);
-  const [uploadModalReviewer, setUploadModalReviewer] = useState(null);
   const [editingNotes, setEditingNotes] = useState(null); // { suggestionId, value }
   const [savingNotes, setSavingNotes] = useState(false);
 
@@ -1324,25 +1169,6 @@ export default function ReviewerManagePanel({
     }
   };
 
-  const handleMarkReceivedNoFile = async (suggestionId) => {
-    if (!confirm('Mark this review as received without a file? Use this for informal feedback or paper reviews you do not plan to scan.')) return;
-    try {
-      const resp = await fetch('/api/review-manager/mark-received-no-file', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ suggestionId }),
-      });
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok || !data.ok) {
-        alert(`Could not mark received: ${data.reason || resp.status}`);
-        return;
-      }
-      if (onRefresh) onRefresh();
-    } catch (err) {
-      alert(`Network error: ${err.message}`);
-    }
-  };
-
   // Remove a reviewer from THIS request. The my-candidates DELETE endpoint is
   // server-authoritative (S213, Codex BUG-1 fix): it revokes any live magic link
   // FIRST, then soft-deletes (sets the suggestion wmkf_selected=false). It never
@@ -1390,11 +1216,6 @@ export default function ReviewerManagePanel({
     } catch (err) {
       console.error('Failed to update status:', err);
     }
-  };
-
-  const handleUploadComplete = () => {
-    setUploadModalReviewer(null);
-    if (onRefresh) onRefresh();
   };
 
   const formatDate = (dateStr) => {
@@ -1561,19 +1382,6 @@ export default function ReviewerManagePanel({
                             currentStatus={r.reviewStatus}
                             onChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
                           />
-                          {/* Upload review */}
-                          {(r.reviewStatus === 'materials_sent' || r.reviewStatus === 'under_review') && (
-                            <button
-                              onClick={() => setUploadModalReviewer(r)}
-                              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100"
-                              title="Staff upload (override)"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                              </svg>
-                              <span>Staff upload (override)</span>
-                            </button>
-                          )}
                           {/* Download received review from SharePoint via Graph. */}
                           {r.reviewSharePointFolder && (
                             <a
@@ -1591,7 +1399,6 @@ export default function ReviewerManagePanel({
                             reviewer={r}
                             onRegenerate={() => handleRegenerateToken(r.suggestionId)}
                             onRevoke={() => handleRevokeToken(r.suggestionId)}
-                            onMarkReceivedNoFile={() => handleMarkReceivedNoFile(r.suggestionId)}
                             onRemove={() => handleRemoveReviewer(r)}
                           />
                         </div>
@@ -1622,13 +1429,6 @@ export default function ReviewerManagePanel({
               setSelectedReviewers(new Set());
               if (onRefresh) onRefresh();
             }}
-          />
-
-          <UploadReviewModal
-            isOpen={!!uploadModalReviewer}
-            onClose={() => setUploadModalReviewer(null)}
-            reviewer={uploadModalReviewer}
-            onUploaded={handleUploadComplete}
           />
         </>
       )}

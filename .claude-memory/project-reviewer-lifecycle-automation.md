@@ -23,6 +23,14 @@ Do not:
 
 Ground truth: Dataverse `wmkf_appreviewersuggestion` (post-W3–W6 cutover; same fields formerly on Postgres `reviewer_suggestions`).
 
+> **Dated update (S347, 2026-07-08):** the "today" state described below is a Session-113
+> planning snapshot, now largely overtaken by shipped work — the design *discipline* still
+> applies, but the manual-tracking framing does NOT reflect current behavior. Automated
+> reminders/transitions shipped (reviewer-engagement Phases 1–4, S275). Review intake is now
+> the structured in-browser portal `/submit` (S301–302), NOT a file upload. The staff-side
+> "mark received in UI" / "staff upload" fallbacks referenced at the bottom of this note were
+> **removed from the Track Reviewers panel (S347)** — see `project-reviewer-upload-dormant-not-deleted`.
+
 The reviewer-recruitment lifecycle today has several semi-manual tracking points: email-sent (semi-automated via .eml workflow today), email-opened (not tracked), response-received (manual), review-received (manual via upload). The forward goal is automated reminders and status transitions driven by these fields.
 
 **Why:** Justin flagged this during Session 113 while designing the direct-email-send feature. Sending tens of emails per cycle is small enough to micromanage today, but follow-up cadence (e.g., "reviewer hasn't responded in 14 days → send reminder") is exactly the kind of thing that should be automated, not tracked in someone's head.

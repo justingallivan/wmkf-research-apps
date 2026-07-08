@@ -107,6 +107,15 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   file-upload path: memory `project-reviewer-upload-dormant-not-deleted`.
   **The whole epic (Phases 0–5) is COMPLETE (S302).**
   Full plan: `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md`.
+- **Staff-side upload + "mark received" surfaces removed from the Track Reviewers panel (S347).**
+  `ReviewerManagePanel`'s ⋮ menu no longer offers **"Staff upload (override)"** (file upload →
+  `/api/review-manager/upload-review`, was `UploadReviewModal` + `ReviewFormFields`) or **"Mark
+  received (no file)"** (`/api/review-manager/mark-received-no-file`). These were PDF-email-era
+  holdovers — a modern review is structured `wmkf_appreviewanswer` data via `/submit`, not a file,
+  and `ReviewFormFields` only renders picklist/string (no rich-text). **Routes + services are
+  RETAINED unchanged** for a planned dedicated staff "manual review rescue" tool that must mirror
+  the full `ReviewAuthoringForm` (incl. rich-text). `ReviewFormFields.js` is now orphaned but kept.
+  Memory `project-reviewer-upload-dormant-not-deleted`.
 - **The review question SET is staff-editable (Dataverse `wmkf_reviewquestion`), not hardcoded — Phases A+B+C LIVE (S303–S304).**
   `lib/external/review-question-fetcher.js::getActiveQuestionSet()` (cached, single-flight,
   **fail-closed** — context/draft/submit 500 if the set can't load) is the runtime source. The
@@ -119,9 +128,11 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   an in-flight session or the answer is recorded against text the reviewer never saw (Codex Phase B P1-A).
   Draft load reconciles type-aware — a draft value whose shape ≠ the current field type is discarded. `lib/external/review-form-schema.js` is RETAINED as the field-shape +
   seed + helper source (`reviewParentColumnByKey` dual-write binding, label decoders) and the
-  dormant default param; the seeded set is byte-identical to it, so behavior is unchanged. Staff
-  upload (`ReviewFormFields`/`ReviewerManagePanel`) + the two legacy `validateReviewForm` paths
-  stay on the static default until Phase D. **Phase C (S304): superuser editor** at `/admin` →
+  dormant default param; the seeded set is byte-identical to it, so behavior is unchanged. The two
+  legacy `validateReviewForm` paths stay on the static default until Phase D. (The staff
+  `ReviewFormFields` upload surface that also used the static default was **removed from
+  `ReviewerManagePanel` in S347** — see the staff-side removal note below; `ReviewFormFields.js`
+  is now orphaned but retained.) **Phase C (S304): superuser editor** at `/admin` →
   `ReviewQuestionsSection` → `pages/api/admin/review-questions.js`: add/edit/drag-reorder/remove the set;
   the route diffs by row id (`lib/admin/review-question-save.js`) and applies ONE atomic
   `executeChangeset` (create/update/soft-delete), enforces key-immutability + `questionSetVersion`

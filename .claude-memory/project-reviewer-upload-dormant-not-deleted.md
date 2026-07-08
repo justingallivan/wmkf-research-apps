@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-upload-dormant-not-deleted
-description: The external-reviewer FILE-UPLOAD path is hidden-not-deleted (S301 Phase 2 cutover to in-browser authoring). Route/infra retained server-side + hardened with a post-submit finality guard; how to re-enable.
+description: Both the reviewer-portal FILE-UPLOAD path (S301) AND the staff-side "Staff upload (override)" + "Mark received (no file)" Track-Reviewers surfaces (S347) are hidden/removed-not-deleted — routes/services retained server-side for a future staff rescue tool. How to re-enable.
 metadata:
   type: project
   status: active
@@ -22,8 +22,22 @@ deleted**:
 
 - **Kept server-side:** `pages/api/external/review/[token]/upload.js`,
   `lib/services/review-upload.js`, the virus-scan path, `sharepoint-cleanup.js`, and
-  the `wmkf_reviewsharepointfolder` / `wmkf_reviewfilename` columns. The staff
-  upload-on-behalf path is unaffected.
+  the `wmkf_reviewsharepointfolder` / `wmkf_reviewfilename` columns.
+
+## Staff-side surfaces ALSO removed from the Track Reviewers panel (S347)
+
+The staff-side counterparts on `ReviewerManagePanel` (Track Reviewers ⋮ menu) — the
+**"Staff upload (override)"** file-upload control (`/api/review-manager/upload-review`,
+`UploadReviewModal` + `ReviewFormFields`) and **"Mark received (no file)"**
+(`/api/review-manager/mark-received-no-file`) — were **removed from the UI (S347)**.
+They were PDF-email-era holdovers: a modern review is structured answer-snapshot data
+(via the portal `/submit`), not a file, and `ReviewFormFields` can't even capture the
+rich-text answers (it renders picklist/string only). **Routes + services are RETAINED
+server-side** (unchanged), for a planned dedicated staff "manual review rescue" tool
+that must mirror the FULL `ReviewAuthoringForm` (incl. rich-text) — see
+[[project-staff-review-rescue-tool]]. Side effect: `shared/components/external/ReviewFormFields.js` is now
+**orphaned** (no importer) — leave it (a rescue-tool candidate), don't treat its removal
+as required. [VERIFIED via `ReviewerManagePanel.js` (S347) + route files still present.]
 - **Hardened (Codex P0-1, S302):** the reviewer-token upload path
   (`opts.source === 'reviewer_self_token'`) now **409s once `wmkf_reviewreceivedat`
   is set**, so the dormant-but-reachable route can't overwrite a completed in-browser
