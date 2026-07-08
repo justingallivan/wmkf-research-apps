@@ -4,9 +4,10 @@
  * See docs/REVIEWER_REMOVE_ENTIRELY_BUILD_PLAN.md. Distinct from the
  * recoverable "X" (soft-delete) — this PERMANENTLY deletes, in one atomic
  * Dataverse changeset, the honorarium akoya_request (if linked), any
- * review-answer snapshot rows, and the suggestion row itself, plus the
- * Postgres review draft. Optionally (opt-in, default OFF) also deletes the
- * global contact.
+ * review-answer snapshot rows, and the suggestion row itself. It then runs
+ * isolated best-effort cleanups for SharePoint review files and the Postgres
+ * review draft. Optionally (opt-in, default OFF) it also attempts to delete
+ * the global contact in a separate changeset.
  *
  * Fetches the preflight disclosure (GET .../my-candidates?mode=removal-
  * preflight&suggestionId=...) on open so the confirm is driven by accurate,
@@ -63,10 +64,14 @@ export default function RemoveEntirelyModal({ candidate, onClose, onRemoved }) {
       parts.push(`This deletes their honorarium request (${formatAmount(disclosure.honorarium.amount) || 'amount unknown'}).`);
     }
     if (disclosure?.hasSubmittedReview) {
-      parts.push('This deletes their submitted review.');
+      parts.push(
+        disclosure?.reviewSharePointFolder
+          ? 'This removes submitted-review Dataverse rows and attempts best-effort cleanup of uploaded SharePoint review file(s).'
+          : 'This removes submitted-review Dataverse rows. No SharePoint file pointer is present on the row.',
+      );
     }
     if (deleteContact) {
-      parts.push('This ALSO permanently deletes their contact record.');
+      parts.push('This ALSO attempts to permanently delete their contact record.');
     }
     if (!confirm(parts.join('\n\n'))) return;
 
@@ -124,7 +129,20 @@ export default function RemoveEntirelyModal({ candidate, onClose, onRemoved }) {
                     {' — '}<span className="font-medium">we will never pay this person for this engagement</span>
                   </li>
                 )}
-                {disclosure.hasSubmittedReview && <li>Their submitted review</li>}
+                {disclosure.hasSubmittedReview && (
+                  <li>
+                    Submitted-review Dataverse rows
+                    {disclosure.reviewSharePointFolder
+                      ? ' and best-effort cleanup of uploaded SharePoint file(s)'
+                      : ' (no SharePoint file pointer on the row)'}
+                  </li>
+                )}
+                {disclosure.reviewSharePointFolder && (
+                  <li className="break-all">
+                    SharePoint review pointer recorded for audit: {disclosure.reviewSharePointFolder}
+                    {disclosure.reviewFilename ? ` / ${disclosure.reviewFilename}` : ''}
+                  </li>
+                )}
               </ul>
             </div>
           )}
@@ -139,7 +157,7 @@ export default function RemoveEntirelyModal({ candidate, onClose, onRemoved }) {
                   onChange={(e) => setDeleteContact(e.target.checked)}
                 />
                 <span>
-                  Also delete this contact <span className="text-gray-500">(default off — leaves the reviewer's global CRM record intact)</span>
+                  Also attempt to delete this contact <span className="text-gray-500">(default off — leaves the reviewer's global CRM record intact)</span>
                 </span>
               </label>
               {deleteContact && disclosure.contactAssociations && (

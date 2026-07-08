@@ -18,6 +18,8 @@ const HONORARIUM_ID = '33333333-3333-4333-8333-333333333333';
 const POTENTIAL_REVIEWER_ID = '44444444-4444-4444-8444-444444444444';
 const CONTACT_ID = '55555555-5555-4555-8555-555555555555';
 const ACTOR = 'su-1';
+const REVIEW_FOLDER = 'REQ-1_22222222222242228222222222222222/Reviewer_Uploads/11111111-1111-4111-8111-111111111111';
+const REVIEW_FILENAME = 'review.pdf';
 
 const findById = jest.fn();
 const findAllByPotentialReviewer = jest.fn(async () => []);
@@ -79,6 +81,20 @@ jest.mock('../../lib/services/alert-service', () => ({
   default: { updateAlertMetadata: (...a) => updateAlertMetadata(...a) },
 }));
 
+const getDriveId = jest.fn(async () => 'drive-1');
+const listFiles = jest.fn(async () => []);
+jest.mock('../../lib/services/graph-service', () => ({
+  GraphService: {
+    getDriveId: (...a) => getDriveId(...a),
+    listFiles: (...a) => listFiles(...a),
+  },
+}));
+
+const cleanupSharePointItems = jest.fn(async () => true);
+jest.mock('../../lib/services/sharepoint-cleanup', () => ({
+  cleanupSharePointItems: (...a) => cleanupSharePointItems(...a),
+}));
+
 let removeCandidateEntirely;
 let describeRemoval;
 let RemoveCandidateError;
@@ -96,6 +112,8 @@ function baseSuggestion(overrides = {}) {
     _wmkf_honorariumrequest_value: null,
     _wmkf_potentialreviewer_value: null,
     wmkf_reviewreceivedat: null,
+    wmkf_reviewsharepointfolder: null,
+    wmkf_reviewfilename: null,
     ...overrides,
   };
 }
@@ -113,6 +131,9 @@ beforeEach(() => {
   deleteBySuggestion.mockResolvedValue(1);
   notify.mockResolvedValue({ id: 42 });
   updateAlertMetadata.mockResolvedValue({});
+  getDriveId.mockResolvedValue('drive-1');
+  listFiles.mockResolvedValue([]);
+  cleanupSharePointItems.mockResolvedValue(true);
 });
 
 describe('removeCandidateEntirely — full bundle', () => {
@@ -128,15 +149,20 @@ describe('removeCandidateEntirely — full bundle', () => {
 
     const out = await removeCandidateEntirely({ suggestionId: SUGGESTION_ID, actingUserSystemId: ACTOR });
 
-    expect(out).toEqual({
+    expect(out).toEqual(expect.objectContaining({
       success: true,
       suggestionId: SUGGESTION_ID,
       honorariumDeleted: true,
       answerRowsDeleted: 2,
       contactDeleted: false,
+      contactDeleteAttempted: false,
+      contactDeleteError: null,
       draftDeleted: true,
+      postgresError: null,
+      warnings: [],
+      partialFailure: null,
       auditAlertId: 42,
-    });
+    }));
 
     // ONE changeset call.
     expect(runChangeset).toHaveBeenCalledTimes(1);
@@ -193,7 +219,7 @@ describe('removeCandidateEntirely — review-answer / draft absent', () => {
 });
 
 describe('removeCandidateEntirely — Action B (deleteContact)', () => {
-  test('adds the contact delete op LAST and surfaces the full association count', async () => {
+  test('runs contact delete in a separate changeset after Action A and surfaces the full association count', async () => {
     findById.mockResolvedValue(baseSuggestion({ _wmkf_potentialreviewer_value: POTENTIAL_REVIEWER_ID }));
     getPotentialReviewerById.mockResolvedValue({ _wmkf_contact_value: CONTACT_ID, wmkf_name: 'Dr X' });
     getByIdWithSelect.mockResolvedValue({ wmkf_portaloid: 'oid-1', wmkf_billcomid: 'bc-1' });
@@ -209,11 +235,18 @@ describe('removeCandidateEntirely — Action B (deleteContact)', () => {
       actingUserSystemId: ACTOR,
     });
 
+    expect(out.contactDeleteAttempted).toBe(true);
     expect(out.contactDeleted).toBe(true);
-    const [operations] = runChangeset.mock.calls[0];
-    expect(operations[operations.length - 1]).toEqual(
+    expect(runChangeset).toHaveBeenCalledTimes(2);
+
+    const [requiredOperations] = runChangeset.mock.calls[0];
+    expect(requiredOperations.some((o) => o.entitySet === 'contacts')).toBe(false);
+
+    const [contactOperations] = runChangeset.mock.calls[1];
+    expect(contactOperations).toEqual([
       expect.objectContaining({ method: 'DELETE', entitySet: 'contacts', key: CONTACT_ID }),
-    );
+    ]);
+    expect(runChangeset.mock.invocationCallOrder[1]).toBeGreaterThan(runChangeset.mock.invocationCallOrder[0]);
 
     // The audit metadata carries the full comprehensive association snapshot.
     const auditMetadata = notify.mock.calls[0][0].metadata;
@@ -224,6 +257,45 @@ describe('removeCandidateEntirely — Action B (deleteContact)', () => {
       portalIdentityLinked: true,
       billVendorLinked: true,
     }));
+  });
+
+  test('contact delete failure is isolated from Action A and recorded as partial', async () => {
+    findById.mockResolvedValue(baseSuggestion({ _wmkf_potentialreviewer_value: POTENTIAL_REVIEWER_ID }));
+    getPotentialReviewerById.mockResolvedValue({ _wmkf_contact_value: CONTACT_ID, wmkf_name: 'Dr X' });
+    runChangeset
+      .mockResolvedValueOnce({ ok: true })
+      .mockRejectedValueOnce(new Error('contact restrict relationship'));
+
+    const out = await removeCandidateEntirely({
+      suggestionId: SUGGESTION_ID,
+      deleteContact: true,
+      actingUserSystemId: ACTOR,
+    });
+
+    expect(runChangeset).toHaveBeenCalledTimes(2);
+    const [requiredOperations] = runChangeset.mock.calls[0];
+    expect(requiredOperations.some((o) => o.entitySet === 'contacts')).toBe(false);
+    const [contactOperations] = runChangeset.mock.calls[1];
+    expect(contactOperations).toEqual([
+      expect.objectContaining({ method: 'DELETE', entitySet: 'contacts', key: CONTACT_ID }),
+    ]);
+
+    expect(deleteBySuggestion).toHaveBeenCalledWith(SUGGESTION_ID);
+    expect(out).toEqual(expect.objectContaining({
+      success: true,
+      contactDeleteAttempted: true,
+      contactDeleted: false,
+      contactDeleteError: 'contact restrict relationship',
+      partialFailure: 'contact_delete_failed',
+      warnings: ['contact_delete_failed'],
+    }));
+    expect(updateAlertMetadata).toHaveBeenCalledWith(42, {
+      result: expect.objectContaining({
+        status: 'partial_contact_delete_failed',
+        contactDeleted: false,
+        contactDeleteError: 'contact restrict relationship',
+      }),
+    });
   });
 
   test('deleteContact:false (default) never adds a contact op even when a contact is linked', async () => {
@@ -267,6 +339,100 @@ describe('removeCandidateEntirely — Dataverse-changeset-fails', () => {
   });
 });
 
+describe('removeCandidateEntirely — SharePoint review-file cleanup', () => {
+  test('records folder/filename in the audit snapshot and best-effort deletes listed files after Action A', async () => {
+    findById.mockResolvedValue(baseSuggestion({
+      wmkf_reviewreceivedat: '2026-07-01',
+      wmkf_reviewsharepointfolder: REVIEW_FOLDER,
+      wmkf_reviewfilename: REVIEW_FILENAME,
+    }));
+    listFiles.mockResolvedValue([
+      { id: 'sp-1', name: REVIEW_FILENAME },
+      { id: 'sp-2', name: 'supplement.docx' },
+    ]);
+
+    const out = await removeCandidateEntirely({ suggestionId: SUGGESTION_ID, actingUserSystemId: ACTOR });
+
+    expect(getDriveId).toHaveBeenCalledWith('akoya_request');
+    expect(listFiles).toHaveBeenCalledWith('akoya_request', REVIEW_FOLDER, { recursive: false });
+    expect(cleanupSharePointItems).toHaveBeenCalledWith(
+      'drive-1',
+      [
+        { id: 'sp-1', name: REVIEW_FILENAME },
+        { id: 'sp-2', name: 'supplement.docx' },
+      ],
+      'remove-candidate-review-files',
+    );
+    expect(out).toEqual(expect.objectContaining({
+      reviewFile: expect.objectContaining({
+        folder: REVIEW_FOLDER,
+        filename: REVIEW_FILENAME,
+        wmkf_reviewsharepointfolder: REVIEW_FOLDER,
+        wmkf_reviewfilename: REVIEW_FILENAME,
+      }),
+      sharePointCleanupAttempted: true,
+      sharePointReviewFilesDeleted: true,
+      sharePointReviewFilesDeletedCount: 2,
+      warnings: [],
+    }));
+
+    const auditMetadata = notify.mock.calls[0][0].metadata;
+    expect(auditMetadata).toEqual(expect.objectContaining({
+      reviewSharePointFolder: REVIEW_FOLDER,
+      reviewFilename: REVIEW_FILENAME,
+      disclosure: expect.objectContaining({
+        reviewSharePointFolder: REVIEW_FOLDER,
+        reviewFilename: REVIEW_FILENAME,
+        reviewFile: expect.objectContaining({
+          wmkf_reviewsharepointfolder: REVIEW_FOLDER,
+          wmkf_reviewfilename: REVIEW_FILENAME,
+        }),
+      }),
+    }));
+    expect(updateAlertMetadata).toHaveBeenCalledWith(42, {
+      result: expect.objectContaining({
+        sharePointCleanup: expect.objectContaining({
+          attempted: true,
+          filesFound: 2,
+          deleted: true,
+          error: null,
+        }),
+      }),
+    });
+  });
+
+  test('SharePoint cleanup failure is recorded as partial and does not undo Action A', async () => {
+    findById.mockResolvedValue(baseSuggestion({
+      wmkf_reviewreceivedat: '2026-07-01',
+      wmkf_reviewsharepointfolder: REVIEW_FOLDER,
+      wmkf_reviewfilename: REVIEW_FILENAME,
+    }));
+    listFiles.mockResolvedValue([{ id: 'sp-1', name: REVIEW_FILENAME }]);
+    cleanupSharePointItems.mockResolvedValue(false);
+
+    const out = await removeCandidateEntirely({ suggestionId: SUGGESTION_ID, actingUserSystemId: ACTOR });
+
+    expect(runChangeset).toHaveBeenCalledTimes(1);
+    expect(deleteBySuggestion).toHaveBeenCalledWith(SUGGESTION_ID);
+    expect(out).toEqual(expect.objectContaining({
+      success: true,
+      partialFailure: 'sharepoint_review_file_cleanup_failed',
+      warnings: ['sharepoint_review_file_cleanup_failed'],
+      sharePointReviewFilesDeleted: false,
+    }));
+    expect(updateAlertMetadata).toHaveBeenCalledWith(42, {
+      result: expect.objectContaining({
+        status: 'partial_sharepoint_review_file_cleanup_failed',
+        sharePointCleanup: expect.objectContaining({
+          attempted: true,
+          deleted: false,
+          error: 'one_or_more_sharepoint_deletes_failed',
+        }),
+      }),
+    });
+  });
+});
+
 describe('removeCandidateEntirely — Postgres-fails-after-changeset', () => {
   test('recorded as a partial result, not silent — the Dataverse deletes already committed', async () => {
     deleteBySuggestion.mockRejectedValue(new Error('pg connection reset'));
@@ -275,12 +441,40 @@ describe('removeCandidateEntirely — Postgres-fails-after-changeset', () => {
     // the failure is recorded on the audit row, not thrown/swallowed.
     expect(out.success).toBe(true);
     expect(out.draftDeleted).toBe(false);
+    expect(out.postgresError).toBe('pg connection reset');
+    expect(out.partialFailure).toBe('postgres_draft_delete_failed');
+    expect(out.warnings).toEqual(['postgres_draft_delete_failed']);
     expect(updateAlertMetadata).toHaveBeenCalledWith(42, {
       result: expect.objectContaining({
         status: 'partial_postgres_draft_delete_failed',
         postgresError: 'pg connection reset',
       }),
     });
+  });
+
+  test('audit-result update failure emits a fallback durable alert with the partial result', async () => {
+    deleteBySuggestion.mockRejectedValue(new Error('pg connection reset'));
+    updateAlertMetadata.mockRejectedValue(new Error('system_alerts update failed'));
+
+    const out = await removeCandidateEntirely({ suggestionId: SUGGESTION_ID, actingUserSystemId: ACTOR });
+
+    expect(out.partialFailure).toBe('postgres_draft_delete_failed');
+    expect(notify).toHaveBeenCalledTimes(2);
+    expect(notify.mock.calls[1][0]).toEqual(expect.objectContaining({
+      type: 'reviewer_candidate_remove_audit_update_failed',
+      severity: 'error',
+      metadata: expect.objectContaining({
+        suggestionId: SUGGESTION_ID,
+        actingUserSystemId: ACTOR,
+        auditAlertId: 42,
+        updateError: 'system_alerts update failed',
+        resultPatch: expect.objectContaining({
+          status: 'partial_postgres_draft_delete_failed',
+          postgresError: 'pg connection reset',
+          warnings: ['postgres_draft_delete_failed'],
+        }),
+      }),
+    }));
   });
 });
 
@@ -313,6 +507,38 @@ describe('describeRemoval — preflight', () => {
       hasSubmittedReview: true,
       answerRowCount: 1,
       contactId: null,
+      reviewFile: {
+        folder: null,
+        filename: null,
+        wmkf_reviewsharepointfolder: null,
+        wmkf_reviewfilename: null,
+      },
+      reviewSharePointFolder: null,
+      reviewFilename: null,
+    }));
+    expect(notify).not.toHaveBeenCalled();
+    expect(runChangeset).not.toHaveBeenCalled();
+  });
+
+  test('includes SharePoint folder/filename pointers and treats them as submitted-review evidence', async () => {
+    findById.mockResolvedValue(baseSuggestion({
+      wmkf_reviewsharepointfolder: REVIEW_FOLDER,
+      wmkf_reviewfilename: REVIEW_FILENAME,
+    }));
+    fetchAnswersBySuggestion.mockResolvedValue({});
+
+    const out = await describeRemoval({ suggestionId: SUGGESTION_ID });
+
+    expect(out).toEqual(expect.objectContaining({
+      hasSubmittedReview: true,
+      reviewSharePointFolder: REVIEW_FOLDER,
+      reviewFilename: REVIEW_FILENAME,
+      reviewFile: {
+        folder: REVIEW_FOLDER,
+        filename: REVIEW_FILENAME,
+        wmkf_reviewsharepointfolder: REVIEW_FOLDER,
+        wmkf_reviewfilename: REVIEW_FILENAME,
+      },
     }));
     expect(notify).not.toHaveBeenCalled();
     expect(runChangeset).not.toHaveBeenCalled();

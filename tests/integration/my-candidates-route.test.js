@@ -343,6 +343,32 @@ describe('DELETE', () => {
       });
     });
 
+    test('partial cleanup warnings from the service are surfaced in the API response', async () => {
+      removeCandidateEntirely.mockResolvedValue({
+        success: true,
+        suggestionId: SUGGESTION_ID,
+        partialFailure: 'postgres_draft_delete_failed',
+        warnings: ['postgres_draft_delete_failed'],
+        postgresError: 'pg connection reset',
+      });
+      const req = {
+        method: 'DELETE',
+        query: {},
+        body: { suggestionId: SUGGESTION_ID, mode: 'hard' },
+      };
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toEqual(expect.objectContaining({
+        success: true,
+        suggestionId: SUGGESTION_ID,
+        partialFailure: 'postgres_draft_delete_failed',
+        warnings: ['postgres_draft_delete_failed'],
+        postgresError: 'pg connection reset',
+      }));
+    });
+
     test('same GUID-validation gate as the soft-delete path: invalid suggestionId → 400, service never called', async () => {
       const req = { method: 'DELETE', query: {}, body: { suggestionId: 'not-a-guid', mode: 'hard' } };
       const res = mockRes();
@@ -399,13 +425,25 @@ describe('GET mode: removal-preflight', () => {
       answerRowCount: 0,
       contactId: null,
       contactAssociations: null,
+      reviewFile: {
+        folder: 'REQ-1/Reviewer_Uploads/Jane',
+        filename: 'review.pdf',
+        wmkf_reviewsharepointfolder: 'REQ-1/Reviewer_Uploads/Jane',
+        wmkf_reviewfilename: 'review.pdf',
+      },
+      reviewSharePointFolder: 'REQ-1/Reviewer_Uploads/Jane',
+      reviewFilename: 'review.pdf',
     });
     const req = { method: 'GET', query: { mode: 'removal-preflight', suggestionId: SUGGESTION_ID }, body: {} };
     const res = mockRes();
     await handler(req, res);
 
     expect(res.statusCode).toBe(200);
-    expect(res.body).toEqual(expect.objectContaining({ suggestionId: SUGGESTION_ID }));
+    expect(res.body).toEqual(expect.objectContaining({
+      suggestionId: SUGGESTION_ID,
+      reviewSharePointFolder: 'REQ-1/Reviewer_Uploads/Jane',
+      reviewFilename: 'review.pdf',
+    }));
     expect(describeRemoval).toHaveBeenCalledWith({ suggestionId: SUGGESTION_ID });
   });
 

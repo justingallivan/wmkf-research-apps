@@ -9,12 +9,13 @@
  * PATCH  — Per-suggestion lifecycle/researcher/person edits, restore, or
  *           bulk-by-request updates (programArea, grantCycleCode).
  * DELETE — Soft-delete a single suggestion (sets wmkf_selected = false), or
- *           (mode:'hard' in the body) PERMANENTLY remove it — one atomic
+ *           (mode:'hard' in the body) PERMANENTLY remove it — one required atomic
  *           Dataverse changeset (honorarium akoya_request + review-answer
- *           snapshot rows + the suggestion row [+ deleteContact:true also
- *           the contact]) + Postgres review_drafts cleanup, with a
- *           pre-delete audit breadcrumb. Same app-access gate as the soft
- *           delete — no additional precondition (owner decision: no blocks).
+ *           snapshot rows + the suggestion row) + isolated best-effort
+ *           cleanups for optional contact delete, SharePoint review files,
+ *           and Postgres review_drafts, with a pre-delete audit breadcrumb.
+ *           Same app-access gate as the soft delete — no additional
+ *           precondition (owner decision: no blocks).
  *
  * Thin multi-verb route shell (Route→Service Consolidation Plan, Stage 3 —
  * the P1m multi-verb pilot, Decision 1): auth guard → ONE withDalContext
