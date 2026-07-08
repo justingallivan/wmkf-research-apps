@@ -68,56 +68,6 @@ Please provide the questions list in markdown format.`;
 }
 
 /**
- * Synthesize common themes from peer reviews
- * @param {Array<string>} reviewTexts - Array of review text documents
- * @returns {string} - The theme synthesis prompt
- */
-export function createThemeSynthesisPrompt(reviewTexts) {
-  return `Analyze these ${reviewTexts.length} peer review(s) and identify common themes, patterns, and areas of agreement or disagreement among reviewers.
-
-**INSTRUCTIONS:**
-1. Identify 3-5 major themes that appear across multiple reviews
-2. For each theme, note:
-   - How many reviewers mentioned it
-   - Whether reviewers agreed or disagreed on this point
-   - Key quotes or examples
-3. Highlight any areas of strong consensus
-4. Note any significant disagreements between reviewers
-5. Summarize the overall assessment trajectory (unanimous enthusiasm, mixed reception, etc.)
-
-**PEER REVIEW TEXTS:**
-
-${reviewTexts.map((text, index) => `**Review ${index + 1}:**\n${text}\n\n---\n`).join('')}
-
-Please provide a structured analysis of the common themes and patterns.`;
-}
-
-/**
- * Generate action items from peer review feedback
- * @param {Array<string>} reviewTexts - Array of review text documents
- * @returns {string} - The action items prompt
- */
-export function createActionItemsPrompt(reviewTexts) {
-  return `Based on these ${reviewTexts.length} peer review(s), generate a prioritized list of action items that the proposal authors should address.
-
-**INSTRUCTIONS:**
-1. Extract all suggestions, recommendations, and required changes from the reviews
-2. Categorize them as:
-   - **Critical (Must Address)**: Issues that could lead to rejection if not addressed
-   - **Important (Should Address)**: Significant improvements that would strengthen the proposal
-   - **Minor (Consider Addressing)**: Small improvements or clarifications
-3. For each item, note which reviewer(s) raised it
-4. Provide specific, actionable recommendations
-5. If reviewers disagree on an item, note the disagreement
-
-**PEER REVIEW TEXTS:**
-
-${reviewTexts.map((text, index) => `**Review ${index + 1}:**\n${text}\n\n---\n`).join('')}
-
-Please provide a structured list of prioritized action items in markdown format.`;
-}
-
-/**
  * Extract reviewer information from review text
  * @param {string} reviewText - Single review document text
  * @returns {Object} - Extracted reviewer information

@@ -41,8 +41,6 @@ export {
 export {
   createPeerReviewAnalysisPrompt,
   createPeerReviewQuestionsPrompt,
-  createThemeSynthesisPrompt,
-  createActionItemsPrompt,
   extractReviewerInfo
 } from './prompts/peer-reviewer';
 

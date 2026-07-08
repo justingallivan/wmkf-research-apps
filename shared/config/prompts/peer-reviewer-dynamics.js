@@ -8,10 +8,10 @@
  *     parsing comes back empty/short — the existing route makes a second
  *     call to a stricter questions-only prompt)
  *
- * The other two functions in `peer-reviewer.js` (`createThemeSynthesisPrompt`,
- * `createActionItemsPrompt`) are unused — defined but never imported. Skipped
- * here; if they get wired up in the future, add them to this file + the seed
- * script then.
+ * `peer-reviewer.js` formerly also defined `createThemeSynthesisPrompt` and
+ * `createActionItemsPrompt`, which were never imported anywhere. They were
+ * removed as dead code S344 (2026-07-08); if theme-synthesis / action-items
+ * passes are ever wanted, author fresh prompts here + in the seed script.
  *
  * SOURCE OF TRUTH RECONCILIATION
  * ──────────────────────────────────────────────────────────────────────────
