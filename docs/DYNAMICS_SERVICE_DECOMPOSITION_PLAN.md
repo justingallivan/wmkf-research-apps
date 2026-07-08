@@ -192,6 +192,9 @@ consolidation with `graph-service.js`'s duplicate `fetchWithTimeout`, and any ad
   `DynamicsService.getRecord/updateRecord/deleteRecord` id-arg positions in `pages/api/`
   (`check-trust-boundary-guid.js:20-27`) — it never scans `lib/services/`, and the facade preserves
   the names, so no gate change is needed. Run it at Checkpoints C and F as confirmation.
+  [STALE-ACCEPTED: scripts/check-trust-boundary-guid.js — S342 touched it only with a reverted
+  temporary debug line; the file is byte-identical to origin/main (no net change), so this reference
+  stays accurate.]
 - **C9 — Call-time env reads must not be hoisted.** `process.env.DYNAMICS_URL` is read inside nearly
   every method body; `DYNAMICS_IMPERSONATION_ENABLED` is read at call time in `_withCallerId`
   (`:164`) and `createAndSendEmail` (`:1366`); the four `DYNAMICS_*` creds are destructured inside
