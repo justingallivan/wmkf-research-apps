@@ -57,11 +57,22 @@ jest.mock('../../lib/dataverse/adapters/researcher', () => ({
 jest.mock('../../lib/external/token-lifecycle', () => ({ ensureToken: jest.fn() }));
 jest.mock('../../lib/dataverse/duplicate-key', () => ({ translateDuplicateKeyError: jest.fn(() => null) }));
 
+// "Remove entirely" — a distinct service module; mocked wholesale here since
+// its own orchestration logic is pinned in tests/unit/remove-candidate-service.test.js.
+// This file only pins the ROUTE's dispatch/auth/error-mapping for mode=hard
+// and the removal-preflight GET mode.
+jest.mock('../../lib/services/reviewer-finder/remove-candidate-service', () => ({
+  __esModule: true,
+  describeRemoval: jest.fn(),
+  removeCandidateEntirely: jest.fn(),
+}));
+
 const { requireAppAccess } = require('../../lib/utils/auth');
 const { resolveByEmail } = require('../../lib/services/program-director-resolver');
 const grantRequestAdapter = require('../../lib/dataverse/adapters/grant-request');
 const suggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
+const { describeRemoval, removeCandidateEntirely } = require('../../lib/services/reviewer-finder/remove-candidate-service');
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const SUGGESTION_ID = '33333333-3333-3333-3333-333333333333';
@@ -284,5 +295,173 @@ describe('DELETE', () => {
     expect(res.statusCode).toBe(400);
     expect(res.body).toEqual({ error: 'suggestionId is not a valid GUID' });
     expect(suggestionAdapter.softDelete).not.toHaveBeenCalled();
+  });
+
+  describe('mode: hard ("Remove entirely")', () => {
+    test('happy path: dispatches to removeCandidateEntirely (not softDelete), envelope passed through', async () => {
+      removeCandidateEntirely.mockResolvedValue({
+        success: true,
+        suggestionId: SUGGESTION_ID,
+        honorariumDeleted: true,
+        answerRowsDeleted: 2,
+        contactDeleted: false,
+        draftDeleted: true,
+        auditAlertId: 42,
+      });
+      const req = {
+        method: 'DELETE',
+        query: {},
+        body: { suggestionId: SUGGESTION_ID, mode: 'hard' },
+      };
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toEqual(expect.objectContaining({ success: true, suggestionId: SUGGESTION_ID }));
+      expect(removeCandidateEntirely).toHaveBeenCalledWith({
+        suggestionId: SUGGESTION_ID,
+        deleteContact: false,
+        actingUserSystemId: 'u-1',
+      });
+      expect(suggestionAdapter.softDelete).not.toHaveBeenCalled();
+    });
+
+    test('deleteContact:true is forwarded through', async () => {
+      removeCandidateEntirely.mockResolvedValue({ success: true });
+      const req = {
+        method: 'DELETE',
+        query: {},
+        body: { suggestionId: SUGGESTION_ID, mode: 'hard', deleteContact: true },
+      };
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(removeCandidateEntirely).toHaveBeenCalledWith({
+        suggestionId: SUGGESTION_ID,
+        deleteContact: true,
+        actingUserSystemId: 'u-1',
+      });
+    });
+
+    test('partial cleanup warnings from the service are surfaced in the API response', async () => {
+      removeCandidateEntirely.mockResolvedValue({
+        success: true,
+        suggestionId: SUGGESTION_ID,
+        partialFailure: 'postgres_draft_delete_failed',
+        warnings: ['postgres_draft_delete_failed'],
+        postgresError: 'pg connection reset',
+      });
+      const req = {
+        method: 'DELETE',
+        query: {},
+        body: { suggestionId: SUGGESTION_ID, mode: 'hard' },
+      };
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toEqual(expect.objectContaining({
+        success: true,
+        suggestionId: SUGGESTION_ID,
+        partialFailure: 'postgres_draft_delete_failed',
+        warnings: ['postgres_draft_delete_failed'],
+        postgresError: 'pg connection reset',
+      }));
+    });
+
+    test('same GUID-validation gate as the soft-delete path: invalid suggestionId → 400, service never called', async () => {
+      const req = { method: 'DELETE', query: {}, body: { suggestionId: 'not-a-guid', mode: 'hard' } };
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.statusCode).toBe(400);
+      expect(removeCandidateEntirely).not.toHaveBeenCalled();
+    });
+
+    test('unauthenticated → same app-access gate as every other verb, service never called', async () => {
+      requireAppAccess.mockImplementationOnce(async (req, resp) => {
+        resp.status(401).json({ error: 'Authentication required' });
+        return null;
+      });
+      const req = { method: 'DELETE', query: {}, body: { suggestionId: SUGGESTION_ID, mode: 'hard' } };
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.statusCode).toBe(401);
+      expect(removeCandidateEntirely).not.toHaveBeenCalled();
+    });
+
+    test('domain ServiceHttpError from the service → mapped status/body', async () => {
+      const { ServiceHttpError } = require('../../lib/services/service-http-error');
+      removeCandidateEntirely.mockRejectedValue(new ServiceHttpError('nope', { httpStatus: 409, body: { error: 'nope' } }));
+      const req = { method: 'DELETE', query: {}, body: { suggestionId: SUGGESTION_ID, mode: 'hard' } };
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.statusCode).toBe(409);
+      expect(res.body).toEqual({ error: 'nope' });
+    });
+
+    test('unexpected error → 500', async () => {
+      removeCandidateEntirely.mockRejectedValue(new Error('dataverse down'));
+      const req = { method: 'DELETE', query: {}, body: { suggestionId: SUGGESTION_ID, mode: 'hard' } };
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.statusCode).toBe(500);
+      expect(res.body.error).toBe('Failed to remove candidate entirely');
+    });
+  });
+});
+
+describe('GET mode: removal-preflight', () => {
+  test('happy path: returns the disclosure', async () => {
+    describeRemoval.mockResolvedValue({
+      suggestionId: SUGGESTION_ID,
+      requestId: REQUEST_ID,
+      requestNumber: 'R-1',
+      honorarium: null,
+      hasSubmittedReview: false,
+      answerRowCount: 0,
+      contactId: null,
+      contactAssociations: null,
+      reviewFile: {
+        folder: 'REQ-1/Reviewer_Uploads/Jane',
+        filename: 'review.pdf',
+        wmkf_reviewsharepointfolder: 'REQ-1/Reviewer_Uploads/Jane',
+        wmkf_reviewfilename: 'review.pdf',
+      },
+      reviewSharePointFolder: 'REQ-1/Reviewer_Uploads/Jane',
+      reviewFilename: 'review.pdf',
+    });
+    const req = { method: 'GET', query: { mode: 'removal-preflight', suggestionId: SUGGESTION_ID }, body: {} };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual(expect.objectContaining({
+      suggestionId: SUGGESTION_ID,
+      reviewSharePointFolder: 'REQ-1/Reviewer_Uploads/Jane',
+      reviewFilename: 'review.pdf',
+    }));
+    expect(describeRemoval).toHaveBeenCalledWith({ suggestionId: SUGGESTION_ID });
+  });
+
+  test('missing suggestionId → 400, service never called', async () => {
+    const req = { method: 'GET', query: { mode: 'removal-preflight' }, body: {} };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(400);
+    expect(describeRemoval).not.toHaveBeenCalled();
+  });
+
+  test('invalid suggestionId GUID → 400', async () => {
+    const req = { method: 'GET', query: { mode: 'removal-preflight', suggestionId: 'not-a-guid' }, body: {} };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(400);
+    expect(describeRemoval).not.toHaveBeenCalled();
   });
 });

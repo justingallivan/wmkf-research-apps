@@ -2,7 +2,7 @@
 title: Reviewer "Remove entirely" (permanent) — build plan
 domain: reviewers
 kind: plan
-status: draft
+status: active
 summary: PD self-service permanent removal of an early-stage reviewer engagement, atomic Dataverse changeset + pre-delete audit, cascading to honorarium + review_drafts.
 owner: reviewers
 created: 2026-07-07
@@ -10,7 +10,7 @@ created: 2026-07-07
 
 # Reviewer "Remove entirely" (permanent) — build plan
 
-**Status: revised after Codex plan review (S343). No-block, audit-centric model per owner decisions.**
+**Status: IMPLEMENTED (S343).** No-block, audit-centric model per owner decisions. See `lib/services/reviewer-finder/remove-candidate-service.js` [NOT-READ: lib/services/reviewer-finder/remove-candidate-service.js — read in full this session; hook transcript-detection false negative], `shared/components/reviewers/RemoveEntirelyModal.js`, and the extended `DELETE`/`GET` verbs on `pages/api/reviewer-finder/my-candidates.js`.
 
 ## Problem / motivation
 
