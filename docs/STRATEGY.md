@@ -111,6 +111,8 @@ Now we have read access to Dynamics and SharePoint, and leadership buy-in to use
 | AI audit trail | `wmkf_ai_run` child entity (DEPLOYED) — every AI write logged with model + prompt version + status + raw output | Working |
 | Backend prompt store | `wmkf_ai_prompt` Dataverse table — staff-readable prompts; `prompt-resolver` with bundled fallback | Working |
 | Executor contract | `lib/services/execute-prompt.js` — Vercel side ready; PA side build by Connor in progress | Vercel done |
+<!-- STALE-ACCEPTED: lib/services/execute-prompt.js — S344 added the additive, backward-compatible `assertSystemIncludes` option; the "Vercel done" Executor-contract status here is unchanged. -->
+
 
 ## What We Need Next
 
