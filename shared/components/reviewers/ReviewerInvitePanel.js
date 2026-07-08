@@ -27,7 +27,8 @@
  *   - loading, onRefresh, settings ({ signature })
  */
 
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Card } from '../Layout';
 import InviteEmailModal from './InviteEmailModal';
 import CandidateEditModal from './CandidateEditModal';
@@ -70,6 +71,105 @@ function candidateContactPageUrl(c) {
   return facultyPageUrl || c.website;
 }
 
+const REMOVE_MENU_WIDTH = 264; // wide enough for the permanent-delete subtitle
+const REMOVE_MENU_ITEM_H = 56;  // two two-line items — drives the upward-flip estimate
+
+// The single "Remove ▾" control on an active candidate row, surfacing the two
+// distinct removals directly (S347 discoverability fix — permanent delete used
+// to be reachable ONLY after a soft-remove + expanding the "Removed" section):
+//   • "Remove from this proposal" → recoverable per-request drop (removeCandidate)
+//   • "Delete permanently…"       → opens RemoveEntirelyModal (engagement +
+//                                    honorarium + reviews; contact-delete is that
+//                                    modal's own nested opt-in)
+// Both destinations carry their own confirm, so this menu is just routing.
+// Mirrors TokenActionsMenu's portalled, outside-click-closing, upward-flipping
+// pattern so the menu escapes the row's clipping/stacking context.
+function RowRemoveMenu({ candidate, disabled = false, onRemoveFromProposal, onDeletePermanently }) {
+  const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState(null); // { left, top } in viewport px, or null
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
+
+  const place = useCallback(() => {
+    const btn = btnRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    const estHeight = 2 * REMOVE_MENU_ITEM_H + 8;
+    const openUp = rect.bottom + estHeight > window.innerHeight && rect.top > estHeight;
+    setCoords({
+      left: Math.max(8, rect.right - REMOVE_MENU_WIDTH),
+      top: openUp ? rect.top - estHeight - 4 : rect.bottom + 4,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    place();
+    // Close only when the click is outside BOTH the trigger and the portalled menu.
+    const onDocClick = (e) => {
+      if (btnRef.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    // Position is computed once on open; close on scroll/resize so a stale fixed
+    // position can never be shown detached from its row.
+    const onReflow = () => setOpen(false);
+    document.addEventListener('mousedown', onDocClick);
+    window.addEventListener('scroll', onReflow, true);
+    window.addEventListener('resize', onReflow);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      window.removeEventListener('scroll', onReflow, true);
+      window.removeEventListener('resize', onReflow);
+    };
+  }, [open, place]);
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        disabled={disabled}
+        className="flex items-center gap-0.5 px-1.5 py-1 text-xs text-gray-400 hover:text-red-600 disabled:opacity-50 rounded hover:bg-gray-100"
+        title="Remove this candidate"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        Remove
+        <span aria-hidden="true" className="text-[10px]">▾</span>
+      </button>
+      {open && coords && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          role="menu"
+          style={{ position: 'fixed', left: coords.left, top: coords.top, width: REMOVE_MENU_WIDTH }}
+          className="bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1 text-sm"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => { setOpen(false); onRemoveFromProposal(); }}
+            className="w-full text-left px-3 py-2 hover:bg-gray-50"
+          >
+            Remove from this proposal
+            <span className="block text-xs text-gray-400">Recoverable — moves to Removed below</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => { setOpen(false); onDeletePermanently(); }}
+            className="w-full text-left px-3 py-2 hover:bg-gray-50 text-red-700 border-t border-gray-100"
+          >
+            Delete permanently…
+            <span className="block text-xs text-red-400">Engagement, honorarium &amp; reviews — cannot be undone</span>
+          </button>
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
 export default function ReviewerInvitePanel({ requestId, candidates = [], removedCandidates = [], loading = false, onRefresh, settings = {}, canManage = true }) {
   const [selected, setSelected] = useState(() => new Set());
   const [modal, setModal] = useState(null); // { candidates, allowResend } | null
@@ -77,7 +177,7 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
   const [removingId, setRemovingId] = useState(null);
   const [withdrawing, setWithdrawing] = useState(false);
   const [restoringId, setRestoringId] = useState(null);
-  const [showRemoved, setShowRemoved] = useState(false);
+  const [showRemoved, setShowRemoved] = useState(true);
   const [removeEntirelyTarget, setRemoveEntirelyTarget] = useState(null); // candidate row | null
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
@@ -327,18 +427,12 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
                     <span className="flex items-center gap-1 flex-shrink-0">
                       <StatusChip c={c} />
                       {canManage && (
-                        <button
-                          type="button"
-                          onClick={() => removeCandidate(c)}
+                        <RowRemoveMenu
+                          candidate={c}
                           disabled={removingId === c.suggestionId}
-                          className="p-1 text-gray-300 hover:text-red-600 disabled:opacity-50 rounded hover:bg-gray-100"
-                          title="Remove from this request"
-                          aria-label={`Remove ${c.name || 'candidate'} from this request`}
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
+                          onRemoveFromProposal={() => removeCandidate(c)}
+                          onDeletePermanently={() => setRemoveEntirelyTarget(c)}
+                        />
                       )}
                     </span>
                   </div>
