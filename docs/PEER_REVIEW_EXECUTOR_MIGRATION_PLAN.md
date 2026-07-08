@@ -38,7 +38,7 @@ prompt and published (`--execute`, verified). Verification:
 
 ## Post-ship hardening (Codex adversarial review #2, S344 — REWORK → fixed)
 
-<!-- RECHECKED after lib/services/execute-prompt.js change: this section documents that exact change (the assertSystemIncludes option, execute-prompt.js compose→call path); the plan is current, S344. -->
+<!-- [RECHECKED after lib/services/execute-prompt.js change: this section documents that exact change — the assertSystemIncludes option added to execute-prompt.js compose→call path; plan is current, S344.] -->
 A second Codex review (against the shipped diff) raised two confirmed findings; both fixed:
 - **[HIGH] A7 fail-open on the mutable row.** The route-local `assertPreambleCoversNonces`
   only checked the caller's string, not that `{{a7_preamble}}` survived into the composed
