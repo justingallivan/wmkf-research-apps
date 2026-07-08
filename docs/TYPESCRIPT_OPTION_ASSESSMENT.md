@@ -188,6 +188,13 @@ reversible.
 4. Fix the duplicate `isGuid` at `lib/bill/onboard-reviewer-service.js:359` (a local re-decl of
    the canonical guard [VERIFIED via grep] — the exact "sibling declaration drifts" trap the map
    warns about) by importing the branded one.
+   - **DONE S342, with a gotcha (Codex adversarial-review catch).** The local guard did an
+     *untrimmed* exact test; the canonical `isGuid` *trims* before testing. A naive swap therefore
+     silently made `validateOnboardInput` accept surrounding-whitespace ids while still using the
+     raw (untrimmed) value in reservation / contact reads / akoya_request PATCHes — a fail-fast
+     regression. Resolved by a local `isCanonicalGuid` (`isGuid(v) && v === v.trim()`) so
+     whitespace ids are rejected at validation as before. Lesson: when deduping a guard onto a
+     canonical one, diff their *semantics* (trim, case, empties), not just their names.
 
 This lifts **class #2** (the IDOR/`$filter`-injection boundary, map Tier-A #3) toward
 compile-time rung 1 on ~3 annotated files + 1 CI line — the thing the map says JS structurally

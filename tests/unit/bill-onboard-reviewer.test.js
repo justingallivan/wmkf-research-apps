@@ -472,6 +472,18 @@ describe('validateOnboardInput (shared gate)', () => {
   it('rejects a non-GUID honorariumRequestId', () => {
     expect(validateOnboardInput({ ...BASE_INPUT, honorariumRequestId: 'nope' })).toMatch(/honorariumRequestId/);
   });
+  // Regression: the canonical isGuid trims before testing, but this path uses
+  // the raw id downstream — so a surrounding-whitespace id must still fail fast
+  // at validation (a 400 before any BILL/Dataverse side effect), matching the
+  // prior untrimmed local guard. See onboard-reviewer-service isCanonicalGuid.
+  it('rejects a honorariumRequestId with surrounding whitespace', () => {
+    expect(validateOnboardInput({ ...BASE_INPUT, honorariumRequestId: ` ${BASE_INPUT.honorariumRequestId} ` }))
+      .toMatch(/honorariumRequestId/);
+  });
+  it('rejects a reviewerContactId with a trailing newline', () => {
+    expect(validateOnboardInput({ ...BASE_INPUT, reviewerContactId: `${BASE_INPUT.reviewerContactId}\n` }))
+      .toMatch(/reviewerContactId/);
+  });
   it('rejects a missing address', () => {
     expect(validateOnboardInput({ ...BASE_INPUT, address: undefined })).toMatch(/address required/);
   });
