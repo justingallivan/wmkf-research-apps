@@ -1,17 +1,36 @@
 ---
 name: project-prompt-legacy-audit-followup
-description: "Action item (S343 → next session): act on the Fable AI-prompt legacy audit (docs/PROMPT_LEGACY_AUDIT.md) — dormant admin prompts, phase-ii extraction re-scope, dead-prompt cleanup."
+description: "RESOLVED S344: acted on the Fable AI-prompt legacy audit — sunset the 4 PDF-upload apps (extraction retired), wired peer-review to the Executor, removed dead generators. Residual: write-path [ASSUMED] audit."
 metadata: 
   node_type: memory
-  status: active
+  status: stale
   type: project
   originSessionId: 4eb6d1fe-c277-43b8-977b-92cc18644286
 ---
 
-Owner asked (Justin, S343, 2026-07-07) to make acting on the Fable prompt-legacy
-audit a **next-session action item**. The audit report is durable at
-`docs/PROMPT_LEGACY_AUDIT.md` (committed `efc64175`; full per-prompt table +
-`[VERIFIED]`/`[ASSUMED]` labels). Read it first before acting.
+**RESOLVED S344 (2026-07-08).** All four prioritized follow-ups were acted on:
+- **(1) Dormant admin prompts** — dispositioned. `peer-review-summarizer.*` was
+  **wired to the Executor** (`process-peer-reviews.js` now runs the rows via
+  `executePrompt`; staff /admin edits take effect; commit `1559e8dc`, hardened
+  `4dd5c84b`). `phase-ii.*` rows stay dormant because their apps were sunset (below).
+- **(2) `phase-ii.extract-structured` re-scope** — owner chose to **sunset the 4
+  PDF-upload apps** (`phase-ii-writeup`, `batch-proposal-summaries`,
+  `batch-phase-i-summaries`, `phase-i-writeup`) rather than re-scope in place; code
+  retained (not archived) as the reference for a future Dataverse-native migration
+  (commit `f9d9a593`). See [[project-nomenclature-and-app-sunset-sweep]].
+- **(3) `phase-i-writeup`** — covered by the sunset (it was one of the 4).
+- **(4) Dead generators** — `createThemeSynthesisPrompt` + `createActionItemsPrompt`
+  removed (`18b7578b`).
+
+**Residual (only open thread):** the full extraction-consumer write-path audit the
+report flagged `[ASSUMED]` — confirming no *other* LLM free-text reaches a
+length-capped controlled `akoya_request` field. Low priority; the crash class is
+contained. See `docs/PROMPT_LEGACY_AUDIT.md` + [[project-peer-review-executor-migration]].
+
+---
+Historical (S343 origin): Owner asked (Justin, S343, 2026-07-07) to make acting on
+the Fable prompt-legacy audit a next-session action item. Audit at
+`docs/PROMPT_LEGACY_AUDIT.md` (committed `efc64175`).
 
 **Prioritized follow-ups (from the report):**
 1. **Dormant-but-editable admin prompts (highest-signal, do first).** The live
