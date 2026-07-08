@@ -47,6 +47,15 @@
     "lib/services/reviewer-rollup.js",
     // --- Phase 1 call-site coverage: the route that mints an ActorRef and
     //     calls the branded setTriageStatus sink ---
-    "pages/api/workbench/triage.js"
+    "pages/api/workbench/triage.js",
+    // --- Trust-boundary call-site coverage: the ONLY two routes that pass a
+    //     CLIENT-supplied id into a Dataverse selector (per check:trust-boundary-guid).
+    //     @ts-check'd so the client id must be isGuid-narrowed to Guid before it
+    //     reaches the branded executePrompt.requestId / findById(id) sink — a
+    //     compile-time guarantee over the actual untrusted-input surface. Server-
+    //     derived-id selector calls (other adapters/routes) are not a trust-boundary
+    //     risk and are intentionally out of scope. ---
+    "pages/api/phase-i-dynamics/summarize-v2.js",
+    "pages/api/reviewer-finder/cycle-material.js"
   ]
 }

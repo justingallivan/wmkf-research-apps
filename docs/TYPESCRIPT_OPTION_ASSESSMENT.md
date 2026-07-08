@@ -29,8 +29,23 @@ summary: "Whether/how to adopt TypeScript, the lever behind the Invariant Map's 
 > `DynamicsService.getRecord/updateRecord/deleteRecord(...)` facade (not only the internal module),
 > and for `ActorRef` through `setTriageStatus`. Facade coverage was completed this session in
 > response to a Codex adversarial-review finding (the earlier module-only gate could pass while raw
-> selector strings compiled through the untyped facade). Phase 2 (`.ts` migration) remains a
-> separate future owner decision, unchanged.
+> selector strings compiled through the untyped facade).
+>
+> **Trust-boundary CALL-SITE coverage (the point that ends the whack-a-mole).** The untrusted-input
+> surface is small and enumerable: `check:trust-boundary-guid` reports exactly TWO of 146 routes pass
+> a *client-supplied* id into a selector — `pages/api/phase-i-dynamics/summarize-v2.js`
+> (`executePrompt.requestId`) and `pages/api/reviewer-finder/cycle-material.js` (`findById`). Both
+> are now `@ts-check`'d, and their sinks brand the id (`executePrompt`'s `requestId`,
+> `grant-cycles-dataverse` `findById`'s `id`). Verified by DELETING each route's `isGuid` guard and
+> confirming `check:types` goes red — so the guard is compile-time load-bearing, not decorative.
+> Server-derived-id selector calls (other adapters/routes) are intentionally out of scope: they are
+> not a trust-boundary risk, so chasing full selector-caller coverage is the wrong (near-infinite)
+> target. **`any`-poisoning caveat (load-bearing):** `req.body` is ambient `any`, and `any` silently
+> satisfies `Guid` — so a client id must be narrowed from `unknown`/typed (`req.query` is typed;
+> `req.body` fields are cast to `unknown`) for the guard to actually bite. Typing the id as `any`
+> anywhere on the path makes the gate theater.
+>
+> Phase 2 (`.ts` migration) remains a separate future owner decision, unchanged.
 
 ## 0. Bottom line (read this first)
 

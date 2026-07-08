@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * API Route: /api/phase-i-dynamics/summarize-v2
  *
@@ -37,6 +38,10 @@ const AUDIENCE_DESCRIPTIONS = {
   'technical-expert': 'a technical expert audience, using field-specific terminology and assuming domain knowledge',
 };
 
+/**
+ * @param {import('next').NextApiRequest} req
+ * @param {import('next').NextApiResponse} res
+ */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -48,13 +53,18 @@ export default async function handler(req, res) {
   const allowed = await limiter(req, res);
   if (allowed !== true) return;
 
+  // Type requestGuid as `unknown` (not the ambient `any` of req.body) so the
+  // isGuid narrowing below is LOAD-BEARING for the type gate: remove the guard
+  // and requestGuid stays `unknown`, which is not assignable to the branded
+  // `Guid` param of executePrompt → the build breaks. (`any` would silently
+  // satisfy Guid and make the gate theater.)
   const {
     requestGuid = null,
     fileRef = null,
     summaryLength = 1,
     summaryLevel = 'technical-non-expert',
     overwrite = false,
-  } = req.body || {};
+  } = /** @type {{ requestGuid?: unknown, fileRef?: any, summaryLength?: number, summaryLevel?: string, overwrite?: any }} */ (req.body || {});
 
   if (!requestGuid) return res.status(400).json({ error: 'requestGuid is required' });
   // Client-supplied id reaches a raw Dataverse key predicate via executePrompt →
@@ -66,14 +76,16 @@ export default async function handler(req, res) {
   let fileLoad;
   try {
     fileLoad = await loadFile(fileRef);
-  } catch (err) {
+  } catch (rawErr) {
+    const err = /** @type {any} */ (rawErr);
     if (err.status) return res.status(err.status).json({ error: err.message });
     return res.status(500).json({ error: `Failed to load file: ${err.message}` });
   }
 
+  /** @type {any} */
   let result;
   try {
-    result = await executePrompt({
+    result = /** @type {any} */ (await executePrompt({
       promptName: PROMPT_NAME,
       requestId: requestGuid,
       overrideVariables: {
@@ -86,13 +98,15 @@ export default async function handler(req, res) {
         summary_length: summaryLength,
         summary_length_suffix: summaryLength > 1 ? 's' : '',
         audience_description:
-          AUDIENCE_DESCRIPTIONS[summaryLevel] || AUDIENCE_DESCRIPTIONS['technical-non-expert'],
+          /** @type {Record<string, string>} */ (AUDIENCE_DESCRIPTIONS)[summaryLevel]
+            || AUDIENCE_DESCRIPTIONS['technical-non-expert'],
       },
       runSource: 'Vercel Interactive',
       forceOverwrite: !!overwrite,
-      actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
-    });
-  } catch (err) {
+      actingUserSystemId: /** @type {any} */ (access.session)?.user?.dynamicsSystemuserId || null,
+    }));
+  } catch (rawErr) {
+    const err = /** @type {any} */ (rawErr);
     console.error('[summarize-v2] executePrompt failed:', err.message);
     return res.status(500).json({
       error: 'Failed to summarize proposal',
@@ -104,7 +118,7 @@ export default async function handler(req, res) {
   // Block path → HTTP 409 in the shape the UI expects (existingLength,
   // existingContent, recordModifiedOn on a single `conflict` object).
   if (result.blocked) {
-    const c = result.conflicts.find(x => x.field === 'wmkf_ai_summary') || result.conflicts[0];
+    const c = result.conflicts.find((/** @type {any} */ x) => x.field === 'wmkf_ai_summary') || result.conflicts[0];
     return res.status(409).json({
       error: 'wmkf_ai_summary already populated — confirm overwrite to proceed',
       runId: result.runId,
@@ -118,7 +132,7 @@ export default async function handler(req, res) {
   }
 
   // Surface API usage to the per-user usage log.
-  logUsage({
+  logUsage(/** @type {any} */ ({
     userProfileId: access.profileId,
     appName: 'batch-phase-i',
     model: result.meta?.modelUsed,
@@ -128,9 +142,9 @@ export default async function handler(req, res) {
     cacheReadTokens: result.usage?.cache_read_input_tokens || 0,
     latencyMs: 0, // Executor doesn't expose this yet — add to meta if needed
     status: 'success',
-  });
+  }));
 
-  const summaryWrite = result.writeResults?.results?.find(r => r.output === 'summary');
+  const summaryWrite = result.writeResults?.results?.find((/** @type {any} */ r) => r.output === 'summary');
   const writebackOk = !!summaryWrite?.ok;
   const writebackFailure = writebackOk ? null : (summaryWrite?.reason || 'writeback_failed');
 

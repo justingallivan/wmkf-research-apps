@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * GET /api/reviewer-finder/cycle-material?cycleId=<guid>&pathname=<blob-pathname>
  *
@@ -35,6 +36,7 @@ import { isPrivateCycleMaterialPathname } from '../../../lib/utils/cycle-materia
 // lib/utils/cycle-material-ref.js). The prefix is the SINGLE classifier across every
 // consumer (route, grant-cycles GET, both email reads) so they never disagree about
 // what is private (Codex SLICE2-5-VERIFY).
+/** @param {any} cycle */
 function privateMaterialsOf(cycle) {
   const map = new Map();
   if (isPrivateCycleMaterialPathname(cycle?.reviewTemplateBlobUrl)) {
@@ -60,11 +62,13 @@ const CONTENT_TYPES = {
   jpeg: 'image/jpeg',
 };
 
+/** @param {any} filename */
 function contentTypeFor(filename) {
   const ext = String(filename || '').toLowerCase().split('.').pop();
-  return CONTENT_TYPES[ext] || 'application/octet-stream';
+  return /** @type {Record<string, string>} */ (CONTENT_TYPES)[ext || ''] || 'application/octet-stream';
 }
 
+/** @param {any} name */
 function sanitizeFilename(name) {
   // \x22 is the double-quote char; written as a hex escape so no literal `"`
   // appears in source ahead of the handler (a stray quote here would pair with
@@ -73,6 +77,10 @@ function sanitizeFilename(name) {
   return String(name || 'download').replace(/[\x22\r\n]/g, '');
 }
 
+/**
+ * @param {import('next').NextApiRequest} req
+ * @param {import('next').NextApiResponse} res
+ */
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
@@ -120,7 +128,7 @@ export default async function handler(req, res) {
   } catch (e) {
     // Missing private-store token is a server misconfiguration (helper fails
     // closed) → 503; anything else (not-found, read failure) → 404.
-    const status = /UPLOADS_BLOB_RW_TOKEN/.test(e.message || '') ? 503 : 404;
+    const status = /UPLOADS_BLOB_RW_TOKEN/.test(/** @type {any} */ (e).message || '') ? 503 : 404;
     console.error('[cycle-material] private read failed:', e);
     return res.status(status).json({ error: 'Failed to read cycle material' });
   }
