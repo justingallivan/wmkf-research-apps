@@ -504,7 +504,7 @@ touched gates → commit. Leaf-first per the DAG.
   validation still precedes `assertTrustedDalContext` (C2), the C11 failure/confirmation/Content-ID/
   CRLF/non-surfaced-header semantics are preserved, imports resolve, and the facade wrapper forwards
   operations/options unchanged. **→ Checkpoint E (`email.js`) is UNBLOCKED.**
-- **Checkpoint E — `email.js` (Stage 8). CODE-COMPLETE S345; DEDICATED review PENDING.** These three
+- **Checkpoint E — `email.js` (Stage 8). EXECUTED + DEDICATED adversarial review PASSED (S345, Codex verdict `approve`, "no material findings").** These three
   methods are exempt from the static access-layer gate as `NON_ENTITY_TRANSPORT_METHODS`
   (`check-dataverse-access-layer.js:106`), so **the runtime `assertTrustedDalContext` asserts are the
   ONLY enforcement on this surface — a dropped assert would be CI-invisible.** `resolveSystemUser`,
@@ -524,7 +524,15 @@ touched gates → commit. Leaf-first per the DAG.
   `check:types` green (`check:dynamics-context-boundary` 615 files, 0 violations).
   - [RECHECKED after lib/services/dynamics/email.js change: S345 — verbatim `resolveSystemUser`/`createEmailActivity`/`addEmailAttachment`/`sendEmail`/`createAndSendEmail` (C1 svc-rewrite); deps dynamics-context only (network reached via `svc`); 3 assert sites first-statement; C7 filter frozen; C9 env read not hoisted; zero body `this.`]
   - [RECHECKED after lib/services/dynamics-service.js change: S345 — facade rewired (5 delegating wrappers pass `this`), now fully-orphaned `assertTrustedDalContext` import dropped, behavior-freeze; no stray refs; suite green]
-  - **DEDICATED adversarial review PENDING** (Codex behavior-freeze verification, per the plan's Checkpoint-E review mode — the NON_ENTITY_TRANSPORT_METHODS CI-blind-spot makes this review the only check on assert placement). Gates confirmed green pre-review: `check:dataverse-access-layer`, `check:dynamics-context-boundary`.
+  - **DEDICATED adversarial review PASSED (S345, Codex).** Verdict `approve`, "no material findings" —
+  mechanical body comparison confirmed all 5 moved bodies match the parent modulo only the
+  static→function outdent and `this.`→`svc.`; independently re-verified assert-first placement at
+  `email.js:77,149,187`, the call-time env read at `email.js:216`, the sequential attachment loop at
+  `email.js:224-225`, the frozen raw OData interpolation at `email.js:54`, the plain-Error shapes at
+  `email.js:133,174,201`, facade-routed composed calls at `email.js:221,225,229`, the single
+  `assertTrustedDalContext` import at `email.js:36`, and confirmed `dynamics-service.js` no longer
+  imports it (comment-only hit remaining). **→ Checkpoint F (`ai-run.js` + facade finalize) is
+  UNBLOCKED.**
 - **Checkpoint F — `ai-run.js` (Stage 9) + facade finalize (Stage 10). BATCHED review.** `logAiRun`
   picklist maps + retention plumbing (characterize truncation marker math `:1194-1198` and
   unknown-taskType/status throws); then dead-import cleanup, confirm facade ≈260 L, full suite +
