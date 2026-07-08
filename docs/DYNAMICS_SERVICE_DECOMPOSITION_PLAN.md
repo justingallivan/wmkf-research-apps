@@ -16,7 +16,7 @@ related:
 
 # DynamicsService Decomposition Plan
 
-**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stages 1 (`auth.js`) + 2 (`restrictions.js`) + 3 (`annotations.js`) all EXECUTED + BATCHED adversarial review PASSED (S339, verdict SOUND/approve — "could not refute the behavior-freeze", no material findings, base `d4463548..HEAD`); Checkpoint B Stages 4 (`schema.js`) + 5 (`read-ops.js`) EXECUTED + BATCHED adversarial review PASSED (S341, Codex behavior-freeze verified; merged to main S342, commit `daac9761`); Checkpoints C–F pending.** This applies the exact cadence proven on the
+**Status: IN PROGRESS — Stage 0 EXECUTED (S338, commit `f65966f`); Checkpoint A Stages 1 (`auth.js`) + 2 (`restrictions.js`) + 3 (`annotations.js`) all EXECUTED + BATCHED adversarial review PASSED (S339, verdict SOUND/approve — "could not refute the behavior-freeze", no material findings, base `d4463548..HEAD`); Checkpoint B Stages 4 (`schema.js`) + 5 (`read-ops.js`) EXECUTED + BATCHED adversarial review PASSED (S341, Codex behavior-freeze verified; merged to main S342, commit `daac9761`); Checkpoint C Stage 6 (`write-core.js`) CODE-COMPLETE S345 (DEDICATED review pending); Checkpoints D–F pending.** This applies the exact cadence proven on the
 DiscoveryService decomposition (S335) and the ContactEnrichmentService decomposition (S336):
 strategy chosen up front (facade + extracted modules), leaf-first staged extraction, each cluster
 characterization-covered (baselined green pre-extraction, mutation-proven) BEFORE the code moves,
@@ -448,11 +448,28 @@ touched gates → commit. Leaf-first per the DAG.
   the facade read wrappers were restored from `...args` to real typed signatures (runtime-neutral,
   same forwarded args, suite 5144/5144). Extraction/behavior claims above remain accurate; see the
   TS gate note under Checkpoint F and `docs/TYPESCRIPT_OPTION_ASSESSMENT.md`.]
-- **Checkpoint C — `write-core.js` (Stage 6). DEDICATED review.** The DAL entity-write core: 4
-  `assertTrustedDalContext` sites (C2), impersonation fallback (C12), 412/ETag contracts (C13),
-  `updateIfEmpty` read-modify-write discriminated results (`:875-915`). Baseline:
-  `dal-enforcement.test.js`, `dynamics-service-caller-id.test.js`, `adapters-caller-id.test.js`,
-  `reviewer-adapters-writeback.test.js`. Gates: ALL FIVE — `check:dataverse-access-layer`,
+- **Checkpoint C — `write-core.js` (Stage 6). CODE-COMPLETE S345; DEDICATED review PENDING.** The
+  DAL entity-write core: `_withCallerId`, `_writeFetch`, `createRecord`, `updateRecord`,
+  `updateIfEmpty`, `deleteRecord`, `disassociate` moved verbatim to
+  `lib/services/dynamics/write-core.js` (333 L) with the C1 svc-dispatch rewrite; facade keeps 7 thin
+  delegating wrappers and drops the now-orphaned `fetchWithTimeout`/`API_TIMEOUT` imports (`buildNoResponseError`
+  was already import-only on origin/main — pre-existing, deferred to facade-finalize). The 4
+  `assertTrustedDalContext` sites (C2) stay first-statement inside the moved mutators; the impersonation
+  403-fallback (C12) lives in `_writeFetch`; 412/ETag + plain-Error/`.status` shapes (C13) and the
+  `updateIfEmpty` five-outcome discriminated result are byte-identical. Characterization landed FIRST
+  (`tests/unit/dynamics-service-write-core.test.js`, 12 tests: `updateIfEmpty`'s five outcomes + read-before-write,
+  `deleteRecord`/`disassociate` plain-Error/`.status` + 404-idempotent, `createRecord`/`updateRecord`
+  buildServiceError incl. 412) — green pre- and post-extraction. Verified: C1 guard (zero `this.` in
+  function bodies); full suite **5190/5190**; build green; ALL FIVE LAW gates + self-tests green
+  (`check:dataverse-access-layer` recognizes write-core.js as an exempt dynamics submodule;
+  `check:dynamics-context-boundary` 613 files, 0 violations — write-core imports `assertTrustedDalContext`,
+  a read, not a bypass); `check:types` green (facade wrappers keep real typed signatures incl. the `Guid`
+  brand on `recordId`). Baseline suites (`dal-enforcement`, `dynamics-service-caller-id`,
+  `adapters-caller-id`, `reviewer-adapters-writeback`) green pre- and post-move.
+  - [RECHECKED after lib/services/dynamics/write-core.js change: S345 — verbatim `_withCallerId`/`_writeFetch`/`createRecord`/`updateRecord`/`updateIfEmpty`/`deleteRecord`/`disassociate`; deps http/constants/dynamics-context/service-error; 4 assert sites first-statement; zero body `this.`; suite 5190/5190]
+  - [RECHECKED after lib/services/dynamics-service.js change: S345 — facade rewired (7 delegating wrappers pass `this`; `_withCallerId`/`_writeFetch` svc-less per Q2), orphaned `fetchWithTimeout`/`API_TIMEOUT` imports dropped, behavior-freeze; no stray refs; suite green]
+  - [RECHECKED after docs/agent-wiki/topics/dataverse-dynamics.md change: S345 — assert-site file attribution reconciled (4 entity mutators now in write-core.js; executeChangeset + 3 email remain in dynamics-service.js; total still 9); check:agent-wiki green]
+  - **DEDICATED adversarial review PENDING** (Codex behavior-freeze verification, per the plan's Checkpoint-C review mode). Gates confirmed green pre-review: ALL FIVE — `check:dataverse-access-layer`,
   `check:route-service-boundary`, `check:dynamics-context-boundary`, `check:odata-escape`,
   `check:trust-boundary-guid`.
 - **Checkpoint D — `changeset.js` (Stage 7). DEDICATED review — the highest-risk cluster**
