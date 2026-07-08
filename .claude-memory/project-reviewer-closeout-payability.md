@@ -1,6 +1,7 @@
 ---
 name: project-reviewer-closeout-payability
 description: "Owner ask (S343) — add a PD \"did-their-duty / payable-or-not\" disposition to review closeout so ops has a clean signal; the accept-side guardrail for reviewer/test-case limbo."
+status: active
 metadata: 
   node_type: memory
   type: project
