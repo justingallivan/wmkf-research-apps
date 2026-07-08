@@ -10,6 +10,30 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — First compile-time trust boundary: branded-type `check:types` gate ships to prod (Session 342)
+
+**Milestone:** The JS codebase gains its first *compile-time* trust-boundary enforcement — a
+standalone `tsc --noEmit` gate (`check:types`) using JSDoc branded types on `.js` files (no `.ts`
+renames), the structural follow-through on S341's runtime requestId fix.
+
+**Sessions:** 342 (built on the S340/S341 Fable TS Phase 0/1 branch, merged + hardened over three
+Codex adversarial rounds).
+
+**Ship state:**
+- `Guid`/`ActorRef` brands enforce through the PUBLIC `DynamicsService.*` facade + the 2 routes that
+  pass a *client* id into a selector; deleting an `isGuid` guard turns `check:types` red (ratchet proven).
+- Also shipped this session: all 4 S341 backlog branches to prod (auth fail-closed, Dynamics
+  Checkpoint-B decomposition, prompt-cache nonce, the TS gate) — each deployed Ready, one-at-a-time.
+- Killed recurring Dependabot CI-failure emails (skip Gitleaks/claude-review on bot PRs; ignore majors).
+
+**Why it matters:** Regex/AST gates detect *patterns* and can be evaded; a branded type is un-gameable
+within a checked file. The whack-a-mole illusion came from the wrong denominator — the untrusted
+surface is 2 routes, not every selector caller, and it is now structurally closed. Caught the
+`any`-poisoning trap (`req.body: any` silently satisfies `Guid`) that would have made it theater.
+
+**Pointers:** `docs/TYPESCRIPT_OPTION_ASSESSMENT.md`, `tsconfig.check.json`; commits `3f40047`
+(facade), `c27fbac` (trust routes), `1f2860d` (BILL guard regression), `b9a349d` (Fable merge).
+
 ## July 2026 — Live requestId injection/IDOR surface closed in prod; trust-boundary gate learns the executePrompt indirection (Session 341)
 
 **Milestone:** A Codex review of the Fable TypeScript Phase-0 branch surfaced (and tracing confirmed) a live authenticated over-fetch/IDOR/OData-injection surface on `main`: `summarize-v2` forwarded `req.body.requestGuid` with only a presence check through `executePrompt` → `grantRequestAdapter` → the raw `akoya_requests(${id})` key predicate, and `check-trust-boundary-guid` was green because it never traced the `executePrompt` indirection. Fixed defense-in-depth (route-edge `isGuid`, an `executePrompt` chokepoint, and teaching the gate to model `executePrompt({ requestId })` as an object-arg sink — surviving two adversarial re-reviews that caught a gate false-positive), then shipped to prod.
