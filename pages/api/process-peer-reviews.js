@@ -287,6 +287,10 @@ async function analyzePeerReviews(reviewTexts, userProfileId) {
       },
       runSource: 'Vercel Interactive',
       forceOverwrite: true, // outputs are kind:none — no guarded targets, so no-op
+      // Fail closed if the row's system prompt no longer interpolates the A7
+      // preamble (the nonces live in the preamble): a stale/edited row that
+      // dropped {{a7_preamble}} must abort, not send review content unprotected.
+      assertSystemIncludes: reviewNonces,
     });
     logPeerReviewUsage(analyzeResult, userProfileId);
     const analysisText = analyzeResult.parsed?.response_text || '';
@@ -368,6 +372,7 @@ async function analyzePeerReviews(reviewTexts, userProfileId) {
           },
           runSource: 'Vercel Interactive',
           forceOverwrite: true,
+          assertSystemIncludes: reviewNonces, // fail closed if row dropped {{a7_preamble}}
         });
         logPeerReviewUsage(questionsResult, userProfileId);
         let questionsContent = (questionsResult.parsed?.response_text || '').trim();

@@ -36,6 +36,23 @@ prompt and published (`--execute`, verified). Verification:
 - **Model/params parity:** row `sonnet`/2500/16384/0.3 == `baseConfig`.
 - Full `npm test` (5176), `npm run build`, and surface gates green.
 
+## Post-ship hardening (Codex adversarial review #2, S344 — REWORK → fixed)
+
+A second Codex review (against the shipped diff) raised two confirmed findings; both fixed:
+- **[HIGH] A7 fail-open on the mutable row.** The route-local `assertPreambleCoversNonces`
+  only checked the caller's string, not that `{{a7_preamble}}` survived into the composed
+  system prompt — a stale/edited row could send content with no preamble. **Fix:** added
+  `executePrompt({ assertSystemIncludes })` (`lib/services/execute-prompt.js`) — after
+  compose, before the Claude call, it throws (writing a failed run row) if the composed
+  system prompt lacks any required substring. The route passes `assertSystemIncludes:
+  reviewNonces` (the nonces live in the preamble), so a dropped placeholder fails closed.
+  Unit-tested (`tests/unit/execute-prompt-payload-boundary.test.js`) + re-verified e2e
+  against the live row.
+- **[MEDIUM] Sunset superuser page access.** Removing the 4 keys from `ALL_APP_KEYS` means
+  the client guard (which ignores `isSuperuser`) blocks superusers from the still-routable
+  sunset pages, though grant-holders + the API routes still work. **Fix:** documented the
+  real behavior in `appRegistry.js` (accepted for retired apps; not re-adding keys).
+
 ## Review outcome (Codex adversarial design review, S344 — SOUND-WITH-CHANGES)
 
 Two HIGH findings, both **verified against code** and folded in below:

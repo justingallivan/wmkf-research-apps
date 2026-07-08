@@ -50,7 +50,12 @@ reviewer-finder prompt migration.
   per-review nonces) and passes it as a plain override, the Executor adds NO preamble — the
   route MUST supply the preamble as its own variable interpolated into the row (peer-review
   puts it in the system prompt via `{{a7_preamble}}`), and that variable must be seeded
-  `required:true`/no-default so an omission fails closed instead of silently dropping A7. See
+  `required:true`/no-default so an omission fails closed. That alone is NOT enough — the row
+  system prompt (`{{a7_preamble}}`) is staff-editable, so a bad /admin edit could drop the
+  placeholder and send content with no preamble while a route-local check still passes. Pass
+  `executePrompt({ assertSystemIncludes: [<nonces>] })`: the Executor throws AFTER composing and
+  BEFORE the Claude call if the composed system prompt is missing any required substring, tying
+  the guarantee to the real prompt, not caller inputs (S344, Codex-flagged). See
   `docs/PEER_REVIEW_EXECUTOR_MIGRATION_PLAN.md`.
 - **Model-aware request building (S286):** `llm-client._buildBody` OMITS the `temperature`
   param for models that reject it (Opus 4.8 — the API 400s with "`temperature` is

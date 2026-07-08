@@ -221,16 +221,25 @@ export const APP_LIFECYCLE_REGISTRY = {
   },
   // Sunset S344 (2026-07-08): the four PDF-upload document-processing apps are no
   // longer used in their current format. Removed from APP_REGISTRY (out of nav /
-  // home / admin grant UI) but pages + API routes are intentionally LEFT ROUTABLE
-  // and the code is retained as the reference for a planned Dataverse-native
-  // migration (e.g. Phase I writeup elements → Request Workbench, an unbuilt
-  // feature). NOT 'deprecated' — nothing was archived to _archived/. Existing
-  // user_app_access grants are retained (honored on read by requireAppAccess;
-  // only NEW grants are blocked since the keys left ALL_APP_KEYS). The structured
-  // extraction all four share (proposal-summarizer.createStructuredDataExtractionPrompt,
-  // formerly the phase-ii.extract-structured prompt) is the surface the S343
-  // prompt-legacy audit flagged for Dataverse-native re-scope — see
-  // docs/PROMPT_LEGACY_AUDIT.md.
+  // home / admin grant UI). The page files + API routes are intentionally kept in
+  // the tree (NOT archived to _archived/) as the reference for a planned
+  // Dataverse-native migration (e.g. Phase I writeup elements → Request Workbench,
+  // an unbuilt feature). Access after sunset [VERIFIED via app-access.js +
+  // AppAccessContext.js, S344]:
+  //   - The API routes stay server-side reachable: `requireAppAccess` honors an
+  //     existing grant AND has a superuser bypass.
+  //   - A non-superuser who still holds a retained grant can also load the PAGE
+  //     (their raw grants come back from /api/app-access unfiltered).
+  //   - A SUPERUSER can NOT load the page in the browser: the client guard
+  //     (`RequireAppAccess`→`hasAccess`) checks membership in the returned app
+  //     list and ignores isSuperuser, and superusers receive `ALL_APP_KEYS`
+  //     (which these keys left). This is acceptable for retired apps — do not
+  //     re-add them to ALL_APP_KEYS to "fix" browser access.
+  // Existing grants are retained (honored on read; only NEW grants are blocked
+  // since the keys left ALL_APP_KEYS). The structured extraction all four share
+  // (proposal-summarizer.createStructuredDataExtractionPrompt, formerly the
+  // phase-ii.extract-structured prompt) is the surface the S343 prompt-legacy
+  // audit flagged for Dataverse-native re-scope — see docs/PROMPT_LEGACY_AUDIT.md.
   'batch-phase-i-summaries': {
     name: 'Batch Phase I Summaries',
     status: 'sunset-candidate',

@@ -474,3 +474,57 @@ describe('executePrompt — LLMClient transport (Phase 2)', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// assertSystemIncludes (S344) — fail-closed guard for callers (e.g.
+// process-peer-reviews) that inject a security-critical block through a MUTABLE
+// row variable. The Executor must refuse the model call if the required text
+// did not survive composition (e.g. a stale/edited row dropped {{a7_preamble}}).
+// ---------------------------------------------------------------------------
+
+describe('executePrompt — assertSystemIncludes (S344 fail-closed)', () => {
+  test('throws BEFORE the Claude call when a required substring is missing from the composed system prompt', async () => {
+    // Row system prompt is static 'SYS' — it does NOT contain the required nonce,
+    // simulating a row whose {{a7_preamble}} placeholder was removed.
+    PROMPT_ROW = buildPromptRow({ variables: [], systemPrompt: 'SYS', promptBody: 'BODY' });
+
+    await expect(
+      executePrompt({
+        promptName: 'phase-i.summary',
+        overrideVariables: {},
+        runSource: 'Vercel Test',
+        assertSystemIncludes: ['MISSING-NONCE-abc123'],
+      }),
+    ).rejects.toThrow(/missing 1 required substring\(s\) \(assertSystemIncludes\)/);
+
+    // Fail closed: the model was never called.
+    expect(fetchedBodies).toHaveLength(0);
+    // Audit invariant: a failed run row is still written.
+    const runRow = createdRunRows.find((c) => c.entitySet === 'wmkf_ai_runs');
+    expect(runRow).toBeDefined();
+    expect(runRow.payload.wmkf_ai_notes).toMatch(/assertSystemIncludes/);
+  });
+
+  test('proceeds when the required substring survives composition into the system block', async () => {
+    // Mirrors peer-review's wiring: the caller-supplied preamble is interpolated
+    // into the system prompt via {{a7_preamble}}, and the caller asserts a nonce
+    // that lives inside that preamble.
+    PROMPT_ROW = buildPromptRow({
+      variables: [{ name: 'a7_preamble', source: { kind: 'override' }, required: true }],
+      systemPrompt: '{{a7_preamble}}',
+      promptBody: 'BODY',
+    });
+
+    const result = await executePrompt({
+      promptName: 'phase-i.summary',
+      overrideVariables: { a7_preamble: 'UNTRUSTED CONTENT RULES: nonce=LIVE-NONCE-xyz789 end' },
+      runSource: 'Vercel Test',
+      assertSystemIncludes: ['LIVE-NONCE-xyz789'],
+    });
+
+    expect(fetchedBodies).toHaveLength(1);
+    const sent = JSON.parse(fetchedBodies[0].body);
+    expect(sent.system[0].text).toContain('LIVE-NONCE-xyz789');
+    expect(result.blocked).toBe(false);
+  });
+});
