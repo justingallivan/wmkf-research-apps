@@ -439,10 +439,12 @@ touched gates → commit. Leaf-first per the DAG.
   `queryAllRecords` 5000-cap/paging `:671-677`, `aggregateRecords` op allowlist `:571-574`,
   `searchRecords` normalization `:741-756`). Gates: `check:dataverse-access-layer`,
   `check:route-service-boundary`, `check:odata-escape`.
-  [RECHECKED after lib/services/dynamics/read-ops.js change: S342 added `// @ts-check` + JSDoc
-  branded-`Guid` annotations for the `check:types` gate (getRecord `recordId`) plus one
-  behavior-preserving guard tweak in `aggregateRecords` — the extraction/behavior claims above
-  remain accurate; see the TS gate follow-up under Checkpoint F and `docs/TYPESCRIPT_OPTION_ASSESSMENT.md`.]
+  [RECHECKED after lib/services/dynamics/read-ops.js + lib/services/dynamics-service.js change:
+  S342 added `// @ts-check` + JSDoc branded-`Guid` annotations for the `check:types` gate (getRecord
+  `recordId`, facade write selectors) plus one behavior-preserving guard tweak in `aggregateRecords`;
+  the facade read wrappers were restored from `...args` to real typed signatures (runtime-neutral,
+  same forwarded args, suite 5144/5144). Extraction/behavior claims above remain accurate; see the
+  TS gate note under Checkpoint F and `docs/TYPESCRIPT_OPTION_ASSESSMENT.md`.]
 - **Checkpoint C — `write-core.js` (Stage 6). DEDICATED review.** The DAL entity-write core: 4
   `assertTrustedDalContext` sites (C2), impersonation fallback (C12), 412/ETag contracts (C13),
   `updateIfEmpty` read-modify-write discriminated results (`:875-915`). Baseline:
@@ -471,12 +473,15 @@ touched gates → commit. Leaf-first per the DAG.
   plan's status header, `/sweep` the fact-level restatements (the agent-wiki assert-site count was
   corrected 5→8 in `docs/agent-wiki/topics/dataverse-dynamics.md` S338, commit `426463c` — 8 in
   dynamics-service.js + 1 in `core/changeset.js:97`; re-verify at finalize).
-  - **TS gate follow-up (from S342, `docs/TYPESCRIPT_OPTION_ASSESSMENT.md`).** Checkpoint B turned
-    the facade's read selectors into thin `...args` forwarding wrappers, which erase the branded
-    `Guid` signature before a call reaches `read-ops.js` — so the `check:types` gate enforces the
-    brand only at the module boundary today. At facade finalize, give each `...args` wrapper its
-    real typed signature (and `// @ts-check` the facade), then add `dynamics-service.js` to
-    `tsconfig.check.json` `include` so the `Guid` brand bites callers through the facade end-to-end.
+  - **TS gate — facade coverage DONE (S342, `docs/TYPESCRIPT_OPTION_ASSESSMENT.md`).** Checkpoint B
+    had turned the facade's read selectors into thin `...args` forwarding wrappers, which erased the
+    branded `Guid` signature. S342 restored the read wrappers (`getEntityDefinitions`, `queryRecords`,
+    `getRecord`, `countRecords`, `aggregateRecords`, `queryAllRecords`, `searchRecords`,
+    `resolveEntitySetName`, `getPrimaryIdAttribute`, `getEntityKey`) to real typed signatures,
+    `// @ts-check`'d the facade, and added `dynamics-service.js` to `tsconfig.check.json` — so the
+    `Guid` brand now bites callers through the public `DynamicsService.*` API (verified via a facade
+    disconfirming check). Runtime-neutral: the wrappers forward the same arguments; full suite
+    5144/5144 green. NOTE for facade-finalize: the read wrappers are no longer `...args`.
 
 If any checkpoint review returns a BLOCKER, that checkpoint converges (fold → re-review) before the
 next begins.

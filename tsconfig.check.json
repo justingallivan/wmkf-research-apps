@@ -34,14 +34,12 @@
     "lib/utils/guid.js",
     "lib/dataverse/core/changeset.js",
     "lib/services/dynamics/read-ops.js",
-    // NOTE: lib/services/dynamics-service.js (the facade) is intentionally NOT
-    // listed. Checkpoint B of the Dynamics decomposition turned its read
-    // selectors into thin `...args` forwarding wrappers, which erase the
-    // branded signature before a call reaches read-ops.js — so branding the
-    // facade requires typing every `...args` wrapper. That end-to-end pass is
-    // deferred to the decomposition's facade-finalize checkpoint (Stage 10);
-    // until then read-ops.js enforces the brand at the module boundary.
-    // See docs/DYNAMICS_SERVICE_DECOMPOSITION_PLAN.md + TYPESCRIPT_OPTION_ASSESSMENT.md §5.
+    // The facade IS covered: its read wrappers were restored from `...args` to
+    // real typed signatures and its write selectors (updateRecord, updateIfEmpty,
+    // deleteRecord, disassociate) brand `recordId` as `Guid`, so a raw string
+    // interpolated into a key predicate fails to compile through the public
+    // `DynamicsService.getRecord(...)` API — not only at the read-ops module.
+    "lib/services/dynamics-service.js",
     // --- Phase 1: branded ActorRef + enum exhaustiveness (folded in from the
     //     former tsconfig.check-phase1.json) ---
     "lib/utils/actor-ref.js",

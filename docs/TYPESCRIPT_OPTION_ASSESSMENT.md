@@ -19,15 +19,17 @@ summary: "Whether/how to adopt TypeScript, the lever behind the Invariant Map's 
 > **Implementation status (S342).** Phase 0 + Phase 1 SHIPPED as a single standalone
 > `check:types` gate (`tsconfig.check.json`, wired into `.github/workflows/test.yml`). Covered +
 > `@ts-check`'d: `lib/utils/guid.js` (branded `Guid`), `lib/dataverse/core/changeset.js`,
-> `lib/services/dynamics/read-ops.js` (branded `recordId` on `getRecord`), `lib/utils/actor-ref.js`
-> (branded `ActorRef`), `lib/services/workbench/triage-service.js`, `lib/services/reviewer-rollup.js`
-> (enum exhaustiveness), and the `pages/api/workbench/triage.js` call-site. A disconfirming check
-> confirmed the gate BITES (raw `string` rejected for both `Guid` and `ActorRef`).
-> **Known residual — facade coverage deferred:** the Dynamics decomposition (Checkpoint B) turned
-> `dynamics-service.js`'s read selectors into thin `...args` forwarding wrappers that erase the
-> branded signature, so the `Guid` brand is enforced at the `read-ops.js` module boundary but does
-> NOT yet bite callers that go through the facade. Typing the facade wrappers is deferred to the
-> decomposition's facade-finalize checkpoint (Stage 10). Phase 2 (`.ts` migration) remains a
+> `lib/services/dynamics/read-ops.js` (branded `recordId` on `getRecord`),
+> `lib/services/dynamics-service.js` (the FACADE — read wrappers restored from `...args` to real
+> typed signatures; write selectors `updateRecord`/`updateIfEmpty`/`deleteRecord`/`disassociate`
+> brand `recordId` as `Guid`), `lib/utils/actor-ref.js` (branded `ActorRef`),
+> `lib/services/workbench/triage-service.js`, `lib/services/reviewer-rollup.js` (enum
+> exhaustiveness), and the `pages/api/workbench/triage.js` call-site. Two disconfirming checks
+> confirmed the gate BITES end-to-end: a raw `string` is rejected for `Guid` through the PUBLIC
+> `DynamicsService.getRecord/updateRecord/deleteRecord(...)` facade (not only the internal module),
+> and for `ActorRef` through `setTriageStatus`. Facade coverage was completed this session in
+> response to a Codex adversarial-review finding (the earlier module-only gate could pass while raw
+> selector strings compiled through the untyped facade). Phase 2 (`.ts` migration) remains a
 > separate future owner decision, unchanged.
 
 ## 0. Bottom line (read this first)
