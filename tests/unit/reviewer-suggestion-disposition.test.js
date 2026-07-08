@@ -89,6 +89,11 @@ describe('restore scope guard (Codex S285 review High)', () => {
     const patched = DynamicsService.updateRecord.mock.calls.find((c) => c[2] && 'wmkf_selected' in c[2]);
     expect(patched).toBeTruthy();
     expect(patched[2].wmkf_selected).toBe(true);
+    // S343 fresh start: the stale invite stamps are cleared so the restored row
+    // reads "Not invited" and can be invited again (new live token on invite).
+    expect(patched[2].wmkf_invited).toBe(false);
+    expect(patched[2].wmkf_emailsentat).toBeNull();
+    expect(patched[2].wmkf_respondremindersentat).toBeNull();
     // TOCTOU guard: the write is conditional on the row read by the scope check.
     expect(patched[3]).toMatchObject({ ifMatch: 'W/"42"' });
   });
