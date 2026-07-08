@@ -162,6 +162,10 @@ Add A7 preamble handling — the ONE change to the seeded assets:
   missing preamble throws rather than silently dropping A7. Keep everything else identical.
 - Run `node scripts/seed-peer-review-summarizer-prompts.js --dry-run` then
   `--execute`; the script re-publishes the current rows (update-by-name, verifies).
+  [RECHECKED after scripts/seed-peer-review-summarizer-prompts.js change: the
+  a7_preamble variable (required, no default) was added to both rows in the seed
+  script and re-published via --execute; verified both rows current with 4/3
+  variables + parseMode:raw (S344).]
 
 ## Explicitly NOT byte-identical (framing change — accept)
 
