@@ -22,9 +22,14 @@ exact (or wildcard-matched) redirect URIs.
 
 **How to apply:** to smoke an **auth-gated** change (anything behind
 `requireAppAccess`/NextAuth), prefer **localhost** — `http://localhost:3000/api/auth/callback/azure-ad`
-IS registered, and `.env.local` already has the Azure AD + NextAuth creds, so
-`npm run dev` signs in cleanly while still hitting real cloud resources (e.g. the
-private Blob store). Otherwise add the exact preview callback URL to the Azure app
-registration (`a652a292-…` → Authentication → Redirect URIs) and don't redeploy
-(a new deploy = new hash = mismatch again). Do NOT assume a branch push previews.
-Related: [[project-vercel-sensitive-env-pull-empty]], [[project-dev-environment]].
+IS registered. **Stale claim corrected (S346): do NOT assume `.env.local` already
+has the Azure AD + NextAuth creds** — as of S346 that file had none of them at all
+(likely fell out of a machine reset or fresh clone), which silently produced a
+different, confusing failure mode than a redirect mismatch: see
+[[project-local-dev-auth-setup]] for the full checklist (Azure AD vars,
+`AUTH_REQUIRED=true`, `EXTERNAL_LINK_SECRET`) this session had to rediscover.
+Verify presence before assuming local sign-in works. Otherwise add the exact
+preview callback URL to the Azure app registration (`a652a292-…` → Authentication →
+Redirect URIs) and don't redeploy (a new deploy = new hash = mismatch again). Do NOT
+assume a branch push previews.
+Related: [[project-vercel-sensitive-env-pull-empty]], [[project-dev-environment]], [[project-local-dev-auth-setup]].

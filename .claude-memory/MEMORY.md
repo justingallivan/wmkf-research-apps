@@ -23,6 +23,7 @@
 - External/platform/literal claims: feedback-verify-external-platform-claims.md; feedback-cite-ground-truth.md; feedback-no-fabricated-placeholder-values.md
 - Review relay / fanout / guards: feedback-share-codex-verbatim.md; feedback-surface-full-review-findings.md; feedback-symbol-consumer-fanout.md; feedback-idempotency-name-the-mechanism.md; feedback-scrutinize-exemptions-and-fallthrough.md; feedback-enforcement-hierarchy.md
 - Vercel/deploy/env/domain checks: feedback-deployment-monitoring-use-inspect.md; reference-vercel-sensitive-env-unreadable.md; project-branded-domains.md; project-jsdom-serverless-esm-incompat.md
+- Local `npm run dev` auth setup (wrong-user/no-signout symptom, invite-link minting): project-local-dev-auth-setup.md; project-vercel-cli-deploy-preview-auth.md
 
 ## Working Norms
 - Git/branch/main: feedback-verify-branch-before-git-action.md; project-commit-directly-to-main.md

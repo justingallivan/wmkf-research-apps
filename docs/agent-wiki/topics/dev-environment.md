@@ -88,6 +88,15 @@ Claude config sync, and environment-specific operating notes.
   No `akoya_request` teardown — in capture-only mode there is none; in the
   no-BILL creation posture, any minted honorarium request needs separate cleanup.
 
+- **A "wrong user logged in, no sign-out button" symptom on `localhost:3000` is
+  usually `AUTH_REQUIRED` missing/not `'true'` in `.env.local`, not a browser or
+  Microsoft-SSO problem (S346).** `AUTH_REQUIRED` fails OPEN — unless it is the
+  literal string `'true'`, Azure AD is skipped entirely and the dev-only
+  `ProfileSelector` lets you silently pick any existing Postgres `user_profiles`
+  row. Full local-auth checklist (Azure AD vars, `AUTH_REQUIRED=true`,
+  `EXTERNAL_LINK_SECRET`): `project-local-dev-auth-setup`. Editing `.env.local`
+  does not reach an already-running `next dev` process — restart it after any
+  change.
 - **Never run `rtk init` in this repo.** It replaces the condensed RTK block in
   root `CLAUDE.md` (between the `<!-- rtk-instructions v2 -->` markers) with a
   ~139-line command reference, pushing the file past the 200-line

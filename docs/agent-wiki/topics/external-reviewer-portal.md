@@ -178,18 +178,27 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   been submitted through the portal (built ahead of the D26 cycle), so populated
   review-consumption UI needs a staged submission — the S308 token procedure
   below is the recipe.
-- **Smoke-testing the live prod accept form (S308 procedure).** To get a working
+- **Smoke-testing the prod accept form (S308 procedure).** To get a working
   magic link for a test reviewer WITHOUT sending an email: hit `POST /api/review-manager/
   regenerate-token { suggestionId }` from an authenticated STAFF session — it mints the
-  token *in prod* (where `EXTERNAL_LINK_SECRET` lives) and returns `{ url }`, the
-  `reviews.wmkeck.org/external/review/<jwt>` link. Two dead-ends: (1) minting locally
-  fails — `.env.local` has no `EXTERNAL_LINK_SECRET` (sensitive Vercel var, reads back
-  empty); (2) `REVIEWER_EMAIL_DELIVERY_MODE=capture` is hard-blocked in Vercel production
-  (`send-emails.js:778`), so "capture for rehearsal" only works on non-prod. Loading the
+  token *in prod* (where the real `EXTERNAL_LINK_SECRET` lives) and returns `{ url }`, the
+  `reviews.wmkeck.org/external/review/<jwt>` link. `REVIEWER_EMAIL_DELIVERY_MODE=capture`
+  is hard-blocked in Vercel production (`send-emails.js:778`), so this prod-mint route is
+  for accept/decline-link smoke only, not for rehearsing a send. Loading the
   link is read-only (stamps first-access); a real ACCEPT fires the honorarium automation
   (creates an `akoya_request`), so for UI checks opt out of the honorarium and stop before
   accept. Revoke when done via `POST /api/review-manager/revoke-token { suggestionId }`
   (or the Invite-tab "X", which soft-deletes + revokes).
+  **Local capture-mode invite testing is now unblocked (S346).** The earlier claim that
+  local minting always fails was about a FRESH clone with no local secret at all —
+  `EXTERNAL_LINK_SECRET` is a purely internal HMAC key (sign+verify both happen in the
+  same process, per `lib/services/external-token.js` header; never shared with an
+  external party), so any 32+ char throwaway string works for local-only testing. Set one
+  in `.env.local` (`openssl rand -hex 32` or similar) and restart `next dev`; combined with
+  `REVIEWER_EMAIL_DELIVERY_MODE=capture` (not prod-blocked locally), the full
+  preview→render→mint→capture-send→portal-view pipeline now runs end-to-end on
+  `localhost:3000`. See memory `project-local-dev-auth-setup` for the full local-auth
+  checklist this session had to rediscover.
 - **E2E harness runs against a real build, not `next dev`.** The Playwright
   reviewer-portal harness (`tests/e2e/`, `npm run test:e2e`) mocks the data layer and
   runs against `next build --webpack && next start` — NOT `next dev`. It is CI-gated
