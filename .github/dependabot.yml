@@ -9,6 +9,15 @@ updates:
     labels:
       - "dependencies"
     ignore:
+      # Major updates are handled deliberately, NOT via automated PRs. A major
+      # bump routinely carries breaking changes that break Jest/Playwright, which
+      # produced a recurring stream of real CI-failure emails on bot PRs nobody
+      # was ready to adapt. Dependabot still proposes grouped minor/patch updates
+      # (which stay green and are safe to merge); take majors by hand when wanted.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # (The specific version ignores below are now largely subsumed by the
+      # blanket major ignore, but kept as explicit documentation of hard blocks.)
       - dependency-name: "react"
         versions: [">=19"]
       - dependency-name: "react-dom"
