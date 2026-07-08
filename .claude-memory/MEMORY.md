@@ -48,6 +48,7 @@
 - Dataverse / Dynamics / Explorer / Power Tools / CRM facts / grant lifecycle fields: ../docs/agent-wiki/topics/dataverse-dynamics.md
 - Dataverse write/audit/settings specifics: reference-dataverse-audit-trail-actor-detection.md; project-dataverse-batch-changeset-available.md; reference-dataverse-altkey-lookup-upsert-url.md; project-dataverse-settings-audit-enablement.md
 - Prompt / Executor / document processing: ../docs/agent-wiki/topics/prompt-executor.md; project-prompt-governance.md
+- Prompt legacy audit follow-up (action item, S343 → next session): project-prompt-legacy-audit-followup.md; ../docs/PROMPT_LEGACY_AUDIT.md
 - BILL / honoraria / payment semantics: ../docs/agent-wiki/topics/finance-honoraria.md; project-honorarium-payment-landscape.md
 - Auth / admin / access / security / private Blob / file download: ../docs/agent-wiki/topics/security-auth.md
 - Integrity screener / Retraction Watch / PubPeer / News: ../docs/agent-wiki/topics/integrity-screener.md
