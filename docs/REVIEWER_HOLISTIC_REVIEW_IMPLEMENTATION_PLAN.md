@@ -20,10 +20,30 @@ Direction source: `docs/audits/reviewer-holistic-review-fable-2026-07-08.md`
 (read it first — this plan implements its §3–§5; its §1–§2 carry the rationale
 and the owner-stated constraints that bound every choice here).
 
+## Execution model (owner, S349 — overrides the per-phase shipping guidance below)
+
+Justin's chosen model (2026-07-08): this is a **major effort to build out in
+full on a dedicated testing branch**, then compare the **finished** reviewer
+finding/identity pipeline **head-to-head against the state-of-the-art on main**
+before any merge decision — not a drip of phase PRs into main. Consequences:
+
+- The phase ORDER below (P0 → … → P4) remains a sensible build order *within*
+  the branch. The "one phase per PR, ship to main, do not batch" instruction in
+  the next section does NOT apply — build the whole thing on the branch.
+- Stand up the eval layers first so the end-product comparison is possible:
+  **P2.1** (frozen identity eval fixtures), **P3.2** (A/B on 2–3 D26-style
+  proposals), **P3.3** (per-channel accept-yield report) are the comparison
+  harness against main.
+- All safety invariants and **[OWNER-GATE]** markers still bind on the branch.
+- **Status: PARKED — not green-lit.** Do not start the build without explicit
+  owner go. Intent recorded in `.claude-memory/project-reviewer-holistic-redesign-parallel-build.md`.
+
 ## How to use this plan (implementing agent: read this section fully)
 
 - **One phase per session/PR.** Phases are ordered by risk-reduction per unit
-  of work and are independently shippable. Do not batch phases.
+  of work and are independently shippable. Do not batch phases. *(Superseded by
+  the Execution model above — kept because the risk ordering it describes is the
+  branch build order.)*
 - **Read before each phase** (non-negotiable): the memory files listed in that
   phase's "Read first" line, plus `.claude-memory/project-reviewer-sourcing-constraints.md`
   and `.claude-memory/project-reviewer-self-report-orcid-sticky-confirmed.md`

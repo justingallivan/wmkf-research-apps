@@ -37,6 +37,7 @@
 
 ## Task Routing
 - Reviewer origination / retrieval: ../docs/agent-wiki/topics/reviewer-origination.md; project-reviewer-sourcing-constraints.md (owner: ~1 applicant rec/panel recent policy; reuse per-PD practice; referral multiplies the engine)
+- Reviewer finding/identity holistic redesign (Fable 2026-07-08 plan; owner S349 wants a dedicated branch build-out + head-to-head vs main, NOT incremental-to-main; PARKED pending go): project-reviewer-holistic-redesign-parallel-build.md; ../docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md
 - Reviewer identity / ORCID / contact / COI / PI identity: ../docs/agent-wiki/topics/reviewer-identity.md; project-reviewer-verify-fail-dangerous.md
 - Reviewer workbench / lifecycle / roster / referral: ../docs/agent-wiki/topics/reviewer-workbench-lifecycle.md; project-workbench-consolidation-rollout.md
 - Reviewer-invite local testing / capture mode side effects: reviewer-invite-capture-mode-not-full-sandbox.md
