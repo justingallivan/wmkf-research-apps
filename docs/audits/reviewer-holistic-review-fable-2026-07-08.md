@@ -42,8 +42,8 @@ You are solving two problems that are real, but you have framed them as one
 problem ("build a search-and-verify engine per proposal") when the evidence you
 yourselves collected says they are different problems: **finding is a
 per-proposal community-location problem whose one scalable human channel — the
-referral chain — is unbuilt, and disambiguation is a provenance problem you
-keep treating as a confidence problem.** The "surface and inform, human decides" frame is right and
+referral chain — is captured but not closed into a loop, and disambiguation is
+a provenance problem you keep treating as a confidence problem.** The "surface and inform, human decides" frame is right and
 you should keep it — but it has quietly become a license to never finish a
 decision, and the failure-severity question you left open has an answer:
 **confidently-wrong identity is the root failure**, because both of the other
@@ -110,7 +110,7 @@ The evidence on candidate sources, with the current-practice constraints:
 | Applicant-recommended | 80% PD pick-rate, judged blind (experiment §2) | capped ~1/panel (recent anti-stacking policy) |
 | Claude-assisted (Track A) | 65% pick-rate | none — the workhorse |
 | Bare grounded retrieval | 35% pick-rate, deceased/retired/trainee noise | retired by experiment |
-| Referral capture | "the real convergence engine" (Part C §8a) | **unbuilt**; multiplies the engine (needs tier-1 contact first) |
+| Referral capture | "the real convergence engine" (Part C §8a) | captured (S249) but **handoff loop unbuilt**; multiplies the engine (needs tier-1 contact first) |
 | Reviewer history / pool reuse | per-PD practice; none currently (owner-stated) | deprioritized, not impossible |
 
 Two conclusions follow. First, **the Claude-assisted engine is the product, not
@@ -249,9 +249,17 @@ identity *inference* (expensive, where the reversals live).
 
 ### Under-invested (the neglected gaps)
 
-- **Referral capture.** Named the real convergence engine in your own reframe;
-  still pending. This is the single highest-leverage unbuilt feature in either
-  half.
+- **The referral handoff loop.** *(Corrected during plan-drafting: capture
+  itself SHIPPED S249 — staff "Add or Refer a Reviewer"
+  (`project-reviewer-referral-capture` memory) and the decline form's "Anyone
+  you'd suggest instead?" persisting to `wmkf_declinereferral`
+  [VERIFIED via `shared/components/external/DeclineFormView.js:102-111`,
+  `lib/dataverse/adapters/reviewer-suggestion.js:1343-1344`].)* What is
+  missing is the loop-closure: `pages/api/external/review/[token]/respond.js:7`
+  defers "referral handoff" to a follow-up build — referral free text lands in
+  a Dataverse field with no staff notification or one-click resolve into the
+  candidate pool. Captured-but-unread referrals are the highest-leverage gap
+  in either half.
 - **Applicant recommendations as search seeds.** *(Revised — the original
   "elevate them to the top of the slate" recommendation is retracted: the
   channel is capped at ~1/panel by a recent anti-stacking policy,
@@ -301,14 +309,15 @@ inversion; formally retire it (see §5).
 
 Then invest in this order:
 
-1. **Referral capture (build now).** Decline→suggest→iterate is where good
-   slates actually converge per your own analysis, and every referred name
-   arrives pre-disambiguated by the referrer ("my colleague X at Y") — it
-   short-circuits both of your hard problems at once. It is a *multiplier on
-   the engine* (a never-contacted expert can't refer), so it converts every
-   tier-1 slate improvement into compounding reach. This is the only item on
-   any roadmap that improves finding *and* disambiguation *and* recall
-   simultaneously.
+1. **Close the referral loop (build now).** Capture exists (S249 staff
+   Add-or-Refer; decline-form free text → `wmkf_declinereferral`); the deferred
+   handoff (`respond.js:7`) does not — referrals land in a field nobody is
+   routed to. Build the loop-closure: surface decline referrals to staff and
+   one-click-resolve them through the existing Add-or-Refer machinery. Every
+   referred name arrives pre-disambiguated by the referrer ("my colleague X at
+   Y") — it short-circuits both of your hard problems at once, and it is a
+   *multiplier on the engine* (a never-contacted expert can't refer), so it
+   converts every tier-1 slate improvement into compounding reach.
 2. **Use applicant recommendations as neighborhood seeds, not slate
    candidates.** *(Revised — "elevate to top of Find tab" retracted per the
    ~1/panel cap.)* Feed `wmkf_potentialreviewer1..5` into origination as
