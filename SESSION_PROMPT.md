@@ -71,6 +71,26 @@ disambiguation.
    rich-text via `getActiveQuestionSet`), route through `lib/external/build-review-submission.js`
    so staff-entered ≈ portal. Backends exist. **Blocked on placement decision (below).**
 
+3. **Dispatch the whack-a-mole META-review (owner runs Fable).**
+   Evidence: `docs/WHACK_A_MOLE_META_REVIEW_FABLE_PROMPT.md`; anchored on
+   `docs/audits/whack-a-mole-audit-2026-07-08.md`. Same mechanics as #1 (new `claude-fable-5`
+   session, `git pull`, "Read and execute …", no `/start` or `/stop`); writes to
+   `outputs/whack-a-mole-meta-review-fable-findings.md` (gitignored). **Run this FIRST** — it
+   scopes the codebase-wide "prevent the class" changes and may reprioritize the fixes below.
+
+### Whack-a-mole remediation (S349 audit — full tiered to-do in `docs/audits/whack-a-mole-audit-2026-07-08.md`)
+
+**Next-up fixes** (bounded, high-confidence — do after the meta-review, or independently):
+1. Carryover-freshness gate (recurring class with NO existing guard).
+2. Finish the code-level nomenclature rename (route namespaces / authz keys still carry
+   `reviewer-finder`/`review-manager`/"candidate"; doc sweeps keep unwinding until the code renames).
+3. Akoya cycle-code fail-loud (off-month meeting dates silently drop from Jxx/Dxx cohorting).
+   *(The identity `binding-source` fix is real but belongs to the PARKED reviewer holistic plan — not standalone here.)*
+
+**Backlog** (future sessions — see audit doc §"Backlog"): Dynamics Explorer auto-derived schema;
+idempotent Dataverse deploy tool; engagement-stamp state machine; dual reviewer-count consolidation;
+coverage-tool/TypeScript-adoption decision; DAL "site 33" tail; service-growth lessons-learned note.
+
 ### Owner Decision Needed
 
 1. **Reviewer-identity `confirmed` sentinel — downgrade automated spine `confirmed` to

@@ -116,6 +116,12 @@ related:
 | [TODO_EMAIL_NOTIFICATIONS.md](TODO_EMAIL_NOTIFICATIONS.md) | plan | draft |  | System-alert emails are wired to the Dynamics email transport (DynamicsService.createAndSendEmail). When NOTIFICATION_EMAIL_FROM is set, the... | 2026-07-02 |
 | [UNIFIED_EMAIL_SIGNATURE_PLAN.md](UNIFIED_EMAIL_SIGNATURE_PLAN.md) | plan | active |  | - The grantee invite/reminder need a signature; titles are NOT in Dataverse, so the signature must come from a per-user store with a sensible... | 2026-07-02 |
 
+## engineering-process
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [WHACK_A_MOLE_META_REVIEW_FABLE_PROMPT.md](WHACK_A_MOLE_META_REVIEW_FABLE_PROMPT.md) | draft | draft |  | Fresh-eyes Fable prompt: given the S349 whack-a-mole audit, propose codebase-wide structural + process changes that prevent the patch-then-re-patch class. | 2026-07-08 |
+
 ## finance-honoraria
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
