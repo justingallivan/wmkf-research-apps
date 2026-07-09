@@ -8,6 +8,10 @@ metadata:
   last_verified: S203 via memory-content (not re-probed 2026-06-04)
 ---
 
+> **BUILD PARKED (2026-07-08, S348):** the intake-portal build is on the back burner
+> (Connor re-engineering GOApply). These UI todos are deferred, not scheduled. Retained
+> for revival. See [[project-intake-portal-parked]].
+
 ## Recall Rule
 
 Read this when: working on the `/apply` intake portal sign-out flow or the Entra External ID sign-up / attribute-collection UX.

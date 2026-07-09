@@ -8,6 +8,13 @@ metadata:
   last_verified: S168 via memory-content (not re-probed 2026-06-04)
 ---
 
+> **BUILD PARKED (2026-07-08, S348):** the intake-portal build (incl. this institution
+> typeahead) is on the back burner (Connor re-engineering GOApply). Retained for revival;
+> don't start build work off this memory. See [[project-intake-portal-parked]]. NB the
+> *reviewer*-side account-matching twin was reversed as high-harm/low-yield
+> ([[project-reviewer-institution-match]]) — revisit whether that applies here (applicant
+> self-picks with a confirm-step, a different risk profile) before building.
+
 ## Recall Rule
 
 Read this when: designing the intake portal's institution-selection control, or any path where a free-text org name lands in the system (PA flows, external integrations).

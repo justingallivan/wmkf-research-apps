@@ -33,6 +33,14 @@ update_triggers:
 
 # Intake Portal
 
+> **⚠️ BUILD PARKED (owner decision, 2026-07-08).** The applicant intake-portal
+> build is on the back burner — Connor is re-engineering GOApply for the next cycle,
+> so our portal effort is paused pending whether WMKF adopts it. Do NOT spin up
+> intake-portal build/planning as active work; the admin UI and institution-typeahead
+> are intentionally unbuilt. The design memories are retained for revival, not stale.
+> See `.claude-memory/project-intake-portal-parked.md`. (The intake Blob/draft/submit
+> infrastructure below already exists and remains live.)
+
 Use this page before work on applicant intake: draft capture, submit, attachment
 handling, intake Blob storage, auth/external identity, institution match, and
 intake-to-Dataverse mapping.

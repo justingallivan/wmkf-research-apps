@@ -8,6 +8,10 @@ scope: intake
 last_verified: unknown via memory-content (not re-probed 2026-06-04)
 ---
 
+> **BUILD PARKED (2026-07-08, S348):** the intake-portal build is on the back burner
+> (Connor re-engineering GOApply). Retained for revival; don't start build work off
+> this memory. See [[project-intake-portal-parked]].
+
 ## Recall Rule
 
 Read this when: sizing or scoping any intake-portal pilot work.
