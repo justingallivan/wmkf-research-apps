@@ -23,17 +23,44 @@ The quota target itself must be settable in the reviewer workflow. Without a liv
 
 This plan does not change the reviewer-facing "no longer needed" flow. The PD still decides which pending invitees to release from the Workbench Reviewers tab; the system must not auto-withdraw pending reviewers.
 
+## Codebase Drift Since Scoping (re-verified 2026-07-09, S350)
+
+This plan was scoped 2026-07-02. It was recovered to `main` (commit `1420d79c`) and
+re-verified against a codebase roughly a week ahead. **Neither proposed change has been
+built.** The goal and both changes remain valid, but two structural shifts landed after
+scoping and moved cited code:
+
+1. **The quota check moved off the synchronous accept path into the async drain.** The
+   reviewer accept-fast-response build (shipped 2026-07-04, `reviewer_acceptance_jobs`
+   queue + drain) moved `maybeNotifyQuotaReached()` out of `respond.js`. It is now called
+   **only** from `lib/services/reviewer-acceptance-drain.js` (`processReviewerAcceptanceJob`),
+   which the `/api/cron/drain-reviewer-acceptances` cron runs (~2-min cadence). The drain
+   re-verifies the Dataverse accept committed (`verifyAcceptedOrCancel`) before running the
+   quota step, and wraps the whole job in `withDalContext('cron-drain-reviewer-acceptances')`.
+   **Implication:** the PD email now fires from the async drain, not synchronously on accept —
+   a short delay, and the "fires only after a committed accept" invariant is satisfied by the
+   drain's accept re-verification rather than by call-ordering in `respond.js`. The trusted DAL
+   context needed for the email send is already established by the cron.
+2. **Campaign-config write/validation moved route → service.** Per the Route→Service
+   Consolidation Plan (Stage 2), `pages/api/review-manager/campaign-config.js` is now a thin
+   shell delegating to `lib/services/review-manager/campaign-config-service.js`. `desiredCount`
+   is a generic entry in that service's `WRITABLE_FIELDS` map (`{ col: 'wmkf_desiredcount',
+   kind: 'int' }`), validated non-negative-int-or-null by `coerceField`, and returned by
+   `readConfig`. **Implication for Change #1:** the backend write/read/validation for
+   `desiredCount` already exist end-to-end with no backend edits needed — only the modal UI is
+   missing.
+
 ## Current State
 
-- [VERIFIED via `pages/api/external/review/[token]/respond.js:750-766`] A fresh accept calls `maybeNotifyQuotaReached()` after the accept write commits.
-- [VERIFIED via `lib/services/reviewer-quota.js:52-67`] `maybeNotifyQuotaReached()` counts accepted reviewers, then conditionally writes `wmkf_quotanotifiedat` with `If-Match` before notifying.
-- [VERIFIED via `lib/services/reviewer-quota.js:87-102`] The current notification call passes the resolved PD email as `explicitRecipients`, but uses `severity: 'info'` and does not set `emailAdmins: true`.
-- [VERIFIED via `lib/services/notification-service.js:75-85`] `NotificationService.notify()` only sends email when `emailAdmins` is true or severity is `error`/`critical`.
-- [VERIFIED via `tests/unit/notification-service-explicit-recipients.test.js:75-86`] `NotificationService.sendAdminEmail()` already supports explicit recipients without category fan-out.
-- [VERIFIED via `pages/api/review-manager/campaign-config.js:33-40`] The campaign config API supports writing `desiredCount` to Dataverse column `wmkf_desiredcount`.
-- [VERIFIED via `pages/api/review-manager/campaign-config.js:72-79`] `desiredCount` is validated as a non-negative integer or `null`.
-- [VERIFIED via `shared/components/reviewers/CampaignConfigModal.js:21-78`] The current campaign config modal only loads and saves response timing fields; it does not expose or submit `desiredCount`.
-- [VERIFIED via `pages/api/review-manager/send-emails.js:609-640`] The initial invite-batch send seeds response timing config only; it does not seed `wmkf_desiredcount`.
+- [VERIFIED 2026-07-09 via `lib/services/reviewer-acceptance-drain.js` (`processReviewerAcceptanceJob`, quota step ~line 406)] The accept follow-up drain calls `maybeNotifyQuotaReached()` after re-verifying the Dataverse accept committed. (Was `respond.js` at scoping; moved by the 2026-07-04 accept-fast-response drain.)
+- [VERIFIED 2026-07-09 via `lib/services/reviewer-quota.js` (`maybeNotifyQuotaReached`, ~lines 46-83)] Counts accepted reviewers, then conditionally writes `wmkf_quotanotifiedat` with `If-Match` (bounded-retry loop distinguishing the two 412 causes) before notifying.
+- [VERIFIED 2026-07-09 via `lib/services/reviewer-quota.js` (notify call, ~lines 88-100)] The current notification call passes the resolved PD email as `explicitRecipients` and still sets `category: 'reviewers'`, but uses `severity: 'info'` and does not set `emailAdmins: true`.
+- [VERIFIED 2026-07-09 via `lib/services/notification-service.js:74-75`] `NotificationService.notify()` only sends email when `emailAdmins` is true or severity is `error`/`critical`.
+- [VERIFIED 2026-07-09 via `tests/unit/notification-service-explicit-recipients.test.js`] `NotificationService.sendAdminEmail()` already supports explicit recipients, union'd with (optional) category recipients and deduped.
+- [VERIFIED 2026-07-09 via `lib/services/review-manager/campaign-config-service.js:38`] The campaign config service supports writing `desiredCount` to Dataverse column `wmkf_desiredcount` via its generic `WRITABLE_FIELDS` map. (Was the route file at scoping; moved route → service.)
+- [VERIFIED 2026-07-09 via `lib/services/review-manager/campaign-config-service.js:84-87` (`coerceField`)] `desiredCount` is validated as a non-negative integer, with `null` allowed to clear the column.
+- [VERIFIED 2026-07-09 via `shared/components/reviewers/CampaignConfigModal.js:7-11`] The current campaign config modal only loads and saves response-timing fields; it deliberately does not expose or submit `desiredCount` ("we don't surface a control that does nothing yet").
+- [VERIFIED 2026-07-09] The initial invite-batch send seeds response-timing config only; it does not seed `wmkf_desiredcount`. (Send logic moved to `lib/services/review-manager/send-emails-service.js`; neither the route nor the service references `desiredCount`.)
 
 Result: the quota threshold path currently creates the `reviewer_quota_reached` alert row when `wmkf_desiredcount` is already populated, but the email branch is skipped. If `wmkf_desiredcount` is not populated outside the app, the quota path returns `no_quota_configured` and never reaches the notification branch.
 
@@ -43,7 +70,7 @@ Result: the quota threshold path currently creates the `reviewer_quota_reached` 
 |---|---|---|
 | PDs can set or clear the quota target from the reviewer workflow | `shared/components/reviewers/CampaignConfigModal.js`, `pages/api/review-manager/campaign-config.js` | Modal GET state includes `desiredCount`; save payload includes `desiredCount`; API validation remains non-negative integer or `null` |
 | A missing quota remains explicitly supported | `shared/components/reviewers/CampaignConfigModal.js`, `lib/services/reviewer-quota.js` | Clearing the field sends `desiredCount: null`; quota checker still returns `no_quota_configured` for null or non-positive values |
-| Quota threshold still fires only after a committed fresh accept | `pages/api/external/review/[token]/respond.js`, unchanged | Existing `respond.js` call remains after accept write |
+| Quota threshold still fires only after a committed fresh accept | `lib/services/reviewer-acceptance-drain.js`, unchanged | Drain's `verifyAcceptedOrCancel` gates the quota step on a confirmed-accepted Dataverse row; the `maybeNotifyQuotaReached()` call in the drain remains after that gate (call moved off `respond.js` by the 2026-07-04 accept-fast-response build) |
 | Only the first threshold winner can attempt the PD email | `lib/services/reviewer-quota.js` | Existing `wmkf_quotanotifiedat` conditional `If-Match` write remains before notify |
 | The quota alert email goes to the lead PD when resolvable | `lib/services/reviewer-quota.js` | `NotificationService.notify()` receives `emailAdmins: true` and `explicitRecipients: [pdEmail]` |
 | The quota alert does not fan out to the `reviewers` category by accident | `lib/services/reviewer-quota.js` | Omit `category` when `pdEmail` is present, relying on explicit-only recipient routing |
@@ -59,7 +86,7 @@ In `shared/components/reviewers/CampaignConfigModal.js`, add a reviewer quota in
 - Load `desiredCount` from `GET /api/review-manager/campaign-config`.
 - Let the PD enter a non-negative integer reviewer target or clear the field.
 - Submit `desiredCount` in the existing `POST /api/review-manager/campaign-config` payload.
-- Preserve the existing API-side validation in `pages/api/review-manager/campaign-config.js`; do not add a separate write route.
+- Preserve the existing validation, which now lives in `lib/services/review-manager/campaign-config-service.js` (`coerceField` / `WRITABLE_FIELDS`), not the thin route shell; do not add a separate write route. The service already accepts, validates, and returns `desiredCount`, so no backend change is required — this is a UI-only change.
 
 The UI label should make clear this is the number of committed reviewers needed before the PD is notified, not an automatic withdrawal count.
 
