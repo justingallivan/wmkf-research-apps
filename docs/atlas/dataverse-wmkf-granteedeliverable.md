@@ -33,6 +33,7 @@ Data:
 - `wmkf_inviteddate` (DateTime) — first Drafted→Invited transition only; re-sends do not reset it.
 - `wmkf_remindeddate` (DateTime) — automatic reminder send timestamp.
 - `wmkf_waiverackedat` (DateTime) — timestamp the grantee acknowledged the publication waiver at submit; companion to the `wmkf_WaiverPolicyVersion` lookup. Added 2026-07-09.
+- `wmkf_waiverbodyhash` (String, 64) — SHA-256 hex of the exact waiver body the grantee saw (from the signed render token). Audit aid: a later in-place edit of the acknowledged version's body is detectable when this stored hash no longer matches the current `wmkf_policybody` hash. Added 2026-07-09.
 
 ## Read Paths
 
@@ -51,7 +52,7 @@ Data:
   - `patchDeliverable()` — writes only package-owned status/image/caption/date fields.
 - `pages/api/workbench/grantee-deliverables/generate.js` — ensures package row and stamps status Drafted from null/Drafted only.
 - `pages/api/workbench/grantee-deliverables/send-invite.js` — ensures package row; on first Drafted→Invited flip stamps `wmkf_inviteddate=now`; re-sends leave status/date unchanged.
-- `lib/services/grantee-upload.js` — after validating/uploading image, commits the package row (`wmkf_imagecaption`, `wmkf_imagefileref`, status→Submitted, `wmkf_WaiverPolicyVersion` bind + `wmkf_waiverackedat`) AND the `akoya_request` approved-abstract PATCH in ONE atomic Dataverse changeset (per-op If-Match). SharePoint upload is outside the changeset; a non-412 failure re-reads before deleting the upload.
+- `lib/services/grantee-upload.js` — after validating/uploading image, commits the package row (`wmkf_imagecaption`, `wmkf_imagefileref`, status→Submitted, `wmkf_WaiverPolicyVersion` bind + `wmkf_waiverackedat` + `wmkf_waiverbodyhash`) AND the `akoya_request` approved-abstract PATCH in ONE atomic Dataverse changeset (per-op If-Match). SharePoint upload is outside the changeset; a non-412 failure re-reads before deleting the upload.
 - `pages/api/cron/grantee-deliverable-reminders.js` — durable pre-send claim moves status to Reminder Sent before sending; finalize stamps `wmkf_remindeddate`.
 
 ## Cross-System

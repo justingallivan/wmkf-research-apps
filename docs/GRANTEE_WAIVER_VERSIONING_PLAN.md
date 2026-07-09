@@ -211,6 +211,12 @@ Pass 1 (original plan):
 - **[high] two-row write not rollback-safe** → 4b (Dataverse changeset).
 - **[medium] fail-closed not operationalized** → §5 (probe, explicit reasons, alert).
 
+Pass 3 (implemented code, base `edf9c2f5`):
+- **[medium] render-token bodyHash minted but never persisted/enforced** → resolved:
+  the acknowledged body hash is now persisted on the deliverable
+  (`wmkf_WaiverBodyHash`, wave12), so a later in-place edit of the acknowledged
+  version's body is detectable by audit (stored hash vs current `wmkf_policybody`).
+
 Pass 2 (revised plan):
 - **[high] client-echoed id ≠ proof of what was shown** → 4a now uses a server-signed
   waiver-render token; versionId comes from the verified payload (owner may downgrade

@@ -124,6 +124,7 @@ export default async function handler(req, res) {
       writeGranteeDeliverables({
         request, deliverable, editedAbstract, caption, imageFile,
         waiverVersionId: waiver.versionId,
+        waiverBodyHash: waiver.bodyHash,
       }));
 
     if (!result.ok) {

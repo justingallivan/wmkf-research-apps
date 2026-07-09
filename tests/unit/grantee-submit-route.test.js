@@ -82,7 +82,7 @@ beforeEach(() => {
   verifyGranteeToken.mockReset();
   writeGranteeDeliverables.mockReset().mockResolvedValue({ ok: true });
   // Default: a valid render token bound to this request (r1) with a GUID version.
-  verifyWaiverRenderToken.mockReset().mockResolvedValue({ valid: true, requestId: 'r1', versionId: VER, bodyHash: 'h' });
+  verifyWaiverRenderToken.mockReset().mockResolvedValue({ valid: true, requestId: 'r1', versionId: VER, bodyHash: 'bodyhash-abc' });
   NotificationService.notify.mockReset().mockResolvedValue({});
 });
 
@@ -151,8 +151,9 @@ test('happy path: parses multipart, calls service, returns 200', async () => {
   expect(Buffer.isBuffer(arg.imageFile.buffer)).toBe(true);
   expect(arg.request.akoya_requestid).toBe('r1');
   expect(arg.deliverable.wmkf_granteedeliverableid).toBe('d1');
-  // The server-resolved (verified) version id is passed through to the service.
+  // The server-resolved (verified) version id + body hash are passed through.
   expect(arg.waiverVersionId).toBe(VER);
+  expect(arg.waiverBodyHash).toBe('bodyhash-abc');
 });
 
 test('missing/expired render token (client stale) → 409 waiver_invalid, service NOT called, no alert', async () => {

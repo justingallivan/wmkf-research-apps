@@ -11,6 +11,13 @@
       "description": "Timestamp when the grantee acknowledged the publication waiver at deliverable submit. Companion to the wmkf_WaiverPolicyVersion lookup, which pins the specific policy version row the grantee saw.",
       "format": "DateAndTime",
       "behavior": "UserLocal"
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_WaiverBodyHash",
+      "displayName": "Waiver Body Hash",
+      "description": "SHA-256 hex of the waiver policy body text the grantee actually saw at submit (from the signed render token). Persisted alongside the wmkf_WaiverPolicyVersion lookup so an audit can prove the exact acknowledged text and detect any later in-place edit of that version's body (stored hash != current wmkf_policybody hash). Policy versions are immutable by convention — this makes a violation detectable after the fact.",
+      "maxLength": 64
     }
   ],
   "relationships": [

@@ -149,9 +149,10 @@ New fields (the existing `wmkf_abstract` is the source and is NOT created):
 **Consent fields — UPDATED 2026-07-09.** The original S268 schema deliberately stored no consent
 fields. That was reversed at owner request: the waiver is now versioned in the `grantee-waiver`
 policy slot, and the acknowledged version is persisted on the `wmkf_granteedeliverable` package row
-via `wmkf_WaiverPolicyVersion` (lookup → `wmkf_policyversion`) + `wmkf_WaiverAckedAt` (DateTime). Those
-two columns are added by the standalone `wave12-grantee-waiver-consent` schema wave; the abstract
-content fields and status picklist are unchanged. See `docs/GRANTEE_WAIVER_VERSIONING_PLAN.md`.
+via `wmkf_WaiverPolicyVersion` (lookup → `wmkf_policyversion`) + `wmkf_WaiverAckedAt` (DateTime) +
+`wmkf_WaiverBodyHash` (String, SHA-256 of the acknowledged body, audit aid). Those three columns are
+added by the standalone `wave12-grantee-waiver-consent` schema wave; the abstract content fields and
+status picklist are unchanged. See `docs/GRANTEE_WAIVER_VERSIONING_PLAN.md`.
 
 Status picklist option set (mirror in `shared/config/granteeDeliverableStatus.js` — keep symmetric):
 `Drafted` (100000000), `Invited` (100000001), `Reminder Sent` (100000002), `Submitted` (100000003),

@@ -39,9 +39,10 @@ const VER = '33333333-3333-3333-3333-333333333333';
 const ABSTRACT = 'The team will measure the thing in a sufficiently long approved abstract sentence.';
 const png = () => Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 const imageFile = (name = 'fig.png') => ({ buffer: png(), filename: name });
+const BODY_HASH = 'a'.repeat(64);
 const call = (over = {}) => writeGranteeDeliverables({
   request: REQ, deliverable: DELIVERABLE, editedAbstract: ABSTRACT, caption: 'A figure.',
-  imageFile: imageFile(), waiverVersionId: VER, ...over,
+  imageFile: imageFile(), waiverVersionId: VER, waiverBodyHash: BODY_HASH, ...over,
 });
 
 beforeEach(() => {
@@ -77,9 +78,17 @@ test('happy path: uploads image + one atomic changeset of both PATCHes, per-op I
       wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.SUBMITTED,
       wmkf_imagefileref: 'https://sp/new.png',
       'wmkf_WaiverPolicyVersion@odata.bind': `/wmkf_policyversions(${VER})`,
+      wmkf_waiverbodyhash: BODY_HASH,
     },
   });
   expect(typeof ops[1].body.wmkf_waiverackedat).toBe('string');
+});
+
+test('omits the body hash column when none is supplied (still writes the version lookup)', async () => {
+  await call({ waiverBodyHash: undefined });
+  const [ops] = runChangeset.mock.calls[0];
+  expect(ops[1].body).not.toHaveProperty('wmkf_waiverbodyhash');
+  expect(ops[1].body['wmkf_WaiverPolicyVersion@odata.bind']).toBe(`/wmkf_policyversions(${VER})`);
 });
 
 test('missing waiverVersionId → fail closed (policy_misconfigured), no upload/changeset', async () => {
