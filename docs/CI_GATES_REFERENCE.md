@@ -228,6 +228,10 @@ Added S154. Runs `scripts/reconcile-memory-claims.js`. Fails on `spec_without_en
 - Promotion to the P0 set above is reasonable once the bucket lands AND the gate has been green continuously for a stretch of sessions.
 - For routine memory audits that must not dirty the tracked report, use `npm run check:memory-drift:no-write` (read-only; never regenerates `docs/RECONCILIATION_REPORT.json`).
 
+### `check:memory-health` (advisory) — active-memory hygiene worklist (S348)
+
+Added S348 (audit Slice 5 from `docs/audits/memory-hygiene-control-audit-2026-07-02.md`). Runs `scripts/check-memory-health.js`. **Read-only, never fails** — complements `check:memory-router` (structure) with semantic-freshness signals. Reports per active leaf memory: `shadow-atlas` (structural claim, no Atlas/source/probe pointer), `weak-basis` (structural claim + stale/absent `last_verified`), `no-recall-rule`, `oversize-routed`, `stale-routed`. Parses both frontmatter conventions (top-level and `metadata:`-block `status:`). `--json` emits a machine-readable triage worklist; `--quiet` prints summary only. It is the intended starting point for future memory-triage passes (see `docs/audits/memory-triage-2026-07-08.md`). Wired into the `/start` advisory gate list.
+
 ### `check:model-override-warming` — LLM 404-on-tier-alias prevention (S230)
 
 AST gate (`@babel/parser`). Every `pages/api/**` route that reaches a `getModelForApp` / `getFallbackModelForApp` call — directly or transitively through an imported module — must call an **awaited** `loadModelOverrides()` first (and within a single function, the warm must lexically precede a direct resolver call). Without warming, the synchronous resolver returns the raw tier alias (e.g. `sonnet`) and Anthropic 404s in prod; unit tests never catch it (they mock the LLM). This class recurred 3× (web-suggestions S229; applicant-reviewers + integrity-screener/screen S230) before the gate.
