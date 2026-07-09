@@ -59,10 +59,10 @@ beforeEach(() => {
 });
 
 describe('listSlots', () => {
-  it('flags unprovisioned slots and returns both allowlisted codes', async () => {
+  it('flags unprovisioned slots and returns all allowlisted codes', async () => {
     policy.querySlotByCode.mockResolvedValue({ records: [] });
     const { slots } = await listSlots();
-    expect(slots.map((s) => s.code)).toEqual(['reviewer-coi', 'reviewer-ai-use']);
+    expect(slots.map((s) => s.code)).toEqual(['reviewer-coi', 'reviewer-ai-use', 'grantee-waiver']);
     expect(slots.every((s) => s.invariantError === 'slot_not_provisioned')).toBe(true);
   });
 

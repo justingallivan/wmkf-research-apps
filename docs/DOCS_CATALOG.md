@@ -145,6 +145,12 @@ related:
 | [CONNOR_CONTACT_MERGE_AND_REVIEWER_LINKING.md](CONNOR_CONTACT_MERGE_AND_REVIEWER_LINKING.md) | history | active |  | Date: 2026-06-25 (S289). Author: Justin + Claude. Status: discussion / questions. | 2026-07-02 |
 | [PROPOSAL_CONTEXT_EXTRACTION_PLAN.md](PROPOSAL_CONTEXT_EXTRACTION_PLAN.md) | plan | active |  | Created: 2026-04-17 (Session 103) Status: Planning — relevant to single-phase cycle (two cycles out). | 2026-07-02 |
 
+## grantee-deliverables
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [GRANTEE_WAIVER_VERSIONING_PLAN.md](GRANTEE_WAIVER_VERSIONING_PLAN.md) | plan | draft |  | Version the grantee publication waiver like the reviewer COI/AI-use policies: a grantee-waiver slot, admin editing, and an acked-version lookup. |  |
+
 ## grantee-portal
 
 | File | Kind | Status | Canonical | Summary | Cataloged |

@@ -1,0 +1,27 @@
+{
+  "name": "wmkf_granteedeliverable-waiver-consent",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_granteedeliverable",
+  "_comment": "Grantee publication-waiver consent capture (2026-07-09). Mirrors the reviewer Stage-2a policy-ack pattern in wave3/04: a version LOOKUP pins the exact wmkf_policyversion the grantee acknowledged, plus a companion DateTime. Depends on wmkf_policyversion (wave3) and wmkf_granteedeliverable (wave3-grantee-deliverable-table) already existing; deploy this standalone wave after both. Reverses the original GRANTEE_PORTAL_SPEC 'no consent fields persisted' decision (see docs/GRANTEE_WAIVER_VERSIONING_PLAN.md).",
+  "attributes": [
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_WaiverAckedAt",
+      "displayName": "Waiver Acknowledged At",
+      "description": "Timestamp when the grantee acknowledged the publication waiver at deliverable submit. Companion to the wmkf_WaiverPolicyVersion lookup, which pins the specific policy version row the grantee saw.",
+      "format": "DateAndTime",
+      "behavior": "UserLocal"
+    }
+  ],
+  "relationships": [
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_granteedeliverable_waiverpolicyversion",
+      "referencedEntity": "wmkf_policyversion",
+      "lookupSchemaName": "wmkf_WaiverPolicyVersion",
+      "lookupDisplayName": "Waiver Policy Version",
+      "lookupDescription": "The exact wmkf_policyversion row (grantee-waiver slot) the grantee acknowledged at submit. Pinning the specific child preserves what the grantee actually saw, even if staff later activate a different version on the parent. Default Restrict cascade prevents hard-delete of referenced version rows.",
+      "required": "None"
+    }
+  ]
+}
