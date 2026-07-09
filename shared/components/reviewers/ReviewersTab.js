@@ -55,10 +55,12 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
   const [declineReferrals, setDeclineReferrals] = useState([]);
-  // ReviewersTab is NOT keyed by requestId (page reuses the instance across
-  // request navigations), so an in-flight decline-referral fetch from the prior
-  // request could paint its referrals onto the new one. Guard every post-await
-  // write against the request that is current NOW.
+  // ReviewersTab is NOT keyed by requestId (the workbench page reuses the
+  // instance across request navigations — the [requestId].js key is on
+  // AwardeeTab, not this tab), so an in-flight fetch from the prior request
+  // could paint its data onto the new one. All three loaders below capture the
+  // request they fired for and guard every post-await write against the request
+  // that is current NOW.
   const currentRequestIdRef = useRef(requestId);
   currentRequestIdRef.current = requestId;
   // Pre-fill payload handed to ReviewerFindPanel when staff click "Add as
@@ -75,20 +77,24 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
 
   const loadReviewers = useCallback(async () => {
     if (!requestId) return;
+    const rid = requestId;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/review-manager/reviewers?proposalId=${encodeURIComponent(requestId)}`);
+      const res = await fetch(`/api/review-manager/reviewers?proposalId=${encodeURIComponent(rid)}`);
       const data = await res.json().catch(() => ({}));
+      if (rid !== currentRequestIdRef.current) return; // request changed mid-flight — drop stale result
       if (!res.ok || !data.success) {
         throw new Error(data.error || `Failed to load reviewers (${res.status})`);
       }
       setProposal((data.proposals && data.proposals[0]) || null);
     } catch (e) {
-      setError(e.message);
-      setProposal(null);
+      if (rid === currentRequestIdRef.current) {
+        setError(e.message);
+        setProposal(null);
+      }
     } finally {
-      setLoading(false);
+      if (rid === currentRequestIdRef.current) setLoading(false);
     }
   }, [requestId]);
 
@@ -100,20 +106,24 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   // regardless of accepted) — the data behind the Candidates tab + its badge.
   const loadCandidates = useCallback(async () => {
     if (!requestId) return;
+    const rid = requestId;
     setCandidatesLoading(true);
     try {
-      const res = await fetch(`/api/reviewer-finder/my-candidates?requestId=${encodeURIComponent(requestId)}`);
+      const res = await fetch(`/api/reviewer-finder/my-candidates?requestId=${encodeURIComponent(rid)}`);
       const data = await res.json().catch(() => ({}));
+      if (rid !== currentRequestIdRef.current) return; // request changed mid-flight — drop stale result
       const prop = (data.proposals && data.proposals[0]) || null;
       const rows = (prop && prop.candidates) || [];
       const removed = (prop && prop.removedCandidates) || [];
       setCandidates(Array.isArray(rows) ? rows : []);
       setRemovedCandidates(Array.isArray(removed) ? removed : []);
     } catch {
-      setCandidates([]);
-      setRemovedCandidates([]);
+      if (rid === currentRequestIdRef.current) {
+        setCandidates([]);
+        setRemovedCandidates([]);
+      }
     } finally {
-      setCandidatesLoading(false);
+      if (rid === currentRequestIdRef.current) setCandidatesLoading(false);
     }
   }, [requestId]);
 
