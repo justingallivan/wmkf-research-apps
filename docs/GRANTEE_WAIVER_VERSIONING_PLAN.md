@@ -27,10 +27,14 @@ green (5224). The proposed artifacts below now EXIST and match this plan
 - [RECHECKED after lib/external/grantee-waiver-policy.js change: `resolveActiveWaiverPolicy` fail-closed classifier built per §5]
 - [RECHECKED after lib/services/grantee-upload.js change: atomic changeset + cross-store recovery built per §4b]
 
-**NOT yet run (gated on owner go):** the prod Dataverse steps — `apply-dataverse-schema
---wave=12-grantee-waiver-consent --execute`, `seed-grantee-waiver-policy.mjs`, and the
-`probe-grantee-waiver-slot.mjs` gate — MUST run before/with the production deploy
-because the portal fails closed on an unseeded slot (§5 rollout ordering).
+**Prod Dataverse steps — DONE 2026-07-09 (owner-run).** `apply-dataverse-schema
+--target=prod --wave=12-grantee-waiver-consent --execute` created `wmkf_WaiverAckedAt`,
+`wmkf_WaiverBodyHash`, and the `wmkf_WaiverPolicyVersion` lookup on `wmkf_granteedeliverable`
+(prod `wmkf.crm.dynamics.com`); `seed-grantee-waiver-policy.mjs` seeded the `grantee-waiver`
+slot + initial version; `probe-grantee-waiver-slot.mjs` passed (VERDICT: OK). The
+fail-closed dependency (§5) is now satisfied in prod — the portal edit view resolves
+the waiver and records the acknowledged version. Only the production code deploy of
+`main` remains (if not already auto-deployed).
 
 ## Goal
 
