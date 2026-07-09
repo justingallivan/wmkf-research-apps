@@ -10,6 +10,29 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Grantee publication waiver becomes versioned + consent-captured (Session 350)
+
+**Milestone:** The grantee publication-consent waiver moves from a hardcoded frontend constant (never
+persisted) to a **versioned policy** in the reviewer COI/AI-use policy machinery, and the acknowledged
+version is now **persisted per submission** — the first grantee-side consent-of-record. Reverses the
+original S268 `GRANTEE_PORTAL_SPEC` "no consent fields persisted" decision, at owner request.
+
+**Sessions:** 350 (design + 3 adversarial Codex passes — 2 on the plan, 1 on the code).
+
+**Ship state:**
+- New `grantee-waiver` slot (staff-editable in admin → Policies, same `PoliciesSection` UI). Prod
+  Dataverse schema wave12 applied + slot seeded + probe green (2026-07-09).
+- Records "what the grantee saw" via a signed render token (version+bodyHash bound); submit persists
+  `wmkf_WaiverPolicyVersion`/`wmkf_waiverackedat`/`wmkf_waiverbodyhash` on `wmkf_granteedeliverable`.
+- Submit's two Dataverse writes are now ONE atomic changeset (per-op If-Match), closing a pre-existing
+  partial-success hole; SharePoint reconciled by re-read-before-delete. Fail-closed on the slot.
+
+**Why it matters:** consent to a specific published wording is now auditable and version-pinned rather
+than "a submission exists"; and the fix hardened the grantee submit write to be genuinely atomic.
+
+**Pointers:** `docs/GRANTEE_WAIVER_VERSIONING_PLAN.md`, `project-grantee-waiver-versioning.md`; commits
+`9b327651`(A) `ec46676e`(B) `e0cbbb56`(C) `ebbe0e4c`(D) `552a8574`(E).
+
 ## July 2026 — First compile-time trust boundary: branded-type `check:types` gate ships to prod (Session 342)
 
 **Milestone:** The JS codebase gains its first *compile-time* trust-boundary enforcement — a
