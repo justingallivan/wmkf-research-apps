@@ -20,13 +20,21 @@ The decisive tell: this machine's Codex worktree reflog
 shows `spec-audit`. The spec-audit work was committed on the user's **work computer**
 and never pushed, so it is unreachable from here.
 
-**Recovery (must run ON the work computer; user gated until ~2026-07-08):**
-1. `git branch -a | grep spec-audit` → if present, `git push origin codex/spec-audit`.
-2. If the ref is gone, the commit is likely dangling:
-   `git reflog --all | grep -iE 'spec-audit|370f3867'` /
-   `git fsck --full | grep 'dangling commit'`, then
-   `git show --stat <c> | grep -i 'REVIEWER_ACCEPT_FAST\|REVIEWER_QUOTA_PD'`.
-3. `git branch codex/spec-audit <hash> && git push origin codex/spec-audit`.
+**Update 2026-07-08 (S348):** the *feature* these docs describe shipped independently —
+the reviewer-acceptance fast-response drain is on `main` (commit `a3103b3c`, 2026-07-02:
+migration `024_reviewer_acceptance_jobs.sql` + `lib/services/reviewer-acceptance-{drain,email,job-service}.js`
++ `pages/api/cron/drain-reviewer-acceptances.js`). So `REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md`
+is now mostly a historical design record; `REVIEWER_QUOTA_PD_EMAIL_PLAN.md` may still be an
+unbuilt plan (recover for the rationale). The user re-sighted commit `370f3867` on the work
+computer 2026-07-08 and confirmed it is still **unpushed** (re-verified absent here:
+`git cat-file -t 370f3867` fails; not on origin, not in any dangling commit).
+
+**Recovery — ONE command on the work computer** (the hash is known, so no branch hunt):
+```bash
+git push origin 370f3867:refs/heads/codex/spec-audit
+```
+(If that hash errors, fall back: `git branch -a | grep spec-audit` /
+`git fsck --full | grep 'dangling commit'` then push the found hash.)
 
 Once pushed, fetch here, review, and `git merge --no-ff codex/spec-audit` (docs-only,
 low-risk). Do NOT reconstruct the docs from scratch and do NOT re-run the local search
