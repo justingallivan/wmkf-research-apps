@@ -18,11 +18,13 @@ OR when anyone proposes acting on `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_
 Do:
 - Treat the plan as the agreed direction for a redesign of reviewer finding +
   identity, sourced from `docs/audits/reviewer-holistic-review-fable-2026-07-08.md`.
-- Build it on a **dedicated long-lived testing branch**, not incrementally into
-  main. The owner (S349) wants the *end product* built out (all of P0–P4) and
-  then compared **head-to-head against the current state-of-the-art on main**
-  before any merge decision. The comparison is of the finished pipeline, not
-  per-phase.
+- Keep the plan's **staged, phased build** (P0 → … → P4, one phase at a time,
+  don't batch — that part is fine, probably required). What's different is only
+  *where the phases land*: they accumulate on a **dedicated long-lived testing
+  branch and are NOT merged to main one at a time**. The redesign is held off
+  main until built out in full, so the *end product* can be compared
+  **head-to-head against the current state-of-the-art on main** — two
+  fully-built pipelines on separate branches — before any merge decision.
 - Use the plan's own eval layers as the comparison harness: **P2.1** frozen
   identity eval fixtures, **P3.2** A/B on 2–3 D26-style proposals, **P3.3**
   per-channel accept-yield report. These are what make "how does it compare"
@@ -32,10 +34,11 @@ Do:
   does not waive the sticky/fail-closed identity guards.
 
 Do not:
-- Follow the plan's "one phase per PR, ship to main incrementally, do not
-  batch" prose literally — that is superseded by the owner's build-on-a-branch,
-  compare-the-end-product model (the phase ORDER is still a sensible build
-  order within the branch; the ship-to-main-per-phase part is not the plan).
+- Read "keep the staged build" as "batch it all into one blob" — the phasing
+  (one phase at a time, don't batch) stays. The ONLY change from the plan's
+  prose is that each phase lands on the testing branch, NOT merged to main
+  individually; main stays the comparison baseline until the end-product
+  head-to-head. Don't merge phases to main as they finish.
 - Start building without an explicit owner go — as of S349 this is parked, not
   green-lit. It is a major effort, not a quick task.
 - Let the plan or its source audit go unrouted again — before S349 neither had

@@ -20,30 +20,35 @@ Direction source: `docs/audits/reviewer-holistic-review-fable-2026-07-08.md`
 (read it first — this plan implements its §3–§5; its §1–§2 carry the rationale
 and the owner-stated constraints that bound every choice here).
 
-## Execution model (owner, S349 — overrides the per-phase shipping guidance below)
+## Execution model (owner, S349 — where the phases land, not how they're staged)
 
-Justin's chosen model (2026-07-08): this is a **major effort to build out in
-full on a dedicated testing branch**, then compare the **finished** reviewer
-finding/identity pipeline **head-to-head against the state-of-the-art on main**
-before any merge decision — not a drip of phase PRs into main. Consequences:
+Justin's chosen model (2026-07-08): **keep the staged, phased build** (P0 → …
+→ P4, one phase at a time, don't batch — probably required, as the plan lays
+out). What changes is only *where the phases land and how success is judged*:
 
-- The phase ORDER below (P0 → … → P4) remains a sensible build order *within*
-  the branch. The "one phase per PR, ship to main, do not batch" instruction in
-  the next section does NOT apply — build the whole thing on the branch.
-- Stand up the eval layers first so the end-product comparison is possible:
-  **P2.1** (frozen identity eval fixtures), **P3.2** (A/B on 2–3 D26-style
-  proposals), **P3.3** (per-channel accept-yield report) are the comparison
-  harness against main.
+- **Phases accumulate on a dedicated testing branch, they are NOT merged to
+  main one at a time.** The redesign is held off main until it is built out in
+  full, so that a whole-pipeline comparison is even possible (if each phase
+  shipped to main, main would just *become* the redesign and there'd be nothing
+  to compare against).
+- **Success = an end-product head-to-head.** The fully-built redesign branch is
+  compared against the current state-of-the-art on **main** — two fully-built
+  pipelines on separate branches — before any merge decision.
+- Stand up the eval layers early so that comparison is measurable, not a vibe
+  check: **P2.1** (frozen identity eval fixtures), **P3.2** (A/B on 2–3
+  D26-style proposals), **P3.3** (per-channel accept-yield report) are the
+  comparison harness against main.
 - All safety invariants and **[OWNER-GATE]** markers still bind on the branch.
 - **Status: PARKED — not green-lit.** Do not start the build without explicit
   owner go. Intent recorded in `.claude-memory/project-reviewer-holistic-redesign-parallel-build.md`.
 
 ## How to use this plan (implementing agent: read this section fully)
 
-- **One phase per session/PR.** Phases are ordered by risk-reduction per unit
-  of work and are independently shippable. Do not batch phases. *(Superseded by
-  the Execution model above — kept because the risk ordering it describes is the
-  branch build order.)*
+- **One phase per session/PR — onto the testing branch, not main.** Phases are
+  ordered by risk-reduction per unit of work and are independently buildable.
+  Do not batch phases. (Per the Execution model above, "PR" means a PR into the
+  redesign testing branch; the phases are not merged to main individually —
+  main stays the comparison baseline until the end-product head-to-head.)
 - **Read before each phase** (non-negotiable): the memory files listed in that
   phase's "Read first" line, plus `.claude-memory/project-reviewer-sourcing-constraints.md`
   and `.claude-memory/project-reviewer-self-report-orcid-sticky-confirmed.md`
