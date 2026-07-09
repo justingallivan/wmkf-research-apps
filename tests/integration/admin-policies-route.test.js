@@ -93,7 +93,7 @@ describe('envelope inventory gap fill (Stage 5 Phase A)', () => {
 });
 
 describe('GET', () => {
-  it('returns both visible slots with active version, history, and a parentEtag', async () => {
+  it('returns all visible slots with active version, history, and a parentEtag', async () => {
     DynamicsService.queryRecords.mockImplementation((entity, opts) => {
       if (entity === 'wmkf_policies') {
         return Promise.resolve({ records: [parentRecord(opts.filter.includes('reviewer-coi') ? 'reviewer-coi' : 'reviewer-ai-use')] });
@@ -106,7 +106,8 @@ describe('GET', () => {
     await handler({ method: 'GET' }, res);
 
     expect(res.statusCode).toBe(200);
-    expect(res.body.slots).toHaveLength(2);
+    expect(res.body.slots).toHaveLength(3); // reviewer-coi, reviewer-ai-use, grantee-waiver
+    expect(res.body.slots.map((s) => s.code)).toContain('grantee-waiver');
     const coi = res.body.slots.find((s) => s.code === 'reviewer-coi');
     expect(coi.parentId).toBe(PARENT_ID);
     expect(coi.parentEtag).toBe('W/"1"');
