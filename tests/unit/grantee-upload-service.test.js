@@ -1,18 +1,24 @@
 /**
- * writeGranteeDeliverables — validate → scan → upload → ETag-PATCH → rollback.
+ * writeGranteeDeliverables — validate → scan → upload → ATOMIC changeset →
+ * cross-store recovery. The two Dataverse PATCHes (akoya_request + deliverable)
+ * commit together via runChangeset with per-op If-Match; SharePoint is outside
+ * the changeset and reconciled in the catch.
  *
  * @jest-environment node
  */
-jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: { updateRecord: jest.fn() } }));
-jest.mock('../../lib/services/grantee-deliverable-record', () => ({ patchDeliverable: jest.fn() }));
+jest.mock('../../lib/dataverse/core/changeset', () => ({ runChangeset: jest.fn() }));
+jest.mock('../../lib/services/grantee-deliverable-record', () => ({
+  getDeliverableForRequest: jest.fn(),
+  GRANTEE_DELIVERABLE_ENTITY_SET: 'wmkf_granteedeliverables',
+}));
 jest.mock('../../lib/services/graph-service', () => ({
   GraphService: { getDriveId: jest.fn(), uploadFile: jest.fn(), deleteFile: jest.fn(), listFiles: jest.fn() },
 }));
 jest.mock('../../lib/services/cloudmersive-scan', () => ({ scanBytes: jest.fn() }));
 jest.mock('../../lib/utils/virus-scan-config', () => ({ isVirusScanEnabled: jest.fn(() => false) }));
 
-import { DynamicsService } from '../../lib/services/dynamics-service';
-import { patchDeliverable } from '../../lib/services/grantee-deliverable-record';
+import { runChangeset } from '../../lib/dataverse/core/changeset';
+import { getDeliverableForRequest } from '../../lib/services/grantee-deliverable-record';
 import { GraphService } from '../../lib/services/graph-service';
 import { scanBytes } from '../../lib/services/cloudmersive-scan';
 import { isVirusScanEnabled } from '../../lib/utils/virus-scan-config';
@@ -29,13 +35,18 @@ const DELIVERABLE = {
   wmkf_imagefileref: null,
   _etag: 'W/"2"',
 };
+const VER = '33333333-3333-3333-3333-333333333333';
 const ABSTRACT = 'The team will measure the thing in a sufficiently long approved abstract sentence.';
 const png = () => Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 const imageFile = (name = 'fig.png') => ({ buffer: png(), filename: name });
+const call = (over = {}) => writeGranteeDeliverables({
+  request: REQ, deliverable: DELIVERABLE, editedAbstract: ABSTRACT, caption: 'A figure.',
+  imageFile: imageFile(), waiverVersionId: VER, ...over,
+});
 
 beforeEach(() => {
-  DynamicsService.updateRecord.mockReset().mockResolvedValue({});
-  patchDeliverable.mockReset().mockResolvedValue({});
+  runChangeset.mockReset().mockResolvedValue({ ok: true, operations: [] });
+  getDeliverableForRequest.mockReset().mockResolvedValue(null);
   GraphService.getDriveId.mockReset().mockResolvedValue('drive-1');
   GraphService.uploadFile.mockReset().mockResolvedValue({ id: 'item-new', name: 'n.png', webUrl: 'https://sp/new.png' });
   GraphService.deleteFile.mockReset().mockResolvedValue();
@@ -44,85 +55,122 @@ beforeEach(() => {
   isVirusScanEnabled.mockReset().mockReturnValue(false);
 });
 
-test('happy path: uploads image + PATCHes all four fields conditionally, status Submitted', async () => {
-  const r = await writeGranteeDeliverables({ request: REQ, deliverable: DELIVERABLE, editedAbstract: ABSTRACT, caption: 'A figure.', imageFile: imageFile() });
+test('happy path: uploads image + one atomic changeset of both PATCHes, per-op If-Match, waiver pinned', async () => {
+  const r = await call();
   expect(r).toEqual({ ok: true });
 
   const upName = GraphService.uploadFile.mock.calls[0][2];
   expect(upName).toMatch(/^1002794_grantee_image_[0-9a-f]{8}\.png$/); // server-controlled, unique
-  expect(GraphService.uploadFile.mock.calls[0][1]).toMatch(/Grantee_Uploads$/);
 
-  const [, , patch, opts] = DynamicsService.updateRecord.mock.calls[0];
-  expect(patch).toEqual({ wmkf_abstractapproved: ABSTRACT });
-  expect(opts).toEqual({ ifMatch: 'W/"1"' });
-  expect(patchDeliverable).toHaveBeenCalledWith(REQ.akoya_requestid, {
-    wmkf_imagecaption: 'A figure.',
-    wmkf_imagefileref: 'https://sp/new.png',
-    wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.SUBMITTED,
-  }, { ifMatch: 'W/"2"' });
+  expect(runChangeset).toHaveBeenCalledTimes(1);
+  const [ops] = runChangeset.mock.calls[0];
+  // request PATCH (abstract) with its ETag
+  expect(ops[0]).toEqual({
+    method: 'PATCH', entitySet: 'akoya_requests', key: REQ.akoya_requestid,
+    body: { wmkf_abstractapproved: ABSTRACT }, ifMatch: 'W/"1"',
+  });
+  // deliverable PATCH with waiver bind + acked timestamp + its ETag
+  expect(ops[1]).toMatchObject({
+    method: 'PATCH', entitySet: 'wmkf_granteedeliverables', key: 'deliv-1', ifMatch: 'W/"2"',
+    body: {
+      wmkf_imagecaption: 'A figure.',
+      wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.SUBMITTED,
+      wmkf_imagefileref: 'https://sp/new.png',
+      'wmkf_WaiverPolicyVersion@odata.bind': `/wmkf_policyversions(${VER})`,
+    },
+  });
+  expect(typeof ops[1].body.wmkf_waiverackedat).toBe('string');
+});
+
+test('missing waiverVersionId → fail closed (policy_misconfigured), no upload/changeset', async () => {
+  const r = await writeGranteeDeliverables({ request: REQ, deliverable: DELIVERABLE, editedAbstract: ABSTRACT, caption: 'c', imageFile: imageFile(), waiverVersionId: undefined });
+  expect(r).toEqual({ ok: false, reason: 'policy_misconfigured', status: 500 });
+  expect(GraphService.uploadFile).not.toHaveBeenCalled();
+  expect(runChangeset).not.toHaveBeenCalled();
 });
 
 test('abstract + caption required', async () => {
-  expect((await writeGranteeDeliverables({ request: REQ, deliverable: DELIVERABLE, editedAbstract: 'short', caption: 'c', imageFile: imageFile() })).reason).toBe('abstract_required');
-  expect((await writeGranteeDeliverables({ request: REQ, deliverable: DELIVERABLE, editedAbstract: ABSTRACT, caption: '', imageFile: imageFile() })).reason).toBe('caption_required');
+  expect((await call({ editedAbstract: 'short' })).reason).toBe('abstract_required');
+  expect((await call({ caption: '' })).reason).toBe('caption_required');
 });
 
-test('image required when none on file; optional when one exists', async () => {
-  expect((await writeGranteeDeliverables({ request: REQ, deliverable: DELIVERABLE, editedAbstract: ABSTRACT, caption: 'c', imageFile: null })).reason).toBe('image_required');
+test('image required when none on file; optional when one exists (PATCH omits ref)', async () => {
+  expect((await call({ imageFile: null })).reason).toBe('image_required');
 
-  // existing image on file → image optional; PATCH omits the ref
   const withImg = { ...DELIVERABLE, wmkf_imagefileref: 'https://sp/old.png' };
-  const r = await writeGranteeDeliverables({ request: REQ, deliverable: withImg, editedAbstract: ABSTRACT, caption: 'c', imageFile: null });
+  const r = await call({ deliverable: withImg, imageFile: null });
   expect(r.ok).toBe(true);
   expect(GraphService.uploadFile).not.toHaveBeenCalled();
-  expect(patchDeliverable.mock.calls[0][1]).not.toHaveProperty('wmkf_imagefileref');
+  const [ops] = runChangeset.mock.calls[0];
+  expect(ops[1].body).not.toHaveProperty('wmkf_imagefileref');
 });
 
 test('rejects an image whose magic bytes mismatch its extension', async () => {
   const fake = { buffer: Buffer.from([0xff, 0xd8, 0xff]), filename: 'fig.png' }; // jpeg bytes, .png name
-  const r = await writeGranteeDeliverables({ request: REQ, deliverable: DELIVERABLE, editedAbstract: ABSTRACT, caption: 'c', imageFile: fake });
+  const r = await call({ imageFile: fake });
   expect(r.reason).toBe('image_invalid');
   expect(GraphService.uploadFile).not.toHaveBeenCalled();
 });
 
 test('rejects an oversized image', async () => {
   const big = { buffer: Buffer.concat([png(), Buffer.alloc(16 * 1024 * 1024)]), filename: 'fig.png' };
-  expect((await writeGranteeDeliverables({ request: REQ, deliverable: DELIVERABLE, editedAbstract: ABSTRACT, caption: 'c', imageFile: big })).reason).toBe('image_too_large');
+  expect((await call({ imageFile: big })).reason).toBe('image_too_large');
 });
 
 test('infected scan → 422, no upload', async () => {
   isVirusScanEnabled.mockReturnValue(true);
   scanBytes.mockResolvedValue({ scan_result: 'infected' });
-  const r = await writeGranteeDeliverables({ request: REQ, deliverable: DELIVERABLE, editedAbstract: ABSTRACT, caption: 'c', imageFile: imageFile() });
+  const r = await call();
   expect(r).toEqual({ ok: false, reason: 'infected', status: 422 });
   expect(GraphService.uploadFile).not.toHaveBeenCalled();
 });
 
-test('no _etag → 503 fail-closed (no PATCH, no upload)', async () => {
-  const r = await writeGranteeDeliverables({ request: { ...REQ, _etag: undefined }, deliverable: DELIVERABLE, editedAbstract: ABSTRACT, caption: 'c', imageFile: imageFile() });
-  expect(r).toEqual({ ok: false, reason: 'no_etag', status: 503 });
+test('no _etag on either row → 503 fail-closed (no changeset, no upload)', async () => {
+  expect(await call({ request: { ...REQ, _etag: undefined } })).toEqual({ ok: false, reason: 'no_etag', status: 503 });
+  expect(await call({ deliverable: { ...DELIVERABLE, _etag: undefined } })).toEqual({ ok: false, reason: 'no_etag', status: 503 });
   expect(GraphService.uploadFile).not.toHaveBeenCalled();
 });
 
-test('PATCH failure rolls back the uploaded image', async () => {
-  patchDeliverable.mockRejectedValue(new Error('boom'));
-  const r = await writeGranteeDeliverables({ request: REQ, deliverable: DELIVERABLE, editedAbstract: ABSTRACT, caption: 'c', imageFile: imageFile() });
-  expect(r).toMatchObject({ ok: false, reason: 'dataverse_failed' });
-  expect(GraphService.deleteFile).toHaveBeenCalledWith('drive-1', 'item-new');
-});
-
-test('SharePoint upload failure → sharepoint_failed, no PATCH', async () => {
+test('SharePoint upload failure → sharepoint_failed, no changeset', async () => {
   GraphService.uploadFile.mockRejectedValue(new Error('graph 500'));
-  const r = await writeGranteeDeliverables({ request: REQ, deliverable: DELIVERABLE, editedAbstract: ABSTRACT, caption: 'c', imageFile: imageFile() });
+  const r = await call();
   expect(r).toMatchObject({ ok: false, reason: 'sharepoint_failed', status: 502 });
-  expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  expect(runChangeset).not.toHaveBeenCalled();
 });
 
-test('412 conflict → rollback + reason conflict (409)', async () => {
-  patchDeliverable.mockRejectedValue(Object.assign(new Error('precondition'), { status: 412 }));
-  const r = await writeGranteeDeliverables({ request: REQ, deliverable: DELIVERABLE, editedAbstract: ABSTRACT, caption: 'c', imageFile: imageFile() });
+test('412 anywhere in the changeset → whole thing rolls back → conflict (409) + upload cleaned up', async () => {
+  runChangeset.mockRejectedValue(Object.assign(new Error('precondition'), { status: 412 }));
+  const r = await call();
   expect(r).toEqual({ ok: false, reason: 'conflict', status: 409 });
   expect(GraphService.deleteFile).toHaveBeenCalledWith('drive-1', 'item-new');
+  expect(getDeliverableForRequest).not.toHaveBeenCalled(); // 412 = nothing committed; no re-read
+});
+
+test('non-412 error with nothing committed → cleans up upload → dataverse_failed', async () => {
+  runChangeset.mockRejectedValue(new Error('batch 500'));
+  getDeliverableForRequest.mockResolvedValue({ wmkf_imagefileref: null, wmkf_deliverablestatus: null });
+  const r = await call();
+  expect(r).toMatchObject({ ok: false, reason: 'dataverse_failed', status: 502 });
+  expect(GraphService.deleteFile).toHaveBeenCalledWith('drive-1', 'item-new');
+});
+
+test('non-412 error but re-read shows it committed (response drop) → success, upload kept', async () => {
+  runChangeset.mockRejectedValue(new Error('socket hang up'));
+  getDeliverableForRequest.mockResolvedValue({
+    wmkf_imagefileref: 'https://sp/new.png',
+    wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.SUBMITTED,
+  });
+  const r = await call();
+  expect(r).toEqual({ ok: true });
+  expect(GraphService.deleteFile).not.toHaveBeenCalledWith('drive-1', 'item-new');
+});
+
+test('non-412 error and re-read FAILS → leave upload in place (never delete a maybe-referenced image)', async () => {
+  runChangeset.mockRejectedValue(new Error('socket hang up'));
+  getDeliverableForRequest.mockRejectedValue(new Error('re-read failed'));
+  const r = await call();
+  expect(r).toMatchObject({ ok: false, reason: 'dataverse_failed', status: 502 });
+  expect(GraphService.deleteFile).not.toHaveBeenCalledWith('drive-1', 'item-new');
 });
 
 test('on replace-success, best-effort prunes the prior (stale) image', async () => {
@@ -132,9 +180,8 @@ test('on replace-success, best-effort prunes the prior (stale) image', async () 
     { id: 'old-1', name: '1002794_grantee_image_oldoldol.jpg' },
     { id: 'item-new', name: '1002794_grantee_image_newnewne.png' },
   ]);
-  const r = await writeGranteeDeliverables({ request: REQ, deliverable: withImg, editedAbstract: ABSTRACT, caption: 'c', imageFile: imageFile() });
+  const r = await call({ deliverable: withImg });
   expect(r.ok).toBe(true);
-  // deletes the stale one, not the new one
   expect(GraphService.deleteFile).toHaveBeenCalledWith('drive-1', 'old-1');
   expect(GraphService.deleteFile).not.toHaveBeenCalledWith('drive-1', 'item-new');
 });

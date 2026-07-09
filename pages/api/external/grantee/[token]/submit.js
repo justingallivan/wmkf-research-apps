@@ -6,11 +6,14 @@
  * parallel grantee variant of the reviewer upload route.
  *
  * Order (fail-fast): method → rate-limit → verify token (aud:'grantee') → record
- * outcome → editable-status guard → parse multipart → writeGranteeDeliverables
- * (validate image magic → scan → upload → ETag-conditional PATCH + rollback).
+ * outcome → editable-status guard → parse multipart → verify waiver render token →
+ * writeGranteeDeliverables (validate image magic → scan → upload → atomic changeset).
  *
- * The publish-image waiver is a client-side submit gate (chunk 4) — nothing about
- * it is sent or persisted; a submitted package IS the consent record.
+ * Publication waiver (as of 2026-07-09): the checkbox is still a client-side submit
+ * gate, but the ACKNOWLEDGED VERSION is now recorded. The client echoes the signed
+ * render token minted by /context; this route verifies it, confirms it was minted
+ * for THIS request, and passes the bound version id to the service, which pins it
+ * on the deliverable row (wmkf_WaiverPolicyVersion + wmkf_waiverackedat).
  */
 
 import Busboy from 'busboy';
@@ -18,7 +21,39 @@ import { verifyGranteeToken } from '../../../../../lib/external/verify-grantee-t
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 import { withDalContext } from '../../../../../lib/dataverse/core/context';
 import { writeGranteeDeliverables, MAX_IMAGE_BYTES } from '../../../../../lib/services/grantee-upload';
+import { verifyWaiverRenderToken } from '../../../../../lib/services/external-token';
+import { WAIVER_SLOT_CODE } from '../../../../../lib/external/grantee-waiver-policy';
+import { isGuid } from '../../../../../lib/utils/guid';
+import NotificationService from '../../../../../lib/services/notification-service';
 import { isGranteeEditableStatus } from '../../../../../shared/config/granteeDeliverableStatus';
+
+/**
+ * Best-effort operator alert when a grantee submit is blocked by a waiver-token
+ * failure that looks suspicious (bad signature/claim, request mismatch, or a
+ * malformed version) rather than plain client staleness. Carries the slot code so
+ * a mis-seed / wrong-env / post-deploy breakage is visible, not silently blocking
+ * grantees. Wrapped in a trusted DAL context so the admin-email path can send.
+ */
+async function alertWaiverBlock({ requestId, detail }) {
+  try {
+    await withDalContext('grantee-waiver-alert', () => NotificationService.notify({
+      type: 'grantee_waiver_block',
+      severity: 'warning',
+      emailAdmins: true,
+      autoResolveKey: `grantee_waiver_block:${WAIVER_SLOT_CODE}`,
+      title: 'Grantee waiver submit blocked (fail-closed)',
+      message:
+        `A grantee submission was blocked because the ${WAIVER_SLOT_CODE} waiver render token `
+        + `failed verification (${detail}). Confirm the slot is seeded + active and the portal `
+        + `deploy matches the seeded environment.`,
+      metadata: { requestId, slotCode: WAIVER_SLOT_CODE, detail },
+      source: 'grantee-waiver',
+      category: 'ops',
+    }));
+  } catch (err) {
+    console.error('[grantee/submit] waiver-block alert failed (non-fatal):', err?.message || err);
+  }
+}
 
 export const config = {
   api: { bodyParser: false }, // busboy needs the raw stream
@@ -67,8 +102,29 @@ export default async function handler(req, res) {
     const caption = parsed.fields.caption || '';
     const imageFile = parsed.files[0] || null;
 
+    // Verify the signed waiver render token → the exact version the grantee saw.
+    // Fail closed: the version id comes from the VERIFIED payload (not raw input),
+    // must be bound to THIS request, and must be a GUID before it reaches the
+    // @odata.bind selector (check:trust-boundary-guid). A plain stale/expired token
+    // just asks the grantee to reload; a suspicious failure also alerts operators.
+    const waiver = await verifyWaiverRenderToken(parsed.fields.waiverToken || '');
+    const waiverOk = waiver.valid
+      && waiver.requestId === verified.requestId
+      && isGuid(waiver.versionId);
+    if (!waiverOk) {
+      const clientStale = !waiver.valid && (waiver.reason === 'expired' || waiver.reason === 'no_token');
+      if (!clientStale) {
+        const detail = waiver.valid ? 'request_mismatch_or_bad_version' : waiver.reason;
+        await alertWaiverBlock({ requestId: verified.requestId, detail });
+      }
+      return res.status(409).json({ ok: false, reason: 'waiver_invalid' });
+    }
+
     const result = await withDalContext('grantee-submit', () =>
-      writeGranteeDeliverables({ request, deliverable, editedAbstract, caption, imageFile }));
+      writeGranteeDeliverables({
+        request, deliverable, editedAbstract, caption, imageFile,
+        waiverVersionId: waiver.versionId,
+      }));
 
     if (!result.ok) {
       // Generic, non-leaky reasons (service already logged specifics server-side).

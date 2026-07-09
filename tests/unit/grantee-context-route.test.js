@@ -17,10 +17,17 @@ jest.mock('../../lib/external/verify-grantee-token', () => ({
 jest.mock('../../lib/services/grantee-document-assembly', () => ({
   assembleGranteeDocument: jest.fn(),
 }));
+jest.mock('../../lib/external/grantee-waiver-policy', () => ({
+  resolveActiveWaiverPolicy: jest.fn(),
+  WAIVER_SLOT_CODE: 'grantee-waiver',
+}));
+jest.mock('../../lib/services/external-token', () => ({ mintWaiverRenderToken: jest.fn() }));
 
 import { checkRateLimit, recordTokenOutcome } from '../../lib/external/rate-limit';
 import { verifyGranteeToken } from '../../lib/external/verify-grantee-token';
 import { assembleGranteeDocument } from '../../lib/services/grantee-document-assembly';
+import { resolveActiveWaiverPolicy } from '../../lib/external/grantee-waiver-policy';
+import { mintWaiverRenderToken } from '../../lib/services/external-token';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 import handler from '../../pages/api/external/grantee/[token]/context';
 
@@ -72,6 +79,11 @@ beforeEach(() => {
   recordTokenOutcome.mockReset().mockResolvedValue(undefined);
   verifyGranteeToken.mockReset();
   assembleGranteeDocument.mockReset().mockResolvedValue(previewModel());
+  resolveActiveWaiverPolicy.mockReset().mockResolvedValue({
+    ok: true,
+    policy: { title: 'Publication Consent Waiver', body: 'Consent body text.', activeVersionId: 'ver-1' },
+  });
+  mintWaiverRenderToken.mockReset().mockResolvedValue('render.token');
 });
 
 test('non-GET → 405', async () => {
@@ -118,6 +130,39 @@ test('editable status (Invited) → editable:true, view:edit', async () => {
   expect(res.body.deliverable.hasImage).toBe(false);
   // raw SharePoint ref must NOT leak to the external client
   expect(res.body.deliverable.imageFileRef).toBeUndefined();
+  // edit view carries the versioned waiver + a signed render token
+  expect(res.body.waiverPolicy).toEqual({ title: 'Publication Consent Waiver', body: 'Consent body text.', versionId: 'ver-1' });
+  expect(res.body.waiverToken).toBe('render.token');
+  expect(mintWaiverRenderToken).toHaveBeenCalledWith(expect.objectContaining({ requestId: 'req-1', versionId: 'ver-1', body: 'Consent body text.' }));
+});
+
+test('FAIL-CLOSED: waiver policy unavailable (transient) on edit view → 503 policy_unavailable, no token', async () => {
+  verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+  resolveActiveWaiverPolicy.mockResolvedValue({ ok: false, reason: 'policy_unavailable' });
+  const res = mockRes();
+  await handler({ method: 'GET', query: { token: 't' }, headers: {} }, res);
+  expect(res.statusCode).toBe(503);
+  expect(res.body).toEqual({ ok: false, reason: 'policy_unavailable' });
+  expect(mintWaiverRenderToken).not.toHaveBeenCalled();
+});
+
+test('FAIL-CLOSED: waiver slot misconfigured on edit view → 500 policy_misconfigured', async () => {
+  verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+  resolveActiveWaiverPolicy.mockResolvedValue({ ok: false, reason: 'policy_misconfigured' });
+  const res = mockRes();
+  await handler({ method: 'GET', query: { token: 't' }, headers: {} }, res);
+  expect(res.statusCode).toBe(500);
+  expect(res.body).toEqual({ ok: false, reason: 'policy_misconfigured' });
+});
+
+test('non-edit (submitted) view does NOT resolve the waiver (no wasted read, no token)', async () => {
+  verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.COMPLETE));
+  const res = mockRes();
+  await handler({ method: 'GET', query: { token: 't' }, headers: {} }, res);
+  expect(res.body.view).toBe('submitted');
+  expect(res.body.waiverPolicy).toBeNull();
+  expect(res.body.waiverToken).toBeNull();
+  expect(resolveActiveWaiverPolicy).not.toHaveBeenCalled();
 });
 
 test('submitted status (Complete) → editable:false, view:submitted', async () => {

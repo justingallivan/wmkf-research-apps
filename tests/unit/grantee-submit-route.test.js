@@ -20,12 +20,18 @@ jest.mock('../../lib/services/grantee-upload', () => ({
   // Small cap so a tiny over-cap file exercises the busboy fileSize limit branch.
   MAX_IMAGE_BYTES: 16,
 }));
+jest.mock('../../lib/services/external-token', () => ({ verifyWaiverRenderToken: jest.fn() }));
+jest.mock('../../lib/services/notification-service', () => ({ __esModule: true, default: { notify: jest.fn() } }));
 
 import { checkRateLimit, recordTokenOutcome } from '../../lib/external/rate-limit';
 import { verifyGranteeToken } from '../../lib/external/verify-grantee-token';
 import { writeGranteeDeliverables } from '../../lib/services/grantee-upload';
+import { verifyWaiverRenderToken } from '../../lib/services/external-token';
+import NotificationService from '../../lib/services/notification-service';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 import handler from '../../pages/api/external/grantee/[token]/submit';
+
+const VER = '33333333-3333-3333-3333-333333333333';
 
 function mockRes() {
   const res = { statusCode: 200, headers: {}, body: null };
@@ -75,6 +81,9 @@ beforeEach(() => {
   recordTokenOutcome.mockReset().mockResolvedValue(undefined);
   verifyGranteeToken.mockReset();
   writeGranteeDeliverables.mockReset().mockResolvedValue({ ok: true });
+  // Default: a valid render token bound to this request (r1) with a GUID version.
+  verifyWaiverRenderToken.mockReset().mockResolvedValue({ valid: true, requestId: 'r1', versionId: VER, bodyHash: 'h' });
+  NotificationService.notify.mockReset().mockResolvedValue({});
 });
 
 test('non-POST → 405', async () => {
@@ -129,7 +138,7 @@ test('happy path: parses multipart, calls service, returns 200', async () => {
   verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
   const res = mockRes();
   await handler(multipartReq({
-    fields: { editedAbstract: 'the approved abstract text', caption: 'A figure.' },
+    fields: { editedAbstract: 'the approved abstract text', caption: 'A figure.', waiverToken: 'signed.tok' },
     file: { filename: 'fig.png', buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]) },
   }), res);
 
@@ -142,6 +151,49 @@ test('happy path: parses multipart, calls service, returns 200', async () => {
   expect(Buffer.isBuffer(arg.imageFile.buffer)).toBe(true);
   expect(arg.request.akoya_requestid).toBe('r1');
   expect(arg.deliverable.wmkf_granteedeliverableid).toBe('d1');
+  // The server-resolved (verified) version id is passed through to the service.
+  expect(arg.waiverVersionId).toBe(VER);
+});
+
+test('missing/expired render token (client stale) → 409 waiver_invalid, service NOT called, no alert', async () => {
+  verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+  verifyWaiverRenderToken.mockResolvedValue({ valid: false, reason: 'expired' });
+  const res = mockRes();
+  await handler(multipartReq({
+    fields: { editedAbstract: 'x', caption: 'c', waiverToken: 'stale' },
+    file: { filename: 'fig.png', buffer: Buffer.from([0x89, 0x50]) },
+  }), res);
+  expect(res.statusCode).toBe(409);
+  expect(res.body.reason).toBe('waiver_invalid');
+  expect(writeGranteeDeliverables).not.toHaveBeenCalled();
+  expect(NotificationService.notify).not.toHaveBeenCalled(); // plain staleness is not alert-worthy
+});
+
+test('render token for a DIFFERENT request → 409 + operator alert (suspicious), service NOT called', async () => {
+  verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+  verifyWaiverRenderToken.mockResolvedValue({ valid: true, requestId: 'SOMEONE_ELSE', versionId: VER });
+  const res = mockRes();
+  await handler(multipartReq({
+    fields: { editedAbstract: 'x', caption: 'c', waiverToken: 'foreign' },
+    file: { filename: 'fig.png', buffer: Buffer.from([0x89, 0x50]) },
+  }), res);
+  expect(res.statusCode).toBe(409);
+  expect(res.body.reason).toBe('waiver_invalid');
+  expect(writeGranteeDeliverables).not.toHaveBeenCalled();
+  expect(NotificationService.notify).toHaveBeenCalledTimes(1);
+});
+
+test('render token version is not a GUID → 409 + alert (defensive; would be a bad selector)', async () => {
+  verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+  verifyWaiverRenderToken.mockResolvedValue({ valid: true, requestId: 'r1', versionId: "not-a-guid') or 1=1--" });
+  const res = mockRes();
+  await handler(multipartReq({
+    fields: { editedAbstract: 'x', caption: 'c', waiverToken: 'x' },
+    file: { filename: 'fig.png', buffer: Buffer.from([0x89, 0x50]) },
+  }), res);
+  expect(res.statusCode).toBe(409);
+  expect(writeGranteeDeliverables).not.toHaveBeenCalled();
+  expect(NotificationService.notify).toHaveBeenCalledTimes(1);
 });
 
 test('busboy FILE_TOO_LARGE → 400 image_too_large, service not called', async () => {
@@ -175,7 +227,7 @@ test('maps a service failure status/reason through (e.g. image_invalid 400)', as
   writeGranteeDeliverables.mockResolvedValue({ ok: false, reason: 'image_invalid', status: 400 });
   const res = mockRes();
   await handler(multipartReq({
-    fields: { editedAbstract: 'x', caption: 'c' },
+    fields: { editedAbstract: 'x', caption: 'c', waiverToken: 'signed.tok' },
     file: { filename: 'fig.png', buffer: Buffer.from([0x89, 0x50]) },
   }), res);
   expect(res.statusCode).toBe(400);
