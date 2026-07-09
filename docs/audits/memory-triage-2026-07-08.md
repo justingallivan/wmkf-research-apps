@@ -98,13 +98,19 @@ plus the status corrections above.
 
 ## Cross-cutting findings (NOT memory fixes — surfaced for follow-up)
 
-1. **`lib/dataverse/adapters/researcher.js` stale code comments** assert "the
-   resolver never emits 'confirmed'" (~lines 227, 269), but
-   `lib/services/reviewer-identity-resolver.js:261,279` DO return
-   `status: 'confirmed'`. Live comment/behavior mismatch on a safety-sensitive
-   identity path — a real code cleanup item (per `project-reviewer-self-report-orcid-sticky-confirmed`).
-2. **`docs/STRATEGY.md` says "17 purpose-built tools"** while `appRegistry.js` /
-   `CANONICAL_COUNTS.md` = 12 app definitions. Doc drift, out of memory scope.
+1. **`lib/dataverse/adapters/researcher.js` stale code comments** asserted "the
+   resolver never emits 'confirmed'", but `lib/services/reviewer-identity-resolver.js:261,279`
+   DO return `status: 'confirmed'` (automated spine). **ADDRESSED S348:** corrected both
+   `writeIdentityDecision`/`clearIdentityFields` comments to be truthful and to point at the
+   open reconciliation question — WITHOUT changing behavior. **Still open for the owner:**
+   whether the spine's automated `confirmed` should be downgraded to `probable` (or the
+   sentinel model changed), since an automated `confirmed` now inherits the same sticky,
+   un-downgradeable protection designed for human attestations. See
+   `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` §14.
+2. **`docs/STRATEGY.md` said "17 purpose-built tools"** while `appRegistry.js` /
+   `CANONICAL_COUNTS.md` = 12 app definitions (reviewer-finder + review-manager consolidated;
+   4 PDF apps sunset S344). **ADDRESSED S348:** changed to "a dozen purpose-built tools"
+   (drift-proof narrative phrasing).
 3. **Intake memberships-admin surface / institution-search typeahead** described as
    "ongoing pilot work" in two intake memories, but no `pages/apply/admin/memberships`
    route or fuzzy-match UI found in the tree. Confirm build status or requeue.

@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: S218 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-08 (S348) — discrepancy re-confirmed live (resolver emits 'confirmed' at reviewer-identity-resolver.js:261,279); researcher.js comments corrected to match; sticky-skip + fail-closed reads unchanged. Design reconciliation (downgrade spine 'confirmed'?) STILL OPEN.
 ---
 
 ## Recall Rule

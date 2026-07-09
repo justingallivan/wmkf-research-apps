@@ -34,7 +34,7 @@ Six systems support WMKF's grant workflow:
 
 5. **SharePoint** — Cloud document storage. Two primary areas: the AkoyaGO site (where AkoyaGO stores documents, not meant for direct user access) and the WMKF site (shared staff documents with multiple sub-sites).
 
-6. **Vercel App Suite** (this project) — 17 purpose-built tools that summarize proposals, find reviewers, screen applicant integrity, explore CRM data, and more. Originally standalone, now with expanding connections to the other systems. The applicant intake portal (`/apply/*`) is being built for the **next cycle's Phase I intake** — a single applicant submission entered as Phase I (the earlier "mid-June 2026 Phase II Research pilot" framing is superseded; see `docs/SYSTEM_MODEL.md`).
+6. **Vercel App Suite** (this project) — a dozen purpose-built tools that summarize proposals, find reviewers, screen applicant integrity, explore CRM data, and more. Originally standalone, now with expanding connections to the other systems. The applicant intake portal (`/apply/*`) is being built for the **next cycle's Phase I intake** — a single applicant submission entered as Phase I (the earlier "mid-June 2026 Phase II Research pilot" framing is superseded; see `docs/SYSTEM_MODEL.md`).
 
 ---
 
