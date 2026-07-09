@@ -3,7 +3,7 @@ title: "Reviewer Accept Fast Response Design"
 domain: reviewer-workbench
 kind: spec
 status: active
-summary: "Design for making reviewer Stage 2a accept return quickly without losing required address, identity, email, quota, or alert side effects."
+summary: "SHIPPED as the reviewer_acceptance_jobs queue + drain: reviewer Stage 2a accept returns fast, post-accept side effects run durably."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -16,6 +16,35 @@ related:
 ---
 
 # Reviewer Accept Fast Response Design
+
+## Status: Shipped
+
+This design is **built and live**. The sections below are retained as the design
+of record; they describe the shipped architecture, with these deltas between the
+original proposal and what landed:
+
+- **Table name:** shipped as **`reviewer_acceptance_jobs`**
+  (`lib/db/migrations/024_reviewer_acceptance_jobs.sql`), not the proposed
+  `reviewer_accept_followup_jobs`. Shape and intent match the design.
+- **Insert-before-PATCH (stricter variant) was chosen.** The job is enqueued as
+  `accept_pending` *before* the accept PATCH, then marked `queued` after the PATCH
+  succeeds; a 412 conflict cancels the staged job. This is the stricter option
+  raised in "Recommended Design" / Open Question, and it closes the
+  "accepted but no job" hole. See `lib/services/external-review/respond-service.js`
+  (the `DRAIN CONTRACT` comment locks the `accept_pending → queued` handshake).
+- **Durable drain worker:** `lib/services/reviewer-acceptance-drain.js`
+  (`processReviewerAcceptanceJob`) runs honorarium capture, ORCID capture, board
+  identity, contact name/title sync, email + affiliation mismatch alerts,
+  once-only acceptance confirmation email, and quota check — idempotently, with
+  lease tokens and per-step completion markers. Job store:
+  `lib/services/reviewer-acceptance-job-service.js`. Cron entry:
+  `pages/api/cron/drain-reviewer-acceptances.js`.
+- **Client transition (optional part) NOT adopted.** `Stage2aView` still awaits a
+  fresh `/context` after `/respond` (`pages/external/review/[token].js`
+  `onResponseSubmitted`) rather than transitioning purely from the `/respond`
+  JSON. This was labeled optional in "Client Transition"; the core latency win is
+  realized server-side because the slow post-accept tail now runs in the drain, so
+  the follow-up `/context` read is cheap.
 
 ## Audience
 

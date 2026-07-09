@@ -1,9 +1,9 @@
 ---
 name: project-spec-audit-docs-recovery-parked
-description: Codex codex/spec-audit design docs exist ONLY on the work computer (unpushed); recover after ~2026-07-08, do not re-search local/origin
+description: RESOLVED 2026-07-09 (S350) — the two codex/spec-audit design docs were cherry-picked to main (1420d79c); recovery is done, do not re-search work computer
 metadata:
   type: project
-status: active
+status: closed
 ---
 
 The `codex/spec-audit` branch (commit was cited as `370f3867` in the S318 handoff)
@@ -29,15 +29,19 @@ unbuilt plan (recover for the rationale). The user re-sighted commit `370f3867` 
 computer 2026-07-08 and confirmed it is still **unpushed** (re-verified absent here:
 `git cat-file -t 370f3867` fails; not on origin, not in any dangling commit).
 
-**Recovery — ONE command on the work computer** (the hash is known, so no branch hunt):
-```bash
-git push origin 370f3867:refs/heads/codex/spec-audit
-```
-(If that hash errors, fall back: `git branch -a | grep spec-audit` /
-`git fsck --full | grep 'dangling commit'` then push the found hash.)
+**RESOLVED 2026-07-09 (S350).** The user cherry-picked both docs to `main` from the
+work computer — commit `1420d79c` "Add reviewer accept-fast-response + quota PD-email
+design docs". `REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md` and `REVIEWER_QUOTA_PD_EMAIL_PLAN.md`
+are now present in `docs/`. Recovery is done; do NOT re-search the work computer or push
+`370f3867`.
 
-Once pushed, fetch here, review, and `git merge --no-ff codex/spec-audit` (docs-only,
-low-risk). Do NOT reconstruct the docs from scratch and do NOT re-run the local search
-before the branch is pushed. See [[feedback-dont-resurface-parked-items]] and
-[[feedback-commit-before-delegating-to-worktree-agent]] (the near-miss: unpushed
-worktree commits are recoverable only from the machine that made them).
+Post-recovery reconcile (S350): `REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md` was verified
+against live source and confirmed **shipped** (reviewer_acceptance_jobs queue + drain;
+built with the stricter insert-before-PATCH variant; optional client-only transition NOT
+adopted). Its frontmatter stays `status: active` with a "Status: Shipped" reconciliation
+block recording the deltas. `REVIEWER_QUOTA_PD_EMAIL_PLAN.md` was recovered but NOT yet
+verified built-vs-plan — treat its build status as unconfirmed until checked.
+
+Lesson retained: unpushed worktree commits are recoverable only from the machine that made
+them. See [[feedback-dont-resurface-parked-items]] and
+[[feedback-commit-before-delegating-to-worktree-agent]].

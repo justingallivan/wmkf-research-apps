@@ -276,7 +276,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md](REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md) | spec | active |  | Design for making reviewer Stage 2a accept return quickly without losing required address, identity, email, quota, or alert side effects. | 2026-07-02 |
+| [REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md](REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md) | spec | active |  | SHIPPED as the reviewer_acceptance_jobs queue + drain: reviewer Stage 2a accept returns fast, post-accept side effects run durably. | 2026-07-02 |
 | [REVIEWER_ANALYZE_CONTRACT_SPEC.md](REVIEWER_ANALYZE_CONTRACT_SPEC.md) | source-of-truth | canonical | yes | REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md §4.4/§5/§7. Labels: [VERIFIED] (read from source this session), [PROPOSED], [OPEN] (decide with reviewer). | 2026-07-02 |
 | [REVIEWER_ARCHITECTURE.md](REVIEWER_ARCHITECTURE.md) | spec | active |  | Plus, when a potential reviewer is first invited:. | 2026-07-02 |
 | [REVIEWER_BILL_HARDENING_FINDINGS.md](REVIEWER_BILL_HARDENING_FINDINGS.md) | audit | historical |  | - contactEdits validation (was P3): respond.js now bounds each field's length + checks email shape, returning a clean 400 instead of a Dataverse 500. | 2026-07-02 |
