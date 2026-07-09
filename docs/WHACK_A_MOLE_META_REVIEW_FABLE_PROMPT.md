@@ -108,7 +108,10 @@ Structural amplifier evidence (for Amplifiers A/B above):
 
 ## Deliverable
 
-Write to `outputs/whack-a-mole-meta-review-fable-findings.md` (gitignored).
+Write to `docs/audits/whack-a-mole-meta-review-fable-2026-07-08.md` — a TRACKED
+path (mirrors where the reviewer holistic review landed), so the findings
+return to the repo via git with no copy-paste step. Commit it at the end of
+your session (or the owner will).
 Structure suggestion (adapt freely):
 1. Verdict on the framing (is the audit's meta-pattern right? what's missing?).
 2. Prioritized structural/process changes — each with: the class it closes,
@@ -121,5 +124,6 @@ Structure suggestion (adapt freely):
 
 Run in a NEW top-level `claude-fable-5` session. `git pull` first. Do NOT run
 `/start` or `/stop` (skips the gate battery; keeps our session narrative out of
-your fresh read). Bring the findings back to a Claude working session to decide
-and reconcile into the backlog + memory.
+your fresh read). Commit the findings doc (the tracked path above) at the end
+so a later Claude working session reads it directly, decides, and reconciles
+into the backlog + memory.

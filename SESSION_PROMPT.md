@@ -75,7 +75,8 @@ disambiguation.
    Evidence: `docs/WHACK_A_MOLE_META_REVIEW_FABLE_PROMPT.md`; anchored on
    `docs/audits/whack-a-mole-audit-2026-07-08.md`. Same mechanics as #1 (new `claude-fable-5`
    session, `git pull`, "Read and execute …", no `/start` or `/stop`); writes to
-   `outputs/whack-a-mole-meta-review-fable-findings.md` (gitignored). **Run this FIRST** — it
+   `docs/audits/whack-a-mole-meta-review-fable-2026-07-08.md` (tracked — commit it so it
+   returns via git). **Run this FIRST** — it
    scopes the codebase-wide "prevent the class" changes and may reprioritize the fixes below.
 
 ### Whack-a-mole remediation (S349 audit — full tiered to-do in `docs/audits/whack-a-mole-audit-2026-07-08.md`)
