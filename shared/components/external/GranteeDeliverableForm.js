@@ -203,7 +203,15 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
 
       {error && <p role="alert" style={{ color: '#b00' }}>{error}</p>}
 
-      <button type="submit" disabled={!canSubmit} style={{ marginTop: '1rem' }}>
+      {/* Prominent primary submit, matching the suite's primary buttons (e.g. the
+          reviewer Stage 2a "Accept and continue"). Gated by `canSubmit`: abstract +
+          caption filled, an image present, the waiver acknowledged, and the signed
+          waiverToken — disabled state is visually distinct (greyed, not-allowed). */}
+      <button
+        type="submit"
+        disabled={!canSubmit}
+        className="mt-4 w-full sm:w-auto px-6 py-3 text-sm font-semibold rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed"
+      >
         {submitting ? 'Submitting…' : 'Submit'}
       </button>
 
