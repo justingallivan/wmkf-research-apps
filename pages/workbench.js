@@ -276,6 +276,7 @@ function WorkbenchDashboard() {
                       </div>
                       {p.institution && <div className="text-sm text-gray-700 mt-1 truncate">{p.institution}</div>}
                       {p.projectLeader && <div className="text-xs text-gray-500 mt-0.5">PI: {p.projectLeader}</div>}
+                      {p.programDirector && <div className="text-xs text-gray-500 mt-0.5">PD: {p.programDirector}</div>}
                     </div>
                     <div className="text-right shrink-0">
                       <StageChip stage={p.workRemaining} />
