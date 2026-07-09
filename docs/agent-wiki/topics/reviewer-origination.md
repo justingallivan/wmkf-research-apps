@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-02
+last_verified: 2026-07-08
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -65,6 +65,14 @@ the *grounded* arm, not Claude (origination probe, 1002878: every plant-virologi
 candidate was grounded-arm only). The pipeline's weak link is downstream identity
 resolution (see the namesake-collision worked example in `reviewer-identity.md`), not
 origination.
+
+**Owner-stated sourcing constraints (2026-07-08, S349 — see
+`.claude-memory/project-reviewer-sourcing-constraints.md`):** applicant-suggested
+reviewers are capped ~1/panel in practice (undue influence); no reviewer has been
+re-used in ~4 years (field breadth, welcome-preservation, sparse data). So the
+Claude-assisted engine fills nearly every panel seat, referral capture is the only
+scalable human channel, and roster-reuse/applicant-recs-first designs are dead ends.
+Holistic-review analysis: `docs/audits/reviewer-holistic-review-fable-2026-07-08.md`.
 
 **Current posture:**
 - Keep Claude as the origination engine — recall-oriented, human-curated.
