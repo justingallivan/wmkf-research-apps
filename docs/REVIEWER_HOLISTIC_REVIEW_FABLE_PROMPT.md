@@ -137,7 +137,7 @@ reasons — judge whether the *pattern* of how we reason is itself the problem. 
   empirical signal), `docs/REVIEWER_ARCHITECTURE.md`, `docs/REVIEWER_DATA_MODEL.md`.
 - Code: `lib/services/discovery-service.js` (facade) and `lib/services/discovery/`
   (`match-signals.js`, `ranking.js`, `name-matching.js`, `affiliation.js`,
-  `publications.js`, `literature-search.js`, `coauthor-coi.js`, `provenance.js`);
+  `publications.js`, `literature-search.js`, `coauthor-coi.js`, `provenance.js`); <!-- drain-table:ignore reason=code-module -->
   `lib/services/reviewer-finder/save-candidates-service.js`;
   `lib/services/contact-enrichment/`, `lib/services/openalex-service.js`,
   `lib/services/serp-contact-service.js`.
