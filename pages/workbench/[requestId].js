@@ -146,6 +146,12 @@ function WorkbenchRequest() {
         />
       ) : activeTab === 'reviewers' ? (
         <ReviewersTab
+          // Key by requestId so the whole subtree remounts on request
+          // navigation (matches AwardeeTab below). Without this, the reused
+          // instance + its children (ReviewerFindPanel's proposal/applicant
+          // loaders) can leak a prior request's data into the new one via
+          // in-flight fetches; a fresh mount starts clean.
+          key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
           context={ctx}
           canManage={canManage}
