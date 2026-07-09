@@ -60,7 +60,8 @@
 - Strategy / system model / roadmap / phasing / Virtual Review Panel: ../docs/agent-wiki/topics/strategy-roadmap.md
 - Proposal docs / phasing / Phase I-II: project-j27-doc-capture-evolution.md; project-grant-phasing-evolution.md; project-phaseistatus-decision-lifecycle.md
 - Grantee and email templates: project-grantee-deliverable-email-voice.md; project-email-template-token-syntax.md
-- Grantee publication waiver (versioned, staff-editable in admin Policies; SHIPPED S350): project-grantee-waiver-versioning.md; ../docs/GRANTEE_WAIVER_VERSIONING_PLAN.md
+- Grantee publication waiver (versioned, staff-editable in admin Policies; SHIPPED S350; ack modal S351): project-grantee-waiver-versioning.md; ../docs/GRANTEE_WAIVER_VERSIONING_PLAN.md
+- Reviewer ack provenance parity (MINOR follow-up S351 — reviewer COI/AI-use acks lack body-hash + bind version at-submit, not render): project-reviewer-ack-provenance-parity-followup.md
 - Deferred cleanup / dead-code session: project-deferred-code-cleanup.md
 - Whack-a-mole / accumulated patch-debt / redesign candidates (S349 audit; Fable meta-review DONE 2026-07-08): execute from ../docs/WHACK_A_MOLE_REMEDIATION_PLAN.md; findings: ../docs/audits/whack-a-mole-meta-review-fable-2026-07-08.md; original audit: ../docs/audits/whack-a-mole-audit-2026-07-08.md
 - Parked: project-wide prompt-caching audit (Anthropic flagged low cache-hit rate, S339): project-cache-hit-rate-review.md
