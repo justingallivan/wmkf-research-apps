@@ -41,6 +41,7 @@
     "check:doc-currency:self-test": "node scripts/check-doc-currency-self-test.js",
     "check:memory-drift": "node scripts/check-memory-drift.js",
     "check:memory-drift:no-write": "node scripts/check-memory-drift.js --no-write",
+    "check:memory-health": "node scripts/check-memory-health.js",
     "check:fact-consistency": "node scripts/check-fact-consistency.js",
     "check:fact-consistency:self-test": "node scripts/check-fact-consistency-self-test.js",
     "check:canonical-pointers": "node scripts/check-canonical-pointers.js",
