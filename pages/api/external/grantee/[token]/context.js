@@ -137,7 +137,7 @@ export default async function handler(req, res) {
         return res.status(httpStatus).json({ ok: false, reason: resolved.reason });
       }
       const { policy } = resolved;
-      waiverPolicy = { title: policy.title, body: policy.body, versionId: policy.activeVersionId };
+      waiverPolicy = { title: policy.title, body: policy.body, versionId: policy.activeVersionId, versionLabel: policy.versionLabel };
       // 30-day render token — generous enough that a slow grantee editing session
       // never expires; re-minted on every context load, and version-bound so it
       // records what was shown even after a later staff republish.

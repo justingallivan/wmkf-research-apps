@@ -15,13 +15,15 @@
  */
 
 import { useState } from 'react';
+import PolicyAckModal from './PolicyAckModal';
 
 // Publication-consent waiver wording. As of 2026-07-09 the LIVE text comes from
-// the versioned `grantee-waiver` policy (rendered from `waiverPolicy.body`); this
-// constant is only a last-resort fallback if the policy body is somehow absent
-// (the context route fails closed, so on the edit view it normally isn't). The
-// waiver remains a CLIENT-SIDE submit gate — the checkbox is never sent; the
-// server records the acknowledged version (bound in `waiverToken`).
+// the versioned `grantee-waiver` policy (shown in the acknowledgment modal from
+// `waiverPolicy.body`); this constant is only a last-resort fallback if the
+// policy body is somehow absent (the context route fails closed, so on the edit
+// view it normally isn't). The waiver remains a CLIENT-SIDE submit gate — the
+// acknowledgment is never sent; the server records the acknowledged version
+// (bound in `waiverToken`).
 const WAIVER_LABEL =
   "By submitting, I give the W. M. Keck Foundation permission to publish the abstract, project title, my name and institution, and the image and caption I provide here in materials announcing this award, in print and online. I further confirm that I have the right to share the image I've uploaded.";
 
@@ -51,7 +53,8 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
   const [abstract, setAbstract] = useState(init.abstractApproved || init.abstractFormatted || '');
   const [caption, setCaption] = useState(init.caption || '');
   const [imageFile, setImageFile] = useState(null);
-  const [waiver, setWaiver] = useState(false);
+  const [waiverAcknowledged, setWaiverAcknowledged] = useState(false);
+  const [waiverModalOpen, setWaiverModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [done, setDone] = useState(false);
@@ -61,9 +64,16 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
   // The versioned waiver text + its binding token must be present to submit. The
   // context route fails closed, so on the edit view these are normally set; this
   // is a defensive gate against a partial payload.
-  const waiverText = waiverPolicy?.body || WAIVER_LABEL;
+  // The versioned waiver shown in the acknowledgment modal. Title/body/version
+  // come from the `grantee-waiver` policy; WAIVER_LABEL is the last-resort body
+  // fallback (context fails closed, so on the edit view the policy is present).
+  const waiverModalPolicy = {
+    title: waiverPolicy?.title || 'Publication consent',
+    body: waiverPolicy?.body || WAIVER_LABEL,
+    versionLabel: waiverPolicy?.versionLabel || '—',
+  };
   const canSubmit =
-    waiver &&
+    waiverAcknowledged &&
     Boolean(waiverToken) &&
     abstract.trim().length > 0 &&
     caption.trim().length > 0 &&
@@ -156,16 +166,55 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
         />
       </label>
 
-      <label style={{ display: 'block', marginTop: '1rem' }}>
-        <input type="checkbox" checked={waiver} onChange={(e) => setWaiver(e.target.checked)} />{' '}
-        {waiverText}
-      </label>
+      {/* Publication-consent waiver — read + acknowledge in a modal (mirrors the
+          reviewer policy-acknowledgment UX). The acknowledgment is the client-side
+          submit gate; the signed waiverToken (echoed on submit) is what records
+          the acknowledged version server-side. */}
+      <div style={{ marginTop: '1rem' }}>
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 flex items-center justify-between gap-3">
+          <div>
+            <h4 className="text-sm font-semibold text-gray-900">{waiverModalPolicy.title}</h4>
+            {waiverAcknowledged ? (
+              <p className="text-xs text-green-700 mt-1">
+                ✓ Acknowledged · v{waiverModalPolicy.versionLabel}{' '}
+                <button
+                  type="button"
+                  onClick={() => setWaiverModalOpen(true)}
+                  className="ml-2 text-xs text-gray-500 underline hover:text-gray-700"
+                >
+                  View again
+                </button>
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500 mt-1">Read and acknowledge to submit.</p>
+            )}
+          </div>
+          {!waiverAcknowledged && (
+            <button
+              type="button"
+              onClick={() => setWaiverModalOpen(true)}
+              className="flex-shrink-0 px-3 py-1.5 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+            >
+              Read waiver →
+            </button>
+          )}
+        </div>
+      </div>
 
       {error && <p role="alert" style={{ color: '#b00' }}>{error}</p>}
 
       <button type="submit" disabled={!canSubmit} style={{ marginTop: '1rem' }}>
         {submitting ? 'Submitting…' : 'Submit'}
       </button>
+
+      {waiverModalOpen && (
+        <PolicyAckModal
+          policy={waiverModalPolicy}
+          isAcknowledged={waiverAcknowledged}
+          onAcknowledge={() => { setWaiverAcknowledged(true); setWaiverModalOpen(false); }}
+          onClose={() => setWaiverModalOpen(false)}
+        />
+      )}
     </form>
   );
 }
