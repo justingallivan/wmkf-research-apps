@@ -16,6 +16,22 @@ related:
 
 # Grantee Publication Waiver Versioning Plan
 
+## Implementation status — IMPLEMENTED IN CODE 2026-07-09 (S350)
+
+All code, tests, and doc reconciliation are committed to `main` (stages A–D:
+`9b327651`, `ec46676e`, `e0cbbb56`, `ebbe0e4c`, + suite fix `8b70fadd`); full suite
+green (5224). The proposed artifacts below now EXIST and match this plan
+— re-checked this session:
+- [RECHECKED after scripts/seed-grantee-waiver-policy.mjs change: built as described in §2; body = current WAIVER_LABEL verbatim]
+- [RECHECKED after lib/services/admin/policies-service.js change: `grantee-waiver` added to `VISIBLE_SLOT_CODES` per §3]
+- [RECHECKED after lib/external/grantee-waiver-policy.js change: `resolveActiveWaiverPolicy` fail-closed classifier built per §5]
+- [RECHECKED after lib/services/grantee-upload.js change: atomic changeset + cross-store recovery built per §4b]
+
+**NOT yet run (gated on owner go):** the prod Dataverse steps — `apply-dataverse-schema
+--wave=12-grantee-waiver-consent --execute`, `seed-grantee-waiver-policy.mjs`, and the
+`probe-grantee-waiver-slot.mjs` gate — MUST run before/with the production deploy
+because the portal fails closed on an unseeded slot (§5 rollout ordering).
+
 ## Goal
 
 Today the grantee publication-consent waiver is a hardcoded frontend constant
