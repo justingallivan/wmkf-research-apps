@@ -61,7 +61,7 @@
 - Proposal docs / phasing / Phase I-II: project-j27-doc-capture-evolution.md; project-grant-phasing-evolution.md; project-phaseistatus-decision-lifecycle.md
 - Grantee and email templates: project-grantee-deliverable-email-voice.md; project-email-template-token-syntax.md
 - Deferred cleanup / dead-code session: project-deferred-code-cleanup.md
-- Whack-a-mole / accumulated patch-debt / redesign candidates (S349 audit; ranked areas + tiered remediation to-do): ../docs/audits/whack-a-mole-audit-2026-07-08.md; meta-review to dispatch: ../docs/WHACK_A_MOLE_META_REVIEW_FABLE_PROMPT.md
+- Whack-a-mole / accumulated patch-debt / redesign candidates (S349 audit; Fable meta-review DONE 2026-07-08): execute from ../docs/WHACK_A_MOLE_REMEDIATION_PLAN.md; findings: ../docs/audits/whack-a-mole-meta-review-fable-2026-07-08.md; original audit: ../docs/audits/whack-a-mole-audit-2026-07-08.md
 - Parked: project-wide prompt-caching audit (Anthropic flagged low cache-hit rate, S339): project-cache-hit-rate-review.md
 - Parked: spec-audit design-docs recovery (work computer, ~2026-07-08): project-spec-audit-docs-recovery-parked.md
 - Private-repo CI (why CodeQL gone, Semgrep split, Pro needed for branch protection): project-private-repo-ci-visibility.md

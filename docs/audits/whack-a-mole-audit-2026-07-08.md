@@ -75,6 +75,12 @@ areas are tracked THERE; they are not duplicated below.
 
 ## Remediation to-do
 
+> **Superseded for execution (2026-07-08, same day):** the Fable meta-review
+> (`docs/audits/whack-a-mole-meta-review-fable-2026-07-08.md`) reprioritized
+> this list, and `docs/WHACK_A_MOLE_REMEDIATION_PLAN.md` is the executable,
+> code-verified plan (owner-scoped: all seven items, full rename build). Work
+> from the plan; the tiers below are the original draft kept for history.
+
 ### Next-up (bounded, high-confidence — pull from these first; ~2–3 sessions of work)
 
 1. **Carryover-freshness gate (#9).** The only recurring class with no

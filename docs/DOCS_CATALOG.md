@@ -121,6 +121,7 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [WHACK_A_MOLE_META_REVIEW_FABLE_PROMPT.md](WHACK_A_MOLE_META_REVIEW_FABLE_PROMPT.md) | draft | draft |  | Fresh-eyes Fable prompt: given the S349 whack-a-mole audit, propose codebase-wide structural + process changes that prevent the patch-then-re-patch class. | 2026-07-08 |
+| [WHACK_A_MOLE_REMEDIATION_PLAN.md](WHACK_A_MOLE_REMEDIATION_PLAN.md) | plan | active |  | Executable, code-verified plan for the seven meta-review items — stamp registry, fixture evals, invariant sweep, carryover probes, axis check, rename, checkJs. | 2026-07-08 |
 
 ## finance-honoraria
 

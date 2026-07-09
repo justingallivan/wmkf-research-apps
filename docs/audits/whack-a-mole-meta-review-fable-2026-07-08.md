@@ -90,6 +90,10 @@ optional, the decomposition queue is working without it.
 
 ---
 
+> **Execution plan (added same day):** `docs/WHACK_A_MOLE_REMEDIATION_PLAN.md`
+> turns the seven items below into code-verified workstreams (owner-scoped
+> 2026-07-08: all seven, nomenclature rename as a full build).
+
 ## 2. The prioritized list
 
 | # | Change | Class it closes | Cost | Closes by construction? |
