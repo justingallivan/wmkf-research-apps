@@ -23,6 +23,7 @@ Identity:
 
 Lookup:
 - `wmkf_Request` / `_wmkf_request_value` → `akoya_request` (ApplicationRequired).
+- `wmkf_WaiverPolicyVersion` / `_wmkf_waiverpolicyversion_value` → `wmkf_policyversion` (N:1, Restrict, optional). The exact publication-waiver version the grantee acknowledged at submit. Added 2026-07-09 by the `wave12-grantee-waiver-consent` schema wave. Parent slot `grantee-waiver` in `wmkf_policy`/`wmkf_policyversion`; see `docs/GRANTEE_WAIVER_VERSIONING_PLAN.md`.
 - Alternate key `wmkf_granteedeliverable_request_key` on `wmkf_request` enforces at most one package row per request.
 
 Data:
@@ -31,6 +32,7 @@ Data:
 - `wmkf_imagecaption` (Memo, 4000) — grantee-provided image caption.
 - `wmkf_inviteddate` (DateTime) — first Drafted→Invited transition only; re-sends do not reset it.
 - `wmkf_remindeddate` (DateTime) — automatic reminder send timestamp.
+- `wmkf_waiverackedat` (DateTime) — timestamp the grantee acknowledged the publication waiver at submit; companion to the `wmkf_WaiverPolicyVersion` lookup. Added 2026-07-09.
 
 ## Read Paths
 
@@ -49,7 +51,7 @@ Data:
   - `patchDeliverable()` — writes only package-owned status/image/caption/date fields.
 - `pages/api/workbench/grantee-deliverables/generate.js` — ensures package row and stamps status Drafted from null/Drafted only.
 - `pages/api/workbench/grantee-deliverables/send-invite.js` — ensures package row; on first Drafted→Invited flip stamps `wmkf_inviteddate=now`; re-sends leave status/date unchanged.
-- `lib/services/grantee-upload.js` — after validating/uploading image, writes package `wmkf_imagecaption`, `wmkf_imagefileref`, and status Submitted; approved abstract text is written to `akoya_request`.
+- `lib/services/grantee-upload.js` — after validating/uploading image, commits the package row (`wmkf_imagecaption`, `wmkf_imagefileref`, status→Submitted, `wmkf_WaiverPolicyVersion` bind + `wmkf_waiverackedat`) AND the `akoya_request` approved-abstract PATCH in ONE atomic Dataverse changeset (per-op If-Match). SharePoint upload is outside the changeset; a non-412 failure re-reads before deleting the upload.
 - `pages/api/cron/grantee-deliverable-reminders.js` — durable pre-send claim moves status to Reminder Sent before sending; finalize stamps `wmkf_remindeddate`.
 
 ## Cross-System

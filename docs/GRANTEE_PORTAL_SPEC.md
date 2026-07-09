@@ -47,11 +47,16 @@ Per grantee, exactly:
 3. **One image caption** — free text.
 4. **Publication-consent waiver** — a single checkbox granting permission to publish the abstract,
    project title, grantee name + institution, and the image + caption in award-announcement materials
-   (print + online), and confirming the grantee has the right to share the image. Owner-provided
-   wording (S278). Low-stakes / non-controversial (owner: never been refused). **Implemented as a UI submit-gate,
-   NOT a stored field:** the submit button stays disabled until the box is checked, so a submission
-   existing *is* the consent record. **No consent fields are persisted to Dataverse** (no boolean,
-   timestamp, IP/UA/version/hash, snapshot, or contact lookup).
+   (print + online), and confirming the grantee has the right to share the image. The checkbox remains
+   a UI submit-gate (submit stays disabled until it is checked).
+   - **UPDATED 2026-07-09 — the waiver is now VERSIONED and the acknowledged version IS persisted**
+     (reverses the original S278 "no consent fields persisted" decision, at owner request). The
+     wording lives in the versioned `grantee-waiver` policy slot (same `wmkf_policy`/`wmkf_policyversion`
+     machinery + admin Policies section as the reviewer COI/AI-use policies), editable by staff.
+     On submit, the deliverable row records the exact acknowledged version via the
+     `wmkf_WaiverPolicyVersion` lookup + `wmkf_waiverackedat` timestamp — "what the grantee saw",
+     bound by a signed render token so submit records the displayed version, not a client-chosen one.
+     See `docs/GRANTEE_WAIVER_VERSIONING_PLAN.md`.
 
 ## Resolved design decisions (S268)
 
@@ -99,11 +104,14 @@ Per grantee, exactly:
    copy-paste fallback link (`19bd446e`).
 4. **Collect:** in the portal the grantee returns the **edited abstract (in-portal text)**, one
    **graphical image** (upload), and an **image caption** (free text), with the **publish-image box
-   checked** (the box gates the submit button; nothing about consent is persisted).
-5. **Store (atomic):** upload the image to SharePoint, then PATCH Dataverse with the approved
-   abstract + caption + image ref + status. **On Dataverse failure, clean up the
-   SharePoint upload** (follow the review-upload rollback pattern — `lib/services/review-upload.js:176-227`).
-   Virus-scan the image on intake.
+   checked** (the box gates the submit button). The client echoes the signed waiver render token so
+   the server can record the acknowledged version (2026-07-09).
+5. **Store (atomic):** upload the image to SharePoint, then commit BOTH Dataverse rows — the
+   `akoya_request` approved abstract and the `wmkf_granteedeliverable` caption/image-ref/status +
+   waiver version/timestamp — in a single **Dataverse changeset** (per-op If-Match; a stale ETag on
+   either row rolls back the whole changeset). SharePoint is outside the changeset: on a non-412
+   failure the writer re-reads the deliverable before deleting the upload, so it never deletes an
+   image a committed row references (`lib/services/grantee-upload.js`). Virus-scan the image on intake.
 6. **Cadence:** once per cycle, with an optional reminder for non-responders.
 
 ## Reuse — shared primitives vs parallel grantee variant
@@ -138,10 +146,12 @@ New fields (the existing `wmkf_abstract` is the source and is NOT created):
 | `wmkf_GranteeImageCaption` | Memo (4000) | Free-text image caption. |
 | `wmkf_GranteeDeliverableStatus` | Picklist | Package lifecycle (below). Mirrors `shared/config/granteeDeliverableStatus.js`. |
 
-**No consent fields** — the publication-consent waiver is a client-side submit gate (checkbox enables
-submit), not stored. The existence of a submitted package is the consent record. So the new schema
-is just **4 content fields + 1 status picklist** (5 total): the two abstract fields, the image ref,
-the caption, and the status.
+**Consent fields — UPDATED 2026-07-09.** The original S268 schema deliberately stored no consent
+fields. That was reversed at owner request: the waiver is now versioned in the `grantee-waiver`
+policy slot, and the acknowledged version is persisted on the `wmkf_granteedeliverable` package row
+via `wmkf_WaiverPolicyVersion` (lookup → `wmkf_policyversion`) + `wmkf_WaiverAckedAt` (DateTime). Those
+two columns are added by the standalone `wave12-grantee-waiver-consent` schema wave; the abstract
+content fields and status picklist are unchanged. See `docs/GRANTEE_WAIVER_VERSIONING_PLAN.md`.
 
 Status picklist option set (mirror in `shared/config/granteeDeliverableStatus.js` — keep symmetric):
 `Drafted` (100000000), `Invited` (100000001), `Reminder Sent` (100000002), `Submitted` (100000003),
