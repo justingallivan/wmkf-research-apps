@@ -36,7 +36,7 @@
 - Search / schema language: feedback-grep-general-codebase-terms.md; feedback-human-legibility-schema-principle.md
 
 ## Task Routing
-- Reviewer origination / retrieval: ../docs/agent-wiki/topics/reviewer-origination.md; project-reviewer-sourcing-constraints.md (owner: ~1 applicant rec/panel, zero reviewer reuse)
+- Reviewer origination / retrieval: ../docs/agent-wiki/topics/reviewer-origination.md; project-reviewer-sourcing-constraints.md (owner: ~1 applicant rec/panel recent policy; reuse per-PD practice; referral multiplies the engine)
 - Reviewer identity / ORCID / contact / COI / PI identity: ../docs/agent-wiki/topics/reviewer-identity.md; project-reviewer-verify-fail-dangerous.md
 - Reviewer workbench / lifecycle / roster / referral: ../docs/agent-wiki/topics/reviewer-workbench-lifecycle.md; project-workbench-consolidation-rollout.md
 - Reviewer-invite local testing / capture mode side effects: reviewer-invite-capture-mode-not-full-sandbox.md

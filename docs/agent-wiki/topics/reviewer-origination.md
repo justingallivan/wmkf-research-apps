@@ -68,10 +68,12 @@ origination.
 
 **Owner-stated sourcing constraints (2026-07-08, S349 — see
 `.claude-memory/project-reviewer-sourcing-constraints.md`):** applicant-suggested
-reviewers are capped ~1/panel in practice (undue influence); no reviewer has been
-re-used in ~4 years (field breadth, welcome-preservation, sparse data). So the
-Claude-assisted engine fills nearly every panel seat, referral capture is the only
-scalable human channel, and roster-reuse/applicant-recs-first designs are dead ends.
+reviewers capped ~1/panel (recent anti-stacking policy — could evolve); reviewer
+reuse is per-PD practice (none currently; a departed colleague reused repeatedly —
+STRATEGY.md:81 reflects his practice); referral is a MULTIPLIER on the engine
+(never-contacted experts can't refer). So the Claude-assisted engine fills nearly
+every panel seat and its slate quality compounds through referral; deprioritize
+roster-reuse/applicant-recs-first designs.
 Holistic-review analysis: `docs/audits/reviewer-holistic-review-fable-2026-07-08.md`.
 
 **Current posture:**

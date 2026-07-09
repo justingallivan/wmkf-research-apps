@@ -12,22 +12,27 @@ frame-critical sources read directly by the synthesizing session:
 `docs/audits/memory-triage-2026-07-08.md`, and the five core reviewer memories.
 All opinions below are mine, held in one mind. No code was changed.
 
-> **Revised after owner review (same day).** Justin corrected three domain
-> facts (owner-stated, 2026-07-08):
-> (1) applicant-suggested reviewers are in practice **capped at ~1 per panel**
-> to avoid undue influence by friends-of-applicant — the *bias* was recorded
-> (Part C §8's friends-of-PI exclusion) but the operational cap was not
-> [VERIFIED absent: grep across docs/ and .claude-memory/]; a policy-limited
-> channel, not an under-used rich one. (2) The past-reviewer database was not
-> built **by choice**: data is sparse (improving with current legibility work)
-> and staff avoid wearing out reviewers' welcome. (3) Field breadth is so wide
-> that **no reviewer has been re-used in ~4 years** (owner-stated) — which
-> contradicts `docs/STRATEGY.md:81` "good reviewers get called upon repeatedly"
-> [VERIFIED present] (flagged for a strategy-doc fix, not applied here).
-> Sections 0, 1.2, 2, and 3 are revised in place accordingly; the net effect
-> *strengthens* the referral-capture and Claude-as-engine conclusions and
-> retracts the roster-flywheel and applicant-recs-first recommendations.
-> §4–§6 are unaffected.
+> **Revised after owner review (same day, two rounds).** Justin corrected and
+> then nuanced three domain facts (owner-stated, 2026-07-08):
+> (1) applicant-suggested reviewers are capped at **~1 per panel — a very
+> recent, reactive policy** (a colleague would stack panels with them); the
+> *bias* was recorded (Part C §8's friends-of-PI exclusion) but the operational
+> cap was not [VERIFIED absent: grep across docs/ and .claude-memory/]. A
+> policy-limited channel for now, though recent enough that it could evolve.
+> (2) The past-reviewer database was not built **by choice**: data is sparse
+> (improving with current legibility work) and staff avoid wearing out
+> reviewers' welcome. (3) **Reviewer reuse is per-PD practice, not an org
+> constant**: Justin has not re-used a reviewer in ~4 years (one data point);
+> a departed colleague reused reviewers repeatedly — so `docs/STRATEGY.md:81`
+> "good reviewers get called upon repeatedly" [VERIFIED present] reflects that
+> departed practice (stale as current description, not false; no fix required).
+> (4) **Referral is a multiplier on the engine, not an independent channel** —
+> a declining expert can only refer if the engine found and contacted them
+> first. Sections 0, 1.2, 2, and 3 are revised in place accordingly; the net
+> effect *strengthens* the Claude-engine-as-product and referral conclusions
+> and retracts the roster-flywheel and applicant-recs-first recommendations.
+> §4–§6 are unaffected. Facts captured in
+> `.claude-memory/project-reviewer-sourcing-constraints.md`.
 
 ---
 
@@ -47,12 +52,12 @@ single strongest empirical result in the whole record — 78% of the applicants'
 own recommended reviewers were surfaced by *neither* origination arm
 (`REVIEWER_FINDER_ORIGINATION_EXPERIMENT_2026-06-12.md` §2) — is telling you
 that the names you miss live in humans' heads, not in bibliometric space. With
-applicant recommendations policy-capped (~1/panel, undue influence) and
-reviewer reuse effectively zero (owner-stated, ~4 years), the marginal unit of
-engineering belongs in two places: the referral chain (the only human channel
-that scales across your field breadth), and the quality of the
-Claude-assisted engine itself — which, at those constraints, is not the
-fallback but the product.
+applicant recommendations policy-capped (~1/panel, recent anti-stacking rule)
+and reviewer reuse absent under current staff practice (owner-stated), the
+marginal unit of engineering belongs in two places: the referral chain, and
+the quality of the Claude-assisted engine itself — and these compound rather
+than compete, because a declining expert can only refer if the engine found
+and contacted them first. The engine is not the fallback but the product.
 
 ---
 
@@ -90,37 +95,41 @@ retracted, see the revision note at top.)*
 
 The system is architected as a per-proposal search engine: proposal → analyze →
 originate → verify → rank → slate. The owner-supplied operating facts say
-that architecture is closer to right than my first read allowed — **there is no
-roster flywheel to cultivate.** Field breadth is so wide that no reviewer has
-been re-used in ~4 years (owner-stated), applicant recommendations are
-policy-capped at ~1 per panel to avoid undue influence, and staff deliberately
-avoid wearing out past reviewers' welcome. Every proposal is a cold start by
-the nature of the portfolio, not by tooling deficiency.
+that architecture is closer to right than my first read allowed — **under
+current staff practice there is no roster flywheel to cultivate.** Justin has
+not re-used a reviewer in ~4 years (one PD's data point — a departed colleague
+did reuse reviewers repeatedly, so this is practice, not physics), applicant
+recommendations were recently capped at ~1 per panel after a colleague stacked
+panels with them, and staff deliberately avoid wearing out past reviewers'
+welcome. Under that practice, every proposal is effectively a cold start.
 
-The evidence on candidate sources, with the policy constraints applied:
+The evidence on candidate sources, with the current-practice constraints:
 
 | Source | Quality signal | Constraint |
 |---|---|---|
-| Applicant-recommended | 80% PD pick-rate, judged blind (experiment §2) | capped ~1/panel (undue influence) |
+| Applicant-recommended | 80% PD pick-rate, judged blind (experiment §2) | capped ~1/panel (recent anti-stacking policy) |
 | Claude-assisted (Track A) | 65% pick-rate | none — the workhorse |
 | Bare grounded retrieval | 35% pick-rate, deceased/retired/trainee noise | retired by experiment |
-| Referral capture | "the real convergence engine" (Part C §8a) | **unbuilt** |
-| Reviewer history / pool reuse | none — zero reuse in ~4 years (owner-stated) | not a channel |
+| Referral capture | "the real convergence engine" (Part C §8a) | **unbuilt**; multiplies the engine (needs tier-1 contact first) |
+| Reviewer history / pool reuse | per-PD practice; none currently (owner-stated) | deprioritized, not impossible |
 
 Two conclusions follow. First, **the Claude-assisted engine is the product, not
-the cold-start fallback** — when reuse is zero and applicant recs are capped,
-nearly every panel seat is filled from the algorithmic slate plus whatever
-humans volunteer along the way. Its 65% pick-rate is carrying the workflow.
-Second, the recall gap the experiment exposed (39/50 applicant picks missed by
-both arms) still says the missing names live in humans' heads — but the only
-human channel compatible with the constraints is the **referral chain**:
+the cold-start fallback** — with no reuse in current practice and applicant
+recs capped, nearly every panel seat is filled from the algorithmic slate plus
+whatever humans volunteer along the way. Its 65% pick-rate is carrying the
+workflow. Second, the recall gap the experiment exposed (39/50 applicant picks
+missed by both arms) still says the missing names live in humans' heads — and
+the human channel compatible with the constraints is the **referral chain**:
 declining independent experts suggesting colleagues. Referrals have no
 undue-influence problem, arrive pre-disambiguated ("my colleague X at Y"), and
-surface fresh people per proposal, which is exactly the shape your portfolio
-requires. Applicant recommendations, meanwhile, are worth more as *search
-seeds* than as candidates: a name you won't invite still reveals the relevant
-community (co-author neighborhoods, field anchors) in which to find
-independent people.
+surface fresh people per proposal. But — the owner's key structural point —
+**referral is a multiplier on the engine, not a substitute for it**: someone
+the engine never surfaced and contacted can't offer an alternate. Tier-1 slate
+quality compounds through every referral hop, which is one more reason the
+engine deserves the investment. Applicant recommendations, meanwhile, are
+worth more as *search seeds* than as candidates: a name you won't invite still
+reveals the relevant community (co-author neighborhoods, field anchors) in
+which to find independent people.
 
 ### 1.3 Disambiguation: the lifecycle already contains a perfect disambiguator
 
@@ -245,17 +254,20 @@ identity *inference* (expensive, where the reversals live).
   half.
 - **Applicant recommendations as search seeds.** *(Revised — the original
   "elevate them to the top of the slate" recommendation is retracted: the
-  channel is policy-capped at ~1/panel for undue-influence reasons,
+  channel is capped at ~1/panel by a recent anti-stacking policy,
   owner-stated.)* Their residual value is real but different: an
   80%-pick-rate name you won't invite still locates the relevant community.
   Nothing today uses `wmkf_potentialreviewer1..5` as neighborhood seeds
   (co-author graph, field anchors) for finding *independent* experts near
   them — a cheap recall lever with no influence problem.
-- **~~Reviewer history / pool reuse~~ — retracted.** Zero reviewer reuse in
-  ~4 years (owner-stated: field breadth, welcome-preservation, sparse data)
-  means per-person history has no ranking value. What survives is the
-  *channel-level* version, next bullet — and it aligns with the owner's own
-  point that the data improves with the current legibility work.
+- **~~Reviewer history / pool reuse~~ — deprioritized.** No reuse under
+  current staff practice (owner-stated: ~4 years, one PD's data point —
+  a departed colleague did reuse reviewers; reasons: field breadth,
+  welcome-preservation, sparse data), so per-person history has no ranking
+  value *today*. Not impossible in principle — revisit only if practice
+  changes. What survives now is the *channel-level* version, next bullet —
+  which aligns with the owner's point that the data improves with the current
+  legibility work.
 - **Outcome capture.** The origination experiment had to substitute a sniff
   test because accept/decline/review-quality outcomes aren't systematically
   joined back to origination provenance. Every future direction decision will
@@ -280,7 +292,8 @@ identity *inference* (expensive, where the reversals live).
 
 **Keep Claude-assisted origination as the spine — and treat it as the product,
 not the fallback.** The experiment settled the direction, and the owner's
-operating facts (zero reuse, capped applicant recs) mean the algorithmic slate
+operating facts (no reuse in current practice, capped applicant recs, referral
+gated on tier-1 contact) mean the algorithmic slate
 fills nearly every panel seat: its quality per-field *is* the finding
 capability. The edge-hardening that survived (forename gate, recency ranking,
 provenance tags) is worth keeping. Do not revive the retrieval-first
@@ -291,7 +304,9 @@ Then invest in this order:
 1. **Referral capture (build now).** Decline→suggest→iterate is where good
    slates actually converge per your own analysis, and every referred name
    arrives pre-disambiguated by the referrer ("my colleague X at Y") — it
-   short-circuits both of your hard problems at once. This is the only item on
+   short-circuits both of your hard problems at once. It is a *multiplier on
+   the engine* (a never-contacted expert can't refer), so it converts every
+   tier-1 slate improvement into compounding reach. This is the only item on
    any roadmap that improves finding *and* disambiguation *and* recall
    simultaneously.
 2. **Use applicant recommendations as neighborhood seeds, not slate
