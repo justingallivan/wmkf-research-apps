@@ -20,6 +20,8 @@
 import { verifyGranteeToken } from '../../../../../lib/external/verify-grantee-token';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 import { withDalContext } from '../../../../../lib/dataverse/core/context';
+import { resolveActiveWaiverPolicy } from '../../../../../lib/external/grantee-waiver-policy';
+import { mintWaiverRenderToken } from '../../../../../lib/services/external-token';
 import { assembleGranteeDocument } from '../../../../../lib/services/grantee-document-assembly';
 import { renderAwardBlock } from '../../../../../lib/services/grantee-document-html';
 import {
@@ -118,6 +120,35 @@ export default async function handler(req, res) {
       ? await buildPreviewHtml(verified.requestId)
       : null;
 
+    // Publication waiver: only the edit view needs it (the grantee is about to
+    // acknowledge + submit). Fail CLOSED — if the grantee-waiver slot can't
+    // resolve, refuse the edit view with the mapped reason rather than render an
+    // un-versioned/unconsentable form. Resolution + version binding is done via a
+    // signed render token so submit records exactly the version shown.
+    let waiverPolicy = null;
+    let waiverToken = null;
+    if (view === 'edit') {
+      const resolved = await resolveActiveWaiverPolicy();
+      if (!resolved.ok) {
+        // Transient (unavailable) → 503; deterministic misconfig → 500. No
+        // operator alert here (context is high-traffic/retryable); the submit
+        // path alerts on a fail-closed block.
+        const httpStatus = resolved.reason === 'policy_unavailable' ? 503 : 500;
+        return res.status(httpStatus).json({ ok: false, reason: resolved.reason });
+      }
+      const { policy } = resolved;
+      waiverPolicy = { title: policy.title, body: policy.body, versionId: policy.activeVersionId };
+      // 30-day render token — generous enough that a slow grantee editing session
+      // never expires; re-minted on every context load, and version-bound so it
+      // records what was shown even after a later staff republish.
+      waiverToken = await mintWaiverRenderToken({
+        requestId: verified.requestId,
+        versionId: policy.activeVersionId,
+        body: policy.body,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      });
+    }
+
     return res.status(200).json({
       ok: true,
       request: {
@@ -140,6 +171,11 @@ export default async function handler(req, res) {
       // Display-only assembled award (output a). null when unavailable or on a
       // closed view; the page renders it above the form when present.
       preview,
+      // Versioned publication waiver (edit view only). `waiverPolicy.body` is the
+      // exact text to display; `waiverToken` binds that version and must be echoed
+      // back on submit. Both null on non-edit views.
+      waiverPolicy,
+      waiverToken,
     });
   } catch (e) {
     console.error('[grantee/context] unexpected error:', e?.message || e);

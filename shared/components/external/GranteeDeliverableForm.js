@@ -16,8 +16,12 @@
 
 import { useState } from 'react';
 
-// Publication-consent waiver wording (owner-provided, S278). Client-side submit
-// gate only — never sent/persisted; a submitted package IS the consent record.
+// Publication-consent waiver wording. As of 2026-07-09 the LIVE text comes from
+// the versioned `grantee-waiver` policy (rendered from `waiverPolicy.body`); this
+// constant is only a last-resort fallback if the policy body is somehow absent
+// (the context route fails closed, so on the edit view it normally isn't). The
+// waiver remains a CLIENT-SIDE submit gate — the checkbox is never sent; the
+// server records the acknowledged version (bound in `waiverToken`).
 const WAIVER_LABEL =
   "By submitting, I give the W. M. Keck Foundation permission to publish the abstract, project title, my name and institution, and the image and caption I provide here in materials announcing this award, in print and online. I further confirm that I have the right to share the image I've uploaded.";
 
@@ -42,7 +46,7 @@ const FIELD_STYLE = {
   boxSizing: 'border-box',
 };
 
-export default function GranteeDeliverableForm({ token, deliverable, onSubmitted }) {
+export default function GranteeDeliverableForm({ token, deliverable, waiverPolicy, waiverToken, onSubmitted }) {
   const init = deliverable || {};
   const [abstract, setAbstract] = useState(init.abstractApproved || init.abstractFormatted || '');
   const [caption, setCaption] = useState(init.caption || '');
@@ -54,8 +58,13 @@ export default function GranteeDeliverableForm({ token, deliverable, onSubmitted
 
   // An image is satisfied by a new upload OR one already on file (replacing is optional).
   const hasImage = imageFile != null || Boolean(init.hasImage);
+  // The versioned waiver text + its binding token must be present to submit. The
+  // context route fails closed, so on the edit view these are normally set; this
+  // is a defensive gate against a partial payload.
+  const waiverText = waiverPolicy?.body || WAIVER_LABEL;
   const canSubmit =
     waiver &&
+    Boolean(waiverToken) &&
     abstract.trim().length > 0 &&
     caption.trim().length > 0 &&
     hasImage &&
@@ -82,6 +91,9 @@ export default function GranteeDeliverableForm({ token, deliverable, onSubmitted
       const fd = new FormData();
       fd.append('editedAbstract', abstract);
       fd.append('caption', caption);
+      // Echo the signed render token so the server records the exact waiver
+      // version the grantee saw (server verifies + extracts the version id).
+      if (waiverToken) fd.append('waiverToken', waiverToken);
       if (imageFile) fd.append('image', imageFile);
       const res = await fetch(`/api/external/grantee/${token}/submit`, { method: 'POST', body: fd });
       const data = await res.json().catch(() => ({}));
@@ -146,7 +158,7 @@ export default function GranteeDeliverableForm({ token, deliverable, onSubmitted
 
       <label style={{ display: 'block', marginTop: '1rem' }}>
         <input type="checkbox" checked={waiver} onChange={(e) => setWaiver(e.target.checked)} />{' '}
-        {WAIVER_LABEL}
+        {waiverText}
       </label>
 
       {error && <p role="alert" style={{ color: '#b00' }}>{error}</p>}

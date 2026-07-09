@@ -64,7 +64,7 @@ export default function GranteePortalPage() {
     );
   }
 
-  const { request, deliverable, view, preview } = state.data;
+  const { request, deliverable, view, preview, waiverPolicy, waiverToken } = state.data;
 
   return (
     <Shell>
@@ -74,7 +74,12 @@ export default function GranteePortalPage() {
       {preview && <AwardPreview html={preview} />}
 
       {view === 'edit' && (
-        <GranteeDeliverableForm token={token} deliverable={deliverable} />
+        <GranteeDeliverableForm
+          token={token}
+          deliverable={deliverable}
+          waiverPolicy={waiverPolicy}
+          waiverToken={waiverToken}
+        />
       )}
 
       {view === 'submitted' && (
