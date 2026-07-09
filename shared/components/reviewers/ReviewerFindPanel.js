@@ -47,9 +47,10 @@ function fileKeyOf(f) {
   return `${f.library}::${f.folder}::${f.name}`;
 }
 
-export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSaved, canManage = true }) {
+export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSaved, canManage = true, prefill = null, onPrefillConsumed }) {
   const requestIdRef = useRef(requestId);
   requestIdRef.current = requestId;
+  const manualCardRef = useRef(null);
   const [ingest, setIngest] = useState({ loading: true, data: null, error: null });
   const [doc, setDoc] = useState({ loading: true, data: null, error: null });
   const [manual, setManual] = useState({
@@ -68,6 +69,32 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
     lookupResult: null,
     resolution: null,
   });
+
+  // Pre-fill the Add-or-Refer form from a decline referral (parent switches to
+  // this sub-tab and passes { name, referredBy }). The suggested text lands in
+  // `name` for staff to review/clean before Add — identity resolution still
+  // goes through the normal abstain-or-confirm flow, so a free-text suggestion
+  // never auto-resolves to a namesake. Consumed once, then cleared.
+  useEffect(() => {
+    if (!prefill) return;
+    setManual((prev) => ({
+      ...prev,
+      name: prefill.name || '',
+      referredBy: prefill.referredBy || '',
+      note: prefill.note || prev.note,
+      error: null,
+      added: null,
+      lookupResult: null,
+      resolution: null,
+      orcid: '',
+      orcidAutofilled: false,
+      lookupMsg: { tone: 'ok', text: 'Pre-filled from a decline referral — review the name, then Add.' },
+    }));
+    if (manualCardRef.current) {
+      manualCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    onPrefillConsumed?.();
+  }, [prefill, onPrefillConsumed]);
 
   const runIngestion = useCallback(async () => {
     if (!requestId) return;
@@ -354,6 +381,7 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
   // ABOVE the optional verify card. State lives here; the JSX is passed down as a
   // slot so it sits between those two without ReviewerSearchSection owning the form.
   const manualAddCard = (
+    <div ref={manualCardRef}>
     <Card hover={false}>
       <div className="flex items-center justify-between mb-2">
         <div>
@@ -546,6 +574,7 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
         </div>
       </form>
     </Card>
+    </div>
   );
 
   return (

@@ -70,6 +70,33 @@ The "X" on an Invite Reviewers panel (`ReviewerInvitePanel`) card is a **soft-de
 
 **"Remove entirely" — permanent removal (S343; discoverability revised S347):** a distinct, destructive action alongside the recoverable "X" (`RemoveEntirelyModal.js`). **S347:** the owner (S344) couldn't find it because it was reachable ONLY after soft-removing a candidate and expanding the "Removed" list. It is now surfaced directly on **active** candidate rows via a single **"Remove ▾"** menu (`RowRemoveMenu` in `ReviewerInvitePanel.js`) offering two routes — "Remove from this proposal" (the recoverable `removeCandidate` soft-delete "X") and "Delete permanently…" (opens `RemoveEntirelyModal` via `setRemoveEntirelyTarget`). The menu is pure routing; each destination keeps its own confirm/preflight. The collapsible "Removed (N)" list still hosts Restore + its own "Remove entirely" and now **defaults to expanded** (`showRemoved` initial `true`). The underlying `DELETE`/service contract is unchanged. `DELETE /api/reviewer-finder/my-candidates {suggestionId, mode:'hard', deleteContact?}` → `removeCandidateEntirely` (`lib/services/reviewer-finder/remove-candidate-service.js`) PERMANENTLY deletes, in ONE atomic Dataverse `$batch` changeset (`runChangeset`, leaf-to-root order: review-answer snapshot rows → the suggestion row → the honorarium `akoya_request` if linked [→ the contact last, only if `deleteContact:true`]), plus a Postgres `ReviewDraftService.deleteBySuggestion` cleanup (NOT in the changeset — cross-store, ordered AFTER the changeset commits). Same app-access gate as the soft-delete "X"; no per-PD ownership scoping and **no blocks** (high-trust owner decision, S343 — a PD decides when/why; safety is a durable pre-delete `system_alerts` audit breadcrumb via `NotificationService.notify`, written BEFORE any delete and aborting the whole operation if it fails to write, plus the accurate `describeRemoval` preflight disclosure (`GET my-candidates?mode=removal-preflight&suggestionId=`) surfaced in the confirm modal — not a precondition/test-mode gate). Design: `docs/REVIEWER_REMOVE_ENTIRELY_BUILD_PLAN.md`.
 
+## Decline-referral surface + one-click add (S349)
+
+When a reviewer declines via the external portal, the decline form's free-text
+"Anyone you'd suggest instead?" is captured to `wmkf_declinereferral` on the
+suggestion row (`reviewer-suggestion.js` decline writer — **capture has always
+been live**). Until S349 **nothing read it** — the suggested names sat unseen.
+
+- **Reader:** `GET /api/workbench/decline-referrals?requestId=` →
+  `lib/services/workbench/decline-referrals-service.js` (`getDeclineReferrals`).
+  Returns declined rows with a non-empty referral, each with the decliner's
+  `wmkf_name` resolved. **Deliberately independent of
+  `review-manager/reviewers-service.js`**, which filters to accepted reviewers
+  and early-returns when none are accepted — so referrals surface even when
+  every invitee declined before anyone accepted.
+- **Surface:** `ReviewersTab` fetches it and passes `declineReferrals` +
+  `onAddReferral` to `ReviewerManagePanel`, which renders an amber callout at
+  the top of the **Track Reviewers** sub-tab only.
+- **One-click "Add as candidate":** does NOT bypass identity resolution. It
+  pre-fills the existing Add-or-Refer form (`ReviewerFindPanel` `prefill` prop:
+  suggested text → `name`, decliner → `referredBy`) and switches to the Find
+  sub-tab; staff confirm through the normal abstain-or-confirm
+  `manual-reviewer` flow, so a free-text suggestion never auto-resolves to a
+  namesake (memory `project-reviewer-verify-fail-dangerous`). Lands `referred`
+  provenance exactly as the S249 manual-referral path.
+- Origin of the direction: Fable holistic review P3.1
+  (`docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md`).
+
 ## Durable Memory
 
 - Workbench and invite workflow: `project-reviewer-apps-redesign-direction`, `project-reviewer-workbench-invite-workflow`.

@@ -54,6 +54,10 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   const [candidatesLoading, setCandidatesLoading] = useState(true);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
+  const [declineReferrals, setDeclineReferrals] = useState([]);
+  // Pre-fill payload handed to ReviewerFindPanel when staff click "Add as
+  // candidate" on a decline referral. Cleared once the Find panel consumes it.
+  const [prefillManual, setPrefillManual] = useState(null);
 
   const reviewers = proposal?.reviewers || [];
   // Candidates badge: saved candidates not yet invited (and not accepted/declined).
@@ -111,6 +115,25 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
     loadCandidates();
   }, [loadCandidates]);
 
+  // Decline-referrals: names a declining reviewer suggested on the external
+  // portal (captured to wmkf_declinereferral). Read via a dedicated endpoint so
+  // it surfaces even when no reviewer has accepted yet (the review-manager GET
+  // early-returns in that case). Fail-soft: an empty list on any error.
+  const loadDeclineReferrals = useCallback(async () => {
+    if (!requestId) return;
+    try {
+      const res = await fetch(`/api/workbench/decline-referrals?requestId=${encodeURIComponent(requestId)}`);
+      const data = await res.json().catch(() => ({}));
+      setDeclineReferrals(res.ok && Array.isArray(data.referrals) ? data.referrals : []);
+    } catch {
+      setDeclineReferrals([]);
+    }
+  }, [requestId]);
+
+  useEffect(() => {
+    loadDeclineReferrals();
+  }, [loadDeclineReferrals]);
+
   // Refresh BOTH data sources after any mutation. An accepted reviewer appears in
   // both the Candidates roster (my-candidates) and the Invite/Track lists
   // (review-manager/reviewers); removing/editing/inviting from one surface must
@@ -120,7 +143,24 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   const refreshAll = useCallback(() => {
     loadCandidates();
     loadReviewers();
-  }, [loadCandidates, loadReviewers]);
+    loadDeclineReferrals();
+  }, [loadCandidates, loadReviewers, loadDeclineReferrals]);
+
+  // "Add as candidate" on a decline referral: pre-fill the Add-or-Refer form
+  // (suggested text → name for staff to review; decliner → referredBy) and
+  // switch to the Find sub-tab. Identity resolution stays in the normal
+  // abstain-or-confirm flow, so a free-text suggestion never auto-resolves.
+  const handleAddReferral = useCallback((referral) => {
+    setPrefillManual({
+      name: referral?.referralText || '',
+      referredBy: referral?.reviewerName || '',
+    });
+    router.push(
+      { pathname: router.pathname, query: { ...router.query, sub: 'find' } },
+      undefined,
+      { shallow: true },
+    );
+  }, [router]);
 
   const selectSub = (key) => {
     router.push(
@@ -169,9 +209,13 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
                 {t.key === 'candidates' ? (
                   <SubTabBadge count={candidatesToInvite} workRemaining={candidatesToInvite} />
                 ) : isManage ? (
+                  // Track Reviewers folds in pending decline-referrals so the tab
+                  // signals them (amber) even when no reviewer has accepted yet —
+                  // otherwise the badge reads 0 and staff never open the tab where
+                  // the referral callout lives (the all-declined-before-accept case).
                   <SubTabBadge
-                    count={countForMode(reviewers, t.key)}
-                    workRemaining={workRemainingForMode(reviewers, t.key)}
+                    count={countForMode(reviewers, t.key) + (t.key === 'track' ? declineReferrals.length : 0)}
+                    workRemaining={workRemainingForMode(reviewers, t.key) + (t.key === 'track' ? declineReferrals.length : 0)}
                   />
                 ) : null}
               </button>
@@ -225,6 +269,8 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           canManage={canManage}
           savedPoolNames={candidates.map((c) => c.name).filter(Boolean)}
           onSaved={refreshAll}
+          prefill={prefillManual}
+          onPrefillConsumed={() => setPrefillManual(null)}
         />
       ) : current === 'candidates' ? (
         <ReviewerInvitePanel
@@ -245,6 +291,8 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           settings={settings}
           mode={current}
           canManage={canManage}
+          declineReferrals={declineReferrals}
+          onAddReferral={handleAddReferral}
         />
       )}
     </div>

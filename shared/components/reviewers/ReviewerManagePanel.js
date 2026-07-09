@@ -1066,6 +1066,8 @@ export default function ReviewerManagePanel({
   settings = {},
   mode,
   canManage = true,
+  declineReferrals = [],
+  onAddReferral,
 }) {
   const [selectedReviewers, setSelectedReviewers] = useState(new Set());
   const [emailModalOpen, setEmailModalOpen] = useState(false);
@@ -1231,6 +1233,46 @@ export default function ReviewerManagePanel({
 
   return (
     <div className="space-y-4">
+      {/* Decline-referrals: names a declining reviewer suggested (captured to
+          wmkf_declinereferral on the external portal). Surfaced only on Track
+          Reviewers — the home base once invites are out. "Add as candidate"
+          routes through the normal Add-or-Refer resolution flow (parent
+          switches to Find + pre-fills), so a free-text suggestion never
+          auto-resolves to a namesake. */}
+      {mode === 'track' && declineReferrals.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-900 mb-1">
+            {declineReferrals.length} referral{declineReferrals.length !== 1 ? 's' : ''} from reviewers who declined
+          </p>
+          <p className="text-xs text-amber-800 mb-3">
+            A reviewer who declined suggested someone else. Add them as a candidate to follow up.
+          </p>
+          <ul className="space-y-2">
+            {declineReferrals.map((r) => (
+              <li
+                key={r.suggestionId}
+                className="flex items-start justify-between gap-3 rounded-md bg-white/70 border border-amber-100 p-2"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm text-gray-900 break-words whitespace-pre-wrap">{r.referralText}</p>
+                  <p className="text-xs text-gray-500">
+                    suggested by {r.reviewerName || 'a declining reviewer'}
+                  </p>
+                </div>
+                {canManage && onAddReferral && (
+                  <button
+                    type="button"
+                    onClick={() => onAddReferral(r)}
+                    className="shrink-0 text-xs font-medium text-amber-900 border border-amber-300 rounded-md px-2 py-1 hover:bg-amber-100"
+                  >
+                    Add as candidate
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {/* Actions bar. Counts use selectedList (visible + selected), not the raw
           selectedReviewers set, which can retain IDs no longer visible after a
           refresh removes a reviewer — that would overcount (Codex S209). */}
