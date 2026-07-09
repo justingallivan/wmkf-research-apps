@@ -39,8 +39,15 @@ Post-recovery reconcile (S350): `REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md` was ve
 against live source and confirmed **shipped** (reviewer_acceptance_jobs queue + drain;
 built with the stricter insert-before-PATCH variant; optional client-only transition NOT
 adopted). Its frontmatter stays `status: active` with a "Status: Shipped" reconciliation
-block recording the deltas. `REVIEWER_QUOTA_PD_EMAIL_PLAN.md` was recovered but NOT yet
-verified built-vs-plan — treat its build status as unconfirmed until checked.
+block recording the deltas. `REVIEWER_QUOTA_PD_EMAIL_PLAN.md` was recovered and, on
+2026-07-09 verification, is **NOT built** — both proposed changes are absent: (1)
+`CampaignConfigModal.js` still deliberately does not surface `desiredCount` (comment:
+"we don't surface a control that does nothing yet"); (2) `lib/services/reviewer-quota.js`
+notify call still uses `severity:'info'` with NO `emailAdmins:true` and still carries
+`category:'reviewers'`, so the PD email is inert (notification-service gates email on
+`emailAdmins || error || critical`). `explicitRecipients` + `desiredCount` API validation
+pre-existed the plan. Frontmatter stays `status: active` / `kind: plan` (accurate for an
+unbuilt plan).
 
 Lesson retained: unpushed worktree commits are recoverable only from the machine that made
 them. See [[feedback-dont-resurface-parked-items]] and

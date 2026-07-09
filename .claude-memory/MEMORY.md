@@ -63,7 +63,7 @@
 - Deferred cleanup / dead-code session: project-deferred-code-cleanup.md
 - Whack-a-mole / accumulated patch-debt / redesign candidates (S349 audit; Fable meta-review DONE 2026-07-08): execute from ../docs/WHACK_A_MOLE_REMEDIATION_PLAN.md; findings: ../docs/audits/whack-a-mole-meta-review-fable-2026-07-08.md; original audit: ../docs/audits/whack-a-mole-audit-2026-07-08.md
 - Parked: project-wide prompt-caching audit (Anthropic flagged low cache-hit rate, S339): project-cache-hit-rate-review.md
-- RESOLVED (S350): spec-audit design-docs recovered to main (1420d79c); accept-fast-response verified shipped, quota-PD-email plan unverified: project-spec-audit-docs-recovery-parked.md
+- RESOLVED (S350): spec-audit design-docs recovered to main (1420d79c); accept-fast-response verified SHIPPED, quota-PD-email verified NOT built (still an open plan): project-spec-audit-docs-recovery-parked.md
 - Private-repo CI (why CodeQL gone, Semgrep split, Pro needed for branch protection): project-private-repo-ci-visibility.md
 - E2E reviewer suite re-baseline (RESOLVED 2026-07-04, 23/23 green; client-UX drift lesson): project-e2e-reviewer-rebaseline-parked.md
 
