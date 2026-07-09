@@ -77,17 +77,25 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
   // never auto-resolves to a namesake. Consumed once, then cleared.
   useEffect(() => {
     if (!prefill) return;
+    // Start from a CLEAN identity slate — carry only name/referredBy from the
+    // referral. Leaving a stale email/affiliation would let the add path's
+    // confident-lookup auto-resolve reuse the wrong person by email (identity
+    // hazard, project-reviewer-verify-fail-dangerous). Clear every identity
+    // anchor, not just orcid.
     setManual((prev) => ({
       ...prev,
       name: prefill.name || '',
       referredBy: prefill.referredBy || '',
-      note: prefill.note || prev.note,
+      note: prefill.note || '',
+      email: '',
+      affiliation: '',
       error: null,
       added: null,
       lookupResult: null,
       resolution: null,
       orcid: '',
       orcidAutofilled: false,
+      lookingUp: false,
       lookupMsg: { tone: 'ok', text: 'Pre-filled from a decline referral — review the name, then Add.' },
     }));
     if (manualCardRef.current) {

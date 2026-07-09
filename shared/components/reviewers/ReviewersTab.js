@@ -26,7 +26,7 @@
  *   - settings  : { signature } for the email templates
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import ReviewerManagePanel from './ReviewerManagePanel';
@@ -55,6 +55,12 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
   const [declineReferrals, setDeclineReferrals] = useState([]);
+  // ReviewersTab is NOT keyed by requestId (page reuses the instance across
+  // request navigations), so an in-flight decline-referral fetch from the prior
+  // request could paint its referrals onto the new one. Guard every post-await
+  // write against the request that is current NOW.
+  const currentRequestIdRef = useRef(requestId);
+  currentRequestIdRef.current = requestId;
   // Pre-fill payload handed to ReviewerFindPanel when staff click "Add as
   // candidate" on a decline referral. Cleared once the Find panel consumes it.
   const [prefillManual, setPrefillManual] = useState(null);
@@ -121,16 +127,21 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   // early-returns in that case). Fail-soft: an empty list on any error.
   const loadDeclineReferrals = useCallback(async () => {
     if (!requestId) return;
+    const rid = requestId;
     try {
-      const res = await fetch(`/api/workbench/decline-referrals?requestId=${encodeURIComponent(requestId)}`);
+      const res = await fetch(`/api/workbench/decline-referrals?requestId=${encodeURIComponent(rid)}`);
       const data = await res.json().catch(() => ({}));
+      if (rid !== currentRequestIdRef.current) return; // request changed mid-flight — drop stale result
       setDeclineReferrals(res.ok && Array.isArray(data.referrals) ? data.referrals : []);
     } catch {
-      setDeclineReferrals([]);
+      if (rid === currentRequestIdRef.current) setDeclineReferrals([]);
     }
   }, [requestId]);
 
   useEffect(() => {
+    // Clear immediately on request change so a slow fetch can't leave the prior
+    // request's referrals visible while the new one loads.
+    setDeclineReferrals([]);
     loadDeclineReferrals();
   }, [loadDeclineReferrals]);
 
