@@ -21,14 +21,14 @@ Do not:
 - Assume the app can hard-delete a Contact — the role has NO DeleteAccess (`0x80048306` / `unManagedIdsAccessDenied`, verified S213).
 - Assume deactivating an orphan unblocks re-use — `contact.findByEmail` matches regardless of statecode.
 
-Ground truth: `pages/api/review-manager/send-emails.js`, `lib/dataverse/adapters/contact.js`, `scripts/smoke-test-candidate.mjs`. Related: [[project-reviewer-workbench-invite-workflow]].
+Ground truth: `lib/services/review-manager/send-emails-service.js` (promotion logic), `lib/dataverse/adapters/contact.js`, `scripts/smoke-test-candidate.mjs`. Related: [[project-reviewer-workbench-invite-workflow]].
 
 The Reviewer Finder / Review Manager send-emails flow promotes recipients to CRM contacts on first outreach (find-or-create by email, then `setContactLink` on the `wmkf_potentialreviewer`). **Verified end-to-end on 2026-05-01** with a test send to `justingallivan@me.com` — `_wmkf_contact_value` populated correctly.
 
 **Why:** Connor granted `AppendTo` on Contact at BusinessUnitLevel to the `# WMK: Research Review App Suite` security role on 2026-05-01. Prior to that, the create half worked (orphan contacts landed in CRM) but the link half 403'd.
 
 **How to apply:**
-- Promotion runs inline in `pages/api/review-manager/send-emails.js` (~line 247) only for the rows actually emailed in a given send and only when `_wmkf_contact_value` is null. Existing orphan rows from the pre-grant period will get linked the next time they're sent to (find-by-email reuses the orphan contact — no duplicates).
+- Promotion runs in `lib/services/review-manager/send-emails-service.js` (look for `findOrCreateByEmail` + `setContactLink`; the `pages/api/review-manager/send-emails.js` route is now a thin wrapper — logic moved into the service, S348-verified) only for the rows actually emailed in a given send and only when `_wmkf_contact_value` is null. Existing orphan rows from the pre-grant period will get linked the next time they're sent to (find-by-email reuses the orphan contact — no duplicates).
 - Tracked in `docs/archive/PENDING_ADMIN_REQUESTS.md` Section 4 (marked Done; doc archived).
 
 **Delete is NOT granted (verified S213, 2026-06-02).** The `# WMK: Research Review App Suite` role has Create + AppendTo on Contact but **no DeleteAccess** (error `0x80048306` / `unManagedIdsAccessDenied`, 403). Consequences:

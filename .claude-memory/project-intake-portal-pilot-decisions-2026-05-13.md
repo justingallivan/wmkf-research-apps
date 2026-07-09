@@ -3,9 +3,9 @@ name: Intake portal pilot — Track 1 decisions 2026-05-13
 description: Sarah+Connor sync Track 1 closed all four agenda items. Two notable deltas from 2026-05-06: 1C reversed to PA-built packet, 1D narrowed scope (deployed S178 as wmkf_proposalbudgetline + wmkf_apprequestperson extensions, not the in-meeting "two new entities" sketch). See top-of-file banner.
 type: project
 originSessionId: 3c35888d-8da4-46e3-83ac-31a25bbdc4e4
-status: active
+status: closed
 scope: intake
-last_verified: 2026-05-22 (S178) via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-08 (S348 audit) — closed: point-in-time meeting decisions; the 1C/1D deltas shipped (wmkf_proposalbudgetline + wmkf_apprequestperson extensions, verified in lib/dataverse/schema/wave4/). Historical record; for current shape read docs/atlas + wave4 schema.
 ---
 
 ## Recall Rule

@@ -3,7 +3,7 @@ name: project-prompt-legacy-audit-followup
 description: "RESOLVED S344: acted on the Fable AI-prompt legacy audit — sunset the 4 PDF-upload apps (extraction retired), wired peer-review to the Executor, removed dead generators. Residual: write-path [ASSUMED] audit."
 metadata: 
   node_type: memory
-  status: stale
+  status: closed
   type: project
   originSessionId: 4eb6d1fe-c277-43b8-977b-92cc18644286
 ---

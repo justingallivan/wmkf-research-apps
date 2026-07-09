@@ -3,9 +3,9 @@ name: Reviewer lifecycle — automate the manual tracking points
 description: Reviewer-recruitment lifecycle has timestamp/status fields that are set manually; long-term goal is automated reminders driven by these fields. Originally framed against the Postgres reviewer_suggestions schema; post-W3-W6 cutover the same fields live on Dataverse wmkf_appreviewersuggestion. Design discipline below still applies.
 type: project
 originSessionId: 223c47bb-55ef-4adb-bab2-c2616bfa5311
-status: active
+status: closed
 scope: reviewer
-last_verified: 2026-05-12 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-08 (S348 audit) — closed: automation shipped (engagement Phases 1-4, S275); review intake is /submit portal; staff upload removed S347. Design-discipline rationale retained as history. See project-reviewer-upload-dormant-not-deleted + agent-wiki reviewer-workbench-lifecycle for current state.
 ---
 
 ## Recall Rule

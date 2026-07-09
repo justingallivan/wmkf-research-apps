@@ -3,10 +3,24 @@ name: project-reviewer-institution-match
 description: Reviewer affiliation must be matched against existing `accounts` whenever it lands in Dataverse — discovery save, contact promotion, and any future reviewer-side edit
 metadata:
   type: project
-  status: active
+  status: stale
   scope: reviewer
-  last_verified: S213 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-08 (S348 audit) — account-matching plan below REVERSED by owner 2026-06-27; see warning
 ---
+
+> **STALE (2026-07-08, S348 audit).** The core prescription below — match reviewer
+> affiliation against `accounts` and write `contact.parentcustomerid` at promotion —
+> was **explicitly reversed by the owner on 2026-06-27** (Increment 2a, commit
+> `fa15ee4b`) after verification found no account search-by-name precedent, AKA/acronym
+> unreliability, and that a wrong-account auto-link is high-harm for low yield. The
+> **shipped design is ALERT-ONLY** (`reviewer_contact_affiliation_mismatch` staff alert
+> via `lib/services/alert-reviewer-affiliation-mismatch.js`, which explicitly does NOT
+> write `contact.parentcustomerid` — see its header comment). Do NOT build the
+> account-matcher / `parentcustomerid`-writer this file recommends. Current truth:
+> `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` §"Increment 2a" and
+> `docs/agent-wiki/topics/reviewer-identity.md`. Retained as history of why
+> account-matching was considered and rejected. [VERIFIED via
+> alert-reviewer-affiliation-mismatch.js:6; no live code writes contact.parentcustomerid at promotion]
 
 ## Recall Rule
 
