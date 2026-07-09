@@ -1,35 +1,35 @@
 ---
 name: project-vercel-cli-deploy-preview-auth
-description: WMKF Vercel project deploys via CLI only (no GitHub git-integration); preview hash URLs fail Azure AD redirect — smoke auth-gated changes on localhost or add the exact URL to Azure
+description: WMKF Vercel project DOES deploy to production on push to main (git-integration active, owner-corrected S350); to smoke an auth-gated change prefer localhost (registered Azure redirect)
 metadata:
   type: project
   status: active
 ---
 
-The `wmkf_research_apps` Vercel project has **no GitHub git-integration**
-(`.vercel/project.json` has no gitRepo link; `vercel git` shows none; the whole
-deploy history is CLI hash URLs `wmkfresearchapps-<hash>-justin-gallivans-projects.vercel.app`,
-zero `-git-<branch>-` deploys). So **pushing a branch does NOT trigger a Vercel
-preview build**, and the `-git-*` redirect-URI wildcard registered in Azure
-(`docs/AUTHENTICATION_SETUP.md`) never matches a real deploy.
+**CORRECTED 2026-07-09 (S350), owner-stated:** pushing to `main` **DOES** trigger a
+production Vercel deploy — git-integration is active and "deploys to main on push as
+it always does." The prior claim in this file ("no GitHub git-integration; pushing a
+branch does NOT trigger a build; deploy is CLI-only", "Verified S242") is **WRONG** and
+is retracted. Do NOT run a manual `vercel --prod` to ship main — the push already
+deploys it. (S350 also hit an unrelated CLI-deploy failure: `vercel --prod` choked
+packaging `.codegraph/daemon.sock` — a live unix socket the tarball can't read; a
+`.vercelignore` with `.codegraph` would fix CLI deploys if ever needed, but the git
+push is the real deploy path.)
 
-Consequence: a `vercel deploy` preview gets a hash URL that is **not** a
-registered Azure AD redirect URI → sign-in fails with `AADSTS50011` redirect-URI
-mismatch. Verified S242.
+Deploy-monitoring: after a push, confirm readiness with `vercel inspect <deployment-url>`
+(deterministic `status ● Ready/Building/Error`), NOT a `vercel ls | grep <hash>` poll —
+see [[feedback-deployment-monitoring-use-inspect]].
 
-**Why:** every preview hash URL is unique and unregistered; Azure AD requires
-exact (or wildcard-matched) redirect URIs.
+**Auth-gated smoke (still useful):** to test anything behind `requireAppAccess`/NextAuth,
+prefer **localhost** — `http://localhost:3000/api/auth/callback/azure-ad` IS a registered
+Azure redirect URI. Do NOT assume `.env.local` already has Azure AD + NextAuth creds
+(S346: that file had none — see [[project-local-dev-auth-setup]] for the full checklist:
+Azure AD vars, `AUTH_REQUIRED=true`, `EXTERNAL_LINK_SECRET`).
 
-**How to apply:** to smoke an **auth-gated** change (anything behind
-`requireAppAccess`/NextAuth), prefer **localhost** — `http://localhost:3000/api/auth/callback/azure-ad`
-IS registered. **Stale claim corrected (S346): do NOT assume `.env.local` already
-has the Azure AD + NextAuth creds** — as of S346 that file had none of them at all
-(likely fell out of a machine reset or fresh clone), which silently produced a
-different, confusing failure mode than a redirect mismatch: see
-[[project-local-dev-auth-setup]] for the full checklist (Azure AD vars,
-`AUTH_REQUIRED=true`, `EXTERNAL_LINK_SECRET`) this session had to rediscover.
-Verify presence before assuming local sign-in works. Otherwise add the exact
-preview callback URL to the Azure app registration (`a652a292-…` → Authentication →
-Redirect URIs) and don't redeploy (a new deploy = new hash = mismatch again). Do NOT
-assume a branch push previews.
-Related: [[project-vercel-sensitive-env-pull-empty]], [[project-dev-environment]], [[project-local-dev-auth-setup]].
+**Needs re-verification (was derived from the now-retracted premise):** whether a
+non-main branch push creates a `-git-<branch>-` preview deploy, and whether such a
+preview URL matches the Azure `-git-*` redirect wildcard in `docs/AUTHENTICATION_SETUP.md`.
+The old AADSTS50011-on-preview claim assumed CLI hash URLs; with git-integration the
+preview URL shape may differ. Verify against a real preview before relying on either.
+
+Related: [[project-vercel-sensitive-env-pull-empty]], [[project-dev-environment]], [[project-local-dev-auth-setup]], [[project-branded-domains]].
