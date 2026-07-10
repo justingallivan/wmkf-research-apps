@@ -3,18 +3,28 @@ title: Whack-a-Mole Remediation Plan
 domain: engineering-process
 kind: plan
 status: active
-summary: "Executable, code-verified plan for the seven meta-review items — stamp registry, fixture evals, invariant sweep, carryover probes, axis check, rename, checkJs."
+summary: "Original code-verified workstream proposal; independent Codex review returned NEEDS REWORK and owner reconciliation is pending before execution."
 canonical: false
 cataloged: 2026-07-08
 owner: engineering-process
 related:
   - docs/audits/whack-a-mole-meta-review-fable-2026-07-08.md
   - docs/audits/whack-a-mole-audit-2026-07-08.md
+  - docs/audits/whack-a-mole-independent-review-codex-2026-07-09.md
   - docs/CLOSEABLE_CLASS_INVARIANT_MAP.md
   - docs/TYPESCRIPT_OPTION_ASSESSMENT.md
 ---
 
 # Whack-a-Mole Remediation Plan
+
+> **Independent review added 2026-07-09 — owner decision pending.**
+> `docs/audits/whack-a-mole-independent-review-codex-2026-07-09.md` reached
+> **NEEDS REWORK**: keep WS0 narrowly; reshape WS1–WS3 around explicit semantic
+> state-space contracts and independent test oracles; reject WS4/WS5; defer WS6
+> outside this program; keep WS7 as an opportunistic posture. This records a
+> later review finding, not owner acceptance or a supersession decision. Do not
+> execute the workstream sequence below until the owner reconciles the two
+> recommendations.
 
 Written 2026-07-08 (Fable, same session as the meta-review). Implements all
 seven items of `docs/audits/whack-a-mole-meta-review-fable-2026-07-08.md` §2,

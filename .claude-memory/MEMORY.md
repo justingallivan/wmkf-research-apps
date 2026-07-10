@@ -63,7 +63,7 @@
 - Grantee publication waiver (versioned, staff-editable in admin Policies; SHIPPED S350; ack modal S351): project-grantee-waiver-versioning.md; ../docs/GRANTEE_WAIVER_VERSIONING_PLAN.md
 - Reviewer ack provenance parity (MINOR follow-up S351 — reviewer COI/AI-use acks lack body-hash + bind version at-submit, not render): project-reviewer-ack-provenance-parity-followup.md
 - Deferred cleanup / dead-code session: project-deferred-code-cleanup.md
-- Whack-a-mole / accumulated patch-debt / redesign candidates (S349 audit; Fable meta-review DONE 2026-07-08): execute from ../docs/WHACK_A_MOLE_REMEDIATION_PLAN.md; findings: ../docs/audits/whack-a-mole-meta-review-fable-2026-07-08.md; original audit: ../docs/audits/whack-a-mole-audit-2026-07-08.md
+- Whack-a-mole review (owner reconciliation pending; do not execute): ../docs/WHACK_A_MOLE_REMEDIATION_PLAN.md; ../docs/audits/whack-a-mole-independent-review-codex-2026-07-09.md
 - Parked: project-wide prompt-caching audit (Anthropic flagged low cache-hit rate, S339): project-cache-hit-rate-review.md
 - RESOLVED (S350): spec-audit design-docs recovered to main (1420d79c); accept-fast-response verified SHIPPED; quota-PD-email BUILT S352 (+admin default 4, modal prefill, first-send seed): project-spec-audit-docs-recovery-parked.md
 - Private-repo CI (why CodeQL gone, Semgrep split, Pro needed for branch protection): project-private-repo-ci-visibility.md

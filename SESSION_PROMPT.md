@@ -67,10 +67,12 @@ reviewer-coi / reviewer-ai-use too. Related: `project-grantee-waiver-versioning.
 
 ### Verified Open
 
-1. **Whack-a-mole remediation workstreams.** Evidence: `docs/WHACK_A_MOLE_REMEDIATION_PLAN.md`
-   (8 code-verified workstreams, `ec43426b`). Meta-review itself is DONE (S349) — do NOT
-   re-dispatch. Candidate first fixes: carryover-freshness gate, code-level nomenclature
-   rename, Akoya cycle-code fail-loud. Verify blast radius before building each.
+1. **Reconcile the whack-a-mole remediation direction.** The original executable proposal is
+   `docs/WHACK_A_MOLE_REMEDIATION_PLAN.md` (`ec43426b`). A later independent Codex review,
+   `docs/audits/whack-a-mole-independent-review-codex-2026-07-09.md`, reached **NEEDS REWORK**:
+   keep WS0 narrowly; reshape WS1–WS3; reject WS4/WS5; defer WS6; keep WS7 as posture.
+   This is an owner decision, not an accepted replacement plan. Do NOT execute the original
+   sequence or re-dispatch another review before that reconciliation.
 
 2. **Build the staff "manual review rescue" tool.** (Carried S347/S348, not started.)
    Evidence: `project-staff-review-rescue-tool.md`. Mirror `ReviewAuthoringForm`, route
@@ -84,21 +86,18 @@ reviewer-coi / reviewer-ai-use too. Related: `project-grantee-waiver-versioning.
 
 ### Owner Decision Needed
 
-1. **Green-light the reviewer holistic redesign branch build?** Evidence:
+1. **Adopt, modify, or reject the independent whack-a-mole review's named changes?** Evidence:
+   `docs/audits/whack-a-mole-independent-review-codex-2026-07-09.md`; original direction:
+   `docs/WHACK_A_MOLE_REMEDIATION_PLAN.md`.
+2. **Green-light the reviewer holistic redesign branch build?** Evidence:
    `project-reviewer-holistic-redesign-parallel-build.md`; PARKED pending explicit go.
-2. **Staff rescue tool placement.** Admin/superuser page vs. Reviews tab — gates Verified Open #2.
-3. **Reviewer closeout-payability design.** Evidence: `project-reviewer-closeout-payability.md` (S343).
-4. **How far to push the TS `check:types` gate.** Evidence: `docs/TYPESCRIPT_OPTION_ASSESSMENT.md`.
-5. **Two untracked S349-era dispatch-prompt drafts sitting in `docs/` on this machine:**
-   `docs/REVIEWER_HOLISTIC_REVIEW_CODEX_PROMPT.md` and
-   `docs/WHACK_A_MOLE_META_REVIEW_CODEX_PROMPT.md` (both `status: draft`). The meta-review
-   one is obsolete (meta-review DONE S349); the holistic one may still matter if the branch
-   build gets a go. Not committed/deleted in S352 (not this agent's artifacts). Decide:
-   commit, delete, or leave.
+3. **Staff rescue tool placement.** Admin/superuser page vs. Reviews tab — gates Verified Open #2.
+4. **Reviewer closeout-payability design.** Evidence: `project-reviewer-closeout-payability.md` (S343).
+5. **How far to push the TS `check:types` gate.** Evidence: `docs/TYPESCRIPT_OPTION_ASSESSMENT.md`.
 
 ### Parked
 
-1. Reviewer holistic redesign branch build (owner go pending — Owner Decision #1).
+1. Reviewer holistic redesign branch build (owner go pending — Owner Decision #2).
 2. "No longer needed" stand-down flow for ACCEPTED reviewers (S347; `withdraw-sufficient` only targets invited-pending).
 3. Product/UX asks: review-output formatting (`project-review-output-formatting.md`), campaign-settings UX (`project-campaign-settings-ux-revisit.md`).
 4. Project-wide prompt-cache-hit audit (`project-cache-hit-rate-review.md`).
@@ -107,9 +106,9 @@ reviewer-coi / reviewer-ai-use too. Related: `project-grantee-waiver-versioning.
 
 ### Verify Before Acting
 
-1. **Whack-a-mole workstreams are recommendations, not confirmed worklists.** Before building
-   each: nomenclature rename → grep live route/authz usage; carryover gate → confirm no
-   existing guard covers it; cycle-code → read `akoya-temporal-axis-encodings.md` first.
+1. **Whack-a-mole workstreams are recommendations, not confirmed worklists.** The 2026-07-09
+   independent review specifically disputes WS4/WS5/WS6 and requires WS1–WS3 reshaping. Resolve
+   Owner Decision #1 before building any workstream.
 2. **The label_conflict "bug" is partly working-as-designed.** The fix is UX (label bump
    guidance), NOT relaxing version immutability. Verify across all three policy slots.
 
@@ -124,7 +123,9 @@ reviewer-coi / reviewer-ai-use too. Related: `project-grantee-waiver-versioning.
    Evidence: `project-grantee-waiver-versioning.md`. Do NOT restore the hardcoded-only waiver.
 3. **`main` auto-deploys to prod on push.** Staff canonical host `applications.wmkeck.org`.
 4. **Reviewer manual-add 500 FIXED (S351, `4e458e56`)** — no `Proxy` over module namespaces.
-5. **Whack-a-mole meta-review DONE (S349).** Execute the plan; don't re-run the review.
+5. **Whack-a-mole reviews DONE (Fable S349 + independent Codex 2026-07-09).** Do not dispatch
+   another review; resolve the conflicting recommendations through Owner Decision #1. The plan
+   is not execution-ready while that decision is open.
 6. **accept-fast-response SHIPPED; decline-referral SHIPPED (S349); DynamicsService
    decomposition (S345) / peer-review Executor migration (S344) / 4 PDF-app sunset (S344) COMPLETE.**
 
@@ -139,7 +140,8 @@ reviewer-coi / reviewer-ai-use too. Related: `project-grantee-waiver-versioning.
 | `lib/services/reviewer-campaign-timeline.js` | Admin timeline defaults incl. desiredCount default 4 (S352) |
 | `lib/services/review-manager/send-emails-service.js` | First-send seeding of timing columns + quota (S352, $select L213) |
 | `docs/REVIEWER_QUOTA_PD_EMAIL_PLAN.md` | SHIPPED plan + S352 reconciliation record |
-| `docs/WHACK_A_MOLE_REMEDIATION_PLAN.md` | 8 remediation workstreams (Verified Open #1) |
+| `docs/WHACK_A_MOLE_REMEDIATION_PLAN.md` | Original 8-workstream proposal; execution paused for owner reconciliation |
+| `docs/audits/whack-a-mole-independent-review-codex-2026-07-09.md` | Independent NEEDS REWORK review + replacement operating model |
 
 ## Testing
 
