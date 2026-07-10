@@ -57,6 +57,12 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => {
   };
 });
 jest.mock('../../lib/services/backprop-reviewer-orcid', () => ({ backPropReviewerOrcidToContact: jest.fn(async () => ({ action: 'noop' })) }));
+// Reviewer quota (wmkf_desiredcount) seed: server-side admin default, read via this
+// service. Default resolves { desiredCount: null } (no seed) unless a test overrides it.
+const getReviewerCampaignTimeline = jest.fn(async () => ({ timeline: { desiredCount: null } }));
+jest.mock('../../lib/services/reviewer-campaign-timeline', () => ({
+  getReviewerCampaignTimeline: (...a) => getReviewerCampaignTimeline(...a),
+}));
 // Stage-aware secure-link button label: send-emails reads email.reviewer_<type>.button_label.
 jest.mock('../../lib/services/settings-service', () => ({
   getSettingStrict: jest.fn(async (key) => {
@@ -435,6 +441,55 @@ describe('send-emails — Phase 1 campaign-config persistence (first invite)', (
   test('non-invitation templateType never writes config', async () => {
     await run({ drafts: [draft()], templateType: 'followup', campaignConfig: CONFIG });
     expect(updateRecord).not.toHaveBeenCalled();
+  });
+});
+
+describe('send-emails — reviewer quota (wmkf_desiredcount) seed on first invite', () => {
+  const CONFIG = { respondOffsetDays: 7, reviewDueDate: '2026-08-01' };
+  const invite = (over = {}) => ({ drafts: [draft()], templateType: 'invitation', campaignConfig: CONFIG, ...over });
+
+  test('unset wmkf_desiredcount + admin default 4 → writes wmkf_desiredcount 4 alongside the timing columns', async () => {
+    getReviewerCampaignTimeline.mockResolvedValueOnce({ timeline: { desiredCount: 4 } });
+    await run(invite());
+    expect(updateRecord).toHaveBeenCalledTimes(1);
+    expect(updateRecord).toHaveBeenCalledWith('akoya_requests', 'req-1',
+      { wmkf_respondoffsetdays: 7, wmkf_reviewduedate: '2026-08-01', wmkf_desiredcount: 4 }, expect.any(Object));
+  });
+
+  test('already-set wmkf_desiredcount is never overwritten (sibling timing columns still seed)', async () => {
+    getReviewerCampaignTimeline.mockResolvedValueOnce({ timeline: { desiredCount: 4 } });
+    REQUEST = { ...REQUEST, wmkf_desiredcount: 2 };
+    await run(invite());
+    expect(updateRecord).toHaveBeenCalledTimes(1);
+    expect(updateRecord).toHaveBeenCalledWith('akoya_requests', 'req-1',
+      { wmkf_respondoffsetdays: 7, wmkf_reviewduedate: '2026-08-01' }, expect.any(Object));
+  });
+
+  test('request fetch $selects wmkf_desiredcount — the never-overwrite guard is blind without it', async () => {
+    // Guards the select at send-emails-service.js ~L213: if the column is dropped from
+    // the projection, reqRec.wmkf_desiredcount is undefined and the seed would clobber
+    // a quota the PD already set via the campaign settings modal.
+    getReviewerCampaignTimeline.mockResolvedValueOnce({ timeline: { desiredCount: 4 } });
+    await run(invite());
+    const reqFetch = getRecord.mock.calls.find(([entity, , opts]) => entity === 'akoya_requests' && opts?.select);
+    expect(reqFetch?.[2]?.select).toContain('wmkf_desiredcount');
+  });
+
+  test('admin default null → no wmkf_desiredcount write (timing columns still seed)', async () => {
+    getReviewerCampaignTimeline.mockResolvedValueOnce({ timeline: { desiredCount: null } });
+    await run(invite());
+    expect(updateRecord).toHaveBeenCalledTimes(1);
+    expect(updateRecord).toHaveBeenCalledWith('akoya_requests', 'req-1',
+      { wmkf_respondoffsetdays: 7, wmkf_reviewduedate: '2026-08-01' }, expect.any(Object));
+  });
+
+  test('timeline read throws → send still succeeds; quota seed is skipped, not the whole batch', async () => {
+    getReviewerCampaignTimeline.mockRejectedValueOnce(new Error('settings read failed'));
+    const res = await run(invite());
+    expect(resultOf(res).stats).toMatchObject({ sent: 1 });
+    expect(updateRecord).toHaveBeenCalledTimes(1);
+    expect(updateRecord).toHaveBeenCalledWith('akoya_requests', 'req-1',
+      { wmkf_respondoffsetdays: 7, wmkf_reviewduedate: '2026-08-01' }, expect.any(Object));
   });
 });
 
