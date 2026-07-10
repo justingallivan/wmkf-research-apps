@@ -11,7 +11,7 @@ This is a Next.js multi-application system for grant and document workflows, dep
 3. **Time-box support work.** Cleanup, reconciliation, documentation audits, and verification loops support the user's objective. Check in before they exceed approximately 30 minutes or two commits without advancing that objective.
 4. **Relevant red gates block completion.** Run gates for surfaces you changed. A gate and its self-test run sequentially, never in parallel. Gate mechanics and scopes live in `docs/CI_GATES_REFERENCE.md`.
 5. **Reconcile durable facts completely.** For docs, memory, instruction files, and `SESSION_PROMPT.md`, follow `.claude/rules/durable-docs.md`; use `/sweep` for fact-level reconciliation.
-6. **Commit working changes regularly.** Commit completed, working features/fixes with descriptive messages; preserve unrelated user changes.
+6. **Commit working changes regularly.** Commit completed, working features/fixes with descriptive messages; preserve unrelated user changes. `main` auto-deploys to production: follow `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` — Tier 0 work may land directly, while Tier 1–3 runtime work uses a branch and deliberate promotion.
 7. **Ask, don't assume.** If something is unclear, ask before writing a single line. Never make silent assumptions about intent, architecture, or requirements.
 8. **Simplest solution first.** Always implement the simplest thing that could work. Do not add abstractions or flexibility that weren't explicitly requested.
 9. **Don't touch unrelated code.** If a file or function is not directly part of the current task, do not modify it, even if you think it could be improved.
