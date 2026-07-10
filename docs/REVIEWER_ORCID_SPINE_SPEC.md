@@ -41,10 +41,12 @@ ambiguous/fabricated ones **abstain to needs-review** — never "closest plausib
   29% cross-source ORCID conflict (24/82); **47% affiliation mismatch** (36/77 where both
   present); OpenAlex's own #1 hit is frequently a namesake (Robert Sang→Florida State, not
   Griffith; Olga Smirnova→Technion, not Max-Born).
-- **Constrained selection + abstain eliminates confident-wrong**
-  (`eval-orcid-spine-constrained.mjs`, **84 names / 7 fields**): of **39** naive-wrong cases,
-  **18** recovered the right record at rank>1 (Robert Sang→Griffith @ rank 4, ORCID-corroborated),
-  **21** safely abstained, **0** stayed confidently wrong.
+- **Constrained selection + abstain eliminates proxy-labeled confident-wrong in this run**
+  (`eval-orcid-spine-constrained.mjs`, **84 names / 7 fields**): of **39** top-1 affiliation
+  mismatches under the harness's proxy ground truth, **18** selected a rank>1 record that matched the
+  claimed context, **21** abstained, and **0** still asserted the proxy-mismatching rank-1 record.
+  This is evidence that constraint + abstention reduces risky assertion; it is **not** an independently
+  labeled person-level finding that 39 real identities were wrong and zero remain wrong.
 - **Resolution rate** (same 84-name run): CONFIRMED 39% (33/84) + PLAUSIBLE 27% (23/84) =
   **66% resolved**, **33% abstain** (28/84 → needs-review, includes correctly-rejected
   fabrications: count=0 for "Sigal Itzkovitz", misspelled "Alexandria Landsman", "Andres Bhatt").

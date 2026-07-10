@@ -16,9 +16,11 @@ related:
 
 # Reviewer Holistic Review — Implementation Plan
 
-Direction source: `docs/audits/reviewer-holistic-review-fable-2026-07-08.md`
-(read it first — this plan implements its §3–§5; its §1–§2 carry the rationale
-and the owner-stated constraints that bound every choice here).
+Original direction source: `docs/audits/reviewer-holistic-review-fable-2026-07-08.md`.
+Before using this parked plan, read
+`docs/audits/reviewer-holistic-review-comparison-2026-07-09.md`; it preserves
+the useful direction while correcting evidence overclaims, the now-shipped
+P3.1 staff handoff, and the identity-contract scope.
 
 ## Execution model (owner, S349 — where the phases land, not how they're staged)
 
@@ -41,6 +43,13 @@ out). What changes is only *where the phases land and how success is judged*:
 - All safety invariants and **[OWNER-GATE]** markers still bind on the branch.
 - **Status: PARKED — not green-lit.** Do not start the build without explicit
   owner go. Intent recorded in `.claude-memory/project-reviewer-holistic-redesign-parallel-build.md`.
+
+> **Reconciled 2026-07-09:** P3.1's staff-facing decline-referral surface and
+> one-click Add-or-Refer handoff shipped on main in S349 (`e955a1df`). Its
+> historical build steps below are retained as provenance, not remaining work.
+> The external decline-acknowledgment/referral email is still a separate open
+> choice. All other phases remain parked and should be reassessed against the
+> comparison memo before owner approval.
 
 ## How to use this plan (implementing agent: read this section fully)
 
@@ -271,9 +280,16 @@ design before implementation (durable state, cross-layer).
 (the owner constraints that shaped these), `.claude-memory/project-reviewer-referral-capture.md`,
 `docs/REVIEWER_FINDER_REFERRAL_CAPTURE_DESIGN.md`.
 
-### P3.1 Close the referral loop (highest-leverage feature work)
+### P3.1 Close the staff-facing referral loop — SHIPPED S349
 
-State [VERIFIED 2026-07-08 via direct reads]: capture exists on both sides —
+**Current state [VERIFIED 2026-07-09 via source + `e955a1df`]:** the workbench
+reader, Track Reviewers callout, and one-click prefill into the normal
+Add-or-Refer identity flow are live. See
+`docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` “Decline-referral
+surface + one-click add.” The remainder of this subsection records the
+pre-build state and acceptance contract.
+
+Historical pre-build state [VERIFIED 2026-07-08 via direct reads]: capture existed on both sides —
 staff "Add or Refer a Reviewer" (S249; route
 `pages/api/workbench/manual-reviewer.js:55,77` accepts `referredBy` and
 delegates to `lib/services/workbench/manual-reviewer-service.js`) and the
@@ -286,7 +302,7 @@ writing `wmkf_declinereferral`). **Zero staff-side readers** of
 `lib/services/{review-manager,workbench}/`, `pages/api/`); `respond.js:7`
 explicitly defers "referral handoff" to a follow-up build.
 
-Build, in order:
+Historical build sequence (completed for surface + one-click resolve):
 1. **Surface:** in the workbench Track Reviewers panel, render a visible
    "referred: <free text>" callout on any declined suggestion whose
    `wmkf_declinereferral` is non-empty (probe first: how declines render
@@ -414,13 +430,15 @@ anything is live.
 | P0 identity safety | S | Low (guards preserved) | Yes (design call) | full tests |
 | P1 binding source | M | Medium (schema + guards) | Yes (new column) | contract-reconcile, full tests |
 | P2 eval + consolidation | M | Low (behavior-frozen) | Only for red-gate promotion / stratum-3 choice | full tests, eval:identity |
-| P3.1 referral loop | M | Medium (new UI + write path) | Email trigger only | contract-reconcile, e2e capture-mode |
+| P3.1 staff referral loop | SHIPPED S349 | — | External email only | shipped in `e955a1df` |
 | P3.2 seeds | S | Low (prompt-level) | Prod reseed | A/B sniff, prompt-injection gate if registered |
 | P3.3 outcome report | S | None (read-only) | No | — |
 | P4 deletions | M | Medium (destructive) | Yes (P4.1) | characterization tests, live-caller greps, /sweep |
 
-Recommended order: P0 → P3.3 (free, informs everything) → P3.1 → P1 → P2 →
-P3.2 → P4. P0 and P3.3 fit one session each; nothing in P3/P4 depends on P1.
+Recommended order for remaining parked work: reassess against the 2026-07-09
+comparison memo, then P0 → P3.3 (free, informs everything) → P1 → P2 → P3.2 →
+P4 if owner-approved. P3.1's staff handoff is already shipped. P0 and P3.3 fit
+one session each; nothing in remaining P3/P4 depends on P1.
 
 ## Open owner decisions (collected)
 
