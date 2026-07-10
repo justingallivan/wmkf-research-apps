@@ -46,8 +46,14 @@ block recording the deltas. `REVIEWER_QUOTA_PD_EMAIL_PLAN.md` was recovered and,
 notify call still uses `severity:'info'` with NO `emailAdmins:true` and still carries
 `category:'reviewers'`, so the PD email is inert (notification-service gates email on
 `emailAdmins || error || critical`). `explicitRecipients` + `desiredCount` API validation
-pre-existed the plan. Frontmatter stays `status: active` / `kind: plan` (accurate for an
-unbuilt plan).
+pre-existed the plan. Frontmatter stayed `status: active` / `kind: plan` while unbuilt.
+
+**Built 2026-07-09 (S352).** The quota-PD-email plan SHIPPED (`4a2ee03c`), plus owner-requested
+extensions beyond the plan: admin "Reviewer quota" default (4) in the Reviewer Campaign
+Timeline settings, CampaignConfigModal prefill of due-date/quota from those defaults
+(`c2785729`), and non-clobbering first-invite-send seeding of `wmkf_desiredcount`
+(`a28876b0`). The plan doc now carries a Shipped reconciliation note. Nothing about this
+memory's recovery story changes; the "may still be an unbuilt plan" era is over.
 
 Lesson retained: unpushed worktree commits are recoverable only from the machine that made
 them. See [[feedback-dont-resurface-parked-items]] and

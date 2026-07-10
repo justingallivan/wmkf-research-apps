@@ -120,6 +120,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
+| [WHACK_A_MOLE_META_REVIEW_CODEX_PROMPT.md](WHACK_A_MOLE_META_REVIEW_CODEX_PROMPT.md) | draft | draft |  | Fresh-eyes Fable prompt: given the S349 whack-a-mole audit, propose codebase-wide structural + process changes that prevent the patch-then-re-patch class. | 2026-07-08 |
 | [WHACK_A_MOLE_META_REVIEW_FABLE_PROMPT.md](WHACK_A_MOLE_META_REVIEW_FABLE_PROMPT.md) | draft | draft |  | Fresh-eyes Fable prompt: given the S349 whack-a-mole audit, propose codebase-wide structural + process changes that prevent the patch-then-re-patch class. | 2026-07-08 |
 | [WHACK_A_MOLE_REMEDIATION_PLAN.md](WHACK_A_MOLE_REMEDIATION_PLAN.md) | plan | active |  | Executable, code-verified plan for the seven meta-review items — stamp registry, fixture evals, invariant sweep, carryover probes, axis check, rename, checkJs. | 2026-07-08 |
 
@@ -257,6 +258,7 @@ related:
 | [REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md](REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md) | plan | active |  | Source memories: project-serpapi-capability-erosion, project-serpapi-budget-latency. | 2026-07-02 |
 | [REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md](REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md) | plan | active |  | An anchor is an evidence item extracted from or derived from the proposal. It may seed work resolution, literature expansion, identity resolution,... | 2026-07-02 |
 | [REVIEWER_FINDER.md](REVIEWER_FINDER.md) | source-of-truth | canonical | yes | The Reviewer Finder is the flagship application for finding and contacting expert reviewers for grant proposals. | 2026-07-02 |
+| [REVIEWER_HOLISTIC_REVIEW_CODEX_PROMPT.md](REVIEWER_HOLISTIC_REVIEW_CODEX_PROMPT.md) | audit | draft |  | Pointer-based prompt for a CODEX session to holistically reassess reviewer finding and disambiguation — reframe-first, full latitude, curated reading map. | 2026-07-08 |
 | [REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md](REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md) | audit | draft |  | Pointer-based prompt for a Fable session to holistically reassess reviewer finding and disambiguation — reframe-first, full latitude, curated reading map. | 2026-07-08 |
 | [REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md](REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md) | plan | draft |  | Phased plan for the 2026-07-08 holistic-review direction: identity provenance split, eval-first hardening, referral loop-closure, deletions. | 2026-07-08 |
 | [REVIEWER_IDENTITY_ORCID_EMPLOYMENT_PROMOTION_DESIGN.md](REVIEWER_IDENTITY_ORCID_EMPLOYMENT_PROMOTION_DESIGN.md) | spec | active |  | 2. Promotion rule (reviewer-identity-resolver.js classifySpineEvidence): strong orcid_employment_corroborated + topic_match + spine.forenameAgrees... | 2026-07-02 |
@@ -309,7 +311,7 @@ related:
 | [REVIEWER_MERGE_DESIGN.md](REVIEWER_MERGE_DESIGN.md) | spec | active |  | Chunks 1–3 (adapters, lib/services/reviewer-merge.js, the pages/api/reviewer-finder/merge-candidates route) are committed and tested. | 2026-07-02 |
 | [REVIEWER_ONBOARDING_FLOW_MOCKUP.md](REVIEWER_ONBOARDING_FLOW_MOCKUP.md) | spec | active |  | What a potential reviewer sees at each stage of the invitation → accept/decline → confirmation journey, as built in the reviewer portal... | 2026-07-02 |
 | [REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md](REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md) | plan | active |  | Target environment: Prod (Dataverse Wave 2 schema is live). | 2026-07-02 |
-| [REVIEWER_QUOTA_PD_EMAIL_PLAN.md](REVIEWER_QUOTA_PD_EMAIL_PLAN.md) | plan | active |  | Make the existing reviewer quota threshold alert send an actual email to the lead Program Director. |  |
+| [REVIEWER_QUOTA_PD_EMAIL_PLAN.md](REVIEWER_QUOTA_PD_EMAIL_PLAN.md) | plan | active |  | SHIPPED S352 (2026-07-09): the reviewer quota threshold alert now emails the lead Program Director, and the quota target is settable/seeded end-to-end. |  |
 | [REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md](REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md) | plan | active |  | 3. Editor = full WYSIWYG (tiptap) → HTML, sanitized server-side with sanitize-html. Each narrative answer is stored twice: sanitized HTML (rich... | 2026-07-02 |
 | [REVIEWER_SELF_REPORT_ORCID_E2E_HANDOFF.md](REVIEWER_SELF_REPORT_ORCID_E2E_HANDOFF.md) | plan | historical |  | Audience: Codex, taking over development of the e2e test suite for this feature. | 2026-07-02 |
 | [REVIEWER_STAGE_2A_BUILD_PLAN.md](REVIEWER_STAGE_2A_BUILD_PLAN.md) | plan | active |  | Date: 2026-05-09 (build); 2026-05-12 (status banner refresh). | 2026-07-02 |

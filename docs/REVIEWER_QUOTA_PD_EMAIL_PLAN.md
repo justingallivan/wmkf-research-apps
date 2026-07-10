@@ -3,7 +3,7 @@ title: "Reviewer Quota PD Email Plan"
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Make the existing reviewer quota threshold alert send an actual email to the lead Program Director."
+summary: "SHIPPED S352 (2026-07-09): the reviewer quota threshold alert now emails the lead Program Director, and the quota target is settable/seeded end-to-end."
 owner: product-engineering
 related:
   - docs/REVIEWER_ENGAGEMENT_SPEC.md
@@ -14,6 +14,31 @@ related:
 ---
 
 # Reviewer Quota PD Email Plan
+
+## Status: SHIPPED (S352, 2026-07-09)
+
+Both proposed changes are built and deployed, plus three owner-requested extensions
+beyond the original plan:
+
+- **Change #1 (quota settable in the modal)** — `4a2ee03c`. `CampaignConfigModal` loads,
+  saves, and clears `desiredCount` (UI-only, as planned).
+- **Change #2 (PD email on quota reached)** — `4a2ee03c`. The `reviewer_quota_reached`
+  notify sets `emailAdmins: true`, drops `category: 'reviewers'`, keeps
+  `explicitRecipients: pdEmail ? [pdEmail] : []` (alert-only fallback when the PD email
+  is unresolvable), exactly per §Proposed Changes.
+- **Extension: admin default** — `c2785729`. The Reviewer Campaign Timeline admin panel
+  carries a "Reviewer quota" default (`desiredCount`, default 4) in
+  `reviewer.campaign_timeline_defaults`; legacy stored JSON backfills 4, an explicitly
+  cleared default stays null. The campaign settings modal prefills Review due date and
+  Reviewer quota from these defaults when the request value is unset (durable only on Save).
+- **Extension: first-send seeding** — `a28876b0`. `send-emails-service.js` seeds
+  `wmkf_desiredcount` from the admin default on the first invite send, in the same
+  per-column non-clobbering gate as the timing columns (server-side default read only,
+  never from the client payload; best-effort). The request `$select` now includes
+  `wmkf_desiredcount` so the never-overwrite guard sees existing values (regression-tested).
+
+The sections below are the original plan, retained as the design record. Their
+"current state" claims describe the pre-build codebase.
 
 ## Goal
 
@@ -26,8 +51,9 @@ This plan does not change the reviewer-facing "no longer needed" flow. The PD st
 ## Codebase Drift Since Scoping (re-verified 2026-07-09, S350)
 
 This plan was scoped 2026-07-02. It was recovered to `main` (commit `1420d79c`) and
-re-verified against a codebase roughly a week ahead. **Neither proposed change has been
-built.** The goal and both changes remain valid, but two structural shifts landed after
+re-verified against a codebase roughly a week ahead. **Neither proposed change had been
+built at that point** (both shipped S352 — see Status above). The goal and both changes
+remained valid, but two structural shifts landed after
 scoping and moved cited code:
 
 1. **The quota check moved off the synchronous accept path into the async drain.** The
