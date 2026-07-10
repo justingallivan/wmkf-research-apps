@@ -120,6 +120,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
+| [CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md](CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md) | decision | active |  | Campaign-aware release, rehearsal, Dataverse isolation, promotion, and rollback strategy for the twice-yearly proposal-review workflow. | 2026-07-09 |
 | [WHACK_A_MOLE_META_REVIEW_FABLE_PROMPT.md](WHACK_A_MOLE_META_REVIEW_FABLE_PROMPT.md) | draft | draft |  | Fresh-eyes Fable prompt: given the S349 whack-a-mole audit, propose codebase-wide structural + process changes that prevent the patch-then-re-patch class. | 2026-07-08 |
 | [WHACK_A_MOLE_REMEDIATION_PLAN.md](WHACK_A_MOLE_REMEDIATION_PLAN.md) | plan | active |  | Original code-verified workstream proposal; independent Codex review returned NEEDS REWORK and owner reconciliation is pending before execution. | 2026-07-08 |
 
@@ -294,7 +295,7 @@ related:
 | [REVIEWER_CONTACT_LEADS_SPEC.md](REVIEWER_CONTACT_LEADS_SPEC.md) | spec | active |  | Drafted: 2026-06-18 Scope: Reviewer Finder contact recall and staff workflow. This is a product/architecture spec, not an implementation record. | 2026-07-02 |
 | [REVIEWER_CONTACT_LINKER_DESIGN.md](REVIEWER_CONTACT_LINKER_DESIGN.md) | spec | active |  | 1. wmkf_potentialreviewers ↔ wmkf_potentialreviewers — duplicate reviewer rows (the misspelled-duplicate bug). Being fixed now... | 2026-07-02 |
 | [REVIEWER_DATA_MODEL.md](REVIEWER_DATA_MODEL.md) | source-of-truth | canonical | yes | Visual orientation for the reviewer-domain Dataverse entities and how they connect. Use this when you're not sure which entity holds which piece... | 2026-07-02 |
-| [REVIEWER_E2E_REHEARSAL_RUNBOOK.md](REVIEWER_E2E_REHEARSAL_RUNBOOK.md) | runbook | active |  | Purpose: rehearse the reviewer invitation and return flow without sending real Dynamics email, without writing test review files to SharePoint,... | 2026-07-02 |
+| [REVIEWER_E2E_REHEARSAL_RUNBOOK.md](REVIEWER_E2E_REHEARSAL_RUNBOOK.md) | runbook | active |  | Safe reviewer invitation and return rehearsal through browser mocks, capture-mode controlled writes, or an allowlisted live smoke. | 2026-07-02 |
 | [REVIEWER_ENGAGEMENT_PLAN_INTERPRETATION.md](REVIEWER_ENGAGEMENT_PLAN_INTERPRETATION.md) | decision | active |  | ⚠️ SUPERSEDED (S277) — historical pre-implementation snapshot. Do not treat node labels as current state. | 2026-07-02 |
 | [REVIEWER_ENGAGEMENT_SPEC.md](REVIEWER_ENGAGEMENT_SPEC.md) | source-of-truth | canonical | yes | A PD action that emails the proposal/materials to the ACCEPTED reviewers. It is a clean wrapper over the existing manual Materials send — NOT a... | 2026-07-02 |
 | [REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md](REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md) | spec | active |  | State labels: [VERIFIED] = read in source this session; [ASSUMED] = inference. | 2026-07-02 |

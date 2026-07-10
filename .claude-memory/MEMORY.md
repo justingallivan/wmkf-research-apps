@@ -26,7 +26,7 @@
 - Local `npm run dev` auth setup (wrong-user/no-signout symptom, invite-link minting): project-local-dev-auth-setup.md; project-vercel-cli-deploy-preview-auth.md
 
 ## Working Norms
-- Git/branch/main: feedback-verify-branch-before-git-action.md; project-commit-directly-to-main.md
+- Git/branch/main and campaign releases: feedback-verify-branch-before-git-action.md; project-commit-directly-to-main.md; ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
 - Reviewer preferences: feedback-prioritize-contact-recall-over-identity-precision.md; feedback-manual-affiliation-edit-no-coi-recheck.md
 - Completion posture: feedback-thoroughness-default.md; feedback-drive-to-completion.md; feedback-truncation-is-breakage-not-completion.md; feedback-first-time-correctness-over-rework.md; feedback-real-fix-not-design-note.md; feedback-self-review-before-delegating-review.md; feedback-dont-self-certify-convergence.md; feedback-escalate-aggregate-scope-not-step-size.md
 - Refactor / behavior-freeze extraction: feedback-behavior-freeze-passthrough-no-default.md; ../docs/DISCOVERY_SERVICE_DECOMPOSITION_PLAN.md (facade+modules decomposition playbook)
@@ -56,7 +56,7 @@
 - BILL / honoraria / payment semantics: ../docs/agent-wiki/topics/finance-honoraria.md; project-honorarium-payment-landscape.md
 - Auth / admin / access / security / private Blob / file download: ../docs/agent-wiki/topics/security-auth.md
 - Integrity screener / Retraction Watch / PubPeer / News: ../docs/agent-wiki/topics/integrity-screener.md
-- Dev environment / secrets / Vercel deploy / local build: ../docs/agent-wiki/topics/dev-environment.md
+- Dev environment / secrets / Vercel deploy / local build: ../docs/agent-wiki/topics/dev-environment.md; ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
 - Strategy / system model / roadmap / phasing / Virtual Review Panel: ../docs/agent-wiki/topics/strategy-roadmap.md
 - Proposal docs / phasing / Phase I-II: project-j27-doc-capture-evolution.md; project-grant-phasing-evolution.md; project-phaseistatus-decision-lifecycle.md
 - Grantee and email templates: project-grantee-deliverable-email-voice.md; project-email-template-token-syntax.md

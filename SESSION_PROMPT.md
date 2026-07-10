@@ -84,6 +84,15 @@ reviewer-coi / reviewer-ai-use too. Related: `project-grantee-waiver-versioning.
    [ASSUMED working — other admin emails use the same service]. When the first real quota
    trips, confirm the PD email arrived (or probe `NotificationService.isEmailEnabled()`).
 
+4. **Implement the first campaign-release safety control.** The adopted operating
+   direction is `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`. Its highest-priority
+   unbuilt control is the centralized fail-closed Dataverse deployment-target/write
+   interlock; after that, re-probe and provision reviewer schema/config in the sandbox.
+   Do not describe capture mode as a sandbox: render persists token state and a captured
+   invitation send still stamps lifecycle fields. The current `/stop` skill also
+   hard-codes `git push origin main`; make `/start` and `/stop` branch-aware before
+   relying on them for the new feature-branch workflow.
+
 ### Owner Decision Needed
 
 1. **Adopt, modify, or reject the independent whack-a-mole review's named changes?** Evidence:
@@ -142,6 +151,8 @@ reviewer-coi / reviewer-ai-use too. Related: `project-grantee-waiver-versioning.
 | `docs/REVIEWER_QUOTA_PD_EMAIL_PLAN.md` | SHIPPED plan + S352 reconciliation record |
 | `docs/WHACK_A_MOLE_REMEDIATION_PLAN.md` | Original 8-workstream proposal; execution paused for owner reconciliation |
 | `docs/audits/whack-a-mole-independent-review-codex-2026-07-09.md` | Independent NEEDS REWORK review + replacement operating model |
+| `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` | Adopted campaign windows, risk tiers, Dataverse test modes, promotion, and rollback direction |
+| `docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md` | Concrete mocked/capture/live reviewer rehearsal procedures and side-effect boundaries |
 
 ## Testing
 

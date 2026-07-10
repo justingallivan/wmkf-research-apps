@@ -3,11 +3,12 @@ title: Reviewer End-to-End Rehearsal Runbook
 domain: reviewer-workbench
 kind: runbook
 status: active
-summary: "Purpose: rehearse the reviewer invitation and return flow without sending real Dynamics email, without writing test review files to SharePoint,..."
+summary: "Safe reviewer invitation and return rehearsal through browser mocks, capture-mode controlled writes, or an allowlisted live smoke."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
 related:
+  - docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
   - docs/CREDENTIALS_RUNBOOK.md
   - tests/unit/reviewer-invite-panel-invite-capture.test.js
   - tests/unit/invite-email-modal-capture.test.js
@@ -18,9 +19,15 @@ related:
 
 Date: 2026-06-21
 
-Purpose: rehearse the reviewer invitation and return flow without sending real Dynamics email, without writing test review files to SharePoint, and without polluting production Dataverse data.
+Purpose: rehearse the reviewer invitation and return flow while choosing an
+explicit side-effect boundary. The browser-mocked path reaches no external data
+service. Capture mode blocks real Dynamics email but is **not** a full Dataverse
+sandbox.
 
-This runbook covers the current no-send local rehearsal loop. It complements `docs/CREDENTIALS_RUNBOOK.md`, which remains the source of truth for environment-variable definitions and rotation guidance.
+This runbook covers the current browser-mocked, capture-mode, and allowlisted live
+smoke loops. `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` governs which
+mode is appropriate; `docs/CREDENTIALS_RUNBOOK.md` remains the source of truth for
+environment-variable definitions and rotation guidance.
 
 ---
 
@@ -29,6 +36,11 @@ This runbook covers the current no-send local rehearsal loop. It complements `do
 - `REVIEWER_EMAIL_DELIVERY_MODE=capture` is for non-production rehearsal only.
 - The send route refuses capture mode when `VERCEL_ENV=production`.
 - Capture mode skips Dynamics email send, skips contact promotion/back-propagation, and returns the rendered email artifact in the send result.
+- Capture mode does **not** suppress every Dataverse write. Rendering a template
+  containing the external-link placeholder persists a fresh token hash/expiry, and
+  a captured invitation send with `markAsSent=true` still stamps invitation
+  lifecycle state. Use only throwaway reviewer suggestions/requests when capture is
+  connected to production Dataverse.
 - The browser E2E tests mock external-reviewer portal data routes at the browser boundary. They render the real reviewer pages, but they do not reach Dataverse, SharePoint, Dynamics, or Blob storage.
 - Do not use a real reviewer or a live production request for manual experiments unless you intend to create real lifecycle records.
 - Do not set `EMERGENCY_AUTH_BYPASS=true` for testing. Use normal staff sign-in for live browser smoke tests, or run the local mocked rehearsal in development mode.
@@ -146,7 +158,9 @@ For a capture-mode rehearsal against local/live APIs instead of browser route mo
    - `Respond to Invitation` button/link (invitation-stage label)
    - fallback full URL
 
-Expected: no real Dynamics email is sent. The captured artifact is the testable email output.
+Expected: no real Dynamics email is sent. The captured artifact is the testable
+email output. This path may still persist the token and invitation lifecycle fields
+described under Safety Boundaries.
 
 ---
 
