@@ -2,14 +2,34 @@
  * @jest-environment jsdom
  *
  * GranteeDeliverableForm — the external grantee edit form. Covers the publish
- * waiver SUBMIT GATE (button disabled until the box is checked AND the required
- * fields are present AND the signed render token is present), the versioned
- * waiver text, the multipart submit contract (now echoing the render token), and
- * the thank-you state. The checkbox itself is still a client gate — never sent.
+ * waiver SUBMIT GATE (button disabled until the waiver is acknowledged AND the
+ * required fields are present AND the signed render token is present), the
+ * versioned waiver text, the multipart submit contract (now echoing the render
+ * token), and the thank-you state.
+ *
+ * As of S351 the inline checkbox was replaced by the scroll-gated PolicyAckModal
+ * (see grantee-deliverable-form-waiver.test.js for the modal-wiring test).
+ * PolicyAckModal is mocked at its boundary here too, so acknowledgment is
+ * "click Read waiver, then click the mock's acknowledge button" instead of
+ * "click the checkbox". The signed waiverToken (never the raw acknowledgment)
+ * is still what's sent to the server.
  */
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import GranteeDeliverableForm from '../../shared/components/external/GranteeDeliverableForm';
+
+// Minimal stand-in exposing the two callbacks the form depends on (mirrors
+// grantee-deliverable-form-waiver.test.js's mocking pattern).
+jest.mock('../../shared/components/external/PolicyAckModal', () => ({
+  __esModule: true,
+  default: (props) => (
+    <div data-testid="policy-modal">
+      <span>{props.policy?.body}</span>
+      <button type="button" onClick={props.onAcknowledge}>mock-acknowledge</button>
+      <button type="button" onClick={props.onClose}>mock-close</button>
+    </div>
+  ),
+}));
 
 const deliverable = {
   abstractFormatted: 'The team will measure the thing across a long enough sentence to be valid.',
@@ -36,22 +56,33 @@ function pngFile() {
 
 afterEach(() => { if (global.fetch && global.fetch.mockRestore) global.fetch.mockRestore(); });
 
+const submitBtn = () => screen.getByRole('button', { name: /^submit$/i });
+
+// Acknowledge via the mocked PolicyAckModal: open it, then click its acknowledge
+// button — mirrors the real "Read waiver" → scroll-gate → acknowledge flow that
+// grantee-deliverable-form-waiver.test.js exercises against the real modal wiring.
+function acknowledgeWaiver() {
+  fireEvent.click(screen.getByRole('button', { name: /read waiver/i }));
+  fireEvent.click(screen.getByRole('button', { name: 'mock-acknowledge' }));
+}
+
 test('renders the VERSIONED waiver text from waiverPolicy (not the hardcoded constant)', () => {
   renderForm();
+  fireEvent.click(screen.getByRole('button', { name: /read waiver/i }));
   expect(screen.getByText(/consent to publication of the versioned waiver text/i)).toBeInTheDocument();
 });
 
 test('prefills the abstract and disables submit until waiver + fields are complete', () => {
   renderForm();
   expect(screen.getByLabelText('Abstract')).toHaveValue(deliverable.abstractFormatted);
-  const submit = screen.getByRole('button', { name: /^submit$/i });
+  const submit = submitBtn();
   expect(submit).toBeDisabled();
 
   fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
   fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [pngFile()] } });
   expect(submit).toBeDisabled();
 
-  fireEvent.click(screen.getByRole('checkbox'));
+  acknowledgeWaiver();
   expect(submit).toBeEnabled();
 });
 
@@ -59,21 +90,21 @@ test('a missing render token keeps submit disabled even when everything else is 
   renderForm({ waiverToken: null });
   fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
   fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [pngFile()] } });
-  fireEvent.click(screen.getByRole('checkbox'));
-  expect(screen.getByRole('button', { name: /^submit$/i })).toBeDisabled();
+  acknowledgeWaiver();
+  expect(submitBtn()).toBeDisabled();
 });
 
 test('checking the waiver alone does NOT enable submit without an image', () => {
   renderForm();
   fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
-  fireEvent.click(screen.getByRole('checkbox'));
-  expect(screen.getByRole('button', { name: /^submit$/i })).toBeDisabled();
+  acknowledgeWaiver();
+  expect(submitBtn()).toBeDisabled();
 });
 
 test('an already-on-file image satisfies the image requirement (no re-upload needed)', () => {
   renderForm({ deliverable: { ...deliverable, hasImage: true, caption: 'Existing caption.' } });
-  fireEvent.click(screen.getByRole('checkbox'));
-  expect(screen.getByRole('button', { name: /^submit$/i })).toBeEnabled();
+  acknowledgeWaiver();
+  expect(submitBtn()).toBeEnabled();
 });
 
 test('submit POSTs multipart (echoing the render token) and shows the thank-you state', async () => {
@@ -82,8 +113,8 @@ test('submit POSTs multipart (echoing the render token) and shows the thank-you 
 
   fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
   fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [pngFile()] } });
-  fireEvent.click(screen.getByRole('checkbox'));
-  fireEvent.click(screen.getByRole('button', { name: /^submit$/i }));
+  acknowledgeWaiver();
+  fireEvent.click(submitBtn());
 
   await waitFor(() => expect(screen.getByText(/your materials have been submitted/i)).toBeInTheDocument());
 
@@ -95,7 +126,7 @@ test('submit POSTs multipart (echoing the render token) and shows the thank-you 
   expect(opts.body.has('image')).toBe(true);
   expect(opts.body.get('editedAbstract')).toBe(deliverable.abstractFormatted);
   expect(opts.body.get('caption')).toBe('A figure.');
-  // The signed render token IS echoed; the raw checkbox value is NOT.
+  // The signed render token IS echoed; the raw acknowledgment is NOT.
   expect(opts.body.get('waiverToken')).toBe(WAIVER_TOKEN);
   expect(opts.body.has('waiver')).toBe(false);
 });
@@ -105,9 +136,9 @@ test('a failed submit surfaces an error and re-enables the button', async () => 
   renderForm();
   fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
   fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [pngFile()] } });
-  fireEvent.click(screen.getByRole('checkbox'));
-  fireEvent.click(screen.getByRole('button', { name: /^submit$/i }));
+  acknowledgeWaiver();
+  fireEvent.click(submitBtn());
 
   await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/scan failed/i));
-  expect(screen.getByRole('button', { name: /^submit$/i })).toBeEnabled();
+  expect(submitBtn()).toBeEnabled();
 });
