@@ -87,13 +87,27 @@ been live**). Until S349 **nothing read it** — the suggested names sat unseen.
 - **Surface:** `ReviewersTab` fetches it and passes `declineReferrals` +
   `onAddReferral` to `ReviewerManagePanel`, which renders an amber callout at
   the top of the **Track Reviewers** sub-tab only.
-- **One-click "Add as candidate":** does NOT bypass identity resolution. It
-  pre-fills the existing Add-or-Refer form (`ReviewerFindPanel` `prefill` prop:
-  suggested text → `name`, decliner → `referredBy`) and switches to the Find
-  sub-tab; staff confirm through the normal abstain-or-confirm
-  `manual-reviewer` flow, so a free-text suggestion never auto-resolves to a
-  namesake (memory `project-reviewer-verify-fail-dangerous`). Lands `referred`
-  provenance exactly as the S249 manual-referral path.
+- **One-click "Add as candidate" (in-place, S354):** does NOT bypass identity
+  resolution. The button POSTs the suggested name + decliner straight to
+  `/api/workbench/manual-reviewer` (no `resolution`) and stays on Track
+  Reviewers; the server resolves identity itself (`addManualReviewer` →
+  `lookupReviewerIdentity`). Three per-row outcomes, keyed by `suggestionId` in
+  `ReviewersTab`'s `referralActions` state and rendered inline by
+  `ReviewerManagePanel` (`ReferralAction`/`ReferralConfirm`): **200** → the row
+  shows "✓ Added" and the tab lands on **Invite Reviewers** where the new
+  candidate appears (a bare name usually has no email, so it's added but not yet
+  *sendable* until staff add one there); **409 + `lookup`** (ambiguous /
+  conflict) → the row switches to an **inline identity-confirm picker** (staff
+  pick the right existing person or "Add as new person" → re-POST with the
+  chosen `resolution`), so a free-text suggestion never auto-resolves to a
+  namesake (memory `project-reviewer-verify-fail-dangerous`); **other error**
+  (incl. `applicant_excluded`) → inline message + "Try again". Lands `referred`
+  provenance exactly as the S249 manual-referral path. Before S354 the button
+  pre-filled the Find-tab Add-or-Refer form and routed there via
+  `router.push({sub:'find'})` (the `ReviewerFindPanel` `prefill` prop, now
+  unused) — a colleague reported it "did nothing" (the tab hop was unreliable /
+  the pre-filled card sat below the fold), so it was replaced with this in-place
+  flow. Tests: `tests/unit/reviewers-tab-referral-add.test.js`.
 - Origin of the direction: Fable holistic review P3.1
   (`docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md`).
 

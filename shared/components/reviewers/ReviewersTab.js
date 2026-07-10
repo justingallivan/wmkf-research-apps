@@ -63,9 +63,11 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   // that is current NOW.
   const currentRequestIdRef = useRef(requestId);
   currentRequestIdRef.current = requestId;
-  // Pre-fill payload handed to ReviewerFindPanel when staff click "Add as
-  // candidate" on a decline referral. Cleared once the Find panel consumes it.
-  const [prefillManual, setPrefillManual] = useState(null);
+  // Per-referral inline action state for the Track Reviewers decline-referral
+  // callout, keyed by suggestionId: { status: 'adding'|'confirm'|'added'|'error',
+  // lookup?, error?, addedName?, invitable? }. Drives the one-click add + inline
+  // identity-confirm UX without leaving the Track sub-tab.
+  const [referralActions, setReferralActions] = useState({});
 
   const reviewers = proposal?.reviewers || [];
   // Candidates badge: saved candidates not yet invited (and not accepted/declined).
@@ -167,28 +169,75 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
     loadDeclineReferrals();
   }, [loadCandidates, loadReviewers, loadDeclineReferrals]);
 
-  // "Add as candidate" on a decline referral: pre-fill the Add-or-Refer form
-  // (suggested text → name for staff to review; decliner → referredBy) and
-  // switch to the Find sub-tab. Identity resolution stays in the normal
-  // abstain-or-confirm flow, so a free-text suggestion never auto-resolves.
-  const handleAddReferral = useCallback((referral) => {
-    setPrefillManual({
-      name: referral?.referralText || '',
-      referredBy: referral?.reviewerName || '',
-    });
-    router.push(
-      { pathname: router.pathname, query: { ...router.query, sub: 'find' } },
-      undefined,
-      { shallow: true },
-    );
-  }, [router]);
-
   const selectSub = (key) => {
     router.push(
       { pathname: router.pathname, query: { ...router.query, sub: key } },
       undefined,
       { shallow: true },
     );
+  };
+
+  // "Add as candidate" on a decline referral: add the suggested person straight
+  // into this request's candidate pool in place (no tab hop). The server
+  // resolves identity itself — a confident match or a clearly-new person is
+  // added immediately; an ambiguous/conflicting identity returns 409 + `lookup`,
+  // which we surface as an inline picker on the referral row (staff confirm → we
+  // re-POST with the chosen resolution). A free-text suggestion is thus never
+  // auto-resolved to a namesake. On success we refresh both lists and land on
+  // the Invite Reviewers sub-tab where the new candidate now appears.
+  const addReferralCandidate = async (referral, resolution) => {
+    const sid = referral?.suggestionId;
+    const name = (referral?.referralText || '').trim();
+    if (!sid || !name || !requestId) return;
+    const rid = requestId;
+    setReferralActions((prev) => ({ ...prev, [sid]: { status: 'adding' } }));
+    try {
+      const res = await fetch('/api/workbench/manual-reviewer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: rid,
+          name,
+          referredBy: referral?.reviewerName || undefined,
+          resolution: resolution || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (rid !== currentRequestIdRef.current) return; // request changed mid-flight — drop stale result
+      if (res.ok && data.success) {
+        setReferralActions((prev) => ({
+          ...prev,
+          [sid]: {
+            status: 'added',
+            addedName: data.candidate?.name || name,
+            invitable: !!data.candidate?.invitable,
+          },
+        }));
+        refreshAll();
+        selectSub('candidates'); // land on Invite Reviewers, where the new row shows
+        return;
+      }
+      if (res.status === 409 && data.lookup) {
+        setReferralActions((prev) => ({ ...prev, [sid]: { status: 'confirm', lookup: data.lookup } }));
+        return;
+      }
+      const message = data.code === 'applicant_excluded'
+        ? 'This person is excluded for this request.'
+        : (data.error || `Couldn’t add (${res.status}).`);
+      setReferralActions((prev) => ({ ...prev, [sid]: { status: 'error', error: message } }));
+    } catch (e) {
+      if (rid !== currentRequestIdRef.current) return;
+      setReferralActions((prev) => ({ ...prev, [sid]: { status: 'error', error: e.message } }));
+    }
+  };
+
+  const dismissReferralAction = (sid) => {
+    setReferralActions((prev) => {
+      if (!(sid in prev)) return prev;
+      const next = { ...prev };
+      delete next[sid];
+      return next;
+    });
   };
 
   // When the URL names no sub-tab, land on a state-aware default (computed, not
@@ -290,8 +339,6 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           canManage={canManage}
           savedPoolNames={candidates.map((c) => c.name).filter(Boolean)}
           onSaved={refreshAll}
-          prefill={prefillManual}
-          onPrefillConsumed={() => setPrefillManual(null)}
         />
       ) : current === 'candidates' ? (
         <ReviewerInvitePanel
@@ -313,7 +360,10 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           mode={current}
           canManage={canManage}
           declineReferrals={declineReferrals}
-          onAddReferral={handleAddReferral}
+          referralActions={referralActions}
+          onAddReferral={addReferralCandidate}
+          onGoToInvite={() => selectSub('candidates')}
+          onDismissReferral={dismissReferralAction}
         />
       )}
     </div>

@@ -1056,6 +1056,135 @@ function StatusDropdown({ currentStatus, onChange }) {
   );
 }
 
+// ─── Decline-referral inline add helpers ────────────────────────────────────
+
+// Map an identity-lookup match/candidate to the resolution the manual-reviewer
+// route expects. A reviewer id reuses the person row; a bare contact id reuses
+// the contact. Returns null when neither id is present (nothing to reuse).
+function referralResolutionFor(candidate) {
+  if (!candidate) return null;
+  if (candidate.reviewerId) {
+    return { mode: 'reuse_reviewer', reviewerId: candidate.reviewerId, contactId: candidate.contactId || undefined };
+  }
+  if (candidate.contactId) {
+    return { mode: 'reuse_contact', contactId: candidate.contactId };
+  }
+  return null;
+}
+
+function referralContextLine(context) {
+  if (!context) return '';
+  return [context.email, context.affiliation, context.hasOrcid ? 'ORCID' : null].filter(Boolean).join(' · ');
+}
+
+// The compact right-side action for one referral row (idle / adding / added /
+// error). The 'confirm' state renders a full-width picker below instead — see
+// ReferralConfirm — so it is not handled here.
+function ReferralAction({ referral, state, canManage, onAdd, onGoToInvite }) {
+  const status = state?.status;
+  if (status === 'adding') {
+    return <span className="shrink-0 text-xs text-amber-800">Adding…</span>;
+  }
+  if (status === 'added') {
+    return (
+      <div className="shrink-0 text-right">
+        <p className="text-xs font-medium text-green-700">✓ Added {state.addedName}</p>
+        {onGoToInvite && (
+          <button type="button" onClick={onGoToInvite} className="text-xs text-amber-900 underline hover:text-amber-950">
+            Go to Invite Reviewers →
+          </button>
+        )}
+        {state.invitable === false && (
+          <p className="text-[11px] text-gray-500 mt-0.5">Add an email there to invite.</p>
+        )}
+      </div>
+    );
+  }
+  if (status === 'error') {
+    return (
+      <div className="shrink-0 text-right max-w-[16rem]">
+        <p className="text-xs text-red-700">{state.error}</p>
+        {canManage && onAdd && (
+          <button type="button" onClick={() => onAdd(referral)} className="text-xs text-amber-900 underline">
+            Try again
+          </button>
+        )}
+      </div>
+    );
+  }
+  if (!canManage || !onAdd) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => onAdd(referral)}
+      className="shrink-0 text-xs font-medium text-amber-900 border border-amber-300 rounded-md px-2 py-1 hover:bg-amber-100"
+    >
+      Add as candidate
+    </button>
+  );
+}
+
+// Full-width identity-confirm picker shown when the server couldn't confidently
+// resolve the suggested name (409 + lookup). Staff pick the right existing
+// person or add as new; a free-text suggestion is never auto-resolved to a
+// namesake.
+function ReferralConfirm({ referral, lookup, onChoose, onCancel }) {
+  const options = [];
+  if (lookup?.outcome === 'confident' && lookup.match) options.push(lookup.match);
+  if (lookup?.outcome === 'candidates') options.push(...(lookup.candidates || []));
+  return (
+    <div className="mt-2 border border-amber-200 bg-amber-50 rounded p-2 text-sm">
+      <p className="font-medium text-amber-900">
+        Confirm who “{referral.referralText}” is before adding
+      </p>
+      {lookup?.outcome === 'conflict' && (
+        <p className="text-xs text-red-700 mt-1">
+          Existing records disagree ({lookup.reason}). Add as a new person only if this is someone different.
+        </p>
+      )}
+      {options.length > 0 && (
+        <div className="mt-2 space-y-1.5">
+          {options.map((c, idx) => {
+            const resolution = referralResolutionFor(c);
+            if (!resolution) return null;
+            const ctx = referralContextLine(c.context);
+            return (
+              <button
+                key={`${c.source || 'match'}-${c.reviewerId || c.contactId || idx}`}
+                type="button"
+                onClick={() => onChoose(resolution)}
+                className="w-full text-left border border-amber-200 bg-white rounded p-2 hover:border-amber-400"
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-gray-900">{c.context?.name || 'Existing person'}</span>
+                  <span className="text-xs text-gray-500">
+                    {c.source || 'match'}{c.matchKey ? ` · ${c.matchKey}` : ''}{c.context?.active === false ? ' · inactive' : ''}
+                  </span>
+                </span>
+                {ctx && <span className="block text-xs text-gray-600 mt-0.5">{ctx}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onChoose({ mode: 'create_new' })}
+          className="text-xs font-medium text-amber-900 border border-amber-300 rounded px-2 py-1 bg-white hover:bg-amber-100"
+        >
+          Add as new person
+        </button>
+        {onCancel && (
+          <button type="button" onClick={onCancel} className="text-xs text-gray-500 hover:text-gray-700">
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Reviewer Manage Panel ──────────────────────────────────────────────────
 
 export default function ReviewerManagePanel({
@@ -1067,7 +1196,10 @@ export default function ReviewerManagePanel({
   mode,
   canManage = true,
   declineReferrals = [],
+  referralActions = {},
   onAddReferral,
+  onGoToInvite,
+  onDismissReferral,
 }) {
   const [selectedReviewers, setSelectedReviewers] = useState(new Set());
   const [emailModalOpen, setEmailModalOpen] = useState(false);
@@ -1248,28 +1380,42 @@ export default function ReviewerManagePanel({
             A reviewer who declined suggested someone else. Add them as a candidate to follow up.
           </p>
           <ul className="space-y-2">
-            {declineReferrals.map((r) => (
-              <li
-                key={r.suggestionId}
-                className="flex items-start justify-between gap-3 rounded-md bg-white/70 border border-amber-100 p-2"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm text-gray-900 break-words whitespace-pre-wrap">{r.referralText}</p>
-                  <p className="text-xs text-gray-500">
-                    suggested by {r.reviewerName || 'a declining reviewer'}
-                  </p>
-                </div>
-                {canManage && onAddReferral && (
-                  <button
-                    type="button"
-                    onClick={() => onAddReferral(r)}
-                    className="shrink-0 text-xs font-medium text-amber-900 border border-amber-300 rounded-md px-2 py-1 hover:bg-amber-100"
-                  >
-                    Add as candidate
-                  </button>
-                )}
-              </li>
-            ))}
+            {declineReferrals.map((r) => {
+              const state = referralActions[r.suggestionId];
+              const confirming = state?.status === 'confirm';
+              return (
+                <li
+                  key={r.suggestionId}
+                  className="rounded-md bg-white/70 border border-amber-100 p-2"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm text-gray-900 break-words whitespace-pre-wrap">{r.referralText}</p>
+                      <p className="text-xs text-gray-500">
+                        suggested by {r.reviewerName || 'a declining reviewer'}
+                      </p>
+                    </div>
+                    {!confirming && (
+                      <ReferralAction
+                        referral={r}
+                        state={state}
+                        canManage={canManage}
+                        onAdd={onAddReferral}
+                        onGoToInvite={onGoToInvite}
+                      />
+                    )}
+                  </div>
+                  {confirming && (
+                    <ReferralConfirm
+                      referral={r}
+                      lookup={state.lookup}
+                      onChoose={(resolution) => onAddReferral && onAddReferral(r, resolution)}
+                      onCancel={onDismissReferral ? () => onDismissReferral(r.suggestionId) : undefined}
+                    />
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
