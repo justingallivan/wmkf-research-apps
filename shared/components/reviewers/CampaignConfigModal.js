@@ -4,11 +4,12 @@
  * the first invite-batch send; this modal is the "editable later from the Reviewers
  * tab" surface (spec §3.E).
  *
- * Phase 1 exposes the two fields that exist today end-to-end: "days to respond"
- * (the per-reviewer respond-by offset) and the fixed review-due date. The reminder
- * toggles/leads and desiredCount are persisted on the same record but get their UI
- * controls in the phases that consume them (3 and 4), so we don't surface a control
- * that does nothing yet.
+ * Phase 1 exposes "days to respond" (the per-reviewer respond-by offset), the fixed
+ * review-due date, and the reviewer quota target (`desiredCount` — the number of
+ * committed/accepted reviewers needed before the lead PD is notified; it does not
+ * auto-withdraw anyone). The reminder toggles/leads are persisted on the same record
+ * but get their UI controls in the phase that consumes them (3), so we don't surface
+ * a control that does nothing yet.
  *
  * Props:
  *   - requestId : the akoya_request GUID
@@ -24,6 +25,7 @@ export default function CampaignConfigModal({ requestId, onClose, onSaved }) {
   const [error, setError] = useState(null);
   const [respondOffsetDays, setRespondOffsetDays] = useState('');
   const [reviewDueDate, setReviewDueDate] = useState('');
+  const [desiredCount, setDesiredCount] = useState('');
 
   // Guards post-await setState on the save path if the modal unmounts mid-request.
   const mountedRef = useRef(true);
@@ -42,6 +44,7 @@ export default function CampaignConfigModal({ requestId, onClose, onSaved }) {
         const c = data.config || {};
         setRespondOffsetDays(c.respondOffsetDays == null ? '' : c.respondOffsetDays);
         setReviewDueDate(c.reviewDueDate || '');
+        setDesiredCount(c.desiredCount == null ? '' : c.desiredCount);
       } catch (e) {
         if (!cancelled) setError(e.message);
       } finally {
@@ -59,6 +62,7 @@ export default function CampaignConfigModal({ requestId, onClose, onSaved }) {
     const config = {
       respondOffsetDays: respondOffsetDays === '' ? null : Math.max(0, Math.floor(Number(respondOffsetDays))),
       reviewDueDate: reviewDueDate === '' ? null : reviewDueDate,
+      desiredCount: desiredCount === '' ? null : Math.max(0, Math.floor(Number(desiredCount))),
     };
     try {
       const res = await fetch('/api/review-manager/campaign-config', {
@@ -111,6 +115,19 @@ export default function CampaignConfigModal({ requestId, onClose, onSaved }) {
                 />
                 <span className="block text-[11px] text-gray-400 mt-1">
                   Fixed deadline for completed reviews. Edits apply going forward.
+                </span>
+              </label>
+              <label className="block text-xs text-gray-600">
+                Reviewer quota
+                <input
+                  type="number" min="0" step="1" value={desiredCount}
+                  onChange={(e) => setDesiredCount(e.target.value === '' ? '' : Math.max(0, Math.floor(Number(e.target.value))))}
+                  className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1"
+                />
+                <span className="block text-[11px] text-gray-400 mt-1">
+                  Number of committed reviewers needed before you're notified. This does not
+                  automatically decline any pending invitees — you choose who to release from the
+                  Reviewers tab.
                 </span>
               </label>
             </>

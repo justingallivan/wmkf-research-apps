@@ -46,7 +46,28 @@ test('count reaches desired + marker null → conditional set (If-Match) then no
     expect.objectContaining({ ifMatch: 'W/"5"' }),
   );
   expect(notify).toHaveBeenCalledTimes(1);
-  expect(notify.mock.calls[0][0]).toMatchObject({ type: 'reviewer_quota_reached', explicitRecipients: ['pd@keck.org'] });
+  expect(notify.mock.calls[0][0]).toMatchObject({
+    type: 'reviewer_quota_reached',
+    emailAdmins: true,
+    explicitRecipients: ['pd@keck.org'],
+  });
+  expect(notify.mock.calls[0][0].category).toBeUndefined();
+});
+
+test('PD email unresolvable → still notified (marker owns once-only), empty explicitRecipients, no category fallback', async () => {
+  const resolver = require('../../lib/services/program-director-resolver');
+  resolver.resolveProgramDirectorEmailForRequest.mockResolvedValueOnce(null);
+  getRecord.mockResolvedValue(request());
+  countAcceptedForRequest.mockResolvedValue(3);
+  const r = await maybeNotifyQuotaReached({ requestId: REQ });
+  expect(r).toMatchObject({ notified: true, count: 3, desired: 3 });
+  expect(notify).toHaveBeenCalledTimes(1);
+  expect(notify.mock.calls[0][0]).toMatchObject({
+    type: 'reviewer_quota_reached',
+    emailAdmins: true,
+    explicitRecipients: [],
+  });
+  expect(notify.mock.calls[0][0].category).toBeUndefined();
 });
 
 test('below desired → no marker write, no notify', async () => {
