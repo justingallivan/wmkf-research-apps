@@ -36,6 +36,12 @@ export default function CampaignConfigModal({ requestId, onClose, onSaved }) {
     (async () => {
       setLoading(true);
       setError(null);
+      let defaults = null;
+      try {
+        const defaultsRes = await fetch('/api/review-manager/campaign-timeline-defaults');
+        const defaultsData = await defaultsRes.json().catch(() => ({}));
+        if (defaultsRes.ok && defaultsData?.timeline) defaults = defaultsData.timeline;
+      } catch { /* admin cycle defaults are best-effort; fall back to empty */ }
       try {
         const res = await fetch(`/api/review-manager/campaign-config?requestId=${encodeURIComponent(requestId)}`);
         const data = await res.json().catch(() => ({}));
@@ -43,8 +49,10 @@ export default function CampaignConfigModal({ requestId, onClose, onSaved }) {
         if (cancelled) return;
         const c = data.config || {};
         setRespondOffsetDays(c.respondOffsetDays == null ? '' : c.respondOffsetDays);
-        setReviewDueDate(c.reviewDueDate || '');
-        setDesiredCount(c.desiredCount == null ? '' : c.desiredCount);
+        setReviewDueDate(c.reviewDueDate || (defaults && defaults.reviewDueDate) || '');
+        setDesiredCount(c.desiredCount == null
+          ? (defaults && defaults.desiredCount != null ? defaults.desiredCount : '')
+          : c.desiredCount);
       } catch (e) {
         if (!cancelled) setError(e.message);
       } finally {

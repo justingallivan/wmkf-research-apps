@@ -13,9 +13,13 @@ const REQUEST_ID = 'req-1';
 
 afterEach(() => { if (global.fetch && global.fetch.mockRestore) global.fetch.mockRestore(); });
 
-function mockGet(config) {
+function mockGet(config, defaultsTimeline = { reviewDueDate: '', desiredCount: 4 }, defaultsOk = true) {
   return jest.spyOn(global, 'fetch').mockImplementation((url, opts) => {
     if (!opts || opts.method === undefined) {
+      if (String(url).includes('campaign-timeline-defaults')) {
+        if (!defaultsOk) return Promise.resolve({ ok: false, json: async () => ({ error: 'nope' }) });
+        return Promise.resolve({ ok: true, json: async () => ({ timeline: defaultsTimeline, isDefault: false, malformed: false }) });
+      }
       return Promise.resolve({ ok: true, json: async () => ({ requestId: REQUEST_ID, config }) });
     }
     return Promise.resolve({ ok: true, json: async () => ({ success: true }) });
@@ -62,5 +66,45 @@ describe('CampaignConfigModal — reviewer quota (desiredCount)', () => {
       const body = JSON.parse(postCall[1].body);
       expect(body.config.desiredCount).toBeNull();
     });
+  });
+});
+
+describe('CampaignConfigModal — admin default prefill', () => {
+  test('null request-level reviewDueDate and desiredCount prefill from admin defaults', async () => {
+    mockGet(
+      { respondOffsetDays: 5, reviewDueDate: null, desiredCount: null },
+      { reviewDueDate: '2026-09-01', desiredCount: 8 },
+    );
+    render(<CampaignConfigModal requestId={REQUEST_ID} onClose={jest.fn()} />);
+    await waitFor(() => expect(screen.getByDisplayValue('8')).toBeInTheDocument());
+    expect(screen.getByDisplayValue('2026-09-01')).toBeInTheDocument();
+  });
+
+  test('non-null request-level values win over admin defaults', async () => {
+    mockGet(
+      { respondOffsetDays: 5, reviewDueDate: '2026-08-01', desiredCount: 6 },
+      { reviewDueDate: '2026-09-01', desiredCount: 8 },
+    );
+    render(<CampaignConfigModal requestId={REQUEST_ID} onClose={jest.fn()} />);
+    await waitFor(() => expect(screen.getByDisplayValue('6')).toBeInTheDocument());
+    expect(screen.getByDisplayValue('2026-08-01')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('8')).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue('2026-09-01')).not.toBeInTheDocument();
+  });
+
+  test('admin defaults fetch failure leaves reviewDueDate and desiredCount empty', async () => {
+    mockGet(
+      { respondOffsetDays: 5, reviewDueDate: null, desiredCount: null },
+      undefined,
+      false,
+    );
+    render(<CampaignConfigModal requestId={REQUEST_ID} onClose={jest.fn()} />);
+    await waitFor(() => expect(screen.getByDisplayValue('5')).toBeInTheDocument());
+    expect(screen.queryByDisplayValue('2026-09-01')).not.toBeInTheDocument();
+    // Both the quota and review-due-date inputs should be blank.
+    const quotaInput = screen.getByLabelText(/reviewer quota/i);
+    const dueDateInput = screen.getByLabelText(/review due date/i);
+    expect(quotaInput).toHaveValue(null);
+    expect(dueDateInput.value).toBe('');
   });
 });

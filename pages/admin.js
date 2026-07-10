@@ -2588,6 +2588,7 @@ function ReviewerCampaignTimelineSection() {
     respondOffsetDays: 7,
     proposalReleaseDate: '',
     reviewDueDate: '',
+    desiredCount: 4,
   });
   const [isDefault, setIsDefault] = useState(false);
   const [malformed, setMalformed] = useState(false);
@@ -2607,6 +2608,7 @@ function ReviewerCampaignTimelineSection() {
         respondOffsetDays: data.timeline?.respondOffsetDays == null ? '' : data.timeline.respondOffsetDays,
         proposalReleaseDate: data.timeline?.proposalReleaseDate || '',
         reviewDueDate: data.timeline?.reviewDueDate || '',
+        desiredCount: data.timeline?.desiredCount == null ? '' : data.timeline.desiredCount,
       });
       setIsDefault(!!data.isDefault);
       setMalformed(!!data.malformed);
@@ -2636,6 +2638,9 @@ function ReviewerCampaignTimelineSection() {
       const respondOffsetDays = timeline.respondOffsetDays === ''
         ? null
         : Number(timeline.respondOffsetDays);
+      const desiredCount = timeline.desiredCount === ''
+        ? null
+        : Number(timeline.desiredCount);
       const res = await fetch('/api/review-manager/campaign-timeline-defaults', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -2643,6 +2648,7 @@ function ReviewerCampaignTimelineSection() {
           timeline: {
             ...timeline,
             respondOffsetDays,
+            desiredCount,
           },
         }),
       });
@@ -2697,7 +2703,7 @@ function ReviewerCampaignTimelineSection() {
           />
         </label>
         <label className="text-xs text-gray-600">
-          Days to respond
+          Days to respond to invitation
           <input
             type="number"
             min="0"
@@ -2706,6 +2712,20 @@ function ReviewerCampaignTimelineSection() {
             onChange={(e) => update('respondOffsetDays', normalizeOffsetInput(e.target.value))}
             className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
           />
+        </label>
+        <label className="text-xs text-gray-600">
+          Reviewer quota
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={timeline.desiredCount}
+            onChange={(e) => update('desiredCount', normalizeOffsetInput(e.target.value))}
+            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+          />
+          <span className="block text-[11px] text-gray-400 mt-1">
+            Default number of committed reviewers before the PD is notified. Seeds new campaigns&apos; settings.
+          </span>
         </label>
         <label className="text-xs text-gray-600">
           Proposals released to reviewers

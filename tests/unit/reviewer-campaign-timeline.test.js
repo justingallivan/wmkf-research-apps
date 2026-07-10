@@ -35,6 +35,7 @@ describe('reviewer campaign timeline defaults', () => {
       respondOffsetDays: null,
       proposalReleaseDate: '2026-07-08',
       reviewDueDate: '2026-07-22',
+      desiredCount: 10,
       extra: 'ignored',
     }));
     expect(parsed).toEqual({
@@ -44,10 +45,29 @@ describe('reviewer campaign timeline defaults', () => {
         respondOffsetDays: null,
         proposalReleaseDate: '2026-07-08',
         reviewDueDate: '2026-07-22',
+        desiredCount: 10,
       },
       isDefault: false,
       malformed: false,
     });
+  });
+
+  test('legacy stored JSON without desiredCount merges in the default (4)', () => {
+    const parsed = parseStoredTimeline(JSON.stringify({
+      cycleLabel: 'D25',
+      respondOffsetDays: 7,
+      reviewDueDate: '2026-01-01',
+    }));
+    expect(parsed.timeline.desiredCount).toBe(4);
+    expect(parsed.isDefault).toBe(false);
+  });
+
+  test('stored JSON with desiredCount explicitly null keeps it null (not merged)', () => {
+    const parsed = parseStoredTimeline(JSON.stringify({
+      cycleLabel: 'D25',
+      desiredCount: null,
+    }));
+    expect(parsed.timeline.desiredCount).toBeNull();
   });
 
   test('malformed stored JSON falls back without throwing', () => {
@@ -63,6 +83,16 @@ describe('reviewer campaign timeline defaults', () => {
       .toThrow('reviewDueDate must be a YYYY-MM-DD date or blank');
     expect(() => normalizeTimeline({ respondOffsetDays: -1 }))
       .toThrow('respondOffsetDays must be a non-negative integer or blank');
+  });
+
+  test('write validation rejects a bad desiredCount, accepts null/blank and a non-negative integer', () => {
+    expect(() => normalizeTimeline({ desiredCount: -1 }))
+      .toThrow('desiredCount must be a non-negative integer or blank');
+    expect(() => normalizeTimeline({ desiredCount: 1.5 }))
+      .toThrow('desiredCount must be a non-negative integer or blank');
+    expect(normalizeTimeline({ desiredCount: null }).desiredCount).toBeNull();
+    expect(normalizeTimeline({ desiredCount: '' }).desiredCount).toBeNull();
+    expect(normalizeTimeline({ desiredCount: 6 }).desiredCount).toBe(6);
   });
 
   test('get reads the Dataverse setting key', async () => {
@@ -84,6 +114,7 @@ describe('reviewer campaign timeline defaults', () => {
       respondOffsetDays: '10',
       proposalReleaseDate: '',
       reviewDueDate: '2026-07-22',
+      desiredCount: 5,
     }, 42);
     expect(mockSetSetting).toHaveBeenCalledWith(
       REVIEWER_CAMPAIGN_TIMELINE_KEY,
@@ -93,6 +124,7 @@ describe('reviewer campaign timeline defaults', () => {
         respondOffsetDays: 10,
         proposalReleaseDate: '',
         reviewDueDate: '2026-07-22',
+        desiredCount: 5,
       }),
       42,
     );
