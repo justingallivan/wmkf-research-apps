@@ -286,6 +286,9 @@ deliberately (strategy §4).
    deployment × target × op matrix plus exception paths (date-bounded ack,
    grant matching/expiry/malformed-JSON, mode resolution, unknown host).
    No hook wiring — zero behavior change. Landable safely.
+   **[DONE 2026-07-11 S355 — RECHECKED after lib/dataverse/core/interlock.js
+   change: built on branch `interlock-stage1` (commits 610b50ca + d55b5175
+   audit-logging amendment), 83/83 tests green per build report, unmerged.]**
 2. **Stage 2 — wire the hook sites, deploy `warn` everywhere.** Add the call
    sites from §3.5; set `DATAVERSE_TARGET_INTERLOCK=warn` in production,
    preview, and `.env.local`. Observe logs across normal staff use **including
