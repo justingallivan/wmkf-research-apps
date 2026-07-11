@@ -39,4 +39,8 @@ silent drift means commits land on the wrong branch and create a costly untangli
   drift is detected mid-task, pause and flag.
 - Do NOT propose worktrees / new directories / changes to the two-machine sync as the
   fix — Justin declined that. The whole deal is consistent self-checking instead.
+- Since S356 the `/start` and `/stop` skills encode this check themselves (branch
+  verify before pull; re-verify before docs commit; push current branch, not
+  hard-coded main). That covers session boundaries only — mid-session git actions
+  still rely on this rule.
 - Related: [[project-commit-directly-to-main]], [[project-workbench-consolidation-rollout]].
