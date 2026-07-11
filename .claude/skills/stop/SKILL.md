@@ -1,16 +1,26 @@
 ---
 name: stop
 description: End session by updating SESSION_PROMPT.md and relevant project documentation
-allowed-tools: Read, Edit, Write, Bash(git log:*, git status, git diff:*, git add:*, git commit:*, git push:*)
+allowed-tools: Read, Edit, Write, Bash(git log:*, git status, git diff:*, git add:*, git commit:*, git push:*, git rev-parse:*)
 ---
 
 # Session End
 
 Wrap up the current session by updating documentation and syncing to remote.
 
-## Step 1: Review the Session
+## Step 1: Verify the Branch, Then Review the Session
 
-Check `git log --oneline -10` and `git status` to see what this session produced.
+Run `git rev-parse --abbrev-ref HEAD` FIRST. The shared checkout's HEAD drifts when
+a concurrent Codex/subagent session does branch work (S355: a docs commit landed on
+a feature branch and needed a cherry-pick rescue; see
+`feedback-verify-branch-before-git-action`).
+
+- On `main` → normal flow.
+- On any other branch → STOP and ask the user where the session docs
+  (SESSION_PROMPT.md etc.) should land — usually `main`, but a deliberate Tier 1–3
+  feature branch session may want them on the branch. Never assume.
+
+Then check `git log --oneline -10` and `git status` to see what this session produced.
 
 ## Step 2: Commit Any Remaining Changes
 
@@ -58,8 +68,12 @@ uncommitted changes — they may cause issues on another machine.
 
 ## Step 4: Commit Documentation Updates
 
-After updating documentation files:
+After updating documentation files — re-verify the branch immediately before the
+commit (`git rev-parse --abbrev-ref HEAD`); the Step 1 check is point-in-time and
+HEAD can drift mid-session. If it is not the branch confirmed in Step 1, stop and
+resolve before committing:
 ```bash
+git rev-parse --abbrev-ref HEAD   # must print the intended branch
 git add SESSION_PROMPT.md CLAUDE.md DEVELOPMENT_LOG.md .claude-memory/
 git commit -m "Document Session N and create Session N+1 prompt"
 ```
@@ -68,10 +82,14 @@ Including `.claude-memory/` ensures any memory writes from this session are comm
 
 ## Step 5: Push to Remote (Critical for Multi-Mac Workflow)
 
-Always push before ending the session:
+Always push before ending the session. Push the branch you are actually on — never
+hard-code `main`:
 ```bash
-git push origin main
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+git push origin "$BRANCH"
 ```
+If `$BRANCH` is not the branch confirmed in Step 1, stop and resolve the drift
+before pushing. Never push a feature branch's commits to `main` by ref-spec.
 
 Verify the push succeeded. If it fails:
 - Check for network issues

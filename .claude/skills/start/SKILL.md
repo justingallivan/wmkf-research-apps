@@ -11,8 +11,19 @@ Start a new coding session with proper git sync and context loading.
 ## Step 1: Git Housekeeping
 
 Before reading any files, sync the repo: `git rev-parse HEAD` (fails → repo may be
-corrupted, see CLAUDE.md for recovery), `git fetch origin && git status`, pull if
-behind (`git pull origin main`; merge conflicts → stop and alert the user).
+corrupted, see CLAUDE.md for recovery), then check the active branch with
+`git rev-parse --abbrev-ref HEAD`.
+
+**If HEAD is not on `main`, STOP before any pull.** The checkout may be
+mid-feature-branch (deliberate Tier 1–3 work per the campaign release strategy) or
+drifted by a concurrent Codex/subagent session (see
+`feedback-verify-branch-before-git-action`). Report the branch to the user and ask
+whether to stay on it or switch back to `main` — never run `git pull origin main`
+while on another branch (it merges main into that branch).
+
+Once confirmed on the intended branch: `git fetch origin && git status`, pull if
+behind (`git pull origin main` on main; on a feature branch pull its own upstream;
+merge conflicts → stop and alert the user).
 
 If there are uncommitted changes, warn the user — they may be leftover from a
 previous session; ask whether to commit, stash, or discard them.

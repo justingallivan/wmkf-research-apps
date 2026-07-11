@@ -47,6 +47,14 @@ Claude config sync, and environment-specific operating notes.
 
 ## Operating Notes
 
+- **Session automation is branch-aware (S356).** `/start` checks
+  `git rev-parse --abbrev-ref HEAD` before any pull (never `git pull origin main`
+  from a feature branch), and `/stop` verifies the branch at Step 1, re-verifies
+  immediately before the docs commit, and pushes the current branch instead of a
+  hard-coded `main`. Hazard this guards: the shared checkout's HEAD drifts when a
+  concurrent Codex/subagent session does branch work (S280: commits landed on
+  `codex-portal-work` and had to be untangled; S355: a docs commit landed on a
+  feature branch and was recovered via cherry-pick). Policy memory: `feedback-verify-branch-before-git-action`.
 - **New-machine setup:** `scripts/bootstrap-machine.sh` (idempotent) recreates the
   per-machine, gitignored state after a fresh clone — the `.agents/skills` +
   auto-memory symlinks (slug computed from the repo path at runtime), `npm install`,
