@@ -205,15 +205,27 @@ Never a client-supplied flag (strategy §6). Two shapes:
    terminal path segment (Codex adversarial finding, 2026-07-11 — the
    terminal-segment parser skipped the record check on bound-action POSTs).
    **Creates cannot be record-allowlisted** (no ID exists yet); they are
-   constrained by entity set only. That honest gap is why Mode D still
+   constrained by entity set only, and this fast-path applies ONLY to the
+   exact collection URL (`/api/data/v<ver>/<entitySet>`, no trailing path) —
+   a collection-bound action (`/contacts/Microsoft.Dynamics.CRM.SomeAction`)
+   also has no key but is denied: the grant shape cannot scope what the
+   action does (Codex round-2 finding). That honest gap is why Mode D still
    requires the written expected-writes list and post-run reconciliation from
-   strategy §5. Every allowed rehearsal write logs one structured line with
-   the purpose. Expired or malformed grant → treated as absent (fail closed).
+   strategy §5. **`recordIds` is GUID-only** (round-2): a URL key predicate
+   that is not a plain GUID — alternate key
+   (`wmkf_things(wmkf_questionkey='x')`) or composite key — never matches,
+   even if listed verbatim in the grant, because alternate-key writes are
+   upsert channels that CREATE on first touch
+   (`scripts/seed-review-questions.mjs`, `lib/external/review-answer-snapshot.js`);
+   non-GUID grant entries are ignored; GUID matching is case-insensitive.
+   Alt-key/upsert rehearsals are never grant-coverable in v1. Every allowed
+   rehearsal write logs one structured line with the purpose. Expired or
+   malformed grant → treated as absent (fail closed).
    **`$batch` is never grant-coverable in v1** — hard deny regardless of grant
    contents (a changeset bundles arbitrary sub-requests this layer never
    inspects, so no v1 grant shape could scope it; the earlier `"BATCH"` ops
-   escape was removed per the same Codex review — it silently dropped
-   entity/record scoping). [RECHECKED after lib/dataverse/core/interlock.js change: rulings implemented in commit b2409928 on `interlock-stage1`, 88/88 tests per build report; diff reviewed.]
+   escape was removed per the round-1 Codex review — it silently dropped
+   entity/record scoping). [RECHECKED after lib/dataverse/core/interlock.js change: round-1 rulings in commit b2409928, round-2 rulings (exact-collection create path, GUID-only recordIds) in commit 9bffbcd6 on `interlock-stage1`, 94/94 tests per build report; both diffs reviewed.]
 
 ### 3.4 Enforcement mode and flag
 
@@ -292,9 +304,9 @@ deliberately (strategy §4).
    No hook wiring — zero behavior change. Landable safely.
    **[DONE 2026-07-11 S355 — RECHECKED after lib/dataverse/core/interlock.js
    change: built on branch `interlock-stage1` (commits 610b50ca, d55b5175
-   audit logging, b2409928 adversarial-review fixes: first-segment OData
-   parsing + $batch hard deny), 88/88 tests green per build report,
-   unmerged.]**
+   audit logging, b2409928 round-1 fixes: first-segment OData parsing +
+   $batch hard deny, 9bffbcd6 round-2 fixes: exact-collection create path +
+   GUID-only recordIds), 94/94 tests green per build report, unmerged.]**
 2. **Stage 2 — wire the hook sites, deploy `warn` everywhere.** Add the call
    sites from §3.5; set `DATAVERSE_TARGET_INTERLOCK=warn` in production,
    preview, and `.env.local`. Observe logs across normal staff use **including
