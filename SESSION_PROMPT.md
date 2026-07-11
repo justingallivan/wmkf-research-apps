@@ -1,90 +1,60 @@
-# Session 356 Prompt: interlock warn-log observation, plus carryover
+# Session 357 Prompt: interlock warn-log observation (soaking), plus carryover
 
-## Session 355 Summary
+## Session 356 Summary
 
-Full-lifecycle session on ONE objective: the fail-closed Dataverse
-target/write interlock went from [PLANNED] (strategy §6) to designed, built,
-four-times adversarially reviewed, merged, and LIVE in `warn` mode. Plus one
-empirical fact settled (akoyago hostname), one wrong runbook host corrected,
-and two process memories written.
+Short cleanup session: two Verified Open items closed (branch-aware session
+automation; policy label_conflict UX), one gate-list sync. All gates were green
+at start (full `/start` sweep, including the new `check:types`). The interlock
+warn rollout went live ~1 hour into this session — observation deferred to S357+.
 
 ### What Was Completed
 
-1. **Interlock design** — `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md`:
-   verified inventory of every runtime Dataverse HTTP path (two write funnels
-   + read-only export family), tracked hostname registry, deployment × target
-   × operation policy matrix, off/warn/on modes, two audited exceptions
-   (date-bounded operator ack; Mode-D rehearsal grant).
-2. **Stage 1 (policy module)** — `lib/dataverse/core/interlock.js` +
-   `target-registry.js` + 103-test suite. Merged at `e113b4bf`.
-3. **Four Codex adversarial rounds, eight findings (2+2+3+1), all fixed and
-   diff-reviewed.** Theme: every finding was fail-open-by-omission at the
-   EDGES (input grammar, exception structure, config/wiring/error seams) —
-   the core matrix survived untouched. Hardening: first-segment OData
-   parsing; `$batch` never grant-coverable; GUID-only recordIds (alt-keys are
-   upsert channels); exact-collection-only create fast-path; set-but-invalid
-   flag fails closed to `on`; URL scoping in-module
-   (`shouldInspectDataverseUrl`); export denials never rewrapped as
-   FetchXmlError.
-4. **Stage 2 (hook wiring)** — three hook families call the interlock
-   unconditionally: `dynamics/http.js#fetchWithTimeout` (covers read-ops,
-   write-core, changeset, email), `dataverse/client.js#call()`, and the
-   dataverse-export read family. 9 wiring tests pin the denial contracts
-   (never wrapped as transient/no-response; dryRun exempt). Merged at
-   `8067de3a`; full suite 5361/5361 + prod build green.
-5. **Warn rollout EXECUTED** — `DATAVERSE_TARGET_INTERLOCK=warn` live in
-   `.env.local` + Vercel Production/Preview; production redeployed (aliased
-   `reviews.wmkeck.org`, Ready); zero `[dataverse-interlock]` lines on the
-   live deployment at rollout time.
-6. **akoyago resolved empirically** — read-only Global Discovery probe: the
-   app registration sees exactly two orgs (`wmkf` prod, display name "WM Keck
-   Foundation akoyaGO", and sandbox `orgd9e66399`); `akoyago.crm.dynamics.com`
-   never existed (product-name/hostname conflation). Runbook's sandbox host
-   corrected (`wmkfsandbox` → `orgd9e66399`) + four interlock env vars
-   documented in `docs/CREDENTIALS_RUNBOOK.md`.
-7. **All three §7 owner decisions resolved**: akoyago (probe); prod→sandbox =
-   deny; preview prod-reads stay denied by default.
-8. **Tooling/preferences**: Codex CLI upgraded 0.133→0.144.1; owner directive
-   persisted — ALL Codex calls use `--model gpt-5.5`
-   (`feedback-codex-model-gpt55`). New process memory
-   `feedback-author-adversarial-pass-first` (author attacks enforcement code
-   BEFORE delegating review). New reference
-   `reference-staleness-ack-single-line` (stop-hook ack parser needs
-   path+RECHECKED on one physical line).
+1. **`/start` gate list synced** — `check:types` existed in package.json but not
+   in the skill's gate list; added per the skill's own staleness rule (`7a95feac`).
+2. **Session automation made branch-aware** (S355 wrong-ref fix, was item 2) —
+   `/start` now verifies HEAD before any pull (never `git pull origin main` from a
+   feature branch); `/stop` verifies the branch at Step 1, re-verifies immediately
+   before the docs commit, and pushes the current branch instead of hard-coded
+   main. Wiki `dev-environment` topic documents the S280/S355 drift hazard;
+   `feedback-verify-branch-before-git-action` notes the skills now encode the
+   check at session boundaries only — mid-session git actions still rely on the
+   self-policing rule (`f9f586ab`, `d4a1f65e`).
+3. **Policy label_conflict UX fixed** (was item 3, carried from S353) — client-only
+   guidance in `shared/components/admin/PoliciesSection.js`; server immutability
+   untouched. Publish form defaults to a unique label (today, else `-2`/`-3`…),
+   warns inline when the entered/prefilled label is taken (trimmed +
+   case-insensitive, mirroring the Dataverse lookup; advisory only — client sees
+   the 50 newest versions, server stays the enforcer), one-click suggested label,
+   clearer 409 banner copy. 4 new jsdom component tests
+   (`tests/unit/policies-section-label-guidance.test.js`). Built on a short-lived
+   branch per Tier 1, merged `--no-ff` (`34e8cb2d`, merge `69f1bff3`). Policy
+   suites 27/27; lint 0 errors on changed files (the one `PoliciesSection.js`
+   warning pre-exists on main); `check:types` green.
 
 ### Commits (main, all pushed)
 
-- `e113b4bf` — Merge Stage-1 policy module (+ `610b50ca`/`d55b5175`/`b2409928`/`9bffbcd6` on branch)
-- `4e10f940` — round-3 hardening (invalid mode → on; in-module URL scoping)
-- `8067de3a` — Merge Stage-2 hook wiring (+ `8278d170`/`ad68d97c` on branch)
-- `87da872e` — warn rollout docs (env live, redeploy verified)
-- `9e16bed8`/`5a55c3da` — akoyago resolution + registry/wiki reconcile
-- `5c818aac` — owner policy decisions resolved
-- `b93714c4`/`9a3f6550`/`ec81cb34`/`753ea109` — memory entries
-- Session 355 stop/handoff commit follows this file.
+- `7a95feac` — /start gate list: add check:types
+- `f9f586ab` — branch-aware /start + /stop + wiki hazard note
+- `d4a1f65e` — memory reconcile (session-boundary scope of the skill check)
+- `34e8cb2d` / `69f1bff3` — label_conflict UX branch + merge
 
 ## Next Items
 
 ### Verified Open
 
-1. **Interlock observation → flip to `on` (plan §5 Stage 3).** `warn` is live
-   everywhere as of 2026-07-11. Review logs after normal staff use + at least
-   one full cron cycle: every `[dataverse-interlock] would deny` line is
+1. **Interlock observation → flip to `on` (plan §5 Stage 3).** `warn` went live
+   everywhere 2026-07-11 (~S356 start). Review logs after normal staff use + at
+   least one full cron cycle: every `[dataverse-interlock] would deny` line is
    either a real hazard or a policy gap to fix first. EXPECTED noise source:
    local `npm run dev` reads prod Dataverse → local→prod reads log would-deny
    lines; at flip time decide whether `.env.local` gets
    `DATAVERSE_ALLOW_PROD_READS=yes`. Evidence:
    `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md` §5; `vercel env ls`.
-2. **Make session automation branch-aware** (`/start` pulls `origin/main`,
-   `/stop` hard-codes push to main). ELEVATED: S355 hit the exact failure —
-   a subagent switched the shared checkout to a feature branch and a docs
-   commit landed on the wrong ref (recovered via cherry-pick). Evidence:
-   `.claude/skills/start/SKILL.md`, `.claude/skills/stop/SKILL.md`, S355
-   transcript.
-3. **Fix the policy-version `label_conflict` UX** without weakening
-   immutability. Evidence: `lib/services/admin/policies-service.js:274-292`,
-   `shared/components/admin/PoliciesSection.js`. (Carried from S353;
-   unverified this session beyond the file paths existing.)
+2. **Spot-check the label_conflict UX on the live admin page** after the
+   auto-deploy of `69f1bff3` (open admin → Policies → Publish new version;
+   prefill from active should show the amber label warning + suggestion).
+   Component tests cover the behavior; this is a 2-minute live confirmation,
+   not a build task. Evidence: `tests/unit/policies-section-label-guidance.test.js`.
 
 ### Owner Decision Needed (carryover, unchanged, still blocked)
 
@@ -106,7 +76,7 @@ and two process memories written.
 3. Prior parked items carry forward unchanged (reviewer holistic redesign
    branch; accepted-reviewer stand-down; review rendition formatting;
    campaign settings UX; prompt-cache-hit audit; reviewer ack provenance
-   parity; Dependabot PR #53; intake portal). Evidence: S353–S355
+   parity; Dependabot PR #53; intake portal). Evidence: S353–S356
    SESSION_PROMPT history + cited memories.
 
 ### Verify Before Acting
@@ -127,28 +97,27 @@ and two process memories written.
 2. All Codex calls use `--model gpt-5.5` unless the owner says otherwise
    (`feedback-codex-model-gpt55`). The user's `~/.codex/config.toml` pins
    gpt-5.6-sol which the CLI rejects — do not edit that file.
-3. Decline-referral one-click add (`ef97fcd`, S354) shipped and verified.
+3. **Policy version immutability and the label_conflict 409 are working as
+   designed** (S353 verify-note, S356 fix): the fix was client-side guidance
+   only. Do not add server-side mutation or label auto-rewrite.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `lib/dataverse/core/interlock.js` | Policy module: classify/mode/exceptions/assert (+`shouldInspectDataverseUrl`) |
-| `lib/dataverse/core/target-registry.js` | Tracked hostname registry (prod `wmkf`, sandbox `orgd9e66399`) |
-| `lib/services/dynamics/http.js` | Hook 1: fetchWithTimeout (assert BEFORE the wrap-try) |
-| `lib/dataverse/client.js` | Hook 2: call() (assert after dryRun; CJS requires the ESM module — Node 24 OK) |
-| `lib/services/dataverse-export/fetch-client.js` | Hook 3 + denial-preservation guard in requestWithBackoff |
-| `tests/unit/dataverse-interlock.test.js` | 103 policy tests |
-| `tests/unit/dataverse-interlock-wiring.test.js` | 9 wiring/denial-contract tests |
-| `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md` | Design + status (§5 rollout stages) |
-| `scripts/discover-dynamics-envs.js` | Read-only org discovery probe (akoyago resolution) |
+| `shared/components/admin/PoliciesSection.js` | Admin policy publish UI — unique-label guidance (S356) |
+| `tests/unit/policies-section-label-guidance.test.js` | jsdom coverage for the label guidance |
+| `lib/services/admin/policies-service.js` | Immutable publish state machine (unchanged S356) |
+| `.claude/skills/start/SKILL.md` / `.claude/skills/stop/SKILL.md` | Branch-aware session automation (S356) |
+| `lib/dataverse/core/interlock.js` | Interlock policy module (warn mode live) |
+| `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md` | Design + rollout stages (§5) |
 
 ## Testing
 
 ```bash
-npx jest tests/unit/dataverse-interlock.test.js tests/unit/dataverse-interlock-wiring.test.js
+npx jest tests/unit/policies-section-label-guidance.test.js tests/unit/policies-service.test.js tests/integration/admin-policies-route.test.js
 npm run check:types
-# Observe warn logs on the live prod deployment:
+# Observe interlock warn logs on the live prod deployment:
 vercel ls --prod   # get current deployment URL
 vercel logs <url> | grep dataverse-interlock
 ```
