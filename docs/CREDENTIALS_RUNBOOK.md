@@ -99,10 +99,21 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 | `DYNAMICS_TENANT_ID` | Azure tenant for CRM | Same as `AZURE_AD_TENANT_ID` |
 | `DYNAMICS_CLIENT_ID` | CRM app registration ID | Azure Portal → separate app registration |
 | `DYNAMICS_CLIENT_SECRET` | CRM app secret | Azure Portal → same app → Certificates & secrets |
-| `DYNAMICS_SANDBOX_URL` | Sandbox CRM instance (probe scripts only) | `https://wmkfsandbox.crm.dynamics.com` |
+| `DYNAMICS_SANDBOX_URL` | Sandbox CRM instance. ⚠️ NOT probe-only: four runtime services (`dataverse-settings-service`, `dataverse-identity-map`, `dataverse-app-access-service`, `grant-cycles-dataverse`) resolve `DYNAMICS_SANDBOX_URL \|\| DYNAMICS_URL`, so setting it repoints them | `https://orgd9e66399.crm.dynamics.com` (verified via Global Discovery probe S355 — the only sandbox instance visible to the app registration; the previously documented `wmkfsandbox.crm.dynamics.com` is not among them and is unrecognized by the interlock target registry) |
 | `DYNAMICS_IMPERSONATION_ENABLED` | Send `MSCRMCallerID` on user-driven Dynamics writes | Manual (`true` to enable) — off by default; see `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md` |
 | `SHAREPOINT_SITE_URL` | SharePoint Graph base | e.g., `https://appriver3651007194.sharepoint.com/sites/akoyaGO` |
 | `REVIEWER_MATERIALS_FOLDERS` | Allowlist for external reviewer file visibility | Manual (default `Reviewer_Downloads`) |
+
+### Optional — Dataverse target/write interlock (Stage 1 merged, unwired; see `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md` §3.6)
+
+None are secrets. The module enforces nothing until Stage-2 hook wiring lands.
+
+| Variable | Purpose | Source |
+|----------|---------|--------|
+| `DATAVERSE_TARGET_INTERLOCK` | Enforcement mode: `off`/`warn`/`on`. Unset/empty → `off`; any other invalid value fails closed to `on` with a console.warn | Manual, per environment; rollout `warn` → `on` per plan §5 |
+| `DATAVERSE_ALLOW_PROD_READS` | `yes` allows preview/local reads of production Dataverse (Mode B shadow-reads); anything else denies | Manual, preview/local only, set when a shadow comparison is actually running |
+| `DATAVERSE_PROD_WRITE_ACK` | `"<purpose> <YYYY-MM-DD>"` — operator ack for local scripts writing prod; honored only for deployment class `local` and only when the date is today (UTC) | Per-invocation operator shell only — never committed, never set in Vercel |
+| `DATAVERSE_REHEARSAL_GRANT` | JSON Mode-D rehearsal grant (`purpose`/`ops`/`entitySets`/`recordIds` (GUID-only)/`expiresAt`); `$batch` and alternate-key writes are never grant-coverable | Per-rehearsal, removed after; never in production env unless a Mode-D rehearsal is live |
 
 ### Optional — Research APIs
 

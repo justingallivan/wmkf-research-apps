@@ -13,6 +13,7 @@ import {
   classifyDeployment,
   classifyTarget,
   resolveInterlockMode,
+  shouldInspectDataverseUrl,
   assertDataverseOperationAllowed,
   _resetInterlockStateForTests,
 } from '../../lib/dataverse/core/interlock.js';
@@ -41,6 +42,8 @@ const ENV_KEYS = [
   'DATAVERSE_ALLOW_PROD_READS',
   'DATAVERSE_PROD_WRITE_ACK',
   'DATAVERSE_REHEARSAL_GRANT',
+  'DYNAMICS_URL',
+  'DYNAMICS_SANDBOX_URL',
 ];
 
 let savedEnv;
@@ -131,6 +134,11 @@ describe('resolveInterlockMode', () => {
     expect(resolveInterlockMode()).toBe('off');
   });
 
+  test('empty string -> off', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = '';
+    expect(resolveInterlockMode()).toBe('off');
+  });
+
   test('off/warn/on pass through', () => {
     for (const mode of ['off', 'warn', 'on']) {
       process.env.DATAVERSE_TARGET_INTERLOCK = mode;
@@ -138,12 +146,68 @@ describe('resolveInterlockMode', () => {
     }
   });
 
-  test('invalid value -> off, with one console.warn', () => {
+  test('invalid value -> on, with one console.warn naming the value', () => {
     process.env.DATAVERSE_TARGET_INTERLOCK = 'bogus';
     const spy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    expect(resolveInterlockMode()).toBe('off');
+    expect(resolveInterlockMode()).toBe('on');
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy.mock.calls[0][0]).toMatch(/\[dataverse-interlock\]/);
+    expect(spy.mock.calls[0][0]).toContain(JSON.stringify('bogus'));
+    expect(spy.mock.calls[0][0]).toMatch(/falling back to 'on'/);
+  });
+});
+
+describe('shouldInspectDataverseUrl', () => {
+  test('registry host -> true', () => {
+    expect(shouldInspectDataverseUrl(PROD_URL)).toBe(true);
+  });
+
+  test('unlisted *.crm.dynamics.com host -> true', () => {
+    expect(shouldInspectDataverseUrl(UNKNOWN_URL)).toBe(true);
+  });
+
+  test('login.microsoftonline.com -> false', () => {
+    expect(shouldInspectDataverseUrl('https://login.microsoftonline.com/token')).toBe(false);
+  });
+
+  test('graph.microsoft.com -> false', () => {
+    expect(shouldInspectDataverseUrl('https://graph.microsoft.com/v1.0/me')).toBe(false);
+  });
+
+  test('host matching DYNAMICS_URL env -> true even for a non-dynamics domain', () => {
+    process.env.DYNAMICS_URL = 'https://custom.example.test/api/data/v9.2';
+    expect(shouldInspectDataverseUrl('https://custom.example.test/anything')).toBe(true);
+  });
+
+  test('host matching DYNAMICS_SANDBOX_URL env -> true even for a non-dynamics domain', () => {
+    process.env.DYNAMICS_SANDBOX_URL = 'https://sandbox.custom.example.test/api/data/v9.2';
+    expect(shouldInspectDataverseUrl('https://sandbox.custom.example.test/anything')).toBe(true);
+  });
+});
+
+describe('assertDataverseOperationAllowed — URL scoping', () => {
+  test('parseable non-Dataverse URLs are skipped with no logging', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    setDeployment('preview');
+    const spy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(() =>
+      assertDataverseOperationAllowed({
+        url: 'https://login.microsoftonline.com/token',
+        method: 'POST',
+        callerLabel: 'test',
+      }),
+    ).not.toThrow();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  test('malformed URLs are not skipped and still fail closed', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    setDeployment('preview');
+
+    expect(() =>
+      assertDataverseOperationAllowed({ url: 'not-a-url', method: 'POST', callerLabel: 'test' }),
+    ).toThrow(/target=unknown/);
   });
 });
 

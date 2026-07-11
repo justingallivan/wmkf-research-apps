@@ -101,8 +101,11 @@ runtime and out of scope (§4).
   `lib/services/dynamics-context.js:124`): on/off, NODE_ENV-keyed default.
 - `DATAVERSE_DAL_UNIVERSAL` (`resolveDalUniversalMode`,
   `lib/services/dynamics-context.js:207`): explicit `off`/`warn`/`on`, unset →
-  `off`, invalid → `off` + one console.warn. **The interlock copies this
-  resolver shape.**
+  `off`, invalid → `off` + one console.warn. **The interlock started from this
+  resolver shape but deliberately diverges on invalid values** (round-3 Codex
+  finding): unset/empty → `off`, but a set-and-invalid value → `on` + one
+  console.warn — a typo'd flag must never silently disable a fail-closed
+  control (§3.4).
 
 ## 3. Design
 
@@ -230,10 +233,12 @@ Never a client-supplied flag (strategy §6). Two shapes:
 
 ### 3.4 Enforcement mode and flag
 
-`DATAVERSE_TARGET_INTERLOCK` = `off` | `warn` | `on`, resolved exactly like
-`resolveDalUniversalMode` (§2.5): unset → `off`, invalid → `off` with one
-console.warn. No `NODE_ENV`-keyed default — turning this on is always a
-deliberate per-environment act. `warn` logs one structured
+`DATAVERSE_TARGET_INTERLOCK` = `off` | `warn` | `on`. Unset or empty → `off`
+(rollout requirement); **any other invalid value → `on` (deny posture) with
+one console.warn naming the value** — a set-but-garbage flag must never
+silently disable the control (round-3 Codex finding; diverges deliberately
+from `resolveDalUniversalMode`, see §2.5). No `NODE_ENV`-keyed default —
+turning this on is always a deliberate per-environment act. `warn` logs one structured
 `[dataverse-interlock]` line per would-be-denied call and never throws. `on`
 throws an error whose message names the deployment class, target class,
 method, callerLabel, and the flag to consult — same actionable shape as
@@ -243,12 +248,17 @@ method, callerLabel, and the flag to consult — same actionable shape as
 
 1. **`fetchWithTimeout` in `lib/services/dynamics/http.js:23`.** One seam
    covers the entire DynamicsService family: reads (read-ops), writes
-   (write-core), changesets, and email, present and future. Guarding logic:
-   parse the URL host; if it matches the registry **or** ends in
-   `.crm.dynamics.com`, evaluate the policy; any other host (the
-   `login.microsoftonline.com` token endpoint; this helper is also used by
-   `graph-service.js` per the comment at `http.js:27`) passes through
-   untouched.
+   (write-core), changesets, and email, present and future. URL scoping lives
+   INSIDE the module (round-3 Codex finding — hook sites must not each carry
+   their own skip guard): `assertDataverseOperationAllowed` first consults the
+   exported `shouldInspectDataverseUrl(url)`, which inspects registry hosts,
+   `*.crm.dynamics.com`, and any host matching the current
+   `DYNAMICS_URL`/`DYNAMICS_SANDBOX_URL` (so a repointed env is never silently
+   skipped); parseable non-Dataverse hosts (the `login.microsoftonline.com`
+   token endpoint; this helper is also used by `graph-service.js` per the
+   comment at `http.js:27`) no-op with no logging, and unparseable URLs flow
+   into the classify/deny path (fail closed). Hook sites therefore call the
+   assert unconditionally.
 2. **`call()` in `lib/dataverse/client.js:67`** (skip when `dryRun`; the token
    fetch at `client.js:44` doesn't go through `call` and needs no hook). This
    also puts schema-apply scripts and any future `createClient` consumer under
