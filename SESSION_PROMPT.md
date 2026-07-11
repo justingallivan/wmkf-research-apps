@@ -1,160 +1,124 @@
-# Session 354 Prompt: policy-label UX, remediation decision, and campaign safety foundations
+# Session 355 Prompt: reviewer institution→CRM linking (pending stakeholder decision), plus carryover
 
-## Session 353 Summary
+## Session 354 Summary
 
-Architecture/review session. No product code, API, schema, or deployment behavior
-changed. Three durable documentation packages were preserved on `main`; the stop
-commit and push follow this handoff.
+Bug-fix + design session. One product fix shipped to production; one larger
+direction investigated with a read-only probe and parked pending a stakeholder
+decision. No schema or API-contract changes.
 
 ### What Was Completed
 
-1. **Reviewer-finding holistic review package preserved (`2b03e2de`).** Added the
-   independent review prompt/output, comparison, implementation plan, and ORCID-spine
-   specification as cataloged git-tracked documents. This did not start the redesign;
-   the dedicated-branch build remains parked pending explicit owner approval.
+1. **Decline-referral "Add as candidate" now works — one-click in-place add (`ef97fcd`, deployed to `main`/prod).**
+   A PD reported the Track Reviewers "Add as candidate" button (S349) "did
+   nothing." Root cause: its only action was `router.push({sub:'find'})` +
+   prefill — an unreliable tab hop, with the pre-filled card below the fold.
+   Replaced with an in-place add: the button POSTs the suggested name + decliner
+   to the existing `/api/workbench/manual-reviewer` (no `resolution`) and stays
+   on Track Reviewers. Per-row outcomes: **200** → "✓ Added" + lands on Invite
+   Reviewers; **409 + `lookup`** → inline identity-confirm picker (never
+   auto-resolves a namesake); **excluded/error** → inline message + Try again.
+   Client-only — no route/schema/migration change; reuses the existing server
+   path. New tests `tests/unit/reviewers-tab-referral-add.test.js` (3);
+   eslint + `check:types` + full `npm run build` + 92 reviewer/workbench tests
+   green. Wiki updated (`reviewer-workbench-lifecycle.md`).
 
-2. **Independent whack-a-mole review preserved (`6583e0d2`).** The code-grounded
-   review returned **NEEDS REWORK**. `docs/WHACK_A_MOLE_REMEDIATION_PLAN.md` now says
-   not to execute its original sequence until the owner reconciles the competing
-   recommendations: keep WS0 narrowly; reshape WS1–WS3; reject WS4/WS5; defer WS6;
-   keep WS7 as posture.
+2. **Explained the `reviewer_contact_affiliation_mismatch` System Alert** and
+   investigated auto-populating reviewer institutions into the CRM. Wrote and ran
+   a **read-only** probe (`scripts/probe-reviewer-affiliation-account-match.js`).
+   Findings: live backlog is only **~8** alerts (all "contact has no
+   institution," not conflicts); **~30%** of reported affiliations exact-match one
+   Account; **~62%** aren't in Accounts at all; 120 duplicate account names; noisy
+   affiliation data. Conclusion: **it's a data problem, not a matching problem.**
+   Owner insight settled the architecture: research names (OpenAlex/ROR) vs
+   legal/payee names (Dataverse Accounts) are **two namespaces** — resolution must
+   always be against Dataverse; OpenAlex is only an alias-feeder. Direction
+   **PARKED** pending a Connor + Sarah account-cleanup decision. Full detail:
+   `.claude-memory/project-reviewer-affiliation-institution-linking.md`.
 
-3. **Campaign release and Dataverse test strategy adopted (`c5151b46`).** Added the
-   campaign calendar, risk tiers, Dataverse test modes, external-user rehearsal,
-   expand/migrate/contract posture, promotion, and rollback strategy. Reconciled the
-   old direct-to-main memory with the new risk-tiered workflow.
-
-4. **Capture-mode boundary corrected (`c5151b46`).** The reviewer rehearsal runbook
-   no longer describes capture mode as a sandbox. [VERIFIED from current source]
-   capture blocks Dynamics email/contact promotion/ORCID back-propagation, but render
-   persists token state and a captured invitation send can stamp lifecycle fields.
-
-5. **Instruction convention reconciled (stop commit follows).** `CLAUDE.md` now points
-   to the campaign release strategy: Tier 0 may land on `main`; Tier 1–3 runtime work
-   uses a branch and deliberate promotion because pushing `main` deploys production.
+3. **Drafted a one-page stakeholder brief** for Connor + Sarah at
+   `outputs/reviewer-institution-crm-linking-brief.md` (**note: `outputs/` is
+   gitignored — this file is local-only, not in the repo**).
 
 ### Commits
 
-- `2b03e2de` — docs(reviewer): preserve holistic review synthesis
-- `6583e0d2` — docs: preserve independent whack-a-mole review
-- `c5151b46` — docs: add campaign release and Dataverse test strategy
-- Session 353 stop/handoff commit follows this file.
+- `ef97fcd` — fix(workbench): one-click in-place add for decline-referrals
+- Session 354 stop/handoff commit follows this file (docs + memory).
 
 ## Next Items
 
-### Verified Open
-
-1. **Fix the policy-version `label_conflict` UX without weakening immutability.**
-   [VERIFIED via `lib/services/admin/policies-service.js:274-292` and
-   `shared/components/admin/PoliciesSection.js:25-35`] Publishing changed content
-   under an existing label correctly returns `label_conflict`, while the UI only says
-   the label exists with different content. Add unique-label guidance or suggestion;
-   do not mutate a published version in place. Verify all policy slots.
-
-2. **Make session automation branch-aware.** [VERIFIED via
-   `.claude/skills/start/SKILL.md:15` and `.claude/skills/stop/SKILL.md:73`] `/start`
-   pulls `origin/main` and `/stop` hard-codes `git push origin main`. Reconcile both
-   with the adopted risk tiers before relying on them from feature branches.
-
-3. **Design the fail-closed Dataverse deployment-target/write interlock.** [PLANNED,
-   not built] The governing matrix is
-   `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` §6. Trace every write entry
-   point before implementation; preview/local pointed at production Dataverse must
-   deny writes by default, while approved rehearsals remain narrow and auditable.
-
 ### Owner Decision Needed
 
-1. **Reconcile the whack-a-mole recommendations.** Choose whether to adopt, modify,
-   or reject the changes named in
-   `docs/audits/whack-a-mole-independent-review-codex-2026-07-09.md`. Do not execute
-   `docs/WHACK_A_MOLE_REMEDIATION_PLAN.md` as written before this decision.
+1. **Take the reviewer-institution→CRM linking brief to Connor + Sarah.**
+   Evidence: `outputs/reviewer-institution-crm-linking-brief.md` (local),
+   `.claude-memory/project-reviewer-affiliation-institution-linking.md`.
+   Decide whether to canonicalize/de-dupe the Accounts table and attach a
+   ROR/EIN + alias crosswalk (the "unlock" that makes reviewer→Account linking
+   deterministic and reusable). Do NOT build the typeahead/cache before that.
 
-2. **Green-light the reviewer holistic redesign experiment?**
-   `.claude-memory/project-reviewer-holistic-redesign-parallel-build.md` records a
-   dedicated long-lived testing branch, phased P0–P4 build, and head-to-head comparison
-   against `main`; it remains not started and parked pending explicit approval.
+2. Carryover from S353 — unchanged, still owner-blocked: reconcile the
+   whack-a-mole recommendations; green-light (or not) the reviewer holistic
+   redesign; staff manual-review rescue-tool location; reviewer closeout
+   payability scope; desired end state for `check:types`.
+   Evidence: prior SESSION_PROMPT history + the memories they cite.
 
-3. **Choose the staff manual-review rescue-tool location.** Admin/superuser surface
-   versus Reviews tab. [VERIFIED] The retained routes, submission builder, and full
-   `ReviewAuthoringForm` still exist; requirements live in
-   `.claude-memory/project-staff-review-rescue-tool.md`.
+### Verified Open (from S353, not started this session)
 
-4. **Scope reviewer closeout payability.** The owner-endorsed direction is an additive
-   payability disposition at review closeout, not deletion of financial records.
-   Evidence: `.claude-memory/project-reviewer-closeout-payability.md`.
+1. **Fix the policy-version `label_conflict` UX** without weakening immutability.
+   Evidence: `lib/services/admin/policies-service.js:274-292`,
+   `shared/components/admin/PoliciesSection.js`.
 
-5. **Choose the desired end state for `check:types`.** Evidence and fail-open limits:
-   `docs/TYPESCRIPT_OPTION_ASSESSMENT.md`.
+2. **Make session automation branch-aware.** `/start` pulls `origin/main`,
+   `/stop` hard-codes `git push origin main`. Evidence:
+   `.claude/skills/start/SKILL.md`, `.claude/skills/stop/SKILL.md`.
+
+3. **Design the fail-closed Dataverse deployment-target/write interlock**
+   (PLANNED, not built). Evidence:
+   `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` §6.
 
 ### Parked
 
-1. Reviewer holistic redesign branch build — explicit owner go required.
-2. Accepted-reviewer “no longer needed” stand-down flow — current
-   `withdraw-sufficient` scope was previously limited to invited-pending; re-verify
-   before design.
-3. Review rendition formatting —
-   `.claude-memory/project-review-output-formatting.md` remains active.
-4. Campaign-settings prominence/defaults UX — owner-reported behavior needs source
-   verification before scope; `.claude-memory/project-campaign-settings-ux-revisit.md`.
-5. Project-wide prompt-cache-hit audit —
-   `.claude-memory/project-cache-hit-rate-review.md` remains deferred.
-6. Reviewer acknowledgment provenance parity — minor follow-up in
-   `.claude-memory/project-reviewer-ack-provenance-parity-followup.md`.
-7. Dependabot PR #53 — [VERIFIED 2026-07-09 via `gh`] still OPEN; six checks green;
-   mergeability reported UNKNOWN. Merge remains a deliberate owner action.
+1. Reviewer institution→CRM linking build (typeahead/cache/account-creation) —
+   re-open trigger: Connor + Sarah agree to the account-cleanup direction.
+   Evidence: `.claude-memory/project-reviewer-affiliation-institution-linking.md`.
+2. Prior parked items carry forward unchanged (reviewer holistic redesign branch;
+   accepted-reviewer stand-down flow; review rendition formatting; campaign
+   settings UX; prompt-cache-hit audit; reviewer ack provenance parity;
+   Dependabot PR #53). Evidence: S353 SESSION_PROMPT history + cited memories.
 
 ### Verify Before Acting
 
-1. **Whack-a-mole workstreams are recommendations, not an approved worklist.** The
-   independent review disputes WS4/WS5/WS6 and reshapes WS1–WS3.
-2. **`label_conflict` is partly working as designed.** Fix guidance/label selection,
-   not the version immutability and consent/audit model.
-3. **Sandbox reviewer readiness is stale evidence.** The last durable probe says the
-   sandbox exists but lacked reviewer schema/policy seeds. Re-probe schema,
-   permissions, policies, and email behavior before treating it as usable.
-4. **Quota-PD email runtime preconditions remain unverified this session.** The path
-   depends on Dynamics credentials, `NOTIFICATION_EMAIL_FROM`, and a synced sender.
-   Confirm the first real quota email or run a specifically approved read-only
-   configuration check; do not infer delivery from code alone.
+1. **The affiliation-alert options (auto-link, free-text fill, alert-suppression)
+   are DISCUSSED, not decided or built.** Nothing was written to Dataverse this
+   session. Re-verify the probe numbers (`scripts/probe-reviewer-affiliation-account-match.js`)
+   before quoting them — data drifts as reviewers accept.
 
 ### Do Not Reopen Without New Decision
 
-1. **The two broad reviews are complete.** Do not dispatch another whack-a-mole or
-   holistic reviewer review; resolve their recommendations instead.
-2. **Campaign strategy is adopted, but its mechanical controls are not built.** Do
-   not describe the Dataverse interlock, sandbox parity, deterministic rollout, or
-   branch-aware session skills as current infrastructure.
-3. **Capture mode is not a sandbox.** Use browser route mocks for side-effect-free
-   rehearsal or approved throwaway records for live-API capture.
-4. **Quota-PD-email and grantee waiver work remain shipped.** Do not rebuild or
-   restore their superseded paths without new evidence/decision.
+1. **The decline-referral one-click add (`ef97fcd`) shipped and is verified**
+   (tests + build). Don't rebuild it; the old prefill-to-Find prefill prop on
+   `ReviewerFindPanel` is intentionally left dormant.
+2. Two S353 broad reviews (whack-a-mole, holistic) remain complete — resolve
+   their recommendations, don't re-run them.
 
 ## Key Files Reference
 
 | File | Purpose |
-|---|---|
-| `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` | Adopted campaign-aware release/test/rollback direction |
-| `docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md` | Concrete mocked, capture, and allowlisted live reviewer rehearsal |
-| `docs/WHACK_A_MOLE_REMEDIATION_PLAN.md` | Original proposal; execution paused for owner reconciliation |
-| `docs/audits/whack-a-mole-independent-review-codex-2026-07-09.md` | Independent NEEDS REWORK verdict and replacement operating model |
-| `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md` | Parked reviewer-finding/identity redesign plan |
-| `lib/services/admin/policies-service.js` | Immutable policy publish state machine and `label_conflict` outcome |
-| `shared/components/admin/PoliciesSection.js` | Current policy status copy and label input UX |
-| `.claude/skills/start/SKILL.md` / `.claude/skills/stop/SKILL.md` | Session automation that still assumes `main` |
+|------|---------|
+| `shared/components/reviewers/ReviewersTab.js` | `addReferralCandidate` in-place add + per-row `referralActions` state |
+| `shared/components/reviewers/ReviewerManagePanel.js` | `ReferralAction` / `ReferralConfirm` inline referral UI |
+| `lib/services/workbench/manual-reviewer-service.js` | Server-side identity resolve (reused, unchanged) |
+| `lib/services/alert-reviewer-affiliation-mismatch.js` | The affiliation-mismatch alert generator |
+| `scripts/probe-reviewer-affiliation-account-match.js` | Read-only probe: reported affiliations vs Accounts |
+| `outputs/reviewer-institution-crm-linking-brief.md` | Stakeholder brief (local-only; `outputs/` gitignored) |
 
 ## Testing
 
-No product code changed, so product tests were not rerun. Documentation work passed:
-
 ```bash
-npm run check:agent-invariants
-npm run check:instruction-architecture
-npm run check:docs-catalog
-npm run check:fact-consistency && npm run check:fact-consistency:self-test
-npm run check:memory-router && npm run check:memory-router:self-test
-npm run check:doc-currency && npm run check:doc-currency:self-test
-npm run check:canonical-pointers && npm run check:canonical-pointers:self-test
-npm run check:doc-symbol-refs && npm run check:doc-symbol-refs:self-test
-npm run check:build-claim-freshness && npm run check:build-claim-freshness:self-test
-npm run check:memory-drift:no-write
+npx jest tests/unit/reviewers-tab-referral-add.test.js \
+         tests/unit/reviewers-tab-stale-request.test.js \
+         tests/unit/workbench-manual-reviewer-service.test.js \
+         tests/unit/manual-reviewer-endpoint.test.js
+npm run check:types
+# Re-run the read-only affiliation probe (no writes):
+node scripts/probe-reviewer-affiliation-account-match.js
 ```

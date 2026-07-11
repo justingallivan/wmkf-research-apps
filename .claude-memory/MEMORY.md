@@ -62,6 +62,7 @@
 - Grantee and email templates: project-grantee-deliverable-email-voice.md; project-email-template-token-syntax.md
 - Grantee publication waiver (versioned, staff-editable in admin Policies; SHIPPED S350; ack modal S351): project-grantee-waiver-versioning.md; ../docs/GRANTEE_WAIVER_VERSIONING_PLAN.md
 - Reviewer ack provenance parity (MINOR follow-up S351 — reviewer COI/AI-use acks lack body-hash + bind version at-submit, not render): project-reviewer-ack-provenance-parity-followup.md
+- Reviewer institution → CRM linking / affiliation-mismatch alert / institution typeahead (PARKED S354 — pending Connor+Sarah account cleanup; ROR/OpenAlex canonical spine): project-reviewer-affiliation-institution-linking.md
 - Deferred cleanup / dead-code session: project-deferred-code-cleanup.md
 - Whack-a-mole review (owner reconciliation pending; do not execute): ../docs/WHACK_A_MOLE_REMEDIATION_PLAN.md; ../docs/audits/whack-a-mole-independent-review-codex-2026-07-09.md
 - Parked: project-wide prompt-caching audit (Anthropic flagged low cache-hit rate, S339): project-cache-hit-rate-review.md
