@@ -22,12 +22,34 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Labels are unique per slot (Dataverse alternate key; server-enforced).
+// Comparison mirrors the server: trimmed, and case-insensitive like the
+// Dataverse OData label lookup. slot.versions is capped at the 50 newest,
+// so this set is advisory — the server remains the enforcer.
+function takenLabelSet(versions) {
+  return new Set((versions || []).map(v => (v.versionLabel || '').trim().toLowerCase()));
+}
+
+function isLabelTaken(label, taken) {
+  return taken.has((label || '').trim().toLowerCase());
+}
+
+function suggestUniqueLabel(base, taken) {
+  const root = (base || todayISO()).trim();
+  if (!isLabelTaken(root, taken)) return root;
+  for (let i = 2; i <= 99; i++) {
+    const candidate = `${root}-${i}`;
+    if (candidate.length <= 50 && !isLabelTaken(candidate, taken)) return candidate;
+  }
+  return root;
+}
+
 const STATUS_COPY = {
   completed:             { tone: 'green',  text: 'Published.' },
   already_published:     { tone: 'gray',   text: 'No change — that exact version is already active.' },
   partial:               { tone: 'amber',  text: 'Published with warnings — see details below.' },
   concurrency_conflict:  { tone: 'amber',  text: 'Another admin published while you were editing. Reload and re-apply your changes.' },
-  label_conflict:        { tone: 'amber',  text: 'A version with that label already exists with different content.' },
+  label_conflict:        { tone: 'amber',  text: 'That label is already used by a published version with different content. Published versions are immutable — pick a new label (see the suggestion under the label field) and publish again.' },
   invalid_body:          { tone: 'red',    text: 'Policy body contains disallowed content.' },
   slot_not_provisioned:  { tone: 'red',    text: 'Slot row missing in Dataverse. Run the seed script.' },
   duplicate_slot_rows:   { tone: 'red',    text: 'Multiple Dataverse rows for this slot. Manual cleanup required.' },
@@ -236,7 +258,8 @@ function buildSlotDataverseFields(slot) {
 }
 
 function PublishForm({ slot, onSuccess, onOutcome }) {
-  const [versionLabel, setVersionLabel] = useState(todayISO());
+  const taken = takenLabelSet(slot.versions);
+  const [versionLabel, setVersionLabel] = useState(() => suggestUniqueLabel(todayISO(), taken));
   const [title, setTitle] = useState(slot.activeVersion?.title || '');
   const [body, setBody] = useState('');
   const [effectiveDate, setEffectiveDate] = useState(todayISO());
@@ -280,6 +303,8 @@ function PublishForm({ slot, onSuccess, onOutcome }) {
   };
 
   const bodyTooShort = body.length < 50;
+  const labelTaken = isLabelTaken(versionLabel, taken);
+  const suggestedLabel = suggestUniqueLabel(versionLabel, taken);
 
   return (
     <div className="p-4 space-y-3">
@@ -292,6 +317,19 @@ function PublishForm({ slot, onSuccess, onOutcome }) {
             maxLength={50}
             className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
           />
+          {labelTaken && (
+            <span className="mt-1 block text-[11px] text-amber-700">
+              Already used by a published version. Identical content is a no-op; changed
+              content will be rejected — versions are immutable.{' '}
+              <button
+                type="button"
+                onClick={() => setVersionLabel(suggestedLabel)}
+                className="underline hover:text-amber-900"
+              >
+                Use “{suggestedLabel}”
+              </button>
+            </span>
+          )}
         </label>
         <label className="block text-xs text-gray-700">
           Effective date
