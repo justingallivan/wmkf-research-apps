@@ -21,6 +21,9 @@ import { PRODUCTION_HOSTS, SANDBOX_HOSTS } from '../../lib/dataverse/core/target
 const PROD_URL = `https://${PRODUCTION_HOSTS[0]}/api/data/v9.2/contacts`;
 const PROD_RECORD_URL = `https://${PRODUCTION_HOSTS[0]}/api/data/v9.2/contacts(11111111-1111-1111-1111-111111111111)`;
 const PROD_BATCH_URL = `https://${PRODUCTION_HOSTS[0]}/api/data/v9.2/$batch`;
+const PROD_BOUND_ACTION_URL = `https://${PRODUCTION_HOSTS[0]}/api/data/v9.2/emails(11111111-1111-1111-1111-111111111111)/Microsoft.Dynamics.CRM.SendEmail`;
+const PROD_REF_URL = `https://${PRODUCTION_HOSTS[0]}/api/data/v9.2/akoya_requests(11111111-1111-1111-1111-111111111111)/some_navigation_property/$ref`;
+const PROD_MALFORMED_URL = `https://${PRODUCTION_HOSTS[0]}/not-an-odata-path`;
 const SANDBOX_URL = `https://${SANDBOX_HOSTS[0]}/api/data/v9.2/contacts`;
 const UNKNOWN_URL = 'https://someorg.crm.dynamics.com/api/data/v9.2/contacts';
 
@@ -407,7 +410,7 @@ describe('DATAVERSE_REHEARSAL_GRANT exception', () => {
     ).toThrow();
   });
 
-  test('$batch write requires "BATCH" explicitly in ops, even if the method itself is listed', () => {
+  test('$batch write is denied even when POST is in ops (no "BATCH" escape hatch)', () => {
     process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
     process.env.DATAVERSE_REHEARSAL_GRANT = JSON.stringify({
       purpose: 'rehearsal',
@@ -422,11 +425,11 @@ describe('DATAVERSE_REHEARSAL_GRANT exception', () => {
     ).toThrow();
   });
 
-  test('$batch write is allowed when ops includes "BATCH"', () => {
+  test('$batch write is denied even when the grant lists "BATCH" in ops — batch is never grant-coverable in v1', () => {
     process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
     process.env.DATAVERSE_REHEARSAL_GRANT = JSON.stringify({
       purpose: 'rehearsal',
-      ops: ['BATCH'],
+      ops: ['POST', 'BATCH'],
       entitySets: ['contacts'],
       recordIds: [],
       expiresAt: futureIso(),
@@ -434,7 +437,82 @@ describe('DATAVERSE_REHEARSAL_GRANT exception', () => {
     setDeployment('preview');
     expect(() =>
       assertDataverseOperationAllowed({ url: PROD_BATCH_URL, method: 'POST', callerLabel: 'test' }),
+    ).toThrow();
+  });
+
+  test('bound-action POST (emails(guid)/SendEmail) matches the grant only when the base entitySet AND recordId are both covered', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    process.env.DATAVERSE_REHEARSAL_GRANT = JSON.stringify({
+      purpose: 'rehearsal',
+      ops: ['POST'],
+      entitySets: ['emails'],
+      recordIds: ['11111111-1111-1111-1111-111111111111'],
+      expiresAt: futureIso(),
+    });
+    setDeployment('preview');
+    expect(() =>
+      assertDataverseOperationAllowed({ url: PROD_BOUND_ACTION_URL, method: 'POST', callerLabel: 'test' }),
     ).not.toThrow();
+  });
+
+  test('bound-action POST with a recordId NOT in the grant is denied', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    process.env.DATAVERSE_REHEARSAL_GRANT = JSON.stringify({
+      purpose: 'rehearsal',
+      ops: ['POST'],
+      entitySets: ['emails'],
+      recordIds: ['22222222-2222-2222-2222-222222222222'],
+      expiresAt: futureIso(),
+    });
+    setDeployment('preview');
+    expect(() =>
+      assertDataverseOperationAllowed({ url: PROD_BOUND_ACTION_URL, method: 'POST', callerLabel: 'test' }),
+    ).toThrow();
+  });
+
+  test('$ref DELETE (akoya_requests(guid)/nav/$ref) matches via the base entity set + GUID', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    process.env.DATAVERSE_REHEARSAL_GRANT = JSON.stringify({
+      purpose: 'rehearsal',
+      ops: ['DELETE'],
+      entitySets: ['akoya_requests'],
+      recordIds: ['11111111-1111-1111-1111-111111111111'],
+      expiresAt: futureIso(),
+    });
+    setDeployment('preview');
+    expect(() =>
+      assertDataverseOperationAllowed({ url: PROD_REF_URL, method: 'DELETE', callerLabel: 'test' }),
+    ).not.toThrow();
+  });
+
+  test('$ref DELETE with an unlisted GUID is denied', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    process.env.DATAVERSE_REHEARSAL_GRANT = JSON.stringify({
+      purpose: 'rehearsal',
+      ops: ['DELETE'],
+      entitySets: ['akoya_requests'],
+      recordIds: ['22222222-2222-2222-2222-222222222222'],
+      expiresAt: futureIso(),
+    });
+    setDeployment('preview');
+    expect(() =>
+      assertDataverseOperationAllowed({ url: PROD_REF_URL, method: 'DELETE', callerLabel: 'test' }),
+    ).toThrow();
+  });
+
+  test('a malformed / non-OData path fails grant matching (fail closed)', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    process.env.DATAVERSE_REHEARSAL_GRANT = JSON.stringify({
+      purpose: 'rehearsal',
+      ops: ['POST'],
+      entitySets: ['contacts'],
+      recordIds: [],
+      expiresAt: futureIso(),
+    });
+    setDeployment('preview');
+    expect(() =>
+      assertDataverseOperationAllowed({ url: PROD_MALFORMED_URL, method: 'POST', callerLabel: 'test' }),
+    ).toThrow();
   });
 });
 
