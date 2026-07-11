@@ -211,8 +211,9 @@ Requirements:
 **[PLANNED — highest-priority enabling control]** Add a centralized, fail-closed
 interlock at the trusted Dataverse write boundary. UI warnings and route-specific
 flags are not sufficient. Concrete design (modules, policy matrix, hook points,
-rollout): `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md` (S355, design only —
-still not built).
+rollout): `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md` (S355; Stage-1 policy
+module exists on branch `interlock-stage1`, unmerged and unwired — the interlock
+is NOT yet enforcing anything).
 
 The decision must combine server-known facts:
 

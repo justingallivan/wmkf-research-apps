@@ -16,8 +16,16 @@ related:
 
 # Dataverse Target and Write Interlock Design
 
-**Status: DESIGN ONLY (2026-07-11, Session 355). No interlock code exists in the
-repo.** This document turns
+**Status: Stage 1 built on branch `interlock-stage1` (2026-07-11, Session 355;
+unmerged, unwired — zero runtime effect). Nothing on `main`, and no hook wiring
+anywhere.** [RECHECKED after lib/dataverse/core/interlock.js +
+lib/dataverse/core/target-registry.js changes on that branch (creation, then a
+same-session §3.3 audit-logging amendment) — VERIFIED via `git ls-tree main`
+(0 interlock files) and `git diff main interlock-stage1 --stat` (only added
+files: policy module, registry, test suite; zero existing files touched, so
+§3.5 hook points remain unbuilt). This doc describes the interlock at
+stage/contract level, not line level; branch-side edits within Stage-1 scope
+do not invalidate it.] This document turns
 `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` §6 — the
 "[PLANNED — highest-priority enabling control]" — into a concrete, buildable
 design. State labels follow the strategy doc's convention: **[VERIFIED]** was
