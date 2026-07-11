@@ -243,7 +243,11 @@ throws an error whose message names the deployment class, target class,
 method, callerLabel, and the flag to consult — same actionable shape as
 `assertTrustedDalContext`.
 
-### 3.5 Hook points **[PLANNED]** — three, matching the §2 inventory
+### 3.5 Hook points — three, matching the §2 inventory
+
+**[BUILT on branch `interlock-stage2`, 2026-07-11 S355 — wired but inert until
+the env flag is set; enforcement still requires the §5 Stage-2 `warn` rollout.]**
+[RECHECKED after lib/services/dynamics/http.js + lib/dataverse/client.js + lib/services/dataverse-export/fetch-client.js + lib/services/dataverse-export/live-taxonomy.js change: all four hook sites call assertDataverseOperationAllowed unconditionally per this section (commit 8278d170 + the export denial-preservation fix); denial-contract wiring tests in tests/unit/dataverse-interlock-wiring.test.js; diffs reviewed.]
 
 1. **`fetchWithTimeout` in `lib/services/dynamics/http.js:23`.** One seam
    covers the entire DynamicsService family: reads (read-ops), writes

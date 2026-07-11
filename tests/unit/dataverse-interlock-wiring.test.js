@@ -17,6 +17,7 @@
 
 import { jest } from '@jest/globals';
 import { fetchWithTimeout } from '../../lib/services/dynamics/http.js';
+import { fetchXmlPage, FetchXmlError } from '../../lib/services/dataverse-export/fetch-client.js';
 import { createClient } from '../../lib/dataverse/client.js';
 import { _resetInterlockStateForTests } from '../../lib/dataverse/core/interlock.js';
 
@@ -105,6 +106,47 @@ describe('dynamics/http.js fetchWithTimeout', () => {
     expect(caught).toBeDefined();
     expect(caught.noResponse).toBeUndefined();
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('dataverse-export/fetch-client.js fetchXmlPage', () => {
+  test('on mode + registry-unknown Dataverse URL: preserves raw interlock denial', async () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    process.env.DYNAMICS_URL = 'https://someorg.crm.dynamics.com';
+
+    let caught;
+    try {
+      await fetchXmlPage('contacts', '<fetch></fetch>', { token: 't' });
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught.message).toMatch(/\[dataverse-interlock\] denied/);
+    expect(caught).not.toBeInstanceOf(FetchXmlError);
+    expect(caught.stage).toBeUndefined();
+    expect(caught.retryable).toBeUndefined();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test('genuine network error still wraps as FetchXmlError', async () => {
+    delete process.env.DATAVERSE_TARGET_INTERLOCK;
+    process.env.DYNAMICS_URL = 'https://someorg.crm.dynamics.com';
+    global.fetch = jest.fn(() => Promise.reject(new Error('socket hang up')));
+
+    let caught;
+    try {
+      await fetchXmlPage('contacts', '<fetch></fetch>', { token: 't' });
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(FetchXmlError);
+    expect(caught.message).toBe('FetchXML network error: socket hang up');
+    expect(caught.stage).toBe('paging');
+    expect(caught.page).toBe(1);
+    expect(caught.retryable).toBe(false);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 });
 
