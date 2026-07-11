@@ -25,6 +25,7 @@ This is a Next.js multi-application system for grant and document workflows, dep
 - Use `lib/services/llm-client.js` for provider calls and `lib/services/execute-prompt.js` for the shared Executor contract.
 - Use explicit Dynamics restriction context; preserve fail-closed auth and restriction behavior. Post-auth entry points establish it via `lib/dataverse/core/context.js` `withDalContext`; entity writes fail closed outside a trusted context under `DATAVERSE_DAL_ENFORCEMENT` (on in ALL environments — prod flipped to explicit `on` 2026-07-04/S330; unset would still mean on outside production). Closed (Session 330, 2026-07-04): `DynamicsService.createEmailActivity`/`addEmailAttachment`/`sendEmail` now call `assertTrustedDalContext` first, matching entity-write enforcement — see `docs/agent-wiki/topics/dataverse-dynamics.md` and `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` stage log.
 - Private intake Blob operations use `INTAKE_BLOB_RW_TOKEN`, never the shared Blob token.
+- The Dataverse target/write interlock (`lib/dataverse/core/interlock.js`, wired at all runtime Dataverse HTTP seams since S355) classifies deployment × target-hostname × operation and fails closed on unknowns; `DATAVERSE_TARGET_INTERLOCK=warn` is live everywhere (flip to `on` pending log observation). Never bypass it via a client-supplied flag; hostname classification lives in the tracked `target-registry.js` — extending it is a reviewed commit, not an env edit. See `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md`.
 
 ## High-Risk Workflows
 

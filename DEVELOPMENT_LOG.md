@@ -10,6 +10,20 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Fail-closed Dataverse target/write interlock ships, live in warn mode (Session 355)
+
+**Milestone:** The strategy-§6 "highest-priority enabling control" went from planned to live in one
+session: a deployment-class × Dataverse-target × operation-class policy interlock at every runtime
+Dataverse HTTP seam, hostname-classified against a tracked registry, fail-closed on anything unknown.
+**Sessions:** 355 (design → Stage 1 → 4 Codex adversarial rounds/8 findings fixed → Stage 2 wiring → warn rollout).
+**Ship state:**
+- `DATAVERSE_TARGET_INTERLOCK=warn` live in `.env.local` + Vercel Production/Preview; observe-only, never blocks; flip to `on` awaits log review (plan §5 Stage 3).
+- Three hook families wired: `dynamics/http.js#fetchWithTimeout`, `dataverse/client.js#call()`, dataverse-export reads; 112 tests pin the policy + denial contracts.
+- Exceptions narrow and audited: date-bounded operator ack; GUID-only Mode-D rehearsal grants; `$batch`/alt-key writes never coverable.
+- Settled empirically: `akoyago.crm.dynamics.com` never existed (display-name conflation); sandbox is `orgd9e66399.crm.dynamics.com` (runbook corrected).
+**Why it matters:** preview/local pointed at prod Dataverse is no longer one env-var away from silent prod writes — the strategy's precondition for safe campaign-era refactoring.
+**Pointers:** `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md`; merges `e113b4bf` (Stage 1), `8067de3a` (Stage 2); rollout `87da872e`.
+
 ## July 2026 — Grantee publication waiver becomes versioned + consent-captured (Session 350)
 
 **Milestone:** The grantee publication-consent waiver moves from a hardcoded frontend constant (never
