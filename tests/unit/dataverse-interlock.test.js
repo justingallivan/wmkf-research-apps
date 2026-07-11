@@ -24,6 +24,13 @@ const PROD_BATCH_URL = `https://${PRODUCTION_HOSTS[0]}/api/data/v9.2/$batch`;
 const PROD_BOUND_ACTION_URL = `https://${PRODUCTION_HOSTS[0]}/api/data/v9.2/emails(11111111-1111-1111-1111-111111111111)/Microsoft.Dynamics.CRM.SendEmail`;
 const PROD_REF_URL = `https://${PRODUCTION_HOSTS[0]}/api/data/v9.2/akoya_requests(11111111-1111-1111-1111-111111111111)/some_navigation_property/$ref`;
 const PROD_MALFORMED_URL = `https://${PRODUCTION_HOSTS[0]}/not-an-odata-path`;
+const PROD_COLLECTION_BOUND_ACTION_URL = `https://${PRODUCTION_HOSTS[0]}/api/data/v9.2/contacts/Microsoft.Dynamics.CRM.SomeAction`;
+const PROD_ALT_KEY_URL = `https://${PRODUCTION_HOSTS[0]}/api/data/v9.2/wmkf_reviewquestions(wmkf_questionkey='q1')`;
+const PROD_COMPOSITE_ALT_KEY_URL = `https://${PRODUCTION_HOSTS[0]}/api/data/v9.2/wmkf_answers(_wmkf_appreviewersuggestion_value=11111111-1111-1111-1111-111111111111,wmkf_questionkey='q1')`;
+const PROD_UPPERCASE_GUID_URL = `https://${PRODUCTION_HOSTS[0]}/api/data/v9.2/contacts(11111111-1111-1111-1111-111111111111)`.replace(
+  '11111111-1111-1111-1111-111111111111',
+  '11111111-1111-1111-1111-111111111111'.toUpperCase(),
+);
 const SANDBOX_URL = `https://${SANDBOX_HOSTS[0]}/api/data/v9.2/contacts`;
 const UNKNOWN_URL = 'https://someorg.crm.dynamics.com/api/data/v9.2/contacts';
 
@@ -513,6 +520,110 @@ describe('DATAVERSE_REHEARSAL_GRANT exception', () => {
     expect(() =>
       assertDataverseOperationAllowed({ url: PROD_MALFORMED_URL, method: 'POST', callerLabel: 'test' }),
     ).toThrow();
+  });
+
+  test('collection-bound action (no recordId, trailing path) is denied even when ops+entitySets match', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    process.env.DATAVERSE_REHEARSAL_GRANT = JSON.stringify({
+      purpose: 'rehearsal',
+      ops: ['POST'],
+      entitySets: ['contacts'],
+      recordIds: [],
+      expiresAt: futureIso(),
+    });
+    setDeployment('preview');
+    expect(() =>
+      assertDataverseOperationAllowed({
+        url: PROD_COLLECTION_BOUND_ACTION_URL,
+        method: 'POST',
+        callerLabel: 'test',
+      }),
+    ).toThrow();
+  });
+
+  test('exact collection URL (no trailing path) is still allowed as a create', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    process.env.DATAVERSE_REHEARSAL_GRANT = JSON.stringify({
+      purpose: 'rehearsal',
+      ops: ['POST'],
+      entitySets: ['contacts'],
+      recordIds: [],
+      expiresAt: futureIso(),
+    });
+    setDeployment('preview');
+    expect(() =>
+      assertDataverseOperationAllowed({ url: PROD_URL, method: 'POST', callerLabel: 'test' }),
+    ).not.toThrow();
+  });
+
+  test('alternate-key predicate is denied even when that exact string is in recordIds', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    process.env.DATAVERSE_REHEARSAL_GRANT = JSON.stringify({
+      purpose: 'rehearsal',
+      ops: ['PATCH'],
+      entitySets: ['wmkf_reviewquestions'],
+      recordIds: ["wmkf_questionkey='q1'"],
+      expiresAt: futureIso(),
+    });
+    setDeployment('preview');
+    expect(() =>
+      assertDataverseOperationAllowed({ url: PROD_ALT_KEY_URL, method: 'PATCH', callerLabel: 'test' }),
+    ).toThrow();
+  });
+
+  test('composite alternate-key predicate is denied', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    process.env.DATAVERSE_REHEARSAL_GRANT = JSON.stringify({
+      purpose: 'rehearsal',
+      ops: ['PATCH'],
+      entitySets: ['wmkf_answers'],
+      recordIds: [
+        '_wmkf_appreviewersuggestion_value=11111111-1111-1111-1111-111111111111,wmkf_questionkey=\'q1\'',
+      ],
+      expiresAt: futureIso(),
+    });
+    setDeployment('preview');
+    expect(() =>
+      assertDataverseOperationAllowed({
+        url: PROD_COMPOSITE_ALT_KEY_URL,
+        method: 'PATCH',
+        callerLabel: 'test',
+      }),
+    ).toThrow();
+  });
+
+  test('uppercase-GUID URL matches a lowercase grant entry (case-insensitive compare)', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    process.env.DATAVERSE_REHEARSAL_GRANT = JSON.stringify({
+      purpose: 'rehearsal',
+      ops: ['PATCH'],
+      entitySets: ['contacts'],
+      recordIds: ['11111111-1111-1111-1111-111111111111'],
+      expiresAt: futureIso(),
+    });
+    setDeployment('preview');
+    expect(() =>
+      assertDataverseOperationAllowed({
+        url: PROD_UPPERCASE_GUID_URL,
+        method: 'PATCH',
+        callerLabel: 'test',
+      }),
+    ).not.toThrow();
+  });
+
+  test('non-GUID garbage in recordIds is ignored — only the valid GUID entry matches', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    process.env.DATAVERSE_REHEARSAL_GRANT = JSON.stringify({
+      purpose: 'rehearsal',
+      ops: ['PATCH'],
+      entitySets: ['contacts'],
+      recordIds: ["wmkf_questionkey='q1'", '11111111-1111-1111-1111-111111111111'],
+      expiresAt: futureIso(),
+    });
+    setDeployment('preview');
+    expect(() =>
+      assertDataverseOperationAllowed({ url: PROD_RECORD_URL, method: 'PATCH', callerLabel: 'test' }),
+    ).not.toThrow();
   });
 });
 
