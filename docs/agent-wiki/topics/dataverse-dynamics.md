@@ -118,9 +118,12 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   from `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md`; the three hook
   families (dynamics/http.js `fetchWithTimeout`, dataverse/client.js `call()`,
   dataverse-export) call `assertDataverseOperationAllowed` unconditionally
-  (merge 8067de3a). It enforces NOTHING until `DATAVERSE_TARGET_INTERLOCK`
-  is set — verified unset in `.env.local` and all Vercel envs at merge time;
-  the plan-§5 `warn` rollout is the deliberate next step. Set-but-invalid
+  (merge 8067de3a). `DATAVERSE_TARGET_INTERLOCK=warn` live in `.env.local` +
+  Vercel Production/Preview since 2026-07-11 (observe-only — logs would-deny
+  lines, never blocks); flip to `on` after observation per plan §5. A
+  `[dataverse-interlock]` line in prod logs means env misconfig or an
+  unregistered target — investigate, don't extend the registry blindly.
+  Set-but-invalid
   flag values fail closed to `on`. Hardened by four Codex adversarial rounds
   (rehearsal grants: GUID-only recordIds, exact-collection creates, `$batch`
   never coverable; denials never reclassified as transient/FetchXml network

@@ -106,9 +106,10 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 
 ### Optional — Dataverse target/write interlock (Stages 1+2 merged — wired, inert; see `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md` §3.6)
 
-None are secrets. The hook sites are wired (merge 8067de3a) but the interlock
-enforces nothing until `DATAVERSE_TARGET_INTERLOCK` is set (unset everywhere
-as of 2026-07-11; the plan-§5 `warn` rollout is the deliberate next step).
+None are secrets. The hook sites are wired (merge 8067de3a) and
+`DATAVERSE_TARGET_INTERLOCK=warn` is live in `.env.local` + Vercel
+Production/Preview since 2026-07-11 (observe-only, never blocks); the flip to
+`on` follows observation per plan §5.
 
 | Variable | Purpose | Source |
 |----------|---------|--------|

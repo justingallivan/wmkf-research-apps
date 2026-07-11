@@ -18,10 +18,13 @@ related:
 
 **Status: Stages 1+2 MERGED to `main` (2026-07-11, Session 355; Stage 1 at
 e113b4bf, Stage 2 hook wiring at 8067de3a; full suite 5361/5361 green on the
-Stage-2 branch tip). WIRED but INERT: all three §3.5 hook families call the
-module, but `DATAVERSE_TARGET_INTERLOCK` is unset in `.env.local` and every
-Vercel environment (verified via `vercel env ls` at merge time), so nothing is
-enforced yet — the §5 `warn` rollout is the next deliberate step.**
+Stage-2 branch tip). WIRED and in `warn` mode everywhere: the §5 Stage-2
+rollout ran 2026-07-11 — `DATAVERSE_TARGET_INTERLOCK=warn` set in `.env.local`
+and Vercel Production + Preview (verified via `vercel env ls`), production
+redeployed and Ready (aliased `reviews.wmkeck.org`), zero
+`[dataverse-interlock]` lines in initial logs. `warn` never blocks; the
+remaining §5 step is observation across normal staff use + one cron cycle,
+then the deliberate flip to `on` (§5 Stage 3).**
 [RECHECKED after lib/dataverse/core/interlock.js + lib/dataverse/core/target-registry.js changes — VERIFIED via the merge diffs and four Codex adversarial review rounds (eight findings total: 2+2+3+1 across rounds, all fixed and personally diff-reviewed). This doc describes the interlock at stage/contract level, not line level.] This document turns
 `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` §6 — the
 "[PLANNED — highest-priority enabling control]" — into a concrete, buildable
