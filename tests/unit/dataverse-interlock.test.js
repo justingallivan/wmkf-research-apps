@@ -14,6 +14,7 @@ import {
   classifyTarget,
   resolveInterlockMode,
   assertDataverseOperationAllowed,
+  _resetInterlockStateForTests,
 } from '../../lib/dataverse/core/interlock.js';
 import { PRODUCTION_HOSTS, SANDBOX_HOSTS } from '../../lib/dataverse/core/target-registry.js';
 
@@ -40,6 +41,9 @@ beforeEach(() => {
   // Tests set NODE_ENV/VERCEL_ENV explicitly per case; clear the jest-set
   // NODE_ENV=test default so classifyDeployment() cases are unambiguous.
   delete process.env.VERCEL_ENV;
+  // The prod-write-ack log gate is once-per-process by design; reset it so
+  // one test's ack-allowed call doesn't silence the next test's assertion.
+  _resetInterlockStateForTests();
 });
 
 afterEach(() => {
@@ -431,5 +435,121 @@ describe('DATAVERSE_REHEARSAL_GRANT exception', () => {
     expect(() =>
       assertDataverseOperationAllowed({ url: PROD_BATCH_URL, method: 'POST', callerLabel: 'test' }),
     ).not.toThrow();
+  });
+});
+
+describe('§3.3 exception audit logging (plan §3.3)', () => {
+  function todayUtc() {
+    return new Date().toISOString().slice(0, 10);
+  }
+  function futureIso() {
+    return new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  }
+
+  describe('prod write ack', () => {
+    test('logs "PROD WRITE ACK active: <purpose>" once across two allowed calls', () => {
+      process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+      process.env.DATAVERSE_PROD_WRITE_ACK = `backfill grant records ${todayUtc()}`;
+      setDeployment('local');
+      const spy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      assertDataverseOperationAllowed({ url: PROD_URL, method: 'POST', callerLabel: 'test' });
+      assertDataverseOperationAllowed({ url: PROD_RECORD_URL, method: 'PATCH', callerLabel: 'test' });
+
+      const ackLogs = spy.mock.calls.filter((call) =>
+        /^\[dataverse-interlock\] PROD WRITE ACK active: backfill grant records$/.test(call[0]),
+      );
+      expect(ackLogs).toHaveLength(1);
+    });
+
+    test('does not log in warn mode when the write is denied (no ack present)', () => {
+      process.env.DATAVERSE_TARGET_INTERLOCK = 'warn';
+      setDeployment('preview');
+      const spy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      assertDataverseOperationAllowed({ url: PROD_URL, method: 'POST', callerLabel: 'test' });
+
+      const ackLogs = spy.mock.calls.filter((call) => /PROD WRITE ACK active/.test(call[0]));
+      expect(ackLogs).toHaveLength(0);
+    });
+
+    test('mode "off" never logs, even with a valid ack present', () => {
+      process.env.DATAVERSE_TARGET_INTERLOCK = 'off';
+      process.env.DATAVERSE_PROD_WRITE_ACK = `backfill grant records ${todayUtc()}`;
+      setDeployment('local');
+      const spy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      assertDataverseOperationAllowed({ url: PROD_URL, method: 'POST', callerLabel: 'test' });
+
+      expect(spy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('rehearsal grant', () => {
+    test('logs a structured line with purpose/method/entitySet for every allowed write', () => {
+      process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+      process.env.DATAVERSE_REHEARSAL_GRANT = JSON.stringify({
+        purpose: 'rehearsal-audit',
+        ops: ['POST', 'PATCH'],
+        entitySets: ['contacts'],
+        recordIds: ['11111111-1111-1111-1111-111111111111'],
+        expiresAt: futureIso(),
+      });
+      setDeployment('preview');
+      const spy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      assertDataverseOperationAllowed({ url: PROD_URL, method: 'POST', callerLabel: 'test' });
+      assertDataverseOperationAllowed({ url: PROD_RECORD_URL, method: 'PATCH', callerLabel: 'test' });
+
+      const grantLogs = spy.mock.calls.filter((call) =>
+        /^\[dataverse-interlock\] rehearsal grant write allowed:/.test(call[0]),
+      );
+      expect(grantLogs).toHaveLength(2);
+      expect(grantLogs[0][0]).toMatch(/purpose="rehearsal-audit"/);
+      expect(grantLogs[0][0]).toMatch(/method=POST/);
+      expect(grantLogs[0][0]).toMatch(/entitySet=contacts/);
+      expect(grantLogs[0][0]).not.toMatch(/recordId=/);
+      expect(grantLogs[1][0]).toMatch(/purpose="rehearsal-audit"/);
+      expect(grantLogs[1][0]).toMatch(/method=PATCH/);
+      expect(grantLogs[1][0]).toMatch(/entitySet=contacts/);
+      expect(grantLogs[1][0]).toMatch(/recordId=11111111-1111-1111-1111-111111111111/);
+    });
+
+    test('does not log when the grant does not cover the write (denied path unchanged)', () => {
+      process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+      process.env.DATAVERSE_REHEARSAL_GRANT = JSON.stringify({
+        purpose: 'rehearsal-audit',
+        ops: ['POST'],
+        entitySets: ['accounts'],
+        recordIds: [],
+        expiresAt: futureIso(),
+      });
+      setDeployment('preview');
+      const spy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      expect(() =>
+        assertDataverseOperationAllowed({ url: PROD_URL, method: 'POST', callerLabel: 'test' }),
+      ).toThrow();
+
+      const grantLogs = spy.mock.calls.filter((call) => /rehearsal grant write allowed/.test(call[0]));
+      expect(grantLogs).toHaveLength(0);
+    });
+
+    test('mode "off" never logs, even with a covering grant present', () => {
+      process.env.DATAVERSE_TARGET_INTERLOCK = 'off';
+      process.env.DATAVERSE_REHEARSAL_GRANT = JSON.stringify({
+        purpose: 'rehearsal-audit',
+        ops: ['POST'],
+        entitySets: ['contacts'],
+        recordIds: [],
+        expiresAt: futureIso(),
+      });
+      setDeployment('preview');
+      const spy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      assertDataverseOperationAllowed({ url: PROD_URL, method: 'POST', callerLabel: 'test' });
+
+      expect(spy).not.toHaveBeenCalled();
+    });
   });
 });
