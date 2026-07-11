@@ -104,9 +104,11 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 | `SHAREPOINT_SITE_URL` | SharePoint Graph base | e.g., `https://appriver3651007194.sharepoint.com/sites/akoyaGO` |
 | `REVIEWER_MATERIALS_FOLDERS` | Allowlist for external reviewer file visibility | Manual (default `Reviewer_Downloads`) |
 
-### Optional — Dataverse target/write interlock (Stage 1 merged, unwired; see `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md` §3.6)
+### Optional — Dataverse target/write interlock (Stages 1+2 merged — wired, inert; see `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md` §3.6)
 
-None are secrets. The module enforces nothing until Stage-2 hook wiring lands.
+None are secrets. The hook sites are wired (merge 8067de3a) but the interlock
+enforces nothing until `DATAVERSE_TARGET_INTERLOCK` is set (unset everywhere
+as of 2026-07-11; the plan-§5 `warn` rollout is the deliberate next step).
 
 | Variable | Purpose | Source |
 |----------|---------|--------|

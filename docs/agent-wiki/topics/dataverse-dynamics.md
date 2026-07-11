@@ -111,16 +111,20 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   shapes. Plan + full stage log: `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`.
   See the resolved email-helper note above for the runtime guard layered under
   the static gate exemption.
-- **Dataverse target/write interlock: Stage 1 merged, UNWIRED (S355,
-  2026-07-11).** `lib/dataverse/core/interlock.js` + `target-registry.js`
+- **Dataverse target/write interlock: Stages 1+2 merged — WIRED but INERT
+  (S355, 2026-07-11).** `lib/dataverse/core/interlock.js` + `target-registry.js`
   (tracked hostname registry: prod `wmkf.crm.dynamics.com`, sandbox
   `orgd9e66399.crm.dynamics.com`) implement the deployment×target×op policy
-  from `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md`. No hook site calls it
-  yet and `DATAVERSE_TARGET_INTERLOCK` defaults `off` — it enforces NOTHING
-  until Stage 2 wiring (three hook points: dynamics/http.js `fetchWithTimeout`,
-  dataverse/client.js `call()`, dataverse-export). Hardened by two Codex
-  adversarial rounds (rehearsal grants: GUID-only recordIds, exact-collection
-  creates, `$batch` never coverable). Hazard facts settled by probe:
+  from `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md`; the three hook
+  families (dynamics/http.js `fetchWithTimeout`, dataverse/client.js `call()`,
+  dataverse-export) call `assertDataverseOperationAllowed` unconditionally
+  (merge 8067de3a). It enforces NOTHING until `DATAVERSE_TARGET_INTERLOCK`
+  is set — verified unset in `.env.local` and all Vercel envs at merge time;
+  the plan-§5 `warn` rollout is the deliberate next step. Set-but-invalid
+  flag values fail closed to `on`. Hardened by four Codex adversarial rounds
+  (rehearsal grants: GUID-only recordIds, exact-collection creates, `$batch`
+  never coverable; denials never reclassified as transient/FetchXml network
+  errors). Hazard facts settled by probe:
   `akoyago.crm.dynamics.com` is NOT an org (akoyaGO is the prod org's display
   name); the app registration sees exactly two instances via Global Discovery;
   `.api.crm.dynamics.com` host forms are deliberately unregistered (fail

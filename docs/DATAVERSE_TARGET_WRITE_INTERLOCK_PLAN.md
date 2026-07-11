@@ -16,10 +16,13 @@ related:
 
 # Dataverse Target and Write Interlock Design
 
-**Status: Stage 1 MERGED to `main` (2026-07-11, Session 355, merge commit
-e113b4bf; full suite 5343/5343 green on the branch tip). Still UNWIRED — zero
-runtime effect: `DATAVERSE_TARGET_INTERLOCK` defaults `off` and no §3.5 hook
-site calls the module yet.** [RECHECKED after lib/dataverse/core/interlock.js + lib/dataverse/core/target-registry.js changes — VERIFIED via the merge diff (3 added files: policy module, registry, test suite; zero existing files touched) and two Codex adversarial review rounds with all four findings fixed and personally diff-reviewed. This doc describes the interlock at stage/contract level, not line level.] This document turns
+**Status: Stages 1+2 MERGED to `main` (2026-07-11, Session 355; Stage 1 at
+e113b4bf, Stage 2 hook wiring at 8067de3a; full suite 5361/5361 green on the
+Stage-2 branch tip). WIRED but INERT: all three §3.5 hook families call the
+module, but `DATAVERSE_TARGET_INTERLOCK` is unset in `.env.local` and every
+Vercel environment (verified via `vercel env ls` at merge time), so nothing is
+enforced yet — the §5 `warn` rollout is the next deliberate step.**
+[RECHECKED after lib/dataverse/core/interlock.js + lib/dataverse/core/target-registry.js changes — VERIFIED via the merge diffs and four Codex adversarial review rounds (eight findings total: 2+2+3+1 across rounds, all fixed and personally diff-reviewed). This doc describes the interlock at stage/contract level, not line level.] This document turns
 `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` §6 — the
 "[PLANNED — highest-priority enabling control]" — into a concrete, buildable
 design. State labels follow the strategy doc's convention: **[VERIFIED]** was
