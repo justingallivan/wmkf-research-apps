@@ -212,8 +212,9 @@ Requirements:
 interlock at the trusted Dataverse write boundary. UI warnings and route-specific
 flags are not sufficient. Concrete design (modules, policy matrix, hook points,
 rollout): `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md` (S355; Stage-1 policy
-module exists on branch `interlock-stage1`, unmerged and unwired — the interlock
-is NOT yet enforcing anything).
+module MERGED to `main` at e113b4bf but UNWIRED — no hook site calls it and the
+flag defaults `off`, so the interlock is NOT yet enforcing anything; Stage 2
+wiring remains [PLANNED]).
 
 The decision must combine server-known facts:
 

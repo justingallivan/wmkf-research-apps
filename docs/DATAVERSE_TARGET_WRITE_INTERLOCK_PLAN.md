@@ -16,16 +16,10 @@ related:
 
 # Dataverse Target and Write Interlock Design
 
-**Status: Stage 1 built on branch `interlock-stage1` (2026-07-11, Session 355;
-unmerged, unwired — zero runtime effect). Nothing on `main`, and no hook wiring
-anywhere.** [RECHECKED after lib/dataverse/core/interlock.js +
-lib/dataverse/core/target-registry.js changes on that branch (creation, then a
-same-session §3.3 audit-logging amendment) — VERIFIED via `git ls-tree main`
-(0 interlock files) and `git diff main interlock-stage1 --stat` (only added
-files: policy module, registry, test suite; zero existing files touched, so
-§3.5 hook points remain unbuilt). This doc describes the interlock at
-stage/contract level, not line level; branch-side edits within Stage-1 scope
-do not invalidate it.] This document turns
+**Status: Stage 1 MERGED to `main` (2026-07-11, Session 355, merge commit
+e113b4bf; full suite 5343/5343 green on the branch tip). Still UNWIRED — zero
+runtime effect: `DATAVERSE_TARGET_INTERLOCK` defaults `off` and no §3.5 hook
+site calls the module yet.** [RECHECKED after lib/dataverse/core/interlock.js + lib/dataverse/core/target-registry.js changes — VERIFIED via the merge diff (3 added files: policy module, registry, test suite; zero existing files touched) and two Codex adversarial review rounds with all four findings fixed and personally diff-reviewed. This doc describes the interlock at stage/contract level, not line level.] This document turns
 `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` §6 — the
 "[PLANNED — highest-priority enabling control]" — into a concrete, buildable
 design. State labels follow the strategy doc's convention: **[VERIFIED]** was
@@ -129,11 +123,18 @@ export const PRODUCTION_HOSTS = ['wmkf.crm.dynamics.com'];
 export const SANDBOX_HOSTS = ['orgd9e66399.crm.dynamics.com'];
 ```
 
-**[OWNER DECISION]** `docs/POSTGRES_TO_DATAVERSE_MIGRATION.md` names
-`akoyago.crm.dynamics.com` as "Prod". Dataverse orgs can carry multiple
-hostnames after a rename. Before Stage 2 wiring, confirm whether
-`akoyago.crm.dynamics.com` still resolves to the production org; if yes it
-goes in `PRODUCTION_HOSTS`, if no the doc reference gets marked historical.
+**[RESOLVED 2026-07-11 via Global Discovery probe
+(`scripts/discover-dynamics-envs.js`, read-only)]** `akoyago.crm.dynamics.com`
+is NOT a real org: the app registration sees exactly two instances — `wmkf`
+(display name "WM Keck Foundation **akoyaGO**" — the product name an old doc
+conflated into a hostname) and sandbox `orgd9e66399`. The registry stays
+as-is; `docs/POSTGRES_TO_DATAVERSE_MIGRATION.md` was corrected the same day.
+Note the discovery service lists API hosts in the `<org>.api.crm.dynamics.com`
+form — the registry deliberately does NOT include that form. The runtime
+always uses the plain host (`DYNAMICS_URL`), so an `.api.` URL appearing at a
+hook site classifies `unknown` → fails closed; if that ever surfaces in
+Stage-2 warn logs, it is a signal to investigate the caller, not to blindly
+extend the registry.
 
 `lib/dataverse/core/interlock.js` — [RECHECKED after lib/dataverse/core/interlock.js change: built on branch `interlock-stage1` (incl. same-session §3.3 audit-logging amendment, commit d55b5175); exports, matrix, modes, and exceptions match this section — reviewed via `git show`.]
 Pure policy logic, no Node-only imports at top level (`lib/dataverse/client.js` is reachable from client-adjacent bundle
@@ -306,7 +307,8 @@ deliberately (strategy §4).
    change: built on branch `interlock-stage1` (commits 610b50ca, d55b5175
    audit logging, b2409928 round-1 fixes: first-segment OData parsing +
    $batch hard deny, 9bffbcd6 round-2 fixes: exact-collection create path +
-   GUID-only recordIds), 94/94 tests green per build report, unmerged.]**
+   GUID-only recordIds) and MERGED to main at e113b4bf; interlock suite 94/94
+   + full suite 5343/5343 green, both run firsthand.]**
 2. **Stage 2 — wire the hook sites, deploy `warn` everywhere.** Add the call
    sites from §3.5; set `DATAVERSE_TARGET_INTERLOCK=warn` in production,
    preview, and `.env.local`. Observe logs across normal staff use **including
@@ -336,10 +338,10 @@ redeploy on Vercel; immediate for local/scripts).
   interlock defaults `off`, and `classifyDeployment()` returns `test` under
   Jest, for which sandbox/mock targets stay writable.
 
-## 7. Open decisions before build
+## 7. Open decisions before Stage 2 wiring
 
-1. **[OWNER DECISION]** `akoyago.crm.dynamics.com` — live prod alias or
-   historical? (§3.1)
+1. **[RESOLVED 2026-07-11]** `akoyago.crm.dynamics.com` — not a real org
+   (Global Discovery probe; see §3.1). Registry unchanged.
 2. **[OWNER DECISION]** production-app → sandbox: deny (recommended) or warn?
    (§3.2)
 3. **[OWNER DECISION]** should preview deployments get

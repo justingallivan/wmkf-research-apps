@@ -88,7 +88,7 @@ related:
 | [DYNAMICS_EXPLORER_PATH_A_PLAN.md](DYNAMICS_EXPLORER_PATH_A_PLAN.md) | plan | active |  | Dynamics Explorer fails frequently because its schema knowledge is hand-transcribed, and the prompt instructs the model to trust baked-in... | 2026-07-02 |
 | [DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md](DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md) | plan | active |  | Owner: Justin (app side), Connor (Dynamics side — Delegate role granted) Last updated: 2026-05-12 (status banner refresh; original plan dated... | 2026-07-02 |
 | [DYNAMICS_SCHEMA_ANNOTATION.md](DYNAMICS_SCHEMA_ANNOTATION.md) | source-of-truth | active |  | Scope (clarified 2026-05-08). This doc records the field annotations baked into the Dynamics Explorer chat tool's TABLE_ANNOTATIONS — what the... | 2026-07-02 |
-| [POSTGRES_TO_DATAVERSE_MIGRATION.md](POSTGRES_TO_DATAVERSE_MIGRATION.md) | plan | active |  | Target environment: Prod (akoyago.crm.dynamics.com). Sandbox path was used during Wave 1 staging; Wave 1 cutover to prod 2026-04-24, drop 2026-05-12. | 2026-07-02 |
+| [POSTGRES_TO_DATAVERSE_MIGRATION.md](POSTGRES_TO_DATAVERSE_MIGRATION.md) | plan | active |  | Target: prod wmkf.crm.dynamics.com (the akoyaGO org). Sandbox used for Wave 1 staging; cutover to prod 2026-04-24, drop 2026-05-12. | 2026-07-02 |
 | [W4_ANOMALY_TRIAGE.md](W4_ANOMALY_TRIAGE.md) | history | active |  | Parity script: scripts/backfill-reviewer-suggestions-parity.js Rerun timestamp: 2026-05-12T22:02:01Z (this session). | 2026-07-02 |
 | [W4_RECONCILE_CONTRACT.md](W4_RECONCILE_CONTRACT.md) | source-of-truth | canonical | yes | Designed-on-paper before building (Codex S147 pre-W4 review Q1 BLOCKER: the identity contract must be unambiguous before code lands). | 2026-07-02 |
 

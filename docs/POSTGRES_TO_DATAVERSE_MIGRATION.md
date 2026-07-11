@@ -3,7 +3,7 @@ title: "Postgres → Dataverse Migration Map"
 domain: dataverse
 kind: plan
 status: active
-summary: "Target environment: Prod (akoyago.crm.dynamics.com). Sandbox path was used during Wave 1 staging; Wave 1 cutover to prod 2026-04-24, drop 2026-05-12."
+summary: "Target: prod wmkf.crm.dynamics.com (the akoyaGO org). Sandbox used for Wave 1 staging; cutover to prod 2026-04-24, drop 2026-05-12."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -18,7 +18,7 @@ related:
 
 **Created:** 2026-04-22 (Session 106)
 **Status:** **Wave 1 COMPLETE 2026-05-12** (Postgres tables dropped). Wave 2 in progress (per `REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`). This document remains as historical schema-design context; live state lives in the Atlas.
-**Target environment:** Prod (`akoyago.crm.dynamics.com`). Sandbox path was used during Wave 1 staging; Wave 1 cutover to prod 2026-04-24, drop 2026-05-12.
+**Target environment:** Prod (`wmkf.crm.dynamics.com` — display name "WM Keck Foundation akoyaGO"; this doc originally wrote the hostname as `akoyago.crm.dynamics.com`, a conflation of the akoyaGO product name — no such org exists per the Global Discovery probe, S355 2026-07-11). Sandbox path was used during Wave 1 staging; Wave 1 cutover to prod 2026-04-24, drop 2026-05-12.
 
 ## Read this first: ground truth lives in the Atlas
 
