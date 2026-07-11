@@ -115,7 +115,9 @@ runtime and out of scope (§4).
 ### 3.1 New modules **[PLANNED]**
 
 `lib/dataverse/core/target-registry.js` — a tracked, code-reviewed hostname
-registry. Changing an org's classification requires a commit, satisfying
+registry. [RECHECKED after lib/dataverse/core/target-registry.js change:
+built on branch `interlock-stage1` per this section; hosts match the snippet
+below verbatim — `git show interlock-stage1:lib/dataverse/core/target-registry.js`.] Changing an org's classification requires a commit, satisfying
 strategy §12: *"Dataverse target classification is verified, not inferred from
 a variable name."* Classification keys off the **actual request URL's
 hostname**, never off which env var supplied it.
@@ -133,8 +135,12 @@ hostnames after a rename. Before Stage 2 wiring, confirm whether
 `akoyago.crm.dynamics.com` still resolves to the production org; if yes it
 goes in `PRODUCTION_HOSTS`, if no the doc reference gets marked historical.
 
-`lib/dataverse/core/interlock.js` — pure policy logic, no Node-only imports at
-top level (`lib/dataverse/client.js` is reachable from client-adjacent bundle
+`lib/dataverse/core/interlock.js` — [RECHECKED after
+lib/dataverse/core/interlock.js change: built on branch `interlock-stage1`
+(incl. same-session §3.3 audit-logging amendment, commit d55b5175); exports,
+matrix, modes, and exceptions match this section — reviewed via
+`git show interlock-stage1:lib/dataverse/core/interlock.js`.] Pure policy
+logic, no Node-only imports at top level (`lib/dataverse/client.js` is reachable from client-adjacent bundle
 paths per its own header comment at `client.js:11-14`, so everything it pulls
 in must stay browser-import-safe). Exports:
 
