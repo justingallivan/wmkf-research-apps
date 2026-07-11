@@ -181,9 +181,8 @@ assertDataverseOperationAllowed({ url, method, callerLabel })
 Production-app → sandbox is denied in both directions on purpose: it can only
 mean the `DYNAMICS_SANDBOX_URL || DYNAMICS_URL` fallback (§2.2) or a bad env
 edit has silently repointed part of the production runtime. The interlock's
-job is to surface exactly that. **[OWNER DECISION]** — confirm deny
-(recommended) rather than warn for this row before flipping `on` in
-production.
+job is to surface exactly that. **[OWNER DECIDED 2026-07-11 S355: deny]** —
+confirmed by the owner; matches the merged implementation.
 
 ### 3.3 Exceptions — server-side, narrow, auditable, time-bounded
 
@@ -352,10 +351,12 @@ redeploy on Vercel; immediate for local/scripts).
 
 1. **[RESOLVED 2026-07-11]** `akoyago.crm.dynamics.com` — not a real org
    (Global Discovery probe; see §3.1). Registry unchanged.
-2. **[OWNER DECISION]** production-app → sandbox: deny (recommended) or warn?
-   (§3.2)
-3. **[OWNER DECISION]** should preview deployments get
-   `DATAVERSE_ALLOW_PROD_READS=yes` by default (makes Mode B shadow-reads
-   cheap) or stay read-denied until explicitly needed (stricter)?
-   Recommendation: stay denied; set it per-preview when a shadow comparison is
-   actually being run.
+2. **[OWNER DECIDED 2026-07-11 S355]** production-app → sandbox: **deny**
+   (§3.2). Matches the merged implementation — no code change.
+3. **[OWNER DECIDED 2026-07-11 S355]** preview deployments stay
+   read-denied by default; `DATAVERSE_ALLOW_PROD_READS=yes` is set
+   per-preview only while a Mode-B shadow comparison is actually running,
+   and removed afterward. Matches the merged implementation — no code change.
+
+All §7 decisions are resolved. Stage-2 wiring (§3.5, §5 Stage 2) is
+unblocked.
