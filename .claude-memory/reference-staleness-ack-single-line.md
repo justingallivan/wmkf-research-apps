@@ -1,6 +1,7 @@
 ---
 name: reference-staleness-ack-single-line
 description: "Stop-hook doc-staleness acks only parse when path + \"[RECHECKED after ... change:\" share ONE physical line — don't line-wrap the marker"
+status: active
 metadata: 
   node_type: memory
   type: reference
