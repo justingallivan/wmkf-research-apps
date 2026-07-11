@@ -196,16 +196,24 @@ Never a client-supplied flag (strategy §6). Two shapes:
 2. **Mode-D rehearsal grant** — `DATAVERSE_REHEARSAL_GRANT` (JSON):
    `{ "purpose": "...", "ops": ["POST","PATCH"], "entitySets": [...],
    "recordIds": [...], "expiresAt": "ISO" }`. A write is allowed only when the
-   method is in `ops`, the URL's entity set is in `entitySets`, and — for
-   URL-addressed records (PATCH/DELETE) — the record GUID is in `recordIds`.
+   method is in `ops`, the URL's entity set is in `entitySets`, and — for any
+   URL-addressed record — the record GUID is in `recordIds`. Entity set and
+   record id are parsed from the **first** `entitySet(guid)` segment after
+   `/api/data/v<version>/`, so bound actions
+   (`emails(guid)/Microsoft.Dynamics.CRM.SendEmail`) and
+   navigation-property/`$ref` writes match against the base record, never the
+   terminal path segment (Codex adversarial finding, 2026-07-11 — the
+   terminal-segment parser skipped the record check on bound-action POSTs).
    **Creates cannot be record-allowlisted** (no ID exists yet); they are
    constrained by entity set only. That honest gap is why Mode D still
    requires the written expected-writes list and post-run reconciliation from
    strategy §5. Every allowed rehearsal write logs one structured line with
    the purpose. Expired or malformed grant → treated as absent (fail closed).
-   `$batch` bodies are not parsed in v1: a changeset write under a rehearsal
-   grant is denied unless the grant's `ops` includes `"BATCH"` explicitly —
-   coarse, but never silently wider than the grant.
+   **`$batch` is never grant-coverable in v1** — hard deny regardless of grant
+   contents (a changeset bundles arbitrary sub-requests this layer never
+   inspects, so no v1 grant shape could scope it; the earlier `"BATCH"` ops
+   escape was removed per the same Codex review — it silently dropped
+   entity/record scoping). [RECHECKED after lib/dataverse/core/interlock.js change: rulings implemented in commit b2409928 on `interlock-stage1`, 88/88 tests per build report; diff reviewed.]
 
 ### 3.4 Enforcement mode and flag
 
@@ -283,8 +291,10 @@ deliberately (strategy §4).
    grant matching/expiry/malformed-JSON, mode resolution, unknown host).
    No hook wiring — zero behavior change. Landable safely.
    **[DONE 2026-07-11 S355 — RECHECKED after lib/dataverse/core/interlock.js
-   change: built on branch `interlock-stage1` (commits 610b50ca + d55b5175
-   audit-logging amendment), 83/83 tests green per build report, unmerged.]**
+   change: built on branch `interlock-stage1` (commits 610b50ca, d55b5175
+   audit logging, b2409928 adversarial-review fixes: first-segment OData
+   parsing + $batch hard deny), 88/88 tests green per build report,
+   unmerged.]**
 2. **Stage 2 — wire the hook sites, deploy `warn` everywhere.** Add the call
    sites from §3.5; set `DATAVERSE_TARGET_INTERLOCK=warn` in production,
    preview, and `.env.local`. Observe logs across normal staff use **including
