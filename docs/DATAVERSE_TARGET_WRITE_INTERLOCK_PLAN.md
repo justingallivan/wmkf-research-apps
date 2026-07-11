@@ -245,7 +245,7 @@ method, callerLabel, and the flag to consult — same actionable shape as
 
 ### 3.5 Hook points — three, matching the §2 inventory
 
-**[BUILT on branch `interlock-stage2`, 2026-07-11 S355 — wired but inert until
+**[MERGED to `main` at 8067de3a, 2026-07-11 S355 — wired but inert until
 the env flag is set; enforcement still requires the §5 Stage-2 `warn` rollout.]**
 [RECHECKED after lib/services/dynamics/http.js + lib/dataverse/client.js + lib/services/dataverse-export/fetch-client.js + lib/services/dataverse-export/live-taxonomy.js change: all four hook sites call assertDataverseOperationAllowed unconditionally per this section (commit 8278d170 + the export denial-preservation fix); denial-contract wiring tests in tests/unit/dataverse-interlock-wiring.test.js; diffs reviewed.]
 
