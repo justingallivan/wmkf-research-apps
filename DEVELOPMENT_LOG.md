@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — BILL API integration tabled; address-based reviewer onboarding instead (Session 357)
+
+**Milestone:** Owner tabled the BILL.com API integration for several months, possibly permanently —
+reviewers will be onboarded via their address plus existing foundation systems.
+**Sessions:** 357 (decision recorded + reconciled; same session fixed the daily-maintenance BILL
+subtask crash that had been emailing errors every day).
+**Ship state:**
+- Nothing live disabled: `BILL_ENABLED` unset in every Vercel env; `onboardReviewer()` already degrades to alert_only.
+- BILL code stays dormant, not deleted; known-red bill test suites stay red indefinitely.
+- Stage 2a required address+phone collection is now load-bearing (the "relax next cycle" question closed as moot).
+- Maintenance ESM-interop fix: BILL sweeps now `await import()` the ESM bill modules (`bd5df78e`).
+**Why it matters:** redirects the reviewer-payment roadmap — no BILL pipeline work without a new owner
+decision, and the portal's captured address is the substrate for the replacement flow.
+**Pointers:** `.claude-memory/project-honorarium-payment-landscape.md`; `docs/agent-wiki/topics/finance-honoraria.md`; commits `9f4dbac3`, `bd5df78e`.
+
 ## July 2026 — Fail-closed Dataverse target/write interlock ships, live in warn mode (Session 355)
 
 **Milestone:** The strategy-§6 "highest-priority enabling control" went from planned to live in one
