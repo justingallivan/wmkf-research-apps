@@ -63,147 +63,9 @@ const statements = [
     UNIQUE(source, query_hash)
   )`,
 
-  // Table: researchers
-  `CREATE TABLE IF NOT EXISTS researchers (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    normalized_name VARCHAR(255),
-    primary_affiliation VARCHAR(500),
-    department VARCHAR(255),
-    email VARCHAR(255),
-    website VARCHAR(500),
-    orcid VARCHAR(50),
-    google_scholar_id VARCHAR(100),
-    h_index INTEGER,
-    i10_index INTEGER,
-    total_citations INTEGER,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_checked TIMESTAMP
-  )`,
-
-  // Table: publications
-  `CREATE TABLE IF NOT EXISTS publications (
-    id SERIAL PRIMARY KEY,
-    researcher_id INTEGER REFERENCES researchers(id) ON DELETE CASCADE,
-    title TEXT NOT NULL,
-    authors TEXT[],
-    author_position INTEGER,
-    publication_date DATE,
-    year INTEGER,
-    journal VARCHAR(500),
-    doi VARCHAR(100),
-    pmid VARCHAR(50),
-    pmcid VARCHAR(50),
-    arxiv_id VARCHAR(50),
-    citations INTEGER DEFAULT 0,
-    abstract TEXT,
-    source VARCHAR(50),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(doi)
-  )`,
-
-  // Table: researcher_keywords
-  `CREATE TABLE IF NOT EXISTS researcher_keywords (
-    id SERIAL PRIMARY KEY,
-    researcher_id INTEGER REFERENCES researchers(id) ON DELETE CASCADE,
-    keyword VARCHAR(255) NOT NULL,
-    relevance_score FLOAT DEFAULT 1.0,
-    source VARCHAR(50),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(researcher_id, keyword, source)
-  )`,
-
-  // Table: reviewer_suggestions
-  `CREATE TABLE IF NOT EXISTS reviewer_suggestions (
-    id SERIAL PRIMARY KEY,
-    proposal_id VARCHAR(100) NOT NULL,
-    proposal_title TEXT,
-    researcher_id INTEGER REFERENCES researchers(id) ON DELETE CASCADE,
-    relevance_score FLOAT,
-    match_reason TEXT,
-    sources TEXT[],
-    suggested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    selected BOOLEAN DEFAULT FALSE,
-    invited BOOLEAN DEFAULT FALSE,
-    accepted BOOLEAN,
-    notes TEXT,
-    UNIQUE(proposal_id, researcher_id)
-  )`,
-
-  // ============================================
-  // V2 NEW TABLE: proposal_searches
-  // ============================================
-  `CREATE TABLE IF NOT EXISTS proposal_searches (
-    id SERIAL PRIMARY KEY,
-    proposal_title TEXT,
-    proposal_hash VARCHAR(64),
-    author_institution VARCHAR(255),
-    claude_suggestions JSONB,
-    search_queries JSONB,
-    verified_count INTEGER DEFAULT 0,
-    discovered_count INTEGER DEFAULT 0,
-    selected_candidates INTEGER[],
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )`,
-
   // Indexes
   `CREATE INDEX IF NOT EXISTS idx_search_cache_lookup ON search_cache(source, query_hash)`,
   `CREATE INDEX IF NOT EXISTS idx_search_cache_expires ON search_cache(expires_at)`,
-  `CREATE INDEX IF NOT EXISTS idx_researchers_normalized ON researchers(normalized_name)`,
-  `CREATE INDEX IF NOT EXISTS idx_researchers_email ON researchers(email)`,
-  `CREATE INDEX IF NOT EXISTS idx_researchers_updated ON researchers(last_updated)`,
-  `CREATE INDEX IF NOT EXISTS idx_researchers_orcid ON researchers(orcid)`,
-  `CREATE INDEX IF NOT EXISTS idx_researchers_scholar_id ON researchers(google_scholar_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_publications_researcher ON publications(researcher_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_publications_date ON publications(publication_date DESC)`,
-  `CREATE INDEX IF NOT EXISTS idx_publications_doi ON publications(doi)`,
-  `CREATE INDEX IF NOT EXISTS idx_keywords_researcher ON researcher_keywords(researcher_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_keywords_keyword ON researcher_keywords(keyword)`,
-  `CREATE INDEX IF NOT EXISTS idx_suggestions_proposal ON reviewer_suggestions(proposal_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_suggestions_researcher ON reviewer_suggestions(researcher_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_proposal_searches_hash ON proposal_searches(proposal_hash)`,
-  `CREATE INDEX IF NOT EXISTS idx_proposal_searches_created ON proposal_searches(created_at DESC)`,
-];
-
-// V2 column additions (run after tables exist)
-const v2Alterations = [
-  // Add google_scholar_url to researchers
-  `ALTER TABLE researchers ADD COLUMN IF NOT EXISTS google_scholar_url VARCHAR(500)`,
-  // Add orcid_url to researchers
-  `ALTER TABLE researchers ADD COLUMN IF NOT EXISTS orcid_url VARCHAR(255)`,
-  // Add metrics_updated_at to researchers
-  `ALTER TABLE researchers ADD COLUMN IF NOT EXISTS metrics_updated_at TIMESTAMP`,
-  // Add url to publications
-  `ALTER TABLE publications ADD COLUMN IF NOT EXISTS url VARCHAR(500)`,
-];
-
-// V3 column additions for contact enrichment
-const v3Alterations = [
-  // Contact enrichment fields for researchers
-  `ALTER TABLE researchers ADD COLUMN IF NOT EXISTS email_source VARCHAR(100)`,
-  `ALTER TABLE researchers ADD COLUMN IF NOT EXISTS email_year INTEGER`,
-  `ALTER TABLE researchers ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP`,
-  `ALTER TABLE researchers ADD COLUMN IF NOT EXISTS faculty_page_url VARCHAR(500)`,
-  `ALTER TABLE researchers ADD COLUMN IF NOT EXISTS contact_enriched_at TIMESTAMP`,
-  `ALTER TABLE researchers ADD COLUMN IF NOT EXISTS contact_enrichment_source VARCHAR(50)`,
-  // Outreach tracking for reviewer_suggestions
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMP`,
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS email_opened_at TIMESTAMP`,
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS response_received_at TIMESTAMP`,
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS response_type VARCHAR(50)`,
-  // Additional indexes
-  `CREATE INDEX IF NOT EXISTS idx_researchers_contact_enriched ON researchers(contact_enriched_at)`,
-];
-
-// V4 column additions for email generation feature
-const v4Alterations = [
-  // Add proposal_abstract to reviewer_suggestions for email generation
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS proposal_abstract TEXT`,
-  // Add PI information for email templates
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS proposal_authors TEXT`,
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS proposal_institution TEXT`,
 ];
 
 // V7: Grant cycles table and foreign keys
@@ -230,26 +92,6 @@ const v7Statements = [
   `CREATE INDEX IF NOT EXISTS idx_grant_cycles_short_code ON grant_cycles(short_code)`,
 ];
 
-const v7Alterations = [
-  // Add grant_cycle_id FK to proposal_searches
-  `ALTER TABLE proposal_searches ADD COLUMN IF NOT EXISTS grant_cycle_id INTEGER REFERENCES grant_cycles(id) ON DELETE SET NULL`,
-  // Add grant_cycle_id FK to reviewer_suggestions
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS grant_cycle_id INTEGER REFERENCES grant_cycles(id) ON DELETE SET NULL`,
-  // Indexes for FK columns
-  `CREATE INDEX IF NOT EXISTS idx_proposal_searches_cycle ON proposal_searches(grant_cycle_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_suggestions_cycle ON reviewer_suggestions(grant_cycle_id)`,
-];
-
-// V8: Add declined status for reviewer suggestions
-const v8Alterations = [
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS declined BOOLEAN DEFAULT FALSE`,
-];
-
-// V9: Add program_area for Keck Foundation programs
-const v9Alterations = [
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS program_area VARCHAR(100)`,
-];
-
 // V10: User profiles
 // (user_preferences originally lived here too — migrated to Dataverse
 // wmkf_appuserpreference in Wave 1; Postgres table dropped 2026-05-12.)
@@ -271,16 +113,6 @@ const v10Statements = [
   `CREATE INDEX IF NOT EXISTS idx_user_profiles_default ON user_profiles(is_default)`,
 ];
 
-const v10Alterations = [
-  // Add user_profile_id FK to proposal_searches
-  `ALTER TABLE proposal_searches ADD COLUMN IF NOT EXISTS user_profile_id INTEGER REFERENCES user_profiles(id) ON DELETE SET NULL`,
-  // Add user_profile_id FK to reviewer_suggestions
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS user_profile_id INTEGER REFERENCES user_profiles(id) ON DELETE SET NULL`,
-  // Indexes for FK columns
-  `CREATE INDEX IF NOT EXISTS idx_proposal_searches_user ON proposal_searches(user_profile_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_reviewer_suggestions_user ON reviewer_suggestions(user_profile_id)`,
-];
-
 // V11: Azure AD authentication integration
 const v11Alterations = [
   // Add Azure AD fields to user_profiles
@@ -291,11 +123,6 @@ const v11Alterations = [
   // Index for Azure ID lookups
   `CREATE INDEX IF NOT EXISTS idx_user_profiles_azure_id ON user_profiles(azure_id)`,
   `CREATE INDEX IF NOT EXISTS idx_user_profiles_azure_email ON user_profiles(azure_email)`,
-];
-
-// V12: Researcher notes for tracking conflicts, preferences, etc.
-const v12Alterations = [
-  `ALTER TABLE researchers ADD COLUMN IF NOT EXISTS notes TEXT`,
 ];
 
 // V13: Applicant Integrity Screener tables
@@ -428,29 +255,6 @@ const v15Statements = [
 // V16 (user_app_access) and V17 (system_settings) migrated to Dataverse
 // in Wave 1; Postgres tables dropped 2026-05-12. See migration 007.
 
-// V18: Review Manager columns on reviewer_suggestions
-const v18Alterations = [
-  // Proposal URL — shared link to full proposal, stored per-suggestion but updated in batch per proposal
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS proposal_url VARCHAR(1000)`,
-  // Materials email tracking
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS materials_sent_at TIMESTAMP`,
-  // Reminder tracking
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMP`,
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS reminder_count INTEGER DEFAULT 0`,
-  // Review receipt tracking
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS review_received_at TIMESTAMP`,
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS review_blob_url VARCHAR(500)`,
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS review_filename VARCHAR(255)`,
-  // Thank-you email tracking
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS thankyou_sent_at TIMESTAMP`,
-  // Review lifecycle status: accepted, materials_sent, under_review, review_received, complete
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS review_status VARCHAR(50)`,
-  // Password for accessing the proposal document (shared per proposal)
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS proposal_password VARCHAR(255)`,
-  // Index for review status filtering
-  `CREATE INDEX IF NOT EXISTS idx_suggestions_review_status ON reviewer_suggestions(review_status)`,
-];
-
 // V19: System alerts, health check history, and maintenance runs
 const v19Statements = [
   // Table: system_alerts — central alert store for all automated notifications
@@ -526,13 +330,6 @@ const v21Alterations = [
 // V22 (rename proposal-summarizer → phase-ii-writeup on user_app_access)
 // no longer applies — user_app_access dropped from Postgres in Wave 1.
 // Equivalent rename was performed in Dataverse wmkf_appuserappaccesses directly.
-
-// V23a: Add request_number to proposal_searches and reviewer_suggestions
-const v23aAlterations = [
-  `ALTER TABLE proposal_searches ADD COLUMN IF NOT EXISTS request_number VARCHAR(20)`,
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS request_number VARCHAR(20)`,
-  `CREATE INDEX IF NOT EXISTS idx_reviewer_suggestions_request ON reviewer_suggestions(request_number)`,
-];
 
 // V23b: Dynamics Explorer feedback logging
 const v23bStatements = [
@@ -931,78 +728,6 @@ const v24Statements = [
   `CREATE INDEX IF NOT EXISTS idx_panel_review_items_provider ON panel_review_items(llm_provider, stage)`,
 ];
 
-// V6 column additions for proposal summary attachments and Co-PI tracking
-const v6Alterations = [
-  // Summary page extraction - store extracted page(s) in Vercel Blob
-  `ALTER TABLE proposal_searches ADD COLUMN IF NOT EXISTS summary_blob_url VARCHAR(500)`,
-  `ALTER TABLE proposal_searches ADD COLUMN IF NOT EXISTS summary_filename VARCHAR(255)`,
-  `ALTER TABLE proposal_searches ADD COLUMN IF NOT EXISTS summary_pages VARCHAR(50)`, // e.g., "2" or "1,2"
-  // Full proposal blob URL (already uploaded via existing flow)
-  `ALTER TABLE proposal_searches ADD COLUMN IF NOT EXISTS full_proposal_blob_url VARCHAR(500)`,
-  // Co-PI information for email templates
-  `ALTER TABLE proposal_searches ADD COLUMN IF NOT EXISTS co_investigators TEXT`, // comma-separated names
-  `ALTER TABLE proposal_searches ADD COLUMN IF NOT EXISTS co_investigator_count INTEGER`,
-  // Also add to reviewer_suggestions for email generation
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS co_investigators TEXT`,
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS co_investigator_count INTEGER`,
-  // Summary blob URL in reviewer_suggestions (for My Candidates email generation)
-  `ALTER TABLE reviewer_suggestions ADD COLUMN IF NOT EXISTS summary_blob_url VARCHAR(500)`,
-];
-
-// V5 data migration: merge duplicate proposals based on title
-async function mergeDuplicateProposals() {
-  console.log('\nChecking for duplicate proposals to merge...');
-
-  // Find proposals with duplicate titles
-  const duplicates = await sql`
-    SELECT proposal_title, array_agg(DISTINCT proposal_id) as proposal_ids, COUNT(DISTINCT proposal_id) as count
-    FROM reviewer_suggestions
-    WHERE proposal_title IS NOT NULL
-    GROUP BY proposal_title
-    HAVING COUNT(DISTINCT proposal_id) > 1
-  `;
-
-  if (duplicates.rows.length === 0) {
-    console.log('  No duplicate proposals found.');
-    return;
-  }
-
-  console.log(`  Found ${duplicates.rows.length} proposal(s) with duplicate entries.`);
-
-  for (const row of duplicates.rows) {
-    const title = row.proposal_title;
-    const proposalIds = row.proposal_ids;
-
-    // Generate canonical proposal ID from title
-    const canonicalId = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50);
-
-    console.log(`  Merging ${proposalIds.length} entries for: "${title.substring(0, 40)}..."`);
-    console.log(`    New ID: ${canonicalId}`);
-
-    // First, delete duplicate researcher entries for the same title
-    // Keep only the most recent entry for each researcher
-    await sql`
-      DELETE FROM reviewer_suggestions
-      WHERE id NOT IN (
-        SELECT DISTINCT ON (researcher_id) id
-        FROM reviewer_suggestions
-        WHERE proposal_title = ${title}
-        ORDER BY researcher_id, suggested_at DESC
-      )
-      AND proposal_title = ${title}
-    `;
-
-    // Now update all remaining entries to use the canonical ID
-    await sql`
-      UPDATE reviewer_suggestions
-      SET proposal_id = ${canonicalId}
-      WHERE proposal_title = ${title}
-    `;
-  }
-
-  console.log('  Duplicate proposals merged successfully.');
-}
-
 async function runMigration() {
   try {
     const existingTables = await sql`
@@ -1038,85 +763,6 @@ async function runMigration() {
       }
     }
 
-    // Run V2 column additions
-    console.log(`\nApplying v2 schema updates (${v2Alterations.length} alterations)...`);
-    for (let i = 0; i < v2Alterations.length; i++) {
-      const statement = v2Alterations[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v2-${i + 1}/${v2Alterations.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists') || error.message.includes('duplicate column')) {
-          console.log(`[v2-${i + 1}/${v2Alterations.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v2-${i + 1}/${v2Alterations.length}] ✗ Error: ${error.message}`);
-          // Don't throw on alter table errors - continue with other alterations
-        }
-      }
-    }
-
-    // Run V3 column additions (contact enrichment)
-    console.log(`\nApplying v3 schema updates - contact enrichment (${v3Alterations.length} alterations)...`);
-    for (let i = 0; i < v3Alterations.length; i++) {
-      const statement = v3Alterations[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v3-${i + 1}/${v3Alterations.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists') || error.message.includes('duplicate column')) {
-          console.log(`[v3-${i + 1}/${v3Alterations.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v3-${i + 1}/${v3Alterations.length}] ✗ Error: ${error.message}`);
-          // Don't throw on alter table errors - continue with other alterations
-        }
-      }
-    }
-
-    // Run V4 column additions (email generation)
-    console.log(`\nApplying v4 schema updates - email generation (${v4Alterations.length} alterations)...`);
-    for (let i = 0; i < v4Alterations.length; i++) {
-      const statement = v4Alterations[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v4-${i + 1}/${v4Alterations.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists') || error.message.includes('duplicate column')) {
-          console.log(`[v4-${i + 1}/${v4Alterations.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v4-${i + 1}/${v4Alterations.length}] ✗ Error: ${error.message}`);
-          // Don't throw on alter table errors - continue with other alterations
-        }
-      }
-    }
-
-    // Run V5 data migration (merge duplicate proposals)
-    await mergeDuplicateProposals();
-
-    // Run V6 column additions (proposal summary attachments & Co-PI)
-    console.log(`\nApplying v6 schema updates - summary attachments & Co-PI (${v6Alterations.length} alterations)...`);
-    for (let i = 0; i < v6Alterations.length; i++) {
-      const statement = v6Alterations[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v6-${i + 1}/${v6Alterations.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists') || error.message.includes('duplicate column')) {
-          console.log(`[v6-${i + 1}/${v6Alterations.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v6-${i + 1}/${v6Alterations.length}] ✗ Error: ${error.message}`);
-          // Don't throw on alter table errors - continue with other alterations
-        }
-      }
-    }
-
     // Run V7 table creation (grant_cycles)
     console.log(`\nApplying v7 schema updates - grant cycles table (${v7Statements.length} statements)...`);
     for (let i = 0; i < v7Statements.length; i++) {
@@ -1132,61 +778,6 @@ async function runMigration() {
         } else {
           console.error(`[v7-${i + 1}/${v7Statements.length}] ✗ Error: ${error.message}`);
           throw error;
-        }
-      }
-    }
-
-    // Run V7 column additions (FK columns)
-    console.log(`\nApplying v7 schema updates - grant cycle FK columns (${v7Alterations.length} alterations)...`);
-    for (let i = 0; i < v7Alterations.length; i++) {
-      const statement = v7Alterations[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v7-${i + 1}/${v7Alterations.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists') || error.message.includes('duplicate column')) {
-          console.log(`[v7-${i + 1}/${v7Alterations.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v7-${i + 1}/${v7Alterations.length}] ✗ Error: ${error.message}`);
-          // Don't throw on alter table errors - continue with other alterations
-        }
-      }
-    }
-
-    // Run V8 column additions (declined status)
-    console.log(`\nApplying v8 schema updates - declined status (${v8Alterations.length} alterations)...`);
-    for (let i = 0; i < v8Alterations.length; i++) {
-      const statement = v8Alterations[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v8-${i + 1}/${v8Alterations.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists') || error.message.includes('duplicate column')) {
-          console.log(`[v8-${i + 1}/${v8Alterations.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v8-${i + 1}/${v8Alterations.length}] ✗ Error: ${error.message}`);
-        }
-      }
-    }
-
-    // Run V9 column additions (program_area)
-    console.log(`\nApplying v9 schema updates - program area (${v9Alterations.length} alterations)...`);
-    for (let i = 0; i < v9Alterations.length; i++) {
-      const statement = v9Alterations[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v9-${i + 1}/${v9Alterations.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists') || error.message.includes('duplicate column')) {
-          console.log(`[v9-${i + 1}/${v9Alterations.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v9-${i + 1}/${v9Alterations.length}] ✗ Error: ${error.message}`);
         }
       }
     }
@@ -1210,24 +801,6 @@ async function runMigration() {
       }
     }
 
-    // Run V10 column additions (user_profile_id FK columns)
-    console.log(`\nApplying v10 schema updates - user profile FK columns (${v10Alterations.length} alterations)...`);
-    for (let i = 0; i < v10Alterations.length; i++) {
-      const statement = v10Alterations[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v10-${i + 1}/${v10Alterations.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists') || error.message.includes('duplicate column')) {
-          console.log(`[v10-${i + 1}/${v10Alterations.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v10-${i + 1}/${v10Alterations.length}] ✗ Error: ${error.message}`);
-        }
-      }
-    }
-
     // Run V11 column additions (Azure AD authentication)
     console.log(`\nApplying v11 schema updates - Azure AD authentication (${v11Alterations.length} alterations)...`);
     for (let i = 0; i < v11Alterations.length; i++) {
@@ -1242,24 +815,6 @@ async function runMigration() {
           console.log(`[v11-${i + 1}/${v11Alterations.length}] ○ Already exists: ${preview}...`);
         } else {
           console.error(`[v11-${i + 1}/${v11Alterations.length}] ✗ Error: ${error.message}`);
-        }
-      }
-    }
-
-    // Run V12 column additions (researcher notes)
-    console.log(`\nApplying v12 schema updates - Researcher notes (${v12Alterations.length} alterations)...`);
-    for (let i = 0; i < v12Alterations.length; i++) {
-      const statement = v12Alterations[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v12-${i + 1}/${v12Alterations.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists') || error.message.includes('duplicate column')) {
-          console.log(`[v12-${i + 1}/${v12Alterations.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v12-${i + 1}/${v12Alterations.length}] ✗ Error: ${error.message}`);
         }
       }
     }
@@ -1325,25 +880,6 @@ async function runMigration() {
     // Dataverse in Wave 1; both Postgres tables dropped 2026-05-12.
     // See migration 007_drop_wave1_tables.sql.
 
-    // Run V18 alterations (Review Manager columns)
-    console.log(`\nApplying v18 schema updates - Review Manager (${v18Alterations.length} statements)...`);
-    for (let i = 0; i < v18Alterations.length; i++) {
-      const statement = v18Alterations[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v18-${i + 1}/${v18Alterations.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v18-${i + 1}/${v18Alterations.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v18-${i + 1}/${v18Alterations.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
     // Run V19 table creation (System alerts, health history, maintenance runs)
     console.log(`\nApplying v19 schema updates - Alerts & monitoring (${v19Statements.length} statements)...`);
     for (let i = 0; i < v19Statements.length; i++) {
@@ -1401,24 +937,6 @@ async function runMigration() {
 
     // V22 (rename on user_app_access) no longer applies — table dropped from
     // Postgres in Wave 1. Equivalent rename was applied in Dataverse directly.
-
-    // Run V23a alterations (request_number columns)
-    console.log(`\nApplying v23a schema updates - Request number columns (${v23aAlterations.length} statements)...`);
-    for (let i = 0; i < v23aAlterations.length; i++) {
-      const statement = v23aAlterations[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v23a-${i + 1}/${v23aAlterations.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v23a-${i + 1}/${v23aAlterations.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v23a-${i + 1}/${v23aAlterations.length}] ✗ Error: ${error.message}`);
-        }
-      }
-    }
 
     // Run V23b table creation (Dynamics feedback)
     console.log(`\nApplying v23b schema updates - Dynamics feedback (${v23bStatements.length} statements)...`);
@@ -1650,52 +1168,13 @@ async function runMigration() {
     console.log('\n✓ Database migration completed successfully!');
     console.log('\nTables created/updated:');
     console.log('  • search_cache (API search result caching)');
-    console.log('  • researchers (deduplicated researcher profiles)');
-    console.log('  • publications (papers linked to researchers)');
-    console.log('  • researcher_keywords (expertise areas)');
-    console.log('  • reviewer_suggestions (proposal-researcher matches)');
-    console.log('  • proposal_searches (v2: search history tracking)');
-    console.log('\nV2 column additions:');
-    console.log('  • researchers.google_scholar_url');
-    console.log('  • researchers.orcid_url');
-    console.log('  • researchers.metrics_updated_at');
-    console.log('  • publications.url');
-    console.log('\nV3 column additions (contact enrichment):');
-    console.log('  • researchers.email_source');
-    console.log('  • researchers.email_year');
-    console.log('  • researchers.email_verified_at');
-    console.log('  • researchers.faculty_page_url');
-    console.log('  • researchers.contact_enriched_at');
-    console.log('  • researchers.contact_enrichment_source');
-    console.log('  • reviewer_suggestions.email_sent_at');
-    console.log('  • reviewer_suggestions.response_type');
-    console.log('\nV4 column additions (email generation):');
-    console.log('  • reviewer_suggestions.proposal_abstract');
-    console.log('  • reviewer_suggestions.proposal_authors');
-    console.log('  • reviewer_suggestions.proposal_institution');
-    console.log('\nV6 column additions (summary attachments & Co-PI):');
-    console.log('  • proposal_searches.summary_blob_url');
-    console.log('  • proposal_searches.summary_filename');
-    console.log('  • proposal_searches.summary_pages');
-    console.log('  • proposal_searches.full_proposal_blob_url');
-    console.log('  • proposal_searches.co_investigators');
-    console.log('  • proposal_searches.co_investigator_count');
-    console.log('  • reviewer_suggestions.co_investigators');
-    console.log('  • reviewer_suggestions.co_investigator_count');
-    console.log('  • reviewer_suggestions.summary_blob_url');
     console.log('\nV7 new table: grant_cycles');
     console.log('  • grant_cycles (id, name, short_code, program_name, review_deadline,');
     console.log('    summary_pages, review_template_blob_url, additional_attachments,');
     console.log('    custom_fields, is_active, created_at, updated_at)');
-    console.log('\nV7 column additions (grant cycle FK):');
-    console.log('  • proposal_searches.grant_cycle_id');
-    console.log('  • reviewer_suggestions.grant_cycle_id');
     console.log('\nV10 new table: user_profiles');
     console.log('  • user_profiles (id, name, display_name, avatar_color, is_default,');
     console.log('    is_active, created_at, last_used_at)');
-    console.log('\nV10 column additions (user profile FK):');
-    console.log('  • proposal_searches.user_profile_id');
-    console.log('  • reviewer_suggestions.user_profile_id');
     console.log('\nV11 column additions (Azure AD authentication):');
     console.log('  • user_profiles.azure_id (unique)');
     console.log('  • user_profiles.azure_email');
@@ -1712,16 +1191,6 @@ async function runMigration() {
     console.log('\nV15 new table (API usage logging):');
     console.log('  • api_usage_log (user_profile_id, app_name, model, input_tokens,');
     console.log('    output_tokens, estimated_cost_cents, latency_ms, request_status)');
-    console.log('\nV18 column additions (Review Manager):');
-    console.log('  • reviewer_suggestions.proposal_url');
-    console.log('  • reviewer_suggestions.materials_sent_at');
-    console.log('  • reviewer_suggestions.reminder_sent_at');
-    console.log('  • reviewer_suggestions.reminder_count');
-    console.log('  • reviewer_suggestions.review_received_at');
-    console.log('  • reviewer_suggestions.review_blob_url');
-    console.log('  • reviewer_suggestions.review_filename');
-    console.log('  • reviewer_suggestions.thankyou_sent_at');
-    console.log('  • reviewer_suggestions.review_status');
     console.log('\nV19 new tables (Alerts & monitoring):');
     console.log('  • system_alerts (alert_type, severity, title, message, metadata,');
     console.log('    source, status, auto_resolve_key, acknowledged_by/at, resolved_by/at)');

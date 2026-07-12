@@ -585,6 +585,7 @@ async function main() {
     // for drift detection. With migrations folded into schema-as-code, the
     // remaining entries are genuinely undeclared tables.
     for (const table of postgres.tables) {
+      if (table === 'schema_migrations') continue; // apply-migrations.js runner bookkeeping, not schema-as-code
       if (!schemaTables.has(table)) {
         postgresTableMismatch.push({ table, in_schema_as_code: false, deployed: true });
       }
