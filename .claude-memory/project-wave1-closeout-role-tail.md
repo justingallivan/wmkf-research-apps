@@ -1,13 +1,13 @@
 ---
 name: project-wave1-closeout-role-tail
-description: "Wave 1 Postgres → Dataverse migration CLOSED 2026-05-12. Tables dropped, dispatcher defaults flipped, docs updated. Active tail: app-user temp-role revert needs a fresh role probe before action."
+description: "Wave 1 Postgres → Dataverse migration CLOSED 2026-05-12. Tables dropped, dispatcher defaults flipped, docs updated. Role tail RESOLVED by owner decision 2026-07-12: temp elevations stay for the rest of the project; Justin handles any eventual revert with Connor directly."
 metadata: 
   node_type: memory
   type: project
   originSessionId: e2f71cb4-b29c-4510-b8fe-1da4a49ec6ee
   status: active
   scope: dataverse
-  last_verified: 2026-07-12 — Wave1 tables-dropped stands; app-user role tail RE-PROBED via probe-app-user-roles.js — WMKF AI Elevated TEMP + System Customizer are STILL attached (temp elevations not yet reverted)
+  last_verified: 2026-07-12 — Wave1 tables-dropped stands; role tail RE-PROBED (elevations attached) and RESOLVED by owner decision the same day: elevations intentionally retained for the rest of the project
 ---
 
 ## Recall Rule
@@ -17,7 +17,7 @@ Read this when: anything touches the Wave 1 Postgres→Dataverse migration, the 
 Do:
 - Treat Wave 1 as DONE — don't re-litigate the flag flip, the drop, or the table list.
 - Treat the Wave 1 migration itself as closed.
-- Before acting on the temp role elevations (`WMKF AI Elevated TEMP` + `System Customizer`), run the role probe in `docs/WAVE1_REVERT_TEMP_ELEVATIONS.md`; this Batch A triage did not re-probe live Dataverse role state.
+- Treat the temp role elevations (`WMKF AI Elevated TEMP` + `System Customizer`) as INTENTIONALLY RETAINED (owner decision 2026-07-12) — do not propose or schedule a revert; Justin owns that conversation with Connor.
 - Remember dispatcher Postgres branches were deleted; `WAVE1_BACKEND_*=postgres` now throws at cold-start by design.
 
 Do not:
@@ -37,11 +37,12 @@ Wave 1 closed out cleanly on **2026-05-12**.
 5. **Drop migration 2026-05-12T01:30:41Z** — `lib/db/migrations/007_drop_wave1_tables.sql` executed against prod Postgres. All three tables dropped under transactional safety guards. Recovery window via Neon PITR until 2026-05-19T01:30Z.
 6. **Codex review + follow-ups 2026-05-12** — Dispatcher defaults flipped from postgres to dataverse (the major footgun Codex flagged: missing/typo'd flag would route to a dead branch and silently degrade in `database-service.js`). Typo fixes. Atlas + CLAUDE.md updates.
 
-**Single deferred item: revert temp role elevations on prod app user.**
+**Role tail RESOLVED by owner decision (2026-07-12): elevations stay.**
 
-- **RE-PROBED 2026-07-12** (`scripts/probe-app-user-roles.js`): app user `systemuserid 53e97fb3-a006-f111-8406-000d3a352682` still has BOTH temp elevations — `WMKF AI Elevated TEMP` + `System Customizer` — attached. The revert has NOT happened. Full current role set: `Delegate`, `System Customizer`, `WMKF AI Elevated TEMP`, `WMKF AI Tools`, `WMKF Custom Entities`, `WMKF Research Review App Suite - Staff`, `akoyaGO Team User (no accounting)` (note the app-suite role is now named `WMKF Research Review App Suite - Staff`, not the older `# WMK: Research Review App Suite`). Still re-probe before acting, but as of this date the elevations are confirmed present.
-- **Why deferred** (Justin's policy call 2026-05-11): keep elevations on through the intake-portal pilot iteration. We're actively creating new entities/fields under Connor's delegated authority (`project_dataverse_creator_privileges`, summary-after model). Reverting now and re-adding for every batch is more friction than the marginal security gain.
-- **When to revert:** once the pilot's `wmkf_portal_*` schema settles (probably after the first real submission cycle, mid-to-late June 2026). At that point follow `docs/WAVE1_REVERT_TEMP_ELEVATIONS.md` and ask Connor about the `akoyaGO Team User (no accounting)` vs. `akoyaGO Read Only access` role-name discrepancy.
+- **Owner decision 2026-07-12 (Justin, in-session):** the temp elevations are needed for the rest of the project and are intentionally retained. Any eventual revert is Justin's conversation with Connor, handled outside agent sessions. Do not re-surface this as an open item.
+- **RE-PROBED 2026-07-12** (`scripts/probe-app-user-roles.js`): app user `systemuserid 53e97fb3-a006-f111-8406-000d3a352682` has BOTH elevations — `WMKF AI Elevated TEMP` + `System Customizer` — attached. Full current role set: `Delegate`, `System Customizer`, `WMKF AI Elevated TEMP`, `WMKF AI Tools`, `WMKF Custom Entities`, `WMKF Research Review App Suite - Staff`, `akoyaGO Team User (no accounting)`.
+- **Naming clarification (probe-verified 2026-07-12):** `# WMK: Research Review App Suite` is the app USER's display name (systemuser `fullname`, created 2026-02-10 — confirmed via read-only systemusers GET). The suite security ROLE has been named `WMKF Research Review App Suite - Staff` since its creation on 2026-04-24 (role record createdon 2026-04-24T18:32Z, modifiedon 18:58Z same day; no role with the old string exists). Earlier memories that said "the `# WMK: Research Review App Suite` role" were conflating the user name with the role name — there was no tenant-side rename.
+- **Why elevations were kept** (Justin's original policy call 2026-05-11, superseded by the 2026-07-12 decision above): active entity/field creation under Connor's delegated authority (`project_dataverse_creator_privileges`, summary-after model) makes revert-and-re-add churn worse than the marginal security gain.
 
 **How to apply:**
 - Wave 1 is **done** — don't re-litigate the flag flip, the drop, or the table list in future sessions.
