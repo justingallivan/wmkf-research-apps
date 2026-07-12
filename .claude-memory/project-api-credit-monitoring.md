@@ -5,7 +5,7 @@ type: project
 originSessionId: 855d17dc-8935-4bc6-88a5-cb73f4cb1b2d
 status: active
 scope: global
-last_verified: S209 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-12 — migration high-water mark 024 confirmed via lib/db/migrations/ (024_reviewer_acceptance_jobs.sql is highest); Anthropic-console facts (auto-reload ON, $500/mo spend limit) are organizational, not probeable
 ---
 
 ## Recall Rule

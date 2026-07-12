@@ -51,7 +51,7 @@ Session 109 (2026-04-24) reconciled six design docs + Wave 1 reality + Connor's 
 **Phase 0 — SHIPPED (historical, kept for context):**
 - Connor added `wmkf_ai_systemprompt` Memo + Lookup `wmkf_ai_prompt` on `wmkf_ai_run` (verified live).
 - `phase-i.summary` prompt row authored; `lib/services/execute-prompt.js` is the canonical Executor implementation; `pages/api/phase-i-dynamics/summarize-v2.js` imports it.
-- `wmkf_ai_prompts` has 11 rows live; `wmkf_ai_runs` has 329 rows (2026-05-14 audit; **re-probed S209 2026-06-01 — both unchanged**, so no Executor runs in between).
+- `wmkf_ai_prompts` has 17 rows live; `wmkf_ai_runs` has 351 rows (verified live 2026-07-12; was 11/329 at the 2026-05-14 audit and unchanged through S209 2026-06-01, then grew — so Executor runs have occurred since).
 - No PA flows yet, no context blocks yet, no cross-prompt cache alignment yet — those are Phase 1/2.
 
 **Phase 1 — post-cycle:** Connor builds PA `ExecutePrompt` child flow + first parent flow. Same prompt rows. `prior_output` source kind. Echo-prompt test oracle verifies byte-identical output from both callers.

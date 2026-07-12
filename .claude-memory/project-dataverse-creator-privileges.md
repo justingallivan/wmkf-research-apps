@@ -5,7 +5,7 @@ type: project
 originSessionId: 064dffdf-ba31-44c3-81f2-73bf4d3b908f
 status: active
 scope: dataverse
-last_verified: 2026-05-14 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-12 re-reviewed — Connor's standing entity-creation authorization is organizational (meeting-attested 2026-05-06), not probeable; specific live schema names verify against docs/APPLICATION_STATE_ATLAS.md
 ---
 
 ## Recall Rule

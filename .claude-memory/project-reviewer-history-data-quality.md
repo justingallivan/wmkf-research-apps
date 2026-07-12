@@ -5,7 +5,7 @@ type: project
 originSessionId: 8d412c2f-d6c6-4080-a43c-79e0e04e9653
 status: active
 scope: reviewer
-last_verified: 2026-05-12 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-12 — migration 018 (DROP reviewer_suggestions + drain tables, 337 rows backed up first) confirmed present in lib/db/migrations/018_drop_reviewer_finder_postgres_tables.sql, verified 2026-06-04/S219; the pre-J26 adoption-history caveat is organizational and unchanged
 ---
 
 ## Recall Rule

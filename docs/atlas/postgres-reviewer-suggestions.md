@@ -9,7 +9,7 @@
 
 ## Source of truth
 
-**Historical.** Postgres held the legacy historical record before the 2026-06-04 drop. Dataverse `wmkf_appreviewersuggestion` now holds the active per-proposal lifecycle (621 rows as of the 2026-07-03 memory-drift probe). The old parity probe showed ~99% of Postgres rows were stale duplicates of Dataverse rows.
+**Historical.** Postgres held the legacy historical record before the 2026-06-04 drop. Dataverse `wmkf_appreviewersuggestion` now holds the active per-proposal lifecycle (662 rows as of the 2026-07-12 memory-drift probe). The old parity probe showed ~99% of Postgres rows were stale duplicates of Dataverse rows.
 
 ## Schema (live, 37 columns)
 

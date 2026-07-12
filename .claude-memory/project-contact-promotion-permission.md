@@ -5,7 +5,7 @@ type: project
 originSessionId: 9ea67012-f70f-47e6-ba56-ded9f73601c4
 status: active
 scope: reviewer
-last_verified: 2026-06-02 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-12 — app user still holds the Research Review App Suite role (now named "WMKF Research Review App Suite - Staff") via probe-app-user-roles.js; the Create/AppendTo grant + no-DeleteAccess are privilege-level facts derived from a write 403 (S213), not re-probeable read-only
 ---
 
 ## Recall Rule

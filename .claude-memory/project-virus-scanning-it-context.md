@@ -7,7 +7,7 @@ metadata:
   originSessionId: 31a4b8ba-daca-4b1d-9ce6-4b88706b7693
   status: active
   scope: security
-  last_verified: S190 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-12 re-reviewed — DFT email exchange + tenant M365 posture (no MDO / no Safe Attachments; Defender-for-Endpoint + Huntress only) are organizational IT-decision facts, not probeable
 ---
 
 ## Recall Rule

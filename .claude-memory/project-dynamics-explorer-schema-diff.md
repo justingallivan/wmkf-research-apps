@@ -5,7 +5,7 @@ type: project
 originSessionId: 176c13fa-41ec-4cad-a5ac-c3ad9b64cdac
 status: active
 scope: dynamics
-last_verified: 2026-05-05 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-12 — diff-tool how-to is durable; scripts/dynamics-schema-diff.js + scripts/dynamics-schema-map.js present. The 2026-05-05 example gap (wmkf_ai_summary) has since been curated into TABLE_ANNOTATIONS (now present in shared/config/prompts/dynamics-explorer.js), which illustrates rather than changes the guidance
 ---
 
 ## Recall Rule

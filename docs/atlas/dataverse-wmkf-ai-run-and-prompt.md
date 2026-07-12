@@ -1,9 +1,9 @@
 # Atlas: `wmkf_ai_run` + `wmkf_ai_prompt` (Dataverse)
 
-**Last verified:** 2026-05-25 via `scripts/reconcile-memory-claims.js`
+**Last verified:** 2026-07-12 via `scripts/reconcile-memory-claims.js`
 **Source spec:** `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` (canonical; v2 archived)
 
-## `wmkf_ai_run` (329 rows)
+## `wmkf_ai_run` (351 rows)
 
 **Source of truth:** Dataverse-only. Append-only audit ledger for every AI invocation against a grant request.
 
@@ -45,7 +45,7 @@ Both written by `execute-prompt.js` `writeRunRow()`. Migration plans touching ei
 
 **Migration disposition:** stays in Dataverse. No Postgres counterpart. Dynamics Explorer treats `wmkf_ai_run` as an operational log, not business data: `pages/api/dynamics-explorer/chat.js` denies direct schema requests for the table and strips `wmkf_ai_run` hits from Dataverse Search results before tool output reaches Claude.
 
-## `wmkf_ai_prompt` (11 rows)
+## `wmkf_ai_prompt` (17 rows)
 
 **Source of truth:** Dataverse-only. Holds prompt rows for the Executor v3 contract.
 
@@ -72,7 +72,7 @@ Both written by `execute-prompt.js` `writeRunRow()`. Migration plans touching ei
 
 These are independent. Don't conflate them.
 
-**Migration disposition:** strategic destination for staff-facing prompts (per memory: *"all staff-facing prompts (content readable/editable by non-technical staff). New prompts default there; migrate user-driven apps when touched"*). 11 rows means light current adoption; expand as Executor-mode apps land.
+**Migration disposition:** strategic destination for staff-facing prompts (per memory: *"all staff-facing prompts (content readable/editable by non-technical staff). New prompts default there; migrate user-driven apps when touched"*). 17 rows means light current adoption; expand as Executor-mode apps land.
 
 ## `prompt_publish_audit` (Postgres — append-only)
 

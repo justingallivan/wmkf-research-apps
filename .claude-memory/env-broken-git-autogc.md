@@ -7,7 +7,7 @@ metadata:
   originSessionId: 8821677f-2a33-4a32-b5ca-e3fb038b41a1
   status: active
   scope: dev-env
-  last_verified: S209 (2026-06-01) via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-12 via pwd, git config --get gc.auto, git count-objects -v, git rev-list --all --count, and .git/objects flag scan
 ---
 
 ## Recall Rule
@@ -24,7 +24,7 @@ Do not:
 
 Ground truth: historical-only (resolved S209; recovery runbook + do-not-relitigate guard). Root cause confirmed S175 via `ls -lO` showing `dataless` flag.
 
-> **RESOLVED (verified S209, 2026-06-01; refreshed 2026-06-23).** The recommended fix was executed: the repo now lives at **`/Users/gallivan/Code/WMKF_Apps`** (off any cloud-synced path), `gc.auto` is **unset**, there are **no dataless objects**, loose-object count is 6,327 (not 31K), and full-walk traversal (`git rev-list --all --count`) completes in <30s without hanging. Kept as the **recovery runbook** for the `cannot lock ref 'HEAD'` lock-file case and as a do-not-relitigate guard (never put `.git` back under a cloud File Provider).
+> **RESOLVED. [VERIFIED 2026-07-12 via `pwd`, `git config --get gc.auto`, `git count-objects -v`, `git rev-list --all --count`, and a `.git/objects` flag scan.]** The recommended fix was executed: the repo now lives at **`/Users/gallivan/Code/WMKF_Apps`** (off any cloud-synced path), `gc.auto` is **unset**, there are **no dataless objects**, loose-object growth is visible through `git count-objects -v` without freezing a naturally changing count here, and full-walk traversal completes without hanging. Kept as the **recovery runbook** for the `cannot lock ref 'HEAD'` lock-file case and as a do-not-relitigate guard (never put `.git` back under a cloud File Provider).
 
 **Symptom (S174–S175):** every git command that walks ALL loose objects in
 `.git/objects/` — `gc`, `repack`, `prune`, `fsck` — hangs. Targeted commands

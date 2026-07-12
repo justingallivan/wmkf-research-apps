@@ -4,8 +4,8 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-05-07 via `scripts/audit-dataverse-state.js`; row count re-probed 2026-07-03 via `scripts/reconcile-memory-claims.js`
-**Live row count:** 4,393
+**Last verified:** 2026-05-07 via `scripts/audit-dataverse-state.js`; row count re-probed 2026-07-12 via `scripts/reconcile-memory-claims.js`
+**Live row count:** 4,416
 **Entity set:** `wmkf_potentialreviewerses` (note Dynamics-pluralized form)
 **Adapter:** `lib/dataverse/adapters/potential-reviewer.js`
 **Extension manifest:** `lib/dataverse/schema/wave2-existing/wmkf_potentialreviewers-extensions.json`
@@ -14,7 +14,7 @@
 
 **Connor's lead/person record.** One row per real person — global, not per-proposal. Email is the de-dupe key. Promoted to a CRM `contact` when staff first reaches out (via `wmkf_contact` lookup).
 
-This is the **canonical person record** for the reviewer-finder domain. Dataverse `wmkf_potentialreviewers` has 4,393 rows because Connor's team also tracks reviewers from other systems and historical outreach; dropped Postgres `researchers` was only a small, 331-row historical pool.
+This is the **canonical person record** for the reviewer-finder domain. Dataverse `wmkf_potentialreviewers` has 4,416 rows because Connor's team also tracks reviewers from other systems and historical outreach; dropped Postgres `researchers` was only a small, 331-row historical pool.
 
 ## Key fields (live, sample-probed 2026-05-07)
 
@@ -82,10 +82,10 @@ Per the migration plan, this table is treated as **scratch + history** rather th
 
 ## Migration disposition (live source of truth for reviewer identity)
 
-Already the live source of truth for reviewer identity. Dataverse `wmkf_potentialreviewers` currently has 4,393 rows, including vendor-historical and post-cutover writes; pre-cutover bulk import from Postgres `researchers` was replaced with an engagement-history approach (don't bulk-migrate). One-shot post-pilot drop (per the section above) is the cleanup vehicle.
+Already the live source of truth for reviewer identity. Dataverse `wmkf_potentialreviewers` currently has 4,416 rows, including vendor-historical and post-cutover writes; pre-cutover bulk import from Postgres `researchers` was replaced with an engagement-history approach (don't bulk-migrate). One-shot post-pilot drop (per the section above) is the cleanup vehicle.
 
 ## Open questions / gotchas
 
-- Dataverse `wmkf_potentialreviewers` currently has 4,393 rows, much larger than the dropped Postgres `researchers` 331-row historical pool. Per the migration plan: don't import researchers in bulk — engagement-history approach replaces the bulk-import pattern.
+- Dataverse `wmkf_potentialreviewers` currently has 4,416 rows, much larger than the dropped Postgres `researchers` 331-row historical pool. Per the migration plan: don't import researchers in bulk — engagement-history approach replaces the bulk-import pattern.
 - `wmkf_contact` lookup population unknown — should probe how many rows have a non-null contact link before any drop operation runs.
 - The "per-proposal slot vs. per-person canonical" distinction is contextual: the *table* is per-person (email is the dedupe key, `upsertByEmail` is idempotent), but `akoya_request.wmkf_potentialreviewer1..5` lookups treat individual rows as **per-proposal slot fills**. Both framings are correct; the one-shot post-pilot DELETE acts on per-person rows that have no per-proposal engagement (the earlier cleanup-cron design was replaced — see "Engaged semantics" section above).

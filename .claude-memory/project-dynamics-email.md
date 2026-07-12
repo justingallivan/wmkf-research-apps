@@ -7,7 +7,7 @@ metadata:
   originSessionId: 17893605-3207-451d-8190-118bbacd8141
   status: active
   scope: dynamics
-  last_verified: Session 77 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-12 — SendEmail bound-action pattern is durable API doc; service methods (resolveSystemUser/createEmailActivity/addEmailAttachment/sendEmail/createAndSendEmail) confirmed present in lib/services/dynamics-service.js (now facades over lib/services/dynamics/email.js); a live send was not re-exercised (it writes)
 ---
 
 ## Recall Rule

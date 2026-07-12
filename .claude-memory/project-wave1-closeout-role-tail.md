@@ -7,7 +7,7 @@ metadata:
   originSessionId: e2f71cb4-b29c-4510-b8fe-1da4a49ec6ee
   status: active
   scope: dataverse
-  last_verified: 2026-06-04 via live Postgres probe for dropped tables; app-user role tail not re-probed in Batch A
+  last_verified: 2026-07-12 — Wave1 tables-dropped stands; app-user role tail RE-PROBED via probe-app-user-roles.js — WMKF AI Elevated TEMP + System Customizer are STILL attached (temp elevations not yet reverted)
 ---
 
 ## Recall Rule
@@ -39,7 +39,7 @@ Wave 1 closed out cleanly on **2026-05-12**.
 
 **Single deferred item: revert temp role elevations on prod app user.**
 
-- As of the prior role-state note, app user `# WMK: Research Review App Suite` (`systemuserid 53e97fb3-a006-f111-8406-000d3a352682`) had `WMKF AI Elevated TEMP` + `System Customizer` attached. Treat this as `ACTIVE_NEEDS_PROBE`, not confirmed-current, until the role-check command in `docs/WAVE1_REVERT_TEMP_ELEVATIONS.md` is rerun.
+- **RE-PROBED 2026-07-12** (`scripts/probe-app-user-roles.js`): app user `systemuserid 53e97fb3-a006-f111-8406-000d3a352682` still has BOTH temp elevations — `WMKF AI Elevated TEMP` + `System Customizer` — attached. The revert has NOT happened. Full current role set: `Delegate`, `System Customizer`, `WMKF AI Elevated TEMP`, `WMKF AI Tools`, `WMKF Custom Entities`, `WMKF Research Review App Suite - Staff`, `akoyaGO Team User (no accounting)` (note the app-suite role is now named `WMKF Research Review App Suite - Staff`, not the older `# WMK: Research Review App Suite`). Still re-probe before acting, but as of this date the elevations are confirmed present.
 - **Why deferred** (Justin's policy call 2026-05-11): keep elevations on through the intake-portal pilot iteration. We're actively creating new entities/fields under Connor's delegated authority (`project_dataverse_creator_privileges`, summary-after model). Reverting now and re-adding for every batch is more friction than the marginal security gain.
 - **When to revert:** once the pilot's `wmkf_portal_*` schema settles (probably after the first real submission cycle, mid-to-late June 2026). At that point follow `docs/WAVE1_REVERT_TEMP_ELEVATIONS.md` and ask Connor about the `akoyaGO Team User (no accounting)` vs. `akoyaGO Read Only access` role-name discrepancy.
 

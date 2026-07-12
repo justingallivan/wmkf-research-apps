@@ -53,7 +53,7 @@ Junction for `wmkf_apppublication ↔ wmkf_appresearcher`. Originally marked NOT
 | Entity | Schema-as-code? | Deployed? | Has data? |
 |---|---|---|---|
 | `wmkf_appresearcher` | (deleted S213) | **DROPPED S213** (404) | collapsed onto `wmkf_potentialreviewers` (was 339 rows) |
-| `wmkf_appreviewersuggestion` | (extension manifest only) | ✅ | ✅ (621 rows) |
+| `wmkf_appreviewersuggestion` | (extension manifest only) | ✅ | ✅ (662 rows) |
 | `wmkf_apppublication` | (deleted S213) | **DROPPED S213** (404) | was empty |
 | `wmkf_appgrantcycle` | ✅ (partial) | ✅ | 10 rows (Dataverse-primary post-2026-05-12) |
 | `wmkf_appproposalsearch` | ✅ | ✅ (entity set is `wmkf_appproposalsearchs`, NOT `-es`) | empty |

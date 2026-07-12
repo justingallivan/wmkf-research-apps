@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: dev-environment
-  last_verified: 2026-06-23 via live runtime /api/health probe + authenticated write probe (POST/DELETE 200) on applications.wmkeck.org
+  last_verified: 2026-07-12 — legacy-host→branded 307 redirect (page nav) + /api/* exclusion re-confirmed via live curl (wmkfresearch.vercel.app/ → applications.wmkeck.org; /api/health stays on legacy signin); staff-auth cutover write-probe last done 2026-06-23 (POST/DELETE 200 on applications.wmkeck.org); NEXTAUTH_URL/env values are Vercel-side, not re-probed this pass
 ---
 
 ## The strategy (owner + Codex, S271; refreshed 2026-06-23)

@@ -7,7 +7,7 @@ metadata:
   originSessionId: 17893605-3207-451d-8190-118bbacd8141
   status: active
   scope: dynamics
-  last_verified: unknown via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-12 via live systemusers OData count (enabled @wmkeck.org non-application users = 22; application/service accounts = 196)
 ---
 
 ## Recall Rule
@@ -23,7 +23,7 @@ Do not:
 
 Ground truth: Dynamics user/licensing facts (re-probe live if a count matters); shipped approach [[project-dynamics-identity-reconciliation]].
 
-- **16 licensed staff users** (Read-Write, `@wmkeck.org`) + ~180 Microsoft service accounts
+- **~22 enabled `@wmkeck.org` (non-application) users** + ~196 Microsoft service accounts (live systemusers OData count, 2026-07-12; was 16 + ~180 when first noted). Exact license tier isn't exposed via OData, so the staff figure counts enabled non-application users as a licensed-staff proxy — treat as approximate, not a precise Read-Write license count.
 - All staff already have Dynamics licenses — an OBO flow would not require additional licensing, but is not recommended due to complexity
 
 **How to apply:** When evaluating impersonation or delegation approaches, the licensing constraint is not the limiting factor. Complexity of OBO token flows is. See [[project-dynamics-identity-reconciliation]] for the shipped approach (MSCRMCallerID via Delegate role).

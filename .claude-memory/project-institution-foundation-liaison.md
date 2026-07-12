@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: dynamics
-  last_verified: S209 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-12 re-reviewed — contact-role triad semantics are user-attested (WMKF authority, S159) + behavioral-signature corroborated; the field meanings are not probe-provable, and the evidence files under docs/atlas/evidence/ remain the substantiation
 ---
 
 ## Recall Rule

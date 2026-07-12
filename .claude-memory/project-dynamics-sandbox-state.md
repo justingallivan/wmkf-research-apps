@@ -7,7 +7,7 @@ metadata:
   originSessionId: ada6c18e-51f9-4c56-94fa-c8dabd742178
   status: active
   scope: dataverse
-  last_verified: S213 (2026-06-02) via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-12 via discover-dynamics-envs.js (sandbox orgd9e66399 reachable, WhoAmI OK, OrgId 3d52a072-b138-ef11-8e4b-000d3a106422 matches) + read-only OData GET (wmkf_appreviewersuggestion/appresearcher/appgrantcycle → 404; wmkf_policyversion → 0 rows) — all reachability + schema-staleness claims re-confirmed live
 ---
 
 ## Recall Rule
