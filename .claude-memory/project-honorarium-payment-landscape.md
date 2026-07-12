@@ -1,6 +1,6 @@
 ---
 name: Reviewer honorarium onboarding/payment reality (current-state, reverse-engineered)
-description: How reviewer honoraria get created and still do not get paid through AkoyaGO/BILL. Core finding for Steph/Ops "mimic Rosie's grant flow" ask: the AkoyaGO payment engine has NEVER paid an individual (0/9,151 disbursements) - it is rail-agnostic but payee-bound to institutions. As of the 2026-07-01 no-BILL-cycle decision, our portal is the planned sole creator of reviewer honorarium akoya_request rows, but the vendor+payment tail remains deferred/offline.
+description: How reviewer honoraria get created and still do not get paid through AkoyaGO/BILL. Core finding for Steph/Ops "mimic Rosie's grant flow" ask: the AkoyaGO payment engine has NEVER paid an individual (0/9,151 disbursements) - it is rail-agnostic but payee-bound to institutions. OWNER DECISION 2026-07-12: the BILL API integration is TABLED for several months, possibly permanently - onboarding will instead use reviewer addresses + existing foundation systems. The portal remains the sole creator of reviewer honorarium akoya_request rows; the BILL code stays dormant, not deleted.
 metadata:
   type: project
   status: active
@@ -47,6 +47,21 @@ capture-only window (since 2026-06-22) and all were test rows (`Gallivan_test`,
 real reviewers accepted while capture-only was on. (25 rows are eligible across ALL
 cycles, but those are pre-feature historical accepts the cycle-scoping deliberately
 excludes; never run a blanket `--execute`.)
+
+**2026-07-12 OWNER DECISION (Justin, in-session): BILL API integration TABLED.**
+Tabled for several months, possibly permanently. Reviewers will instead be
+onboarded using their address plus existing foundation systems (no BILL API).
+Consequences for agents:
+- Do NOT build on, extend, or propose the BILL API pipeline (vendor create,
+  webhook, resume sweep semantics) without a NEW owner decision.
+- The BILL code stays dormant, not deleted — `BILL_ENABLED` is unset in all
+  Vercel environments (verified `vercel env ls` 2026-07-12; only
+  `BILL_ONBOARDING_DEFERRED` exists), so `ensureHonorariumOnboarding()` already
+  degrades to alert_only and the daily maintenance BILL sweeps no-op cleanly
+  (ESM-interop crash fixed 2026-07-12, commit bd5df78e).
+- The address-based onboarding path is NOT yet designed/built in this repo; if
+  asked to support it, start from `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md`
+  (portal remains sole creator of honorarium `akoya_request` rows).
 
 ## Historical GoApply-created cohort chain (all [VERIFIED via probe] unless noted)
 

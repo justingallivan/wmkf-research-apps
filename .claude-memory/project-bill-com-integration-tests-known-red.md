@@ -1,6 +1,6 @@
 ---
 name: project-bill-com-integration-tests-known-red
-description: tests/unit/bill.test.js and tests/unit/discovery-verification-status.test.js are EXPECTED-RED (~29 failures, ReferenceError-class) from an unfinished bill.com integration — known/accepted, fires nightly on Vercel, NOT a regression to chase and NOT a check:* gate. Any full-suite failure OUTSIDE these two suites is real.
+description: tests/unit/bill.test.js and tests/unit/discovery-verification-status.test.js are EXPECTED-RED (~29 failures, ReferenceError-class) from an unfinished bill.com integration — known/accepted, fires nightly on Vercel, NOT a regression to chase and NOT a check:* gate. Any full-suite failure OUTSIDE these two suites is real. Expect these to stay red indefinitely: the BILL API integration was TABLED by the owner 2026-07-12 (possibly permanently), so the integration will not be finished on any near timeline.
 metadata:
   type: project
   status: active

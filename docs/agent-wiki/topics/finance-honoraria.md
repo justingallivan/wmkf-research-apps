@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-07
+last_verified: 2026-07-12
 stale_after_days: 90
 owner: finance-ops
 source_files:
@@ -35,6 +35,15 @@ source, Atlas, and the Power Automate owner before testing against production.
 - External accept automation hazard: `project-reviewer-accept-prod-automation`.
 
 ## Honorarium Request Creation And BILL Deferral
+
+**OWNER DECISION 2026-07-12: the BILL API integration is TABLED for several
+months, possibly permanently.** Reviewer onboarding will instead use the
+reviewer's address plus existing foundation systems. Do not build on or propose
+the BILL API pipeline without a new owner decision; the BILL code stays dormant,
+not deleted (`BILL_ENABLED` unset in every Vercel environment — verified
+2026-07-12 — so `onboardReviewer()` degrades to alert_only). Detail:
+`project-honorarium-payment-landscape` memory. The 2026-07-01 posture below
+remains the live mechanical state.
 
 **Current plan (2026-07-01 decision):** full BILL.com onboarding remains deferred,
 but the portal is now the planned sole creator of reviewer honorarium
