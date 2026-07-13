@@ -8,7 +8,6 @@ canonical: false
 cataloged: 2026-07-12
 owner: product-engineering
 related:
-  - outputs/reviewer-holistic-redesign-adversarial-review-2026-07-13.md
   - docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md
   - lib/services/reviewer-identity-binding-writer.js
   - lib/services/reviewer-identity-binding-contract.js
@@ -26,9 +25,9 @@ related:
 > implementation contract, not as open work. Binding-writer caller activation
 > remains separately owner-gated.
 
-Source review: `outputs/reviewer-holistic-redesign-adversarial-review-2026-07-13.md`
-(read it before starting; this brief is the actionable subset, not a
-replacement). Review verdict: **READY WITH FIXES** — merging `75d26a22` is
+The accepted findings from the local review artifact are retained below. That
+artifact was generated under the gitignored `outputs/` directory and is not a
+repository dependency. Review verdict: **READY WITH FIXES** — merging `75d26a22` is
 safe (all new surfaces are inert; census-verified [VERIFIED via rg census in
 the review, review artifact §5.1-5.2]); these fixes gate the **first
 production caller** of the binding writer, except F2 which is live behavior
