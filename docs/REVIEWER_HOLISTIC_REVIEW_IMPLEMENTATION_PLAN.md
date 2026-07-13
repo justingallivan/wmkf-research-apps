@@ -436,6 +436,15 @@ for the allowlisted identity-bearing fields; malformed, oversized, unknown-key,
 or unknown-source payloads must fail closed. Its exact schema and transition
 rules are a required I1.3 writer contract, not client input.
 
+**[PURE CONTRACT BUILT; NO DATAVERSE READER/WRITER 2026-07-12]**
+`lib/services/reviewer-identity-binding-contract.js` now freezes the non-I/O
+contract: checksum-valid `orcid:`, exact OpenAlex author `openalex:`, and
+server-created `staff-attestation:` anchors only; coherent bound/unbound tuples;
+and deterministic strict lineage for the seven overlapping fields. Lineage is
+capped at 2,048 UTF-8 bytes, rejects unknown keys/sources/future generations,
+and requires every non-null field to have exactly one entry. ORCID and Scholar
+id/URL pairs must be canonical; metrics retain their live schema ranges.
+
 If proposal COI is derived from a person binding, persist or otherwise prove
 both the binding version and the authoritative proposal/rule context used for
 that decision. Wave 13 carries `wmkf_identitycoistatus`,
@@ -446,6 +455,15 @@ normalization and rule-version contract must be frozen and tested before a
 writer lands. Missing/unknown status, a mismatched/unknown binding version, or
 a missing/mismatched context hash is stale and fails closed until recomputed.
 Do not persist a separate `stale` status or opaque eligibility boolean.
+
+`lib/services/institution-coi-context.js` now freezes the pure proposal-side
+institution context hash: server-loaded authority only, lowercase request GUID,
+exact canonical institution tuples, deterministic sorting, explicit rule
+version, and lowercase SHA-256. It deliberately excludes coauthor COI: current
+save does not recompute that decision authoritatively. A structured `clear` is
+forbidden until every reviewer-affiliation signal used by the decision is
+server-owned and covered by the binding generation; client candidate or
+workbench `analysisResult` inputs cannot establish durable currency.
 
 ### I1.2 Transition table
 
@@ -480,6 +498,16 @@ Create one pure action-policy helper used by invite/send, ORCID back-propagation
 and merge protection. Sibling consumers may add stricter domain rules but may
 not reinterpret confidence as provenance.
 
+The future writer must use optimistic concurrency: read `@odata.etag`, compute
+the transition, and issue the one coherent PATCH with `ifMatch`; a 412 rereads
+and recomputes through a small bounded retry. Human-event replay identity is
+durable, not `new Date()`: staff uses the server-created confirmation UUID, and
+self-report uses canonical ORCID plus the engagement's stable acceptance
+timestamp. Replaying the same event is a no-op; a later correction event bumps
+even when the visible ORCID text is unchanged. Any staff/automated affiliation
+change that can affect institution COI must advance the binding generation or
+invalidate linked suggestion currency.
+
 ---
 
 ## I2 — Schema delivery, backfill, and complete consumer migration
@@ -496,6 +524,15 @@ extension specs (ten fields total), and
 `scripts/preflight-reviewer-identity-binding-fields.mjs` derives the expected
 metadata from those specs. No application code selects or writes the columns;
 schema creation alone therefore cannot change production behavior.
+
+**[SANDBOX BLOCKED BY MISSING PARENT ENTITY 2026-07-12]** The documented
+sandbox target (`orgd9e66399.crm.dynamics.com`) is reachable, but the Wave 13
+preflight fails because `wmkf_appreviewersuggestion` does not exist there. The
+combined wave was not partially applied. Production metadata remains 10 ABSENT,
+0 EXACT, 0 DIVERGENT. The next owner decision is either to provision the missing
+reviewer schema in sandbox first or explicitly approve the established
+production dry-run → execute → metadata-verify exception; no reader/writer may
+land before one of those paths completes.
 
 Use a new isolated string-suffixed wave such as
 `wave13-reviewer-identity-binding`; do not append to or rerun wave6 as the new

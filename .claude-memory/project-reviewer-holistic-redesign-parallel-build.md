@@ -37,6 +37,19 @@ per-field lineage plus proposal COI binding/context currency. Apply remains a
 separate owner gate; dual writers/readers remain later slices. Null future fields
 mean legacy/unknown, never eligible-by-default.
 
+The pure non-I/O contracts are built in
+`reviewer-identity-binding-contract.js` and `institution-coi-context.js`, with
+focused negative tests. They freeze strict canonical anchors, binding tuples,
+seven-field lineage, and server-loaded proposal institution context hashing but
+do not select or write Wave 13 columns. Durable institution-COI `clear` still
+requires server-owned reviewer affiliations covered by the binding generation.
+
+The documented sandbox is reachable but lacks
+`wmkf_appreviewersuggestion`; Wave 13 preflight therefore aborts before apply and
+the combined wave was not partially installed. Production remains 10 ABSENT / 0
+DIVERGENT. The owner must choose sandbox reviewer-schema provisioning or an
+explicit production-only schema exception before runtime wiring resumes.
+
 ## Required evidence model
 
 - Identity confidence is not provenance. The durable contract separates
