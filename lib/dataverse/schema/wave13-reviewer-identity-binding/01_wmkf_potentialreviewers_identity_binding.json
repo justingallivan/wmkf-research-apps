@@ -1,0 +1,53 @@
+{
+  "name": "wmkf_potentialreviewers-identity-binding",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_potentialreviewers",
+  "_comment": "Additive identity-binding durability for the reviewer holistic redesign. These columns are deliberately non-authoritative at schema delivery: null means legacy/unbound, and current runtime readers/writers continue to use the legacy identity fields until a later owner-approved dual-write/read cutover. IdentityFieldLineageJson is a compact server-owned map for the small identity-bearing field set; it is not a duplicate of IdentityVerifiedAnchorsJson evidence.",
+  "attributes": [
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_IdentityBindingVersion",
+      "displayName": "Identity Binding Version",
+      "description": "Monotonic generation of the current bound-person identity. Null means legacy/unbound. Starts at 1; advances only for a material binding transition.",
+      "minValue": 1,
+      "maxValue": 2147483647
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_IdentityBindingSource",
+      "displayName": "Identity Binding Source",
+      "description": "Server-owned provenance for the current binding: self_reported | staff_confirmed | automated | legacy_unbound. Null is also treated as legacy/unbound during migration. Resolver confidence is not a binding source.",
+      "maxLength": 32
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_IdentityBindingAnchor",
+      "displayName": "Identity Binding Anchor",
+      "description": "Canonical server-normalized anchor for the currently bound person, such as an ORCID or OpenAlex canonical key. Null means no durable binding has been established.",
+      "maxLength": 255
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_IdentityBoundAt",
+      "displayName": "Identity Bound At",
+      "description": "Timestamp when the current identity binding generation was established or explicitly attested.",
+      "format": "DateAndTime",
+      "behavior": "UserLocal"
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_IdentityDerivedBindingVersion",
+      "displayName": "Identity Derived Binding Version",
+      "description": "Binding generation from which the current resolver-derived identity bundle was produced. Null or a mismatch with IdentityBindingVersion means the derived bundle is stale.",
+      "minValue": 1,
+      "maxValue": 2147483647
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_IdentityFieldLineageJson",
+      "displayName": "Identity Field Lineage (JSON)",
+      "description": "Compact server-owned map from each mutable identity-bearing field to its source and binding generation. Enables replacement to clear superseded derived values without erasing independently attested/manual values. Not identity evidence; evidence remains in IdentityEvidenceSummary and IdentityVerifiedAnchorsJson.",
+      "maxLength": 8000
+    }
+  ]
+}

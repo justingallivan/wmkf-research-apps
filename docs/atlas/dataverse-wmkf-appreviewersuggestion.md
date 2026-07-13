@@ -30,6 +30,18 @@ Suggestion content:
 - `wmkf_sources` (String, comma-joined provenance)
 - `wmkf_notes` (Memo)
 
+### Planned additive identity-COI currency — tracked, not deployed or authoritative
+
+`lib/dataverse/schema/wave13-reviewer-identity-binding/02_wmkf_appreviewersuggestion_identity_coi.json`
+tracks four nullable fields: `wmkf_identitycoistatus`,
+`wmkf_identitycoibindingversion`, `wmkf_identitycoicontexthash`, and
+`wmkf_identitycoicheckedat`. Together they can later prove that a structured
+proposal-specific COI result was computed for both the current person-binding
+generation and the current canonical proposal/rule context. As of 2026-07-12
+the wave has not been applied, and no live reader or writer uses these names.
+Missing/unknown status, generation mismatch, or missing/context-hash mismatch is
+designed to mean stale; `stale` and action eligibility are computed, not stored.
+
 Lifecycle bools (each has a `*name` virtual):
 - `wmkf_selected`, `wmkf_invited`, `wmkf_accepted`, `wmkf_declined`
 

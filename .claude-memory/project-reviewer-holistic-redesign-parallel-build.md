@@ -31,6 +31,12 @@ The plan is **active under a hybrid incremental model**:
 4. **D1 cleanup:** Track B or heuristic deletion waits until promotion and one
    complete campaign of old/new observation.
 
+Wave 13 identity-binding schema artifacts are now tracked but are **not deployed
+or authoritative**. The ten nullable fields cover person binding generation and
+per-field lineage plus proposal COI binding/context currency. Apply remains a
+separate owner gate; dual writers/readers remain later slices. Null future fields
+mean legacy/unknown, never eligible-by-default.
+
 ## Required evidence model
 
 - Identity confidence is not provenance. The durable contract separates

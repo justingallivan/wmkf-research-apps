@@ -99,6 +99,14 @@ Identity resolver: `wmkf_identitystatus`, `wmkf_identityconfidenceband`,
 `wmkf_identityresolverversion`, `wmkf_identityresolvedat`, `wmkf_identityevidencesummary`,
 `wmkf_identityverifiedanchorsjson`.
 
+**Tracked but not deployed/authoritative (Wave 13, 2026-07-12):** identity-binding
+generation/source/anchor/timestamp, derived generation, and compact field
+lineage are specified as `wmkf_identitybindingversion`,
+`wmkf_identitybindingsource`, `wmkf_identitybindinganchor`,
+`wmkf_identityboundat`, `wmkf_identityderivedbindingversion`, and
+`wmkf_identityfieldlineagejson`. They remain absent or ignored until the
+separate schema apply and later reader/writer promotion gates complete.
+
 ### 2c. On `wmkf_appreviewersuggestion` (entirely ours)
 
 Linkage: `wmkf_suggestionlabel`, `wmkf_potentialreviewer`, `wmkf_request`, `wmkf_grantcyclecode`,
@@ -120,6 +128,11 @@ Decline capture: `wmkf_declinereasonpicklist`, `wmkf_declinereason`, `wmkf_decli
 Stage-2a stamps: `wmkf_honorariumoptout`, `wmkf_withdrawnsufficientat`, `wmkf_coiackedat`,
 `wmkf_aiuseackedat`, `wmkf_coipolicyversion` (→ `wmkf_policyversion`),
 `wmkf_aiusepolicyversion` (→ `wmkf_policyversion`), `wmkf_honorariumrequest` (→ `akoya_request`).
+
+**Tracked but not deployed/authoritative (Wave 13, 2026-07-12):** structured
+identity-COI currency is specified as `wmkf_identitycoistatus`,
+`wmkf_identitycoibindingversion`, `wmkf_identitycoicontexthash`, and
+`wmkf_identitycoicheckedat`. Current production COI behavior remains unchanged.
 
 ### 2d. On `wmkf_ai_run` (entirely ours)
 

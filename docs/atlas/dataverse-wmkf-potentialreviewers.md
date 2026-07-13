@@ -43,6 +43,20 @@ Field caps observed empirically:
 
 **Bibliometric fields (S213 — folded in from the dropped `wmkf_appresearcher` sidecar):** `wmkf_primaryaffiliation` (500, the canonical full-string affiliation per D-AFF), `wmkf_department` (255), `wmkf_orcid`/`wmkf_orcidurl`, `wmkf_googlescholarid`/`wmkf_googlescholarurl`, `wmkf_hindex`/`wmkf_i10index`/`wmkf_totalcitations`, `wmkf_website`/`wmkf_facultypageurl`, `wmkf_keywords` (Memo), `wmkf_emailsource`, `wmkf_lastchecked`/`wmkf_metricsupdatedat`/`wmkf_contactenrichedat`/`wmkf_contactenrichmentsource`. (`wmkf_organizationname` kept as a clamped-100 compat shadow.) Written by `adapters/researcher.js` (now person-targeting) + `potential-reviewer.js`. See `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md`.
 
+### Planned additive identity binding — tracked, not deployed or authoritative
+
+`lib/dataverse/schema/wave13-reviewer-identity-binding/01_wmkf_potentialreviewers_identity_binding.json`
+tracks six nullable fields: `wmkf_identitybindingversion`,
+`wmkf_identitybindingsource`, `wmkf_identitybindinganchor`,
+`wmkf_identityboundat`, `wmkf_identityderivedbindingversion`, and
+`wmkf_identityfieldlineagejson`. They provide a monotonic person-binding
+generation plus compact per-field lineage for safe correction/invalidation.
+As of 2026-07-12 the wave has not been applied, and no live reader or writer uses
+these names. When deployed later, null remains legacy/unbound and cannot confer
+action eligibility. Existing resolver evidence remains in
+`wmkf_identityevidencesummary` and `wmkf_identityverifiedanchorsjson`; the new
+lineage field does not duplicate that evidence payload.
+
 ## Adapter contract (`lib/dataverse/adapters/potential-reviewer.js`)
 
 Methods:

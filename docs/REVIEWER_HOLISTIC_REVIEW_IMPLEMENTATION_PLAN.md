@@ -265,6 +265,16 @@ version; do not proliferate it to UI payloads.
 
 ### C0.3 Make corrections invalidate dependent state
 
+**[SCHEMA PREREQUISITE BUILT; NOT DEPLOYED OR AUTHORITATIVE 2026-07-12]**
+The live containment audit found that this promise cannot be implemented safely
+against the current columns: the seven overlapping identity fields have no
+per-field lineage, proposal COI has no structured currency marker, and a person
+binding has no durable generation. The additive prerequisite is now tracked in
+`wave13-reviewer-identity-binding` with a read-only ABSENT/EXACT/DIVERGENT
+preflight. It adds no runtime reader or writer and must be applied through the
+I2.1 owner gate before C0.3 resumes. Until then, current behavior remains
+authoritative; null future fields mean legacy/unknown, never eligible-by-default.
+
 Create one server-owned rebind/invalidation operation used by:
 
 - PD confirmation in `save-candidates-service`;
@@ -405,7 +415,10 @@ Extend the person entity with a new isolated schema wave. The design must carry:
   explicit legacy/unbound state for migration);
 - canonical bound-person anchor;
 - binding/attestation timestamp;
-- derived-state binding version.
+- derived-state binding version;
+- compact per-field lineage for the overlapping mutable identity bundle, so a
+  replacement can clear superseded automated values without erasing an
+  independently attested/manual value.
 
 Continue using the existing evidence summary/verified-anchor fields for compact
 evidence provenance; do not duplicate their payload without a demonstrated need.
@@ -414,9 +427,25 @@ eligibility is computed from current binding, derived-state version, evidence,
 email source, and proposal-specific state rather than stored as an opaque
 boolean.
 
+The tracked Wave 13 contract uses these person columns:
+`wmkf_identitybindingversion`, `wmkf_identitybindingsource`,
+`wmkf_identitybindinganchor`, `wmkf_identityboundat`,
+`wmkf_identityderivedbindingversion`, and
+`wmkf_identityfieldlineagejson`. The lineage JSON is a compact server-owned map
+for the allowlisted identity-bearing fields; malformed, oversized, unknown-key,
+or unknown-source payloads must fail closed. Its exact schema and transition
+rules are a required I1.3 writer contract, not client input.
+
 If proposal COI is derived from a person binding, persist or otherwise prove
-the binding version used for that decision. A mismatched/unknown version is
-stale and fails closed until recomputed.
+both the binding version and the authoritative proposal/rule context used for
+that decision. Wave 13 carries `wmkf_identitycoistatus`,
+`wmkf_identitycoibindingversion`, `wmkf_identitycoicontexthash`, and
+`wmkf_identitycoicheckedat` on the suggestion. The context hash is lowercase
+SHA-256 over a canonical, versioned server-side COI context; the exact input
+normalization and rule-version contract must be frozen and tested before a
+writer lands. Missing/unknown status, a mismatched/unknown binding version, or
+a missing/mismatched context hash is stale and fails closed until recomputed.
+Do not persist a separate `stale` status or opaque eligibility boolean.
 
 ### I1.2 Transition table
 
@@ -460,6 +489,13 @@ not reinterpret confidence as provenance.
 **[VERIFIED]** Dataverse schema is delivered through declarative waves and
 `scripts/apply-dataverse-schema.js`; the apply engine creates missing attributes
 but does not reconcile a divergent existing definition.
+
+**[ARTIFACTS BUILT; EXTERNAL APPLY PENDING OWNER GATE 2026-07-12]**
+`lib/dataverse/schema/wave13-reviewer-identity-binding/` contains two additive
+extension specs (ten fields total), and
+`scripts/preflight-reviewer-identity-binding-fields.mjs` derives the expected
+metadata from those specs. No application code selects or writes the columns;
+schema creation alone therefore cannot change production behavior.
 
 Use a new isolated string-suffixed wave such as
 `wave13-reviewer-identity-binding`; do not append to or rerun wave6 as the new

@@ -1,0 +1,38 @@
+{
+  "name": "wmkf_appreviewersuggestion-identity-coi",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_appreviewersuggestion",
+  "_comment": "Additive proposal-specific COI currency for the reviewer holistic redesign. These columns are deliberately non-authoritative at schema delivery. Current save/send behavior remains unchanged until a later owner-approved dual-write/read cutover; null or a binding-version mismatch will then be treated as unknown/stale and fail closed for identity-dependent actions.",
+  "attributes": [
+    {
+      "type": "String",
+      "schemaName": "wmkf_IdentityCoiStatus",
+      "displayName": "Identity COI Status",
+      "description": "Server-owned proposal-specific institution COI result for the recorded binding generation: clear | conflict | unknown. Staleness is determined by comparing IdentityCoiBindingVersion with the person's current IdentityBindingVersion.",
+      "maxLength": 20
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_IdentityCoiBindingVersion",
+      "displayName": "Identity COI Binding Version",
+      "description": "Person identity-binding generation used to compute this proposal-specific COI result. Null or mismatch means unknown/stale.",
+      "minValue": 1,
+      "maxValue": 2147483647
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_IdentityCoiContextHash",
+      "displayName": "Identity COI Context Hash",
+      "description": "Lowercase SHA-256 hex of the canonical authoritative proposal-side COI inputs plus the COI rule version. A missing or mismatched hash means the recorded COI result is stale even when the person binding generation is unchanged.",
+      "maxLength": 64
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_IdentityCoiCheckedAt",
+      "displayName": "Identity COI Checked At",
+      "description": "Timestamp when the proposal-specific identity COI result was computed for IdentityCoiBindingVersion.",
+      "format": "DateAndTime",
+      "behavior": "UserLocal"
+    }
+  ]
+}
