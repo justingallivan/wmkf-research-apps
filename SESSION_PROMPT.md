@@ -1,105 +1,148 @@
-# Session 361 Prompt: first reviewer identity-binding caller observation
+# Session 362 Prompt: adversarial review before a reviewer-binding smoke
 
-## Current objective
+## Session 361 Summary
 
-Observe the newly promoted first production caller of
-`reviewer-identity-binding-writer.js` without widening the identity-policy
-migration.
+The first production caller of the Wave 13 reviewer identity-binding writer is
+deployed, but no positive durable binding event has yet been observed. Rather
+than wait indefinitely for an organic reviewer acceptance, the owner requested
+a Claude handoff that adversarially reviews both the deployed code and the
+existing production-touching PR4 test runner before any smoke test is designed
+or run.
 
-Implementation PR #57 merged to `main` at `00ffb09c`; deployment
-`dpl_4YpnVVdRmDHyuzgPVSKXNcx22bKu` is READY on the production aliases. Current
-follow-up branch: `codex/reviewer-binding-activation-live-docs`.
+### What Was Completed
 
-## Decision and scope
+1. **Identity-receipt lifetime and writer contracts were hardened**
+   - The owner selected a 14-day TTL for reviewer-candidate attestation receipts.
+   - The adversarial-review fixes tightened timestamp normalization, transition
+     complements, signed-decision enforcement, shared field authority, batch
+     correlation uniqueness, and the production Wave 13 preflight contract.
+   - PR #55 merged these changes to `main` at `3a90785c`.
 
-The owner approved this exact first-caller strategy on 2026-07-13:
+2. **The first durable binding-writer caller was promoted**
+   - Acceptance-drain self-report now passes the durable job's stable
+     `accepted_at` into `capture-self-reported-orcid.js`.
+   - Clean and already-bound rows use the versioned writer. Only typed
+     `legacy_classification_required` may take the transitional two-write
+     fallback; every other writer failure stops downstream work and leaves the
+     durable job retryable.
+   - PR #57 merged at `00ffb09c`; Vercel deployment
+     `dpl_4YpnVVdRmDHyuzgPVSKXNcx22bKu` reached READY on production aliases.
+   - Immediate scheduled-drain observation found no error-level logs, while the
+     dated post-deploy population probe still found zero Wave 13 rows. That is
+     not a permanent current-state guarantee.
 
-1. Activate the writer only in the durable reviewer-acceptance drain's
-   self-report path, using the acceptance job's stable `accepted_at`.
-2. Clean unbound and already-bound rows use the versioned writer.
-3. Only typed `IdentityBindingWriteError` code
-   `legacy_classification_required` may use the existing transitional person
-   writes.
-4. Every other writer failure fails closed before contact fill, honorarium,
-   back-propagation, board identity, email, quota, or job completion; the durable
-   job remains retryable.
-5. Decline/no-stable-timestamp capture, automated writers/readers, backfill,
-   merge/action policy, and the four Wave 13 suggestion COI fields are unchanged.
+3. **Durable documentation was reconciled after promotion**
+   - PR #56 merged the docs-catalog dependency repair at `851f693b`.
+   - PR #58 merged the first-caller production status at `53f85236`.
+   - The implementation plan, data model, person Atlas, service catalog,
+     reviewer-identity wiki, and project memory agree that the caller is live
+     while broader writers/readers remain gated.
 
-## Promoted implementation
+4. **A read-only adversarial-review handoff was prepared for Claude**
+   - `docs/REVIEWER_IDENTITY_BINDING_PRODUCTION_SMOKE_ADVERSARIAL_REVIEW_HANDOFF.md`
+     requires a whole-flow review of the deployed caller and
+     `scripts/pr4-e2e.js`, then an attack on the proposed dedicated-smoke design.
+   - The brief forbids live writes, production smoke execution, implementation,
+     commits, and pushes. Claude's only permitted write is the requested review
+     artifact under `outputs/`.
+   - The handoff landed directly on `main` as docs-only commit `937df5fe`.
 
-- `lib/services/capture-self-reported-orcid.js`
-  - accepts `bindingEventAt`;
-  - builds a partial `self_reported` binding event with canonical ORCID anchor;
-  - accepts only committed writer outcomes `init`, `refresh`, `rebind`, `noop`;
-  - uses the legacy two-write fallback only for the exact typed classification
-    error;
-  - performs contact fill only after person persistence.
-- `lib/services/reviewer-acceptance-drain.js`
-  - canonicalizes `accepted_at` / payload `acceptedAt` to ISO;
-  - captures the self-report before honorarium and all other follow-up;
-  - removes the pre-persistence synthetic in-memory `confirmed` value;
-  - marks the in-memory reviewer confirmed only after capture returns
-    `{persisted:true}`;
-  - lets binding/capture failures bubble so the acceptance job retries.
-- Unit tests pin stable event reuse, Date normalization, ordering, typed-only
-  fallback, forged/untyped error refusal, blocked/missing/unknown outcome
-  refusal, and no downstream work after capture failure.
+### Commits
 
-## Verified evidence
+- `42b4e7d5` - `fix(reviewer): shorten identity receipt TTL`
+- `722ebe3b` - `fix(reviewer): harden identity binding contracts`
+- `3a90785c` - Merge PR #55, reviewer-attestation TTL and hardening
+- `9f244036` - `fix(docs): remove ignored review dependency`
+- `851f693b` - Merge PR #56, docs-catalog repair
+- `1978413b` - `feat(reviewer): activate durable self-report binding`
+- `00ffb09c` - Merge PR #57, first production binding caller
+- `533180c1` - `docs(reviewer): record binding caller promotion`
+- `53f85236` - Merge PR #58, production-live documentation
+- `937df5fe` - `docs(reviewer): hand off binding smoke adversarial review`
 
-- Focused contract suite after the final fail-closed tightening:
-  5 suites / 135 tests green (capture, acceptance drain, binding writer,
-  honorarium orchestrator, ORCID back-propagation).
-- Adjacent acceptance/trust suites: 3 suites / 45 tests green. Scoped ESLint and
-  `check:types` are green.
-- Full suite: 482/482 suites and 5,504/5,504 tests green. Production build is
-  green.
-- Atlas, API-route, Dataverse-DAL, route/service-boundary, docs-catalog,
-  fact-consistency, doc-symbol, build-claim, doc-currency, memory-router, and
-  memory-drift gates are green; every defined self-test was run sequentially.
-- Pre-activation production population probe on 2026-07-13:
-  4,417 potential-reviewer rows; 0 bound; 2,559 clean unbound; 1,858
-  legacy-dirty. This was read-only and does not imply post-deployment state.
-- Final read-only Wave 13 preflight: 0 ABSENT / 10 EXACT / 0 DIVERGENT, zero
-  populated person rows, zero populated suggestion rows, and second-precision
-  persisted resolver timestamps. The earlier evidence remains captured at
-  `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md`.
-- `/contract-reconcile` Mode B is complete across whole flow, async/retry state,
-  helper semantics, durable surfaces, docs, and raw caller fan-out. `/sweep`
-  leaves zero live stale first-caller claims; remaining old claims are explicitly
-  historical records.
-- Post-promotion verification: the production deployment is READY; three
-  scheduled acceptance-drain calls completed with no error-level logs. An
-  immediate post-deploy population probe still found zero Wave 13 rows, so the
-  caller is live but no first durable binding event has yet been observed.
+## Next Items
 
-## Next observation
+### Verified Open
 
-1. After the next reviewer acceptance containing a valid self-reported ORCID,
-   re-run the read-only population/preflight and inspect acceptance-drain logs.
-   Confirm that a clean row gains the expected self-reported binding, or that a
-   dirty legacy row takes only the approved typed fallback.
-2. Keep automated writers, backfill, policy readers, merge/action policy, and
-   suggestion COI currency gated until separately approved.
+1. **Have Claude perform the read-only adversarial review.**
+   Evidence: the controlling brief is
+   `docs/REVIEWER_IDENTITY_BINDING_PRODUCTION_SMOKE_ADVERSARIAL_REVIEW_HANDOFF.md`;
+   the required output
+   `outputs/reviewer-identity-binding-production-smoke-adversarial-review-2026-07-13.md`
+   was verified absent at session close.
+   Start with `/start`, follow the handoff literally, use `/contract-reconcile`
+   in review mode, and produce only the named output artifact.
 
-## Parked / unchanged
+### Owner Decision Needed
 
-- Policy reader and complete consumer migration (plan I2.3).
-- Automated, staff-correction, merge, revocation, and backfill callers.
-- Structured suggestion COI currency readers/writers.
-- Legacy-row classification/backfill beyond the explicitly approved self-report
-  fallback.
-- Interlock `warn` to `on`, Daily Maintenance operational confirmation,
-  `label_conflict` spot-check, reviewer-institution linking, and address-based
-  onboarding scope.
+1. **Choose the smoke implementation only after reviewing Claude's verdict.**
+   Evidence: the handoff requires separate verdicts for deployed code, the
+   current PR4 script, and the proposed smoke architecture.
+   Decide whether to implement a dedicated guarded smoke, repair the PR4 runner,
+   use a persistent fixture, accept a narrower proof, or continue waiting for an
+   organic positive control. This decision also owns production fixture/request
+   selection, cleanup authority, and whether acceptance-job audit rows may be
+   deleted.
 
-## Key files
+### Parked
 
-- `lib/services/capture-self-reported-orcid.js`
-- `lib/services/reviewer-acceptance-drain.js`
-- `lib/services/reviewer-identity-binding-writer.js`
-- `tests/unit/capture-self-reported-orcid.test.js`
-- `tests/unit/reviewer-acceptance-drain.test.js`
-- `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md`
-- `.claude-memory/project-reviewer-holistic-redesign-parallel-build.md`
+1. **Broader Wave 13 caller and reader migration.**
+   Evidence: `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md` and
+   `.claude-memory/project-reviewer-holistic-redesign-parallel-build.md`.
+   Automated writers, staff correction, merge/revocation, backfill, action-policy
+   readers, and structured suggestion COI currency remain gated.
+
+2. **Unrelated operational follow-ups.**
+   Evidence: prior session carryover, unchanged by Session 361.
+   Interlock `warn` to `on`, Daily Maintenance operational confirmation,
+   `label_conflict` spot-check, reviewer-institution linking, and address-based
+   onboarding remain outside this slice.
+
+### Verify Before Acting
+
+1. **Refresh production evidence before treating the zero-population snapshot as current.**
+   Evidence currently available:
+   `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md` and the
+   post-deploy observation recorded in the person Atlas.
+   An organic binding may appear at any time; use read-only population/log/job
+   inspection before planning or implementing against the old zero-row result.
+
+2. **Re-prove every production-smoke safety precondition before execution.**
+   Evidence currently available: the adversarial-review handoff's Part C and
+   residual owner gates.
+   Verify the request/fixture is approved and non-live, excluded side effects are
+   mechanically prevented, cron races and interruption are safe, exact cleanup
+   permissions are known, audit-retention policy is resolved, and final baseline
+   restoration is measurable.
+
+### Do Not Reopen Without New Decision
+
+1. **Do not run `scripts/pr4-e2e.js` or any production smoke from the handoff session.**
+   Evidence: the Claude brief is explicitly read-only and forbids all PR4,
+   setup, cleanup, cron, and live-write execution.
+
+2. **Do not change the 14-day reviewer-attestation TTL as part of smoke work.**
+   Evidence: owner decision implemented in `42b4e7d5` and merged through PR #55.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/REVIEWER_IDENTITY_BINDING_PRODUCTION_SMOKE_ADVERSARIAL_REVIEW_HANDOFF.md` | Controlling Claude review brief |
+| `scripts/pr4-e2e.js` | Existing production-touching runner under review; do not run |
+| `lib/services/reviewer-acceptance-drain.js` | Durable worker and side-effect ordering |
+| `lib/services/capture-self-reported-orcid.js` | Stable-event binding entry point and typed fallback |
+| `lib/services/reviewer-identity-binding-writer.js` | Versioned, fail-closed Wave 13 writer |
+| `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md` | Migration status and broader gates |
+| `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md` | Dated metadata/population evidence |
+
+## Testing
+
+For the Claude review, use only read-only inspection, static gates, and focused
+mock/disposable-state tests permitted by the handoff. Do not run the production
+smoke or any PR4 setup/cleanup command.
+
+After any later documentation changes, run the applicable docs catalog,
+fact-consistency, symbol-reference, build-claim-freshness, doc-currency, memory
+drift, and `git diff --check` gates, including each defined self-test
+sequentially.
