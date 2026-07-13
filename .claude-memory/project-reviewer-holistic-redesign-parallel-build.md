@@ -37,21 +37,27 @@ sandbox was rejected as an unsuitable validation target; post-apply typed
 metadata verification reported 0 ABSENT / 10 EXACT / 0 DIVERGENT. The ten
 nullable fields cover person binding generation and per-field lineage plus
 proposal COI binding/context currency. No live application reader/writer uses
-them; a post-apply any-non-null probe returned zero person and zero suggestion
-rows, so existing state remains legacy-unknown and cannot become
-eligible-by-default. Dual writers/readers remain later gated slices.
+the suggestion fields. The person fields now have an inert, ETag-protected
+binding writer and narrow adapter seam, but no production caller; a post-apply
+any-non-null probe returned zero person and zero suggestion rows, so existing
+state remains legacy-unknown and cannot become eligible-by-default. Runtime
+caller migration remains a later gated slice.
 
 The pure non-I/O contracts are built in
 `reviewer-identity-binding-contract.js` and `institution-coi-context.js`, with
 focused negative tests. They freeze strict canonical anchors, binding tuples,
-seven-field lineage, and server-loaded proposal institution context hashing but
-do not select or write Wave 13 columns. Durable institution-COI `clear` still
+pair-atomic seven-field lineage, and server-loaded proposal institution context
+hashing. `reviewer-identity-binding-writer.js` now supplies the inert person
+read/conditional-write seam with bounded 412 recompute, explicit source
+precedence, monotonic human-event ordering, manual-lineage protection, and
+fail-closed legacy handling. Automation cannot refresh a human binding until a
+durable refresh-ordering signal exists. Durable institution-COI `clear` still
 requires server-owned reviewer affiliations covered by the binding generation.
 
 The documented sandbox is reachable but ancient/unknown and lacks
 `wmkf_appreviewersuggestion`; Wave 13 was not partially installed there. The
 owner explicitly approved the production-only schema exception. That approval
-does not authorize runtime readers/writers or transition activation.
+does not authorize production caller or transition activation.
 
 ## Required evidence model
 

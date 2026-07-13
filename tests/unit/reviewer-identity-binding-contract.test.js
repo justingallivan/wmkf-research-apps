@@ -94,6 +94,12 @@ describe('reviewer identity binding contract', () => {
       bindingAnchor: 'openalex:A123',
       boundAt: 'July 12 2026 20:00:00 UTC',
     }).ok).toBe(false);
+    expect(validateIdentityBindingTuple({
+      bindingVersion: 1,
+      bindingSource: 'automated',
+      bindingAnchor: 'openalex:a123',
+      boundAt: '2026-07-12T20:00:00.000Z',
+    }).ok).toBe(false);
   });
 
   test('round-trips deterministic strict lineage and identifies only automated fields', () => {
@@ -142,5 +148,21 @@ describe('reviewer identity binding contract', () => {
       currentBindingVersion: 2,
     }).ok).toBe(false);
     expect(parseIdentityFieldLineage('x'.repeat(2049), { values: VALUES, currentBindingVersion: 2 }).ok).toBe(false);
+  });
+
+  test('rejects identity pairs whose two fields have different lineage', () => {
+    const mismatchedOrcid = lineage();
+    mismatchedOrcid.wmkf_orcidurl = { source: 'automated', bindingVersion: 2 };
+    expect(parseIdentityFieldLineage(JSON.stringify({ schemaVersion: 1, fields: mismatchedOrcid }), {
+      values: VALUES,
+      currentBindingVersion: 2,
+    })).toMatchObject({ ok: false, errors: expect.arrayContaining([expect.stringContaining('ORCID pair')]) });
+
+    const mismatchedScholar = lineage();
+    mismatchedScholar.wmkf_googlescholarurl = { source: 'automated', bindingVersion: 1 };
+    expect(parseIdentityFieldLineage(JSON.stringify({ schemaVersion: 1, fields: mismatchedScholar }), {
+      values: VALUES,
+      currentBindingVersion: 2,
+    })).toMatchObject({ ok: false, errors: expect.arrayContaining([expect.stringContaining('Scholar pair')]) });
   });
 });

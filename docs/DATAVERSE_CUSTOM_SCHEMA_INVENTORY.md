@@ -106,7 +106,9 @@ lineage are specified as `wmkf_identitybindingversion`,
 `wmkf_identityboundat`, `wmkf_identityderivedbindingversion`, and
 `wmkf_identityfieldlineagejson`. The owner-approved production-only apply and
 post-apply typed metadata verification completed with all six EXACT. No live
-application reader/writer uses them; existing rows remain null/legacy-unbound.
+production caller uses them: an inert ETag-protected binding writer now has a
+narrow select/PATCH seam, but only focused tests import it. Existing rows remain
+null/legacy-unbound, and dirty legacy rows require explicit classification.
 
 ### 2c. On `wmkf_appreviewersuggestion` (entirely ours)
 

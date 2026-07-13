@@ -52,10 +52,15 @@ defines six live nullable fields: `wmkf_identitybindingversion`,
 `wmkf_identityfieldlineagejson`. They provide a monotonic person-binding
 generation plus compact per-field lineage for safe correction/invalidation.
 The owner-approved production-only apply completed 2026-07-12; typed metadata
-verification reported all six EXACT. No live application reader or writer uses
-these names, so the columns are non-authoritative and every existing row remains
+verification reported all six EXACT. No production caller uses these names: the
+inert `reviewer-identity-binding-writer.js` and
+its narrow `researcher.js` ETag seam now select/PATCH them only when explicitly
+invoked, and a raw caller census finds focused tests but no production caller.
+The columns therefore remain non-authoritative and every existing row remains
 null/legacy-unbound; a post-apply any-non-null probe returned zero rows. Null
-cannot confer action eligibility. Existing resolver evidence remains in
+cannot confer action eligibility. Dirty legacy rows with existing identity
+values but no lineage are blocked rather than inferred or cleared. Existing
+resolver evidence remains in
 `wmkf_identityevidencesummary` and `wmkf_identityverifiedanchorsjson`; the new
 lineage field does not duplicate that evidence payload.
 
@@ -77,11 +82,13 @@ Methods:
 - `pages/api/review-manager/reviewers.js` `fetchPotentialReviewers` — chunked OR-chain on `wmkf_potentialreviewersid` to hydrate the Review Manager reviewer list
 - `pages/api/reviewer-finder/{save-candidates,my-candidates}.js`
 - `pages/api/workbench/enrich-recommended.js`, `lib/services/contact-enrichment-service.js`, `adapters/researcher.js` — read the bibliometric fields here (S213: was the `wmkf_appresearcher` sidecar)
+- `lib/services/reviewer-identity-binding-writer.js` — inert fail-closed binding snapshot read; currently test-only with no production caller
 
 ## Write paths
 
 - Endpoints: same as read (via `upsertByEmail` / `update` / `setContactLink`)
 - `scripts/backfill-postgres-to-dataverse.js` — `upsertByEmail` against the Postgres `researchers` pool during Wave 2 backfill.
+- `lib/services/reviewer-identity-binding-writer.js` — one complete ETag-guarded person PATCH after transition validation; currently test-only with no production caller
 
 ## Cross-system
 
