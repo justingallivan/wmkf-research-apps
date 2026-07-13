@@ -128,7 +128,10 @@ describe('captureSelfReportedReviewerOrcid', () => {
       rawOrcid: VALID,
       contactId: 'c-1',
       bindingEventAt: 'not-a-timestamp',
-    }, d)).rejects.toThrow('boundAt must be a canonical ISO UTC timestamp');
+    }, d)).rejects.toMatchObject({
+      message: 'boundAt must be a canonical ISO UTC timestamp',
+      retryable: false,
+    });
 
     // The malformed value reaches the writer verbatim for fail-closed
     // rejection instead of being coerced onto the transitional path.
@@ -188,6 +191,41 @@ describe('captureSelfReportedReviewerOrcid', () => {
     expect(d.researcher.updateById).not.toHaveBeenCalled();
     expect(d.researcher.writeIdentityDecision).not.toHaveBeenCalled();
     expect(d.contacts.setOrcidIfAbsent).not.toHaveBeenCalled();
+  });
+
+  test('deterministic blocked outcomes are terminal instead of retrying eight times', async () => {
+    const d = deps();
+    d.writeBinding.mockResolvedValueOnce({
+      outcome: 'blocked',
+      reason: 'staff_correction_requires_authorized_self_report_override',
+    });
+
+    await expect(captureSelfReportedReviewerOrcid({
+      potentialReviewerId: 'pr-1',
+      rawOrcid: VALID,
+      bindingEventAt: '2026-07-01T10:00:00.000Z',
+    }, d)).rejects.toMatchObject({
+      code: 'binding_transition_blocked',
+      retryable: false,
+    });
+  });
+
+  test('bounded optimistic-concurrency exhaustion remains retryable', async () => {
+    const d = deps();
+    const conflict = new IdentityBindingWriteError(
+      'concurrent_update_exhausted',
+      'identity binding changed during all write attempts',
+    );
+    d.writeBinding.mockRejectedValueOnce(conflict);
+
+    await expect(captureSelfReportedReviewerOrcid({
+      potentialReviewerId: 'pr-1',
+      rawOrcid: VALID,
+      bindingEventAt: '2026-07-01T10:00:00.000Z',
+    }, d)).rejects.toMatchObject({
+      code: 'concurrent_update_exhausted',
+    });
+    expect(conflict.retryable).toBeUndefined();
   });
 
   test('invalid / malformed iD → skip, no writes', async () => {

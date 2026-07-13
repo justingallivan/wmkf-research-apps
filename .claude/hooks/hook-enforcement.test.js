@@ -240,6 +240,42 @@ test('scope claim reminder allows visibly derived plan counts', () => {
   assert.strictEqual(result.status, 0, result.stderr);
 });
 
+test('scope claim reminder does not treat Markdown list ordinals as numeric coverage claims', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-scope-list-'));
+  const result = runHook('scope-claim-reminder.js', {
+    tool_name: 'Write',
+    cwd: root,
+    tool_input: {
+      file_path: path.join(root, 'docs/TEST_PLAN.md'),
+      content: [
+        '# Test Plan',
+        '| Route union | TBD at Stage 0 |',
+        '1. Verify every route against the accepted baseline.',
+        '2. Keep the route scope fail-closed.',
+      ].join('\n'),
+    },
+  });
+  assert.strictEqual(result.status, 0, result.stderr);
+});
+
+test('scope claim reminder still blocks a real count inside a Markdown list item', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-scope-list-count-'));
+  const result = runHook('scope-claim-reminder.js', {
+    tool_name: 'Write',
+    cwd: root,
+    tool_input: {
+      file_path: path.join(root, 'docs/TEST_PLAN.md'),
+      content: [
+        '# Test Plan',
+        '| Route union | TBD at Stage 0 |',
+        '1. Verify all 147 routes against the accepted baseline.',
+      ].join('\n'),
+    },
+  });
+  assert.strictEqual(result.status, 2, result.stderr);
+  assert.match(result.stderr, /unresolved quantity uncertainty/);
+});
+
 test('session lifecycle detects unresolved strict same-session doc staleness', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-stale-doc-'));
   write(path.join(root, 'docs/TEST_PLAN.md'), [

@@ -42,8 +42,10 @@ production caller after F1–F8 remediation: acceptance-drain reviewer self-repo
 only, keyed by the job's stable `accepted_at`. The production implementation
 uses the binding writer for clean
 or already-bound rows, falls back only on typed
-`legacy_classification_required`, and stops the retryable job before honorarium
-or contact follow-up on every other writer failure. This does not activate the
+`legacy_classification_required`, and stops the job before honorarium or contact
+follow-up on every other writer failure. Deterministic typed binding failures
+are terminal; bounded optimistic-concurrency exhaustion and untyped transport
+failures remain retryable. This does not activate the
 policy reader, automated writers, decline path, backfill, or action-policy
 migration. Vercel deployment `dpl_4YpnVVdRmDHyuzgPVSKXNcx22bKu` is READY.
 
@@ -293,9 +295,10 @@ eligible-by-default.
 
 **[HARDENED + VERIFIED 2026-07-13]** The adversarial-review remediation is
 built: a live read-only sample confirmed second-precision Dataverse timestamp
-serialization, and strict second- or millisecond-precision UTC timestamps now
-normalize once at the writer boundary; every named transition guard has complement coverage; the
-dead decision-preservation branch is removed; the resolver and binding contract
+serialization; the shared writer normalizes canonical timestamp formatting,
+while the self-report capture boundary floors its stable event identity to
+Dataverse second precision before writing. Every named transition guard has
+complement coverage; the dead decision-preservation branch is removed; the resolver and binding contract
 share one literal seven-field authority; unsigned identity payloads cannot
 write durable resolver decisions; and duplicate batch correlation keys are
 rejected per row. The first production caller is promoted: acceptance-drain
@@ -543,7 +546,9 @@ revoked state. `capture-self-reported-orcid.js` is now the single production
 service import, live since PR #57 / `00ffb09c`. Acceptance jobs pass canonical `accepted_at`;
 clean/already-bound rows use the writer, typed `legacy_classification_required`
 alone uses the transitional self-report writes, and all other writer failures
-stop the job before honorarium/contact follow-up. The writer result still keeps
+stop the job before honorarium/contact follow-up. Deterministic typed failures
+are marked non-retryable, while bounded concurrency exhaustion and untyped
+transport failures retain the retry path. The writer result still keeps
 `downstreamEligible:false`; no action-policy consumer migration is implied.
 
 Replace status-only adapter guards with a shared binding writer that:
@@ -652,8 +657,9 @@ Migrate every live trust consumer, not only the adapter and merge guard:
 - merge protection and merge DTOs;
 - acceptance drain ordering—**promoted 2026-07-13:** no synthetic
   in-memory `confirmed` precedes persistence; a stable acceptance event durably
-  rebinds before honorarium/back-propagation, while the broader consumer policy
-  migration remains open;
+  rebinds before honorarium/back-propagation; lease-guarded claim/cancel/complete/
+  failure updates fail closed, and only a returned completion row is reported in
+  `completedJobIds`, while the broader consumer policy migration remains open;
 - external-token, render, send, merge, and backfill `$select` projections;
 - PR4/e2e verification scripts and any script that treats
   `status === 'confirmed'` as provenance.

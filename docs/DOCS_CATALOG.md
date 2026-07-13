@@ -245,6 +245,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
+| [REVIEWER_BINDING_SMOKE_CODEX_HANDOFF.md](REVIEWER_BINDING_SMOKE_CODEX_HANDOFF.md) | audit | active |  | Reviewer-binding smoke: four review rounds resolved, verification green, request 1002379 authorized, and deployment/run gates remain. | 2026-07-13 |
 | [REVIEWER_FINDER_COI_CHUNK2_DESIGN.md](REVIEWER_FINDER_COI_CHUNK2_DESIGN.md) | spec | active |  | Author: Claude (S240, 2026-06-10). Builds on Chunk 1 (shipped, b19b3b9). | 2026-07-02 |
 | [REVIEWER_FINDER_D26_PIPELINE_FLOWCHART.md](REVIEWER_FINDER_D26_PIPELINE_FLOWCHART.md) | spec | active |  | Legend — 🟩 green = exists/shipped · 🟨 amber = needs building/fixing · 🟪 purple = open policy decision · ⬛ gray/dashed-X = off / abandoned /... | 2026-07-02 |
 | [REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md](REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md) | source-of-truth | canonical | yes | Status: MAINTAINED current-state reference (owns the live behavioral guarantees below). | 2026-07-02 |
