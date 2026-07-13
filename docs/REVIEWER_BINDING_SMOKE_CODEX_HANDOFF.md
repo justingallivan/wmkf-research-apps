@@ -3,7 +3,7 @@ title: Reviewer Binding Smoke — Codex Takeover Handoff
 domain: reviewer-identity
 kind: audit
 status: active
-summary: "Wave 13 binding production smoke follow-up: all four adversarial rounds resolved on PR #60, verification green, and only explicit owner-run gates remain."
+summary: "Reviewer-binding smoke: four review rounds resolved, verification green, request 1002379 authorized, and deployment/run gates remain."
 canonical: false
 cataloged: 2026-07-13
 owner: product-engineering
@@ -50,10 +50,12 @@ throughput is too low to wait for.
   clean-init precondition, Wave 13 assertion set including exact evidence
   summary + anchors JSON + untouched-field checks, fail-closed cleanup
   evaluation, allowlist fixture authorization, deployment+job attribution
-  matcher). 81 unit tests, no live writes.
+  matcher). 82 unit tests, no live writes.
 - `scripts/lib/smoke-reviewer-binding-fixtures.js` — owner-reviewed fixture
-  allowlist, **deliberately empty**; the runner aborts until a GUID is
-  committed.
+  allowlist. Request `1002379` is authorized as
+  `54e2b88b-04b9-f011-bbd3-6045bd02b4cc` (live Dataverse read verified on
+  2026-07-13); the runner still requires the operator's matching
+  `--approved-request-id` double entry.
 - Cron telemetry (Tier-1 runtime, additive): the drain returns claimed
   `jobIds` plus per-outcome ids; `pages/api/cron/drain-reviewer-acceptances.js` records a
   deployment fingerprint (`VERCEL_GIT_COMMIT_SHA`/`VERCEL_DEPLOYMENT_ID`,
@@ -128,11 +130,12 @@ self-certification.
 
 ## Residual owner gates (unchanged from the review artifact §10)
 
-1. Fixture request GUID committed to
-   `scripts/lib/smoke-reviewer-binding-fixtures.js` (recommend a closed cycle's
-   request; the suggestion is transient but staff-visible during the window).
-2. Authorization to run; `--expect-deployment` from `vercel inspect`, and the
-   deployment must **contain the cron telemetry** (post-PR #60 merge).
+1. **Satisfied:** owner approved request `1002379`; its live-resolved GUID
+   `54e2b88b-04b9-f011-bbd3-6045bd02b4cc` is committed to
+   `scripts/lib/smoke-reviewer-binding-fixtures.js`.
+2. **Still required:** authorization to run; `--expect-deployment` from
+   `vercel inspect`, and the deployment must **contain the cron telemetry**
+   (post-PR #60 merge).
 3. Queue-row retention: default keep; `--delete-job` only by explicit choice.
 4. Review-artifact findings F2 and F3 are implemented on this branch; no owner
    decision remains for their retry/lease semantics.
@@ -146,13 +149,13 @@ the shipped F1 normalization at the self-report capture boundary.
 
 ## Verification completed
 
-- Full Jest: 483 suites / 5,599 tests passed.
-- Affected four-suite run: 143 tests passed; smoke contract alone: 81 passed.
+- Full Jest: 483 suites / 5,600 tests passed.
+- Affected four-suite run: 145 tests passed; smoke contract alone: 82 passed.
 - `node --check`, `npm run check:types`, and `npm run lint` passed (lint retains
   the repository's pre-existing warning baseline, with zero errors).
 - Required code/security/Atlas/wiki/doc/instruction/harness gates and their
   self-tests passed sequentially; `docs/DOCS_CATALOG.md` was regenerated.
 - Round-4 post-fix independent focused review: **NO FINDINGS**.
 - No production smoke, drain, `pr4-e2e`, or other production-writing command
-  was run. The residual fixture, deployment-attestation, and run-authorization
-  gates below remain owner actions.
+  was run. The fixture gate is now satisfied; deployment attestation and
+  explicit run authorization remain owner actions.

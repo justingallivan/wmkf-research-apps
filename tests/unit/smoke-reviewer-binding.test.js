@@ -27,9 +27,11 @@ import {
   secondEqual,
   wholeSecondIso,
 } from '../../scripts/lib/smoke-reviewer-binding-core.js';
+import { APPROVED_FIXTURE_REQUEST_IDS } from '../../scripts/lib/smoke-reviewer-binding-fixtures.js';
 
 const ORCID = '0000-0002-1825-0097';
 const ACCEPTED_AT = '2026-07-14T10:00:00.000Z';
+const APPROVED_REQUEST_ID = '54e2b88b-04b9-f011-bbd3-6045bd02b4cc';
 const SUGGESTION = { wmkf_appreviewersuggestionid: '11111111-1111-4111-8111-111111111111', wmkf_accepted: true };
 const REVIEWER = { wmkf_potentialreviewersid: '33333333-3333-4333-8333-333333333333' };
 const RUNNER_SOURCE = readFileSync('scripts/smoke-reviewer-binding.js', 'utf8');
@@ -237,6 +239,10 @@ describe('assertWave13Binding', () => {
 });
 
 describe('assertApprovedRequest — double-entry fixture authorization', () => {
+  test('tracks only the owner-approved request 1002379 GUID', () => {
+    expect(APPROVED_FIXTURE_REQUEST_IDS).toEqual([APPROVED_REQUEST_ID]);
+  });
+
   const APPROVED = '22222222-2222-4222-8222-222222222222';
   const ALLOWLIST = [APPROVED];
 

@@ -7,4 +7,8 @@
  * an invocation-time value supplied by the same command that performs writes.
  */
 
-export const APPROVED_FIXTURE_REQUEST_IDS = Object.freeze([]);
+export const APPROVED_FIXTURE_REQUEST_IDS = Object.freeze([
+  // Owner-approved 2026-07-13: request 1002379, "Quantum Chimera: Connecting
+  // Synthesis to Function to Explore New Frontiers in Chemical Space".
+  '54e2b88b-04b9-f011-bbd3-6045bd02b4cc',
+]);
