@@ -1,148 +1,148 @@
-# Session 362 Prompt: adversarial review before a reviewer-binding smoke
+# Session 363 Prompt: Codex finishes the binding smoke (round-3 findings)
 
-## Session 361 Summary
+## Session 362 Summary
 
-The first production caller of the Wave 13 reviewer identity-binding writer is
-deployed, but no positive durable binding event has yet been observed. Rather
-than wait indefinitely for an organic reviewer acceptance, the owner requested
-a Claude handoff that adversarially reviews both the deployed code and the
-existing production-touching PR4 test runner before any smoke test is designed
-or run.
+Session 362 executed the read-only adversarial review from the Session 361
+handoff, then (owner-directed) fixed the P1 it found, built the dedicated
+production smoke, and ran three Codex adversarial-review rounds on it. The
+effort is handed to Codex via
+`docs/REVIEWER_BINDING_SMOKE_CODEX_HANDOFF.md` (on the PR #60 branch).
 
 ### What Was Completed
 
-1. **Identity-receipt lifetime and writer contracts were hardened**
-   - The owner selected a 14-day TTL for reviewer-candidate attestation receipts.
-   - The adversarial-review fixes tightened timestamp normalization, transition
-     complements, signed-decision enforcement, shared field authority, batch
-     correlation uniqueness, and the production Wave 13 preflight contract.
-   - PR #55 merged these changes to `main` at `3a90785c`.
+1. **Adversarial review delivered (read-only, per the S361 brief)**
+   - Verdicts: deployed code READY WITH FIXES; `scripts/pr4-e2e.js` DO NOT
+     RUN (all seven prior concerns confirmed plus `upsertByEmail` real-person
+     reuse and the dev-mode cron-auth bypass); smoke architecture READY WITH
+     NAMED CHANGES (12 named changes).
+   - Headline finding F1 (P1): Dataverse drops fractional seconds on DateTime
+     round-trips, so the millisecond binding event identity made a job retry
+     reclassify its own replay as a rebind or an out-of-order block.
+   - Artifact:
+     `outputs/reviewer-identity-binding-production-smoke-adversarial-review-2026-07-13.md`
+     — **gitignored, exists only on this machine**.
 
-2. **The first durable binding-writer caller was promoted**
-   - Acceptance-drain self-report now passes the durable job's stable
-     `accepted_at` into `capture-self-reported-orcid.js`.
-   - Clean and already-bound rows use the versioned writer. Only typed
-     `legacy_classification_required` may take the transitional two-write
-     fallback; every other writer failure stops downstream work and leaves the
-     durable job retryable.
-   - PR #57 merged at `00ffb09c`; Vercel deployment
-     `dpl_4YpnVVdRmDHyuzgPVSKXNcx22bKu` reached READY on production aliases.
-   - Immediate scheduled-drain observation found no error-level logs, while the
-     dated post-deploy population probe still found zero Wave 13 rows. That is
-     not a permanent current-state guarantee.
+2. **F1 fixed and deployed (PR #59, merged at `38640dd7`)**
+   - `capture-self-reported-orcid.js` truncates the self-report event identity
+     (`boundAt`/`resolvedAt`) to second precision on both the durable and
+     typed-fallback paths; unparseable values still fail closed in the writer.
+   - Writer regression test: second-precision stored row + truncated replay
+     event → `noop`.
 
-3. **Durable documentation was reconciled after promotion**
-   - PR #56 merged the docs-catalog dependency repair at `851f693b`.
-   - PR #58 merged the first-caller production status at `53f85236`.
-   - The implementation plan, data model, person Atlas, service catalog,
-     reviewer-identity wiki, and project memory agree that the caller is live
-     while broader writers/readers remain gated.
+3. **Dedicated production smoke built (PR #60, open, head `09725c4c`)**
+   - `scripts/smoke-reviewer-binding.js` + pure safety logic in
+     `scripts/lib/smoke-reviewer-binding-core.js` (64 unit tests, no live
+     writes) + deliberately empty owner-reviewed fixture allowlist
+     `scripts/lib/smoke-reviewer-binding-fixtures.js`.
+   - Additive Tier-1 cron telemetry: drain returns claimed `jobIds`; the cron
+     records a deployment fingerprint in `maintenance_runs.details` on success
+     and failure paths.
+   - Hardened through two Codex adversarial rounds (`40d33555`, `76391b1b` —
+     the latter implemented by Codex rescue session
+     `019f5c30-30cf-7840-827a-e6b3f0b10ccd` and committed on its behalf).
 
-4. **A read-only adversarial-review handoff was prepared for Claude**
-   - `docs/REVIEWER_IDENTITY_BINDING_PRODUCTION_SMOKE_ADVERSARIAL_REVIEW_HANDOFF.md`
-     requires a whole-flow review of the deployed caller and
-     `scripts/pr4-e2e.js`, then an attack on the proposed dedicated-smoke design.
-   - The brief forbids live writes, production smoke execution, implementation,
-     commits, and pushes. Claude's only permitted write is the requested review
-     artifact under `outputs/`.
-   - The handoff landed directly on `main` as docs-only commit `937df5fe`.
+4. **Session docs reconciled**
+   - Project memory, reviewer-identity wiki topic, and person Atlas updated for
+     the F1 fix and the smoke; Codex takeover handoff committed to the branch.
 
 ### Commits
 
-- `42b4e7d5` - `fix(reviewer): shorten identity receipt TTL`
-- `722ebe3b` - `fix(reviewer): harden identity binding contracts`
-- `3a90785c` - Merge PR #55, reviewer-attestation TTL and hardening
-- `9f244036` - `fix(docs): remove ignored review dependency`
-- `851f693b` - Merge PR #56, docs-catalog repair
-- `1978413b` - `feat(reviewer): activate durable self-report binding`
-- `00ffb09c` - Merge PR #57, first production binding caller
-- `533180c1` - `docs(reviewer): record binding caller promotion`
-- `53f85236` - Merge PR #58, production-live documentation
-- `937df5fe` - `docs(reviewer): hand off binding smoke adversarial review`
+- `0b8d5447` - `fix(reviewer): truncate binding event identity to Dataverse second precision`
+- `38640dd7` - Merge PR #59 (F1 fix; deployed to production on merge)
+- `fe2c3aeb` - `feat(reviewer): add gated production smoke for the Wave 13 binding chain`
+- `40d33555` - `fix(reviewer): harden smoke gating, attribution, and assertions per Codex review`
+- `76391b1b` - `fix(reviewer): bind smoke attribution to deployment+job, harden cleanup and fixture gating`
+- `09725c4c` - `docs(reviewer): closing handoff for Codex takeover of the binding smoke`
+  (the last four are on branch `claude/reviewer-binding-smoke`, PR #60)
 
 ## Next Items
 
 ### Verified Open
 
-1. **Have Claude perform the read-only adversarial review.**
-   Evidence: the controlling brief is
-   `docs/REVIEWER_IDENTITY_BINDING_PRODUCTION_SMOKE_ADVERSARIAL_REVIEW_HANDOFF.md`;
-   the required output
-   `outputs/reviewer-identity-binding-production-smoke-adversarial-review-2026-07-13.md`
-   was verified absent at session close.
-   Start with `/start`, follow the handoff literally, use `/contract-reconcile`
-   in review mode, and produce only the named output artifact.
+1. **Codex fixes the two round-3 adversarial findings on PR #60.**
+   Evidence: the round-3 review output (recorded in
+   `docs/REVIEWER_BINDING_SMOKE_CODEX_HANDOFF.md`, on the branch) and
+   `scripts/lib/smoke-reviewer-binding-core.js:124-129` /
+   `scripts/smoke-reviewer-binding.js:275-306`.
+   (a) Attribution accepts a CLAIMED-but-not-completed job: the drain fills
+   `jobIds` before processing, so record per-outcome ids (e.g.
+   `completedJobIds`) and require the smoke job in the completed set of the
+   fingerprint-matching run; add the `retried:1, completed:0` regression test.
+   Fixing the ignored lease-guarded completion result in
+   `processReviewerAcceptanceJob` closes review-artifact finding F2 at the
+   same time. (b) Persist an incremental recovery artifact after each
+   production write boundary with an outer error/signal handler.
+   Then run adversarial-review round 4 before merge.
+
+2. **Merge PR #60 after round 4 is clean.**
+   Evidence: https://github.com/justingallivan/wmkf-research-apps/pull/60.
+   The smoke cannot attribute correctly until a deployment containing the new
+   cron telemetry is live, so merge precedes any run.
 
 ### Owner Decision Needed
 
-1. **Choose the smoke implementation only after reviewing Claude's verdict.**
-   Evidence: the handoff requires separate verdicts for deployed code, the
-   current PR4 script, and the proposed smoke architecture.
-   Decide whether to implement a dedicated guarded smoke, repair the PR4 runner,
-   use a persistent fixture, accept a narrower proof, or continue waiting for an
-   organic positive control. This decision also owns production fixture/request
-   selection, cleanup authority, and whether acceptance-job audit rows may be
-   deleted.
+1. **Commit the approved fixture request GUID.**
+   Evidence: `scripts/lib/smoke-reviewer-binding-fixtures.js` is deliberately
+   empty and the runner aborts while it is. Recommend a closed cycle's
+   `akoya_request`. This is the authorization mechanism — an owner-reviewed
+   commit, not a CLI value.
+2. **Authorize the smoke run** (operator supplies `--expect-deployment` from
+   `vercel inspect`; keep the completed queue row — `--delete-job` only by
+   explicit choice; first run without `--cleanup`).
 
 ### Parked
 
-1. **Broader Wave 13 caller and reader migration.**
-   Evidence: `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md` and
-   `.claude-memory/project-reviewer-holistic-redesign-parallel-build.md`.
-   Automated writers, staff correction, merge/revocation, backfill, action-policy
-   readers, and structured suggestion COI currency remain gated.
-
-2. **Unrelated operational follow-ups.**
-   Evidence: prior session carryover, unchanged by Session 361.
-   Interlock `warn` to `on`, Daily Maintenance operational confirmation,
-   `label_conflict` spot-check, reviewer-institution linking, and address-based
-   onboarding remain outside this slice.
+1. **Review-artifact finding F3** (deterministic blocked binding outcomes are
+   retried 8× before terminal). Evidence: review artifact §5; P3, non-blocking.
+2. **Broader Wave 13 caller and reader migration** — unchanged; see
+   `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md`.
+3. **Unrelated operational follow-ups** — interlock `warn`→`on`, Daily
+   Maintenance confirmation, `label_conflict` spot-check, reviewer-institution
+   linking, address-based onboarding. Unchanged by Session 362.
 
 ### Verify Before Acting
 
-1. **Refresh production evidence before treating the zero-population snapshot as current.**
-   Evidence currently available:
-   `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md` and the
-   post-deploy observation recorded in the person Atlas.
-   An organic binding may appear at any time; use read-only population/log/job
-   inspection before planning or implementing against the old zero-row result.
-
-2. **Re-prove every production-smoke safety precondition before execution.**
-   Evidence currently available: the adversarial-review handoff's Part C and
-   residual owner gates.
-   Verify the request/fixture is approved and non-live, excluded side effects are
-   mechanically prevented, cron races and interruption are safe, exact cleanup
-   permissions are known, audit-retention policy is resolved, and final baseline
-   restoration is measurable.
+1. **The `scope-claim-reminder.js` hook blocks every edit to
+   `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md`.**
+   Evidence: reproduced three times this session with unrelated edit content;
+   it cites prose list items at lines 75–77/95 as count claims. The plan's
+   timestamp sentence (~line 294) is one sentence behind the shipped F1 fix.
+   Fix the hook or annotate per its instructions — do not work around it.
+2. **Wave 13 population may no longer be zero.**
+   Evidence: the 2026-07-13 preflight snapshot is dated; an organic binding
+   (now on the FIXED code path) may have landed. Re-run the read-only
+   preflight before relying on population claims; the smoke compares against
+   a fresh pre-run snapshot by design.
 
 ### Do Not Reopen Without New Decision
 
-1. **Do not run `scripts/pr4-e2e.js` or any production smoke from the handoff session.**
-   Evidence: the Claude brief is explicitly read-only and forbids all PR4,
-   setup, cleanup, cron, and live-write execution.
-
-2. **Do not change the 14-day reviewer-attestation TTL as part of smoke work.**
-   Evidence: owner decision implemented in `42b4e7d5` and merged through PR #55.
+1. **Do not run `scripts/pr4-e2e.js` or any production smoke from a dev
+   session.** Evidence: review artifact Part B (seven confirmed defects, two
+   new hazards) and the handoff constraints; the smoke is manual and
+   owner-executed only.
+2. **Do not change the 14-day reviewer-attestation TTL or the Wave 13 gating
+   posture.** Evidence: owner decisions, S361 (`42b4e7d5`, PR #55).
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_IDENTITY_BINDING_PRODUCTION_SMOKE_ADVERSARIAL_REVIEW_HANDOFF.md` | Controlling Claude review brief |
-| `scripts/pr4-e2e.js` | Existing production-touching runner under review; do not run |
-| `lib/services/reviewer-acceptance-drain.js` | Durable worker and side-effect ordering |
-| `lib/services/capture-self-reported-orcid.js` | Stable-event binding entry point and typed fallback |
-| `lib/services/reviewer-identity-binding-writer.js` | Versioned, fail-closed Wave 13 writer |
-| `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md` | Migration status and broader gates |
-| `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md` | Dated metadata/population evidence |
+| `docs/REVIEWER_BINDING_SMOKE_CODEX_HANDOFF.md` | Codex takeover brief (on the PR #60 branch) |
+| `scripts/smoke-reviewer-binding.js` | Manual owner-gated smoke runner (PR #60) |
+| `scripts/lib/smoke-reviewer-binding-core.js` | Pure safety logic; round-3 finding (a) lives here |
+| `scripts/lib/smoke-reviewer-binding-fixtures.js` | Empty owner-reviewed fixture allowlist |
+| `lib/services/reviewer-acceptance-drain.js` | Drain; `jobIds` telemetry; per-outcome ids TODO |
+| `pages/api/cron/drain-reviewer-acceptances.js` | Cron; deployment fingerprint in maintenance details |
+| `lib/services/capture-self-reported-orcid.js` | F1 fix (second-precision event identity), deployed |
+| `outputs/reviewer-identity-binding-production-smoke-adversarial-review-2026-07-13.md` | Full review artifact (LOCAL ONLY, gitignored) |
 
 ## Testing
 
-For the Claude review, use only read-only inspection, static gates, and focused
-mock/disposable-state tests permitted by the handoff. Do not run the production
-smoke or any PR4 setup/cleanup command.
+```bash
+npx jest tests/unit/smoke-reviewer-binding.test.js tests/unit/reviewer-acceptance-drain.test.js tests/unit/capture-self-reported-orcid.test.js tests/unit/reviewer-identity-binding-writer.test.js
+npm test            # full suite (5572 green at session close)
+npm run check:types
+# plus the gate+self-test pairs listed in the handoff doc for any new slice
+```
 
-After any later documentation changes, run the applicable docs catalog,
-fact-consistency, symbol-reference, build-claim-freshness, doc-currency, memory
-drift, and `git diff --check` gates, including each defined self-test
-sequentially.
+Never execute the smoke, the PR4 scripts, or the drain from a dev session.
