@@ -109,6 +109,10 @@ post-apply typed metadata verification completed with all six EXACT. No live
 production caller uses them: an inert ETag-protected binding writer now has a
 narrow select/PATCH seam, but only focused tests import it. Existing rows remain
 null/legacy-unbound, and dirty legacy rows require explicit classification.
+**[VERIFIED 2026-07-13 via `node
+scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod
+--include-population`]**; captured dated output:
+`docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md`.
 
 ### 2c. On `wmkf_appreviewersuggestion` (entirely ours)
 
@@ -137,7 +141,8 @@ identity-COI currency is specified as `wmkf_identitycoistatus`,
 `wmkf_identitycoibindingversion`, `wmkf_identitycoicontexthash`, and
 `wmkf_identitycoicheckedat`. Post-apply typed metadata verification reported all
 four EXACT. No live application reader/writer uses them; current production COI
-behavior remains unchanged.
+behavior remains unchanged. This is the same dated 2026-07-13 snapshot and must
+be refreshed before schema-adjacent work.
 
 ### 2d. On `wmkf_ai_run` (entirely ours)
 
@@ -225,5 +230,6 @@ appear to be vendor- or migration-provided that our app only reads — please co
 ---
 
 *Prepared from code + Atlas. Wave 13 field shapes were freshly live-metadata
-verified 2026-07-12; other logical names/entity sets retain the earlier probe
+verified 2026-07-13 via the command and captured audit linked above; other
+logical names/entity sets retain the earlier probe
 dates above. Read/write classification is traced from application call sites.*

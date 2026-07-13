@@ -2,7 +2,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-07-12 Wave 13 typed metadata preflight; prior 2026-05-31 (S208 — `wmkf_applicantdisposition` deployed + live metadata probe: 77 `wmkf_`-prefixed attrs, 108 total). Row count re-probed 2026-07-12 via `scripts/reconcile-memory-claims.js`.
+**Last verified:** 2026-07-13 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population`; prior 2026-05-31 (S208 — `wmkf_applicantdisposition` deployed + live metadata probe: 77 `wmkf_`-prefixed attrs, 108 total). Row count re-probed 2026-07-12 via `scripts/reconcile-memory-claims.js`.
 **Live row count:** 662
 **Entity set:** `wmkf_appreviewersuggestions`
 **Adapter:** `lib/dataverse/adapters/reviewer-suggestion.js`
@@ -38,10 +38,13 @@ defines four live nullable fields: `wmkf_identitycoistatus`,
 `wmkf_identitycoicheckedat`. Together they can later prove that a structured
 proposal-specific COI result was computed for both the current person-binding
 generation and the current canonical proposal/rule context. The owner-approved
-production-only apply completed 2026-07-12; typed metadata verification reported
-all four EXACT. No live application reader or writer uses these names, so the
-columns are non-authoritative; a post-apply any-non-null probe returned zero
-rows. Missing/unknown
+production-only apply completed 2026-07-12. **[VERIFIED 2026-07-13 via the
+command in Last verified]** typed metadata reported all four EXACT. No live
+application reader or writer uses these names, so the columns are
+non-authoritative; the same population probe returned zero rows. The dated
+output is captured in
+`docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md` and must be
+refreshed before schema-adjacent work. Missing/unknown
 status, generation mismatch, or missing/context-hash mismatch is designed to
 mean stale; `stale` and action eligibility are computed, not stored.
 

@@ -677,6 +677,8 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(payload.orcid).toBeNull();
     expect(payload.googleScholarId).toBeNull();
     expect(payload.hIndex).toBeNull();
+    expect(researcherAdapter.writeIdentityDecision).not.toHaveBeenCalled();
+    expect(researcherAdapter.clearIdentityFields).toHaveBeenCalled();
   });
 
   test('explicit contact persist flags false → confirmed identity still saves no sendable contact fields', async () => {

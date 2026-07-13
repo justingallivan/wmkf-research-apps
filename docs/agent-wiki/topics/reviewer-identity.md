@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-12
+last_verified: 2026-07-13
 stale_after_days: 45
 owner: reviewer-finder
 source_files:
@@ -9,6 +9,7 @@ source_files:
   - lib/services/reviewer-identity-resolver.js
   - lib/services/contact-enrichment-service.js
   - lib/services/reviewer-candidate-attestation.js
+  - lib/services/reviewer-finder/save-candidates-service.js
   - lib/services/reviewer-roster-store.js
   - lib/services/proposal-pi-identity.js
   - lib/dataverse/adapters/potential-reviewer.js
@@ -33,6 +34,7 @@ watch_paths:
   - lib/dataverse/adapters/reviewer-suggestion.js
   - lib/dataverse/adapters/researcher.js
   - pages/api/reviewer-finder/**
+  - lib/services/reviewer-finder/save-candidates-service.js
   - pages/api/workbench/reviewer-roster.js
   - pages/api/review-manager/send-emails.js
   - docs/atlas/dataverse-wmkf-potentialreviewers.md
@@ -93,7 +95,7 @@ no drift). The 8 contracts:
 
 A PD who recognizes a `needs_identity_review` candidate (real person, but the auto-resolver couldn't confirm and the suggested email/website are wrong) can rescue them WITHOUT a full re-resolve. On the Find tab, such a card shows **"✓ This is the right person → edit & add"** → opens `CandidateEditModal` in `confirmMode` (email/website/affiliation editable + a required "I've verified this is the correct person" checkbox). On confirm, `ReviewerSearchSection` first calls the authenticated roster `PATCH action:'confirm_identity'`. The server requires an existing active request row and atomically stores a random confirmation id, canonical manual contact, actor profile/system-user ids, timestamp, and `source:'staff_confirmed'`; only then does the client apply its `pdIdentityConfirmed` UI marker and opaque confirmation id. `save-candidates` treats the boolean as non-authoritative: it re-reads the confirmation by the same request + opaque id and requires exact canonical name/email/website/affiliation agreement. Missing, fake, cross-request, changed-contact, or failed reads stop before any adapter write.
 
-A valid confirmation skips the unresolved hard-reject and persists only the PD-typed email/website/affiliation (manual provenance), while force-nulling all resolver-sourced ORCID/Scholar/metrics and skipping `writeIdentityDecision`; institution COI is still enforced. Independently, automated `confirmed`/`probable` identity fields loosen persistence only with the request- and identity-bundle-bound signed receipt minted by `/api/reviewer-finder/enrich-contacts`; unsigned client status is deny-only for FIELD persistence — but the S359 adversarial review found the decision write itself is not receipt-gated: `save-candidates-service.js:895-899` still persists an unsigned client `contactEnrichment.identity` via `writeIdentityDecision` (capped at `probable`, sticky-`confirmed` protected; open fix F2 in `docs/REVIEWER_HOLISTIC_REDESIGN_ADVERSARIAL_FINDINGS_HANDOFF.md`). Email remains manual/low-confidence, so confirm-before-invite still fires. Audit: `matchReason` gets `[Identity confirmed by PD; contact entered manually]`. Tests: `reviewer-route-identity-gate`, `reviewer-roster-store`/endpoint, `reviewer-candidate-attestation`, and stale-save UI tests. This covers the *contact-wrong, person-right* case; the *person-wrong* (namesake) case below is still deferred.
+A valid confirmation skips the unresolved hard-reject and persists only the PD-typed email/website/affiliation (manual provenance), while force-nulling all resolver-sourced ORCID/Scholar/metrics and skipping `writeIdentityDecision`; institution COI is still enforced. Independently, automated `confirmed`/`probable` identity fields loosen persistence only with the request- and identity-bundle-bound signed receipt minted by `/api/reviewer-finder/enrich-contacts`. **Hardened 2026-07-13:** unsigned client identity is now deny-only for both field persistence and the durable resolver-decision write; `save-candidates-service` calls `writeIdentityDecision` only when `automatedIdentityReceipt.valid`, while the invalid-receipt path still clears stale resolver-sourced fields. Email remains manual/low-confidence, so confirm-before-invite still fires. Audit: `matchReason` gets `[Identity confirmed by PD; contact entered manually]`. Tests: `reviewer-route-identity-gate`, `reviewer-roster-store`/endpoint, `reviewer-candidate-attestation`, and stale-save UI tests. This covers the *contact-wrong, person-right* case; the *person-wrong* (namesake) case below is still deferred.
 
 ## Future Work — Edit-and-Re-Resolve (Deferred)
 

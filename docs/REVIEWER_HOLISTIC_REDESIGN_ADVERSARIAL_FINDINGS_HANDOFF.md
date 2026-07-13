@@ -2,8 +2,8 @@
 title: Reviewer Holistic Redesign — Adversarial Review Findings Handoff (for Codex)
 domain: reviewer-identity
 kind: audit
-status: active
-summary: "Actionable fix brief from the 2026-07-13 adversarial review: caller-activation blocker F1, live containment gap F2, guard-test gaps, sliced remediation."
+status: historical
+summary: "Completed remediation record for the eight findings from the 2026-07-13 adversarial review."
 canonical: false
 cataloged: 2026-07-12
 owner: product-engineering
@@ -16,6 +16,15 @@ related:
 ---
 
 # Adversarial Review Findings — Implementation Handoff for Codex
+
+> **COMPLETED 2026-07-13.** F1–F7 are implemented with focused regression
+> coverage; F6 uses the owner-approved 14-day TTL. F8 is reproducible through
+> `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod
+> --include-population`, with dated output captured at
+> `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md`. The
+> detailed sections below are retained as the historical accepted findings and
+> implementation contract, not as open work. Binding-writer caller activation
+> remains separately owner-gated.
 
 Source review: `outputs/reviewer-holistic-redesign-adversarial-review-2026-07-13.md`
 (read it before starting; this brief is the actionable subset, not a

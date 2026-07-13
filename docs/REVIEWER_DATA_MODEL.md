@@ -21,10 +21,15 @@ Visual orientation for the reviewer-domain Dataverse entities and how they conne
 > **Authoritative source for any single entity is its atlas page** (`docs/atlas/dataverse-*.md`). This doc summarizes the connections; the atlas pages have the per-field detail.
 
 > **Identity-binding durability foundation (deployed, not authoritative,
-> 2026-07-12):** Wave 13 added nullable binding generation/source/anchor/time,
+> 2026-07-13):** Wave 13 added nullable binding generation/source/anchor/time,
 > derived-generation, and per-field-lineage columns to the person, plus COI
 > status/binding-generation/context-hash/check-time columns to the engagement.
-> Typed production metadata verification reported all ten EXACT. An inert,
+> **[VERIFIED 2026-07-13 via `node
+> scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod
+> --include-population`]** typed production metadata reported all ten EXACT and
+> zero rows with any Wave 13 field populated. This is a dated snapshot captured
+> in `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md`, not a
+> permanent current-state guarantee. An inert,
 > ETag-protected person-binding writer now selects/PATCHes the six person fields
 > when invoked, but it has no production caller; the four engagement COI fields
 > still have no application reader/writer. Null remains legacy/unknown; later

@@ -84,7 +84,7 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`contact-enrichment-service.js`** — 5-tier contact lookup; header documents Dataverse writeback migration.
 - **`reviewer-roster-store.js`** — Postgres operational roster for request-scoped Find state; active-row staff identity confirmation is stored here and re-read fail-closed at save.
 - **`reviewer-candidate-attestation.js`** — Transitional `NEXTAUTH_SECRET`-signed receipt binding server-computed automated identity fields to one request/candidate bundle before save.
-- **`reviewer-identity-binding-writer.js`** — Inert, server-owned Wave 13 person-binding transition seam: fail-closed snapshot + ETag read, strict lineage/source precedence, one complete conditional PATCH, and bounded 412 reread/recompute. No production caller is activated; dirty legacy rows, revocation, and unauthorized human correction remain blocked.
+- **`reviewer-identity-binding-writer.js`** — Inert, server-owned Wave 13 person-binding transition seam: fail-closed snapshot + ETag read, strict UTC timestamp normalization, lineage/source precedence, one complete conditional PATCH, and bounded 412 reread/recompute. No production caller is activated; dirty legacy rows, revocation, and unauthorized human correction remain blocked.
 
 ### Integrity Screener
 
@@ -153,6 +153,7 @@ If you're touching a service or utility, read its header before this catalog. If
 
 - **`chunk.js`** — Canonical array-chunk helper: `chunk(array, size)` → in-order sub-arrays of ≤ size. Fail-closed: non-array → `TypeError`, non-positive-integer size → `RangeError`; `[]` → `[]`; input never mutated. Import under the alias `chunked` at call sites (per-iteration variables are commonly named `chunk`). **Use this — not a hand-rolled `for (i += N) slice` loop** (consolidated S331-332, `docs/CHUNK_CONSOLIDATION_PLAN.md`).
 - **`reviewer-save-key.js`** — Shared browser/server partial-save correlation key; explicit client ids win, otherwise normalized submitted anchors distinguish same-name rows. Never use it for person merging.
+- **`reviewer-identity-fields.js`** — Literal seven-field authority for resolver-sourced reviewer identity values that require durable lineage; shared by the legacy resolver and Wave 13 binding contract.
 - **`reviewer-manual-confirmation.js`** — Canonical name/contact projection and exact matcher for request-scoped staff identity confirmation records.
 
 ### Secrets
