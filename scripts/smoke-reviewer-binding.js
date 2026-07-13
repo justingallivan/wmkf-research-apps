@@ -15,9 +15,10 @@
  *   no quota, no honorarium, no contact writes, no mismatch alerts;
  * - accepted state is written to Dataverse BEFORE the job is staged;
  * - the deployed cron claims the job — this script NEVER invokes the drain;
- * - the smoke must run against a deployment containing the jobIds/deployment
- *   maintenance telemetry added after the 2026-07-13 adversarial review;
- * - no cleanup while the job is non-terminal; artifact captured first;
+ * - the smoke must run against a deployment containing completedJobIds plus
+ *   deployment-fingerprint maintenance telemetry;
+ * - recovery state is persisted before and after every production write;
+ * - job-backed cleanup only after immutable `completed` status; artifact first;
  * - the completed queue row is KEPT unless --delete-job is passed.
  *
  * Usage:
@@ -31,10 +32,10 @@
  * scripts/lib/smoke-reviewer-binding-fixtures.js. --expect-deployment must name
  * the production deployment (from `vercel inspect`) the cron is expected to run;
  * the matching maintenance run must record both this deployment fingerprint and
- * the exact smoke job id.
+ * the exact smoke job id in completedJobIds.
  *
  * Exit codes: 0 pass · 1 assertion failure · 2 timeout/interrupted (job may
- * still be live — do NOT clean up by hand until it is terminal) · 3 aborted
+ * still be live — do NOT clean up by hand unless it is `completed`) · 3 aborted
  * precondition.
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
@@ -72,7 +73,15 @@ const DELETE_JOB = hasFlag('delete-job');
 // confirm would let a later, unauthorized invocation write to production.
 const CONFIRMED = hasFlag('confirm-prod-dataverse');
 
+let recoveryEnabled = false;
+
 function abort(message) {
+  if (recoveryEnabled) {
+    const error = new Error(message);
+    error.code = 'smoke_precondition_failed';
+    error.exitCode = 3;
+    throw error;
+  }
   console.error(`ABORT: ${message}`);
   process.exit(3);
 }
@@ -175,24 +184,30 @@ async function pollJobUntilTerminal(jobId, startedAt) {
     const job = rows[0] || null;
     if (!job) abort(`job ${jobId} disappeared from reviewer_acceptance_jobs`);
     console.log(`  [${new Date().toISOString()}] job ${jobId}: status=${job.status} attempts=${job.attempts} locked_until=${job.locked_until ? new Date(job.locked_until).toISOString() : null} last_error=${job.last_error ? JSON.stringify(job.last_error.slice(0, 120)) : null}`);
-    if (core.canCleanup(job)) return job;
+    if (core.isJobTerminal(job)) return job;
     if (Date.now() > deadline) {
       console.error(`\nTIMEOUT after ${TIMEOUT_MINUTES} minutes. The job is still ${job.status} and may yet be claimed by the production cron.`);
       console.error('NO cleanup was performed. Re-check the job before touching any row:');
       console.error(`  SELECT * FROM reviewer_acceptance_jobs WHERE id = ${jobId};`);
       console.error(`Window started at ${startedAt}.`);
-      process.exit(2);
+      const error = new Error(`smoke timed out with job ${jobId} still ${job.status}`);
+      error.code = 'smoke_timeout';
+      error.exitCode = 2;
+      throw error;
     }
     await new Promise((resolve) => setTimeout(resolve, POLL_SECONDS * 1000));
   }
 }
 
-async function deleteOrReport(entitySet, id, label) {
+async function deleteOrReport(entitySet, id, label, { allowDuringFatal = false } = {}) {
   try {
     await DynamicsService.deleteRecord(entitySet, id);
     console.log(`  deleted ${label} ${id}`);
     return { deleted: true };
   } catch (delErr) {
+    // Delete and deactivation are separate writes. A signal during the delete
+    // must fence the fallback before it can start on the main/operator path.
+    if (!allowDuringFatal) assertMainFlowActive();
     try {
       await DynamicsService.updateRecord(entitySet, id, { statecode: 1, statuscode: 2 });
       console.log(`  DEACTIVATED (delete unavailable) ${label} ${id}: ${delErr.message?.slice(0, 100)}`);
@@ -230,28 +245,272 @@ function parseDetails(details) {
 }
 
 const startedAt = new Date().toISOString();
-let interruptGuard = null;
-process.on('SIGINT', () => {
-  console.error('\nInterrupted. NO cleanup was performed.');
-  if (interruptGuard) console.error(interruptGuard);
-  console.error('If a job was staged, the production cron may still process it — verify it is terminal before touching any row.');
-  process.exit(2);
-});
-
-await assertNoLocalServer();
-
-const prePopulation = runPopulationPreflight('pre-smoke');
+let prePopulation = null;
+let artifactPath = null;
+let failed = false;
+let fatalRequested = false;
+let fatalPromise = null;
 
 const artifact = {
   startedAt,
   orcid: ORCID,
   approvedRequestId: APPROVED_REQUEST_ID,
   expectDeployment: EXPECT_DEPLOYMENT,
-  prePopulation,
+  prePopulation: null,
+  state: 'initializing',
+  phase: 'preflight',
+  pendingWrite: null,
   problems: [],
 };
 
-let failed = false;
+function initializeArtifact(smokeKey) {
+  const outDir = join(__dirname, '..', 'outputs');
+  if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
+  artifactPath = join(outDir, `${smokeKey}-result.json`);
+  artifact.smokeKey = smokeKey;
+  artifact.prePopulation = prePopulation;
+  artifact.state = 'in_progress';
+  artifact.phase = 'authorized';
+  recoveryEnabled = true;
+  persistArtifact();
+}
+
+function persistArtifact({ finished = false } = {}) {
+  if (!artifactPath) return;
+  artifact.updatedAt = new Date().toISOString();
+  if (finished) {
+    artifact.finishedAt = artifact.updatedAt;
+    artifact.pass = !failed && artifact.state === 'passed';
+  }
+  writeFileSync(artifactPath, JSON.stringify(artifact, null, 2));
+}
+
+function beginProductionWrite(name, { allowDuringFatal = false } = {}) {
+  if (!allowDuringFatal) assertMainFlowActive();
+  artifact.pendingWrite = name;
+  artifact.phase = `before_${name}`;
+  persistArtifact();
+}
+
+function finishProductionWrite(name, patch = {}) {
+  Object.assign(artifact, patch);
+  artifact.pendingWrite = null;
+  artifact.phase = `${name}_written`;
+  persistArtifact();
+}
+
+function assertMainFlowActive() {
+  if (!fatalRequested) return;
+  const error = new Error('fatal shutdown already requested');
+  error.code = 'smoke_fatal_shutdown_requested';
+  error.exitCode = 2;
+  throw error;
+}
+
+async function readRecoveryJob() {
+  if (artifact.jobId) {
+    const { rows } = await sql`SELECT * FROM reviewer_acceptance_jobs WHERE id = ${artifact.jobId}`;
+    return rows[0] || null;
+  }
+  if (artifact.suggestionId && artifact.acceptedAt) {
+    const { rows } = await sql`
+      SELECT * FROM reviewer_acceptance_jobs
+       WHERE suggestion_id = ${artifact.suggestionId}
+         AND accepted_at = ${artifact.acceptedAt}
+       ORDER BY created_at DESC
+       LIMIT 1
+    `;
+    if (rows[0]) artifact.jobId = rows[0].id;
+    return rows[0] || null;
+  }
+  return null;
+}
+
+async function cleanupKnownRows({ terminalJob, reason }) {
+  const allowDuringFatal = reason === 'unexpected_failure';
+  artifact.cleanupInProgress = true;
+  persistArtifact();
+  const cleanup = { reason, startedAt: new Date().toISOString() };
+  if (artifact.suggestionId) {
+    beginProductionWrite('cleanup_suggestion', { allowDuringFatal });
+    cleanup.suggestion = await deleteOrReport(
+      'wmkf_appreviewersuggestions',
+      artifact.suggestionId,
+      'suggestion',
+      { allowDuringFatal },
+    );
+    cleanup.suggestionStillReadable = await isRecordStillReadable(
+      'wmkf_appreviewersuggestions',
+      artifact.suggestionId,
+      'wmkf_appreviewersuggestionid',
+      'suggestion',
+    );
+    finishProductionWrite('cleanup_suggestion', {
+      cleanupProgress: {
+        ...(artifact.cleanupProgress || {}),
+        suggestion: cleanup.suggestion,
+        suggestionStillReadable: cleanup.suggestionStillReadable,
+      },
+    });
+  }
+  if (artifact.personId) {
+    beginProductionWrite('cleanup_person', { allowDuringFatal });
+    cleanup.person = await deleteOrReport(
+      'wmkf_potentialreviewerses',
+      artifact.personId,
+      'person',
+      { allowDuringFatal },
+    );
+    cleanup.personStillReadable = await isRecordStillReadable(
+      'wmkf_potentialreviewerses',
+      artifact.personId,
+      'wmkf_potentialreviewersid',
+      'person',
+    );
+    finishProductionWrite('cleanup_person', {
+      cleanupProgress: {
+        ...(artifact.cleanupProgress || {}),
+        person: cleanup.person,
+        personStillReadable: cleanup.personStillReadable,
+      },
+    });
+  }
+  const postPopulation = runPopulationPreflight('post-recovery-cleanup');
+  cleanup.postPopulation = postPopulation;
+  cleanup.populationRestored = Object.entries(prePopulation || {})
+    .every(([entity, count]) => postPopulation[entity] === count);
+  cleanup.ok = (!artifact.suggestionId
+      || (cleanup.suggestion?.deleted === true && cleanup.suggestionStillReadable === false))
+    && (!artifact.personId
+      || (cleanup.person?.deleted === true && cleanup.personStillReadable === false))
+    && cleanup.populationRestored;
+
+  if (DELETE_JOB && core.canCleanup(terminalJob) && cleanup.ok) {
+    beginProductionWrite('cleanup_job', { allowDuringFatal });
+    const { rows: deleted } = await sql`
+      DELETE FROM reviewer_acceptance_jobs
+       WHERE id = ${artifact.jobId} AND status = 'completed'
+       RETURNING id
+    `;
+    cleanup.jobDeleted = deleted.length > 0;
+    if (!cleanup.jobDeleted) cleanup.ok = false;
+    finishProductionWrite('cleanup_job', { cleanupJobDeleted: cleanup.jobDeleted });
+  } else {
+    cleanup.jobDeleted = false;
+  }
+  cleanup.finishedAt = new Date().toISOString();
+  artifact.cleanupInProgress = false;
+  if (reason === 'operator_requested') artifact.cleanup = cleanup;
+  else artifact.recoveryCleanup = cleanup;
+  if (!cleanup.ok) {
+    failed = true;
+    artifact.problems.push('recovery cleanup did not fully delete known rows and restore the population baseline');
+  }
+  persistArtifact();
+  return cleanup;
+}
+
+async function handleFatal(error, { signal = null } = {}) {
+  failed = true;
+  const pendingWriteAtFailure = artifact.pendingWrite;
+  const phaseAtFailure = artifact.phase;
+
+  // Signal callbacks cannot be awaited by Node. Stamp the signal, current
+  // phase, and pending write synchronously before the first await so even a
+  // concurrent main-flow resolution cannot exit without durable evidence.
+  artifact.failure = {
+    signal,
+    code: error?.code || null,
+    message: error?.message || String(error),
+    stack: error?.stack || null,
+    observedJobStatus: null,
+    jobReadError: null,
+    pendingWrite: pendingWriteAtFailure,
+    phase: phaseAtFailure,
+    at: new Date().toISOString(),
+  };
+  artifact.state = signal ? 'interrupted' : 'failed';
+  artifact.phase = signal ? 'signal_received' : 'error_caught';
+  artifact.recovery = {
+    autoCleanupEligible: false,
+    cleanupRequested: CLEANUP,
+    jobStaged: Boolean(artifact.jobId),
+    jobCompleted: false,
+    pendingWrite: pendingWriteAtFailure,
+  };
+  persistArtifact({ finished: true });
+
+  let observedJob = null;
+  let jobReadError = null;
+  try {
+    observedJob = await readRecoveryJob();
+  } catch (readError) {
+    jobReadError = readError?.message || String(readError);
+  }
+
+  artifact.job = observedJob || artifact.job || null;
+  artifact.failure.observedJobStatus = observedJob?.status || null;
+  artifact.failure.jobReadError = jobReadError;
+  artifact.phase = signal ? 'signal_received' : 'error_caught';
+
+  const autoCleanup = core.canAutoCleanupRecovery({
+    cleanupRequested: CLEANUP,
+    jobId: artifact.jobId,
+    job: observedJob,
+    pendingWrite: pendingWriteAtFailure,
+    cleanupInProgress: artifact.cleanupInProgress,
+    signal,
+  });
+  artifact.recovery = {
+    autoCleanupEligible: autoCleanup,
+    cleanupRequested: CLEANUP,
+    jobStaged: Boolean(artifact.jobId),
+    jobCompleted: core.canCleanup(observedJob),
+    pendingWrite: pendingWriteAtFailure,
+  };
+  persistArtifact({ finished: true });
+
+  if (autoCleanup && (artifact.personId || artifact.suggestionId)) {
+    try {
+      await bypassDynamicsRestrictions('smoke-reviewer-binding-recovery-cleanup', () =>
+        cleanupKnownRows({ terminalJob: observedJob, reason: 'unexpected_failure' }),
+      );
+    } catch (cleanupError) {
+      artifact.recoveryCleanup = {
+        ok: false,
+        error: cleanupError?.message || String(cleanupError),
+      };
+      artifact.problems.push(`recovery cleanup threw: ${cleanupError?.message || cleanupError}`);
+      persistArtifact({ finished: true });
+    }
+  }
+
+  console.error(`\n${signal ? 'INTERRUPTED' : 'FAILED'}: ${error?.message || error}`);
+  if (artifactPath) console.error(`Recovery artifact: ${artifactPath}`);
+  if (artifact.personId || artifact.suggestionId || artifact.jobId) {
+    console.error(`Known rows: person=${artifact.personId || 'none'} suggestion=${artifact.suggestionId || 'none'} job=${artifact.jobId || 'none'}`);
+  }
+  if (artifact.jobId && !core.canCleanup(observedJob)) {
+    console.error('The job is not confirmed completed. Failed/cancelled jobs can be requeued; do not clean up Dataverse rows.');
+  }
+  process.exit(signal ? 2 : (error?.exitCode || 1));
+}
+
+function requestFatal(error, options = {}) {
+  fatalRequested = true;
+  if (!fatalPromise) fatalPromise = handleFatal(error, options);
+  return fatalPromise;
+}
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.once(signal, () => {
+    void requestFatal(new Error(`${signal} received`), { signal });
+  });
+}
+
+await assertNoLocalServer();
+
+prePopulation = runPopulationPreflight('pre-smoke');
 const recordProblems = (label, result) => {
   if (result.ok) {
     console.log(`  PASS ${label}`);
@@ -263,15 +522,18 @@ const recordProblems = (label, result) => {
   artifact.problems.push(...result.problems.map((p) => `${label}: ${p}`));
 };
 
-await bypassDynamicsRestrictions('smoke-reviewer-binding', async () => {
+try {
+  await bypassDynamicsRestrictions('smoke-reviewer-binding', async () => {
   const request = await resolveRequest(REQUEST);
   const approval = core.assertApprovedRequest(request.akoya_requestid, APPROVED_REQUEST_ID, APPROVED_FIXTURE_REQUEST_IDS);
   if (!approval.ok) abort(approval.problems.join('; '));
   const smokeKey = core.buildSmokeKey();
   const email = `${smokeKey}@example.org`;
-  artifact.smokeKey = smokeKey;
+  assertMainFlowActive();
+  initializeArtifact(smokeKey);
 
   // ── Setup: unique clean person, no contact ──────────────────────────────
+  beginProductionWrite('person_create');
   const person = await potentialReviewer.upsertByEmail({
     name: `Smoke Binding Reviewer ${smokeKey.slice(-6)}`,
     email,
@@ -279,10 +541,12 @@ await bypassDynamicsRestrictions('smoke-reviewer-binding', async () => {
     expertise: 'smoke test',
   });
   if (person.created !== true) {
+    finishProductionWrite('person_create_refused', { reusedPersonId: person.id || null });
     abort(`upsertByEmail reused an existing person (${person.id}) for ${email} — refusing to treat a matched row as test-owned. Nothing was created; nothing to clean up.`);
   }
   console.log(`person: ${person.id} (${email})`);
-  artifact.personId = person.id;
+  finishProductionWrite('person_create', { personId: person.id });
+  assertMainFlowActive();
 
   const cleanRow = await researcher.getIdentityBindingForUpdate(person.id);
   const cleanCheck = core.assertCleanInitRow(cleanRow);
@@ -294,6 +558,7 @@ await bypassDynamicsRestrictions('smoke-reviewer-binding', async () => {
     abort(`freshly created person ${person.id} unexpectedly has a contact link ${personBefore._wmkf_contact_value}`);
   }
 
+  beginProductionWrite('suggestion_create');
   const suggestion = await suggestionAdapter.upsert({
     potentialReviewerId: person.id,
     requestId: request.akoya_requestid,
@@ -302,12 +567,13 @@ await bypassDynamicsRestrictions('smoke-reviewer-binding', async () => {
     selected: false,
   });
   console.log(`suggestion: ${suggestion.id}`);
-  artifact.suggestionId = suggestion.id;
-  interruptGuard = `Created rows: person=${person.id} suggestion=${suggestion.id} (suggestion may hold accepted state).`;
+  finishProductionWrite('suggestion_create', { suggestionId: suggestion.id });
+  assertMainFlowActive();
 
   // ── Accepted state BEFORE staging (drain ordering requirement) ──────────
   const acceptedAt = core.wholeSecondIso();
   artifact.acceptedAt = acceptedAt;
+  beginProductionWrite('accepted_state');
   await DynamicsService.updateRecord('wmkf_appreviewersuggestions', suggestion.id, {
     wmkf_accepted: true,
     wmkf_declined: false,
@@ -316,6 +582,8 @@ await bypassDynamicsRestrictions('smoke-reviewer-binding', async () => {
     wmkf_honorariumoptout: true,
     wmkf_reviewerorcid: ORCID,
   });
+  finishProductionWrite('accepted_state', { acceptedAt });
+  assertMainFlowActive();
   const acceptedRow = await suggestionAdapter.getForAcceptanceDrain(suggestion.id);
   if (acceptedRow?.wmkf_accepted !== true || !core.secondEqual(acceptedRow?.wmkf_responsereceivedat, acceptedAt)) {
     abort(`accepted state did not read back (accepted=${acceptedRow?.wmkf_accepted}, responseReceivedAt=${acceptedRow?.wmkf_responsereceivedat}). Clean up person/suggestion by hand — no job was staged.`);
@@ -323,6 +591,7 @@ await bypassDynamicsRestrictions('smoke-reviewer-binding', async () => {
   console.log(`accepted state stamped at ${acceptedAt} and read back.`);
 
   // ── Stage the durable job (queued; deployed cron claims it) ─────────────
+  beginProductionWrite('job_staging');
   const job = await enqueueReviewerAcceptanceJob(core.buildSmokeJobArgs({
     acceptanceKey: `${smokeKey}-accept`,
     acceptedAt,
@@ -332,13 +601,16 @@ await bypassDynamicsRestrictions('smoke-reviewer-binding', async () => {
     orcid: ORCID,
   }));
   console.log(`job staged: id=${job.id} status=${job.status} accepted_at=${acceptedAt}`);
-  artifact.jobId = job.id;
-  interruptGuard = `Created rows: person=${person.id} suggestion=${suggestion.id} job=${job.id}. The production cron may still claim the job.`;
+  finishProductionWrite('job_staging', { jobId: job.id, job });
+  assertMainFlowActive();
 
   // ── Poll until the deployed cron finishes it ─────────────────────────────
   console.log(`\nPolling job ${job.id} every ${POLL_SECONDS}s (timeout ${TIMEOUT_MINUTES}m). This script never invokes the drain.`);
   const terminalJob = await pollJobUntilTerminal(job.id, startedAt);
+  assertMainFlowActive();
   artifact.job = terminalJob;
+  artifact.phase = 'job_terminal';
+  persistArtifact();
 
   // ── Assertions ───────────────────────────────────────────────────────────
   console.log('\n── Assertions ──');
@@ -377,10 +649,10 @@ await bypassDynamicsRestrictions('smoke-reviewer-binding', async () => {
   artifact.maintenanceRuns = runs;
   artifact.attributionRunId = matchedRun?.id || null;
   console.log(`\n── Attribution ──`);
-  console.log(`maintenance_runs (drain-reviewer-acceptances) since ${startedAt}: ${runs.length} run(s); ${matchedRun ? `run ${matchedRun.id} recorded the smoke job and expected deployment` : 'no run recorded both the smoke job and expected deployment'}.`);
+  console.log(`maintenance_runs (drain-reviewer-acceptances) since ${startedAt}: ${runs.length} run(s); ${matchedRun ? `run ${matchedRun.id} completed the smoke job on the expected deployment` : 'no run recorded both completion of the smoke job and the expected deployment'}.`);
   for (const run of runs) {
     const details = parseDetails(run.details);
-    console.log(`  run ${run.id}: ${run.status} processed=${run.records_processed} deployment=${details.deployment?.deploymentId || details.deployment?.gitCommitSha || 'none'} jobIds=${JSON.stringify(details.jobIds || [])}`);
+    console.log(`  run ${run.id}: ${run.status} processed=${run.records_processed} deployment=${details.deployment?.deploymentId || details.deployment?.gitCommitSha || 'none'} completedJobIds=${JSON.stringify(details.completedJobIds || [])} retriedJobIds=${JSON.stringify(details.retriedJobIds || [])} leaseLostJobIds=${JSON.stringify(details.leaseLostJobIds || [])}`);
   }
   recordProblems('deployed-drain attribution', core.assertDrainAttribution({
     matchedRun,
@@ -391,102 +663,38 @@ await bypassDynamicsRestrictions('smoke-reviewer-binding', async () => {
   console.log(`expected deployment (operator-attested via vercel inspect): ${EXPECT_DEPLOYMENT}`);
 
   // ── Artifact before any cleanup ──────────────────────────────────────────
-  const outDir = join(__dirname, '..', 'outputs');
-  if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
-  const artifactPath = join(outDir, `${smokeKey}-result.json`);
-  const writeArtifact = () => {
-    artifact.finishedAt = new Date().toISOString();
-    artifact.pass = !failed;
-    writeFileSync(artifactPath, JSON.stringify(artifact, null, 2));
-  };
-  writeArtifact();
+  artifact.phase = 'assertions_complete';
+  persistArtifact();
   console.log(`\nartifact: ${artifactPath}`);
 
-  // ── Cleanup (only on explicit flag, only after terminal) ────────────────
+  // ── Cleanup (only on explicit flag, only after immutable completion) ───
   if (!CLEANUP) {
     console.log('\nCleanup skipped (pass --cleanup to remove the smoke person/suggestion; the queue row is kept as audit evidence unless --delete-job).');
     console.log(`rows: person=${person.id} suggestion=${suggestion.id} job=${job.id}`);
   } else {
     console.log('\n── Cleanup ──');
     if (!core.canCleanup(terminalJob)) {
-      console.error('  refusing cleanup: job is not terminal.');
-      artifact.problems.push('cleanup: job is not terminal');
+      console.error('  refusing cleanup: job is not completed (failed/cancelled jobs can be requeued).');
+      artifact.problems.push('cleanup: job is not completed');
       failed = true;
-      writeArtifact();
+      persistArtifact();
     } else {
-      const suggestionCleanup = await deleteOrReport('wmkf_appreviewersuggestions', suggestion.id, 'suggestion');
-      const personCleanup = await deleteOrReport('wmkf_potentialreviewerses', person.id, 'person');
-      const suggestionStillReadable = await isRecordStillReadable(
-        'wmkf_appreviewersuggestions',
-        suggestion.id,
-        'wmkf_appreviewersuggestionid',
-        'suggestion',
-      );
-      const personStillReadable = await isRecordStillReadable(
-        'wmkf_potentialreviewerses',
-        person.id,
-        'wmkf_potentialreviewersid',
-        'person',
-      );
-      const postPopulation = runPopulationPreflight('post-cleanup');
-      artifact.postPopulation = postPopulation;
-      const restored = Object.entries(prePopulation).every(([entity, count]) => postPopulation[entity] === count);
-      if (restored) {
-        console.log('baseline restored: post-cleanup population matches the pre-smoke snapshot.');
+      const cleanup = await cleanupKnownRows({ terminalJob, reason: 'operator_requested' });
+      if (cleanup.ok) {
+        console.log('baseline restored: known rows are absent and post-cleanup population matches the pre-smoke snapshot.');
       } else {
-        console.error(`baseline NOT restored: pre=${JSON.stringify(prePopulation)} post=${JSON.stringify(postPopulation)} — investigate before rerunning.`);
+        console.error(`cleanup did not fully verify: ${JSON.stringify(cleanup)}`);
       }
-      const cleanupResult = core.evaluateCleanup({
-        suggestionOutcome: suggestionCleanup,
-        personOutcome: personCleanup,
-        suggestionStillReadable,
-        personStillReadable,
-        populationRestored: restored,
-      });
-      if (!cleanupResult.ok) {
-        failed = true;
-        for (const problem of cleanupResult.problems) {
-          console.error(`  cleanup failure: ${problem}`);
-          artifact.problems.push(`cleanup: ${problem}`);
-        }
-      }
-
-      let jobDeleted = false;
-      if (DELETE_JOB && cleanupResult.allowJobDeletion) {
-        const { rows: deleted } = await sql`
-          DELETE FROM reviewer_acceptance_jobs
-           WHERE id = ${job.id} AND status = ANY(${['completed', 'failed', 'cancelled']})
-           RETURNING id
-        `;
-        jobDeleted = deleted.length > 0;
-        if (jobDeleted) {
-          console.log(`  deleted queue job ${job.id}`);
-        } else {
-          console.error(`  queue job ${job.id} NOT deleted (not terminal?)`);
-          artifact.problems.push(`cleanup: queue job ${job.id} not deleted despite verified row cleanup`);
-          failed = true;
-        }
-      } else if (DELETE_JOB) {
-        console.log(`  queue job ${job.id} kept as audit evidence because cleanup did not fully verify.`);
-      } else {
-        console.log(`  queue job ${job.id} kept as audit evidence (pass --delete-job to remove it after cleanup verifies).`);
-      }
-
-      artifact.cleanup = {
-        suggestion: suggestionCleanup,
-        person: personCleanup,
-        suggestionStillReadable,
-        personStillReadable,
-        populationRestored: restored,
-        allowJobDeletion: cleanupResult.allowJobDeletion,
-        jobDeleted,
-      };
-      // Recompute pass so the durable artifact can never say pass=true while
-      // the process exits non-zero on a cleanup/baseline failure.
-      writeArtifact();
     }
   }
-});
+  });
 
-console.log(`\n${failed ? 'FAIL' : 'PASS'} — smoke ${artifact.smokeKey}`);
-process.exit(failed ? 1 : 0);
+  if (fatalPromise) await fatalPromise;
+  artifact.state = failed ? 'failed' : 'passed';
+  artifact.phase = 'complete';
+  persistArtifact({ finished: true });
+  console.log(`\n${failed ? 'FAIL' : 'PASS'} — smoke ${artifact.smokeKey}`);
+  process.exit(failed ? 1 : 0);
+} catch (error) {
+  await requestFatal(error);
+}

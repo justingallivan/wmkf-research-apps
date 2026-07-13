@@ -8,6 +8,7 @@
  * legacy-fallback run must FAIL), the acceptance-email negative assertion,
  * and the no-cleanup-while-active rule.
  */
+import { readFileSync } from 'fs';
 import {
   assertApprovedRequest,
   assertCleanInitRow,
@@ -16,9 +17,11 @@ import {
   assertWave13Binding,
   buildSmokeJobArgs,
   buildSmokeKey,
+  canAutoCleanupRecovery,
   canCleanup,
   evaluateCleanup,
   findMatchingDrainAttributionRun,
+  isJobTerminal,
   isWholeSecondIso,
   parsePopulationCounts,
   secondEqual,
@@ -29,6 +32,7 @@ const ORCID = '0000-0002-1825-0097';
 const ACCEPTED_AT = '2026-07-14T10:00:00.000Z';
 const SUGGESTION = { wmkf_appreviewersuggestionid: '11111111-1111-4111-8111-111111111111', wmkf_accepted: true };
 const REVIEWER = { wmkf_potentialreviewersid: '33333333-3333-4333-8333-333333333333' };
+const RUNNER_SOURCE = readFileSync('scripts/smoke-reviewer-binding.js', 'utf8');
 
 function unboundPersonRow(overrides = {}) {
   return {
@@ -273,6 +277,7 @@ describe('assertDrainAttribution — blocking deployed-cron attribution', () => 
     id: 101,
     details: {
       jobIds: [77],
+      completedJobIds: [77],
       deployment: { gitCommitSha: '38640dd7abcdef', deploymentId: 'dpl_good' },
     },
   };
@@ -299,16 +304,16 @@ describe('assertDrainAttribution — blocking deployed-cron attribution', () => 
   test('fails when a run has the job id but wrong deployment fingerprint', () => {
     const runs = [{
       id: 102,
-      details: { jobIds: [jobId], deployment: { gitCommitSha: 'aaaaaaaaaaaaaaaa', deploymentId: 'dpl_wrong' } },
+      details: { completedJobIds: [jobId], deployment: { gitCommitSha: 'aaaaaaaaaaaaaaaa', deploymentId: 'dpl_wrong' } },
     }];
     const matchedRun = findMatchingDrainAttributionRun(runs, { jobId, expectDeployment: '38640dd7' });
     const out = assertDrainAttribution({ matchedRun, totalRuns: runs.length, jobId, expectDeployment: '38640dd7' });
     expect(out.ok).toBe(false);
-    expect(out.problems.join(' ')).toContain('jobIds');
+    expect(out.problems.join(' ')).toContain('completedJobIds');
   });
 
   test('fails when a run has the job id but no deployment fingerprint', () => {
-    const runs = [{ id: 103, details: { jobIds: [jobId] } }];
+    const runs = [{ id: 103, details: { completedJobIds: [jobId] } }];
     const matchedRun = findMatchingDrainAttributionRun(runs, { jobId, expectDeployment: '38640dd7' });
     expect(assertDrainAttribution({ matchedRun, totalRuns: runs.length, jobId, expectDeployment: '38640dd7' }).ok).toBe(false);
   });
@@ -316,7 +321,7 @@ describe('assertDrainAttribution — blocking deployed-cron attribution', () => 
   test('fails when a run has the matching fingerprint but not the smoke job id', () => {
     const runs = [{
       id: 104,
-      details: { jobIds: [999], deployment: { gitCommitSha: '38640dd7abcdef', deploymentId: 'dpl_good' } },
+      details: { completedJobIds: [999], deployment: { gitCommitSha: '38640dd7abcdef', deploymentId: 'dpl_good' } },
     }];
     const matchedRun = findMatchingDrainAttributionRun(runs, { jobId, expectDeployment: '38640dd7' });
     expect(assertDrainAttribution({ matchedRun, totalRuns: runs.length, jobId, expectDeployment: '38640dd7' }).ok).toBe(false);
@@ -324,6 +329,26 @@ describe('assertDrainAttribution — blocking deployed-cron attribution', () => 
 
   test('fails without an attested deployment', () => {
     expect(assertDrainAttribution({ matchedRun: matchingRun, totalRuns: 1, jobId, expectDeployment: '' }).ok).toBe(false);
+  });
+
+  test('fails when the expected deployment claimed and retried the job without completing it', () => {
+    const runs = [{
+      id: 105,
+      details: {
+        jobIds: [jobId],
+        completed: 0,
+        completedJobIds: [],
+        retried: 1,
+        retriedJobIds: [jobId],
+        deployment: { gitCommitSha: '38640dd7abcdef', deploymentId: 'dpl_good' },
+      },
+    }];
+    const matchedRun = findMatchingDrainAttributionRun(runs, { jobId, expectDeployment: '38640dd7' });
+    const out = assertDrainAttribution({ matchedRun, totalRuns: runs.length, jobId, expectDeployment: '38640dd7' });
+
+    expect(matchedRun).toBeNull();
+    expect(out.ok).toBe(false);
+    expect(out.problems.join(' ')).toContain('claim/retry/failure is not proof');
   });
 });
 
@@ -358,14 +383,73 @@ describe('cleanup guard', () => {
     ['accept_pending', false],
     ['queued', false],
     ['completed', true],
-    ['failed', true],
-    ['cancelled', true],
+    ['failed', false],
+    ['cancelled', false],
   ])('status %s → canCleanup %s', (status, expected) => {
     expect(canCleanup({ status })).toBe(expected);
   });
 
+  test.each(['completed', 'failed', 'cancelled'])('polling recognizes terminal status %s', (status) => {
+    expect(isJobTerminal({ status })).toBe(true);
+  });
+
   test('no job → no cleanup', () => {
     expect(canCleanup(null)).toBe(false);
+  });
+
+  test('unexpected-failure auto-cleanup is opt-in and allowed before any job is staged', () => {
+    expect(canAutoCleanupRecovery({ cleanupRequested: true, jobId: null, job: null })).toBe(true);
+    expect(canAutoCleanupRecovery({ cleanupRequested: false, jobId: null, job: null })).toBe(false);
+  });
+
+  test('an uncertain job-staging write blocks recovery cleanup', () => {
+    expect(canAutoCleanupRecovery({
+      cleanupRequested: true,
+      jobId: null,
+      job: null,
+      pendingWrite: 'job_staging',
+    })).toBe(false);
+  });
+
+  test('a staged job permits recovery cleanup only after immutable completion', () => {
+    expect(canAutoCleanupRecovery({
+      cleanupRequested: true,
+      jobId: 77,
+      job: { status: 'queued' },
+    })).toBe(false);
+    expect(canAutoCleanupRecovery({
+      cleanupRequested: true,
+      jobId: 77,
+      job: { status: 'failed' },
+    })).toBe(false);
+    expect(canAutoCleanupRecovery({
+      cleanupRequested: true,
+      jobId: 77,
+      job: { status: 'cancelled' },
+    })).toBe(false);
+    expect(canAutoCleanupRecovery({
+      cleanupRequested: true,
+      jobId: 77,
+      job: { status: 'completed' },
+    })).toBe(true);
+  });
+
+  test('signal handling never auto-cleans while a production write may still be resolving', () => {
+    expect(canAutoCleanupRecovery({
+      cleanupRequested: true,
+      jobId: null,
+      job: null,
+      signal: 'SIGTERM',
+    })).toBe(false);
+  });
+
+  test('a cleanup failure never recursively starts a second cleanup pass', () => {
+    expect(canAutoCleanupRecovery({
+      cleanupRequested: true,
+      jobId: 77,
+      job: { status: 'completed' },
+      cleanupInProgress: true,
+    })).toBe(false);
   });
 
   test('allows job deletion only after deletes, GUID absence, and restored population', () => {
@@ -453,5 +537,57 @@ describe('buildSmokeKey', () => {
   test('is unique per second and carries the source tag', () => {
     const key = buildSmokeKey(new Date('2026-07-14T10:00:00.000Z'));
     expect(key).toBe('smoke-reviewer-binding-20260714100000');
+  });
+});
+
+describe('incremental recovery artifact wiring', () => {
+  test.each([
+    ['person_create', 'potentialReviewer.upsertByEmail'],
+    ['suggestion_create', 'suggestionAdapter.upsert'],
+    ['accepted_state', "DynamicsService.updateRecord('wmkf_appreviewersuggestions'"],
+    ['job_staging', 'enqueueReviewerAcceptanceJob'],
+  ])('persists before and immediately after the %s production boundary', (boundary, writeCall) => {
+    const before = RUNNER_SOURCE.indexOf(`beginProductionWrite('${boundary}')`);
+    const write = RUNNER_SOURCE.indexOf(writeCall, before);
+    const after = RUNNER_SOURCE.indexOf(`finishProductionWrite('${boundary}'`, write);
+    expect(before).toBeGreaterThan(-1);
+    expect(write).toBeGreaterThan(before);
+    expect(after).toBeGreaterThan(write);
+  });
+
+  test('the recorder writes JSON synchronously and outer handling covers errors, SIGINT, and SIGTERM', () => {
+    expect(RUNNER_SOURCE).toContain('writeFileSync(artifactPath, JSON.stringify(artifact, null, 2))');
+    expect(RUNNER_SOURCE).toContain("for (const signal of ['SIGINT', 'SIGTERM'])");
+    expect(RUNNER_SOURCE).toContain('await requestFatal(error)');
+    expect(RUNNER_SOURCE).toContain('observedJobStatus');
+  });
+
+  test('signal state is persisted before the recovery job read and main exit awaits fatal shutdown', () => {
+    const handler = RUNNER_SOURCE.indexOf('async function handleFatal');
+    const firstPersist = RUNNER_SOURCE.indexOf('persistArtifact({ finished: true })', handler);
+    const recoveryRead = RUNNER_SOURCE.indexOf('await readRecoveryJob()', handler);
+    const fatalAwait = RUNNER_SOURCE.indexOf('if (fatalPromise) await fatalPromise;');
+    const successExit = RUNNER_SOURCE.indexOf('process.exit(failed ? 1 : 0)');
+    expect(firstPersist).toBeGreaterThan(handler);
+    expect(firstPersist).toBeLessThan(recoveryRead);
+    expect(fatalAwait).toBeGreaterThan(recoveryRead);
+    expect(fatalAwait).toBeLessThan(successExit);
+  });
+
+  test('a fatal request blocks every new main-flow production boundary', () => {
+    const begin = RUNNER_SOURCE.indexOf('function beginProductionWrite');
+    const guard = RUNNER_SOURCE.indexOf('if (!allowDuringFatal) assertMainFlowActive();', begin);
+    const pendingWrite = RUNNER_SOURCE.indexOf('artifact.pendingWrite = name;', begin);
+    expect(guard).toBeGreaterThan(begin);
+    expect(guard).toBeLessThan(pendingWrite);
+  });
+
+  test('a signal during delete fences the fallback deactivation write', () => {
+    const helper = RUNNER_SOURCE.indexOf('async function deleteOrReport');
+    const deleteWrite = RUNNER_SOURCE.indexOf('await DynamicsService.deleteRecord', helper);
+    const fallbackGuard = RUNNER_SOURCE.indexOf('if (!allowDuringFatal) assertMainFlowActive();', deleteWrite);
+    const deactivateWrite = RUNNER_SOURCE.indexOf('await DynamicsService.updateRecord', deleteWrite);
+    expect(fallbackGuard).toBeGreaterThan(deleteWrite);
+    expect(fallbackGuard).toBeLessThan(deactivateWrite);
   });
 });

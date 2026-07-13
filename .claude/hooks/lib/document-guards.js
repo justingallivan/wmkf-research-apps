@@ -174,8 +174,12 @@ function findAssumptionQuantityLeaks(text) {
       uncertainties.push({ line, lineNumber: index + 1, subjects: subjectSet(line) });
       return;
     }
+    // Markdown ordered-list ordinals describe sequence, not quantity. Judge
+    // the remaining text so `1. Verify every route` does not become a bogus
+    // numeric coverage claim merely because the line also contains "route".
+    const claimText = line.replace(/^\s*\d+[.)]\s+/, '');
     if (
-      CLOSED_COUNT_RE.test(line) &&
+      CLOSED_COUNT_RE.test(claimText) &&
       COUNT_CONTEXT_RE.test(line) &&
       !UNCERTAINTY_RE.test(line) &&
       !QUALIFIED_COUNT_RE.test(line)

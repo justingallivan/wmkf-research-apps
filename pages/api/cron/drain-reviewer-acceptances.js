@@ -38,13 +38,15 @@ export default async function handler(req, res) {
     const result = await withDalContext('cron-drain-reviewer-acceptances', () =>
       drainReviewerAcceptanceJobs({ limit, lockSeconds }),
     );
-    const status = result.failed > 0 ? 'failed' : 'completed';
+    const status = result.failed > 0 || result.leaseLost > 0 ? 'failed' : 'completed';
     await MaintenanceService.completeRun(runId, {
       status,
       recordsProcessed: result.claimed,
       recordsDeleted: result.completed + result.cancelled,
       details: { limit, lockSeconds, deployment, ...result },
-      errorMessage: result.failed > 0 ? `${result.failed} reviewer acceptance job(s) failed` : undefined,
+      errorMessage: status === 'failed'
+        ? `${result.failed} reviewer acceptance job(s) failed; ${result.leaseLost} lease(s) lost`
+        : undefined,
     });
     return res.json({ ok: true, limit, lockSeconds, ...result });
   } catch (error) {

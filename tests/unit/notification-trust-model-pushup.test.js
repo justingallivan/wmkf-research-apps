@@ -464,9 +464,9 @@ function makeAcceptanceDrainDeps(overrides = {}) {
       }),
     },
     jobs: {
-      cancelReviewerAcceptanceJob: jest.fn(),
-      completeReviewerAcceptanceJob: jest.fn(),
-      mergeReviewerAcceptanceJobStep: jest.fn(),
+      cancelReviewerAcceptanceJob: jest.fn().mockResolvedValue({ id: 7 }),
+      completeReviewerAcceptanceJob: jest.fn().mockResolvedValue({ id: 7, status: 'completed' }),
+      mergeReviewerAcceptanceJobStep: jest.fn().mockResolvedValue({ id: 7 }),
     },
     potentialReviewers: {
       getById: jest.fn().mockResolvedValue({
@@ -1095,10 +1095,17 @@ describe('notification trust-model Stage 2 pushed-up wrappers', () => {
       trustedAtDrain = hasTrustedDalContext();
       return {
         claimed: 0,
+        jobIds: [],
         completed: 0,
+        completedJobIds: [],
         cancelled: 0,
+        cancelledJobIds: [],
         failed: 0,
+        failedJobIds: [],
         retried: 0,
+        retriedJobIds: [],
+        leaseLost: 0,
+        leaseLostJobIds: [],
         errors: [],
       };
     });
@@ -1112,6 +1119,51 @@ describe('notification trust-model Stage 2 pushed-up wrappers', () => {
     expect(res.body).toMatchObject({ ok: true, claimed: 0, completed: 0, failed: 0 });
     expect(mockDrainReviewerAcceptanceJobs).toHaveBeenCalledWith({ limit: 5, lockSeconds: 300 });
     expect(trustedAtDrain).toBe(true);
+    expect(MaintenanceService.completeRun).toHaveBeenCalledWith('run-1', expect.objectContaining({
+      status: 'completed',
+      details: expect.objectContaining({
+        completedJobIds: [],
+        retriedJobIds: [],
+        leaseLostJobIds: [],
+      }),
+    }));
+  });
+
+  test('drain cron persists a failed maintenance run when a claimed job loses its lease', async () => {
+    mockDrainReviewerAcceptanceJobs.mockResolvedValue({
+      claimed: 1,
+      jobIds: [7],
+      completed: 0,
+      completedJobIds: [],
+      cancelled: 0,
+      cancelledJobIds: [],
+      failed: 0,
+      failedJobIds: [],
+      retried: 0,
+      retriedJobIds: [],
+      leaseLost: 1,
+      leaseLostJobIds: [7],
+      errors: [{ jobId: 7, code: 'reviewer_acceptance_lease_lost' }],
+    });
+    jest.spyOn(MaintenanceService, 'startRun').mockResolvedValue('run-lease-lost');
+    jest.spyOn(MaintenanceService, 'completeRun').mockResolvedValue(undefined);
+
+    const res = makeRes();
+    await drainHandler({ method: 'GET', headers: {}, query: {} }, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ ok: true, completed: 0, leaseLost: 1 });
+    expect(MaintenanceService.completeRun).toHaveBeenCalledWith(
+      'run-lease-lost',
+      expect.objectContaining({
+        status: 'failed',
+        errorMessage: '0 reviewer acceptance job(s) failed; 1 lease(s) lost',
+        details: expect.objectContaining({
+          completedJobIds: [],
+          leaseLostJobIds: [7],
+        }),
+      }),
+    );
   });
 
   test('site 11 - grantee deliverable reminder default alert inherits grantee-deliverable-reminders-cron context', async () => {

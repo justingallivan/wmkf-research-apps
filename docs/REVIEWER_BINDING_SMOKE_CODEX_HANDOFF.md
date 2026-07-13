@@ -3,7 +3,7 @@ title: Reviewer Binding Smoke — Codex Takeover Handoff
 domain: reviewer-identity
 kind: audit
 status: active
-summary: "Closing handoff for the Wave 13 binding production smoke: shipped F1 fix, PR #60 state, two open adversarial-review findings, and residual owner gates."
+summary: "Wave 13 binding production smoke follow-up: all four adversarial rounds resolved on PR #60, verification green, and only explicit owner-run gates remain."
 canonical: false
 cataloged: 2026-07-13
 owner: product-engineering
@@ -41,7 +41,8 @@ throughput is too low to wait for.
   second-precision stored row + truncated replay event → `noop`
   (`tests/unit/reviewer-identity-binding-writer.test.js`).
 
-**Open on branch `claude/reviewer-binding-smoke` (PR #60, head `76391b1b`):**
+**On branch `claude/reviewer-binding-smoke` (PR #60; takeover base
+`09725c4c`):**
 
 - `scripts/smoke-reviewer-binding.js` — the manual, owner-gated smoke runner.
 - `scripts/lib/smoke-reviewer-binding-core.js` — pure safety logic (frozen
@@ -49,23 +50,24 @@ throughput is too low to wait for.
   clean-init precondition, Wave 13 assertion set including exact evidence
   summary + anchors JSON + untouched-field checks, fail-closed cleanup
   evaluation, allowlist fixture authorization, deployment+job attribution
-  matcher). 64 unit tests, no live writes.
+  matcher). 81 unit tests, no live writes.
 - `scripts/lib/smoke-reviewer-binding-fixtures.js` — owner-reviewed fixture
   allowlist, **deliberately empty**; the runner aborts until a GUID is
   committed.
 - Cron telemetry (Tier-1 runtime, additive): the drain returns claimed
-  `jobIds`; `pages/api/cron/drain-reviewer-acceptances.js` records a
+  `jobIds` plus per-outcome ids; `pages/api/cron/drain-reviewer-acceptances.js` records a
   deployment fingerprint (`VERCEL_GIT_COMMIT_SHA`/`VERCEL_DEPLOYMENT_ID`,
   absent on local runs by construction) in `maintenance_runs.details` on both
-  the success and failure `completeRun` paths.
+  the success and failure `completeRun` paths. Smoke attribution requires the
+  exact job in `completedJobIds`, never merely in the claimed set.
 
 The controlling analysis is the Session 362 review artifact
 `outputs/reviewer-identity-binding-production-smoke-adversarial-review-2026-07-13.md`
-(gitignored, local): §9 is the smoke contract, §5 the findings (F1 shipped;
-F2 lease-loss and F3 blocked-retry classification remain open, non-blocking),
-§10 the owner gates.
+(gitignored, local): §9 is the smoke contract, §5 records the original
+findings (F1 shipped there; F2 lease-loss and F3 blocked-retry classification
+are now resolved on this branch), and §10 records the owner gates.
 
-## Review history on PR #60 (three adversarial rounds)
+## Review history on PR #60 (four adversarial rounds)
 
 1. Round 1 → fixed in `40d33555`: double-entry fixture flag, blocking
    attribution (then temporal), exact evidence/anchors/untouched-field
@@ -76,36 +78,40 @@ F2 lease-loss and F3 blocked-retry classification remain open, non-blocking),
    overlap), tracked fixture allowlist as an authorization source independent
    of the CLI, fail-closed cleanup (deactivation fails the run; exact-GUID
    readability re-checks; `--delete-job` only after full cleanup verification).
-3. Round 3 (2026-07-13, latest) → **two findings OPEN. This is the next work.**
+3. Round 3 (2026-07-13) → **two findings implemented on this branch; round 4
+   required before merge.**
+4. Round 4 (2026-07-13) → found a signal/main-exit race, requeueable
+   failed/cancelled cleanup fence, stale retry comment, and a nested
+   delete→deactivation write-after-signal edge. All were fixed. The final
+   independent focused re-review returned **NO FINDINGS**.
 
-## Open findings to fix (round 3, verbatim substance)
+## Round 3 findings — implemented
 
-1. **[high] A failed claim is accepted as proof that the expected deployment
-   completed the job** (`scripts/lib/smoke-reviewer-binding-core.js:124-129`).
-   The drain fills `jobIds` from every CLAIMED job before processing, so the
-   expected deployment can claim the smoke job, fail, and a different worker
-   can complete it later — attribution still matches. Codex's read-only probe
-   confirmed the matcher accepts details with `completed: 0, retried: 1`.
-   Fix direction: record per-outcome ids (e.g. `completedJobIds`) in the drain
-   result → cron details, and require the smoke job in the COMPLETED set of
-   the fingerprint-matching run; regression test for `retried:1, completed:0`.
-   The reviewer also suggested verifying the lease-guarded
-   `completeReviewerAcceptanceJob` returned a row before reporting completion
-   (this is the same ignored-stale-lease gap as review-artifact finding F2 —
-   fixing it in `processReviewerAcceptanceJob` closes both).
-2. **[medium] Post-write failures can strand production state without a
-   durable recovery artifact** (`scripts/smoke-reviewer-binding.js:275-306`).
-   The artifact is only written after polling + assertions; any abort or
-   rejected await between person creation and that point exits with created
-   IDs only in stdout. Fix direction: persist an incremental recovery artifact
-   immediately after EACH production write boundary (person, suggestion,
-   accepted-state stamp, job staged), wrap the write sequence in an outer
-   error/signal handler that records IDs + job status before exiting, and
-   auto-clean only when no job was staged or the job is confirmed terminal.
+1. **[RESOLVED] Completed-only deployed-cron attribution.** The drain exposes
+   `completedJobIds`, `cancelledJobIds`, `failedJobIds`, `retriedJobIds`, and
+   `leaseLostJobIds`; the matcher requires the exact smoke job in
+   `completedJobIds` for the fingerprint-matching run. The
+   `completed:0, retried:1` shape is a negative regression. Lease-guarded
+   email-step claims, cancellations, completion, and failure recording all
+   fail closed on a null row, closing review-artifact F2 as well.
+2. **[RESOLVED] Incremental recovery artifact.** The runner persists before
+   and immediately after person creation, suggestion creation, accepted-state
+   stamping, and job staging. Timeout, unexpected errors, SIGINT, and SIGTERM
+   record known GUIDs, the latest exact job row/status, the pending write, and
+   the failure in the same artifact. Error-path cleanup remains owner-opted-in
+   and is allowed only when no job could have been staged or the exact job was
+   re-read `completed`; failed/cancelled jobs are not cleanup fences because
+   enqueue can reopen them. Signal handling never auto-cleans, stamps the
+   artifact synchronously before its first await, and prevents the main flow
+   from outrunning the single fatal shutdown.
 
-Both fixes belong on the same branch/PR. After fixing, re-run
-`/codex:adversarial-review` (round 4) before merge — each round has found
-real issues; do not self-certify convergence.
+Review-artifact F3 is also resolved in this slice: deterministic typed binding
+failures are terminal, while bounded optimistic-concurrency exhaustion and
+untyped transport failures remain retryable.
+
+All fixes remain on the same branch/PR. Round 4 and its post-fix focused
+re-review are complete; the clean verdict is independent rather than a
+self-certification.
 
 ## Constraints (unchanged, binding)
 
@@ -128,26 +134,25 @@ real issues; do not self-certify convergence.
 2. Authorization to run; `--expect-deployment` from `vercel inspect`, and the
    deployment must **contain the cron telemetry** (post-PR #60 merge).
 3. Queue-row retention: default keep; `--delete-job` only by explicit choice.
-4. Whether to also fix review-artifact findings F2 (drain ignores stale-lease
-   null results → possible duplicate acceptance email) and F3 (deterministic
-   blocked outcomes retried 8×) — F2 partially overlaps open finding 1 above.
+4. Review-artifact findings F2 and F3 are implemented on this branch; no owner
+   decision remains for their retry/lease semantics.
 
-## Known repo irritant
+## Resolved repo irritant
 
-The `scope-claim-reminder.js` hook blocks **every** edit to
-`docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md` on an apparent false
-positive (it flags prose list items at lines 75–77/95 as count claims). The
-plan's timestamp-normalization sentence (~line 294) is one sentence behind the
-shipped F1 fix as a result. Fix the hook or annotate per its instructions
-before reconciling that doc; do not silently work around it.
+The `scope-claim-reminder.js` false positive is fixed: Markdown ordered-list
+ordinals are stripped before numeric-coverage detection, with a regression in
+`.claude/hooks/hook-enforcement.test.js`. The implementation plan now describes
+the shipped F1 normalization at the self-report capture boundary.
 
-## Verification checklist for the next slice
+## Verification completed
 
-`npx jest tests/unit/smoke-reviewer-binding.test.js tests/unit/reviewer-acceptance-drain.test.js`,
-full `npm test`, `node --check` on the scripts, `npm run check:types`, then
-gates + self-tests sequentially: `check:api-routes`, `check:atlas`,
-`check:agent-wiki`, `check:doc-symbol-refs`, `check:dataverse-access-layer`,
-`check:dynamics-context-boundary`, `check:secret-scan`,
-`check:scaffolding-tokens`. Update the smoke bullet in
-`docs/agent-wiki/topics/reviewer-identity.md` if attribution/cleanup semantics
-change again.
+- Full Jest: 483 suites / 5,599 tests passed.
+- Affected four-suite run: 143 tests passed; smoke contract alone: 81 passed.
+- `node --check`, `npm run check:types`, and `npm run lint` passed (lint retains
+  the repository's pre-existing warning baseline, with zero errors).
+- Required code/security/Atlas/wiki/doc/instruction/harness gates and their
+  self-tests passed sequentially; `docs/DOCS_CATALOG.md` was regenerated.
+- Round-4 post-fix independent focused review: **NO FINDINGS**.
+- No production smoke, drain, `pr4-e2e`, or other production-writing command
+  was run. The residual fixture, deployment-attestation, and run-authorization
+  gates below remain owner actions.

@@ -297,6 +297,42 @@ describe('processReviewerAcceptanceJob', () => {
     expect(d.sendAcceptanceEmail).toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
   });
+
+  it('fails closed before sending an acceptance email when the lease-step claim no-ops', async () => {
+    const d = deps();
+    d.jobs.mergeReviewerAcceptanceJobStep.mockResolvedValueOnce(null);
+
+    await expect(processReviewerAcceptanceJob(job(), d)).rejects.toMatchObject({
+      code: 'reviewer_acceptance_lease_lost',
+      retryable: true,
+    });
+
+    expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
+    expect(d.quota).not.toHaveBeenCalled();
+    expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
+  });
+
+  it('does not report completion when the lease-guarded completion update no-ops', async () => {
+    const d = deps();
+    d.jobs.completeReviewerAcceptanceJob.mockResolvedValueOnce(null);
+
+    await expect(processReviewerAcceptanceJob(job({ isAcceptRepeat: true }), d)).rejects.toMatchObject({
+      code: 'reviewer_acceptance_lease_lost',
+    });
+  });
+
+  it('does not report cancellation when the lease-guarded cancellation update no-ops', async () => {
+    const stale = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+    const d = deps(acceptedSuggestion({ wmkf_accepted: false }));
+    d.jobs.cancelReviewerAcceptanceJob.mockResolvedValueOnce(null);
+
+    await expect(processReviewerAcceptanceJob(
+      job({ status: 'accept_pending', createdAt: stale }),
+      d,
+    )).rejects.toMatchObject({
+      code: 'reviewer_acceptance_lease_lost',
+    });
+  });
 });
 
 describe('drainReviewerAcceptanceJobs', () => {
@@ -307,11 +343,111 @@ describe('drainReviewerAcceptanceJobs', () => {
 
     const result = await drainReviewerAcceptanceJobs({ deps: d });
 
-    expect(result).toMatchObject({ claimed: 1, jobIds: [77], retried: 1, failed: 0 });
+    expect(result).toMatchObject({
+      claimed: 1,
+      jobIds: [77],
+      completed: 0,
+      completedJobIds: [],
+      retried: 1,
+      retriedJobIds: [77],
+      failed: 0,
+      leaseLost: 0,
+    });
     expect(d.jobs.recordReviewerAcceptanceJobFailure).toHaveBeenCalledWith(
       expect.objectContaining({ id: 77 }),
       expect.any(Error),
       expect.objectContaining({ retryable: true }),
     );
+  });
+
+  it('records only lease loss when failure recording no-ops under a stale token', async () => {
+    const d = deps();
+    d.jobs.claimReviewerAcceptanceJobs.mockResolvedValueOnce([job()]);
+    d.suggestions.getForAcceptanceDrain.mockRejectedValueOnce(new Error('Dataverse down'));
+    d.jobs.recordReviewerAcceptanceJobFailure.mockResolvedValueOnce(null);
+
+    const result = await drainReviewerAcceptanceJobs({ deps: d });
+
+    expect(result).toMatchObject({
+      claimed: 1,
+      completed: 0,
+      completedJobIds: [],
+      retried: 0,
+      retriedJobIds: [],
+      failed: 0,
+      failedJobIds: [],
+      leaseLost: 1,
+      leaseLostJobIds: [77],
+    });
+    expect(result.errors).toEqual([
+      expect.objectContaining({
+        jobId: 77,
+        retryable: true,
+        code: 'reviewer_acceptance_lease_lost',
+      }),
+    ]);
+  });
+
+  it('terminally fails deterministic binding blocks without scheduling another retry', async () => {
+    const d = deps();
+    d.jobs.claimReviewerAcceptanceJobs.mockResolvedValueOnce([job()]);
+    const blocked = Object.assign(new Error('binding_transition_blocked'), {
+      code: 'binding_transition_blocked',
+      retryable: false,
+    });
+    d.captureOrcid.mockRejectedValueOnce(blocked);
+    d.jobs.recordReviewerAcceptanceJobFailure.mockResolvedValueOnce({ status: 'failed' });
+
+    const result = await drainReviewerAcceptanceJobs({ deps: d });
+
+    expect(result).toMatchObject({
+      claimed: 1,
+      completed: 0,
+      retried: 0,
+      failed: 1,
+      failedJobIds: [77],
+    });
+    expect(d.jobs.recordReviewerAcceptanceJobFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 77 }),
+      blocked,
+      expect.objectContaining({ retryable: false }),
+    );
+  });
+
+  it('records completed ids only after the lease-guarded completion returns a row', async () => {
+    const d = deps();
+    d.jobs.claimReviewerAcceptanceJobs.mockResolvedValueOnce([job({ isAcceptRepeat: true })]);
+
+    const result = await drainReviewerAcceptanceJobs({ deps: d });
+
+    expect(result).toMatchObject({
+      claimed: 1,
+      jobIds: [77],
+      completed: 1,
+      completedJobIds: [77],
+      retried: 0,
+      retriedJobIds: [],
+      leaseLost: 0,
+      leaseLostJobIds: [],
+    });
+  });
+
+  it('does not classify a stale completion as completed or retried', async () => {
+    const d = deps();
+    d.jobs.claimReviewerAcceptanceJobs.mockResolvedValueOnce([job({ isAcceptRepeat: true })]);
+    d.jobs.completeReviewerAcceptanceJob.mockResolvedValueOnce(null);
+
+    const result = await drainReviewerAcceptanceJobs({ deps: d });
+
+    expect(result).toMatchObject({
+      claimed: 1,
+      completed: 0,
+      completedJobIds: [],
+      retried: 0,
+      retriedJobIds: [],
+      leaseLost: 1,
+      leaseLostJobIds: [77],
+    });
+    expect(d.jobs.recordReviewerAcceptanceJobFailure).not.toHaveBeenCalled();
   });
 });

@@ -89,8 +89,10 @@ export function assertApprovedRequest(resolvedRequestId, approvedRequestId, allo
 /**
  * Deployed-drain attribution is BLOCKING: the smoke passes only when at least
  * one drain-reviewer-acceptances maintenance run records BOTH the exact job id
- * and the expected deployment fingerprint. Older deployments and local dev runs
- * write no fingerprint/jobIds and must fail this smoke.
+ * in its completed-job set and the expected deployment fingerprint. Claimed,
+ * retried, failed, or lease-lost jobs are not proof that this deployment
+ * completed the smoke. Older deployments and local dev runs write no
+ * fingerprint/completedJobIds and must fail this smoke.
  */
 function parseRunDetails(details) {
   if (!details) return {};
@@ -116,16 +118,17 @@ function deploymentMatches(details, expectDeployment) {
   return Boolean(gitCommitSha && gitCommitSha.startsWith(expected));
 }
 
-function jobIdsInclude(details, jobId) {
+function completedJobIdsInclude(details, jobId) {
   const expected = normalizeId(jobId);
-  return Array.isArray(details?.jobIds) && details.jobIds.some((id) => normalizeId(id) === expected);
+  return Array.isArray(details?.completedJobIds)
+    && details.completedJobIds.some((id) => normalizeId(id) === expected);
 }
 
 export function findMatchingDrainAttributionRun(runs, { jobId, expectDeployment }) {
   if (!Array.isArray(runs)) return null;
   return runs.find((run) => {
     const details = parseRunDetails(run?.details);
-    return jobIdsInclude(details, jobId) && deploymentMatches(details, expectDeployment);
+    return completedJobIdsInclude(details, jobId) && deploymentMatches(details, expectDeployment);
   }) || null;
 }
 
@@ -137,7 +140,7 @@ export function assertDrainAttribution({ matchedRun, totalRuns, jobId, expectDep
   if (!Number.isInteger(totalRuns) || totalRuns < 1) {
     problems.push('no drain-reviewer-acceptances maintenance runs occurred in the smoke window — the deployed cron cannot be attributed');
   } else if (!matchedRun) {
-    problems.push(`no maintenance run recorded both jobIds containing job ${jobId} and deployment fingerprint ${expectDeployment} (${totalRuns} run(s) in the window) — the job was completed by something this run cannot attribute to the expected deployed cron`);
+    problems.push(`no maintenance run recorded both completedJobIds containing job ${jobId} and deployment fingerprint ${expectDeployment} (${totalRuns} run(s) in the window) — a claim/retry/failure is not proof that the expected deployed cron completed the job`);
   }
   return { ok: problems.length === 0, problems };
 }
@@ -348,9 +351,38 @@ export function assertJobOutcome(job) {
   return { ok: problems.length === 0, problems };
 }
 
-/** Cleanup is only legal once the job can no longer be claimed by the cron. */
-export function canCleanup(job) {
+/** Polling stops on every terminal outcome so assertions can report it. */
+export function isJobTerminal(job) {
   return Boolean(job && REVIEWER_ACCEPTANCE_JOB_TERMINAL_STATUSES.includes(job.status));
+}
+
+/**
+ * Cleanup is legal only after immutable completion. Failed/cancelled jobs can
+ * be requeued by enqueueReviewerAcceptanceJob, so they are not cleanup fences.
+ */
+export function canCleanup(job) {
+  return job?.status === 'completed';
+}
+
+/**
+ * Unexpected-failure cleanup is opt-in and fail-closed. It is safe only when
+ * cleanup is not already underway and either no job could have been staged or
+ * the exact job was re-read completed. Signal handlers never
+ * auto-clean because a production write may still be resolving.
+ */
+export function canAutoCleanupRecovery({
+  cleanupRequested,
+  jobId,
+  job,
+  pendingWrite,
+  cleanupInProgress,
+  signal,
+} = {}) {
+  if (cleanupRequested !== true || cleanupInProgress || signal) return false;
+  // An enqueue can commit even if the client loses the response, so an error
+  // while job staging is in flight cannot prove that no job exists.
+  if (!jobId) return pendingWrite !== 'job_staging';
+  return canCleanup(job);
 }
 
 /**
