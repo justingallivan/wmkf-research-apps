@@ -27,7 +27,7 @@ merged the inert writer branch to `main`.
      `save-candidates-service.js:895-899` regardless of receipt validity.
      **F3 (P2)** seven reachable writer guards with zero failing-test coverage.
      **F4–F8 (P3)** dead `preserveDecision` branch, circular allowlist
-     assertion, receipt negative-test gaps + 180-day TTL, batch key collisions,
+     assertion, receipt negative-test gaps + then-180-day TTL, batch key collisions,
      live-state doc claims without reproducible evidence.
 
 2. **Codex remediation handoff**
@@ -79,22 +79,25 @@ merged the inert writer branch to `main`.
    - Live spot-check the already-tested `label_conflict` publish guidance.
      Evidence: `tests/unit/policies-section-label-guidance.test.js`.
 
+### Owner Decision Resolved
+
+1. **Receipt TTL (F6): 14 days.** Owner decision on 2026-07-13. The
+   `codex/reviewer-attestation-ttl-14d` Tier-2 branch changes the signed receipt
+   lifetime and adds absent/wrong-secret/expired negative coverage.
+
 ### Owner Decision Needed
 
-1. **Receipt TTL (F6).** `reviewer-candidate-attestation.js:16` sets 180 days;
-   re-enrichment mints fresh receipts, so a much shorter TTL shrinks the
-   replay window at no workflow cost. Decide before/with Slice A.
-2. **Design-intent confirmations (review §6):**
+1. **Design-intent confirmations (review §6):**
    `reviewer-merge.js:236` merge protection and
    `CandidateEditModal.js:573` confirmed-only affordance both exclude
    automated-`probable` records (the post-C0.2 automated ceiling). Confirm
    intended or open a follow-up.
-3. **First production caller and legacy transition strategy (unchanged, now
+2. **First production caller and legacy transition strategy (unchanged, now
    additionally gated on F1).** Evidence: implementation plan I1/I2; review
    artifact §7. No caller migration is authorized; F1 must be resolved first.
-4. **Reviewer-institution → CRM linking brief** (unchanged owner coordination
+3. **Reviewer-institution → CRM linking brief** (unchanged owner coordination
    item; do not infer an implementation request).
-5. **Address-based reviewer onboarding scope** (unchanged;
+4. **Address-based reviewer onboarding scope** (unchanged;
    `.claude-memory/project-honorarium-payment-landscape.md`).
 
 ### Parked

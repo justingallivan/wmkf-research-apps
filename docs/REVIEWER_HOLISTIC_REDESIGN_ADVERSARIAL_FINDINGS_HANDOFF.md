@@ -179,14 +179,12 @@ intent).
 
 ## F6 (P3) — Attestation receipt gaps
 
-[VERIFIED via lib/services/reviewer-candidate-attestation.js:16, 109-116 and
-its test file] add negative tests for wrong-secret (tampered/re-signed
-token), expired token, and absent token — `receipt.valid` is the sole
-loosener for resolver-field persistence, and none of the failure
-classifications are asserted. Separately, propose shortening `TTL_SECONDS`
-(currently 180 days) — re-enrichment mints a fresh receipt, so a much shorter
-TTL shrinks the replay window at no workflow cost. TTL change is an owner
-call; present it, don't just land it.
+[VERIFIED via lib/services/reviewer-candidate-attestation.js and its test file]
+wrong-secret (tampered/re-signed), expired, and absent tokens now have explicit
+fail-closed regression coverage. Owner decision (2026-07-13): shorten
+`TTL_SECONDS` from 180 days to **14 days**. Re-enrichment mints a fresh receipt,
+so the shorter lifetime reduces the replay window without changing the
+identity-bundle or request binding.
 
 ## F7 (P3) — Batch key collisions not rejected
 
