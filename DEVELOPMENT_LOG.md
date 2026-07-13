@@ -10,6 +10,18 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Wave 13 reviewer identity binding proven in production (Sessions 362–363)
+
+**Milestone:** The first controlled positive test of the deployed acceptance-drain → self-report capture → Wave 13 binding-writer chain passed in production after four adversarial review rounds.
+**Sessions:** 362–363 (design/review/hardening, PR #60 merge, owner-authorized production execution).
+**Ship state:**
+- PR #60 merged at `5bb6a8b8`; exact deployment `dpl_BqCBSFWoRto2noQdrovHG7fBsA6X` processed completed queue job `25` (`attempts=0`) under maintenance run `15060`.
+- Exact `self_reported` binding assertions passed; no contact link or system alert was created.
+- Synthetic Dataverse rows were deleted and absence-verified; the Wave 13 population returned to its pre-smoke baseline (person 1 / suggestion 0).
+- The completed Postgres queue row remains as the audit record by explicit owner decision.
+**Why it matters:** the first promoted Wave 13 writer path is now production-proven end to end, including deployment attribution and fail-closed recovery/cleanup, rather than only unit- and preflight-proven.
+**Pointers:** `docs/REVIEWER_BINDING_SMOKE_CODEX_HANDOFF.md`; commits `de60fb96`, `a872fbcf`, merge `5bb6a8b8`; local gitignored artifact `outputs/smoke-reviewer-binding-20260713232414-result.json`.
+
 ## July 2026 — BILL API integration tabled; address-based reviewer onboarding instead (Session 357)
 
 **Milestone:** Owner tabled the BILL.com API integration for several months, possibly permanently —

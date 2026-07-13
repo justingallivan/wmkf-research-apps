@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-13 via adversarial-remediation implementation, focused tests, caller census, and the reproducible production Wave 13 metadata/population preflight
+  last_verified: 2026-07-13 via PR #60 merge plus owner-authorized production smoke, exact deployment/job attribution, binding assertions, and verified cleanup
 ---
 
 ## Recall Rule
@@ -46,10 +46,12 @@ and narrow adapter seam. The owner approved its first production caller on
 `dpl_4YpnVVdRmDHyuzgPVSKXNcx22bKu` reached READY: acceptance-drain self-report
 only, keyed by stable `accepted_at`.
 The same reproducible population probe rerun immediately after deployment
-returned zero person and zero suggestion rows, so current state remains
-legacy-unknown and cannot
-become eligible-by-default. Broader caller and policy-reader migration remains
-gated.
+returned zero person and zero suggestion rows. By the later owner-authorized
+S363 smoke, the fresh pre-run baseline was one person and zero suggestion rows;
+the pre-existing person's origin was not adjudicated. The synthetic smoke rows
+were deleted and absence-verified, restoring that exact baseline. None of this
+makes legacy/unknown rows eligible by default. Broader caller and policy-reader
+migration remains gated.
 
 **S359 adversarial review (2026-07-13 artifact): fixes implemented and
 promoted.** The inert
@@ -69,9 +71,14 @@ closed; F6 uses the owner-approved 14-day receipt lifetime. F8 is captured
 reproducibly at
 `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md`. The first
 self-report caller is now production-live. Three immediate post-deploy drain
-runs had no error-level logs, while the population probe remained zero, so the
-first durable binding event has not yet been observed. Automated writers,
-decline, backfill, action-policy readers, and other callers remain gated.
+runs had no error-level logs, while that immediate population probe remained
+zero. S363 then merged PR #60 (`5bb6a8b8`) and ran the owner-authorized positive
+control against deployment `dpl_BqCBSFWoRto2noQdrovHG7fBsA6X`: maintenance run
+`15060` attributed exact completed job `25`; the exact Wave 13 `self_reported`
+binding passed; no contact or system alert was created; synthetic Dataverse rows
+were deleted and absence-verified; and the completed queue job was retained by
+owner decision. Automated writers, decline, backfill, action-policy readers,
+and other callers remain gated.
 
 The pure non-I/O contracts are built in
 `reviewer-identity-binding-contract.js` and `institution-coi-context.js`, with

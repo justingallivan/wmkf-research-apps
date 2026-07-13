@@ -480,8 +480,13 @@ narrow `researcher.js` ETag adapter seam select and conditionally patch the
 person fields when invoked. `capture-self-reported-orcid.js` is now the single
 production-service import, reached by the acceptance drain only when it has the
 stable acceptance timestamp. PR #57 / `00ffb09c` promoted that caller; the
-immediate post-deploy population remained zero, so no first durable binding
-event has yet been observed.
+immediate post-deploy population remained zero. The owner-authorized S363
+positive-control smoke then proved the deployed cron → capture → writer chain:
+exact `self_reported` binding assertions passed under PR #60 deployment
+`dpl_BqCBSFWoRto2noQdrovHG7fBsA6X`, cleanup restored the pre-smoke population
+baseline, and completed audit job `25` remains retained. The pre-smoke baseline
+already contained one person row with a Wave 13 field; its origin was not
+adjudicated by the smoke, so do not infer that it was organic self-report.
 
 If proposal COI is derived from a person binding, persist or otherwise prove
 both the binding version and the authoritative proposal/rule context used for

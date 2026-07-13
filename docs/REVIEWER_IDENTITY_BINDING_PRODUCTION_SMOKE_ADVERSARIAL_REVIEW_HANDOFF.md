@@ -2,8 +2,8 @@
 title: Reviewer Identity Binding Production Smoke — Adversarial Review Handoff
 domain: reviewer-identity
 kind: audit
-status: active
-summary: "Read-only Claude review brief for the deployed first binding-writer caller and the production-touching PR4 smoke-test candidate."
+status: historical
+summary: "Historical read-only review brief that led to the dedicated reviewer-binding smoke; implementation and production execution are complete."
 canonical: false
 cataloged: 2026-07-13
 owner: product-engineering
@@ -20,6 +20,13 @@ related:
 ---
 
 # Claude handoff: adversarial review of the deployed binding caller and smoke test
+
+> **Historical (completed 2026-07-13):** This review brief produced the
+> adversarial findings that were implemented in PR #59 and PR #60. The dedicated
+> smoke passed in production with verified cleanup; see
+> `docs/REVIEWER_BINDING_SMOKE_CODEX_HANDOFF.md` for the execution record. The
+> instructions below are preserved as the dated review contract, not current
+> next actions.
 
 Use this prompt in a fresh Claude session at the repository root.
 

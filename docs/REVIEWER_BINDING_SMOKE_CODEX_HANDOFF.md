@@ -1,9 +1,9 @@
 ---
-title: Reviewer Binding Smoke — Codex Takeover Handoff
+title: Reviewer Binding Smoke — Production Execution Record
 domain: reviewer-identity
 kind: audit
 status: active
-summary: "Reviewer-binding smoke: four review rounds resolved, verification green, request 1002379 authorized, and deployment/run gates remain."
+summary: "Reviewer-binding smoke: PR #60 merged and the owner-authorized production run passed with verified cleanup; completed queue job 25 is retained."
 canonical: false
 cataloged: 2026-07-13
 owner: product-engineering
@@ -18,15 +18,15 @@ related:
   - tests/unit/smoke-reviewer-binding.test.js
 ---
 
-# Codex takeover handoff: Wave 13 reviewer-binding production smoke
+# Wave 13 reviewer-binding production smoke: execution record
 
-Session 362 closing document. Codex takes over from here. The objective is
-unchanged: a controlled positive control proving the **deployed** cron drain →
+Sessions 362–363 design, review, implementation, and execution record. The
+objective was a controlled positive control proving the **deployed** cron drain →
 `capture-self-reported-orcid` → binding-writer chain produces the exact first
 `self_reported` Wave 13 binding, because organic ORCID-bearing acceptance
-throughput is too low to wait for.
+throughput was too low to wait for. The objective is now satisfied.
 
-## State at handoff
+## Implemented state
 
 **Merged to `main` (deployed on merge):**
 
@@ -41,8 +41,8 @@ throughput is too low to wait for.
   second-precision stored row + truncated replay event → `noop`
   (`tests/unit/reviewer-identity-binding-writer.test.js`).
 
-**On branch `claude/reviewer-binding-smoke` (PR #60; takeover base
-`09725c4c`):**
+**Merged to `main` in PR #60 (`5bb6a8b8`, production deployment
+`dpl_BqCBSFWoRto2noQdrovHG7fBsA6X`):**
 
 - `scripts/smoke-reviewer-binding.js` — the manual, owner-gated smoke runner.
 - `scripts/lib/smoke-reviewer-binding-core.js` — pure safety logic (frozen
@@ -111,15 +111,16 @@ Review-artifact F3 is also resolved in this slice: deterministic typed binding
 failures are terminal, while bounded optimistic-concurrency exhaustion and
 untyped transport failures remain retryable.
 
-All fixes remain on the same branch/PR. Round 4 and its post-fix focused
-re-review are complete; the clean verdict is independent rather than a
-self-certification.
+All fixes merged in PR #60. Round 4 and its post-fix focused re-review are
+complete; the clean verdict is independent rather than a self-certification.
 
 ## Constraints (unchanged, binding)
 
-- **Never run** `scripts/smoke-reviewer-binding.js`, `scripts/pr4-e2e*.js`,
-  the drain, or any production-writing command from a dev session. The smoke
-  is manual and owner-executed. Unit tests + gates only.
+- Do not run `scripts/smoke-reviewer-binding.js`, the drain, or another
+  production-writing command from a routine dev session. The smoke is manual,
+  owner-authorized, and deployment-attested; any new execution requires a new
+  explicit authorization. Unit tests + gates are the default.
+- **Never run** `scripts/pr4-e2e*.js` for this purpose.
 - `scripts/pr4-e2e.js` is quarantined for this purpose (seven confirmed
   defects + two hazards — review artifact Part B). Do not repair it as part
   of this effort.
@@ -128,16 +129,25 @@ self-certification.
 - The 14-day attestation TTL and the Wave 13 gating posture are owner
   decisions; out of scope.
 
-## Residual owner gates (unchanged from the review artifact §10)
+## Owner gates and execution outcome
 
 1. **Satisfied:** owner approved request `1002379`; its live-resolved GUID
    `54e2b88b-04b9-f011-bbd3-6045bd02b4cc` is committed to
    `scripts/lib/smoke-reviewer-binding-fixtures.js`.
-2. **Still required:** authorization to run; `--expect-deployment` from
-   `vercel inspect`, and the deployment must **contain the cron telemetry**
-   (post-PR #60 merge).
-3. Queue-row retention: default keep; `--delete-job` only by explicit choice.
-4. Review-artifact findings F2 and F3 are implemented on this branch; no owner
+2. **Satisfied:** owner authorized the production run with cleanup against
+   deployment `dpl_BqCBSFWoRto2noQdrovHG7fBsA6X` after PR #60 merged.
+3. **Satisfied:** smoke `smoke-reviewer-binding-20260713232414` passed. Job
+   `25` completed with `attempts=0`; maintenance run `15060` attributed that
+   exact completed job to the expected deployment. The exact Wave 13
+   `self_reported` binding assertions passed; no contact link or system alert
+   was created.
+4. **Satisfied:** cleanup deleted and absence-verified synthetic suggestion
+   `27fe48f5-117f-f111-ab0e-000d3a32b07f` and person
+   `4be225f1-117f-f111-ab0e-7ced8d3c39fd`; the population returned to the
+   pre-smoke baseline (person `1`, suggestion `0`).
+5. **Owner decision preserved:** queue job `25` remains as the completed audit
+   row (`jobDeleted:false`). Do not delete it without a new explicit decision.
+6. Review-artifact findings F2 and F3 are implemented on `main`; no owner
    decision remains for their retry/lease semantics.
 
 ## Resolved repo irritant
@@ -156,6 +166,9 @@ the shipped F1 normalization at the self-report capture boundary.
 - Required code/security/Atlas/wiki/doc/instruction/harness gates and their
   self-tests passed sequentially; `docs/DOCS_CATALOG.md` was regenerated.
 - Round-4 post-fix independent focused review: **NO FINDINGS**.
-- No production smoke, drain, `pr4-e2e`, or other production-writing command
-  was run. The fixture gate is now satisfied; deployment attestation and
-  explicit run authorization remain owner actions.
+- Production smoke passed on 2026-07-13 against the exact expected deployment;
+  cleanup passed and retained job `25`. Recovery artifact (gitignored, local):
+  `outputs/smoke-reviewer-binding-20260713232414-result.json`.
+- A post-smoke Vercel error-level scan found no smoke failure. It did surface
+  one unrelated PostgreSQL SSL-mode deprecation warning on
+  `/api/cron/drain-submissions`; that request returned HTTP 200.
