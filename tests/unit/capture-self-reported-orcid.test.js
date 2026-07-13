@@ -62,6 +62,9 @@ describe('captureSelfReportedReviewerOrcid', () => {
   test('stable acceptance timestamp uses the durable writer before contact fill', async () => {
     const d = deps();
     const bindingEventAt = '2026-07-01T10:00:00.347Z';
+    // Dataverse persists DateTime at second precision — the event identity is
+    // truncated before the writer so a retry replays as an exact no-op.
+    const persistedEventAt = '2026-07-01T10:00:00.000Z';
 
     const out = await captureSelfReportedReviewerOrcid({
       potentialReviewerId: 'pr-1',
@@ -78,7 +81,7 @@ describe('captureSelfReportedReviewerOrcid', () => {
       event: {
         source: 'self_reported',
         anchor: `orcid:${VALID}`,
-        boundAt: bindingEventAt,
+        boundAt: persistedEventAt,
         fieldMode: 'partial',
         fields: {
           wmkf_orcid: VALID,
@@ -86,7 +89,7 @@ describe('captureSelfReportedReviewerOrcid', () => {
         },
         decision: expect.objectContaining({
           status: 'confirmed',
-          resolvedAt: bindingEventAt,
+          resolvedAt: persistedEventAt,
         }),
       },
     });
@@ -94,6 +97,44 @@ describe('captureSelfReportedReviewerOrcid', () => {
     expect(d.researcher.writeIdentityDecision).not.toHaveBeenCalled();
     expect(d.writeBinding.mock.invocationCallOrder[0])
       .toBeLessThan(d.contacts.setOrcidIfAbsent.mock.invocationCallOrder[0]);
+  });
+
+  test('whole-second and second-precision acceptance timestamps pass through unchanged', async () => {
+    const d = deps();
+    await captureSelfReportedReviewerOrcid({
+      potentialReviewerId: 'pr-1',
+      rawOrcid: VALID,
+      bindingEventAt: '2026-07-01T10:00:00.000Z',
+    }, d);
+    expect(d.writeBinding.mock.calls[0][0].event.boundAt).toBe('2026-07-01T10:00:00.000Z');
+
+    await captureSelfReportedReviewerOrcid({
+      potentialReviewerId: 'pr-1',
+      rawOrcid: VALID,
+      bindingEventAt: '2026-07-01T10:00:00Z',
+    }, d);
+    expect(d.writeBinding.mock.calls[1][0].event.boundAt).toBe('2026-07-01T10:00:00.000Z');
+  });
+
+  test('unparseable acceptance timestamp still fails closed in the writer (no silent legacy path)', async () => {
+    const d = deps();
+    d.writeBinding.mockRejectedValueOnce(new IdentityBindingWriteError(
+      'invalid_event',
+      'boundAt must be a canonical ISO UTC timestamp',
+    ));
+
+    await expect(captureSelfReportedReviewerOrcid({
+      potentialReviewerId: 'pr-1',
+      rawOrcid: VALID,
+      contactId: 'c-1',
+      bindingEventAt: 'not-a-timestamp',
+    }, d)).rejects.toThrow('boundAt must be a canonical ISO UTC timestamp');
+
+    // The malformed value reaches the writer verbatim for fail-closed
+    // rejection instead of being coerced onto the transitional path.
+    expect(d.writeBinding.mock.calls[0][0].event.boundAt).toBe('not-a-timestamp');
+    expect(d.researcher.updateById).not.toHaveBeenCalled();
+    expect(d.contacts.setOrcidIfAbsent).not.toHaveBeenCalled();
   });
 
   test('dirty legacy row falls back only on the typed classification error', async () => {
@@ -108,11 +149,14 @@ describe('captureSelfReportedReviewerOrcid', () => {
       rawOrcid: VALID,
       contactId: 'c-1',
       actingUserSystemId: 'u1',
-      bindingEventAt: '2026-07-01T10:00:00.000Z',
+      bindingEventAt: '2026-07-01T10:00:00.347Z',
     }, d);
 
     expect(d.researcher.updateById).toHaveBeenCalledTimes(1);
     expect(d.researcher.writeIdentityDecision).toHaveBeenCalledTimes(1);
+    // The fallback shares the truncated event identity with the durable path.
+    expect(d.researcher.writeIdentityDecision.mock.calls[0][1].resolvedAt)
+      .toBe('2026-07-01T10:00:00.000Z');
     expect(d.contacts.setOrcidIfAbsent).toHaveBeenCalledTimes(1);
   });
 
