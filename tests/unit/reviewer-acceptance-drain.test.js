@@ -307,7 +307,7 @@ describe('drainReviewerAcceptanceJobs', () => {
 
     const result = await drainReviewerAcceptanceJobs({ deps: d });
 
-    expect(result).toMatchObject({ claimed: 1, retried: 1, failed: 0 });
+    expect(result).toMatchObject({ claimed: 1, jobIds: [77], retried: 1, failed: 0 });
     expect(d.jobs.recordReviewerAcceptanceJobFailure).toHaveBeenCalledWith(
       expect.objectContaining({ id: 77 }),
       expect.any(Error),

@@ -29,6 +29,10 @@ export default async function handler(req, res) {
   const limit = clampInt(req.query.limit, 1, 50, 5);
   const lockSeconds = clampInt(req.query.lockSeconds, 60, 900, 300);
   const runId = await MaintenanceService.startRun('drain-reviewer-acceptances');
+  const deployment = {
+    gitCommitSha: process.env.VERCEL_GIT_COMMIT_SHA || null,
+    deploymentId: process.env.VERCEL_DEPLOYMENT_ID || null,
+  };
 
   try {
     const result = await withDalContext('cron-drain-reviewer-acceptances', () =>
@@ -39,7 +43,7 @@ export default async function handler(req, res) {
       status,
       recordsProcessed: result.claimed,
       recordsDeleted: result.completed + result.cancelled,
-      details: { limit, lockSeconds, ...result },
+      details: { limit, lockSeconds, deployment, ...result },
       errorMessage: result.failed > 0 ? `${result.failed} reviewer acceptance job(s) failed` : undefined,
     });
     return res.json({ ok: true, limit, lockSeconds, ...result });
@@ -47,6 +51,7 @@ export default async function handler(req, res) {
     console.error('[cron:drain-reviewer-acceptances] error:', error);
     await MaintenanceService.completeRun(runId, {
       status: 'failed',
+      details: { limit, lockSeconds, deployment },
       errorMessage: error.message,
     });
     return res.status(500).json({

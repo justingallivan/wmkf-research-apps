@@ -61,40 +61,119 @@ export function buildSmokeKey(now = new Date()) {
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Double-entry fixture authorization: the run must name the owner-approved
- * request twice (`--request` selects, `--approved-request-id` authorizes) and
- * the RESOLVED GUID must equal the approval. A generic confirm flag alone is
+ * Fixture authorization: the run must name the owner-approved request twice
+ * (`--request` selects, `--approved-request-id` authorizes), the RESOLVED GUID
+ * must equal the approval, and that GUID must be present in the committed
+ * allowlist. A generic confirm flag or same-invocation duplicate value alone is
  * not authorization to write against an arbitrary live request.
  */
-export function assertApprovedRequest(resolvedRequestId, approvedRequestId) {
+export function assertApprovedRequest(resolvedRequestId, approvedRequestId, allowlist = []) {
   const problems = [];
   if (typeof approvedRequestId !== 'string' || !GUID_RE.test(approvedRequestId)) {
     problems.push('--approved-request-id must be the owner-approved fixture request GUID');
   } else if (String(resolvedRequestId).toLowerCase() !== approvedRequestId.toLowerCase()) {
     problems.push(`resolved request ${resolvedRequestId} does not match the approved fixture ${approvedRequestId} — refusing to write against an unapproved request`);
   }
+  const normalizedAllowlist = Array.isArray(allowlist)
+    ? allowlist.filter((id) => typeof id === 'string' && GUID_RE.test(id)).map((id) => id.toLowerCase())
+    : [];
+  const resolved = String(resolvedRequestId || '').toLowerCase();
+  if (normalizedAllowlist.length === 0) {
+    problems.push('no approved reviewer-binding smoke fixture is committed; owner must commit the approved fixture GUID to scripts/lib/smoke-reviewer-binding-fixtures.js first');
+  } else if (!normalizedAllowlist.includes(resolved)) {
+    problems.push(`resolved request ${resolvedRequestId} is not in the committed reviewer-binding smoke fixture allowlist`);
+  }
   return { ok: problems.length === 0, problems };
 }
 
 /**
  * Deployed-drain attribution is BLOCKING: the smoke passes only when at least
- * one drain-reviewer-acceptances maintenance run's window brackets the job's
- * completion (the window comparison itself runs server-side in SQL to avoid
- * client timezone parsing of timestamp-without-tz columns). Zero total runs or
- * zero bracketing runs means the queue was drained by something this run
- * cannot attribute — that is a FAIL, not a footnote.
+ * one drain-reviewer-acceptances maintenance run records BOTH the exact job id
+ * and the expected deployment fingerprint. Older deployments and local dev runs
+ * write no fingerprint/jobIds and must fail this smoke.
  */
-export function assertDrainAttribution({ bracketingRuns, totalRuns, expectDeployment }) {
+function parseRunDetails(details) {
+  if (!details) return {};
+  if (typeof details === 'object') return details;
+  try {
+    return JSON.parse(details);
+  } catch {
+    return {};
+  }
+}
+
+function normalizeId(value) {
+  return String(value ?? '').trim();
+}
+
+function deploymentMatches(details, expectDeployment) {
+  const expected = normalizeId(expectDeployment);
+  const fingerprint = details?.deployment || {};
+  const gitCommitSha = normalizeId(fingerprint.gitCommitSha);
+  const deploymentId = normalizeId(fingerprint.deploymentId);
+  if (!expected) return false;
+  if (expected.startsWith('dpl_')) return deploymentId === expected;
+  return Boolean(gitCommitSha && gitCommitSha.startsWith(expected));
+}
+
+function jobIdsInclude(details, jobId) {
+  const expected = normalizeId(jobId);
+  return Array.isArray(details?.jobIds) && details.jobIds.some((id) => normalizeId(id) === expected);
+}
+
+export function findMatchingDrainAttributionRun(runs, { jobId, expectDeployment }) {
+  if (!Array.isArray(runs)) return null;
+  return runs.find((run) => {
+    const details = parseRunDetails(run?.details);
+    return jobIdsInclude(details, jobId) && deploymentMatches(details, expectDeployment);
+  }) || null;
+}
+
+export function assertDrainAttribution({ matchedRun, totalRuns, jobId, expectDeployment }) {
   const problems = [];
   if (typeof expectDeployment !== 'string' || !expectDeployment.trim()) {
     problems.push('--expect-deployment is required: record the production deployment (vercel inspect) the cron is expected to run');
   }
   if (!Number.isInteger(totalRuns) || totalRuns < 1) {
     problems.push('no drain-reviewer-acceptances maintenance runs occurred in the smoke window — the deployed cron cannot be attributed');
-  } else if (!Number.isInteger(bracketingRuns) || bracketingRuns < 1) {
-    problems.push(`no maintenance run window brackets the job completion (${totalRuns} run(s) in the window) — the job was completed by something this run cannot attribute to the deployed cron`);
+  } else if (!matchedRun) {
+    problems.push(`no maintenance run recorded both jobIds containing job ${jobId} and deployment fingerprint ${expectDeployment} (${totalRuns} run(s) in the window) — the job was completed by something this run cannot attribute to the expected deployed cron`);
   }
   return { ok: problems.length === 0, problems };
+}
+
+export function evaluateCleanup({
+  suggestionOutcome,
+  personOutcome,
+  suggestionStillReadable,
+  personStillReadable,
+  populationRestored,
+} = {}) {
+  const problems = [];
+  if (suggestionOutcome?.deleted !== true) {
+    problems.push(suggestionOutcome?.deactivated
+      ? 'suggestion deactivated instead of deleted'
+      : `suggestion delete failed${suggestionOutcome?.error ? `: ${suggestionOutcome.error}` : ''}`);
+  }
+  if (personOutcome?.deleted !== true) {
+    problems.push(personOutcome?.deactivated
+      ? 'person deactivated instead of deleted'
+      : `person delete failed${personOutcome?.error ? `: ${personOutcome.error}` : ''}`);
+  }
+  if (suggestionStillReadable) {
+    problems.push('suggestion GUID is still readable after cleanup');
+  }
+  if (personStillReadable) {
+    problems.push('person GUID is still readable after cleanup');
+  }
+  if (populationRestored !== true) {
+    problems.push('Wave 13 population baseline was not restored after cleanup');
+  }
+  return {
+    ok: problems.length === 0,
+    allowJobDeletion: problems.length === 0,
+    problems,
+  };
 }
 
 /**

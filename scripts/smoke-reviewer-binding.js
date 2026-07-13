@@ -15,6 +15,8 @@
  *   no quota, no honorarium, no contact writes, no mismatch alerts;
  * - accepted state is written to Dataverse BEFORE the job is staged;
  * - the deployed cron claims the job — this script NEVER invokes the drain;
+ * - the smoke must run against a deployment containing the jobIds/deployment
+ *   maintenance telemetry added after the 2026-07-13 adversarial review;
  * - no cleanup while the job is non-terminal; artifact captured first;
  * - the completed queue row is KEPT unless --delete-job is passed.
  *
@@ -24,10 +26,12 @@
  *        [--orcid 0000-0002-1825-0097] [--timeout-minutes 15] [--poll-seconds 15] \
  *        [--cleanup] [--delete-job] --confirm-prod-dataverse
  *
- * Authorization is double-entry: the RESOLVED request GUID must equal the
- * owner-approved --approved-request-id, and --expect-deployment must name the
- * production deployment (from `vercel inspect`) the cron is expected to run —
- * both are recorded in the artifact and attribution is a blocking assertion.
+ * Authorization is tracked + double-entry: the RESOLVED request GUID must
+ * equal the owner-approved --approved-request-id AND be committed in
+ * scripts/lib/smoke-reviewer-binding-fixtures.js. --expect-deployment must name
+ * the production deployment (from `vercel inspect`) the cron is expected to run;
+ * the matching maintenance run must record both this deployment fingerprint and
+ * the exact smoke job id.
  *
  * Exit codes: 0 pass · 1 assertion failure · 2 timeout/interrupted (job may
  * still be live — do NOT clean up by hand until it is terminal) · 3 aborted
@@ -98,8 +102,13 @@ const { normalizeOrcid } = await import('../lib/utils/orcid-normalize.js');
 const { enqueueReviewerAcceptanceJob } = await import('../lib/services/reviewer-acceptance-job-service.js');
 const { sql } = await import('@vercel/postgres');
 const core = await import('./lib/smoke-reviewer-binding-core.js');
+const { APPROVED_FIXTURE_REQUEST_IDS } = await import('./lib/smoke-reviewer-binding-fixtures.js');
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+if (APPROVED_FIXTURE_REQUEST_IDS.length === 0) {
+  abort('no approved reviewer-binding smoke fixture is committed; owner must commit the approved fixture GUID to scripts/lib/smoke-reviewer-binding-fixtures.js first.');
+}
 
 const wanted = normalizeOrcid(ORCID_RAW);
 if (wanted.state !== 'valid') abort(`--orcid is not a valid ORCID (${wanted.state})`);
@@ -187,11 +196,36 @@ async function deleteOrReport(entitySet, id, label) {
     try {
       await DynamicsService.updateRecord(entitySet, id, { statecode: 1, statuscode: 2 });
       console.log(`  DEACTIVATED (delete unavailable) ${label} ${id}: ${delErr.message?.slice(0, 100)}`);
-      return { deleted: false, deactivated: true };
+      return { deleted: false, deactivated: true, error: delErr.message || String(delErr) };
     } catch (deactErr) {
       console.log(`  could not delete or deactivate ${label} ${id}: ${deactErr.message?.slice(0, 120)}`);
-      return { deleted: false, deactivated: false };
+      return { deleted: false, deactivated: false, error: deactErr.message || String(deactErr) };
     }
+  }
+}
+
+async function isRecordStillReadable(entitySet, id, select, label) {
+  try {
+    await DynamicsService.getRecord(entitySet, id, { select });
+    console.error(`  ${label} ${id} is still readable after delete`);
+    return true;
+  } catch (err) {
+    if (err?.status === 404 || /\b404\b/.test(String(err?.message || ''))) {
+      console.log(`  verified ${label} ${id} is absent`);
+      return false;
+    }
+    console.error(`  could not verify ${label} ${id} absence: ${err.message?.slice(0, 120) || err}`);
+    return true;
+  }
+}
+
+function parseDetails(details) {
+  if (!details) return {};
+  if (typeof details === 'object') return details;
+  try {
+    return JSON.parse(details);
+  } catch {
+    return {};
   }
 }
 
@@ -231,7 +265,7 @@ const recordProblems = (label, result) => {
 
 await bypassDynamicsRestrictions('smoke-reviewer-binding', async () => {
   const request = await resolveRequest(REQUEST);
-  const approval = core.assertApprovedRequest(request.akoya_requestid, APPROVED_REQUEST_ID);
+  const approval = core.assertApprovedRequest(request.akoya_requestid, APPROVED_REQUEST_ID, APPROVED_FIXTURE_REQUEST_IDS);
   if (!approval.ok) abort(approval.problems.join('; '));
   const smokeKey = core.buildSmokeKey();
   const email = `${smokeKey}@example.org`;
@@ -330,35 +364,28 @@ await bypassDynamicsRestrictions('smoke-reviewer-binding', async () => {
   });
 
   // ── Attribution (BLOCKING) ───────────────────────────────────────────────
-  // The window comparison runs server-side: maintenance_runs timestamps are
-  // timestamp-without-tz columns that node-postgres would parse in the LOCAL
-  // timezone, silently skewing a client-side comparison against the job's
-  // timestamptz completed_at.
   const { rows: runs } = await sql`
-    SELECT id, job_name, status, records_processed, started_at, completed_at
+    SELECT id, job_name, status, records_processed, started_at, completed_at, details
       FROM maintenance_runs
      WHERE job_name = 'drain-reviewer-acceptances' AND started_at >= ${startedAt}::timestamptz AT TIME ZONE 'UTC'
      ORDER BY started_at
   `;
-  const { rows: bracketing } = await sql`
-    SELECT r.id
-      FROM maintenance_runs r
-      JOIN reviewer_acceptance_jobs j ON j.id = ${job.id}
-     WHERE r.job_name = 'drain-reviewer-acceptances'
-       AND r.started_at <= (j.completed_at AT TIME ZONE 'UTC')
-       AND r.completed_at IS NOT NULL
-       AND r.completed_at >= (j.completed_at AT TIME ZONE 'UTC')
-  `;
+  const matchedRun = core.findMatchingDrainAttributionRun(runs, {
+    jobId: job.id,
+    expectDeployment: EXPECT_DEPLOYMENT,
+  });
   artifact.maintenanceRuns = runs;
-  artifact.bracketingRunIds = bracketing.map((r) => r.id);
+  artifact.attributionRunId = matchedRun?.id || null;
   console.log(`\n── Attribution ──`);
-  console.log(`maintenance_runs (drain-reviewer-acceptances) since ${startedAt}: ${runs.length} run(s); ${bracketing.length} bracket the job completion.`);
+  console.log(`maintenance_runs (drain-reviewer-acceptances) since ${startedAt}: ${runs.length} run(s); ${matchedRun ? `run ${matchedRun.id} recorded the smoke job and expected deployment` : 'no run recorded both the smoke job and expected deployment'}.`);
   for (const run of runs) {
-    console.log(`  run ${run.id}: ${run.status} processed=${run.records_processed}`);
+    const details = parseDetails(run.details);
+    console.log(`  run ${run.id}: ${run.status} processed=${run.records_processed} deployment=${details.deployment?.deploymentId || details.deployment?.gitCommitSha || 'none'} jobIds=${JSON.stringify(details.jobIds || [])}`);
   }
   recordProblems('deployed-drain attribution', core.assertDrainAttribution({
-    bracketingRuns: bracketing.length,
+    matchedRun,
     totalRuns: runs.length,
+    jobId: job.id,
     expectDeployment: EXPECT_DEPLOYMENT,
   }));
   console.log(`expected deployment (operator-attested via vercel inspect): ${EXPECT_DEPLOYMENT}`);
@@ -383,34 +410,77 @@ await bypassDynamicsRestrictions('smoke-reviewer-binding', async () => {
     console.log('\n── Cleanup ──');
     if (!core.canCleanup(terminalJob)) {
       console.error('  refusing cleanup: job is not terminal.');
+      artifact.problems.push('cleanup: job is not terminal');
+      failed = true;
+      writeArtifact();
     } else {
       const suggestionCleanup = await deleteOrReport('wmkf_appreviewersuggestions', suggestion.id, 'suggestion');
       const personCleanup = await deleteOrReport('wmkf_potentialreviewerses', person.id, 'person');
-      if (DELETE_JOB) {
-        const { rows: deleted } = await sql`
-          DELETE FROM reviewer_acceptance_jobs
-           WHERE id = ${job.id} AND status = ANY(${['completed', 'failed', 'cancelled']})
-           RETURNING id
-        `;
-        console.log(deleted.length ? `  deleted queue job ${job.id}` : `  queue job ${job.id} NOT deleted (not terminal?)`);
-      } else {
-        console.log(`  queue job ${job.id} kept as audit evidence (pass --delete-job to remove it).`);
-      }
-
+      const suggestionStillReadable = await isRecordStillReadable(
+        'wmkf_appreviewersuggestions',
+        suggestion.id,
+        'wmkf_appreviewersuggestionid',
+        'suggestion',
+      );
+      const personStillReadable = await isRecordStillReadable(
+        'wmkf_potentialreviewerses',
+        person.id,
+        'wmkf_potentialreviewersid',
+        'person',
+      );
       const postPopulation = runPopulationPreflight('post-cleanup');
       artifact.postPopulation = postPopulation;
       const restored = Object.entries(prePopulation).every(([entity, count]) => postPopulation[entity] === count);
       if (restored) {
         console.log('baseline restored: post-cleanup population matches the pre-smoke snapshot.');
-      } else if (personCleanup.deleted) {
-        console.error(`baseline NOT restored: pre=${JSON.stringify(prePopulation)} post=${JSON.stringify(postPopulation)} — investigate before rerunning.`);
-        artifact.problems.push(`cleanup: baseline not restored despite person deletion (pre=${JSON.stringify(prePopulation)} post=${JSON.stringify(postPopulation)})`);
-        failed = true;
       } else {
-        console.error(`baseline delta EXPECTED and present: the person could not be deleted (deactivation leaves its Wave 13 fields populated). pre=${JSON.stringify(prePopulation)} post=${JSON.stringify(postPopulation)}. Report this delta to the owner; do not claim restoration.`);
-        artifact.problems.push('cleanup: person deactivated (delete unavailable) — Wave 13 population baseline intentionally NOT restored; owner must resolve the residual row');
+        console.error(`baseline NOT restored: pre=${JSON.stringify(prePopulation)} post=${JSON.stringify(postPopulation)} — investigate before rerunning.`);
       }
-      artifact.cleanup = { suggestion: suggestionCleanup, person: personCleanup, jobDeleted: DELETE_JOB };
+      const cleanupResult = core.evaluateCleanup({
+        suggestionOutcome: suggestionCleanup,
+        personOutcome: personCleanup,
+        suggestionStillReadable,
+        personStillReadable,
+        populationRestored: restored,
+      });
+      if (!cleanupResult.ok) {
+        failed = true;
+        for (const problem of cleanupResult.problems) {
+          console.error(`  cleanup failure: ${problem}`);
+          artifact.problems.push(`cleanup: ${problem}`);
+        }
+      }
+
+      let jobDeleted = false;
+      if (DELETE_JOB && cleanupResult.allowJobDeletion) {
+        const { rows: deleted } = await sql`
+          DELETE FROM reviewer_acceptance_jobs
+           WHERE id = ${job.id} AND status = ANY(${['completed', 'failed', 'cancelled']})
+           RETURNING id
+        `;
+        jobDeleted = deleted.length > 0;
+        if (jobDeleted) {
+          console.log(`  deleted queue job ${job.id}`);
+        } else {
+          console.error(`  queue job ${job.id} NOT deleted (not terminal?)`);
+          artifact.problems.push(`cleanup: queue job ${job.id} not deleted despite verified row cleanup`);
+          failed = true;
+        }
+      } else if (DELETE_JOB) {
+        console.log(`  queue job ${job.id} kept as audit evidence because cleanup did not fully verify.`);
+      } else {
+        console.log(`  queue job ${job.id} kept as audit evidence (pass --delete-job to remove it after cleanup verifies).`);
+      }
+
+      artifact.cleanup = {
+        suggestion: suggestionCleanup,
+        person: personCleanup,
+        suggestionStillReadable,
+        personStillReadable,
+        populationRestored: restored,
+        allowJobDeletion: cleanupResult.allowJobDeletion,
+        jobDeleted,
+      };
       // Recompute pass so the durable artifact can never say pass=true while
       // the process exits non-zero on a cleanup/baseline failure.
       writeArtifact();

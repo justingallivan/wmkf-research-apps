@@ -17,6 +17,8 @@ import {
   buildSmokeJobArgs,
   buildSmokeKey,
   canCleanup,
+  evaluateCleanup,
+  findMatchingDrainAttributionRun,
   isWholeSecondIso,
   parsePopulationCounts,
   secondEqual,
@@ -232,15 +234,28 @@ describe('assertWave13Binding', () => {
 
 describe('assertApprovedRequest — double-entry fixture authorization', () => {
   const APPROVED = '22222222-2222-4222-8222-222222222222';
+  const ALLOWLIST = [APPROVED];
 
-  test('passes when the resolved GUID equals the approval (case-insensitive)', () => {
-    expect(assertApprovedRequest(APPROVED.toUpperCase(), APPROVED)).toEqual({ ok: true, problems: [] });
+  test('passes when the resolved GUID equals the approval and is committed in the allowlist', () => {
+    expect(assertApprovedRequest(APPROVED.toUpperCase(), APPROVED, ALLOWLIST)).toEqual({ ok: true, problems: [] });
   });
 
   test('fails when the resolved request differs from the approval', () => {
-    const out = assertApprovedRequest('99999999-9999-4999-8999-999999999999', APPROVED);
+    const out = assertApprovedRequest('99999999-9999-4999-8999-999999999999', APPROVED, ALLOWLIST);
     expect(out.ok).toBe(false);
     expect(out.problems.join(' ')).toContain('unapproved request');
+  });
+
+  test('fails when the same GUID is supplied twice but not committed in the allowlist', () => {
+    const out = assertApprovedRequest(APPROVED, APPROVED, []);
+    expect(out.ok).toBe(false);
+    expect(out.problems.join(' ')).toContain('commit the approved fixture GUID');
+  });
+
+  test('fails when the resolved request is not in the committed allowlist', () => {
+    const out = assertApprovedRequest(APPROVED, APPROVED, ['99999999-9999-4999-8999-999999999999']);
+    expect(out.ok).toBe(false);
+    expect(out.problems.join(' ')).toContain('not in the committed');
   });
 
   test.each([
@@ -248,30 +263,67 @@ describe('assertApprovedRequest — double-entry fixture authorization', () => {
     ['not a GUID', 'REQ-123'],
     ['empty', ''],
   ])('fails when the approval id is %s', (_label, approved) => {
-    expect(assertApprovedRequest(APPROVED, approved).ok).toBe(false);
+    expect(assertApprovedRequest(APPROVED, approved, ALLOWLIST).ok).toBe(false);
   });
 });
 
 describe('assertDrainAttribution — blocking deployed-cron attribution', () => {
-  test('passes with a bracketing run and an attested deployment', () => {
-    expect(assertDrainAttribution({ bracketingRuns: 1, totalRuns: 3, expectDeployment: '38640dd7' }))
+  const jobId = 77;
+  const matchingRun = {
+    id: 101,
+    details: {
+      jobIds: [77],
+      deployment: { gitCommitSha: '38640dd7abcdef', deploymentId: 'dpl_good' },
+    },
+  };
+
+  test('passes when one run records the exact job id and matching git SHA prefix', () => {
+    const runs = [matchingRun];
+    const matchedRun = findMatchingDrainAttributionRun(runs, { jobId, expectDeployment: '38640dd7' });
+    expect(assertDrainAttribution({ matchedRun, totalRuns: runs.length, jobId, expectDeployment: '38640dd7' }))
       .toEqual({ ok: true, problems: [] });
   });
 
+  test('passes when one run records the exact job id and matching deployment id', () => {
+    const runs = [matchingRun];
+    const matchedRun = findMatchingDrainAttributionRun(runs, { jobId, expectDeployment: 'dpl_good' });
+    expect(assertDrainAttribution({ matchedRun, totalRuns: runs.length, jobId, expectDeployment: 'dpl_good' }).ok).toBe(true);
+  });
+
   test('fails with zero maintenance runs in the window', () => {
-    const out = assertDrainAttribution({ bracketingRuns: 0, totalRuns: 0, expectDeployment: '38640dd7' });
+    const out = assertDrainAttribution({ matchedRun: null, totalRuns: 0, jobId, expectDeployment: '38640dd7' });
     expect(out.ok).toBe(false);
     expect(out.problems.join(' ')).toContain('cannot be attributed');
   });
 
-  test('fails when runs exist but none bracket the job completion', () => {
-    const out = assertDrainAttribution({ bracketingRuns: 0, totalRuns: 4, expectDeployment: '38640dd7' });
+  test('fails when a run has the job id but wrong deployment fingerprint', () => {
+    const runs = [{
+      id: 102,
+      details: { jobIds: [jobId], deployment: { gitCommitSha: 'aaaaaaaaaaaaaaaa', deploymentId: 'dpl_wrong' } },
+    }];
+    const matchedRun = findMatchingDrainAttributionRun(runs, { jobId, expectDeployment: '38640dd7' });
+    const out = assertDrainAttribution({ matchedRun, totalRuns: runs.length, jobId, expectDeployment: '38640dd7' });
     expect(out.ok).toBe(false);
-    expect(out.problems.join(' ')).toContain('bracket');
+    expect(out.problems.join(' ')).toContain('jobIds');
+  });
+
+  test('fails when a run has the job id but no deployment fingerprint', () => {
+    const runs = [{ id: 103, details: { jobIds: [jobId] } }];
+    const matchedRun = findMatchingDrainAttributionRun(runs, { jobId, expectDeployment: '38640dd7' });
+    expect(assertDrainAttribution({ matchedRun, totalRuns: runs.length, jobId, expectDeployment: '38640dd7' }).ok).toBe(false);
+  });
+
+  test('fails when a run has the matching fingerprint but not the smoke job id', () => {
+    const runs = [{
+      id: 104,
+      details: { jobIds: [999], deployment: { gitCommitSha: '38640dd7abcdef', deploymentId: 'dpl_good' } },
+    }];
+    const matchedRun = findMatchingDrainAttributionRun(runs, { jobId, expectDeployment: '38640dd7' });
+    expect(assertDrainAttribution({ matchedRun, totalRuns: runs.length, jobId, expectDeployment: '38640dd7' }).ok).toBe(false);
   });
 
   test('fails without an attested deployment', () => {
-    expect(assertDrainAttribution({ bracketingRuns: 1, totalRuns: 1, expectDeployment: '' }).ok).toBe(false);
+    expect(assertDrainAttribution({ matchedRun: matchingRun, totalRuns: 1, jobId, expectDeployment: '' }).ok).toBe(false);
   });
 });
 
@@ -314,6 +366,68 @@ describe('cleanup guard', () => {
 
   test('no job → no cleanup', () => {
     expect(canCleanup(null)).toBe(false);
+  });
+
+  test('allows job deletion only after deletes, GUID absence, and restored population', () => {
+    expect(evaluateCleanup({
+      suggestionOutcome: { deleted: true },
+      personOutcome: { deleted: true },
+      suggestionStillReadable: false,
+      personStillReadable: false,
+      populationRestored: true,
+    })).toEqual({ ok: true, allowJobDeletion: true, problems: [] });
+  });
+
+  test('fails and keeps the job when suggestion delete falls back to deactivation', () => {
+    const out = evaluateCleanup({
+      suggestionOutcome: { deleted: false, deactivated: true },
+      personOutcome: { deleted: true },
+      suggestionStillReadable: true,
+      personStillReadable: false,
+      populationRestored: false,
+    });
+    expect(out.ok).toBe(false);
+    expect(out.allowJobDeletion).toBe(false);
+    expect(out.problems.join(' ')).toContain('deactivated');
+  });
+
+  test('fails and keeps the job when person deletion fails', () => {
+    const out = evaluateCleanup({
+      suggestionOutcome: { deleted: true },
+      personOutcome: { deleted: false, error: 'blocked by dependency' },
+      suggestionStillReadable: false,
+      personStillReadable: true,
+      populationRestored: false,
+    });
+    expect(out.ok).toBe(false);
+    expect(out.allowJobDeletion).toBe(false);
+    expect(out.problems.join(' ')).toContain('person delete failed');
+  });
+
+  test('fails and keeps the job when GUID absence checks fail despite delete outcomes', () => {
+    const out = evaluateCleanup({
+      suggestionOutcome: { deleted: true },
+      personOutcome: { deleted: true },
+      suggestionStillReadable: false,
+      personStillReadable: true,
+      populationRestored: true,
+    });
+    expect(out.ok).toBe(false);
+    expect(out.allowJobDeletion).toBe(false);
+    expect(out.problems.join(' ')).toContain('person GUID');
+  });
+
+  test('fails and keeps the job when population is not restored', () => {
+    const out = evaluateCleanup({
+      suggestionOutcome: { deleted: true },
+      personOutcome: { deleted: true },
+      suggestionStillReadable: false,
+      personStillReadable: false,
+      populationRestored: false,
+    });
+    expect(out.ok).toBe(false);
+    expect(out.allowJobDeletion).toBe(false);
+    expect(out.problems.join(' ')).toContain('population baseline');
   });
 });
 
