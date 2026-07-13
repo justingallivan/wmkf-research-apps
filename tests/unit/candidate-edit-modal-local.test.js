@@ -8,7 +8,7 @@
  * can't desync the name-keyed Find card.
  */
 
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CandidateEditModal from '../../shared/components/reviewers/CandidateEditModal';
 
 const candidate = { name: 'Javier Martinez', affiliation: 'MIT', email: 'wrong@gmail.com', website: '', hIndex: 31 };
@@ -16,7 +16,7 @@ const candidate = { name: 'Javier Martinez', affiliation: 'MIT', email: 'wrong@g
 afterEach(() => { if (global.fetch && global.fetch.mockRestore) global.fetch.mockRestore(); });
 
 describe('CandidateEditModal — local (onApply) mode', () => {
-  test('Save emits only changed fields to onApply and does NOT PATCH', () => {
+  test('Save emits only changed fields to onApply and does NOT PATCH', async () => {
     const onApply = jest.fn();
     const onClose = jest.fn();
     const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({ ok: true, json: async () => ({}) });
@@ -25,9 +25,9 @@ describe('CandidateEditModal — local (onApply) mode', () => {
     fireEvent.change(screen.getByDisplayValue('wrong@gmail.com'), { target: { value: 'real@mit.edu' } });
     fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
-    expect(onApply).toHaveBeenCalledWith({ email: 'real@mit.edu' });
+    await waitFor(() => expect(onApply).toHaveBeenCalledWith({ email: 'real@mit.edu' }));
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(onClose).toHaveBeenCalled();
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
   test('the Name field is read-only in local mode', () => {
@@ -40,20 +40,45 @@ describe('CandidateEditModal — local (onApply) mode', () => {
     expect(screen.getByText(/marked unverified.*confirm before any invitation/i)).toBeInTheDocument();
   });
 
-  test('no changes → just closes, no onApply', () => {
+  test('no changes → just closes, no onApply', async () => {
     const onApply = jest.fn();
     const onClose = jest.fn();
     render(<CandidateEditModal candidate={candidate} onApply={onApply} onClose={onClose} nameEditable={false} />);
     fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(onApply).not.toHaveBeenCalled();
-    expect(onClose).toHaveBeenCalled();
   });
 
   test('saved mode (no onApply) still PATCHes /my-candidates', async () => {
     const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({ ok: true, json: async () => ({}) });
-    render(<CandidateEditModal candidate={{ ...candidate, suggestionId: 'S1' }} onClose={jest.fn()} onSaved={jest.fn()} />);
+    const onSaved = jest.fn();
+    render(<CandidateEditModal candidate={{ ...candidate, suggestionId: 'S1' }} onClose={jest.fn()} onSaved={onSaved} />);
     fireEvent.change(screen.getByDisplayValue('wrong@gmail.com'), { target: { value: 'real@mit.edu' } });
     fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
-    expect(fetchSpy).toHaveBeenCalledWith('/api/reviewer-finder/my-candidates', expect.objectContaining({ method: 'PATCH' }));
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledWith('/api/reviewer-finder/my-candidates', expect.objectContaining({ method: 'PATCH' })));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+  });
+});
+
+describe('CandidateEditModal — identity confirmation', () => {
+  test('awaits server confirmation and stays open with an error when it fails', async () => {
+    const onClose = jest.fn();
+    const onConfirm = jest.fn(async () => { throw new Error('Confirmation could not be recorded'); });
+    render(<CandidateEditModal
+      candidate={candidate}
+      onClose={onClose}
+      onConfirm={onConfirm}
+      confirmMode
+      nameEditable={false}
+    />);
+
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: /add to candidates/i }));
+
+    await waitFor(() => expect(screen.getByText('Confirmation could not be recorded')).toBeInTheDocument());
+    expect(onConfirm).toHaveBeenCalledWith({
+      email: 'wrong@gmail.com', website: '', affiliation: 'MIT',
+    });
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

@@ -11,6 +11,7 @@ import { mayPersistIdentity } from '../../../lib/services/reviewer-identity-reso
 import { buildReviewerProvenance, PROVENANCE_KINDS, provenanceGroupOf, provenanceKindOf, sanitizeInstitutionCOIDetails as _sanitizeInstitutionCOIDetails } from '../../../lib/utils/reviewer-provenance';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import { parseReferredSeeds as _parseReferredSeeds } from '../../../lib/utils/reviewer-referral-seeds';
+import { reviewerSaveKey } from '../../../lib/utils/reviewer-save-key';
 
 /**
  * Merge contact-enrichment results (from /enrich-contacts) back onto the chosen
@@ -37,22 +38,31 @@ export function isCandidateSelectable(c) {
   return (provenanceGroupOf(c) !== 'needs_identity_review' || c?.pdIdentityConfirmed === true) && !c?.hasInstitutionCOI;
 }
 
+export function candidateWasSaved(candidate, savedKeys = [], savedNames = []) {
+  const stableKeys = new Set(Array.isArray(savedKeys) ? savedKeys : []);
+  if (stableKeys.size > 0) return stableKeys.has(reviewerSaveKey(candidate));
+  const legacyNames = new Set((Array.isArray(savedNames) ? savedNames : []).map(_normalizeReviewerName));
+  return legacyNames.has(_normalizeReviewerName(candidate?.name));
+}
+
 export function mergeEnrichment(candidates, enrichmentResults) {
   if (!Array.isArray(candidates)) return [];
   if (!Array.isArray(enrichmentResults) || enrichmentResults.length === 0) return candidates;
   const byName = new Map();
   for (const r of enrichmentResults) {
-    if (r && r.name && r.contactEnrichment) byName.set(r.name, r.contactEnrichment);
+    if (r && r.name && r.contactEnrichment) byName.set(r.name, r);
   }
   return candidates.map((c) => {
-    const e = byName.get(c.name);
-    if (!e) return c;
+    const enriched = byName.get(c.name);
+    if (!enriched) return c;
+    const e = enriched.contactEnrichment;
     const contactEnrichment = {
       ...e,
       website: ContactParser.sanitizeWebsiteForCandidate(e.website, c.name) || null,
     };
     return {
       ...c,
+      automatedIdentityAttestation: enriched.automatedIdentityAttestation || null,
       contactEnrichment,
       // Institution COI re-evaluated server-side against the post-enrichment
       // affiliation (enrich-contacts). `coiRecomputed` distinguishes "ran and
@@ -326,7 +336,7 @@ export function pruneCandidateForRoster(c) {
     // a roster reload — otherwise a deferred/unresolved candidate recorded as
     // surfaced-active loses its marker and becomes silently selectable again on reload
     // (the gate would only hold for the live run). Persist all three the group test reads.
-    identityStatus: c.identityStatus || null,
+    identityStatus: c.identityStatus || e.identity?.status || null,
     needsIdentification: !!c.needsIdentification,
     verificationStatus: c.verificationStatus || null,
     // Source / provenance flags the card branches on.
@@ -385,11 +395,22 @@ export function pruneCandidateForRoster(c) {
     googleScholarId: c.googleScholarId || e.googleScholarId || null,
     priorAffiliation: e.priorAffiliation || null,
     hIndex: c.hIndex ?? e.hIndex ?? null,
+    i10Index: c.i10Index ?? e.i10Index ?? null,
     totalCitations: c.totalCitations ?? e.totalCitations ?? null,
     publicationCount5yr: Number.isFinite(c.publicationCount5yr) ? c.publicationCount5yr : (e.publicationCount5yr ?? null),
     publications: Array.isArray(c.publications)
       ? c.publications.slice(0, 10).map((p) => ({ title: p && p.title, year: p && p.year, url: p && p.url }))
       : [],
     relevanceScore: typeof c.relevanceScore === 'number' ? c.relevanceScore : null,
+    automatedIdentityAttestation: typeof c.automatedIdentityAttestation === 'string'
+      && c.automatedIdentityAttestation.length <= 4096
+      ? c.automatedIdentityAttestation
+      : null,
+    // UI convenience only. Save-candidates derives authority by looking up the
+    // opaque confirmation id in the request-scoped server roster.
+    pdIdentityConfirmed: c.pdIdentityConfirmed === true,
+    pdIdentityConfirmationId: typeof c.pdIdentityConfirmationId === 'string'
+      ? c.pdIdentityConfirmationId
+      : null,
   };
 }

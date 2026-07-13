@@ -36,6 +36,10 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 }));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   stampSuggestionAnchor: jest.fn(async () => ({ updated: 1 })),
+  findIdentityConfirmation: jest.fn(async () => null),
+}));
+jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
+  verifyAutomatedIdentityAttestation: jest.fn(async () => ({ valid: true, source: 'automated_resolver' })),
 }));
 jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
   lookupReviewerIdentity: jest.fn(async () => ({ outcome: 'none' })),

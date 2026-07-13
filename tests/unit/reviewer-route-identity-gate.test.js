@@ -70,6 +70,10 @@ jest.mock('../../lib/services/contact-enrichment-service', () => ({
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   recordSurfaced: jest.fn(async () => 1),
   stampSuggestionAnchor: jest.fn(async () => ({ updated: 1 })),
+  findIdentityConfirmation: jest.fn(async () => null),
+}));
+jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
+  verifyAutomatedIdentityAttestation: jest.fn(async () => ({ valid: true, source: 'automated_resolver' })),
 }));
 jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
   lookupReviewerIdentity: jest.fn(async () => ({ outcome: 'none' })),
@@ -92,6 +96,7 @@ const contactAdapter = require('../../lib/dataverse/adapters/contact');
 const accountAdapter = require('../../lib/dataverse/adapters/account');
 const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const rosterStore = require('../../lib/services/reviewer-roster-store');
+const { verifyAutomatedIdentityAttestation } = require('../../lib/services/reviewer-candidate-attestation');
 const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity-lookup');
 const NotificationService = require('../../lib/services/notification-service').default;
 const { RESOLVER_SOURCED_FIELDS } = require('../../lib/services/reviewer-identity-resolver');
@@ -129,6 +134,8 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     accountAdapter.getById.mockResolvedValue(null);
     lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
     NotificationService.notify.mockResolvedValue({ id: 'alert-1' });
+    verifyAutomatedIdentityAttestation.mockResolvedValue({ valid: true, source: 'automated_resolver' });
+    rosterStore.findIdentityConfirmation.mockResolvedValue(null);
   });
 
   const run = (identity) => {
@@ -517,6 +524,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
       candidates: [{
         name: 'Dr Real Person',
         pdIdentityConfirmed: true,
+        pdIdentityConfirmationId: 'confirm-1',
         needsIdentification: true,                 // would normally hard-reject
         email: 'correct@uni.edu', emailSource: 'manual', emailPersistAllowed: true,
         website: 'https://correct.uni.edu/faculty', websiteSource: 'manual', websitePersistAllowed: true,
@@ -527,7 +535,46 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     },
   });
 
+  test('bare client pdIdentityConfirmed flag is rejected before any write', async () => {
+    const res = mockRes();
+    const req = pdConfirmedReq({ pdIdentityConfirmationId: undefined });
+    await handler(req, res);
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toMatchObject({ rejectedInvalid: 1 });
+    expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+    expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+  });
+
+  test('mismatched server confirmation is rejected before any write', async () => {
+    rosterStore.findIdentityConfirmation.mockResolvedValueOnce({
+      source: 'staff_confirmed', normalizedName: 'real person', email: 'other@uni.edu',
+      website: 'https://correct.uni.edu/faculty', affiliation: 'Right University',
+    });
+    const res = mockRes();
+    await handler(pdConfirmedReq(), res);
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toMatchObject({ rejectedInvalid: 1 });
+    expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  });
+
+  test('staff confirmation read failure fails closed before any write', async () => {
+    rosterStore.findIdentityConfirmation.mockRejectedValueOnce(new Error('postgres unavailable'));
+    const res = mockRes();
+    await handler(pdConfirmedReq(), res);
+    expect(res.statusCode).toBe(500);
+    expect(res.body).toMatchObject({ success: false, savedCount: 0 });
+    expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+    expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+  });
+
   test('PD override: unresolved row is SAVED (not hard-rejected) with the manual email', async () => {
+    rosterStore.findIdentityConfirmation.mockResolvedValueOnce({
+      source: 'staff_confirmed',
+      normalizedName: 'real person',
+      email: 'correct@uni.edu',
+      website: 'https://correct.uni.edu/faculty',
+      affiliation: 'Right University',
+    });
     const res = mockRes();
     await handler(pdConfirmedReq(), res);
     expect(res.statusCode).toBe(200);
@@ -539,6 +586,10 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   });
 
   test('PD override: contact lookup receives manual email but no ORCID', async () => {
+    rosterStore.findIdentityConfirmation.mockResolvedValueOnce({
+      source: 'staff_confirmed', normalizedName: 'real person', email: 'pd@example.edu',
+      website: 'https://correct.uni.edu/faculty', affiliation: 'Right University',
+    });
     const res = mockRes();
     await handler(pdConfirmedReq({ email: 'pd@example.edu', orcid: '0000-0002-1825-0097' }), res);
 
@@ -551,6 +602,10 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   });
 
   test('PD override: emailSource is FORCED manual server-side (forged source ignored)', async () => {
+    rosterStore.findIdentityConfirmation.mockResolvedValueOnce({
+      source: 'staff_confirmed', normalizedName: 'real person', email: 'correct@uni.edu',
+      website: 'https://correct.uni.edu/faculty', affiliation: 'Right University',
+    });
     const res = mockRes();
     // A forged/stale payload claims a high-confidence source — must be overridden.
     await handler(pdConfirmedReq({ emailSource: 'orcid' }), res);
@@ -560,6 +615,10 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   });
 
   test('PD override: auto-fetched ORCID / Scholar / metrics are NULLED (never blessed)', async () => {
+    rosterStore.findIdentityConfirmation.mockResolvedValueOnce({
+      source: 'staff_confirmed', normalizedName: 'real person', email: 'correct@uni.edu',
+      website: 'https://correct.uni.edu/faculty', affiliation: 'Right University',
+    });
     const res = mockRes();
     await handler(pdConfirmedReq(), res);
     const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
@@ -575,12 +634,20 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   });
 
   test('PD override: a "[Identity confirmed by PD]" audit note is stamped on the suggestion', async () => {
+    rosterStore.findIdentityConfirmation.mockResolvedValueOnce({
+      source: 'staff_confirmed', normalizedName: 'real person', email: 'correct@uni.edu',
+      website: 'https://correct.uni.edu/faculty', affiliation: 'Right University',
+    });
     const res = mockRes();
     await handler(pdConfirmedReq(), res);
     expect(reviewerSuggestionAdapter.upsert.mock.calls[0][0].matchReason).toMatch(/Identity confirmed by PD/);
   });
 
   test('PD override: blanked website does NOT fall back to the wrong enrichment website', async () => {
+    rosterStore.findIdentityConfirmation.mockResolvedValueOnce({
+      source: 'staff_confirmed', normalizedName: 'real person', email: 'correct@uni.edu',
+      website: '', affiliation: 'Right University',
+    });
     const res = mockRes();
     // PD corrected the email but cleared the (wrong) website entirely.
     await handler(pdConfirmedReq({ website: '', websiteSource: 'manual', websitePersistAllowed: false }), res);
@@ -590,12 +657,26 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   });
 
   test('PD override does NOT waive institution-COI (still hard-rejected)', async () => {
+    rosterStore.findIdentityConfirmation.mockResolvedValueOnce({
+      source: 'staff_confirmed', normalizedName: 'real person', email: 'correct@uni.edu',
+      website: 'https://correct.uni.edu/faculty', affiliation: 'Right University',
+    });
     const res = mockRes();
     await handler(pdConfirmedReq({ hasInstitutionCOI: true }), res);
     expect(res.statusCode).toBe(422);
     expect(res.body.savedCount).toBe(0);
     expect(res.body.rejectedInstitutionCOI).toBe(1);
     expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  });
+
+  test('client confirmed status without a valid server receipt cannot persist automated identity fields', async () => {
+    verifyAutomatedIdentityAttestation.mockResolvedValueOnce({ valid: false, reason: 'no_token' });
+    const res = await run({ status: 'confirmed' });
+    expect(res.statusCode).toBe(200);
+    const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
+    expect(payload.orcid).toBeNull();
+    expect(payload.googleScholarId).toBeNull();
+    expect(payload.hIndex).toBeNull();
   });
 
   test('explicit contact persist flags false → confirmed identity still saves no sendable contact fields', async () => {

@@ -1,0 +1,101 @@
+/**
+ * @jest-environment jsdom
+ */
+
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import ReviewerSearchSection from '../../shared/components/reviewers/ReviewerSearchSection';
+const { reviewerSaveKey } = require('../../lib/utils/reviewer-save-key');
+
+const REQ_A = 'aaaaaaaa-1111-1111-1111-111111111111';
+const REQ_B = 'bbbbbbbb-2222-2222-2222-222222222222';
+const candidate = (name, email) => ({
+  name,
+  email,
+  identityStatus: 'probable',
+  provenance: {
+    kind: 'literature_retrieved',
+    sources: ['pubmed'],
+    seedRole: 'query_seed',
+    groundingWorkIds: [],
+  },
+});
+const CANDIDATE_A = candidate('Dr Candidate A', 'a@example.edu');
+const CANDIDATE_B = candidate('Dr Candidate B', 'b@example.edu');
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+function response(body, ok = true, status = ok ? 200 : 500) {
+  return { ok, status, json: async () => body };
+}
+
+afterEach(() => {
+  jest.clearAllMocks();
+  global.fetch = jest.fn();
+});
+
+async function runStaleSave(saveResponse) {
+  const save = deferred();
+  const onSaved = jest.fn();
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      if (target.includes(REQ_A)) return Promise.resolve(response({ success: true, active: [CANDIDATE_A], excluded: [], allNames: [CANDIDATE_A.name] }));
+      if (target.includes(REQ_B)) return Promise.resolve(response({ success: true, active: [CANDIDATE_B], excluded: [], allNames: [CANDIDATE_B.name] }));
+    }
+    if (target === '/api/reviewer-finder/save-candidates') return save.promise;
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
+      return Promise.resolve(response({ success: true }));
+    }
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+
+  const { rerender } = render(<ReviewerSearchSection
+    requestId={REQ_A}
+    blobUrl="blob-a"
+    proposalKey="proposal-a"
+    onSaved={onSaved}
+  />);
+  await screen.findByLabelText('Select Dr Candidate A');
+  fireEvent.click(screen.getByLabelText('Select Dr Candidate A'));
+  fireEvent.click(screen.getByRole('button', { name: /save 1 selected as candidates/i }));
+
+  await act(async () => {
+    rerender(<ReviewerSearchSection
+      requestId={REQ_B}
+      blobUrl="blob-b"
+      proposalKey="proposal-b"
+      onSaved={onSaved}
+    />);
+  });
+  await screen.findByLabelText('Select Dr Candidate B');
+
+  await act(async () => {
+    save.resolve(saveResponse);
+    await save.promise;
+  });
+  await waitFor(() => expect(screen.getByLabelText('Select Dr Candidate B')).toBeInTheDocument());
+  return { onSaved };
+}
+
+test('late success from the prior request cannot graduate or complete the new request UI', async () => {
+  const { onSaved } = await runStaleSave(response({
+    success: true,
+    savedCount: 1,
+    savedNames: [CANDIDATE_A.name],
+    savedKeys: [reviewerSaveKey(CANDIDATE_A)],
+  }));
+  expect(screen.getByLabelText('Select Dr Candidate B')).toBeInTheDocument();
+  expect(screen.queryByText(/Saved 1 of 1/)).not.toBeInTheDocument();
+  expect(onSaved).not.toHaveBeenCalled();
+});
+
+test('late failure from the prior request cannot paint an error onto the new request', async () => {
+  const { onSaved } = await runStaleSave(response({ error: 'Old request failed' }, false, 500));
+  expect(screen.getByLabelText('Select Dr Candidate B')).toBeInTheDocument();
+  expect(screen.queryByText(/Old request failed/)).not.toBeInTheDocument();
+  expect(onSaved).not.toHaveBeenCalled();
+});

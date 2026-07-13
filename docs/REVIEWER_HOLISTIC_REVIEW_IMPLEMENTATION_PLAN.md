@@ -186,7 +186,17 @@ containment slice. **[OWNER-GATE]** for each production promotion.
 
 ### C0.1 Validate each save row without breaking partial success
 
-**[VERIFIED]** `/api/reviewer-finder/save-candidates` currently validates only
+**[IMPLEMENTED + VERIFIED 2026-07-12 on
+`codex/reviewer-holistic-c0-save-validation`; NOT YET PROMOTED]** Row validation,
+stable save/error keys, same-name graduation protection, request-generation
+guards, server-signed automated identity receipts, and request-scoped staff
+identity confirmation are complete. Verification: 197 targeted tests, full
+suite 478/478 suites and 5,395/5,395 tests, typecheck, production build, and the
+applicable route/DAL/docs/security gates plus self-tests. Promotion remains the
+C0.1 owner gate; C0.2 has not started.
+
+**[VERIFIED pre-C0.1 baseline; superseded by the implementation above]**
+`/api/reviewer-finder/save-candidates` validated only
 `requestId` plus a non-empty `candidates` array. The service saves per row, and
 the client uses `savedNames` to mark only successful rows saved.
 

@@ -131,9 +131,9 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
     const submitToken = reqToken.current;
 
     try {
-      // CONFIRM mode (PD identity override): always send email/website/affiliation
-      // as the PD-confirmed contact — even an unchanged field is an explicit "use
-      // this" — so the parent stamps the whole contact manual and promotes the row.
+      // CONFIRM mode: always send email/website/affiliation as the PD-confirmed
+      // contact — even an unchanged field is an explicit "use this". The parent
+      // must await the authenticated server attestation before stamping local UI.
       if (confirmMode) {
         if (!identityConfirmed) {
           setError('Tick the confirmation box to add this reviewer.');
@@ -143,7 +143,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
           setError('An email is required to add and invite this reviewer.');
           return;
         }
-        onConfirm({
+        await onConfirm({
           email: formData.email.trim(),
           website: formData.website.trim(),
           affiliation: formData.affiliation.trim(),

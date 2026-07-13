@@ -2,7 +2,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-07-03 (Contract 5 institution-COI follow-up through Phase C: `status='coi_dropped'` stores hard-drop ledger rows; contradicted low-trust COI matches can remain `active` but flagged read-only).
+**Last verified:** 2026-07-12 (C0.1 containment: request-scoped staff identity confirmations are stored in the active candidate JSON and re-read by `save-candidates`; automated identity receipts are opaque signed values, not raw resolver evidence).
 **Live row count:** 0 (new table; no rows until the Workbench Find tab records a search).
 
 ## NOT a regression of the S219/migration-018 Dataverse cutover
@@ -22,7 +22,7 @@ Migration 018 dropped the **canonical reviewer-identity** Postgres tables (`rese
 | normalized_name | text | `normalizeReviewerName(candidate.name)` — the dedup key |
 | display_name | text | surface-time `candidate.name` for re-render |
 | status | text | `active` \| `excluded` \| `saved` \| `coi_dropped` (CHECK-constrained) |
-| candidate | jsonb | pruned render DTO (only `CandidateCard`-rendered fields, not raw enrichment internals). Applicant-suggested enrichment rows carry `enrichedProposalKey` (`library::folder::name`) so the UI can restore only same-proposal enrichment. Institution-COI ledger and flagged active rows carry `hasInstitutionCOI` and `institutionCOIDetails` (`piInstitution`, reviewer affiliation, `dropDecision`, corroboration reason, drop stage/source where applicable). |
+| candidate | jsonb | pruned render DTO (only `CandidateCard`-rendered fields, not raw enrichment internals). Applicant-suggested enrichment rows carry `enrichedProposalKey` (`library::folder::name`) so the UI can restore only same-proposal enrichment. Institution-COI ledger and flagged active rows carry `hasInstitutionCOI` and `institutionCOIDetails` (`piInstitution`, reviewer affiliation, `dropDecision`, corroboration reason, drop stage/source where applicable). An authenticated `confirm_identity` action may add `staffIdentityConfirmation` (opaque id, canonical manual contact, actor ids, timestamp, source) plus its UI marker. Automated candidates may carry a server-signed `automatedIdentityAttestation`; it binds the request and identity-bearing persistence bundle without storing resolver anchors/tier payloads. |
 | source_kind | text | Provenance kind: `cited_reference` \| `proposal_named` \| `applicant_suggested` \| `literature_retrieved` \| `grounded_seed` \| `barred_parametric`. Legacy rows may hold `claude_verified` or `database`; reads normalize those to a `provenance` DTO without rewriting the row. |
 | first_seen_at | timestamptz | |
 | updated_at | timestamptz | |
@@ -35,12 +35,12 @@ Indexes: `uq_reviewer_find_roster_req_name` UNIQUE `(request_id, normalized_name
 
 ## Read paths
 
-- `lib/services/reviewer-roster-store.js` `listForRequest(requestId)` — the only reader. Surfaced via `pages/api/workbench/reviewer-roster.js` GET, consumed by `shared/components/reviewers/ReviewerSearchSection.js` (roster load-on-mount → active/excluded render + the dedup name union fed into `/analyze` + `/discover`; applicant-suggested active rows with a matching `enrichedProposalKey` restore the Find tab without re-running `/api/workbench/enrich-recommended`). `coi_dropped` rows are excluded from active/excluded render buckets and contribute only through `allNames`.
+- `lib/services/reviewer-roster-store.js` `listForRequest(requestId)` reads the rendered roster. `findIdentityConfirmation(requestId, confirmationId)` is the fail-closed save-boundary read for a staff confirmation and returns only the server-stored confirmation object. The roster GET is consumed by `shared/components/reviewers/ReviewerSearchSection.js` (load-on-mount → active/excluded render + the dedup name union fed into `/analyze` + `/discover`; applicant-suggested active rows with a matching `enrichedProposalKey` restore the Find tab without re-running `/api/workbench/enrich-recommended`). `coi_dropped` rows are excluded from active/excluded render buckets and contribute only through `allNames`.
 
 ## Write paths
 
-- `lib/services/reviewer-roster-store.js` only: `recordSurfaced` (bulk upsert `active`, never-downgrade guard, row cap), `recordCoiDropped` (bulk upsert `coi_dropped`, compact hard-drop ledger, never overwrites active/excluded/saved rows), `setExcluded` (upsert → `excluded`), `promote` (`excluded`→`active`), `markSaved` (active/saved → `saved`).
-- `pages/api/workbench/reviewer-roster.js` (POST/PATCH), driven by `ReviewerSearchSection` actions (record-on-results, Exclude, Promote, save-graduation after `save-candidates`, applicant-promotion graduation after `promote-applicant-reviewer`).
+- `lib/services/reviewer-roster-store.js` only: `recordSurfaced` (bulk upsert `active`, never-downgrade guard, row cap), `recordCoiDropped` (bulk upsert `coi_dropped`, compact hard-drop ledger, never overwrites active/excluded/saved rows), `setExcluded` (upsert → `excluded`), `promote` (`excluded`→`active`), `confirmIdentity` (active-row-only authenticated staff confirmation), `markSaved` (active/saved → `saved`).
+- `pages/api/workbench/reviewer-roster.js` (POST/PATCH), driven by `ReviewerSearchSection` actions (record-on-results, Exclude, Promote, authenticated identity confirmation, save-graduation after `save-candidates`, applicant-promotion graduation after `promote-applicant-reviewer`).
 - `pages/api/workbench/enrich-recommended.js` records applicant-suggested enrichment output directly via `recordSurfaced(requestId, prunedCandidates)` as `status='active'`, stamped with `candidate.enrichedProposalKey`.
 - `pages/api/reviewer-finder/discover.js` records institution-COI candidates hard-dropped by Track A verified discovery and referred-seed discovery as `status='coi_dropped'`. `lib/services/discovery-service.js` returns Track B institution-COI hard drops to the route for the same request-scoped write. Phase-C flag-not-drop candidates flow through the existing `recordSurfaced` active-row path instead.
 
@@ -53,5 +53,7 @@ No Dataverse equivalent — operational/ephemeral by design. Crossing points: a 
 - Growth bounded by a per-request row cap (v1); a TTL cleanup cron for closed requests is a tracked follow-up (mirror `DatabaseService.cleanupExpiredCache`).
 - PATCH handlers are eviction-tolerant (upsert from the submitted blob / no-op) so a row evicted by the cap while still on screen can't 404 a card action.
 - Stores a pruned render DTO, never the raw `contactEnrichment` internals (no resolver anchors / tierResults).
+- Staff confirmation authority is not the client boolean. `save-candidates` must retrieve the opaque confirmation id under the same request and match the canonical name/email/website/affiliation; missing, mismatched, cross-request, or failed reads stop before writes.
+- Automated `confirmed` / `probable` fields are deny-only without a valid signed receipt. The receipt uses existing `NEXTAUTH_SECRET`, is request- and identity-bundle-bound, and expires after the transitional 180-day window.
 - Applicant-suggested restore is keyed on `candidate.enrichedProposalKey`, not the proposal Blob URL. `load-proposal` uses `addRandomSuffix:true`, so `blobUrl` changes across reloads and is not a stable cache key.
 - `coi_dropped` is observability-only. Do not expose it as a recover/promote UI bucket without a separate policy decision; Contract 5 still hard-drops current-institution COI by default and save still fail-closes. The only visible discovery exception is the Phase-C contradicted low-trust flag, which remains read-only and unsaveable.

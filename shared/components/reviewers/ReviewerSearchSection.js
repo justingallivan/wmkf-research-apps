@@ -50,6 +50,7 @@ import {
   filterExcluded,
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
+  candidateWasSaved,
   normalizeReviewerName,
   pruneCandidateForRoster,
   dedupeByNamePreferReferred,
@@ -64,7 +65,6 @@ import {
   withReviewerProvenance,
 } from '../../../lib/utils/reviewer-provenance';
 import { DEFAULT_REVIEWER_COUNT } from '../../config/reviewerFinderPreferences';
-import { reviewerSaveKey } from '../../../lib/utils/reviewer-save-key';
 
 // The four literature sources the discover endpoint understands. The user picks
 // which to query (parity with the standalone Reviewer Finder); at least one must
@@ -540,7 +540,7 @@ export default function ReviewerSearchSection({
   // invalidate an in-flight run so a stale stream can't overwrite newer state
   // (Finding 7).
   const runningRef = useRef(false);
-  const savingRef = useRef(false);
+  const savingRef = useRef(null);
   const genRef = useRef(0);
   const excludeEditedRef = useRef(false);
 
@@ -562,6 +562,7 @@ export default function ReviewerSearchSection({
     setReferredBy('');
     setBlockedReferredSeeds([]);
     setRecPhase('idle'); setRecCandidates([]); setRecProgress([]); setRecError(null);
+    setEditingContact(null); setConfirmingContact(null);
     excludeEditedRef.current = false;
     setExcludeText((excludedNames || []).join(', '));
 
@@ -871,9 +872,10 @@ export default function ReviewerSearchSection({
   // (S240 Chunk 2a hard drop): discovery already drops these, but enrichment can promote
   // a current affiliation that matches the PI's institution after the fact — those rows
   // become unselectable + unsavable (the save-candidates API also hard-rejects them).
-  // A PD identity override (pdIdentityConfirmed) makes an otherwise unverifiable
-  // needs-identity-review row selectable — the PD vouched for who it is. Institution
-  // COI is NOT waived by it (a real policy conflict, independent of identity).
+  // The UI marker `pdIdentityConfirmed` makes an otherwise unverifiable row
+  // selectable only after the authenticated roster action returned an opaque
+  // server confirmation id. Save-candidates re-verifies it; the marker has no
+  // server authority. Institution COI is never waived.
   const selectableCandidates = displayCandidates.filter(isCandidateSelectable);
 
   // A Claude suggestion the server couldn't verify can ALSO surface — and verify —
@@ -1016,29 +1018,59 @@ export default function ReviewerSearchSection({
   const [confirmingContact, setConfirmingContact] = useState(null);
 
   // PD confirms a needs-identity-review row IS the right person + supplies corrected
-  // contact. Reuses setManualContact (stamps email/website/affiliation 'manual' and
-  // auto-selects) AND stamps pdIdentityConfirmed so isSelectable lets it through and
-  // save-candidates persists the manual contact while dropping unverified bibliometrics.
-  const confirmIdentityContact = useCallback((cand, updates) => {
+  // contact. The authenticated roster PATCH stores the request-scoped attestation
+  // first; only then do we stamp manual contact + the UI marker/opaque id locally.
+  const confirmIdentityContact = useCallback(async (cand, updates) => {
     if (!cand) return;
     const key = candKey(cand);
-    if (!key) return;
+    if (!key || !requestId) return;
+    const myGen = genRef.current;
+    const confirmedCandidate = {
+      ...cand,
+      ...updates,
+      emailSource: 'manual',
+      websiteSource: updates.website ? 'manual' : null,
+      affiliationSource: 'staff_manual',
+      contactEnrichment: {
+        ...(cand.contactEnrichment || {}),
+        ...updates,
+        emailSource: 'manual',
+        websiteSource: updates.website ? 'manual' : null,
+        affiliationSource: 'staff_manual',
+      },
+    };
+    const response = await fetch('/api/workbench/reviewer-roster', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requestId, action: 'confirm_identity', candidate: confirmedCandidate }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success || !data.confirmationId) {
+      throw new Error(data.error || 'Could not record identity confirmation. Please retry.');
+    }
+    if (genRef.current !== myGen) return;
     setManualContact(cand, updates);
-    const stamp = (c) => (candKey(c) === key ? { ...c, pdIdentityConfirmed: true } : c);
+    const stamp = (c) => (candKey(c) === key ? {
+      ...c,
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: data.confirmationId,
+    } : c);
     setCandidates((prev) => prev.map(stamp));
     setRecCandidates((prev) => prev.map(stamp));
     setRosterActive((prev) => prev.map(stamp));
-  }, [setManualContact]);
+  }, [requestId, setManualContact]);
 
   const saveSelected = useCallback(async () => {
-    if (savingRef.current) return;
+    const myGen = genRef.current;
+    if (savingRef.current === myGen) return;
     // Filter by isSelectable too (not just `selected`): a needs-identity-review row
     // can't be checked, but this guarantees one never reaches save-candidates even if
     // a stale `selected` entry survives a reclassification (defense-in-depth; the
     // server 422s these anyway).
     const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && isCandidateSelectable(c));
     if (chosen.length === 0) return;
-    savingRef.current = true;
+    savingRef.current = myGen;
+    const isCurrent = () => genRef.current === myGen;
     setPhase('saving');
     setError(null); setErrorMeta(null); setProgress([]); setSavedMsg(null);
     try {
@@ -1096,7 +1128,7 @@ export default function ReviewerSearchSection({
       const promotedNames = [];
       const contactConflicts = [];
       if (applicantChosen.length > 0) {
-        pushProgress(`Promoting ${applicantChosen.length} applicant-referred reviewer(s)…`);
+        if (isCurrent()) pushProgress(`Promoting ${applicantChosen.length} applicant-referred reviewer(s)…`);
         const results = await Promise.all(applicantChosen.map(async (c) => {
           try {
             // Carry the PD's hand-corrections (ONLY the fields marked manual) so the
@@ -1155,27 +1187,26 @@ export default function ReviewerSearchSection({
         const detail = failures.map((f) => `${f.name || 'Unknown candidate'}: ${f.error || 'failed'}`).join('; ');
         messageParts.push(`${failures.length} could not be saved (${detail}).`);
       }
-      setSavedMsg(messageParts.join(' '));
-      setPhase('done');
+      if (isCurrent()) {
+        setSavedMsg(messageParts.join(' '));
+        setPhase('done');
+      }
 
       // Graduate ONLY the successfully-saved names: flip them to status='saved'
       // in the roster (so they leave the active Find list → Candidates tab, but
       // stay deduped) and splice them out of the active view. Failed rows remain
       // active/selectable. Best-effort — a roster failure doesn't fail the save.
       if (savedNames.length > 0 || savedKeys.length > 0) {
-        const savedKeySet = new Set(savedKeys);
-        const legacyNameKeys = savedKeys.length === 0
-          ? new Set(savedNames.map((n) => normalizeReviewerName(n)))
-          : null;
-        const wasSaved = (candidate) => savedKeySet.has(reviewerSaveKey(candidate))
-          || (legacyNameKeys ? legacyNameKeys.has(candKey(candidate)) : false);
-        setCandidates((prev) => prev.filter((c) => !wasSaved(c)));
-        setRosterActive((prev) => prev.filter((c) => !wasSaved(c)));
-        setSelected((prev) => {
-          const next = new Set(prev);
-          displayCandidates.filter(wasSaved).forEach((candidate) => next.delete(candKey(candidate)));
-          return next;
-        });
+        const wasSaved = (candidate) => candidateWasSaved(candidate, savedKeys, savedNames);
+        if (isCurrent()) {
+          setCandidates((prev) => prev.filter((c) => !wasSaved(c)));
+          setRosterActive((prev) => prev.filter((c) => !wasSaved(c)));
+          setSelected((prev) => {
+            const next = new Set(prev);
+            displayCandidates.filter(wasSaved).forEach((candidate) => next.delete(candKey(candidate)));
+            return next;
+          });
+        }
         if (requestId) {
           try {
             await fetch('/api/workbench/reviewer-roster', {
@@ -1188,10 +1219,12 @@ export default function ReviewerSearchSection({
       }
       if (promotedNames.length > 0) {
         const promotedKeys = new Set(promotedNames.map((n) => normalizeReviewerName(n)));
-        setCandidates((prev) => prev.filter((c) => !promotedKeys.has(candKey(c))));
-        setRecCandidates((prev) => prev.filter((c) => !promotedKeys.has(candKey(c))));
-        setRosterActive((prev) => prev.filter((c) => !promotedKeys.has(candKey(c))));
-        setSelected((prev) => { const next = new Set(prev); promotedKeys.forEach((k) => next.delete(k)); return next; });
+        if (isCurrent()) {
+          setCandidates((prev) => prev.filter((c) => !promotedKeys.has(candKey(c))));
+          setRecCandidates((prev) => prev.filter((c) => !promotedKeys.has(candKey(c))));
+          setRosterActive((prev) => prev.filter((c) => !promotedKeys.has(candKey(c))));
+          setSelected((prev) => { const next = new Set(prev); promotedKeys.forEach((k) => next.delete(k)); return next; });
+        }
         if (requestId) {
           try {
             await fetch('/api/workbench/reviewer-roster', {
@@ -1200,16 +1233,18 @@ export default function ReviewerSearchSection({
               body: JSON.stringify({ requestId, action: 'saved', names: promotedNames }),
             });
           } catch {
-            setRosterNote("Couldn't mark promoted applicant-referred reviewers as saved in the Find roster — they may reappear after reload.");
+            if (isCurrent()) setRosterNote("Couldn't mark promoted applicant-referred reviewers as saved in the Find roster — they may reappear after reload.");
           }
         }
       }
-      if (onSaved && totalSucceeded > 0) onSaved();
+      if (isCurrent() && onSaved && totalSucceeded > 0) onSaved();
     } catch (e) {
-      setError(e.message);
-      setPhase('error');
+      if (isCurrent()) {
+        setError(e.message);
+        setPhase('error');
+      }
     } finally {
-      savingRef.current = false;
+      if (savingRef.current === myGen) savingRef.current = null;
     }
   }, [displayCandidates, selected, requestId, analysis, cycleCode, onSaved, pushProgress]);
 

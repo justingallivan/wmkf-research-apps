@@ -1,19 +1,22 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-03
+last_verified: 2026-07-12
 stale_after_days: 45
 owner: reviewer-finder
 source_files:
   - lib/services/reviewer-identity-evidence.js
   - lib/services/reviewer-identity-resolver.js
   - lib/services/contact-enrichment-service.js
+  - lib/services/reviewer-candidate-attestation.js
+  - lib/services/reviewer-roster-store.js
   - lib/services/proposal-pi-identity.js
   - lib/dataverse/adapters/potential-reviewer.js
   - lib/dataverse/adapters/reviewer-suggestion.js
   - lib/dataverse/adapters/researcher.js
   - pages/api/reviewer-finder/discover.js
   - pages/api/reviewer-finder/save-candidates.js
+  - pages/api/workbench/reviewer-roster.js
   - pages/api/reviewer-finder/my-candidates.js
   - pages/api/review-manager/send-emails.js
   - pages/api/review-manager/render-emails.js
@@ -30,6 +33,7 @@ watch_paths:
   - lib/dataverse/adapters/reviewer-suggestion.js
   - lib/dataverse/adapters/researcher.js
   - pages/api/reviewer-finder/**
+  - pages/api/workbench/reviewer-roster.js
   - pages/api/review-manager/send-emails.js
   - docs/atlas/dataverse-wmkf-potentialreviewers.md
   - docs/atlas/dataverse-wmkf-appreviewersuggestion.md
@@ -85,9 +89,11 @@ no drift). The 8 contracts:
 
 - **Board-writeup identity person fields (S308).** Three reviewer/staff-CONFIRMED person columns on `wmkf_potentialreviewers` — `wmkf_academicrank` (200; academic rank, NOT an administrative title), `wmkf_primarydepartment` (255), `wmkf_maininstitution` (255) — kept DISTINCT from the enrichment-sourced `wmkf_primaryaffiliation`/`wmkf_department` (those prefill these but overwriting them would degrade reviewer-card display + identity scoring). Captured (required) at Stage 2a accept and staff-editable in the workbench; one canonical current value (board write-ups freeze it). Schema: `lib/dataverse/schema/wave10-reviewer-board-identity/`. Read/write paths: external-reviewer-portal + reviewer-workbench-lifecycle topics; Atlas `docs/atlas/dataverse-wmkf-potentialreviewers.md`. No resolver/provenance interaction (plain person-field writes; not in any identity-status path).
 
-## PD Identity Override — Contact Correction (S285, SHIPPED)
+## PD Identity Override — Contact Correction (S285, C0.1 hardened)
 
-A PD who recognizes a `needs_identity_review` candidate (real person, but the auto-resolver couldn't confirm and the suggested email/website are wrong) can rescue them WITHOUT a full re-resolve. On the Find tab, such a card shows **"✓ This is the right person → edit & add"** → opens `CandidateEditModal` in `confirmMode` (email/website/affiliation editable + a required "I've verified this is the correct person" checkbox). On confirm, `confirmIdentityContact` (ReviewerSearchSection) stamps the contact `manual` + sets `pdIdentityConfirmed:true`, which makes the row selectable (`isSelectable`) and is sent to `save-candidates`. The server honors `pdIdentityConfirmed` as an explicit, isolated override (`rawCandidate.pdIdentityConfirmed === true`): it **skips the `isUnresolvedIdentity` hard-reject** and persists the PD-typed email/website/affiliation (sourced ONLY from `candidate.*`, never the enrichment fallback — a blanked field stays null), while **force-nulling all resolver-sourced ORCID/Scholar/metrics** (`blockByIdentity`/`blockScholar` forced true) and **skipping `writeIdentityDecision`** (no resolver verdict is fabricated). **Institution-COI is NOT waived** by the override (identity confirmation ≠ COI waiver). Email stays `manual` → confirm-before-invite still fires at send. Audit: `matchReason` gets `[Identity confirmed by PD; contact entered manually]`. Every server branch is `pdConfirmed ? override : existing`, so the auto-discovery firewall is unchanged for normal rows. Tests: `tests/unit/reviewer-route-identity-gate.test.js` (PD-override block). This covers the *contact-wrong, person-right* case; the *person-wrong* (namesake) case below is still deferred.
+A PD who recognizes a `needs_identity_review` candidate (real person, but the auto-resolver couldn't confirm and the suggested email/website are wrong) can rescue them WITHOUT a full re-resolve. On the Find tab, such a card shows **"✓ This is the right person → edit & add"** → opens `CandidateEditModal` in `confirmMode` (email/website/affiliation editable + a required "I've verified this is the correct person" checkbox). On confirm, `ReviewerSearchSection` first calls the authenticated roster `PATCH action:'confirm_identity'`. The server requires an existing active request row and atomically stores a random confirmation id, canonical manual contact, actor profile/system-user ids, timestamp, and `source:'staff_confirmed'`; only then does the client apply its `pdIdentityConfirmed` UI marker and opaque confirmation id. `save-candidates` treats the boolean as non-authoritative: it re-reads the confirmation by the same request + opaque id and requires exact canonical name/email/website/affiliation agreement. Missing, fake, cross-request, changed-contact, or failed reads stop before any adapter write.
+
+A valid confirmation skips the unresolved hard-reject and persists only the PD-typed email/website/affiliation (manual provenance), while force-nulling all resolver-sourced ORCID/Scholar/metrics and skipping `writeIdentityDecision`; institution COI is still enforced. Independently, automated `confirmed`/`probable` identity fields loosen persistence only with the request- and identity-bundle-bound signed receipt minted by `/api/reviewer-finder/enrich-contacts`; unsigned client status is deny-only. Email remains manual/low-confidence, so confirm-before-invite still fires. Audit: `matchReason` gets `[Identity confirmed by PD; contact entered manually]`. Tests: `reviewer-route-identity-gate`, `reviewer-roster-store`/endpoint, `reviewer-candidate-attestation`, and stale-save UI tests. This covers the *contact-wrong, person-right* case; the *person-wrong* (namesake) case below is still deferred.
 
 ## Future Work — Edit-and-Re-Resolve (Deferred)
 

@@ -9,6 +9,7 @@
  *   PATCH { requestId, action:'exclude', candidate } → set aside
  *   PATCH { requestId, action:'promote', name }      → excluded → active (returns blob)
  *   PATCH { requestId, action:'saved', names }       → graduated to the Dataverse pool
+ *   PATCH { requestId, action:'confirm_identity', candidate } → staff attestation
  *
  * App-key tuple matches my-candidates.js so the Find tab's `reviewers`/
  * `reviewer-finder` grants both reach it.
@@ -19,6 +20,7 @@ import {
   recordSurfaced,
   setExcluded,
   promote,
+  confirmIdentity,
   markSaved,
   listForRequest,
 } from '../../../lib/services/reviewer-roster-store';
@@ -40,7 +42,7 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') return await handleGet(req, res);
     if (req.method === 'POST') return await handlePost(req, res);
-    if (req.method === 'PATCH') return await handlePatch(req, res);
+    if (req.method === 'PATCH') return await handlePatch(req, res, access);
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error) {
     console.error('reviewer-roster error:', error.message);
@@ -79,7 +81,7 @@ async function handlePost(req, res) {
   return res.status(200).json({ success: true, recorded });
 }
 
-async function handlePatch(req, res) {
+async function handlePatch(req, res, access) {
   const { requestId, action } = req.body || {};
   if (!validRequestId(requestId)) {
     return res.status(400).json({ error: 'Valid requestId (GUID) is required' });
@@ -110,5 +112,35 @@ async function handlePatch(req, res) {
     return res.status(200).json({ success: true, saved });
   }
 
-  return res.status(400).json({ error: 'Unknown action (expected exclude | promote | saved)' });
+  if (action === 'confirm_identity') {
+    const { candidate } = req.body;
+    if (!candidate?.name || !candidate?.email) {
+      return res.status(400).json({ error: 'candidate name and email are required to confirm identity' });
+    }
+    const manualCandidate = {
+      ...candidate,
+      emailSource: 'manual',
+      websiteSource: candidate.website ? 'manual' : null,
+      affiliationSource: 'staff_manual',
+      contactEnrichment: {
+        ...(candidate.contactEnrichment || {}),
+        email: candidate.email,
+        emailSource: 'manual',
+        website: candidate.website || null,
+        websiteSource: candidate.website ? 'manual' : null,
+        affiliation: candidate.affiliation || null,
+        affiliationSource: 'staff_manual',
+      },
+    };
+    const confirmed = await confirmIdentity(requestId, pruneCandidateForRoster(manualCandidate), {
+      actorProfileId: access?.profileId || null,
+      actorSystemUserId: access?.session?.user?.dynamicsSystemuserId || null,
+    });
+    if (!confirmed) {
+      return res.status(409).json({ error: 'Candidate is no longer active; reload before confirming identity.' });
+    }
+    return res.status(200).json({ success: true, ...confirmed });
+  }
+
+  return res.status(400).json({ error: 'Unknown action (expected exclude | promote | saved | confirm_identity)' });
 }

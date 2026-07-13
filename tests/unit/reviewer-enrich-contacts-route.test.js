@@ -37,8 +37,13 @@ jest.mock('../../lib/services/contact-enrichment-service', () => ({
   },
 }));
 
+jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
+  mintAutomatedIdentityAttestation: jest.fn(async ({ candidate }) => `receipt:${candidate.name}`),
+}));
+
 import handler from '../../pages/api/reviewer-finder/enrich-contacts';
 import { ContactEnrichmentService } from '../../lib/services/contact-enrichment-service';
+import { mintAutomatedIdentityAttestation } from '../../lib/services/reviewer-candidate-attestation';
 
 function mockRes() {
   return {
@@ -103,4 +108,24 @@ test('opts into partial abort results and streams partial complete metadata', as
     },
   ]);
   expect(res.ended).toBe(true);
+});
+
+test('adds a server identity receipt to enriched candidates when requestId is present', async () => {
+  ContactEnrichmentService.enrichCandidates.mockResolvedValue({
+    enriched: [{ name: 'Dr. A', contactEnrichment: { identity: { status: 'probable' } } }],
+    stats: {},
+  });
+  const req = {
+    method: 'POST',
+    body: {
+      requestId: '11111111-1111-1111-1111-111111111111',
+      candidates: [{ name: 'Dr. A' }],
+      options: {},
+    },
+  };
+  const res = mockRes();
+  await handler(req, res);
+  const complete = res.frames.find((frame) => frame.type === 'complete');
+  expect(mintAutomatedIdentityAttestation).toHaveBeenCalled();
+  expect(complete.results[0].automatedIdentityAttestation).toBe('receipt:Dr. A');
 });

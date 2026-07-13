@@ -29,6 +29,7 @@ import { loadModelOverrides } from '../../../lib/services/model-override-loader'
 import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { resolveProposalPI, piInstitutions } from '../../../lib/services/proposal-pi-identity';
+import { mintAutomatedIdentityAttestation } from '../../../lib/services/reviewer-candidate-attestation';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -184,6 +185,24 @@ export default async function handler(req, res) {
     // The full audit also rides on stats below for the client.
     if (results?.stats?.contactAudit) {
       console.log('[enrich-contacts] contact-leads audit:', JSON.stringify(results.stats.contactAudit));
+    }
+
+    // Bind the server-computed identity bundle to this request before returning
+    // it to the browser. Save-candidates treats unsigned/modified identity fields
+    // as hints that may tighten gates, never as permission to persist ORCID,
+    // Scholar, or metrics. A mint failure degrades to a safe contact/name-only
+    // save rather than hiding otherwise useful search results.
+    if (requestId && Array.isArray(results?.enriched)) {
+      await Promise.all(results.enriched.map(async (candidate) => {
+        try {
+          candidate.automatedIdentityAttestation = await mintAutomatedIdentityAttestation({
+            requestId,
+            candidate,
+          });
+        } catch (error) {
+          console.error('[enrich-contacts] identity receipt mint failed:', error.message);
+        }
+      }));
     }
 
     // Send final results

@@ -10,6 +10,7 @@ import {
   filterExcluded,
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
+  candidateWasSaved,
   pruneCandidateForRoster,
   sanitizeInstitutionCOIDetails,
   mergeReferredProvenance,
@@ -162,6 +163,15 @@ describe('isCandidateSelectable', () => {
 });
 
 describe('mergeEnrichment', () => {
+  test('preserves the server-signed automated identity receipt', () => {
+    const [out] = mergeEnrichment([{ name: 'Dr Receipt' }], [{
+      name: 'Dr Receipt',
+      automatedIdentityAttestation: 'signed-receipt',
+      contactEnrichment: { identity: { status: 'probable' } },
+    }]);
+    expect(out.automatedIdentityAttestation).toBe('signed-receipt');
+    expect(pruneCandidateForRoster(out).automatedIdentityAttestation).toBe('signed-receipt');
+  });
   const candidates = [
     { name: 'Dr. A', email: null, website: null, relevanceScore: 90 },
     { name: 'Dr. B', email: 'old@b.edu' },
@@ -288,6 +298,20 @@ describe('mergeEnrichment', () => {
     expect(out[0].hasInstitutionCOI).toBe(true);
     expect(out[0].institutionCOIDetails).toEqual({ piInstitution: 'JHU', reviewerInstitution: 'JHU' });
     expect(out[0].institutionCOIDetails).not.toHaveProperty('historical');
+  });
+});
+
+describe('saved candidate correlation', () => {
+  test('stable keys do not graduate a same-name candidate with different anchors', () => {
+    const saved = { name: 'Dr Same Name', email: 'first@example.edu', affiliation: 'One University' };
+    const sibling = { name: 'Same Name', email: 'second@example.edu', affiliation: 'Two University' };
+    const { reviewerSaveKey } = require('../../lib/utils/reviewer-save-key');
+    expect(candidateWasSaved(saved, [reviewerSaveKey(saved)], ['Dr Same Name'])).toBe(true);
+    expect(candidateWasSaved(sibling, [reviewerSaveKey(saved)], ['Dr Same Name'])).toBe(false);
+  });
+
+  test('legacy savedNames remain supported only when stable keys are absent', () => {
+    expect(candidateWasSaved({ name: 'Dr Legacy' }, [], ['Legacy'])).toBe(true);
   });
 });
 

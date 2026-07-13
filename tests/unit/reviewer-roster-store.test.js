@@ -128,6 +128,47 @@ describe('promote', () => {
   });
 });
 
+describe('staff identity confirmation', () => {
+  test('stores an actor/time/contact-bound confirmation only on an active request row', async () => {
+    sql.mockResolvedValueOnce({ rows: [{ candidate: { name: 'Dr Ann Lee' } }], rowCount: 1 });
+    const out = await store.confirmIdentity(REQ, {
+      name: 'Dr Ann Lee',
+      email: ' ANN@Example.edu ',
+      website: 'https://example.edu/ann',
+      affiliation: 'Example University',
+    }, { actorProfileId: 7, actorSystemUserId: 'SYS-7' });
+
+    expect(out.confirmationId).toEqual(expect.any(String));
+    const text = queryTextOf(0);
+    expect(text).toMatch(/status = 'active'/);
+    expect(text).toMatch(/candidate = candidate \|\|/);
+    const stored = JSON.parse(allInterpolations().find((entry) => (
+      typeof entry === 'string' && entry.includes('staffIdentityConfirmation')
+    )));
+    expect(stored).toMatchObject({
+      email: 'ann@example.edu',
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: out.confirmationId,
+      staffIdentityConfirmation: {
+        source: 'staff_confirmed',
+        normalizedName: 'ann lee',
+        email: 'ann@example.edu',
+        actorProfileId: 7,
+        actorSystemUserId: 'SYS-7',
+      },
+    });
+  });
+
+  test('findIdentityConfirmation is request + opaque-id scoped', async () => {
+    sql.mockResolvedValueOnce({ rows: [{ confirmation: { source: 'staff_confirmed', email: 'ann@example.edu' } }] });
+    await expect(store.findIdentityConfirmation(REQ, 'confirm-1')).resolves.toMatchObject({
+      source: 'staff_confirmed', email: 'ann@example.edu',
+    });
+    expect(queryTextOf(0)).toMatch(/candidate->>'pdIdentityConfirmationId'/);
+    expect(allInterpolations()).toEqual(expect.arrayContaining([REQ, 'confirm-1']));
+  });
+});
+
 describe('markSaved', () => {
   test('upserts each named row to saved (eviction-tolerant, leaving excluded untouched)', async () => {
     const n = await store.markSaved(REQ, ['Ann Lee', 'Bob Roe', '']);

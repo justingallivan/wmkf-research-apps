@@ -11,6 +11,7 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   recordSurfaced: jest.fn(async () => 0),
   setExcluded: jest.fn(async () => {}),
   promote: jest.fn(async () => ({ name: 'Bob Roe' })),
+  confirmIdentity: jest.fn(async () => ({ confirmationId: 'confirm-1', candidate: { name: 'Ann Lee' } })),
   markSaved: jest.fn(async () => 1),
 }));
 
@@ -120,6 +121,37 @@ describe('PATCH', () => {
     await handler({ method: 'PATCH', body: { requestId: REQ, action: 'saved', names: ['Ann Lee'] } }, r);
     expect(r.statusCode).toBe(200);
     expect(store.markSaved).toHaveBeenCalledWith(REQ, ['Ann Lee']);
+  });
+
+  it('confirm_identity records an actor-bound server confirmation', async () => {
+    requireAppAccess.mockResolvedValueOnce({
+      profileId: 5,
+      session: { user: { dynamicsSystemuserId: 'SYS-5' } },
+    });
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'confirm_identity',
+      candidate: { name: 'Ann Lee', email: 'ANN@EXAMPLE.EDU', affiliation: 'Example U' },
+    } }, r);
+    expect(r.statusCode).toBe(200);
+    expect(store.confirmIdentity).toHaveBeenCalledWith(
+      REQ,
+      expect.objectContaining({ name: 'Ann Lee', email: 'ANN@EXAMPLE.EDU' }),
+      { actorProfileId: 5, actorSystemUserId: 'SYS-5' },
+    );
+    expect(r.body.confirmationId).toBe('confirm-1');
+  });
+
+  it('confirm_identity returns 409 when the active roster row is gone', async () => {
+    store.confirmIdentity.mockResolvedValueOnce(null);
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'confirm_identity',
+      candidate: { name: 'Ann Lee', email: 'ann@example.edu' },
+    } }, r);
+    expect(r.statusCode).toBe(409);
   });
 
   it('unknown action → 400', async () => {
