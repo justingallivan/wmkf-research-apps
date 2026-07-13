@@ -9,7 +9,9 @@
  * and the no-cleanup-while-active rule.
  */
 import {
+  assertApprovedRequest,
   assertCleanInitRow,
+  assertDrainAttribution,
   assertJobOutcome,
   assertWave13Binding,
   buildSmokeJobArgs,
@@ -69,6 +71,13 @@ function boundPersonRow(overrides = {}) {
     wmkf_identityconfidenceband: 'high',
     wmkf_identityresolverversion: 'self-report@accept',
     wmkf_identityresolvedat: '2026-07-14T10:00:00Z',
+    wmkf_identityevidencesummary: 'Reviewer self-confirmed this ORCID on the authenticated invitation form (magic-link).',
+    wmkf_identityverifiedanchorsjson: JSON.stringify([{
+      type: 'self_reported_orcid',
+      canonicalKey: `orcid:${ORCID}`,
+      sourceUrl: `https://orcid.org/${ORCID}`,
+      verifier: 'reviewerSelfReport@self-report@accept',
+    }]),
     ...overrides,
   };
 }
@@ -200,8 +209,69 @@ describe('assertWave13Binding', () => {
     ['lineage drift', { wmkf_identityfieldlineagejson: JSON.stringify({ schemaVersion: 1, fields: { wmkf_orcid: { source: 'automated', bindingVersion: 1 }, wmkf_orcidurl: { source: 'automated', bindingVersion: 1 } } }) }],
     ['non-confirmed decision', { wmkf_identitystatus: 'probable' }],
     ['wrong resolver version', { wmkf_identityresolverversion: 'resolver@1' }],
+    ['missing evidence summary', { wmkf_identityevidencesummary: null }],
+    ['drifted evidence summary', { wmkf_identityevidencesummary: 'confirmed — resolver evidence' }],
+    ['missing anchors JSON', { wmkf_identityverifiedanchorsjson: null }],
+    ['anchors for a different ORCID', { wmkf_identityverifiedanchorsjson: JSON.stringify([{ type: 'self_reported_orcid', canonicalKey: 'orcid:0000-0001-5109-3700', sourceUrl: 'https://orcid.org/0000-0001-5109-3700', verifier: 'reviewerSelfReport@self-report@accept' }]) }],
   ])('fails on %s', (_label, override) => {
     expect(assertWave13Binding(boundPersonRow(override), { orcid: ORCID, acceptedAt: ACCEPTED_AT }).ok).toBe(false);
+  });
+
+  test.each([
+    ['wmkf_googlescholarid', 'abc123'],
+    ['wmkf_googlescholarurl', 'https://scholar.google.com/citations?user=abc123'],
+    ['wmkf_hindex', 12],
+    ['wmkf_i10index', 3],
+    ['wmkf_totalcitations', 400],
+  ])('fails when untouched identity field %s was written', (field, value) => {
+    const out = assertWave13Binding(boundPersonRow({ [field]: value }), { orcid: ORCID, acceptedAt: ACCEPTED_AT });
+    expect(out.ok).toBe(false);
+    expect(out.problems.join(' ')).toContain(field);
+  });
+});
+
+describe('assertApprovedRequest — double-entry fixture authorization', () => {
+  const APPROVED = '22222222-2222-4222-8222-222222222222';
+
+  test('passes when the resolved GUID equals the approval (case-insensitive)', () => {
+    expect(assertApprovedRequest(APPROVED.toUpperCase(), APPROVED)).toEqual({ ok: true, problems: [] });
+  });
+
+  test('fails when the resolved request differs from the approval', () => {
+    const out = assertApprovedRequest('99999999-9999-4999-8999-999999999999', APPROVED);
+    expect(out.ok).toBe(false);
+    expect(out.problems.join(' ')).toContain('unapproved request');
+  });
+
+  test.each([
+    ['missing', undefined],
+    ['not a GUID', 'REQ-123'],
+    ['empty', ''],
+  ])('fails when the approval id is %s', (_label, approved) => {
+    expect(assertApprovedRequest(APPROVED, approved).ok).toBe(false);
+  });
+});
+
+describe('assertDrainAttribution — blocking deployed-cron attribution', () => {
+  test('passes with a bracketing run and an attested deployment', () => {
+    expect(assertDrainAttribution({ bracketingRuns: 1, totalRuns: 3, expectDeployment: '38640dd7' }))
+      .toEqual({ ok: true, problems: [] });
+  });
+
+  test('fails with zero maintenance runs in the window', () => {
+    const out = assertDrainAttribution({ bracketingRuns: 0, totalRuns: 0, expectDeployment: '38640dd7' });
+    expect(out.ok).toBe(false);
+    expect(out.problems.join(' ')).toContain('cannot be attributed');
+  });
+
+  test('fails when runs exist but none bracket the job completion', () => {
+    const out = assertDrainAttribution({ bracketingRuns: 0, totalRuns: 4, expectDeployment: '38640dd7' });
+    expect(out.ok).toBe(false);
+    expect(out.problems.join(' ')).toContain('bracket');
+  });
+
+  test('fails without an attested deployment', () => {
+    expect(assertDrainAttribution({ bracketingRuns: 1, totalRuns: 1, expectDeployment: '' }).ok).toBe(false);
   });
 });
 

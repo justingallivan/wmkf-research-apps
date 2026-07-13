@@ -20,8 +20,14 @@
  *
  * Usage:
  *   node scripts/smoke-reviewer-binding.js --request <GUID|requestNum> \
+ *        --approved-request-id <GUID> --expect-deployment <sha-or-dpl> \
  *        [--orcid 0000-0002-1825-0097] [--timeout-minutes 15] [--poll-seconds 15] \
  *        [--cleanup] [--delete-job] --confirm-prod-dataverse
+ *
+ * Authorization is double-entry: the RESOLVED request GUID must equal the
+ * owner-approved --approved-request-id, and --expect-deployment must name the
+ * production deployment (from `vercel inspect`) the cron is expected to run —
+ * both are recorded in the artifact and attribution is a blocking assertion.
  *
  * Exit codes: 0 pass · 1 assertion failure · 2 timeout/interrupted (job may
  * still be live — do NOT clean up by hand until it is terminal) · 3 aborted
@@ -51,24 +57,35 @@ function arg(name, def = null) {
 const hasFlag = (name) => process.argv.includes(`--${name}`);
 
 const REQUEST = arg('request');
+const APPROVED_REQUEST_ID = arg('approved-request-id');
+const EXPECT_DEPLOYMENT = arg('expect-deployment');
 const ORCID_RAW = arg('orcid', '0000-0002-1825-0097');
 const TIMEOUT_MINUTES = Math.max(4, Number(arg('timeout-minutes', 15)) || 15);
 const POLL_SECONDS = Math.max(5, Number(arg('poll-seconds', 15)) || 15);
 const CLEANUP = hasFlag('cleanup');
 const DELETE_JOB = hasFlag('delete-job');
-const CONFIRMED = hasFlag('confirm-prod-dataverse') || process.env.SMOKE_REVIEWER_BINDING_CONFIRM === 'true';
+// Deliberately a per-run flag ONLY — no environment fallback. A standing env
+// confirm would let a later, unauthorized invocation write to production.
+const CONFIRMED = hasFlag('confirm-prod-dataverse');
 
 function abort(message) {
   console.error(`ABORT: ${message}`);
   process.exit(3);
 }
 
+const USAGE = 'Usage: node scripts/smoke-reviewer-binding.js --request <GUID|requestNum> --approved-request-id <GUID> --expect-deployment <sha-or-dpl> [--orcid <iD>] [--timeout-minutes 15] [--poll-seconds 15] [--cleanup] [--delete-job] --confirm-prod-dataverse';
 if (hasFlag('help') || hasFlag('h') || !REQUEST) {
-  console.log('Usage: node scripts/smoke-reviewer-binding.js --request <GUID|requestNum> [--orcid <iD>] [--timeout-minutes 15] [--poll-seconds 15] [--cleanup] [--delete-job] --confirm-prod-dataverse');
+  console.log(USAGE);
   process.exit(REQUEST ? 0 : 3);
 }
 if (!CONFIRMED) {
   abort('this smoke creates real PROD Dataverse rows and a production queue job. Re-run with --confirm-prod-dataverse when the owner has authorized the run.');
+}
+if (!APPROVED_REQUEST_ID) {
+  abort('--approved-request-id <GUID> is required: authorization must name the owner-approved fixture request, not bless the run generically.');
+}
+if (!EXPECT_DEPLOYMENT || !String(EXPECT_DEPLOYMENT).trim()) {
+  abort('--expect-deployment <sha-or-dpl> is required: run `vercel inspect` on the production deployment first and pass its SHA or deployment id so the artifact records what the cron was expected to run.');
 }
 
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
@@ -194,6 +211,8 @@ const prePopulation = runPopulationPreflight('pre-smoke');
 const artifact = {
   startedAt,
   orcid: ORCID,
+  approvedRequestId: APPROVED_REQUEST_ID,
+  expectDeployment: EXPECT_DEPLOYMENT,
   prePopulation,
   problems: [],
 };
@@ -212,6 +231,8 @@ const recordProblems = (label, result) => {
 
 await bypassDynamicsRestrictions('smoke-reviewer-binding', async () => {
   const request = await resolveRequest(REQUEST);
+  const approval = core.assertApprovedRequest(request.akoya_requestid, APPROVED_REQUEST_ID);
+  if (!approval.ok) abort(approval.problems.join('; '));
   const smokeKey = core.buildSmokeKey();
   const email = `${smokeKey}@example.org`;
   artifact.smokeKey = smokeKey;
@@ -308,28 +329,50 @@ await bypassDynamicsRestrictions('smoke-reviewer-binding', async () => {
     problems: alertRows.map((a) => `alert ${a.id} ${a.alert_type} (${a.severity}) "${a.title}"`),
   });
 
-  // ── Attribution evidence ─────────────────────────────────────────────────
+  // ── Attribution (BLOCKING) ───────────────────────────────────────────────
+  // The window comparison runs server-side: maintenance_runs timestamps are
+  // timestamp-without-tz columns that node-postgres would parse in the LOCAL
+  // timezone, silently skewing a client-side comparison against the job's
+  // timestamptz completed_at.
   const { rows: runs } = await sql`
     SELECT id, job_name, status, records_processed, started_at, completed_at
       FROM maintenance_runs
-     WHERE job_name = 'drain-reviewer-acceptances' AND started_at >= ${startedAt}
+     WHERE job_name = 'drain-reviewer-acceptances' AND started_at >= ${startedAt}::timestamptz AT TIME ZONE 'UTC'
      ORDER BY started_at
   `;
+  const { rows: bracketing } = await sql`
+    SELECT r.id
+      FROM maintenance_runs r
+      JOIN reviewer_acceptance_jobs j ON j.id = ${job.id}
+     WHERE r.job_name = 'drain-reviewer-acceptances'
+       AND r.started_at <= (j.completed_at AT TIME ZONE 'UTC')
+       AND r.completed_at IS NOT NULL
+       AND r.completed_at >= (j.completed_at AT TIME ZONE 'UTC')
+  `;
   artifact.maintenanceRuns = runs;
+  artifact.bracketingRunIds = bracketing.map((r) => r.id);
   console.log(`\n── Attribution ──`);
-  console.log(`maintenance_runs (drain-reviewer-acceptances) since ${startedAt}: ${runs.length} run(s)`);
+  console.log(`maintenance_runs (drain-reviewer-acceptances) since ${startedAt}: ${runs.length} run(s); ${bracketing.length} bracket the job completion.`);
   for (const run of runs) {
-    console.log(`  run ${run.id}: ${run.status} processed=${run.records_processed} ${new Date(run.started_at).toISOString()} → ${run.completed_at ? new Date(run.completed_at).toISOString() : '…'}`);
+    console.log(`  run ${run.id}: ${run.status} processed=${run.records_processed}`);
   }
-  console.log('Record the deployed SHA alongside this run: `vercel inspect <production deployment>` — the deployed cron is the only caller of the drain when no local server is running (verified above).');
+  recordProblems('deployed-drain attribution', core.assertDrainAttribution({
+    bracketingRuns: bracketing.length,
+    totalRuns: runs.length,
+    expectDeployment: EXPECT_DEPLOYMENT,
+  }));
+  console.log(`expected deployment (operator-attested via vercel inspect): ${EXPECT_DEPLOYMENT}`);
 
   // ── Artifact before any cleanup ──────────────────────────────────────────
   const outDir = join(__dirname, '..', 'outputs');
   if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
   const artifactPath = join(outDir, `${smokeKey}-result.json`);
-  artifact.finishedAt = new Date().toISOString();
-  artifact.pass = !failed;
-  writeFileSync(artifactPath, JSON.stringify(artifact, null, 2));
+  const writeArtifact = () => {
+    artifact.finishedAt = new Date().toISOString();
+    artifact.pass = !failed;
+    writeFileSync(artifactPath, JSON.stringify(artifact, null, 2));
+  };
+  writeArtifact();
   console.log(`\nartifact: ${artifactPath}`);
 
   // ── Cleanup (only on explicit flag, only after terminal) ────────────────
@@ -361,12 +404,16 @@ await bypassDynamicsRestrictions('smoke-reviewer-binding', async () => {
         console.log('baseline restored: post-cleanup population matches the pre-smoke snapshot.');
       } else if (personCleanup.deleted) {
         console.error(`baseline NOT restored: pre=${JSON.stringify(prePopulation)} post=${JSON.stringify(postPopulation)} — investigate before rerunning.`);
+        artifact.problems.push(`cleanup: baseline not restored despite person deletion (pre=${JSON.stringify(prePopulation)} post=${JSON.stringify(postPopulation)})`);
         failed = true;
       } else {
         console.error(`baseline delta EXPECTED and present: the person could not be deleted (deactivation leaves its Wave 13 fields populated). pre=${JSON.stringify(prePopulation)} post=${JSON.stringify(postPopulation)}. Report this delta to the owner; do not claim restoration.`);
+        artifact.problems.push('cleanup: person deactivated (delete unavailable) — Wave 13 population baseline intentionally NOT restored; owner must resolve the residual row');
       }
       artifact.cleanup = { suggestion: suggestionCleanup, person: personCleanup, jobDeleted: DELETE_JOB };
-      writeFileSync(artifactPath, JSON.stringify(artifact, null, 2));
+      // Recompute pass so the durable artifact can never say pass=true while
+      // the process exits non-zero on a cleanup/baseline failure.
+      writeArtifact();
     }
   }
 });

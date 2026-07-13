@@ -58,6 +58,45 @@ export function buildSmokeKey(now = new Date()) {
   return `${SMOKE_SOURCE_TAG}-${now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}`;
 }
 
+const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Double-entry fixture authorization: the run must name the owner-approved
+ * request twice (`--request` selects, `--approved-request-id` authorizes) and
+ * the RESOLVED GUID must equal the approval. A generic confirm flag alone is
+ * not authorization to write against an arbitrary live request.
+ */
+export function assertApprovedRequest(resolvedRequestId, approvedRequestId) {
+  const problems = [];
+  if (typeof approvedRequestId !== 'string' || !GUID_RE.test(approvedRequestId)) {
+    problems.push('--approved-request-id must be the owner-approved fixture request GUID');
+  } else if (String(resolvedRequestId).toLowerCase() !== approvedRequestId.toLowerCase()) {
+    problems.push(`resolved request ${resolvedRequestId} does not match the approved fixture ${approvedRequestId} — refusing to write against an unapproved request`);
+  }
+  return { ok: problems.length === 0, problems };
+}
+
+/**
+ * Deployed-drain attribution is BLOCKING: the smoke passes only when at least
+ * one drain-reviewer-acceptances maintenance run's window brackets the job's
+ * completion (the window comparison itself runs server-side in SQL to avoid
+ * client timezone parsing of timestamp-without-tz columns). Zero total runs or
+ * zero bracketing runs means the queue was drained by something this run
+ * cannot attribute — that is a FAIL, not a footnote.
+ */
+export function assertDrainAttribution({ bracketingRuns, totalRuns, expectDeployment }) {
+  const problems = [];
+  if (typeof expectDeployment !== 'string' || !expectDeployment.trim()) {
+    problems.push('--expect-deployment is required: record the production deployment (vercel inspect) the cron is expected to run');
+  }
+  if (!Number.isInteger(totalRuns) || totalRuns < 1) {
+    problems.push('no drain-reviewer-acceptances maintenance runs occurred in the smoke window — the deployed cron cannot be attributed');
+  } else if (!Number.isInteger(bracketingRuns) || bracketingRuns < 1) {
+    problems.push(`no maintenance run window brackets the job completion (${totalRuns} run(s) in the window) — the job was completed by something this run cannot attribute to the deployed cron`);
+  }
+  return { ok: problems.length === 0, problems };
+}
+
 /**
  * Frozen job-staging arguments for the smoke event. Invariants:
  * - `isAcceptRepeat: true` — the drain skips the acceptance-confirmation email
@@ -182,6 +221,33 @@ export function assertWave13Binding(person, { orcid, acceptedAt }) {
   }
   if (!secondEqual(person.wmkf_identityresolvedat, acceptedAt)) {
     problems.push(`wmkf_identityresolvedat=${JSON.stringify(person.wmkf_identityresolvedat)} does not match acceptedAt at second precision`);
+  }
+
+  // Decision audit evidence must be present and exact — the writer persists
+  // the capture service's fixed self-report summary and compact anchor array
+  // (capture-self-reported-orcid.js buildSelfReportDecision → writer
+  // buildDecisionPatch). A binding without its evidence is not a pass.
+  const expectedSummary = 'Reviewer self-confirmed this ORCID on the authenticated invitation form (magic-link).';
+  if (person.wmkf_identityevidencesummary !== expectedSummary) {
+    problems.push(`wmkf_identityevidencesummary=${JSON.stringify(person.wmkf_identityevidencesummary)}, expected the fixed self-report summary`);
+  }
+  const expectedAnchors = JSON.stringify([{
+    type: 'self_reported_orcid',
+    canonicalKey: `orcid:${orcid}`,
+    sourceUrl: `https://orcid.org/${orcid}`,
+    verifier: 'reviewerSelfReport@self-report@accept',
+  }]);
+  if (person.wmkf_identityverifiedanchorsjson !== expectedAnchors) {
+    problems.push(`wmkf_identityverifiedanchorsjson=${JSON.stringify(person.wmkf_identityverifiedanchorsjson)} != expected ${expectedAnchors}`);
+  }
+
+  // The partial self-report event must not have touched any other identity
+  // field on a clean-init person.
+  for (const field of IDENTITY_LINEAGE_FIELDS) {
+    if (field === 'wmkf_orcid' || field === 'wmkf_orcidurl') continue;
+    if (person[field] !== null && person[field] !== undefined) {
+      problems.push(`${field}=${JSON.stringify(person[field])} — a non-ORCID identity field was written by a partial self-report init`);
+    }
   }
   return { ok: problems.length === 0, problems };
 }
