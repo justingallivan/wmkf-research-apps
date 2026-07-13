@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-12 — C0.2 implemented on its Tier-2 branch; automated confirmed decisions are downgraded before persistence; promotion pending.
+  last_verified: 2026-07-12 — C0.2 promoted at e5ed38db; automated confirmed decisions are downgraded before persistence; production deployment READY with clean error scan.
 ---
 
 ## Recall Rule
