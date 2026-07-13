@@ -1,159 +1,181 @@
-# Session 358 Prompt: interlock observation (still soaking), post-BILL-tabling landscape
+# Session 359 Prompt: adversarial review of the reviewer holistic redesign
 
-## Session 357 Summary
+## Session 358 Summary
 
-Hygiene + ops session. Full memory/Atlas/schema-as-code hygiene sweep (Codex
-triage → probe verification → reconcile), two owner decisions recorded (Wave-1
-elevations retained; **BILL API integration TABLED**), and the daily-maintenance
-BILL subtask crash fixed (the error emails Justin got every day). All gates were
-green at start (32/32) and after every commit. Neither S357 carryover item
-(interlock log review; label-UX spot-check) was touched — both carry forward.
+Session 358 converted the reviewer holistic review into an owner-approved hybrid
+incremental plan, then implemented the evaluation foundation and the first
+fail-closed containment/binding slices. Runtime changes were promoted one
+invariant at a time; additive identity-binding work remains legacy-default and
+the final writer has no production caller.
 
 ### What Was Completed
 
-1. **Memory + Atlas hygiene sweep** (`0a2b3dee`) — Codex (gpt-5.5) triaged all
-   128 memory-health-flagged files (1 factual fix, 115 structural false
-   positives, 12 needing privileged probes). The 12 were then probe-verified
-   live: 5 confirmed, 2 corrected (CRM user counts ~22 staff/~196 service
-   accounts as OData proxies; Wave-1 role tail), 5 unprobeable organizational
-   facts given single-line staleness acks. Atlas live counts reconciled across
-   7 docs (wmkf_ai_prompt 17, wmkf_ai_run 351, appreviewersuggestion 662,
-   potentialreviewers 4,416, as of 2026-07-12).
-2. **Postgres schema-as-code aligned with live DB** (`348faaf2`) —
-   `scripts/setup-database.js` + `lib/db/schema.sql` no longer declare the five
-   tables dropped live 2026-06-04 by migration 018 (researchers, publications,
-   researcher_keywords, reviewer_suggestions, proposal_searches; zero live app
-   callers verified). `reconcile-memory-claims.js` now excludes
-   `schema_migrations` (runner bookkeeping). All four drift-report buckets = 0.
-3. **Wave-1 role tail closed by owner decision** (`03d2e73c`) — temp elevations
-   (`WMKF AI Elevated TEMP` + `System Customizer`) are intentionally retained
-   for the rest of the project; Justin handles any eventual revert with Connor
-   directly. Also probe-settled a naming conflation: `# WMK: Research Review
-   App Suite` is the app USER's display name; the suite ROLE has been `WMKF
-   Research Review App Suite - Staff` since its 2026-04-24 creation — there was
-   never a tenant-side rename.
-4. **Daily-maintenance BILL subtask crash fixed** (`66e4367b`, merge
-   `bd5df78e`) — `sweepBillOnboarding()`/`cleanupBillOnboardingState()` loaded
-   ESM bill modules via CJS `require()`; in the prod Turbopack bundle the named
-   exports are missing → daily "listPending is not a function" /
-   "cleanupCompleted is not a function" error emails. Switched to
-   `await import()` (repo's established seam). 24/24 tests, prod build green
-   with exports present in built chunks. Tier-1: short-lived branch, `--no-ff`.
-5. **BILL API integration TABLED — owner decision recorded** (`9f4dbac3`) —
-   tabled for several months, possibly permanently; onboarding will use
-   reviewer address + existing foundation systems. Reconciled across
-   finance-honoraria wiki, MEMORY.md router, and 4 BILL memories. Nothing live
-   needed disabling (`BILL_ENABLED` unset in every Vercel env — verified; the
-   path already degrades to alert_only). The required address+phone collection
-   on Stage 2a accept is now load-bearing (relax question CLOSED as moot).
+1. **Plan reconciliation and hybrid delivery model**
+   - Reworked `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md` around
+     containment-first execution, independently labeled evaluation, server-owned
+     cohort activation, and post-observation cleanup.
+   - Recorded the active direction in
+     `.claude-memory/project-reviewer-holistic-redesign-parallel-build.md`.
 
-### Commits (main, all pushed)
+2. **B0 evaluation foundation**
+   - Added the tracked evaluation manifest and structural/frozen-state validator.
+   - The manifest remains intentionally non-runnable until the post-containment
+     baseline and owner-supplied evaluation inputs are frozen.
 
-- `0a2b3dee` — memory + Atlas hygiene sweep
-- `348faaf2` — schema-as-code alignment (5 retired tables removed from fresh-install)
-- `03d2e73c` — Wave-1 elevations retained + role-name conflation fix
-- `66e4367b`/`bd5df78e` — maintenance BILL ESM-interop fix (branch + merge)
-- `9f4dbac3` — BILL tabling reconciliation
+3. **C0.1 candidate-save containment — promoted**
+   - Added per-row validation, stable save/error keys, server-signed automated
+     identity receipts, request-scoped staff confirmation, partial-success
+     honesty, same-name protection, and generation-scoped client updates.
+   - Promoted at `c5b0593a`; promotion record at `f47f923c`.
+
+4. **C0.2 attestation-origin enforcement — promoted**
+   - Made identity origin server-only at the adapter boundary, restricted durable
+     `confirmed` writes to self-report, downgraded automated `confirmed`, and
+     preserved sticky/fail-closed reads across direct callers.
+   - Promoted at `e5ed38db`; promotion record at `199e1e1a`.
+
+5. **Wave 13 identity-binding foundation**
+   - Added two additive Dataverse solution artifacts, exact/divergent preflight,
+     schema/Atlas contracts, pure identity-binding and institution-COI contracts,
+     and focused negative tests.
+   - The owner-approved production-only schema apply was recorded at `91b98232`:
+     10 fields verified exact and all values initially null. Deployment does not
+     make the fields authoritative.
+
+6. **Inert atomic identity-binding writer**
+   - Added a complete ETag-protected read/PATCH seam, explicit-null bundle writes,
+     typed-412 reread/recompute, source precedence, monotonic event ordering,
+     pair-atomic anchors/lineage, manual-lineage protection, and fail-closed legacy
+     handling.
+   - Commit `75d26a22` is on
+     `codex/reviewer-holistic-i1-binding-writer`. No production caller imports the
+     writer; suggestion COI fields remain unused by application readers/writers.
+   - Final verification passed 482/482 suites, 5,478/5,478 tests, typecheck,
+     ESLint, production build, DAL/route boundaries, documentation gates, and
+     contract reconciliation.
+
+### Commits
+
+- `3d764121` — add holistic evaluation manifest gate
+- `d57af618` — validate partial candidate saves
+- `c5b0593a` — complete candidate save containment
+- `f47f923c` — record C0.1 promotion
+- `e5ed38db` — enforce identity attestation origin
+- `199e1e1a` — record C0.2 promotion
+- `319321df` — add identity binding schema wave
+- `3bd1b857` — define identity binding contracts
+- `91b98232` — record Wave 13 schema deployment
+- `75d26a22` — add inert identity binding writer
 
 ## Next Items
 
 ### Verified Open
 
-1. **Interlock observation → flip to `on` (plan §5 Stage 3).** `warn` live
-   everywhere since 2026-07-11; still soaking, untouched in S357. Review prod
-   logs after normal staff use + at least one full cron cycle: every
-   `[dataverse-interlock] would deny` line is a real hazard or a policy gap.
-   EXPECTED noise: local `npm run dev` reads prod Dataverse (S357's memory
-   probes did exactly this); at flip time decide whether `.env.local` gets
-   `DATAVERSE_ALLOW_PROD_READS=yes`. Evidence:
-   `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md` §5; `vercel logs`.
-2. **Confirm tomorrow's Daily Maintenance email is clean** —
-   `billOnboardingResume`/`billOnboardingState` should report counts, not
-   errors, after `bd5df78e` deployed. First clean run may process a backlog of
-   torn/TTL rows. 2-minute check of the email or cron log. Evidence:
-   `lib/services/maintenance-service.js:147-260`.
-3. **Spot-check the label_conflict UX on the live admin page** (carried from
-   S357, still unverified live; component tests cover it). Admin → Policies →
-   Publish new version → expect amber taken-label warning + suggestion.
-   Evidence: `tests/unit/policies-section-label-guidance.test.js`.
+1. **Perform the requested read-only adversarial review.**
+   Evidence: `docs/REVIEWER_HOLISTIC_REDESIGN_ADVERSARIAL_REVIEW_PROMPT.md` and
+   commit range `43220961..75d26a22`.
+   Follow that prompt literally. Review the full redesign and implementation,
+   invoke `/contract-reconcile`, and write only
+   `outputs/reviewer-holistic-redesign-adversarial-review-2026-07-13.md`.
 
-### Owner Decision Needed (carryover, unchanged, still blocked)
+2. **Merge/promotion decision for the inert writer branch.**
+   Evidence: branch `codex/reviewer-holistic-i1-binding-writer`, head
+   `75d26a22`.
+   This is an owner decision after the adversarial review. Do not merge during
+   the review session.
 
-1. Reviewer-institution→CRM linking brief to Connor + Sarah
-   (`outputs/reviewer-institution-crm-linking-brief.md`, local-only).
-2. Whack-a-mole reconciliation; rescue-tool location; closeout payability
-   scope; `check:types` end state. The holistic-redesign green-light is
-   RESOLVED (owner 2026-07-12): hybrid incremental execution is active under
-   `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md`. Evidence:
-   S353–S357 SESSION_PROMPT history + cited memories.
-3. **Address-based reviewer onboarding — scope undefined.** Owner said (S357)
-   onboarding will use reviewer address + existing foundation systems; the
-   portal already captures/requires address+phone at Stage 2a accept. What (if
-   anything) the repo needs beyond that awaits Justin's definition of the flow.
-   Evidence: `.claude-memory/project-honorarium-payment-landscape.md` (2026-07-12
-   decision block).
+3. **Operational carryovers outside the requested review.**
+   - Interlock observation before the deliberate `warn` → `on` flip remains
+     open. Evidence: `CLAUDE.md` and
+     `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md` §5 Stage 3.
+   - Confirm the first clean Daily Maintenance run after `bd5df78e`; this needs
+     email or cron-log evidence, not another code change.
+   - Live spot-check the already-tested `label_conflict` publish guidance.
+     Evidence: `tests/unit/policies-section-label-guidance.test.js`.
+   These are not part of the Session 359 adversarial review and should not be
+   mixed into its artifact.
+
+### Owner Decision Needed
+
+1. **First production caller and legacy transition strategy.**
+   Evidence: `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md` I1/I2 and
+   `.claude-memory/project-reviewer-holistic-redesign-parallel-build.md`.
+   Dirty legacy rows intentionally fail closed; revocation, durable automated
+   refresh ordering over human bindings, and conservative legacy classification
+   remain unresolved gates. No caller migration is authorized by the schema or
+   inert writer commits.
+
+2. **Reviewer-institution → CRM linking brief.**
+   The Connor/Sarah handoff remains an owner coordination item; do not infer an
+   implementation request from the reviewer identity work.
+
+3. **Address-based reviewer onboarding scope.**
+   Evidence: `.claude-memory/project-honorarium-payment-landscape.md` and
+   `.claude-memory/project-reviewer-address-collection-provisional.md`.
+   Address and phone remain required; any additional repository flow awaits an
+   owner-defined scope.
 
 ### Parked
 
-1. Interlock Stage 4 (`check:dataverse-interlock` gate) — re-open after the
-   flip to `on` or any hook-file refactor. Evidence: plan §5.
-2. `DYNAMICS_SANDBOX_URL || DYNAMICS_URL` fallback cleanup — quiet-window work.
-3. Memory-health advisory worklist: 117 files flagged, now purely structural
-   (missing Recall-Rule headings, size, vocabulary) after S357 removed all
-   factual staleness — cosmetic memory-shape work, no urgency. Evidence:
-   `npm run check:memory-health` (advisory, never fails).
-4. Prior parked items carry forward unchanged (accepted-reviewer stand-down;
-   review rendition formatting; campaign
-   settings UX; prompt-cache-hit audit; reviewer ack provenance parity;
-   Dependabot PR #53; intake portal; deferred dead-code cleanup — the dormant
-   BILL code is now also a candidate for that session IF the tabling ever
-   firms up to permanent, owner call first).
+1. **Runtime reader/writer migration, suggestion COI currency, and action-policy
+   activation.**
+   Evidence: implementation plan I2 and the no-production-caller census recorded
+   with `75d26a22`.
+   Re-open only after review findings are resolved and the relevant owner gate is
+   explicit.
+
+2. **Track-B/heuristic cleanup.**
+   Evidence: implementation plan D1.
+   Cleanup waits for frozen evaluation, controlled pilot promotion, and one full
+   campaign of observation.
 
 ### Verify Before Acting
 
-1. Any `[dataverse-interlock]` line in PROD logs = env misconfig or an
-   unregistered target — investigate the caller; extending
-   `lib/dataverse/core/target-registry.js` is a reviewed commit, not an env
-   edit. Evidence: registry header + wiki dataverse topic.
-2. Re-verify affiliation probe numbers before quoting
-   (`scripts/probe-reviewer-affiliation-account-match.js`).
+1. Re-run the production-caller census before claiming the writer or Wave 13
+   suggestion fields are still inert; branch state may change after Session 358.
+2. Re-probe live Wave 13 metadata/value state before any backfill or caller
+   activation. Never infer legacy provenance from `wmkf_identitystatus`.
+3. Re-read the adversarial output and verify every finding against the then-current
+   tree before implementing a fix.
 
 ### Do Not Reopen Without New Decision
 
-1. **BILL API integration is TABLED (owner, 2026-07-12; possibly permanent).**
-   Do not build on, extend, or propose the BILL pipeline; code stays dormant,
-   not deleted; the known-red bill test suites stay red indefinitely. Evidence:
-   `.claude-memory/project-honorarium-payment-landscape.md`;
-   `docs/agent-wiki/topics/finance-honoraria.md`; `9f4dbac3`.
-2. **Wave-1 temp elevations are intentionally retained (owner, 2026-07-12).**
-   Do not re-surface the revert as an open item; Justin handles it with Connor.
-   Evidence: `.claude-memory/project-wave1-closeout-role-tail.md`; `03d2e73c`.
-3. Interlock policy calls are owner-decided (S355): prod→sandbox = deny;
-   preview prod-reads denied by default; `$batch`/alt-key writes never
-   grant-coverable in v1; invalid flag → `on`. Evidence: plan §3.2/§3.3/§7.
-4. Codex calls use `--model gpt-5.5` unless the owner says otherwise; do not
-   edit `~/.codex/config.toml`. Evidence: `feedback-codex-model-gpt55`.
-5. Policy version immutability + label_conflict 409 work as designed (S353/
-   S356); client-side guidance only, no server mutation.
+1. Do not activate runtime behavior merely because Wave 13 schema is deployed.
+2. Do not infer self-report or staff attestation from legacy `confirmed` rows.
+3. Do not delete Track B or old readers/writers before the plan's evaluation,
+   pilot, promotion, and observation gates.
+4. Do not change the established “surface, do not gate” COI policy as part of
+   identity-binding work.
+5. BILL API integration remains tabled by owner decision; do not extend or
+   re-enable it without a new decision.
+6. Wave-1 temporary elevations remain intentionally retained; do not carry a
+   revert forward as an open task.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `lib/services/maintenance-service.js` | Daily cleanup; BILL sweeps now `await import()` ESM bill modules (S357) |
-| `lib/bill/onboarding-state.js` | ESM named exports the sweeps consume (unchanged S357) |
-| `scripts/setup-database.js` | Fresh-install shape; five retired tables removed (S357) |
-| `scripts/reconcile-memory-claims.js` | Drift-report generator; schema_migrations excluded (S357) |
-| `.claude-memory/project-honorarium-payment-landscape.md` | BILL tabling decision + address-based onboarding context |
-| `docs/agent-wiki/topics/finance-honoraria.md` | BILL/honoraria routing; tabling recorded at top |
-| `lib/dataverse/core/interlock.js` | Interlock policy module (warn mode live, still soaking) |
+| `docs/REVIEWER_HOLISTIC_REDESIGN_ADVERSARIAL_REVIEW_PROMPT.md` | Exact read-only Claude review brief |
+| `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md` | Active hybrid plan and phase gates |
+| `.claude-memory/project-reviewer-holistic-redesign-parallel-build.md` | Durable active direction and safety boundaries |
+| `lib/services/reviewer-finder/save-candidates-service.js` | C0.1 per-row containment and trusted decision reconstruction |
+| `lib/dataverse/adapters/researcher.js` | Transitional C0.2 enforcement and narrow atomic binding adapter |
+| `lib/services/reviewer-identity-binding-contract.js` | Pure binding tuple/lineage contract |
+| `lib/services/reviewer-identity-binding-writer.js` | Inert ETag-protected transition planner/writer |
+| `lib/services/institution-coi-context.js` | Pure proposal institution-context currency contract |
+| `scripts/preflight-reviewer-identity-binding-fields.mjs` | Wave 13 ABSENT/EXACT/DIVERGENT preflight |
 
 ## Testing
 
+The next session is a review, not an implementation session. Run focused tests or
+gates only to test a concrete hypothesis. Useful anchors include:
+
 ```bash
-npx jest tests/unit/maintenance-bill-onboarding.test.js tests/unit/bill-onboarding-state.test.js
-node scripts/reconcile-memory-claims.js   # all four drift buckets should stay 0
-# Observe interlock warn logs on the live prod deployment:
-vercel ls --prod   # get current deployment URL
-vercel logs <url> | grep dataverse-interlock
+npx jest tests/unit/reviewer-identity-binding-contract.test.js \
+  tests/unit/reviewer-identity-binding-adapter.test.js \
+  tests/unit/reviewer-identity-binding-writer.test.js
+
+npx jest tests/unit/save-candidates-service.test.js \
+  tests/integration/save-candidates-route.test.js \
+  tests/unit/reviewer-search-section-save-stale.test.js
 ```
