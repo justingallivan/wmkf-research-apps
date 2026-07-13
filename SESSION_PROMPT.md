@@ -1,142 +1,123 @@
-# Session 359 Prompt: adversarial review of the reviewer holistic redesign
+# Session 360 Prompt: adversarial-review remediation slices (Codex handoff)
 
-## Session 358 Summary
+## Session 359 Summary
 
-Session 358 converted the reviewer holistic review into an owner-approved hybrid
-incremental plan, then implemented the evaluation foundation and the first
-fail-closed containment/binding slices. Runtime changes were promoted one
-invariant at a time; additive identity-binding work remains legacy-default and
-the final writer has no production caller.
+Session 359 executed the requested read-only adversarial review of the reviewer
+holistic redesign (range `43220961..75d26a22`), produced the review artifact and
+a Codex-facing remediation handoff, and — on the owner's explicit decision —
+merged the inert writer branch to `main`.
 
 ### What Was Completed
 
-1. **Plan reconciliation and hybrid delivery model**
-   - Reworked `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md` around
-     containment-first execution, independently labeled evaluation, server-owned
-     cohort activation, and post-observation cleanup.
-   - Recorded the active direction in
-     `.claude-memory/project-reviewer-holistic-redesign-parallel-build.md`.
+1. **Adversarial review (verdict: READY WITH FIXES)**
+   - Full `/start` gate sweep (57 gates green) and `/contract-reconcile`
+     Mode-A review across all seven audits; 152/152 focused tests green.
+   - Artifact: `outputs/reviewer-holistic-redesign-adversarial-review-2026-07-13.md`
+     (gitignored by convention; local only).
+   - Independently re-verified: writer/contract/COI-helper/adapter-seam and all
+     ten Wave 13 fields are production-inert; C0.1/C0.2 containment claims
+     survived attack; adapter ETag/If-Match/typed-412/explicit-null claims
+     verified against real `DynamicsService` source.
+   - Findings: **F1 (P1)** writer timestamp canonicalization cannot survive a
+     Dataverse DateTime round-trip (mechanism CONFIRMED by executing the real
+     pure functions: a stored second-precision `boundAt` throws
+     `invalid_current_state`; live serialization still `[ASSUMED]` — probe
+     blocked by session permissions). **F2 (P2)** unsigned client
+     `contactEnrichment.identity` persists as a durable `automated` decision in
+     `save-candidates-service.js:895-899` regardless of receipt validity.
+     **F3 (P2)** seven reachable writer guards with zero failing-test coverage.
+     **F4–F8 (P3)** dead `preserveDecision` branch, circular allowlist
+     assertion, receipt negative-test gaps + 180-day TTL, batch key collisions,
+     live-state doc claims without reproducible evidence.
 
-2. **B0 evaluation foundation**
-   - Added the tracked evaluation manifest and structural/frozen-state validator.
-   - The manifest remains intentionally non-runnable until the post-containment
-     baseline and owner-supplied evaluation inputs are frozen.
+2. **Codex remediation handoff**
+   - `docs/REVIEWER_HOLISTIC_REDESIGN_ADVERSARIAL_FINDINGS_HANDOFF.md`:
+     evidence-labeled fix specs, per-guard complement-input table, ground
+     rules (no writer caller activation; contracts frozen), and suggested
+     slices A (F2+F6, live), B (F1 probe→fix + F3/F4/F5, inert),
+     C (F7).
 
-3. **C0.1 candidate-save containment — promoted**
-   - Added per-row validation, stable save/error keys, server-signed automated
-     identity receipts, request-scoped staff confirmation, partial-success
-     honesty, same-name protection, and generation-scoped client updates.
-   - Promoted at `c5b0593a`; promotion record at `f47f923c`.
-
-4. **C0.2 attestation-origin enforcement — promoted**
-   - Made identity origin server-only at the adapter boundary, restricted durable
-     `confirmed` writes to self-report, downgraded automated `confirmed`, and
-     preserved sticky/fail-closed reads across direct callers.
-   - Promoted at `e5ed38db`; promotion record at `199e1e1a`.
-
-5. **Wave 13 identity-binding foundation**
-   - Added two additive Dataverse solution artifacts, exact/divergent preflight,
-     schema/Atlas contracts, pure identity-binding and institution-COI contracts,
-     and focused negative tests.
-   - The owner-approved production-only schema apply was recorded at `91b98232`:
-     10 fields verified exact and all values initially null. Deployment does not
-     make the fields authoritative.
-
-6. **Inert atomic identity-binding writer**
-   - Added a complete ETag-protected read/PATCH seam, explicit-null bundle writes,
-     typed-412 reread/recompute, source precedence, monotonic event ordering,
-     pair-atomic anchors/lineage, manual-lineage protection, and fail-closed legacy
-     handling.
-   - Commit `75d26a22` is on
-     `codex/reviewer-holistic-i1-binding-writer`. No production caller imports the
-     writer; suggestion COI fields remain unused by application readers/writers.
-   - Final verification passed 482/482 suites, 5,478/5,478 tests, typecheck,
-     ESLint, production build, DAL/route boundaries, documentation gates, and
-     contract reconciliation.
+3. **Owner-approved merge to `main`**
+   - `codex/reviewer-holistic-i1-binding-writer` merged at `4e0ae1bd` and
+     pushed. Review basis: all new runtime surfaces census-verified inert, so
+     merge = no behavior change. Production behavior remains C0.1/C0.2 as
+     promoted in S358.
 
 ### Commits
 
-- `3d764121` — add holistic evaluation manifest gate
-- `d57af618` — validate partial candidate saves
-- `c5b0593a` — complete candidate save containment
-- `f47f923c` — record C0.1 promotion
-- `e5ed38db` — enforce identity attestation origin
-- `199e1e1a` — record C0.2 promotion
-- `319321df` — add identity binding schema wave
-- `3bd1b857` — define identity binding contracts
-- `91b98232` — record Wave 13 schema deployment
-- `75d26a22` — add inert identity binding writer
+- `a7bb3680` — docs(reviewer): add adversarial review findings handoff for Codex
+- `4e0ae1bd` — merge codex/reviewer-holistic-i1-binding-writer to main
 
 ## Next Items
 
 ### Verified Open
 
-1. **Perform the requested read-only adversarial review.**
-   Evidence: `docs/REVIEWER_HOLISTIC_REDESIGN_ADVERSARIAL_REVIEW_PROMPT.md` and
-   commit range `43220961..75d26a22`.
-   Follow that prompt literally. Review the full redesign and implementation,
-   invoke `/contract-reconcile`, and write only
-   `outputs/reviewer-holistic-redesign-adversarial-review-2026-07-13.md`.
+1. **Dispatch the remediation slices to Codex** per
+   `docs/REVIEWER_HOLISTIC_REDESIGN_ADVERSARIAL_FINDINGS_HANDOFF.md`.
+   Evidence: the handoff doc (committed, on `main`) and the review artifact.
+   Slice A (F2 receipt-gate the decision write + F6 attestation negative
+   tests) is live-behavior containment and can start immediately on a Tier-2
+   branch. Slice B (F1) must start with the live serialization probe.
+   Slice C (F7 batch key uniqueness) is independent.
 
-2. **Merge/promotion decision for the inert writer branch.**
-   Evidence: branch `codex/reviewer-holistic-i1-binding-writer`, head
-   `75d26a22`.
-   This is an owner decision after the adversarial review. Do not merge during
-   the review session.
+2. **F1 live probe — needs a sanctioned run.**
+   Evidence: review artifact §F1; draft script in the S359 scratchpad
+   (`probe-datetime-roundtrip.mjs`); production rows already hold
+   millisecond-written `wmkf_identityresolvedat` values
+   (`lib/dataverse/adapters/researcher.js:321`,
+   `capture-self-reported-orcid.js:73`), so one read-only query answers the
+   question. The S359 permission classifier blocked live production reads;
+   run it as a tracked read-only `scripts/probe-*` script in a session where
+   the owner authorizes it.
 
-3. **Operational carryovers outside the requested review.**
-   - Interlock observation before the deliberate `warn` → `on` flip remains
-     open. Evidence: `CLAUDE.md` and
-     `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md` §5 Stage 3.
-   - Confirm the first clean Daily Maintenance run after `bd5df78e`; this needs
-     email or cron-log evidence, not another code change.
+3. **Operational carryovers (unchanged from S359 prompt; not addressed by the
+   review session):**
+   - Interlock observation before the deliberate `warn` → `on` flip.
+     Evidence: `CLAUDE.md`, `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md` §5.
+   - Confirm the first clean Daily Maintenance run after `bd5df78e`
+     (email/cron-log evidence, not code).
    - Live spot-check the already-tested `label_conflict` publish guidance.
      Evidence: `tests/unit/policies-section-label-guidance.test.js`.
-   These are not part of the Session 359 adversarial review and should not be
-   mixed into its artifact.
 
 ### Owner Decision Needed
 
-1. **First production caller and legacy transition strategy.**
-   Evidence: `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md` I1/I2 and
-   `.claude-memory/project-reviewer-holistic-redesign-parallel-build.md`.
-   Dirty legacy rows intentionally fail closed; revocation, durable automated
-   refresh ordering over human bindings, and conservative legacy classification
-   remain unresolved gates. No caller migration is authorized by the schema or
-   inert writer commits.
-
-2. **Reviewer-institution → CRM linking brief.**
-   The Connor/Sarah handoff remains an owner coordination item; do not infer an
-   implementation request from the reviewer identity work.
-
-3. **Address-based reviewer onboarding scope.**
-   Evidence: `.claude-memory/project-honorarium-payment-landscape.md` and
-   `.claude-memory/project-reviewer-address-collection-provisional.md`.
-   Address and phone remain required; any additional repository flow awaits an
-   owner-defined scope.
+1. **Receipt TTL (F6).** `reviewer-candidate-attestation.js:16` sets 180 days;
+   re-enrichment mints fresh receipts, so a much shorter TTL shrinks the
+   replay window at no workflow cost. Decide before/with Slice A.
+2. **Design-intent confirmations (review §6):**
+   `reviewer-merge.js:236` merge protection and
+   `CandidateEditModal.js:573` confirmed-only affordance both exclude
+   automated-`probable` records (the post-C0.2 automated ceiling). Confirm
+   intended or open a follow-up.
+3. **First production caller and legacy transition strategy (unchanged, now
+   additionally gated on F1).** Evidence: implementation plan I1/I2; review
+   artifact §7. No caller migration is authorized; F1 must be resolved first.
+4. **Reviewer-institution → CRM linking brief** (unchanged owner coordination
+   item; do not infer an implementation request).
+5. **Address-based reviewer onboarding scope** (unchanged;
+   `.claude-memory/project-honorarium-payment-landscape.md`).
 
 ### Parked
 
-1. **Runtime reader/writer migration, suggestion COI currency, and action-policy
-   activation.**
-   Evidence: implementation plan I2 and the no-production-caller census recorded
-   with `75d26a22`.
-   Re-open only after review findings are resolved and the relevant owner gate is
-   explicit.
-
-2. **Track-B/heuristic cleanup.**
-   Evidence: implementation plan D1.
-   Cleanup waits for frozen evaluation, controlled pilot promotion, and one full
-   campaign of observation.
+1. **Runtime reader/writer migration, suggestion COI currency, action-policy
+   activation.** Evidence: plan I2; review confirmed zero production
+   references to all ten Wave 13 fields. Re-open only after F1–F3 land and
+   the owner gate is explicit.
+2. **Track-B/heuristic cleanup.** Evidence: plan D1. Unchanged gates.
 
 ### Verify Before Acting
 
-1. Re-run the production-caller census before claiming the writer or Wave 13
-   suggestion fields are still inert; branch state may change after Session 358.
-2. Re-probe live Wave 13 metadata/value state before any backfill or caller
-   activation. Never infer legacy provenance from `wmkf_identitystatus`.
-3. Re-read the adversarial output and verify every finding against the then-current
-   tree before implementing a fix.
+1. **Branch deletion:** `codex/reviewer-holistic-i1-binding-writer` is merged
+   (`4e0ae1bd`); before deleting the local branch, confirm no unmerged work
+   (`git branch --contains` / `git log main..codex/...` empty).
+2. Re-run the production-caller census before any claim that the writer or
+   Wave 13 fields are still inert — Slice work will change this.
+3. Re-probe live Wave 13 metadata/value state before any backfill or caller
+   activation; never infer legacy provenance from `wmkf_identitystatus` (F8:
+   convert the plan/Atlas live-state claims to dated `[VERIFIED via <command>]`
+   at the next schema-adjacent session).
+4. The review artifact lives in gitignored `outputs/` on this machine only —
+   copy or re-derive from the docs handoff if working from the other Mac.
 
 ### Do Not Reopen Without New Decision
 
@@ -144,38 +125,41 @@ the final writer has no production caller.
 2. Do not infer self-report or staff attestation from legacy `confirmed` rows.
 3. Do not delete Track B or old readers/writers before the plan's evaluation,
    pilot, promotion, and observation gates.
-4. Do not change the established “surface, do not gate” COI policy as part of
+4. Do not change the established "surface, do not gate" COI policy as part of
    identity-binding work.
-5. BILL API integration remains tabled by owner decision; do not extend or
-   re-enable it without a new decision.
-6. Wave-1 temporary elevations remain intentionally retained; do not carry a
-   revert forward as an open task.
+5. BILL API integration remains tabled by owner decision.
+6. Wave-1 temporary elevations remain intentionally retained.
+7. C0.1/C0.2 promoted slices survived adversarial verification — do not reopen
+   their containment design without a new finding.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_HOLISTIC_REDESIGN_ADVERSARIAL_REVIEW_PROMPT.md` | Exact read-only Claude review brief |
+| `docs/REVIEWER_HOLISTIC_REDESIGN_ADVERSARIAL_FINDINGS_HANDOFF.md` | Codex remediation brief (F1–F8, slices, ground rules) |
+| `outputs/reviewer-holistic-redesign-adversarial-review-2026-07-13.md` | Full review artifact (local, gitignored) |
 | `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md` | Active hybrid plan and phase gates |
-| `.claude-memory/project-reviewer-holistic-redesign-parallel-build.md` | Durable active direction and safety boundaries |
-| `lib/services/reviewer-finder/save-candidates-service.js` | C0.1 per-row containment and trusted decision reconstruction |
-| `lib/dataverse/adapters/researcher.js` | Transitional C0.2 enforcement and narrow atomic binding adapter |
-| `lib/services/reviewer-identity-binding-contract.js` | Pure binding tuple/lineage contract |
-| `lib/services/reviewer-identity-binding-writer.js` | Inert ETag-protected transition planner/writer |
-| `lib/services/institution-coi-context.js` | Pure proposal institution-context currency contract |
-| `scripts/preflight-reviewer-identity-binding-fields.mjs` | Wave 13 ABSENT/EXACT/DIVERGENT preflight |
+| `lib/services/reviewer-identity-binding-writer.js` | Inert writer — F1/F3/F4 fix surface |
+| `lib/services/reviewer-identity-binding-contract.js` | Pure contract — F1/F5 fix surface |
+| `lib/services/reviewer-finder/save-candidates-service.js` | F2 fix surface (decision write at :895-899) |
+| `lib/services/reviewer-candidate-attestation.js` | F6 fix surface (receipt verify + TTL) |
+| `lib/utils/reviewer-save-key.js` | F7 fix surface (batch key uniqueness) |
+| `scripts/preflight-reviewer-identity-binding-fields.mjs` | F8 rerun target (`--target=prod`) |
 
 ## Testing
 
-The next session is a review, not an implementation session. Run focused tests or
-gates only to test a concrete hypothesis. Useful anchors include:
-
 ```bash
+# Slice A (F2/F6)
+npx jest tests/unit/save-candidates-service.test.js \
+  tests/integration/save-candidates-route.test.js \
+  tests/unit/reviewer-candidate-attestation.test.js
+
+# Slice B (F1/F3/F4/F5)
 npx jest tests/unit/reviewer-identity-binding-contract.test.js \
   tests/unit/reviewer-identity-binding-adapter.test.js \
   tests/unit/reviewer-identity-binding-writer.test.js
 
-npx jest tests/unit/save-candidates-service.test.js \
-  tests/integration/save-candidates-route.test.js \
+# Slice C (F7)
+npx jest tests/unit/reviewer-save-key.test.js \
   tests/unit/reviewer-search-section-save-stale.test.js
 ```

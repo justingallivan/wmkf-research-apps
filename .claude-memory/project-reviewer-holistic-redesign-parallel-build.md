@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-12 via owner approval, governing release strategy, live contract audit, and reconciled implementation plan
+  last_verified: 2026-07-12 via S359 adversarial review (READY WITH FIXES), caller census, and owner-approved merge of the inert writer to main (4e0ae1bd)
 ---
 
 ## Recall Rule
@@ -42,6 +42,19 @@ binding writer and narrow adapter seam, but no production caller; a post-apply
 any-non-null probe returned zero person and zero suggestion rows, so existing
 state remains legacy-unknown and cannot become eligible-by-default. Runtime
 caller migration remains a later gated slice.
+
+**S359 adversarial review (2026-07-13 artifact): READY WITH FIXES.** The inert
+writer branch merged to `main` at `4e0ae1bd` after the review census re-proved
+every new surface production-inert. Fixes gate the FIRST PRODUCTION CALLER,
+not the merge: **F1 (P1)** the writer's millisecond-canonical timestamp rule
+cannot survive a Dataverse DateTime round-trip (mechanism proven offline;
+live serialization still unprobed — the S359 permission policy blocked the
+read-only probe); **F2 (P2, live)** `save-candidates-service.js:895-899`
+persists unsigned client `contactEnrichment.identity` as an `automated`
+decision regardless of receipt validity; **F3 (P2)** seven writer guards have
+no failing-test coverage. Remediation slices and evidence:
+`docs/REVIEWER_HOLISTIC_REDESIGN_ADVERSARIAL_FINDINGS_HANDOFF.md`. Do not wire
+a writer caller before F1 is resolved.
 
 The pure non-I/O contracts are built in
 `reviewer-identity-binding-contract.js` and `institution-coi-context.js`, with
