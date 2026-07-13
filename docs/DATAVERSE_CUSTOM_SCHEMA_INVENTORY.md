@@ -105,10 +105,13 @@ lineage are specified as `wmkf_identitybindingversion`,
 `wmkf_identitybindingsource`, `wmkf_identitybindinganchor`,
 `wmkf_identityboundat`, `wmkf_identityderivedbindingversion`, and
 `wmkf_identityfieldlineagejson`. The owner-approved production-only apply and
-post-apply typed metadata verification completed with all six EXACT. No live
-production caller uses them: an inert ETag-protected binding writer now has a
-narrow select/PATCH seam, but only focused tests import it. Existing rows remain
-null/legacy-unbound, and dirty legacy rows require explicit classification.
+post-apply typed metadata verification completed with all six EXACT. An
+ETag-protected binding writer has a narrow select/PATCH seam. Its first
+production caller is built on `codex/reviewer-binding-self-report-activation`
+pending promotion: acceptance-drain self-report with a stable acceptance event.
+The pre-activation production snapshot found existing rows null/legacy-unbound;
+dirty legacy rows still require explicit classification and use only the
+explicitly approved transitional fallback in that caller.
 **[VERIFIED 2026-07-13 via `node
 scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod
 --include-population`]**; captured dated output:

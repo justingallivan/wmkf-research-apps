@@ -37,6 +37,16 @@ merely linking to them:
   duplicate build;
 - destructive cleanup follows a successful comparison and promotion decision.
 
+**[BUILT; PROMOTION PENDING 2026-07-13]** The owner approved the first narrow
+production caller after F1–F8 remediation: acceptance-drain reviewer self-report
+only, keyed by the job's stable `accepted_at`. The branch
+`codex/reviewer-binding-self-report-activation` uses the binding writer for clean
+or already-bound rows, falls back only on typed
+`legacy_classification_required`, and stops the retryable job before honorarium
+or contact follow-up on every other writer failure. This does not activate the
+policy reader, automated writers, decline path, backfill, or action-policy
+migration and is not production-live until deliberately promoted.
+
 The original Fable review remains useful for strategy and prioritization. It is
 not controlling evidence for current code state.
 
@@ -265,7 +275,7 @@ version; do not proliferate it to UI payloads.
 
 ### C0.3 Make corrections invalidate dependent state
 
-**[SCHEMA + INERT WRITER PREREQUISITE BUILT; NOT AUTHORITATIVE 2026-07-12]**
+**[SCHEMA + WRITER PREREQUISITE BUILT; NOT AUTHORITATIVE 2026-07-12]**
 The live containment audit found that this promise cannot be implemented safely
 against the current columns: the seven overlapping identity fields have no
 per-field lineage, proposal COI has no structured currency marker, and a person
@@ -277,9 +287,10 @@ scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod
 --include-population`]** typed metadata reported 0 ABSENT / 10 EXACT / 0
 DIVERGENT. The dated output is captured at
 `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md`. The later
-inert writer adds a test-only person read/PATCH seam but no
-production caller; current behavior remains authoritative, and null fields mean
-legacy/unknown, never eligible-by-default.
+writer added the person read/PATCH seam. Its first narrow production caller is
+built on `codex/reviewer-binding-self-report-activation` pending promotion;
+current production behavior remains authoritative until promotion, and null
+fields mean legacy/unknown, never eligible-by-default.
 
 **[HARDENED + VERIFIED 2026-07-13]** The adversarial-review remediation is
 built: a live read-only sample confirmed second-precision Dataverse timestamp
@@ -288,7 +299,8 @@ normalize once at the writer boundary; every named transition guard has compleme
 dead decision-preservation branch is removed; the resolver and binding contract
 share one literal seven-field authority; unsigned identity payloads cannot
 write durable resolver decisions; and duplicate batch correlation keys are
-rejected per row. The binding writer still has no production caller.
+rejected per row. The first production caller is now built, but not yet
+promoted: acceptance-drain self-report only, with the stable acceptance event.
 
 Create one server-owned rebind/invalidation operation used by:
 
@@ -419,8 +431,10 @@ The artifact is observational evidence, not a causal head-to-head result.
 
 ## I1 — Define the versioned identity-binding contract
 
-**[FIELDS DEPLOYED + INERT WRITER BUILT 2026-07-12; OWNER-GATE REMAINS]** for
-runtime caller activation and consumer migration.
+**[FIELDS DEPLOYED + WRITER BUILT 2026-07-12; FIRST CALLER APPROVED/BUILT,
+PROMOTION PENDING 2026-07-13]** The narrow acceptance-drain self-report caller is
+the only activated build surface; policy-reader and broader consumer migration
+remain gated.
 
 ### I1.1 Minimal durable model
 
@@ -452,7 +466,7 @@ for the allowlisted identity-bearing fields; malformed, oversized, unknown-key,
 or unknown-source payloads must fail closed. Its exact schema and transition
 rules are a required I1.3 writer contract, not client input.
 
-**[PURE CONTRACT + INERT WRITER BUILT; NO PRODUCTION CALLER 2026-07-12]**
+**[PURE CONTRACT + WRITER BUILT; FIRST CALLER PENDING PROMOTION 2026-07-13]**
 `lib/services/reviewer-identity-binding-contract.js` now freezes the non-I/O
 contract: checksum-valid `orcid:`, exact OpenAlex author `openalex:`, and
 server-created `staff-attestation:` anchors only; coherent bound/unbound tuples;
@@ -461,9 +475,11 @@ capped at 2,048 UTF-8 bytes, rejects unknown keys/sources/future generations,
 and requires every non-null field to have exactly one entry. ORCID and Scholar
 id/URL pairs must be canonical and share one lineage source/generation; metrics
 retain their live schema ranges. `reviewer-identity-binding-writer.js` and the
-narrow `researcher.js` ETag adapter seam now select and conditionally patch the
-person fields when invoked, but a raw caller census finds only focused tests.
-Production behavior and existing rows remain unchanged.
+narrow `researcher.js` ETag adapter seam select and conditionally patch the
+person fields when invoked. `capture-self-reported-orcid.js` is now the single
+production-service import, reached by the acceptance drain only when it has the
+stable acceptance timestamp. The branch is pending promotion, so production
+behavior and existing rows remain unchanged at this point.
 
 If proposal COI is derived from a person binding, persist or otherwise prove
 both the binding version and the authoritative proposal/rule context used for
@@ -487,9 +503,11 @@ workbench `analysisResult` inputs cannot establish durable currency.
 
 ### I1.2 Transition table
 
-The inert writer now tests the supported subset of this transition table;
+The writer tests the supported subset of this transition table;
 revocation, legacy-dirty classification, authorized staff override of a
-self-report, merge policy, and production caller activation remain gated:
+self-report, merge policy, broad caller activation, and policy-reader migration
+remain gated. The acceptance-drain self-report caller is the sole approved first
+slice and is pending promotion:
 
 | Event | Source | Version behavior | Required invalidation/recompute | Action posture |
 |---|---|---|---|---|
@@ -507,8 +525,9 @@ cases, not fall-through defaults.
 
 ### I1.3 One writer and one policy reader
 
-**[INERT WRITER FOUNDATION BUILT; POLICY READER + CALLER MIGRATION PENDING
-2026-07-12]** `reviewer-identity-binding-writer.js` performs a fail-closed read,
+**[WRITER FOUNDATION BUILT; FIRST SELF-REPORT CALLER BUILT; POLICY READER +
+BROADER CALLER MIGRATION PENDING 2026-07-13]**
+`reviewer-identity-binding-writer.js` performs a fail-closed read,
 validates the current tuple/lineage, plans explicit `init`/`refresh`/`rebind`/
 `noop`/`blocked` outcomes, and sends one complete PATCH guarded by the row ETag.
 Only a typed 412 triggers reread/recompute, with three total attempts. Exact
@@ -521,8 +540,12 @@ out-of-order automated events are blocked; and automation cannot refresh a
 human binding until durable refresh ordering exists. Dirty legacy rows with
 populated identity fields but no lineage are blocked rather than inferred or
 erased. Revocation remains blocked because the deployed tuple has no monotonic
-revoked state. No production service imports the writer yet, and its result
-keeps `downstreamEligible:false`.
+revoked state. `capture-self-reported-orcid.js` is now the single production
+service import, pending promotion. Acceptance jobs pass canonical `accepted_at`;
+clean/already-bound rows use the writer, typed `legacy_classification_required`
+alone uses the transitional self-report writes, and all other writer failures
+stop the job before honorarium/contact follow-up. The writer result still keeps
+`downstreamEligible:false`; no action-policy consumer migration is implied.
 
 Replace status-only adapter guards with a shared binding writer that:
 
@@ -537,7 +560,7 @@ Create one pure action-policy helper used by invite/send, ORCID back-propagation
 and merge protection. Sibling consumers may add stricter domain rules but may
 not reinterpret confidence as provenance.
 
-The inert writer uses optimistic concurrency: read `@odata.etag`, compute the
+The writer uses optimistic concurrency: read `@odata.etag`, compute the
 transition, and issue the one coherent PATCH with `ifMatch`; a 412 rereads and
 recomputes through a small bounded retry. Human-event replay identity is
 durable, not `new Date()`: staff uses the server-created confirmation UUID, and
@@ -567,10 +590,11 @@ pre-apply snapshot reported 10 ABSENT / 0 EXACT / 0 DIVERGENT and execute
 created all ten attributes. **[VERIFIED 2026-07-13 via
 `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod
 --include-population`]** current typed metadata reported 0 ABSENT / 10 EXACT /
-0 DIVERGENT. The
-later inert person-binding writer now has a narrow select/PATCH seam, but no
-production caller imports it, so schema creation and this foundation slice do
-not change production behavior. The same command found zero person and zero
+0 DIVERGENT. The later person-binding writer has a narrow select/PATCH seam. Its
+first production caller is built on
+`codex/reviewer-binding-self-report-activation` pending promotion, so the schema
+and caller still do not change current production behavior. The same command
+found zero person and zero
 suggestion rows with any Wave 13 field populated. The captured output is
 `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md`; these are
 dated snapshots and must be refreshed before later schema-adjacent work.
@@ -628,8 +652,10 @@ Migrate every live trust consumer, not only the adapter and merge guard:
 - invite rendering and server send enforcement;
 - ORCID back-propagation and its workbench/send/honorarium callers;
 - merge protection and merge DTOs;
-- acceptance drain ordering—remove the synthetic in-memory `confirmed` value
-  and durably rebind before honorarium/back-propagation;
+- acceptance drain ordering—**built pending promotion 2026-07-13:** no synthetic
+  in-memory `confirmed` precedes persistence; a stable acceptance event durably
+  rebinds before honorarium/back-propagation, while the broader consumer policy
+  migration remains open;
 - external-token, render, send, merge, and backfill `$select` projections;
 - PR4/e2e verification scripts and any script that treats
   `status === 'confirmed'` as provenance.
@@ -821,8 +847,9 @@ the change into cleanup.
 
 1. Approve each C0 runtime promotion after its evidence bundle.
 2. Approve the M1 label set, rubric, thresholds, and adjudicator before freezing.
-3. **Durable fields approved/deployed 2026-07-12;** approve transition semantics
-   before runtime writers/readers activate.
+3. **Durable fields approved/deployed 2026-07-12; first acceptance self-report
+   caller approved/built 2026-07-13, promotion pending.** Broader runtime
+   writers/readers and policy migration retain their own gates.
 4. **Additive production schema execution approved/completed 2026-07-12,**
    separately from code deployment.
 5. Decide early-career/no-ORCID evaluation versus explicit abstention.

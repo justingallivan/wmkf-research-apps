@@ -29,10 +29,12 @@ Visual orientation for the reviewer-domain Dataverse entities and how they conne
 > --include-population`]** typed production metadata reported all ten EXACT and
 > zero rows with any Wave 13 field populated. This is a dated snapshot captured
 > in `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md`, not a
-> permanent current-state guarantee. An inert,
-> ETag-protected person-binding writer now selects/PATCHes the six person fields
-> when invoked, but it has no production caller; the four engagement COI fields
-> still have no application reader/writer. Null remains legacy/unknown; later
+> permanent current-state guarantee. An ETag-protected person-binding writer
+> selects/PATCHes the six person fields. Its first production caller is built on
+> `codex/reviewer-binding-self-report-activation` pending promotion: a reviewer
+> acceptance job with a stable `accepted_at` durably binds self-reported ORCID
+> before honorarium/contact follow-up. The four engagement COI fields still have
+> no application reader/writer. Null remains legacy/unknown; later
 > eligibility will be computed rather than stored. See the two entity Atlas
 > pages and `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md` I1/I2.
 
