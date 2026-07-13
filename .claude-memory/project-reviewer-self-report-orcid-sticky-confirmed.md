@@ -1,36 +1,41 @@
 ---
 name: project-reviewer-self-report-orcid-sticky-confirmed
-description: PR4 shipped — reviewer self-reported ORCID capture; `confirmed` is meant to be a sticky human-attestation sentinel. ⚠️ S235 DISCREPANCY (Codex-verified): the automated OpenAlex/ORCID SPINE (S232/S233) DOES emit `confirmed` — the "resolver never emits confirmed" invariant below is contradicted by live code. Needs a dedicated reconciliation pass.
+description: Reviewer self-reported ORCID capture plus C0.2 persistence containment; automated confirmed decisions are capped at probable at the adapter boundary.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-08 (S348) — discrepancy re-confirmed live (resolver emits 'confirmed' at reviewer-identity-resolver.js:261,279); researcher.js comments corrected to match; sticky-skip + fail-closed reads unchanged. Design reconciliation (downgrade spine 'confirmed'?) STILL OPEN.
+  last_verified: 2026-07-12 — C0.2 implemented on its Tier-2 branch; automated confirmed decisions are downgraded before persistence; promotion pending.
 ---
 
 ## Recall Rule
 
-Read this when: touching the reviewer self-reported ORCID capture, the identity resolver's emitted statuses, or `writeIdentityDecision`/`clearIdentityFields`.
+Read this when touching reviewer self-reported ORCID capture, resolver status
+semantics, or `writeIdentityDecision`/`clearIdentityFields`.
 
-> ⚠️ **OPEN DISCREPANCY (S235, Codex-verified — needs a dedicated reconciliation pass).** This memory's core invariant ("the automated resolver NEVER emits `confirmed`") is **false for the OpenAlex/ORCID identity SPINE** shipped later (S232 `0ac4728` / S233 `86b8dd4`): `classifySpineEvidence` returns `confirmed` (`lib/services/reviewer-identity-resolver.js:165,172`), `mapSpineVerificationResult` maps it straight to verified/high-confidence (`lib/services/discovery-service.js`), and tests lock that behavior (`reviewer-identity-evidence.test.js`). So an AUTOMATED `confirmed` IS reachable. The sticky-skip guards in `researcher.js` (`writeIdentityDecision`/`clearIdentityFields`) still hold, but the "only a human emits confirmed" premise they were designed around no longer holds — whether the spine's `confirmed` should be downgraded to `probable`, or the sentinel model changed, is the open question. Do NOT rely on "automated = never confirmed" until reconciled. (The S235 ORCID-employment promotion fix deliberately emits `probable` only, so it did not widen this.)
+`confirmed` is the transitional persisted sentinel for reviewer self-report.
+The resolver may still produce an automated decision labeled `confirmed`, so
+confidence alone is not provenance. The adapter boundary enforces provenance:
 
-Do:
-- Preserve `confirmed` on `wmkf_identitystatus` as a RESERVED sticky human-attestation sentinel. (CAVEAT: the automated spine emits `confirmed` too — see the discrepancy above; this "Do" reflects the original PR4 intent, not current spine behavior.)
-- Keep both adapter write paths refusing to overwrite/null when stored status is `confirmed`, and keep both reads FAIL-CLOSED (transient/403 propagates, never falls through to a wipe).
-- Treat reviewer self-report as the highest-trust ORCID source (it overwrites a resolver guess).
+- `writeIdentityDecision` requires server-only `identityOrigin`.
+- Only `self_report` with incoming `confirmed` may persist `confirmed` and it
+  intentionally does not pre-read; a fresh reviewer attestation wins.
+- Every runtime resolver writer and identity backfill uses `automated`.
+- Automated incoming `confirmed` is cloned and downgraded to `probable`; the
+  caller's decision object is not mutated.
+- Every automated write first reads current status, skips stored `confirmed`,
+  and propagates read failure without writing.
+- `clearIdentityFields` accepts only `automated`, reads current status, skips
+  stored `confirmed`, and propagates read failure without clearing.
+- Missing or unknown origins fail before any Dataverse read or write.
 
-Do not:
-- Make the resolver emit `confirmed`, add a manual-attestation status, or refactor the two adapter methods without re-preserving the sticky-skip + fail-closed reads — you reintroduce the silent-wipe bug.
+The marker is adapter-only and must not enter UI or resolver DTOs. It is
+containment, not the durable model: legacy `confirmed` rows do not encode their
+source, and the automated guard is read-then-write rather than an atomic
+conditional update. The reviewer holistic plan's I1 phase replaces it with a
+versioned binding source and coherent transition writer.
 
-Ground truth: `lib/services/capture-self-reported-orcid.js`, `lib/dataverse/adapters/researcher.js` (`writeIdentityDecision`, `clearIdentityFields`), `pages/api/external/review/[token]/respond.js`, `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` §14, `tests/unit/capture-self-reported-orcid.test.js`.
-
-PR4 (reviewer self-reported ORCID) SHIPPED to prod S218 (merge `876dd88`, headless e2e runner `015aad6`). At Stage 2a the reviewer confirms/corrects their own ORCID on the authenticated magic-link accept/decline form; `pages/api/external/review/[token]/respond.js` then calls `captureSelfReportedReviewerOrcid` (`lib/services/capture-self-reported-orcid.js`) — **non-fatal** (accept/decline already committed) — which OVERWRITES the person `wmkf_orcid`/`wmkf_orcidurl` (self-report beats a resolver guess) and fill-only writes the contact join key via `setOrcidIfAbsent`.
-
-**Invariant (PR4 design intent — see the S235 discrepancy above; partly false now):** `confirmed` on `wmkf_identitystatus` was meant to be a RESERVED sticky human-attestation sentinel that the automated resolver never emits. As of the S232/S233 spine that is **no longer true** — the spine's `classifySpineEvidence` DOES emit `confirmed`. What still holds: both write paths in `lib/dataverse/adapters/researcher.js` refuse to overwrite/null a stored `confirmed` (the sticky-skip + fail-closed reads):
-- `writeIdentityDecision` (~L203–213): if the incoming decision isn't itself `confirmed`, it reads the row and RETURNS without overwriting when stored status is `confirmed`.
-- `clearIdentityFields` (~L237–245): refuses to null identity fields when stored status is `confirmed`.
-Both reads **fail CLOSED** (Codex S217 #1): a transient/403 read error propagates rather than falling through and wiping an attestation we couldn't verify.
-
-**Why:** without these guards an automated resolver verdict (or a downgrade-triggered field clear) would silently overwrite/wipe a reviewer-attested ORCID — the highest-trust source we have (the person attested it after receiving the token at their own email).
-
-**How to apply:** if you ever make the resolver emit `confirmed`, add a manual-attestation status, or refactor `writeIdentityDecision`/`clearIdentityFields`, you MUST preserve the sticky-skip + fail-closed reads, or you reintroduce the silent-wipe bug. Tests: `tests/unit/capture-self-reported-orcid.test.js`. Design: `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` §14. Related: [[project-reviewer-identity-resolution-phase1]] (the resolver + `wmkf_identity*` fields), [[project-reviewer-identity-resolution]].
+Ground truth: `lib/dataverse/adapters/researcher.js`,
+`lib/services/capture-self-reported-orcid.js`, all direct mutation callers,
+`tests/unit/researcher-identity-confirmed-sticky.test.js`, and
+`docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md` C0.2.

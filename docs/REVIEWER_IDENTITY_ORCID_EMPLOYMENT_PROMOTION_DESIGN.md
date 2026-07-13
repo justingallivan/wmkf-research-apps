@@ -23,7 +23,8 @@ design-reviewed (READY WITH NAMED CHANGES); all 4 folded in:
    (probable-only; no new `confirmed` path).
 3. **Regression tests** (`reviewer-identity-evidence.test.js`): Smirnova drift → probable;
    wrong-forename namesake → unresolved; initial-only displayName → unresolved.
-4. **Sticky-`confirmed` discrepancy flagged** (not fixed here) — see §3 + the memory note.
+4. **Sticky-`confirmed` discrepancy flagged** (not fixed in this historical
+   slice). C0.2 now contains it at the persistence adapter; see §3.
 
 **Live-verified:** Smirnova → `probable` with the full institution name. **Known caveat (NOT
 fixed):** with a short/empty institution string she still abstains at SELECTION
@@ -90,14 +91,14 @@ person — the employment check runs against the SELECTED record's ORCID profile
 selection yields a wrong (but corroborated-looking) ORCID. The promotion must not weaken the
 namesake protection.
 
-## 3. The sticky-confirmed tension (flag, don't break)
-`[[project-reviewer-self-report-orcid-sticky-confirmed]]` (S218) states the automated resolver
-"only ever emits probable/unresolved/ambiguous — `confirmed` is NOT reachable from it" and
-`confirmed` is a reserved sticky human-attestation sentinel. But `classifySpineEvidence`
-(S232/S233, later) HAS `confirmed` branches (`:166`, `:173`). Either the memory is stale or the
-spine's `confirmed` is downgraded before persistence. This design targets `probable` only and
-does NOT add a new `confirmed` path, so it doesn't worsen the tension — but Codex should confirm
-the spine's existing `confirmed` emission vs the sticky sentinel (separate finding).
+## 3. The sticky-confirmed tension (contained after this design)
+`classifySpineEvidence` can emit `confirmed` as an automated confidence decision.
+C0.2 contains that mismatch at `researcher.writeIdentityDecision`: every caller
+declares a server-only origin, automated `confirmed` is cloned and persisted as
+`probable`, and a successful current-status read is required before any
+automated write. Stored `confirmed` rows remain protected. This is not durable
+provenance or an atomic compare-and-write; I1 replaces the transitional marker
+with versioned binding source.
 
 ## Q. Questions for Codex
 1. Is promoting `orcid_employment_corroborated[strong]` (+ `topic_match`) to `probable` without

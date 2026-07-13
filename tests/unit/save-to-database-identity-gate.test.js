@@ -42,8 +42,16 @@ describe('saveToDatabase — identity gate on the email-keyed side path', () => 
     expect(payload.orcid).toBeNull();
     expect(payload.orcidUrl).toBeNull();
     expect(payload.googleScholarUrl).toBeNull();
-    expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith('PID-1', expect.objectContaining({ status: 'unresolved' }));
-    expect(researcherAdapter.clearIdentityFields).toHaveBeenCalledWith('PID-1', expect.any(Array));
+    expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith(
+      'PID-1',
+      expect.objectContaining({ status: 'unresolved' }),
+      { identityOrigin: 'automated' },
+    );
+    expect(researcherAdapter.clearIdentityFields).toHaveBeenCalledWith(
+      'PID-1',
+      expect.any(Array),
+      { identityOrigin: 'automated' },
+    );
   });
 
   test('probable verdict → ORCID + Scholar URL written; no clear', async () => {

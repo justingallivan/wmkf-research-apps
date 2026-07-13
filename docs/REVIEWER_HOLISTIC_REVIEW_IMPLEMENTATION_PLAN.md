@@ -193,7 +193,8 @@ identity confirmation are complete. Verification: 197 targeted tests, full
 suite 478/478 suites and 5,395/5,395 tests, typecheck, production build, and the
 applicable route/DAL/docs/security gates plus self-tests. Production deployment
 `dpl_AxKRtNJtPMi3eKQK9LLeGHUQHTqt` reached READY with live aliases and no error
-logs in the post-deploy scan. C0.2 has not started.
+logs in the post-deploy scan. C0.2 is implemented on its isolated Tier-2 branch
+and awaits its own verification bundle and owner promotion gate.
 
 **[VERIFIED pre-C0.1 baseline; superseded by the implementation above]**
 `/api/reviewer-finder/save-candidates` validated only
@@ -230,6 +231,21 @@ test in which the first save resolves after the UI has moved to another request;
 neither its success nor its failure may update the new request's roster.
 
 ### C0.2 Close the attestation-overwrite hole
+
+**[IMPLEMENTED + VERIFIED ON BRANCH 2026-07-12; NOT PROMOTED]**
+`researcher.writeIdentityDecision` now requires a server-only
+`identityOrigin` of `self_report` or `automated`; only `self_report` may persist
+`confirmed`. All six direct writers declare their origin (one self-report and
+five automated runtime/backfill paths). Automated `confirmed` decisions are
+cloned and persisted as `probable`, stored
+`confirmed` rows remain sticky, and unknown origins/read failures write
+nothing. `clearIdentityFields` accepts only the automated origin and preserves
+the same sticky, fail-closed read. The adapter matrix and caller-path tests are
+implemented. The guard remains read-then-write rather than atomic; I1 must
+replace it with a durable binding contract. Verification: 133 targeted unit
+tests, 24 route integrations, full suite 478/478 suites and 5,414/5,414 tests,
+ESLint, script syntax checks, typecheck, production build, and the applicable
+Dataverse/docs/memory gates plus self-tests.
 
 Until the durable binding fields exist, make the origin of a `confirmed`
 decision explicit at the adapter boundary. Only the reviewer self-report path

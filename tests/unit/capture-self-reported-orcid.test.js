@@ -42,7 +42,7 @@ describe('captureSelfReportedReviewerOrcid', () => {
     expect(decision.resolvedAt).toBe('T0');
     expect(decision.anchors[0].type).toBe('self_reported_orcid');
     expect(decision.anchors[0].canonicalKey).toBe(`orcid:${VALID}`);
-    expect(opts).toEqual({ actingUserSystemId: 'u1' });
+    expect(opts).toEqual({ actingUserSystemId: 'u1', identityOrigin: 'self_report' });
 
     // Contact: fill-only join-key write.
     expect(d.contacts.setOrcidIfAbsent).toHaveBeenCalledWith('c-1', VALID, { actingUserSystemId: 'u1' });

@@ -390,15 +390,14 @@ captures it onto the **person** and the **contact** so it joins the flow.
   §4 conflict policy still applies — a genuine different-iD case is surfaced, not
   clobbered). Invalid iD / missing person → clean skip.
 - **Trust model — `confirmed` is a sticky human-attestation sentinel.** The
-  resolver (`reviewer-identity-resolver`) NEVER emits `confirmed` (only
-  probable/unresolved/ambiguous), so a stored `confirmed` unambiguously means
-  self-reported/manually-attested. `researcher.writeIdentityDecision` and
-  `clearIdentityFields` now **refuse to downgrade or clear a `confirmed`** record
-  (each reads the current status first; an incoming `confirmed` — a fresh
-  attestation — is the only thing that replaces a prior `confirmed`). This is the
-  correctness lynchpin: without it, a later automated enrich pass that computed a
-  sub-probable verdict would overwrite the status and `clearIdentityFields` would
-  wipe the attested ORCID.
+  resolver may emit `confirmed` as a confidence decision, but the persistence
+  adapter requires a server-only origin marker. Only `self_report` may persist
+  `confirmed`; every automated writer identifies itself, is capped at
+  `probable`, and must successfully read current status before writing. Both
+  `writeIdentityDecision` and `clearIdentityFields` skip a stored `confirmed`
+  and fail closed on read errors. This is transitional containment rather than
+  durable provenance: legacy rows do not encode who attested them, and the
+  read-then-write guard is not atomic.
 - **Wiring** (`respond.js`): runs on a fresh **decline** (person + contact-if-
   promoted) AND on **accept** (after honorarium, using its just-created
   `contactId` ?? the invite-time pointer); independent of honorarium opt-out; all

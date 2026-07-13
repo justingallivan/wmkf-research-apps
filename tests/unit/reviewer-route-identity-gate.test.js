@@ -153,8 +153,8 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(payload.googleScholarUrl).toBeNull();
     expect(payload.hIndex).toBeNull();
     expect(payload.totalCitations).toBeNull();
-    expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith('PID-1', expect.objectContaining({ status: 'unresolved' }), expect.any(Object));
-    expect(researcherAdapter.clearIdentityFields).toHaveBeenCalledWith('PID-1', RESOLVER_SOURCED_FIELDS, expect.any(Object));
+    expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith('PID-1', expect.objectContaining({ status: 'unresolved' }), expect.objectContaining({ identityOrigin: 'automated' }));
+    expect(researcherAdapter.clearIdentityFields).toHaveBeenCalledWith('PID-1', RESOLVER_SOURCED_FIELDS, expect.objectContaining({ identityOrigin: 'automated' }));
   });
 
   test('probable verdict → ORCID/Scholar persisted, NO clear', async () => {
@@ -163,7 +163,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(payload.orcid).toBe('0000-0001');
     expect(payload.googleScholarId).toBe('ABC');
     expect(payload.hIndex).toBe(40);
-    expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith('PID-1', expect.objectContaining({ status: 'probable' }), expect.any(Object));
+    expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith('PID-1', expect.objectContaining({ status: 'probable' }), expect.objectContaining({ identityOrigin: 'automated' }));
     expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
   });
 
@@ -1052,8 +1052,8 @@ describe('enrich-recommended route — identity gate + clear-on-downgrade', () =
     expect(payload.orcid).toBeNull();
     expect(payload.googleScholarId).toBeNull();
     expect(payload.hIndex).toBeNull();
-    expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith('PID-1', expect.objectContaining({ status: 'unresolved' }), expect.any(Object));
-    expect(researcherAdapter.clearIdentityFields).toHaveBeenCalledWith('PID-1', RESOLVER_SOURCED_FIELDS, expect.any(Object));
+    expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith('PID-1', expect.objectContaining({ status: 'unresolved' }), expect.objectContaining({ identityOrigin: 'automated' }));
+    expect(researcherAdapter.clearIdentityFields).toHaveBeenCalledWith('PID-1', RESOLVER_SOURCED_FIELDS, expect.objectContaining({ identityOrigin: 'automated' }));
   });
 
   test('probable verdict → ORCID/Scholar persisted, decision written, NO clear', async () => {
@@ -1061,7 +1061,7 @@ describe('enrich-recommended route — identity gate + clear-on-downgrade', () =
     const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
     expect(payload.orcid).toBe('0000-0001');
     expect(payload.hIndex).toBe(40);
-    expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith('PID-1', expect.objectContaining({ status: 'probable' }), expect.any(Object));
+    expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith('PID-1', expect.objectContaining({ status: 'probable' }), expect.objectContaining({ identityOrigin: 'automated' }));
     expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
   });
 

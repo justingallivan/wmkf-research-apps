@@ -285,7 +285,10 @@ async function runApply() {
         }), `upsert ${e.name}`);
         await sleep(120);
         // returns early if stored status is `confirmed` (sticky human attestation)
-        await withRetry(() => researcherAdapter.writeIdentityDecision(e.id, e.decision), `decision ${e.name}`);
+        await withRetry(
+          () => researcherAdapter.writeIdentityDecision(e.id, e.decision, { identityOrigin: 'automated' }),
+          `decision ${e.name}`,
+        );
         await sleep(120);
         appendFileSync(APPLIED_LOG, JSON.stringify({ id: e.id, orcidId: e.orcidId }) + '\n');
         ok++;
