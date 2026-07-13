@@ -37,15 +37,15 @@ merely linking to them:
   duplicate build;
 - destructive cleanup follows a successful comparison and promotion decision.
 
-**[BUILT; PROMOTION PENDING 2026-07-13]** The owner approved the first narrow
+**[PROMOTED 2026-07-13 via PR #57 / `00ffb09c`]** The owner approved the first narrow
 production caller after F1–F8 remediation: acceptance-drain reviewer self-report
-only, keyed by the job's stable `accepted_at`. The branch
-`codex/reviewer-binding-self-report-activation` uses the binding writer for clean
+only, keyed by the job's stable `accepted_at`. The production implementation
+uses the binding writer for clean
 or already-bound rows, falls back only on typed
 `legacy_classification_required`, and stops the retryable job before honorarium
 or contact follow-up on every other writer failure. This does not activate the
 policy reader, automated writers, decline path, backfill, or action-policy
-migration and is not production-live until deliberately promoted.
+migration. Vercel deployment `dpl_4YpnVVdRmDHyuzgPVSKXNcx22bKu` is READY.
 
 The original Fable review remains useful for strategy and prioritization. It is
 not controlling evidence for current code state.
@@ -288,9 +288,8 @@ scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod
 DIVERGENT. The dated output is captured at
 `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md`. The later
 writer added the person read/PATCH seam. Its first narrow production caller is
-built on `codex/reviewer-binding-self-report-activation` pending promotion;
-current production behavior remains authoritative until promotion, and null
-fields mean legacy/unknown, never eligible-by-default.
+live since PR #57 / `00ffb09c`; null fields still mean legacy/unknown, never
+eligible-by-default.
 
 **[HARDENED + VERIFIED 2026-07-13]** The adversarial-review remediation is
 built: a live read-only sample confirmed second-precision Dataverse timestamp
@@ -299,8 +298,8 @@ normalize once at the writer boundary; every named transition guard has compleme
 dead decision-preservation branch is removed; the resolver and binding contract
 share one literal seven-field authority; unsigned identity payloads cannot
 write durable resolver decisions; and duplicate batch correlation keys are
-rejected per row. The first production caller is now built, but not yet
-promoted: acceptance-drain self-report only, with the stable acceptance event.
+rejected per row. The first production caller is promoted: acceptance-drain
+self-report only, with the stable acceptance event (PR #57 / `00ffb09c`).
 
 Create one server-owned rebind/invalidation operation used by:
 
@@ -431,10 +430,9 @@ The artifact is observational evidence, not a causal head-to-head result.
 
 ## I1 — Define the versioned identity-binding contract
 
-**[FIELDS DEPLOYED + WRITER BUILT 2026-07-12; FIRST CALLER APPROVED/BUILT,
-PROMOTION PENDING 2026-07-13]** The narrow acceptance-drain self-report caller is
-the only activated build surface; policy-reader and broader consumer migration
-remain gated.
+**[FIELDS DEPLOYED + WRITER BUILT 2026-07-12; FIRST CALLER PROMOTED
+2026-07-13]** The narrow acceptance-drain self-report caller is the only live
+caller surface; policy-reader and broader consumer migration remain gated.
 
 ### I1.1 Minimal durable model
 
@@ -466,7 +464,7 @@ for the allowlisted identity-bearing fields; malformed, oversized, unknown-key,
 or unknown-source payloads must fail closed. Its exact schema and transition
 rules are a required I1.3 writer contract, not client input.
 
-**[PURE CONTRACT + WRITER BUILT; FIRST CALLER PENDING PROMOTION 2026-07-13]**
+**[PURE CONTRACT + WRITER BUILT; FIRST CALLER PROMOTED 2026-07-13]**
 `lib/services/reviewer-identity-binding-contract.js` now freezes the non-I/O
 contract: checksum-valid `orcid:`, exact OpenAlex author `openalex:`, and
 server-created `staff-attestation:` anchors only; coherent bound/unbound tuples;
@@ -478,8 +476,9 @@ retain their live schema ranges. `reviewer-identity-binding-writer.js` and the
 narrow `researcher.js` ETag adapter seam select and conditionally patch the
 person fields when invoked. `capture-self-reported-orcid.js` is now the single
 production-service import, reached by the acceptance drain only when it has the
-stable acceptance timestamp. The branch is pending promotion, so production
-behavior and existing rows remain unchanged at this point.
+stable acceptance timestamp. PR #57 / `00ffb09c` promoted that caller; the
+immediate post-deploy population remained zero, so no first durable binding
+event has yet been observed.
 
 If proposal COI is derived from a person binding, persist or otherwise prove
 both the binding version and the authoritative proposal/rule context used for
@@ -506,8 +505,8 @@ workbench `analysisResult` inputs cannot establish durable currency.
 The writer tests the supported subset of this transition table;
 revocation, legacy-dirty classification, authorized staff override of a
 self-report, merge policy, broad caller activation, and policy-reader migration
-remain gated. The acceptance-drain self-report caller is the sole approved first
-slice and is pending promotion:
+remain gated. The acceptance-drain self-report caller is the sole promoted first
+slice:
 
 | Event | Source | Version behavior | Required invalidation/recompute | Action posture |
 |---|---|---|---|---|
@@ -541,7 +540,7 @@ human binding until durable refresh ordering exists. Dirty legacy rows with
 populated identity fields but no lineage are blocked rather than inferred or
 erased. Revocation remains blocked because the deployed tuple has no monotonic
 revoked state. `capture-self-reported-orcid.js` is now the single production
-service import, pending promotion. Acceptance jobs pass canonical `accepted_at`;
+service import, live since PR #57 / `00ffb09c`. Acceptance jobs pass canonical `accepted_at`;
 clean/already-bound rows use the writer, typed `legacy_classification_required`
 alone uses the transitional self-report writes, and all other writer failures
 stop the job before honorarium/contact follow-up. The writer result still keeps
@@ -591,10 +590,9 @@ created all ten attributes. **[VERIFIED 2026-07-13 via
 `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod
 --include-population`]** current typed metadata reported 0 ABSENT / 10 EXACT /
 0 DIVERGENT. The later person-binding writer has a narrow select/PATCH seam. Its
-first production caller is built on
-`codex/reviewer-binding-self-report-activation` pending promotion, so the schema
-and caller still do not change current production behavior. The same command
-found zero person and zero
+first production caller is live since PR #57 / `00ffb09c`; the schema remains
+non-authoritative to broader policy consumers. The same command found zero
+person and zero
 suggestion rows with any Wave 13 field populated. The captured output is
 `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md`; these are
 dated snapshots and must be refreshed before later schema-adjacent work.
@@ -652,7 +650,7 @@ Migrate every live trust consumer, not only the adapter and merge guard:
 - invite rendering and server send enforcement;
 - ORCID back-propagation and its workbench/send/honorarium callers;
 - merge protection and merge DTOs;
-- acceptance drain ordering—**built pending promotion 2026-07-13:** no synthetic
+- acceptance drain ordering—**promoted 2026-07-13:** no synthetic
   in-memory `confirmed` precedes persistence; a stable acceptance event durably
   rebinds before honorarium/back-propagation, while the broader consumer policy
   migration remains open;
@@ -848,7 +846,7 @@ the change into cleanup.
 1. Approve each C0 runtime promotion after its evidence bundle.
 2. Approve the M1 label set, rubric, thresholds, and adjudicator before freezing.
 3. **Durable fields approved/deployed 2026-07-12; first acceptance self-report
-   caller approved/built 2026-07-13, promotion pending.** Broader runtime
+   caller approved/promoted 2026-07-13 via PR #57 / `00ffb09c`.** Broader runtime
    writers/readers and policy migration retain their own gates.
 4. **Additive production schema execution approved/completed 2026-07-12,**
    separately from code deployment.

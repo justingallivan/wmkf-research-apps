@@ -2,8 +2,8 @@
 title: Reviewer Holistic Redesign — Adversarial Implementation Review Prompt
 domain: reviewer-identity
 kind: audit
-status: active
-summary: "Read-only Claude review brief for the hybrid redesign plan and the B0/C0/I1 implementation through commit 75d26a22."
+status: historical
+summary: "Historical read-only Claude review brief for the B0/C0/I1 implementation through commit 75d26a22, completed before the first caller promotion."
 canonical: false
 cataloged: 2026-07-12
 owner: product-engineering
@@ -16,6 +16,10 @@ related:
 ---
 
 # Claude prompt: adversarial review of the reviewer holistic redesign
+
+> **Historical review input.** This prompt is pinned to pre-caller commit
+> `75d26a22`; its resulting findings were remediated before PR #57 promoted the
+> first acceptance-drain self-report caller at `00ffb09c` on 2026-07-13.
 
 Use this prompt in a fresh Claude session at the repository root.
 

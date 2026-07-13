@@ -1,12 +1,14 @@
-# Session 361 Prompt: first reviewer identity-binding caller activation
+# Session 361 Prompt: first reviewer identity-binding caller observation
 
 ## Current objective
 
-Finish and promote the owner-approved first production caller of
+Observe the newly promoted first production caller of
 `reviewer-identity-binding-writer.js` without widening the identity-policy
 migration.
 
-Current branch: `codex/reviewer-binding-self-report-activation`.
+Implementation PR #57 merged to `main` at `00ffb09c`; deployment
+`dpl_4YpnVVdRmDHyuzgPVSKXNcx22bKu` is READY on the production aliases. Current
+follow-up branch: `codex/reviewer-binding-activation-live-docs`.
 
 ## Decision and scope
 
@@ -24,7 +26,7 @@ The owner approved this exact first-caller strategy on 2026-07-13:
 5. Decline/no-stable-timestamp capture, automated writers/readers, backfill,
    merge/action policy, and the four Wave 13 suggestion COI fields are unchanged.
 
-## Built on the current branch
+## Promoted implementation
 
 - `lib/services/capture-self-reported-orcid.js`
   - accepts `bindingEventAt`;
@@ -67,11 +69,19 @@ The owner approved this exact first-caller strategy on 2026-07-13:
   helper semantics, durable surfaces, docs, and raw caller fan-out. `/sweep`
   leaves zero live stale first-caller claims; remaining old claims are explicitly
   historical records.
+- Post-promotion verification: the production deployment is READY; three
+  scheduled acceptance-drain calls completed with no error-level logs. An
+  immediate post-deploy population probe still found zero Wave 13 rows, so the
+  caller is live but no first durable binding event has yet been observed.
 
-## Remaining before promotion
+## Next observation
 
-1. Commit, push the Tier-2 branch, open a PR, and wait for green CI. Do not merge
-   without the owner's deliberate promotion decision.
+1. After the next reviewer acceptance containing a valid self-reported ORCID,
+   re-run the read-only population/preflight and inspect acceptance-drain logs.
+   Confirm that a clean row gains the expected self-reported binding, or that a
+   dirty legacy row takes only the approved typed fallback.
+2. Keep automated writers, backfill, policy readers, merge/action policy, and
+   suggestion COI currency gated until separately approved.
 
 ## Parked / unchanged
 
