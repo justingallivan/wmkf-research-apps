@@ -265,7 +265,7 @@ version; do not proliferate it to UI payloads.
 
 ### C0.3 Make corrections invalidate dependent state
 
-**[SCHEMA PREREQUISITE DEPLOYED; NOT AUTHORITATIVE 2026-07-12]**
+**[SCHEMA + INERT WRITER PREREQUISITE BUILT; NOT AUTHORITATIVE 2026-07-12]**
 The live containment audit found that this promise cannot be implemented safely
 against the current columns: the seven overlapping identity fields have no
 per-field lineage, proposal COI has no structured currency marker, and a person
@@ -273,8 +273,9 @@ binding has no durable generation. The additive prerequisite is now tracked in
 `wave13-reviewer-identity-binding` with a read-only ABSENT/EXACT/DIVERGENT
 preflight. The owner-approved production-only apply created all ten fields and
 post-apply typed metadata verification reported 0 ABSENT / 10 EXACT / 0
-DIVERGENT. It adds no runtime reader or writer; current behavior remains
-authoritative, and null fields mean legacy/unknown, never eligible-by-default.
+DIVERGENT. The later inert writer adds a test-only person read/PATCH seam but no
+production caller; current behavior remains authoritative, and null fields mean
+legacy/unknown, never eligible-by-default.
 
 Create one server-owned rebind/invalidation operation used by:
 
@@ -405,8 +406,8 @@ The artifact is observational evidence, not a causal head-to-head result.
 
 ## I1 — Define the versioned identity-binding contract
 
-**[FIELDS APPROVED + DEPLOYED 2026-07-12; OWNER-GATE REMAINS]** for transition
-semantics and runtime activation.
+**[FIELDS DEPLOYED + INERT WRITER BUILT 2026-07-12; OWNER-GATE REMAINS]** for
+runtime caller activation and consumer migration.
 
 ### I1.1 Minimal durable model
 
@@ -438,14 +439,18 @@ for the allowlisted identity-bearing fields; malformed, oversized, unknown-key,
 or unknown-source payloads must fail closed. Its exact schema and transition
 rules are a required I1.3 writer contract, not client input.
 
-**[PURE CONTRACT BUILT; NO DATAVERSE READER/WRITER 2026-07-12]**
+**[PURE CONTRACT + INERT WRITER BUILT; NO PRODUCTION CALLER 2026-07-12]**
 `lib/services/reviewer-identity-binding-contract.js` now freezes the non-I/O
 contract: checksum-valid `orcid:`, exact OpenAlex author `openalex:`, and
 server-created `staff-attestation:` anchors only; coherent bound/unbound tuples;
 and deterministic strict lineage for the seven overlapping fields. Lineage is
 capped at 2,048 UTF-8 bytes, rejects unknown keys/sources/future generations,
 and requires every non-null field to have exactly one entry. ORCID and Scholar
-id/URL pairs must be canonical; metrics retain their live schema ranges.
+id/URL pairs must be canonical and share one lineage source/generation; metrics
+retain their live schema ranges. `reviewer-identity-binding-writer.js` and the
+narrow `researcher.js` ETag adapter seam now select and conditionally patch the
+person fields when invoked, but a raw caller census finds only focused tests.
+Production behavior and existing rows remain unchanged.
 
 If proposal COI is derived from a person binding, persist or otherwise prove
 both the binding version and the authoritative proposal/rule context used for
@@ -469,7 +474,9 @@ workbench `analysisResult` inputs cannot establish durable currency.
 
 ### I1.2 Transition table
 
-Define and test these transitions before schema deployment:
+The inert writer now tests the supported subset of this transition table;
+revocation, legacy-dirty classification, authorized staff override of a
+self-report, merge policy, and production caller activation remain gated:
 
 | Event | Source | Version behavior | Required invalidation/recompute | Action posture |
 |---|---|---|---|---|
@@ -487,6 +494,23 @@ cases, not fall-through defaults.
 
 ### I1.3 One writer and one policy reader
 
+**[INERT WRITER FOUNDATION BUILT; POLICY READER + CALLER MIGRATION PENDING
+2026-07-12]** `reviewer-identity-binding-writer.js` performs a fail-closed read,
+validates the current tuple/lineage, plans explicit `init`/`refresh`/`rebind`/
+`noop`/`blocked` outcomes, and sends one complete PATCH guarded by the row ETag.
+Only a typed 412 triggers reread/recompute, with three total attempts. Exact
+human-event replay is a no-op; changed replay payloads and older same-source
+human events are blocked. Self-report outranks automation and staff confirmation
+regardless of their timestamps, while staff replacement of a self-report
+requires a future authorized correction event. Automated different-person
+rebinding blocks if any non-automated lineage would otherwise be erased;
+out-of-order automated events are blocked; and automation cannot refresh a
+human binding until durable refresh ordering exists. Dirty legacy rows with
+populated identity fields but no lineage are blocked rather than inferred or
+erased. Revocation remains blocked because the deployed tuple has no monotonic
+revoked state. No production service imports the writer yet, and its result
+keeps `downstreamEligible:false`.
+
 Replace status-only adapter guards with a shared binding writer that:
 
 - reads current binding fail closed;
@@ -500,9 +524,9 @@ Create one pure action-policy helper used by invite/send, ORCID back-propagation
 and merge protection. Sibling consumers may add stricter domain rules but may
 not reinterpret confidence as provenance.
 
-The future writer must use optimistic concurrency: read `@odata.etag`, compute
-the transition, and issue the one coherent PATCH with `ifMatch`; a 412 rereads
-and recomputes through a small bounded retry. Human-event replay identity is
+The inert writer uses optimistic concurrency: read `@odata.etag`, compute the
+transition, and issue the one coherent PATCH with `ifMatch`; a 412 rereads and
+recomputes through a small bounded retry. Human-event replay identity is
 durable, not `new Date()`: staff uses the server-created confirmation UUID, and
 self-report uses canonical ORCID plus the engagement's stable acceptance
 timestamp. Replaying the same event is a no-op; a later correction event bumps
@@ -527,9 +551,10 @@ extension specs (ten fields total), and
 metadata from those specs. The production-only apply was explicitly approved
 after the owner classified the ancient sandbox as unsuitable. Fresh preflight
 reported 10 ABSENT / 0 EXACT / 0 DIVERGENT; execute created all ten attributes;
-post-apply typed verification reported 0 ABSENT / 10 EXACT / 0 DIVERGENT. No
-application code selects or writes the columns, so schema creation did not
-change production behavior. A post-apply row probe found zero person or
+post-apply typed verification reported 0 ABSENT / 10 EXACT / 0 DIVERGENT. The
+later inert person-binding writer now has a narrow select/PATCH seam, but no
+production caller imports it, so schema creation and this foundation slice do
+not change production behavior. A post-apply row probe found zero person or
 suggestion rows with any Wave 13 field populated.
 
 **[SANDBOX EXCEPTION APPROVED 2026-07-12]** The documented

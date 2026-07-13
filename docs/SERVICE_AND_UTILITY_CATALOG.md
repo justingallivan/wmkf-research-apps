@@ -84,6 +84,7 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`contact-enrichment-service.js`** — 5-tier contact lookup; header documents Dataverse writeback migration.
 - **`reviewer-roster-store.js`** — Postgres operational roster for request-scoped Find state; active-row staff identity confirmation is stored here and re-read fail-closed at save.
 - **`reviewer-candidate-attestation.js`** — Transitional `NEXTAUTH_SECRET`-signed receipt binding server-computed automated identity fields to one request/candidate bundle before save.
+- **`reviewer-identity-binding-writer.js`** — Inert, server-owned Wave 13 person-binding transition seam: fail-closed snapshot + ETag read, strict lineage/source precedence, one complete conditional PATCH, and bounded 412 reread/recompute. No production caller is activated; dirty legacy rows, revocation, and unauthorized human correction remain blocked.
 
 ### Integrity Screener
 
