@@ -99,13 +99,14 @@ Identity resolver: `wmkf_identitystatus`, `wmkf_identityconfidenceband`,
 `wmkf_identityresolverversion`, `wmkf_identityresolvedat`, `wmkf_identityevidencesummary`,
 `wmkf_identityverifiedanchorsjson`.
 
-**Tracked but not deployed/authoritative (Wave 13, 2026-07-12):** identity-binding
+**Deployed but not authoritative (Wave 13, 2026-07-12):** identity-binding
 generation/source/anchor/timestamp, derived generation, and compact field
 lineage are specified as `wmkf_identitybindingversion`,
 `wmkf_identitybindingsource`, `wmkf_identitybindinganchor`,
 `wmkf_identityboundat`, `wmkf_identityderivedbindingversion`, and
-`wmkf_identityfieldlineagejson`. They remain absent or ignored until the
-separate schema apply and later reader/writer promotion gates complete.
+`wmkf_identityfieldlineagejson`. The owner-approved production-only apply and
+post-apply typed metadata verification completed with all six EXACT. No live
+application reader/writer uses them; existing rows remain null/legacy-unbound.
 
 ### 2c. On `wmkf_appreviewersuggestion` (entirely ours)
 
@@ -129,10 +130,12 @@ Stage-2a stamps: `wmkf_honorariumoptout`, `wmkf_withdrawnsufficientat`, `wmkf_co
 `wmkf_aiuseackedat`, `wmkf_coipolicyversion` (→ `wmkf_policyversion`),
 `wmkf_aiusepolicyversion` (→ `wmkf_policyversion`), `wmkf_honorariumrequest` (→ `akoya_request`).
 
-**Tracked but not deployed/authoritative (Wave 13, 2026-07-12):** structured
+**Deployed but not authoritative (Wave 13, 2026-07-12):** structured
 identity-COI currency is specified as `wmkf_identitycoistatus`,
 `wmkf_identitycoibindingversion`, `wmkf_identitycoicontexthash`, and
-`wmkf_identitycoicheckedat`. Current production COI behavior remains unchanged.
+`wmkf_identitycoicheckedat`. Post-apply typed metadata verification reported all
+four EXACT. No live application reader/writer uses them; current production COI
+behavior remains unchanged.
 
 ### 2d. On `wmkf_ai_run` (entirely ours)
 
@@ -219,6 +222,6 @@ appear to be vendor- or migration-provided that our app only reads — please co
 
 ---
 
-*Prepared from code + Atlas, not a fresh live-metadata probe. Logical names and entity sets are
-verified against schema-as-code; read/write classification is traced from app call sites. Happy to
-run a live Dataverse metadata probe for field-level certainty before this goes out.*
+*Prepared from code + Atlas. Wave 13 field shapes were freshly live-metadata
+verified 2026-07-12; other logical names/entity sets retain the earlier probe
+dates above. Read/write classification is traced from application call sites.*

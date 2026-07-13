@@ -31,11 +31,15 @@ The plan is **active under a hybrid incremental model**:
 4. **D1 cleanup:** Track B or heuristic deletion waits until promotion and one
    complete campaign of old/new observation.
 
-Wave 13 identity-binding schema artifacts are now tracked but are **not deployed
-or authoritative**. The ten nullable fields cover person binding generation and
-per-field lineage plus proposal COI binding/context currency. Apply remains a
-separate owner gate; dual writers/readers remain later slices. Null future fields
-mean legacy/unknown, never eligible-by-default.
+Wave 13 identity-binding schema is **deployed but not authoritative**. The
+owner-approved production-only apply completed 2026-07-12 after the ancient
+sandbox was rejected as an unsuitable validation target; post-apply typed
+metadata verification reported 0 ABSENT / 10 EXACT / 0 DIVERGENT. The ten
+nullable fields cover person binding generation and per-field lineage plus
+proposal COI binding/context currency. No live application reader/writer uses
+them; a post-apply any-non-null probe returned zero person and zero suggestion
+rows, so existing state remains legacy-unknown and cannot become
+eligible-by-default. Dual writers/readers remain later gated slices.
 
 The pure non-I/O contracts are built in
 `reviewer-identity-binding-contract.js` and `institution-coi-context.js`, with
@@ -44,11 +48,10 @@ seven-field lineage, and server-loaded proposal institution context hashing but
 do not select or write Wave 13 columns. Durable institution-COI `clear` still
 requires server-owned reviewer affiliations covered by the binding generation.
 
-The documented sandbox is reachable but lacks
-`wmkf_appreviewersuggestion`; Wave 13 preflight therefore aborts before apply and
-the combined wave was not partially installed. Production remains 10 ABSENT / 0
-DIVERGENT. The owner must choose sandbox reviewer-schema provisioning or an
-explicit production-only schema exception before runtime wiring resumes.
+The documented sandbox is reachable but ancient/unknown and lacks
+`wmkf_appreviewersuggestion`; Wave 13 was not partially installed there. The
+owner explicitly approved the production-only schema exception. That approval
+does not authorize runtime readers/writers or transition activation.
 
 ## Required evidence model
 

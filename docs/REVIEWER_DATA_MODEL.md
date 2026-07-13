@@ -20,11 +20,12 @@ Visual orientation for the reviewer-domain Dataverse entities and how they conne
 
 > **Authoritative source for any single entity is its atlas page** (`docs/atlas/dataverse-*.md`). This doc summarizes the connections; the atlas pages have the per-field detail.
 
-> **Planned identity-binding durability (tracked, not deployed or authoritative,
-> 2026-07-12):** Wave 13 adds nullable binding generation/source/anchor/time,
+> **Identity-binding durability foundation (deployed, not authoritative,
+> 2026-07-12):** Wave 13 added nullable binding generation/source/anchor/time,
 > derived-generation, and per-field-lineage columns to the person, plus COI
 > status/binding-generation/context-hash/check-time columns to the engagement.
-> No live reader or writer uses them yet. Null remains legacy/unknown; later
+> Typed production metadata verification reported all ten EXACT. No live reader
+> or writer uses them yet. Null remains legacy/unknown; later
 > eligibility will be computed rather than stored. See the two entity Atlas
 > pages and `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md` I1/I2.
 

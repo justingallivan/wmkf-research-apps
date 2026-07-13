@@ -2,11 +2,11 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-05-31 (S208 — `wmkf_applicantdisposition` deployed + live metadata probe: 77 `wmkf_`-prefixed attrs, 108 total) — prior 2026-05-09 (Stage 2a additions) / 2026-05-07 via `scripts/audit-dataverse-state.js` + EntityDefinitions metadata probe. Row count re-probed 2026-07-12 via `scripts/reconcile-memory-claims.js`.
+**Last verified:** 2026-07-12 Wave 13 typed metadata preflight; prior 2026-05-31 (S208 — `wmkf_applicantdisposition` deployed + live metadata probe: 77 `wmkf_`-prefixed attrs, 108 total). Row count re-probed 2026-07-12 via `scripts/reconcile-memory-claims.js`.
 **Live row count:** 662
 **Entity set:** `wmkf_appreviewersuggestions`
 **Adapter:** `lib/dataverse/adapters/reviewer-suggestion.js`
-**Extension manifests:** base entity in `lib/dataverse/schema/wave2/wmkf_app_reviewer_suggestion.json`; extensions in `lib/dataverse/schema/wave2-existing/wmkf_appreviewersuggestion-extensions.json` (S128–S130 additions) + `lib/dataverse/schema/wave3/04_wmkf_appreviewersuggestion_stage2a.json` (S143 Stage 2a slice 1 additions) + `lib/dataverse/schema/wave5/01_wmkf_appreviewersuggestion_workbench.json` (S196 Workbench prep) + `lib/dataverse/schema/wave6/01_wmkf_appreviewersuggestion_applicant_disposition.json` (S208 applicant disposition). Relevance-score range widen artifact: `scripts/widen-relevancescore-max.mjs`.
+**Extension manifests:** base entity in `lib/dataverse/schema/wave2/wmkf_app_reviewer_suggestion.json`; extensions in `lib/dataverse/schema/wave2-existing/wmkf_appreviewersuggestion-extensions.json` (S128–S130 additions) + `lib/dataverse/schema/wave3/04_wmkf_appreviewersuggestion_stage2a.json` (S143 Stage 2a slice 1 additions) + `lib/dataverse/schema/wave5/01_wmkf_appreviewersuggestion_workbench.json` (S196 Workbench prep) + `lib/dataverse/schema/wave6/01_wmkf_appreviewersuggestion_applicant_disposition.json` (S208 applicant disposition) + `lib/dataverse/schema/wave13-reviewer-identity-binding/02_wmkf_appreviewersuggestion_identity_coi.json`. Relevance-score range widen artifact: `scripts/widen-relevancescore-max.mjs`.
 **Native entity audit:** ENABLED (S143). Field-level before/after on the engagement-scope correction fields below is captured by Dataverse's native audit log; no parallel audit entity built. See `scripts/enable-suggestion-audit.mjs`.
 
 ## Source of truth
@@ -30,17 +30,20 @@ Suggestion content:
 - `wmkf_sources` (String, comma-joined provenance)
 - `wmkf_notes` (Memo)
 
-### Planned additive identity-COI currency — tracked, not deployed or authoritative
+### Additive identity-COI currency — deployed, not authoritative
 
 `lib/dataverse/schema/wave13-reviewer-identity-binding/02_wmkf_appreviewersuggestion_identity_coi.json`
-tracks four nullable fields: `wmkf_identitycoistatus`,
+defines four live nullable fields: `wmkf_identitycoistatus`,
 `wmkf_identitycoibindingversion`, `wmkf_identitycoicontexthash`, and
 `wmkf_identitycoicheckedat`. Together they can later prove that a structured
 proposal-specific COI result was computed for both the current person-binding
-generation and the current canonical proposal/rule context. As of 2026-07-12
-the wave has not been applied, and no live reader or writer uses these names.
-Missing/unknown status, generation mismatch, or missing/context-hash mismatch is
-designed to mean stale; `stale` and action eligibility are computed, not stored.
+generation and the current canonical proposal/rule context. The owner-approved
+production-only apply completed 2026-07-12; typed metadata verification reported
+all four EXACT. No live application reader or writer uses these names, so the
+columns are non-authoritative; a post-apply any-non-null probe returned zero
+rows. Missing/unknown
+status, generation mismatch, or missing/context-hash mismatch is designed to
+mean stale; `stale` and action eligibility are computed, not stored.
 
 Lifecycle bools (each has a `*name` virtual):
 - `wmkf_selected`, `wmkf_invited`, `wmkf_accepted`, `wmkf_declined`

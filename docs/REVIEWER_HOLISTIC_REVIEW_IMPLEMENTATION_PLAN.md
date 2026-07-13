@@ -265,15 +265,16 @@ version; do not proliferate it to UI payloads.
 
 ### C0.3 Make corrections invalidate dependent state
 
-**[SCHEMA PREREQUISITE BUILT; NOT DEPLOYED OR AUTHORITATIVE 2026-07-12]**
+**[SCHEMA PREREQUISITE DEPLOYED; NOT AUTHORITATIVE 2026-07-12]**
 The live containment audit found that this promise cannot be implemented safely
 against the current columns: the seven overlapping identity fields have no
 per-field lineage, proposal COI has no structured currency marker, and a person
 binding has no durable generation. The additive prerequisite is now tracked in
 `wave13-reviewer-identity-binding` with a read-only ABSENT/EXACT/DIVERGENT
-preflight. It adds no runtime reader or writer and must be applied through the
-I2.1 owner gate before C0.3 resumes. Until then, current behavior remains
-authoritative; null future fields mean legacy/unknown, never eligible-by-default.
+preflight. The owner-approved production-only apply created all ten fields and
+post-apply typed metadata verification reported 0 ABSENT / 10 EXACT / 0
+DIVERGENT. It adds no runtime reader or writer; current behavior remains
+authoritative, and null fields mean legacy/unknown, never eligible-by-default.
 
 Create one server-owned rebind/invalidation operation used by:
 
@@ -404,7 +405,8 @@ The artifact is observational evidence, not a causal head-to-head result.
 
 ## I1 — Define the versioned identity-binding contract
 
-**[OWNER-GATE]** for new Dataverse fields and transition semantics.
+**[FIELDS APPROVED + DEPLOYED 2026-07-12; OWNER-GATE REMAINS]** for transition
+semantics and runtime activation.
 
 ### I1.1 Minimal durable model
 
@@ -518,21 +520,26 @@ invalidate linked suggestion currency.
 `scripts/apply-dataverse-schema.js`; the apply engine creates missing attributes
 but does not reconcile a divergent existing definition.
 
-**[ARTIFACTS BUILT; EXTERNAL APPLY PENDING OWNER GATE 2026-07-12]**
+**[DEPLOYED + METADATA-VERIFIED; NON-AUTHORITATIVE 2026-07-12]**
 `lib/dataverse/schema/wave13-reviewer-identity-binding/` contains two additive
 extension specs (ten fields total), and
 `scripts/preflight-reviewer-identity-binding-fields.mjs` derives the expected
-metadata from those specs. No application code selects or writes the columns;
-schema creation alone therefore cannot change production behavior.
+metadata from those specs. The production-only apply was explicitly approved
+after the owner classified the ancient sandbox as unsuitable. Fresh preflight
+reported 10 ABSENT / 0 EXACT / 0 DIVERGENT; execute created all ten attributes;
+post-apply typed verification reported 0 ABSENT / 10 EXACT / 0 DIVERGENT. No
+application code selects or writes the columns, so schema creation did not
+change production behavior. A post-apply row probe found zero person or
+suggestion rows with any Wave 13 field populated.
 
-**[SANDBOX BLOCKED BY MISSING PARENT ENTITY 2026-07-12]** The documented
+**[SANDBOX EXCEPTION APPROVED 2026-07-12]** The documented
 sandbox target (`orgd9e66399.crm.dynamics.com`) is reachable, but the Wave 13
 preflight fails because `wmkf_appreviewersuggestion` does not exist there. The
-combined wave was not partially applied. Production metadata remains 10 ABSENT,
-0 EXACT, 0 DIVERGENT. The next owner decision is either to provision the missing
-reviewer schema in sandbox first or explicitly approve the established
-production dry-run → execute → metadata-verify exception; no reader/writer may
-land before one of those paths completes.
+combined wave was not partially applied there. The owner identified that
+sandbox as ancient/unknown and approved the established production dry-run →
+execute → metadata-verify exception. This exception authorizes only the
+additive schema operation; runtime readers/writers and transition semantics keep
+their separate promotion gates.
 
 Use a new isolated string-suffixed wave such as
 `wave13-reviewer-identity-binding`; do not append to or rerun wave6 as the new
@@ -771,8 +778,10 @@ the change into cleanup.
 
 1. Approve each C0 runtime promotion after its evidence bundle.
 2. Approve the M1 label set, rubric, thresholds, and adjudicator before freezing.
-3. Approve the I1 durable fields and transition semantics.
-4. Approve additive production schema execution separately from code deployment.
+3. **Durable fields approved/deployed 2026-07-12;** approve transition semantics
+   before runtime writers/readers activate.
+4. **Additive production schema execution approved/completed 2026-07-12,**
+   separately from code deployment.
 5. Decide early-career/no-ORCID evaluation versus explicit abstention.
 6. Decide whether to test applicant recommendations as prompt-level community
    seeds and authorize any production prompt reseed.

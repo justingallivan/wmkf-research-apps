@@ -4,11 +4,11 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-05-07 via `scripts/audit-dataverse-state.js`; row count re-probed 2026-07-12 via `scripts/reconcile-memory-claims.js`
+**Last verified:** 2026-07-12 Wave 13 typed metadata preflight; row count re-probed 2026-07-12 via `scripts/reconcile-memory-claims.js`
 **Live row count:** 4,416
 **Entity set:** `wmkf_potentialreviewerses` (note Dynamics-pluralized form)
 **Adapter:** `lib/dataverse/adapters/potential-reviewer.js`
-**Extension manifest:** `lib/dataverse/schema/wave2-existing/wmkf_potentialreviewers-extensions.json`
+**Extension manifests:** `lib/dataverse/schema/wave2-existing/wmkf_potentialreviewers-extensions.json` + `lib/dataverse/schema/wave13-reviewer-identity-binding/01_wmkf_potentialreviewers_identity_binding.json`
 
 ## Source of truth
 
@@ -43,17 +43,19 @@ Field caps observed empirically:
 
 **Bibliometric fields (S213 — folded in from the dropped `wmkf_appresearcher` sidecar):** `wmkf_primaryaffiliation` (500, the canonical full-string affiliation per D-AFF), `wmkf_department` (255), `wmkf_orcid`/`wmkf_orcidurl`, `wmkf_googlescholarid`/`wmkf_googlescholarurl`, `wmkf_hindex`/`wmkf_i10index`/`wmkf_totalcitations`, `wmkf_website`/`wmkf_facultypageurl`, `wmkf_keywords` (Memo), `wmkf_emailsource`, `wmkf_lastchecked`/`wmkf_metricsupdatedat`/`wmkf_contactenrichedat`/`wmkf_contactenrichmentsource`. (`wmkf_organizationname` kept as a clamped-100 compat shadow.) Written by `adapters/researcher.js` (now person-targeting) + `potential-reviewer.js`. See `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md`.
 
-### Planned additive identity binding — tracked, not deployed or authoritative
+### Additive identity binding — deployed, not authoritative
 
 `lib/dataverse/schema/wave13-reviewer-identity-binding/01_wmkf_potentialreviewers_identity_binding.json`
-tracks six nullable fields: `wmkf_identitybindingversion`,
+defines six live nullable fields: `wmkf_identitybindingversion`,
 `wmkf_identitybindingsource`, `wmkf_identitybindinganchor`,
 `wmkf_identityboundat`, `wmkf_identityderivedbindingversion`, and
 `wmkf_identityfieldlineagejson`. They provide a monotonic person-binding
 generation plus compact per-field lineage for safe correction/invalidation.
-As of 2026-07-12 the wave has not been applied, and no live reader or writer uses
-these names. When deployed later, null remains legacy/unbound and cannot confer
-action eligibility. Existing resolver evidence remains in
+The owner-approved production-only apply completed 2026-07-12; typed metadata
+verification reported all six EXACT. No live application reader or writer uses
+these names, so the columns are non-authoritative and every existing row remains
+null/legacy-unbound; a post-apply any-non-null probe returned zero rows. Null
+cannot confer action eligibility. Existing resolver evidence remains in
 `wmkf_identityevidencesummary` and `wmkf_identityverifiedanchorsjson`; the new
 lineage field does not duplicate that evidence payload.
 
