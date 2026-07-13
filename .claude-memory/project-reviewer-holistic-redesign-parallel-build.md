@@ -31,7 +31,8 @@ The plan is **active under a hybrid incremental model**:
 4. **D1 cleanup:** Track B or heuristic deletion waits until promotion and one
    complete campaign of old/new observation.
 
-Wave 13 identity-binding schema is **deployed but not authoritative**. The
+Wave 13 identity-binding schema is **deployed but not authoritative to policy
+readers**. The
 owner-approved production-only apply completed 2026-07-12 after the ancient
 sandbox was rejected as an unsuitable validation target. **[VERIFIED
 2026-07-13 via `node scripts/preflight-reviewer-identity-binding-fields.mjs
@@ -39,11 +40,14 @@ sandbox was rejected as an unsuitable validation target. **[VERIFIED
 EXACT / 0 DIVERGENT. The ten
 nullable fields cover person binding generation and per-field lineage plus
 proposal COI binding/context currency. No live application reader/writer uses
-the suggestion fields. The person fields now have an inert, ETag-protected
-binding writer and narrow adapter seam, but no production caller; the same
-reproducible population probe returned zero person and zero suggestion rows, so existing
-state remains legacy-unknown and cannot become eligible-by-default. Runtime
-caller migration remains a later gated slice.
+the suggestion fields. The person fields have an ETag-protected binding writer
+and narrow adapter seam. The owner approved its first production caller on
+2026-07-13, built on `codex/reviewer-binding-self-report-activation` pending
+promotion: acceptance-drain self-report only, keyed by stable `accepted_at`.
+The same reproducible pre-activation population probe returned zero person and
+zero suggestion rows, so that dated state remains legacy-unknown and cannot
+become eligible-by-default. Broader caller and policy-reader migration remains
+gated.
 
 **S359 adversarial review (2026-07-13 artifact): fixes implemented on the
 current remediation branch; promotion pending.** The inert
@@ -56,14 +60,15 @@ requires a valid server receipt before writing the client-carried resolver
 decision; F3's named guards have direct complement tests; F4/F5/F7 are also
 closed; F6 uses the owner-approved 14-day receipt lifetime. F8 is captured
 reproducibly at
-`docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md`. Runtime
-caller activation remains owner-gated.
+`docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md`. The first
+self-report caller is now approved/built pending promotion; automated writers,
+decline, backfill, action-policy readers, and other callers remain gated.
 
 The pure non-I/O contracts are built in
 `reviewer-identity-binding-contract.js` and `institution-coi-context.js`, with
 focused negative tests. They freeze strict canonical anchors, binding tuples,
 pair-atomic seven-field lineage, and server-loaded proposal institution context
-hashing. `reviewer-identity-binding-writer.js` now supplies the inert person
+hashing. `reviewer-identity-binding-writer.js` supplies the person
 read/conditional-write seam with bounded 412 recompute, explicit source
 precedence, monotonic human-event ordering, manual-lineage protection, and
 fail-closed legacy handling. Automation cannot refresh a human binding until a
@@ -72,8 +77,9 @@ requires server-owned reviewer affiliations covered by the binding generation.
 
 The documented sandbox is reachable but ancient/unknown and lacks
 `wmkf_appreviewersuggestion`; Wave 13 was not partially installed there. The
-owner explicitly approved the production-only schema exception. That approval
-does not authorize production caller or transition activation.
+owner explicitly approved the production-only schema exception. The later
+2026-07-13 decision separately authorizes only the narrow acceptance-drain
+self-report caller described above.
 
 ## Required evidence model
 

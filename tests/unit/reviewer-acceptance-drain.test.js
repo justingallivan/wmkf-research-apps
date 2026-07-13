@@ -84,7 +84,7 @@ function deps(currentSuggestion = acceptedSuggestion()) {
       getById: jest.fn(async () => reviewer()),
     },
     ensureHonorarium: jest.fn(async () => ({ status: 'deferred', contactId: 'contact-1' })),
-    captureOrcid: jest.fn(async () => ({})),
+    captureOrcid: jest.fn(async () => ({ persisted: true })),
     captureIdentity: jest.fn(async () => ({})),
     syncNameTitle: jest.fn(async () => ({})),
     alertEmail: jest.fn(async () => ({})),
@@ -111,10 +111,18 @@ describe('processReviewerAcceptanceJob', () => {
     expect(d.ensureHonorarium).toHaveBeenCalledWith(expect.objectContaining({
       suggestion: expect.objectContaining({ wmkf_appreviewersuggestionid: SUGGESTION_ID }),
       request: expect.objectContaining({ akoya_requestid: REQUEST_ID }),
-      reviewer: expect.objectContaining({ wmkf_orcid: '0000-0002-1825-0097' }),
+      reviewer: expect.objectContaining({
+        wmkf_orcid: '0000-0002-1825-0097',
+        wmkf_identitystatus: 'confirmed',
+      }),
       body: expect.objectContaining({ address: expect.any(Object) }),
     }));
-    expect(d.captureOrcid).toHaveBeenCalledWith(expect.objectContaining({ contactId: 'contact-1' }));
+    expect(d.captureOrcid).toHaveBeenCalledWith(expect.objectContaining({
+      contactId: '44444444-4444-4444-8444-444444444444',
+      bindingEventAt: '2026-07-01T10:00:00.000Z',
+    }));
+    expect(d.captureOrcid.mock.invocationCallOrder[0])
+      .toBeLessThan(d.ensureHonorarium.mock.invocationCallOrder[0]);
     expect(d.captureIdentity).toHaveBeenCalledWith(expect.objectContaining({ academicRank: 'Professor' }));
     expect(d.syncNameTitle).toHaveBeenCalledWith(expect.objectContaining({ trusted: true }));
     expect(d.alertEmail).toHaveBeenCalledWith(expect.objectContaining({ reviewerEmail: 'reviewer@example.org' }));
@@ -130,9 +138,34 @@ describe('processReviewerAcceptanceJob', () => {
     await processReviewerAcceptanceJob(job({ isAcceptRepeat: true }), d);
 
     expect(d.ensureHonorarium).toHaveBeenCalled();
+    expect(d.captureOrcid).toHaveBeenCalledWith(expect.objectContaining({
+      bindingEventAt: '2026-07-01T10:00:00.000Z',
+    }));
     expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
     expect(d.quota).not.toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).toHaveBeenCalled();
+  });
+
+  it('normalizes a Date-valued accepted_at before activating the writer', async () => {
+    const d = deps();
+    await processReviewerAcceptanceJob(job({
+      acceptedAt: new Date('2026-07-01T10:00:00.347Z'),
+    }), d);
+
+    expect(d.captureOrcid).toHaveBeenCalledWith(expect.objectContaining({
+      bindingEventAt: '2026-07-01T10:00:00.347Z',
+    }));
+  });
+
+  it('does not synthesize confirmed when capture abstains', async () => {
+    const d = deps();
+    d.captureOrcid.mockResolvedValueOnce({ skipped: 'invalid_orcid', state: 'malformed' });
+
+    await processReviewerAcceptanceJob(job(), d);
+
+    const honorariumReviewer = d.ensureHonorarium.mock.calls[0][0].reviewer;
+    expect(honorariumReviewer.wmkf_orcid).toBe('0000-0002-1825-0097');
+    expect(honorariumReviewer).not.toHaveProperty('wmkf_identitystatus');
   });
 
   it('opt-out jobs skip honorarium but still run non-payment follow-up work', async () => {
@@ -227,6 +260,20 @@ describe('processReviewerAcceptanceJob', () => {
     expect(d.syncNameTitle).toHaveBeenCalled();
     expect(d.sendAcceptanceEmail).toHaveBeenCalled();
     expect(d.quota).toHaveBeenCalled();
+    expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
+  });
+
+  it('retries binding failures before honorarium or other downstream work starts', async () => {
+    const d = deps();
+    d.captureOrcid.mockRejectedValueOnce(new Error('identity binding unavailable'));
+
+    await expect(processReviewerAcceptanceJob(job(), d)).rejects.toThrow('identity binding unavailable');
+
+    expect(d.ensureHonorarium).not.toHaveBeenCalled();
+    expect(d.captureIdentity).not.toHaveBeenCalled();
+    expect(d.syncNameTitle).not.toHaveBeenCalled();
+    expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
+    expect(d.quota).not.toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
   });
 

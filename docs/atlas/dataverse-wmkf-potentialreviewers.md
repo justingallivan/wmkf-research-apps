@@ -53,12 +53,13 @@ defines six live nullable fields: `wmkf_identitybindingversion`,
 generation plus compact per-field lineage for safe correction/invalidation.
 The owner-approved production-only apply completed 2026-07-12. **[VERIFIED
 2026-07-13 via the command in Last verified]** typed metadata reported all six
-EXACT. No production caller uses these names: the
-inert `reviewer-identity-binding-writer.js` and
-its narrow `researcher.js` ETag seam now select/PATCH them only when explicitly
-invoked, and a raw caller census finds focused tests but no production caller.
-The columns therefore remain non-authoritative and every existing row remains
-null/legacy-unbound; the same population probe returned zero rows. The dated
+EXACT. `reviewer-identity-binding-writer.js` and its narrow `researcher.js` ETag
+seam select/PATCH them only when explicitly invoked. The first production caller
+is built on `codex/reviewer-binding-self-report-activation` pending promotion:
+the acceptance drain passes stable `accepted_at` into self-report capture, which
+commits the person binding before contact/honorarium follow-up. The columns remain
+non-authoritative to policy readers and backfills; the pre-activation population
+probe returned zero rows, so that dated snapshot remains legacy/unbound. The dated
 output is captured in
 `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md` and must be
 refreshed before schema-adjacent work. Null
@@ -86,13 +87,14 @@ Methods:
 - `pages/api/review-manager/reviewers.js` `fetchPotentialReviewers` — chunked OR-chain on `wmkf_potentialreviewersid` to hydrate the Review Manager reviewer list
 - `pages/api/reviewer-finder/{save-candidates,my-candidates}.js`
 - `pages/api/workbench/enrich-recommended.js`, `lib/services/contact-enrichment-service.js`, `adapters/researcher.js` — read the bibliometric fields here (S213: was the `wmkf_appresearcher` sidecar)
-- `lib/services/reviewer-identity-binding-writer.js` — inert fail-closed binding snapshot read; currently test-only with no production caller
+- `lib/services/reviewer-identity-binding-writer.js` — fail-closed binding snapshot read; first production caller built in acceptance-drain self-report, pending promotion
 
 ## Write paths
 
 - Endpoints: same as read (via `upsertByEmail` / `update` / `setContactLink`)
 - `scripts/backfill-postgres-to-dataverse.js` — `upsertByEmail` against the Postgres `researchers` pool during Wave 2 backfill.
-- `lib/services/reviewer-identity-binding-writer.js` — one complete ETag-guarded person PATCH after transition validation; currently test-only with no production caller
+- `lib/services/reviewer-identity-binding-writer.js` — one complete ETag-guarded person PATCH after transition validation; first production caller built in acceptance-drain self-report, pending promotion
+- `lib/services/capture-self-reported-orcid.js` — stable acceptance events use the binding writer; only typed `legacy_classification_required` falls back to the transitional person writes, and contact fill follows person persistence
 
 ## Cross-system
 

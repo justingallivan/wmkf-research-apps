@@ -84,7 +84,8 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`contact-enrichment-service.js`** — 5-tier contact lookup; header documents Dataverse writeback migration.
 - **`reviewer-roster-store.js`** — Postgres operational roster for request-scoped Find state; active-row staff identity confirmation is stored here and re-read fail-closed at save.
 - **`reviewer-candidate-attestation.js`** — Transitional `NEXTAUTH_SECRET`-signed receipt binding server-computed automated identity fields to one request/candidate bundle before save.
-- **`reviewer-identity-binding-writer.js`** — Inert, server-owned Wave 13 person-binding transition seam: fail-closed snapshot + ETag read, strict UTC timestamp normalization, lineage/source precedence, one complete conditional PATCH, and bounded 412 reread/recompute. No production caller is activated; dirty legacy rows, revocation, and unauthorized human correction remain blocked.
+- **`capture-self-reported-orcid.js`** — Self-reported ORCID persistence seam. Accept-drain calls with a stable acceptance timestamp use the Wave 13 binding writer before contact fill; only typed `legacy_classification_required` falls back to the transitional person writes. Older/decline calls without a stable event retain the transitional path.
+- **`reviewer-identity-binding-writer.js`** — Server-owned Wave 13 person-binding transition seam: fail-closed snapshot + ETag read, strict UTC timestamp normalization, lineage/source precedence, one complete conditional PATCH, and bounded 412 reread/recompute. Its first production caller is built on `codex/reviewer-binding-self-report-activation` pending promotion: acceptance-drain self-report only. Dirty legacy rows, revocation, unauthorized human correction, policy-reader migration, and automated writer migration remain blocked or deferred.
 
 ### Integrity Screener
 

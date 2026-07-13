@@ -7,6 +7,7 @@
  * normalizes; the contact write is skipped (person-only) when no contact exists.
  */
 import { captureSelfReportedReviewerOrcid } from '../../lib/services/capture-self-reported-orcid.js';
+import { IdentityBindingWriteError } from '../../lib/services/reviewer-identity-binding-writer.js';
 
 const VALID = '0000-0002-1825-0097';
 
@@ -19,6 +20,7 @@ function deps() {
     contacts: {
       setOrcidIfAbsent: jest.fn().mockResolvedValue({ action: 'write', orcid: VALID }),
     },
+    writeBinding: jest.fn().mockResolvedValue({ outcome: 'init' }),
   };
 }
 
@@ -54,6 +56,93 @@ describe('captureSelfReportedReviewerOrcid', () => {
     expect(out).toEqual({ persisted: true, orcid: VALID, contact: null });
     expect(d.researcher.updateById).toHaveBeenCalled();
     expect(d.researcher.writeIdentityDecision).toHaveBeenCalled();
+    expect(d.contacts.setOrcidIfAbsent).not.toHaveBeenCalled();
+  });
+
+  test('stable acceptance timestamp uses the durable writer before contact fill', async () => {
+    const d = deps();
+    const bindingEventAt = '2026-07-01T10:00:00.347Z';
+
+    const out = await captureSelfReportedReviewerOrcid({
+      potentialReviewerId: 'pr-1',
+      rawOrcid: VALID,
+      contactId: 'c-1',
+      actingUserSystemId: 'u1',
+      bindingEventAt,
+    }, d);
+
+    expect(out).toEqual({ persisted: true, orcid: VALID, contact: { action: 'write', orcid: VALID } });
+    expect(d.writeBinding).toHaveBeenCalledWith({
+      potentialReviewerId: 'pr-1',
+      actingUserSystemId: 'u1',
+      event: {
+        source: 'self_reported',
+        anchor: `orcid:${VALID}`,
+        boundAt: bindingEventAt,
+        fieldMode: 'partial',
+        fields: {
+          wmkf_orcid: VALID,
+          wmkf_orcidurl: `https://orcid.org/${VALID}`,
+        },
+        decision: expect.objectContaining({
+          status: 'confirmed',
+          resolvedAt: bindingEventAt,
+        }),
+      },
+    });
+    expect(d.researcher.updateById).not.toHaveBeenCalled();
+    expect(d.researcher.writeIdentityDecision).not.toHaveBeenCalled();
+    expect(d.writeBinding.mock.invocationCallOrder[0])
+      .toBeLessThan(d.contacts.setOrcidIfAbsent.mock.invocationCallOrder[0]);
+  });
+
+  test('dirty legacy row falls back only on the typed classification error', async () => {
+    const d = deps();
+    d.writeBinding.mockRejectedValueOnce(new IdentityBindingWriteError(
+      'legacy_classification_required',
+      'legacy identity fields require explicit classification before first binding',
+    ));
+
+    await captureSelfReportedReviewerOrcid({
+      potentialReviewerId: 'pr-1',
+      rawOrcid: VALID,
+      contactId: 'c-1',
+      actingUserSystemId: 'u1',
+      bindingEventAt: '2026-07-01T10:00:00.000Z',
+    }, d);
+
+    expect(d.researcher.updateById).toHaveBeenCalledTimes(1);
+    expect(d.researcher.writeIdentityDecision).toHaveBeenCalledTimes(1);
+    expect(d.contacts.setOrcidIfAbsent).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    ['unexpected writer failure', new Error('Dataverse unavailable')],
+    ['untyped legacy-shaped failure', Object.assign(new Error('legacy-shaped'), { code: 'legacy_classification_required' })],
+    ['blocked transition', null],
+    ['missing writer result', 'missing'],
+    ['unknown writer outcome', 'unknown'],
+  ])('%s fails closed before legacy or contact writes', async (_label, writerError) => {
+    const d = deps();
+    if (writerError === null) {
+      d.writeBinding.mockResolvedValueOnce({ outcome: 'blocked', reason: 'unsupported_binding_transition' });
+    } else if (writerError === 'missing') {
+      d.writeBinding.mockResolvedValueOnce(undefined);
+    } else if (writerError === 'unknown') {
+      d.writeBinding.mockResolvedValueOnce({ outcome: 'future_outcome' });
+    } else {
+      d.writeBinding.mockRejectedValueOnce(writerError);
+    }
+
+    await expect(captureSelfReportedReviewerOrcid({
+      potentialReviewerId: 'pr-1',
+      rawOrcid: VALID,
+      contactId: 'c-1',
+      bindingEventAt: '2026-07-01T10:00:00.000Z',
+    }, d)).rejects.toThrow();
+
+    expect(d.researcher.updateById).not.toHaveBeenCalled();
+    expect(d.researcher.writeIdentityDecision).not.toHaveBeenCalled();
     expect(d.contacts.setOrcidIfAbsent).not.toHaveBeenCalled();
   });
 
