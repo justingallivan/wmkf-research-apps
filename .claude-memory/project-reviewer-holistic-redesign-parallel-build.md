@@ -1,72 +1,89 @@
 ---
 name: project-reviewer-holistic-redesign-parallel-build
-description: The 2026-07-08 Fable holistic review of reviewer finding + identity produced a full implementation plan (docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md). Owner direction (S349): treat as a MAJOR effort on a DEDICATED testing branch — build the whole plan (P0–P4) out, then compare the finished pipeline head-to-head against state-of-the-art on main before merging. Not started; parked pending owner go.
+description: The reviewer finding/identity redesign is PARKED pending owner go. The reconciled plan now separates current-safety containment from the long-lived experiment: C0 may promote independently to main after an explicit owner decision; M1 through F2 accumulate on a dedicated branch against a frozen main commit; destructive D1 cleanup happens only after a successful controlled pilot and promotion decision.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-08 via owner statement (S349) + direct read of the plan + audit docs
+  last_verified: 2026-07-12 via controlling comparison memo, live contract audit, and reconciled implementation plan
 ---
 
 ## Recall Rule
 
-Read this when: planning or starting work on the reviewer-finding pipeline
-(`lib/services/discovery/`, discovery-service facade) or reviewer-identity
-resolution (`reviewer-identity-resolver.js`, `researcher.js` identity fields),
-OR when anyone proposes acting on `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md`.
+Read this when planning or starting reviewer-finding work
+(`lib/services/discovery/`, the discovery facade) or reviewer identity work
+(`reviewer-identity-resolver.js`, `researcher.js` identity fields), or whenever
+`docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md` is proposed for action.
 
-Do:
-- Treat the plan as the agreed direction for a redesign of reviewer finding +
-  identity, sourced from `docs/audits/reviewer-holistic-review-fable-2026-07-08.md`.
-- Keep the plan's **staged, phased build** (P0 → … → P4, one phase at a time,
-  don't batch — that part is fine, probably required). What's different is only
-  *where the phases land*: they accumulate on a **dedicated long-lived testing
-  branch and are NOT merged to main one at a time**. The redesign is held off
-  main until built out in full, so the *end product* can be compared
-  **head-to-head against the current state-of-the-art on main** — two
-  fully-built pipelines on separate branches — before any merge decision.
-- Use the plan's own eval layers as the comparison harness: **P2.1** frozen
-  identity eval fixtures, **P3.2** A/B on 2–3 D26-style proposals, **P3.3**
-  per-channel accept-yield report. These are what make "how does it compare"
-  answerable rather than a sniff test.
-- Still honor every safety invariant in the plan's "Universal invariants"
-  block and the [OWNER-GATE] markers on individual phases — a testing branch
-  does not waive the sticky/fail-closed identity guards.
+## Current direction
 
-Do not:
-- Read "keep the staged build" as "batch it all into one blob" — the phasing
-  (one phase at a time, don't batch) stays. The ONLY change from the plan's
-  prose is that each phase lands on the testing branch, NOT merged to main
-  individually; main stays the comparison baseline until the end-product
-  head-to-head. Don't merge phases to main as they finish.
-- Start building without an explicit owner go — as of S349 this is parked, not
-  green-lit. It is a major effort, not a quick task.
-- Let the plan or its source audit go unrouted again — before S349 neither had
-  a memory pointer.
+The plan is **parked, not green-lit**. It has two execution lanes:
 
-Ground truth:
-- Plan: `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md` (`status: draft`).
-- Source review: `docs/audits/reviewer-holistic-review-fable-2026-07-08.md`
-  (§1–§2 rationale + owner constraints; §3–§5 = what the plan implements).
-- Owner sourcing constraints that bound the finding half:
-  [[project-reviewer-sourcing-constraints]].
-- Identity-safety context the P0/P1 phases turn on:
-  [[project-reviewer-self-report-orcid-sticky-confirmed]],
-  [[project-reviewer-verify-fail-dangerous]].
+1. **C0 containment:** current save-boundary, correction, attestation-overwrite,
+   and send-eligibility defects are built on a short-lived Tier-1 branch. The
+   owner must explicitly decide whether verified containment promotes to main
+   before the larger redesign or whether the continuing exposure is accepted.
+2. **M1→F2 redesign experiment:** measurement, versioned identity binding,
+   migration/fan-out, resolver hardening, finding experiments, and a controlled
+   pilot accumulate one phase at a time on a dedicated testing branch. The
+   comparison baseline is an exact frozen main commit plus frozen prompts,
+   models, documents, exclusions, and rubric—not a moving branch name.
+3. **D1 cleanup:** Track B or heuristic deletion is post-promotion work only.
+   It contributes no experiment signal and must not reduce reversibility before
+   the promote/stop decision.
 
-**Why:** The Fable session (top-level `claude-fable-5`) reassessed the whole
-reviewer finding + disambiguation surface and produced a phased plan. The owner
-judged it a major effort worth doing as an isolated experiment — build the
-redesigned pipeline in full on its own branch and measure it against today's
-production pipeline, rather than dripping changes into main where they can't be
-compared as a whole.
+## Required evidence model
 
-**How to apply:** When reviewer-finding/identity work comes up, surface this
-plan and its branch-build model. Do not silently execute the plan's incremental
-sequencing; do not start the build without owner sign-off; when the build does
-run, stand up the eval harness (P2.1/P3.2/P3.3) first so the head-to-head
-comparison against main is possible.
+- Identity confidence is not provenance. The durable contract separates
+  binding source, version, canonical anchor, evidence lineage, correction, and
+  action eligibility.
+- Existing tests/eval scripts may seed fixture shapes but do not supply ground
+  truth. The identity benchmark is independently labeled and adjudicated before
+  A/B output is unblinded.
+- The existing suggestion ledger supports an observational channel baseline,
+  not a causal historical experiment: source tokens can overlap and current
+  selected/engagement state is mutable.
+- Offline A/B qualifies a limited controlled pilot; it cannot measure
+  acceptance or review completion while the redesign remains off production.
+- The staff decline-referral callout and Add-or-Refer handoff are already
+  shipped. Measure conversion; do not rebuild them.
 
-Related: [[project-reviewer-apps-redesign-direction]] (the Workbench/UI
-redesign — a DIFFERENT axis; this memory is the finding/identity *engine*),
-[[project-reviewer-recall-over-precision]], [[project-reviewer-count-invariant]].
+## Do
+
+- Start with the plan's B0 owner/evaluation freeze.
+- Keep C0 promotion separate from the redesign-branch decision.
+- Build phases one at a time; do not batch the redesign into one opaque change.
+- Preserve fail-closed identity reads and the no-COI-regating posture.
+- Run `/contract-reconcile` for containment, binding/schema, and cross-layer
+  phases; run `/sweep` for durable fact changes.
+- Require raw-field consumer/projection fan-out before retiring
+  `wmkf_identitystatus` as a trust signal.
+- Use the plan's independently labeled identity gates, blinded proposal A/B,
+  and controlled-pilot thresholds for promote/stop.
+
+## Do not
+
+- Do not start without the relevant owner gate.
+- Do not treat the old P0→P4 sequence or a single
+  `wmkf_identitybindingsource` column as the current plan.
+- Do not let client-supplied nested identity state establish persistence or
+  action eligibility.
+- Do not infer self-report from legacy `confirmed`; unproven rows stay
+  legacy/unbound until reviewed.
+- Do not call mutable suggestion rows an immutable shortlist/panel history.
+- Do not delete Track B or other retrieval/ranking code before the offline
+  comparison, controlled pilot, and explicit promotion decision all succeed.
+
+## Ground truth
+
+- Reconciled plan: `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md`
+- Controlling synthesis: `docs/audits/reviewer-holistic-review-comparison-2026-07-09.md`
+- Current-tree review: `docs/audits/reviewer-holistic-review-codex-2026-07-09.md`
+- Strategic source review: `docs/audits/reviewer-holistic-review-fable-2026-07-08.md`
+- Owner sourcing constraints: [[project-reviewer-sourcing-constraints]]
+- Identity safety context: [[project-reviewer-self-report-orcid-sticky-confirmed]],
+  [[project-reviewer-verify-fail-dangerous]]
+
+Related: [[project-reviewer-apps-redesign-direction]] (Workbench/UI is a
+different axis), [[project-reviewer-recall-over-precision]],
+[[project-reviewer-count-invariant]].

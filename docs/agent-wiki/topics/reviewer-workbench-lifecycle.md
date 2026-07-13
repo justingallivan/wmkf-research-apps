@@ -108,7 +108,9 @@ been live**). Until S349 **nothing read it** — the suggested names sat unseen.
   unused) — a colleague reported it "did nothing" (the tab hop was unreliable /
   the pre-filled card sat below the fold), so it was replaced with this in-place
   flow. Tests: `tests/unit/reviewers-tab-referral-add.test.js`.
-- Origin of the direction: Fable holistic review P3.1
+- Origin of the direction: the former Fable holistic-review P3.1; the
+  reconciled implementation plan now records the shipped surface as F1.1 and
+  treats conversion measurement as remaining work
   (`docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md`).
 
 ## Durable Memory

@@ -3,448 +3,666 @@ title: Reviewer Holistic Review — Implementation Plan
 domain: reviewer-identity
 kind: plan
 status: draft
-summary: "Phased plan for the 2026-07-08 holistic-review direction: identity provenance split, eval-first hardening, referral loop-closure, deletions."
+summary: "Parked plan for identity containment, versioned binding, independent evaluation, a controlled pilot, and post-promotion cleanup."
 canonical: false
-cataloged: 2026-07-08
+cataloged: 2026-07-12
 owner: product-engineering
 related:
+  - docs/audits/reviewer-holistic-review-comparison-2026-07-09.md
+  - docs/audits/reviewer-holistic-review-codex-2026-07-09.md
   - docs/audits/reviewer-holistic-review-fable-2026-07-08.md
   - lib/services/reviewer-identity-resolver.js
   - lib/dataverse/adapters/researcher.js
-  - .claude-memory/project-reviewer-sourcing-constraints.md
+  - .claude-memory/project-reviewer-holistic-redesign-parallel-build.md
 ---
 
 # Reviewer Holistic Review — Implementation Plan
 
-Original direction source: `docs/audits/reviewer-holistic-review-fable-2026-07-08.md`.
-Before using this parked plan, read
-`docs/audits/reviewer-holistic-review-comparison-2026-07-09.md`; it preserves
-the useful direction while correcting evidence overclaims, the now-shipped
-P3.1 staff handoff, and the identity-contract scope.
+## Status and controlling direction
 
-## Execution model (owner, S349 — where the phases land, not how they're staged)
+**PARKED — not green-lit.** No phase begins without the owner gate named for
+that phase. The 2026-07-09 comparison memo is the controlling assessment where
+the source reviews conflict. This plan incorporates its corrections rather than
+merely linking to them:
 
-Justin's chosen model (2026-07-08): **keep the staged, phased build** (P0 → …
-→ P4, one phase at a time, don't batch — probably required, as the plan lays
-out). What changes is only *where the phases land and how success is judged*:
+- current trust-boundary and correction defects are contained before the
+  experimental redesign;
+- identity is a versioned binding contract, not `confirmed` plus one source
+  column;
+- independently labeled evaluation precedes resolver tuning;
+- the staff referral handoff is treated as shipped; measurement replaces a
+  duplicate build;
+- destructive cleanup follows a successful comparison and promotion decision.
 
-- **Phases accumulate on a dedicated testing branch, they are NOT merged to
-  main one at a time.** The redesign is held off main until it is built out in
-  full, so that a whole-pipeline comparison is even possible (if each phase
-  shipped to main, main would just *become* the redesign and there'd be nothing
-  to compare against).
-- **Success = an end-product head-to-head.** The fully-built redesign branch is
-  compared against the current state-of-the-art on **main** — two fully-built
-  pipelines on separate branches — before any merge decision.
-- Stand up the eval layers early so that comparison is measurable, not a vibe
-  check: **P2.1** (frozen identity eval fixtures), **P3.2** (A/B on 2–3
-  D26-style proposals), **P3.3** (per-channel accept-yield report) are the
-  comparison harness against main.
-- All safety invariants and **[OWNER-GATE]** markers still bind on the branch.
-- **Status: PARKED — not green-lit.** Do not start the build without explicit
-  owner go. Intent recorded in `.claude-memory/project-reviewer-holistic-redesign-parallel-build.md`.
+The original Fable review remains useful for strategy and prioritization. It is
+not controlling evidence for current code state.
 
-> **Reconciled 2026-07-09:** P3.1's staff-facing decline-referral surface and
-> one-click Add-or-Refer handoff shipped on main in S349 (`e955a1df`). Its
-> historical build steps below are retained as provenance, not remaining work.
-> The external decline-acknowledgment/referral email is still a separate open
-> choice. All other phases remain parked and should be reassessed against the
-> comparison memo before owner approval.
+## Evidence labels
 
-## How to use this plan (implementing agent: read this section fully)
+- **[VERIFIED]** — rechecked against the 2026-07-12 tree or a named owner
+  statement.
+- **[PLANNED]** — required behavior in this plan; not built.
+- **[ASSUMED]** — must be probed before implementation and may not justify a
+  destructive or trust-bearing action.
+- **[STALE/CONFLICT]** — contradicted by the current tree or controlling memo.
 
-- **One phase per session/PR — onto the testing branch, not main.** Phases are
-  ordered by risk-reduction per unit of work and are independently buildable.
-  Do not batch phases. (Per the Execution model above, "PR" means a PR into the
-  redesign testing branch; the phases are not merged to main individually —
-  main stays the comparison baseline until the end-product head-to-head.)
-- **Read before each phase** (non-negotiable): the memory files listed in that
-  phase's "Read first" line, plus `.claude-memory/project-reviewer-sourcing-constraints.md`
-  and `.claude-memory/project-reviewer-self-report-orcid-sticky-confirmed.md`
-  for anything touching identity.
-- **Probe before asserting.** Every `[ASSUMED]` marker in this plan is a claim
-  the plan's author did NOT verify against source — verify it live before
-  building on it. Claims marked `[VERIFIED …]` were checked on 2026-07-08 at
-  repo HEAD (`6563c7c5`); re-verify line numbers, which drift.
-- **Owner gates.** Items marked **[OWNER-GATE]** need Justin's explicit go
-  before execution — the plan records the recommendation, not the approval.
-- **Universal invariants that this plan must never violate:**
-  - Sticky-skip + fail-closed reads in `writeIdentityDecision` /
-    `clearIdentityFields` (`lib/dataverse/adapters/researcher.js`) survive
-    every refactor — removing them reintroduces the silent-wipe bug
-    (memory `project-reviewer-self-report-orcid-sticky-confirmed`, "Do not").
-  - Forename-gate polarity stays contradiction-only (`forenameContradicts
-    !== true`) on the affiliation/topic promotions and agreement-required
-    (`forenameAgrees === true`) on the employment-only promotion — the S236
-    regression (Keller/Sang) is the proof this distinction is load-bearing
-    [VERIFIED via `reviewer-identity-resolver.js:267-296`].
-  - Reviewer self-report remains the highest-trust ORCID source and always
-    beats a resolver guess.
-  - No COI re-gating; surface-not-gate posture unchanged
-    (memory `project-reviewer-coi-rely-on-self-disclosure`).
-  - Behavior-freeze rules for extractions/consolidations: characterization
-    tests first, passthrough-no-default
-    (memory `feedback-behavior-freeze-passthrough-no-default`).
-  - External-token routes stay token-authenticated public surfaces
-    (`.claude/rules/external-reviewers.md`); app routes use `requireAppAccess`
-    and register in `docs/API_ROUTE_SECURITY_MATRIX.md`.
-- **Gates.** After each phase: `npm test` (full suite — green means the FULL
-  suite, memory `feedback-green-requires-full-test-suite`), plus the
-  phase-specific gates listed. Doc/wiki edits → `npm run check:agent-wiki` and
-  a `/sweep`-style restatement grep. Anything touching durable state or
-  cross-layer contracts (P1, P3.1) → run `/contract-reconcile`.
+## Two-lane execution model
 
-## Non-goals (do not do these, even if they look adjacent)
+The old P0→P4 model mixed production safety fixes, experimental redesign, and
+cleanup on one long-lived branch. That is replaced by two lanes.
 
-- No retrieval-first inversion revival; no Track-B resurrection.
-- No roster-reuse / per-person reviewer-history features (owner practice:
-  effectively no reuse — deprioritized, not impossible; revisit only on owner
-  signal).
-- No "elevate applicant recs" slate changes (recent ~1/panel anti-stacking
-  policy).
-- No new identity statuses; no COI gating changes; no new soft COI flags.
-- No new external data sources.
+### Lane 1 — containment candidate for deliberate promotion to `main`
 
----
+The defects in C0 are current correctness risks. Build them on a short-lived
+Tier-1 feature branch and verify them independently. The owner must then choose
+one of two explicit outcomes:
 
-## P0 — Identity safety patches (small, ship first)
+1. promote the containment changes to `main` before the long redesign; or
+2. record acceptance of the continuing exposure while they remain only on the
+   redesign branch.
 
-**Read first:** `.claude-memory/project-reviewer-self-report-orcid-sticky-confirmed.md`,
-`.claude-memory/project-reviewer-verify-fail-dangerous.md`,
-audit doc §4.1. **[OWNER-GATE]** — this resolves the triage-doc open question
-("downgrade spine `confirmed`?") in the downgrade direction; Justin has seen
-the recommendation but has not explicitly approved execution.
+Do not silently strand live safety fixes on the experimental branch.
 
-### P0.1 Spine `confirmed` → `probable`
+### Lane 2 — long-lived redesign branch
 
-- Change the two automated `confirmed` emissions to `probable`:
-  `lib/services/reviewer-identity-resolver.js:261` (authorship_grounded +
-  topic/employment) and `:279` (strong affiliation + employment + topic)
-  [VERIFIED via direct read 2026-07-08]. Update the stale header comment at
-  `reviewer-identity-resolver.js:16` and the branch comments.
-- Behavior consequences to handle deliberately, not incidentally:
-  - `mayPersistIdentity` (`reviewer-identity-resolver.js:390`) treats
-    confirmed/probable identically — persistence eligibility is unchanged
-    [VERIFIED via direct read].
-  - `lib/services/discovery/track-b-identity.js` maps spine `confirmed`
-    to `verificationConfidence: 0.95` [ASSUMED exact lines ~66-82 via reader
-    trace — re-verify by reading the file]; decide the `probable` mapping
-    explicitly (existing probable mapping applies; do NOT invent a new
-    confidence constant).
-  - Tests lock the old behavior: `tests/unit/reviewer-identity-evidence.test.js`
-    (and possibly `discovery-verification-status.test.js`) assert spine
-    `confirmed` [ASSUMED which cases — grep first]. Update assertions as part
-    of the change, citing this plan; do not weaken unrelated cases.
-  - UI: anywhere that renders a "confirmed"-tier badge from spine results
-    [ASSUMED — grep `identityStatus` consumers in `shared/components/reviewers/`]
-    should degrade gracefully to the probable badge; verify no selectability
-    regression (probable is persist-worthy and selectable).
-- Acceptance: `rtk grep -n "'confirmed'" lib/services/reviewer-identity-resolver.js`
-  shows no automated emission; full suite green; one manual discovery run
-  (capture mode — see memory `reviewer-invite-capture-mode-not-full-sandbox`)
-  shows previously-confirmed spine candidates now probable and still
-  selectable.
+After B0 freezes the comparison, phases M1→F2 accumulate one at a time on a
+dedicated testing branch. They do not merge individually to `main`. The branch
+is compared against the exact frozen baseline commit, not against a moving
+`main` branch.
 
-### P0.2 Close the attestation-overwrite hole
+D1 cleanup is not part of the experiment. It begins only after the redesign
+passes the offline and controlled-pilot gates and the owner chooses promotion.
 
-- Today an incoming `confirmed` skips the sticky read and overwrites
-  unconditionally — including over a stored human attestation
-  (`lib/dataverse/adapters/researcher.js:238-239` [ASSUMED exact lines via
-  reader trace + memory; re-verify by reading `writeIdentityDecision` in
-  full]). After P0.1 no automated path emits `confirmed`, but the adapter
-  should not depend on that staying true (that is exactly how the original
-  invariant broke — prose, not enforcement).
-- Change: `writeIdentityDecision` accepts `confirmed` only when the caller
-  passes an explicit attestation marker (e.g. `{ attested: true }` option),
-  supplied ONLY by `lib/services/capture-self-reported-orcid.js`
-  (`writeIdentityDecision` call ~`:81` [ASSUMED via reader trace]). Caller
-  list to re-verify by grep before editing [ASSUMED via reader trace]:
-  `contact-enrichment/persistence.js:129`, `save-candidates-service.js:772`,
-  `enrich-recommended-service.js:393`, `capture-self-reported-orcid.js:81`,
-  two backfill scripts. A non-attested `confirmed` is downgraded to
-  `probable` (log it) rather than thrown — fail-safe, not fail-crash, since
-  this path runs non-fatally inside accept/decline.
-- Preserve verbatim: sticky-skip on stored `confirmed` for non-confirmed
-  incomings, fail-closed read-error propagation, `clearIdentityFields`
-  no-op-on-confirmed. Add a unit test for each of the four cells
-  (attested/stored × yes/no).
-- Acceptance: new tests + existing `tests/unit/capture-self-reported-orcid.test.js`
-  green; grep shows no other caller passes the attestation marker.
+## Whole-flow contract
 
-### P0.3 Comment/memory reconciliation
+Every identity phase must trace and test this complete flow:
 
-- Fix `capture-self-reported-orcid.js` header (~`:12-17`, "resolver NEVER
-  emits confirmed" — false until P0.1, true after; make it state the enforced
-  rule, not history).
-- Reconcile `.claude-memory/project-reviewer-self-report-orcid-sticky-confirmed.md`:
-  the S235 discrepancy is CLOSED by P0.1/P0.2; rewrite the warning block to
-  record the resolution (reconcile-don't-append). Update
-  `docs/REVIEWER_ORCID_SPINE_SPEC.md` §6 (its "confirmed must remain
-  reachable" argument is overruled — note why) and
-  `docs/agent-wiki/topics/reviewer-identity.md`. Run the restatement grep:
-  `rtk grep -rn "never emits" lib/ docs/ .claude-memory/`.
+1. analyze/discover/enrich result;
+2. client candidate state;
+3. save request payload;
+4. route authentication and envelope validation;
+5. per-row server validation and trusted identity decision;
+6. person binding plus derived-field persistence;
+7. proposal-specific COI and suggestion state;
+8. save response identifiers and retryable client state;
+9. staff edits, self-report, merge, and later correction;
+10. invite/materials/honorarium action eligibility;
+11. docs, Atlas, scripts, tests, and gates.
+
+No phase is complete after proving only a write path.
+
+## Universal invariants
+
+1. **Confidence is not provenance.** `wmkf_identitystatus` may describe
+   resolver confidence; it may not prove who supplied or attested the binding.
+2. **Unknown fails closed.** Missing/unknown binding source, version, correction
+   state, or required derived-state version is ineligible for identity-dependent
+   writes and actions.
+3. **Server authority.** Persistence eligibility never derives solely from
+   client-supplied nested identity state. PD confirmation is a distinct explicit
+   staff action, not a magic status value in an otherwise automated payload.
+4. **Versioned replacement.** A correction creates or advances one binding
+   version and invalidates or recomputes all state derived from the superseded
+   binding. A record may not combine a new ORCID with an old Scholar profile,
+   metrics, affiliation evidence, or COI conclusion.
+5. **Lineage-aware clearing.** Automated replacement may clear fields derived
+   from the superseded binding; it must not erase independently attested/manual
+   fields without an explicit transition rule.
+6. **Self-report ordering.** Reviewer self-report is persisted as a durable
+   rebind before ORCID back-propagation, honorarium onboarding, or any other
+   identity-dependent downstream action. No synthetic in-memory `confirmed`
+   shortcut may bypass that order.
+7. **Action-boundary enforcement.** Invite/send, ORCID back-propagation, merge,
+   and downstream automation consume the current binding/action policy rather
+   than `{confirmed, probable}` literals.
+8. **Partial success remains honest.** In a mixed batch, only successful rows
+   become saved in the client. Malformed and failed rows remain retryable and
+   carry stable identifiers, not only display names.
+9. **Async state is generation-scoped.** Analyze, enrich, save, and pilot
+   routing carry the current request/proposal generation. Every post-`await`
+   client write verifies that generation (success and failure paths), or the
+   old request may not mutate the newly selected proposal's state.
+10. **Fail-closed reads survive refactors.** A failed read of current binding
+   state never falls through to an overwrite, clear, merge, or send.
+11. **No COI policy change.** The surface-not-gate posture and authoritative
+    institution-COI save check remain unchanged.
+12. **Behavior freeze for extraction.** Characterization tests precede helper
+    consolidation; passthrough semantics gain no new defaults.
+13. **Destructive work is last.** No removal is justified by a plan label or a
+    disabled flag alone; live callers and behavior must be verified immediately
+    before deletion.
+
+## Non-goals
+
+- No retrieval-first inversion revival or Track-B resurrection.
+- No roster-reuse or per-person reviewer-history product work without a new
+  owner signal.
+- No applicant-recommendation slate expansion; the recent approximately
+  one-per-panel policy remains an owner practice, not a hard-coded invariant.
+- No COI re-gating or new soft COI flags.
+- No new external data vendors or procurement work.
+- No SerpAPI/contact-enrichment tier reduction in this plan.
 
 ---
 
-## P1 — Binding provenance (the structural fix)
+## B0 — Owner gate and evaluation freeze
 
-**Read first:** audit §4.1 "structurally"; `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md`
-§14; `.claude-memory/reference-dataverse-audit-trail-actor-detection.md`.
-**[OWNER-GATE]** — new Dataverse column. Run `/contract-reconcile` on the
-design before implementation (durable state, cross-layer).
+**[OWNER-GATE]** Approve Lane 1 execution and the Lane 2 experiment separately.
 
-- **Schema:** add a choice column `wmkf_identitybindingsource`
-  (`self_reported` | `staff_confirmed` | `automated`) on the person entity
-  (`wmkf_potentialreviewerses` — adapter `lib/dataverse/adapters/researcher.js`).
-  Probe how prior `wmkf_identity*` columns were added (schema scripts vs.
-  manual maker-portal — check `lib/dataverse/schema/` and ask Connor/Justin;
-  [ASSUMED] there is a repeatable path).
-- **Writes:** `writeIdentityDecision` gains a `bindingSource` param —
-  `capture-self-reported-orcid` → `self_reported`; a future staff-confirm
-  action and the S285 `pdIdentityConfirmed` override → `staff_confirmed`
-  (probe where that override lives before wiring [ASSUMED:
-  workbench/enrich-recommended path]); everything else → `automated`.
-- **Guards:** sticky-skip and `clearIdentityFields` no-op key on
-  `bindingSource !== 'automated'` instead of `status === 'confirmed'`. Order
-  of trust for overwrites: `self_reported` > `staff_confirmed` > `automated`;
-  equal-or-higher source may overwrite, lower may not. Keep fail-closed reads.
-- **Backfill:** existing rows where `wmkf_identitystatus = 'confirmed'` —
-  distinguish self-report-set rows via the Dataverse audit trail if feasible
-  (see actor-detection memory); otherwise default existing `confirmed` to
-  `self_reported` (conservative: preserves protection; the population is
-  reviewers who went through Stage 2a [ASSUMED — verify no other historical
-  confirmed-writers existed before defaulting]). Write the backfill as a
-  dry-run/apply/verify script like `scripts/backfill-contact-orcid.js`.
-- **After P1, `confirmed`-as-sentinel is fully retired**: status is pure
-  confidence; P0.2's attestation marker becomes `bindingSource`, and the P0.2
-  special-casing can be simplified away.
-- Acceptance: four-cell overwrite tests re-expressed against sources; merge
-  guard (`lib/services/reviewer-merge.js:232-236` identity non-downgrade
-  [ASSUMED lines via reader trace — re-verify]) re-keyed and tested;
-  contract-reconcile findings addressed; docs/memory reconciled (§14 backprop
-  doc, spine spec, wiki identity topic).
+Before the first redesign commit, create a tracked evaluation manifest containing:
+
+- exact `baselineCommit` from `origin/main` and redesign starting SHA;
+- frozen proposal IDs and document hashes;
+- identity fixture version;
+- prompt row/version, resolved model IDs, model overrides, reviewer count,
+  temperature, exclusions, and run count;
+- scoring rubric, tie rule, thresholds, named adjudicator, artifact schema,
+  and evaluation-script version.
+
+Changing a frozen item creates a new evaluation version. It may not silently
+replace the registered comparison.
+
+**Acceptance:** manifest reviewed before behavior changes; baseline checkout is
+reproducible; owner records whether verified C0 containment may promote to main.
 
 ---
 
-## P2 — Eval-first hardening and consolidation
+## C0 — Contain current identity-boundary defects
 
-**Read first:** `scripts/eval-orcid-spine-sweep.mjs` header;
-`.claude-memory/project-reviewer-verify-fail-dangerous.md`;
-`.claude-memory/feedback-behavior-freeze-passthrough-no-default.md`.
+**Lane:** short-lived Tier-1 branch. **[OWNER-GATE]** for promotion.
 
-### P2.1 Frozen identity eval fixtures
+### C0.1 Validate each save row without breaking partial success
 
-- Extract the known hazard cases into offline JSON fixtures (no live API in
-  CI): fabricated wrong-forename (Alfred/Alain Laederach), initial-only real
-  reviewers (U. Keller, R. T. Sang), affiliation drift (Olga Smirnova),
-  namesake collision (Robert Sang/Florida State), OpenAlex merged cluster
-  (Wen Li), plus 5–10 clean positives. Source the shapes from the existing
-  tests and eval scripts; record expected classification per case.
-- Add `npm run eval:identity` running `classifySpineEvidence` /
-  `resolveIdentity` over the fixtures; wire as an advisory check first
-  (promote to red gate only with owner sign-off — new gate fixtures can trip
-  scanner gates, memory `feedback-new-gate-fixtures-trip-scanner-gates`).
-- **Adopt the standing rule (add to `docs/agent-wiki/topics/reviewer-identity.md`):**
-  no new anchor type, promotion branch, or gate-polarity change lands without
-  a fixture that fails before the change and passes after.
+**[VERIFIED]** `/api/reviewer-finder/save-candidates` currently validates only
+`requestId` plus a non-empty `candidates` array. The service saves per row, and
+the client uses `savedNames` to mark only successful rows saved.
 
-### P2.2 Name-comparison consolidation
+Add explicit per-candidate schema/normalization at the start of the service
+loop, before any adapter write:
 
-- Three parallel implementations exist [ASSUMED via reader trace — re-verify
-  each by reading]: `lib/services/discovery/name-matching.js` (PubMed byline
-  logic, nickname map), `reviewer-identity-evidence.js` (~`:288-330`,
-  `givenNameToken`/`forenameFullyAgrees`/`forenamesContradict`), and the
-  work-author-resolver's parser path. Consolidate into one module
-  (suggest `lib/services/identity/name-compare.js`) exposing the *existing*
-  semantic predicates unchanged — behavior-freeze: write characterization
-  tests capturing current outputs for the P2.1 fixture names FIRST, then
-  extract with passthrough semantics, no default-value changes.
-- Acceptance: characterization tests green before and after; the three call
-  sites import the shared module; `eval:identity` unchanged.
+- require a stable `clientCandidateId` (or deterministic submitted candidate
+  key), name, and supported field shapes;
+- reject unknown status/source values and unbounded identity/evidence payloads;
+- treat nested identity and provenance as untrusted hints until reconstructed
+  or verified by a server-owned path;
+- do not allow a client-supplied `confirmed` or `pdIdentityConfirmed` value to
+  manufacture automated persistence eligibility;
+- keep request-envelope validation in the route and row validation in the
+  service so one malformed row does not reject valid siblings.
 
-### P2.3 Stratum-3 decision
+Response contract:
 
-- Either run the spine spec §10 early-career/no-ORCID eval (extend
-  `eval-orcid-spine-sweep.mjs` with a stratum-3 name set; cited-reference
-  ground truth per the spec) **or** amend
-  `docs/REVIEWER_ORCID_SPINE_SPEC.md` §10 to state the accepted posture:
-  "early-career names abstain to the human; unmeasured tail acknowledged."
-  **[OWNER-GATE]** on which. Do not leave the current state (gate marked
-  TODO, slice marked implemented).
+- mixed valid + invalid: `200`, successful rows plus per-row errors;
+- all policy/validation rejected: `422`;
+- zero saved with operational failures: retain the existing `500` category;
+- add `rejectedInvalid`, `code: 'invalid_candidate'`, submitted row index, and
+  stable candidate key to failures;
+- retain `savedNames` for compatibility, add `savedKeys`, then migrate the
+  client to `savedKeys` before removing name-based graduation.
 
----
+Tests must prove failed/malformed rows remain selected and retryable, successful
+rows alone become saved, duplicate display names cannot graduate each other,
+and `success:true` is impossible when every row failed. Add a proposal-switch
+test in which the first save resolves after the UI has moved to another request;
+neither its success nor its failure may update the new request's roster.
 
-## P3 — Finding investments
+### C0.2 Close the attestation-overwrite hole
 
-**Read first:** `.claude-memory/project-reviewer-sourcing-constraints.md`
-(the owner constraints that shaped these), `.claude-memory/project-reviewer-referral-capture.md`,
-`docs/REVIEWER_FINDER_REFERRAL_CAPTURE_DESIGN.md`.
+Until the durable binding fields exist, make the origin of a `confirmed`
+decision explicit at the adapter boundary. Only the reviewer self-report path
+may pass the transitional attestation marker. Automated writers and backfills
+must identify themselves as automated; an automated incoming `confirmed` is
+downgraded to `probable` before persistence and may not overwrite a stored
+attestation.
 
-### P3.1 Close the staff-facing referral loop — SHIPPED S349
+Preserve the existing sticky skip and fail-closed reads. Cover the full matrix:
+incoming origin (self-report/automated/unknown) × stored status
+(confirmed/non-confirmed/read failure). Unknown origin fails closed.
 
-**Current state [VERIFIED 2026-07-09 via source + `e955a1df`]:** the workbench
-reader, Track Reviewers callout, and one-click prefill into the normal
-Add-or-Refer identity flow are live. See
-`docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` “Decline-referral
-surface + one-click add.” The remainder of this subsection records the
-pre-build state and acceptance contract.
+This marker is transitional. I1 replaces it with the durable binding source and
+version; do not proliferate it to UI payloads.
 
-Historical pre-build state [VERIFIED 2026-07-08 via direct reads]: capture existed on both sides —
-staff "Add or Refer a Reviewer" (S249; route
-`pages/api/workbench/manual-reviewer.js:55,77` accepts `referredBy` and
-delegates to `lib/services/workbench/manual-reviewer-service.js`) and the
-external decline form persisting free text
-(`shared/components/external/DeclineFormView.js:102-111` "Anyone you'd
-suggest instead?" → `pages/api/external/review/[token]/respond.js` →
-`applyReviewerResponse` → `lib/dataverse/adapters/reviewer-suggestion.js:1343-1344`
-writing `wmkf_declinereferral`). **Zero staff-side readers** of
-`wmkf_declinereferral` exist (disconfirming grep across `shared/components/`,
-`lib/services/{review-manager,workbench}/`, `pages/api/`); `respond.js:7`
-explicitly defers "referral handoff" to a follow-up build.
+### C0.3 Make corrections invalidate dependent state
 
-Historical build sequence (completed for surface + one-click resolve):
-1. **Surface:** in the workbench Track Reviewers panel, render a visible
-   "referred: <free text>" callout on any declined suggestion whose
-   `wmkf_declinereferral` is non-empty (probe first: how declines render
-   today [ASSUMED — read the Track panel component and its data service];
-   ensure the field is in that read path's `$select`). A per-request badge
-   ("2 unread referrals") is the minimum viable notification; a decline-ack
-   email trigger is optional follow-up **[OWNER-GATE]** (external email).
-2. **One-click resolve:** "Add as candidate" from that callout, pre-filling
-   the existing Add-or-Refer flow (`ReviewerFindPanel.js` card →
-   `POST /api/workbench/manual-reviewer` with `referredBy` = the declining
-   reviewer's name) so provenance lands as `referred` exactly as S249 built
-   it. Free-text→identity uses the existing abstain-or-confirm resolution in
-   `manual-reviewer-service.js` (resolution modes `reuse_reviewer` /
-   `reuse_contact` / `create_new` [VERIFIED via `manual-reviewer.js:29`]);
-   never auto-resolve to a namesake
-   (memory `project-reviewer-verify-fail-dangerous`).
-3. **Dismissal state:** staff can mark a referral handled/ignored [ASSUMED no
-   existing field — probe; a local suggestion-row flag or reuse of an existing
-   status field beats a new column; escalate to owner if a column is needed].
-- Auth: the surface/resolve UI is staff-side (`requireAppAccess` route
-  family); do NOT add staff data to the external token surface
-  (`.claude/rules/external-reviewers.md`).
-- Run `/contract-reconcile` (new read path over durable state + UI state).
-- Acceptance: decline with referral in capture-mode e2e → callout appears →
-  one-click add creates a `referred`-provenance candidate surviving a
-  `my-candidates` reload (the S249 durability lesson).
+Create one server-owned rebind/invalidation operation used by:
 
-### P3.2 Applicant recommendations as neighborhood seeds
+- PD confirmation in `save-candidates-service`;
+- reviewer self-report in `capture-self-reported-orcid`;
+- identity-bearing staff edits in `my-candidates-service`;
+- later automated re-resolution where the bound person changes.
 
-- Feed the request's `wmkf_potentialreviewer1..5` names+affiliations into the
-  Stage-1 `analyze` context as **community anchors** with an explicit
-  instruction: "candidates similar in expertise-community to these, but
-  independent of the applicant; do NOT return these people." Prompt-level
-  first — no new lane, no OpenAlex expansion machinery (simplest thing;
-  measure before building more). Verify the applicant-suggested exclusion
-  covers analyze output, not just dedup [ASSUMED — grep applicant-exclusion
-  handling in `pages/api/reviewer-finder/discover.js` and the dedup service].
-- Prompt changes go through the Dataverse-resolved prompt row + Executor
-  contract (`docs/EXECUTOR_CONTRACT.md`; memory `project-prompt-governance`;
-  `.claude/rules/llm-and-prompts.md` — run `check:prompt-injection-tagging` +
-  self-test sequentially if the surface is registered) — prod reseed is
-  Justin's step.
-- Acceptance: A/B on 2–3 D26-style proposals (owner sniff test — the S246
-  method): does the seeded run surface more on-community candidates?
-  **[OWNER-GATE]** for the prod prompt reseed.
+For the containment slice, update the person row with one explicit PATCH that
+can write nulls; do not pass nulls through `upsertByPotentialReviewer`, which
+prunes them. Clear only the established resolver-sourced field set, preserve
+manual fields, and recompute or fail closed on proposal-specific COI before a
+later action. A write failure must not be reported as a successful rebind.
 
-### P3.3 Channel-level outcome report (no schema work)
+Classify staff-edit fields explicitly: descriptive edits that do not change the
+person binding remain ordinary edits; name, email, ORCID, identity anchor, or a
+staff “right person” action trigger the rebind contract.
 
-- Write a read-only probe script (`scripts/probe-origination-outcomes.mjs`)
-  tallying, per `wmkf_sources` token / provenance kind on
-  `wmkf_appreviewersuggestion` rows: invited → accepted → declined →
-  review-submitted counts. The suggestion ledger carries provenance +
-  lifecycle state per `docs/REVIEWER_DATA_MODEL.md` [ASSUMED exact status
-  fields — probe the entity columns before writing the script].
-- Output an evidence artifact under `docs/atlas/evidence/` (follow the
-  existing gitignored-artifacts convention there). Run once per cycle; this
-  replaces sniff-test-by-necessity with real accept-yield per channel.
-- No UI, no cron, no persistence — a script and a habit.
+### C0.4 Enforce current-state eligibility at send
+
+The send service already re-derives email confidence from the person row.
+Extend the server-authoritative gate so stale/invalidated identity state is not
+actionable. The modal remains advisory. Tests must include a wrong/stale bundle
+present in the fixture; a negative assertion without dangerous input is not an
+eligibility test.
+
+### C0 verification
+
+- scoped unit/integration tests for route → service → adapters → response →
+  client graduation;
+- capture-mode invitation test for stale/unknown state refusal;
+- full `npm test` and `npm run check:types`;
+- `check:api-routes` + self-test sequentially if request/response documentation
+  changes;
+- `/contract-reconcile` before promotion.
 
 ---
 
-## P4 — Deletions and doc retirement (destructive; verify-before-destructive applies)
+## M1 — Build the evaluation system before further resolver changes
 
-**Read first:** `.claude-memory/feedback-verify-before-destructive-carryover.md`;
-CLAUDE.md rule 2. Grep live callers for EVERY deletion; stop and report if
-anything is live.
+### M1.1 Independently labeled person benchmark
 
-### P4.1 Delete Track B **[OWNER-GATE]**
+Create at least 40 frozen cases before tuning behavior:
 
-- Preconditions to verify live: `TRACK_B_ENABLED` is hard-coded `false` with
-  no env/runtime override (`lib/services/discovery/constants.js:47`
-  [VERIFIED via reader trace 2026-07-08 — re-verify]); its query generation
-  was already removed S253 (analyze PART 3); no non-test caller reaches
-  `lib/services/discovery/literature-search.js` except the
-  `TRACK_B_ENABLED`-gated facade delegations (the module self-describes as
-  "ARCHIVED OFF … kept intact and dormant" with characterization net
-  `tests/unit/discovery-literature-search.test.js` [VERIFIED via direct read
-  of `literature-search.js:1-16`]).
-- Remove: `literature-search.js` + its characterization test, the
-  `TRACK_B_ENABLED` branches, and the always-empty merge/defer/resolve tail
-  (`discovery-service.js:249-300` [ASSUMED range via reader trace — re-read
-  the whole facade section first]). **Keep**: `track-b-identity.js` exports
-  that live paths use (probe imports — the name is misleading [ASSUMED]);
-  the route-level COI pass in `discover.js` (the in-service partition it
-  duplicated was only "already run" for Track B — re-read both sites and keep
-  exactly one authoritative pass, documented).
-- Characterization tests for `discover()` output on a fixture proposal before
-  and after (identical output = the tail was truly dead).
-- Reconcile docs/memory: wiki origination topic, redesign plan references,
-  any `TRACK_B` mentions (`rtk grep -rn "TRACK_B" --include="*.md" docs/ .claude-memory/`).
-- Note the facade constraint: `discovery-service.js` static passthroughs are
-  a deliberate call-site/test-compatibility surface
-  (`docs/DISCOVERY_SERVICE_DECOMPOSITION_PLAN.md`) — removing delegations
-  must follow that plan's C1 rules, not ad-hoc deletion.
+- at least 20 hazards: namesakes, wrong forenames, initials, affiliation drift,
+  merged clusters, stale binding/correction, and no-ORCID/early-career cases;
+- at least 20 clean positives across fields and career stages.
 
-### P4.2 Retire the retrieval-first inversion formally
+Each case stores separately:
 
-- Add a supersession banner to `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md`
-  Part A §4/§7 (and the §4.5 cited-reference lane): "deferred by the S246
-  experiment; posture lives in the origination wiki topic." Do not rewrite
-  the historical content (durable-docs rule: classify, don't silently
-  rewrite). Reconcile the origination wiki frontmatter if it implies the
-  plan is current direction.
+1. frozen candidate input and upstream response shapes;
+2. expected person anchor or required abstention;
+3. permitted action eligibility;
+4. authoritative evidence citations;
+5. labeler and adjudication status.
 
-### P4.3 Heuristic dedupe (opportunistic, lowest priority)
+Existing tests and ORCID scripts may supply input shapes, but their current
+classifications are not truth. Labels are established without viewing either
+pipeline’s output, using authoritative public identity evidence, with disputes
+adjudicated before unblinding.
 
-- One institution-alias source: `match-signals.js` (~`:140-189`) vs.
-  `deduplication-service.js` (~`:422+`) [ASSUMED lines via reader trace] —
-  merge or delete in favor of spine structured matching where the caller has
-  spine data. One 5-year-recency implementation. Retire the biology-biased
-  synonym table (`match-signals.js` ~`:56-79`) **only** with
-  characterization tests showing Track-A verification outcomes on the P2.1
-  fixtures are unchanged or justified. If the diff is behavioral, stop and
-  surface to owner.
-- SerpAPI/contact-enrichment tier reduction (audit §5.3) is **explicitly
-  deferred** out of this plan — bigger blast radius, needs its own
-  behavior-freeze design. Do not fold it into P4.3.
+Metrics:
+
+- false-binding count/rate;
+- correct-binding coverage;
+- abstention count/rate;
+- correction integrity across transition cases;
+- unsafe-action count/rate.
+
+Hard offline safety gates:
+
+- zero false bindings in hazard fixtures;
+- zero unsafe actions;
+- every correction-transition fixture fully invalidates/recomputes derived state;
+- no reduction in correct-binding count versus frozen main;
+- clean-positive abstention may exceed baseline by at most one case.
+
+Use exact numerators/denominators; do not turn a small fixture set into an
+unsupported population claim.
+
+### M1.2 Proposal-level blinded head-to-head
+
+Select ten held-out proposals before execution, stratified across program area
+and thin/full proposal signal. Do not use proposals that tuned the redesign.
+
+Run frozen main and completed redesign with identical documents, prompt/model
+configuration, candidate count, exclusions, and environment. Run three
+replicates per proposal/arm and retain run IDs. Union and deduplicate candidates,
+randomize blind IDs, then have the PD score:
+
+- correct person;
+- on-topic;
+- independent/eligible;
+- shortlist yes/no;
+- disqualifier reason;
+- coverage contribution;
+- whether the slate can staff the target panel without another search.
+
+Offline pilot-eligibility rule:
+
+- all identity safety gates pass;
+- no wrong-person increase;
+- aggregate eligible-shortlist count is at least baseline;
+- redesign loses on no more than two proposals;
+- redesign wins on at least four proposals and has at least two more wins than
+  losses, where a win means equal-or-better coverage with higher eligible
+  shortlist yield or fewer additional searches.
+
+A tie or threshold miss means retain the baseline and revise or stop.
+
+### M1.3 Observational channel baseline
+
+Build the read-only outcome probe before finding changes. Report by each
+`wmkf_sources` token:
+
+- sourced rows, currently selected, invited, accepted, declined,
+  decline-with-referral, materials sent, and review received.
+
+Report multi-touch attribution and exclusive-token cohorts separately. Never
+sum multi-touch channel counts as unique people. Label `wmkf_selected` as a
+current mutable snapshot, not historical shortlist, and materials-sent as a
+participation proxy, not final panel seating. Use `wmkf_reviewreceivedat` for
+review submission.
+
+The artifact is observational evidence, not a causal head-to-head result.
 
 ---
 
-## Sequencing summary
+## I1 — Define the versioned identity-binding contract
 
-| Phase | Size | Risk | Owner gate | Blocking gates |
+**[OWNER-GATE]** for new Dataverse fields and transition semantics.
+
+### I1.1 Minimal durable model
+
+Extend the person entity with a new isolated schema wave. The design must carry:
+
+- binding version (monotonic integer or equivalent generation);
+- binding source (`self_reported`, `staff_confirmed`, `automated`, plus an
+  explicit legacy/unbound state for migration);
+- canonical bound-person anchor;
+- binding/attestation timestamp;
+- derived-state binding version.
+
+Continue using the existing evidence summary/verified-anchor fields for compact
+evidence provenance; do not duplicate their payload without a demonstrated need.
+Correction/supersession is represented by advancing the binding version. Action
+eligibility is computed from current binding, derived-state version, evidence,
+email source, and proposal-specific state rather than stored as an opaque
+boolean.
+
+If proposal COI is derived from a person binding, persist or otherwise prove
+the binding version used for that decision. A mismatched/unknown version is
+stale and fails closed until recomputed.
+
+### I1.2 Transition table
+
+Define and test these transitions before schema deployment:
+
+| Event | Source | Version behavior | Required invalidation/recompute | Action posture |
 |---|---|---|---|---|
-| P0 identity safety | S | Low (guards preserved) | Yes (design call) | full tests |
-| P1 binding source | M | Medium (schema + guards) | Yes (new column) | contract-reconcile, full tests |
-| P2 eval + consolidation | M | Low (behavior-frozen) | Only for red-gate promotion / stratum-3 choice | full tests, eval:identity |
-| P3.1 staff referral loop | SHIPPED S349 | — | External email only | shipped in `e955a1df` |
-| P3.2 seeds | S | Low (prompt-level) | Prod reseed | A/B sniff, prompt-injection gate if registered |
-| P3.3 outcome report | S | None (read-only) | No | — |
-| P4 deletions | M | Medium (destructive) | Yes (P4.1) | characterization tests, live-caller greps, /sweep |
+| automated first resolution | automated | create v1 | derive allowed fields | eligible only if policy passes |
+| automated same-person replay | automated | no bump when materially identical | idempotent refresh only | unchanged |
+| automated different-person result | automated | bump | replace matching-lineage fields; recompute COI | blocked until complete |
+| PD “right person” confirmation | staff_confirmed | bump | clear automated identity bundle; retain explicit staff fields; recompute COI | blocked until complete |
+| staff identity-bearing correction | staff_confirmed | bump | invalidate superseded derived state | blocked until complete |
+| reviewer self-report | self_reported | bump | self-report wins; invalidate/recompute dependent state | downstream only after durable commit |
+| later correction/revocation | explicit correcting source | bump | invalidate old binding and action state | blocked until complete |
+| merge | compare binding source/version | preserve higher-trust/current binding by explicit rule | never discard live attestation silently | fail closed on ambiguity |
 
-Recommended order for remaining parked work: reassess against the 2026-07-09
-comparison memo, then P0 → P3.3 (free, informs everything) → P1 → P2 → P3.2 →
-P4 if owner-approved. P3.1's staff handoff is already shipped. P0 and P3.3 fit
-one session each; nothing in remaining P3/P4 depends on P1.
+Unknown source/version and stale derived versions are explicit negative test
+cases, not fall-through defaults.
 
-## Open owner decisions (collected)
+### I1.3 One writer and one policy reader
 
-1. Approve P0 downgrade direction (resolves triage finding #1).
-2. Approve the P1 `wmkf_identitybindingsource` column + backfill default.
-3. Stratum-3: run the eval or document always-abstain (P2.3).
-4. Referral decline-ack / handoff email — send externally or badge-only (P3.1).
-5. Prod prompt reseed for seeded analyze (P3.2).
-6. Approve Track B deletion (P4.1).
+Replace status-only adapter guards with a shared binding writer that:
+
+- reads current binding fail closed;
+- enforces source precedence;
+- detects materially identical replay;
+- advances the version only for a real transition;
+- writes the binding plus explicit invalidations as one coherent operation;
+- returns the committed binding used by downstream consumers.
+
+Create one pure action-policy helper used by invite/send, ORCID back-propagation,
+and merge protection. Sibling consumers may add stricter domain rules but may
+not reinterpret confidence as provenance.
+
+---
+
+## I2 — Schema delivery, backfill, and complete consumer migration
+
+### I2.1 Schema delivery
+
+**[VERIFIED]** Dataverse schema is delivered through declarative waves and
+`scripts/apply-dataverse-schema.js`; the apply engine creates missing attributes
+but does not reconcile a divergent existing definition.
+
+Use a new isolated string-suffixed wave such as
+`wave13-reviewer-identity-binding`; do not append to or rerun wave6 as the new
+delivery unit. Add a preflight with three outcomes:
+
+- `ABSENT` — creation path;
+- `EXACT` — safe idempotent no-op;
+- `DIVERGENT` — abort before application code deploys.
+
+Deployment order:
+
+1. sandbox dry-run;
+2. sandbox execute and metadata verification;
+3. production dry-run;
+4. production execute and metadata verification;
+5. only then deploy readers/writers that select the new columns.
+
+Rollback disables new application reads/writes through an explicit compatibility
+gate. It does not drop columns.
+
+### I2.2 Conservative legacy backfill
+
+Do not infer human attestation from `wmkf_identitystatus = 'confirmed'` alone.
+Classify legacy rows only from recoverable explicit evidence/audit provenance.
+Unproven rows remain `legacy/unbound` and require review before an
+identity-dependent action.
+
+Provide dry-run/summary/apply/verify modes, resumable checkpoints, before/after
+counts, per-category samples, and idempotent replay. Backfill scripts identify
+their writes as automated unless evidence proves another source.
+
+### I2.3 Symbol-consumer and projection migration
+
+Migrate every live trust consumer, not only the adapter and merge guard:
+
+- identity writer/clear paths in contact enrichment, save-candidates,
+  workbench enrichment, self-report, and both identity backfills;
+- invite rendering and server send enforcement;
+- ORCID back-propagation and its workbench/send/honorarium callers;
+- merge protection and merge DTOs;
+- acceptance drain ordering—remove the synthetic in-memory `confirmed` value
+  and durably rebind before honorarium/back-propagation;
+- external-token, render, send, merge, and backfill `$select` projections;
+- PR4/e2e verification scripts and any script that treats
+  `status === 'confirmed'` as provenance.
+
+Keep specialized projections least-privilege, but include every field required
+by the shared policy helper. Grep the raw persisted field names after migration;
+map/helper-symbol searches alone are insufficient.
+
+### I2.4 Durable surfaces and gates
+
+Update in the same phase:
+
+- `docs/atlas/dataverse-wmkf-potentialreviewers.md`;
+- `docs/DATAVERSE_CUSTOM_SCHEMA_INVENTORY.md`;
+- `docs/REVIEWER_DATA_MODEL.md`;
+- reviewer identity wiki/design docs;
+- `docs/API_ROUTE_SECURITY_MATRIX.md` if save request/response semantics change;
+- this plan and linked memory.
+
+Run sequentially where defined: schema preflight, scoped tests, full tests,
+types, `check:atlas` + self-test, `check:api-routes` + self-test,
+`check:dataverse-access-layer` + self-test, `check:route-service-boundary` +
+self-test, `check:docs-catalog`, `check:fact-consistency` + self-test,
+`check:doc-symbol-refs` + self-test, and `check:build-claim-freshness` +
+self-test. Run `/contract-reconcile` and `/sweep` before completion.
+
+---
+
+## H1 — Evaluation-backed resolver hardening
+
+### H1.1 Status semantics
+
+After I1 separates confidence from provenance, decide whether automated
+high-confidence results retain `confirmed` as a confidence label or are renamed.
+This is a UI/evaluation decision, not an attestation-safety mechanism. Any
+change must pass M1 without weakening abstention or action safety.
+
+### H1.2 Name-comparison consolidation
+
+Re-verify the three candidate implementations in discovery name matching,
+reviewer identity evidence, and the work-author resolver. Write characterization
+tests against M1 fixtures first, then extract existing semantic predicates into
+one module with passthrough/no-default behavior.
+
+Do not collapse distinct semantics such as exact exclusion, fuzzy author
+matching, display dedupe, and persistence identity resolution.
+
+### H1.3 Early-career/no-ORCID decision
+
+**[OWNER-GATE]** Either run the independently labeled stratum-3 evaluation or
+document the accepted posture that these names abstain to a human. Do not call
+an unmeasured slice implemented.
+
+---
+
+## F1 — Finding investments
+
+### F1.1 Staff referral loop — shipped
+
+**[VERIFIED]** The workbench surfaces decline referrals and pre-fills the normal
+Add-or-Refer flow. Do not rebuild it. The open work is measurement in M1.3 and,
+separately, an **[OWNER-GATE]** on whether an external decline-acknowledgment
+email is worthwhile.
+
+### F1.2 Applicant recommendations as neighborhood seeds
+
+Test applicant-suggested names/affiliations as community anchors in analyze,
+with explicit exclusion of those people from returned candidates. Keep this
+prompt-level first; no new retrieval lane. Verify exclusion at the final output,
+not only dedupe.
+
+Prompt changes follow the Dataverse-resolved prompt plus Executor contract.
+Production reseed remains the owner’s step. Evaluate through M1.2; do not cite
+the historical narrow 65/35 experiment as proof of this design.
+
+### F1.3 Stage panel assembly
+
+Only after M1 identifies a measurable need, test the comparison memo’s staged
+workflow: establish panel intent, generate a broad inexpensive slate, let the
+PD shortlist, and deeply enrich/disambiguate only kept candidates. Measure
+staff rescue work and time-to-panel-ready; do not assume this is faster.
+
+---
+
+## F2 — Controlled live pilot and promotion decision
+
+Offline comparison cannot measure acceptance or completed reviews while the
+redesign remains off production. A limited pilot therefore follows the offline
+gate and precedes full promotion.
+
+Before the pilot, record immutable proposal-to-arm assignment and pipeline
+commit/version. If the mutable suggestion ledger cannot preserve that event,
+add the smallest durable experiment surface or classify the pilot as
+observational; do not claim causality from mutable `selected` state.
+
+### Production routing and rollback contract
+
+The pilot must run through a server-owned assignment boundary:
+
+- both pipeline versions are deployed behind a fail-closed dispatcher;
+- baseline is the default for an absent, unknown, malformed, or unreadable
+  assignment;
+- staff/client payloads cannot select an arm;
+- an assignment is immutable for a request once its first pilot run begins;
+- every generated/saved suggestion is attributable to pipeline commit/version
+  and assignment version;
+- disabling new redesign assignments does not rewrite historical attribution;
+- rollback returns unassigned/new requests to baseline without making existing
+  redesign-derived rows appear to be baseline output.
+
+Before choosing a storage mechanism, probe existing app-setting and suggestion
+surfaces. If no existing surface can enforce immutable assignment plus durable
+attribution, write a separate owner-gated durable-surface design and run
+`/contract-reconcile`; do not hide the pilot in an environment variable or a
+client-supplied flag. Production deployment also obeys the Dataverse target
+interlock and campaign release strategy.
+
+Pilot metrics:
+
+- selected→invited;
+- invited→accepted and invited→declined;
+- decline→referral;
+- accepted→materials sent;
+- materials sent→review received;
+- staff-added rescue count and time-to-panel-ready.
+
+Promotion requires:
+
+- all offline safety and proposal gates pass;
+- zero unsafe actions in the pilot;
+- non-inferior invited→accepted and materials→review-received conversion;
+- no increase in staff rescue work or time-to-panel-ready;
+- explicit owner promote/stop decision.
+
+With small annual samples, report exact numerators/denominators and confidence
+intervals; treat channel results as directional rather than claiming powered
+superiority.
+
+---
+
+## D1 — Post-decision cleanup only
+
+D1 does not run while building or evaluating the redesign.
+
+### D1.1 Track B deletion **[OWNER-GATE]**
+
+Immediately before deletion, re-verify that `TRACK_B_ENABLED` has no runtime
+override and enumerate all live imports/callers. Preserve any live
+`track-b-identity` helpers until their consumers migrate. Characterize
+`discover()` at the accepted redesign commit and prove output is identical
+before/after cleanup.
+
+Delete only after the redesign has passed F2 and the owner chooses promotion.
+Reconcile the discovery facade compatibility contract, wiki, plans, tests, and
+all `TRACK_B` restatements.
+
+### D1.2 Historical plan retirement
+
+Add supersession/classification banners to retrieval-first plans whose posture
+is no longer current. Preserve historical content; do not rewrite history as if
+the old direction never existed.
+
+### D1.3 Heuristic consolidation
+
+Institution aliases, recency calculations, and biology-biased synonyms are
+separate behavior changes unless characterization proves otherwise. If any
+fixture output changes, stop and return to owner/evaluation rather than folding
+the change into cleanup.
+
+---
+
+## Sequencing and gates
+
+| Order | Phase | Lane | Owner gate | Exit evidence |
+|---|---|---|---|---|
+| 1 | B0 freeze | both | experiment + containment decision | tracked reproducible manifest |
+| 2 | C0 containment | short Tier-1 branch | promotion decision | contract trace, tests, capture send gate |
+| 3 | M1 measurement | redesign branch | label/rubric approval | independent benchmark + frozen A/B + observational baseline |
+| 4 | I1 binding contract | redesign branch | schema/semantics | transition table + design contract |
+| 5 | I2 schema/migration | redesign branch | production schema execution | verified metadata, backfill, full fan-out |
+| 6 | H1 hardening | redesign branch | stratum/status choices | benchmark non-regression |
+| 7 | F1 finding experiments | redesign branch | prompt reseed where applicable | blinded proposal comparison |
+| 8 | F2 controlled pilot | limited production exposure | pilot + promote/stop | downstream outcomes + owner decision |
+| 9 | D1 cleanup | post-promotion | destructive approval | live-caller audit + behavior freeze |
+
+## Collected owner decisions
+
+1. Approve C0 implementation and decide whether verified containment promotes
+   to `main` before the redesign.
+2. Approve the M1 label set, rubric, thresholds, and adjudicator.
+3. Approve the I1 durable fields and transition semantics.
+4. Decide early-career/no-ORCID evaluation versus explicit abstention.
+5. Decide whether to test applicant recommendations as prompt-level community
+   seeds and authorize any production prompt reseed.
+6. Decide whether an external decline-referral acknowledgment email is useful.
+7. Approve the limited live pilot after offline gates pass.
+8. Record promote/stop after the pilot.
+9. Approve Track B deletion only after promotion.
+
+## Completion rule
+
+“Ready to merge” requires every applicable contract-reconcile audit: whole
+flow, partial success, async/stale state, helper semantics, durable surfaces,
+doc reconciliation, and raw-symbol consumer fan-out. Any unverified claim stays
+`[ASSUMED]`; any red relevant gate blocks completion.
