@@ -240,6 +240,33 @@ describe('planIdentityBindingTransition', () => {
     expect(plan.committedBinding.boundAt).toBe(T1);
   });
 
+  test('self-report replay against a Dataverse second-precision stored row is a no-op', () => {
+    // Dataverse persists wmkf_identityboundat without fractional seconds; the
+    // capture service truncates the event identity to match. A job retry must
+    // classify as an exact human replay, not a rebind or an ordering block.
+    const current = boundRow({
+      source: 'self_reported',
+      anchor: `orcid:${ORCID_B}`,
+      boundAt: T1_SECONDS,
+      values: {
+        wmkf_orcid: ORCID_B,
+        wmkf_orcidurl: `https://orcid.org/${ORCID_B}`,
+      },
+      decision: persistedHumanDecision({ wmkf_identityresolvedat: T1_SECONDS }),
+    });
+    const plan = planIdentityBindingTransition(current, selfEvent({
+      boundAt: T1,
+      decision: humanDecision({ resolvedAt: T1 }),
+    }));
+
+    expect(plan).toMatchObject({ outcome: 'noop', reason: 'materially_identical', personPatch: null });
+    expect(plan.committedBinding).toMatchObject({
+      bindingVersion: 1,
+      bindingSource: 'self_reported',
+      boundAt: T1,
+    });
+  });
+
   test('blocks partial automated initialization before any patch is planned', () => {
     expect(planIdentityBindingTransition(unboundRow(), automatedEvent({
       fieldMode: 'partial',

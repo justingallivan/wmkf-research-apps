@@ -57,7 +57,12 @@ writer branch merged to `main` at `4e0ae1bd` after the review census re-proved
 every new surface production-inert. A live read-only sample confirmed that
 Dataverse returns persisted resolver timestamps at second precision; F1 now
 normalizes strict second-/millisecond-precision UTC timestamps once on
-load/event boundaries; F2
+load/event boundaries. The S362 smoke-readiness adversarial review found format
+normalization alone left a retry hazard (a millisecond-bearing `accepted_at`
+never round-trips equal to the stored `wmkf_identityboundat`, so a job retry
+reclassified its own replay as a rebind or ordering block); the capture service
+now truncates the self-report event identity to second precision before the
+writer, making a retry an exact no-op; F2
 requires a valid server receipt before writing the client-carried resolver
 decision; F3's named guards have direct complement tests; F4/F5/F7 are also
 closed; F6 uses the owner-approved 14-day receipt lifetime. F8 is captured

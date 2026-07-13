@@ -95,7 +95,7 @@ Methods:
 - Endpoints: same as read (via `upsertByEmail` / `update` / `setContactLink`)
 - `scripts/backfill-postgres-to-dataverse.js` — `upsertByEmail` against the Postgres `researchers` pool during Wave 2 backfill.
 - `lib/services/reviewer-identity-binding-writer.js` — one complete ETag-guarded person PATCH after transition validation; first production caller is live in acceptance-drain self-report
-- `lib/services/capture-self-reported-orcid.js` — stable acceptance events use the binding writer; only typed `legacy_classification_required` falls back to the transitional person writes, and contact fill follows person persistence
+- `lib/services/capture-self-reported-orcid.js` — stable acceptance events use the binding writer with the event identity (`boundAt`/`resolvedAt`) truncated to Dataverse second precision (DateTime columns drop fractional seconds on round-trip, so a job retry must replay as an exact no-op); only typed `legacy_classification_required` falls back to the transitional person writes, and contact fill follows person persistence
 
 ## Cross-system
 
