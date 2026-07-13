@@ -157,7 +157,12 @@ test('happy-path response envelope is pinned exactly (single resolved candidate)
     success: true,
     savedCount: 1,
     savedNames: ['Dr X'],
+    savedKeys: ['candidate:x|email:x%40mit.edu|orcid:-|affiliation:mit'],
     totalRequested: 1,
+    rejectedInvalid: undefined,
+    rejectedUnresolved: undefined,
+    rejectedInstitutionCOI: undefined,
+    errors: undefined,
   });
   expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalledWith(
     expect.objectContaining({ potentialReviewerId: 'PID-1', requestId: 'REQ-1', selected: true }),
@@ -182,11 +187,15 @@ test('422 envelope pinned exactly when every candidate is rejected as unresolved
     success: false,
     savedCount: 0,
     savedNames: [],
+    savedKeys: [],
     totalRequested: 1,
+    rejectedInvalid: 0,
     rejectedUnresolved: 1,
     rejectedInstitutionCOI: 0,
     errors: [{
       name: 'Dr Unresolved',
+      candidateKey: expect.any(String),
+      index: 0,
       error: 'Candidate identity is unresolved (needs identity review); not saved.',
       code: 'identity_unresolved',
     }],
@@ -209,8 +218,17 @@ test('500 envelope pinned exactly when every candidate fails a non-identity adap
     success: false,
     savedCount: 0,
     savedNames: [],
+    savedKeys: [],
     totalRequested: 1,
-    errors: [{ name: 'Dr Fails', error: 'Dataverse write failed' }],
+    rejectedInvalid: undefined,
+    rejectedUnresolved: undefined,
+    rejectedInstitutionCOI: undefined,
+    errors: [expect.objectContaining({
+      name: 'Dr Fails',
+      candidateKey: expect.any(String),
+      index: 0,
+      error: 'Dataverse write failed',
+    })],
   });
 });
 

@@ -64,6 +64,7 @@ import {
   withReviewerProvenance,
 } from '../../../lib/utils/reviewer-provenance';
 import { DEFAULT_REVIEWER_COUNT } from '../../config/reviewerFinderPreferences';
+import { reviewerSaveKey } from '../../../lib/utils/reviewer-save-key';
 
 // The four literature sources the discover endpoint understands. The user picks
 // which to query (parity with the standalone Reviewer Finder); at least one must
@@ -1057,6 +1058,7 @@ export default function ReviewerSearchSection({
 
       let saved = 0;
       let savedNames = [];
+      let savedKeys = [];
       if (toSave.length > 0) {
         pushProgress(`Saving ${toSave.length} candidate(s)…`);
         try {
@@ -1082,6 +1084,7 @@ export default function ReviewerSearchSection({
             throw new Error(detail ? `No candidates were saved: ${detail}` : 'No candidates were saved.');
           }
           savedNames = Array.isArray(sData.savedNames) ? sData.savedNames : [];
+          savedKeys = Array.isArray(sData.savedKeys) ? sData.savedKeys : [];
           const normalFailed = toSave.length - saved;
           if (normalFailed > 0 && Array.isArray(sData.errors)) failures.push(...sData.errors);
         } catch (e) {
@@ -1159,11 +1162,20 @@ export default function ReviewerSearchSection({
       // in the roster (so they leave the active Find list → Candidates tab, but
       // stay deduped) and splice them out of the active view. Failed rows remain
       // active/selectable. Best-effort — a roster failure doesn't fail the save.
-      if (savedNames.length > 0) {
-        const savedKeys = new Set(savedNames.map((n) => normalizeReviewerName(n)));
-        setCandidates((prev) => prev.filter((c) => !savedKeys.has(candKey(c))));
-        setRosterActive((prev) => prev.filter((c) => !savedKeys.has(candKey(c))));
-        setSelected((prev) => { const next = new Set(prev); savedKeys.forEach((k) => next.delete(k)); return next; });
+      if (savedNames.length > 0 || savedKeys.length > 0) {
+        const savedKeySet = new Set(savedKeys);
+        const legacyNameKeys = savedKeys.length === 0
+          ? new Set(savedNames.map((n) => normalizeReviewerName(n)))
+          : null;
+        const wasSaved = (candidate) => savedKeySet.has(reviewerSaveKey(candidate))
+          || (legacyNameKeys ? legacyNameKeys.has(candKey(candidate)) : false);
+        setCandidates((prev) => prev.filter((c) => !wasSaved(c)));
+        setRosterActive((prev) => prev.filter((c) => !wasSaved(c)));
+        setSelected((prev) => {
+          const next = new Set(prev);
+          displayCandidates.filter(wasSaved).forEach((candidate) => next.delete(candKey(candidate)));
+          return next;
+        });
         if (requestId) {
           try {
             await fetch('/api/workbench/reviewer-roster', {

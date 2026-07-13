@@ -9,9 +9,10 @@
  * Thin route shell (Route→Service Consolidation Plan, Stage 3): method
  * dispatch → auth guard → input validation → withDalContext → one service
  * call → result/error→HTTP mapping. The per-candidate save pipeline with
- * its PARTIAL-SUCCESS semantics (identity hard-reject, institution-COI
- * gate, contact/identity persist gating, conditional rejected-count and errors
- * response keys, 422 all-rejected / 500 nothing-saved envelopes) lives in
+ * its PARTIAL-SUCCESS semantics (per-row validation before writes, identity
+ * hard-reject, institution-COI gate, contact/identity persist gating, stable
+ * savedKeys/error correlations, conditional rejected-count and errors response
+ * keys, 422 all-rejected / 500 nothing-saved envelopes) lives in
  * lib/services/reviewer-finder/save-candidates-service.js — clients depend
  * on those exact shapes.
  */

@@ -59,7 +59,11 @@ const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer
 const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity-lookup');
 const { loadCoiContext } = require('../../lib/services/reviewer-request-context');
 const { ServiceHttpError } = require('../../lib/services/service-http-error');
-const { saveCandidates, SaveCandidatesError } = require('../../lib/services/reviewer-finder/save-candidates-service');
+const {
+  saveCandidates,
+  SaveCandidatesError,
+  validateCandidateInput,
+} = require('../../lib/services/reviewer-finder/save-candidates-service');
 
 const BASE = { requestId: 'REQ-1', actingUserSystemId: 'SYS-1' };
 
@@ -95,17 +99,23 @@ test('422 SaveCandidatesError with the full body (both rejected counts always pr
     success: false,
     savedCount: 0,
     savedNames: [],
+    savedKeys: [],
     totalRequested: 2,
+    rejectedInvalid: 0,
     rejectedUnresolved: 1,
     rejectedInstitutionCOI: 1,
     errors: [
       {
         name: 'Dr Unresolved',
+        candidateKey: expect.any(String),
+        index: 0,
         error: 'Candidate identity is unresolved (needs identity review); not saved.',
         code: 'identity_unresolved',
       },
       {
         name: 'Dr COI',
+        candidateKey: expect.any(String),
+        index: 1,
         error: 'Candidate is at the proposal PI’s institution (institution COI); not saved.',
         code: 'institution_coi',
       },
@@ -124,14 +134,21 @@ test('500 SaveCandidatesError when nothing saved for non-rejection reasons; reje
 
   expect(err).toBeInstanceOf(SaveCandidatesError);
   expect(err.httpStatus).toBe(500);
-  expect(err.body).toEqual({
+  expect(err.body).toMatchObject({
     error: 'No candidates were saved.',
     success: false,
     savedCount: 0,
     savedNames: [],
+    savedKeys: [],
     totalRequested: 1,
-    errors: [{ name: 'Dr Fails', error: 'Dataverse write failed' }],
+    errors: [expect.objectContaining({
+      name: 'Dr Fails',
+      candidateKey: expect.any(String),
+      index: 0,
+      error: 'Dataverse write failed',
+    })],
   });
+  expect(err.body.rejectedInvalid).toBeUndefined();
   expect(err.body.rejectedUnresolved).toBeUndefined();
   expect(err.body.rejectedInstitutionCOI).toBeUndefined();
 });
@@ -158,18 +175,81 @@ test('clean full success: 200 payload with NO rejected*/errors keys (undefined-v
     candidates: [{ name: 'Dr X', email: 'x@mit.edu' }],
   });
 
-  expect(out).toEqual({
+  expect(out).toMatchObject({
     success: true,
     savedCount: 1,
     savedNames: ['Dr X'],
+    savedKeys: [expect.stringContaining('candidate:x|')],
     totalRequested: 1,
   });
+  expect(out.rejectedInvalid).toBeUndefined();
+  expect(out.rejectedUnresolved).toBeUndefined();
+  expect(out.rejectedInstitutionCOI).toBeUndefined();
+  expect(out.errors).toBeUndefined();
   // Conditional keys are present-but-undefined, so res.json drops them.
   expect(JSON.parse(JSON.stringify(out))).toEqual({
     success: true,
     savedCount: 1,
     savedNames: ['Dr X'],
+    savedKeys: [expect.stringContaining('candidate:x|')],
     totalRequested: 1,
+  });
+});
+
+test('per-row validation rejects malformed rows before any adapter write', async () => {
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [
+      { name: 'Dr Valid', email: 'valid@example.edu' },
+      { name: '', email: 'missing-name@example.edu' },
+      { name: 'Dr Invalid Status', identityStatus: 'staff_says_yes' },
+    ],
+  });
+
+  expect(out).toMatchObject({
+    success: true,
+    savedCount: 1,
+    savedNames: ['Dr Valid'],
+    rejectedInvalid: 2,
+  });
+  expect(out.savedKeys).toHaveLength(1);
+  expect(out.errors).toEqual([
+    expect.objectContaining({ index: 1, code: 'invalid_candidate', candidateKey: null }),
+    expect.objectContaining({ index: 2, code: 'invalid_candidate' }),
+  ]);
+  expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledTimes(1);
+  expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalledTimes(1);
+});
+
+test('all malformed rows return 422 with stable validation correlations', async () => {
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [null, { name: 'Dr Bad Identity', contactEnrichment: { identity: { status: 'invented' } } }],
+  }).catch((error) => error);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    error: 'Selected candidates were not saved; see row errors for invalid or ineligible candidates.',
+    success: false,
+    savedCount: 0,
+    savedKeys: [],
+    rejectedInvalid: 2,
+  });
+  expect(err.body.errors).toEqual([
+    expect.objectContaining({ index: 0, code: 'invalid_candidate', candidateKey: null }),
+    expect.objectContaining({ index: 1, code: 'invalid_candidate', candidateKey: expect.any(String) }),
+  ]);
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+});
+
+test('candidate validation bounds nested identity payloads', () => {
+  expect(validateCandidateInput({
+    name: 'Dr Too Many Anchors',
+    contactEnrichment: { identity: { status: 'probable', anchors: Array.from({ length: 51 }, () => ({})) } },
+  }, 4)).toMatchObject({
+    ok: false,
+    error: { index: 4, code: 'invalid_candidate' },
   });
 });
 
@@ -368,9 +448,15 @@ test('mixed partial success: saved rows kept, rejected/failed rows accumulate th
   expect(out.rejectedUnresolved).toBe(1);
   expect(out.rejectedInstitutionCOI).toBe(1);
   expect(out.errors).toEqual([
-    expect.objectContaining({ name: 'Dr Unresolved', code: 'identity_unresolved' }),
-    expect.objectContaining({ name: 'Dr COI', code: 'institution_coi' }),
-    { name: 'Dr Fails', error: 'adapter down' },
+    expect.objectContaining({
+      name: 'Dr Unresolved', code: 'identity_unresolved', index: 1, candidateKey: expect.any(String),
+    }),
+    expect.objectContaining({
+      name: 'Dr COI', code: 'institution_coi', index: 2, candidateKey: expect.any(String),
+    }),
+    expect.objectContaining({
+      name: 'Dr Fails', error: 'adapter down', index: 3, candidateKey: expect.any(String),
+    }),
   ]);
 });
 
@@ -389,7 +475,12 @@ test('a late per-candidate failure (suggestion upsert) does not abort the batch 
 
   expect(out.savedCount).toBe(1);
   expect(out.savedNames).toEqual(['Dr First']);
-  expect(out.errors).toEqual([{ name: 'Dr Second', error: 'suggestion write failed' }]);
+  expect(out.errors).toEqual([expect.objectContaining({
+    name: 'Dr Second',
+    candidateKey: expect.any(String),
+    index: 1,
+    error: 'suggestion write failed',
+  })]);
 });
 
 test('server recomputes institution COI from the reused reviewer CRM affiliation (getByEmail) before any save write', async () => {
