@@ -15,6 +15,8 @@
  * Usage:
  *   node scripts/preflight-reviewer-identity-binding-fields.mjs --target=sandbox
  *   node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod
+ *   node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population
+ *   node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-timestamp-samples
  *   node scripts/preflight-reviewer-identity-binding-fields.mjs --self-test
  *
  * This script never writes to Dataverse.
@@ -34,6 +36,10 @@ const TYPE_CAST = Object.freeze({
   Memo: 'MemoAttributeMetadata',
   Integer: 'IntegerAttributeMetadata',
   DateTime: 'DateTimeAttributeMetadata',
+});
+const ENTITY_SETS = Object.freeze({
+  wmkf_potentialreviewers: 'wmkf_potentialreviewerses',
+  wmkf_appreviewersuggestion: 'wmkf_appreviewersuggestions',
 });
 
 export function loadExpectedEntities() {
@@ -107,6 +113,11 @@ export function classifyCollectionRows(field, rows) {
   return { state: 'present', notes: [] };
 }
 
+export function buildAnyNonNullFilter(fields) {
+  if (!Array.isArray(fields) || fields.length === 0) throw new Error('population probe requires fields');
+  return fields.map((field) => `${field.logical} ne null`).join(' or ');
+}
+
 function typedSelect(type) {
   const common = 'LogicalName,AttributeType,RequiredLevel';
   if (type === 'String') return `${common},MaxLength,FormatName`;
@@ -146,6 +157,42 @@ async function probeField({ resourceUrl, token, entity, field }) {
   }
   const notes = compareFieldMetadata(field, await typedResponse.json());
   return { state: notes.length === 0 ? 'exact' : 'divergent', notes };
+}
+
+async function countRowsWithAnyIdentityField({ resourceUrl, token, entity, fields }) {
+  const filter = buildAnyNonNullFilter(fields);
+  const entitySet = ENTITY_SETS[entity];
+  if (!entitySet) throw new Error(`population probe has no entity-set mapping for ${entity}`);
+  const url =
+    `${resourceUrl}/api/data/v9.2/${entitySet}`
+    + `?$filter=${encodeURIComponent(filter)}&$count=true&$top=1&$select=${fields[0].logical}`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+  });
+  if (!response.ok) {
+    throw new Error(`unexpected population response probing ${entity} (${response.status}): ${(await response.text()).slice(0, 400)}`);
+  }
+  const data = await response.json();
+  if (!Number.isInteger(data['@odata.count']) || data['@odata.count'] < 0) {
+    throw new Error(`population response for ${entity} is missing @odata.count`);
+  }
+  return data['@odata.count'];
+}
+
+async function samplePersistedResolvedTimestamps({ resourceUrl, token }) {
+  const field = 'wmkf_identityresolvedat';
+  const url =
+    `${resourceUrl}/api/data/v9.2/wmkf_potentialreviewerses`
+    + `?$select=${field}&$filter=${field}%20ne%20null&$top=5`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+  });
+  if (!response.ok) {
+    throw new Error(`unexpected timestamp-sample response (${response.status}): ${(await response.text()).slice(0, 400)}`);
+  }
+  const data = await response.json();
+  if (!Array.isArray(data.value)) throw new Error('timestamp-sample response is missing value[]');
+  return data.value.map((row) => row[field]).filter((value) => typeof value === 'string');
 }
 
 function loadEnvironment() {
@@ -224,8 +271,10 @@ function runSelfTest() {
   }
   const absent = classifyCollectionRows(stringField, []);
   if (absent.state !== 'absent') throw new Error('empty metadata collection was not classified absent');
+  const expectedFilter = fields.map((field) => `${field.logical} ne null`).join(' or ');
+  if (buildAnyNonNullFilter(fields) !== expectedFilter) throw new Error('population filter is incomplete');
 
-  console.log('PASS: Wave 13 preflight self-test (2 entities, 10 fields, collection existence/type and exact/divergent comparison).');
+  console.log('PASS: Wave 13 preflight self-test (2 entities, 10 fields, metadata comparison and complete population filter).');
 }
 
 async function main() {
@@ -277,6 +326,28 @@ async function main() {
   console.log('PROCEED: every field is absent or matches the Wave 13 contract exactly.');
   if (absent.length > 0) {
     console.log(`  Next: node scripts/apply-dataverse-schema.js --target=${target} --wave=13-reviewer-identity-binding --execute`);
+  }
+  if (process.argv.includes('--include-population')) {
+    if (absent.length > 0) {
+      console.log('Population snapshot skipped: one or more Wave 13 fields are absent.');
+    } else {
+      console.log(`Wave 13 population snapshot (target=${target}):`);
+      for (const expected of loadExpectedEntities()) {
+        const count = await countRowsWithAnyIdentityField({
+          resourceUrl,
+          token,
+          entity: expected.entity,
+          fields: expected.fields,
+        });
+        console.log(`  ${expected.entity}: ${count} row(s) with any Wave 13 field non-null.`);
+      }
+    }
+  }
+  if (process.argv.includes('--include-timestamp-samples')) {
+    const timestamps = await samplePersistedResolvedTimestamps({ resourceUrl, token });
+    console.log('Persisted wmkf_identityresolvedat samples (raw Dataverse JSON):');
+    if (timestamps.length === 0) console.log('  none');
+    else for (const timestamp of timestamps) console.log(`  ${timestamp}`);
   }
 }
 

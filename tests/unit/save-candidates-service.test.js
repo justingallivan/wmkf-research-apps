@@ -9,8 +9,7 @@
  * rejected-count and errors keys, and per-candidate failure isolation. The deep
  * identity/COI/persist-gate branches stay covered by
  * tests/unit/reviewer-route-identity-gate.test.js through the route.
- * (No duplicate-key translation path exists on this route — that is
- * my-candidates PATCH semantics.)
+ * Duplicate correlation keys are rejected per row before any adapter write.
  */
 
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
@@ -222,6 +221,34 @@ test('per-row validation rejects malformed rows before any adapter write', async
     expect.objectContaining({ index: 2, code: 'invalid_candidate' }),
   ]);
   expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledTimes(1);
+  expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalledTimes(1);
+});
+
+test('duplicate candidate keys are rejected per row without graduating the failed sibling', async () => {
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [
+      { name: 'Dr First', email: 'first@example.edu', clientCandidateId: 'duplicate-1' },
+      { name: 'Dr Second', email: 'second@example.edu', clientCandidateId: 'duplicate-1' },
+    ],
+  });
+
+  expect(out).toMatchObject({
+    success: true,
+    savedCount: 1,
+    savedNames: ['Dr First'],
+    savedKeys: ['client:duplicate-1'],
+    rejectedInvalid: 1,
+    errors: [{
+      name: 'Dr Second',
+      candidateKey: 'client:duplicate-1',
+      index: 1,
+      code: 'invalid_candidate',
+      error: 'Duplicate candidate correlation key in this save request.',
+    }],
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledTimes(1);
+  expect(researcherAdapter.upsertByPotentialReviewer).toHaveBeenCalledTimes(1);
   expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalledTimes(1);
 });
 

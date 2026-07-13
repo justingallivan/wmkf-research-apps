@@ -2,6 +2,7 @@ import { RESOLVER_SOURCED_FIELDS } from '../../lib/services/reviewer-identity-re
 import {
   IDENTITY_LINEAGE_FIELDS,
   normalizeBindingAnchor,
+  normalizeIdentityTimestamp,
   selectBindingAnchor,
   validateIdentityBindingTuple,
   parseIdentityFieldLineage,
@@ -32,8 +33,27 @@ function lineage() {
 }
 
 describe('reviewer identity binding contract', () => {
-  test('lineage allowlist stays identical to the resolver clear/persist set', () => {
+  test('lineage allowlist is pinned literally and shared with the resolver clear/persist set', () => {
+    expect(IDENTITY_LINEAGE_FIELDS).toEqual([
+      'wmkf_googlescholarid',
+      'wmkf_googlescholarurl',
+      'wmkf_hindex',
+      'wmkf_i10index',
+      'wmkf_totalcitations',
+      'wmkf_orcid',
+      'wmkf_orcidurl',
+    ]);
     expect(IDENTITY_LINEAGE_FIELDS).toEqual(RESOLVER_SOURCED_FIELDS);
+  });
+
+  test('normalizes strict second and sub-second UTC timestamps without accepting loose dates', () => {
+    expect(normalizeIdentityTimestamp('2026-07-12T20:00:00Z')).toBe('2026-07-12T20:00:00.000Z');
+    expect(normalizeIdentityTimestamp('2026-07-12T20:00:00.1Z')).toBe('2026-07-12T20:00:00.100Z');
+    expect(normalizeIdentityTimestamp('2026-07-12T20:00:00.012Z')).toBe('2026-07-12T20:00:00.012Z');
+    expect(normalizeIdentityTimestamp('2026-02-30T20:00:00Z')).toBeNull();
+    expect(normalizeIdentityTimestamp('2026-07-12T20:00:00+00:00')).toBeNull();
+    expect(normalizeIdentityTimestamp('2026-07-12T20:00:00.0000Z')).toBeNull();
+    expect(normalizeIdentityTimestamp('July 12 2026 20:00:00 UTC')).toBeNull();
   });
 
   test('canonicalizes only checksum-valid ORCID, exact OpenAlex, and staff attestation anchors', () => {
@@ -60,7 +80,7 @@ describe('reviewer identity binding contract', () => {
       bindingVersion: 2,
       bindingSource: 'self_reported',
       bindingAnchor: `orcid:${ORCID}`,
-      boundAt: '2026-07-12T20:00:00.000Z',
+      boundAt: '2026-07-12T20:00:00Z',
       derivedBindingVersion: null,
     })).toMatchObject({ ok: true, state: 'bound' });
     expect(validateIdentityBindingTuple({

@@ -2,8 +2,10 @@
  * @jest-environment node
  */
 
+import { decodeJwt } from 'jose';
 import {
   mintAutomatedIdentityAttestation,
+  TTL_SECONDS,
   verifyAutomatedIdentityAttestation,
 } from '../../lib/services/reviewer-candidate-attestation';
 import {
@@ -30,8 +32,47 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  jest.useRealTimers();
   if (priorSecret === undefined) delete process.env.NEXTAUTH_SECRET;
   else process.env.NEXTAUTH_SECRET = priorSecret;
+});
+
+test('server receipt carries the owner-approved 14-day lifetime', async () => {
+  const token = await mintAutomatedIdentityAttestation({ requestId: REQUEST, candidate: CANDIDATE });
+  const payload = decodeJwt(token);
+
+  expect(TTL_SECONDS).toBe(14 * 24 * 60 * 60);
+  expect(payload.exp - payload.iat).toBe(TTL_SECONDS);
+});
+
+test('absent receipt fails closed', async () => {
+  await expect(verifyAutomatedIdentityAttestation('', {
+    requestId: REQUEST,
+    candidate: CANDIDATE,
+  })).resolves.toEqual({ valid: false, reason: 'no_token' });
+});
+
+test('receipt signed with a different secret fails closed', async () => {
+  const token = await mintAutomatedIdentityAttestation({ requestId: REQUEST, candidate: CANDIDATE });
+  process.env.NEXTAUTH_SECRET = 'different-reviewer-attestation-secret';
+
+  await expect(verifyAutomatedIdentityAttestation(token, {
+    requestId: REQUEST,
+    candidate: CANDIDATE,
+  })).resolves.toEqual({ valid: false, reason: 'invalid_signature' });
+});
+
+test('receipt fails closed after the 14-day lifetime and clock tolerance', async () => {
+  jest.useFakeTimers();
+  const issuedAt = new Date('2026-07-13T00:00:00.000Z');
+  jest.setSystemTime(issuedAt);
+  const token = await mintAutomatedIdentityAttestation({ requestId: REQUEST, candidate: CANDIDATE });
+
+  jest.setSystemTime(new Date(issuedAt.getTime() + ((TTL_SECONDS + 31) * 1000)));
+  await expect(verifyAutomatedIdentityAttestation(token, {
+    requestId: REQUEST,
+    candidate: CANDIDATE,
+  })).resolves.toEqual({ valid: false, reason: 'expired' });
 });
 
 test('server receipt verifies only for the bound request and identity bundle', async () => {

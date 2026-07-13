@@ -2,7 +2,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-07-12 (C0.1 containment: request-scoped staff identity confirmations are stored in the active candidate JSON and re-read by `save-candidates`; automated identity receipts are opaque signed values, not raw resolver evidence).
+**Last verified:** 2026-07-13 (C0.1 containment: request-scoped staff identity confirmations are stored in the active candidate JSON and re-read by `save-candidates`; automated identity receipts are opaque signed values, not raw resolver evidence).
 **Live row count:** 0 (new table; no rows until the Workbench Find tab records a search).
 
 ## NOT a regression of the S219/migration-018 Dataverse cutover
@@ -54,6 +54,6 @@ No Dataverse equivalent — operational/ephemeral by design. Crossing points: a 
 - PATCH handlers are eviction-tolerant (upsert from the submitted blob / no-op) so a row evicted by the cap while still on screen can't 404 a card action.
 - Stores a pruned render DTO, never the raw `contactEnrichment` internals (no resolver anchors / tierResults).
 - Staff confirmation authority is not the client boolean. `save-candidates` must retrieve the opaque confirmation id under the same request and match the canonical name/email/website/affiliation; missing, mismatched, cross-request, or failed reads stop before writes.
-- Automated `confirmed` / `probable` fields are deny-only without a valid signed receipt. The receipt uses existing `NEXTAUTH_SECRET`, is request- and identity-bundle-bound, and expires after the transitional 180-day window.
+- Automated `confirmed` / `probable` fields are deny-only without a valid signed receipt. The receipt uses existing `NEXTAUTH_SECRET`, is request- and identity-bundle-bound, and expires after 14 days.
 - Applicant-suggested restore is keyed on `candidate.enrichedProposalKey`, not the proposal Blob URL. `load-proposal` uses `addRandomSuffix:true`, so `blobUrl` changes across reloads and is not a stable cache key.
 - `coi_dropped` is observability-only. Do not expose it as a recover/promote UI bucket without a separate policy decision; Contract 5 still hard-drops current-institution COI by default and save still fail-closes. The only visible discovery exception is the Phase-C contradicted low-trust flag, which remains read-only and unsaveable.

@@ -4,7 +4,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-07-12 Wave 13 typed metadata preflight; row count re-probed 2026-07-12 via `scripts/reconcile-memory-claims.js`
+**Last verified:** 2026-07-13 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population`; row count re-probed 2026-07-12 via `scripts/reconcile-memory-claims.js`
 **Live row count:** 4,416
 **Entity set:** `wmkf_potentialreviewerses` (note Dynamics-pluralized form)
 **Adapter:** `lib/dataverse/adapters/potential-reviewer.js`
@@ -51,13 +51,17 @@ defines six live nullable fields: `wmkf_identitybindingversion`,
 `wmkf_identityboundat`, `wmkf_identityderivedbindingversion`, and
 `wmkf_identityfieldlineagejson`. They provide a monotonic person-binding
 generation plus compact per-field lineage for safe correction/invalidation.
-The owner-approved production-only apply completed 2026-07-12; typed metadata
-verification reported all six EXACT. No production caller uses these names: the
+The owner-approved production-only apply completed 2026-07-12. **[VERIFIED
+2026-07-13 via the command in Last verified]** typed metadata reported all six
+EXACT. No production caller uses these names: the
 inert `reviewer-identity-binding-writer.js` and
 its narrow `researcher.js` ETag seam now select/PATCH them only when explicitly
 invoked, and a raw caller census finds focused tests but no production caller.
 The columns therefore remain non-authoritative and every existing row remains
-null/legacy-unbound; a post-apply any-non-null probe returned zero rows. Null
+null/legacy-unbound; the same population probe returned zero rows. The dated
+output is captured in
+`docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md` and must be
+refreshed before schema-adjacent work. Null
 cannot confer action eligibility. Dirty legacy rows with existing identity
 values but no lineage are blocked rather than inferred or cleared. Existing
 resolver evidence remains in

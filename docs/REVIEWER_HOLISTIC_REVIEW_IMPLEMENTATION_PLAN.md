@@ -272,10 +272,23 @@ per-field lineage, proposal COI has no structured currency marker, and a person
 binding has no durable generation. The additive prerequisite is now tracked in
 `wave13-reviewer-identity-binding` with a read-only ABSENT/EXACT/DIVERGENT
 preflight. The owner-approved production-only apply created all ten fields and
-post-apply typed metadata verification reported 0 ABSENT / 10 EXACT / 0
-DIVERGENT. The later inert writer adds a test-only person read/PATCH seam but no
+**[VERIFIED 2026-07-13 via `node
+scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod
+--include-population`]** typed metadata reported 0 ABSENT / 10 EXACT / 0
+DIVERGENT. The dated output is captured at
+`docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md`. The later
+inert writer adds a test-only person read/PATCH seam but no
 production caller; current behavior remains authoritative, and null fields mean
 legacy/unknown, never eligible-by-default.
+
+**[HARDENED + VERIFIED 2026-07-13]** The adversarial-review remediation is
+built: a live read-only sample confirmed second-precision Dataverse timestamp
+serialization, and strict second- or millisecond-precision UTC timestamps now
+normalize once at the writer boundary; every named transition guard has complement coverage; the
+dead decision-preservation branch is removed; the resolver and binding contract
+share one literal seven-field authority; unsigned identity payloads cannot
+write durable resolver decisions; and duplicate batch correlation keys are
+rejected per row. The binding writer still has no production caller.
 
 Create one server-owned rebind/invalidation operation used by:
 
@@ -544,18 +557,23 @@ invalidate linked suggestion currency.
 `scripts/apply-dataverse-schema.js`; the apply engine creates missing attributes
 but does not reconcile a divergent existing definition.
 
-**[DEPLOYED + METADATA-VERIFIED; NON-AUTHORITATIVE 2026-07-12]**
+**[DEPLOYED + METADATA-VERIFIED; NON-AUTHORITATIVE 2026-07-13]**
 `lib/dataverse/schema/wave13-reviewer-identity-binding/` contains two additive
 extension specs (ten fields total), and
 `scripts/preflight-reviewer-identity-binding-fields.mjs` derives the expected
 metadata from those specs. The production-only apply was explicitly approved
-after the owner classified the ancient sandbox as unsuitable. Fresh preflight
-reported 10 ABSENT / 0 EXACT / 0 DIVERGENT; execute created all ten attributes;
-post-apply typed verification reported 0 ABSENT / 10 EXACT / 0 DIVERGENT. The
+after the owner classified the ancient sandbox as unsuitable. The 2026-07-12
+pre-apply snapshot reported 10 ABSENT / 0 EXACT / 0 DIVERGENT and execute
+created all ten attributes. **[VERIFIED 2026-07-13 via
+`node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod
+--include-population`]** current typed metadata reported 0 ABSENT / 10 EXACT /
+0 DIVERGENT. The
 later inert person-binding writer now has a narrow select/PATCH seam, but no
 production caller imports it, so schema creation and this foundation slice do
-not change production behavior. A post-apply row probe found zero person or
-suggestion rows with any Wave 13 field populated.
+not change production behavior. The same command found zero person and zero
+suggestion rows with any Wave 13 field populated. The captured output is
+`docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md`; these are
+dated snapshots and must be refreshed before later schema-adjacent work.
 
 **[SANDBOX EXCEPTION APPROVED 2026-07-12]** The documented
 sandbox target (`orgd9e66399.crm.dynamics.com`) is reachable, but the Wave 13

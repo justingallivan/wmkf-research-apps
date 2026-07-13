@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-12 via S359 adversarial review (READY WITH FIXES), caller census, and owner-approved merge of the inert writer to main (4e0ae1bd)
+  last_verified: 2026-07-13 via adversarial-remediation implementation, focused tests, caller census, and the reproducible production Wave 13 metadata/population preflight
 ---
 
 ## Recall Rule
@@ -33,28 +33,31 @@ The plan is **active under a hybrid incremental model**:
 
 Wave 13 identity-binding schema is **deployed but not authoritative**. The
 owner-approved production-only apply completed 2026-07-12 after the ancient
-sandbox was rejected as an unsuitable validation target; post-apply typed
-metadata verification reported 0 ABSENT / 10 EXACT / 0 DIVERGENT. The ten
+sandbox was rejected as an unsuitable validation target. **[VERIFIED
+2026-07-13 via `node scripts/preflight-reviewer-identity-binding-fields.mjs
+--target=prod --include-population`]** typed metadata remains 0 ABSENT / 10
+EXACT / 0 DIVERGENT. The ten
 nullable fields cover person binding generation and per-field lineage plus
 proposal COI binding/context currency. No live application reader/writer uses
 the suggestion fields. The person fields now have an inert, ETag-protected
-binding writer and narrow adapter seam, but no production caller; a post-apply
-any-non-null probe returned zero person and zero suggestion rows, so existing
+binding writer and narrow adapter seam, but no production caller; the same
+reproducible population probe returned zero person and zero suggestion rows, so existing
 state remains legacy-unknown and cannot become eligible-by-default. Runtime
 caller migration remains a later gated slice.
 
-**S359 adversarial review (2026-07-13 artifact): READY WITH FIXES.** The inert
+**S359 adversarial review (2026-07-13 artifact): fixes implemented on the
+current remediation branch; promotion pending.** The inert
 writer branch merged to `main` at `4e0ae1bd` after the review census re-proved
-every new surface production-inert. Fixes gate the FIRST PRODUCTION CALLER,
-not the merge: **F1 (P1)** the writer's millisecond-canonical timestamp rule
-cannot survive a Dataverse DateTime round-trip (mechanism proven offline;
-live serialization still unprobed — the S359 permission policy blocked the
-read-only probe); **F2 (P2, live)** `save-candidates-service.js:895-899`
-persists unsigned client `contactEnrichment.identity` as an `automated`
-decision regardless of receipt validity; **F3 (P2)** seven writer guards have
-no failing-test coverage. Remediation slices and evidence:
-`docs/REVIEWER_HOLISTIC_REDESIGN_ADVERSARIAL_FINDINGS_HANDOFF.md`. Do not wire
-a writer caller before F1 is resolved.
+every new surface production-inert. A live read-only sample confirmed that
+Dataverse returns persisted resolver timestamps at second precision; F1 now
+normalizes strict second-/millisecond-precision UTC timestamps once on
+load/event boundaries; F2
+requires a valid server receipt before writing the client-carried resolver
+decision; F3's named guards have direct complement tests; F4/F5/F7 are also
+closed; F6 uses the owner-approved 14-day receipt lifetime. F8 is captured
+reproducibly at
+`docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md`. Runtime
+caller activation remains owner-gated.
 
 The pure non-I/O contracts are built in
 `reviewer-identity-binding-contract.js` and `institution-coi-context.js`, with

@@ -8,6 +8,7 @@ import {
   writeReviewerIdentityBinding,
 } from '../../lib/services/reviewer-identity-binding-writer.js';
 import {
+  IDENTITY_BINDING_VERSION_MAX,
   IDENTITY_LINEAGE_FIELDS,
   serializeIdentityFieldLineage,
 } from '../../lib/services/reviewer-identity-binding-contract.js';
@@ -15,6 +16,7 @@ import {
 const ORCID_A = '0000-0002-1825-0097';
 const ORCID_B = '0000-0001-5109-3700';
 const T1 = '2026-07-12T20:00:00.000Z';
+const T1_SECONDS = '2026-07-12T20:00:00Z';
 const T2 = '2026-07-13T20:00:00.000Z';
 const STAFF_A = 'staff-attestation:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
@@ -224,9 +226,39 @@ describe('planIdentityBindingTransition', () => {
     ].sort());
   });
 
+  test('normalizes Dataverse second-precision timestamps before comparison and persistence', () => {
+    const current = boundRow({
+      boundAt: T1_SECONDS,
+      decision: persistedAutomatedDecision({ wmkf_identityresolvedat: T1_SECONDS }),
+    });
+    const plan = planIdentityBindingTransition(current, automatedEvent({
+      boundAt: T1_SECONDS,
+      decision: automatedDecision({ resolvedAt: T1_SECONDS }),
+    }));
+
+    expect(plan).toMatchObject({ outcome: 'noop', reason: 'materially_identical' });
+    expect(plan.committedBinding.boundAt).toBe(T1);
+  });
+
+  test('blocks partial automated initialization before any patch is planned', () => {
+    expect(planIdentityBindingTransition(unboundRow(), automatedEvent({
+      fieldMode: 'partial',
+    }))).toMatchObject({
+      outcome: 'blocked',
+      reason: 'automated_init_requires_replacement_bundle',
+      personPatch: null,
+    });
+  });
+
   test('blocks dirty legacy rows instead of inferring or erasing provenance', () => {
     expect(() => planIdentityBindingTransition(unboundRow({ wmkf_hindex: 22 }), automatedEvent()))
       .toThrow(expect.objectContaining({ code: 'legacy_classification_required' }));
+  });
+
+  test('blocks an unbound row that carries lineage even when all identity values are null', () => {
+    expect(() => planIdentityBindingTransition(unboundRow({
+      wmkf_identityfieldlineagejson: JSON.stringify({ schemaVersion: 1, fields: {} }),
+    }), automatedEvent())).toThrow(expect.objectContaining({ code: 'legacy_classification_required' }));
   });
 
   test('rejects missing ETags and malformed stored lineage before planning a patch', () => {
@@ -286,6 +318,7 @@ describe('planIdentityBindingTransition', () => {
       invalidateSuggestionCoi: false,
     });
     expect(plan.personPatch.wmkf_hindex).toBe(11);
+    expect(plan.personPatch.wmkf_identityresolvedat).toBe(T2);
   });
 
   test('materially identical automated replay is a no-op', () => {
@@ -327,6 +360,48 @@ describe('planIdentityBindingTransition', () => {
     }))).toMatchObject({
       outcome: 'blocked',
       reason: expect.stringContaining('automated_rebind_has_nonautomated_lineage'),
+      personPatch: null,
+    });
+  });
+
+  test('partial automated different-person rebind is blocked', () => {
+    expect(planIdentityBindingTransition(boundRow(), automatedEvent({
+      anchor: 'openalex:A123',
+      fieldMode: 'partial',
+      fields: { wmkf_hindex: 5 },
+      decision: automatedDecision({ resolvedAt: T2 }),
+    }))).toMatchObject({
+      outcome: 'blocked',
+      reason: 'automated_rebind_requires_replacement_bundle',
+      personPatch: null,
+    });
+  });
+
+  test('automated refresh preserves equal human-lineage values but blocks conflicts', () => {
+    const current = boundRow({
+      values: {
+        wmkf_orcid: ORCID_A,
+        wmkf_orcidurl: `https://orcid.org/${ORCID_A}`,
+        wmkf_hindex: 10,
+      },
+      lineageSources: { wmkf_hindex: 'staff_manual' },
+    });
+    const equal = planIdentityBindingTransition(current, automatedEvent({
+      decision: automatedDecision({ resolvedAt: T2 }),
+    }));
+    expect(equal).toMatchObject({ outcome: 'refresh', personPatch: { wmkf_hindex: 10 } });
+    expect(JSON.parse(equal.lineageJson).fields.wmkf_hindex.source).toBe('staff_manual');
+
+    expect(planIdentityBindingTransition(current, automatedEvent({
+      fields: {
+        wmkf_orcid: ORCID_A,
+        wmkf_orcidurl: `https://orcid.org/${ORCID_A}`,
+        wmkf_hindex: 11,
+      },
+      decision: automatedDecision({ resolvedAt: T2 }),
+    }))).toMatchObject({
+      outcome: 'blocked',
+      reason: 'automated_field_conflicts_with_human_lineage:wmkf_hindex',
       personPatch: null,
     });
   });
@@ -490,6 +565,30 @@ describe('planIdentityBindingTransition', () => {
     });
   });
 
+  test('blocks a different human event identity at the same timestamp', () => {
+    const current = boundRow({
+      source: 'self_reported',
+      anchor: `orcid:${ORCID_B}`,
+      boundAt: T2,
+      values: {
+        wmkf_orcid: ORCID_B,
+        wmkf_orcidurl: `https://orcid.org/${ORCID_B}`,
+      },
+      decision: persistedHumanDecision({ wmkf_identityresolvedat: T2 }),
+    });
+    expect(planIdentityBindingTransition(current, selfEvent({
+      anchor: `orcid:${ORCID_A}`,
+      fields: {
+        wmkf_orcid: ORCID_A,
+        wmkf_orcidurl: `https://orcid.org/${ORCID_A}`,
+      },
+    }))).toMatchObject({
+      outcome: 'blocked',
+      reason: 'human_event_identity_collision',
+      personPatch: null,
+    });
+  });
+
   test.each([
     [automatedEvent({ anchor: 'openalex:a123' }), /canonical/],
     [automatedEvent({ fields: { wmkf_orcid: ORCID_A } }), /ORCID pair/],
@@ -534,6 +633,46 @@ describe('planIdentityBindingTransition', () => {
       },
       decision: automatedDecision({ resolvedAt: T2 }),
     }))).toMatchObject({ outcome: 'blocked', reason: 'automated_replay_payload_mismatch', personPatch: null });
+  });
+
+  test('same-timestamp automated decisions cannot switch the bound person', () => {
+    expect(planIdentityBindingTransition(boundRow(), automatedEvent({
+      anchor: 'openalex:A123',
+      fields: { wmkf_hindex: 5 },
+    }))).toMatchObject({
+      outcome: 'blocked',
+      reason: 'automated_event_identity_collision',
+      personPatch: null,
+    });
+  });
+
+  test.each([
+    ['staff to self-report', boundRow({
+      version: IDENTITY_BINDING_VERSION_MAX,
+      source: 'staff_confirmed',
+      anchor: STAFF_A,
+      values: {},
+      decision: persistedHumanDecision({ wmkf_identityresolverversion: 'staff@1' }),
+    }), selfEvent()],
+    ['automated to self-report', boundRow({ version: IDENTITY_BINDING_VERSION_MAX }), selfEvent()],
+    ['later self-report correction', boundRow({
+      version: IDENTITY_BINDING_VERSION_MAX,
+      source: 'self_reported',
+      anchor: `orcid:${ORCID_B}`,
+      boundAt: T1,
+      values: {
+        wmkf_orcid: ORCID_B,
+        wmkf_orcidurl: `https://orcid.org/${ORCID_B}`,
+      },
+    }), selfEvent()],
+    ['automated different-person rebind', boundRow({ version: IDENTITY_BINDING_VERSION_MAX }), automatedEvent({
+      anchor: 'openalex:A123',
+      fields: { wmkf_hindex: 5 },
+      decision: automatedDecision({ resolvedAt: T2 }),
+    })],
+  ])('fails closed when the binding version is exhausted for %s', (_label, current, event) => {
+    expect(() => planIdentityBindingTransition(current, event))
+      .toThrow(expect.objectContaining({ code: 'version_exhausted' }));
   });
 });
 
