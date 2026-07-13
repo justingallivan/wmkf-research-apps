@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-holistic-redesign-parallel-build
-description: The reviewer finding/identity redesign is PARKED pending owner go. The reconciled plan now separates current-safety containment from the long-lived experiment: C0 may promote independently to main after an explicit owner decision; M1 through F2 accumulate on a dedicated branch against a frozen main commit; destructive D1 cleanup happens only after a successful controlled pilot and promotion decision.
+description: The reviewer finding/identity redesign is ACTIVE under the owner-approved hybrid model: safe legacy-default slices reach main through short branches; containment promotes per invariant; the baseline freezes after shared containment; cohort activation is server-owned; destructive cleanup waits through a controlled pilot and one campaign of observation.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-12 via controlling comparison memo, live contract audit, and reconciled implementation plan
+  last_verified: 2026-07-12 via owner approval, governing release strategy, live contract audit, and reconciled implementation plan
 ---
 
 ## Recall Rule
@@ -17,20 +17,19 @@ Read this when planning or starting reviewer-finding work
 
 ## Current direction
 
-The plan is **parked, not green-lit**. It has two execution lanes:
+The plan is **active under a hybrid incremental model**:
 
-1. **C0 containment:** current save-boundary, correction, attestation-overwrite,
-   and send-eligibility defects are built on a short-lived Tier-1 branch. The
-   owner must explicitly decide whether verified containment promotes to main
-   before the larger redesign or whether the continuing exposure is accepted.
-2. **M1→F2 redesign experiment:** measurement, versioned identity binding,
-   migration/fan-out, resolver hardening, finding experiments, and a controlled
-   pilot accumulate one phase at a time on a dedicated testing branch. The
-   comparison baseline is an exact frozen main commit plus frozen prompts,
-   models, documents, exclusions, and rubric—not a moving branch name.
-3. **D1 cleanup:** Track B or heuristic deletion is post-promotion work only.
-   It contributes no experiment signal and must not reduce reversibility before
-   the promote/stop decision.
+1. **Safe slices to main:** evaluation assets, additive schema artifacts, seams,
+   dual writes, and shadow comparisons land through short branches while legacy
+   behavior remains authoritative.
+2. **C0 containment:** current save-boundary, correction, attestation-overwrite,
+   and send-eligibility defects promote one verified invariant at a time on
+   Tier-2 branches.
+3. **Measured switches:** the baseline freezes after shared containment. New
+   readers/finding behavior activate only through a server-owned deterministic
+   request cohort; missing/invalid assignment selects baseline.
+4. **D1 cleanup:** Track B or heuristic deletion waits until promotion and one
+   complete campaign of old/new observation.
 
 ## Required evidence model
 
@@ -50,8 +49,8 @@ The plan is **parked, not green-lit**. It has two execution lanes:
 
 ## Do
 
-- Start with the plan's B0 owner/evaluation freeze.
-- Keep C0 promotion separate from the redesign-branch decision.
+- Start with the plan's B0 manifest foundation; freeze only after shared C0.
+- Keep every production slice small, legacy-default, and independently reversible.
 - Build phases one at a time; do not batch the redesign into one opaque change.
 - Preserve fail-closed identity reads and the no-COI-regating posture.
 - Run `/contract-reconcile` for containment, binding/schema, and cross-layer
@@ -63,7 +62,7 @@ The plan is **parked, not green-lit**. It has two execution lanes:
 
 ## Do not
 
-- Do not start without the relevant owner gate.
+- Do not activate runtime behavior without the relevant promotion gate.
 - Do not treat the old P0→P4 sequence or a single
   `wmkf_identitybindingsource` column as the current plan.
 - Do not let client-supplied nested identity state establish persistence or
@@ -72,7 +71,7 @@ The plan is **parked, not green-lit**. It has two execution lanes:
   legacy/unbound until reviewed.
 - Do not call mutable suggestion rows an immutable shortlist/panel history.
 - Do not delete Track B or other retrieval/ranking code before the offline
-  comparison, controlled pilot, and explicit promotion decision all succeed.
+  comparison, controlled pilot, explicit promotion, and campaign observation.
 
 ## Ground truth
 

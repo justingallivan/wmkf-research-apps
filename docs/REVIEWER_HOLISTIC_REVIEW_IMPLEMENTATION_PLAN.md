@@ -2,8 +2,8 @@
 title: Reviewer Holistic Review — Implementation Plan
 domain: reviewer-identity
 kind: plan
-status: draft
-summary: "Parked plan for identity containment, versioned binding, independent evaluation, a controlled pilot, and post-promotion cleanup."
+status: active
+summary: "Active hybrid plan: safe slices reach main behind legacy-default seams; identity containment, measured rollout, and post-campaign cleanup."
 canonical: false
 cataloged: 2026-07-12
 owner: product-engineering
@@ -20,8 +20,11 @@ related:
 
 ## Status and controlling direction
 
-**PARKED — not green-lit.** No phase begins without the owner gate named for
-that phase. The 2026-07-09 comparison memo is the controlling assessment where
+**ACTIVE — hybrid execution approved 2026-07-12.** The evaluation foundation
+and incremental branch-by-abstraction model are green-lit. Phase-specific
+schema execution, production cohort activation, destructive cleanup, and
+runtime promotion gates still require the explicit decisions named below. The
+2026-07-09 comparison memo is the controlling assessment where
 the source reviews conflict. This plan incorporates its corrections rather than
 merely linking to them:
 
@@ -46,32 +49,31 @@ not controlling evidence for current code state.
   destructive or trust-bearing action.
 - **[STALE/CONFLICT]** — contradicted by the current tree or controlling memo.
 
-## Two-lane execution model
+## Hybrid incremental execution model
 
 The old P0→P4 model mixed production safety fixes, experimental redesign, and
-cleanup on one long-lived branch. That is replaced by two lanes.
+cleanup on one long-lived branch. The replacement follows the governing
+campaign-release strategy's branch-by-abstraction rule:
 
-### Lane 1 — containment candidate for deliberate promotion to `main`
+1. Build each slice on a short-lived branch with one named invariant and one
+   rollback path.
+2. Merge independently safe slices to `main` only after their tier-specific
+   tests and deliberate promotion decision.
+3. Keep legacy behavior authoritative by default. Additive schema, dual writes,
+   policy seams, evaluation assets, and shadow comparisons may reach `main`
+   before any user-visible switch.
+4. Route behavior changes through a server-owned deterministic request cohort;
+   absent, unknown, or unreadable assignment selects the baseline.
+5. Freeze the comparison against the exact post-containment baseline commit,
+   not a moving branch name.
+6. Retain old readers/writers through the controlled pilot and at least one
+   complete campaign of observation.
+7. Run D1 cleanup only after promotion and observation; it is not part of the
+   experiment and never shares a behavior-change commit.
 
-The defects in C0 are current correctness risks. Build them on a short-lived
-Tier-1 feature branch and verify them independently. The owner must then choose
-one of two explicit outcomes:
-
-1. promote the containment changes to `main` before the long redesign; or
-2. record acceptance of the continuing exposure while they remain only on the
-   redesign branch.
-
-Do not silently strand live safety fixes on the experimental branch.
-
-### Lane 2 — long-lived redesign branch
-
-After B0 freezes the comparison, phases M1→F2 accumulate one at a time on a
-dedicated testing branch. They do not merge individually to `main`. The branch
-is compared against the exact frozen baseline commit, not against a moving
-`main` branch.
-
-D1 cleanup is not part of the experiment. It begins only after the redesign
-passes the offline and controlled-pilot gates and the owner chooses promotion.
+No multi-phase redesign branch is required for delivery. A temporary branch or
+worktree may host unfinished exploratory code, but production-intended work is
+re-cut into small legacy-default slices before merging to `main`.
 
 ## Whole-flow contract
 
@@ -147,7 +149,9 @@ No phase is complete after proving only a write path.
 
 ## B0 — Owner gate and evaluation freeze
 
-**[OWNER-GATE]** Approve Lane 1 execution and the Lane 2 experiment separately.
+**[APPROVED 2026-07-12]** Build the evaluation foundation and use the hybrid
+incremental model. Runtime behavior and external-state gates remain scoped to
+their phases.
 
 Before the first redesign commit, create a tracked evaluation manifest containing:
 
@@ -162,14 +166,23 @@ Before the first redesign commit, create a tracked evaluation manifest containin
 Changing a frozen item creates a new evaluation version. It may not silently
 replace the registered comparison.
 
+**Foundation built:** the draft lives at
+`docs/audits/reviewer-holistic-evaluation-manifest-v1.json`; validate its
+structure with `npm run eval:reviewer-holistic:manifest`. Before any comparison
+run, `node scripts/validate-reviewer-holistic-evaluation-manifest.js
+--require-frozen` must pass. Draft status is deliberately non-runnable: the
+baseline freezes after shared C0 containment, not at scaffold creation.
+
 **Acceptance:** manifest reviewed before behavior changes; baseline checkout is
-reproducible; owner records whether verified C0 containment may promote to main.
+reproducible; shared containment is merged or explicitly excluded before the
+baseline commit is frozen.
 
 ---
 
 ## C0 — Contain current identity-boundary defects
 
-**Lane:** short-lived Tier-1 branch. **[OWNER-GATE]** for promotion.
+**Delivery:** one short-lived Tier-2 branch per independently reversible
+containment slice. **[OWNER-GATE]** for each production promotion.
 
 ### C0.1 Validate each save row without breaking partial success
 
@@ -439,6 +452,11 @@ Deployment order:
 Rollback disables new application reads/writes through an explicit compatibility
 gate. It does not drop columns.
 
+Commit the manifest/preflight first. Apply the additive schema as a separate
+owner-approved operation while all production readers still ignore it. Land
+dual writers and shadow readers in later short branches; no single merge may
+both create the fields and make them authoritative.
+
 ### I2.2 Conservative legacy backfill
 
 Do not infer human attestation from `wmkf_identitystatus = 'confirmed'` alone.
@@ -636,29 +654,31 @@ the change into cleanup.
 
 | Order | Phase | Lane | Owner gate | Exit evidence |
 |---|---|---|---|---|
-| 1 | B0 freeze | both | experiment + containment decision | tracked reproducible manifest |
-| 2 | C0 containment | short Tier-1 branch | promotion decision | contract trace, tests, capture send gate |
-| 3 | M1 measurement | redesign branch | label/rubric approval | independent benchmark + frozen A/B + observational baseline |
-| 4 | I1 binding contract | redesign branch | schema/semantics | transition table + design contract |
-| 5 | I2 schema/migration | redesign branch | production schema execution | verified metadata, backfill, full fan-out |
-| 6 | H1 hardening | redesign branch | stratum/status choices | benchmark non-regression |
-| 7 | F1 finding experiments | redesign branch | prompt reseed where applicable | blinded proposal comparison |
-| 8 | F2 controlled pilot | limited production exposure | pilot + promote/stop | downstream outcomes + owner decision |
-| 9 | D1 cleanup | post-promotion | destructive approval | live-caller audit + behavior freeze |
+| 1 | B0 manifest foundation | short Tier-0/1 branch → main | approved | validator + draft manifest |
+| 2 | M1 measurement | short behavior-free branches → main | label/rubric approval | independent benchmark + observational baseline |
+| 3 | C0 containment | one Tier-2 branch per invariant → main | per-slice promotion | contract trace, tests, capture send gate |
+| 4 | freeze baseline | tracked manifest update | owner approval | exact post-containment commit + frozen inputs |
+| 5 | I1 binding contract | design/tests/seam branches → main, legacy default | schema/semantics | transition table + policy seam |
+| 6 | I2 expand/dual-write/backfill | separate Tier-2/3 branches → main | production schema + read switch | verified metadata, shadow parity, full fan-out |
+| 7 | H1 hardening | cohort-disabled branch → main | stratum/status choices | benchmark non-regression |
+| 8 | F1 finding experiments | baseline-default dispatcher → main | prompt/cohort activation | blinded proposal comparison |
+| 9 | F2 controlled pilot | deterministic production cohort | pilot + promote/stop | downstream outcomes + owner decision |
+| 10 | campaign observation | old/new coexist | expansion approval | one complete campaign without safety regression |
+| 11 | D1 cleanup | post-observation branch | destructive approval | live-caller audit + behavior freeze |
 
 ## Collected owner decisions
 
-1. Approve C0 implementation and decide whether verified containment promotes
-   to `main` before the redesign.
-2. Approve the M1 label set, rubric, thresholds, and adjudicator.
+1. Approve each C0 runtime promotion after its evidence bundle.
+2. Approve the M1 label set, rubric, thresholds, and adjudicator before freezing.
 3. Approve the I1 durable fields and transition semantics.
-4. Decide early-career/no-ORCID evaluation versus explicit abstention.
-5. Decide whether to test applicant recommendations as prompt-level community
+4. Approve additive production schema execution separately from code deployment.
+5. Decide early-career/no-ORCID evaluation versus explicit abstention.
+6. Decide whether to test applicant recommendations as prompt-level community
    seeds and authorize any production prompt reseed.
-6. Decide whether an external decline-referral acknowledgment email is useful.
-7. Approve the limited live pilot after offline gates pass.
-8. Record promote/stop after the pilot.
-9. Approve Track B deletion only after promotion.
+7. Decide whether an external decline-referral acknowledgment email is useful.
+8. Approve the limited live pilot after offline gates pass.
+9. Record promote/stop after the pilot.
+10. Approve Track B deletion only after promotion and campaign observation.
 
 ## Completion rule
 

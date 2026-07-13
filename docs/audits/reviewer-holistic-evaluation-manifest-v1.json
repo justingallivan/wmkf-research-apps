@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "status": "draft",
+  "freezePoint": "after_shared_c0_containment",
+  "createdAt": "2026-07-13T01:08:13.000Z",
+  "baseline": {
+    "origin": "origin/main",
+    "commit": null,
+    "runtimeBehavior": "legacy-default"
+  },
+  "redesign": {
+    "startingCommit": null,
+    "pipelineVersion": null
+  },
+  "identityBenchmark": {
+    "fixtureVersion": null,
+    "minimumCases": 40,
+    "hazardMinimum": 20,
+    "cleanPositiveMinimum": 20,
+    "labelingPolicy": "independent_blinded_adjudicated"
+  },
+  "proposalEvaluation": {
+    "proposalIds": [],
+    "documentHashes": {},
+    "replicatesPerArm": 3,
+    "selectionPolicy": "held_out_stratified_thin_and_full_signal"
+  },
+  "runtimeConfig": {
+    "promptRowId": null,
+    "promptVersion": null,
+    "modelIds": [],
+    "modelOverridesHash": null,
+    "reviewerCount": null,
+    "temperature": null,
+    "exclusionsHash": null
+  },
+  "rubric": {
+    "version": "reviewer-holistic-v1",
+    "identityHardGates": {
+      "hazardFalseBindingsMax": 0,
+      "unsafeActionsMax": 0,
+      "correctionIntegrityRequired": 1,
+      "cleanPositiveAbstentionIncreaseMaxCases": 1
+    },
+    "proposalPilotGates": {
+      "wrongPersonIncreaseMax": 0,
+      "lossesMax": 2,
+      "winsMin": 4,
+      "winMarginMin": 2,
+      "eligibleShortlistNonInferior": true
+    }
+  },
+  "adjudicator": null,
+  "artifactSchemaVersion": 1
+}

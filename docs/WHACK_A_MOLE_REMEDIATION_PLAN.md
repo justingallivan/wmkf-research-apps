@@ -47,9 +47,12 @@ drift; the executing agent must re-confirm each cited anchor before editing.
   a branch and treat the merge as the owner's deploy decision.**
 - Run the gate battery relevant to each WS before claiming done (listed
   per-WS); `/contract-reconcile` where flagged.
-- Do NOT start the reviewer holistic redesign (PARKED, separate branch plan),
-  re-gate COI, or rename any `.js` file to `.ts` (five gates fail open on
-  rename — `docs/TYPESCRIPT_OPTION_ASSESSMENT.md` §0.2, unchanged).
+- The reviewer holistic redesign is now ACTIVE as a separate hybrid program
+  (`docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md`): do not fold its
+  identity/finding work into these workstreams or create overlapping edits
+  without explicit coordination. Also do not re-gate COI or rename any `.js`
+  file to `.ts` (five gates fail open on rename —
+  `docs/TYPESCRIPT_OPTION_ASSESSMENT.md` §0.2, unchanged).
 
 ---
 
@@ -480,6 +483,6 @@ missing classification key fails the compile or the WS1 gate.
   semantics at ~19 call sites), WS6.2 (cross-layer).
 - Timebox WS3 Part B and WS6.4 (support work; check in at ~30 min / two
   commits per CLAUDE.md rule 3).
-- Nothing here touches the PARKED reviewer holistic redesign; if a WS
-  collides with it (e.g. resolver edits), the fixture corpus (WS2) is the
-  only sanctioned overlap.
+- Nothing here owns the ACTIVE reviewer holistic redesign; if a WS collides
+  with it (e.g. resolver edits), coordinate with that hybrid program first.
+  The fixture corpus (WS2) remains the only pre-authorized overlap.

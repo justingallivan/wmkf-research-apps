@@ -81,8 +81,10 @@ green at start (32/32) and after every commit. Neither S357 carryover item
 
 1. Reviewer-institution→CRM linking brief to Connor + Sarah
    (`outputs/reviewer-institution-crm-linking-brief.md`, local-only).
-2. Whack-a-mole reconciliation; holistic-redesign green-light; rescue-tool
-   location; closeout payability scope; `check:types` end state. Evidence:
+2. Whack-a-mole reconciliation; rescue-tool location; closeout payability
+   scope; `check:types` end state. The holistic-redesign green-light is
+   RESOLVED (owner 2026-07-12): hybrid incremental execution is active under
+   `docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md`. Evidence:
    S353–S357 SESSION_PROMPT history + cited memories.
 3. **Address-based reviewer onboarding — scope undefined.** Owner said (S357)
    onboarding will use reviewer address + existing foundation systems; the
@@ -100,8 +102,8 @@ green at start (32/32) and after every commit. Neither S357 carryover item
    (missing Recall-Rule headings, size, vocabulary) after S357 removed all
    factual staleness — cosmetic memory-shape work, no urgency. Evidence:
    `npm run check:memory-health` (advisory, never fails).
-4. Prior parked items carry forward unchanged (reviewer holistic redesign
-   branch; accepted-reviewer stand-down; review rendition formatting; campaign
+4. Prior parked items carry forward unchanged (accepted-reviewer stand-down;
+   review rendition formatting; campaign
    settings UX; prompt-cache-hit audit; reviewer ack provenance parity;
    Dependabot PR #53; intake portal; deferred dead-code cleanup — the dormant
    BILL code is now also a candidate for that session IF the tabling ever
