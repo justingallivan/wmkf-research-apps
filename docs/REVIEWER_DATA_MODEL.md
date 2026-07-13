@@ -30,8 +30,8 @@ Visual orientation for the reviewer-domain Dataverse entities and how they conne
 > zero rows with any Wave 13 field populated. This is a dated snapshot captured
 > in `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md`, not a
 > permanent current-state guarantee. An ETag-protected person-binding writer
-> selects/PATCHes the six person fields. Its first production caller is built on
-> `codex/reviewer-binding-self-report-activation` pending promotion: a reviewer
+> selects/PATCHes the six person fields. Its first production caller is live
+> since PR #57 / `00ffb09c`: a reviewer
 > acceptance job with a stable `accepted_at` durably binds self-reported ORCID
 > before honorarium/contact follow-up. The four engagement COI fields still have
 > no application reader/writer. Null remains legacy/unknown; later

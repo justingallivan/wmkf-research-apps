@@ -42,15 +42,17 @@ nullable fields cover person binding generation and per-field lineage plus
 proposal COI binding/context currency. No live application reader/writer uses
 the suggestion fields. The person fields have an ETag-protected binding writer
 and narrow adapter seam. The owner approved its first production caller on
-2026-07-13, built on `codex/reviewer-binding-self-report-activation` pending
-promotion: acceptance-drain self-report only, keyed by stable `accepted_at`.
-The same reproducible pre-activation population probe returned zero person and
-zero suggestion rows, so that dated state remains legacy-unknown and cannot
+2026-07-13; PR #57 merged at `00ffb09c` and Vercel production deployment
+`dpl_4YpnVVdRmDHyuzgPVSKXNcx22bKu` reached READY: acceptance-drain self-report
+only, keyed by stable `accepted_at`.
+The same reproducible population probe rerun immediately after deployment
+returned zero person and zero suggestion rows, so current state remains
+legacy-unknown and cannot
 become eligible-by-default. Broader caller and policy-reader migration remains
 gated.
 
-**S359 adversarial review (2026-07-13 artifact): fixes implemented on the
-current remediation branch; promotion pending.** The inert
+**S359 adversarial review (2026-07-13 artifact): fixes implemented and
+promoted.** The inert
 writer branch merged to `main` at `4e0ae1bd` after the review census re-proved
 every new surface production-inert. A live read-only sample confirmed that
 Dataverse returns persisted resolver timestamps at second precision; F1 now
@@ -61,7 +63,9 @@ decision; F3's named guards have direct complement tests; F4/F5/F7 are also
 closed; F6 uses the owner-approved 14-day receipt lifetime. F8 is captured
 reproducibly at
 `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md`. The first
-self-report caller is now approved/built pending promotion; automated writers,
+self-report caller is now production-live. Three immediate post-deploy drain
+runs had no error-level logs, while the population probe remained zero, so the
+first durable binding event has not yet been observed. Automated writers,
 decline, backfill, action-policy readers, and other callers remain gated.
 
 The pure non-I/O contracts are built in
