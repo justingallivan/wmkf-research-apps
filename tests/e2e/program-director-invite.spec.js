@@ -491,7 +491,7 @@ test.describe('Program Director reviewer invitation flow', () => {
     expect(campaignReads).toEqual([REQUEST_ID]);
     expect(campaignWrites).toEqual([{
       requestId: REQUEST_ID,
-      config: { respondOffsetDays: 14, reviewDueDate: '2026-08-05' },
+      config: { respondOffsetDays: 14, reviewDueDate: '2026-08-05', desiredCount: 2 },
     }]);
   });
 
