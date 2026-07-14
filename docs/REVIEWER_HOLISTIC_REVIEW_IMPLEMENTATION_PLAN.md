@@ -323,8 +323,8 @@ staff “right person” action trigger the rebind contract.
 
 ### C0.4 Enforce current-state eligibility at send
 
-**[READ-ONLY CONTRACT AUDIT COMPLETE 2026-07-14; RUNTIME ENFORCEMENT NOT
-READY]** The audit at
+**[READ-ONLY CONTRACT AUDIT + INERT STAGE A FOUNDATION COMPLETE 2026-07-14;
+RUNTIME ENFORCEMENT NOT READY]** The audit at
 `docs/audits/reviewer-c0-4-send-eligibility-audit-2026-07-14.md` found that
 send/render currently read legacy email provenance and identity status, not the
 Wave 13 person-binding or suggestion-COI currency fields. The explicit-target
@@ -332,15 +332,18 @@ production preflight remains 0 ABSENT / 10 EXACT / 0 DIVERGENT, but only one
 person row and zero suggestion rows have any Wave 13 value. A fail-closed cutover
 now would therefore block essentially all outreach; a null-is-eligible bypass
 would defeat C0.4. Render also rotates the external-token hash before the send
-boundary, so send-only enforcement is incomplete. No runtime code changed.
+boundary, so send-only enforcement is incomplete.
 
-Before enforcement, land an inert pure action-policy contract and projections,
-populate/classify the binding and proposal-COI currency under the existing I1/I2
-owner gates, prove shadow reason counts, and define explicit server-side stage
-semantics for invitation/materials/follow-up/thank-you. The low-email-confidence
-staff acknowledgement may remain an address-provenance override only; it may not
-override invalid/stale identity or COI state. Runtime activation remains a
-separate Tier-2 owner gate.
+Stage A now provides the pure `reviewer-action-policy` contract, shared literal
+Wave 13 input-field lists, specialized person/suggestion projections, and
+complement-driven characterization tests. A raw-symbol census confirms the
+helper and projections have no runtime caller; render/send behavior is unchanged.
+Before enforcement, populate/classify the binding and proposal-COI currency
+under the existing I1/I2 owner gates, prove shadow reason counts, and define
+explicit server-side stage semantics for invitation/materials/follow-up/thank-you.
+The low-email-confidence staff acknowledgement may remain an address-provenance
+override only; it may not override invalid/stale identity or COI state. Runtime
+activation remains a separate Tier-2 owner gate.
 
 The send service already re-derives email confidence from the person row.
 Extend the server-authoritative gate so stale/invalidated identity state is not
@@ -608,8 +611,9 @@ cases, not fall-through defaults.
 
 ### I1.3 One writer and one policy reader
 
-**[WRITER FOUNDATION BUILT; FIRST SELF-REPORT CALLER BUILT; POLICY READER +
-BROADER CALLER MIGRATION PENDING 2026-07-13]**
+**[WRITER FOUNDATION + INERT ACTION-POLICY CONTRACT BUILT; FIRST SELF-REPORT
+CALLER BUILT; RUNTIME POLICY READER + BROADER CALLER MIGRATION PENDING
+2026-07-14]**
 `reviewer-identity-binding-writer.js` performs a fail-closed read,
 validates the current tuple/lineage, plans explicit `init`/`refresh`/`rebind`/
 `noop`/`blocked` outcomes, and sends one complete PATCH guarded by the row ETag.
@@ -641,9 +645,11 @@ Replace status-only adapter guards with a shared binding writer that:
 - writes the binding plus explicit invalidations as one coherent operation;
 - returns the committed binding used by downstream consumers.
 
-Create one pure action-policy helper used by invite/send, ORCID back-propagation,
-and merge protection. Sibling consumers may add stricter domain rules but may
-not reinterpret confidence as provenance.
+The pure `reviewer-action-policy.js` helper and its specialized read projections
+now exist with no runtime caller. A later owner-gated consumer migration should
+use that one contract for invite/send, ORCID back-propagation, and merge
+protection. Sibling consumers may add stricter domain rules but may not
+reinterpret confidence as provenance.
 
 The writer uses optimistic concurrency: read `@odata.etag`, compute the
 transition, and issue the one coherent PATCH with `ifMatch`; a 412 rereads and

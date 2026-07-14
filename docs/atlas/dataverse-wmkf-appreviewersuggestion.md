@@ -39,10 +39,12 @@ defines four live nullable fields: `wmkf_identitycoistatus`,
 proposal-specific COI result was computed for both the current person-binding
 generation and the current canonical proposal/rule context. The owner-approved
 production-only apply completed 2026-07-12. **[VERIFIED 2026-07-13 via the
-command in Last verified]** typed metadata reported all four EXACT. No live
-application reader or writer uses these names, so the columns are
-non-authoritative; the 2026-07-14 population refresh still returned zero rows
-with any Wave 13 suggestion value. The earlier dated output is captured in
+command in Last verified]** typed metadata reported all four EXACT. The inert
+C0.4 Stage-A method `reviewer-suggestion.findActionPolicyById` now selects the
+four fields and preserves the applicant-excluded refusal, but no runtime caller
+or writer uses them. The columns therefore remain non-authoritative; the
+2026-07-14 population refresh still returned zero rows with any Wave 13
+suggestion value. The earlier dated output is captured in
 `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md` and must be
 refreshed before schema-adjacent work. Missing/unknown
 status, generation mismatch, or missing/context-hash mismatch is designed to

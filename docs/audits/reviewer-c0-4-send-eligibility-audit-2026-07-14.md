@@ -147,18 +147,18 @@
 
 ## Implementation-ready staged scope
 
-### Stage A — inert contract and characterization tests
+### Stage A — inert contract and characterization tests — BUILT 2026-07-14
 
-- Add a pure `reviewer-action-policy` helper with a closed result set such as
+- Added a pure `reviewer-action-policy` helper with the closed result set
   `eligible | legacy_unclassified | binding_invalid | derived_stale |
   coi_unknown | coi_conflict | coi_stale`.
 - Unknown/malformed values take a named ineligible path. No client field can
   manufacture an eligible result.
-- Preserve `emailConfidence` unchanged and evaluate it only after identity
-  action eligibility passes.
-- Add specialized authoritative projections for both person and suggestion;
-  preserve the applicant-excluded `findById` chokepoint.
-- Do not call the helper from render or send yet.
+- `emailConfidence` remains unchanged and outside the helper.
+- Added specialized read-only projections for both person and suggestion; the
+  suggestion projection preserves the applicant-excluded refusal.
+- The helper and both projections have no runtime caller. Render and send remain
+  unchanged.
 
 ### Stage B — population and shadow proof
 
@@ -189,7 +189,7 @@
 | Pure policy | null, malformed, unknown source, missing anchor, or version mismatch is ineligible |
 | Pure policy | `coi_conflict`, `coi_unknown`, missing hash, and binding-version mismatch are ineligible |
 | Pure policy | low-address acknowledgement cannot change an identity-ineligible result |
-| Projection | render and send fetch every required raw Wave 13 field and preserve excluded-row refusal |
+| Projection | specialized reads fetch every required raw Wave 13 field and preserve excluded-row refusal |
 | Render service | a fully populated stale fixture is present; no token mint occurs and the row is skipped |
 | Render service | mixed eligible/stale rows mint only for the eligible row |
 | Send service | stale fixture has a sendable email and dangerous attachments; no email, contact, ORCID, lifecycle, or campaign write occurs |
@@ -203,9 +203,9 @@
 
 ## Final verdict
 
-**NEEDS REWORK.** The read-only audit is implementation-ready, but C0.4 runtime
-enforcement is not ready to build as a standalone send patch. Required named
-changes are: a separate pure action-policy contract, authoritative projections,
-binding/COI population plus shadow proof, render-time token gating, explicit
+**NEEDS REWORK FOR RUNTIME ENFORCEMENT.** The inert Stage A contract,
+specialized projections, and characterization tests are built, but C0.4 runtime
+enforcement is not ready as a standalone send patch. Remaining named changes
+are binding/COI population plus shadow proof, render-time token gating, explicit
 post-engagement semantics, and honest UI handling. No production behavior was
-changed by this audit.
+changed by the audit or Stage A foundation.
