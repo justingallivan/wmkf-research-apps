@@ -7,6 +7,11 @@ const {
   validateProposalEvaluation,
 } = require('../../scripts/lib/reviewer-holistic-m1');
 const { parseCli: parseAssetCli } = require('../../scripts/validate-reviewer-holistic-m1-assets');
+const {
+  SEEDS: identitySeeds,
+  addManualEvidence,
+  parseCli: parseIdentityCollectorCli,
+} = require('../../scripts/collect-reviewer-holistic-identity-cases');
 const { parseCli: parseChannelProbeCli } = require('../../scripts/probe-reviewer-channel-baseline');
 
 function clone(value) {
@@ -17,6 +22,7 @@ function identityCase(index, stratum) {
   const abstain = stratum === 'hazard';
   return {
     caseId: `case-${index}`,
+    caseStatus: 'labeled',
     stratum,
     hazardTypes: abstain ? ['namesake'] : [],
     frozenInput: { candidate: { name: `Candidate ${index}` }, upstreamResponses: { orcid: {} } },
@@ -28,6 +34,7 @@ function identityCase(index, stratum) {
     },
     evidence: [{
       url: `https://example.org/evidence/${index}`,
+      sourceType: 'institutional_profile',
       claim: 'Authoritative identity evidence reviewed independently.',
       accessedAt: '2026-07-14T00:00:00.000Z',
     }],
@@ -79,6 +86,33 @@ describe('M1 evaluation assets', () => {
     expect(() => parseAssetCli(['one.json', 'two.json', 'three.json'])).toThrow('unknown positional arguments');
   });
 
+  test('identity collector has a balanced unique seed pool and fail-closed CLI', () => {
+    expect(identitySeeds).toHaveLength(40);
+    expect(new Set(identitySeeds.map((seed) => seed.caseId)).size).toBe(40);
+    expect(identitySeeds.filter((seed) => seed.stratum === 'hazard')).toHaveLength(20);
+    expect(identitySeeds.filter((seed) => seed.stratum === 'clean_positive')).toHaveLength(20);
+    expect(() => parseIdentityCollectorCli(['--unknown'])).toThrow('unknown argument');
+    expect(() => parseIdentityCollectorCli(['extra.json'])).toThrow('unknown positional argument');
+    expect(parseIdentityCollectorCli(['--manual-evidence-only', '--write'])).toEqual(expect.objectContaining({
+      manualEvidenceOnly: true,
+      write: true,
+    }));
+    const existingCases = identitySeeds.map((seed) => ({
+      caseId: seed.caseId,
+      frozenInput: { candidate: { name: seed.name, samplingRationale: 'curator-only' } },
+      evidence: [],
+    }));
+    const augmented = addManualEvidence(existingCases, '2026-07-14T00:00:00.000Z');
+    const harcombe = augmented.find((item) => item.caseId === 'clean-07-will-harcombe');
+    expect(harcombe.evidence).toEqual([
+      expect.objectContaining({ sourceType: 'institutional_profile' }),
+    ]);
+    expect(harcombe.frozenInput.candidate).not.toHaveProperty('samplingRationale');
+    expect(() => addManualEvidence([], '2026-07-14T00:00:00.000Z')).toThrow(
+      'requires all 40 proposed cases',
+    );
+  });
+
   test('tracked empty drafts are structurally valid but cannot freeze', () => {
     expect(validateIdentityBenchmark(identityDraft)).toEqual({ ok: true, errors: [] });
     expect(validateProposalEvaluation(proposalDraft)).toEqual({ ok: true, errors: [] });
@@ -90,18 +124,44 @@ describe('M1 evaluation assets', () => {
     expect(validateIdentityBenchmark(frozenIdentity(), { requireFrozen: true })).toEqual({ ok: true, errors: [] });
   });
 
+  test('proposed cases preserve evidence inputs without becoming labels', () => {
+    const asset = clone(identityDraft);
+    asset.cases = [{
+      caseId: 'proposed-1',
+      caseStatus: 'proposed',
+      stratum: 'hazard',
+      hazardTypes: ['namesake'],
+      frozenInput: { candidate: { name: 'Wei Zhang' }, upstreamResponses: { openAlex: {} } },
+      expected: null,
+      evidence: [{
+        url: 'https://orcid.org/0000-0000-0000-0000',
+        sourceType: 'orcid_record',
+        claim: 'Candidate public identity record for independent review.',
+        accessedAt: '2026-07-14T00:00:00.000Z',
+      }],
+      labeler: null,
+      adjudication: { status: 'pending', adjudicator: null },
+    }];
+    expect(validateIdentityBenchmark(asset)).toEqual({ ok: true, errors: [] });
+    expect(validateIdentityBenchmark(asset, { requireFrozen: true }).errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: 'cases[0].caseStatus' }),
+    ]));
+  });
+
   test('identity freeze fails closed on unresolved or unsupported input', () => {
     const asset = frozenIdentity();
     asset.cases[0].adjudication.status = 'pending';
     asset.cases[1].hazardTypes = ['unknown_hazard'];
     asset.cases[2].expected.actionEligible = true;
     asset.cases[2].expected.abstain = true;
+    asset.cases[3].evidence[0].sourceType = 'discovery';
     const result = validateIdentityBenchmark(asset, { requireFrozen: true });
     expect(result.ok).toBe(false);
     expect(result.errors).toEqual(expect.arrayContaining([
       expect.objectContaining({ path: 'cases[0].adjudication.status' }),
       expect.objectContaining({ path: 'cases[1].hazardTypes' }),
       expect.objectContaining({ path: 'cases[2].expected.actionEligible' }),
+      expect.objectContaining({ path: 'cases[3].evidence' }),
     ]));
   });
 

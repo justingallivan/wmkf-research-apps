@@ -13,6 +13,7 @@ const IDENTITY_TOP_LEVEL_KEYS = new Set([
 ]);
 const IDENTITY_CASE_KEYS = new Set([
   'caseId',
+  'caseStatus',
   'stratum',
   'hazardTypes',
   'frozenInput',
@@ -28,8 +29,19 @@ const EXPECTED_KEYS = new Set([
   'actionEligible',
   'correctionIntegrity',
 ]);
-const EVIDENCE_KEYS = new Set(['url', 'claim', 'accessedAt']);
+const EVIDENCE_KEYS = new Set(['url', 'sourceType', 'claim', 'accessedAt']);
 const ADJUDICATION_KEYS = new Set(['status', 'adjudicator']);
+const EVIDENCE_TYPES = new Set([
+  'discovery',
+  'orcid_record',
+  'institutional_profile',
+  'publisher_record',
+]);
+const AUTHORITATIVE_EVIDENCE_TYPES = new Set([
+  'orcid_record',
+  'institutional_profile',
+  'publisher_record',
+]);
 const HAZARD_TYPES = new Set([
   'namesake',
   'wrong_forename',
@@ -128,6 +140,9 @@ function validateIdentityBenchmark(asset, { requireFrozen = false } = {}) {
     if (!nonEmptyString(item.caseId)) add(`${base}.caseId`, 'must be non-empty');
     if (caseIds.has(item.caseId)) add(`${base}.caseId`, 'must be unique');
     caseIds.add(item.caseId);
+    if (!['proposed', 'labeled'].includes(item.caseStatus)) {
+      add(`${base}.caseStatus`, 'must be proposed or labeled');
+    }
     if (!['hazard', 'clean_positive'].includes(item.stratum)) {
       add(`${base}.stratum`, 'must be hazard or clean_positive');
     }
@@ -157,25 +172,29 @@ function validateIdentityBenchmark(asset, { requireFrozen = false } = {}) {
       add(`${base}.frozenInput.upstreamResponses`, 'must be an object');
     }
 
-    if (!isObject(item.expected)) add(`${base}.expected`, 'must be an object');
-    rejectUnknown(item.expected, EXPECTED_KEYS, `${base}.expected`, add);
-    if (typeof item.expected?.abstain !== 'boolean') {
-      add(`${base}.expected.abstain`, 'must be a boolean');
-    }
-    if (typeof item.expected?.actionEligible !== 'boolean') {
-      add(`${base}.expected.actionEligible`, 'must be a boolean');
-    }
-    if (!['not_applicable', 'must_invalidate_and_recompute'].includes(item.expected?.correctionIntegrity)) {
-      add(`${base}.expected.correctionIntegrity`, 'has an unsupported value');
-    }
-    if (item.expected?.abstain === true && item.expected?.personAnchor !== null) {
-      add(`${base}.expected.personAnchor`, 'must be null when abstention is required');
-    }
-    if (item.expected?.abstain === false && !nonEmptyString(item.expected?.personAnchor)) {
-      add(`${base}.expected.personAnchor`, 'must be non-empty when a binding is expected');
-    }
-    if (item.expected?.abstain === true && item.expected?.actionEligible === true) {
-      add(`${base}.expected.actionEligible`, 'cannot be true when abstention is required');
+    if (item.caseStatus === 'proposed') {
+      if (item.expected !== null) add(`${base}.expected`, 'must be null until independently labeled');
+    } else {
+      if (!isObject(item.expected)) add(`${base}.expected`, 'must be an object for a labeled case');
+      rejectUnknown(item.expected, EXPECTED_KEYS, `${base}.expected`, add);
+      if (typeof item.expected?.abstain !== 'boolean') {
+        add(`${base}.expected.abstain`, 'must be a boolean');
+      }
+      if (typeof item.expected?.actionEligible !== 'boolean') {
+        add(`${base}.expected.actionEligible`, 'must be a boolean');
+      }
+      if (!['not_applicable', 'must_invalidate_and_recompute'].includes(item.expected?.correctionIntegrity)) {
+        add(`${base}.expected.correctionIntegrity`, 'has an unsupported value');
+      }
+      if (item.expected?.abstain === true && item.expected?.personAnchor !== null) {
+        add(`${base}.expected.personAnchor`, 'must be null when abstention is required');
+      }
+      if (item.expected?.abstain === false && !nonEmptyString(item.expected?.personAnchor)) {
+        add(`${base}.expected.personAnchor`, 'must be non-empty when a binding is expected');
+      }
+      if (item.expected?.abstain === true && item.expected?.actionEligible === true) {
+        add(`${base}.expected.actionEligible`, 'cannot be true when abstention is required');
+      }
     }
 
     if (!Array.isArray(item.evidence) || item.evidence.length === 0) {
@@ -191,24 +210,37 @@ function validateIdentityBenchmark(asset, { requireFrozen = false } = {}) {
         if (!/^https:\/\//i.test(String(evidence.url || ''))) {
           add(`${evidencePath}.url`, 'must be an HTTPS URL');
         }
+        if (!EVIDENCE_TYPES.has(evidence.sourceType)) {
+          add(`${evidencePath}.sourceType`, 'has an unsupported value');
+        }
         if (!nonEmptyString(evidence.claim)) add(`${evidencePath}.claim`, 'must be non-empty');
         if (!validTimestamp(evidence.accessedAt)) {
           add(`${evidencePath}.accessedAt`, 'must be an ISO-compatible timestamp');
         }
       });
     }
-    if (!nonEmptyString(item.labeler)) add(`${base}.labeler`, 'must be non-empty');
-    if (
-      nonEmptyString(item.labeler)
-      && Array.isArray(asset.labelers)
-      && !asset.labelers.includes(item.labeler)
-    ) {
-      add(`${base}.labeler`, 'must be registered in the top-level labelers list');
+    if (item.caseStatus === 'proposed') {
+      if (item.labeler !== null) add(`${base}.labeler`, 'must be null until independently labeled');
+    } else {
+      if (!nonEmptyString(item.labeler)) add(`${base}.labeler`, 'must be non-empty');
+      if (
+        nonEmptyString(item.labeler)
+        && Array.isArray(asset.labelers)
+        && !asset.labelers.includes(item.labeler)
+      ) {
+        add(`${base}.labeler`, 'must be registered in the top-level labelers list');
+      }
     }
     if (!isObject(item.adjudication)) add(`${base}.adjudication`, 'must be an object');
     rejectUnknown(item.adjudication, ADJUDICATION_KEYS, `${base}.adjudication`, add);
     if (!['pending', 'agreed', 'adjudicated'].includes(item.adjudication?.status)) {
       add(`${base}.adjudication.status`, 'must be pending, agreed, or adjudicated');
+    }
+    if (item.caseStatus === 'proposed' && item.adjudication?.status !== 'pending') {
+      add(`${base}.adjudication.status`, 'must remain pending until independently labeled');
+    }
+    if (item.caseStatus === 'proposed' && item.adjudication?.adjudicator !== null) {
+      add(`${base}.adjudication.adjudicator`, 'must be null until adjudication');
     }
     if (item.adjudication?.status === 'adjudicated' && !nonEmptyString(item.adjudication?.adjudicator)) {
       add(`${base}.adjudication.adjudicator`, 'must name the adjudicator');
@@ -229,6 +261,12 @@ function validateIdentityBenchmark(asset, { requireFrozen = false } = {}) {
     if (hazards < 20) add('cases', 'must contain at least 20 hazard cases');
     if (clean < 20) add('cases', 'must contain at least 20 clean-positive cases');
     cases.forEach((item, index) => {
+      if (item?.caseStatus !== 'labeled') {
+        add(`cases[${index}].caseStatus`, 'must be labeled before freezing');
+      }
+      if (!item?.evidence?.some((entry) => AUTHORITATIVE_EVIDENCE_TYPES.has(entry?.sourceType))) {
+        add(`cases[${index}].evidence`, 'must include authoritative ORCID, institutional, or publisher evidence');
+      }
       if (!['agreed', 'adjudicated'].includes(item?.adjudication?.status)) {
         add(`cases[${index}].adjudication.status`, 'must be resolved before freezing');
       }
@@ -495,6 +533,8 @@ function aggregateChannelBaseline(inputRows) {
 }
 
 module.exports = {
+  AUTHORITATIVE_EVIDENCE_TYPES,
+  EVIDENCE_TYPES,
   HAZARD_TYPES,
   aggregateChannelBaseline,
   tokenizeSources,

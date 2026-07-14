@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-14 via M1 draft-asset validators, focused tests, and explicit-target read-only production channel baseline
+  last_verified: 2026-07-14 via M1 proposed identity pool, draft-asset validators, focused tests, and explicit-target read-only production channel baseline
 ---
 
 ## Recall Rule
@@ -97,12 +97,16 @@ owner explicitly approved the production-only schema exception. The later
 2026-07-13 decision separately authorizes only the narrow acceptance-drain
 self-report caller described above.
 
-**M1 measurement foundation (2026-07-14):** the identity-benchmark and blinded
-proposal-evaluation data-entry contracts are tracked as intentionally empty
-drafts, with a fail-closed validator for frozen/scored status. They are not
-labels, cohorts, or evidence yet: the owner still must name the
-labelers/adjudicator, approve the 40-case set, select ten held-out proposals,
-and name the PD scorer. M1.3 is built and captured as an aggregate-only,
+**M1 measurement foundation (2026-07-14):** the identity benchmark now carries
+a proposed 40-case public-evidence pool (20 hazard / 20 clean-positive) assembled
+without either reviewer pipeline. Every case has frozen candidate/upstream
+response shapes and at least one ORCID, institutional, or publisher source, but
+all 40 have null expected labels and labelers with pending adjudication. The
+validator permits that evidence-collection state while refusing freeze until
+every case is independently labeled, resolved, and owner-approved. The blinded
+proposal-evaluation asset remains an intentionally empty draft. The owner still
+must name the labelers/adjudicator, approve the case set, select ten held-out
+proposals, and name the PD scorer. M1.3 is built and captured as an aggregate-only,
 read-only production artifact: 668 suggestion engagement rows, 275 exclusive
 token and 393 multi-touch, across 11 observed source tokens. The artifact
 labels selection as mutable, materials sent as a proxy, and token totals as

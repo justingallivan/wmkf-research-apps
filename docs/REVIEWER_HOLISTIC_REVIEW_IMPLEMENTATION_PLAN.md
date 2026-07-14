@@ -343,8 +343,8 @@ eligibility test.
 
 ## M1 — Build the evaluation system before further resolver changes
 
-**[FOUNDATION + M1.3 BUILT 2026-07-14; M1.1 LABELS + M1.2 COHORT/SCORES
-PENDING OWNER FREEZE]** The tracked draft identity benchmark and blinded
+**[FOUNDATION + M1.1 PROPOSED POOL + M1.3 BUILT 2026-07-14; M1.1 LABELS +
+M1.2 COHORT/SCORES PENDING OWNER FREEZE]** The tracked draft identity benchmark and blinded
 proposal-evaluation assets now have fail-closed validators at
 `scripts/validate-reviewer-holistic-m1-assets.js`; draft validation is
 `npm run eval:reviewer-holistic:m1`, while `--require-frozen` and
@@ -352,19 +352,32 @@ proposal-evaluation assets now have fail-closed validators at
 is `scripts/probe-reviewer-channel-baseline.js`, and its dated aggregate-only
 production artifact is
 `docs/audits/reviewer-channel-baseline-2026-07-14.json`. No resolver, reader,
-writer, or production behavior changed. M1.1 cannot freeze until the owner
-names the labelers/adjudicator and approves the case set; M1.2 cannot freeze
+writer, or production behavior changed. M1.1 now carries a 40-case proposed
+evidence pool but cannot freeze until the owner approves it and names the
+labelers/adjudicator; M1.2 cannot freeze
 until the owner selects the ten held-out proposals and PD scorer.
 
 ### M1.1 Independently labeled person benchmark
 
-**[DRAFT CONTRACT BUILT; LABELING NOT STARTED]**
-`docs/audits/reviewer-holistic-identity-benchmark-v1.json` is intentionally
-empty. Its validator rejects unknown fields, visible pipeline outputs,
-unsupported hazard types, incoherent bind/abstain/action labels, missing HTTPS
+**[40-CASE PROPOSED POOL ASSEMBLED; LABELING NOT STARTED]**
+`docs/audits/reviewer-holistic-identity-benchmark-v1.json` contains 20 proposed
+hazard cases and 20 proposed clean-positive cases assembled without invoking
+either reviewer pipeline. Each stores the candidate input, a dated minimal
+OpenAlex/ORCID response snapshot, and at least one candidate ORCID,
+institutional, or publisher source. All 40 remain `caseStatus: proposed` with
+`expected: null`, `labeler: null`, and pending adjudication; they are neither
+ground-truth labels nor evaluation evidence. The reproducible collector is
+`scripts/collect-reviewer-holistic-identity-cases.js`; its manual-evidence-only
+mode can add reviewed citations without refreshing or mixing upstream API
+snapshots. Curator sampling rationales remain in the collector seed definitions
+and are not emitted into the labeler-facing frozen candidate input.
+
+The validator rejects unknown fields, visible pipeline outputs, unsupported
+hazard/evidence types, incoherent bind/abstain/action labels, missing HTTPS
 evidence, unregistered labelers, unresolved adjudication, and frozen sets below
-the 40 / 20 hazard / 20 clean-positive minimums. The draft is a data-entry
-contract, not a labeled benchmark and not evaluation evidence.
+the 40 / 20 hazard / 20 clean-positive minimums. Proposed cases may collect
+evidence while unlabeled; freeze requires every case to be labeled, resolved,
+and backed by authoritative ORCID, institutional, or publisher evidence.
 
 Create at least 40 frozen cases before tuning behavior:
 
