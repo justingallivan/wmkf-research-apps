@@ -2,7 +2,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-07-14 via the explicit-target read-only `scripts/probe-reviewer-channel-baseline.js` (row count and M1.3 lifecycle/source aggregates); Wave 13 field metadata last verified 2026-07-13 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population`; prior 2026-05-31 (S208 — `wmkf_applicantdisposition` deployed + live metadata probe: 77 `wmkf_`-prefixed attrs, 108 total).
+**Last verified:** 2026-07-14 via the explicit-target read-only `scripts/probe-reviewer-channel-baseline.js` (row count and M1.3 lifecycle/source aggregates) plus `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population` (Wave 13 metadata/population); prior 2026-05-31 (S208 — `wmkf_applicantdisposition` deployed + live metadata probe: 77 `wmkf_`-prefixed attrs, 108 total).
 **Live row count:** 668
 **Entity set:** `wmkf_appreviewersuggestions`
 **Adapter:** `lib/dataverse/adapters/reviewer-suggestion.js`
@@ -41,8 +41,8 @@ generation and the current canonical proposal/rule context. The owner-approved
 production-only apply completed 2026-07-12. **[VERIFIED 2026-07-13 via the
 command in Last verified]** typed metadata reported all four EXACT. No live
 application reader or writer uses these names, so the columns are
-non-authoritative; the same population probe returned zero rows. The dated
-output is captured in
+non-authoritative; the 2026-07-14 population refresh still returned zero rows
+with any Wave 13 suggestion value. The earlier dated output is captured in
 `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md` and must be
 refreshed before schema-adjacent work. Missing/unknown
 status, generation mismatch, or missing/context-hash mismatch is designed to

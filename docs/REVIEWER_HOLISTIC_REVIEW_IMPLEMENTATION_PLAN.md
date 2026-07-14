@@ -323,6 +323,25 @@ staff “right person” action trigger the rebind contract.
 
 ### C0.4 Enforce current-state eligibility at send
 
+**[READ-ONLY CONTRACT AUDIT COMPLETE 2026-07-14; RUNTIME ENFORCEMENT NOT
+READY]** The audit at
+`docs/audits/reviewer-c0-4-send-eligibility-audit-2026-07-14.md` found that
+send/render currently read legacy email provenance and identity status, not the
+Wave 13 person-binding or suggestion-COI currency fields. The explicit-target
+production preflight remains 0 ABSENT / 10 EXACT / 0 DIVERGENT, but only one
+person row and zero suggestion rows have any Wave 13 value. A fail-closed cutover
+now would therefore block essentially all outreach; a null-is-eligible bypass
+would defeat C0.4. Render also rotates the external-token hash before the send
+boundary, so send-only enforcement is incomplete. No runtime code changed.
+
+Before enforcement, land an inert pure action-policy contract and projections,
+populate/classify the binding and proposal-COI currency under the existing I1/I2
+owner gates, prove shadow reason counts, and define explicit server-side stage
+semantics for invitation/materials/follow-up/thank-you. The low-email-confidence
+staff acknowledgement may remain an address-provenance override only; it may not
+override invalid/stale identity or COI state. Runtime activation remains a
+separate Tier-2 owner gate.
+
 The send service already re-derives email confidence from the person row.
 Extend the server-authoritative gate so stale/invalidated identity state is not
 actionable. The modal remains advisory. Tests must include a wrong/stale bundle

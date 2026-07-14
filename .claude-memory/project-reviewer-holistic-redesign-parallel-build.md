@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-14 via owner approval and parking of the M1.1 case pool, draft-asset validators, focused tests, and explicit-target read-only production channel baseline
+  last_verified: 2026-07-14 via the M1.1 parking decision, M1 asset gates, and the read-only C0.4 send-eligibility contract/population audit
 ---
 
 ## Recall Rule
@@ -24,7 +24,8 @@ The plan is **active under a hybrid incremental model**:
    behavior remains authoritative.
 2. **C0 containment:** current save-boundary, correction, attestation-overwrite,
    and send-eligibility defects promote one verified invariant at a time on
-   Tier-2 branches.
+   Tier-2 branches. C0.4 enforcement is dependency-gated by authoritative Wave
+   13 population and shadow proof; it is not a standalone send-service patch.
 3. **Measured switches:** the baseline freezes after shared containment. New
    readers/finding behavior activate only through a server-owned deterministic
    request cohort; missing/invalid assignment selects baseline.
@@ -52,6 +53,17 @@ the pre-existing person's origin was not adjudicated. The synthetic smoke rows
 were deleted and absence-verified, restoring that exact baseline. None of this
 makes legacy/unknown rows eligible by default. Broader caller and policy-reader
 migration remains gated.
+
+**C0.4 read-only contract audit (2026-07-14):** a fresh explicit-target preflight
+reported 0 ABSENT / 10 EXACT / 0 DIVERGENT and a current population of one person
+row / zero suggestion rows with any Wave 13 value. Send and render re-read only
+legacy email provenance/status; neither loads durable binding/COI currency, and
+render can rotate the external-token hash before send. The current
+low-email-confidence acknowledgement is address-specific but is not an identity
+action policy. Runtime enforcement is therefore not ready: first land an inert
+pure policy/projection/test slice, populate/classify and shadow the durable
+fields under I1/I2 gates, then owner-gate render+send enforcement. Audit:
+`docs/audits/reviewer-c0-4-send-eligibility-audit-2026-07-14.md`.
 
 **S359 adversarial review (2026-07-13 artifact): fixes implemented and
 promoted.** The inert

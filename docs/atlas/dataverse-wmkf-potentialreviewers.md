@@ -4,7 +4,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-07-13 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population`; row count re-probed 2026-07-12 via `scripts/reconcile-memory-claims.js`
+**Last verified:** Wave 13 metadata/population refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population`; total row count last re-probed 2026-07-12 via `scripts/reconcile-memory-claims.js`
 **Live row count:** 4,416
 **Entity set:** `wmkf_potentialreviewerses` (note Dynamics-pluralized form)
 **Adapter:** `lib/dataverse/adapters/potential-reviewer.js`
@@ -60,8 +60,10 @@ the acceptance drain passes stable `accepted_at` into self-report capture, which
 commits the person binding before contact/honorarium follow-up. The columns remain
 non-authoritative to policy readers and backfills; the immediate post-deploy
 population probe returned zero rows, so no first durable binding event has yet
-been observed. The dated
-output is captured in
+been observed at that immediate post-deploy checkpoint. The 2026-07-14 read-only
+refresh found one person row with at least one Wave 13 value; its origin was not
+adjudicated by this aggregate probe and it does not make the fields broadly
+authoritative. The earlier dated output is captured in
 `docs/audits/reviewer-identity-binding-prod-preflight-2026-07-13.md` and must be
 refreshed before schema-adjacent work. Null
 cannot confer action eligibility. Dirty legacy rows with existing identity
