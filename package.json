@@ -19,6 +19,8 @@
     "test": "jest",
     "smoke:reviewer-contact": "node --import ./scripts/lib/use-extensionless.mjs scripts/smoke-reviewer-contact-anchoring.mjs",
     "eval:reviewer-holistic:manifest": "node scripts/validate-reviewer-holistic-evaluation-manifest.js",
+    "eval:reviewer-holistic:m1": "node scripts/validate-reviewer-holistic-m1-assets.js",
+    "probe:reviewer-holistic:channels": "node scripts/probe-reviewer-channel-baseline.js",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:unit": "jest tests/unit",

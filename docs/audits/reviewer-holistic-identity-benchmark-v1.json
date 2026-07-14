@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "status": "draft",
+  "benchmarkVersion": "reviewer-identity-v1",
+  "labelingPolicy": "independent_blinded_adjudicated",
+  "pipelineOutputsVisibleToLabelers": false,
+  "labelers": [],
+  "adjudicator": null,
+  "frozenAt": null,
+  "cases": []
+}

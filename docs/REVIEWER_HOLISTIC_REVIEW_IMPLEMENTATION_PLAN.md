@@ -343,7 +343,28 @@ eligibility test.
 
 ## M1 — Build the evaluation system before further resolver changes
 
+**[FOUNDATION + M1.3 BUILT 2026-07-14; M1.1 LABELS + M1.2 COHORT/SCORES
+PENDING OWNER FREEZE]** The tracked draft identity benchmark and blinded
+proposal-evaluation assets now have fail-closed validators at
+`scripts/validate-reviewer-holistic-m1-assets.js`; draft validation is
+`npm run eval:reviewer-holistic:m1`, while `--require-frozen` and
+`--require-scored` enforce the later execution gates. The read-only M1.3 probe
+is `scripts/probe-reviewer-channel-baseline.js`, and its dated aggregate-only
+production artifact is
+`docs/audits/reviewer-channel-baseline-2026-07-14.json`. No resolver, reader,
+writer, or production behavior changed. M1.1 cannot freeze until the owner
+names the labelers/adjudicator and approves the case set; M1.2 cannot freeze
+until the owner selects the ten held-out proposals and PD scorer.
+
 ### M1.1 Independently labeled person benchmark
+
+**[DRAFT CONTRACT BUILT; LABELING NOT STARTED]**
+`docs/audits/reviewer-holistic-identity-benchmark-v1.json` is intentionally
+empty. Its validator rejects unknown fields, visible pipeline outputs,
+unsupported hazard types, incoherent bind/abstain/action labels, missing HTTPS
+evidence, unregistered labelers, unresolved adjudication, and frozen sets below
+the 40 / 20 hazard / 20 clean-positive minimums. The draft is a data-entry
+contract, not a labeled benchmark and not evaluation evidence.
 
 Create at least 40 frozen cases before tuning behavior:
 
@@ -385,6 +406,16 @@ unsupported population claim.
 
 ### M1.2 Proposal-level blinded head-to-head
 
+**[DRAFT CONTRACT BUILT; COHORT NOT SELECTED OR RUN]**
+`docs/audits/reviewer-holistic-proposal-evaluation-v1.json` is intentionally
+empty. Its validator requires an explicit non-tuning cohort, unique source and
+blind proposal IDs, document hashes, thin/full signal coverage, multiple
+program areas, a hashed randomization seed, and a named PD scorer before
+freeze. A scored artifact additionally requires exactly three unique run IDs
+per arm and complete scores keyed only by blind candidate IDs, with an exact
+post-unblinding map from every blind candidate ID to its baseline/redesign arm
+membership.
+
 Select ten held-out proposals before execution, stratified across program area
 and thin/full proposal signal. Do not use proposals that tuned the redesign.
 
@@ -414,6 +445,15 @@ Offline pilot-eligibility rule:
 A tie or threshold miss means retain the baseline and revise or stop.
 
 ### M1.3 Observational channel baseline
+
+**[BUILT + PRODUCTION BASELINE CAPTURED 2026-07-14]** The explicit-target,
+read-only probe captured 668 `wmkf_appreviewersuggestion` engagement rows: all
+668 carried at least one source token, 275 were exclusive-token rows, and 393
+were multi-touch rows. The artifact reports exact counts, denominators, and
+rates for 11 observed tokens across sourced, selected, invited, accepted,
+declined, referral, materials-sent, and review-received signals. It stores no
+names, emails, or proposal content. The result is observational and overlapping
+token totals are not unique-person counts.
 
 Build the read-only outcome probe before finding changes. Report by each
 `wmkf_sources` token:
@@ -725,9 +765,10 @@ an unmeasured slice implemented.
 ### F1.1 Staff referral loop — shipped
 
 **[VERIFIED]** The workbench surfaces decline referrals and pre-fills the normal
-Add-or-Refer flow. Do not rebuild it. The open work is measurement in M1.3 and,
-separately, an **[OWNER-GATE]** on whether an external decline-acknowledgment
-email is worthwhile.
+Add-or-Refer flow. Do not rebuild it. M1.3 now provides the first observational
+source/referral baseline; future refreshes and any interpretation remain
+observational. Separately, an **[OWNER-GATE]** remains on whether an external
+decline-acknowledgment email is worthwhile.
 
 ### F1.2 Applicant recommendations as neighborhood seeds
 

@@ -1,0 +1,1164 @@
+{
+  "observedAt": "2026-07-14T20:01:24.554Z",
+  "target": "production",
+  "targetHostname": "wmkf.crm.dynamics.com",
+  "sourceEntitySet": "wmkf_appreviewersuggestions",
+  "schemaVersion": 1,
+  "probeVersion": "reviewer-channel-baseline-v1",
+  "unit": "suggestion_engagement_rows",
+  "interpretation": {
+    "selected": "current mutable snapshot, not historical shortlist",
+    "materialsSent": "participation proxy, not final panel seating",
+    "reviewReceived": "wmkf_reviewreceivedat is the submission signal",
+    "attribution": "token counts overlap; never sum token-attribution counts as unique people"
+  },
+  "population": {
+    "totalRows": 668,
+    "rowsWithSources": 668,
+    "rowsWithoutSources": 0,
+    "exclusiveTokenRows": 275,
+    "multiTouchRows": 393
+  },
+  "attributedByToken": {
+    "applicant": {
+      "sourcedRows": {
+        "count": 171,
+        "denominator": 668,
+        "rate": 0.2559880239520958
+      },
+      "currentlySelected": {
+        "count": 53,
+        "denominator": 171,
+        "rate": 0.30994152046783624
+      },
+      "invited": {
+        "count": 27,
+        "denominator": 171,
+        "rate": 0.15789473684210525
+      },
+      "accepted": {
+        "count": 14,
+        "denominator": 171,
+        "rate": 0.08187134502923976
+      },
+      "declined": {
+        "count": 8,
+        "denominator": 171,
+        "rate": 0.04678362573099415
+      },
+      "declineWithReferral": {
+        "count": 3,
+        "denominator": 171,
+        "rate": 0.017543859649122806
+      },
+      "materialsSent": {
+        "count": 1,
+        "denominator": 171,
+        "rate": 0.005847953216374269
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 171,
+        "rate": 0
+      }
+    },
+    "claude": {
+      "sourcedRows": {
+        "count": 259,
+        "denominator": 668,
+        "rate": 0.38772455089820357
+      },
+      "currentlySelected": {
+        "count": 255,
+        "denominator": 259,
+        "rate": 0.9845559845559846
+      },
+      "invited": {
+        "count": 46,
+        "denominator": 259,
+        "rate": 0.1776061776061776
+      },
+      "accepted": {
+        "count": 15,
+        "denominator": 259,
+        "rate": 0.05791505791505792
+      },
+      "declined": {
+        "count": 10,
+        "denominator": 259,
+        "rate": 0.03861003861003861
+      },
+      "declineWithReferral": {
+        "count": 1,
+        "denominator": 259,
+        "rate": 0.003861003861003861
+      },
+      "materialsSent": {
+        "count": 14,
+        "denominator": 259,
+        "rate": 0.05405405405405406
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 259,
+        "rate": 0
+      }
+    },
+    "literature_retrieved": {
+      "sourcedRows": {
+        "count": 96,
+        "denominator": 668,
+        "rate": 0.1437125748502994
+      },
+      "currentlySelected": {
+        "count": 74,
+        "denominator": 96,
+        "rate": 0.7708333333333334
+      },
+      "invited": {
+        "count": 28,
+        "denominator": 96,
+        "rate": 0.2916666666666667
+      },
+      "accepted": {
+        "count": 10,
+        "denominator": 96,
+        "rate": 0.10416666666666667
+      },
+      "declined": {
+        "count": 8,
+        "denominator": 96,
+        "rate": 0.08333333333333333
+      },
+      "declineWithReferral": {
+        "count": 4,
+        "denominator": 96,
+        "rate": 0.041666666666666664
+      },
+      "materialsSent": {
+        "count": 0,
+        "denominator": 96,
+        "rate": 0
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 96,
+        "rate": 0
+      }
+    },
+    "manual": {
+      "sourcedRows": {
+        "count": 5,
+        "denominator": 668,
+        "rate": 0.0074850299401197605
+      },
+      "currentlySelected": {
+        "count": 5,
+        "denominator": 5,
+        "rate": 1
+      },
+      "invited": {
+        "count": 3,
+        "denominator": 5,
+        "rate": 0.6
+      },
+      "accepted": {
+        "count": 2,
+        "denominator": 5,
+        "rate": 0.4
+      },
+      "declined": {
+        "count": 1,
+        "denominator": 5,
+        "rate": 0.2
+      },
+      "declineWithReferral": {
+        "count": 0,
+        "denominator": 5,
+        "rate": 0
+      },
+      "materialsSent": {
+        "count": 2,
+        "denominator": 5,
+        "rate": 0.4
+      },
+      "reviewReceived": {
+        "count": 1,
+        "denominator": 5,
+        "rate": 0.2
+      }
+    },
+    "openalex": {
+      "sourcedRows": {
+        "count": 13,
+        "denominator": 668,
+        "rate": 0.019461077844311378
+      },
+      "currentlySelected": {
+        "count": 12,
+        "denominator": 13,
+        "rate": 0.9230769230769231
+      },
+      "invited": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "accepted": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "declined": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "declineWithReferral": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "materialsSent": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      }
+    },
+    "orcid": {
+      "sourcedRows": {
+        "count": 13,
+        "denominator": 668,
+        "rate": 0.019461077844311378
+      },
+      "currentlySelected": {
+        "count": 12,
+        "denominator": 13,
+        "rate": 0.9230769230769231
+      },
+      "invited": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "accepted": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "declined": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "declineWithReferral": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "materialsSent": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      }
+    },
+    "proposal_named": {
+      "sourcedRows": {
+        "count": 17,
+        "denominator": 668,
+        "rate": 0.025449101796407185
+      },
+      "currentlySelected": {
+        "count": 14,
+        "denominator": 17,
+        "rate": 0.8235294117647058
+      },
+      "invited": {
+        "count": 5,
+        "denominator": 17,
+        "rate": 0.29411764705882354
+      },
+      "accepted": {
+        "count": 1,
+        "denominator": 17,
+        "rate": 0.058823529411764705
+      },
+      "declined": {
+        "count": 2,
+        "denominator": 17,
+        "rate": 0.11764705882352941
+      },
+      "declineWithReferral": {
+        "count": 0,
+        "denominator": 17,
+        "rate": 0
+      },
+      "materialsSent": {
+        "count": 0,
+        "denominator": 17,
+        "rate": 0
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 17,
+        "rate": 0
+      }
+    },
+    "pubmed": {
+      "sourcedRows": {
+        "count": 359,
+        "denominator": 668,
+        "rate": 0.5374251497005988
+      },
+      "currentlySelected": {
+        "count": 331,
+        "denominator": 359,
+        "rate": 0.9220055710306406
+      },
+      "invited": {
+        "count": 79,
+        "denominator": 359,
+        "rate": 0.2200557103064067
+      },
+      "accepted": {
+        "count": 26,
+        "denominator": 359,
+        "rate": 0.07242339832869081
+      },
+      "declined": {
+        "count": 20,
+        "denominator": 359,
+        "rate": 0.055710306406685235
+      },
+      "declineWithReferral": {
+        "count": 5,
+        "denominator": 359,
+        "rate": 0.013927576601671309
+      },
+      "materialsSent": {
+        "count": 14,
+        "denominator": 359,
+        "rate": 0.03899721448467967
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 359,
+        "rate": 0
+      }
+    },
+    "referred": {
+      "sourcedRows": {
+        "count": 18,
+        "denominator": 668,
+        "rate": 0.02694610778443114
+      },
+      "currentlySelected": {
+        "count": 17,
+        "denominator": 18,
+        "rate": 0.9444444444444444
+      },
+      "invited": {
+        "count": 8,
+        "denominator": 18,
+        "rate": 0.4444444444444444
+      },
+      "accepted": {
+        "count": 3,
+        "denominator": 18,
+        "rate": 0.16666666666666666
+      },
+      "declined": {
+        "count": 0,
+        "denominator": 18,
+        "rate": 0
+      },
+      "declineWithReferral": {
+        "count": 0,
+        "denominator": 18,
+        "rate": 0
+      },
+      "materialsSent": {
+        "count": 0,
+        "denominator": 18,
+        "rate": 0
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 18,
+        "rate": 0
+      }
+    },
+    "staff_manual": {
+      "sourcedRows": {
+        "count": 57,
+        "denominator": 668,
+        "rate": 0.08532934131736528
+      },
+      "currentlySelected": {
+        "count": 53,
+        "denominator": 57,
+        "rate": 0.9298245614035088
+      },
+      "invited": {
+        "count": 34,
+        "denominator": 57,
+        "rate": 0.5964912280701754
+      },
+      "accepted": {
+        "count": 13,
+        "denominator": 57,
+        "rate": 0.22807017543859648
+      },
+      "declined": {
+        "count": 6,
+        "denominator": 57,
+        "rate": 0.10526315789473684
+      },
+      "declineWithReferral": {
+        "count": 3,
+        "denominator": 57,
+        "rate": 0.05263157894736842
+      },
+      "materialsSent": {
+        "count": 0,
+        "denominator": 57,
+        "rate": 0
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 57,
+        "rate": 0
+      }
+    },
+    "unknown": {
+      "sourcedRows": {
+        "count": 73,
+        "denominator": 668,
+        "rate": 0.1092814371257485
+      },
+      "currentlySelected": {
+        "count": 72,
+        "denominator": 73,
+        "rate": 0.9863013698630136
+      },
+      "invited": {
+        "count": 10,
+        "denominator": 73,
+        "rate": 0.136986301369863
+      },
+      "accepted": {
+        "count": 4,
+        "denominator": 73,
+        "rate": 0.0547945205479452
+      },
+      "declined": {
+        "count": 2,
+        "denominator": 73,
+        "rate": 0.0273972602739726
+      },
+      "declineWithReferral": {
+        "count": 0,
+        "denominator": 73,
+        "rate": 0
+      },
+      "materialsSent": {
+        "count": 3,
+        "denominator": 73,
+        "rate": 0.0410958904109589
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 73,
+        "rate": 0
+      }
+    }
+  },
+  "exclusiveByToken": {
+    "applicant": {
+      "sourcedRows": {
+        "count": 161,
+        "denominator": 668,
+        "rate": 0.2410179640718563
+      },
+      "currentlySelected": {
+        "count": 44,
+        "denominator": 161,
+        "rate": 0.2732919254658385
+      },
+      "invited": {
+        "count": 18,
+        "denominator": 161,
+        "rate": 0.11180124223602485
+      },
+      "accepted": {
+        "count": 9,
+        "denominator": 161,
+        "rate": 0.055900621118012424
+      },
+      "declined": {
+        "count": 5,
+        "denominator": 161,
+        "rate": 0.031055900621118012
+      },
+      "declineWithReferral": {
+        "count": 1,
+        "denominator": 161,
+        "rate": 0.006211180124223602
+      },
+      "materialsSent": {
+        "count": 1,
+        "denominator": 161,
+        "rate": 0.006211180124223602
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 161,
+        "rate": 0
+      }
+    },
+    "manual": {
+      "sourcedRows": {
+        "count": 5,
+        "denominator": 668,
+        "rate": 0.0074850299401197605
+      },
+      "currentlySelected": {
+        "count": 5,
+        "denominator": 5,
+        "rate": 1
+      },
+      "invited": {
+        "count": 3,
+        "denominator": 5,
+        "rate": 0.6
+      },
+      "accepted": {
+        "count": 2,
+        "denominator": 5,
+        "rate": 0.4
+      },
+      "declined": {
+        "count": 1,
+        "denominator": 5,
+        "rate": 0.2
+      },
+      "declineWithReferral": {
+        "count": 0,
+        "denominator": 5,
+        "rate": 0
+      },
+      "materialsSent": {
+        "count": 2,
+        "denominator": 5,
+        "rate": 0.4
+      },
+      "reviewReceived": {
+        "count": 1,
+        "denominator": 5,
+        "rate": 0.2
+      }
+    },
+    "staff_manual": {
+      "sourcedRows": {
+        "count": 36,
+        "denominator": 668,
+        "rate": 0.05389221556886228
+      },
+      "currentlySelected": {
+        "count": 33,
+        "denominator": 36,
+        "rate": 0.9166666666666666
+      },
+      "invited": {
+        "count": 23,
+        "denominator": 36,
+        "rate": 0.6388888888888888
+      },
+      "accepted": {
+        "count": 8,
+        "denominator": 36,
+        "rate": 0.2222222222222222
+      },
+      "declined": {
+        "count": 6,
+        "denominator": 36,
+        "rate": 0.16666666666666666
+      },
+      "declineWithReferral": {
+        "count": 3,
+        "denominator": 36,
+        "rate": 0.08333333333333333
+      },
+      "materialsSent": {
+        "count": 0,
+        "denominator": 36,
+        "rate": 0
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 36,
+        "rate": 0
+      }
+    },
+    "unknown": {
+      "sourcedRows": {
+        "count": 73,
+        "denominator": 668,
+        "rate": 0.1092814371257485
+      },
+      "currentlySelected": {
+        "count": 72,
+        "denominator": 73,
+        "rate": 0.9863013698630136
+      },
+      "invited": {
+        "count": 10,
+        "denominator": 73,
+        "rate": 0.136986301369863
+      },
+      "accepted": {
+        "count": 4,
+        "denominator": 73,
+        "rate": 0.0547945205479452
+      },
+      "declined": {
+        "count": 2,
+        "denominator": 73,
+        "rate": 0.0273972602739726
+      },
+      "declineWithReferral": {
+        "count": 0,
+        "denominator": 73,
+        "rate": 0
+      },
+      "materialsSent": {
+        "count": 3,
+        "denominator": 73,
+        "rate": 0.0410958904109589
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 73,
+        "rate": 0
+      }
+    }
+  },
+  "multiTouchByToken": {
+    "applicant": {
+      "sourcedRows": {
+        "count": 10,
+        "denominator": 668,
+        "rate": 0.014970059880239521
+      },
+      "currentlySelected": {
+        "count": 9,
+        "denominator": 10,
+        "rate": 0.9
+      },
+      "invited": {
+        "count": 9,
+        "denominator": 10,
+        "rate": 0.9
+      },
+      "accepted": {
+        "count": 5,
+        "denominator": 10,
+        "rate": 0.5
+      },
+      "declined": {
+        "count": 3,
+        "denominator": 10,
+        "rate": 0.3
+      },
+      "declineWithReferral": {
+        "count": 2,
+        "denominator": 10,
+        "rate": 0.2
+      },
+      "materialsSent": {
+        "count": 0,
+        "denominator": 10,
+        "rate": 0
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 10,
+        "rate": 0
+      }
+    },
+    "claude": {
+      "sourcedRows": {
+        "count": 259,
+        "denominator": 668,
+        "rate": 0.38772455089820357
+      },
+      "currentlySelected": {
+        "count": 255,
+        "denominator": 259,
+        "rate": 0.9845559845559846
+      },
+      "invited": {
+        "count": 46,
+        "denominator": 259,
+        "rate": 0.1776061776061776
+      },
+      "accepted": {
+        "count": 15,
+        "denominator": 259,
+        "rate": 0.05791505791505792
+      },
+      "declined": {
+        "count": 10,
+        "denominator": 259,
+        "rate": 0.03861003861003861
+      },
+      "declineWithReferral": {
+        "count": 1,
+        "denominator": 259,
+        "rate": 0.003861003861003861
+      },
+      "materialsSent": {
+        "count": 14,
+        "denominator": 259,
+        "rate": 0.05405405405405406
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 259,
+        "rate": 0
+      }
+    },
+    "literature_retrieved": {
+      "sourcedRows": {
+        "count": 96,
+        "denominator": 668,
+        "rate": 0.1437125748502994
+      },
+      "currentlySelected": {
+        "count": 74,
+        "denominator": 96,
+        "rate": 0.7708333333333334
+      },
+      "invited": {
+        "count": 28,
+        "denominator": 96,
+        "rate": 0.2916666666666667
+      },
+      "accepted": {
+        "count": 10,
+        "denominator": 96,
+        "rate": 0.10416666666666667
+      },
+      "declined": {
+        "count": 8,
+        "denominator": 96,
+        "rate": 0.08333333333333333
+      },
+      "declineWithReferral": {
+        "count": 4,
+        "denominator": 96,
+        "rate": 0.041666666666666664
+      },
+      "materialsSent": {
+        "count": 0,
+        "denominator": 96,
+        "rate": 0
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 96,
+        "rate": 0
+      }
+    },
+    "openalex": {
+      "sourcedRows": {
+        "count": 13,
+        "denominator": 668,
+        "rate": 0.019461077844311378
+      },
+      "currentlySelected": {
+        "count": 12,
+        "denominator": 13,
+        "rate": 0.9230769230769231
+      },
+      "invited": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "accepted": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "declined": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "declineWithReferral": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "materialsSent": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      }
+    },
+    "orcid": {
+      "sourcedRows": {
+        "count": 13,
+        "denominator": 668,
+        "rate": 0.019461077844311378
+      },
+      "currentlySelected": {
+        "count": 12,
+        "denominator": 13,
+        "rate": 0.9230769230769231
+      },
+      "invited": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "accepted": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "declined": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "declineWithReferral": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "materialsSent": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 13,
+        "rate": 0
+      }
+    },
+    "proposal_named": {
+      "sourcedRows": {
+        "count": 17,
+        "denominator": 668,
+        "rate": 0.025449101796407185
+      },
+      "currentlySelected": {
+        "count": 14,
+        "denominator": 17,
+        "rate": 0.8235294117647058
+      },
+      "invited": {
+        "count": 5,
+        "denominator": 17,
+        "rate": 0.29411764705882354
+      },
+      "accepted": {
+        "count": 1,
+        "denominator": 17,
+        "rate": 0.058823529411764705
+      },
+      "declined": {
+        "count": 2,
+        "denominator": 17,
+        "rate": 0.11764705882352941
+      },
+      "declineWithReferral": {
+        "count": 0,
+        "denominator": 17,
+        "rate": 0
+      },
+      "materialsSent": {
+        "count": 0,
+        "denominator": 17,
+        "rate": 0
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 17,
+        "rate": 0
+      }
+    },
+    "pubmed": {
+      "sourcedRows": {
+        "count": 359,
+        "denominator": 668,
+        "rate": 0.5374251497005988
+      },
+      "currentlySelected": {
+        "count": 331,
+        "denominator": 359,
+        "rate": 0.9220055710306406
+      },
+      "invited": {
+        "count": 79,
+        "denominator": 359,
+        "rate": 0.2200557103064067
+      },
+      "accepted": {
+        "count": 26,
+        "denominator": 359,
+        "rate": 0.07242339832869081
+      },
+      "declined": {
+        "count": 20,
+        "denominator": 359,
+        "rate": 0.055710306406685235
+      },
+      "declineWithReferral": {
+        "count": 5,
+        "denominator": 359,
+        "rate": 0.013927576601671309
+      },
+      "materialsSent": {
+        "count": 14,
+        "denominator": 359,
+        "rate": 0.03899721448467967
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 359,
+        "rate": 0
+      }
+    },
+    "referred": {
+      "sourcedRows": {
+        "count": 18,
+        "denominator": 668,
+        "rate": 0.02694610778443114
+      },
+      "currentlySelected": {
+        "count": 17,
+        "denominator": 18,
+        "rate": 0.9444444444444444
+      },
+      "invited": {
+        "count": 8,
+        "denominator": 18,
+        "rate": 0.4444444444444444
+      },
+      "accepted": {
+        "count": 3,
+        "denominator": 18,
+        "rate": 0.16666666666666666
+      },
+      "declined": {
+        "count": 0,
+        "denominator": 18,
+        "rate": 0
+      },
+      "declineWithReferral": {
+        "count": 0,
+        "denominator": 18,
+        "rate": 0
+      },
+      "materialsSent": {
+        "count": 0,
+        "denominator": 18,
+        "rate": 0
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 18,
+        "rate": 0
+      }
+    },
+    "staff_manual": {
+      "sourcedRows": {
+        "count": 21,
+        "denominator": 668,
+        "rate": 0.03143712574850299
+      },
+      "currentlySelected": {
+        "count": 20,
+        "denominator": 21,
+        "rate": 0.9523809523809523
+      },
+      "invited": {
+        "count": 11,
+        "denominator": 21,
+        "rate": 0.5238095238095238
+      },
+      "accepted": {
+        "count": 5,
+        "denominator": 21,
+        "rate": 0.23809523809523808
+      },
+      "declined": {
+        "count": 0,
+        "denominator": 21,
+        "rate": 0
+      },
+      "declineWithReferral": {
+        "count": 0,
+        "denominator": 21,
+        "rate": 0
+      },
+      "materialsSent": {
+        "count": 0,
+        "denominator": 21,
+        "rate": 0
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 21,
+        "rate": 0
+      }
+    }
+  },
+  "cohortMetrics": {
+    "missingSource": {
+      "sourcedRows": {
+        "count": 0,
+        "denominator": 668,
+        "rate": 0
+      },
+      "currentlySelected": {
+        "count": 0,
+        "denominator": 0,
+        "rate": null
+      },
+      "invited": {
+        "count": 0,
+        "denominator": 0,
+        "rate": null
+      },
+      "accepted": {
+        "count": 0,
+        "denominator": 0,
+        "rate": null
+      },
+      "declined": {
+        "count": 0,
+        "denominator": 0,
+        "rate": null
+      },
+      "declineWithReferral": {
+        "count": 0,
+        "denominator": 0,
+        "rate": null
+      },
+      "materialsSent": {
+        "count": 0,
+        "denominator": 0,
+        "rate": null
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 0,
+        "rate": null
+      }
+    },
+    "exclusiveToken": {
+      "sourcedRows": {
+        "count": 275,
+        "denominator": 668,
+        "rate": 0.4116766467065868
+      },
+      "currentlySelected": {
+        "count": 154,
+        "denominator": 275,
+        "rate": 0.56
+      },
+      "invited": {
+        "count": 54,
+        "denominator": 275,
+        "rate": 0.19636363636363635
+      },
+      "accepted": {
+        "count": 23,
+        "denominator": 275,
+        "rate": 0.08363636363636363
+      },
+      "declined": {
+        "count": 14,
+        "denominator": 275,
+        "rate": 0.05090909090909091
+      },
+      "declineWithReferral": {
+        "count": 4,
+        "denominator": 275,
+        "rate": 0.014545454545454545
+      },
+      "materialsSent": {
+        "count": 6,
+        "denominator": 275,
+        "rate": 0.02181818181818182
+      },
+      "reviewReceived": {
+        "count": 1,
+        "denominator": 275,
+        "rate": 0.0036363636363636364
+      }
+    },
+    "multiTouch": {
+      "sourcedRows": {
+        "count": 393,
+        "denominator": 668,
+        "rate": 0.5883233532934131
+      },
+      "currentlySelected": {
+        "count": 363,
+        "denominator": 393,
+        "rate": 0.9236641221374046
+      },
+      "invited": {
+        "count": 90,
+        "denominator": 393,
+        "rate": 0.22900763358778625
+      },
+      "accepted": {
+        "count": 31,
+        "denominator": 393,
+        "rate": 0.07888040712468193
+      },
+      "declined": {
+        "count": 20,
+        "denominator": 393,
+        "rate": 0.05089058524173028
+      },
+      "declineWithReferral": {
+        "count": 5,
+        "denominator": 393,
+        "rate": 0.01272264631043257
+      },
+      "materialsSent": {
+        "count": 14,
+        "denominator": 393,
+        "rate": 0.035623409669211195
+      },
+      "reviewReceived": {
+        "count": 0,
+        "denominator": 393,
+        "rate": 0
+      }
+    }
+  }
+}

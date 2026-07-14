@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-13 via PR #60 merge plus owner-authorized production smoke, exact deployment/job attribution, binding assertions, and verified cleanup
+  last_verified: 2026-07-14 via M1 draft-asset validators, focused tests, and explicit-target read-only production channel baseline
 ---
 
 ## Recall Rule
@@ -96,6 +96,17 @@ The documented sandbox is reachable but ancient/unknown and lacks
 owner explicitly approved the production-only schema exception. The later
 2026-07-13 decision separately authorizes only the narrow acceptance-drain
 self-report caller described above.
+
+**M1 measurement foundation (2026-07-14):** the identity-benchmark and blinded
+proposal-evaluation data-entry contracts are tracked as intentionally empty
+drafts, with a fail-closed validator for frozen/scored status. They are not
+labels, cohorts, or evidence yet: the owner still must name the
+labelers/adjudicator, approve the 40-case set, select ten held-out proposals,
+and name the PD scorer. M1.3 is built and captured as an aggregate-only,
+read-only production artifact: 668 suggestion engagement rows, 275 exclusive
+token and 393 multi-touch, across 11 observed source tokens. The artifact
+labels selection as mutable, materials sent as a proxy, and token totals as
+overlapping rather than unique people. No resolver or runtime behavior changed.
 
 ## Required evidence model
 

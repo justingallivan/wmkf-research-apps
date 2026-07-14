@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "status": "draft",
+  "evaluationVersion": "reviewer-proposal-head-to-head-v1",
+  "selectionPolicy": "held_out_stratified_thin_and_full_signal",
+  "replicatesPerArm": 3,
+  "scorer": null,
+  "randomizationSeedHash": null,
+  "frozenAt": null,
+  "proposals": []
+}
