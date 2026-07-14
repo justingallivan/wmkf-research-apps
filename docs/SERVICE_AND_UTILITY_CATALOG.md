@@ -86,6 +86,7 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`reviewer-candidate-attestation.js`** — Transitional `NEXTAUTH_SECRET`-signed receipt binding server-computed automated identity fields to one request/candidate bundle before save.
 - **`capture-self-reported-orcid.js`** — Self-reported ORCID persistence seam. Accept-drain calls with a stable acceptance timestamp use the Wave 13 binding writer before contact fill; only typed `legacy_classification_required` falls back to the transitional person writes. Older/decline calls without a stable event retain the transitional path.
 - **`reviewer-identity-binding-writer.js`** — Server-owned Wave 13 person-binding transition seam: fail-closed snapshot + ETag read, strict UTC timestamp normalization, lineage/source precedence, one complete conditional PATCH, and bounded 412 reread/recompute. Its first production caller is live since PR #57 / `00ffb09c`: acceptance-drain self-report only. Dirty legacy rows, revocation, unauthorized human correction, policy-reader migration, and automated writer migration remain blocked or deferred.
+- **`reviewer-action-policy.js`** — Pure C0.4 Stage-A action-eligibility contract over server-loaded Wave 13 person-binding and proposal-COI state. Returns a closed fail-closed result set; address confidence is deliberately separate. The helper and its specialized projections are inert until a later owner-gated runtime cutover.
 
 ### Integrity Screener
 
@@ -155,6 +156,7 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`chunk.js`** — Canonical array-chunk helper: `chunk(array, size)` → in-order sub-arrays of ≤ size. Fail-closed: non-array → `TypeError`, non-positive-integer size → `RangeError`; `[]` → `[]`; input never mutated. Import under the alias `chunked` at call sites (per-iteration variables are commonly named `chunk`). **Use this — not a hand-rolled `for (i += N) slice` loop** (consolidated S331-332, `docs/CHUNK_CONSOLIDATION_PLAN.md`).
 - **`reviewer-save-key.js`** — Shared browser/server partial-save correlation key; explicit client ids win, otherwise normalized submitted anchors distinguish same-name rows. Never use it for person merging.
 - **`reviewer-identity-fields.js`** — Literal seven-field authority for resolver-sourced reviewer identity values that require durable lineage; shared by the legacy resolver and Wave 13 binding contract.
+- **`reviewer-action-policy-fields.js`** — Shared literal Wave 13 field lists for the pure action-policy contract and its inert specialized Dataverse projections.
 - **`reviewer-manual-confirmation.js`** — Canonical name/contact projection and exact matcher for request-scoped staff identity confirmation records.
 
 ### Secrets

@@ -72,10 +72,16 @@ resolver evidence remains in
 `wmkf_identityevidencesummary` and `wmkf_identityverifiedanchorsjson`; the new
 lineage field does not duplicate that evidence payload.
 
+The inert C0.4 Stage-A method `potential-reviewer.getActionPolicyById` now has a
+specialized read-only projection for the complete Wave 13 policy input. It has
+no runtime caller and does not make these fields authoritative or change the
+null/legacy posture.
+
 ## Adapter contract (`lib/dataverse/adapters/potential-reviewer.js`)
 
 Methods:
 - `getByEmail`, `getById`
+- `getActionPolicyById` — inert specialized Wave 13 policy projection; no runtime caller
 - `upsertByEmail({ name, email, affiliation, expertise, whyChosen })` — find-or-create on email; on match, **fill-if-empty only** (preserves staff edits)
 - `update(id, updates)` — partial update with name-splitting
 - `setContactLink(potentialReviewerId, contactId)` — sets `wmkf_Contact@odata.bind`

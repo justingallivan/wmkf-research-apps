@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-14 via the M1.1 parking decision, M1 asset gates, and the read-only C0.4 send-eligibility contract/population audit
+  last_verified: 2026-07-14 via the M1.1 parking decision, M1 asset gates, the C0.4 contract/population audit, and the inert Stage A policy/projection foundation
 ---
 
 ## Recall Rule
@@ -60,9 +60,11 @@ row / zero suggestion rows with any Wave 13 value. Send and render re-read only
 legacy email provenance/status; neither loads durable binding/COI currency, and
 render can rotate the external-token hash before send. The current
 low-email-confidence acknowledgement is address-specific but is not an identity
-action policy. Runtime enforcement is therefore not ready: first land an inert
-pure policy/projection/test slice, populate/classify and shadow the durable
-fields under I1/I2 gates, then owner-gate render+send enforcement. Audit:
+action policy. The inert Stage A slice now supplies the pure closed-result helper,
+shared field lists, specialized fail-closed projections, and characterization
+tests; raw-symbol census shows no runtime caller. Runtime enforcement is still
+not ready: populate/classify and shadow the durable fields under I1/I2 gates,
+then owner-gate render+send enforcement. Audit:
 `docs/audits/reviewer-c0-4-send-eligibility-audit-2026-07-14.md`.
 
 **S359 adversarial review (2026-07-13 artifact): fixes implemented and
