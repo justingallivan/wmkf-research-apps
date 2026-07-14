@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-14 via M1 proposed identity pool, draft-asset validators, focused tests, and explicit-target read-only production channel baseline
+  last_verified: 2026-07-14 via owner approval and parking of the M1.1 case pool, draft-asset validators, focused tests, and explicit-target read-only production channel baseline
 ---
 
 ## Recall Rule
@@ -98,15 +98,18 @@ owner explicitly approved the production-only schema exception. The later
 self-report caller described above.
 
 **M1 measurement foundation (2026-07-14):** the identity benchmark now carries
-a proposed 40-case public-evidence pool (20 hazard / 20 clean-positive) assembled
+an owner-approved 40-case public-evidence pool (20 hazard / 20 clean-positive) assembled
 without either reviewer pipeline. Every case has frozen candidate/upstream
 response shapes and at least one ORCID, institutional, or publisher source, but
 all 40 have null expected labels and labelers with pending adjudication. The
 validator permits that evidence-collection state while refusing freeze until
-every case is independently labeled, resolved, and owner-approved. The blinded
+every case is independently labeled and resolved. The owner approved the case
+set unchanged on 2026-07-14 and then explicitly parked the human-labeling
+exercise; labeler/adjudicator selection, labeling, adjudication, rubric/threshold
+approval, and freeze are deferred until an explicit resume. The blinded
 proposal-evaluation asset remains an intentionally empty draft. The owner still
-must name the labelers/adjudicator, approve the case set, select ten held-out
-proposals, and name the PD scorer. M1.3 is built and captured as an aggregate-only,
+must select ten held-out proposals and name the PD scorer before M1.2 can freeze.
+M1.3 is built and captured as an aggregate-only,
 read-only production artifact: 668 suggestion engagement rows, 275 exclusive
 token and 393 multi-touch, across 11 observed source tokens. The artifact
 labels selection as mutable, materials sent as a proxy, and token totals as

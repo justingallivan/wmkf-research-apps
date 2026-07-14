@@ -343,8 +343,8 @@ eligibility test.
 
 ## M1 — Build the evaluation system before further resolver changes
 
-**[FOUNDATION + M1.1 PROPOSED POOL + M1.3 BUILT 2026-07-14; M1.1 LABELS +
-M1.2 COHORT/SCORES PENDING OWNER FREEZE]** The tracked draft identity benchmark and blinded
+**[FOUNDATION + M1.1 OWNER-APPROVED POOL + M1.3 BUILT 2026-07-14; M1.1
+LABELING PARKED + M1.2 COHORT/SCORES PENDING OWNER FREEZE]** The tracked draft identity benchmark and blinded
 proposal-evaluation assets now have fail-closed validators at
 `scripts/validate-reviewer-holistic-m1-assets.js`; draft validation is
 `npm run eval:reviewer-holistic:m1`, while `--require-frozen` and
@@ -352,21 +352,25 @@ proposal-evaluation assets now have fail-closed validators at
 is `scripts/probe-reviewer-channel-baseline.js`, and its dated aggregate-only
 production artifact is
 `docs/audits/reviewer-channel-baseline-2026-07-14.json`. No resolver, reader,
-writer, or production behavior changed. M1.1 now carries a 40-case proposed
-evidence pool but cannot freeze until the owner approves it and names the
-labelers/adjudicator; M1.2 cannot freeze
+writer, or production behavior changed. The owner approved the M1.1 40-case
+evidence pool as proposed on 2026-07-14, then explicitly parked the exercise;
+labeler/adjudicator selection, labeling, adjudication, and freeze remain deferred
+until the owner resumes it. M1.2 cannot freeze
 until the owner selects the ten held-out proposals and PD scorer.
 
 ### M1.1 Independently labeled person benchmark
 
-**[40-CASE PROPOSED POOL ASSEMBLED; LABELING NOT STARTED]**
+**[40-CASE POOL OWNER-APPROVED 2026-07-14; LABELING PARKED]**
 `docs/audits/reviewer-holistic-identity-benchmark-v1.json` contains 20 proposed
 hazard cases and 20 proposed clean-positive cases assembled without invoking
 either reviewer pipeline. Each stores the candidate input, a dated minimal
 OpenAlex/ORCID response snapshot, and at least one candidate ORCID,
 institutional, or publisher source. All 40 remain `caseStatus: proposed` with
 `expected: null`, `labeler: null`, and pending adjudication; they are neither
-ground-truth labels nor evaluation evidence. The reproducible collector is
+ground-truth labels nor evaluation evidence. The owner approved this case set
+unchanged on 2026-07-14 but parked the human-labeling exercise for later; this
+approval does not approve labels, the rubric/thresholds, an adjudicator, or a
+freeze. The reproducible collector is
 `scripts/collect-reviewer-holistic-identity-cases.js`; its manual-evidence-only
 mode can add reviewed citations without refreshing or mixing upstream API
 snapshots. Curator sampling rationales remain in the collector seed definitions
@@ -909,7 +913,9 @@ the change into cleanup.
 ## Collected owner decisions
 
 1. Approve each C0 runtime promotion after its evidence bundle.
-2. Approve the M1 label set, rubric, thresholds, and adjudicator before freezing.
+2. **M1.1 case pool approved unchanged and labeling parked 2026-07-14.** Resume
+   explicitly before assigning labelers; rubric, thresholds, adjudicator, labels,
+   adjudication, and freeze remain unapproved/pending.
 3. **Durable fields approved/deployed 2026-07-12; first acceptance self-report
    caller approved/promoted 2026-07-13 via PR #57 / `00ffb09c`.** Broader runtime
    writers/readers and policy migration retain their own gates.
