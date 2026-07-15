@@ -32,7 +32,7 @@ merely linking to them:
   experimental redesign;
 - identity is a versioned binding contract, not `confirmed` plus one source
   column;
-- independently labeled evaluation precedes resolver tuning;
+- single-reviewer blinded evaluation precedes resolver tuning;
 - the staff referral handoff is treated as shipped; measurement replaces a
   duplicate build;
 - destructive cleanup follows a successful comparison and promotion decision.
@@ -172,7 +172,7 @@ Before the first redesign commit, create a tracked evaluation manifest containin
 - identity fixture version;
 - prompt row/version, resolved model IDs, model overrides, reviewer count,
   temperature, exclusions, and run count;
-- scoring rubric, tie rule, thresholds, named adjudicator, artifact schema,
+- scoring rubric, tie rule, thresholds, named identity reviewer, artifact schema,
   and evaluation-script version.
 
 Changing a frozen item creates a new evaluation version. It may not silently
@@ -363,7 +363,7 @@ eligibility test.
 ## M1 — Build the evaluation system before further resolver changes
 
 **[FOUNDATION + M1.1 OWNER-APPROVED POOL + M1.3 BUILT 2026-07-14; M1.1
-LABELING PARKED + M1.2 COHORT/SCORES PENDING OWNER FREEZE]** The tracked draft identity benchmark and blinded
+SINGLE-REVIEWER LABELING PREPARED 2026-07-15 + M1.2 COHORT/SCORES PENDING OWNER FREEZE]** The tracked draft identity benchmark and blinded
 proposal-evaluation assets now have fail-closed validators at
 `scripts/validate-reviewer-holistic-m1-assets.js`; draft validation is
 `npm run eval:reviewer-holistic:m1`, while `--require-frozen` and
@@ -372,35 +372,40 @@ is `scripts/probe-reviewer-channel-baseline.js`, and its dated aggregate-only
 production artifact is
 `docs/audits/reviewer-channel-baseline-2026-07-14.json`. No resolver, reader,
 writer, or production behavior changed. The owner approved the M1.1 40-case
-evidence pool as proposed on 2026-07-14, then explicitly parked the exercise;
-labeler/adjudicator selection, labeling, adjudication, and freeze remain deferred
-until the owner resumes it. M1.2 cannot freeze
+evidence pool as proposed on 2026-07-14, then resumed the exercise on
+2026-07-15 under a single-reviewer blinded protocol. The reviewer will perform
+all human decisions; the method makes no inter-rater or adjudication claim.
+Completed labels and benchmark freeze remain pending. M1.2 cannot freeze
 until the owner selects the ten held-out proposals and PD scorer.
 
-### M1.1 Independently labeled person benchmark
+### M1.1 Single-reviewer blinded person benchmark
 
-**[40-CASE POOL OWNER-APPROVED 2026-07-14; LABELING PARKED]**
+**[40-CASE POOL OWNER-APPROVED 2026-07-14; SINGLE-REVIEWER METHOD APPROVED
+2026-07-15; RESULTS PENDING]**
 `docs/audits/reviewer-holistic-identity-benchmark-v1.json` contains 20 proposed
 hazard cases and 20 proposed clean-positive cases assembled without invoking
 either reviewer pipeline. Each stores the candidate input, a dated minimal
 OpenAlex/ORCID response snapshot, and at least one candidate ORCID,
 institutional, or publisher source. All 40 remain `caseStatus: proposed` with
-`expected: null`, `labeler: null`, and pending adjudication; they are neither
+`expected: null`, `labeler: null`, and pending review; they are neither
 ground-truth labels nor evaluation evidence. The owner approved this case set
-unchanged on 2026-07-14 but parked the human-labeling exercise for later; this
-approval does not approve labels, the rubric/thresholds, an adjudicator, or a
-freeze. The reproducible collector is
+unchanged on 2026-07-14 and approved a single-reviewer blinded exercise on
+2026-07-15. One reviewer performs all human decisions without a separate
+labeler or adjudicator; completed labels, rubric/threshold acceptance, and
+freeze remain pending. The reproducible collector is
 `scripts/collect-reviewer-holistic-identity-cases.js`; its manual-evidence-only
 mode can add reviewed citations without refreshing or mixing upstream API
 snapshots. Curator sampling rationales remain in the collector seed definitions
-and are not emitted into the labeler-facing frozen candidate input.
+and are not emitted into the reviewer-facing frozen candidate input.
 
 The validator rejects unknown fields, visible pipeline outputs, unsupported
 hazard/evidence types, incoherent bind/abstain/action labels, missing HTTPS
-evidence, unregistered labelers, unresolved adjudication, and frozen sets below
+evidence, an unregistered or mismatched reviewer, review state inconsistent
+with the single-reviewer policy, and frozen sets below
 the 40 / 20 hazard / 20 clean-positive minimums. Proposed cases may collect
 evidence while unlabeled; freeze requires every case to be labeled, resolved,
-and backed by authoritative ORCID, institutional, or publisher evidence.
+and backed by authoritative ORCID, institutional, or publisher evidence. Freeze
+also requires exactly one named reviewer and a null adjudicator.
 
 Create at least 40 frozen cases before tuning behavior:
 
@@ -414,12 +419,14 @@ Each case stores separately:
 2. expected person anchor or required abstention;
 3. permitted action eligibility;
 4. authoritative evidence citations;
-5. labeler and adjudication status.
+5. reviewer and review-completion status.
 
 Existing tests and ORCID scripts may supply input shapes, but their current
-classifications are not truth. Labels are established without viewing either
-pipeline’s output, using authoritative public identity evidence, with disputes
-adjudicated before unblinding.
+classifications are not truth. The single reviewer establishes labels without
+viewing either pipeline's output or the curator's hazard/clean stratum, using
+authoritative public identity evidence. Because there is no second labeler or
+adjudicator, the results must not be described as inter-rater validated or
+adjudicated.
 
 Metrics:
 
@@ -790,7 +797,7 @@ matching, display dedupe, and persistence identity resolution.
 
 ### H1.3 Early-career/no-ORCID decision
 
-**[OWNER-GATE]** Either run the independently labeled stratum-3 evaluation or
+**[OWNER-GATE]** Either run the single-reviewer blinded stratum-3 evaluation or
 document the accepted posture that these names abstain to a human. Do not call
 an unmeasured slice implemented.
 
@@ -918,7 +925,7 @@ the change into cleanup.
 | Order | Phase | Lane | Owner gate | Exit evidence |
 |---|---|---|---|---|
 | 1 | B0 manifest foundation | short Tier-0/1 branch → main | approved | validator + draft manifest |
-| 2 | M1 measurement | short behavior-free branches → main | label/rubric approval | independent benchmark + observational baseline |
+| 2 | M1 measurement | short behavior-free branches → main | label/rubric approval | blinded benchmark + observational baseline |
 | 3 | C0 containment | one Tier-2 branch per invariant → main | per-slice promotion | contract trace, tests, capture send gate |
 | 4 | freeze baseline | tracked manifest update | owner approval | exact post-containment commit + frozen inputs |
 | 5 | I1 binding contract | design/tests/seam branches → main, legacy default | schema/semantics | transition table + policy seam |
@@ -932,9 +939,11 @@ the change into cleanup.
 ## Collected owner decisions
 
 1. Approve each C0 runtime promotion after its evidence bundle.
-2. **M1.1 case pool approved unchanged and labeling parked 2026-07-14.** Resume
-   explicitly before assigning labelers; rubric, thresholds, adjudicator, labels,
-   adjudication, and freeze remain unapproved/pending.
+2. **M1.1 case pool approved unchanged 2026-07-14; single-reviewer blinded
+   labeling approved and resumed 2026-07-15.** One reviewer performs all human
+   decisions; there is no separate labeler or adjudicator and no inter-rater
+   claim. Completed labels, rubric/threshold acceptance, and freeze remain
+   pending.
 3. **Durable fields approved/deployed 2026-07-12; first acceptance self-report
    caller approved/promoted 2026-07-13 via PR #57 / `00ffb09c`.** Broader runtime
    writers/readers and policy migration retain their own gates.

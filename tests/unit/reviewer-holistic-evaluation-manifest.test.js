@@ -30,7 +30,7 @@ function frozenManifest() {
     temperature: 0.3,
     exclusionsHash: 'd'.repeat(64),
   };
-  manifest.adjudicator = 'owner';
+  manifest.adjudicator = null;
   return manifest;
 }
 
@@ -43,12 +43,20 @@ describe('reviewer holistic evaluation manifest', () => {
       expect.objectContaining({ path: 'status' }),
       expect.objectContaining({ path: 'baseline.commit' }),
       expect.objectContaining({ path: 'proposalEvaluation.proposalIds' }),
-      expect.objectContaining({ path: 'adjudicator' }),
     ]));
   });
 
   test('complete frozen manifest passes the hard precondition', () => {
     expect(validateManifest(frozenManifest(), { requireFrozen: true })).toEqual({ ok: true, errors: [] });
+  });
+
+  test('manifest rejects an adjudicator under the single-reviewer policy', () => {
+    const manifest = clone(draftManifest);
+    manifest.adjudicator = 'owner';
+    expect(validateManifest(manifest).errors).toContainEqual({
+      path: 'adjudicator',
+      message: 'must be null for the single-reviewer identity benchmark',
+    });
   });
 
   test('frozen manifest rejects duplicate proposals and unpaired hashes', () => {

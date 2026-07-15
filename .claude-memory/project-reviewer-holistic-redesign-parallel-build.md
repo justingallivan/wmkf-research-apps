@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-14 via the M1.1 parking decision, M1 asset gates, and the read-only C0.4 send-eligibility contract/population audit
+  last_verified: 2026-07-15 via the M1.1 single-reviewer blinded-labeling decision, M1 asset gates, and the read-only C0.4 send-eligibility contract/population audit
 ---
 
 ## Recall Rule
@@ -109,16 +109,17 @@ owner explicitly approved the production-only schema exception. The later
 2026-07-13 decision separately authorizes only the narrow acceptance-drain
 self-report caller described above.
 
-**M1 measurement foundation (2026-07-14):** the identity benchmark now carries
+**M1 measurement foundation (updated 2026-07-15):** the identity benchmark carries
 an owner-approved 40-case public-evidence pool (20 hazard / 20 clean-positive) assembled
 without either reviewer pipeline. Every case has frozen candidate/upstream
 response shapes and at least one ORCID, institutional, or publisher source, but
-all 40 have null expected labels and labelers with pending adjudication. The
+all 40 have null expected labels and null reviewer names, with pending review state. The
 validator permits that evidence-collection state while refusing freeze until
-every case is independently labeled and resolved. The owner approved the case
-set unchanged on 2026-07-14 and then explicitly parked the human-labeling
-exercise; labeler/adjudicator selection, labeling, adjudication, rubric/threshold
-approval, and freeze are deferred until an explicit resume. The blinded
+every case is labeled by exactly one named reviewer. The owner approved the case
+set unchanged on 2026-07-14 and resumed it on 2026-07-15 under a single-reviewer
+blinded protocol. The reviewer performs every human decision; there is no
+separate labeler or adjudicator and no inter-rater claim. Completed labels,
+rubric/threshold acceptance, and freeze remain pending. The blinded
 proposal-evaluation asset remains an intentionally empty draft. The owner still
 must select ten held-out proposals and name the PD scorer before M1.2 can freeze.
 M1.3 is built and captured as an aggregate-only,
@@ -133,8 +134,9 @@ overlapping rather than unique people. No resolver or runtime behavior changed.
   binding source, version, canonical anchor, evidence lineage, correction, and
   action eligibility.
 - Existing tests/eval scripts may seed fixture shapes but do not supply ground
-  truth. The identity benchmark is independently labeled and adjudicated before
-  A/B output is unblinded.
+  truth. One reviewer labels the identity benchmark blind to curator strata and
+  both pipelines' outputs before A/B output is unblinded; the result is not
+  described as inter-rater validated or adjudicated.
 - The existing suggestion ledger supports an observational channel baseline,
   not a causal historical experiment: source tokens can overlap and current
   selected/engagement state is mutable.
@@ -153,7 +155,7 @@ overlapping rather than unique people. No resolver or runtime behavior changed.
   phases; run `/sweep` for durable fact changes.
 - Require raw-field consumer/projection fan-out before retiring
   `wmkf_identitystatus` as a trust signal.
-- Use the plan's independently labeled identity gates, blinded proposal A/B,
+- Use the plan's single-reviewer blinded identity gates, blinded proposal A/B,
   and controlled-pilot thresholds for promote/stop.
 
 ## Do not

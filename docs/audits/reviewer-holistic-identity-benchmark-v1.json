@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "status": "draft",
   "benchmarkVersion": "reviewer-identity-v1",
-  "labelingPolicy": "independent_blinded_adjudicated",
+  "labelingPolicy": "single_reviewer_blinded",
   "pipelineOutputsVisibleToLabelers": false,
   "labelers": [],
   "adjudicator": null,

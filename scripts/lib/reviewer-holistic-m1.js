@@ -1,3 +1,5 @@
+const crypto = require('node:crypto');
+
 const SHA256_RE = /^[0-9a-f]{64}$/i;
 
 const IDENTITY_TOP_LEVEL_KEYS = new Set([
@@ -106,6 +108,17 @@ function validTimestamp(value) {
   return nonEmptyString(value) && !Number.isNaN(Date.parse(value));
 }
 
+function blindCaseIdFor(caseId) {
+  if (!nonEmptyString(caseId)) throw new TypeError('caseId must be a non-empty string');
+  const digest = crypto
+    .createHash('sha256')
+    .update(`reviewer-identity-v1:${caseId}`)
+    .digest('hex')
+    .slice(0, 10)
+    .toUpperCase();
+  return `RIB-${digest}`;
+}
+
 function validateIdentityBenchmark(asset, { requireFrozen = false } = {}) {
   const errors = [];
   const add = (pathName, message) => errors.push({ path: pathName, message });
@@ -118,13 +131,14 @@ function validateIdentityBenchmark(asset, { requireFrozen = false } = {}) {
   if (asset.benchmarkVersion !== 'reviewer-identity-v1') {
     add('benchmarkVersion', 'must equal reviewer-identity-v1');
   }
-  if (asset.labelingPolicy !== 'independent_blinded_adjudicated') {
-    add('labelingPolicy', 'must equal independent_blinded_adjudicated');
+  if (asset.labelingPolicy !== 'single_reviewer_blinded') {
+    add('labelingPolicy', 'must equal single_reviewer_blinded');
   }
   if (asset.pipelineOutputsVisibleToLabelers !== false) {
     add('pipelineOutputsVisibleToLabelers', 'must equal false');
   }
   if (!Array.isArray(asset.labelers)) add('labelers', 'must be an array');
+  if (asset.adjudicator !== null) add('adjudicator', 'must be null for single-reviewer labeling');
   if (!Array.isArray(asset.cases)) add('cases', 'must be an array');
 
   const cases = Array.isArray(asset.cases) ? asset.cases : [];
@@ -173,7 +187,7 @@ function validateIdentityBenchmark(asset, { requireFrozen = false } = {}) {
     }
 
     if (item.caseStatus === 'proposed') {
-      if (item.expected !== null) add(`${base}.expected`, 'must be null until independently labeled');
+      if (item.expected !== null) add(`${base}.expected`, 'must be null until labeled');
     } else {
       if (!isObject(item.expected)) add(`${base}.expected`, 'must be an object for a labeled case');
       rejectUnknown(item.expected, EXPECTED_KEYS, `${base}.expected`, add);
@@ -220,7 +234,7 @@ function validateIdentityBenchmark(asset, { requireFrozen = false } = {}) {
       });
     }
     if (item.caseStatus === 'proposed') {
-      if (item.labeler !== null) add(`${base}.labeler`, 'must be null until independently labeled');
+      if (item.labeler !== null) add(`${base}.labeler`, 'must be null until labeled');
     } else {
       if (!nonEmptyString(item.labeler)) add(`${base}.labeler`, 'must be non-empty');
       if (
@@ -233,17 +247,20 @@ function validateIdentityBenchmark(asset, { requireFrozen = false } = {}) {
     }
     if (!isObject(item.adjudication)) add(`${base}.adjudication`, 'must be an object');
     rejectUnknown(item.adjudication, ADJUDICATION_KEYS, `${base}.adjudication`, add);
-    if (!['pending', 'agreed', 'adjudicated'].includes(item.adjudication?.status)) {
-      add(`${base}.adjudication.status`, 'must be pending, agreed, or adjudicated');
+    if (!['pending', 'not_applicable'].includes(item.adjudication?.status)) {
+      add(`${base}.adjudication.status`, 'must be pending or not_applicable');
     }
     if (item.caseStatus === 'proposed' && item.adjudication?.status !== 'pending') {
-      add(`${base}.adjudication.status`, 'must remain pending until independently labeled');
+      add(`${base}.adjudication.status`, 'must remain pending until labeled');
     }
     if (item.caseStatus === 'proposed' && item.adjudication?.adjudicator !== null) {
-      add(`${base}.adjudication.adjudicator`, 'must be null until adjudication');
+      add(`${base}.adjudication.adjudicator`, 'must be null');
     }
-    if (item.adjudication?.status === 'adjudicated' && !nonEmptyString(item.adjudication?.adjudicator)) {
-      add(`${base}.adjudication.adjudicator`, 'must name the adjudicator');
+    if (item.caseStatus === 'labeled' && item.adjudication?.status !== 'not_applicable') {
+      add(`${base}.adjudication.status`, 'must be not_applicable for single-reviewer labeling');
+    }
+    if (item.adjudication?.adjudicator !== null) {
+      add(`${base}.adjudication.adjudicator`, 'must be null for single-reviewer labeling');
     }
   }
 
@@ -251,10 +268,13 @@ function validateIdentityBenchmark(asset, { requireFrozen = false } = {}) {
   if (mustBeFrozen) {
     if (asset.status !== 'frozen') add('status', 'must be frozen');
     if (!validTimestamp(asset.frozenAt)) add('frozenAt', 'must be an ISO-compatible timestamp');
-    if (!Array.isArray(asset.labelers) || asset.labelers.length === 0 || asset.labelers.some((x) => !nonEmptyString(x))) {
-      add('labelers', 'must contain named labelers');
+    if (
+      !Array.isArray(asset.labelers)
+      || asset.labelers.length !== 1
+      || !nonEmptyString(asset.labelers[0])
+    ) {
+      add('labelers', 'must contain exactly one named reviewer');
     }
-    if (!nonEmptyString(asset.adjudicator)) add('adjudicator', 'must be non-empty');
     const hazards = cases.filter((item) => item?.stratum === 'hazard').length;
     const clean = cases.filter((item) => item?.stratum === 'clean_positive').length;
     if (cases.length < 40) add('cases', 'must contain at least 40 cases');
@@ -267,14 +287,15 @@ function validateIdentityBenchmark(asset, { requireFrozen = false } = {}) {
       if (!item?.evidence?.some((entry) => AUTHORITATIVE_EVIDENCE_TYPES.has(entry?.sourceType))) {
         add(`cases[${index}].evidence`, 'must include authoritative ORCID, institutional, or publisher evidence');
       }
-      if (!['agreed', 'adjudicated'].includes(item?.adjudication?.status)) {
-        add(`cases[${index}].adjudication.status`, 'must be resolved before freezing');
+      if (item?.adjudication?.status !== 'not_applicable') {
+        add(`cases[${index}].adjudication.status`, 'must be not_applicable before freezing');
       }
       if (
-        item?.adjudication?.status === 'adjudicated'
-        && item.adjudication.adjudicator !== asset.adjudicator
+        Array.isArray(asset.labelers)
+        && asset.labelers.length >= 1
+        && item?.labeler !== asset.labelers[0]
       ) {
-        add(`cases[${index}].adjudication.adjudicator`, 'must match the benchmark adjudicator');
+        add(`cases[${index}].labeler`, 'must match the benchmark reviewer');
       }
     });
   }
@@ -537,6 +558,7 @@ module.exports = {
   EVIDENCE_TYPES,
   HAZARD_TYPES,
   aggregateChannelBaseline,
+  blindCaseIdFor,
   tokenizeSources,
   validateIdentityBenchmark,
   validateProposalEvaluation,

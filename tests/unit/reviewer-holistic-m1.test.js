@@ -2,6 +2,7 @@ const identityDraft = require('../../docs/audits/reviewer-holistic-identity-benc
 const proposalDraft = require('../../docs/audits/reviewer-holistic-proposal-evaluation-v1.json');
 const {
   aggregateChannelBaseline,
+  blindCaseIdFor,
   tokenizeSources,
   validateIdentityBenchmark,
   validateProposalEvaluation,
@@ -35,11 +36,11 @@ function identityCase(index, stratum) {
     evidence: [{
       url: `https://example.org/evidence/${index}`,
       sourceType: 'institutional_profile',
-      claim: 'Authoritative identity evidence reviewed independently.',
+      claim: 'Authoritative identity evidence reviewed blind to pipeline output.',
       accessedAt: '2026-07-14T00:00:00.000Z',
     }],
     labeler: 'labeler-a',
-    adjudication: { status: 'agreed', adjudicator: null },
+    adjudication: { status: 'not_applicable', adjudicator: null },
   };
 }
 
@@ -47,7 +48,7 @@ function frozenIdentity() {
   const asset = clone(identityDraft);
   asset.status = 'frozen';
   asset.labelers = ['labeler-a'];
-  asset.adjudicator = 'adjudicator-a';
+  asset.adjudicator = null;
   asset.frozenAt = '2026-07-14T00:00:00.000Z';
   asset.cases = [
     ...Array.from({ length: 20 }, (_, i) => identityCase(i + 1, 'hazard')),
@@ -113,6 +114,16 @@ describe('M1 evaluation assets', () => {
     );
   });
 
+  test('blind case IDs are deterministic, neutral, and unique across the pool', () => {
+    const ids = identityDraft.cases.map((item) => blindCaseIdFor(item.caseId));
+    expect(ids).toHaveLength(40);
+    expect(new Set(ids).size).toBe(40);
+    expect(blindCaseIdFor(identityDraft.cases[0].caseId)).toBe(ids[0]);
+    expect(ids.every((id) => /^RIB-[0-9A-F]{10}$/.test(id))).toBe(true);
+    expect(ids.join(' ').toLowerCase()).not.toMatch(/hazard|clean/);
+    expect(() => blindCaseIdFor('')).toThrow('caseId must be a non-empty string');
+  });
+
   test('tracked empty drafts are structurally valid but cannot freeze', () => {
     expect(validateIdentityBenchmark(identityDraft)).toEqual({ ok: true, errors: [] });
     expect(validateProposalEvaluation(proposalDraft)).toEqual({ ok: true, errors: [] });
@@ -136,7 +147,7 @@ describe('M1 evaluation assets', () => {
       evidence: [{
         url: 'https://orcid.org/0000-0000-0000-0000',
         sourceType: 'orcid_record',
-        claim: 'Candidate public identity record for independent review.',
+        claim: 'Candidate public identity record for blinded review.',
         accessedAt: '2026-07-14T00:00:00.000Z',
       }],
       labeler: null,
@@ -162,6 +173,20 @@ describe('M1 evaluation assets', () => {
       expect.objectContaining({ path: 'cases[1].hazardTypes' }),
       expect.objectContaining({ path: 'cases[2].expected.actionEligible' }),
       expect.objectContaining({ path: 'cases[3].evidence' }),
+    ]));
+  });
+
+  test('identity freeze requires one reviewer and no adjudicator', () => {
+    const asset = frozenIdentity();
+    asset.labelers.push('labeler-b');
+    asset.adjudicator = 'adjudicator-a';
+    asset.cases[0].labeler = 'labeler-b';
+    const result = validateIdentityBenchmark(asset, { requireFrozen: true });
+    expect(result.ok).toBe(false);
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: 'labelers' }),
+      expect.objectContaining({ path: 'adjudicator' }),
+      expect.objectContaining({ path: 'cases[0].labeler' }),
     ]));
   });
 

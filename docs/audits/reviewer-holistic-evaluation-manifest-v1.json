@@ -17,7 +17,7 @@
     "minimumCases": 40,
     "hazardMinimum": 20,
     "cleanPositiveMinimum": 20,
-    "labelingPolicy": "independent_blinded_adjudicated"
+    "labelingPolicy": "single_reviewer_blinded"
   },
   "proposalEvaluation": {
     "proposalIds": [],

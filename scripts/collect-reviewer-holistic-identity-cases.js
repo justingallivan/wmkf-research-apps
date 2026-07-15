@@ -4,7 +4,7 @@
  *
  * This collector does not label cases and does not call either reviewer
  * pipeline. It freezes only the candidate input plus minimal OpenAlex/ORCID
- * response fields needed for later independent labeling. It performs no
+ * response fields needed for later single-reviewer blinded labeling. It performs no
  * Dataverse, Postgres, Blob, LLM, or other production-system access.
  */
 
@@ -169,7 +169,7 @@ function evidenceFor({ accessedAt, openAlexQueryUrl, openAlex, orcidQueryUrl, or
     {
       url: openAlexQueryUrl,
       sourceType: 'discovery',
-      claim: 'Frozen OpenAlex candidate search used only to assemble the independent-review evidence set.',
+      claim: 'Frozen OpenAlex candidate search used only to assemble the blinded-review evidence set.',
       accessedAt,
     },
     {
@@ -193,7 +193,7 @@ function evidenceFor({ accessedAt, openAlexQueryUrl, openAlex, orcidQueryUrl, or
     evidence.push({
       url: `https://orcid.org/${result.orcidId}`,
       sourceType: 'orcid_record',
-      claim: 'Candidate public ORCID record for independent identity review; inclusion is not acceptance.',
+      claim: 'Candidate public ORCID record for single-reviewer blinded identity review; inclusion is not acceptance.',
       accessedAt,
     });
   }

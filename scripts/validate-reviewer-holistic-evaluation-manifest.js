@@ -138,8 +138,8 @@ function validateManifest(manifest, { requireFrozen = false } = {}) {
   if (identity.cleanPositiveMinimum !== 20) {
     add('identityBenchmark.cleanPositiveMinimum', 'must equal 20');
   }
-  if (identity.labelingPolicy !== 'independent_blinded_adjudicated') {
-    add('identityBenchmark.labelingPolicy', 'must equal independent_blinded_adjudicated');
+  if (identity.labelingPolicy !== 'single_reviewer_blinded') {
+    add('identityBenchmark.labelingPolicy', 'must equal single_reviewer_blinded');
   }
 
   const proposals = isObject(manifest.proposalEvaluation) ? manifest.proposalEvaluation : {};
@@ -191,6 +191,9 @@ function validateManifest(manifest, { requireFrozen = false } = {}) {
   if (proposalGates.winMarginMin !== 2) add('rubric.proposalPilotGates.winMarginMin', 'must equal 2');
   if (proposalGates.eligibleShortlistNonInferior !== true) {
     add('rubric.proposalPilotGates.eligibleShortlistNonInferior', 'must equal true');
+  }
+  if (manifest.adjudicator !== null) {
+    add('adjudicator', 'must be null for the single-reviewer identity benchmark');
   }
 
   const mustBeFrozen = requireFrozen || manifest.status === 'frozen';
@@ -245,7 +248,6 @@ function validateManifest(manifest, { requireFrozen = false } = {}) {
     if (!SHA256_RE.test(String(runtime.exclusionsHash || ''))) {
       add('runtimeConfig.exclusionsHash', 'must be a SHA-256 hash');
     }
-    if (!nonEmptyString(manifest.adjudicator)) add('adjudicator', 'must be non-empty');
   }
 
   return { ok: errors.length === 0, errors };
