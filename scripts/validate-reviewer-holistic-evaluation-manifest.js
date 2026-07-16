@@ -42,10 +42,11 @@ const TOP_LEVEL_KEYS = new Set([
   'rubric',
   'adjudicator',
   'artifactSchemaVersion',
+  'evaluationScriptVersion',
 ]);
 const NESTED_KEYS = {
   baseline: new Set(['origin', 'commit', 'runtimeBehavior']),
-  redesign: new Set(['startingCommit', 'pipelineVersion']),
+  redesign: new Set(['startingCommit', 'implementationCommit', 'pipelineVersion']),
   identityBenchmark: new Set([
     'fixtureVersion',
     'minimumCases',
@@ -119,6 +120,9 @@ function validateManifest(manifest, { requireFrozen = false } = {}) {
     add('createdAt', 'must be an ISO-compatible timestamp');
   }
   if (manifest.artifactSchemaVersion !== 1) add('artifactSchemaVersion', 'must equal 1');
+  if (manifest.evaluationScriptVersion != null && !nonEmptyString(manifest.evaluationScriptVersion)) {
+    add('evaluationScriptVersion', 'must be null or non-empty');
+  }
 
   const baseline = isObject(manifest.baseline) ? manifest.baseline : {};
   if (!isObject(manifest.baseline)) add('baseline', 'must be an object');
@@ -136,6 +140,9 @@ function validateManifest(manifest, { requireFrozen = false } = {}) {
   rejectUnknown(manifest.redesign, 'redesign');
   if (redesign.startingCommit != null && !SHA1_RE.test(String(redesign.startingCommit))) {
     add('redesign.startingCommit', 'must be null or a 40-character commit SHA');
+  }
+  if (redesign.implementationCommit != null && !SHA1_RE.test(String(redesign.implementationCommit))) {
+    add('redesign.implementationCommit', 'must be null or a 40-character commit SHA');
   }
   if (redesign.pipelineVersion != null && !nonEmptyString(redesign.pipelineVersion)) {
     add('redesign.pipelineVersion', 'must be null or non-empty');
@@ -246,11 +253,17 @@ function validateManifest(manifest, { requireFrozen = false } = {}) {
     if (!SHA1_RE.test(String(redesign.startingCommit || ''))) {
       add('redesign.startingCommit', 'must be a 40-character commit SHA');
     }
+    if (!SHA1_RE.test(String(redesign.implementationCommit || ''))) {
+      add('redesign.implementationCommit', 'must be a 40-character commit SHA');
+    }
     if (!nonEmptyString(redesign.pipelineVersion)) {
       add('redesign.pipelineVersion', 'must be non-empty');
     }
     if (!nonEmptyString(identity.fixtureVersion)) {
       add('identityBenchmark.fixtureVersion', 'must be non-empty');
+    }
+    if (!nonEmptyString(manifest.evaluationScriptVersion)) {
+      add('evaluationScriptVersion', 'must be non-empty');
     }
 
     const ids = Array.isArray(proposals.proposalIds) ? proposals.proposalIds : [];
@@ -303,6 +316,7 @@ function validateCommitReferences(manifest, { repoRoot = path.join(__dirname, '.
   for (const [pathName, commit] of [
     ['baseline.commit', manifest?.baseline?.commit],
     ['redesign.startingCommit', manifest?.redesign?.startingCommit],
+    ['redesign.implementationCommit', manifest?.redesign?.implementationCommit],
   ]) {
     if (commit == null) continue;
     try {

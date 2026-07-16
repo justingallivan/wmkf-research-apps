@@ -20,6 +20,7 @@
     "smoke:reviewer-contact": "node --import ./scripts/lib/use-extensionless.mjs scripts/smoke-reviewer-contact-anchoring.mjs",
     "eval:reviewer-holistic:manifest": "node scripts/validate-reviewer-holistic-evaluation-manifest.js",
     "eval:reviewer-holistic:m1": "node scripts/validate-reviewer-holistic-m1-assets.js",
+    "eval:reviewer-holistic:m1-plan": "node --import ./scripts/lib/use-extensionless.mjs scripts/plan-reviewer-holistic-m1.mjs",
     "collect:reviewer-holistic:m1-identities": "node scripts/collect-reviewer-holistic-identity-cases.js",
     "probe:reviewer-holistic:channels": "node scripts/probe-reviewer-channel-baseline.js",
     "test:watch": "jest --watch",

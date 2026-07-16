@@ -88,6 +88,7 @@ export async function observeRuntimeConfig({ target }) {
     { fetchCurrentPrompt },
     { buildExclusionSets },
     { loadReviewerRequestContext },
+    { applicantRecommendationNames, loadApplicantRecommendationSeeds },
     { PRODUCTION_HOSTS },
     baseConfig,
   ] = await Promise.all([
@@ -96,6 +97,7 @@ export async function observeRuntimeConfig({ target }) {
     import('../lib/services/prompt-store.js'),
     import('../lib/services/reviewer-prompt-composer.js'),
     import('../lib/services/reviewer-request-context.js'),
+    import('./lib/reviewer-holistic-pipelines.mjs'),
     import('../lib/dataverse/core/target-registry.js'),
     import('../shared/config/baseConfig.js'),
   ]);
@@ -148,13 +150,20 @@ export async function observeRuntimeConfig({ target }) {
   const resolvedFallback = baseConfig.getFallbackModelForApp('reviewer-finder');
 
   const exclusionEntries = await Promise.all(evaluation.proposals.map(async (proposal) => {
-    const requestContext = await loadReviewerRequestContext(proposal.proposalId, {
-      includeCoPIs: true,
-      requireCompleteInstitutions: true,
-    });
+    const [requestContext, applicantSeeds] = await Promise.all([
+      loadReviewerRequestContext(proposal.proposalId, {
+        includeCoPIs: true,
+        requireCompleteInstitutions: true,
+      }),
+      loadApplicantRecommendationSeeds(proposal.proposalId),
+    ]);
     return {
       proposalId: proposal.proposalId,
-      exclusions: buildExclusionSets({ excludedNames: [], requestContext }),
+      exclusions: buildExclusionSets({
+        excludedNames: applicantRecommendationNames(applicantSeeds),
+        requestContext,
+      }),
+      applicantSeedCount: applicantSeeds.length,
     };
   }));
 
@@ -165,7 +174,10 @@ export async function observeRuntimeConfig({ target }) {
     modelOverridesHash: sha256Canonical(relevantOverrides),
     reviewerCount: 15,
     temperature: 0.3,
-    exclusionsHash: sha256Canonical(exclusionEntries),
+    exclusionsHash: sha256Canonical(exclusionEntries.map(({ proposalId, exclusions }) => ({
+      proposalId,
+      exclusions,
+    }))),
   };
   const diagnostics = {
     targetHost,
@@ -177,10 +189,11 @@ export async function observeRuntimeConfig({ target }) {
     }),
     rawModels: { primary: rawPrimary, fallback: rawFallback },
     resolvedModels: { primary: resolvedPrimary, fallback: resolvedFallback },
-    exclusionCounts: exclusionEntries.map(({ proposalId, exclusions }) => ({
+    exclusionCounts: exclusionEntries.map(({ proposalId, exclusions, applicantSeedCount }) => ({
       proposalId,
       people: exclusions.people.length,
       institutions: exclusions.institutions.length,
+      applicantSeeds: applicantSeedCount,
     })),
   };
   return { runtimeConfig, diagnostics };

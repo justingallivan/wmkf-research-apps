@@ -15,7 +15,9 @@ function frozenManifest() {
   manifest.status = 'frozen';
   manifest.baseline.commit = 'a'.repeat(40);
   manifest.redesign.startingCommit = 'b'.repeat(40);
+  manifest.redesign.implementationCommit = 'c'.repeat(40);
   manifest.redesign.pipelineVersion = 'reviewer-holistic/v1';
+  manifest.evaluationScriptVersion = 'reviewer-holistic-run-plan/v1';
   manifest.identityBenchmark.fixtureVersion = 'identity-fixtures/v1';
   manifest.proposalEvaluation.proposalIds = proposalIds;
   manifest.proposalEvaluation.documentHashes = Object.fromEntries(
@@ -51,7 +53,9 @@ describe('reviewer holistic evaluation manifest', () => {
     expect(frozenCheck.ok).toBe(false);
     expect(frozenCheck.errors).toEqual(expect.arrayContaining([
       expect.objectContaining({ path: 'status' }),
+      expect.objectContaining({ path: 'redesign.implementationCommit' }),
       expect.objectContaining({ path: 'redesign.pipelineVersion' }),
+      expect.objectContaining({ path: 'evaluationScriptVersion' }),
     ]));
   });
 
@@ -118,6 +122,7 @@ describe('reviewer holistic evaluation manifest', () => {
     const head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
     manifest.baseline.commit = head;
     manifest.redesign.startingCommit = head;
+    manifest.redesign.implementationCommit = head;
     expect(validateCommitReferences(manifest)).toEqual({ ok: true, errors: [] });
 
     manifest.redesign.startingCommit = '0'.repeat(40);
@@ -134,6 +139,7 @@ describe('reviewer holistic evaluation manifest', () => {
     const manifest = clone(draftManifest);
     manifest.baseline.commit = null;
     manifest.redesign.startingCommit = null;
+    manifest.redesign.implementationCommit = null;
     expect(validateCommitReferences(manifest)).toEqual({ ok: true, errors: [] });
   });
 });
