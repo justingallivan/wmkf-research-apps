@@ -251,12 +251,15 @@ async function loadFrozenInputs({ manifest, proposalEvaluation, cohort, plan }) 
     { extractTextFromBuffer },
     { loadReviewerRequestContext },
     { buildExclusionSets },
+    { enterDynamicsBypassForScript },
   ] = await Promise.all([
     import('../lib/services/graph-service.js'),
     import('../lib/utils/file-loader.js'),
     import('../lib/services/reviewer-request-context.js'),
     import('../lib/services/reviewer-prompt-composer.js'),
+    import('../lib/services/dynamics-context.js'),
   ]);
+  enterDynamicsBypassForScript('run-reviewer-holistic-m1-preflight');
   const cohortById = new Map(cohort.proposals.map((item) => [item.proposalId, item]));
   const inputByProposal = new Map();
   const exclusionEntries = [];
