@@ -364,7 +364,8 @@ eligibility test.
 
 **[FOUNDATION + M1.1 OWNER-APPROVED POOL + M1.3 BUILT 2026-07-14; M1.1
 SINGLE-REVIEWER LABELING FROZEN 2026-07-16 + M1.2 TEN-PROPOSAL COHORT FROZEN
-2026-07-16, RUN CONFIGURATION/EXECUTION/SCORING PENDING]** The tracked frozen identity benchmark and frozen blinded
+2026-07-16; BASELINE/STARTING SHA + LIVE RUNTIME SNAPSHOT PINNED 2026-07-16;
+REDESIGN/EXECUTION/SCORING PENDING]** The tracked frozen identity benchmark and frozen blinded
 proposal-evaluation assets now have fail-closed validators at
 `scripts/validate-reviewer-holistic-m1-assets.js`; draft validation is
 `npm run eval:reviewer-holistic:m1`, while `--require-frozen` and
@@ -391,7 +392,18 @@ and named Justin as the blinded scorer. The frozen evaluation stores ten opaque
 seed-derived proposal IDs and only the SHA-256 seed commitment; the raw seed is
 retained locally in ignored `.env.m1.local`. All run, arm-membership, and score
 arrays remain empty. The overall evaluation manifest remains draft until the
-baseline/redesign commits and identical runtime configuration are frozen.
+redesign pipeline exists and has a version. The baseline and redesign starting
+point are both pinned to post-containment `origin/main` commit
+`50140eb62dd8f3c04f6d3ab5e131d96711f804d7`; the identity fixture is
+`reviewer-identity-v1`. A read-only production probe pinned prompt row/version,
+resolved model ID, reviewer count 15, temperature 0.3, the relevant model-
+override hash, and a per-proposal hash of the server-derived PI/co-PI/applicant
+institution exclusions. The read-only command
+`node --import ./scripts/lib/use-extensionless.mjs scripts/probe-reviewer-holistic-runtime-config.mjs --target=prod --check-manifest`
+now fails on live drift without making an LLM generation call or any write. No
+completed redesign pipeline or M1.2 head-to-head run orchestrator exists, so
+`redesign.pipelineVersion` remains null, the manifest remains draft, and no paid
+run has started.
 
 ### M1.1 Single-reviewer blinded person benchmark
 
@@ -466,8 +478,9 @@ unsupported population claim.
 
 ### M1.2 Proposal-level blinded head-to-head
 
-**[TEN-PROPOSAL COHORT OWNER-APPROVED AND FROZEN 2026-07-16; RUN
-CONFIGURATION/EXECUTION/SCORING PENDING]**
+**[TEN-PROPOSAL COHORT OWNER-APPROVED AND FROZEN 2026-07-16; BASELINE/STARTING
+SHA + LIVE RUNTIME SNAPSHOT PINNED 2026-07-16; REDESIGN/EXECUTION/SCORING
+PENDING]**
 `docs/audits/reviewer-holistic-proposal-evaluation-v1.json` is frozen with the
 approved ten, scorer Justin, a hashed randomization seed, immutable document
 hashes, and empty execution/scoring arrays. The recommendation and its
@@ -972,7 +985,9 @@ the change into cleanup.
    preserved in the tracked labeling-import audit. **M1.2 proposal cohort
    approved/frozen 2026-07-16:** the owner approved the proposed ten, attested
    to the best of their knowledge that none tuned the redesign, and named Justin
-   as scorer. Run configuration, execution, and blinded scoring remain pending.
+   as scorer. The baseline/starting SHA and a live runtime snapshot are now
+   pinned, but the redesign pipeline/version, execution, and blinded scoring
+   remain pending.
 3. **Durable fields approved/deployed 2026-07-12; first acceptance self-report
    caller approved/promoted 2026-07-13 via PR #57 / `00ffb09c`.** Broader runtime
    writers/readers and policy migration retain their own gates.

@@ -135,8 +135,18 @@ Justin as the blinded scorer. The frozen evaluation contains ten unique opaque
 seed-derived proposal IDs, exact document hashes, and only the randomization
 seed's SHA-256 commitment; the raw seed is retained locally in ignored
 `.env.m1.local`. Run, candidate-arm membership, and score arrays remain empty.
-The overall evaluation manifest remains draft until exact baseline/redesign
-commits and identical runtime configuration are frozen; no M1.2 run has started.
+The overall evaluation manifest now pins both the baseline and redesign starting
+point to post-containment `origin/main` commit
+`50140eb62dd8f3c04f6d3ab5e131d96711f804d7`, links identity fixture
+`reviewer-identity-v1`, and carries a read-only production runtime snapshot:
+prompt row/version, resolved model ID, reviewer count 15, temperature 0.3,
+relevant model-override hash, and a hash of the exact server-derived exclusions
+for all ten proposals. The command
+`node --import ./scripts/lib/use-extensionless.mjs scripts/probe-reviewer-holistic-runtime-config.mjs --target=prod --check-manifest`
+verifies the live values without an LLM generation call or any write. The
+manifest remains draft because no completed redesign pipeline or M1.2
+head-to-head run orchestrator exists and `redesign.pipelineVersion` is still
+null; no M1.2 run has started.
 M1.3 is built and captured as an aggregate-only,
 read-only production artifact: 668 suggestion engagement rows, 275 exclusive
 token and 393 multi-touch, across 11 observed source tokens. The artifact

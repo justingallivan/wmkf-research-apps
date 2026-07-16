@@ -22,8 +22,8 @@ function frozenManifest() {
     proposalIds.map((id, index) => [id, String(index % 10).repeat(64)]),
   );
   manifest.runtimeConfig = {
-    promptRowId: 'reviewer-analyze',
-    promptVersion: 'v1',
+    promptRowId: '11111111-1111-4111-8111-111111111111',
+    promptVersion: '1',
     modelIds: ['provider/model-version'],
     modelOverridesHash: 'c'.repeat(64),
     reviewerCount: 15,
@@ -38,12 +38,35 @@ describe('reviewer holistic evaluation manifest', () => {
   test('tracked draft is structurally valid but not frozen', () => {
     expect(validateManifest(draftManifest)).toEqual({ ok: true, errors: [] });
     expect(draftManifest.proposalEvaluation.proposalIds).toHaveLength(10);
+    expect(draftManifest.baseline.commit).toBe('50140eb62dd8f3c04f6d3ab5e131d96711f804d7');
+    expect(draftManifest.redesign.startingCommit).toBe(draftManifest.baseline.commit);
+    expect(draftManifest.identityBenchmark.fixtureVersion).toBe('reviewer-identity-v1');
+    expect(draftManifest.runtimeConfig).toMatchObject({
+      promptVersion: '2',
+      modelIds: ['claude-opus-4-8'],
+      reviewerCount: 15,
+      temperature: 0.3,
+    });
     const frozenCheck = validateManifest(draftManifest, { requireFrozen: true });
     expect(frozenCheck.ok).toBe(false);
     expect(frozenCheck.errors).toEqual(expect.arrayContaining([
       expect.objectContaining({ path: 'status' }),
+      expect.objectContaining({ path: 'redesign.pipelineVersion' }),
+    ]));
+  });
+
+  test('partially populated draft freeze fields fail closed when malformed', () => {
+    const manifest = clone(draftManifest);
+    manifest.baseline.commit = 'not-a-sha';
+    manifest.runtimeConfig.promptRowId = 'not-a-guid';
+    manifest.runtimeConfig.modelOverridesHash = 'not-a-hash';
+    manifest.runtimeConfig.reviewerCount = 0;
+    const result = validateManifest(manifest);
+    expect(result.errors).toEqual(expect.arrayContaining([
       expect.objectContaining({ path: 'baseline.commit' }),
       expect.objectContaining({ path: 'runtimeConfig.promptRowId' }),
+      expect.objectContaining({ path: 'runtimeConfig.modelOverridesHash' }),
+      expect.objectContaining({ path: 'runtimeConfig.reviewerCount' }),
     ]));
   });
 
@@ -105,5 +128,12 @@ describe('reviewer holistic evaluation manifest', () => {
         message: 'must resolve to a commit in the local repository',
       }],
     });
+  });
+
+  test('draft commit-reference checks skip unpinned null fields', () => {
+    const manifest = clone(draftManifest);
+    manifest.baseline.commit = null;
+    manifest.redesign.startingCommit = null;
+    expect(validateCommitReferences(manifest)).toEqual({ ok: true, errors: [] });
   });
 });
