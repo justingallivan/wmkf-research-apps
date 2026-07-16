@@ -363,8 +363,8 @@ eligibility test.
 ## M1 — Build the evaluation system before further resolver changes
 
 **[FOUNDATION + M1.1 OWNER-APPROVED POOL + M1.3 BUILT 2026-07-14; M1.1
-SINGLE-REVIEWER LABELING FROZEN 2026-07-16 + M1.2 TEN-PROPOSAL COHORT PROPOSED
-2026-07-16, OWNER ATTESTATION/SCORER/FREEZE PENDING]** The tracked frozen identity benchmark and draft blinded
+SINGLE-REVIEWER LABELING FROZEN 2026-07-16 + M1.2 TEN-PROPOSAL COHORT FROZEN
+2026-07-16, RUN CONFIGURATION/EXECUTION/SCORING PENDING]** The tracked frozen identity benchmark and frozen blinded
 proposal-evaluation assets now have fail-closed validators at
 `scripts/validate-reviewer-holistic-m1-assets.js`; draft validation is
 `npm run eval:reviewer-holistic:m1`, while `--require-frozen` and
@@ -385,9 +385,13 @@ mechanically stratified ten-proposal recommendation with five Phase I thin-signa
 documents, five Phase II full-signal documents, immutable SHA-256 hashes, four
 Science and Engineering Research cases, and six Medical Research cases. The
 repository reference sweep found no selected request numbers, but available API
-telemetry cannot prove request-level non-use. M1.2 therefore cannot freeze until
-the owner approves the ten, attests they were not used to tune the redesign, and
-names the PD scorer.
+telemetry cannot prove request-level non-use. On 2026-07-16 the owner approved
+the ten, attested to the best of their knowledge that none tuned the redesign,
+and named Justin as the blinded scorer. The frozen evaluation stores ten opaque
+seed-derived proposal IDs and only the SHA-256 seed commitment; the raw seed is
+retained locally in ignored `.env.m1.local`. All run, arm-membership, and score
+arrays remain empty. The overall evaluation manifest remains draft until the
+baseline/redesign commits and identical runtime configuration are frozen.
 
 ### M1.1 Single-reviewer blinded person benchmark
 
@@ -462,14 +466,16 @@ unsupported population claim.
 
 ### M1.2 Proposal-level blinded head-to-head
 
-**[DRAFT CONTRACT BUILT; TEN-PROPOSAL COHORT PROPOSED 2026-07-16; OWNER
-ATTESTATION/SCORER/FREEZE AND RUNS PENDING]**
-`docs/audits/reviewer-holistic-proposal-evaluation-v1.json` remains intentionally
-empty. The pre-freeze recommendation and its production-read provenance live in
+**[TEN-PROPOSAL COHORT OWNER-APPROVED AND FROZEN 2026-07-16; RUN
+CONFIGURATION/EXECUTION/SCORING PENDING]**
+`docs/audits/reviewer-holistic-proposal-evaluation-v1.json` is frozen with the
+approved ten, scorer Justin, a hashed randomization seed, immutable document
+hashes, and empty execution/scoring arrays. The recommendation and its
+production-read provenance live in
 `docs/audits/reviewer-holistic-proposal-cohort-proposal-v1.json`; the M1 asset
 validator checks its exact ten rows, 5/5 signal split, multi-program coverage,
-document hashes, and pending owner-attestation boundary. The frozen-asset
-validator requires an explicit non-tuning cohort, unique source and
+document hashes, owner approval, and exact agreement with the frozen evaluation.
+The frozen-asset validator requires an explicit non-tuning cohort, unique source and
 blind proposal IDs, document hashes, thin/full signal coverage, multiple
 program areas, a hashed randomization seed, and a named PD scorer before
 freeze. A scored artifact additionally requires exactly three unique run IDs
@@ -477,9 +483,9 @@ per arm and complete scores keyed only by blind candidate IDs, with an exact
 post-unblinding map from every blind candidate ID to its baseline/redesign arm
 membership.
 
-Before execution, the owner must approve the proposed ten and attest that none
-tuned the redesign; then freeze the cohort with opaque blind IDs, a named PD
-scorer, and a hashed randomization seed.
+Before execution, freeze the remaining overall manifest inputs: the exact
+baseline/redesign commits and identical prompt, model, candidate-count,
+temperature, exclusion, and environment configuration.
 
 Run frozen main and completed redesign with identical documents, prompt/model
 configuration, candidate count, exclusions, and environment. Run three
@@ -963,8 +969,10 @@ the change into cleanup.
    benchmark contains 23 Bind and 17 Abstain labels. There is no separate
    labeler or adjudicator and no inter-rater claim. The raw workbook responses,
    workbook hash, normalizations, and five owner-approved resolutions are
-   preserved in the tracked labeling-import audit. M1.2 rubric/threshold
-   acceptance and proposal-cohort freeze remain pending.
+   preserved in the tracked labeling-import audit. **M1.2 proposal cohort
+   approved/frozen 2026-07-16:** the owner approved the proposed ten, attested
+   to the best of their knowledge that none tuned the redesign, and named Justin
+   as scorer. Run configuration, execution, and blinded scoring remain pending.
 3. **Durable fields approved/deployed 2026-07-12; first acceptance self-report
    caller approved/promoted 2026-07-13 via PR #57 / `00ffb09c`.** Broader runtime
    writers/readers and policy migration retain their own gates.

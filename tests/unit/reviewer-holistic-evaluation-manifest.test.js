@@ -37,12 +37,13 @@ function frozenManifest() {
 describe('reviewer holistic evaluation manifest', () => {
   test('tracked draft is structurally valid but not frozen', () => {
     expect(validateManifest(draftManifest)).toEqual({ ok: true, errors: [] });
+    expect(draftManifest.proposalEvaluation.proposalIds).toHaveLength(10);
     const frozenCheck = validateManifest(draftManifest, { requireFrozen: true });
     expect(frozenCheck.ok).toBe(false);
     expect(frozenCheck.errors).toEqual(expect.arrayContaining([
       expect.objectContaining({ path: 'status' }),
       expect.objectContaining({ path: 'baseline.commit' }),
-      expect.objectContaining({ path: 'proposalEvaluation.proposalIds' }),
+      expect.objectContaining({ path: 'runtimeConfig.promptRowId' }),
     ]));
   });
 

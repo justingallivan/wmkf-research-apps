@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-16 via the frozen M1.1 benchmark/import audit, proposed M1.2 cohort, and M1 asset gates
+  last_verified: 2026-07-16 via the frozen M1.1 benchmark/import audit, frozen M1.2 cohort, and M1 asset gates
 ---
 
 ## Recall Rule
@@ -121,16 +121,22 @@ all 40 raw workbook rows, deterministic blind-ID mappings, normalization rules
 and notes, and the five owner-approved resolutions. The validator requires the
 frozen benchmark and import to agree exactly and permits institutional-profile
 anchors only when they match authoritative case evidence. The blinded
-proposal-evaluation asset remains an intentionally empty draft. A read-only
+proposal-evaluation asset is frozen at
+`docs/audits/reviewer-holistic-proposal-evaluation-v1.json`. A read-only
 production inventory on 2026-07-16 produced the mechanically stratified proposal
 at `docs/audits/reviewer-holistic-proposal-cohort-proposal-v1.json`: ten unique
 requests, five Phase I thin-signal documents, five Phase II full-signal documents,
 four Science and Engineering Research cases, six Medical Research cases, and an
 immutable SHA-256 hash for every selected document. No selected request number
 appears in the tracked repository, but the available API telemetry has no request
-identifier and cannot prove non-use. The owner must therefore approve the ten,
-attest they were not used to tune the redesign, and name the PD scorer before
-M1.2 can freeze.
+identifier and cannot prove non-use. On 2026-07-16 the owner approved the ten,
+attested to the best of their knowledge that none tuned the redesign, and named
+Justin as the blinded scorer. The frozen evaluation contains ten unique opaque
+seed-derived proposal IDs, exact document hashes, and only the randomization
+seed's SHA-256 commitment; the raw seed is retained locally in ignored
+`.env.m1.local`. Run, candidate-arm membership, and score arrays remain empty.
+The overall evaluation manifest remains draft until exact baseline/redesign
+commits and identical runtime configuration are frozen; no M1.2 run has started.
 M1.3 is built and captured as an aggregate-only,
 read-only production artifact: 668 suggestion engagement rows, 275 exclusive
 token and 393 multi-touch, across 11 observed source tokens. The artifact

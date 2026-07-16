@@ -1,8 +1,10 @@
 {
   "schemaVersion": 1,
-  "status": "proposed_pending_owner_attestation",
+  "status": "owner_approved",
   "proposalVersion": "reviewer-proposal-cohort-proposal-v1",
   "observedAt": "2026-07-16T13:07:06.424Z",
+  "approvedAt": "2026-07-16T13:18:31.510Z",
+  "scorer": "Justin",
   "source": {
     "target": "production",
     "targetHostname": "wmkf.crm.dynamics.com",
@@ -21,7 +23,7 @@
     "repositorySweepStatus": "passed_for_selected_request_numbers",
     "selectedReferencesFound": 0,
     "telemetryStatus": "insufficient_for_request_level_proof",
-    "ownerAttestation": "pending"
+    "ownerAttestation": "approved_best_of_owner_knowledge"
   },
   "proposals": [
     {
@@ -38,7 +40,7 @@
       "documentBytes": 397465,
       "extractedChars": 7934,
       "extractedWords": 1188,
-      "tuningStatus": "owner_attestation_pending"
+      "tuningStatus": "owner_attested_not_used_for_tuning"
     },
     {
       "proposalId": "631eb17c-7a24-f011-8c4d-6045bd003e28",
@@ -54,7 +56,7 @@
       "documentBytes": 89612,
       "extractedChars": 7439,
       "extractedWords": 996,
-      "tuningStatus": "owner_attestation_pending"
+      "tuningStatus": "owner_attested_not_used_for_tuning"
     },
     {
       "proposalId": "e4115ab9-4e24-f011-8c4e-6045bd0510d4",
@@ -70,7 +72,7 @@
       "documentBytes": 4554893,
       "extractedChars": 40760,
       "extractedWords": 5568,
-      "tuningStatus": "owner_attestation_pending"
+      "tuningStatus": "owner_attested_not_used_for_tuning"
     },
     {
       "proposalId": "cb6845e3-9798-ef11-8a6a-00224803a64e",
@@ -86,7 +88,7 @@
       "documentBytes": 514726,
       "extractedChars": 37807,
       "extractedWords": 5002,
-      "tuningStatus": "owner_attestation_pending"
+      "tuningStatus": "owner_attested_not_used_for_tuning"
     },
     {
       "proposalId": "0e241e8d-9698-ef11-8a6a-000d3a383a3f",
@@ -102,7 +104,7 @@
       "documentBytes": 675933,
       "extractedChars": 7389,
       "extractedWords": 1095,
-      "tuningStatus": "owner_attestation_pending"
+      "tuningStatus": "owner_attested_not_used_for_tuning"
     },
     {
       "proposalId": "85b1fb9b-9498-ef11-8a6a-000d3a344c0f",
@@ -118,7 +120,7 @@
       "documentBytes": 1558562,
       "extractedChars": 37254,
       "extractedWords": 5430,
-      "tuningStatus": "owner_attestation_pending"
+      "tuningStatus": "owner_attested_not_used_for_tuning"
     },
     {
       "proposalId": "d36a659e-5998-ef11-8a6a-00224803a64e",
@@ -138,7 +140,7 @@
       "documentBytes": 321648,
       "extractedChars": 9053,
       "extractedWords": 1753,
-      "tuningStatus": "owner_attestation_pending"
+      "tuningStatus": "owner_attested_not_used_for_tuning"
     },
     {
       "proposalId": "29ae3261-f207-ef11-9f89-000d3a32c1ae",
@@ -154,7 +156,7 @@
       "documentBytes": 150888,
       "extractedChars": 7981,
       "extractedWords": 1083,
-      "tuningStatus": "owner_attestation_pending"
+      "tuningStatus": "owner_attested_not_used_for_tuning"
     },
     {
       "proposalId": "cc417741-1407-ef11-9f89-00224805fbb2",
@@ -171,7 +173,7 @@
       "documentBytes": 882234,
       "extractedChars": 31485,
       "extractedWords": 4327,
-      "tuningStatus": "owner_attestation_pending"
+      "tuningStatus": "owner_attested_not_used_for_tuning"
     },
     {
       "proposalId": "6375f4c2-a401-ef11-a1fd-000d3a3621c7",
@@ -189,7 +191,7 @@
       "documentBytes": 400616,
       "extractedChars": 41333,
       "extractedWords": 5811,
-      "tuningStatus": "owner_attestation_pending"
+      "tuningStatus": "owner_attested_not_used_for_tuning"
     }
   ],
   "excludedCandidates": [

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Validate the M1 identity-label and blinded proposal-evaluation assets.
+ * Validate the M1 identity-label and blinded proposal-evaluation assets,
+ * including approved-cohort and manifest consistency for the tracked freeze.
  * Draft assets may be empty; any populated row must already satisfy its full
  * data-entry contract. Freeze/scored modes add the M1 cohort and completion
  * gates. This script is pure and performs no network or Dataverse access.
@@ -11,8 +12,10 @@ const path = require('node:path');
 const {
   validateIdentityBenchmark,
   validateIdentityLabelingImport,
+  validateProposalCohortFreeze,
   validateProposalCohortProposal,
   validateProposalEvaluation,
+  validateProposalManifestConsistency,
 } = require('./lib/reviewer-holistic-m1');
 
 const ROOT = path.join(__dirname, '..');
@@ -27,6 +30,10 @@ const DEFAULT_PROPOSAL_PATH = path.join(
 const DEFAULT_COHORT_PROPOSAL_PATH = path.join(
   ROOT,
   'docs/audits/reviewer-holistic-proposal-cohort-proposal-v1.json',
+);
+const DEFAULT_MANIFEST_PATH = path.join(
+  ROOT,
+  'docs/audits/reviewer-holistic-evaluation-manifest-v1.json',
 );
 const IDENTITY_IMPORT_FILE = 'reviewer-holistic-identity-labeling-import-v1.json';
 const DEFAULT_IDENTITY_IMPORT_PATH = path.join(ROOT, 'docs/audits', IDENTITY_IMPORT_FILE);
@@ -62,10 +69,12 @@ function main() {
   let identity;
   let identityImport;
   let cohortProposal;
+  let manifest;
   let proposals;
   try {
     identity = readJson(options.identityPath);
     cohortProposal = readJson(DEFAULT_COHORT_PROPOSAL_PATH);
+    manifest = readJson(DEFAULT_MANIFEST_PATH);
     proposals = readJson(options.proposalPath);
     if (identity.status === 'frozen') identityImport = readJson(options.identityImportPath);
   } catch (error) {
@@ -81,6 +90,18 @@ function main() {
     })],
     ['proposal cohort proposal', validateProposalCohortProposal(cohortProposal)],
   ];
+  if (proposals.status === 'frozen' || proposals.status === 'scored') {
+    results.push([
+      'proposal cohort freeze consistency',
+      validateProposalCohortFreeze(cohortProposal, proposals),
+    ]);
+    if (path.resolve(options.proposalPath) === path.resolve(DEFAULT_PROPOSAL_PATH)) {
+      results.push([
+        'proposal manifest consistency',
+        validateProposalManifestConsistency(manifest, proposals),
+      ]);
+    }
+  }
   if (identity.status === 'frozen') {
     results.splice(1, 0, [
       'identity labeling import',
@@ -104,6 +125,7 @@ module.exports = {
   DEFAULT_IDENTITY_PATH,
   DEFAULT_IDENTITY_IMPORT_PATH,
   DEFAULT_COHORT_PROPOSAL_PATH,
+  DEFAULT_MANIFEST_PATH,
   DEFAULT_PROPOSAL_PATH,
   parseCli,
 };

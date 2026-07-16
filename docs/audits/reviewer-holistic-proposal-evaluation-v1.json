@@ -1,11 +1,152 @@
 {
   "schemaVersion": 1,
-  "status": "draft",
+  "status": "frozen",
   "evaluationVersion": "reviewer-proposal-head-to-head-v1",
   "selectionPolicy": "held_out_stratified_thin_and_full_signal",
   "replicatesPerArm": 3,
-  "scorer": null,
-  "randomizationSeedHash": null,
-  "frozenAt": null,
-  "proposals": []
+  "scorer": "Justin",
+  "randomizationSeedHash": "e18c7da62b228fd0353763f4e9379a24759d5b807b54a7925453db17c2542921",
+  "frozenAt": "2026-07-16T13:18:31.510Z",
+  "proposals": [
+    {
+      "proposalId": "ce2a0046-d826-f011-8c4e-6045bd0510d4",
+      "blindProposalId": "RPE-05EB9F1357",
+      "programArea": "Science and Engineering Research",
+      "signalLevel": "thin",
+      "documentHash": "4f8f2443f7de3176d1c2ef84bdeb8e5af1d632abd89783489a43812c9336bbd9",
+      "usedForTuning": false,
+      "runs": {
+        "baseline": [],
+        "redesign": []
+      },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    },
+    {
+      "proposalId": "631eb17c-7a24-f011-8c4d-6045bd003e28",
+      "blindProposalId": "RPE-7D782099B6",
+      "programArea": "Medical Research",
+      "signalLevel": "thin",
+      "documentHash": "7021235c6e41695efa1573f9894b87f6d7b6036847bc780dae5ba979bb71b877",
+      "usedForTuning": false,
+      "runs": {
+        "baseline": [],
+        "redesign": []
+      },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    },
+    {
+      "proposalId": "e4115ab9-4e24-f011-8c4e-6045bd0510d4",
+      "blindProposalId": "RPE-CED4327DFE",
+      "programArea": "Science and Engineering Research",
+      "signalLevel": "full",
+      "documentHash": "7374af688fe6fa13aaf9b6cc28309fa3c77c9c0d8f788cdf1f1d9f48ead030c4",
+      "usedForTuning": false,
+      "runs": {
+        "baseline": [],
+        "redesign": []
+      },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    },
+    {
+      "proposalId": "cb6845e3-9798-ef11-8a6a-00224803a64e",
+      "blindProposalId": "RPE-DC8C882726",
+      "programArea": "Medical Research",
+      "signalLevel": "full",
+      "documentHash": "527d4757e232a98ae2127d78356e758c4c299b13bf19a7d57fbb0b0de52b807e",
+      "usedForTuning": false,
+      "runs": {
+        "baseline": [],
+        "redesign": []
+      },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    },
+    {
+      "proposalId": "0e241e8d-9698-ef11-8a6a-000d3a383a3f",
+      "blindProposalId": "RPE-A142ADF349",
+      "programArea": "Medical Research",
+      "signalLevel": "thin",
+      "documentHash": "fe29ae3d3f29823b3383f0fb7c2d670905296b0ca159d9919d34e42b12858e1d",
+      "usedForTuning": false,
+      "runs": {
+        "baseline": [],
+        "redesign": []
+      },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    },
+    {
+      "proposalId": "85b1fb9b-9498-ef11-8a6a-000d3a344c0f",
+      "blindProposalId": "RPE-24B07429EC",
+      "programArea": "Medical Research",
+      "signalLevel": "full",
+      "documentHash": "170e5a5c065dadae5f4f379beb8deb146df0f3dba6b72930b79d0411a050339b",
+      "usedForTuning": false,
+      "runs": {
+        "baseline": [],
+        "redesign": []
+      },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    },
+    {
+      "proposalId": "d36a659e-5998-ef11-8a6a-00224803a64e",
+      "blindProposalId": "RPE-90CD2376FC",
+      "programArea": "Medical Research",
+      "signalLevel": "thin",
+      "documentHash": "1c83868e08d3788ccdb92a4df7d1edb2a1fc46a6433f9175ee54380b8ebb1e95",
+      "usedForTuning": false,
+      "runs": {
+        "baseline": [],
+        "redesign": []
+      },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    },
+    {
+      "proposalId": "29ae3261-f207-ef11-9f89-000d3a32c1ae",
+      "blindProposalId": "RPE-BD80E75AB7",
+      "programArea": "Science and Engineering Research",
+      "signalLevel": "thin",
+      "documentHash": "d3ab56ca752e8f83c8bd4ce54d80a5d0ba427c087f3e00bcea01fe054ebee190",
+      "usedForTuning": false,
+      "runs": {
+        "baseline": [],
+        "redesign": []
+      },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    },
+    {
+      "proposalId": "cc417741-1407-ef11-9f89-00224805fbb2",
+      "blindProposalId": "RPE-76D01DFADA",
+      "programArea": "Science and Engineering Research",
+      "signalLevel": "full",
+      "documentHash": "eda910b6faa17b3f7df4e472a4acc3fc92f36aea42a6bc319ded8f85557af6b0",
+      "usedForTuning": false,
+      "runs": {
+        "baseline": [],
+        "redesign": []
+      },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    },
+    {
+      "proposalId": "6375f4c2-a401-ef11-a1fd-000d3a3621c7",
+      "blindProposalId": "RPE-BEE5A06084",
+      "programArea": "Medical Research",
+      "signalLevel": "full",
+      "documentHash": "73cc610028d7af644539e9e3ddb45804f85274680f108e708898eafcf817e724",
+      "usedForTuning": false,
+      "runs": {
+        "baseline": [],
+        "redesign": []
+      },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    }
+  ]
 }

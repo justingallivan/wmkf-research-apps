@@ -1,16 +1,20 @@
 const identityDraft = require('../../docs/audits/reviewer-holistic-identity-benchmark-v1.json');
 const identityLabelingImport = require('../../docs/audits/reviewer-holistic-identity-labeling-import-v1.json');
+const evaluationManifest = require('../../docs/audits/reviewer-holistic-evaluation-manifest-v1.json');
 const proposalCohortProposal = require('../../docs/audits/reviewer-holistic-proposal-cohort-proposal-v1.json');
 const proposalDraft = require('../../docs/audits/reviewer-holistic-proposal-evaluation-v1.json');
 const {
   aggregateChannelBaseline,
   blindCaseIdFor,
+  blindProposalIdFor,
   normalizeBenchmarkPersonAnchor,
   tokenizeSources,
   validateIdentityBenchmark,
   validateIdentityLabelingImport,
+  validateProposalCohortFreeze,
   validateProposalCohortProposal,
   validateProposalEvaluation,
+  validateProposalManifestConsistency,
 } = require('../../scripts/lib/reviewer-holistic-m1');
 const { parseCli: parseAssetCli } = require('../../scripts/validate-reviewer-holistic-m1-assets');
 const {
@@ -19,6 +23,8 @@ const {
   parseCli: parseIdentityCollectorCli,
 } = require('../../scripts/collect-reviewer-holistic-identity-cases');
 const { parseCli: parseChannelProbeCli } = require('../../scripts/probe-reviewer-channel-baseline');
+
+const TEST_RANDOMIZATION_SEED = 'a'.repeat(64);
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -30,6 +36,16 @@ function draftIdentity() {
   asset.labelers = [];
   asset.frozenAt = null;
   asset.cases = [];
+  return asset;
+}
+
+function draftProposalEvaluation() {
+  const asset = clone(proposalDraft);
+  asset.status = 'draft';
+  asset.scorer = null;
+  asset.randomizationSeedHash = null;
+  asset.frozenAt = null;
+  asset.proposals = [];
   return asset;
 }
 
@@ -104,9 +120,10 @@ function identityImport(benchmark) {
 }
 
 function proposal(index) {
+  const proposalId = `request-${index}`;
   return {
-    proposalId: `request-${index}`,
-    blindProposalId: `proposal-${index}`,
+    proposalId,
+    blindProposalId: blindProposalIdFor(proposalId, TEST_RANDOMIZATION_SEED),
     programArea: index % 2 ? 'Area A' : 'Area B',
     signalLevel: index % 2 ? 'thin' : 'full',
     documentHash: String(index % 10).repeat(64),
@@ -121,7 +138,7 @@ function frozenProposals() {
   const asset = clone(proposalDraft);
   asset.status = 'frozen';
   asset.scorer = 'pd-a';
-  asset.randomizationSeedHash = 'a'.repeat(64);
+  asset.randomizationSeedHash = 'b'.repeat(64);
   asset.frozenAt = '2026-07-14T00:00:00.000Z';
   asset.proposals = Array.from({ length: 10 }, (_, i) => proposal(i + 1));
   return asset;
@@ -170,12 +187,22 @@ describe('M1 evaluation assets', () => {
     expect(() => blindCaseIdFor('')).toThrow('caseId must be a non-empty string');
   });
 
+  test('blind proposal IDs are deterministic, seed-scoped, opaque, and fail closed', () => {
+    const first = blindProposalIdFor('request-1', TEST_RANDOMIZATION_SEED);
+    expect(first).toMatch(/^RPE-[0-9A-F]{10}$/);
+    expect(blindProposalIdFor('request-1', TEST_RANDOMIZATION_SEED)).toBe(first);
+    expect(blindProposalIdFor('request-1', 'b'.repeat(64))).not.toBe(first);
+    expect(() => blindProposalIdFor('', TEST_RANDOMIZATION_SEED)).toThrow('proposalId');
+    expect(() => blindProposalIdFor('request-1', 'not-a-seed')).toThrow('randomizationSeed');
+  });
+
   test('an empty identity draft remains structurally valid but cannot freeze', () => {
     const identity = draftIdentity();
+    const proposals = draftProposalEvaluation();
     expect(validateIdentityBenchmark(identity)).toEqual({ ok: true, errors: [] });
-    expect(validateProposalEvaluation(proposalDraft)).toEqual({ ok: true, errors: [] });
+    expect(validateProposalEvaluation(proposals)).toEqual({ ok: true, errors: [] });
     expect(validateIdentityBenchmark(identity, { requireFrozen: true }).ok).toBe(false);
-    expect(validateProposalEvaluation(proposalDraft, { requireFrozen: true }).ok).toBe(false);
+    expect(validateProposalEvaluation(proposals, { requireFrozen: true }).ok).toBe(false);
   });
 
   test('tracked identity benchmark and labeling import are frozen and mutually consistent', () => {
@@ -280,19 +307,50 @@ describe('M1 evaluation assets', () => {
     expect(validateProposalEvaluation(frozenProposals(), { requireFrozen: true })).toEqual({ ok: true, errors: [] });
   });
 
-  test('proposed held-out cohort preserves the owner-attestation boundary', () => {
+  test('tracked frozen evaluation exactly matches the owner-approved cohort', () => {
+    expect(validateProposalCohortFreeze(proposalCohortProposal, proposalDraft)).toEqual({
+      ok: true,
+      errors: [],
+    });
+  });
+
+  test('draft overall manifest carries the exact frozen proposal IDs and hashes', () => {
+    expect(validateProposalManifestConsistency(evaluationManifest, proposalDraft)).toEqual({
+      ok: true,
+      errors: [],
+    });
+    const drifted = clone(evaluationManifest);
+    drifted.proposalEvaluation.documentHashes[proposalDraft.proposals[0].proposalId] = 'f'.repeat(64);
+    expect(validateProposalManifestConsistency(drifted, proposalDraft).errors).toEqual([
+      expect.objectContaining({
+        path: `manifest.proposalEvaluation.documentHashes.${proposalDraft.proposals[0].proposalId}`,
+      }),
+    ]);
+  });
+
+  test('owner-approved held-out cohort preserves the attestation boundary', () => {
     expect(validateProposalCohortProposal(proposalCohortProposal)).toEqual({ ok: true, errors: [] });
     expect(proposalCohortProposal.proposals.filter((item) => item.signalLevel === 'thin')).toHaveLength(5);
     expect(proposalCohortProposal.proposals.filter((item) => item.signalLevel === 'full')).toHaveLength(5);
     expect(proposalCohortProposal.proposals.every(
-      (item) => item.tuningStatus === 'owner_attestation_pending',
+      (item) => item.tuningStatus === 'owner_attested_not_used_for_tuning',
     )).toBe(true);
   });
 
-  test('proposed cohort rejects premature tuning clearance and duplicate requests', () => {
+  test('pending cohort requires null approval fields and pending tuning state', () => {
     const asset = clone(proposalCohortProposal);
-    asset.tuningExclusion.ownerAttestation = 'approved';
-    asset.proposals[0].tuningStatus = 'not_used_for_tuning';
+    asset.status = 'proposed_pending_owner_attestation';
+    asset.approvedAt = null;
+    asset.scorer = null;
+    asset.tuningExclusion.ownerAttestation = 'pending';
+    asset.proposals.forEach((item) => { item.tuningStatus = 'owner_attestation_pending'; });
+    expect(validateProposalCohortProposal(asset)).toEqual({ ok: true, errors: [] });
+  });
+
+  test('owner-approved cohort rejects reverted tuning clearance and duplicate requests', () => {
+    const asset = clone(proposalCohortProposal);
+    asset.tuningExclusion.ownerAttestation = 'pending';
+    asset.proposals[0].tuningStatus = 'owner_attestation_pending';
     asset.proposals[1].requestNumber = asset.proposals[0].requestNumber;
     const result = validateProposalCohortProposal(asset);
     expect(result.errors).toEqual(expect.arrayContaining([
@@ -313,6 +371,20 @@ describe('M1 evaluation assets', () => {
       expect.objectContaining({ path: 'proposals[0].usedForTuning' }),
       expect.objectContaining({ path: 'proposals[1].proposalId' }),
       expect.objectContaining({ path: 'proposals' }),
+    ]));
+  });
+
+  test('frozen proposal state rejects run or score data before execution', () => {
+    const asset = frozenProposals();
+    asset.proposals[0].runs.baseline = ['premature-run'];
+    asset.proposals[1].candidateArmMembership = [{
+      blindCandidateId: 'candidate-1',
+      arms: ['baseline'],
+    }];
+    const result = validateProposalEvaluation(asset, { requireFrozen: true });
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: 'proposals[0].runs.baseline' }),
+      expect.objectContaining({ path: 'proposals[1].candidateArmMembership' }),
     ]));
   });
 

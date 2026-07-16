@@ -1,6 +1,8 @@
 const crypto = require('node:crypto');
 
 const SHA256_RE = /^[0-9a-f]{64}$/i;
+const RANDOMIZATION_SEED_RE = /^[0-9a-f]{64}$/;
+const BLIND_PROPOSAL_ID_RE = /^RPE-[0-9A-F]{10}$/;
 const ORCID_RE = /^\d{4}-\d{4}-\d{4}-[\dX]{4}$/;
 const OPENALEX_AUTHOR_RE = /^A[1-9]\d*$/;
 
@@ -130,6 +132,8 @@ const COHORT_PROPOSAL_TOP_LEVEL_KEYS = new Set([
   'status',
   'proposalVersion',
   'observedAt',
+  'approvedAt',
+  'scorer',
   'source',
   'selectionPolicy',
   'signalPolicy',
@@ -196,6 +200,20 @@ function blindCaseIdFor(caseId) {
     .slice(0, 10)
     .toUpperCase();
   return `RIB-${digest}`;
+}
+
+function blindProposalIdFor(proposalId, randomizationSeed) {
+  if (!nonEmptyString(proposalId)) throw new TypeError('proposalId must be a non-empty string');
+  if (!RANDOMIZATION_SEED_RE.test(String(randomizationSeed || ''))) {
+    throw new TypeError('randomizationSeed must be 64 lowercase hexadecimal characters');
+  }
+  const digest = crypto
+    .createHmac('sha256', randomizationSeed)
+    .update(`reviewer-proposal-head-to-head-v1:${proposalId}`)
+    .digest('hex')
+    .slice(0, 10)
+    .toUpperCase();
+  return `RPE-${digest}`;
 }
 
 function orcidChecksumValid(identifier) {
@@ -577,13 +595,20 @@ function validateProposalCohortProposal(asset) {
   }
   rejectUnknown(asset, COHORT_PROPOSAL_TOP_LEVEL_KEYS, '$', add);
   if (asset.schemaVersion !== 1) add('schemaVersion', 'must equal 1');
-  if (asset.status !== 'proposed_pending_owner_attestation') {
-    add('status', 'must equal proposed_pending_owner_attestation');
+  if (!['proposed_pending_owner_attestation', 'owner_approved'].includes(asset.status)) {
+    add('status', 'must equal proposed_pending_owner_attestation or owner_approved');
   }
   if (asset.proposalVersion !== 'reviewer-proposal-cohort-proposal-v1') {
     add('proposalVersion', 'must equal reviewer-proposal-cohort-proposal-v1');
   }
   if (!validTimestamp(asset.observedAt)) add('observedAt', 'must be an ISO-compatible timestamp');
+  if (asset.status === 'owner_approved') {
+    if (!validTimestamp(asset.approvedAt)) add('approvedAt', 'must be an ISO-compatible timestamp');
+    if (!nonEmptyString(asset.scorer)) add('scorer', 'must name the blinded scorer');
+  } else {
+    if (asset.approvedAt !== null) add('approvedAt', 'must be null before owner approval');
+    if (asset.scorer !== null) add('scorer', 'must be null before owner approval');
+  }
   if (asset.selectionPolicy !== 'held_out_stratified_thin_and_full_signal') {
     add('selectionPolicy', 'must equal held_out_stratified_thin_and_full_signal');
   }
@@ -623,8 +648,11 @@ function validateProposalCohortProposal(asset) {
     if (asset.tuningExclusion.telemetryStatus !== 'insufficient_for_request_level_proof') {
       add('tuningExclusion.telemetryStatus', 'must equal insufficient_for_request_level_proof');
     }
-    if (asset.tuningExclusion.ownerAttestation !== 'pending') {
-      add('tuningExclusion.ownerAttestation', 'must equal pending');
+    const expectedAttestation = asset.status === 'owner_approved'
+      ? 'approved_best_of_owner_knowledge'
+      : 'pending';
+    if (asset.tuningExclusion.ownerAttestation !== expectedAttestation) {
+      add('tuningExclusion.ownerAttestation', `must equal ${expectedAttestation}`);
     }
   }
 
@@ -659,8 +687,11 @@ function validateProposalCohortProposal(asset) {
     for (const field of ['documentBytes', 'extractedChars', 'extractedWords']) {
       if (!Number.isInteger(item[field]) || item[field] <= 0) add(`${base}.${field}`, 'must be a positive integer');
     }
-    if (item.tuningStatus !== 'owner_attestation_pending') {
-      add(`${base}.tuningStatus`, 'must equal owner_attestation_pending');
+    const expectedTuningStatus = asset.status === 'owner_approved'
+      ? 'owner_attested_not_used_for_tuning'
+      : 'owner_attestation_pending';
+    if (item.tuningStatus !== expectedTuningStatus) {
+      add(`${base}.tuningStatus`, `must equal ${expectedTuningStatus}`);
     }
   });
   if (proposals.filter((item) => item?.signalLevel === 'thin').length !== 5) {
@@ -690,6 +721,89 @@ function validateProposalCohortProposal(asset) {
     }
   }
 
+  return { ok: errors.length === 0, errors };
+}
+
+function validateProposalCohortFreeze(cohortProposal, evaluation) {
+  const errors = [];
+  const add = (pathName, message) => errors.push({ path: pathName, message });
+  if (cohortProposal?.status !== 'owner_approved') {
+    add('cohortProposal.status', 'must equal owner_approved before freezing');
+  }
+  if (evaluation?.status !== 'frozen') add('evaluation.status', 'must equal frozen');
+  if (evaluation?.scorer !== cohortProposal?.scorer) {
+    add('evaluation.scorer', 'must match the approved cohort scorer');
+  }
+  if (evaluation?.frozenAt !== cohortProposal?.approvedAt) {
+    add('evaluation.frozenAt', 'must match the cohort approval timestamp');
+  }
+
+  const approved = Array.isArray(cohortProposal?.proposals) ? cohortProposal.proposals : [];
+  const frozen = Array.isArray(evaluation?.proposals) ? evaluation.proposals : [];
+  const approvedById = new Map(approved.map((item) => [item.proposalId, item]));
+  if (frozen.length !== approved.length) {
+    add('evaluation.proposals', 'must contain exactly the approved cohort');
+  }
+  frozen.forEach((item, index) => {
+    const approvedItem = approvedById.get(item?.proposalId);
+    if (!approvedItem) {
+      add(`evaluation.proposals[${index}].proposalId`, 'must exist in the approved cohort');
+      return;
+    }
+    for (const [evaluationField, cohortField] of [
+      ['programArea', 'programArea'],
+      ['signalLevel', 'signalLevel'],
+      ['documentHash', 'documentHash'],
+    ]) {
+      if (item[evaluationField] !== approvedItem[cohortField]) {
+        add(`evaluation.proposals[${index}].${evaluationField}`, 'must match the approved cohort');
+      }
+    }
+    if (item.usedForTuning !== false
+      || approvedItem.tuningStatus !== 'owner_attested_not_used_for_tuning') {
+      add(`evaluation.proposals[${index}].usedForTuning`, 'requires approved non-tuning attestation');
+    }
+  });
+  for (const approvedItem of approved) {
+    if (!frozen.some((item) => item?.proposalId === approvedItem.proposalId)) {
+      add('evaluation.proposals', `missing approved proposal '${approvedItem.proposalId}'`);
+    }
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+function validateProposalManifestConsistency(manifest, evaluation) {
+  const errors = [];
+  const add = (pathName, message) => errors.push({ path: pathName, message });
+  const manifestIds = Array.isArray(manifest?.proposalEvaluation?.proposalIds)
+    ? manifest.proposalEvaluation.proposalIds
+    : [];
+  const manifestHashes = isObject(manifest?.proposalEvaluation?.documentHashes)
+    ? manifest.proposalEvaluation.documentHashes
+    : {};
+  const proposals = Array.isArray(evaluation?.proposals) ? evaluation.proposals : [];
+  const evaluationIds = new Set(proposals.map((item) => item?.proposalId));
+  if (manifestIds.length !== proposals.length || new Set(manifestIds).size !== proposals.length) {
+    add('manifest.proposalEvaluation.proposalIds', 'must contain exactly the frozen proposal IDs');
+  }
+  for (const item of proposals) {
+    if (!manifestIds.includes(item.proposalId)) {
+      add('manifest.proposalEvaluation.proposalIds', `missing frozen proposal '${item.proposalId}'`);
+    }
+    if (manifestHashes[item.proposalId] !== item.documentHash) {
+      add(`manifest.proposalEvaluation.documentHashes.${item.proposalId}`, 'must match the frozen document hash');
+    }
+  }
+  for (const proposalId of manifestIds) {
+    if (!evaluationIds.has(proposalId)) {
+      add('manifest.proposalEvaluation.proposalIds', `contains non-frozen proposal '${proposalId}'`);
+    }
+  }
+  for (const proposalId of Object.keys(manifestHashes)) {
+    if (!evaluationIds.has(proposalId)) {
+      add(`manifest.proposalEvaluation.documentHashes.${proposalId}`, 'has no frozen proposal');
+    }
+  }
   return { ok: errors.length === 0, errors };
 }
 
@@ -728,6 +842,9 @@ function validateProposalEvaluation(asset, { requireFrozen = false, requireScore
       if (!nonEmptyString(item[field])) add(`${base}.${field}`, 'must be non-empty');
       if (set.has(item[field])) add(`${base}.${field}`, 'must be unique');
       set.add(item[field]);
+    }
+    if (nonEmptyString(item.blindProposalId) && !BLIND_PROPOSAL_ID_RE.test(item.blindProposalId)) {
+      add(`${base}.blindProposalId`, 'must be an opaque RPE blind ID');
     }
     if (!nonEmptyString(item.programArea)) add(`${base}.programArea`, 'must be non-empty');
     if (!['thin', 'full'].includes(item.signalLevel)) {
@@ -828,6 +945,21 @@ function validateProposalEvaluation(asset, { requireFrozen = false, requireScore
   }
 
   const mustBeScored = requireScored || asset.status === 'scored';
+  if (asset.status === 'frozen' && !mustBeScored) {
+    proposals.forEach((item, index) => {
+      for (const arm of RUN_KEYS) {
+        if (Array.isArray(item?.runs?.[arm]) && item.runs[arm].length > 0) {
+          add(`proposals[${index}].runs.${arm}`, 'must remain empty before execution');
+        }
+      }
+      if (Array.isArray(item?.candidateArmMembership) && item.candidateArmMembership.length > 0) {
+        add(`proposals[${index}].candidateArmMembership`, 'must remain empty before execution');
+      }
+      if (Array.isArray(item?.candidateScores) && item.candidateScores.length > 0) {
+        add(`proposals[${index}].candidateScores`, 'must remain empty before scoring');
+      }
+    });
+  }
   if (mustBeScored) {
     if (asset.status !== 'scored') add('status', 'must be scored');
     proposals.forEach((item, index) => {
@@ -950,10 +1082,13 @@ module.exports = {
   HAZARD_TYPES,
   aggregateChannelBaseline,
   blindCaseIdFor,
+  blindProposalIdFor,
   normalizeBenchmarkPersonAnchor,
   tokenizeSources,
   validateIdentityBenchmark,
   validateIdentityLabelingImport,
+  validateProposalCohortFreeze,
   validateProposalCohortProposal,
   validateProposalEvaluation,
+  validateProposalManifestConsistency,
 };
