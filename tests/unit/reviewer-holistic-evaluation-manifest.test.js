@@ -52,10 +52,10 @@ describe('reviewer holistic evaluation manifest', () => {
       implementationCommit: '166800a3142179db642af3beefd67b8dcc381173',
       pipelineVersion: 'reviewer-holistic-applicant-neighborhood-seeds-v1',
     });
-    expect(trackedManifest.evaluationScriptVersion).toBe('reviewer-holistic-m1-run-plan-v1');
+    expect(trackedManifest.evaluationScriptVersion).toBe('reviewer-holistic-m1-run-plan-v2');
     expect(trackedManifest.execution).toEqual({
-      implementationCommit: '563cac0c860191c5fbce2547027050947a8276e8',
-      scriptVersion: 'reviewer-holistic-m1-executor-v1',
+      implementationCommit: 'ef5ef4044e31b1ef42db4f2036d1f67dd5feed20',
+      scriptVersion: 'reviewer-holistic-m1-executor-v2',
       artifactVersion: 'reviewer-holistic-m1-execution-v1',
     });
     expect(trackedManifest.identityBenchmark.fixtureVersion).toBe('reviewer-identity-v1');
