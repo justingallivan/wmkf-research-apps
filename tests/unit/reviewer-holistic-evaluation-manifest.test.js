@@ -1,4 +1,4 @@
-const draftManifest = require('../../docs/audits/reviewer-holistic-evaluation-manifest-v1.json');
+const trackedManifest = require('../../docs/audits/reviewer-holistic-evaluation-manifest-v1.json');
 const { execFileSync } = require('child_process');
 const {
   validateCommitReferences,
@@ -10,7 +10,7 @@ function clone(value) {
 }
 
 function frozenManifest() {
-  const manifest = clone(draftManifest);
+  const manifest = clone(trackedManifest);
   const proposalIds = Array.from({ length: 10 }, (_, index) => `proposal-${index + 1}`);
   manifest.status = 'frozen';
   manifest.baseline.commit = 'a'.repeat(40);
@@ -37,30 +37,27 @@ function frozenManifest() {
 }
 
 describe('reviewer holistic evaluation manifest', () => {
-  test('tracked draft is structurally valid but not frozen', () => {
-    expect(validateManifest(draftManifest)).toEqual({ ok: true, errors: [] });
-    expect(draftManifest.proposalEvaluation.proposalIds).toHaveLength(10);
-    expect(draftManifest.baseline.commit).toBe('50140eb62dd8f3c04f6d3ab5e131d96711f804d7');
-    expect(draftManifest.redesign.startingCommit).toBe(draftManifest.baseline.commit);
-    expect(draftManifest.identityBenchmark.fixtureVersion).toBe('reviewer-identity-v1');
-    expect(draftManifest.runtimeConfig).toMatchObject({
+  test('tracked manifest is complete and frozen', () => {
+    expect(validateManifest(trackedManifest, { requireFrozen: true })).toEqual({ ok: true, errors: [] });
+    expect(trackedManifest.proposalEvaluation.proposalIds).toHaveLength(10);
+    expect(trackedManifest.baseline.commit).toBe('50140eb62dd8f3c04f6d3ab5e131d96711f804d7');
+    expect(trackedManifest.redesign).toMatchObject({
+      startingCommit: trackedManifest.baseline.commit,
+      implementationCommit: '166800a3142179db642af3beefd67b8dcc381173',
+      pipelineVersion: 'reviewer-holistic-applicant-neighborhood-seeds-v1',
+    });
+    expect(trackedManifest.evaluationScriptVersion).toBe('reviewer-holistic-m1-run-plan-v1');
+    expect(trackedManifest.identityBenchmark.fixtureVersion).toBe('reviewer-identity-v1');
+    expect(trackedManifest.runtimeConfig).toMatchObject({
       promptVersion: '2',
       modelIds: ['claude-opus-4-8'],
       reviewerCount: 15,
       temperature: 0.3,
     });
-    const frozenCheck = validateManifest(draftManifest, { requireFrozen: true });
-    expect(frozenCheck.ok).toBe(false);
-    expect(frozenCheck.errors).toEqual(expect.arrayContaining([
-      expect.objectContaining({ path: 'status' }),
-      expect.objectContaining({ path: 'redesign.implementationCommit' }),
-      expect.objectContaining({ path: 'redesign.pipelineVersion' }),
-      expect.objectContaining({ path: 'evaluationScriptVersion' }),
-    ]));
   });
 
   test('partially populated draft freeze fields fail closed when malformed', () => {
-    const manifest = clone(draftManifest);
+    const manifest = clone(trackedManifest);
     manifest.baseline.commit = 'not-a-sha';
     manifest.runtimeConfig.promptRowId = 'not-a-guid';
     manifest.runtimeConfig.modelOverridesHash = 'not-a-hash';
@@ -79,7 +76,7 @@ describe('reviewer holistic evaluation manifest', () => {
   });
 
   test('manifest rejects an adjudicator under the single-reviewer policy', () => {
-    const manifest = clone(draftManifest);
+    const manifest = clone(trackedManifest);
     manifest.adjudicator = 'owner';
     expect(validateManifest(manifest).errors).toContainEqual({
       path: 'adjudicator',
@@ -100,7 +97,7 @@ describe('reviewer holistic evaluation manifest', () => {
   });
 
   test('unknown top-level fields fail closed', () => {
-    const manifest = clone(draftManifest);
+    const manifest = clone(trackedManifest);
     manifest.clientMaySelectArm = true;
     expect(validateManifest(manifest).errors).toContainEqual({
       path: 'clientMaySelectArm',
@@ -109,7 +106,7 @@ describe('reviewer holistic evaluation manifest', () => {
   });
 
   test('unknown nested freeze fields fail closed', () => {
-    const manifest = clone(draftManifest);
+    const manifest = clone(trackedManifest);
     manifest.runtimeConfig.clientSelectedArm = 'redesign';
     expect(validateManifest(manifest).errors).toContainEqual({
       path: 'runtimeConfig.clientSelectedArm',
@@ -136,7 +133,7 @@ describe('reviewer holistic evaluation manifest', () => {
   });
 
   test('draft commit-reference checks skip unpinned null fields', () => {
-    const manifest = clone(draftManifest);
+    const manifest = clone(trackedManifest);
     manifest.baseline.commit = null;
     manifest.redesign.startingCommit = null;
     manifest.redesign.implementationCommit = null;

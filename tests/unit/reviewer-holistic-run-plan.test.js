@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  */
-import draftManifest from '../../docs/audits/reviewer-holistic-evaluation-manifest-v1.json';
+import trackedManifest from '../../docs/audits/reviewer-holistic-evaluation-manifest-v1.json';
 import proposalEvaluation from '../../docs/audits/reviewer-holistic-proposal-evaluation-v1.json';
 import {
   REVIEWER_HOLISTIC_EVALUATION_SCRIPT_VERSION,
@@ -14,7 +14,7 @@ function clone(value) {
 }
 
 function runnableManifest() {
-  const manifest = clone(draftManifest);
+  const manifest = clone(trackedManifest);
   manifest.status = 'frozen';
   manifest.evaluationScriptVersion = REVIEWER_HOLISTIC_EVALUATION_SCRIPT_VERSION;
   manifest.redesign.pipelineVersion = REVIEWER_HOLISTIC_REDESIGN_PIPELINE_VERSION;
@@ -36,6 +36,11 @@ describe('reviewer holistic M1.2 run plan', () => {
   });
 
   test('fails closed on draft state, version drift, and proposal drift', () => {
+    const draftManifest = clone(trackedManifest);
+    draftManifest.status = 'draft';
+    draftManifest.redesign.implementationCommit = null;
+    draftManifest.redesign.pipelineVersion = null;
+    draftManifest.evaluationScriptVersion = null;
     expect(() => buildReviewerHolisticRunPlan({
       manifest: draftManifest,
       proposalEvaluation,

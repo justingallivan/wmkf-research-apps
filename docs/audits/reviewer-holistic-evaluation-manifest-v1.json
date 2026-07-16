@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "status": "draft",
+  "status": "frozen",
   "freezePoint": "after_shared_c0_containment",
   "createdAt": "2026-07-13T01:08:13.000Z",
   "baseline": {
@@ -10,8 +10,8 @@
   },
   "redesign": {
     "startingCommit": "50140eb62dd8f3c04f6d3ab5e131d96711f804d7",
-    "implementationCommit": null,
-    "pipelineVersion": null
+    "implementationCommit": "166800a3142179db642af3beefd67b8dcc381173",
+    "pipelineVersion": "reviewer-holistic-applicant-neighborhood-seeds-v1"
   },
   "identityBenchmark": {
     "fixtureVersion": "reviewer-identity-v1",
@@ -57,7 +57,7 @@
     "modelOverridesHash": "32dd3df797669df443016c5596fb00b84883982004fe959bbca88cae4c88be9c",
     "reviewerCount": 15,
     "temperature": 0.3,
-    "exclusionsHash": "34dccac68bff4b5bc3e80d4a5d37d21b5e8bdc98de0ce522c61fc08dcb2d5ed4"
+    "exclusionsHash": "6fa4d5dec35c955ccb6c6c74dfc66de08883da5680e1d18a9e847406bde30e97"
   },
   "rubric": {
     "version": "reviewer-holistic-v1",
@@ -77,5 +77,5 @@
   },
   "adjudicator": null,
   "artifactSchemaVersion": 1,
-  "evaluationScriptVersion": null
+  "evaluationScriptVersion": "reviewer-holistic-m1-run-plan-v1"
 }
