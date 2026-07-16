@@ -1,5 +1,6 @@
 const identityDraft = require('../../docs/audits/reviewer-holistic-identity-benchmark-v1.json');
 const identityLabelingImport = require('../../docs/audits/reviewer-holistic-identity-labeling-import-v1.json');
+const proposalCohortProposal = require('../../docs/audits/reviewer-holistic-proposal-cohort-proposal-v1.json');
 const proposalDraft = require('../../docs/audits/reviewer-holistic-proposal-evaluation-v1.json');
 const {
   aggregateChannelBaseline,
@@ -8,6 +9,7 @@ const {
   tokenizeSources,
   validateIdentityBenchmark,
   validateIdentityLabelingImport,
+  validateProposalCohortProposal,
   validateProposalEvaluation,
 } = require('../../scripts/lib/reviewer-holistic-m1');
 const { parseCli: parseAssetCli } = require('../../scripts/validate-reviewer-holistic-m1-assets');
@@ -276,6 +278,28 @@ describe('M1 evaluation assets', () => {
 
   test('complete held-out proposal cohort freezes before execution', () => {
     expect(validateProposalEvaluation(frozenProposals(), { requireFrozen: true })).toEqual({ ok: true, errors: [] });
+  });
+
+  test('proposed held-out cohort preserves the owner-attestation boundary', () => {
+    expect(validateProposalCohortProposal(proposalCohortProposal)).toEqual({ ok: true, errors: [] });
+    expect(proposalCohortProposal.proposals.filter((item) => item.signalLevel === 'thin')).toHaveLength(5);
+    expect(proposalCohortProposal.proposals.filter((item) => item.signalLevel === 'full')).toHaveLength(5);
+    expect(proposalCohortProposal.proposals.every(
+      (item) => item.tuningStatus === 'owner_attestation_pending',
+    )).toBe(true);
+  });
+
+  test('proposed cohort rejects premature tuning clearance and duplicate requests', () => {
+    const asset = clone(proposalCohortProposal);
+    asset.tuningExclusion.ownerAttestation = 'approved';
+    asset.proposals[0].tuningStatus = 'not_used_for_tuning';
+    asset.proposals[1].requestNumber = asset.proposals[0].requestNumber;
+    const result = validateProposalCohortProposal(asset);
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: 'tuningExclusion.ownerAttestation' }),
+      expect.objectContaining({ path: 'proposals[0].tuningStatus' }),
+      expect.objectContaining({ path: 'proposals[1].requestNumber' }),
+    ]));
   });
 
   test('proposal freeze rejects tuning leakage, duplicate IDs, and missing signal strata', () => {

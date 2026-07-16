@@ -11,6 +11,7 @@ const path = require('node:path');
 const {
   validateIdentityBenchmark,
   validateIdentityLabelingImport,
+  validateProposalCohortProposal,
   validateProposalEvaluation,
 } = require('./lib/reviewer-holistic-m1');
 
@@ -22,6 +23,10 @@ const DEFAULT_IDENTITY_PATH = path.join(
 const DEFAULT_PROPOSAL_PATH = path.join(
   ROOT,
   'docs/audits/reviewer-holistic-proposal-evaluation-v1.json',
+);
+const DEFAULT_COHORT_PROPOSAL_PATH = path.join(
+  ROOT,
+  'docs/audits/reviewer-holistic-proposal-cohort-proposal-v1.json',
 );
 const IDENTITY_IMPORT_FILE = 'reviewer-holistic-identity-labeling-import-v1.json';
 const DEFAULT_IDENTITY_IMPORT_PATH = path.join(ROOT, 'docs/audits', IDENTITY_IMPORT_FILE);
@@ -56,9 +61,11 @@ function main() {
   const options = parseCli(process.argv.slice(2));
   let identity;
   let identityImport;
+  let cohortProposal;
   let proposals;
   try {
     identity = readJson(options.identityPath);
+    cohortProposal = readJson(DEFAULT_COHORT_PROPOSAL_PATH);
     proposals = readJson(options.proposalPath);
     if (identity.status === 'frozen') identityImport = readJson(options.identityImportPath);
   } catch (error) {
@@ -72,6 +79,7 @@ function main() {
       requireFrozen: options.requireFrozen,
       requireScored: options.requireScored,
     })],
+    ['proposal cohort proposal', validateProposalCohortProposal(cohortProposal)],
   ];
   if (identity.status === 'frozen') {
     results.splice(1, 0, [
@@ -87,7 +95,7 @@ function main() {
     for (const error of result.errors) console.error(`  - ${error.path}: ${error.message}`);
   }
   if (failed) process.exit(1);
-  console.log(`reviewer holistic M1 assets OK (${identity.status}; ${proposals.status})`);
+  console.log(`reviewer holistic M1 assets OK (${identity.status}; ${proposals.status}; ${cohortProposal.status})`);
 }
 
 if (require.main === module) main();
@@ -95,6 +103,7 @@ if (require.main === module) main();
 module.exports = {
   DEFAULT_IDENTITY_PATH,
   DEFAULT_IDENTITY_IMPORT_PATH,
+  DEFAULT_COHORT_PROPOSAL_PATH,
   DEFAULT_PROPOSAL_PATH,
   parseCli,
 };

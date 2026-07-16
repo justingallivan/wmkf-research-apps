@@ -125,6 +125,49 @@ const SCORE_KEYS = new Set([
   'panelReadyWithoutAnotherSearch',
 ]);
 
+const COHORT_PROPOSAL_TOP_LEVEL_KEYS = new Set([
+  'schemaVersion',
+  'status',
+  'proposalVersion',
+  'observedAt',
+  'source',
+  'selectionPolicy',
+  'signalPolicy',
+  'tuningExclusion',
+  'proposals',
+  'excludedCandidates',
+]);
+const COHORT_PROPOSAL_SOURCE_KEYS = new Set([
+  'target',
+  'targetHostname',
+  'populationObservedAt',
+  'documentsObservedAt',
+  'eligibleCount',
+  'filter',
+]);
+const COHORT_PROPOSAL_SIGNAL_POLICY_KEYS = new Set(['thin', 'full', 'assignment']);
+const COHORT_PROPOSAL_TUNING_KEYS = new Set([
+  'repositorySweepStatus',
+  'selectedReferencesFound',
+  'telemetryStatus',
+  'ownerAttestation',
+]);
+const COHORT_PROPOSAL_KEYS = new Set([
+  'proposalId',
+  'requestNumber',
+  'title',
+  'programArea',
+  'researchProgramAreas',
+  'signalLevel',
+  'documentFileKey',
+  'documentHash',
+  'documentBytes',
+  'extractedChars',
+  'extractedWords',
+  'tuningStatus',
+]);
+const COHORT_PROPOSAL_EXCLUSION_KEYS = new Set(['proposalId', 'requestNumber', 'reason']);
+
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -526,6 +569,130 @@ function validateIdentityLabelingImport(asset, benchmark) {
   return { ok: errors.length === 0, errors };
 }
 
+function validateProposalCohortProposal(asset) {
+  const errors = [];
+  const add = (pathName, message) => errors.push({ path: pathName, message });
+  if (!isObject(asset)) {
+    return { ok: false, errors: [{ path: '$', message: 'proposal cohort proposal must be an object' }] };
+  }
+  rejectUnknown(asset, COHORT_PROPOSAL_TOP_LEVEL_KEYS, '$', add);
+  if (asset.schemaVersion !== 1) add('schemaVersion', 'must equal 1');
+  if (asset.status !== 'proposed_pending_owner_attestation') {
+    add('status', 'must equal proposed_pending_owner_attestation');
+  }
+  if (asset.proposalVersion !== 'reviewer-proposal-cohort-proposal-v1') {
+    add('proposalVersion', 'must equal reviewer-proposal-cohort-proposal-v1');
+  }
+  if (!validTimestamp(asset.observedAt)) add('observedAt', 'must be an ISO-compatible timestamp');
+  if (asset.selectionPolicy !== 'held_out_stratified_thin_and_full_signal') {
+    add('selectionPolicy', 'must equal held_out_stratified_thin_and_full_signal');
+  }
+
+  if (!isObject(asset.source)) {
+    add('source', 'must be an object');
+  } else {
+    rejectUnknown(asset.source, COHORT_PROPOSAL_SOURCE_KEYS, 'source', add);
+    if (asset.source.target !== 'production') add('source.target', 'must equal production');
+    if (!nonEmptyString(asset.source.targetHostname)) add('source.targetHostname', 'must be non-empty');
+    for (const field of ['populationObservedAt', 'documentsObservedAt']) {
+      if (!validTimestamp(asset.source[field])) add(`source.${field}`, 'must be an ISO-compatible timestamp');
+    }
+    if (asset.source.eligibleCount !== 11) add('source.eligibleCount', 'must equal 11');
+    if (!nonEmptyString(asset.source.filter)) add('source.filter', 'must be non-empty');
+  }
+
+  if (!isObject(asset.signalPolicy)) {
+    add('signalPolicy', 'must be an object');
+  } else {
+    rejectUnknown(asset.signalPolicy, COHORT_PROPOSAL_SIGNAL_POLICY_KEYS, 'signalPolicy', add);
+    for (const field of COHORT_PROPOSAL_SIGNAL_POLICY_KEYS) {
+      if (!nonEmptyString(asset.signalPolicy[field])) add(`signalPolicy.${field}`, 'must be non-empty');
+    }
+  }
+
+  if (!isObject(asset.tuningExclusion)) {
+    add('tuningExclusion', 'must be an object');
+  } else {
+    rejectUnknown(asset.tuningExclusion, COHORT_PROPOSAL_TUNING_KEYS, 'tuningExclusion', add);
+    if (asset.tuningExclusion.repositorySweepStatus !== 'passed_for_selected_request_numbers') {
+      add('tuningExclusion.repositorySweepStatus', 'must equal passed_for_selected_request_numbers');
+    }
+    if (asset.tuningExclusion.selectedReferencesFound !== 0) {
+      add('tuningExclusion.selectedReferencesFound', 'must equal 0');
+    }
+    if (asset.tuningExclusion.telemetryStatus !== 'insufficient_for_request_level_proof') {
+      add('tuningExclusion.telemetryStatus', 'must equal insufficient_for_request_level_proof');
+    }
+    if (asset.tuningExclusion.ownerAttestation !== 'pending') {
+      add('tuningExclusion.ownerAttestation', 'must equal pending');
+    }
+  }
+
+  if (!Array.isArray(asset.proposals)) add('proposals', 'must be an array');
+  const proposals = Array.isArray(asset.proposals) ? asset.proposals : [];
+  if (proposals.length !== 10) add('proposals', 'must contain exactly 10 proposals');
+  const proposalIds = new Set();
+  const requestNumbers = new Set();
+  proposals.forEach((item, index) => {
+    const base = `proposals[${index}]`;
+    if (!isObject(item)) {
+      add(base, 'must be an object');
+      return;
+    }
+    rejectUnknown(item, COHORT_PROPOSAL_KEYS, base, add);
+    for (const [field, seen] of [['proposalId', proposalIds], ['requestNumber', requestNumbers]]) {
+      if (!nonEmptyString(item[field])) add(`${base}.${field}`, 'must be non-empty');
+      if (seen.has(item[field])) add(`${base}.${field}`, 'must be unique');
+      seen.add(item[field]);
+    }
+    for (const field of ['title', 'programArea', 'documentFileKey']) {
+      if (!nonEmptyString(item[field])) add(`${base}.${field}`, 'must be non-empty');
+    }
+    if (!Array.isArray(item.researchProgramAreas) || item.researchProgramAreas.length === 0
+      || item.researchProgramAreas.some((value) => !nonEmptyString(value))) {
+      add(`${base}.researchProgramAreas`, 'must contain non-empty labels');
+    }
+    if (!['thin', 'full'].includes(item.signalLevel)) add(`${base}.signalLevel`, 'must be thin or full');
+    if (!SHA256_RE.test(String(item.documentHash || ''))) {
+      add(`${base}.documentHash`, 'must be a SHA-256 hash');
+    }
+    for (const field of ['documentBytes', 'extractedChars', 'extractedWords']) {
+      if (!Number.isInteger(item[field]) || item[field] <= 0) add(`${base}.${field}`, 'must be a positive integer');
+    }
+    if (item.tuningStatus !== 'owner_attestation_pending') {
+      add(`${base}.tuningStatus`, 'must equal owner_attestation_pending');
+    }
+  });
+  if (proposals.filter((item) => item?.signalLevel === 'thin').length !== 5) {
+    add('proposals', 'must contain exactly five thin-signal proposals');
+  }
+  if (proposals.filter((item) => item?.signalLevel === 'full').length !== 5) {
+    add('proposals', 'must contain exactly five full-signal proposals');
+  }
+  if (new Set(proposals.map((item) => item?.programArea).filter(nonEmptyString)).size < 2) {
+    add('proposals', 'must span at least two program areas');
+  }
+
+  if (!Array.isArray(asset.excludedCandidates) || asset.excludedCandidates.length !== 1) {
+    add('excludedCandidates', 'must contain exactly one excluded candidate');
+  } else {
+    const item = asset.excludedCandidates[0];
+    if (!isObject(item)) {
+      add('excludedCandidates[0]', 'must be an object');
+    } else {
+      rejectUnknown(item, COHORT_PROPOSAL_EXCLUSION_KEYS, 'excludedCandidates[0]', add);
+      for (const field of COHORT_PROPOSAL_EXCLUSION_KEYS) {
+        if (!nonEmptyString(item[field])) add(`excludedCandidates[0].${field}`, 'must be non-empty');
+      }
+      if (proposalIds.has(item.proposalId) || requestNumbers.has(item.requestNumber)) {
+        add('excludedCandidates[0]', 'must not duplicate a selected proposal');
+      }
+    }
+  }
+
+  return { ok: errors.length === 0, errors };
+}
+
 function validateProposalEvaluation(asset, { requireFrozen = false, requireScored = false } = {}) {
   const errors = [];
   const add = (pathName, message) => errors.push({ path: pathName, message });
@@ -787,5 +954,6 @@ module.exports = {
   tokenizeSources,
   validateIdentityBenchmark,
   validateIdentityLabelingImport,
+  validateProposalCohortProposal,
   validateProposalEvaluation,
 };

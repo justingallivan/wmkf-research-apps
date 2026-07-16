@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 1,
+  "status": "proposed_pending_owner_attestation",
+  "proposalVersion": "reviewer-proposal-cohort-proposal-v1",
+  "observedAt": "2026-07-16T13:07:06.424Z",
+  "source": {
+    "target": "production",
+    "targetHostname": "wmkf.crm.dynamics.com",
+    "populationObservedAt": "2026-07-16T13:02:26.590Z",
+    "documentsObservedAt": "2026-07-16T13:07:06.424Z",
+    "eligibleCount": 11,
+    "filter": "Native requests created after 2023-12-03 with grant program Research, a populated research-area taxonomy, and lifecycle status Phase II Pending, Declined, or Approved; the live result contained 11 Phase II Declined requests."
+  },
+  "selectionPolicy": "held_out_stratified_thin_and_full_signal",
+  "signalPolicy": {
+    "thin": "Use the Phase I ProjectDescription document.",
+    "full": "Use the Phase II Project Narrative document.",
+    "assignment": "Retain all four Science and Engineering Research requests and six Medical Research requests; within each program, order by request number descending and alternate thin/full starting with thin."
+  },
+  "tuningExclusion": {
+    "repositorySweepStatus": "passed_for_selected_request_numbers",
+    "selectedReferencesFound": 0,
+    "telemetryStatus": "insufficient_for_request_level_proof",
+    "ownerAttestation": "pending"
+  },
+  "proposals": [
+    {
+      "proposalId": "ce2a0046-d826-f011-8c4e-6045bd0510d4",
+      "requestNumber": "1001650",
+      "title": "Visualizing Topological Phases in Real-Space",
+      "programArea": "Science and Engineering Research",
+      "researchProgramAreas": [
+        "Physics"
+      ],
+      "signalLevel": "thin",
+      "documentFileKey": "akoya_request::1001650_CE2A0046D826F0118C4E6045BD0510D4::ProjectDescription.pdf",
+      "documentHash": "4f8f2443f7de3176d1c2ef84bdeb8e5af1d632abd89783489a43812c9336bbd9",
+      "documentBytes": 397465,
+      "extractedChars": 7934,
+      "extractedWords": 1188,
+      "tuningStatus": "owner_attestation_pending"
+    },
+    {
+      "proposalId": "631eb17c-7a24-f011-8c4d-6045bd003e28",
+      "requestNumber": "1001475",
+      "title": "Complete Genome Sequencing and AI-Driven Interpretation for Rare Disease Diagnosis",
+      "programArea": "Medical Research",
+      "researchProgramAreas": [
+        "Genetics/Genomics"
+      ],
+      "signalLevel": "thin",
+      "documentFileKey": "akoya_request::1001475_631EB17C7A24F0118C4D6045BD003E28::ProjectDescription.pdf",
+      "documentHash": "7021235c6e41695efa1573f9894b87f6d7b6036847bc780dae5ba979bb71b877",
+      "documentBytes": 89612,
+      "extractedChars": 7439,
+      "extractedWords": 996,
+      "tuningStatus": "owner_attestation_pending"
+    },
+    {
+      "proposalId": "e4115ab9-4e24-f011-8c4e-6045bd0510d4",
+      "requestNumber": "1001465",
+      "title": "Harnessing a common bacterial immune system",
+      "programArea": "Science and Engineering Research",
+      "researchProgramAreas": [
+        "Microbiology"
+      ],
+      "signalLevel": "full",
+      "documentFileKey": "akoya_request::1001465_E4115AB94E24F0118C4E6045BD0510D4/Phase II::Project Narrative.pdf",
+      "documentHash": "7374af688fe6fa13aaf9b6cc28309fa3c77c9c0d8f788cdf1f1d9f48ead030c4",
+      "documentBytes": 4554893,
+      "extractedChars": 40760,
+      "extractedWords": 5568,
+      "tuningStatus": "owner_attestation_pending"
+    },
+    {
+      "proposalId": "cb6845e3-9798-ef11-8a6a-00224803a64e",
+      "requestNumber": "1001005",
+      "title": "The genetic landscape of subcellular RNA localization and gene expression",
+      "programArea": "Medical Research",
+      "researchProgramAreas": [
+        "Molecular and Cell Biology"
+      ],
+      "signalLevel": "full",
+      "documentFileKey": "akoya_request::1001005_CB6845E39798EF118A6A00224803A64E/Phase II::Project Narrative.pdf",
+      "documentHash": "527d4757e232a98ae2127d78356e758c4c299b13bf19a7d57fbb0b0de52b807e",
+      "documentBytes": 514726,
+      "extractedChars": 37807,
+      "extractedWords": 5002,
+      "tuningStatus": "owner_attestation_pending"
+    },
+    {
+      "proposalId": "0e241e8d-9698-ef11-8a6a-000d3a383a3f",
+      "requestNumber": "1001004",
+      "title": "Unmasking active LINE-1 elements in individual human genomes as key components of multiple major disease states",
+      "programArea": "Medical Research",
+      "researchProgramAreas": [
+        "Molecular Genetics"
+      ],
+      "signalLevel": "thin",
+      "documentFileKey": "akoya_request::1001004_0E241E8D9698EF118A6A000D3A383A3F::ProjectDescription.pdf",
+      "documentHash": "fe29ae3d3f29823b3383f0fb7c2d670905296b0ca159d9919d34e42b12858e1d",
+      "documentBytes": 675933,
+      "extractedChars": 7389,
+      "extractedWords": 1095,
+      "tuningStatus": "owner_attestation_pending"
+    },
+    {
+      "proposalId": "85b1fb9b-9498-ef11-8a6a-000d3a344c0f",
+      "requestNumber": "1001000",
+      "title": "Mechanisms and functions of phase separation in neurons",
+      "programArea": "Medical Research",
+      "researchProgramAreas": [
+        "Cell Biology"
+      ],
+      "signalLevel": "full",
+      "documentFileKey": "akoya_request::1001000_85B1FB9B9498EF118A6A000D3A344C0F/Phase II::Project Narrative.pdf",
+      "documentHash": "170e5a5c065dadae5f4f379beb8deb146df0f3dba6b72930b79d0411a050339b",
+      "documentBytes": 1558562,
+      "extractedChars": 37254,
+      "extractedWords": 5430,
+      "tuningStatus": "owner_attestation_pending"
+    },
+    {
+      "proposalId": "d36a659e-5998-ef11-8a6a-00224803a64e",
+      "requestNumber": "1000949",
+      "title": "INTERCEPT Platform for In Vivo Immune Engineering Through Epigenetic Editing",
+      "programArea": "Medical Research",
+      "researchProgramAreas": [
+        "Clinic/Science Interface",
+        "Biotechnology",
+        "Cancer Biology",
+        "Immunology/Autoimmune Disease",
+        "Nanotechnology"
+      ],
+      "signalLevel": "thin",
+      "documentFileKey": "akoya_request::1000949_D36A659E5998EF118A6A00224803A64E/Phase I::ProjectDescription.pdf",
+      "documentHash": "1c83868e08d3788ccdb92a4df7d1edb2a1fc46a6433f9175ee54380b8ebb1e95",
+      "documentBytes": 321648,
+      "extractedChars": 9053,
+      "extractedWords": 1753,
+      "tuningStatus": "owner_attestation_pending"
+    },
+    {
+      "proposalId": "29ae3261-f207-ef11-9f89-000d3a32c1ae",
+      "requestNumber": "1000117",
+      "title": "Extremely-Far-From-Equilibrium Materials",
+      "programArea": "Science and Engineering Research",
+      "researchProgramAreas": [
+        "Physics"
+      ],
+      "signalLevel": "thin",
+      "documentFileKey": "akoya_request::0997314_29AE3261F207EF119F89000D3A32C1AE::ProjectDescription.pdf",
+      "documentHash": "d3ab56ca752e8f83c8bd4ce54d80a5d0ba427c087f3e00bcea01fe054ebee190",
+      "documentBytes": 150888,
+      "extractedChars": 7981,
+      "extractedWords": 1083,
+      "tuningStatus": "owner_attestation_pending"
+    },
+    {
+      "proposalId": "cc417741-1407-ef11-9f89-00224805fbb2",
+      "requestNumber": "1000063",
+      "title": "High Thermal Conductivity in Polymers Enabled by Dynamic Covalent Chemistry",
+      "programArea": "Science and Engineering Research",
+      "researchProgramAreas": [
+        "Chemistry",
+        "Materials Science"
+      ],
+      "signalLevel": "full",
+      "documentFileKey": "akoya_request::1000063_CC4177411407EF119F8900224805FBB2::Project Narrative.pdf",
+      "documentHash": "eda910b6faa17b3f7df4e472a4acc3fc92f36aea42a6bc319ded8f85557af6b0",
+      "documentBytes": 882234,
+      "extractedChars": 31485,
+      "extractedWords": 4327,
+      "tuningStatus": "owner_attestation_pending"
+    },
+    {
+      "proposalId": "6375f4c2-a401-ef11-a1fd-000d3a3621c7",
+      "requestNumber": "1000014",
+      "title": "Beyond all-or-nothing: Incorporating spike waveform variability into neural computational theory and artificial neural networks",
+      "programArea": "Medical Research",
+      "researchProgramAreas": [
+        "Basic Science Research",
+        "Computer Science",
+        "Neurosciences"
+      ],
+      "signalLevel": "full",
+      "documentFileKey": "akoya_request::1000014_6375F4C2A401EF11A1FD000D3A3621C7/Phase II Documents::Project Narrative.pdf",
+      "documentHash": "73cc610028d7af644539e9e3ddb45804f85274680f108e708898eafcf817e724",
+      "documentBytes": 400616,
+      "extractedChars": 41333,
+      "extractedWords": 5811,
+      "tuningStatus": "owner_attestation_pending"
+    }
+  ],
+  "excludedCandidates": [
+    {
+      "proposalId": "5c323294-d326-f011-8c4d-6045bd003e28",
+      "requestNumber": "1001647",
+      "reason": "The 11-candidate population required one Medical Research exclusion; this single-area Neurosciences request duplicated taxonomy coverage retained by request 1000014."
+    }
+  ]
+}

@@ -363,7 +363,8 @@ eligibility test.
 ## M1 — Build the evaluation system before further resolver changes
 
 **[FOUNDATION + M1.1 OWNER-APPROVED POOL + M1.3 BUILT 2026-07-14; M1.1
-SINGLE-REVIEWER LABELING FROZEN 2026-07-16 + M1.2 COHORT/SCORES PENDING OWNER FREEZE]** The tracked frozen identity benchmark and draft blinded
+SINGLE-REVIEWER LABELING FROZEN 2026-07-16 + M1.2 TEN-PROPOSAL COHORT PROPOSED
+2026-07-16, OWNER ATTESTATION/SCORER/FREEZE PENDING]** The tracked frozen identity benchmark and draft blinded
 proposal-evaluation assets now have fail-closed validators at
 `scripts/validate-reviewer-holistic-m1-assets.js`; draft validation is
 `npm run eval:reviewer-holistic:m1`, while `--require-frozen` and
@@ -378,8 +379,15 @@ Bind and 17 Abstain labels. The source workbook hash, all raw cell responses,
 normalization rules, and the five owner-approved resolutions are preserved in
 `docs/audits/reviewer-holistic-identity-labeling-import-v1.json`; the source
 workbook itself remains outside the repository. This method makes no inter-rater
-or adjudication claim. M1.2 cannot freeze until the owner selects the ten
-held-out proposals and PD scorer.
+or adjudication claim. The read-only M1.2 population and document inventory
+produced `docs/audits/reviewer-holistic-proposal-cohort-proposal-v1.json`: a
+mechanically stratified ten-proposal recommendation with five Phase I thin-signal
+documents, five Phase II full-signal documents, immutable SHA-256 hashes, four
+Science and Engineering Research cases, and six Medical Research cases. The
+repository reference sweep found no selected request numbers, but available API
+telemetry cannot prove request-level non-use. M1.2 therefore cannot freeze until
+the owner approves the ten, attests they were not used to tune the redesign, and
+names the PD scorer.
 
 ### M1.1 Single-reviewer blinded person benchmark
 
@@ -454,9 +462,14 @@ unsupported population claim.
 
 ### M1.2 Proposal-level blinded head-to-head
 
-**[DRAFT CONTRACT BUILT; COHORT NOT SELECTED OR RUN]**
-`docs/audits/reviewer-holistic-proposal-evaluation-v1.json` is intentionally
-empty. Its validator requires an explicit non-tuning cohort, unique source and
+**[DRAFT CONTRACT BUILT; TEN-PROPOSAL COHORT PROPOSED 2026-07-16; OWNER
+ATTESTATION/SCORER/FREEZE AND RUNS PENDING]**
+`docs/audits/reviewer-holistic-proposal-evaluation-v1.json` remains intentionally
+empty. The pre-freeze recommendation and its production-read provenance live in
+`docs/audits/reviewer-holistic-proposal-cohort-proposal-v1.json`; the M1 asset
+validator checks its exact ten rows, 5/5 signal split, multi-program coverage,
+document hashes, and pending owner-attestation boundary. The frozen-asset
+validator requires an explicit non-tuning cohort, unique source and
 blind proposal IDs, document hashes, thin/full signal coverage, multiple
 program areas, a hashed randomization seed, and a named PD scorer before
 freeze. A scored artifact additionally requires exactly three unique run IDs
@@ -464,8 +477,9 @@ per arm and complete scores keyed only by blind candidate IDs, with an exact
 post-unblinding map from every blind candidate ID to its baseline/redesign arm
 membership.
 
-Select ten held-out proposals before execution, stratified across program area
-and thin/full proposal signal. Do not use proposals that tuned the redesign.
+Before execution, the owner must approve the proposed ten and attest that none
+tuned the redesign; then freeze the cohort with opaque blind IDs, a named PD
+scorer, and a hashed randomization seed.
 
 Run frozen main and completed redesign with identical documents, prompt/model
 configuration, candidate count, exclusions, and environment. Run three
