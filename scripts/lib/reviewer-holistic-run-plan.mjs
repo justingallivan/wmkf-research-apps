@@ -18,7 +18,7 @@ const {
   validateProposalManifestConsistency,
 } = require('./reviewer-holistic-m1.js');
 
-export const REVIEWER_HOLISTIC_EVALUATION_SCRIPT_VERSION = 'reviewer-holistic-m1-run-plan-v1';
+export const REVIEWER_HOLISTIC_EVALUATION_SCRIPT_VERSION = 'reviewer-holistic-m1-run-plan-v2';
 
 const ARM_PIPELINES = Object.freeze({
   baseline: REVIEWER_HOLISTIC_BASELINE_PIPELINE_VERSION,

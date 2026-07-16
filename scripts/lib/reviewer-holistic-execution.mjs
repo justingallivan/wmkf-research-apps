@@ -6,7 +6,7 @@ import { createHash, createHmac } from 'node:crypto';
 
 import { normalizeReviewerName } from '../../lib/utils/reviewer-name-match.js';
 
-export const REVIEWER_HOLISTIC_EXECUTION_SCRIPT_VERSION = 'reviewer-holistic-m1-executor-v1';
+export const REVIEWER_HOLISTIC_EXECUTION_SCRIPT_VERSION = 'reviewer-holistic-m1-executor-v2';
 export const REVIEWER_HOLISTIC_EXECUTION_ARTIFACT_VERSION = 'reviewer-holistic-m1-execution-v1';
 export const REVIEWER_HOLISTIC_SCORING_PACKAGE_VERSION = 'reviewer-holistic-m1-scoring-package-v1';
 

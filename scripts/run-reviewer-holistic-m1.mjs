@@ -75,6 +75,7 @@ const EXECUTOR_FILES = [
   ...REDESIGN_FILES,
   'scripts/lib/reviewer-holistic-run-plan.mjs',
   'scripts/lib/reviewer-holistic-execution.mjs',
+  'scripts/probe-reviewer-holistic-runtime-config.mjs',
   'scripts/run-reviewer-holistic-m1.mjs',
 ];
 
@@ -414,4 +415,3 @@ if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
     process.exit(1);
   });
 }
-
