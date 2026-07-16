@@ -1,6 +1,8 @@
 const crypto = require('node:crypto');
 
 const SHA256_RE = /^[0-9a-f]{64}$/i;
+const ORCID_RE = /^\d{4}-\d{4}-\d{4}-[\dX]{4}$/;
+const OPENALEX_AUTHOR_RE = /^A[1-9]\d*$/;
 
 const IDENTITY_TOP_LEVEL_KEYS = new Set([
   'schemaVersion',
@@ -52,6 +54,40 @@ const HAZARD_TYPES = new Set([
   'merged_cluster',
   'stale_binding_correction',
   'no_orcid_early_career',
+]);
+
+const LABELING_IMPORT_TOP_LEVEL_KEYS = new Set([
+  'schemaVersion',
+  'importVersion',
+  'benchmarkVersion',
+  'labelingPolicy',
+  'sourceWorkbook',
+  'normalizationRules',
+  'ownerClarifications',
+  'rows',
+]);
+const LABELING_IMPORT_SOURCE_KEYS = new Set([
+  'fileName',
+  'sha256',
+  'reviewer',
+  'importedAt',
+]);
+const LABELING_IMPORT_CLARIFICATION_KEYS = new Set(['blindCaseId', 'resolution']);
+const LABELING_IMPORT_ROW_KEYS = new Set([
+  'blindCaseId',
+  'caseId',
+  'raw',
+  'normalized',
+  'normalizationNotes',
+]);
+const LABELING_IMPORT_RAW_KEYS = new Set([
+  'decision',
+  'personAnchor',
+  'actionEligible',
+  'correctionIntegrity',
+  'evidenceReliedUpon',
+  'rationale',
+  'status',
 ]);
 
 const PROPOSAL_TOP_LEVEL_KEYS = new Set([
@@ -117,6 +153,62 @@ function blindCaseIdFor(caseId) {
     .slice(0, 10)
     .toUpperCase();
   return `RIB-${digest}`;
+}
+
+function orcidChecksumValid(identifier) {
+  const compact = identifier.replace(/-/g, '');
+  if (!/^\d{15}[\dX]$/.test(compact)) return false;
+  let total = 0;
+  for (const digit of compact.slice(0, 15)) total = (total + Number(digit)) * 2;
+  const result = (12 - (total % 11)) % 11;
+  return compact.at(-1) === (result === 10 ? 'X' : String(result));
+}
+
+function normalizeBenchmarkPersonAnchor(raw, evidence = []) {
+  if (!nonEmptyString(raw)) return { ok: false, error: 'person anchor must be non-empty' };
+  const value = raw.trim();
+  const separator = value.indexOf(':');
+  if (separator <= 0) return { ok: false, error: 'person anchor namespace is missing' };
+  const namespace = value.slice(0, separator);
+  const identifier = value.slice(separator + 1);
+
+  if (namespace === 'orcid') {
+    if (!ORCID_RE.test(identifier) || !orcidChecksumValid(identifier)) {
+      return { ok: false, error: 'person anchor ORCID is malformed' };
+    }
+    return { ok: true, namespace, value };
+  }
+  if (namespace === 'openalex') {
+    if (!OPENALEX_AUTHOR_RE.test(identifier)) {
+      return { ok: false, error: 'person anchor OpenAlex author ID is malformed' };
+    }
+    return { ok: true, namespace, value };
+  }
+  if (namespace === 'institutional-profile') {
+    let parsed;
+    try {
+      parsed = new URL(identifier);
+    } catch {
+      return { ok: false, error: 'institutional-profile anchor URL is malformed' };
+    }
+    if (
+      parsed.protocol !== 'https:'
+      || parsed.username
+      || parsed.password
+      || parsed.hash
+      || !Array.isArray(evidence)
+      || !evidence.some((entry) => (
+        entry?.sourceType === 'institutional_profile' && entry.url === identifier
+      ))
+    ) {
+      return {
+        ok: false,
+        error: 'institutional-profile anchor must exactly match authoritative HTTPS evidence',
+      };
+    }
+    return { ok: true, namespace, value };
+  }
+  return { ok: false, error: `unsupported person anchor namespace '${namespace}'` };
 }
 
 function validateIdentityBenchmark(asset, { requireFrozen = false } = {}) {
@@ -205,6 +297,9 @@ function validateIdentityBenchmark(asset, { requireFrozen = false } = {}) {
       }
       if (item.expected?.abstain === false && !nonEmptyString(item.expected?.personAnchor)) {
         add(`${base}.expected.personAnchor`, 'must be non-empty when a binding is expected');
+      } else if (item.expected?.abstain === false) {
+        const anchor = normalizeBenchmarkPersonAnchor(item.expected?.personAnchor, item.evidence);
+        if (!anchor.ok) add(`${base}.expected.personAnchor`, anchor.error);
       }
       if (item.expected?.abstain === true && item.expected?.actionEligible === true) {
         add(`${base}.expected.actionEligible`, 'cannot be true when abstention is required');
@@ -298,6 +393,135 @@ function validateIdentityBenchmark(asset, { requireFrozen = false } = {}) {
         add(`cases[${index}].labeler`, 'must match the benchmark reviewer');
       }
     });
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+function validateIdentityLabelingImport(asset, benchmark) {
+  const errors = [];
+  const add = (pathName, message) => errors.push({ path: pathName, message });
+  if (!isObject(asset)) {
+    return { ok: false, errors: [{ path: '$', message: 'labeling import must be an object' }] };
+  }
+  rejectUnknown(asset, LABELING_IMPORT_TOP_LEVEL_KEYS, '$', add);
+  if (asset.schemaVersion !== 1) add('schemaVersion', 'must equal 1');
+  if (asset.importVersion !== 'reviewer-identity-workbook-import-v1') {
+    add('importVersion', 'must equal reviewer-identity-workbook-import-v1');
+  }
+  if (asset.benchmarkVersion !== 'reviewer-identity-v1') {
+    add('benchmarkVersion', 'must equal reviewer-identity-v1');
+  }
+  if (asset.labelingPolicy !== 'single_reviewer_blinded') {
+    add('labelingPolicy', 'must equal single_reviewer_blinded');
+  }
+  if (!isObject(asset.sourceWorkbook)) add('sourceWorkbook', 'must be an object');
+  rejectUnknown(asset.sourceWorkbook, LABELING_IMPORT_SOURCE_KEYS, 'sourceWorkbook', add);
+  if (!nonEmptyString(asset.sourceWorkbook?.fileName)) {
+    add('sourceWorkbook.fileName', 'must be non-empty');
+  }
+  if (!SHA256_RE.test(String(asset.sourceWorkbook?.sha256 || ''))) {
+    add('sourceWorkbook.sha256', 'must be a SHA-256 hash');
+  }
+  if (!nonEmptyString(asset.sourceWorkbook?.reviewer)) {
+    add('sourceWorkbook.reviewer', 'must be non-empty');
+  }
+  if (!validTimestamp(asset.sourceWorkbook?.importedAt)) {
+    add('sourceWorkbook.importedAt', 'must be an ISO-compatible timestamp');
+  }
+  if (
+    !Array.isArray(asset.normalizationRules)
+    || asset.normalizationRules.length === 0
+    || asset.normalizationRules.some((rule) => !nonEmptyString(rule))
+  ) {
+    add('normalizationRules', 'must contain non-empty rules');
+  }
+  if (!Array.isArray(asset.ownerClarifications)) {
+    add('ownerClarifications', 'must be an array');
+  } else {
+    const clarificationIds = new Set();
+    asset.ownerClarifications.forEach((clarification, index) => {
+      const base = `ownerClarifications[${index}]`;
+      if (!isObject(clarification)) {
+        add(base, 'must be an object');
+        return;
+      }
+      rejectUnknown(clarification, LABELING_IMPORT_CLARIFICATION_KEYS, base, add);
+      if (!nonEmptyString(clarification.blindCaseId)) add(`${base}.blindCaseId`, 'must be non-empty');
+      if (clarificationIds.has(clarification.blindCaseId)) {
+        add(`${base}.blindCaseId`, 'must be unique');
+      }
+      clarificationIds.add(clarification.blindCaseId);
+      if (!nonEmptyString(clarification.resolution)) add(`${base}.resolution`, 'must be non-empty');
+    });
+  }
+
+  const benchmarkCases = Array.isArray(benchmark?.cases) ? benchmark.cases : [];
+  const benchmarkById = new Map(benchmarkCases.map((item) => [item.caseId, item]));
+  if (!Array.isArray(asset.rows)) {
+    add('rows', 'must be an array');
+  } else {
+    if (asset.rows.length !== 40) add('rows', 'must contain exactly 40 rows');
+    if (asset.rows.length !== benchmarkCases.length) {
+      add('rows', 'must contain exactly one row for every benchmark case');
+    }
+    const blindIds = new Set();
+    const caseIds = new Set();
+    asset.rows.forEach((row, index) => {
+      const base = `rows[${index}]`;
+      if (!isObject(row)) {
+        add(base, 'must be an object');
+        return;
+      }
+      rejectUnknown(row, LABELING_IMPORT_ROW_KEYS, base, add);
+      if (!nonEmptyString(row.blindCaseId)) add(`${base}.blindCaseId`, 'must be non-empty');
+      if (blindIds.has(row.blindCaseId)) add(`${base}.blindCaseId`, 'must be unique');
+      blindIds.add(row.blindCaseId);
+      if (!nonEmptyString(row.caseId)) add(`${base}.caseId`, 'must be non-empty');
+      if (caseIds.has(row.caseId)) add(`${base}.caseId`, 'must be unique');
+      caseIds.add(row.caseId);
+      const benchmarkCase = benchmarkById.get(row.caseId);
+      if (!benchmarkCase) add(`${base}.caseId`, 'must exist in the benchmark');
+      if (benchmarkCase && row.blindCaseId !== blindCaseIdFor(row.caseId)) {
+        add(`${base}.blindCaseId`, 'must match the deterministic case mapping');
+      }
+      if (!isObject(row.raw)) add(`${base}.raw`, 'must be an object');
+      rejectUnknown(row.raw, LABELING_IMPORT_RAW_KEYS, `${base}.raw`, add);
+      for (const field of LABELING_IMPORT_RAW_KEYS) {
+        if (!(field in (row.raw || {}))) add(`${base}.raw.${field}`, 'is required');
+        if (field in (row.raw || {}) && !(row.raw[field] === null || typeof row.raw[field] === 'string')) {
+          add(`${base}.raw.${field}`, 'must be a string or null');
+        }
+      }
+      if (!isObject(row.normalized)) add(`${base}.normalized`, 'must be an object');
+      rejectUnknown(row.normalized, EXPECTED_KEYS, `${base}.normalized`, add);
+      if (!Array.isArray(row.normalizationNotes) || row.normalizationNotes.some((note) => !nonEmptyString(note))) {
+        add(`${base}.normalizationNotes`, 'must be an array of non-empty strings');
+      }
+      if (benchmarkCase?.expected) {
+        for (const field of EXPECTED_KEYS) {
+          if (row.normalized?.[field] !== benchmarkCase.expected[field]) {
+            add(`${base}.normalized.${field}`, 'must match the frozen benchmark label');
+          }
+        }
+      }
+    });
+    benchmarkCases.forEach((benchmarkCase) => {
+      if (!caseIds.has(benchmarkCase.caseId)) {
+        add('rows', `missing benchmark case '${benchmarkCase.caseId}'`);
+      }
+    });
+  }
+
+  if (benchmark?.status !== 'frozen') add('benchmark', 'must reference a frozen benchmark');
+  if (
+    Array.isArray(benchmark?.labelers)
+    && benchmark.labelers.length === 1
+    && asset.sourceWorkbook?.reviewer !== benchmark.labelers[0]
+  ) {
+    add('sourceWorkbook.reviewer', 'must match the benchmark reviewer');
+  }
+  if (benchmark?.frozenAt && asset.sourceWorkbook?.importedAt !== benchmark.frozenAt) {
+    add('sourceWorkbook.importedAt', 'must equal the benchmark frozenAt timestamp');
   }
   return { ok: errors.length === 0, errors };
 }
@@ -559,7 +783,9 @@ module.exports = {
   HAZARD_TYPES,
   aggregateChannelBaseline,
   blindCaseIdFor,
+  normalizeBenchmarkPersonAnchor,
   tokenizeSources,
   validateIdentityBenchmark,
+  validateIdentityLabelingImport,
   validateProposalEvaluation,
 };

@@ -1,16 +1,18 @@
 {
   "schemaVersion": 1,
-  "status": "draft",
+  "status": "frozen",
   "benchmarkVersion": "reviewer-identity-v1",
   "labelingPolicy": "single_reviewer_blinded",
   "pipelineOutputsVisibleToLabelers": false,
-  "labelers": [],
+  "labelers": [
+    "Justin"
+  ],
   "adjudicator": null,
-  "frozenAt": null,
+  "frozenAt": "2026-07-16T12:48:30.000Z",
   "cases": [
     {
       "caseId": "hazard-01-wei-zhang",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "namesake"
@@ -128,7 +130,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Wei+Zhang&per-page=3",
@@ -179,15 +186,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-02-robert-sang",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "namesake",
@@ -291,7 +298,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Robert+Sang&per-page=3",
@@ -330,15 +342,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-03-olga-smirnova",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "namesake",
@@ -453,7 +465,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "openalex:A5003420285",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Olga+Smirnova&per-page=3",
@@ -504,15 +521,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-04-david-yong",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "namesake"
@@ -630,7 +647,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0002-6502-1406",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=David+Yong&per-page=3",
@@ -681,15 +703,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-05-li-huei-tsai",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "merged_cluster"
@@ -792,7 +814,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0003-1262-0592",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Li-Huei+Tsai&per-page=3",
@@ -843,15 +870,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-06-yanjun-chen",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "namesake"
@@ -959,7 +986,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Yanjun+Chen&per-page=3",
@@ -1010,15 +1042,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-07-joshua-weitz",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "affiliation_drift"
@@ -1121,7 +1153,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Joshua+Weitz&per-page=3",
@@ -1166,15 +1203,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-08-taekjip-ha",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "affiliation_drift"
@@ -1284,7 +1321,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0003-2195-6258",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Taekjip+Ha&per-page=3",
@@ -1323,15 +1365,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-09-j-chen",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "initials"
@@ -1451,7 +1493,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=J.+Chen&per-page=3",
@@ -1502,15 +1549,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-10-a-patel",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "initials"
@@ -1613,7 +1660,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=A.+Patel&per-page=3",
@@ -1664,15 +1716,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-11-j-kim",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "initials"
@@ -1780,7 +1832,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=J.+Kim&per-page=3",
@@ -1831,15 +1888,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-12-zhang-wei",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "wrong_forename",
@@ -1946,7 +2003,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Zhang+Wei&per-page=3",
@@ -1997,15 +2059,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-13-philip-tessier",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "wrong_forename"
@@ -2046,7 +2108,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Philip+Tessier&per-page=3",
@@ -2079,15 +2146,15 @@
           "accessedAt": "2026-07-14T20:21:41.180Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-14-sigal-itzkovitz",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "wrong_forename"
@@ -2113,7 +2180,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Sigal+Itzkovitz&per-page=3",
@@ -2134,15 +2206,15 @@
           "accessedAt": "2026-07-14T20:21:41.180Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-15-alexandria-landsman",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "wrong_forename"
@@ -2168,7 +2240,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "institutional-profile:https://opticalscience.osu.edu/people/landsman.7",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Alexandria+Landsman&per-page=3",
@@ -2189,15 +2266,15 @@
           "accessedAt": "2026-07-14T20:21:41.180Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-16-andres-bhatt",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "wrong_forename"
@@ -2223,7 +2300,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Andres+Bhatt&per-page=3",
@@ -2244,15 +2326,15 @@
           "accessedAt": "2026-07-14T20:21:41.180Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-17-christina-wayment-steele",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "no_orcid_early_career"
@@ -2296,7 +2378,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Christina+Wayment-Steele&per-page=3",
@@ -2323,15 +2410,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-18-prineha-narang",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "affiliation_drift",
@@ -2410,7 +2497,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0003-3956-4594",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Prineha+Narang&per-page=3",
@@ -2449,15 +2541,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-19-li-huei-tsai-correction",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "stale_binding_correction"
@@ -2564,7 +2656,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0003-1262-0592",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "must_invalidate_and_recompute"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Li-Huei+Tsai&per-page=3",
@@ -2615,15 +2712,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "hazard-20-olga-smirnova-correction",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "hazard",
       "hazardTypes": [
         "stale_binding_correction"
@@ -2741,7 +2838,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "openalex:A5003420285",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "must_invalidate_and_recompute"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Olga+Smirnova&per-page=3",
@@ -2792,15 +2894,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-01-ram-madabhushi",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -2860,7 +2962,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0001-7564-8010",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Ram+Madabhushi&per-page=3",
@@ -2893,15 +3000,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-02-ursula-keller",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -2998,7 +3105,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0002-1689-8041",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Ursula+Keller&per-page=3",
@@ -3043,15 +3155,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-03-john-c-travers",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -3137,7 +3249,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0003-0350-9104",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=John+C.+Travers&per-page=3",
@@ -3188,15 +3305,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-04-curtis-suttle",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -3263,7 +3380,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0002-0372-0033",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Curtis+Suttle&per-page=3",
@@ -3302,15 +3424,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-05-forest-rohwer",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -3378,7 +3500,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0003-1548-5429",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Forest+Rohwer&per-page=3",
@@ -3417,15 +3544,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-06-mya-breitbart",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -3503,7 +3630,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0003-3210-2899",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Mya+Breitbart&per-page=3",
@@ -3536,15 +3668,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-07-will-harcombe",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -3596,7 +3728,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Will+Harcombe&per-page=3",
@@ -3635,15 +3772,15 @@
           "accessedAt": "2026-07-14T20:21:41.180Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-08-benjamin-kerr",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -3735,7 +3872,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0002-9909-7070",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Benjamin+Kerr&per-page=3",
@@ -3786,15 +3928,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-09-jeff-gore",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -3867,7 +4009,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0003-4583-8555",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Jeff+Gore&per-page=3",
@@ -3906,15 +4053,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-10-olga-zhaxybayeva",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -3974,7 +4121,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0002-1809-3909",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Olga+Zhaxybayeva&per-page=3",
@@ -4007,15 +4159,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-11-sara-seager",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -4086,7 +4238,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0002-6892-6948",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Sara+Seager&per-page=3",
@@ -4125,15 +4282,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-12-nergis-mavalvala",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -4191,7 +4348,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Nergis+Mavalvala&per-page=3",
@@ -4230,15 +4392,15 @@
           "accessedAt": "2026-07-14T20:21:41.180Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-13-fei-fei-li",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -4347,7 +4509,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Fei-Fei+Li&per-page=3",
@@ -4398,15 +4565,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-14-emmanuelle-charpentier",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -4494,7 +4661,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Emmanuelle+Charpentier&per-page=3",
@@ -4539,15 +4711,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-15-jennifer-doudna",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -4644,7 +4816,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0001-9161-999X",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Jennifer+Doudna&per-page=3",
@@ -4683,15 +4860,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-16-pardis-sabeti",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -4783,7 +4960,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0002-9843-1890",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Pardis+Sabeti&per-page=3",
@@ -4822,15 +5004,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-17-katalin-kariko",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -4875,7 +5057,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "openalex:A5030598859",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Katalin+Karik%C3%B3&per-page=3",
@@ -4908,15 +5095,15 @@
           "accessedAt": "2026-07-14T20:21:41.180Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-18-ankur-moitra",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -4997,7 +5184,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0001-7047-0495",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Ankur+Moitra&per-page=3",
@@ -5036,15 +5228,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-19-carrie-partch",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -5145,7 +5337,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": "orcid:0000-0002-4677-2861",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Carrie+Partch&per-page=3",
@@ -5184,15 +5381,15 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     },
     {
       "caseId": "clean-20-luhan-yang",
-      "caseStatus": "proposed",
+      "caseStatus": "labeled",
       "stratum": "clean_positive",
       "hazardTypes": [],
       "frozenInput": {
@@ -5283,7 +5480,12 @@
           }
         }
       },
-      "expected": null,
+      "expected": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
       "evidence": [
         {
           "url": "https://api.openalex.org/authors?search=Luhan+Yang&per-page=3",
@@ -5334,9 +5536,9 @@
           "accessedAt": "2026-07-14T20:18:27.911Z"
         }
       ],
-      "labeler": null,
+      "labeler": "Justin",
       "adjudication": {
-        "status": "pending",
+        "status": "not_applicable",
         "adjudicator": null
       }
     }

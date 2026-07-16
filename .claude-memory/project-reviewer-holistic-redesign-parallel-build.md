@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-15 via the M1.1 single-reviewer blinded-labeling decision, M1 asset gates, and the read-only C0.4 send-eligibility contract/population audit
+  last_verified: 2026-07-16 via the frozen M1.1 single-reviewer benchmark/import audit and M1 asset gates
 ---
 
 ## Recall Rule
@@ -109,17 +109,18 @@ owner explicitly approved the production-only schema exception. The later
 2026-07-13 decision separately authorizes only the narrow acceptance-drain
 self-report caller described above.
 
-**M1 measurement foundation (updated 2026-07-15):** the identity benchmark carries
+**M1 measurement foundation (updated 2026-07-16):** the identity benchmark carries
 an owner-approved 40-case public-evidence pool (20 hazard / 20 clean-positive) assembled
 without either reviewer pipeline. Every case has frozen candidate/upstream
-response shapes and at least one ORCID, institutional, or publisher source, but
-all 40 have null expected labels and null reviewer names, with pending review state. The
-validator permits that evidence-collection state while refusing freeze until
-every case is labeled by exactly one named reviewer. The owner approved the case
-set unchanged on 2026-07-14 and resumed it on 2026-07-15 under a single-reviewer
-blinded protocol. The reviewer performs every human decision; there is no
-separate labeler or adjudicator and no inter-rater claim. Completed labels,
-rubric/threshold acceptance, and freeze remain pending. The blinded
+response shapes, at least one ORCID, institutional, or publisher source, and a
+frozen expected outcome. Justin completed every human decision under the
+single-reviewer blinded protocol; the benchmark froze on 2026-07-16 with 23
+Bind and 17 Abstain labels. There is no separate labeler or adjudicator and no
+inter-rater claim. The tracked import audit preserves the source workbook hash,
+all 40 raw workbook rows, deterministic blind-ID mappings, normalization rules
+and notes, and the five owner-approved resolutions. The validator requires the
+frozen benchmark and import to agree exactly and permits institutional-profile
+anchors only when they match authoritative case evidence. The blinded
 proposal-evaluation asset remains an intentionally empty draft. The owner still
 must select ten held-out proposals and name the PD scorer before M1.2 can freeze.
 M1.3 is built and captured as an aggregate-only,

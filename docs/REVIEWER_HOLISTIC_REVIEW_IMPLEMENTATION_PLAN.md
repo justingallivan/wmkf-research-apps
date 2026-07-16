@@ -363,7 +363,7 @@ eligibility test.
 ## M1 — Build the evaluation system before further resolver changes
 
 **[FOUNDATION + M1.1 OWNER-APPROVED POOL + M1.3 BUILT 2026-07-14; M1.1
-SINGLE-REVIEWER LABELING PREPARED 2026-07-15 + M1.2 COHORT/SCORES PENDING OWNER FREEZE]** The tracked draft identity benchmark and blinded
+SINGLE-REVIEWER LABELING FROZEN 2026-07-16 + M1.2 COHORT/SCORES PENDING OWNER FREEZE]** The tracked frozen identity benchmark and draft blinded
 proposal-evaluation assets now have fail-closed validators at
 `scripts/validate-reviewer-holistic-m1-assets.js`; draft validation is
 `npm run eval:reviewer-holistic:m1`, while `--require-frozen` and
@@ -372,36 +372,41 @@ is `scripts/probe-reviewer-channel-baseline.js`, and its dated aggregate-only
 production artifact is
 `docs/audits/reviewer-channel-baseline-2026-07-14.json`. No resolver, reader,
 writer, or production behavior changed. The owner approved the M1.1 40-case
-evidence pool as proposed on 2026-07-14, then resumed the exercise on
-2026-07-15 under a single-reviewer blinded protocol. The reviewer will perform
-all human decisions; the method makes no inter-rater or adjudication claim.
-Completed labels and benchmark freeze remain pending. M1.2 cannot freeze
-until the owner selects the ten held-out proposals and PD scorer.
+evidence pool as proposed on 2026-07-14, then completed the exercise under a
+single-reviewer blinded protocol. The benchmark froze on 2026-07-16 with 23
+Bind and 17 Abstain labels. The source workbook hash, all raw cell responses,
+normalization rules, and the five owner-approved resolutions are preserved in
+`docs/audits/reviewer-holistic-identity-labeling-import-v1.json`; the source
+workbook itself remains outside the repository. This method makes no inter-rater
+or adjudication claim. M1.2 cannot freeze until the owner selects the ten
+held-out proposals and PD scorer.
 
 ### M1.1 Single-reviewer blinded person benchmark
 
-**[40-CASE POOL OWNER-APPROVED 2026-07-14; SINGLE-REVIEWER METHOD APPROVED
-2026-07-15; RESULTS PENDING]**
-`docs/audits/reviewer-holistic-identity-benchmark-v1.json` contains 20 proposed
-hazard cases and 20 proposed clean-positive cases assembled without invoking
+**[40-CASE POOL OWNER-APPROVED 2026-07-14; SINGLE-REVIEWER LABELS FROZEN
+2026-07-16]**
+`docs/audits/reviewer-holistic-identity-benchmark-v1.json` contains 20 labeled
+hazard cases and 20 labeled clean-positive cases assembled without invoking
 either reviewer pipeline. Each stores the candidate input, a dated minimal
-OpenAlex/ORCID response snapshot, and at least one candidate ORCID,
-institutional, or publisher source. All 40 remain `caseStatus: proposed` with
-`expected: null`, `labeler: null`, and pending review; they are neither
-ground-truth labels nor evaluation evidence. The owner approved this case set
-unchanged on 2026-07-14 and approved a single-reviewer blinded exercise on
-2026-07-15. One reviewer performs all human decisions without a separate
-labeler or adjudicator; completed labels, rubric/threshold acceptance, and
-freeze remain pending. The reproducible collector is
+OpenAlex/ORCID response snapshot, at least one candidate ORCID, institutional,
+or publisher source, and the frozen expected outcome. Justin completed all 40
+human decisions without a separate labeler or adjudicator; the frozen set has
+23 Bind and 17 Abstain labels. The method therefore makes no inter-rater or
+adjudication claim. The tracked labeling-import audit preserves the original
+workbook SHA-256 (`202e76448aa7d5bbb794a17cc17ae70d0a391c0507ef927c3896753c98723544`),
+all 40 raw workbook rows, deterministic blind-ID mappings, canonical normalized
+labels, normalization notes, and owner clarifications. The reproducible collector is
 `scripts/collect-reviewer-holistic-identity-cases.js`; its manual-evidence-only
 mode can add reviewed citations without refreshing or mixing upstream API
 snapshots. Curator sampling rationales remain in the collector seed definitions
 and are not emitted into the reviewer-facing frozen candidate input.
 
 The validator rejects unknown fields, visible pipeline outputs, unsupported
-hazard/evidence types, incoherent bind/abstain/action labels, missing HTTPS
-evidence, an unregistered or mismatched reviewer, review state inconsistent
-with the single-reviewer policy, and frozen sets below
+hazard/evidence types, noncanonical or evidence-unmatched person anchors,
+incoherent bind/abstain/action labels, missing HTTPS evidence, an unregistered
+or mismatched reviewer, review state inconsistent with the single-reviewer
+policy, labeling imports that do not preserve exactly 40 deterministic raw-to-
+frozen mappings, and frozen sets below
 the 40 / 20 hazard / 20 clean-positive minimums. Proposed cases may collect
 evidence while unlabeled; freeze requires every case to be labeled, resolved,
 and backed by authoritative ORCID, institutional, or publisher evidence. Freeze
@@ -940,10 +945,12 @@ the change into cleanup.
 
 1. Approve each C0 runtime promotion after its evidence bundle.
 2. **M1.1 case pool approved unchanged 2026-07-14; single-reviewer blinded
-   labeling approved and resumed 2026-07-15.** One reviewer performs all human
-   decisions; there is no separate labeler or adjudicator and no inter-rater
-   claim. Completed labels, rubric/threshold acceptance, and freeze remain
-   pending.
+   labeling frozen 2026-07-16.** Justin completed all 40 decisions; the frozen
+   benchmark contains 23 Bind and 17 Abstain labels. There is no separate
+   labeler or adjudicator and no inter-rater claim. The raw workbook responses,
+   workbook hash, normalizations, and five owner-approved resolutions are
+   preserved in the tracked labeling-import audit. M1.2 rubric/threshold
+   acceptance and proposal-cohort freeze remain pending.
 3. **Durable fields approved/deployed 2026-07-12; first acceptance self-report
    caller approved/promoted 2026-07-13 via PR #57 / `00ffb09c`.** Broader runtime
    writers/readers and policy migration retain their own gates.

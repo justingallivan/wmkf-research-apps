@@ -1,0 +1,964 @@
+{
+  "schemaVersion": 1,
+  "importVersion": "reviewer-identity-workbook-import-v1",
+  "benchmarkVersion": "reviewer-identity-v1",
+  "labelingPolicy": "single_reviewer_blinded",
+  "sourceWorkbook": {
+    "fileName": "reviewer-identity-benchmark-40-case-single-reviewer.xlsx",
+    "sha256": "202e76448aa7d5bbb794a17cc17ae70d0a391c0507ef927c3896753c98723544",
+    "reviewer": "Justin",
+    "importedAt": "2026-07-16T12:48:30.000Z"
+  },
+  "normalizationRules": [
+    "Bind rows require a canonical ORCID, OpenAlex author ID, or an authoritative institutional-profile URL present in the frozen case evidence.",
+    "Abstain rows carry a null person anchor and actionEligible false.",
+    "Only frozen correction fixtures use must_invalidate_and_recompute; all other cases use not_applicable.",
+    "Owner-approved resolutions override unclear or internally inconsistent workbook cells while preserving every raw entry in this audit artifact."
+  ],
+  "ownerClarifications": [
+    {
+      "blindCaseId": "RIB-1043DBFA02",
+      "resolution": "Approved Bind to ORCID 0000-0003-1262-0592; this correction fixture must invalidate the stale binding and recompute downstream state."
+    },
+    {
+      "blindCaseId": "RIB-35925539F4",
+      "resolution": "The submitter misspelled Alexandra Landsman as Alexandria; bind the case to Alexandra Landsman using the matching Ohio State institutional profile."
+    },
+    {
+      "blindCaseId": "RIB-4EF477E816",
+      "resolution": "Approved Abstain because the frozen OpenAlex evidence contains three competing author IDs and no ORCID anchor."
+    },
+    {
+      "blindCaseId": "RIB-63A5D99024",
+      "resolution": "Approved Abstain with action eligibility No and no person anchor."
+    },
+    {
+      "blindCaseId": "RIB-6C498A7771",
+      "resolution": "Approved Bind to ORCID 0000-0003-2195-6258; the workbook ORCID belongs to Emmanuelle Charpentier."
+    }
+  ],
+  "rows": [
+    {
+      "blindCaseId": "RIB-D894C21FD5",
+      "caseId": "hazard-01-wei-zhang",
+      "raw": {
+        "decision": "Abstain",
+        "personAnchor": "Cannot confirm anything",
+        "actionEligible": "No",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "No matcjes",
+        "rationale": "No matches",
+        "status": "CLEAR ANCHOR"
+      },
+      "normalized": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Correction integrity normalized: must_invalidate_and_recompute -> not_applicable.",
+        "Cleared the workbook anchor because abstentions cannot carry a person anchor.",
+        "Resolved workbook status 'CLEAR ANCHOR' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-0128BBB8E3",
+      "caseId": "hazard-02-robert-sang",
+      "raw": {
+        "decision": "Abstain",
+        "personAnchor": "0000-0002-4582-8544",
+        "actionEligible": "No",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "https://orcid.org/0000-0002-4582-8544",
+        "rationale": "Orcid correct, OpenAlex not.",
+        "status": "CLEAR ANCHOR"
+      },
+      "normalized": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Correction integrity normalized: must_invalidate_and_recompute -> not_applicable.",
+        "Cleared the workbook anchor because abstentions cannot carry a person anchor.",
+        "Resolved workbook status 'CLEAR ANCHOR' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-F438AB5BE4",
+      "caseId": "hazard-03-olga-smirnova",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "1. Olga Smirnova | A5003420285 | ORCID 0000-0002-7746-5733 | Technion – Israel Institute of Technology; Max-Born-Institute for Nonlinear Optics and Short Pulse Spectroscopy; Technische Universität Berlin | 345 works",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "1. Olga Smirnova | A5003420285 | ORCID 0000-0002-7746-5733 | Technion – Israel Institute of Technology; Max-Born-Institute for Nonlinear Optics and Short Pulse Spectroscopy; Technische Universität Berlin | 345 works",
+        "rationale": "1. Olga Smirnova | A5003420285 | ORCID 0000-0002-7746-5733 | Technion – Israel Institute of Technology; Max-Born-Institute for Nonlinear Optics and Short Pulse Spectroscopy; Technische Universität Berlin | 345 works",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "openalex:A5003420285",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to openalex:A5003420285."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-5548A8C322",
+      "caseId": "hazard-04-david-yong",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "https://orcid.org/0000-0002-6502-1406",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "first orcid correct",
+        "rationale": "First Orcid Correct",
+        "status": "USE NOT_APPLICABLE"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0002-6502-1406",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Correction integrity normalized: must_invalidate_and_recompute -> not_applicable.",
+        "Canonicalized the workbook anchor to orcid:0000-0002-6502-1406.",
+        "Resolved workbook status 'USE NOT_APPLICABLE' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-9828D192F5",
+      "caseId": "hazard-05-li-huei-tsai",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "open alex and orcid",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "Open alex, orcid",
+        "rationale": "Open alex, orcid",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0003-1262-0592",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to orcid:0000-0003-1262-0592."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-1987E5B06D",
+      "caseId": "hazard-06-yanjun-chen",
+      "raw": {
+        "decision": "Abstain",
+        "personAnchor": "Open Alex A5100378023",
+        "actionEligible": "No",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "Open Alex correct, orcid not",
+        "rationale": "Open alex",
+        "status": "CLEAR ANCHOR"
+      },
+      "normalized": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Correction integrity normalized: must_invalidate_and_recompute -> not_applicable.",
+        "Cleared the workbook anchor because abstentions cannot carry a person anchor.",
+        "Resolved workbook status 'CLEAR ANCHOR' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-272D73C4B4",
+      "caseId": "hazard-07-joshua-weitz",
+      "raw": {
+        "decision": "Abstain",
+        "personAnchor": "https://orcid.org/0000-0002-3433-8312",
+        "actionEligible": "No",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "https://orcid.org/0000-0002-3433-8312 A5020490780",
+        "rationale": "Open alex, orcid",
+        "status": "CLEAR ANCHOR"
+      },
+      "normalized": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Correction integrity normalized: must_invalidate_and_recompute -> not_applicable.",
+        "Cleared the workbook anchor because abstentions cannot carry a person anchor.",
+        "Resolved workbook status 'CLEAR ANCHOR' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-6C498A7771",
+      "caseId": "hazard-08-taekjip-ha",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "https://orcid.org/0000-0002-0254-0778",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "https://orcid.org/0000-0002-0254-0778",
+        "rationale": "https://orcid.org/0000-0002-0254-0778",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0003-2195-6258",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to orcid:0000-0003-2195-6258."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-865D9497B3",
+      "caseId": "hazard-09-j-chen",
+      "raw": {
+        "decision": "Abstain",
+        "personAnchor": "N/A",
+        "actionEligible": "No",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "None",
+        "rationale": "All wrong",
+        "status": "CLEAR ANCHOR"
+      },
+      "normalized": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Correction integrity normalized: must_invalidate_and_recompute -> not_applicable.",
+        "Cleared the workbook anchor because abstentions cannot carry a person anchor.",
+        "Resolved workbook status 'CLEAR ANCHOR' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-7E2C7DDF9D",
+      "caseId": "hazard-10-a-patel",
+      "raw": {
+        "decision": "Abstain",
+        "personAnchor": "N/A",
+        "actionEligible": "No",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "None",
+        "rationale": "Not determinable",
+        "status": "CLEAR ANCHOR"
+      },
+      "normalized": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Correction integrity normalized: must_invalidate_and_recompute -> not_applicable.",
+        "Cleared the workbook anchor because abstentions cannot carry a person anchor.",
+        "Resolved workbook status 'CLEAR ANCHOR' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-F4FFBA42ED",
+      "caseId": "hazard-11-j-kim",
+      "raw": {
+        "decision": "Abstain",
+        "personAnchor": "No matches",
+        "actionEligible": "No",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "No matches",
+        "rationale": "no matches",
+        "status": "CLEAR ANCHOR"
+      },
+      "normalized": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Correction integrity normalized: must_invalidate_and_recompute -> not_applicable.",
+        "Cleared the workbook anchor because abstentions cannot carry a person anchor.",
+        "Resolved workbook status 'CLEAR ANCHOR' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-AE45D75302",
+      "caseId": "hazard-12-zhang-wei",
+      "raw": {
+        "decision": "Abstain",
+        "personAnchor": "None",
+        "actionEligible": "No",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "None",
+        "rationale": "No matches",
+        "status": "CLEAR ANCHOR"
+      },
+      "normalized": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Correction integrity normalized: must_invalidate_and_recompute -> not_applicable.",
+        "Cleared the workbook anchor because abstentions cannot carry a person anchor.",
+        "Resolved workbook status 'CLEAR ANCHOR' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-C5B171F85A",
+      "caseId": "hazard-13-philip-tessier",
+      "raw": {
+        "decision": "Abstain",
+        "personAnchor": "https://che.engin.umich.edu/people/tessier-peter/",
+        "actionEligible": "No",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "Website correct",
+        "rationale": "Website correct, name not, no open alex or orcid",
+        "status": "CLEAR ANCHOR"
+      },
+      "normalized": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Correction integrity normalized: must_invalidate_and_recompute -> not_applicable.",
+        "Cleared the workbook anchor because abstentions cannot carry a person anchor.",
+        "Resolved workbook status 'CLEAR ANCHOR' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-051E544987",
+      "caseId": "hazard-14-sigal-itzkovitz",
+      "raw": {
+        "decision": "Abstain",
+        "personAnchor": "https://www.weizmann.ac.il/mcb/Le1/prof-shalev-itzkovitz",
+        "actionEligible": "No",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "https://www.weizmann.ac.il/mcb/Le1/prof-shalev-itzkovitz",
+        "rationale": "Website correct, name not",
+        "status": "CLEAR ANCHOR"
+      },
+      "normalized": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Correction integrity normalized: must_invalidate_and_recompute -> not_applicable.",
+        "Cleared the workbook anchor because abstentions cannot carry a person anchor.",
+        "Resolved workbook status 'CLEAR ANCHOR' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-35925539F4",
+      "caseId": "hazard-15-alexandria-landsman",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "https://opticalscience.osu.edu/people/landsman.7",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "https://opticalscience.osu.edu/people/landsman.7",
+        "rationale": "Website correct",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "institutional-profile:https://opticalscience.osu.edu/people/landsman.7",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to institutional-profile:https://opticalscience.osu.edu/people/landsman.7."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-3E42110C33",
+      "caseId": "hazard-16-andres-bhatt",
+      "raw": {
+        "decision": "Abstain",
+        "personAnchor": "N/A",
+        "actionEligible": "No",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "None",
+        "rationale": "No evidence",
+        "status": "CLEAR ANCHOR"
+      },
+      "normalized": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Correction integrity normalized: must_invalidate_and_recompute -> not_applicable.",
+        "Cleared the workbook anchor because abstentions cannot carry a person anchor.",
+        "Resolved workbook status 'CLEAR ANCHOR' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-6E919AA7EE",
+      "caseId": "hazard-17-christina-wayment-steele",
+      "raw": {
+        "decision": "Abstain",
+        "personAnchor": null,
+        "actionEligible": "No",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "orcids incorrect",
+        "rationale": "orcids incorrect",
+        "status": "USE NOT_APPLICABLE"
+      },
+      "normalized": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Correction integrity normalized: must_invalidate_and_recompute -> not_applicable.",
+        "Resolved workbook status 'USE NOT_APPLICABLE' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-39D55CAB51",
+      "caseId": "hazard-18-prineha-narang",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "https://orcid.org/0000-0003-3956-4594",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "https://orcid.org/0000-0003-3956-4594",
+        "rationale": "One orcid, one open alex correct",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0003-3956-4594",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to orcid:0000-0003-3956-4594."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-1043DBFA02",
+      "caseId": "hazard-19-li-huei-tsai-correction",
+      "raw": {
+        "decision": "Abstain",
+        "personAnchor": "https://orcid.org/0000-0003-1262-0592",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "Orcid",
+        "rationale": "First Orcid Correct",
+        "status": "CLEAR ANCHOR"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0003-1262-0592",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "must_invalidate_and_recompute"
+      },
+      "normalizationNotes": [
+        "Owner-approved decision normalization: Abstain -> Bind.",
+        "Canonicalized the workbook anchor to orcid:0000-0003-1262-0592.",
+        "Resolved workbook status 'CLEAR ANCHOR' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-8BCBC31334",
+      "caseId": "hazard-20-olga-smirnova-correction",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "A5003420285 and ORCID 0000-0002-7746-5733",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "Open Alex correct, frozen orcid not",
+        "rationale": "Open alex",
+        "status": "CORRECTION REQUIRED"
+      },
+      "normalized": {
+        "personAnchor": "openalex:A5003420285",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "must_invalidate_and_recompute"
+      },
+      "normalizationNotes": [
+        "Correction integrity normalized: not_applicable -> must_invalidate_and_recompute.",
+        "Canonicalized the workbook anchor to openalex:A5003420285.",
+        "Resolved workbook status 'CORRECTION REQUIRED' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-6B2B91A8C8",
+      "caseId": "clean-01-ram-madabhushi",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "https://orcid.org/0000-0001-7564-8010",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "Search",
+        "rationale": "First open alex and orcid correct",
+        "status": "USE NOT_APPLICABLE"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0001-7564-8010",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Correction integrity normalized: must_invalidate_and_recompute -> not_applicable.",
+        "Canonicalized the workbook anchor to orcid:0000-0001-7564-8010.",
+        "Resolved workbook status 'USE NOT_APPLICABLE' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-C0FAD8198D",
+      "caseId": "clean-02-ursula-keller",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "open alex and orcid",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "Open alex, orcid",
+        "rationale": "Open alex, orcid",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0002-1689-8041",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to orcid:0000-0002-1689-8041."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-C7B9B611D0",
+      "caseId": "clean-03-john-c-travers",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "A5057189106 A5113368926 https://orcid.org/0000-0003-0350-9104",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "Two open alex ids for same person, orcid correct",
+        "rationale": "Two open alex ids for same person, orcid correct",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0003-0350-9104",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to orcid:0000-0003-0350-9104."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-7978580885",
+      "caseId": "clean-04-curtis-suttle",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "https://orcid.org/0000-0002-0372-0033",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "https://orcid.org/0000-0002-0372-0033",
+        "rationale": "Orcid and first open alex correct",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0002-0372-0033",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to orcid:0000-0002-0372-0033."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-9B05E94046",
+      "caseId": "clean-05-forest-rohwer",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "open alex and orcid",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "A5026525836 and orcid",
+        "rationale": "Open alex, orcid",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0003-1548-5429",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to orcid:0000-0003-1548-5429."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-0F3210085B",
+      "caseId": "clean-06-mya-breitbart",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "https://orcid.org/0000-0003-3210-2899",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "Orcid",
+        "rationale": "Orcid Correct",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0003-3210-2899",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to orcid:0000-0003-3210-2899."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-4EF477E816",
+      "caseId": "clean-07-will-harcombe",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "https://cbs.umn.edu/directory/william-harcombe",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "website",
+        "rationale": "Website correct",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Owner-approved decision normalization: Bind -> Abstain.",
+        "Action eligibility normalized: Yes -> No.",
+        "Cleared the workbook anchor because abstentions cannot carry a person anchor."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-9AA891726C",
+      "caseId": "clean-08-benjamin-kerr",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "open alex and orcid",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "https://orcid.org/0000-0002-9909-7070 A5026507747",
+        "rationale": "Open alex, orcid",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0002-9909-7070",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to orcid:0000-0002-9909-7070."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-C0AE06D0C0",
+      "caseId": "clean-09-jeff-gore",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "open alex and orcid",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "Open alex, orcid",
+        "rationale": "Open alex, orcid",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0003-4583-8555",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to orcid:0000-0003-4583-8555."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-14886963F0",
+      "caseId": "clean-10-olga-zhaxybayeva",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "https://orcid.org/0000-0002-1809-3909",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "Open alex, orcid",
+        "rationale": "Open alex, orcid",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0002-1809-3909",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to orcid:0000-0002-1809-3909."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-46F62AD2CF",
+      "caseId": "clean-11-sara-seager",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "https://orcid.org/0000-0002-6892-6948",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "Open alex, orcid",
+        "rationale": "Open alex, orcid",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0002-6892-6948",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to orcid:0000-0002-6892-6948."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-63A5D99024",
+      "caseId": "clean-12-nergis-mavalvala",
+      "raw": {
+        "decision": "Abstain",
+        "personAnchor": "https://physics.mit.edu/faculty/nergis-mavalvala/",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "Website correct",
+        "rationale": "Website correct",
+        "status": "CLEAR ANCHOR"
+      },
+      "normalized": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Action eligibility normalized: Yes -> No.",
+        "Correction integrity normalized: must_invalidate_and_recompute -> not_applicable.",
+        "Cleared the workbook anchor because abstentions cannot carry a person anchor.",
+        "Resolved workbook status 'CLEAR ANCHOR' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-4229363C49",
+      "caseId": "clean-13-fei-fei-li",
+      "raw": {
+        "decision": "Abstain",
+        "personAnchor": "N/A",
+        "actionEligible": "No",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "All people were incorrect",
+        "rationale": "Fei-fei li is at stanford, the suggestions are not.",
+        "status": "CLEAR ANCHOR"
+      },
+      "normalized": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Correction integrity normalized: must_invalidate_and_recompute -> not_applicable.",
+        "Cleared the workbook anchor because abstentions cannot carry a person anchor.",
+        "Resolved workbook status 'CLEAR ANCHOR' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-6C197966D6",
+      "caseId": "clean-14-emmanuelle-charpentier",
+      "raw": {
+        "decision": "Abstain",
+        "personAnchor": "https://orcid.org/0000-0002-0254-0778",
+        "actionEligible": "No",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "Orcid",
+        "rationale": "https://orcid.org/0000-0002-0254-0778 correct",
+        "status": "CLEAR ANCHOR"
+      },
+      "normalized": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Correction integrity normalized: must_invalidate_and_recompute -> not_applicable.",
+        "Cleared the workbook anchor because abstentions cannot carry a person anchor.",
+        "Resolved workbook status 'CLEAR ANCHOR' through the approved normalization rules."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-16025EE290",
+      "caseId": "clean-15-jennifer-doudna",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "https://orcid.org/0000-0001-9161-999X",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "Open alex, orcid",
+        "rationale": "Open alex, orcid",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0001-9161-999X",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to orcid:0000-0001-9161-999X."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-774F450AEA",
+      "caseId": "clean-16-pardis-sabeti",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "https://orcid.org/0000-0002-9843-1890",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "https://orcid.org/0000-0002-9843-1890",
+        "rationale": "Orcid and first open alex correct",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0002-9843-1890",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to orcid:0000-0002-9843-1890."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-92451D93D1",
+      "caseId": "clean-17-katalin-kariko",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "open alex and orcid",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "open alex, orcid, website",
+        "rationale": "open alex, orcid, website",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "openalex:A5030598859",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to openalex:A5030598859."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-70B1410A5A",
+      "caseId": "clean-18-ankur-moitra",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "https://orcid.org/0000-0001-7047-0495",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "https://orcid.org/0000-0001-7047-0495",
+        "rationale": "Orcid and first open alex correct",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0001-7047-0495",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to orcid:0000-0001-7047-0495."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-FA752CB691",
+      "caseId": "clean-19-carrie-partch",
+      "raw": {
+        "decision": "Bind",
+        "personAnchor": "1. Carrie L. Partch | A5021864264 | ORCID 0000-0002-4677-2861 | Howard Hughes Medical Institute; University of California, Santa Cruz; University of California System | 147 works",
+        "actionEligible": "Yes",
+        "correctionIntegrity": "not_applicable",
+        "evidenceReliedUpon": "1. Carrie L. Partch | A5021864264 | ORCID 0000-0002-4677-2861 | Howard Hughes Medical Institute; University of California, Santa Cruz; University of California System | 147 works",
+        "rationale": "1. Carrie L. Partch | A5021864264 | ORCID 0000-0002-4677-2861 | Howard Hughes Medical Institute; University of California, Santa Cruz; University of California System | 147 works",
+        "status": "COMPLETE"
+      },
+      "normalized": {
+        "personAnchor": "orcid:0000-0002-4677-2861",
+        "abstain": false,
+        "actionEligible": true,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Canonicalized the workbook anchor to orcid:0000-0002-4677-2861."
+      ]
+    },
+    {
+      "blindCaseId": "RIB-C4FC14ED12",
+      "caseId": "clean-20-luhan-yang",
+      "raw": {
+        "decision": "Abstain",
+        "personAnchor": "A5101399386",
+        "actionEligible": "No",
+        "correctionIntegrity": "must_invalidate_and_recompute",
+        "evidenceReliedUpon": "Open Alex correct, orcid not",
+        "rationale": "Open alex",
+        "status": "CLEAR ANCHOR"
+      },
+      "normalized": {
+        "personAnchor": null,
+        "abstain": true,
+        "actionEligible": false,
+        "correctionIntegrity": "not_applicable"
+      },
+      "normalizationNotes": [
+        "Correction integrity normalized: must_invalidate_and_recompute -> not_applicable.",
+        "Cleared the workbook anchor because abstentions cannot carry a person anchor.",
+        "Resolved workbook status 'CLEAR ANCHOR' through the approved normalization rules."
+      ]
+    }
+  ]
+}

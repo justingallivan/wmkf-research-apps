@@ -10,6 +10,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   validateIdentityBenchmark,
+  validateIdentityLabelingImport,
   validateProposalEvaluation,
 } = require('./lib/reviewer-holistic-m1');
 
@@ -22,6 +23,8 @@ const DEFAULT_PROPOSAL_PATH = path.join(
   ROOT,
   'docs/audits/reviewer-holistic-proposal-evaluation-v1.json',
 );
+const IDENTITY_IMPORT_FILE = 'reviewer-holistic-identity-labeling-import-v1.json';
+const DEFAULT_IDENTITY_IMPORT_PATH = path.join(ROOT, 'docs/audits', IDENTITY_IMPORT_FILE);
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -39,10 +42,12 @@ function parseCli(argv) {
   if (positional.length > 2) {
     throw new Error(`unknown positional arguments: ${positional.slice(2).join(', ')}`);
   }
+  const identityPath = positional[0] || DEFAULT_IDENTITY_PATH;
   return {
     requireFrozen,
     requireScored,
-    identityPath: positional[0] || DEFAULT_IDENTITY_PATH,
+    identityPath,
+    identityImportPath: path.join(path.dirname(identityPath), IDENTITY_IMPORT_FILE),
     proposalPath: positional[1] || DEFAULT_PROPOSAL_PATH,
   };
 }
@@ -50,10 +55,12 @@ function parseCli(argv) {
 function main() {
   const options = parseCli(process.argv.slice(2));
   let identity;
+  let identityImport;
   let proposals;
   try {
     identity = readJson(options.identityPath);
     proposals = readJson(options.proposalPath);
+    if (identity.status === 'frozen') identityImport = readJson(options.identityImportPath);
   } catch (error) {
     console.error(`M1 asset read failed: ${error.message}`);
     process.exit(1);
@@ -66,6 +73,12 @@ function main() {
       requireScored: options.requireScored,
     })],
   ];
+  if (identity.status === 'frozen') {
+    results.splice(1, 0, [
+      'identity labeling import',
+      validateIdentityLabelingImport(identityImport, identity),
+    ]);
+  }
   let failed = false;
   for (const [label, result] of results) {
     if (result.ok) continue;
@@ -81,6 +94,7 @@ if (require.main === module) main();
 
 module.exports = {
   DEFAULT_IDENTITY_PATH,
+  DEFAULT_IDENTITY_IMPORT_PATH,
   DEFAULT_PROPOSAL_PATH,
   parseCli,
 };

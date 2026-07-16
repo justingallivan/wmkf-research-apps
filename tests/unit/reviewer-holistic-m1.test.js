@@ -1,10 +1,13 @@
 const identityDraft = require('../../docs/audits/reviewer-holistic-identity-benchmark-v1.json');
+const identityLabelingImport = require('../../docs/audits/reviewer-holistic-identity-labeling-import-v1.json');
 const proposalDraft = require('../../docs/audits/reviewer-holistic-proposal-evaluation-v1.json');
 const {
   aggregateChannelBaseline,
   blindCaseIdFor,
+  normalizeBenchmarkPersonAnchor,
   tokenizeSources,
   validateIdentityBenchmark,
+  validateIdentityLabelingImport,
   validateProposalEvaluation,
 } = require('../../scripts/lib/reviewer-holistic-m1');
 const { parseCli: parseAssetCli } = require('../../scripts/validate-reviewer-holistic-m1-assets');
@@ -19,6 +22,15 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function draftIdentity() {
+  const asset = clone(identityDraft);
+  asset.status = 'draft';
+  asset.labelers = [];
+  asset.frozenAt = null;
+  asset.cases = [];
+  return asset;
+}
+
 function identityCase(index, stratum) {
   const abstain = stratum === 'hazard';
   return {
@@ -28,7 +40,7 @@ function identityCase(index, stratum) {
     hazardTypes: abstain ? ['namesake'] : [],
     frozenInput: { candidate: { name: `Candidate ${index}` }, upstreamResponses: { orcid: {} } },
     expected: {
-      personAnchor: abstain ? null : `orcid:0000-0002-1825-${String(1000 + index).slice(-4)}`,
+      personAnchor: abstain ? null : `openalex:A${1000 + index}`,
       abstain,
       actionEligible: !abstain,
       correctionIntegrity: 'not_applicable',
@@ -55,6 +67,38 @@ function frozenIdentity() {
     ...Array.from({ length: 20 }, (_, i) => identityCase(i + 21, 'clean_positive')),
   ];
   return asset;
+}
+
+function identityImport(benchmark) {
+  return {
+    schemaVersion: 1,
+    importVersion: 'reviewer-identity-workbook-import-v1',
+    benchmarkVersion: 'reviewer-identity-v1',
+    labelingPolicy: 'single_reviewer_blinded',
+    sourceWorkbook: {
+      fileName: 'reviewer-identity-benchmark.xlsx',
+      sha256: 'a'.repeat(64),
+      reviewer: benchmark.labelers[0],
+      importedAt: benchmark.frozenAt,
+    },
+    normalizationRules: ['Abstentions carry no person anchor and are not action eligible.'],
+    ownerClarifications: [],
+    rows: benchmark.cases.map((item) => ({
+      blindCaseId: blindCaseIdFor(item.caseId),
+      caseId: item.caseId,
+      raw: {
+        decision: item.expected.abstain ? 'Abstain' : 'Bind',
+        personAnchor: item.expected.personAnchor,
+        actionEligible: item.expected.actionEligible ? 'Yes' : 'No',
+        correctionIntegrity: item.expected.correctionIntegrity,
+        evidenceReliedUpon: item.evidence[0].url,
+        rationale: 'Reviewed against authoritative evidence.',
+        status: 'COMPLETE',
+      },
+      normalized: clone(item.expected),
+      normalizationNotes: [],
+    })),
+  };
 }
 
 function proposal(index) {
@@ -124,19 +168,59 @@ describe('M1 evaluation assets', () => {
     expect(() => blindCaseIdFor('')).toThrow('caseId must be a non-empty string');
   });
 
-  test('tracked empty drafts are structurally valid but cannot freeze', () => {
-    expect(validateIdentityBenchmark(identityDraft)).toEqual({ ok: true, errors: [] });
+  test('an empty identity draft remains structurally valid but cannot freeze', () => {
+    const identity = draftIdentity();
+    expect(validateIdentityBenchmark(identity)).toEqual({ ok: true, errors: [] });
     expect(validateProposalEvaluation(proposalDraft)).toEqual({ ok: true, errors: [] });
-    expect(validateIdentityBenchmark(identityDraft, { requireFrozen: true }).ok).toBe(false);
+    expect(validateIdentityBenchmark(identity, { requireFrozen: true }).ok).toBe(false);
     expect(validateProposalEvaluation(proposalDraft, { requireFrozen: true }).ok).toBe(false);
+  });
+
+  test('tracked identity benchmark and labeling import are frozen and mutually consistent', () => {
+    expect(validateIdentityBenchmark(identityDraft, { requireFrozen: true })).toEqual({ ok: true, errors: [] });
+    expect(validateIdentityLabelingImport(identityLabelingImport, identityDraft)).toEqual({ ok: true, errors: [] });
   });
 
   test('complete identity benchmark passes the 20 hazard / 20 clean-positive gate', () => {
     expect(validateIdentityBenchmark(frozenIdentity(), { requireFrozen: true })).toEqual({ ok: true, errors: [] });
   });
 
+  test('identity anchors are canonical and institutional anchors must match case evidence', () => {
+    expect(normalizeBenchmarkPersonAnchor('orcid:0000-0001-9161-999X')).toEqual({
+      ok: true,
+      namespace: 'orcid',
+      value: 'orcid:0000-0001-9161-999X',
+    });
+    expect(normalizeBenchmarkPersonAnchor('orcid:0000-0001-9161-9990').ok).toBe(false);
+    expect(normalizeBenchmarkPersonAnchor('openalex:A5030598859').ok).toBe(true);
+    expect(normalizeBenchmarkPersonAnchor(
+      'institutional-profile:https://example.org/person',
+      [{ sourceType: 'institutional_profile', url: 'https://example.org/person' }],
+    ).ok).toBe(true);
+    expect(normalizeBenchmarkPersonAnchor(
+      'institutional-profile:https://example.org/person',
+      [{ sourceType: 'institutional_profile', url: 'https://example.org/other' }],
+    ).ok).toBe(false);
+  });
+
+  test('labeling import preserves a complete deterministic raw-to-frozen mapping', () => {
+    const benchmark = frozenIdentity();
+    const imported = identityImport(benchmark);
+    expect(validateIdentityLabelingImport(imported, benchmark)).toEqual({ ok: true, errors: [] });
+
+    imported.rows[0].blindCaseId = imported.rows[1].blindCaseId;
+    imported.rows[2].normalized.abstain = !imported.rows[2].normalized.abstain;
+    imported.rows[3].raw.status = true;
+    const result = validateIdentityLabelingImport(imported, benchmark);
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: 'rows[0].blindCaseId' }),
+      expect.objectContaining({ path: 'rows[2].normalized.abstain' }),
+      expect.objectContaining({ path: 'rows[3].raw.status' }),
+    ]));
+  });
+
   test('proposed cases preserve evidence inputs without becoming labels', () => {
-    const asset = clone(identityDraft);
+    const asset = draftIdentity();
     asset.cases = [{
       caseId: 'proposed-1',
       caseStatus: 'proposed',
