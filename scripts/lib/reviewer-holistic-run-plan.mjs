@@ -102,6 +102,7 @@ export function buildReviewerHolisticRunPlan({ manifest, proposalEvaluation }) {
     evaluationScriptVersion: manifest.evaluationScriptVersion,
     baseline: manifest.baseline,
     redesign: manifest.redesign,
+    execution: manifest.execution,
     proposalEvaluation: manifest.proposalEvaluation,
     runtimeConfig: manifest.runtimeConfig,
   };
@@ -113,4 +114,3 @@ export function buildReviewerHolisticRunPlan({ manifest, proposalEvaluation }) {
     runs,
   };
 }
-

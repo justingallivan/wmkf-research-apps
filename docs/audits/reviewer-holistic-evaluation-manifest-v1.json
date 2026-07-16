@@ -13,6 +13,11 @@
     "implementationCommit": "166800a3142179db642af3beefd67b8dcc381173",
     "pipelineVersion": "reviewer-holistic-applicant-neighborhood-seeds-v1"
   },
+  "execution": {
+    "implementationCommit": "563cac0c860191c5fbce2547027050947a8276e8",
+    "scriptVersion": "reviewer-holistic-m1-executor-v1",
+    "artifactVersion": "reviewer-holistic-m1-execution-v1"
+  },
   "identityBenchmark": {
     "fixtureVersion": "reviewer-identity-v1",
     "minimumCases": 40,
@@ -51,6 +56,7 @@
   "runtimeConfig": {
     "promptRowId": "07beab8a-887a-f111-ab0f-000d3a3065b8",
     "promptVersion": "2",
+    "promptPayloadHash": "f64340a312d55052db16d9cfed111b74ba729316e3a05196e71f5f698dbece48",
     "modelIds": [
       "claude-opus-4-8"
     ],

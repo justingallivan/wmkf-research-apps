@@ -170,20 +170,21 @@ Before the first redesign commit, create a tracked evaluation manifest containin
 - exact `baselineCommit` from `origin/main` and redesign starting SHA;
 - frozen proposal IDs and document hashes;
 - identity fixture version;
-- prompt row/version, resolved model IDs, model overrides, reviewer count,
+- prompt row/version/payload hash, resolved model IDs, model overrides, reviewer count,
   temperature, exclusions, and run count;
 - scoring rubric, tie rule, thresholds, named identity reviewer, artifact schema,
-  and evaluation-script version.
+  evaluation/execution script versions, and executor commit.
 
 Changing a frozen item creates a new evaluation version. It may not silently
 replace the registered comparison.
 
-**Foundation built:** the draft lives at
+**Foundation built and frozen:** the manifest lives at
 `docs/audits/reviewer-holistic-evaluation-manifest-v1.json`; validate its
 structure with `npm run eval:reviewer-holistic:manifest`. Before any comparison
 run, `node scripts/validate-reviewer-holistic-evaluation-manifest.js
---require-frozen` must pass. Draft status is deliberately non-runnable: the
-baseline freezes after shared C0 containment, not at scaffold creation.
+--require-frozen` must pass. The frozen contract pins the baseline, redesign,
+executor, inputs, runtime payload, rubric, and artifact versions; changing one
+creates a new evaluation version rather than mutating this comparison.
 
 **Acceptance:** manifest reviewed before behavior changes; baseline checkout is
 reproducible; shared containment is merged or explicitly excluded before the
@@ -365,8 +366,8 @@ eligibility test.
 **[FOUNDATION + M1.1 OWNER-APPROVED POOL + M1.3 BUILT 2026-07-14; M1.1
 SINGLE-REVIEWER LABELING FROZEN 2026-07-16 + M1.2 TEN-PROPOSAL COHORT FROZEN
 2026-07-16; BASELINE/STARTING SHA + LIVE RUNTIME SNAPSHOT PINNED 2026-07-16;
-REDESIGN ARM + RUN PLAN BUILT/VERSIONED 2026-07-16; PAID EXECUTION/SCORING
-PENDING]** The tracked frozen identity benchmark and frozen blinded
+REDESIGN ARM + RUN PLAN + EXECUTOR BUILT/PINNED 2026-07-16; PAID
+EXECUTION/SCORING PENDING]** The tracked frozen identity benchmark and frozen blinded
 proposal-evaluation assets now have fail-closed validators at
 `scripts/validate-reviewer-holistic-m1-assets.js`; draft validation is
 `npm run eval:reviewer-holistic:m1`, while `--require-frozen` and
@@ -398,8 +399,11 @@ point are both pinned to post-containment `origin/main` commit
 `50140eb62dd8f3c04f6d3ab5e131d96711f804d7`; the identity fixture is
 `reviewer-identity-v1`. The evaluation-only redesign is pinned to implementation
 commit `166800a3142179db642af3beefd67b8dcc381173`, pipeline version
-`reviewer-holistic-applicant-neighborhood-seeds-v1`, and evaluation-script
-version `reviewer-holistic-m1-run-plan-v1`. A read-only production probe pinned prompt row/version,
+`reviewer-holistic-applicant-neighborhood-seeds-v1`, evaluation-script version
+`reviewer-holistic-m1-run-plan-v1`, and paid-executor implementation commit
+`563cac0c860191c5fbce2547027050947a8276e8` with script/artifact versions
+`reviewer-holistic-m1-executor-v1` / `reviewer-holistic-m1-execution-v1`.
+A read-only production probe pinned prompt row/version and exact payload hash,
 resolved model ID, reviewer count 15, temperature 0.3, the relevant model-
 override hash, and a per-proposal hash of the identical applicant-recommendation,
 PI/co-PI, and applicant-institution exclusions used by both arms. The read-only command
@@ -407,9 +411,21 @@ PI/co-PI, and applicant-institution exclusions used by both arms. The read-only 
 now fails on live drift without making an LLM generation call or any write.
 `npm run eval:reviewer-holistic:m1-plan` deterministically verifies 60 unique,
 commit- and version-attributed slots (10 proposals x 2 arms x 3 replicates)
-without downloading documents or calling an LLM. The paid executor, execution,
-candidate blinding, and scoring remain pending; no paid run has started and no
+without downloading documents or calling an LLM. Paid execution, candidate
+blinding, and scoring remain pending; no paid run has started and no
 production route or service selects the redesign.
+
+The paid executor is `scripts/run-reviewer-holistic-m1.mjs`. It is preflight-
+only by default and requires the literal `--execute --confirm-paid-runs=60`
+acknowledgement before generation. It verifies source equivalence, the live
+runtime payload, all ten exact SharePoint file hashes/byte counts, request
+contexts, and applicant seeds before a paid call. An ignored local execution
+artifact checkpoints each deterministic run ID atomically; completed slots are
+immutable, failed slots require explicit retry, interrupted slots remain
+identifiable, and a postflight runtime mismatch invalidates the batch before
+blinding. Exact normalized-name dedupe creates a separate arm-free scoring
+package and keeps the arm/run map in a separate unblinding artifact. No paid
+run has started.
 
 ### M1.1 Single-reviewer blinded person benchmark
 
@@ -486,7 +502,8 @@ unsupported population claim.
 
 **[TEN-PROPOSAL COHORT OWNER-APPROVED AND FROZEN 2026-07-16; BASELINE/STARTING
 SHA + LIVE RUNTIME SNAPSHOT PINNED 2026-07-16; EVALUATION-ONLY REDESIGN ARM +
-60-SLOT RUN PLAN BUILT/VERSIONED 2026-07-16; PAID EXECUTION/SCORING PENDING]**
+60-SLOT RUN PLAN + RESUMABLE EXECUTOR BUILT/VERSIONED 2026-07-16; PAID
+EXECUTION/SCORING PENDING]**
 `docs/audits/reviewer-holistic-proposal-evaluation-v1.json` is frozen with the
 approved ten, scorer Justin, a hashed randomization seed, immutable document
 hashes, and empty execution/scoring arrays. The recommendation and its
@@ -504,8 +521,9 @@ membership.
 
 The overall manifest now freezes the exact baseline/redesign commits, pipeline
 and evaluation-script versions, and identical prompt, model, candidate-count,
-temperature, exclusion, and environment configuration. The read-only plan gate
-must pass before the paid executor is used.
+temperature, exclusion, and environment configuration. It also pins the exact
+prompt payload hash and executor commit/script/artifact versions. The read-only
+plan and executor preflight gates must pass before paid generation.
 
 Run frozen main and completed redesign with identical documents, prompt/model
 configuration, candidate count, exclusions, and environment. Run three
@@ -860,7 +878,8 @@ decline-acknowledgment email is worthwhile.
 
 ### F1.2 Applicant recommendations as neighborhood seeds
 
-**[EVALUATION-ONLY ARM BUILT/VERSIONED 2026-07-16; M1.2 EXECUTION PENDING]**
+**[EVALUATION-ONLY ARM + RESUMABLE EXECUTOR BUILT/VERSIONED 2026-07-16; M1.2
+PAID EXECUTION PENDING]**
 `scripts/lib/reviewer-holistic-pipelines.mjs` loads the five structured applicant
 recommendation slots fail closed, requires names and affiliations, and supplies
 them only to the redesign as prompt-level community-seed data. Both arms receive
@@ -1002,8 +1021,8 @@ the change into cleanup.
    to the best of their knowledge that none tuned the redesign, and named Justin
    as scorer. The baseline/starting SHA and a live runtime snapshot are now
    pinned. The evaluation-only applicant-neighborhood redesign arm and 60-slot
-   read-only run plan are built/versioned; paid execution and blinded scoring
-   remain pending.
+   read-only run plan plus resumable executor are built/versioned and pinned by
+   commit. Paid execution and blinded scoring remain pending.
 3. **Durable fields approved/deployed 2026-07-12; first acceptance self-report
    caller approved/promoted 2026-07-13 via PR #57 / `00ffb09c`.** Broader runtime
    writers/readers and policy migration retain their own gates.

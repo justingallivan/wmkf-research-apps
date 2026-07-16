@@ -17,6 +17,11 @@ function frozenManifest() {
   manifest.redesign.startingCommit = 'b'.repeat(40);
   manifest.redesign.implementationCommit = 'c'.repeat(40);
   manifest.redesign.pipelineVersion = 'reviewer-holistic/v1';
+  manifest.execution = {
+    implementationCommit: 'd'.repeat(40),
+    scriptVersion: 'reviewer-holistic-executor/v1',
+    artifactVersion: 'reviewer-holistic-execution/v1',
+  };
   manifest.evaluationScriptVersion = 'reviewer-holistic-run-plan/v1';
   manifest.identityBenchmark.fixtureVersion = 'identity-fixtures/v1';
   manifest.proposalEvaluation.proposalIds = proposalIds;
@@ -26,6 +31,7 @@ function frozenManifest() {
   manifest.runtimeConfig = {
     promptRowId: '11111111-1111-4111-8111-111111111111',
     promptVersion: '1',
+    promptPayloadHash: 'e'.repeat(64),
     modelIds: ['provider/model-version'],
     modelOverridesHash: 'c'.repeat(64),
     reviewerCount: 15,
@@ -47,6 +53,11 @@ describe('reviewer holistic evaluation manifest', () => {
       pipelineVersion: 'reviewer-holistic-applicant-neighborhood-seeds-v1',
     });
     expect(trackedManifest.evaluationScriptVersion).toBe('reviewer-holistic-m1-run-plan-v1');
+    expect(trackedManifest.execution).toEqual({
+      implementationCommit: '563cac0c860191c5fbce2547027050947a8276e8',
+      scriptVersion: 'reviewer-holistic-m1-executor-v1',
+      artifactVersion: 'reviewer-holistic-m1-execution-v1',
+    });
     expect(trackedManifest.identityBenchmark.fixtureVersion).toBe('reviewer-identity-v1');
     expect(trackedManifest.runtimeConfig).toMatchObject({
       promptVersion: '2',
@@ -60,12 +71,14 @@ describe('reviewer holistic evaluation manifest', () => {
     const manifest = clone(trackedManifest);
     manifest.baseline.commit = 'not-a-sha';
     manifest.runtimeConfig.promptRowId = 'not-a-guid';
+    manifest.runtimeConfig.promptPayloadHash = 'not-a-hash';
     manifest.runtimeConfig.modelOverridesHash = 'not-a-hash';
     manifest.runtimeConfig.reviewerCount = 0;
     const result = validateManifest(manifest);
     expect(result.errors).toEqual(expect.arrayContaining([
       expect.objectContaining({ path: 'baseline.commit' }),
       expect.objectContaining({ path: 'runtimeConfig.promptRowId' }),
+      expect.objectContaining({ path: 'runtimeConfig.promptPayloadHash' }),
       expect.objectContaining({ path: 'runtimeConfig.modelOverridesHash' }),
       expect.objectContaining({ path: 'runtimeConfig.reviewerCount' }),
     ]));
@@ -120,6 +133,7 @@ describe('reviewer holistic evaluation manifest', () => {
     manifest.baseline.commit = head;
     manifest.redesign.startingCommit = head;
     manifest.redesign.implementationCommit = head;
+    manifest.execution.implementationCommit = head;
     expect(validateCommitReferences(manifest)).toEqual({ ok: true, errors: [] });
 
     manifest.redesign.startingCommit = '0'.repeat(40);
@@ -137,6 +151,7 @@ describe('reviewer holistic evaluation manifest', () => {
     manifest.baseline.commit = null;
     manifest.redesign.startingCommit = null;
     manifest.redesign.implementationCommit = null;
+    manifest.execution.implementationCommit = null;
     expect(validateCommitReferences(manifest)).toEqual({ ok: true, errors: [] });
   });
 });

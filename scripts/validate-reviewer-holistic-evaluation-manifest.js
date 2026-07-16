@@ -36,6 +36,7 @@ const TOP_LEVEL_KEYS = new Set([
   'createdAt',
   'baseline',
   'redesign',
+  'execution',
   'identityBenchmark',
   'proposalEvaluation',
   'runtimeConfig',
@@ -47,6 +48,7 @@ const TOP_LEVEL_KEYS = new Set([
 const NESTED_KEYS = {
   baseline: new Set(['origin', 'commit', 'runtimeBehavior']),
   redesign: new Set(['startingCommit', 'implementationCommit', 'pipelineVersion']),
+  execution: new Set(['implementationCommit', 'scriptVersion', 'artifactVersion']),
   identityBenchmark: new Set([
     'fixtureVersion',
     'minimumCases',
@@ -63,6 +65,7 @@ const NESTED_KEYS = {
   runtimeConfig: new Set([
     'promptRowId',
     'promptVersion',
+    'promptPayloadHash',
     'modelIds',
     'modelOverridesHash',
     'reviewerCount',
@@ -148,6 +151,19 @@ function validateManifest(manifest, { requireFrozen = false } = {}) {
     add('redesign.pipelineVersion', 'must be null or non-empty');
   }
 
+  const execution = isObject(manifest.execution) ? manifest.execution : {};
+  if (!isObject(manifest.execution)) add('execution', 'must be an object');
+  rejectUnknown(manifest.execution, 'execution');
+  if (execution.implementationCommit != null && !SHA1_RE.test(String(execution.implementationCommit))) {
+    add('execution.implementationCommit', 'must be null or a 40-character commit SHA');
+  }
+  if (execution.scriptVersion != null && !nonEmptyString(execution.scriptVersion)) {
+    add('execution.scriptVersion', 'must be null or non-empty');
+  }
+  if (execution.artifactVersion != null && !nonEmptyString(execution.artifactVersion)) {
+    add('execution.artifactVersion', 'must be null or non-empty');
+  }
+
   const identity = isObject(manifest.identityBenchmark) ? manifest.identityBenchmark : {};
   if (!isObject(manifest.identityBenchmark)) add('identityBenchmark', 'must be an object');
   rejectUnknown(manifest.identityBenchmark, 'identityBenchmark');
@@ -188,6 +204,9 @@ function validateManifest(manifest, { requireFrozen = false } = {}) {
   }
   if (runtime.promptVersion != null && !POSITIVE_INTEGER_STRING_RE.test(String(runtime.promptVersion))) {
     add('runtimeConfig.promptVersion', 'must be null or a positive-integer string');
+  }
+  if (runtime.promptPayloadHash != null && !SHA256_RE.test(String(runtime.promptPayloadHash))) {
+    add('runtimeConfig.promptPayloadHash', 'must be null or a SHA-256 hash');
   }
   if (Array.isArray(runtime.modelIds) && runtime.modelIds.some((x) => !nonEmptyString(x))) {
     add('runtimeConfig.modelIds', 'must contain only non-empty model IDs');
@@ -259,6 +278,11 @@ function validateManifest(manifest, { requireFrozen = false } = {}) {
     if (!nonEmptyString(redesign.pipelineVersion)) {
       add('redesign.pipelineVersion', 'must be non-empty');
     }
+    if (!SHA1_RE.test(String(execution.implementationCommit || ''))) {
+      add('execution.implementationCommit', 'must be a 40-character commit SHA');
+    }
+    if (!nonEmptyString(execution.scriptVersion)) add('execution.scriptVersion', 'must be non-empty');
+    if (!nonEmptyString(execution.artifactVersion)) add('execution.artifactVersion', 'must be non-empty');
     if (!nonEmptyString(identity.fixtureVersion)) {
       add('identityBenchmark.fixtureVersion', 'must be non-empty');
     }
@@ -285,6 +309,9 @@ function validateManifest(manifest, { requireFrozen = false } = {}) {
     if (!GUID_RE.test(String(runtime.promptRowId || ''))) add('runtimeConfig.promptRowId', 'must be a GUID');
     if (!POSITIVE_INTEGER_STRING_RE.test(String(runtime.promptVersion || ''))) {
       add('runtimeConfig.promptVersion', 'must be a positive-integer string');
+    }
+    if (!SHA256_RE.test(String(runtime.promptPayloadHash || ''))) {
+      add('runtimeConfig.promptPayloadHash', 'must be a SHA-256 hash');
     }
     if (!Array.isArray(runtime.modelIds) || runtime.modelIds.length === 0 || runtime.modelIds.some((x) => !nonEmptyString(x))) {
       add('runtimeConfig.modelIds', 'must contain non-empty model IDs');
@@ -317,6 +344,7 @@ function validateCommitReferences(manifest, { repoRoot = path.join(__dirname, '.
     ['baseline.commit', manifest?.baseline?.commit],
     ['redesign.startingCommit', manifest?.redesign?.startingCommit],
     ['redesign.implementationCommit', manifest?.redesign?.implementationCommit],
+    ['execution.implementationCommit', manifest?.execution?.implementationCommit],
   ]) {
     if (commit == null) continue;
     try {

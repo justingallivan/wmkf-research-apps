@@ -170,6 +170,12 @@ export async function observeRuntimeConfig({ target }) {
   const runtimeConfig = {
     promptRowId: prompt.wmkf_ai_promptid,
     promptVersion: String(prompt.wmkf_promptversion),
+    promptPayloadHash: sha256Canonical({
+      system: prompt.wmkf_ai_systemprompt ?? null,
+      body: prompt.wmkf_ai_promptbody ?? null,
+      variables: prompt.wmkf_ai_promptvariables ?? null,
+      outputSchema: prompt.wmkf_ai_promptoutputschema ?? null,
+    }),
     modelIds: [...new Set([resolvedPrimary, resolvedFallback])],
     modelOverridesHash: sha256Canonical(relevantOverrides),
     reviewerCount: 15,
@@ -181,12 +187,7 @@ export async function observeRuntimeConfig({ target }) {
   };
   const diagnostics = {
     targetHost,
-    promptPayloadHash: sha256Canonical({
-      system: prompt.wmkf_ai_systemprompt ?? null,
-      body: prompt.wmkf_ai_promptbody ?? null,
-      variables: prompt.wmkf_ai_promptvariables ?? null,
-      outputSchema: prompt.wmkf_ai_promptoutputschema ?? null,
-    }),
+    promptPayloadHash: runtimeConfig.promptPayloadHash,
     rawModels: { primary: rawPrimary, fallback: rawFallback },
     resolvedModels: { primary: resolvedPrimary, fallback: resolvedFallback },
     exclusionCounts: exclusionEntries.map(({ proposalId, exclusions, applicantSeedCount }) => ({
