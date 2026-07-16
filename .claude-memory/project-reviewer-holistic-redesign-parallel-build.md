@@ -151,8 +151,8 @@ pins evaluation-script version `reviewer-holistic-m1-run-plan-v2`; the read-only
 plan produces 60 unique, attributable slots. Paid execution, candidate
 blinding, and scoring remain pending; no M1.2 run has started and
 production remains legacy-default. The resumable paid executor is pinned to
-implementation commit `ef5ef4044e31b1ef42db4f2036d1f67dd5feed20`, script
-version `reviewer-holistic-m1-executor-v2`, and artifact version
+implementation commit `e8796ce535954f5d8678f58b94abea1b9ceea66c`, script
+version `reviewer-holistic-m1-executor-v3`, and artifact version
 `reviewer-holistic-m1-execution-v1`. It is preflight-only by default, requires
 an exact 60-run paid acknowledgement, atomically checkpoints per-run outcomes,
 requires explicit failed-run retry, and emits separate blinded scoring and

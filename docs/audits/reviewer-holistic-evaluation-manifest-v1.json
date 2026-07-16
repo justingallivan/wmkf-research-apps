@@ -14,8 +14,8 @@
     "pipelineVersion": "reviewer-holistic-applicant-neighborhood-seeds-v1"
   },
   "execution": {
-    "implementationCommit": "ef5ef4044e31b1ef42db4f2036d1f67dd5feed20",
-    "scriptVersion": "reviewer-holistic-m1-executor-v2",
+    "implementationCommit": "e8796ce535954f5d8678f58b94abea1b9ceea66c",
+    "scriptVersion": "reviewer-holistic-m1-executor-v3",
     "artifactVersion": "reviewer-holistic-m1-execution-v1"
   },
   "identityBenchmark": {

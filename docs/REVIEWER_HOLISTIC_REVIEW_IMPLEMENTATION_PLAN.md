@@ -401,8 +401,8 @@ point are both pinned to post-containment `origin/main` commit
 commit `166800a3142179db642af3beefd67b8dcc381173`, pipeline version
 `reviewer-holistic-applicant-neighborhood-seeds-v1`, evaluation-script version
 `reviewer-holistic-m1-run-plan-v2`, and paid-executor implementation commit
-`ef5ef4044e31b1ef42db4f2036d1f67dd5feed20` with script/artifact versions
-`reviewer-holistic-m1-executor-v2` / `reviewer-holistic-m1-execution-v1`.
+`e8796ce535954f5d8678f58b94abea1b9ceea66c` with script/artifact versions
+`reviewer-holistic-m1-executor-v3` / `reviewer-holistic-m1-execution-v1`.
 A read-only production probe pinned prompt row/version and exact payload hash,
 resolved model ID, reviewer count 15, temperature 0.3, the relevant model-
 override hash, and a per-proposal hash of the identical applicant-recommendation,
