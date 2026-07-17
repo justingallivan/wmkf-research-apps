@@ -16,7 +16,7 @@
  * a deceased/emeritus person has no recent year; a trainee has a short span.
  *
  * Reads each <dir>/<req>.key.json, writes <dir>/<req>.sources.md. OpenAlex only
- * (public, no creds beyond a polite mailto); run unsandboxed for network. No LLM, no
+ * (public data, authenticated with OPENALEX_API_KEY); run unsandboxed for network. No LLM, no
  * pipeline re-run, no Dataverse.
  *
  * Usage: node scripts/origination-sniff-sources.mjs [--dir tmp/origination-sniff]
@@ -36,16 +36,22 @@ loadEnvLocal();
 
 const dir = (() => { const i = process.argv.indexOf('--dir'); return i >= 0 ? process.argv[i + 1] : 'tmp/origination-sniff'; })();
 const OA = 'https://api.openalex.org';
-const MAILTO = process.env.OPENALEX_POLITE_MAILTO || 'justingallivan@me.com';
+const MAILTO = process.env.OPENALEX_POLITE_MAILTO || '';
+const OPENALEX_API_KEY = process.env.OPENALEX_API_KEY || '';
 const NOW = new Date().getFullYear();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Retry 429 (rate limit) and 5xx with exponential backoff — without it, a long
 // batch silently degrades to "not resolved" as OpenAlex throttles partway through.
 async function jget(url, tries = 4) {
+  const requestUrl = new URL(url);
+  if (requestUrl.hostname === 'api.openalex.org' && OPENALEX_API_KEY) {
+    requestUrl.searchParams.set('api_key', OPENALEX_API_KEY);
+  }
   for (let i = 0; i < tries; i += 1) {
     try {
-      const r = await fetch(url, { headers: { 'User-Agent': `wmkf-sniff (mailto:${MAILTO})` } });
+      const userAgent = MAILTO ? `wmkf-sniff (mailto:${MAILTO})` : 'wmkf-sniff';
+      const r = await fetch(requestUrl, { headers: { 'User-Agent': userAgent } });
       if (r.ok) return await r.json();
       if ((r.status === 429 || r.status >= 500) && i < tries - 1) { await sleep(800 * (i + 1)); continue; }
       return { __err: r.status };

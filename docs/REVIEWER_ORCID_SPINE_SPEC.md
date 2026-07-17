@@ -87,8 +87,10 @@ Returns up to N (default 10) author records, each:
 }
 plus: { totalCount }  // OpenAlex meta.count — the collision signal
 ```
-- Polite pool: `mailto` from a config constant. Honor `AbortSignal`, timeout, retry policy
-  (§8). No key required. Add `api.openalex.org` is already in `lib/utils/safe-fetch.js` allowlist.
+- Authenticate with server-only `OPENALEX_API_KEY`; optional
+  `OPENALEX_POLITE_MAILTO` is contact metadata only and provides no quota.
+  Honor `AbortSignal`, timeout, and rate-aware retry policy (§8).
+  `api.openalex.org` is already in `lib/utils/safe-fetch.js` allowlist.
 
 ## 5. `[PROPOSED]` Constrained selection + abstain (the core)
 Input: the N records + `claimedInstitution` (Claude's `suggestedInstitution`) + `fieldText`
@@ -142,7 +144,7 @@ Provenance `kind` stays the candidate's origin (`literature_retrieved`/`proposal
   `reviewer.time_budget_seconds` + `AbortSignal` + per-source timeout/retry (plan §4.4). 1 retry on
   429/5xx, none on 4xx. Partial failure → `sourceStatus` ok/timeout/error; a source outage
   fails OPEN to abstain (needs-review), never to a wrong verify.
-- OpenAlex polite pool (mailto); ORCID public API. Only public names leave the system.
+- OpenAlex API-key budget; ORCID public API. Only public names leave the system.
 
 ## 9. Out of scope (deferred — labeled TODOs)
 - Biomedical/PubMed ORCID-spine + cross-source corroboration (later slice).
@@ -180,8 +182,8 @@ discovery analyze pubmed verification provenance contact orcid openalex`,
    alone can never confirm. ORCID absence is not a demoter, but no qualifying anchors fails closed
    to `unresolved`.
 3. **Source fetching:** reuse `lib/services/orcid-service.js` for ORCID search/employments. Add
-   `lib/services/openalex-service.js` for keyless OpenAlex author search through `safeFetch` with
-   a polite-pool mailto. Fetch ORCID-direct/employments only for the selected record and
+   `lib/services/openalex-service.js` for API-key-authenticated OpenAlex author search through
+   `safeFetch`; optional mailto is contact metadata only. Fetch ORCID-direct/employments only for the selected record and
    tie/conflict cases, not every candidate.
 4. **Abort and outages:** plumb the route deadline `AbortSignal` from `discover.js` through
    `DiscoveryService.discover`, `verifyClaudeSuggestions`, the evidence adapter, and OpenAlex/ORCID

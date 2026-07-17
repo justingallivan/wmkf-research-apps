@@ -15,6 +15,8 @@ import {
   sanitizeInstitutionCOIDetails,
   mergeReferredProvenance,
   dedupeByNamePreferReferred,
+  reviewerCandidateKey,
+  withReviewerCandidateKey,
 } from '../../shared/components/reviewers/reviewer-search-logic.js';
 const { PROVENANCE_KINDS, provenanceGroupOf, provenanceKindOf, provenanceLabelForCandidate } = require('../../lib/utils/reviewer-provenance');
 const { normalizeReviewerName: normName } = require('../../lib/utils/reviewer-name-match');
@@ -163,6 +165,34 @@ describe('isCandidateSelectable', () => {
 });
 
 describe('mergeEnrichment', () => {
+  test('keeps same-name candidates bound to their own enrichment', () => {
+    const candidates = [
+      withReviewerCandidateKey({ name: 'Dr. Alex Kim', affiliation: 'One University' }),
+      withReviewerCandidateKey({ name: 'Dr. Alex Kim', affiliation: 'Two University' }),
+    ];
+    const enrichment = [
+      {
+        ...candidates[0],
+        contactEnrichment: { email: 'alex.one@one.edu', emailSource: 'serp_search' },
+      },
+      {
+        ...candidates[1],
+        contactEnrichment: { email: 'alex.two@two.edu', emailSource: 'serp_search' },
+      },
+    ];
+
+    const out = mergeEnrichment(candidates, enrichment);
+
+    expect(out.map((c) => c.email)).toEqual(['alex.one@one.edu', 'alex.two@two.edu']);
+    expect(out[0].candidateKey).not.toBe(out[1].candidateKey);
+  });
+
+  test('candidate correlation prefers durable identity anchors over name', () => {
+    expect(reviewerCandidateKey({ name: 'Alex Kim', openAlexId: 'A123' })).toBe('openalex:a123');
+    expect(reviewerCandidateKey({ name: 'Alex Kim', affiliation: 'One University' }))
+      .not.toBe(reviewerCandidateKey({ name: 'Alex Kim', affiliation: 'Two University' }));
+  });
+
   test('preserves the server-signed automated identity receipt', () => {
     const [out] = mergeEnrichment([{ name: 'Dr Receipt' }], [{
       name: 'Dr Receipt',

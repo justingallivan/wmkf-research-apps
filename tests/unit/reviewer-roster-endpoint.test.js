@@ -110,17 +110,24 @@ describe('PATCH', () => {
 
   it('promote → returns the restored blob', async () => {
     const r = res();
-    await handler({ method: 'PATCH', body: { requestId: REQ, action: 'promote', name: 'Bob Roe' } }, r);
+    await handler({ method: 'PATCH', body: { requestId: REQ, action: 'promote', candidateKey: 'candidate:bob' } }, r);
     expect(r.statusCode).toBe(200);
-    expect(store.promote).toHaveBeenCalledWith(REQ, 'Bob Roe');
+    expect(store.promote).toHaveBeenCalledWith(REQ, 'candidate:bob');
     expect(r.body.candidate).toEqual({ name: 'Bob Roe' });
   });
 
-  it('saved → markSaved with the names', async () => {
+  it('saved → markSaved with exact pruned candidates', async () => {
     const r = res();
-    await handler({ method: 'PATCH', body: { requestId: REQ, action: 'saved', names: ['Ann Lee'] } }, r);
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'saved',
+      candidates: [{ name: 'Ann Lee', candidateKey: 'candidate:ann' }],
+    } }, r);
     expect(r.statusCode).toBe(200);
-    expect(store.markSaved).toHaveBeenCalledWith(REQ, ['Ann Lee']);
+    expect(store.markSaved).toHaveBeenCalledWith(
+      REQ,
+      [expect.objectContaining({ name: 'Ann Lee', candidateKey: 'candidate:ann' })],
+    );
   });
 
   it('confirm_identity records an actor-bound server confirmation', async () => {

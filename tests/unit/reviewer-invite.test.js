@@ -75,13 +75,13 @@ describe('emailConfidence — Slice G invite-confidence gate', () => {
     }
   });
 
-  test('search-sourced email is HIGH only on a confirmed/probable identity', () => {
+  test('search-sourced email stays LOW even on a confirmed/probable identity', () => {
     for (const source of ['serp_search', 'claude_search']) {
-      expect(emailConfidence({ wmkf_emailsource: source, wmkf_identitystatus: 'confirmed' }).level).toBe('high');
-      expect(emailConfidence({ wmkf_emailsource: source, wmkf_identitystatus: 'probable' }).level).toBe('high');
-      // unconfirmed / unresolved / missing identity → LOW (not anchored)
+      expect(emailConfidence({ wmkf_emailsource: source, wmkf_identitystatus: 'confirmed' }).level).toBe('low');
+      expect(emailConfidence({ wmkf_emailsource: source, wmkf_identitystatus: 'probable' }).level).toBe('low');
       expect(emailConfidence({ wmkf_emailsource: source, wmkf_identitystatus: 'unresolved' }).level).toBe('low');
       expect(emailConfidence({ wmkf_emailsource: source }).level).toBe('low');
+      expect(emailConfidence({ wmkf_emailsource: source }).reason).toContain('first-party evidence');
     }
   });
 
@@ -108,13 +108,13 @@ describe('emailConfidence — Slice G invite-confidence gate', () => {
 
   test('accepts the normalized (camelCase) shape too', () => {
     expect(emailConfidence({ emailSource: 'orcid' }).level).toBe('high');
-    expect(emailConfidence({ emailSource: 'serp_search', identityStatus: 'confirmed' }).level).toBe('high');
+    expect(emailConfidence({ emailSource: 'serp_search', identityStatus: 'confirmed' }).level).toBe('low');
     expect(emailConfidence({ emailSource: 'manual' }).level).toBe('low');
   });
 
   test('source matching is case/whitespace-insensitive', () => {
     expect(emailConfidence({ wmkf_emailsource: ' ORCID ' }).level).toBe('high');
-    expect(emailConfidence({ wmkf_emailsource: 'Serp_Search', wmkf_identitystatus: 'Confirmed' }).level).toBe('high');
+    expect(emailConfidence({ wmkf_emailsource: 'Serp_Search', wmkf_identitystatus: 'Confirmed' }).level).toBe('low');
   });
 
   test('always returns a human-readable reason string', () => {

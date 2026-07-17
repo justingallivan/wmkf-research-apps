@@ -186,12 +186,16 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(reviewerSuggestionAdapter.upsert.mock.calls[1][0].relevanceScore).toBe(87);
   });
 
-  test('stamps the roster row with suggestion/person ids after save using the candidate name key', async () => {
+  test('stamps the exact roster row with suggestion/person ids after save', async () => {
     const req = {
       method: 'POST',
       body: {
         requestId: 'REQ-1',
-        candidates: [{ name: 'Dr. Anchor Row', contactEnrichment: enrichmentFor({ status: 'probable' }) }],
+        candidates: [{
+          name: 'Dr. Anchor Row',
+          candidateKey: 'candidate:anchor-row',
+          contactEnrichment: enrichmentFor({ status: 'probable' }),
+        }],
       },
     };
     const res = mockRes();
@@ -202,6 +206,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
 
     expect(res.statusCode).toBe(200);
     expect(rosterStore.stampSuggestionAnchor).toHaveBeenCalledWith('REQ-1', 'Dr. Anchor Row', {
+      candidateKey: 'candidate:anchor-row',
       suggestionId: 'SUG-ANCHOR',
       potentialReviewerId: 'PID-ANCHOR',
     });
@@ -231,6 +236,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
         requestId: 'REQ-1',
         candidates: [{
           name: 'Seed Existing',
+          candidateKey: 'person:pid-seed',
           email: 'seed@example.edu',
           source: 'referred',
           referredBy: 'Dr. Abby Doyle',
@@ -253,6 +259,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
       matchReason: 'Referred by Dr. Abby Doyle.',
     }));
     expect(rosterStore.stampSuggestionAnchor).toHaveBeenCalledWith('REQ-1', 'Seed Existing', {
+      candidateKey: 'person:pid-seed',
       suggestionId: 'SUG-SEED',
       potentialReviewerId: 'PID-SEED',
     });

@@ -8,16 +8,20 @@ jest.mock('../../lib/utils/safe-fetch.js', () => ({
 
 const { safeFetch } = require('../../lib/utils/safe-fetch.js');
 const { OpenAlexService, registrableDomainFromUrl, reconstructAbstract } = require('../../lib/services/openalex-service');
+const originalOpenAlexApiKey = process.env.OPENALEX_API_KEY;
 
-const jsonResponse = (payload, status = 200) => ({
+const jsonResponse = (payload, status = 200, headers = {}) => ({
   ok: status >= 200 && status < 300,
   status,
+  headers: { get: (name) => headers[String(name).toLowerCase()] || null },
   json: jest.fn(async () => payload),
 });
 
 describe('OpenAlexService.searchAuthors', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    if (originalOpenAlexApiKey === undefined) delete process.env.OPENALEX_API_KEY;
+    else process.env.OPENALEX_API_KEY = originalOpenAlexApiKey;
   });
 
   test('parses author response into spine records', async () => {
@@ -86,10 +90,21 @@ describe('OpenAlexService.searchAuthors', () => {
   test('throws on source outage after retry so adapter can abstain', async () => {
     safeFetch
       .mockResolvedValueOnce(jsonResponse({ error: 'busy' }, 503))
+      .mockResolvedValueOnce(jsonResponse({ error: 'busy' }, 503))
       .mockResolvedValueOnce(jsonResponse({ error: 'busy' }, 503));
 
     await expect(OpenAlexService.searchAuthors('Robert Sang')).rejects.toThrow(/OpenAlex request failed/);
-    expect(safeFetch).toHaveBeenCalledTimes(2);
+    expect(safeFetch).toHaveBeenCalledTimes(3);
+  });
+
+  test('authenticates requests with OPENALEX_API_KEY', async () => {
+    process.env.OPENALEX_API_KEY = 'oa-test-key';
+    safeFetch.mockResolvedValue(jsonResponse({ meta: { count: 0 }, results: [] }));
+
+    await OpenAlexService.searchAuthors('Robert Sang');
+
+    const url = new URL(safeFetch.mock.calls[0][0]);
+    expect(url.searchParams.get('api_key')).toBe('oa-test-key');
   });
 });
 

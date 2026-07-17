@@ -125,6 +125,7 @@ Production/Preview since 2026-07-11 (observe-only, never blocks); the flip to
 | `NCBI_API_KEY` | PubMed higher rate limits | [NCBI Account](https://www.ncbi.nlm.nih.gov/account/settings/) | Free |
 | `ORCID_CLIENT_ID` | Researcher contact lookup **+ identity-spine verification (OpenAlex+ORCID Track-A)** | [ORCID Developer Tools](https://orcid.org/developer-tools) | Free |
 | `ORCID_CLIENT_SECRET` | ORCID authentication | Created with client ID | Free |
+| `OPENALEX_API_KEY` | OpenAlex author/institution/work lookup authentication and rate-limit budget | [OpenAlex API key](https://openalex.org/settings/api) | Free daily budget |
 | `SERP_API_KEY` | Reviewer contact lookup + PubPeer + news (integrity). NOT academic search — Scholar metrics/literature migrated to OpenAlex S251 | [SerpAPI](https://serpapi.com/) | ~$0.01/search |
 
 > **Load-bearing for the reviewer identity spine:** the OpenAlex+ORCID Track-A
@@ -132,11 +133,11 @@ Production/Preview since 2026-07-11 (observe-only, never blocks); the flip to
 > to corroborate a candidate's current employment. **Without them the spine cannot
 > reach `probable`/`confirmed` and silently degrades to `needs-review` for
 > non-biomedical / PubMed-off suggestions** — it fails safe (never mis-verifies), but
-> resolution rate drops. `OPENALEX_POLITE_MAILTO` sets the OpenAlex polite-pool
-> contact — configured in Vercel as `alerts@wmkeck.org` (a real, monitored,
-> non-sensitive WMKF mailbox; OpenAlex uses it only to reach us about API usage).
-> If unset (e.g. local/test), requests use the common pool and no contact email is
-> sent. Never hardcode a fabricated address.
+> resolution rate drops. OpenAlex retired the polite pool in February 2026:
+> `OPENALEX_API_KEY` is now the authenticated request credential and must be set
+> server-side in each runtime environment. `OPENALEX_POLITE_MAILTO` remains only
+> as an optional monitored contact in the User-Agent; it does not authenticate or
+> increase the request budget. Never expose the API key to client code.
 
 ### Optional — Per-App Model Overrides
 

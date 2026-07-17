@@ -26,7 +26,8 @@ import { pathToFileURL } from 'node:url';
 function loadEnvLocal() { try { const env = readFileSync(new URL('../.env.local', import.meta.url), 'utf8'); for (const l of env.split('\n')) { const m = l.match(/^([A-Z0-9_]+)=(.*)$/); if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].trim().replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1'); } } catch {} }
 loadEnvLocal();
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const MAILTO = process.env.OPENALEX_POLITE_MAILTO || ''; // polite pool only if a real mailbox is configured
+const MAILTO = process.env.OPENALEX_POLITE_MAILTO || '';
+const OPENALEX_API_KEY = process.env.OPENALEX_API_KEY || '';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const args = (() => { const o = { requests: [], reviewerCount: 12 }; const a = process.argv.slice(2); for (let i = 0; i < a.length; i++) { if (a[i] === '--requests') o.requests = a[++i].split(',').map((s) => s.trim()).filter(Boolean); else if (a[i] === '--reviewer-count') o.reviewerCount = parseInt(a[++i], 10) || 12; } return o; })();
 function isCliEntrypoint() {
@@ -53,7 +54,8 @@ const clean = (n) => (n || '').replace(/^(dr\.?|prof\.?|professor)\s+/i, '').tri
 const fam = (n) => clean(n).split(' ').slice(-1)[0];
 const giv = (n) => clean(n).split(' ').slice(0, -1).join(' ');
 const normOrcid = (x) => (x ? String(x).match(/(\d{4}-\d{4}-\d{4}-[\dX]{4})/)?.[1] || null : null);
-async function jget(url, opts) { try { const r = await fetch(url, opts); if (!r.ok) return { __err: r.status }; return await r.json(); } catch (e) { return { __err: e.message }; } }
+function withOpenAlexAuth(url) { const u = new URL(url); if (u.hostname === 'api.openalex.org' && OPENALEX_API_KEY) u.searchParams.set('api_key', OPENALEX_API_KEY); return u.toString(); }
+async function jget(url, opts) { try { const r = await fetch(withOpenAlexAuth(url), opts); if (!r.ok) return { __err: r.status }; return await r.json(); } catch (e) { return { __err: e.message }; } }
 const STOP = new Set(['university', 'the', 'of', 'college', 'institute', 'for', 'center', 'centre', 'department', 'dept', 'school', 'national', 'research', 'science', 'sciences', 'and', 'laboratory', 'lab', 'medical', 'medicine', 'state']);
 const toks = (s) => (s || '').toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).filter((t) => t.length >= 4 && !STOP.has(t));
 function tokenOverlap(a, b) { if (!a || !b) return false; const A = new Set(toks(a)); const B = toks(b); return B.some((t) => A.has(t)); }

@@ -54,6 +54,8 @@ import {
   normalizeReviewerName,
   pruneCandidateForRoster,
   dedupeByNamePreferReferred,
+  reviewerCandidateKey,
+  withReviewerCandidateKey,
 } from './reviewer-search-logic';
 import { rankByRelevance } from '../../../lib/utils/relevance-score';
 import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../lib/utils/scholar-url';
@@ -98,14 +100,14 @@ function Pill({ children, tone = 'gray' }) {
   return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tones[tone] || tones.gray}`}>{children}</span>;
 }
 
-// Stable id for a candidate across roster splices + selection (S224): the
-// normalized name — same key the dedup/exclude use, so selection survives a
-// list reorder/splice (the old flat-index selection would corrupt).
+// Stable per-row id across roster splices + selection. Identity anchors win;
+// the fallback includes affiliation, so two different people with the same
+// normalized name cannot share selection or enrichment state.
 function candKey(c) {
-  return normalizeReviewerName(c && c.name);
+  return reviewerCandidateKey(c);
 }
 
-// Dedupe a candidate list by normalized name; first occurrence wins (so a
+// Dedupe a candidate list by candidate identity/correlation key; first occurrence wins (so a
 // freshly-enriched run candidate beats its pruned roster copy). On a collision it
 // grafts referral provenance onto the survivor (S320) so a seeded Externally-Referred
 // reviewer that discovery also finds never loses its badge/referrer to relevance order.
@@ -493,9 +495,9 @@ export default function ReviewerSearchSection({
   const [candidates, setCandidates] = useState([]);
   const [unverified, setUnverified] = useState([]); // Claude suggestions the searched databases couldn't verify (read-only)
   const [analysis, setAnalysis] = useState(null);
-  // `selected` is keyed by normalizeReviewerName(name) — a STABLE id — not by
-  // flat array index (S224): the durable roster + exclude/promote splice the
-  // candidate list, which would corrupt an index-keyed Set.
+  // `selected` is keyed by the stable per-candidate correlation key, not by a
+  // normalized name or flat array index. Same-name people must remain separate
+  // through enrichment, durable roster actions, and partial-save handling.
   const [selected, setSelected] = useState(() => new Set());
   // Durable per-request roster (reviewer_find_roster via /api/workbench/reviewer-roster):
   // active candidates (selectable, persist across reload), the collapsed Excluded
@@ -705,16 +707,17 @@ export default function ReviewerSearchSection({
       //    email + bibliometrics + ORCID/Scholar show on the cards BEFORE the user
       //    selects. Best-effort: a failure leaves un-enriched cards + a note and
       //    still reaches results — it must never fail the search (Finding 10).
-      let enriched = kept;
+      const keyedKept = kept.map(withReviewerCandidateKey);
+      let enriched = keyedKept;
       let enrichFailed = false;
-      if (kept.length > 0) {
+      if (keyedKept.length > 0) {
         try {
-          pushProgress(`Finding contact info & citation metrics for ${kept.length} reviewer(s)…`);
+          pushProgress(`Finding contact info & citation metrics for ${keyedKept.length} reviewer(s)…`);
           const eRes = await fetch('/api/reviewer-finder/enrich-contacts', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              candidates: kept,
+              candidates: keyedKept,
               options: { usePubmed: true, useOrcid: true, useSerpSearch: true, useClaudeSearch: true },
               // Lets the route re-evaluate institution COI on the post-enrichment
               // affiliation so the badge stays accurate after a current-affiliation
@@ -937,7 +940,7 @@ export default function ReviewerSearchSection({
       const res = await fetch('/api/workbench/reviewer-roster', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, action: 'promote', name: cand.name }),
+        body: JSON.stringify({ requestId, action: 'promote', candidateKey: key }),
       });
       if (!res.ok) throw new Error('promote failed');
     } catch {
@@ -1125,7 +1128,7 @@ export default function ReviewerSearchSection({
       }
 
       let promoted = 0;
-      const promotedNames = [];
+      const promotedCandidates = [];
       const contactConflicts = [];
       if (applicantChosen.length > 0) {
         if (isCurrent()) pushProgress(`Promoting ${applicantChosen.length} applicant-referred reviewer(s)…`);
@@ -1163,7 +1166,7 @@ export default function ReviewerSearchSection({
         for (const result of results) {
           if (result.ok) {
             promoted += 1;
-            promotedNames.push(result.candidate.name);
+            promotedCandidates.push(result.candidate);
             if (result.contactError) contactConflicts.push(result.candidate.name || 'a reviewer');
           } else {
             failures.push({ name: result.candidate.name || 'Applicant-referred reviewer', error: result.error });
@@ -1198,6 +1201,7 @@ export default function ReviewerSearchSection({
       // active/selectable. Best-effort — a roster failure doesn't fail the save.
       if (savedNames.length > 0 || savedKeys.length > 0) {
         const wasSaved = (candidate) => candidateWasSaved(candidate, savedKeys, savedNames);
+        const savedRosterCandidates = displayCandidates.filter(wasSaved).map(pruneCandidateForRoster);
         if (isCurrent()) {
           setCandidates((prev) => prev.filter((c) => !wasSaved(c)));
           setRosterActive((prev) => prev.filter((c) => !wasSaved(c)));
@@ -1212,13 +1216,13 @@ export default function ReviewerSearchSection({
             await fetch('/api/workbench/reviewer-roster', {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ requestId, action: 'saved', names: savedNames }),
+              body: JSON.stringify({ requestId, action: 'saved', candidates: savedRosterCandidates }),
             });
           } catch { /* best-effort — savedPoolNames dedup covers re-surfacing */ }
         }
       }
-      if (promotedNames.length > 0) {
-        const promotedKeys = new Set(promotedNames.map((n) => normalizeReviewerName(n)));
+      if (promotedCandidates.length > 0) {
+        const promotedKeys = new Set(promotedCandidates.map(candKey));
         if (isCurrent()) {
           setCandidates((prev) => prev.filter((c) => !promotedKeys.has(candKey(c))));
           setRecCandidates((prev) => prev.filter((c) => !promotedKeys.has(candKey(c))));
@@ -1230,7 +1234,11 @@ export default function ReviewerSearchSection({
             await fetch('/api/workbench/reviewer-roster', {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ requestId, action: 'saved', names: promotedNames }),
+              body: JSON.stringify({
+                requestId,
+                action: 'saved',
+                candidates: promotedCandidates.map(pruneCandidateForRoster),
+              }),
             });
           } catch {
             if (isCurrent()) setRosterNote("Couldn't mark promoted applicant-referred reviewers as saved in the Find roster — they may reappear after reload.");

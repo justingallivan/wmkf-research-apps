@@ -64,6 +64,22 @@ describe('recordSurfaced', () => {
     expect(insertCall).toBeGreaterThanOrEqual(0);
     expect(queryTextOf(insertCall)).toMatch(/status = 'active'/);
   });
+
+  test('keeps same-name candidates with different affiliations in separate roster rows', async () => {
+    await store.recordSurfaced(REQ, [
+      { name: 'Alex Kim', affiliation: 'University One' },
+      { name: 'Alex Kim', affiliation: 'University Two' },
+    ]);
+    const inserts = sql.mock.calls.filter((call) => queryTextOf(sql.mock.calls.indexOf(call)).includes('INSERT INTO reviewer_find_roster'));
+    expect(inserts).toHaveLength(2);
+    const keys = inserts.map((call) => call.slice(1).find((value) => (
+      typeof value === 'string' && value.startsWith('candidate:')
+    )));
+    expect(keys[0]).toBeTruthy();
+    expect(keys[1]).toBeTruthy();
+    expect(keys[0]).not.toBe(keys[1]);
+    expect(inserts[0][0].join(' ')).toMatch(/ON CONFLICT \(request_id, candidate_key\)/);
+  });
 });
 
 describe('recordCoiDropped', () => {
@@ -110,21 +126,23 @@ describe('setExcluded', () => {
   });
 
   test('throws on a nameless candidate', async () => {
-    await expect(store.setExcluded(REQ, { name: '' })).rejects.toThrow(/name required/);
+    await expect(store.setExcluded(REQ, { name: '' })).rejects.toThrow(/name\/key required/);
   });
 });
 
 describe('promote', () => {
   test('returns the stored candidate blob on success', async () => {
     sql.mockResolvedValueOnce({ rows: [{ candidate: { name: 'Bob Roe', hIndex: 9 } }] });
-    const blob = await store.promote(REQ, 'Bob Roe');
+    const blob = await store.promote(REQ, 'candidate:bob');
     expect(blob).toEqual({ name: 'Bob Roe', hIndex: 9 });
     expect(queryTextOf(0)).toMatch(/status = 'excluded'/); // only promotes from excluded
+    expect(queryTextOf(0)).toMatch(/candidate_key =/);
+    expect(allInterpolations()).toContain('candidate:bob');
   });
 
   test('no-op (null) when the row is gone (cap eviction)', async () => {
     sql.mockResolvedValueOnce({ rows: [] });
-    expect(await store.promote(REQ, 'Ghost')).toBeNull();
+    expect(await store.promote(REQ, 'candidate:ghost')).toBeNull();
   });
 });
 
@@ -142,6 +160,7 @@ describe('staff identity confirmation', () => {
     const text = queryTextOf(0);
     expect(text).toMatch(/status = 'active'/);
     expect(text).toMatch(/candidate = candidate \|\|/);
+    expect(text).toMatch(/candidate_key =/);
     const stored = JSON.parse(allInterpolations().find((entry) => (
       typeof entry === 'string' && entry.includes('staffIdentityConfirmation')
     )));
@@ -170,28 +189,36 @@ describe('staff identity confirmation', () => {
 });
 
 describe('markSaved', () => {
-  test('upserts each named row to saved (eviction-tolerant, leaving excluded untouched)', async () => {
-    const n = await store.markSaved(REQ, ['Ann Lee', 'Bob Roe', '']);
+  test('upserts each exact candidate row to saved (eviction-tolerant, leaving excluded untouched)', async () => {
+    const n = await store.markSaved(REQ, [
+      { name: 'Ann Lee', candidateKey: 'candidate:ann' },
+      { name: 'Bob Roe', candidateKey: 'candidate:bob' },
+      { name: '' },
+    ]);
     expect(n).toBe(2); // one upsert per valid name; blank dropped
     expect(sql).toHaveBeenCalledTimes(2);
     const text = queryTextOf(0);
     expect(text).toMatch(/INSERT INTO reviewer_find_roster/); // upsert, not bare UPDATE → eviction-tolerant
     expect(text).toMatch(/status = 'saved'/);
     expect(text).toMatch(/status IN \('active', 'saved'\)/);
-    expect(allInterpolations()).toEqual(expect.arrayContaining(['ann lee', 'bob roe']));
+    expect(text).toMatch(/ON CONFLICT \(request_id, candidate_key\)/);
+    expect(allInterpolations()).toEqual(expect.arrayContaining([
+      'ann lee', 'bob roe', 'candidate:ann', 'candidate:bob',
+    ]));
   });
 
-  test('no-op (0) on an empty name list — no sql issued', async () => {
-    const n = await store.markSaved(REQ, ['', '   ']);
+  test('no-op (0) on an empty candidate list — no sql issued', async () => {
+    const n = await store.markSaved(REQ, [{ name: '' }, null]);
     expect(n).toBe(0);
     expect(sql).not.toHaveBeenCalled();
   });
 });
 
 describe('stampSuggestionAnchor', () => {
-  test('updates the candidate JSON by request + normalized name with suggestion/person ids', async () => {
+  test('updates the candidate JSON by request + exact candidate key with suggestion/person ids', async () => {
     sql.mockResolvedValueOnce({ rows: [{ id: 123 }], rowCount: 1 });
     const out = await store.stampSuggestionAnchor(REQ, 'Prof. Anchor Name', {
+      candidateKey: 'candidate:anchor',
       suggestionId: 'SUG-1',
       potentialReviewerId: 'PID-1',
     });
@@ -201,17 +228,17 @@ describe('stampSuggestionAnchor', () => {
     expect(text).toMatch(/UPDATE reviewer_find_roster/);
     expect(text).toMatch(/candidate = candidate \|\|/);
     expect(text).toMatch(/request_id =/);
-    expect(text).toMatch(/normalized_name =/);
+    expect(text).toMatch(/candidate_key =/);
     expect(allInterpolations()).toEqual(expect.arrayContaining([
       REQ,
-      'anchor name',
+      'candidate:anchor',
       JSON.stringify({ suggestionId: 'SUG-1', potentialReviewerId: 'PID-1' }),
     ]));
   });
 
   test('missing suggestionId or normalized name is a no-op', async () => {
     await expect(store.stampSuggestionAnchor(REQ, 'No Id', {})).resolves.toEqual({ updated: 0 });
-    await expect(store.stampSuggestionAnchor(REQ, '', { suggestionId: 'SUG-1' })).resolves.toEqual({ updated: 0 });
+    await expect(store.stampSuggestionAnchor(REQ, 'No Key', { suggestionId: 'SUG-1' })).resolves.toEqual({ updated: 0 });
     expect(sql).not.toHaveBeenCalled();
   });
 });

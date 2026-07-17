@@ -12,6 +12,10 @@ import { buildReviewerProvenance, PROVENANCE_KINDS, provenanceGroupOf, provenanc
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import { parseReferredSeeds as _parseReferredSeeds } from '../../../lib/utils/reviewer-referral-seeds';
 import { reviewerSaveKey } from '../../../lib/utils/reviewer-save-key';
+import {
+  reviewerCandidateKey as _reviewerCandidateKey,
+  withReviewerCandidateKey as _withReviewerCandidateKey,
+} from '../../../lib/utils/reviewer-candidate-key';
 
 /**
  * Merge contact-enrichment results (from /enrich-contacts) back onto the chosen
@@ -45,17 +49,56 @@ export function candidateWasSaved(candidate, savedKeys = [], savedNames = []) {
   return legacyNames.has(_normalizeReviewerName(candidate?.name));
 }
 
+/**
+ * Stable correlation key for one surfaced candidate row.
+ *
+ * This is deliberately not a name-only identity claim. Prefer durable person
+ * anchors when discovery has them; otherwise use reviewerSaveKey's composite
+ * name/email/ORCID/affiliation fingerprint. The key is stamped before
+ * enrichment and then preserved, so a promoted current affiliation or newly
+ * found email cannot change selection state or attach another same-name
+ * candidate's enrichment.
+ */
+export const reviewerCandidateKey = _reviewerCandidateKey;
+export const withReviewerCandidateKey = _withReviewerCandidateKey;
+
 export function mergeEnrichment(candidates, enrichmentResults) {
   if (!Array.isArray(candidates)) return [];
   if (!Array.isArray(enrichmentResults) || enrichmentResults.length === 0) return candidates;
+  const byKey = new Map();
+  const candidateNameCounts = new Map();
+  const resultNameCounts = new Map();
   const byName = new Map();
-  for (const r of enrichmentResults) {
-    if (r && r.name && r.contactEnrichment) byName.set(r.name, r);
+  for (const candidate of candidates) {
+    const name = String(candidate?.name || '');
+    candidateNameCounts.set(name, (candidateNameCounts.get(name) || 0) + 1);
   }
-  return candidates.map((c) => {
-    const enriched = byName.get(c.name);
-    if (!enriched) return c;
+  for (const r of enrichmentResults) {
+    const key = reviewerCandidateKey(r);
+    if (key && r?.contactEnrichment) byKey.set(key, r);
+    const name = String(r?.name || '');
+    if (name && r?.contactEnrichment) {
+      resultNameCounts.set(name, (resultNameCounts.get(name) || 0) + 1);
+      byName.set(name, r);
+    }
+  }
+  return candidates.map((candidate, index) => {
+    const c = withReviewerCandidateKey(candidate);
+    const uniqueNameMatch = candidateNameCounts.get(c.name) === 1
+      && resultNameCounts.get(c.name) === 1
+      ? byName.get(c.name)
+      : null;
+    const enriched = byKey.get(c.candidateKey)
+      // Legacy callers sometimes return only name + contactEnrichment. A name
+      // join is safe only when that name is unique on BOTH sides.
+      || uniqueNameMatch
+      // enrichCandidates preserves strict input order. This fallback supports
+      // legacy callers that have not stamped candidateKey yet, but only when
+      // the response is a complete 1:1 list.
+      || (enrichmentResults.length === candidates.length ? enrichmentResults[index] : null);
+    if (!enriched) return candidate;
     const e = enriched.contactEnrichment;
+    if (!e) return c;
     const contactEnrichment = {
       ...e,
       website: ContactParser.sanitizeWebsiteForCandidate(e.website, c.name) || null,
@@ -406,6 +449,7 @@ export function pruneCandidateForRoster(c) {
       && c.automatedIdentityAttestation.length <= 4096
       ? c.automatedIdentityAttestation
       : null,
+    candidateKey: reviewerCandidateKey(c),
     // UI convenience only. Save-candidates derives authority by looking up the
     // opaque confirmation id in the request-scoped server roster.
     pdIdentityConfirmed: c.pdIdentityConfirmed === true,

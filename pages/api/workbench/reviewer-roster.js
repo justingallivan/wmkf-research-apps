@@ -7,8 +7,8 @@
  *   GET   ?requestId            → { active, excluded, allNames }
  *   POST  { requestId, candidates }                  → record surfaced (status 'active')
  *   PATCH { requestId, action:'exclude', candidate } → set aside
- *   PATCH { requestId, action:'promote', name }      → excluded → active (returns blob)
- *   PATCH { requestId, action:'saved', names }       → graduated to the Dataverse pool
+ *   PATCH { requestId, action:'promote', candidateKey } → excluded → active (returns blob)
+ *   PATCH { requestId, action:'saved', candidates }  → graduated to the Dataverse pool
  *   PATCH { requestId, action:'confirm_identity', candidate } → staff attestation
  *
  * App-key tuple matches my-candidates.js so the Find tab's `reviewers`/
@@ -97,18 +97,22 @@ async function handlePatch(req, res, access) {
   }
 
   if (action === 'promote') {
-    const { name } = req.body;
-    if (!name) return res.status(400).json({ error: 'name is required to promote' });
-    const candidate = await promote(requestId, name);
+    const { candidateKey } = req.body;
+    if (!candidateKey) return res.status(400).json({ error: 'candidateKey is required to promote' });
+    const candidate = await promote(requestId, candidateKey);
     return res.status(200).json({ success: true, candidate });
   }
 
   if (action === 'saved') {
-    const { names } = req.body;
-    if (!Array.isArray(names) || names.length === 0) {
-      return res.status(400).json({ error: 'names[] is required to mark saved' });
+    const { candidates } = req.body;
+    if (!Array.isArray(candidates) || candidates.length === 0) {
+      return res.status(400).json({ error: 'candidates[] is required to mark saved' });
     }
-    const saved = await markSaved(requestId, names);
+    const pruned = candidates.map(pruneCandidateForRoster).filter((candidate) => candidate?.name && candidate?.candidateKey);
+    if (pruned.length !== candidates.length) {
+      return res.status(400).json({ error: 'Every saved candidate requires name and candidateKey' });
+    }
+    const saved = await markSaved(requestId, pruned);
     return res.status(200).json({ success: true, saved });
   }
 
