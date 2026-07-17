@@ -11,6 +11,7 @@ import {
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
   candidateWasSaved,
+  getCandidateEmailReadiness,
   pruneCandidateForRoster,
   sanitizeInstitutionCOIDetails,
   mergeReferredProvenance,
@@ -298,6 +299,64 @@ describe('mergeEnrichment', () => {
     expect(out[0].hasInstitutionCOI).toBe(true);
     expect(out[0].institutionCOIDetails).toEqual({ piInstitution: 'JHU', reviewerInstitution: 'JHU' });
     expect(out[0].institutionCOIDetails).not.toHaveProperty('historical');
+  });
+});
+
+describe('getCandidateEmailReadiness', () => {
+  test('uses the invitation classifier for authoritative and anchored-search emails', () => {
+    expect(getCandidateEmailReadiness({
+      email: 'person@example.edu',
+      emailSource: 'pubmed',
+      identityStatus: 'unresolved',
+    })).toMatchObject({ level: 'high' });
+
+    expect(getCandidateEmailReadiness({
+      email: 'person@example.edu',
+      contactEnrichment: {
+        emailSource: 'claude_search',
+        identity: { status: 'probable' },
+      },
+    })).toMatchObject({ level: 'high' });
+  });
+
+  test('unknown, manual, contested, and unanchored-search emails need confirmation', () => {
+    for (const emailSource of ['manual', 'search_contested', 'unknown_source']) {
+      expect(getCandidateEmailReadiness({
+        email: 'person@example.edu',
+        emailSource,
+        identityStatus: 'confirmed',
+      })).toMatchObject({ level: 'low' });
+    }
+    expect(getCandidateEmailReadiness({
+      email: 'person@example.edu',
+      emailSource: 'serp_search',
+      identityStatus: 'unresolved',
+    })).toMatchObject({ level: 'low' });
+  });
+
+  test('preserves the specific contested-contact reason for staff review', () => {
+    expect(getCandidateEmailReadiness({
+      email: 'person@other-domain.example',
+      identityStatus: 'confirmed',
+      contactEnrichment: {
+        emailSource: 'search_contested',
+        contactStatusReason: 'Email domain conflicts with the verified institution',
+      },
+    })).toEqual({
+      level: 'low',
+      reason: 'Email domain conflicts with the verified institution',
+    });
+  });
+
+  test('no address is reported as missing even if stale provenance remains', () => {
+    expect(getCandidateEmailReadiness({
+      email: null,
+      emailSource: 'orcid',
+      contactEnrichment: { email: null, emailSource: 'orcid' },
+    })).toEqual({
+      level: 'missing',
+      reason: 'No email address found during contact enrichment',
+    });
   });
 });
 

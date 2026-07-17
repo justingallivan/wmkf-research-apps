@@ -51,6 +51,7 @@ import {
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
   candidateWasSaved,
+  getCandidateEmailReadiness,
   normalizeReviewerName,
   pruneCandidateForRoster,
   dedupeByNamePreferReferred,
@@ -150,7 +151,7 @@ function affiliationSourceLabel(source) {
 // without a checkbox for the non-selectable Unverified section. `onExclude` adds
 // a set-aside action (active cards); `onPromote` adds a restore action (the
 // collapsed Excluded section).
-function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, canManage = true }) {
+export function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, canManage = true }) {
   const [expanded, setExpanded] = useState(false);
   const c = candidate;
   const confidence = typeof c.verificationConfidence === 'number' ? c.verificationConfidence : undefined;
@@ -194,6 +195,8 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
   const aiFlaggedNotRelevant = !!c.aiFlaggedNotRelevant;
   const enr = c.contactEnrichment || {};
   const email = c.email || enr.email || null;
+  const emailSource = c.emailSource || enr.emailSource || null;
+  const emailReadiness = getCandidateEmailReadiness(c);
   const website = c.website || enr.website || null;
   const orcidUrl = c.orcidUrl || enr.orcidUrl || null;
   const scholarUrl = c.googleScholarUrl || enr.googleScholarUrl || buildScholarSearchUrl(c.name, c.affiliation);
@@ -336,27 +339,35 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
             )}
           </div>
 
-          {!identityUnverified && (email || website || orcidUrl) && (
+          {!identityUnverified && (
             <div className="mt-2 flex items-center flex-wrap gap-2 text-xs">
               {email && (
-                <>
-                  <a
-                    href={`mailto:${email}`}
-                    className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
-                    title={`Email (from ${enr.emailSource || 'enrichment'}${enr.emailYear ? `, ${enr.emailYear}` : ''})`}
-                  >
-                    📧 {email}
-                  </a>
-                  {enr.emailSource === 'search_contested' && (
-                    <span
-                      className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-800 rounded border border-amber-200"
-                      title={enr.contactStatusReason || 'Confirm before inviting'}
-                    >
-                      ⚠ Confirm before invite
-                    </span>
-                  )}
-                </>
+                <a
+                  href={`mailto:${email}`}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
+                  title={`Email (from ${emailSource || 'unknown source'}${enr.emailYear ? `, ${enr.emailYear}` : ''})`}
+                >
+                  📧 {email}
+                </a>
               )}
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded border ${
+                  emailReadiness.level === 'high'
+                    ? 'bg-green-50 text-green-800 border-green-200'
+                    : emailReadiness.level === 'low'
+                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                      : 'bg-gray-50 text-gray-600 border-gray-200'
+                }`}
+                title={emailReadiness.level === 'missing'
+                  ? emailReadiness.reason
+                  : `${emailReadiness.reason}. Confidence reflects address provenance and identity match, not deliverability.`}
+              >
+                {emailReadiness.level === 'high'
+                  ? '✓ High-confidence email'
+                  : emailReadiness.level === 'low'
+                    ? '⚠ Email needs confirmation'
+                    : 'Email not found'}
+              </span>
               {website && (
                 <a href={website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded hover:bg-green-100" title="Faculty / personal website">
                   🔗 Website
