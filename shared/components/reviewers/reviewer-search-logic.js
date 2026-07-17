@@ -12,6 +12,7 @@ import { buildReviewerProvenance, PROVENANCE_KINDS, provenanceGroupOf, provenanc
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import { parseReferredSeeds as _parseReferredSeeds } from '../../../lib/utils/reviewer-referral-seeds';
 import { reviewerSaveKey } from '../../../lib/utils/reviewer-save-key';
+import { emailConfidence } from '../../../lib/utils/reviewer-invite';
 
 /**
  * Merge contact-enrichment results (from /enrich-contacts) back onto the chosen
@@ -43,6 +44,33 @@ export function candidateWasSaved(candidate, savedKeys = [], savedNames = []) {
   if (stableKeys.size > 0) return stableKeys.has(reviewerSaveKey(candidate));
   const legacyNames = new Set((Array.isArray(savedNames) ? savedNames : []).map(_normalizeReviewerName));
   return legacyNames.has(_normalizeReviewerName(candidate?.name));
+}
+
+/**
+ * Project the invitation service's authoritative source/identity classifier
+ * onto a Find-tab candidate. "missing" is UI-only: the send path still
+ * re-derives high/low from the persisted person row immediately before send.
+ *
+ * @param {object} candidate
+ * @returns {{ level: 'high'|'low'|'missing', reason: string }}
+ */
+export function getCandidateEmailReadiness(candidate) {
+  const enrichment = candidate?.contactEnrichment || {};
+  const email = candidate?.email || enrichment.email || null;
+  if (!email) {
+    return { level: 'missing', reason: 'No email address found during contact enrichment' };
+  }
+  const confidence = emailConfidence({
+    emailSource: candidate?.emailSource || enrichment.emailSource || null,
+    identityStatus: candidate?.identityStatus
+      || enrichment.identityStatus
+      || enrichment.identity?.status
+      || null,
+  });
+  if (confidence.level === 'low' && enrichment.contactStatusReason) {
+    return { ...confidence, reason: enrichment.contactStatusReason };
+  }
+  return confidence;
 }
 
 export function mergeEnrichment(candidates, enrichmentResults) {
