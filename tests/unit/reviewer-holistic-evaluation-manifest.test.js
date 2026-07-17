@@ -58,7 +58,7 @@ describe('reviewer holistic evaluation manifest', () => {
       scriptVersion: 'reviewer-holistic-m1-executor-v3',
       artifactVersion: 'reviewer-holistic-m1-execution-v1',
     });
-    expect(trackedManifest.identityBenchmark.fixtureVersion).toBe('reviewer-identity-v1');
+    expect(trackedManifest.identityBenchmark.fixtureVersion).toBe('reviewer-identity-v2');
     expect(trackedManifest.runtimeConfig).toMatchObject({
       promptVersion: '2',
       modelIds: ['claude-opus-4-8'],

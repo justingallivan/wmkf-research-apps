@@ -58,6 +58,15 @@ const HAZARD_TYPES = new Set([
   'no_orcid_early_career',
 ]);
 
+const IDENTITY_BENCHMARK_VERSIONS = new Set([
+  'reviewer-identity-v1',
+  'reviewer-identity-v2',
+]);
+const IDENTITY_IMPORT_VERSIONS = new Map([
+  ['reviewer-identity-v1', 'reviewer-identity-workbook-import-v1'],
+  ['reviewer-identity-v2', 'reviewer-identity-workbook-import-v2'],
+]);
+
 const LABELING_IMPORT_TOP_LEVEL_KEYS = new Set([
   'schemaVersion',
   'importVersion',
@@ -281,8 +290,8 @@ function validateIdentityBenchmark(asset, { requireFrozen = false } = {}) {
   rejectUnknown(asset, IDENTITY_TOP_LEVEL_KEYS, '$', add);
   if (asset.schemaVersion !== 1) add('schemaVersion', 'must equal 1');
   if (!['draft', 'frozen'].includes(asset.status)) add('status', 'must be draft or frozen');
-  if (asset.benchmarkVersion !== 'reviewer-identity-v1') {
-    add('benchmarkVersion', 'must equal reviewer-identity-v1');
+  if (!IDENTITY_BENCHMARK_VERSIONS.has(asset.benchmarkVersion)) {
+    add('benchmarkVersion', 'must be a supported reviewer-identity version');
   }
   if (asset.labelingPolicy !== 'single_reviewer_blinded') {
     add('labelingPolicy', 'must equal single_reviewer_blinded');
@@ -466,11 +475,15 @@ function validateIdentityLabelingImport(asset, benchmark) {
   }
   rejectUnknown(asset, LABELING_IMPORT_TOP_LEVEL_KEYS, '$', add);
   if (asset.schemaVersion !== 1) add('schemaVersion', 'must equal 1');
-  if (asset.importVersion !== 'reviewer-identity-workbook-import-v1') {
-    add('importVersion', 'must equal reviewer-identity-workbook-import-v1');
+  const expectedImportVersion = IDENTITY_IMPORT_VERSIONS.get(benchmark?.benchmarkVersion);
+  if (asset.importVersion !== expectedImportVersion) {
+    add('importVersion', `must equal ${expectedImportVersion || 'the benchmark import version'}`);
   }
-  if (asset.benchmarkVersion !== 'reviewer-identity-v1') {
-    add('benchmarkVersion', 'must equal reviewer-identity-v1');
+  if (!IDENTITY_BENCHMARK_VERSIONS.has(asset.benchmarkVersion)) {
+    add('benchmarkVersion', 'must be a supported reviewer-identity version');
+  }
+  if (benchmark?.benchmarkVersion && asset.benchmarkVersion !== benchmark.benchmarkVersion) {
+    add('benchmarkVersion', 'must match the referenced benchmark');
   }
   if (asset.labelingPolicy !== 'single_reviewer_blinded') {
     add('labelingPolicy', 'must equal single_reviewer_blinded');

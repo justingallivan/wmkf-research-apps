@@ -38,6 +38,13 @@ const DEFAULT_MANIFEST_PATH = path.join(
 const IDENTITY_IMPORT_FILE = 'reviewer-holistic-identity-labeling-import-v1.json';
 const DEFAULT_IDENTITY_IMPORT_PATH = path.join(ROOT, 'docs/audits', IDENTITY_IMPORT_FILE);
 
+function identityImportFileFor(identityPath) {
+  const match = path.basename(identityPath).match(/reviewer-holistic-identity-benchmark-(v\d+)\.json$/);
+  return match
+    ? `reviewer-holistic-identity-labeling-import-${match[1]}.json`
+    : IDENTITY_IMPORT_FILE;
+}
+
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
@@ -59,7 +66,7 @@ function parseCli(argv) {
     requireFrozen,
     requireScored,
     identityPath,
-    identityImportPath: path.join(path.dirname(identityPath), IDENTITY_IMPORT_FILE),
+    identityImportPath: path.join(path.dirname(identityPath), identityImportFileFor(identityPath)),
     proposalPath: positional[1] || DEFAULT_PROPOSAL_PATH,
   };
 }

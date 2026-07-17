@@ -366,8 +366,9 @@ eligibility test.
 **[FOUNDATION + M1.1 OWNER-APPROVED POOL + M1.3 BUILT 2026-07-14; M1.1
 SINGLE-REVIEWER LABELING FROZEN 2026-07-16 + M1.2 TEN-PROPOSAL COHORT FROZEN
 2026-07-16; BASELINE/STARTING SHA + LIVE RUNTIME SNAPSHOT PINNED 2026-07-16;
-REDESIGN ARM + RUN PLAN + EXECUTOR BUILT/PINNED 2026-07-16; PAID
-EXECUTION/SCORING PENDING]** The tracked frozen identity benchmark and frozen blinded
+REDESIGN ARM + RUN PLAN + EXECUTOR BUILT/PINNED 2026-07-16; PAID EXECUTION
+COMPLETE 2026-07-16; SCOPED 10-CANDIDATE-PER-PROPOSAL PILOT SCORED/UNBLINDED
+2026-07-17; ORIGINAL 345-CANDIDATE SCORE NOT PERFORMED]** The tracked frozen identity benchmark and frozen blinded
 proposal-evaluation assets now have fail-closed validators at
 `scripts/validate-reviewer-holistic-m1-assets.js`; draft validation is
 `npm run eval:reviewer-holistic:m1`, while `--require-frozen` and
@@ -392,12 +393,13 @@ telemetry cannot prove request-level non-use. On 2026-07-16 the owner approved
 the ten, attested to the best of their knowledge that none tuned the redesign,
 and named Justin as the blinded scorer. The frozen evaluation stores ten opaque
 seed-derived proposal IDs and only the SHA-256 seed commitment; the raw seed is
-retained locally in ignored `.env.m1.local`. All run, arm-membership, and score
-arrays remain empty. The overall evaluation manifest is now frozen. The baseline
+retained locally in ignored `.env.m1.local`. The tracked original evaluation
+asset remains empty by design; separate paid-run and scoped pilot artifacts are
+retained under `outputs/reviewer-holistic-m1/`. The overall evaluation manifest is now frozen. The baseline
 and redesign starting
 point are both pinned to post-containment `origin/main` commit
-`50140eb62dd8f3c04f6d3ab5e131d96711f804d7`; the identity fixture is
-`reviewer-identity-v1`. The evaluation-only redesign is pinned to implementation
+`50140eb62dd8f3c04f6d3ab5e131d96711f804d7`; the active identity fixture is
+`reviewer-identity-v2` and v1 remains historical. The evaluation-only redesign is pinned to implementation
 commit `166800a3142179db642af3beefd67b8dcc381173`, pipeline version
 `reviewer-holistic-applicant-neighborhood-seeds-v1`, evaluation-script version
 `reviewer-holistic-m1-run-plan-v2`, and paid-executor implementation commit
@@ -411,9 +413,20 @@ PI/co-PI, and applicant-institution exclusions used by both arms. The read-only 
 now fails on live drift without making an LLM generation call or any write.
 `npm run eval:reviewer-holistic:m1-plan` deterministically verifies 60 unique,
 commit- and version-attributed slots (10 proposals x 2 arms x 3 replicates)
-without downloading documents or calling an LLM. Paid execution, candidate
-blinding, and scoring remain pending; no paid run has started and no
-production route or service selects the redesign.
+without downloading documents or calling an LLM. Paid execution completed all
+60 slots on 2026-07-16. On 2026-07-17 the owner approved a scoped pilot that
+scores the first 10 workbook candidates per proposal (100 total); its scored
+artifact passed the proposal validator and its arm comparison was unblinded.
+No production route or service selects the redesign.
+
+**M1.1 revised benchmark v2 (owner clarifications 2026-07-16):** The original
+v1 freeze remains preserved as history. A revised single-reviewer workbook and
+paired audit were frozen as `reviewer-identity-v2` after the owner supplied
+additional ORCID evidence and clarified Robert Sang, Alexandra Landsman,
+Li-Huei Tsai, and William Harcombe. The v2 set contains 25 Bind and 15 Abstain
+labels, is validated by the same fail-closed asset validator, and does not claim
+inter-rater or adjudication validity. The revised source workbook hash is
+`fdabbb94efac182c719715740ecbd6ed7fdce3c510c3d7caafab983266183c94`.
 
 The paid executor is `scripts/run-reviewer-holistic-m1.mjs`. It is preflight-
 only by default and requires the literal `--execute --confirm-paid-runs=60`
@@ -424,8 +437,9 @@ artifact checkpoints each deterministic run ID atomically; completed slots are
 immutable, failed slots require explicit retry, interrupted slots remain
 identifiable, and a postflight runtime mismatch invalidates the batch before
 blinding. Exact normalized-name dedupe creates a separate arm-free scoring
-package and keeps the arm/run map in a separate unblinding artifact. No paid
-run has started.
+package and keeps the arm/run map in a separate unblinding artifact. The 60-slot
+paid run completed successfully; the original 345-candidate package remains
+unscored, while the scoped 100-candidate pilot is recorded separately.
 
 ### M1.1 Single-reviewer blinded person benchmark
 
@@ -503,7 +517,8 @@ unsupported population claim.
 **[TEN-PROPOSAL COHORT OWNER-APPROVED AND FROZEN 2026-07-16; BASELINE/STARTING
 SHA + LIVE RUNTIME SNAPSHOT PINNED 2026-07-16; EVALUATION-ONLY REDESIGN ARM +
 60-SLOT RUN PLAN + RESUMABLE EXECUTOR BUILT/VERSIONED 2026-07-16; PAID
-EXECUTION/SCORING PENDING]**
+EXECUTION COMPLETE 2026-07-16; SCOPED 10-CANDIDATE-PER-PROPOSAL PILOT
+SCORED/UNBLINDED 2026-07-17; ORIGINAL 345-CANDIDATE SCORE NOT PERFORMED]**
 `docs/audits/reviewer-holistic-proposal-evaluation-v1.json` is frozen with the
 approved ten, scorer Justin, a hashed randomization seed, immutable document
 hashes, and empty execution/scoring arrays. The recommendation and its
@@ -517,7 +532,11 @@ program areas, a hashed randomization seed, and a named PD scorer before
 freeze. A scored artifact additionally requires exactly three unique run IDs
 per arm and complete scores keyed only by blind candidate IDs, with an exact
 post-unblinding map from every blind candidate ID to its baseline/redesign arm
-membership.
+membership. The owner then approved a separate 10-candidate-per-proposal pilot;
+`outputs/reviewer-holistic-m1/reviewer-holistic-m1-10-pilot-scored-v1.json`
+contains the 100 workbook scores, passed the scored-artifact validator, and was
+unblinded into the matching pilot comparison artifact. The tracked original
+345-candidate evaluation remains unchanged and unscored.
 
 The overall manifest now freezes the exact baseline/redesign commits, pipeline
 and evaluation-script versions, and identical prompt, model, candidate-count,
@@ -879,7 +898,8 @@ decline-acknowledgment email is worthwhile.
 ### F1.2 Applicant recommendations as neighborhood seeds
 
 **[EVALUATION-ONLY ARM + RESUMABLE EXECUTOR BUILT/VERSIONED 2026-07-16; M1.2
-PAID EXECUTION PENDING]**
+PAID EXECUTION COMPLETE 2026-07-16; SCOPED 10-CANDIDATE PILOT
+SCORED/UNBLINDED 2026-07-17]**
 `scripts/lib/reviewer-holistic-pipelines.mjs` loads the five structured applicant
 recommendation slots fail closed, requires names and affiliations, and supplies
 them only to the redesign as prompt-level community-seed data. Both arms receive
@@ -1012,17 +1032,22 @@ the change into cleanup.
 
 1. Approve each C0 runtime promotion after its evidence bundle.
 2. **M1.1 case pool approved unchanged 2026-07-14; single-reviewer blinded
-   labeling frozen 2026-07-16.** Justin completed all 40 decisions; the frozen
-   benchmark contains 23 Bind and 17 Abstain labels. There is no separate
+   labeling frozen 2026-07-16.** Justin completed all 40 decisions; the original
+   v1 benchmark contains 23 Bind and 17 Abstain labels. There is no separate
    labeler or adjudicator and no inter-rater claim. The raw workbook responses,
    workbook hash, normalizations, and five owner-approved resolutions are
-   preserved in the tracked labeling-import audit. **M1.2 proposal cohort
+   preserved in the tracked labeling-import audit. The owner later approved the
+   revised v2 evidence and labels described above; v1 remains the historical
+   freeze. **M1.2 proposal cohort
    approved/frozen 2026-07-16:** the owner approved the proposed ten, attested
    to the best of their knowledge that none tuned the redesign, and named Justin
    as scorer. The baseline/starting SHA and a live runtime snapshot are now
    pinned. The evaluation-only applicant-neighborhood redesign arm and 60-slot
    read-only run plan plus resumable executor are built/versioned and pinned by
-   commit. Paid execution and blinded scoring remain pending.
+   commit. Paid execution completed 60/60 slots on 2026-07-16. On 2026-07-17
+   the owner approved a scoped 10-candidate-per-proposal pilot; the 100 active
+   workbook rows were scored and unblinded in separate pilot artifacts. The
+   original 345-candidate M1.2 score remains unperformed.
 3. **Durable fields approved/deployed 2026-07-12; first acceptance self-report
    caller approved/promoted 2026-07-13 via PR #57 / `00ffb09c`.** Broader runtime
    writers/readers and policy migration retain their own gates.

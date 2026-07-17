@@ -19,7 +19,7 @@
     "artifactVersion": "reviewer-holistic-m1-execution-v1"
   },
   "identityBenchmark": {
-    "fixtureVersion": "reviewer-identity-v1",
+    "fixtureVersion": "reviewer-identity-v2",
     "minimumCases": 40,
     "hazardMinimum": 20,
     "cleanPositiveMinimum": 20,
