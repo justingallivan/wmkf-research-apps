@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "status": "frozen",
   "freezePoint": "after_shared_c0_containment",
-  "createdAt": "2026-07-13T01:08:13.000Z",
+  "createdAt": "2026-07-16T15:30:48.000Z",
   "baseline": {
     "origin": "origin/main",
     "commit": "50140eb62dd8f3c04f6d3ab5e131d96711f804d7",
@@ -19,7 +19,7 @@
     "artifactVersion": "reviewer-holistic-m1-execution-v1"
   },
   "identityBenchmark": {
-    "fixtureVersion": "reviewer-identity-v1",
+    "fixtureVersion": "reviewer-identity-v2",
     "minimumCases": 40,
     "hazardMinimum": 20,
     "cleanPositiveMinimum": 20,

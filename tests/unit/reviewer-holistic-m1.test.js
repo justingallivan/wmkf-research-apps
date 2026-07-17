@@ -1,6 +1,10 @@
+const path = require('path');
+
 const identityDraft = require('../../docs/audits/reviewer-holistic-identity-benchmark-v1.json');
+const activeIdentity = require('../../docs/audits/reviewer-holistic-identity-benchmark-v2.json');
 const identityLabelingImport = require('../../docs/audits/reviewer-holistic-identity-labeling-import-v1.json');
 const evaluationManifest = require('../../docs/audits/reviewer-holistic-evaluation-manifest-v1.json');
+const activeEvaluationManifest = require('../../docs/audits/reviewer-holistic-evaluation-manifest-v2.json');
 const proposalCohortProposal = require('../../docs/audits/reviewer-holistic-proposal-cohort-proposal-v1.json');
 const proposalDraft = require('../../docs/audits/reviewer-holistic-proposal-evaluation-v1.json');
 const {
@@ -16,7 +20,11 @@ const {
   validateProposalEvaluation,
   validateProposalManifestConsistency,
 } = require('../../scripts/lib/reviewer-holistic-m1');
-const { parseCli: parseAssetCli } = require('../../scripts/validate-reviewer-holistic-m1-assets');
+const {
+  DEFAULT_MANIFEST_PATH,
+  parseCli: parseAssetCli,
+  validateIdentityManifestConsistency,
+} = require('../../scripts/validate-reviewer-holistic-m1-assets');
 const {
   SEEDS: identitySeeds,
   addManualEvidence,
@@ -148,6 +156,39 @@ describe('M1 evaluation assets', () => {
   test('asset validator rejects unknown flags and extra paths', () => {
     expect(() => parseAssetCli(['--unknown'])).toThrow('unknown arguments');
     expect(() => parseAssetCli(['one.json', 'two.json', 'three.json'])).toThrow('unknown positional arguments');
+  });
+
+  test('asset validator derives the active identity pair from manifest v2 and fails closed on drift', () => {
+    const options = parseAssetCli([]);
+    expect(path.basename(DEFAULT_MANIFEST_PATH)).toBe('reviewer-holistic-evaluation-manifest-v2.json');
+    expect(path.basename(options.identityPath)).toBe('reviewer-holistic-identity-benchmark-v2.json');
+    expect(path.basename(options.identityImportPath)).toBe('reviewer-holistic-identity-labeling-import-v2.json');
+    expect(options.usesDefaultIdentity).toBe(true);
+    expect(validateIdentityManifestConsistency(activeEvaluationManifest, activeIdentity)).toEqual({
+      ok: true,
+      errors: [],
+    });
+
+    const drifted = clone(activeIdentity);
+    drifted.benchmarkVersion = 'reviewer-identity-v1';
+    expect(validateIdentityManifestConsistency(activeEvaluationManifest, drifted).errors).toContainEqual({
+      path: 'identity.benchmarkVersion',
+      message: 'must match manifest.identityBenchmark.fixtureVersion',
+    });
+    const unfrozen = clone(activeIdentity);
+    unfrozen.status = 'draft';
+    expect(validateIdentityManifestConsistency(activeEvaluationManifest, unfrozen).errors).toContainEqual({
+      path: 'identity.status',
+      message: 'active manifest fixture must be frozen',
+    });
+    const malformedManifest = clone(activeEvaluationManifest);
+    malformedManifest.identityBenchmark.fixtureVersion = 'unknown-version';
+    expect(() => parseAssetCli([], { manifest: malformedManifest })).toThrow(
+      'manifest identityBenchmark.fixtureVersion must match reviewer-identity-vN',
+    );
+    expect(() => parseAssetCli(['custom-identity.json'])).toThrow(
+      'identity benchmark path must be named reviewer-holistic-identity-benchmark-vN.json',
+    );
   });
 
   test('identity collector has a balanced unique seed pool and fail-closed CLI', () => {

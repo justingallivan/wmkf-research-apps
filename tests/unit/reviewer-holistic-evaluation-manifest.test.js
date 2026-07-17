@@ -1,4 +1,5 @@
-const trackedManifest = require('../../docs/audits/reviewer-holistic-evaluation-manifest-v1.json');
+const historicalManifest = require('../../docs/audits/reviewer-holistic-evaluation-manifest-v1.json');
+const trackedManifest = require('../../docs/audits/reviewer-holistic-evaluation-manifest-v2.json');
 const { execFileSync } = require('child_process');
 const {
   validateCommitReferences,
@@ -43,6 +44,21 @@ function frozenManifest() {
 }
 
 describe('reviewer holistic evaluation manifest', () => {
+  test('historical v1 manifest retains its original identity fixture', () => {
+    expect(validateManifest(historicalManifest, { requireFrozen: true })).toEqual({ ok: true, errors: [] });
+    expect(historicalManifest.identityBenchmark.fixtureVersion).toBe('reviewer-identity-v1');
+  });
+
+  test('manifest v2 changes only its timestamp and identity fixture contract', () => {
+    const historicalContract = clone(historicalManifest);
+    const activeContract = clone(trackedManifest);
+    delete historicalContract.createdAt;
+    delete activeContract.createdAt;
+    delete historicalContract.identityBenchmark;
+    delete activeContract.identityBenchmark;
+    expect(activeContract).toEqual(historicalContract);
+  });
+
   test('tracked manifest is complete and frozen', () => {
     expect(validateManifest(trackedManifest, { requireFrozen: true })).toEqual({ ok: true, errors: [] });
     expect(trackedManifest.proposalEvaluation.proposalIds).toHaveLength(10);

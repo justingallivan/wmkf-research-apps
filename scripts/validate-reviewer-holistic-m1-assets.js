@@ -17,12 +17,11 @@ const {
   validateProposalEvaluation,
   validateProposalManifestConsistency,
 } = require('./lib/reviewer-holistic-m1');
+const {
+  validateManifest,
+} = require('./validate-reviewer-holistic-evaluation-manifest');
 
 const ROOT = path.join(__dirname, '..');
-const DEFAULT_IDENTITY_PATH = path.join(
-  ROOT,
-  'docs/audits/reviewer-holistic-identity-benchmark-v1.json',
-);
 const DEFAULT_PROPOSAL_PATH = path.join(
   ROOT,
   'docs/audits/reviewer-holistic-proposal-evaluation-v1.json',
@@ -33,23 +32,34 @@ const DEFAULT_COHORT_PROPOSAL_PATH = path.join(
 );
 const DEFAULT_MANIFEST_PATH = path.join(
   ROOT,
-  'docs/audits/reviewer-holistic-evaluation-manifest-v1.json',
+  'docs/audits/reviewer-holistic-evaluation-manifest-v2.json',
 );
-const IDENTITY_IMPORT_FILE = 'reviewer-holistic-identity-labeling-import-v1.json';
-const DEFAULT_IDENTITY_IMPORT_PATH = path.join(ROOT, 'docs/audits', IDENTITY_IMPORT_FILE);
+
+function identityFileForFixtureVersion(fixtureVersion) {
+  const match = String(fixtureVersion || '').match(/^reviewer-identity-(v\d+)$/);
+  if (!match) {
+    throw new Error(
+      'manifest identityBenchmark.fixtureVersion must match reviewer-identity-vN',
+    );
+  }
+  return `reviewer-holistic-identity-benchmark-${match[1]}.json`;
+}
 
 function identityImportFileFor(identityPath) {
   const match = path.basename(identityPath).match(/reviewer-holistic-identity-benchmark-(v\d+)\.json$/);
-  return match
-    ? `reviewer-holistic-identity-labeling-import-${match[1]}.json`
-    : IDENTITY_IMPORT_FILE;
+  if (!match) {
+    throw new Error(
+      'identity benchmark path must be named reviewer-holistic-identity-benchmark-vN.json',
+    );
+  }
+  return `reviewer-holistic-identity-labeling-import-${match[1]}.json`;
 }
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 
-function parseCli(argv) {
+function parseCli(argv, { manifest } = {}) {
   const allowedFlags = new Set(['--require-frozen', '--require-scored']);
   const unknownFlags = argv.filter((arg) => arg.startsWith('--') && !allowedFlags.has(arg));
   if (unknownFlags.length > 0) {
@@ -61,27 +71,59 @@ function parseCli(argv) {
   if (positional.length > 2) {
     throw new Error(`unknown positional arguments: ${positional.slice(2).join(', ')}`);
   }
-  const identityPath = positional[0] || DEFAULT_IDENTITY_PATH;
+  const usesDefaultIdentity = positional[0] == null;
+  const activeManifest = manifest || readJson(DEFAULT_MANIFEST_PATH);
+  const identityPath = positional[0] || path.join(
+    ROOT,
+    'docs/audits',
+    identityFileForFixtureVersion(activeManifest?.identityBenchmark?.fixtureVersion),
+  );
   return {
     requireFrozen,
     requireScored,
+    usesDefaultIdentity,
     identityPath,
     identityImportPath: path.join(path.dirname(identityPath), identityImportFileFor(identityPath)),
     proposalPath: positional[1] || DEFAULT_PROPOSAL_PATH,
   };
 }
 
+function validateIdentityManifestConsistency(manifest, identity) {
+  const errors = [];
+  const fixtureVersion = manifest?.identityBenchmark?.fixtureVersion;
+  if (typeof fixtureVersion !== 'string' || fixtureVersion.trim().length === 0) {
+    errors.push({
+      path: 'manifest.identityBenchmark.fixtureVersion',
+      message: 'must be a non-empty string',
+    });
+  }
+  if (identity?.status !== 'frozen') {
+    errors.push({
+      path: 'identity.status',
+      message: 'active manifest fixture must be frozen',
+    });
+  }
+  if (identity?.benchmarkVersion !== fixtureVersion) {
+    errors.push({
+      path: 'identity.benchmarkVersion',
+      message: 'must match manifest.identityBenchmark.fixtureVersion',
+    });
+  }
+  return { ok: errors.length === 0, errors };
+}
+
 function main() {
-  const options = parseCli(process.argv.slice(2));
+  let options;
   let identity;
   let identityImport;
   let cohortProposal;
   let manifest;
   let proposals;
   try {
+    manifest = readJson(DEFAULT_MANIFEST_PATH);
+    options = parseCli(process.argv.slice(2), { manifest });
     identity = readJson(options.identityPath);
     cohortProposal = readJson(DEFAULT_COHORT_PROPOSAL_PATH);
-    manifest = readJson(DEFAULT_MANIFEST_PATH);
     proposals = readJson(options.proposalPath);
     if (identity.status === 'frozen') identityImport = readJson(options.identityImportPath);
   } catch (error) {
@@ -90,6 +132,7 @@ function main() {
   }
 
   const results = [
+    ['evaluation manifest', validateManifest(manifest, { requireFrozen: true })],
     ['identity benchmark', validateIdentityBenchmark(identity, { requireFrozen: options.requireFrozen })],
     ['proposal evaluation', validateProposalEvaluation(proposals, {
       requireFrozen: options.requireFrozen,
@@ -97,6 +140,12 @@ function main() {
     })],
     ['proposal cohort proposal', validateProposalCohortProposal(cohortProposal)],
   ];
+  if (options.usesDefaultIdentity) {
+    results.splice(1, 0, [
+      'identity manifest consistency',
+      validateIdentityManifestConsistency(manifest, identity),
+    ]);
+  }
   if (proposals.status === 'frozen' || proposals.status === 'scored') {
     results.push([
       'proposal cohort freeze consistency',
@@ -129,10 +178,11 @@ function main() {
 if (require.main === module) main();
 
 module.exports = {
-  DEFAULT_IDENTITY_PATH,
-  DEFAULT_IDENTITY_IMPORT_PATH,
   DEFAULT_COHORT_PROPOSAL_PATH,
   DEFAULT_MANIFEST_PATH,
   DEFAULT_PROPOSAL_PATH,
+  identityFileForFixtureVersion,
+  identityImportFileFor,
   parseCli,
+  validateIdentityManifestConsistency,
 };

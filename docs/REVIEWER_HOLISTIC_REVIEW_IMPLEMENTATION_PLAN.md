@@ -178,13 +178,22 @@ Before the first redesign commit, create a tracked evaluation manifest containin
 Changing a frozen item creates a new evaluation version. It may not silently
 replace the registered comparison.
 
-**Foundation built and frozen:** the manifest lives at
-`docs/audits/reviewer-holistic-evaluation-manifest-v1.json`; validate its
-structure with `npm run eval:reviewer-holistic:manifest`. Before any comparison
-run, `node scripts/validate-reviewer-holistic-evaluation-manifest.js
---require-frozen` must pass. The frozen contract pins the baseline, redesign,
-executor, inputs, runtime payload, rubric, and artifact versions; changing one
-creates a new evaluation version rather than mutating this comparison.
+**Foundation built, frozen, and versioned:** the original contract remains at
+`docs/audits/reviewer-holistic-evaluation-manifest-v1.json` and retains identity
+fixture `reviewer-identity-v1`. The owner-clarified identity revision is
+recorded separately at
+`docs/audits/reviewer-holistic-evaluation-manifest-v2.json`, which changes only
+the manifest timestamp and identity fixture contract. `npm run
+eval:reviewer-holistic:manifest` and `npm run eval:reviewer-holistic:m1` default
+to v2 and fail closed if its derived benchmark/import pair is absent,
+non-frozen, or version-mismatched. Historical run-plan, runtime-probe, and paid
+executor entry points stay explicitly pinned to manifest v1 because the
+completed proposal execution was recorded under that path and identity is
+outside its fingerprint. Before any new comparison run, the applicable
+versioned manifest must pass
+`node scripts/validate-reviewer-holistic-evaluation-manifest.js
+--require-frozen`. Changing another frozen item creates another evaluation
+version rather than mutating either registered comparison.
 
 **Acceptance:** manifest reviewed before behavior changes; baseline checkout is
 reproducible; shared containment is merged or explicitly excluded before the
@@ -395,11 +404,14 @@ and named Justin as the blinded scorer. The frozen evaluation stores ten opaque
 seed-derived proposal IDs and only the SHA-256 seed commitment; the raw seed is
 retained locally in ignored `.env.m1.local`. The tracked original evaluation
 asset remains empty by design; separate paid-run and scoped pilot artifacts are
-retained under `outputs/reviewer-holistic-m1/`. The overall evaluation manifest is now frozen. The baseline
-and redesign starting
+retained under `outputs/reviewer-holistic-m1/`. Manifest v1 remains frozen with
+the original `reviewer-identity-v1` fixture; manifest v2 records the clarified
+`reviewer-identity-v2` fixture as the active validation contract while
+preserving the proposal/runtime/execution fields. The baseline and redesign starting
 point are both pinned to post-containment `origin/main` commit
-`50140eb62dd8f3c04f6d3ab5e131d96711f804d7`; the active identity fixture is
-`reviewer-identity-v2` and v1 remains historical. The evaluation-only redesign is pinned to implementation
+`50140eb62dd8f3c04f6d3ab5e131d96711f804d7`. Default manifest and M1 asset
+validation now follow v2 mechanically; historical paid-execution entry points
+remain pinned to v1. The evaluation-only redesign is pinned to implementation
 commit `166800a3142179db642af3beefd67b8dcc381173`, pipeline version
 `reviewer-holistic-applicant-neighborhood-seeds-v1`, evaluation-script version
 `reviewer-holistic-m1-run-plan-v2`, and paid-executor implementation commit
@@ -538,11 +550,12 @@ contains the 100 workbook scores, passed the scored-artifact validator, and was
 unblinded into the matching pilot comparison artifact. The tracked original
 345-candidate evaluation remains unchanged and unscored.
 
-The overall manifest now freezes the exact baseline/redesign commits, pipeline
-and evaluation-script versions, and identical prompt, model, candidate-count,
-temperature, exclusion, and environment configuration. It also pins the exact
-prompt payload hash and executor commit/script/artifact versions. The read-only
-plan and executor preflight gates must pass before paid generation.
+Both versioned manifests freeze the same exact baseline/redesign commits,
+pipeline and evaluation-script versions, and identical prompt, model,
+candidate-count, temperature, exclusion, and environment configuration. They
+also pin the same prompt payload hash and executor commit/script/artifact
+versions; v2 differs only in its timestamp and active identity fixture. The
+historical read-only plan and executor preflight remain pinned to v1.
 
 Run frozen main and completed redesign with identical documents, prompt/model
 configuration, candidate count, exclusions, and environment. Run three

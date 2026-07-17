@@ -22,7 +22,7 @@ const DEFAULT_MANIFEST = path.join(
   '..',
   'docs',
   'audits',
-  'reviewer-holistic-evaluation-manifest-v1.json',
+  'reviewer-holistic-evaluation-manifest-v2.json',
 );
 
 const SHA1_RE = /^[0-9a-f]{40}$/i;

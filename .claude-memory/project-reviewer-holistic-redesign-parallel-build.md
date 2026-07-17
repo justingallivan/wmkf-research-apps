@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-16 via the frozen M1.1 benchmark/import audit, frozen M1.2 manifest, pinned executor, and M1 gates
+  last_verified: 2026-07-17 via versioned M1 manifests, active-v2 asset validation, completed paid execution, scoped pilot artifacts, and M1 gates
 ---
 
 ## Recall Rule
@@ -109,59 +109,43 @@ owner explicitly approved the production-only schema exception. The later
 2026-07-13 decision separately authorizes only the narrow acceptance-drain
 self-report caller described above.
 
-**M1 measurement foundation (updated 2026-07-16):** the identity benchmark carries
-an owner-approved 40-case public-evidence pool (20 hazard / 20 clean-positive) assembled
-without either reviewer pipeline. Every case has frozen candidate/upstream
-response shapes, at least one ORCID, institutional, or publisher source, and a
-frozen expected outcome. Justin completed every human decision under the
-single-reviewer blinded protocol; the benchmark froze on 2026-07-16 with 23
-Bind and 17 Abstain labels. There is no separate labeler or adjudicator and no
-inter-rater claim. The tracked import audit preserves the source workbook hash,
-all 40 raw workbook rows, deterministic blind-ID mappings, normalization rules
-and notes, and the five owner-approved resolutions. The validator requires the
-frozen benchmark and import to agree exactly and permits institutional-profile
-anchors only when they match authoritative case evidence. The blinded
-proposal-evaluation asset is frozen at
-`docs/audits/reviewer-holistic-proposal-evaluation-v1.json`. A read-only
-production inventory on 2026-07-16 produced the mechanically stratified proposal
-at `docs/audits/reviewer-holistic-proposal-cohort-proposal-v1.json`: ten unique
-requests, five Phase I thin-signal documents, five Phase II full-signal documents,
-four Science and Engineering Research cases, six Medical Research cases, and an
-immutable SHA-256 hash for every selected document. No selected request number
-appears in the tracked repository, but the available API telemetry has no request
-identifier and cannot prove non-use. On 2026-07-16 the owner approved the ten,
-attested to the best of their knowledge that none tuned the redesign, and named
-Justin as the blinded scorer. The frozen evaluation contains ten unique opaque
-seed-derived proposal IDs, exact document hashes, and only the randomization
-seed's SHA-256 commitment; the raw seed is retained locally in ignored
-`.env.m1.local`. Run, candidate-arm membership, and score arrays remain empty.
-The overall evaluation manifest now pins both the baseline and redesign starting
-point to post-containment `origin/main` commit
-`50140eb62dd8f3c04f6d3ab5e131d96711f804d7`, links identity fixture
-`reviewer-identity-v1`, and carries a read-only production runtime snapshot:
-prompt row/version and payload hash, resolved model ID, reviewer count 15, temperature 0.3,
-relevant model-override hash, and a hash of the identical applicant-recommendation,
-PI/co-PI, and applicant-institution exclusions for all ten proposals. The command
-`node --import ./scripts/lib/use-extensionless.mjs scripts/probe-reviewer-holistic-runtime-config.mjs --target=prod --check-manifest`
-verifies the live values without an LLM generation call or any write. The
-evaluation-only applicant-neighborhood-seed arm is pinned to implementation
-commit `166800a3142179db642af3beefd67b8dcc381173` and pipeline version
-`reviewer-holistic-applicant-neighborhood-seeds-v1`. The frozen manifest also
-pins evaluation-script version `reviewer-holistic-m1-run-plan-v2`; the read-only
-plan produces 60 unique, attributable slots. Paid execution, candidate
-blinding, and scoring remain pending; no M1.2 run has started and
-production remains legacy-default. The resumable paid executor is pinned to
-implementation commit `e8796ce535954f5d8678f58b94abea1b9ceea66c`, script
-version `reviewer-holistic-m1-executor-v3`, and artifact version
-`reviewer-holistic-m1-execution-v1`. It is preflight-only by default, requires
-an exact 60-run paid acknowledgement, atomically checkpoints per-run outcomes,
-requires explicit failed-run retry, and emits separate blinded scoring and
-unblinding artifacts only after all 60 slots plus the runtime postflight pass.
-M1.3 is built and captured as an aggregate-only,
-read-only production artifact: 668 suggestion engagement rows, 275 exclusive
-token and 393 multi-touch, across 11 observed source tokens. The artifact
-labels selection as mutable, materials sent as a proxy, and token totals as
-overlapping rather than unique people. No resolver or runtime behavior changed.
+**M1 measurement foundation (updated 2026-07-17):** the identity benchmark
+carries an owner-approved 40-case public-evidence pool (20 hazard / 20
+clean-positive) assembled without either reviewer pipeline. Justin completed
+every human decision under a single-reviewer blinded protocol. The original v1
+benchmark froze with 23 Bind and 17 Abstain labels; owner clarifications then
+produced a separate v2 benchmark with 25 Bind and 15 Abstain labels. There is no
+separate labeler or adjudicator and no inter-rater claim. The paired tracked
+import audits preserve workbook hashes, all raw rows, deterministic blind-ID
+mappings, normalization rules/notes, and owner clarifications. The validator
+requires the active frozen benchmark/import pair to agree exactly and permits
+institutional-profile anchors only when they match authoritative case evidence.
+
+The blinded proposal asset remains frozen at
+`docs/audits/reviewer-holistic-proposal-evaluation-v1.json`; its paired
+owner-approved ten-proposal cohort is
+`docs/audits/reviewer-holistic-proposal-cohort-proposal-v1.json`. The tracked
+345-candidate evaluation remains unscored by design. Paid execution completed
+60/60 slots on 2026-07-16, and the owner-approved scoped
+10-candidate-per-proposal pilot scored 100 rows on 2026-07-17 in ignored
+`outputs/reviewer-holistic-m1/` artifacts.
+
+Historical manifest v1 retains `reviewer-identity-v1`; active manifest v2
+records `reviewer-identity-v2` while preserving the same proposal, runtime,
+rubric, and execution contract. Default manifest and M1 asset validation derive
+the v2 benchmark/import paths from the active manifest and fail closed on
+missing, non-frozen, or version-mismatched assets. The historical run plan,
+runtime probe, and paid executor remain explicitly pinned to manifest v1. Both
+manifests pin post-containment `origin/main` commit
+`50140eb62dd8f3c04f6d3ab5e131d96711f804d7`, redesign implementation
+`166800a3142179db642af3beefd67b8dcc381173`, executor implementation
+`e8796ce535954f5d8678f58b94abea1b9ceea66c`, and the same production runtime
+snapshot. Production remains legacy-default.
+
+M1.3 is captured as an aggregate-only, read-only production artifact: 668
+suggestion engagement rows, 275 exclusive-token and 393 multi-touch, across 11
+observed source tokens. It labels selection as mutable, materials sent as a
+proxy, and token totals as overlapping rather than unique people.
 
 ## Required evidence model
 
