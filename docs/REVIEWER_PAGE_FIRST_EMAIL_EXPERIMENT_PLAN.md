@@ -2,8 +2,8 @@
 title: Reviewer Page-First Email Experiment Plan
 domain: reviewer-identity
 kind: plan
-status: draft
-summary: "Staged read-only test of anchored Google page discovery for invitation-ready reviewer emails, capped to minimize manual verification."
+status: active
+summary: "Completed staged page-first email experiment: safe but only +1/20 on the fresh cohort, so the cascade was not promoted."
 canonical: false
 cataloged: 2026-07-18
 owner: product-engineering
@@ -19,14 +19,66 @@ related:
 
 # Reviewer Page-First Email Experiment Plan
 
+## Outcome — complete, do not promote (2026-07-18)
+
+The experiment ran through all three predeclared stages. It remained read-only:
+every enrichment prepass used `persist:false`, provider output never became
+sendable without fetching and grounding a first-party institutional page, and
+the only writes were ignored local JSON artifacts. `[VERIFIED via evaluator
+artifacts and script contract]`
+
+- **Stage 1:** after correcting a resolved-page attribution bug and replaying
+  the saved searches without new SerpAPI calls, the current-query arm produced
+  1/13 ready primary subjects and page-first produced 3/13, meeting the +2
+  screen. Five deduplicated outcomes, including the two controls, were manually
+  adjudicated correct; none was `wrong_person`.
+- **Stage 2:** both virtual orderings produced 5/13 correct-ready subjects.
+  Claude-first required 22 measured provider calls versus 27 for Serp-first;
+  its median was 8.3 seconds and p90 was 19.5 seconds. Claude-first was selected
+  for the fresh validation because it saved five calls with equal yield and a
+  slightly better p90.
+- **Stage 3:** a deterministic, fresh cohort was frozen from the M1 source:
+  20 new-to-WMKF thin-footprint subjects, exactly 10 US and 10 non-US, excluding
+  all people in the prior 40-case artifact and the David Liu/Feng Zhang
+  controls. The current arm produced 1/20 correct-ready subjects; the selected
+  Claude-first cascade produced 2/20, a gain of only **+1** versus the required
+  **+3**. It produced no non-US ready subjects, used 70 provider calls, and had
+  p90 latency of 23.7 seconds. All three deduplicated review rows were manually
+  adjudicated correct; none was `wrong_person`.
+
+**Decision:** do not promote or reorder the production paid tiers. Preserve
+first-party page links as staff research leads, keep raw Claude/Serp emails
+`research_only`, and prioritize the independent structured-source work. No
+production behavior or environment configuration changed. `[VERIFIED via
+Stage 3 promotionDecision.status='do_not_promote']`
+
+The experiment used an owner-approved evaluation-only fallback from an absent
+identity-anchored domain to a strongly matched claimed-institution domain. That
+authorization existed only inside cloned evaluator state; the production
+anchored-domain fetch policy was not weakened.
+
+Authoritative local evidence:
+
+- `scripts/evaluate-reviewer-page-first-email.mjs`
+- `scripts/select-reviewer-page-first-stage3-cohort.mjs`
+- `outputs/reviewer-holistic-m1/reviewer-email-page-first-stage1-replay-v1.json`
+- `outputs/reviewer-holistic-m1/reviewer-email-page-first-stage2-v1.json`
+- `outputs/reviewer-holistic-m1/reviewer-email-page-first-stage3-cohort-v1.json`
+- `outputs/reviewer-holistic-m1/reviewer-email-page-first-stage3-v1.json`
+
+The remaining sections preserve the pre-execution protocol. Their `[PLANNED]`
+labels describe the historical design state; this outcome section is
+authoritative for what actually ran.
+
 ## Decision this experiment must support
 
 Should the reviewer resolver use SerpAPI/Google to find candidate-specific
 first-party pages, then run the existing page-grounding tier, for new reviewers
 whose structured scholarly sources did not produce a usable address?
 
-This is a **DRAFT, read-only evaluation plan**, not an authorization to change
-production ordering or send policy. `[PLANNED]`
+This was a read-only evaluation plan, not an authorization to change production
+ordering or send policy. The completed experiment did not authorize a change.
+`[VERIFIED outcome above]`
 
 For execution design, this document supersedes only the companion audit's
 large-cohort “Next Experiment” section; the audit's findings and evidence remain

@@ -411,6 +411,14 @@ already used, same billing, no accuracy gain (claim 15).
 
 # Next Experiment
 
+> **Completed/superseded 2026-07-18.** The lower-burden staged protocol in
+> `docs/REVIEWER_PAGE_FIRST_EMAIL_EXPERIMENT_PLAN.md` replaced the draft below
+> and ran through a fresh 20-person, 10 US / 10 non-US validation cohort. The
+> selected cascade gained only +1 correct-ready subject (2/20 versus 1/20),
+> below its +3 promotion gate, so production ordering and send policy were not
+> changed. The remainder of this section is the historical adversarial proposal,
+> not pending work.
+
 **Question the eval must answer:** for the population that reaches the paid tiers
 (no structured/ORCID address), does a page-first cascade + page-fetch tier
 produce a **correct-person, first-party-page-verified, sendable** address at a

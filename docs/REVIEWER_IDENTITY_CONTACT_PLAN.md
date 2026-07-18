@@ -168,7 +168,7 @@ No new rule without a first failing benchmark case (invariant 6).
 **Owner-gate.** The abstain-vs-bind-right-person policy on fragmented famous
 names (changes what the benchmark counts as correct); production cutover.
 
-## W3 — Email discovery `[PLANNED]`
+## W3 — Email discovery `[ACTIVE; W3.4 DECIDED]`
 
 - **W3.1 Structured corresponding-author email.** Parse Europe PMC OA full-text
   `<corresp>` / `corresp="yes"` for a disambiguated corresponding email, instead
@@ -181,13 +181,15 @@ names (changes what the benchmark counts as correct); production cutover.
 - **W3.3 Preferred email is reviewer-owned.** Pick a deliverable address for the
   invite; the magic-link accept confirms/corrects the preferred one
   (provisional-until-attested). No new schema.
-- **W3.4 Paid-tier decision.** Resolve the Claude/Serp search tiers' fate given
-  they currently yield mostly-unsendable `research_only` leads: either route
-  their yield through the existing page-fetch tier to earn an
-  `institution_page` grade, or retire them to a staff faculty-page link. The
-  staged, manual-burden-capped decision experiment is specified in
-  `REVIEWER_PAGE_FIRST_EMAIL_EXPERIMENT_PLAN.md`; it begins with the frozen
-  13-person hard subset and does not authorize a production change.
+- **W3.4 Paid-tier decision — DECIDED 2026-07-18: do not promote the tested
+  page-first cascade.** The staged experiment completed with zero manually
+  confirmed wrong-person results, but the fresh 20-person cohort gained only
+  one correct-ready subject over the current arm (2/20 versus 1/20), below the
+  predeclared +3 gate; no non-US subject became ready. Production ordering and
+  send policy remain unchanged. Raw Claude/Serp addresses remain
+  `research_only`; first-party page links remain useful staff leads. Evidence
+  and exact call/latency counts:
+  `REVIEWER_PAGE_FIRST_EMAIL_EXPERIMENT_PLAN.md`.
 
 **Invariant.** No search-sourced address becomes invitation-sendable
 (Contract 3 unchanged); alternates resolution never promotes a cross-person
@@ -196,7 +198,8 @@ address.
 (harvard.edu subdomains → alternate; unrelated domains → conflict).
 **Gates.** `check:prompt-injection-tagging` + self-test if the Tier-3 surface is
 touched.
-**Owner-gate.** Paid-tier fate after the page-first experiment.
+**Owner-gate.** Closed for the tested page-first cascade: do not promote.
+Any materially different paid-tier design requires a new bounded experiment.
 
 ## W4 — Durable identity model `[PLANNED]`
 

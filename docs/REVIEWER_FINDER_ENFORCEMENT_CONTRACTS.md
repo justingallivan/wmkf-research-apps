@@ -257,8 +257,9 @@ page-grounded email via `safeFetchInstitutionPage` (`lib/utils/safe-fetch.js`) w
 mechanism Codex required: HTTPS-only, host = exact-or-subdomain of `verifiedInstitutionDomain` ONLY,
 DNS private/reserved-IP block incl. IPv6, **undici IP-pinning dispatcher** (closes the DNS-rebind
 TOCTOU), per-hop redirect re-validation, content-type + 512 KB + timeout caps. The email is stamped
-`emailSource='institution_page'` ONLY when page-grounded (candidate-associated, unique, forename-gated;
-`_selectGroundedEmail`) — `institution_page` is HIGH-trust per Contract 3. Rationale + full design:
+`emailSource='institution_page'` ONLY when page-grounded (unique candidate association via
+preceding-name adjacency, personal-URL owner proof, or page identity plus an exact bare-surname
+mailbox; `_selectGroundedEmail`) — `institution_page` is HIGH-trust per Contract 3. Rationale + full design:
 `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md` (supersedes `REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md` §D).
 Do NOT enable without that mechanism intact; multi-domain institutions (e.g. Kansas State `ksu.edu` vs
 OpenAlex `k-state.edu`) are an intentional v1 gap (the fetch is refused, not relaxed).
