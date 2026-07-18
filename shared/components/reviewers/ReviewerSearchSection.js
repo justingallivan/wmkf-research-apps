@@ -51,6 +51,7 @@ import {
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
   candidateWasSaved,
+  getCandidateEmailReadiness,
   normalizeReviewerName,
   pruneCandidateForRoster,
   dedupeByNamePreferReferred,
@@ -67,7 +68,6 @@ import {
   withReviewerProvenance,
 } from '../../../lib/utils/reviewer-provenance';
 import { DEFAULT_REVIEWER_COUNT } from '../../config/reviewerFinderPreferences';
-import { emailConfidence } from '../../../lib/utils/reviewer-invite';
 
 // The four literature sources the discover endpoint understands. The user picks
 // which to query (parity with the standalone Reviewer Finder); at least one must
@@ -153,7 +153,7 @@ function affiliationSourceLabel(source) {
 // without a checkbox for the non-selectable Unverified section. `onExclude` adds
 // a set-aside action (active cards); `onPromote` adds a restore action (the
 // collapsed Excluded section).
-function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, canManage = true }) {
+export function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, canManage = true }) {
   const [expanded, setExpanded] = useState(false);
   const c = candidate;
   const confidence = typeof c.verificationConfidence === 'number' ? c.verificationConfidence : undefined;
@@ -197,12 +197,14 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
   const aiFlaggedNotRelevant = !!c.aiFlaggedNotRelevant;
   const enr = c.contactEnrichment || {};
   const email = c.email || enr.email || null;
-  const emailAssessment = emailConfidence({
-    email,
-    emailSource: enr.emailSource || c.emailSource || null,
-  });
-  const emailAction = enr.emailAction || c.emailAction || emailAssessment.action;
-  const emailActionReason = enr.emailActionReason || c.emailActionReason || emailAssessment.reason;
+  const emailSource = c.emailSource || enr.emailSource || null;
+  const emailReadiness = getCandidateEmailReadiness(c);
+  const emailAction = email
+    ? (enr.emailAction || c.emailAction || emailReadiness.action)
+    : 'missing';
+  const emailActionReason = email
+    ? (enr.emailActionReason || c.emailActionReason || emailReadiness.reason)
+    : emailReadiness.reason;
   const emailEvidence = enr.emailEvidence || null;
   const evidencePublications = Array.isArray(emailEvidence?.publications)
     ? emailEvidence.publications.filter((publication) => publication?.url).slice(0, 3)
@@ -349,33 +351,17 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
             )}
           </div>
 
-          {!identityUnverified && (email || website || orcidUrl) && (
+          {!identityUnverified && (
             <div className="mt-2 flex items-center flex-wrap gap-2 text-xs">
               {email && (
                 <>
                   <a
                     href={`mailto:${email}`}
                     className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
-                    title={`Email (from ${enr.emailSource || 'enrichment'}${enr.emailYear ? `, ${enr.emailYear}` : ''})`}
+                    title={`Email (from ${emailSource || 'unknown source'}${enr.emailYear ? `, ${enr.emailYear}` : ''})`}
                   >
                     📧 {email}
                   </a>
-                  <span
-                    className={`inline-flex items-center gap-1 px-2 py-1 rounded border ${
-                      emailAction === 'ready'
-                        ? 'bg-green-50 text-green-800 border-green-200'
-                        : emailAction === 'research_only'
-                          ? 'bg-red-50 text-red-800 border-red-200'
-                          : 'bg-amber-50 text-amber-800 border-amber-200'
-                    }`}
-                    title={emailActionReason}
-                  >
-                    {emailAction === 'ready'
-                      ? '✓ Ready'
-                      : emailAction === 'research_only'
-                        ? '⚠ Research only'
-                        : '⚠ Quick check'}
-                  </span>
                   {emailEvidence?.publicationCount > 0 && (
                     <span className="text-gray-600">
                       Evidence: {emailEvidence.publicationCount} recent {emailEvidence.publicationCount === 1 ? 'work' : 'works'}
@@ -403,6 +389,28 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
                   )}
                 </>
               )}
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded border ${
+                  emailAction === 'ready'
+                    ? 'bg-green-50 text-green-800 border-green-200'
+                    : emailAction === 'research_only'
+                      ? 'bg-red-50 text-red-800 border-red-200'
+                      : emailAction === 'quick_check'
+                        ? 'bg-amber-50 text-amber-800 border-amber-200'
+                        : 'bg-gray-50 text-gray-600 border-gray-200'
+                }`}
+                title={emailAction === 'missing'
+                  ? emailActionReason
+                  : `${emailActionReason}. Confidence reflects address provenance and identity-grounded evidence, not deliverability.`}
+              >
+                {emailAction === 'ready'
+                  ? '✓ High-confidence email'
+                  : emailAction === 'research_only'
+                    ? '⚠ Research only'
+                    : emailAction === 'quick_check'
+                      ? '⚠ Email needs confirmation'
+                    : 'Email not found'}
+              </span>
               {website && (
                 <a href={website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded hover:bg-green-100" title="Faculty / personal website">
                   🔗 Website

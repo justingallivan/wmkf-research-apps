@@ -11,6 +11,7 @@ import {
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
   candidateWasSaved,
+  getCandidateEmailReadiness,
   pruneCandidateForRoster,
   pruneEmailEvidence,
   sanitizeInstitutionCOIDetails,
@@ -373,6 +374,74 @@ describe('mergeEnrichment', () => {
     expect(out[0].hasInstitutionCOI).toBe(true);
     expect(out[0].institutionCOIDetails).toEqual({ piInstitution: 'JHU', reviewerInstitution: 'JHU' });
     expect(out[0].institutionCOIDetails).not.toHaveProperty('historical');
+  });
+});
+
+describe('getCandidateEmailReadiness', () => {
+  test('uses the invitation classifier for identity-owned and multiply corroborated emails', () => {
+    expect(getCandidateEmailReadiness({
+      email: 'person@example.edu',
+      emailSource: 'institution_page',
+    })).toMatchObject({ level: 'high', action: 'ready' });
+
+    expect(getCandidateEmailReadiness({
+      email: 'person@example.edu',
+      contactEnrichment: {
+        emailSource: 'scholarly_multi',
+      },
+    })).toMatchObject({ level: 'high', action: 'ready' });
+  });
+
+  test('single-work, legacy, manual, and unknown emails need confirmation', () => {
+    for (const emailSource of ['scholarly_single', 'pubmed', 'manual', 'unknown_source']) {
+      expect(getCandidateEmailReadiness({
+        email: 'person@example.edu',
+        emailSource,
+        identityStatus: 'confirmed',
+      })).toMatchObject({ level: 'low', action: 'quick_check' });
+    }
+  });
+
+  test('search-only and contested emails remain research leads, not sendable addresses', () => {
+    for (const emailSource of ['serp_search', 'claude_search', 'search_contested']) {
+      expect(getCandidateEmailReadiness({
+        email: 'person@example.edu',
+        emailSource,
+        identityStatus: 'confirmed',
+      })).toMatchObject({ level: 'low', action: 'research_only' });
+    }
+    expect(getCandidateEmailReadiness({
+      email: 'person@example.edu',
+      emailSource: 'serp_search',
+      identityStatus: 'probable',
+    })).toMatchObject({ level: 'low', action: 'research_only' });
+  });
+
+  test('preserves the specific contested-contact reason for staff review', () => {
+    expect(getCandidateEmailReadiness({
+      email: 'person@other-domain.example',
+      identityStatus: 'confirmed',
+      contactEnrichment: {
+        emailSource: 'search_contested',
+        contactStatusReason: 'Email domain conflicts with the verified institution',
+      },
+    })).toEqual({
+      level: 'low',
+      action: 'research_only',
+      reason: 'Email domain conflicts with the verified institution',
+    });
+  });
+
+  test('no address is reported as missing even if stale provenance remains', () => {
+    expect(getCandidateEmailReadiness({
+      email: null,
+      emailSource: 'orcid',
+      contactEnrichment: { email: null, emailSource: 'orcid' },
+    })).toEqual({
+      level: 'missing',
+      action: 'missing',
+      reason: 'No email address found during contact enrichment',
+    });
   });
 });
 

@@ -16,6 +16,7 @@ import {
   reviewerCandidateKey as _reviewerCandidateKey,
   withReviewerCandidateKey as _withReviewerCandidateKey,
 } from '../../../lib/utils/reviewer-candidate-key';
+import { emailConfidence } from '../../../lib/utils/reviewer-invite';
 
 /**
  * Merge contact-enrichment results (from /enrich-contacts) back onto the chosen
@@ -61,6 +62,38 @@ export function candidateWasSaved(candidate, savedKeys = [], savedNames = []) {
  */
 export const reviewerCandidateKey = _reviewerCandidateKey;
 export const withReviewerCandidateKey = _withReviewerCandidateKey;
+
+/**
+ * Project the invitation service's authoritative address-source classifier
+ * onto a Find-tab candidate. "missing" is UI-only: the send path still
+ * re-derives high/low from the persisted person row immediately before send.
+ *
+ * @param {object} candidate
+ * @returns {{ level: 'high'|'low'|'missing', action: 'ready'|'quick_check'|'research_only'|'missing', reason: string }}
+ */
+export function getCandidateEmailReadiness(candidate) {
+  const enrichment = candidate?.contactEnrichment || {};
+  const email = candidate?.email || enrichment.email || null;
+  if (!email) {
+    return {
+      level: 'missing',
+      action: 'missing',
+      reason: 'No email address found during contact enrichment',
+    };
+  }
+  const confidence = emailConfidence({
+    email,
+    emailSource: candidate?.emailSource || enrichment.emailSource || null,
+    identityStatus: candidate?.identityStatus
+      || enrichment.identityStatus
+      || enrichment.identity?.status
+      || null,
+  });
+  if (confidence.level === 'low' && enrichment.contactStatusReason) {
+    return { ...confidence, reason: enrichment.contactStatusReason };
+  }
+  return confidence;
+}
 
 export function mergeEnrichment(candidates, enrichmentResults) {
   if (!Array.isArray(candidates)) return [];
