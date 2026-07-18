@@ -598,6 +598,42 @@ test('server-resolved distinct institution ids clear a stale client COI flag', a
   expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledTimes(1);
 });
 
+test('pre-existing distinct institution ids clear a stale client COI flag', async () => {
+  loadCoiContext.mockResolvedValueOnce({
+    applicantInstitutionContext: { state: 'complete', names: ['Example University'] },
+    piResolution: { state: 'ok', reason: null },
+    institutionEntries: [{
+      identity: {
+        name: 'Example University',
+        openAlexId: 'I222222222',
+      },
+      display: 'Example University',
+    }],
+  });
+
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Existing ID Refutation',
+      email: 'existing-id-refutation@example.edu',
+      affiliation: 'Example University',
+      affiliationOpenAlexId: 'I111111111',
+      hasInstitutionCOI: true,
+      contactEnrichment: {
+        coiRecomputed: true,
+        hasInstitutionCOI: true,
+      },
+    }],
+  });
+
+  expect(out).toMatchObject({
+    success: true,
+    savedCount: 1,
+    savedNames: ['Dr Existing ID Refutation'],
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledTimes(1);
+});
+
 test('institution resolver abstention preserves the lexical COI hard block', async () => {
   const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
   loadCoiContext.mockResolvedValueOnce({

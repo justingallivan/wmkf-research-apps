@@ -62,6 +62,10 @@ jest.mock('../../lib/services/deduplication-service', () => ({
   DeduplicationService: {
     markInstitutionCOIResolved: jest.fn(async (cands) => cands),
     institutionCOIDecision: jest.fn(() => null),
+    institutionCOIResolution: jest.fn(async () => ({
+      status: 'lexical_non_match',
+      decision: null,
+    })),
     institutionCOIDecisionResolved: jest.fn(async () => null),
   },
 }));
