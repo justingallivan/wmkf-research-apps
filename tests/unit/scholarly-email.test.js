@@ -16,6 +16,8 @@ function pubmedPublication({
   email = 'jane.roe@stanford.edu',
   year = 2026,
   authorName = 'Jane Roe',
+  authorOrcid = null,
+  affiliation = 'Department of Medicine, Stanford University',
 } = {}) {
   return {
     pmid,
@@ -24,8 +26,9 @@ function pubmedPublication({
     doi: `10.1000/${pmid}`,
     authors: [{
       name: authorName,
-      affiliation: `Department of Medicine, Stanford University. ${email}`,
-      allAffiliations: [`Department of Medicine, Stanford University. ${email}`],
+      authorId: authorOrcid,
+      affiliation: `${affiliation}. ${email}`,
+      allAffiliations: [`${affiliation}. ${email}`],
     }],
   };
 }
@@ -132,6 +135,42 @@ test('initial-only author evidence is rejected without an ORCID match', () => {
   expect(scholarlyEmail.extractPublicationEvidence(publication, CANDIDATE)).toEqual([]);
 });
 
+test('a known mismatched author ORCID vetoes an otherwise matching name and affiliation', () => {
+  const publication = scholarlyEmail.normalizePublication(
+    pubmedPublication({
+      pmid: '334',
+      authorOrcid: '0000-0002-1825-0097',
+    }),
+    'ncbi_pubmed',
+  );
+  const candidate = { ...CANDIDATE, orcidId: '0000-0001-5109-3700' };
+  expect(scholarlyEmail.extractPublicationEvidence(publication, candidate)).toEqual([]);
+});
+
+test('one generic affiliation token does not corroborate a namesake', () => {
+  const publication = scholarlyEmail.normalizePublication(
+    pubmedPublication({
+      pmid: '335',
+      affiliation: 'Department of Medicine, University of Michigan',
+    }),
+    'ncbi_pubmed',
+  );
+  const candidate = { ...CANDIDATE, affiliation: 'Michigan State University' };
+  expect(scholarlyEmail.extractPublicationEvidence(publication, candidate)).toEqual([]);
+});
+
+test('multiple generic affiliation tokens do not corroborate different institutions', () => {
+  const publication = scholarlyEmail.normalizePublication(
+    pubmedPublication({
+      pmid: '336',
+      affiliation: 'National University of Singapore, Cancer Science Institute',
+    }),
+    'ncbi_pubmed',
+  );
+  const candidate = { ...CANDIDATE, affiliation: 'National Cancer Institute' };
+  expect(scholarlyEmail.extractPublicationEvidence(publication, candidate)).toEqual([]);
+});
+
 test('equally supported conflicting addresses cause abstention', () => {
   const rows = [
     {
@@ -172,6 +211,21 @@ test('one provider may fail while the other returns usable evidence', async () =
     status: 'found',
     publicationCount: 1,
     providerErrors: [{ provider: 'ncbi_pubmed', error: 'NCBI unavailable' }],
+  });
+});
+
+test('total provider failure is distinguishable from a definitive miss', async () => {
+  jest.spyOn(PubMedService, 'search').mockRejectedValue(new Error('NCBI unavailable'));
+  jest.spyOn(global, 'fetch').mockRejectedValue(new Error('Europe PMC unavailable'));
+
+  const result = await scholarlyEmail.findScholarlyEmail(CANDIDATE);
+  expect(result).toMatchObject({
+    status: 'provider_error',
+    candidates: [],
+    providerErrors: [
+      { provider: 'ncbi_pubmed', error: 'NCBI unavailable' },
+      { provider: 'europe_pmc', error: 'Europe PMC unavailable' },
+    ],
   });
 });
 

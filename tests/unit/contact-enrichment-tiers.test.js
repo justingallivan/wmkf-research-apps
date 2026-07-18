@@ -186,6 +186,29 @@ describe('Tier 1 — PubMed', () => {
       emailAction: 'missing',
     });
   });
+
+  test('total structured-provider failure is surfaced as an error, not a definitive miss', async () => {
+    scholarlyEmail.findScholarlyEmail.mockResolvedValue({
+      status: 'provider_error',
+      candidates: [],
+      providerErrors: [
+        { provider: 'ncbi_pubmed', error: 'NCBI unavailable' },
+        { provider: 'europe_pmc', error: 'Europe PMC unavailable' },
+      ],
+    });
+    const progress = [];
+    const out = await ContactEnrichmentService.enrichCandidate(
+      { name: 'Dr. Jane Roe', affiliation: 'Stanford University', publications: [] },
+      { usePubmed: true, useOrcid: false, onProgress: (event) => progress.push(event) },
+    );
+
+    expect(out.contactEnrichment.tierResults.scholarly_email.status).toBe('provider_error');
+    expect(progress).toContainEqual(expect.objectContaining({
+      tier: 'scholarly',
+      status: 'error',
+      message: expect.stringMatching(/services unavailable/i),
+    }));
+  });
 });
 
 describe('Tier 2 — ORCID', () => {

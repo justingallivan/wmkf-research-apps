@@ -220,6 +220,31 @@ test('structured author-affiliation evidence preserves an opaque scholarly email
   );
 });
 
+test('a top-level email cannot borrow the scholarly name-guard bypass for another address', async () => {
+  ContactParser.isNameConsistentEmail.mockReturnValue(false);
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      email: 'unproven-address@stanford.edu',
+      contactEnrichment: {
+        email: 'proven-address@stanford.edu',
+        emailSource: 'scholarly_multi',
+      },
+    })),
+  }));
+
+  const { onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+  expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
+    PR,
+    expect.objectContaining({
+      email: null,
+      emailSource: null,
+    }),
+    expect.anything(),
+  );
+});
+
 test('pipeline throw: resolves (never throws) with one generic terminal error', async () => {
   findApplicantRecommendedByRequest.mockRejectedValue(new Error('dataverse down'));
   const { events, onEvent } = recorder();
