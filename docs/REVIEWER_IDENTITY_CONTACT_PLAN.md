@@ -3,7 +3,7 @@ title: Reviewer Identity & Contact — Disambiguation, Affiliation/COI, and Emai
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "Active roadmap: structured scholarly email is live; full-text XML and page-first fallbacks were not promoted; remaining work is eval- and owner-gated."
+summary: "Active roadmap: structured scholarly email and its narrow alternate tie-break are live; full-text XML and page-first fallbacks were not promoted."
 canonical: false
 cataloged: 2026-07-18
 owner: product-engineering
@@ -25,10 +25,11 @@ related:
 ## Status and posture
 
 **ACTIVE ROADMAP — PARTIALLY BUILT.** This plan sequences the work identified in
-the 2026-07-18 assessment. W3.1's NCBI + Europe PMC core-record tier is live;
-the W3.1 full-text fallback and W3.4 page-first cascade have completed
-evaluation and were not promoted. W0–W2, W3.2–W3.3, and W4 remain `[PLANNED]`
-and owner/eval-gated. Rationale and evidence live in the companion audit
+the 2026-07-18 assessment. W3.1's NCBI + Europe PMC core-record tier and W3.2's
+narrow current-affiliation alternate tie-break are live. The W3.1 full-text
+fallback and W3.4 page-first cascade completed evaluation and were not promoted.
+W0–W2, broader co-affiliate handling, W3.3, and W4 remain `[PLANNED]` and
+owner/eval-gated. Rationale and evidence live in the companion audit
 (`docs/audits/reviewer-disambiguation-email-external-alternatives-fable-2026-07-18.md`,
 §§1–5b); this plan holds the *what, in what order, behind which gate*, and does
 not restate the audit's detail. Where this plan and the audit conflict, the
@@ -52,9 +53,11 @@ plan's Wave 13 binding model rather than duplicating it.
 - OpenAlex `associated_institutions` (typed `parent`/`child`/`related`) links
   Broad→MIT/Harvard, Whitehead→MIT, Harvard→40 affiliated hospitals; IAS→empty.
   `[VERIFIED via probe — audit §5b.3/5b.4]`
-- Structured scholarly-email tier abstains on a top-2 address tie
-  (`scholarly-email.js:249`), so dual-appointment alternates false-abstain.
-  `[VERIFIED — audit §5b.4]`
+- The original structured scholarly-email tier abstained on every top-2 address
+  tie, producing a measured false-abstain for Jie Shan. The narrow W3.2 rule now
+  resolves a tie only when exactly one domain matches the claimed/current
+  affiliation; broader dual-appointment equivalence still abstains pending W0.
+  `[VERIFIED — audit §5b.4 + W3.2 artifact below]`
 - The live NCBI + Europe PMC core-record tier found a structured address for
   27/40 frozen subjects (20 `ready`, 7 `quick_check`); it uses full-name/ORCID
   identity matching, candidate-affiliation corroboration, and distinct-work
@@ -176,7 +179,7 @@ No new rule without a first failing benchmark case (invariant 6).
 **Owner-gate.** The abstain-vs-bind-right-person policy on fragmented famous
 names (changes what the benchmark counts as correct); production cutover.
 
-## W3 — Email discovery `[ACTIVE; W3.1 AND W3.4 DECIDED]`
+## W3 — Email discovery `[ACTIVE; W3.1/W3.4 DECIDED; W3.2 NARROW RULE LIVE]`
 
 - **W3.1 Structured corresponding-author email — DECIDED 2026-07-18: keep the
   live core-record tier; do not add the tested OA full-text fallback.** The live
@@ -194,11 +197,20 @@ names (changes what the benchmark counts as correct); production cutover.
   where full text contains a candidate-linked address absent from the core
   record. `[VERIFIED via
   outputs/reviewer-holistic-m1/reviewer-email-scholarly-fulltext-40-v2.json]`
-- **W3.2 Alternates-not-conflict.** In `scholarly-email.js` selection, treat two
-  addresses as same-person *alternates* (not a `conflict` abstain) when their
-  domains are consistent with one person's institution set — shared registrable
-  domain (psl) or domains mapping to `associated_institutions`. Pick one; a real
-  `conflict` is only cross-person/unrelated-institution.
+- **W3.2 Alternates-not-conflict — NARROW RULE IMPLEMENTED 2026-07-18.** On an
+  exact publication-support tie, select an address only when exactly one email
+  domain has an exact non-generic label from the candidate's claimed/current
+  institution; preserve every other tied address as an evidence alternate.
+  Missing affiliation, generic-only overlap, unrelated domains, and two matching
+  domains still abstain as `conflict`. On the frozen 40 this changed exactly one
+  subject: Jie Shan moved from a 2-vs-2 conflict to ready at
+  `jie.shan@cornell.edu`; every other subject's action/email/status was
+  byte-for-byte unchanged (21 ready, 7 quick-check, 12 missing, 0 conflicts).
+  Broader equivalence through registrable domains or OpenAlex
+  `associated_institutions` remains `[PLANNED]` behind W0 rather than being
+  guessed lexically. `[VERIFIED via
+  outputs/reviewer-holistic-m1/reviewer-email-scholarly-alternates-40-v3.json
+  and tests/unit/scholarly-email.test.js]`
 - **W3.3 Preferred email is reviewer-owned.** Pick a deliverable address for the
   invite; the magic-link accept confirms/corrects the preferred one
   (provisional-until-attested). No new schema.
@@ -217,8 +229,9 @@ names (changes what the benchmark counts as correct); production cutover.
 address.
 **Tests.** Existing structured-tier identity, affiliation, distinct-work,
 provider-failure, conflict, and cancellation fixtures remain authoritative.
-For W3.2, add the alternates-vs-conflict matrix (harvard.edu subdomains →
-alternate; unrelated domains → conflict).
+The narrow W3.2 matrix covers a unique Cornell-domain match, generic-token
+abstention, and two matching-domain abstention. Broader associated-institution
+alternates require W0-backed fixtures before implementation.
 **Gates.** `check:prompt-injection-tagging` + self-test if the Tier-3 surface is
 touched.
 **Owner-gate.** Closed for the tested page-first cascade: do not promote.
@@ -250,7 +263,7 @@ apply is a distinct owner-approved operation).
 | 1 | W0 substrate | — | main (additive, inert) | none (tests only) |
 | 2 | W1 affiliation/COI | W0 | branch → main, tests + contract-reconcile | Broad policy; umbrella set |
 | 3 | W2 disambiguation v2 | W0 | seam on main, legacy default | eval gate; cutover |
-| 4 | W3.2–W3.3 email follow-on | W0 for 3.2 | branch → main | alternates policy |
+| 4 | Broader W3.2 + W3.3 follow-on | W0 | branch → main | co-affiliate/preferred-address policy |
 | 5 | W4 durable model | W2 | additive schema wave | schema apply |
 
 W1 is the highest near-term value (live false-drop bug) and is independent of the

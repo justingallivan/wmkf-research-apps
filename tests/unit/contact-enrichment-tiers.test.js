@@ -134,6 +134,8 @@ describe('Tier 1 — PubMed', () => {
         { pmid: '1', title: 'One', year: 2026, url: 'https://pubmed.ncbi.nlm.nih.gov/1/', providers: ['ncbi_pubmed', 'europe_pmc'] },
         { pmid: '2', title: 'Two', year: 2025, url: 'https://pubmed.ncbi.nlm.nih.gov/2/', providers: ['europe_pmc'] },
       ],
+      selectionReason: 'unique_affiliation_domain_match',
+      alternates: [{ email: 'jane@former.example.edu', publicationCount: 2 }],
       providerErrors: [],
     });
     const out = await ContactEnrichmentService.enrichCandidate(
@@ -147,6 +149,8 @@ describe('Tier 1 — PubMed', () => {
       emailEvidence: {
         publicationCount: 2,
         providers: ['ncbi_pubmed', 'europe_pmc'],
+        selectionReason: 'unique_affiliation_domain_match',
+        alternates: [{ email: 'jane@former.example.edu', publicationCount: 2 }],
         deliverabilityChecked: false,
       },
     });

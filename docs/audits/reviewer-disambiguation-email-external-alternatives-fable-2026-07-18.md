@@ -27,7 +27,10 @@
 > increased median latency for the comparable missing subset from 375 ms to
 > 1,052 ms. It was removed and not promoted. Recommendations below to implement
 > `<corresp>` parsing are preserved as the historical audit position; the
-> authoritative decision is `docs/REVIEWER_IDENTITY_CONTACT_PLAN.md` W3.1.
+> narrow W3.2 current-affiliation tie-break subsequently recovered the one
+> measured structured conflict (Jie Shan at Cornell) while retaining broader
+> ties as conflicts. The authoritative decisions are
+> `docs/REVIEWER_IDENTITY_CONTACT_PLAN.md` W3.1/W3.2.
 
 ---
 

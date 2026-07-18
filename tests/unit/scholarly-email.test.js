@@ -197,6 +197,104 @@ test('equally supported conflicting addresses cause abstention', () => {
   });
 });
 
+test('a unique current-affiliation domain resolves an equally supported same-person alternate', () => {
+  const rows = [
+    {
+      email: 'jie.shan@mpsd.mpg.de',
+      workKey: 'pmid:1',
+      provider: 'europe_pmc',
+      matchedBy: 'full_name',
+      publication: { pmid: '1', title: 'One', year: 2026, url: 'https://pubmed.ncbi.nlm.nih.gov/1/' },
+    },
+    {
+      email: 'jie.shan@mpsd.mpg.de',
+      workKey: 'pmid:2',
+      provider: 'europe_pmc',
+      matchedBy: 'full_name',
+      publication: { pmid: '2', title: 'Two', year: 2026, url: 'https://pubmed.ncbi.nlm.nih.gov/2/' },
+    },
+    {
+      email: 'jie.shan@cornell.edu',
+      workKey: 'pmid:3',
+      provider: 'europe_pmc',
+      matchedBy: 'full_name',
+      publication: { pmid: '3', title: 'Three', year: 2025, url: 'https://pubmed.ncbi.nlm.nih.gov/3/' },
+    },
+    {
+      email: 'jie.shan@cornell.edu',
+      workKey: 'pmid:4',
+      provider: 'europe_pmc',
+      matchedBy: 'full_name',
+      publication: { pmid: '4', title: 'Four', year: 2025, url: 'https://pubmed.ncbi.nlm.nih.gov/4/' },
+    },
+  ];
+
+  expect(scholarlyEmail.selectEmail(rows, {
+    candidateAffiliation: 'Cornell University',
+  })).toMatchObject({
+    status: 'found',
+    email: 'jie.shan@cornell.edu',
+    publicationCount: 2,
+    selectionReason: 'unique_affiliation_domain_match',
+    alternates: [{ email: 'jie.shan@mpsd.mpg.de', publicationCount: 2 }],
+  });
+});
+
+test('generic affiliation tokens do not break a tie', () => {
+  const rows = [
+    {
+      email: 'person@national-health.example.org',
+      workKey: 'pmid:1',
+      provider: 'europe_pmc',
+      matchedBy: 'full_name',
+      publication: { pmid: '1', title: 'One', year: 2026 },
+    },
+    {
+      email: 'person@research-center.example.edu',
+      workKey: 'pmid:2',
+      provider: 'europe_pmc',
+      matchedBy: 'full_name',
+      publication: { pmid: '2', title: 'Two', year: 2026 },
+    },
+  ];
+
+  expect(scholarlyEmail.selectEmail(rows, {
+    candidateAffiliation: 'National Health Research Center',
+  }).status).toBe('conflict');
+});
+
+test('a short institution abbreviation cannot match inside an unrelated domain', () => {
+  expect(
+    scholarlyEmail.emailDomainMatchesAffiliation('person@smith.edu', 'MIT'),
+  ).toBe(false);
+  expect(
+    scholarlyEmail.emailDomainMatchesAffiliation('person@mit.edu', 'MIT'),
+  ).toBe(true);
+});
+
+test('two tied addresses that both match the affiliation domain remain a conflict', () => {
+  const rows = [
+    {
+      email: 'first@cornell.edu',
+      workKey: 'pmid:1',
+      provider: 'europe_pmc',
+      matchedBy: 'full_name',
+      publication: { pmid: '1', title: 'One', year: 2026 },
+    },
+    {
+      email: 'second@med.cornell.edu',
+      workKey: 'pmid:2',
+      provider: 'europe_pmc',
+      matchedBy: 'full_name',
+      publication: { pmid: '2', title: 'Two', year: 2026 },
+    },
+  ];
+
+  expect(scholarlyEmail.selectEmail(rows, {
+    candidateAffiliation: 'Cornell University',
+  }).status).toBe('conflict');
+});
+
 test('one provider may fail while the other returns usable evidence', async () => {
   jest.spyOn(PubMedService, 'search').mockRejectedValue(new Error('NCBI unavailable'));
   jest.spyOn(global, 'fetch').mockResolvedValue({

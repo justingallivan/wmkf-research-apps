@@ -11,6 +11,7 @@
  *   node scripts/evaluate-reviewer-scholarly-email.mjs
  *   node scripts/evaluate-reviewer-scholarly-email.mjs --limit 5
  *   node scripts/evaluate-reviewer-scholarly-email.mjs --input path.json --output path.json
+ *   node scripts/evaluate-reviewer-scholarly-email.mjs --output path-v2.json --artifact-version reviewer-email-v2
  */
 
 import { createHash } from 'node:crypto';
@@ -54,6 +55,10 @@ async function mapWithConcurrency(items, concurrency, worker) {
 
 const inputPath = path.resolve(option('--input', DEFAULT_INPUT));
 const outputPath = path.resolve(option('--output', DEFAULT_OUTPUT));
+const artifactVersion = option(
+  '--artifact-version',
+  path.basename(outputPath, path.extname(outputPath)),
+);
 const limitValue = Number(option('--limit', '0'));
 const input = JSON.parse(await readFile(inputPath, 'utf8'));
 const subjects = (Array.isArray(input.results) ? input.results : [])
@@ -117,7 +122,7 @@ const summary = {
 
 const artifact = {
   schemaVersion: 1,
-  artifactVersion: 'reviewer-email-scholarly-production-40-v1',
+  artifactVersion,
   createdAt: new Date().toISOString(),
   startedAt,
   sourceArtifact: inputPath,
