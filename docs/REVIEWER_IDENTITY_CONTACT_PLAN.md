@@ -2,8 +2,8 @@
 title: Reviewer Identity & Contact — Disambiguation, Affiliation/COI, and Email Plan
 domain: reviewer-identity
 kind: plan
-status: draft
-summary: "DRAFT/no-build roadmap for reviewer disambiguation, affiliation/COI matching, and email discovery — sequenced and owner-gated; nothing built."
+status: active
+summary: "Active roadmap: structured scholarly email is live; full-text XML and page-first fallbacks were not promoted; remaining work is eval- and owner-gated."
 canonical: false
 cataloged: 2026-07-18
 owner: product-engineering
@@ -24,9 +24,11 @@ related:
 
 ## Status and posture
 
-**DRAFT — NO BUILD.** This plan sequences the work identified in the
-2026-07-18 assessment; it is a roadmap, not an approved build. Every phase is
-`[PLANNED]`. Rationale and evidence live in the companion audit
+**ACTIVE ROADMAP — PARTIALLY BUILT.** This plan sequences the work identified in
+the 2026-07-18 assessment. W3.1's NCBI + Europe PMC core-record tier is live;
+the W3.1 full-text fallback and W3.4 page-first cascade have completed
+evaluation and were not promoted. W0–W2, W3.2–W3.3, and W4 remain `[PLANNED]`
+and owner/eval-gated. Rationale and evidence live in the companion audit
 (`docs/audits/reviewer-disambiguation-email-external-alternatives-fable-2026-07-18.md`,
 §§1–5b); this plan holds the *what, in what order, behind which gate*, and does
 not restate the audit's detail. Where this plan and the audit conflict, the
@@ -53,6 +55,12 @@ plan's Wave 13 binding model rather than duplicating it.
 - Structured scholarly-email tier abstains on a top-2 address tie
   (`scholarly-email.js:249`), so dual-appointment alternates false-abstain.
   `[VERIFIED — audit §5b.4]`
+- The live NCBI + Europe PMC core-record tier found a structured address for
+  27/40 frozen subjects (20 `ready`, 7 `quick_check`); it uses full-name/ORCID
+  identity matching, candidate-affiliation corroboration, and distinct-work
+  counting. `[VERIFIED via
+  outputs/reviewer-holistic-m1/reviewer-email-scholarly-production-40-v1.json
+  and lib/services/contact-enrichment/scholarly-email.js]`
 - ORCID is not a unique key in practice (duplicate iDs). `[owner-stated + EXTERNAL — audit §5b.1]`
 
 ## Guiding invariants (apply to every phase)
@@ -168,11 +176,24 @@ No new rule without a first failing benchmark case (invariant 6).
 **Owner-gate.** The abstain-vs-bind-right-person policy on fragmented famous
 names (changes what the benchmark counts as correct); production cutover.
 
-## W3 — Email discovery `[ACTIVE; W3.4 DECIDED]`
+## W3 — Email discovery `[ACTIVE; W3.1 AND W3.4 DECIDED]`
 
-- **W3.1 Structured corresponding-author email.** Parse Europe PMC OA full-text
-  `<corresp>` / `corresp="yes"` for a disambiguated corresponding email, instead
-  of regex-tailing the affiliation string. Highest cheap recall+precision win.
+- **W3.1 Structured corresponding-author email — DECIDED 2026-07-18: keep the
+  live core-record tier; do not add the tested OA full-text fallback.** The live
+  resolver already queries NCBI PubMed and Europe PMC `resultType=core`, accepts
+  email only from the matched author's recent, institution-corroborated
+  affiliation, and deduplicates the same work across providers. It found 27/40
+  addresses on the frozen cohort (20 `ready`, 7 `quick_check`). A bounded
+  `fullTextXML` prototype then parsed explicit JATS `<corresp>` linkage for up
+  to five PMC articles only when core evidence missed. It added **0** addresses:
+  the same 20/7/13 result remained, while the nine missing subjects without a
+  provider error moved from 375 ms median to 1,052 ms. Targeted checks for
+  Wherry, Berg, and Shan confirmed the recent PMC papers listed them as
+  coauthors but did not link correspondence to them. The prototype was removed;
+  production behavior is unchanged. Revisit only with a failing benchmark case
+  where full text contains a candidate-linked address absent from the core
+  record. `[VERIFIED via
+  outputs/reviewer-holistic-m1/reviewer-email-scholarly-fulltext-40-v2.json]`
 - **W3.2 Alternates-not-conflict.** In `scholarly-email.js` selection, treat two
   addresses as same-person *alternates* (not a `conflict` abstain) when their
   domains are consistent with one person's institution set — shared registrable
@@ -194,8 +215,10 @@ names (changes what the benchmark counts as correct); production cutover.
 **Invariant.** No search-sourced address becomes invitation-sendable
 (Contract 3 unchanged); alternates resolution never promotes a cross-person
 address.
-**Tests.** `<corresp>` extraction fixtures; alternates-vs-conflict matrix
-(harvard.edu subdomains → alternate; unrelated domains → conflict).
+**Tests.** Existing structured-tier identity, affiliation, distinct-work,
+provider-failure, conflict, and cancellation fixtures remain authoritative.
+For W3.2, add the alternates-vs-conflict matrix (harvard.edu subdomains →
+alternate; unrelated domains → conflict).
 **Gates.** `check:prompt-injection-tagging` + self-test if the Tier-3 surface is
 touched.
 **Owner-gate.** Closed for the tested page-first cascade: do not promote.
@@ -227,28 +250,27 @@ apply is a distinct owner-approved operation).
 | 1 | W0 substrate | — | main (additive, inert) | none (tests only) |
 | 2 | W1 affiliation/COI | W0 | branch → main, tests + contract-reconcile | Broad policy; umbrella set |
 | 3 | W2 disambiguation v2 | W0 | seam on main, legacy default | eval gate; cutover |
-| 4 | W3 email | (W0 for 3.2) | branch → main | paid-tier fate; page-fetch |
+| 4 | W3.2–W3.3 email follow-on | W0 for 3.2 | branch → main | alternates policy |
 | 5 | W4 durable model | W2 | additive schema wave | schema apply |
 
 W1 is the highest near-term value (live false-drop bug) and is independent of the
-disambiguation rebuild. W3.1 (`<corresp>`) is independent and could parallel W1.
-W2 is the largest and is eval-gated. W4 underpins persistence and reconciles with
-Wave 13.
+disambiguation rebuild. W3.1 is closed: keep the live core-record tier and do
+not add the tested full-text fallback. W2 is the largest and is eval-gated. W4
+underpins persistence and reconciles with Wave 13.
 
 ## Open owner decisions
 
 1. **Broad COI-exemption strength** — always exempt a shared Broad, or only when
    the two people's primary campuses differ?
 2. **Umbrella/exempt org set** beyond HHMI + Broad (CZ Biohub, Simons/HFSP…)?
-3. **Paid search-tier fate** — rehabilitate via the page-fetch tier, or retire to
-   a staff faculty-page link?
-4. **Keep the page-fetch tier in the paid-search cascade**, or retain it only as
-   rollback-gated recovery while paid search is retired to staff page links?
-5. **Abstain vs bind-the-right-person** on fragmented famous names — does the
+3. **Abstain vs bind-the-right-person** on fragmented famous names — does the
    benchmark keep abstain-expected, or credit a correct bind with a verify flag?
-6. **Buy-vs-build** — evaluate Prophy for the discovery/disambiguation front half
+4. **Buy-vs-build** — evaluate Prophy for the discovery/disambiguation front half
    (it returns contact info; it is the ERC's tool), or stay fully in-house?
-7. **Appetite / first pick** — stabilize (W1 only) vs rebuild (W1→W2→…)?
+5. **Appetite / first pick** — stabilize (W1 only) vs rebuild (W1→W2→…)?
+
+Closed decisions: W3.1 full-text XML fallback — do not promote; W3.4 page-first
+paid-search cascade — do not promote.
 
 ## Verification & regression strategy
 
@@ -265,5 +287,6 @@ Wave 13.
 Each workstream is "ready to promote" only when its named invariant holds under
 test, its eval/matrix gate passes, the relevant red gates + self-tests are green,
 and its owner gate is answered. Any unverified claim stays `[PLANNED]`/`[ASSUMED]`;
-any red relevant gate blocks completion. Nothing in this plan is built until the
-owner selects a first pick (decision 7).
+any red relevant gate blocks completion. The completed W3.1/W3.4 decisions do
+not authorize the remaining planned work; the owner still selects its first
+pick (open decision 5).

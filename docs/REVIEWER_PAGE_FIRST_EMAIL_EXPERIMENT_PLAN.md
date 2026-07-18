@@ -48,9 +48,12 @@ artifacts and script contract]`
 
 **Decision:** do not promote or reorder the production paid tiers. Preserve
 first-party page links as staff research leads, keep raw Claude/Serp emails
-`research_only`, and prioritize the independent structured-source work. No
-production behavior or environment configuration changed. `[VERIFIED via
-Stage 3 promotionDecision.status='do_not_promote']`
+`research_only`, and retain the already-live NCBI + Europe PMC core-record
+structured tier. A subsequent W3.1 `fullTextXML` fallback trial added 0/40
+addresses and was also not promoted. No production behavior or environment
+configuration changed. `[VERIFIED via Stage 3
+promotionDecision.status='do_not_promote' and
+outputs/reviewer-holistic-m1/reviewer-email-scholarly-fulltext-40-v2.json]`
 
 The experiment used an owner-approved evaluation-only fallback from an absent
 identity-anchored domain to a strongly matched claimed-institution domain. That
@@ -139,8 +142,9 @@ send gate.
 - Treating snippet emails as sendable evidence.
 - Adding `lab`, `site:.edu`, Google Scholar, guessed email patterns, or
   hand-maintained Broad/MIT/Harvard equivalence rules.
-- Testing Europe PMC `<corresp>` parsing. That is a separate structured-source
-  experiment under W3.1 and must not confound this web-page test.
+- Testing Europe PMC `<corresp>` parsing. That was a separate W3.1
+  structured-source experiment and did not confound this web-page test; it
+  subsequently produced 0 incremental addresses and was not promoted.
 - Population-level claims from 13 primary cases.
 
 ## Frozen primary cohort

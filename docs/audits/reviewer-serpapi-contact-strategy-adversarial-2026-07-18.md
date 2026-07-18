@@ -1,3 +1,11 @@
+> **Post-experiment outcome (2026-07-18).** Both proposed additions were tested
+> separately and not promoted. The page-first cascade gained only +1/20 against
+> its +3 gate; the Europe PMC `fullTextXML` fallback added 0/40 beyond the live
+> core-record tier. Production ordering and behavior remain unchanged. The
+> recommendations below are historical; current decisions live in
+> `docs/REVIEWER_PAGE_FIRST_EMAIL_EXPERIMENT_PLAN.md` and
+> `docs/REVIEWER_IDENTITY_CONTACT_PLAN.md` W3.1/W3.4.
+
 # Verdict
 
 **SOUND WITH MATERIAL REVISIONS.**

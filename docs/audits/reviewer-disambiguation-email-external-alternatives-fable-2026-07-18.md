@@ -21,6 +21,14 @@
   artifact. `[EXTERNAL]` = from the 2026-07-18 research pass (source in
   appendix). `[ASSUMED]` = inference not directly probed.
 
+> **Post-audit outcome (2026-07-18).** The live NCBI + Europe PMC core-record
+> tier was measured at 27/40 structured addresses (20 ready, 7 quick-check). A
+> bounded OA `fullTextXML`/JATS `<corresp>` fallback subsequently added 0/40 and
+> increased median latency for the comparable missing subset from 375 ms to
+> 1,052 ms. It was removed and not promoted. Recommendations below to implement
+> `<corresp>` parsing are preserved as the historical audit position; the
+> authoritative decision is `docs/REVIEWER_IDENTITY_CONTACT_PLAN.md` W3.1.
+
 ---
 
 ## 0. One-paragraph verdict
