@@ -3,7 +3,7 @@ title: Reviewer Identity & Contact — Codex Build Handoff
 domain: reviewer-identity
 kind: runbook
 status: active
-summary: "Paste-ready Codex handoff for the Reviewer Identity & Contact plan; scopes the first build to W0+W1 (affiliation/COI), W2-W4 held behind owner gates."
+summary: "Paste-ready continuation handoff: W0 is implemented and inert; W1 affiliation/COI remains the first behavioral build, with W2-W4 gated."
 canonical: false
 cataloged: 2026-07-18
 owner: product-engineering
@@ -17,18 +17,18 @@ related:
 
 This is the fixed entry point for handing the
 [Reviewer Identity & Contact plan](REVIEWER_IDENTITY_CONTACT_PLAN.md) to Codex.
-The plan is a DRAFT / no-build roadmap; **nothing is built until the owner picks a
-first workstream.** This handoff scopes that first build to **W0 + W1**
-(the institution substrate and affiliation/COI correctness) — the ready,
-highest-value slice, because W1 fixes a live false-drop bug and is independent of
-the disambiguation rebuild. W2–W4 stay behind their open owner gates and are out
-of scope here.
+W0, the institution-identity substrate, is implemented and deliberately inert:
+no production path calls it. This handoff now scopes the first behavioral build
+to **W1 affiliation/COI correctness**. W1 fixes a live false-drop bug and is
+independent of the disambiguation rebuild. W2–W4 stay behind their open owner
+gates and are out of scope here.
 
 ## How to use
 
 - Paste the fenced prompt below into Codex. Invoke Codex with `--model gpt-5.5`.
 - The plan and audit are committed history, so a Codex worktree will see them.
-- Keep the scope to W0 + W1; do not let it start W2/W3/W4 (open owner decisions).
+- Reuse and verify the implemented W0 substrate; keep build scope to W1 and do
+  not start W2/W3/W4 (open owner decisions).
 - For the later disambiguation workstream (W2), the frozen 40-case identity
   benchmark is NOT on this branch — retrieve it with
   `git show codex/m1-evaluation-foundation:docs/audits/reviewer-holistic-identity-benchmark-v2.json`.
@@ -36,7 +36,8 @@ of scope here.
 ## Paste-ready handoff prompt
 
 ```
-TASK: Build W0 + W1 of the Reviewer Identity & Contact plan (affiliation/COI correctness).
+TASK: Build W1 of the Reviewer Identity & Contact plan (affiliation/COI correctness),
+reusing the implemented, inert W0 substrate.
 Do NOT start W2, W3, or W4 — they have open owner decisions and are out of scope for this build.
 
 READ FIRST (committed on branch claude/review-reviewer-email-evidence):
@@ -48,9 +49,9 @@ READ FIRST (committed on branch claude/review-reviewer-email-evidence):
       campaign release); source wins over any doc claim — probe, don't trust prose.
 
 BUILD SCOPE:
-- W0  Pure, cached institution resolver: affiliation string -> { openAlexId, ror, country,
-      displayName, associatedInstitutions[] } over OpenAlexService (searchInstitutions/getInstitution).
-      Additive and inert; fail-open (unresolved -> null, callers degrade to today's behavior).
+- W0  ALREADY IMPLEMENTED at lib/services/institution-identity-resolver.js, with OpenAlex
+      institution country/associated-institution mapping in lib/services/openalex-service.js.
+      Verify its tests and preserve its inert, null-on-ambiguity contract; do not rebuild it.
 - W1.1 institutionsMatchForCOI: resolve both sides via W0 and compare OpenAlex/ROR ids FIRST;
       keep the existing name/abbreviation/campus fallback for unresolved cases.
 - W1.2 COI exemption overlay (an id set): a SHARED umbrella/affiliated institute alone is not COI.

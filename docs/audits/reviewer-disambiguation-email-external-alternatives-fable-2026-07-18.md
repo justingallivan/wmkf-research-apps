@@ -32,8 +32,12 @@
 > ties as conflicts. W3.3 was also verified end to end: magic-link acceptance
 > persists the reviewer-confirmed engagement email, and the post-accept
 > confirmation now prefers it over an older person-record address. The
-> authoritative decisions are `docs/REVIEWER_IDENTITY_CONTACT_PLAN.md`
-> W3.1–W3.3.
+> W0 institution-identity substrate was subsequently implemented as an inert,
+> per-run cached resolver: it accepts only a unique strongest OpenAlex identity,
+> preserves ROR/country/associated-institution evidence, and returns `null` for
+> ambiguous matches (including unqualified IAS) without changing any production
+> caller. The authoritative implementation state and decisions are
+> `docs/REVIEWER_IDENTITY_CONTACT_PLAN.md` W0 and W3.1–W3.3.
 
 ---
 

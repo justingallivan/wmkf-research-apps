@@ -179,9 +179,9 @@ The two stress-control people produce four claimed-affiliation views:
 These controls answer “does the method find a correct person-specific page and
 address under each claimed institution?” The paired views share a `personKey`
 but have distinct `subjectViewKey` values. They do not yet test automatic
-co-affiliate expansion, because the production identity/domain substrate does
-not currently materialize that expansion before paid search. `[VERIFIED current
-limitation; co-affiliate expansion remains PLANNED under W0/W1.4]`
+co-affiliate expansion, because the inert W0 institution substrate is not a
+production paid-search caller and W1.4 remains unimplemented. `[VERIFIED current
+limitation; co-affiliate expansion remains PLANNED under W1.4]`
 
 ## Stage 0 — read-only identity/domain prepass
 

@@ -81,6 +81,7 @@ If you're touching a service or utility, read its header before this catalog. If
 
 - **`discovery-service.js`** — Multi-database literature search orchestration.
 - **`deduplication-service.js`** — Name matching, duplicate merge, COI filtering, ranking.
+- **`institution-identity-resolver.js`** — Inert W0 OpenAlex institution resolver with per-run settled caching, unique-strongest name/country selection, structured associated-institution output, and `null` on ambiguity or provider failure; no production caller until a later roadmap wave opts in.
 - **`contact-enrichment-service.js`** — Tiered contact lookup with identity anchoring, structured scholarly-email evidence, and Dataverse writeback.
 - **`contact-enrichment/scholarly-email.js`** — Free NCBI PubMed + Europe PMC author-affiliation email resolver; requires full-forename or exact-ORCID identity plus affiliation corroboration, deduplicates the same work across providers, and abstains on tied addresses.
 - **`reviewer-roster-store.js`** — Postgres operational roster for request-scoped Find state; active-row staff identity confirmation is stored here and re-read fail-closed at save.

@@ -3,7 +3,7 @@ title: Reviewer Identity & Contact — Disambiguation, Affiliation/COI, and Emai
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "Structured scholarly email, a narrow alternate tie-break, and reviewer-owned preferred-email attestation are live; other fallbacks were not promoted."
+summary: "The inert institution substrate and three email improvements are live; COI, disambiguation, broader alternates, and durable identity remain gated."
 canonical: false
 cataloged: 2026-07-18
 owner: product-engineering
@@ -15,6 +15,7 @@ related:
   - docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md
   - lib/services/reviewer-identity-evidence.js
   - lib/services/reviewer-identity-resolver.js
+  - lib/services/institution-identity-resolver.js
   - lib/services/deduplication-service.js
   - lib/services/openalex-service.js
   - lib/services/contact-enrichment/scholarly-email.js
@@ -28,8 +29,9 @@ related:
 the 2026-07-18 assessment. W3.1's NCBI + Europe PMC core-record tier and W3.2's
 narrow current-affiliation alternate tie-break are live. The W3.1 full-text
 fallback and W3.4 page-first cascade completed evaluation and were not promoted.
-W0–W2, broader co-affiliate handling, and W4 remain `[PLANNED]` and
-owner/eval-gated. Rationale and evidence live in the companion audit
+W0's additive institution-identity substrate is implemented but deliberately
+has no production caller. W1–W2, broader co-affiliate handling, and W4 remain
+`[PLANNED]` and owner/eval-gated. Rationale and evidence live in the companion audit
 (`docs/audits/reviewer-disambiguation-email-external-alternatives-fable-2026-07-18.md`,
 §§1–5b); this plan holds the *what, in what order, behind which gate*, and does
 not restate the audit's detail. Where this plan and the audit conflict, the
@@ -56,7 +58,8 @@ plan's Wave 13 binding model rather than duplicating it.
 - The original structured scholarly-email tier abstained on every top-2 address
   tie, producing a measured false-abstain for Jie Shan. The narrow W3.2 rule now
   resolves a tie only when exactly one domain matches the claimed/current
-  affiliation; broader dual-appointment equivalence still abstains pending W0.
+  affiliation. W0 now supplies the institution identities needed for a future
+  broader rule, but no broader dual-appointment equivalence is implemented.
   `[VERIFIED — audit §5b.4 + W3.2 artifact below]`
 - The live NCBI + Europe PMC core-record tier found a structured address for
   27/40 frozen subjects (20 `ready`, 7 `quick_check`); it uses full-name/ORCID
@@ -100,19 +103,30 @@ plan's Wave 13 binding model rather than duplicating it.
 
 ---
 
-## W0 — Institution identity substrate (shared foundation) `[PLANNED]`
+## W0 — Institution identity substrate (shared foundation) `[IMPLEMENTED 2026-07-18; INERT]`
 
-**Goal.** One pure, cached helper: affiliation string → `{ openAlexId, ror,
+**Result.** One isolated, per-run cached resolver: affiliation string →
+`{ openAlexId, ror,
 country, displayName, associatedInstitutions[] }`, reusing
-`OpenAlexService.searchInstitutions`/`getInstitution`. Underpins W1 and W2.
+`OpenAlexService.searchInstitutions`/`getInstitution`. The resolver is additive
+and has no production caller; W1 and W2 must opt in explicitly.
 
-**Approach.** Additive service; no behavior change on its own. Cache per run.
-Fail-open (unresolved institution → null, callers degrade to today's behavior).
+**Selection contract.** Normalize the affiliation, rank exact name above
+multi-token whole-phrase containment above an explicit acronym, optionally
+constrain by an ISO-2 country code, and hydrate only a unique strongest OpenAlex identity.
+Search rank never breaks a tie. Provider failures and unresolved, weak, or tied
+matches return `null`; caller cancellation propagates. Settled identities and
+definitive misses are cached only within the resolver instance.
 
-**Invariant.** Pure/side-effect-free; returns null rather than guessing.
-**Tests.** Resolution + associated-institutions shape for HHMI, Broad, Whitehead,
-IAS (US vs DE), Harvard, Dana-Farber; unresolved/garbage → null.
-**Gate.** Unit tests; no runtime surface, so no red-gate exposure.
+**Invariant.** No persistence or caller mutation; deterministic candidate
+selection returns `null` rather than guessing. Production behavior is unchanged.
+**Verification.** Unit fixtures cover HHMI, Broad, Whitehead, IAS (US vs two DE
+identities), Harvard, Dana-Farber, ambiguity, garbage, caching, transient
+provider failure, hydration mismatch, token-boundary matching, and cancellation.
+Live OpenAlex probes resolved the named US institutions, kept unqualified IAS
+ambiguous, resolved IAS-US with a country hint, and retained IAS-DE ambiguity
+because OpenAlex returns two equally named German identities.
+**Gate.** Unit tests; no runtime surface or red-gate exposure.
 
 ## W1 — Affiliation & COI correctness (highest near-term value; live bug) `[PLANNED]`
 
@@ -207,8 +221,9 @@ names (changes what the benchmark counts as correct); production cutover.
   `jie.shan@cornell.edu`; every other subject's action/email/status was
   byte-for-byte unchanged (21 ready, 7 quick-check, 12 missing, 0 conflicts).
   Broader equivalence through registrable domains or OpenAlex
-  `associated_institutions` remains `[PLANNED]` behind W0 rather than being
-  guessed lexically. `[VERIFIED via
+  `associated_institutions` remains `[PLANNED]`; W0 now provides the grounded
+  institution substrate, but promotion still requires W1 fixtures and the
+  co-affiliate owner policy rather than lexical guessing. `[VERIFIED via
   outputs/reviewer-holistic-m1/reviewer-email-scholarly-alternates-40-v3.json
   and tests/unit/scholarly-email.test.js]`
 - **W3.3 Preferred email is reviewer-owned — IMPLEMENTED 2026-07-18.** The
@@ -267,7 +282,7 @@ apply is a distinct owner-approved operation).
 
 | Order | Workstream | Depends on | Ships to | Owner gate |
 |---|---|---|---|---|
-| 1 | W0 substrate | — | main (additive, inert) | none (tests only) |
+| 1 | W0 substrate `[IMPLEMENTED; INERT]` | — | branch → main (additive, inert) | none (tests only) |
 | 2 | W1 affiliation/COI | W0 | branch → main, tests + contract-reconcile | Broad policy; umbrella set |
 | 3 | W2 disambiguation v2 | W0 | seam on main, legacy default | eval gate; cutover |
 | 4 | Broader W3.2 follow-on | W0 | branch → main | co-affiliate policy |
@@ -287,9 +302,11 @@ underpins persistence and reconciles with Wave 13.
    benchmark keep abstain-expected, or credit a correct bind with a verify flag?
 4. **Buy-vs-build** — evaluate Prophy for the discovery/disambiguation front half
    (it returns contact info; it is the ERC's tool), or stay fully in-house?
-5. **Appetite / first pick** — stabilize (W1 only) vs rebuild (W1→W2→…)?
+5. **Next behavioral pick after inert W0** — stabilize (W1 only) vs rebuild
+   (W1→W2→…)?
 
-Closed decisions: W3.1 full-text XML fallback — do not promote; W3.4 page-first
+Closed decisions: W0 institution substrate — implement inertly before behavior
+changes; W3.1 full-text XML fallback — do not promote; W3.4 page-first
 paid-search cascade — do not promote.
 
 ## Verification & regression strategy
@@ -307,6 +324,6 @@ paid-search cascade — do not promote.
 Each workstream is "ready to promote" only when its named invariant holds under
 test, its eval/matrix gate passes, the relevant red gates + self-tests are green,
 and its owner gate is answered. Any unverified claim stays `[PLANNED]`/`[ASSUMED]`;
-any red relevant gate blocks completion. The completed W3.1/W3.4 decisions do
-not authorize the remaining planned work; the owner still selects its first
-pick (open decision 5).
+any red relevant gate blocks completion. The completed inert W0 substrate and
+W3.1/W3.4 decisions do not authorize the remaining planned behavior changes;
+the owner still selects the next behavioral pick (open decision 5).
