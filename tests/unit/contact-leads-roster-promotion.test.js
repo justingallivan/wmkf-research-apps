@@ -6,8 +6,8 @@
  *  - Slice 5: pruneContactLeads / pruneCandidateForRoster persist a compact,
  *    bounded, payload-free leads array so the section survives a roster reload.
  *  - Slice 4: a promoted lead is stamped emailSource:'manual', and the live
- *    invite gate (emailConfidence) classifies 'manual' as LOW — so a promoted
- *    lead still requires explicit confirm-before-send (the safety invariant).
+ *    invite gate (emailConfidence) classifies 'manual' as quick_check — so a
+ *    promoted lead still requires explicit acknowledgement (the safety invariant).
  */
 
 const {

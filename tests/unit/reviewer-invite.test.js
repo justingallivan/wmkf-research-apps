@@ -67,26 +67,29 @@ describe('recipientMayReceiveAttachments — server-authoritative (acceptance), 
 });
 
 describe('emailConfidence — Slice G invite-confidence gate', () => {
-  test('authoritative sources are HIGH regardless of identity status', () => {
-    for (const source of ['orcid', 'pubmed', 'institution_page']) {
-      expect(emailConfidence({ wmkf_emailsource: source }).level).toBe('high');
+  test('ready sources are HIGH regardless of identity status', () => {
+    for (const source of ['orcid', 'institution_page', 'scholarly_multi']) {
+      expect(emailConfidence({ wmkf_emailsource: source })).toMatchObject({ level: 'high', action: 'ready' });
       // even with an unconfirmed identity, the source itself is authoritative
       expect(emailConfidence({ wmkf_emailsource: source, wmkf_identitystatus: 'unresolved' }).level).toBe('high');
     }
   });
 
-  test('search-sourced email stays LOW even on a confirmed/probable identity', () => {
-    for (const source of ['serp_search', 'claude_search']) {
-      expect(emailConfidence({ wmkf_emailsource: source, wmkf_identitystatus: 'confirmed' }).level).toBe('low');
+  test('search-sourced email stays research-only even on a confirmed/probable identity', () => {
+    for (const source of ['serp_search', 'claude_search', 'search_contested']) {
+      expect(emailConfidence({ wmkf_emailsource: source, wmkf_identitystatus: 'confirmed' }))
+        .toMatchObject({ level: 'low', action: 'research_only' });
       expect(emailConfidence({ wmkf_emailsource: source, wmkf_identitystatus: 'probable' }).level).toBe('low');
       expect(emailConfidence({ wmkf_emailsource: source, wmkf_identitystatus: 'unresolved' }).level).toBe('low');
       expect(emailConfidence({ wmkf_emailsource: source }).level).toBe('low');
-      expect(emailConfidence({ wmkf_emailsource: source }).reason).toContain('first-party evidence');
     }
   });
 
-  test('affiliation-sourced email is LOW even on a confirmed identity (Codex R2)', () => {
-    expect(emailConfidence({ wmkf_emailsource: 'affiliation', wmkf_identitystatus: 'confirmed' }).level).toBe('low');
+  test('single-work and affiliation addresses require a quick check', () => {
+    for (const source of ['scholarly_single', 'pubmed', 'affiliation']) {
+      expect(emailConfidence({ wmkf_emailsource: source, wmkf_identitystatus: 'confirmed' }))
+        .toMatchObject({ level: 'low', action: 'quick_check' });
+    }
   });
 
   test('manually-entered, unknown, and missing sources are LOW', () => {
@@ -94,7 +97,7 @@ describe('emailConfidence — Slice G invite-confidence gate', () => {
     expect(emailConfidence({ wmkf_emailsource: 'manual', wmkf_identitystatus: 'confirmed' }).level).toBe('low');
     expect(emailConfidence({ wmkf_emailsource: 'search_contested', wmkf_identitystatus: 'confirmed' })).toMatchObject({
       level: 'low',
-      reason: expect.stringContaining('confirmation'),
+      action: 'research_only',
     });
     expect(emailConfidence({ wmkf_emailsource: null }).level).toBe('low');
     expect(emailConfidence({}).level).toBe('low');
@@ -102,8 +105,8 @@ describe('emailConfidence — Slice G invite-confidence gate', () => {
   });
 
   test('name-resolved/discovery-tier contested source never inherits anchored search HIGH', () => {
-    expect(emailConfidence({ emailSource: 'search_contested', identityStatus: 'confirmed' }).level).toBe('low');
-    expect(emailConfidence({ emailSource: 'search_contested', identityStatus: 'probable' }).level).toBe('low');
+    expect(emailConfidence({ emailSource: 'search_contested', identityStatus: 'confirmed' }).action).toBe('research_only');
+    expect(emailConfidence({ emailSource: 'search_contested', identityStatus: 'probable' }).action).toBe('research_only');
   });
 
   test('accepts the normalized (camelCase) shape too', () => {
@@ -120,5 +123,12 @@ describe('emailConfidence — Slice G invite-confidence gate', () => {
   test('always returns a human-readable reason string', () => {
     expect(typeof emailConfidence({ wmkf_emailsource: 'manual' }).reason).toBe('string');
     expect(emailConfidence({ wmkf_emailsource: 'manual' }).reason.length).toBeGreaterThan(0);
+  });
+
+  test('an explicit empty address is missing', () => {
+    expect(emailConfidence({ email: null, emailSource: null })).toMatchObject({
+      level: 'low',
+      action: 'missing',
+    });
   });
 });

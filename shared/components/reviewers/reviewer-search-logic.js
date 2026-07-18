@@ -297,6 +297,34 @@ export function pruneContactLeads(leads) {
     .filter((l) => l.value);
 }
 
+export function pruneEmailEvidence(evidence) {
+  if (!evidence || typeof evidence !== 'object') return null;
+  const publications = Array.isArray(evidence.publications)
+    ? evidence.publications.slice(0, 5).map((publication) => ({
+        pmid: publication?.pmid ? String(publication.pmid).slice(0, 32) : null,
+        pmcid: publication?.pmcid ? String(publication.pmcid).slice(0, 32) : null,
+        doi: publication?.doi ? String(publication.doi).slice(0, 160) : null,
+        title: publication?.title ? String(publication.title).slice(0, 500) : null,
+        year: Number.isFinite(publication?.year) ? publication.year : null,
+        url: publication?.url ? String(publication.url).slice(0, 500) : null,
+        providers: Array.isArray(publication?.providers)
+          ? publication.providers.slice(0, 3).map(String)
+          : [],
+      }))
+    : [];
+  return {
+    sourceKind: evidence.sourceKind ? String(evidence.sourceKind).slice(0, 80) : null,
+    sourceUrl: evidence.sourceUrl ? String(evidence.sourceUrl).slice(0, 500) : null,
+    action: evidence.action ? String(evidence.action).slice(0, 40) : null,
+    ownership: evidence.ownership ? String(evidence.ownership).slice(0, 80) : null,
+    affiliationMatched: evidence.affiliationMatched === true,
+    publicationCount: Number.isFinite(evidence.publicationCount) ? evidence.publicationCount : publications.length,
+    providers: Array.isArray(evidence.providers) ? evidence.providers.slice(0, 3).map(String) : [],
+    publications,
+    deliverabilityChecked: evidence.deliverabilityChecked === true,
+  };
+}
+
 /**
  * Prune an enriched candidate down to the fields `CandidateCard` actually
  * renders, for durable storage in `reviewer_find_roster` (S224). Keeps the card
@@ -344,6 +372,9 @@ export function pruneCandidateForRoster(c) {
       email: e.email || null,
       emailSource: e.emailSource || null,
       emailYear: e.emailYear || null,
+      emailAction: e.emailAction || null,
+      emailActionReason: e.emailActionReason || null,
+      emailEvidence: pruneEmailEvidence(e.emailEvidence),
       contactStatus: e.contactStatus || null,
       contactStatusReason: e.contactStatusReason || null,
       verifiedInstitutionDomain: e.verifiedInstitutionDomain || null,
@@ -429,6 +460,8 @@ export function pruneCandidateForRoster(c) {
     email: c.email || e.email || null,
     emailSource: e.emailSource || null,
     emailYear: e.emailYear || null,
+    emailAction: e.emailAction || null,
+    emailActionReason: e.emailActionReason || null,
     // Defensive: re-guard the persisted website so a document-file URL can't ride
     // through the prune (mirrors mergeEnrichment; sanitized at ingestion too).
     website: ContactParser.sanitizeWebsiteForCandidate(c.website || e.website, c.name) || null,

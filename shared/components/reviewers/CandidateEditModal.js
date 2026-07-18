@@ -21,7 +21,7 @@
  *       yet): when provided, Save hands the changed fields to the parent to apply
  *       to client state instead of PATCHing my-candidates. The parent stamps
  *       manual provenance (email/website → emailSource/websiteSource 'manual',
- *       which the invite gate reads as low-confidence). No suggestionId needed.
+ *       which the invite gate reads as quick-check). No suggestionId needed.
  *   - nameEditable (default true) — set false in local mode: the Find card keys
  *       candidates by normalized name, so renaming there would desync selection/
  *       dedup. Name is shown read-only and never included in the emitted updates.
@@ -511,7 +511,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
               <span className="text-xs text-amber-800">
                 I’ve verified this is the correct person. Add them using the contact above — the
                 auto-suggested ORCID / metrics won’t be carried over, and the email is marked
-                unverified so you’ll confirm before any invitation is sent.
+                unverified and requires a quick check before any invitation is sent.
               </span>
             </label>
           )}
@@ -519,7 +519,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
           {!confirmMode && (
             <p className="text-xs text-gray-500">
               {onApply
-                ? 'A manually entered email/website is marked unverified — you’ll confirm before any invitation is sent. Saved with this request when you save the candidate.'
+                ? 'A manually entered email/website is marked unverified — a quick check is required before any invitation is sent. Saved with this request when you save the candidate.'
                 : 'Changes apply to this researcher across all proposals that reference them.'}
             </p>
           )}

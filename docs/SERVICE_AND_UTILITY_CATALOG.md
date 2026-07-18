@@ -75,13 +75,14 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ### Research-database clients
 
-- **`pubmed-service.js`**, **`openalex-service.js`**, **`arxiv-service.js`**, **`biorxiv-service.js`**, **`chemrxiv-service.js`**, **`orcid-service.js`**, **`serp-contact-service.js`** — external research-DB clients (API shapes, rate limits, and tier positioning in each header).
+- **`pubmed-service.js`**, **`openalex-service.js`**, **`arxiv-service.js`**, **`biorxiv-service.js`**, **`chemrxiv-service.js`**, **`orcid-service.js`**, **`serp-contact-service.js`** — external research-DB clients (API shapes, rate limits, and tier positioning in each header). Europe PMC is queried by the scholarly-email helper rather than a standalone client.
 
 ### Reviewer Finder pipeline
 
 - **`discovery-service.js`** — Multi-database literature search orchestration.
 - **`deduplication-service.js`** — Name matching, duplicate merge, COI filtering, ranking.
-- **`contact-enrichment-service.js`** — 5-tier contact lookup; header documents Dataverse writeback migration.
+- **`contact-enrichment-service.js`** — Tiered contact lookup with identity anchoring, structured scholarly-email evidence, and Dataverse writeback.
+- **`contact-enrichment/scholarly-email.js`** — Free NCBI PubMed + Europe PMC author-affiliation email resolver; requires full-forename or exact-ORCID identity plus affiliation corroboration, deduplicates the same work across providers, and abstains on tied addresses.
 - **`reviewer-roster-store.js`** — Postgres operational roster for request-scoped Find state; active-row staff identity confirmation is stored here and re-read fail-closed at save.
 - **`reviewer-candidate-attestation.js`** — Transitional `NEXTAUTH_SECRET`-signed receipt binding server-computed automated identity fields to one request/candidate bundle before save.
 - **`capture-self-reported-orcid.js`** — Self-reported ORCID persistence seam. Accept-drain calls with a stable acceptance timestamp use the Wave 13 binding writer before contact fill; only typed `legacy_classification_required` falls back to the transitional person writes. Older/decline calls without a stable event retain the transitional path.

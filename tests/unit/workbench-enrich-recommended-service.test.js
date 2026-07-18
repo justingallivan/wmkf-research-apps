@@ -102,6 +102,7 @@ jest.mock('../../lib/utils/contact-parser', () => ({
 }));
 jest.mock('../../lib/utils/name-normalization', () => ({ normalizeName: (n) => String(n).toLowerCase() }));
 
+const { ContactParser } = require('../../lib/utils/contact-parser');
 import { enrichRecommended } from '../../lib/services/workbench/enrich-recommended-service';
 
 const REQ = '11111111-1111-1111-1111-111111111111';
@@ -126,6 +127,7 @@ const args = (over = {}) => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  ContactParser.isNameConsistentEmail.mockReturnValue(true);
   getReviewerTimeBudgetSeconds.mockResolvedValue(600);
   findApplicantRecommendedByRequest.mockResolvedValue([
     { _wmkf_potentialreviewer_value: PR, _wmkf_potentialreviewer_value_formatted: 'Dr. Rec One', wmkf_appreviewersuggestionid: SUG },
@@ -191,6 +193,31 @@ test('mid-stream per-candidate writeback failure is a NON-terminal progress fram
   await enrichRecommended(args(), onEvent);
   expect(events.some((e) => e.event === 'progress' && /Could not save metrics for Dr\. Rec One: sidecar down/.test(e.data.message))).toBe(true);
   expect(events[events.length - 1].event).toBe('complete');
+});
+
+test('structured author-affiliation evidence preserves an opaque scholarly email local part', async () => {
+  ContactParser.isNameConsistentEmail.mockReturnValue(false);
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      email: 'lab-director@stanford.edu',
+      contactEnrichment: {
+        email: 'lab-director@stanford.edu',
+        emailSource: 'scholarly_multi',
+      },
+    })),
+  }));
+
+  const { onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+  expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
+    PR,
+    expect.objectContaining({
+      email: 'lab-director@stanford.edu',
+      emailSource: 'scholarly_multi',
+    }),
+    expect.anything(),
+  );
 });
 
 test('pipeline throw: resolves (never throws) with one generic terminal error', async () => {

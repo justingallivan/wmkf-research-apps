@@ -12,6 +12,7 @@ import {
   isCandidateSelectable,
   candidateWasSaved,
   pruneCandidateForRoster,
+  pruneEmailEvidence,
   sanitizeInstitutionCOIDetails,
   mergeReferredProvenance,
   dedupeByNamePreferReferred,
@@ -69,6 +70,50 @@ describe('pruneCandidateForRoster — referred seed anchors survive reload', () 
       seedIdentityMatchKey: 'email',
       seedIdentityNameConsistent: true,
     }));
+  });
+});
+
+describe('scholarly email evidence survives a bounded roster round-trip', () => {
+  test('keeps action + compact publication provenance and drops extra works', () => {
+    const evidence = {
+      sourceKind: 'scholarly_publication',
+      sourceUrl: 'https://pubmed.ncbi.nlm.nih.gov/1/',
+      action: 'ready',
+      ownership: 'author_affiliation',
+      affiliationMatched: true,
+      publicationCount: 6,
+      providers: ['ncbi_pubmed', 'europe_pmc'],
+      publications: Array.from({ length: 6 }, (_, index) => ({
+        pmid: String(index + 1),
+        title: `Paper ${index + 1}`,
+        year: 2026 - index,
+        url: `https://pubmed.ncbi.nlm.nih.gov/${index + 1}/`,
+        providers: ['ncbi_pubmed'],
+        rawPayload: { shouldNotPersist: true },
+      })),
+      deliverabilityChecked: false,
+      rawProviderResponse: { shouldNotPersist: true },
+    };
+    const compact = pruneEmailEvidence(evidence);
+    expect(compact.publications).toHaveLength(5);
+    expect(compact).not.toHaveProperty('rawProviderResponse');
+    expect(compact.publications[0]).not.toHaveProperty('rawPayload');
+
+    const pruned = pruneCandidateForRoster({
+      name: 'Jane Roe',
+      email: 'jane@stanford.edu',
+      contactEnrichment: {
+        email: 'jane@stanford.edu',
+        emailSource: 'scholarly_multi',
+        emailAction: 'ready',
+        emailActionReason: 'Address source: scholarly_multi',
+        emailEvidence: evidence,
+      },
+    });
+    expect(pruned.contactEnrichment).toMatchObject({
+      emailAction: 'ready',
+      emailEvidence: { publicationCount: 6, action: 'ready' },
+    });
   });
 });
 

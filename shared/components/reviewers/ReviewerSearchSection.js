@@ -67,6 +67,7 @@ import {
   withReviewerProvenance,
 } from '../../../lib/utils/reviewer-provenance';
 import { DEFAULT_REVIEWER_COUNT } from '../../config/reviewerFinderPreferences';
+import { emailConfidence } from '../../../lib/utils/reviewer-invite';
 
 // The four literature sources the discover endpoint understands. The user picks
 // which to query (parity with the standalone Reviewer Finder); at least one must
@@ -196,6 +197,16 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
   const aiFlaggedNotRelevant = !!c.aiFlaggedNotRelevant;
   const enr = c.contactEnrichment || {};
   const email = c.email || enr.email || null;
+  const emailAssessment = emailConfidence({
+    email,
+    emailSource: enr.emailSource || c.emailSource || null,
+  });
+  const emailAction = enr.emailAction || c.emailAction || emailAssessment.action;
+  const emailActionReason = enr.emailActionReason || c.emailActionReason || emailAssessment.reason;
+  const emailEvidence = enr.emailEvidence || null;
+  const evidencePublications = Array.isArray(emailEvidence?.publications)
+    ? emailEvidence.publications.filter((publication) => publication?.url).slice(0, 3)
+    : [];
   const website = c.website || enr.website || null;
   const orcidUrl = c.orcidUrl || enr.orcidUrl || null;
   const scholarUrl = c.googleScholarUrl || enr.googleScholarUrl || buildScholarSearchUrl(c.name, c.affiliation);
@@ -349,12 +360,45 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
                   >
                     📧 {email}
                   </a>
-                  {enr.emailSource === 'search_contested' && (
-                    <span
-                      className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-800 rounded border border-amber-200"
-                      title={enr.contactStatusReason || 'Confirm before inviting'}
-                    >
-                      ⚠ Confirm before invite
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-1 rounded border ${
+                      emailAction === 'ready'
+                        ? 'bg-green-50 text-green-800 border-green-200'
+                        : emailAction === 'research_only'
+                          ? 'bg-red-50 text-red-800 border-red-200'
+                          : 'bg-amber-50 text-amber-800 border-amber-200'
+                    }`}
+                    title={emailActionReason}
+                  >
+                    {emailAction === 'ready'
+                      ? '✓ Ready'
+                      : emailAction === 'research_only'
+                        ? '⚠ Research only'
+                        : '⚠ Quick check'}
+                  </span>
+                  {emailEvidence?.publicationCount > 0 && (
+                    <span className="text-gray-600">
+                      Evidence: {emailEvidence.publicationCount} recent {emailEvidence.publicationCount === 1 ? 'work' : 'works'}
+                      {evidencePublications.length > 0 && (
+                        <>
+                          {' ('}
+                          {evidencePublications.map((publication, index) => (
+                            <span key={publication.url}>
+                              {index > 0 ? ', ' : ''}
+                              <a
+                                href={publication.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-700 hover:underline"
+                                title={publication.title || 'Publication evidence'}
+                              >
+                                {publication.year || index + 1}
+                              </a>
+                            </span>
+                          ))}
+                          {')'}
+                        </>
+                      )}
                     </span>
                   )}
                 </>
@@ -407,7 +451,7 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
             )}
             {/* Manual contact edit (manage-only): correct a wrong email/website
                 (or affiliation/h-index) by hand. A typed email is stamped manual
-                → low-confidence at invite (confirm-before-send). */}
+                → quick check at invite (per-recipient acknowledgement). */}
             {!readOnly && canManage && onEdit && !identityUnverified && (
               <button
                 type="button"
@@ -954,7 +998,7 @@ export default function ReviewerSearchSection({
   // isn't a saved Dataverse record yet). Used by the lead "Use this email"
   // promotion (Slice 4) AND the on-card Edit-contact modal. For email/website it
   // stamps `manual` provenance (so emailConfidence → low → the invite flow requires
-  // explicit confirm-before-send) and clears the contact-layer abstain that
+  // explicit quick-check acknowledgement) and clears the contact-layer abstain that
   // withheld a value (e.g. verified_domain_contradiction) so save can persist it.
   // NEVER touches name (the find-card key) or any identity field. Auto-selects so
   // the edit is included on save.
