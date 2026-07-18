@@ -9,6 +9,8 @@ cataloged: 2026-07-18
 owner: product-engineering
 related:
   - docs/audits/reviewer-disambiguation-email-external-alternatives-fable-2026-07-18.md
+  - docs/audits/reviewer-serpapi-contact-strategy-adversarial-2026-07-18.md
+  - docs/REVIEWER_PAGE_FIRST_EMAIL_EXPERIMENT_PLAN.md
   - docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md
   - docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md
   - lib/services/reviewer-identity-evidence.js
@@ -181,8 +183,11 @@ names (changes what the benchmark counts as correct); production cutover.
   (provisional-until-attested). No new schema.
 - **W3.4 Paid-tier decision.** Resolve the Claude/Serp search tiers' fate given
   they currently yield mostly-unsendable `research_only` leads: either route
-  their yield through the page-fetch tier (turn it on for an `institution_page`
-  grade) or retire them to a staff faculty-page link.
+  their yield through the existing page-fetch tier to earn an
+  `institution_page` grade, or retire them to a staff faculty-page link. The
+  staged, manual-burden-capped decision experiment is specified in
+  `REVIEWER_PAGE_FIRST_EMAIL_EXPERIMENT_PLAN.md`; it begins with the frozen
+  13-person hard subset and does not authorize a production change.
 
 **Invariant.** No search-sourced address becomes invitation-sendable
 (Contract 3 unchanged); alternates resolution never promotes a cross-person
@@ -191,7 +196,7 @@ address.
 (harvard.edu subdomains → alternate; unrelated domains → conflict).
 **Gates.** `check:prompt-injection-tagging` + self-test if the Tier-3 surface is
 touched.
-**Owner-gate.** Paid-tier fate; opt-in page-fetch tier on/off.
+**Owner-gate.** Paid-tier fate after the page-first experiment.
 
 ## W4 — Durable identity model `[PLANNED]`
 
@@ -234,7 +239,8 @@ Wave 13.
 2. **Umbrella/exempt org set** beyond HHMI + Broad (CZ Biohub, Simons/HFSP…)?
 3. **Paid search-tier fate** — rehabilitate via the page-fetch tier, or retire to
    a staff faculty-page link?
-4. **Turn on the opt-in page-fetch tier** (`REVIEWER_PAGE_EMAIL_TIER_ENABLED`)?
+4. **Keep the page-fetch tier in the paid-search cascade**, or retain it only as
+   rollback-gated recovery while paid search is retired to staff page links?
 5. **Abstain vs bind-the-right-person** on fragmented famous names — does the
    benchmark keep abstain-expected, or credit a correct bind with a verify flag?
 6. **Buy-vs-build** — evaluate Prophy for the discovery/disambiguation front half
