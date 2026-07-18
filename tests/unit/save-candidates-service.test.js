@@ -66,6 +66,7 @@ const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity-lookup');
 const { loadCoiContext } = require('../../lib/services/reviewer-request-context');
+const { createInstitutionIdentityResolver } = require('../../lib/services/institution-identity-resolver');
 const { ServiceHttpError } = require('../../lib/services/service-http-error');
 const {
   saveCandidates,
@@ -548,6 +549,90 @@ test.each([
   });
   expect(out.rejectedInstitutionCOI).toBeUndefined();
   expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledTimes(1);
+});
+
+test('server-resolved distinct institution ids clear a stale client COI flag', async () => {
+  loadCoiContext.mockResolvedValueOnce({
+    applicantInstitutionContext: { state: 'complete', names: ['University of Michigan'] },
+    piResolution: { state: 'ok', reason: null },
+    institutionEntries: [{
+      identity: 'University of Michigan',
+      display: 'University of Michigan',
+    }],
+  });
+  createInstitutionIdentityResolver.mockReturnValueOnce({
+    resolve: jest.fn(async (name) => (
+      name === 'University of Michigan Ann Arbor'
+        ? {
+            openAlexId: 'I111111111',
+            ror: null,
+            displayName: name,
+          }
+        : {
+            openAlexId: 'I222222222',
+            ror: null,
+            displayName: name,
+          }
+    )),
+  });
+
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Refuted COI',
+      email: 'refuted@example.edu',
+      affiliation: 'University of Michigan Ann Arbor',
+      hasInstitutionCOI: true,
+      contactEnrichment: {
+        coiRecomputed: true,
+        hasInstitutionCOI: true,
+      },
+    }],
+  });
+
+  expect(out).toMatchObject({
+    success: true,
+    savedCount: 1,
+    savedNames: ['Dr Refuted COI'],
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledTimes(1);
+});
+
+test('institution resolver abstention preserves the lexical COI hard block', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  loadCoiContext.mockResolvedValueOnce({
+    applicantInstitutionContext: { state: 'complete', names: ['University of Michigan'] },
+    piResolution: { state: 'ok', reason: null },
+    institutionEntries: [{
+      identity: 'University of Michigan',
+      display: 'University of Michigan',
+    }],
+  });
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Unresolved COI',
+      email: 'unresolved-coi@example.edu',
+      affiliation: 'University of Michigan Ann Arbor',
+      hasInstitutionCOI: true,
+    }],
+  }).catch((error) => error);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    rejectedInstitutionCOI: 1,
+    errors: [{
+      name: 'Dr Unresolved COI',
+      code: 'institution_coi',
+      serverRecomputed: true,
+      decisionSource: 'candidate_payload',
+    }],
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  warn.mockRestore();
 });
 
 test('direct shared MIT affiliation hard-blocks even when the payload also has exempt Broad affiliation', async () => {
