@@ -3,7 +3,7 @@ title: Reviewer Identity & Contact — Disambiguation, Affiliation/COI, and Emai
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "The inert institution substrate and three email improvements are live; COI, disambiguation, broader alternates, and durable identity remain gated."
+summary: "W0/W1 institution and COI corrections plus three email improvements are live; disambiguation, broader alternates, and durable identity remain gated."
 canonical: false
 cataloged: 2026-07-18
 owner: product-engineering
@@ -29,9 +29,9 @@ related:
 the 2026-07-18 assessment. W3.1's NCBI + Europe PMC core-record tier and W3.2's
 narrow current-affiliation alternate tie-break are live. The W3.1 full-text
 fallback and W3.4 page-first cascade completed evaluation and were not promoted.
-W0's additive institution-identity substrate is implemented but deliberately
-has no production caller. W1–W2, broader co-affiliate handling, and W4 remain
-`[PLANNED]` and owner/eval-gated. Rationale and evidence live in the companion audit
+W0's additive institution-identity substrate and W1's affiliation/COI correction
+are implemented. W2, broader email-alternate handling, and W4 remain `[PLANNED]`
+and owner/eval-gated. Rationale and evidence live in the companion audit
 (`docs/audits/reviewer-disambiguation-email-external-alternatives-fable-2026-07-18.md`,
 §§1–5b); this plan holds the *what, in what order, behind which gate*, and does
 not restate the audit's detail. Where this plan and the audit conflict, the
@@ -50,8 +50,11 @@ plan's Wave 13 binding model rather than duplicating it.
   Identity-verified: only 2 of the 7 works false-binds are genuinely unsafe
   (Tsai merged cluster); the recipe recovers ~half the spine's misses.
   `[VERIFIED via run — audit §5a]`
-- COI matcher matches on shared institution id/name with no umbrella exemption;
-  the alias table folds Janelia into HHMI. `[VERIFIED — audit §5b.2]`
+- Before W1, the COI matcher matched shared institution id/name with no umbrella
+  exemption and the alias table folded Janelia into HHMI. W1 now exempts
+  Broad/HHMI-only overlap and separates Janelia. `[HISTORICAL finding; VERIFIED
+  fixed via lib/services/deduplication-service.js and
+  lib/services/discovery/match-signals.js]`
 - OpenAlex `associated_institutions` (typed `parent`/`child`/`related`) links
   Broad→MIT/Harvard, Whitehead→MIT, Harvard→40 affiliated hospitals; IAS→empty.
   `[VERIFIED via probe — audit §5b.3/5b.4]`
@@ -103,13 +106,14 @@ plan's Wave 13 binding model rather than duplicating it.
 
 ---
 
-## W0 — Institution identity substrate (shared foundation) `[IMPLEMENTED 2026-07-18; INERT]`
+## W0 — Institution identity substrate (shared foundation) `[IMPLEMENTED 2026-07-18; ACTIVE FOUNDATION]`
 
 **Result.** One isolated, per-run cached resolver: affiliation string →
 `{ openAlexId, ror,
 country, displayName, associatedInstitutions[] }`, reusing
 `OpenAlexService.searchInstitutions`/`getInstitution`. The resolver is additive
-and has no production caller; W1 and W2 must opt in explicitly.
+and request-scoped. W1 now opts in from COI narrowing, mismatch-alert, and
+identity-corroboration paths; W2 has not opted in.
 
 **Selection contract.** Normalize the affiliation, rank exact name above
 multi-token whole-phrase containment above an explicit acronym, optionally
@@ -119,7 +123,8 @@ matches return `null`; caller cancellation propagates. Settled identities and
 definitive misses are cached only within the resolver instance.
 
 **Invariant.** No persistence or caller mutation; deterministic candidate
-selection returns `null` rather than guessing. Production behavior is unchanged.
+selection returns `null` rather than guessing. W1 callers preserve their lexical
+fallback when resolution abstains or the provider fails.
 **Verification.** Unit fixtures cover HHMI, Broad, Whitehead, IAS (US vs two DE
 identities), Harvard, Dana-Farber, ambiguity, garbage, caching, transient
 provider failure, hydration mismatch, token-boundary matching, and cancellation.
@@ -128,14 +133,16 @@ ambiguous, resolved IAS-US with a country hint, and retained IAS-DE ambiguity
 because OpenAlex returns two equally named German identities.
 **Gate.** Unit tests; no runtime surface or red-gate exposure.
 
-## W1 — Affiliation & COI correctness (highest near-term value; live bug) `[PLANNED]`
+## W1 — Affiliation & COI correctness `[IMPLEMENTED 2026-07-18]`
 
 Fixes false COI hard-drops and false affiliation-mismatch alerts. Ships first
 because it has a live user-visible cost (good reviewers silently dropped).
 
-- **W1.1 ID-space COI matching.** `institutionsMatchForCOI` resolves both sides
-  via W0 and compares ids first; keep the existing name/abbreviation/campus
-  fallback for unresolved cases.
+- **W1.1 ID-space COI matching.** Production discovery, enrichment, workbench,
+  and authoritative save paths use async W0-backed COI decisions. Resolution is
+  deliberately lazy: it may confirm or refute a pre-existing lexical/direct
+  match, but a lexical non-match never becomes a new hard drop. OpenAlex/ROR ids
+  compare first; provider abstention preserves the existing name fallback.
 - **W1.2 Mechanism-2 exemption overlay.** A curated id set (HHMI `I1344073410`,
   Broad `I107606265`) where a *shared* such institution alone is not COI.
   **Scoped to the institute id — a shared parent university still counts.**
@@ -145,9 +152,9 @@ because it has a live user-visible cost (good reviewers silently dropped).
 - **W1.4 Mechanism-1 consistency (mismatch alert + resolver corroboration).**
   Two institutions are consistent when they share an id OR one is in the other's
   `associated_institutions`. Applied to `alert-reviewer-affiliation-mismatch.js`
-  (stop false Broad/MIT, Dana-Farber/Harvard alerts) and to the resolver's
-  institution-corroboration (a hospital `last_known_institution` no longer fails
-  against a claimed university).
+  (stop false Broad/MIT, Dana-Farber/Harvard alerts) and
+  `reviewer-identity-evidence.js` institution corroboration (a hospital
+  `last_known_institution` no longer fails against a claimed university).
 - **W1.5 Hospital firewall.** Explicit invariant + tests that W1.4 never widens
   COI: different hospitals stay distinct (Dana-Farber ≠ MGH → no drop); a
   shared parent ecosystem is at most a soft surfaced signal, never a hard drop.
@@ -161,8 +168,10 @@ Affiliation-mismatch matrix incl. institute/hospital cases.
 **Gates.** `check:route-service-boundary`, `check:dataverse-access-layer` (if the
 save-time COI path is touched) + self-tests, sequentially; `/contract-reconcile`
 before promotion (COI is a fail-closed gate).
-**Owner-gate.** Broad exemption strength (always vs only-when-primary-differs);
-which umbrella orgs beyond HHMI/Broad.
+**Owner decision.** Shared Broad alone is always exempt from automatic hard
+drop, matching HHMI; direct shared MIT/Harvard/hospital/campus affiliations still
+drop. The exempt set remains exactly HHMI + Broad. Any additional umbrella org
+requires a later owner decision.
 
 ## W2 — Works-first disambiguation resolver v2 (eval-gated) `[PLANNED]`
 
@@ -220,10 +229,11 @@ names (changes what the benchmark counts as correct); production cutover.
   subject: Jie Shan moved from a 2-vs-2 conflict to ready at
   `jie.shan@cornell.edu`; every other subject's action/email/status was
   byte-for-byte unchanged (21 ready, 7 quick-check, 12 missing, 0 conflicts).
-  Broader equivalence through registrable domains or OpenAlex
-  `associated_institutions` remains `[PLANNED]`; W0 now provides the grounded
-  institution substrate, but promotion still requires W1 fixtures and the
-  co-affiliate owner policy rather than lexical guessing. `[VERIFIED via
+  Broader email-alternate equivalence through registrable domains or OpenAlex
+  `associated_institutions` remains `[PLANNED]`; W0/W1 now provide the grounded
+  institution and one-hop consistency substrate, but email promotion still
+  requires its own frozen-case evaluation rather than inheriting a COI or
+  identity decision. `[VERIFIED via
   outputs/reviewer-holistic-m1/reviewer-email-scholarly-alternates-40-v3.json
   and tests/unit/scholarly-email.test.js]`
 - **W3.3 Preferred email is reviewer-owned — IMPLEMENTED 2026-07-18.** The
@@ -282,39 +292,36 @@ apply is a distinct owner-approved operation).
 
 | Order | Workstream | Depends on | Ships to | Owner gate |
 |---|---|---|---|---|
-| 1 | W0 substrate `[IMPLEMENTED; INERT]` | — | branch → main (additive, inert) | none (tests only) |
-| 2 | W1 affiliation/COI | W0 | branch → main, tests + contract-reconcile | Broad policy; umbrella set |
+| 1 | W0 substrate `[IMPLEMENTED; ACTIVE FOUNDATION]` | — | branch → main | none |
+| 2 | W1 affiliation/COI `[IMPLEMENTED]` | W0 | branch → main, tests + contract-reconcile | Broad policy closed; future umbrella additions gated |
 | 3 | W2 disambiguation v2 | W0 | seam on main, legacy default | eval gate; cutover |
 | 4 | Broader W3.2 follow-on | W0 | branch → main | co-affiliate policy |
 | 5 | W4 durable model | W2 | additive schema wave | schema apply |
 
-W1 is the highest near-term value (live false-drop bug) and is independent of the
-disambiguation rebuild. W3.1 is closed: keep the live core-record tier and do
-not add the tested full-text fallback. W2 is the largest and is eval-gated. W4
-underpins persistence and reconciles with Wave 13.
+W1 addressed the highest near-term live false-drop bug and remains independent
+of the disambiguation rebuild. W3.1 is closed: keep the live core-record tier
+and do not add the tested full-text fallback. W2 is the largest remaining
+workstream and is eval-gated. W4 underpins persistence and reconciles with Wave 13.
 
 ## Open owner decisions
 
-1. **Broad COI-exemption strength** — always exempt a shared Broad, or only when
-   the two people's primary campuses differ?
-2. **Umbrella/exempt org set** beyond HHMI + Broad (CZ Biohub, Simons/HFSP…)?
-3. **Abstain vs bind-the-right-person** on fragmented famous names — does the
+1. **Umbrella/exempt org set** beyond HHMI + Broad (CZ Biohub, Simons/HFSP…)?
+2. **Abstain vs bind-the-right-person** on fragmented famous names — does the
    benchmark keep abstain-expected, or credit a correct bind with a verify flag?
-4. **Buy-vs-build** — evaluate Prophy for the discovery/disambiguation front half
+3. **Buy-vs-build** — evaluate Prophy for the discovery/disambiguation front half
    (it returns contact info; it is the ERC's tool), or stay fully in-house?
-5. **Next behavioral pick after inert W0** — stabilize (W1 only) vs rebuild
-   (W1→W2→…)?
 
-Closed decisions: W0 institution substrate — implement inertly before behavior
-changes; W3.1 full-text XML fallback — do not promote; W3.4 page-first
-paid-search cascade — do not promote.
+Closed decisions: W0 institution substrate — implemented; W1 — implement the
+no-widening COI correction; shared Broad alone is always exempt, and the exempt
+set is currently HHMI + Broad only; W3.1 full-text XML fallback — do not promote;
+W3.4 page-first paid-search cascade — do not promote.
 
 ## Verification & regression strategy
 
 - The frozen **40-case identity benchmark is the standing regression gate** for
   W2 (and any future disambiguation rule) — extend it, never bypass it. Exact
   numerators/denominators only; no population claims from 40 cases.
-- W1 lands with a COI + affiliation-mismatch **test matrix** as its spec.
+- W1 landed with a COI + affiliation-mismatch **test matrix** as its spec.
 - Relevant red gates run sequentially with self-tests for the surfaces each phase
   touches; `/contract-reconcile` precedes every COI/persistence promotion;
   `/sweep` reconciles durable docs when a changed fact appears in multiple homes.
@@ -324,6 +331,5 @@ paid-search cascade — do not promote.
 Each workstream is "ready to promote" only when its named invariant holds under
 test, its eval/matrix gate passes, the relevant red gates + self-tests are green,
 and its owner gate is answered. Any unverified claim stays `[PLANNED]`/`[ASSUMED]`;
-any red relevant gate blocks completion. The completed inert W0 substrate and
-W3.1/W3.4 decisions do not authorize the remaining planned behavior changes;
-the owner still selects the next behavioral pick (open decision 5).
+any red relevant gate blocks completion. The completed W0/W1 work and W3.1/W3.4
+decisions do not authorize the remaining planned behavior changes.

@@ -60,8 +60,9 @@ jest.mock('../../lib/services/discovery-service', () => ({
 }));
 jest.mock('../../lib/services/deduplication-service', () => ({
   DeduplicationService: {
-    markInstitutionCOI: jest.fn((cands) => cands),
+    markInstitutionCOIResolved: jest.fn(async (cands) => cands),
     institutionCOIDecision: jest.fn(() => null),
+    institutionCOIDecisionResolved: jest.fn(async () => null),
   },
 }));
 jest.mock('../../lib/services/contact-enrichment-service', () => ({

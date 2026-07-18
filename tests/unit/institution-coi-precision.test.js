@@ -19,12 +19,15 @@ describe('institutionsMatchForCOI — curated S321 precision suite', () => {
     ['New York University', 'City University of New York'],
     ['Columbia University', 'University of British Columbia'],
     ['University of Texas at Austin', 'University of Texas at Dallas'],
+    ['Dana-Farber Cancer Institute', 'Massachusetts General Hospital'],
+    ['Institute for Advanced Study', 'Princeton University'],
   ];
 
   const SAME_PAIRS = [
     ['MIT', 'Massachusetts Institute of Technology'],
     ['University of Michigan, Ann Arbor', 'University of Michigan'],
     ['Dept of Chemistry, Stanford University', 'Stanford University'],
+    ['Dana-Farber Cancer Institute', 'Dana-Farber Cancer Institute'],
   ];
 
   test.each(DISTINCT_PAIRS)('does not match distinct institutions: %s vs %s', (a, b) => {
@@ -74,6 +77,138 @@ describe('institutionsMatchForCOI — institution ids first', () => {
       { name: 'MIT', openAlexId: 'https://openalex.org/I63966007' },
       { name: 'Massachusetts Institute of Technology' },
     )).toBe(true);
+  });
+});
+
+describe('institution COI exemptions and campus separation', () => {
+  test.each([
+    ['Broad Institute', 'The Broad Institute'],
+    ['HHMI', 'Howard Hughes Medical Institute'],
+  ])('%s shared alone is visible but is not a hard COI match', (a, b) => {
+    expect(DeduplicationService.institutionsMatchForCOI(a, b)).toBe(false);
+
+    const out = DeduplicationService.partitionConflicts(
+      [{ name: 'Shared institute', affiliation: a, affiliationSource: 'manual' }],
+      [b],
+    );
+
+    expect(out.institutionConflicts).toHaveLength(0);
+    expect(out.institutionFlagged).toHaveLength(1);
+    expect(out.filtered[0]).toMatchObject({
+      name: 'Shared institute',
+      hasInstitutionCOI: true,
+      institutionCOIExempt: true,
+      institutionCOIDetails: {
+        dropDecision: 'exempt',
+        corroborationReason: 'shared_exempt_institution',
+      },
+    });
+  });
+
+  test('Janelia is a distinct campus: self-match drops, while HHMI does not match Janelia', () => {
+    expect(DeduplicationService.institutionsMatchForCOI(
+      'Janelia Research Campus',
+      'Janelia Research Campus',
+    )).toBe(true);
+    expect(DeduplicationService.institutionsMatchForCOI(
+      'Howard Hughes Medical Institute',
+      'Janelia Research Campus',
+    )).toBe(false);
+  });
+
+  test('a direct shared parent/campus wins over an exempt Broad signal', () => {
+    const decision = DeduplicationService.institutionCOIDecision(
+      {
+        name: 'Dual affiliated',
+        affiliation: 'Broad Institute',
+        affiliationSource: 'manual',
+        contactEnrichment: {
+          orcidAffiliation: 'Massachusetts Institute of Technology',
+        },
+      },
+      [
+        { identity: 'Broad Institute', display: 'Broad Institute' },
+        { identity: 'MIT', display: 'MIT' },
+      ],
+    );
+
+    expect(decision).toMatchObject({
+      dropDecision: 'dropped',
+      candidate: {
+        institutionCOIDetails: {
+          piInstitution: 'MIT',
+          reviewerInstitution: 'Massachusetts Institute of Technology',
+        },
+      },
+    });
+  });
+});
+
+describe('partitionConflictsResolved — W0 can narrow but never widen hard drops', () => {
+  test('does not resolve or hard-drop a lexical non-match even when a resolver could map both to one id', async () => {
+    const resolver = {
+      resolve: jest.fn(async () => ({
+        openAlexId: 'https://openalex.org/I1',
+        displayName: 'Shared Parent',
+        associatedInstitutions: [],
+      })),
+    };
+
+    const out = await DeduplicationService.partitionConflictsResolved(
+      [{ name: 'Candidate', affiliation: 'Dana-Farber Cancer Institute' }],
+      ['Massachusetts General Hospital'],
+      [],
+      { resolver },
+    );
+
+    expect(out.filtered).toHaveLength(1);
+    expect(out.institutionConflicts).toHaveLength(0);
+    expect(resolver.resolve).not.toHaveBeenCalled();
+  });
+
+  test('different resolved ids refute a lexical same-name conflict', async () => {
+    const resolver = {
+      resolve: jest.fn()
+        .mockResolvedValueOnce({
+          openAlexId: 'https://openalex.org/I1',
+          displayName: 'Example University',
+          associatedInstitutions: [],
+        })
+        .mockResolvedValueOnce({
+          openAlexId: 'https://openalex.org/I2',
+          displayName: 'Example University',
+          associatedInstitutions: [],
+        }),
+    };
+    const candidate = {
+      name: 'Candidate',
+      affiliation: 'Example University',
+    };
+
+    const out = await DeduplicationService.partitionConflictsResolved(
+      [candidate],
+      ['Example University'],
+      [],
+      { resolver },
+    );
+
+    expect(out.filtered).toEqual([candidate]);
+    expect(out.institutionConflicts).toHaveLength(0);
+    expect(resolver.resolve).toHaveBeenCalledTimes(2);
+  });
+
+  test('provider abstention preserves the legacy lexical hard conflict', async () => {
+    const resolver = { resolve: jest.fn(async () => null) };
+    const out = await DeduplicationService.partitionConflictsResolved(
+      [{ name: 'Candidate', affiliation: 'MIT', affiliationSource: 'manual' }],
+      ['Massachusetts Institute of Technology'],
+      [],
+      { resolver },
+    );
+
+    expect(out.filtered).toHaveLength(0);
+    expect(out.institutionConflicts).toHaveLength(1);
+    expect(resolver.resolve).toHaveBeenCalledTimes(2);
   });
 });
 

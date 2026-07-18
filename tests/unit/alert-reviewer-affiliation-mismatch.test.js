@@ -15,6 +15,9 @@ function makeDeps(overrides = {}) {
       ...overrides.contactsAdapter,
     },
     notify: overrides.notify || jest.fn().mockResolvedValue({ id: 'alert-1' }),
+    institutionConsistency: overrides.institutionConsistency || {
+      areConsistent: jest.fn().mockResolvedValue(false),
+    },
     withDynamicsBypass: overrides.withDynamicsBypass || jest.fn((_label, fn) => fn()),
     warn: overrides.warn || jest.fn(),
   };
@@ -103,6 +106,25 @@ describe('alertReviewerAffiliationMismatch', () => {
     }), deps);
 
     expect(out).toEqual({ skipped: 'match' });
+    expect(deps.notify).not.toHaveBeenCalled();
+  });
+
+  test('one-hop associated affiliation is treated as consistent and skips the alert', async () => {
+    const deps = makeDeps({
+      institutionConsistency: {
+        areConsistent: jest.fn().mockResolvedValue(true),
+      },
+    });
+
+    const out = await alertReviewerAffiliationMismatch(baseArgs({
+      reviewerAffiliation: 'Broad Institute',
+    }), deps);
+
+    expect(out).toEqual({ skipped: 'match' });
+    expect(deps.institutionConsistency.areConsistent).toHaveBeenCalledWith(
+      'Broad Institute',
+      'CRM Account Org',
+    );
     expect(deps.notify).not.toHaveBeenCalled();
   });
 

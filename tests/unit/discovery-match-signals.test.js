@@ -50,6 +50,12 @@ describe('DiscoveryService.checkInstitutionMismatch', () => {
   it('false when both map to the same alias group', () => {
     expect(DiscoveryService.checkInstitutionMismatch('Massachusetts Institute of Technology', 'MIT')).toBe(false);
   });
+  it('does not collapse Janelia Research Campus into HHMI', () => {
+    expect(DiscoveryService.checkInstitutionMismatch(
+      'Janelia Research Campus',
+      'Howard Hughes Medical Institute',
+    )).toBe(true);
+  });
   it('true for two clearly different institutions with no shared significant word', () => {
     expect(DiscoveryService.checkInstitutionMismatch('Stanford', 'Harvard')).toBe(true);
   });
