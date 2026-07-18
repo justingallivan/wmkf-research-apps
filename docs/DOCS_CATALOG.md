@@ -281,6 +281,12 @@ related:
 | [REVIEWER_TRACK_B_IDENTITY_SPEC.md](REVIEWER_TRACK_B_IDENTITY_SPEC.md) | spec | active |  | Original status: PROPOSED. Builds on the shipped S232 ORCID spine (Track A), the S233 honorific + topic-threshold fixes (Fixes 1/2), and the S233... | 2026-07-02 |
 | [REVIEWER_WEB_DISCOVERY_PLAN.md](REVIEWER_WEB_DISCOVERY_PLAN.md) | plan | active |  | - *Probe (not in the app):* scripts/probe-perplexity-reviewer-agent.mjs — one sonar-pro chat call that BOTH searches and reasons, returning... | 2026-07-02 |
 
+## reviewer-operations
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [CLAUDE_SERPAPI_RESOLVER_ADVERSARIAL_REVIEW_PROMPT.md](CLAUDE_SERPAPI_RESOLVER_ADVERSARIAL_REVIEW_PROMPT.md) | draft | active |  | Read-only adversarial review brief for the proposed SerpAPI-first, domain-aware reviewer contact resolution strategy. |  |
+
 ## reviewer-origination
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
