@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-08
+last_verified: 2026-07-18
 stale_after_days: 90
 owner: dev-ops
 source_files:
@@ -9,6 +9,11 @@ source_files:
   - scripts/
   - .github/workflows/
   - .claude/hooks/lib/git-commit-detect.js
+  - .claude/hooks/lib/document-guards.js
+  - .claude/hooks/design-doc-assertion-guard.js
+  - .claude/hooks/pre-review-delegation-trace-guard.js
+  - .claude/hooks/session-lifecycle.js
+  - .claude/settings.json
   - .claude/hooks/enum-parity-commit-guard.js
   - .claude/hooks/trust-boundary-guid-commit-guard.js
 canonical_docs:
@@ -163,14 +168,22 @@ fail open on any other error; then wire it into the `PreToolUse`→`Bash` block 
 
 S330 added a plan/review enforcement layer (Codex-built, designed from the four S330 P0
 coverage-miss mechanisms; shared detectors in **`.claude/hooks/lib/document-guards.js`**,
-plain-node tests beside it). All fail open on internal errors; every blocker has a VISIBLE
-in-artifact escape marker — never a silent env var:
+plain-node tests beside it). All fail open on internal errors. Policy exceptions are
+visible in the artifact or delegation prompt — never a silent env var:
 
 - **`pre-review-delegation-trace-guard.js`** — `PreToolUse(Task|Agent)`. The broad
   LIFECYCLE+PROVENANCE self-trace reminder stays ADVISORY, but repo-local discovery asks in a
   review delegation prompt ("check whether any routes stream") now BLOCK unless adjacent
   TRACED:/Evidence: file:line proof or a `[DELEGATED-DISCOVERY: reason]` escape is present.
+  A fingerprinted adversarial-review receipt marker also BLOCKS unless the same prompt asks
+  for adversarial/refuting review, `file:line` evidence, and a disconfirming check for each
+  recommendation.
   Complements the PostToolUse `codex-verbatim-reminder.js`.
+- **`design-doc-assertion-guard.js`** — `PreToolUse(Write|Edit)`, BLOCKS the narrow
+  detectable pattern of a newly introduced reviewer email plus a strong ownership/identity
+  assertion marker (for example, "almost certainly", "belongs to", or "role mailbox"). Same-sentence
+  source evidence or an explicit hedge passes; broad design/storage claims remain ADVISORY.
+  The settings integration test proves the configured command preserves exit code 2.
 - **`scope-claim-reminder.js`** — `PreToolUse(Write|Edit)`, now BLOCKS plan docs that mix an
   unresolved quantity (TBD/[ASSUMED]) with unqualified derived counts on the same subject.
   Escapes: keep the derived count visibly `[ASSUMED]`, or add `[DERIVED-FROM: <probe>]`;
@@ -183,7 +196,10 @@ in-artifact escape marker — never a silent env var:
 - **`session-lifecycle.js`** — tracks docs touched this session; when a `scripts/`/`lib/`
   source file changes afterward, docs mentioning it get flagged and UNRESOLVED plan/design-doc
   staleness blocks at Stop. Acks: `[RECHECKED after <path> change: ...]` or
-  `[STALE-ACCEPTED: ...]` on a line mentioning the changed path.
+  `[STALE-ACCEPTED: ...]` on a line mentioning the changed path. It also fingerprints
+  consequential review artifacts and blocks Stop until a qualified fresh-agent receipt
+  matches the current file, or the artifact contains
+  `<!-- adversarial-review:waived reason=specific reason -->`.
 
 ## Standard Probe
 

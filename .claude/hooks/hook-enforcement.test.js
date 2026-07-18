@@ -7,8 +7,14 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const {
   detectStaleDocWarnings,
+  fingerprint,
+  record,
+  recordAdversarialReview,
+  statePath,
+  unresolvedAdversarialReviewRequirements,
   unresolvedStaleDocWarnings,
 } = require('./session-lifecycle');
+const { checkAgentInvariants } = require('../../scripts/check-agent-invariants');
 
 const HOOK_DIR = __dirname;
 
@@ -23,6 +29,38 @@ function write(file, text) {
 
 function runHook(script, input) {
   return spawnSync(process.execPath, [path.join(HOOK_DIR, script)], {
+    input: JSON.stringify(input),
+    encoding: 'utf8',
+  });
+}
+
+function runHookRaw(script, input) {
+  return spawnSync(process.execPath, [path.join(HOOK_DIR, script)], {
+    input,
+    encoding: 'utf8',
+  });
+}
+
+function configuredHookCommand(scriptName) {
+  const root = path.resolve(HOOK_DIR, '../..');
+  const settings = JSON.parse(fs.readFileSync(path.join(root, '.claude/settings.json'), 'utf8'));
+  for (const entries of Object.values(settings.hooks || {})) {
+    for (const entry of entries || []) {
+      for (const hook of entry.hooks || []) {
+        if (hook.command?.includes(scriptName)) return hook.command;
+      }
+    }
+  }
+  return null;
+}
+
+function runConfiguredHook(scriptName, input) {
+  const root = path.resolve(HOOK_DIR, '../..');
+  const command = configuredHookCommand(scriptName);
+  assert.ok(command, `${scriptName} is not wired in .claude/settings.json`);
+  return spawnSync('/bin/bash', ['-lc', command], {
+    cwd: root,
+    env: { ...process.env, CLAUDE_PROJECT_DIR: root },
     input: JSON.stringify(input),
     encoding: 'utf8',
   });
@@ -120,6 +158,37 @@ test('review delegation guard allows adjacent trace evidence', () => {
         'TRACED:',
         '- pages/api/foo.js:12 checked stream handling; none found.',
         'Check whether any routes stream.',
+      ].join('\n'),
+    },
+  });
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.match(result.stdout, /SELF-TRACE GATE/);
+});
+
+test('review delegation guard rejects an incomplete adversarial receipt prompt', () => {
+  const result = runHook('pre-review-delegation-trace-guard.js', {
+    tool_name: 'Task',
+    tool_input: {
+      subagent_type: 'codex',
+      prompt: [
+        '[ADVERSARIAL-REVIEW-RECEIPT: docs/audits/example.md]',
+        'Perform an adversarial review with file:line evidence.',
+      ].join('\n'),
+    },
+  });
+  assert.strictEqual(result.status, 2, result.stderr);
+  assert.match(result.stderr, /without the full review contract/);
+});
+
+test('review delegation guard accepts a complete adversarial receipt prompt', () => {
+  const result = runHook('pre-review-delegation-trace-guard.js', {
+    tool_name: 'Task',
+    tool_input: {
+      subagent_type: 'codex',
+      prompt: [
+        '[ADVERSARIAL-REVIEW-RECEIPT: docs/audits/example.md]',
+        'Perform an adversarial review with file:line evidence.',
+        'For each recommendation, name a disconfirming check.',
       ].join('\n'),
     },
   });
@@ -274,6 +343,144 @@ test('scope claim reminder still blocks a real count inside a Markdown list item
   });
   assert.strictEqual(result.status, 2, result.stderr);
   assert.match(result.stderr, /unresolved quantity uncertainty/);
+});
+
+test('design assertion guard blocks the Zhang-style reviewer-email ownership claim', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-assertion-guard-'));
+  const result = runHook('design-doc-assertion-guard.js', {
+    tool_name: 'Write',
+    cwd: root,
+    tool_input: {
+      file_path: path.join(root, 'docs/REVIEWER_AUDIT.md'),
+      content: '`zhang@mit.edu` is almost certainly a different Zhang or a role mailbox, not Feng Zhang\'s personal address.',
+    },
+  });
+  assert.strictEqual(result.status, 2, result.stderr);
+  assert.match(result.stderr, /reviewer-email ownership\/identity claim/);
+});
+
+test('design assertion guard permits sourced, assumed, and enumerated-example forms', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-assertion-guard-'));
+  const variants = [
+    '`zhang@mit.edu` is Feng Zhang\'s published address (https://mcgovern.mit.edu/profile/feng-zhang/).',
+    '`zhang@mit.edu` may be Feng Zhang\'s address [ASSUMED].',
+    '`zhang@mit.edu` is almost certainly a different Zhang. <!-- assertion-exempt: quoted-example -->',
+  ];
+  for (const content of variants) {
+    const result = runHook('design-doc-assertion-guard.js', {
+      tool_name: 'Write',
+      cwd: root,
+      tool_input: { file_path: path.join(root, 'docs/REVIEWER_AUDIT.md'), content },
+    });
+    assert.strictEqual(result.status, 0, `${content}\n${result.stderr}`);
+  }
+});
+
+test('design assertion guard fails open on malformed hook input', () => {
+  const result = runHookRaw('design-doc-assertion-guard.js', '{not-json');
+  assert.strictEqual(result.status, 0, result.stderr);
+});
+
+test('configured design assertion hook preserves the intentional blocking exit', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-assertion-wiring-'));
+  const result = runConfiguredHook('design-doc-assertion-guard.js', {
+    tool_name: 'Write',
+    cwd: root,
+    tool_input: {
+      file_path: path.join(root, 'docs/REVIEWER_AUDIT.md'),
+      content: '`zhang@mit.edu` is almost certainly a different Zhang or a role mailbox.',
+    },
+  });
+  assert.strictEqual(result.status, 2, result.stderr);
+});
+
+test('adversarial review receipt is fingerprint-bound and becomes stale after an edit', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-review-receipt-'));
+  const rel = 'docs/audits/example.md';
+  const full = path.join(root, rel);
+  const stateFile = path.join(root, 'state.json');
+  const reviewText = [
+    '# Verdict',
+    'NEEDS WORK',
+    '# Prioritized Findings',
+    'Recommendation: change the execution order.',
+  ].join('\n');
+  write(full, reviewText);
+  write(stateFile, JSON.stringify({
+    version: 3,
+    baseline: {},
+    baselineInvariantFailures: [],
+    touched: [],
+    touchLog: [],
+    staleDocWarnings: [],
+    adversarialReviewRequirements: {},
+    adversarialReviewReceipts: {},
+    gateCache: {},
+  }));
+
+  record({ tool_input: { file_path: full } }, root, stateFile);
+  let state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  assert.strictEqual(unresolvedAdversarialReviewRequirements(root, state).length, 1);
+
+  recordAdversarialReview({
+    tool_input: {
+      prompt: [
+        `[ADVERSARIAL-REVIEW-RECEIPT: ${rel}]`,
+        'Run an adversarial refutation.',
+        'For each recommendation, provide file:line evidence and a disconfirming check.',
+      ].join('\n'),
+    },
+  }, root, stateFile);
+  state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  assert.strictEqual(unresolvedAdversarialReviewRequirements(root, state).length, 0);
+
+  write(full, `${reviewText}\nCorrection: updated after review.\n`);
+  record({ tool_input: { file_path: full } }, root, stateFile);
+  state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  assert.strictEqual(unresolvedAdversarialReviewRequirements(root, state).length, 1);
+
+  write(full, `${reviewText}\n<!-- adversarial-review:waived reason=owner accepted residual -->\n`);
+  assert.strictEqual(unresolvedAdversarialReviewRequirements(root, state).length, 0);
+});
+
+test('session Stop blocks a consequential review with no current receipt', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-review-stop-'));
+  write(path.join(root, 'CLAUDE.md'), '# Test instructions\n');
+  fs.mkdirSync(path.join(root, '.claude', 'skills'), { recursive: true });
+  fs.mkdirSync(path.join(root, '.claude-memory'), { recursive: true });
+  const rel = 'docs/audits/example.md';
+  write(path.join(root, rel), [
+    '# Verdict',
+    'NEEDS WORK',
+    '# Prioritized Findings',
+    'Recommendation: change the execution order.',
+  ].join('\n'));
+  const sessionId = `test-${Date.now()}`;
+  const file = statePath({ session_id: sessionId }, root);
+  const baselineInvariantFailures = checkAgentInvariants(root)
+    .filter((item) => !item.ok)
+    .map((item) => item.name);
+  write(file, JSON.stringify({
+    version: 3,
+    root,
+    baseline: {},
+    baselineInvariantFailures,
+    touched: [rel],
+    touchLog: [{ path: rel, at: new Date().toISOString() }],
+    staleDocWarnings: [],
+    adversarialReviewRequirements: {
+      [rel]: { fingerprint: fingerprint(root, rel), requiredAt: new Date().toISOString() },
+    },
+    adversarialReviewReceipts: {},
+    gateCache: {},
+  }));
+  const result = spawnSync(process.execPath, [path.join(HOOK_DIR, 'session-lifecycle.js'), 'stop'], {
+    cwd: root,
+    input: JSON.stringify({ cwd: root, session_id: sessionId }),
+    encoding: 'utf8',
+  });
+  assert.strictEqual(result.status, 2, result.stderr);
+  assert.match(result.stderr, /Adversarial review receipt missing or stale/);
 });
 
 test('session lifecycle detects unresolved strict same-session doc staleness', () => {
