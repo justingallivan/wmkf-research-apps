@@ -77,6 +77,24 @@ describe('sendAcceptanceConfirmationEmail — golden path', () => {
       actingUserSystemId: 'su-1',
     }));
   });
+
+  test('reviewer-confirmed engagement email wins over the older person-record email', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue(null);
+    const send = jest.spyOn(DynamicsService, 'createAndSendEmail').mockResolvedValue(undefined);
+
+    await sendAcceptanceConfirmationEmail({
+      suggestion: { wmkf_revieweremail: 'confirmed@current.edu' },
+      request: { akoya_requestid: 'req-1b' },
+      reviewer: {
+        wmkf_name: 'Jane Reviewer',
+        wmkf_emailaddress: 'stale@former.edu',
+      },
+    });
+
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
+      to: 'confirmed@current.edu',
+    }));
+  });
 });
 
 describe('sendAcceptanceConfirmationEmail — PD lookup fallback', () => {

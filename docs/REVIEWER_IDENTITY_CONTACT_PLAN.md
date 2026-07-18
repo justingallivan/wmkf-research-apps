@@ -3,7 +3,7 @@ title: Reviewer Identity & Contact — Disambiguation, Affiliation/COI, and Emai
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "Active roadmap: structured scholarly email and its narrow alternate tie-break are live; full-text XML and page-first fallbacks were not promoted."
+summary: "Structured scholarly email, a narrow alternate tie-break, and reviewer-owned preferred-email attestation are live; other fallbacks were not promoted."
 canonical: false
 cataloged: 2026-07-18
 owner: product-engineering
@@ -28,7 +28,7 @@ related:
 the 2026-07-18 assessment. W3.1's NCBI + Europe PMC core-record tier and W3.2's
 narrow current-affiliation alternate tie-break are live. The W3.1 full-text
 fallback and W3.4 page-first cascade completed evaluation and were not promoted.
-W0–W2, broader co-affiliate handling, W3.3, and W4 remain `[PLANNED]` and
+W0–W2, broader co-affiliate handling, and W4 remain `[PLANNED]` and
 owner/eval-gated. Rationale and evidence live in the companion audit
 (`docs/audits/reviewer-disambiguation-email-external-alternatives-fable-2026-07-18.md`,
 §§1–5b); this plan holds the *what, in what order, behind which gate*, and does
@@ -179,7 +179,7 @@ No new rule without a first failing benchmark case (invariant 6).
 **Owner-gate.** The abstain-vs-bind-right-person policy on fragmented famous
 names (changes what the benchmark counts as correct); production cutover.
 
-## W3 — Email discovery `[ACTIVE; W3.1/W3.4 DECIDED; W3.2 NARROW RULE LIVE]`
+## W3 — Email discovery `[ACTIVE; W3.1/W3.3/W3.4 DECIDED; W3.2 NARROW RULE LIVE]`
 
 - **W3.1 Structured corresponding-author email — DECIDED 2026-07-18: keep the
   live core-record tier; do not add the tested OA full-text fallback.** The live
@@ -211,9 +211,16 @@ names (changes what the benchmark counts as correct); production cutover.
   guessed lexically. `[VERIFIED via
   outputs/reviewer-holistic-m1/reviewer-email-scholarly-alternates-40-v3.json
   and tests/unit/scholarly-email.test.js]`
-- **W3.3 Preferred email is reviewer-owned.** Pick a deliverable address for the
-  invite; the magic-link accept confirms/corrects the preferred one
-  (provisional-until-attested). No new schema.
+- **W3.3 Preferred email is reviewer-owned — IMPLEMENTED 2026-07-18.** The
+  deliverable address sends the invitation and prefills the magic-link accept
+  form. Acceptance confirms or corrects the engagement-scoped address on the
+  suggestion row; the post-accept confirmation now prefers that reviewer-attested
+  address over the older person-record email. A differing CRM contact email is
+  alerted for staff reconciliation rather than silently overwritten. No new
+  schema. `[VERIFIED via Stage2aView.js → respond-service.js →
+  reviewer-suggestion.js → reviewer-acceptance-drain.js →
+  reviewer-acceptance-email.js plus tests/unit/reviewer-acceptance-drain.test.js
+  and tests/unit/reviewer-acceptance-email.test.js]`
 - **W3.4 Paid-tier decision — DECIDED 2026-07-18: do not promote the tested
   page-first cascade.** The staged experiment completed with zero manually
   confirmed wrong-person results, but the fresh 20-person cohort gained only
@@ -263,7 +270,7 @@ apply is a distinct owner-approved operation).
 | 1 | W0 substrate | — | main (additive, inert) | none (tests only) |
 | 2 | W1 affiliation/COI | W0 | branch → main, tests + contract-reconcile | Broad policy; umbrella set |
 | 3 | W2 disambiguation v2 | W0 | seam on main, legacy default | eval gate; cutover |
-| 4 | Broader W3.2 + W3.3 follow-on | W0 | branch → main | co-affiliate/preferred-address policy |
+| 4 | Broader W3.2 follow-on | W0 | branch → main | co-affiliate policy |
 | 5 | W4 durable model | W2 | additive schema wave | schema apply |
 
 W1 is the highest near-term value (live false-drop bug) and is independent of the

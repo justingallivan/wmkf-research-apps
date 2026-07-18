@@ -133,6 +133,26 @@ describe('processReviewerAcceptanceJob', () => {
     expect(d.jobs.completeReviewerAcceptanceJob).toHaveBeenCalledWith(77, expect.any(String));
   });
 
+  it('passes the current reviewer-confirmed engagement email to the confirmation sender', async () => {
+    const d = deps(acceptedSuggestion({
+      wmkf_revieweremail: 'confirmed@current.edu',
+    }));
+    d.potentialReviewers.getById.mockResolvedValueOnce(reviewer({
+      wmkf_emailaddress: 'stale@former.edu',
+    }));
+
+    await processReviewerAcceptanceJob(job(), d);
+
+    expect(d.sendAcceptanceEmail).toHaveBeenCalledWith(expect.objectContaining({
+      suggestion: expect.objectContaining({
+        wmkf_revieweremail: 'confirmed@current.edu',
+      }),
+      reviewer: expect.objectContaining({
+        wmkf_emailaddress: 'stale@former.edu',
+      }),
+    }));
+  });
+
   it('re-accept jobs retry follow-up work but skip one-time confirmation and quota', async () => {
     const d = deps();
     await processReviewerAcceptanceJob(job({ isAcceptRepeat: true }), d);

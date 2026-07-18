@@ -29,8 +29,11 @@
 > `<corresp>` parsing are preserved as the historical audit position; the
 > narrow W3.2 current-affiliation tie-break subsequently recovered the one
 > measured structured conflict (Jie Shan at Cornell) while retaining broader
-> ties as conflicts. The authoritative decisions are
-> `docs/REVIEWER_IDENTITY_CONTACT_PLAN.md` W3.1/W3.2.
+> ties as conflicts. W3.3 was also verified end to end: magic-link acceptance
+> persists the reviewer-confirmed engagement email, and the post-accept
+> confirmation now prefers it over an older person-record address. The
+> authoritative decisions are `docs/REVIEWER_IDENTITY_CONTACT_PLAN.md`
+> W3.1–W3.3.
 
 ---
 
