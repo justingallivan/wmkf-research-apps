@@ -101,8 +101,8 @@ plan's Wave 13 binding model rather than duplicating it.
   alternate-aware email; evidence-bundle persistence.
 - **Non-goals:** reviving retrieval-first origination or Track B; re-gating COI
   more aggressively (this plan only *narrows* false drops); new external data
-  vendors (Prophy evaluation is an owner decision, not assumed); changing the
-  origination engine (Claude stays the spine).
+  vendors (the owner has closed the Prophy option and chosen the in-house
+  resolver); changing the origination engine (Claude stays the spine).
 
 ---
 
@@ -308,13 +308,13 @@ workstream and is eval-gated. W4 underpins persistence and reconciles with Wave 
 1. **Umbrella/exempt org set** beyond HHMI + Broad (CZ Biohub, Simons/HFSP…)?
 2. **Abstain vs bind-the-right-person** on fragmented famous names — does the
    benchmark keep abstain-expected, or credit a correct bind with a verify flag?
-3. **Buy-vs-build** — evaluate Prophy for the discovery/disambiguation front half
-   (it returns contact info; it is the ERC's tool), or stay fully in-house?
 
 Closed decisions: W0 institution substrate — implemented; W1 — implement the
 no-widening COI correction; shared Broad alone is always exempt, and the exempt
 set is currently HHMI + Broad only; W3.1 full-text XML fallback — do not promote;
-W3.4 page-first paid-search cascade — do not promote.
+W3.4 page-first paid-search cascade — do not promote; buy-vs-build — continue
+with the in-house resolver and do not evaluate Prophy. `[OWNER DECISION
+2026-07-18; owner-reported Prophy assessment, not independently benchmarked]`
 
 ## Verification & regression strategy
 

@@ -53,9 +53,10 @@ before merging. This is Tier 1+ runtime work and must not land directly on
 
 W2 works-first disambiguation remains unstarted and eval-gated. The open owner
 questions are whether to add any umbrella organization beyond HHMI/Broad,
-whether the frozen benchmark should credit a correct-but-flagged bind for
-fragmented famous names, and whether to evaluate Prophy versus continue the
-in-house resolver.
+and whether the frozen benchmark should credit a correct-but-flagged bind for
+fragmented famous names. The buy-vs-build question is closed: continue the
+in-house resolver and do not evaluate Prophy. `[OWNER DECISION 2026-07-18;
+owner-reported Prophy assessment, not independently benchmarked]`
 
 For W2, the frozen 40-case identity benchmark is not on this branch; retrieve it
 with:

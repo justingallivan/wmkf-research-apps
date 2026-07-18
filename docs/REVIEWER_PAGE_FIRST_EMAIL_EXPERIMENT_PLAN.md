@@ -10,7 +10,6 @@ owner: product-engineering
 related:
   - docs/REVIEWER_IDENTITY_CONTACT_PLAN.md
   - docs/audits/reviewer-serpapi-contact-strategy-adversarial-2026-07-18.md
-  - outputs/reviewer-holistic-m1/reviewer-email-serp-lab-query-variants-v1.json
   - scripts/evaluate-serp-lab-query-variants.mjs
   - lib/services/contact-enrichment-service.js
   - lib/services/contact-enrichment/page-email.js
