@@ -45,6 +45,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 }));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   stampSuggestionAnchor: jest.fn(async () => ({ updated: 1 })),
+  findEligibilityByCandidateKey: jest.fn(async () => null),
 }));
 jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
   lookupReviewerIdentity: jest.fn(async () => ({ outcome: 'none' })),
@@ -162,6 +163,7 @@ test('happy-path response envelope is pinned exactly (single resolved candidate)
     rejectedInvalid: undefined,
     rejectedUnresolved: undefined,
     rejectedInstitutionCOI: undefined,
+    rejectedIneligible: undefined,
     errors: undefined,
   });
   expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalledWith(
@@ -192,6 +194,7 @@ test('422 envelope pinned exactly when every candidate is rejected as unresolved
     rejectedInvalid: 0,
     rejectedUnresolved: 1,
     rejectedInstitutionCOI: 0,
+    rejectedIneligible: 0,
     errors: [{
       name: 'Dr Unresolved',
       candidateKey: expect.any(String),
@@ -223,6 +226,7 @@ test('500 envelope pinned exactly when every candidate fails a non-identity adap
     rejectedInvalid: undefined,
     rejectedUnresolved: undefined,
     rejectedInstitutionCOI: undefined,
+    rejectedIneligible: undefined,
     errors: [expect.objectContaining({
       name: 'Dr Fails',
       candidateKey: expect.any(String),

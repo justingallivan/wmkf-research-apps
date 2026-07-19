@@ -36,6 +36,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   stampSuggestionAnchor: jest.fn(async () => ({ updated: 1 })),
   findIdentityConfirmation: jest.fn(async () => null),
+  findEligibilityByCandidateKey: jest.fn(async () => null),
 }));
 jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
   verifyAutomatedIdentityAttestation: jest.fn(async () => ({ valid: true, source: 'automated_resolver' })),
@@ -64,6 +65,8 @@ const contactAdapter = require('../../lib/dataverse/adapters/contact');
 const accountAdapter = require('../../lib/dataverse/adapters/account');
 const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
+const reviewerRosterStore = require('../../lib/services/reviewer-roster-store');
+const { verifyAutomatedIdentityAttestation } = require('../../lib/services/reviewer-candidate-attestation');
 const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity-lookup');
 const { loadCoiContext } = require('../../lib/services/reviewer-request-context');
 const { createInstitutionIdentityResolver } = require('../../lib/services/institution-identity-resolver');
@@ -113,6 +116,7 @@ test('422 SaveCandidatesError with the full body (both rejected counts always pr
     rejectedInvalid: 0,
     rejectedUnresolved: 1,
     rejectedInstitutionCOI: 1,
+    rejectedIneligible: 0,
     errors: [
       {
         name: 'Dr Unresolved',
@@ -132,6 +136,81 @@ test('422 SaveCandidatesError with the full body (both rejected counts always pr
   });
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
   expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+});
+
+test('direct deceased evidence is rejected before any Dataverse write', async () => {
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{ name: 'Dr Deceased', eligibilityStatus: 'deceased' }],
+  }).catch((error) => error);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    rejectedIneligible: 1,
+    errors: [expect.objectContaining({
+      name: 'Dr Deceased',
+      code: 'candidate_ineligible',
+    })],
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+});
+
+test('durable eligibility lookup uses the signed pre-enrichment roster key', async () => {
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+    valid: true,
+    source: 'automated_resolver',
+    eligibilityStatus: 'unknown',
+    rosterCandidateKey: 'candidate:pre-enrichment',
+  });
+  reviewerRosterStore.findEligibilityByCandidateKey.mockResolvedValueOnce({
+    rosterStatus: 'ineligible',
+    eligibilityStatus: 'deceased',
+  });
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Changed',
+      candidateKey: 'candidate:pre-enrichment',
+      email: 'new.email@example.edu',
+      affiliation: 'New University',
+      automatedIdentityAttestation: 'signed',
+    }],
+  }).catch((error) => error);
+
+  expect(reviewerRosterStore.findEligibilityByCandidateKey)
+    .toHaveBeenCalledWith(BASE.requestId, 'candidate:pre-enrichment');
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.body).toMatchObject({ rejectedIneligible: 1 });
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['missing', { valid: false, reason: 'no_token' }],
+  ['legacy receipt without a signed roster key', { valid: true, source: 'automated_resolver' }],
+])('roster-managed candidate fails closed with %s eligibility receipt', async (_label, receipt) => {
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce(receipt);
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Managed',
+      candidateKey: 'candidate:pre-enrichment',
+      eligibilityStatus: 'unknown',
+      automatedIdentityAttestation: receipt.valid ? 'legacy-signed' : null,
+    }],
+  }).catch((error) => error);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    rejectedUnresolved: 1,
+    errors: [expect.objectContaining({ code: 'identity_attestation_required' })],
+  });
+  expect(reviewerRosterStore.findEligibilityByCandidateKey).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
 });
 
 test('500 SaveCandidatesError when nothing saved for non-rejection reasons; rejected* keys stay undefined', async () => {

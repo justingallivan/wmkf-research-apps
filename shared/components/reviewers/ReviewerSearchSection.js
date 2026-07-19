@@ -234,6 +234,8 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const hIndex = c.hIndex ?? enr.hIndex ?? null;
   const citations = c.totalCitations ?? enr.totalCitations ?? null;
   const coauthorships = Array.isArray(c.coauthorships) ? c.coauthorships : [];
+  const eligibilityStatus = c.eligibilityStatus || enr.eligibilityStatus || 'unknown';
+  const eligibilityEvidence = c.eligibilityEvidence || enr.eligibilityEvidence || null;
 
   // A cited/PI-named candidate the spine couldn't auto-verify is selectable (the PI vouched for
   // them) but its contact/bibliometrics are force-nulled at save (save-candidates) until identity
@@ -358,6 +360,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             {c.isApplicantRecommended
               ? <Pill tone="green">Applicant recommended</Pill>
               : <Pill tone={provenanceGroupOf(c) === 'needs_identity_review' ? 'amber' : 'gray'}>{provenanceLabel}</Pill>}
+            {eligibilityStatus === 'emeritus' && <Pill tone="amber">Emeritus / retired</Pill>}
             {previousResult && <Pill tone="blue">Previously found</Pill>}
             {/* A cited/PI-named candidate the spine couldn't auto-verify is SELECTABLE (the PI
                 vouched for them) but its contact/bibliometrics are force-nulled at save until
@@ -367,6 +370,20 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               <Pill tone="amber">⚠ Verify identity — no contact saved until confirmed</Pill>
             )}
           </div>
+          {eligibilityStatus === 'emeritus' && eligibilityEvidence?.url && (
+            <p className="mt-1 text-[11px] text-amber-700">
+              Lower priority because an{' '}
+              <a
+                href={eligibilityEvidence.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                official institutional source
+              </a>{' '}
+              identifies this reviewer as emeritus or retired.
+            </p>
+          )}
 
           {!identityUnverified && (
             <div className="mt-2 flex items-center flex-wrap gap-2 text-xs">
@@ -592,6 +609,7 @@ export default function ReviewerSearchSection({
   // set, and the full surfaced-name list fed into the cross-run dedup.
   const [rosterActive, setRosterActive] = useState([]);
   const [rosterExcluded, setRosterExcluded] = useState([]);
+  const [rosterIneligible, setRosterIneligible] = useState([]);
   const [rosterNames, setRosterNames] = useState([]);
   // Gates the search button until the roster GET resolves, so a run can't skip
   // the cross-run dedup by firing before rosterNames is loaded (Codex post-impl).
@@ -645,7 +663,7 @@ export default function ReviewerSearchSection({
     setPhase('idle'); setProgress([]); setCandidates([]); setUnverified([]); setAnalysis(null);
     setSelected(new Set()); setError(null); setErrorMeta(null); setSavedMsg(null); setEnrichNote(null); setExportError(null);
     setExcludedRemoved(0); setRosterNote(null); setRemovingPrevious(false);
-    setRosterActive([]); setRosterExcluded([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false);
+    setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false);
     setSearchSources({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
     setReviewerCount(DEFAULT_REVIEWER_COUNT);
     setAdditionalNotes('');
@@ -669,6 +687,7 @@ export default function ReviewerSearchSection({
           if (res.ok && data.success) {
             setRosterActive(Array.isArray(data.active) ? data.active : []);
             setRosterExcluded(Array.isArray(data.excluded) ? data.excluded : []);
+            setRosterIneligible(Array.isArray(data.ineligible) ? data.ineligible : []);
             setRosterNames(Array.isArray(data.allNames) ? data.allNames : []);
           }
         } catch { /* best-effort — a missing roster just means no dedup/restore this load */ }
@@ -865,8 +884,18 @@ export default function ReviewerSearchSection({
         enriched = [...enriched.filter((c) => !c.aiFlaggedNotRelevant), ...offTopic];
       }
       const dedupedEnriched = dedupeByName(enriched);
+      const deceasedCandidates = dedupedEnriched.filter((candidate) => (
+        (candidate.eligibilityStatus || candidate.contactEnrichment?.eligibilityStatus) === 'deceased'
+      ));
+      const eligibleCandidates = dedupedEnriched.filter((candidate) => (
+        (candidate.eligibilityStatus || candidate.contactEnrichment?.eligibilityStatus) !== 'deceased'
+      ));
 
-      setCandidates(dedupedEnriched);
+      setCandidates(eligibleCandidates);
+      setRosterIneligible((prev) => dedupeByName([
+        ...deceasedCandidates.map(pruneCandidateForRoster),
+        ...prev,
+      ]));
       setUnverified(unverifiedKept.map((c) => withReviewerProvenance(c)));
       setBlockedReferredSeeds(blockedReferredRaw);
       if (enrichFailed) {
@@ -881,6 +910,8 @@ export default function ReviewerSearchSection({
       if (dedupedEnriched.length > 0 && requestId) {
         try {
           const pruned = dedupedEnriched.map(pruneCandidateForRoster);
+          const prunedEligible = pruned.filter((candidate) => candidate.eligibilityStatus !== 'deceased');
+          const prunedIneligible = pruned.filter((candidate) => candidate.eligibilityStatus === 'deceased');
           const rRes = await fetch('/api/workbench/reviewer-roster', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -890,7 +921,8 @@ export default function ReviewerSearchSection({
           if (rRes.ok) {
             // Merge into the existing active roster (prior runs persist), pruned
             // DTOs deduped by normalized name.
-            setRosterActive((prev) => dedupeByName([...pruned, ...prev]));
+            setRosterActive((prev) => dedupeByName([...prunedEligible, ...prev]));
+            setRosterIneligible((prev) => dedupeByName([...prunedIneligible, ...prev]));
             setRosterNames((prev) => Array.from(new Set([...prev, ...dedupedEnriched.map((c) => c.name)])));
             setRosterNote(null);
           } else {
@@ -942,7 +974,18 @@ export default function ReviewerSearchSection({
       });
       if (streamError) throw new Error(streamError);
       if (genRef.current !== myGen) return; // context changed — abort
-      setRecCandidates(Array.isArray(result) ? result : []);
+      const recommendedResults = Array.isArray(result) ? result : [];
+      setRecCandidates(recommendedResults.filter((candidate) => (
+        (candidate.eligibilityStatus || candidate.contactEnrichment?.eligibilityStatus) !== 'deceased'
+      )));
+      setRosterIneligible((prev) => dedupeByName([
+        ...recommendedResults
+          .filter((candidate) => (
+            (candidate.eligibilityStatus || candidate.contactEnrichment?.eligibilityStatus) === 'deceased'
+          ))
+          .map(pruneCandidateForRoster),
+        ...prev,
+      ]));
       setRecPhase('done');
     } catch (e) {
       if (genRef.current === myGen) { setRecError(e.message); setRecPhase('error'); }
@@ -955,7 +998,7 @@ export default function ReviewerSearchSection({
   // ingested recommendations are ready. Runs independently of the Claude search —
   // enrichment uses blobUrl directly for COI if no prior analysis result exists.
   // Defined after enrichRecommended to avoid a temporal dead zone reference error.
-  const haveValidCache = hasValidApplicantEnrichmentCache(rosterActive, proposalKey);
+  const haveValidCache = hasValidApplicantEnrichmentCache([...rosterActive, ...rosterIneligible], proposalKey);
   useEffect(() => {
     const selectableCount = recommended.length;
     if (recPhase !== 'idle' || recRunningRef.current) return;
@@ -1018,7 +1061,7 @@ export default function ReviewerSearchSection({
   // verified row always wins over its unverified twin. Excluded names drop too —
   // they already have their own collapsed section.
   const knownNameKeys = new Set(
-    [...displayCandidates.map(candKey), ...rosterExcluded.map(candKey)].filter(Boolean)
+    [...displayCandidates.map(candKey), ...rosterExcluded.map(candKey), ...rosterIneligible.map(candKey)].filter(Boolean)
   );
   const unverifiedToShow = unverified.filter((c) => !knownNameKeys.has(candKey(c)));
 
@@ -1102,6 +1145,7 @@ export default function ReviewerSearchSection({
       if (!res.ok || !data.success) throw new Error(data.error || 'remove failed');
       setRosterActive(Array.isArray(data.active) ? data.active : []);
       setRosterExcluded(Array.isArray(data.excluded) ? data.excluded : []);
+      setRosterIneligible(Array.isArray(data.ineligible) ? data.ineligible : []);
       setRosterNames(Array.isArray(data.allNames) ? data.allNames : []);
       setSelected((prev) => {
         const next = new Set(prev);
@@ -1717,7 +1761,7 @@ export default function ReviewerSearchSection({
           {/* Durable roster + this-run results — rendered INDEPENDENT of `phase`
               so the per-request candidate list (active + the collapsed Excluded
               set) shows on reload and even when no proposal is loaded. */}
-          {(displayCandidates.length > 0 || rosterExcluded.length > 0 || phase === 'results' || phase === 'done') && (
+          {(displayCandidates.length > 0 || rosterExcluded.length > 0 || rosterIneligible.length > 0 || phase === 'results' || phase === 'done') && (
             <div className="space-y-3 mt-3">
               {savedMsg && <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm">{savedMsg}</div>}
               {enrichNote && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{enrichNote}</div>}
@@ -1757,7 +1801,7 @@ export default function ReviewerSearchSection({
                   </ul>
                 </div>
               )}
-              {displayCandidates.length === 0 && rosterExcluded.length === 0 && unverifiedToShow.length === 0 ? (
+              {displayCandidates.length === 0 && rosterExcluded.length === 0 && rosterIneligible.length === 0 && unverifiedToShow.length === 0 ? (
                 <p className="text-sm text-gray-600">No candidates were found for this proposal.</p>
               ) : (
                 <>
@@ -1874,6 +1918,38 @@ export default function ReviewerSearchSection({
                           <CandidateCard key={`exc-${candKey(c)}`} candidate={c} readOnly onPromote={promoteCandidate} />
                         ))}
                       </div>
+                    </details>
+                  )}
+
+                  {rosterIneligible.length > 0 && (
+                    <details className="border border-red-200 bg-red-50 rounded-lg p-2">
+                      <summary className="text-xs font-medium text-red-800 cursor-pointer">
+                        Not eligible ({rosterIneligible.length}) — official institutional evidence reports these people are deceased
+                      </summary>
+                      <ul className="mt-2 space-y-1 text-xs text-red-800">
+                        {rosterIneligible.map((candidate) => {
+                          const evidence = candidate.eligibilityEvidence
+                            || candidate.contactEnrichment?.eligibilityEvidence;
+                          return (
+                            <li key={`ineligible-${candKey(candidate)}`}>
+                              <span className="font-medium">{candidate.name}</span>
+                              {evidence?.url && (
+                                <>
+                                  {' · '}
+                                  <a
+                                    href={evidence.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline"
+                                  >
+                                    official source
+                                  </a>
+                                </>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
                     </details>
                   )}
 

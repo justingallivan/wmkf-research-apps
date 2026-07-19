@@ -93,4 +93,14 @@ describe('rankByRelevance — fires for the discover-path candidate shape', () =
     expect(ranked[0].name).toBe('high');
     expect(ranked[1].name).toBe('low');
   });
+
+  test('emeritus reviewers rank after ordinary reviewers without changing their score', () => {
+    const ranked = DeduplicationService.rankByRelevance([
+      { name: 'emeritus-high-score', eligibilityStatus: 'emeritus', affiliation: 'MIT', publicationCount5yr: 5 },
+      { name: 'ordinary-low-score', publicationCount5yr: 0 },
+    ]);
+    expect(ranked.map((candidate) => candidate.name))
+      .toEqual(['ordinary-low-score', 'emeritus-high-score']);
+    expect(ranked[1].relevanceScore).toBeGreaterThan(ranked[0].relevanceScore);
+  });
 });

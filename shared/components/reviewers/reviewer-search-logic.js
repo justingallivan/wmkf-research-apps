@@ -40,7 +40,10 @@ import { emailConfidence } from '../../../lib/utils/reviewer-invite';
 export const sanitizeInstitutionCOIDetails = _sanitizeInstitutionCOIDetails;
 
 export function isCandidateSelectable(c) {
-  return (provenanceGroupOf(c) !== 'needs_identity_review' || c?.pdIdentityConfirmed === true) && !c?.hasInstitutionCOI;
+  const eligibilityStatus = c?.eligibilityStatus || c?.contactEnrichment?.eligibilityStatus || 'unknown';
+  return eligibilityStatus !== 'deceased'
+    && (provenanceGroupOf(c) !== 'needs_identity_review' || c?.pdIdentityConfirmed === true)
+    && !c?.hasInstitutionCOI;
 }
 
 export function candidateWasSaved(candidate, savedKeys = [], savedNames = []) {
@@ -140,6 +143,9 @@ export function mergeEnrichment(candidates, enrichmentResults) {
       ...c,
       automatedIdentityAttestation: enriched.automatedIdentityAttestation || null,
       contactEnrichment,
+      eligibilityStatus: e.eligibilityStatus || enriched.eligibilityStatus || c.eligibilityStatus || 'unknown',
+      eligibilityReason: e.eligibilityReason || enriched.eligibilityReason || c.eligibilityReason || null,
+      eligibilityEvidence: e.eligibilityEvidence || enriched.eligibilityEvidence || c.eligibilityEvidence || null,
       // Institution COI re-evaluated server-side against the post-enrichment
       // affiliation (enrich-contacts). `coiRecomputed` distinguishes "ran and
       // found none" (override the discover value) from "didn't run" (keep it).
@@ -390,6 +396,20 @@ export function pruneIdentityDecision(identity) {
   };
 }
 
+export function pruneEligibilityEvidence(evidence) {
+  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) return null;
+  return {
+    status: evidence.status === 'deceased' || evidence.status === 'emeritus'
+      ? evidence.status
+      : null,
+    url: typeof evidence.url === 'string' ? evidence.url.slice(0, 500) : null,
+    title: typeof evidence.title === 'string' ? evidence.title.slice(0, 500) : null,
+    snippet: typeof evidence.snippet === 'string' ? evidence.snippet.slice(0, 800) : null,
+    sourceDomain: typeof evidence.sourceDomain === 'string' ? evidence.sourceDomain.slice(0, 255) : null,
+    checkedAt: typeof evidence.checkedAt === 'string' ? evidence.checkedAt.slice(0, 80) : null,
+  };
+}
+
 /**
  * Prune an enriched candidate down to the fields `CandidateCard` actually
  * renders, for durable storage in `reviewer_find_roster` (S224). Keeps the card
@@ -468,6 +488,9 @@ export function pruneCandidateForRoster(c) {
       // Slice 5: compact quarantined leads so the ContactLeads section survives a
       // roster reload. Bounded + stripped of raw payloads; persistable stays false.
       contactLeads: pruneContactLeads(e.contactLeads),
+      eligibilityStatus: e.eligibilityStatus || c.eligibilityStatus || 'unknown',
+      eligibilityReason: e.eligibilityReason || c.eligibilityReason || null,
+      eligibilityEvidence: pruneEligibilityEvidence(e.eligibilityEvidence || c.eligibilityEvidence),
     },
     name: c.name,
     affiliation: c.affiliation || null,
@@ -480,6 +503,9 @@ export function pruneCandidateForRoster(c) {
     // surfaced-active loses its marker and becomes silently selectable again on reload
     // (the gate would only hold for the live run). Persist all three the group test reads.
     identityStatus: c.identityStatus || e.identity?.status || null,
+    eligibilityStatus: c.eligibilityStatus || e.eligibilityStatus || 'unknown',
+    eligibilityReason: c.eligibilityReason || e.eligibilityReason || null,
+    eligibilityEvidence: pruneEligibilityEvidence(c.eligibilityEvidence || e.eligibilityEvidence),
     needsIdentification: !!c.needsIdentification,
     verificationStatus: c.verificationStatus || null,
     // Source / provenance flags the card branches on.

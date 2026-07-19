@@ -6,6 +6,9 @@
  * runs for real (pure) so we also confirm the route prunes server-side.
  */
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn(async () => ({ profileId: 5 })) }));
+jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
+  verifyAutomatedIdentityAttestation: jest.fn(async () => ({ valid: false, reason: 'no_token' })),
+}));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   listForRequest: jest.fn(async () => ({ active: [], excluded: [], allNames: [] })),
   recordSurfaced: jest.fn(async () => 0),
@@ -24,6 +27,7 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
 
 import handler from '../../pages/api/workbench/reviewer-roster';
 import { requireAppAccess } from '../../lib/utils/auth';
+import { verifyAutomatedIdentityAttestation } from '../../lib/services/reviewer-candidate-attestation';
 import * as store from '../../lib/services/reviewer-roster-store';
 
 const REQ = '11111111-1111-1111-1111-111111111111';
@@ -35,6 +39,7 @@ function res() {
 beforeEach(() => {
   jest.clearAllMocks();
   requireAppAccess.mockResolvedValue({ profileId: 5 });
+  verifyAutomatedIdentityAttestation.mockResolvedValue({ valid: false, reason: 'no_token' });
 });
 
 describe('auth', () => {
@@ -106,6 +111,56 @@ describe('POST recordSurfaced', () => {
     expect(passed[0].tierResults).toBeUndefined();
     // The resolver verdict survives as a safe boolean flag (unresolved → block).
     expect(passed[0].identityPersistAllowed).toBe(false);
+  });
+
+  it('strips a browser-forged deceased claim without a bound server receipt', async () => {
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [{
+      name: 'Ann Lee',
+      eligibilityStatus: 'deceased',
+      eligibilityReason: 'forged',
+      eligibilityEvidence: { status: 'deceased', url: 'https://evil.example/fake' },
+    }] } }, r);
+
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed[0]).toMatchObject({
+      eligibilityStatus: 'unknown',
+      eligibilityReason: null,
+      eligibilityEvidence: null,
+    });
+  });
+
+  it('preserves deceased evidence only when the server receipt binds it', async () => {
+    verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+      valid: true,
+      eligibilityStatus: 'deceased',
+      eligibilityEvidenceBound: true,
+    });
+    const candidate = {
+      name: 'Ann Lee',
+      automatedIdentityAttestation: 'signed',
+      eligibilityStatus: 'deceased',
+      eligibilityReason: 'Official source',
+      eligibilityEvidence: {
+        status: 'deceased',
+        url: 'https://example.edu/in-memoriam/ann-lee',
+      },
+    };
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [candidate] } }, r);
+
+    expect(verifyAutomatedIdentityAttestation).toHaveBeenCalledWith(
+      'signed',
+      expect.objectContaining({ requestId: REQ }),
+    );
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed[0]).toMatchObject({
+      eligibilityStatus: 'deceased',
+      eligibilityEvidence: {
+        status: 'deceased',
+        url: 'https://example.edu/in-memoriam/ann-lee',
+      },
+    });
   });
 });
 

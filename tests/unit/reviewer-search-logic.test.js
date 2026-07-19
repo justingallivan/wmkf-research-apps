@@ -292,6 +292,15 @@ describe('isCandidateSelectable', () => {
       provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
     })).toBe(true);
   });
+
+  test('deceased rows are never selectable, including after PD identity confirmation', () => {
+    expect(isCandidateSelectable({
+      name: 'Deceased',
+      pdIdentityConfirmed: true,
+      eligibilityStatus: 'deceased',
+      provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
+    })).toBe(false);
+  });
 });
 
 describe('mergeEnrichment', () => {
@@ -331,6 +340,33 @@ describe('mergeEnrichment', () => {
     }]);
     expect(out.automatedIdentityAttestation).toBe('signed-receipt');
     expect(pruneCandidateForRoster(out).automatedIdentityAttestation).toBe('signed-receipt');
+  });
+
+  test('promotes and prunes eligibility evidence for durable reload', () => {
+    const [out] = mergeEnrichment([{ name: 'Dr Emeritus' }], [{
+      name: 'Dr Emeritus',
+      contactEnrichment: {
+        eligibilityStatus: 'emeritus',
+        eligibilityReason: 'Official profile says emeritus.',
+        eligibilityEvidence: {
+          status: 'emeritus',
+          url: 'https://example.edu/people/emeritus',
+          title: 'Dr Emeritus | Professor Emeritus',
+          snippet: 'Dr Emeritus is Professor Emeritus.',
+          sourceDomain: 'example.edu',
+          checkedAt: '2026-07-19T12:00:00.000Z',
+        },
+      },
+    }]);
+    expect(out.eligibilityStatus).toBe('emeritus');
+    expect(pruneCandidateForRoster(out)).toMatchObject({
+      eligibilityStatus: 'emeritus',
+      eligibilityEvidence: { sourceDomain: 'example.edu' },
+      contactEnrichment: {
+        eligibilityStatus: 'emeritus',
+        eligibilityEvidence: { url: 'https://example.edu/people/emeritus' },
+      },
+    });
   });
   const candidates = [
     { name: 'Dr. A', email: null, website: null, relevanceScore: 90 },

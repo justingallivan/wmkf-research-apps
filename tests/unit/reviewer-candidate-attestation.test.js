@@ -49,6 +49,43 @@ test('server receipt carries the owner-approved 14-day lifetime', async () => {
   expect(payload.projectionVersion).toBe(PROJECTION_VERSION);
 });
 
+test('server receipt signs and returns deceased eligibility evidence', async () => {
+  const candidate = {
+    ...CANDIDATE,
+    candidateKey: 'candidate:pre-enrichment',
+    eligibilityStatus: 'deceased',
+    eligibilityReason: 'Official page',
+    eligibilityEvidence: {
+      status: 'deceased',
+      url: 'https://example.edu/in-memoriam/jane-smith',
+    },
+    contactEnrichment: {
+      ...CANDIDATE.contactEnrichment,
+      eligibilityStatus: 'deceased',
+    },
+  };
+  const token = await mintAutomatedIdentityAttestation({ requestId: REQUEST, candidate });
+  expect(decodeJwt(token).eligibilityStatus).toBe('deceased');
+  await expect(verifyAutomatedIdentityAttestation(token, { requestId: REQUEST, candidate }))
+    .resolves.toMatchObject({
+      valid: true,
+      eligibilityStatus: 'deceased',
+      rosterCandidateKey: 'candidate:pre-enrichment',
+      eligibilityEvidenceBound: true,
+    });
+
+  await expect(verifyAutomatedIdentityAttestation(token, {
+    requestId: REQUEST,
+    candidate: {
+      ...candidate,
+      eligibilityEvidence: {
+        ...candidate.eligibilityEvidence,
+        url: 'https://evil.example/forged',
+      },
+    },
+  })).resolves.toEqual({ valid: false, reason: 'claim_mismatch' });
+});
+
 test('absent receipt fails closed', async () => {
   await expect(verifyAutomatedIdentityAttestation('', {
     requestId: REQUEST,
@@ -169,6 +206,7 @@ test('legacy receipts remain valid for bound metrics but cannot authorize identi
     valid: true,
     source: 'automated_resolver',
     identityDecisionBound: false,
+    eligibilityEvidenceBound: false,
   });
 });
 
@@ -191,6 +229,7 @@ test('receipt survives the real enrichment merge and roster pruning shape', asyn
     name: 'Dr Jane Smith',
     affiliation: 'Former University',
     identityStatus: 'probable',
+    candidateKey: 'candidate:pre-enrichment',
   };
   const enriched = {
     ...discovered,
@@ -203,6 +242,26 @@ test('receipt survives the real enrichment merge and roster pruning shape', asyn
       hIndex: 20,
       i10Index: 10,
       totalCitations: 100,
+      eligibilityStatus: 'deceased',
+      eligibilityReason: 'Official institutional page',
+      eligibilityEvidence: {
+        status: 'deceased',
+        url: 'https://example.edu/in-memoriam/jane-smith',
+        title: 'In memoriam: Jane Smith',
+        snippet: 'Jane Smith passed away.',
+        sourceDomain: 'example.edu',
+        checkedAt: '2026-07-19T12:00:00.000Z',
+      },
+    },
+    eligibilityStatus: 'deceased',
+    eligibilityReason: 'Official institutional page',
+    eligibilityEvidence: {
+      status: 'deceased',
+      url: 'https://example.edu/in-memoriam/jane-smith',
+      title: 'In memoriam: Jane Smith',
+      snippet: 'Jane Smith passed away.',
+      sourceDomain: 'example.edu',
+      checkedAt: '2026-07-19T12:00:00.000Z',
     },
   };
   const token = await mintAutomatedIdentityAttestation({ requestId: REQUEST, candidate: enriched });
@@ -214,5 +273,8 @@ test('receipt survives the real enrichment merge and roster pruning shape', asyn
   })).resolves.toMatchObject({
     valid: true,
     identityDecisionBound: true,
+    eligibilityStatus: 'deceased',
+    eligibilityEvidenceBound: true,
+    rosterCandidateKey: 'candidate:pre-enrichment',
   });
 });

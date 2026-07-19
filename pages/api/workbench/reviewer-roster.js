@@ -4,8 +4,9 @@
  * (`reviewer_find_roster` via `reviewer-roster-store`); no Dataverse, so no
  * `bypassDynamicsRestrictions` needed. See docs/atlas/postgres-reviewer-find-roster.md.
  *
- *   GET   ?requestId            → { active, excluded, allNames }
- *   POST  { requestId, candidates }                  → record surfaced (status 'active')
+ *   GET   ?requestId            → { active, excluded, ineligible, allNames }
+ *   POST  { requestId, candidates }                  → record surfaced
+ *     (active, or ineligible only with a bound server eligibility receipt)
  *   PATCH { requestId, action:'exclude', candidate } → set aside
  *   PATCH { requestId, action:'promote', candidateKey } → excluded → active (returns blob)
  *   PATCH { requestId, action:'saved', candidates }  → graduated to the Dataverse pool
@@ -26,6 +27,7 @@ import {
   listForRequest,
   removePreviousActiveSearchResults,
 } from '../../../lib/services/reviewer-roster-store';
+import { verifyAutomatedIdentityAttestation } from '../../../lib/services/reviewer-candidate-attestation';
 import { pruneCandidateForRoster } from '../../../shared/components/reviewers/reviewer-search-logic';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -80,8 +82,33 @@ async function handlePost(req, res) {
     return res.status(400).json({ error: `Too many candidates (max ${MAX_CANDIDATES_PER_POST})` });
   }
   // Prune server-side too — never persist raw enrichment internals even if a
-  // client sent them.
-  const pruned = candidates.map(pruneCandidateForRoster).filter((c) => c && c.name);
+  // client sent them. Eligibility is server-issued evidence: overwrite the
+  // browser's fields from the request/candidate-bound receipt, or clear them.
+  const pruned = (await Promise.all(candidates.map(async (candidate) => {
+    const compact = pruneCandidateForRoster(candidate);
+    if (!compact?.name) return null;
+    const receipt = await verifyAutomatedIdentityAttestation(
+      compact.automatedIdentityAttestation,
+      { requestId, candidate: compact },
+    );
+    const eligibilityStatus = receipt.valid && receipt.eligibilityEvidenceBound
+      && (receipt.eligibilityStatus === 'deceased' || receipt.eligibilityStatus === 'emeritus')
+      ? receipt.eligibilityStatus
+      : 'unknown';
+    const preserveEvidence = eligibilityStatus !== 'unknown';
+    return {
+      ...compact,
+      eligibilityStatus,
+      eligibilityReason: preserveEvidence ? compact.eligibilityReason : null,
+      eligibilityEvidence: preserveEvidence ? compact.eligibilityEvidence : null,
+      contactEnrichment: {
+        ...compact.contactEnrichment,
+        eligibilityStatus,
+        eligibilityReason: preserveEvidence ? compact.contactEnrichment?.eligibilityReason : null,
+        eligibilityEvidence: preserveEvidence ? compact.contactEnrichment?.eligibilityEvidence : null,
+      },
+    };
+  }))).filter(Boolean);
   const recorded = await recordSurfaced(requestId, pruned);
   return res.status(200).json({ success: true, recorded });
 }

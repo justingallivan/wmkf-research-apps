@@ -13,6 +13,10 @@ jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (_label, fn) => fn(),
 }));
 
+jest.mock('../../lib/services/reviewer-roster-store', () => ({
+  findCandidateBySuggestion: jest.fn(async () => null),
+}));
+
 const findById = jest.fn();
 const updateLifecycle = jest.fn(async () => {});
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({

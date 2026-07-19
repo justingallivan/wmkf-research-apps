@@ -350,6 +350,9 @@ describe('happy path (progress ordering + full card payload)', () => {
       googleScholarUrl: null,
       hIndex: null,
       totalCitations: null,
+      eligibilityStatus: 'unknown',
+      eligibilityReason: null,
+      eligibilityEvidence: null,
       isApplicantRecommended: true,
     });
 

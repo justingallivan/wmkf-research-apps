@@ -234,15 +234,16 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
   });
 
-  test('a manual email wins: backfill is skipped entirely (roster not read)', async () => {
+  test('a manual email wins: backfill is skipped after the eligibility read', async () => {
     findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'roster@y.edu', emailSource: 'claude_search', emailPersistAllowed: true });
     const req = { method: 'POST', body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, contact: { email: 'manual@y.edu' } } };
     const res = mockRes();
     await handler(req, res);
-    // Manual email persisted; roster never consulted.
+    // Manual email persisted; the one roster read is the eligibility boundary,
+    // and no separate email-backfill lookup occurs.
     expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { email: 'manual@y.edu' }, expect.anything());
     expect(researcherAdapter.updateById).toHaveBeenCalledWith(PERSON_ID, { emailSource: 'manual' }, expect.anything());
-    expect(findCandidateBySuggestion).not.toHaveBeenCalled();
+    expect(findCandidateBySuggestion).toHaveBeenCalledTimes(1);
   });
 
   test('duplicate-email collision on backfill is non-fatal (promoted + contactError)', async () => {
@@ -281,7 +282,7 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     const res = mockRes();
     await handler(req, res);
     // The PD's explicit choice routes to merge — backfill must NOT run.
-    expect(findCandidateBySuggestion).not.toHaveBeenCalled();
+    expect(findCandidateBySuggestion).toHaveBeenCalledTimes(1);
     expect(res.body.contactError).toMatchObject({ code: 'email_conflict', value: 'manual@y.edu' });
     expect(res.body.savedFields).not.toContain('email');
   });

@@ -74,11 +74,16 @@ jest.mock('../../lib/services/contact-enrichment-service', () => ({
 }));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   recordSurfaced: jest.fn(async () => 1),
+  findEligibilityByCandidateKey: jest.fn(async () => null),
   stampSuggestionAnchor: jest.fn(async () => ({ updated: 1 })),
   findIdentityConfirmation: jest.fn(async () => null),
 }));
 jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
-  verifyAutomatedIdentityAttestation: jest.fn(async () => ({ valid: true, source: 'automated_resolver' })),
+  verifyAutomatedIdentityAttestation: jest.fn(async (_token, { candidate } = {}) => ({
+    valid: true,
+    source: 'automated_resolver',
+    ...(candidate?.candidateKey ? { rosterCandidateKey: candidate.candidateKey } : {}),
+  })),
 }));
 jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
   lookupReviewerIdentity: jest.fn(async () => ({ outcome: 'none' })),
@@ -139,7 +144,11 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     accountAdapter.getById.mockResolvedValue(null);
     lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
     NotificationService.notify.mockResolvedValue({ id: 'alert-1' });
-    verifyAutomatedIdentityAttestation.mockResolvedValue({ valid: true, source: 'automated_resolver' });
+    verifyAutomatedIdentityAttestation.mockImplementation(async (_token, { candidate } = {}) => ({
+      valid: true,
+      source: 'automated_resolver',
+      ...(candidate?.candidateKey ? { rosterCandidateKey: candidate.candidateKey } : {}),
+    }));
     rosterStore.findIdentityConfirmation.mockResolvedValue(null);
   });
 

@@ -29,18 +29,37 @@ function queryTextOf(callIndex) {
 }
 
 describe('listForRequest', () => {
-  test('partitions active/excluded and collects allNames across EVERY status', async () => {
+  test('partitions active/excluded/ineligible and collects allNames across EVERY status', async () => {
     sql.mockResolvedValueOnce({ rows: [
       { status: 'active', display_name: 'Ann Lee', candidate: { name: 'Ann Lee' } },
       { status: 'excluded', display_name: 'Bob Roe', candidate: { name: 'Bob Roe' } },
+      { status: 'ineligible', display_name: 'Pat Thiel', candidate: { name: 'Pat Thiel', eligibilityStatus: 'deceased' } },
       { status: 'saved', display_name: 'Cy Poe', candidate: { name: 'Cy Poe' } },
       { status: 'coi_dropped', display_name: 'Dee Coe', candidate: { name: 'Dee Coe', hasInstitutionCOI: true } },
     ] });
     const out = await store.listForRequest(REQ);
     expect(out.active.map((c) => c.name)).toEqual(['Ann Lee']);
     expect(out.excluded.map((c) => c.name)).toEqual(['Bob Roe']);
+    expect(out.ineligible.map((c) => c.name)).toEqual(['Pat Thiel']);
     // allNames is the cross-run dedup union — must include saved + excluded + coi_dropped too.
-    expect(out.allNames).toEqual(['Ann Lee', 'Bob Roe', 'Cy Poe', 'Dee Coe']);
+    expect(out.allNames).toEqual(['Ann Lee', 'Bob Roe', 'Pat Thiel', 'Cy Poe', 'Dee Coe']);
+  });
+});
+
+describe('findCandidateBySuggestion', () => {
+  test('returns the server-owned roster status with the candidate blob', async () => {
+    sql.mockResolvedValueOnce({ rows: [{
+      status: 'ineligible',
+      display_name: 'Pat Thiel',
+      candidate: { name: 'Pat Thiel', suggestionId: 'SUG-1' },
+      source_kind: 'applicant_suggested',
+    }] });
+
+    await expect(store.findCandidateBySuggestion(REQ, 'SUG-1')).resolves.toMatchObject({
+      name: 'Pat Thiel',
+      suggestionId: 'SUG-1',
+      rosterStatus: 'ineligible',
+    });
   });
 });
 
@@ -128,6 +147,18 @@ describe('recordSurfaced', () => {
       Array.isArray(c[0]) && c[0].join(' ').includes('INSERT INTO reviewer_find_roster'));
     expect(insertCall).toBeGreaterThanOrEqual(0);
     expect(queryTextOf(insertCall)).toMatch(/status = 'active'/);
+  });
+
+  test('records direct deceased evidence as monotonic ineligible status', async () => {
+    await store.recordSurfaced(REQ, [{
+      name: 'Patricia Thiel',
+      eligibilityStatus: 'deceased',
+      eligibilityEvidence: { url: 'https://ameslab.gov/pat-thiel' },
+    }]);
+    const text = queryTextOf(0);
+    expect(allInterpolations()).toContain('ineligible');
+    expect(text).toMatch(/EXCLUDED\.status = 'ineligible'/);
+    expect(text).toMatch(/reviewer_find_roster\.status = 'ineligible'/);
   });
 
   test('keeps same-name candidates with different affiliations in separate roster rows', async () => {
