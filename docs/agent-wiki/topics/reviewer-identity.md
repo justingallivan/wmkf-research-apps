@@ -1,13 +1,15 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-18
+last_verified: 2026-07-19
 stale_after_days: 45
 owner: reviewer-finder
 source_files:
   - lib/services/reviewer-identity-evidence.js
   - lib/services/reviewer-identity-resolver.js
   - lib/services/contact-enrichment-service.js
+  - lib/services/contact-enrichment/page-email.js
+  - lib/utils/contact-parser.js
   - lib/services/reviewer-candidate-attestation.js
   - lib/services/reviewer-finder/save-candidates-service.js
   - lib/services/capture-self-reported-orcid.js
@@ -25,6 +27,8 @@ source_files:
   - pages/api/review-manager/send-emails.js
   - pages/api/review-manager/render-emails.js
   - lib/utils/reviewer-invite.js
+  - shared/components/reviewers/reviewer-search-logic.js
+  - shared/components/reviewers/ReviewerSearchSection.js
 canonical_docs:
   - docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md
   - docs/APPLICATION_STATE_ATLAS.md
@@ -77,7 +81,7 @@ no drift). The 8 contracts:
 4. **Structured-PI identity** — `resolveProposalPI` is server-resolved from the request GUID, FAIL-OPEN + AUGMENT-ONLY, gated on confirmed/probable, name-guarded by `forenamesContradict`.
 5. **S240 institution COI** — current same-institution is a default HARD DROP on both discovery tracks AND re-rejected at the durable save boundary (`rejectedInstitutionCOI`). Approved Phase C allows a visible read-only flag only for a single low-trust affiliation match contradicted by current-affiliation evidence; save still rejects it. Historical/former-shared COI is retired. The `POTENTIAL_CONCERNS` amber advisory was retired (Chunk 2b, S254) — the model no longer emits it and COI is screened deterministically server-side (`docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md`, now historical).
 6. **OpenAlex bibliometrics + verified-domain** — `_attachOpenAlexMetrics` sources metrics/affiliation/verified-domain from OpenAlex (ORCID or carried author id; never a bare name search). Scholar deep-links dropped; field renames in `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md`.
-7. **Faculty-page recovery — guarded fetch (S265; domain bound updated S321; grounding hardened 2026-07-18)** — An automated tier (`safeFetchInstitutionPage` + `_attachEmailFromResolvedPage`/`_selectGroundedEmail`) exists behind `REVIEWER_PAGE_EMAIL_TIER_ENABLED` (**default OFF**); when on it page-grounds an `institution_page` email under the named SSRF mechanism (host bound to the identity-anchored institution-domain set — `anchoredInstitutionDomains`, falling back to the single `verifiedInstitutionDomain` — IPv6 private-IP block, undici IP-pinning). Candidate association is directional (name before email) to prevent cross-record staff-email attribution; personal-URL ownership and page identity plus an exact bare-surname mailbox are the two non-adjacency routes. The completed page-first paid-tier experiment gained only +1/20 on the fresh cohort, so it did **not** authorize a production reorder or plausible-domain fetch relaxation. Design/outcome: `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`, `docs/REVIEWER_GATING_STRATEGY_REDESIGN.md`, and `docs/REVIEWER_PAGE_FIRST_EMAIL_EXPERIMENT_PLAN.md`.
+7. **Faculty-page recovery — guarded fetch + ranked mailbox ownership (S265/S321; hardened 2026-07-19)** — The automated tier (`safeFetchInstitutionPage` + `_attachEmailFromResolvedPage`) is code-default off but explicitly enabled in production. It stamps invitation-ready `institution_page` only under the anchored-domain SSRF bound and a unique deterministic mailbox winner: full-name; or, on a title/sole-H1 identity page, initials+surname, surname+initials, or exact surname; then exact URL slug and narrow full-forename adjacency as fallbacks. Equal-best ties, body-only weak forms, domain-only matches, and unmatched role addresses abstain. The broad search-lead helper is not reused. Compact proof/source/alternatives survive `reviewer_find_roster` reload and the card links to the official page; Dataverse/send authorization remains the binary `institution_page` source. The paid-tier ordering experiment still did not authorize a reorder or plausible-domain fetch relaxation. A later zero-paid-call selector replay preserved all prior correct results and added four verified correct people. Design/outcome: `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`, `docs/REVIEWER_GATING_STRATEGY_REDESIGN.md`, and `docs/REVIEWER_PAGE_FIRST_EMAIL_EXPERIMENT_PLAN.md`.
 8. **Work-grounding rescue** — `rescueByWorkGrounding` is purely additive, strict-forename-gated, `probable`-ceiling; can only resolve an already-abstained name.
 
 ## Operating Notes

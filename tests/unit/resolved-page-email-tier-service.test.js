@@ -60,7 +60,37 @@ describe('_attachEmailFromResolvedPage', () => {
     expect(ce.email).toBe('phbuck@stanford.edu');
     expect(ce.emailSource).toBe('institution_page');
     expect(ce.emailPersistAllowed).toBe(true);
+    expect(ce.emailEvidence).toMatchObject({
+      ownershipProof: 'page_url_slug',
+      matchClass: 'url_slug',
+      sourceUrl: 'https://web.stanford.edu/~phbuck/',
+    });
     expect(ce.tierResults.institution_page).toMatchObject({ email: 'phbuck@stanford.edu' });
+  });
+
+  it('records the mailbox ownership class and non-winning page addresses', async () => {
+    safeFetchInstitutionPage.mockResolvedValue({
+      ok: true,
+      status: 200,
+      finalUrl: 'https://engineering.tamu.edu/electrical/profiles/phemmer.html',
+      text:
+        '<title>Hemmer, Philip | Texas A&amp;M Engineering</title>' +
+        '<h1>Philip Hemmer</h1>' +
+        '<a href="mailto:prhemmer@tamu.edu">Email</a>' +
+        ' '.repeat(200) +
+        '<footer><a href="mailto:easa@tamu.edu">Department contact</a></footer>',
+    });
+    const result = makeResult({
+      verifiedInstitutionDomain: 'tamu.edu',
+      facultyPageUrl: 'https://engineering.tamu.edu/electrical/profiles/phemmer.html',
+    });
+    await ContactEnrichmentService._attachEmailFromResolvedPage({ name: 'Philip Hemmer' }, result, {});
+    expect(result.contactEnrichment.email).toBe('prhemmer@tamu.edu');
+    expect(result.contactEnrichment.emailEvidence).toMatchObject({
+      matchClass: 'initials_surname',
+      ownershipProof: 'mailbox_initials_surname_unverified_middle',
+      alternatives: [{ email: 'easa@tamu.edu', matchClass: 'unmatched' }],
+    });
   });
 
   it('replaces a low-trust search email with a grounded institution_page email', async () => {

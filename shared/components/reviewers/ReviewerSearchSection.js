@@ -143,6 +143,18 @@ function affiliationSourceLabel(source) {
   return affiliationProvenance(source) || 'recent publications';
 }
 
+function emailOwnershipLabel(evidence) {
+  const labels = {
+    full_name: 'full-name mailbox match',
+    initials_surname: 'initials + surname mailbox match',
+    surname_initials: 'surname + initials mailbox match',
+    exact_surname: 'exact-surname mailbox match',
+    url_slug: 'mailbox matches the profile URL',
+    name_adjacent: 'name and address listed together',
+  };
+  return labels[evidence?.matchClass] || null;
+}
+
 // Ported from the standalone Reviewer Finder: build a Google Scholar author-search
 // URL as a fallback when we don't have the candidate's real profile URL. Strips
 // honorifics and extracts the institution from a messy affiliation string.
@@ -209,6 +221,10 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const evidencePublications = Array.isArray(emailEvidence?.publications)
     ? emailEvidence.publications.filter((publication) => publication?.url).slice(0, 3)
     : [];
+  const ownershipLabel = emailOwnershipLabel(emailEvidence);
+  const alternativeAddressCount = Array.isArray(emailEvidence?.alternatives)
+    ? emailEvidence.alternatives.length
+    : 0;
   const website = c.website || enr.website || null;
   const orcidUrl = c.orcidUrl || enr.orcidUrl || null;
   const scholarUrl = c.googleScholarUrl || enr.googleScholarUrl || buildScholarSearchUrl(c.name, c.affiliation);
@@ -385,6 +401,24 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                           {')'}
                         </>
                       )}
+                    </span>
+                  )}
+                  {emailEvidence?.sourceKind === 'institution_page' && emailEvidence?.sourceUrl && (
+                    <span className="text-gray-600">
+                      Verified on{' '}
+                      <a
+                        href={emailEvidence.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-700 hover:underline"
+                        title="Open the institutional page used to verify this address"
+                      >
+                        official profile
+                      </a>
+                      {ownershipLabel ? ` · ${ownershipLabel}` : ''}
+                      {alternativeAddressCount > 0
+                        ? ` · ${alternativeAddressCount} other page ${alternativeAddressCount === 1 ? 'address' : 'addresses'} not selected`
+                        : ''}
                     </span>
                   )}
                 </>

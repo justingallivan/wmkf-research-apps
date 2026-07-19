@@ -143,9 +143,11 @@ just display? (Out of scope to build; flag the UX seam.)
 ## 3. Slice F — faculty-page email recovery (identity-safe, SSRF-guarded)
 
 > **Update (S265):** the automated server-side fetch WAS built (with the named SSRF mechanism),
-> behind `REVIEWER_PAGE_EMAIL_TIER_ENABLED` (**default OFF — the live default is still the
-> zero-SSRF path below**). Live design: `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`; contract #7
-> in `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`.
+> behind `REVIEWER_PAGE_EMAIL_TIER_ENABLED` (code-default OFF; production explicitly enabled
+> 2026-07-03). Its ownership selector was hardened 2026-07-19 with ranked mailbox classes,
+> unique-best selection, and roster-visible proof. Live design:
+> `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`; contract #7 in
+> `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`.
 >
 > **Status (S235): SHIPPED via the ZERO-SSRF path** (not the automated fetch below). The
 > automated server-side fetch was designed + Codex-reviewed (READY WITH NAMED CHANGES) but NOT

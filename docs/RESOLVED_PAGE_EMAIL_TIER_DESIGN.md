@@ -1,9 +1,9 @@
 ---
-title: "Resolved-Page Email Tier — Design Plan (rev 3)"
+title: "Resolved-Page Email Tier — Design Plan (rev 4)"
 domain: email
 kind: spec
 status: active
-summary: "- Private-IP block covers IPv6 (::, 0.0.0.0, IPv4-mapped incl. hex-form, fe80::/10, AAAA records); the dns.lookup→connect TOCTOU window is CLOSED..."
+summary: "Guarded page fetch plus deterministic mailbox ranking; only a unique grounded winner receives the invitation-ready institution_page source."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -14,14 +14,30 @@ related:
   - lib/utils/reviewer-invite.js
 ---
 
-# Resolved-Page Email Tier — Design Plan (rev 3)
+# Resolved-Page Email Tier — Design Plan (rev 4)
 
-**Status:** APPROVED for implementation (rev 3 after Codex review #2 — GO-WITH-CHANGES items folded in)
+**Status:** IMPLEMENTED (rev 4 ownership ranking; production promotion remains deliberate)
 **Author:** Claude (S265)
-**Scope:** `lib/utils/safe-fetch.js` (extend), `lib/services/contact-enrichment-service.js`,
-`lib/utils/contact-parser.js`
+**Scope:** guarded fetch, contact parsing, mailbox ownership selection, roster evidence, and candidate-card explanation
 
 ## 0. Revision history
+
+**Rev 4 (2026-07-19, page-email ownership redesign):**
+- Replaced the primary 100-character association heuristic with deterministic mailbox classes:
+  full name, initials+surname, surname+initials, and exact surname. Initial-based and
+  bare-surname forms require the candidate in the page title or sole H1.
+- Kept exact URL-slug ownership and narrow directional adjacency as lower-ranked fallbacks for
+  opaque mailboxes. Adjacency now requires the full forename and the nearest surname mention, so
+  a nearby same-initial namesake does not qualify.
+- Selection is rank-first and fail-closed: one best address wins; an equal-best tie abstains.
+  Domain-only acceptance, global same-surname page scans, and the broad
+  `isNameConsistentEmail` helper remain excluded.
+- `emailEvidence` now records the ownership proof, match class, official source URL, and bounded
+  alternatives. That compact evidence survives `reviewer_find_roster` reload and is shown on the
+  candidate card; the Dataverse/send gate still relies on the binary `institution_page` source.
+- A saved-search replay made zero SerpAPI calls, preserved every existing correct ready result,
+  and added four manually verified correct people across the 17-subject/view Stage-1 cohort.
+  The live Philip Hemmer TAMU page selected `prhemmer@tamu.edu` and rejected the footer address.
 
 **Rev 3 (after Codex review #2 — folded in, design now APPROVED):**
 - **Fetch host predicate is exact-or-subdomain ONLY** — dropped the reverse relation
@@ -133,10 +149,12 @@ Enforced, on the initial request **and every redirect hop** (manual redirect loo
    `maxBytes` cutoff; require `Content-Type` `text/html` or `text/plain`.
 5. No cookies/credentials; `redirect: 'manual'`; descriptive `User-Agent`.
 
-**Feature flag:** `REVIEWER_PAGE_EMAIL_TIER_ENABLED` (default off for first rollout). No coarse
-academic-TLD allowlist — the OpenAlex domain binding is strictly better and avoids `.org/.gov/.de`
-false negatives. (Codex Q5.1/Q5.2: domain-binding + caps acceptable; IP-pinning IMPLEMENTED in the
-post-impl pass — the TOCTOU residual is closed, not merely documented.)
+**Feature flag:** `REVIEWER_PAGE_EMAIL_TIER_ENABLED`. The code fails closed when unset; production
+has explicitly enabled the tier since 2026-07-03. Therefore a selector merge is a production
+behavior change and requires deliberate promotion. No coarse academic-TLD allowlist — the OpenAlex
+domain binding is strictly better and avoids `.org/.gov/.de` false negatives. (Codex Q5.1/Q5.2:
+domain-binding + caps acceptable; IP-pinning IMPLEMENTED in the post-impl pass — the TOCTOU
+residual is closed, not merely documented.)
 
 ## 4. Where it runs (sequencing)
 
@@ -181,32 +199,32 @@ _finalize(candidate, result, { persist, onProgress, scholarCandidate, signal, de
 - Run existing `extractEmails()`; return deduped, in document order, each with its source offset (to
   support name-adjacency below).
 
-**Ground + select** (in the service; the trust decision, NOT a local-part match):
-- Compute the page identity context: candidate **surname present** AND a **forename token or initial
-  compatible** (align with the existing forename-gate principle — do not trust on surname alone) in
-  `<title>`, an `<h1>/<h2>`, or the URL path.
-  In ALL cases the selected email must be **associated with the candidate**, not merely present on a
-  page that names them — "candidate named somewhere + one email" is NOT sufficient (Codex #2/#3: a
-  "Philip Bucksbaum Lab" page whose sole email is a lab admin's would otherwise be wrongly trusted).
-  Association evidence is directional: the candidate-name match must occur in the small window
-  **before** the email. Looking symmetrically after an address can cross into the next staff/person
-  record and misattribute the preceding email (the live David Liu page exposed exactly this shape:
-  lab-manager email, then “David R. Liu …”). A `mailto` whose link text or preceding label names the
-  candidate satisfies this route.
-- **Personal/profile page** → an opaque mailbox may be recovered through the existing personal-URL
-  owner route when the page identifies the candidate and the URL handle is the mailbox local part
-  (`~phbuck` → `phbuck@…`). A second, deliberately narrow route accepts an exact bare-surname
-  mailbox only when the page identity itself names the candidate (`liu@…` on the official
-  David R. Liu profile). Broader name-shaped local parts still require preceding-name adjacency or
-  URL-owner proof.
-- **Directory/multi-email page** → associate each email with the nearest preceding name block;
-  select only an email whose preceding name matches the candidate (surname +
-  forename-compatible) and is the unique candidate-associated email. **Abstain** if zero or
-  more-than-one candidate-matched emails.
-- `isNameConsistentEmail` is not a hard gate or a general page-owner shortcut here. Its broader
-  surname containment rule would re-open same-surname/staff ambiguity.
-- Every selected email must still be domain-related to `verifiedInstitutionDomain` (kept by
-  `_validateEmailAgainstVerifiedDomain` downstream too).
+**Ground + select** (in `page-email.js`; a selector-local trust decision):
+
+1. Filter to addresses whose domain is related to the anchored institution domain.
+2. Normalize the candidate name and mailbox local part by deburring and removing separators.
+   Honorific and suffix tokens are excluded; hyphenated given names retain their initials and
+   hyphenated surnames retain their compact form.
+3. Classify each address, strongest first:
+   - exact full given+surname / surname+given mailbox;
+   - initials+surname or surname+initials (up to two unverified middle letters);
+   - exact surname;
+   - exact personal-page URL slug;
+   - narrow directional adjacency as the opaque-mailbox fallback.
+4. Initial-based and exact-surname classes require **strong page identity**: the full candidate
+   forename and surname appear in the page title, or in the page's sole H1. A body-only directory
+   mention is insufficient. Full-name mailboxes carry their own name evidence.
+5. The adjacency fallback requires the full forename (not merely the first initial) and the
+   candidate must be the nearest matching surname mention before the address. This prevents
+   “Philip Hemmer … Peter Hemmer `phemmer@…`” and “Feng Zhang … Fan Zhang `fzhang@…`” from binding.
+6. Select the unique address in the best match class. Equal-best ties abstain; lower-ranked and
+   unmatched page addresses are recorded as bounded alternatives.
+
+`isNameConsistentEmail` is deliberately neither reused nor narrowed. Its surname-containment rule
+is appropriate for quarantined search leads but too broad for an invitation-ready page source.
+There is no domain-only acceptance and no page-wide same-surname scan: publication and collaborator
+lists would create false conflicts. Every selected email still passes the downstream verified-domain
+guard.
 
 ## 6. Provenance / persistence
 
@@ -220,6 +238,10 @@ _finalize(candidate, result, { persist, onProgress, scholarCandidate, signal, de
   construction. Stats: add `institution_page` to `enrichCandidates` `stats.bySource`.
 - Roster: `emailSource` already persists via `pruneCandidateForRoster`; no schema change. DB
   `wmkf_emailsource` already accepts the string (reviewer-invite reads it).
+- Evidence: `emailEvidence.{sourceUrl,ownershipProof,matchClass,alternatives}` is compacted by
+  `pruneEmailEvidence` and persists in the Postgres `reviewer_find_roster` candidate JSON, so the
+  Find card can explain the decision after reload. It is not written to Dataverse and does not
+  alter send authorization; the server continues to recompute readiness from `wmkf_emailsource`.
 
 ## 7. Latency / cost
 
@@ -251,6 +273,11 @@ the unverifiable paid web_search email.
     exactly one domain-valid email, but it's a lab-admin/`webmaster@` address NOT adjacent to the
     candidate's name → **abstain** (the rev-3 association requirement; Codex #4).
   - Multi-person directory: two name-adjacent emails → abstain; exactly one candidate match → select.
+  - Strong single-person profile: initials+surname with an extra middle letter plus a generic
+    footer address → select the person mailbox and record the footer as unmatched.
+  - Weak directory with candidate and same-initial namesake → abstain.
+  - Full-name mailbox outranks a lower-class address; equal-best mailboxes abstain.
+  - Short surname and hyphenated given name (`gwli`-shape) classify on a strong profile.
   - Same-institution namesake (different forename, same surname) → forename gate abstains.
   - Search email present → tier runs and replaces with grounded `institution_page`; trusted email
     present → tier no-ops.
@@ -261,6 +288,10 @@ the unverifiable paid web_search email.
   predicate rejects the fetch (asserts the known v1 limitation, no email set).
 - No live network (fixtures + mocked fetch/DNS). Gates: `npm test`, `lint`, `build`; re-run
   `check:api-routes`/`check:atlas` if a route/data surface is touched (this tier touches neither).
+- Replay gate: reuse recorded search results (`--replay-search-artifact`, zero SerpAPI calls),
+  refetch only the already-selected first-party pages, diff invitation-ready outcomes, and manually
+  verify every new or changed address. The 2026-07-19 replay produced four unique correct additions,
+  zero wrong-person changes, and no lost correct result.
 
 ## 10. Known v1 limitations (documented, not bugs)
 

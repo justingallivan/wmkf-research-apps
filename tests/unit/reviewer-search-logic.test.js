@@ -118,6 +118,49 @@ describe('scholarly email evidence survives a bounded roster round-trip', () => 
   });
 });
 
+describe('institution-page ownership evidence survives a bounded roster round-trip', () => {
+  test('keeps the proof, official source, and only eight compact alternatives', () => {
+    const evidence = {
+      sourceKind: 'institution_page',
+      sourceUrl: 'https://engineering.tamu.edu/electrical/profiles/phemmer.html',
+      ownershipProof: 'mailbox_initials_surname_unverified_middle',
+      matchClass: 'initials_surname',
+      alternatives: Array.from({ length: 10 }, (_, index) => ({
+        email: `role${index}@tamu.edu`,
+        matchClass: 'unmatched',
+        rawPageContext: { shouldNotPersist: true },
+      })),
+      rawHtml: '<html>should not persist</html>',
+    };
+
+    const compact = pruneEmailEvidence(evidence);
+    expect(compact).toMatchObject({
+      sourceKind: 'institution_page',
+      sourceUrl: evidence.sourceUrl,
+      ownershipProof: 'mailbox_initials_surname_unverified_middle',
+      matchClass: 'initials_surname',
+    });
+    expect(compact.alternatives).toHaveLength(8);
+    expect(compact.alternatives[0]).toEqual({
+      email: 'role0@tamu.edu',
+      matchClass: 'unmatched',
+    });
+    expect(compact).not.toHaveProperty('rawHtml');
+    expect(compact.alternatives[0]).not.toHaveProperty('rawPageContext');
+
+    const pruned = pruneCandidateForRoster({
+      name: 'Philip Hemmer',
+      email: 'prhemmer@tamu.edu',
+      contactEnrichment: {
+        email: 'prhemmer@tamu.edu',
+        emailSource: 'institution_page',
+        emailEvidence: evidence,
+      },
+    });
+    expect(pruned.contactEnrichment.emailEvidence).toEqual(compact);
+  });
+});
+
 describe('sanitizeInstitutionCOIDetails (S240)', () => {
   test('strips legacy .historical, keeps piInstitution + reviewerInstitution', () => {
     expect(sanitizeInstitutionCOIDetails({ piInstitution: 'JHU', reviewerInstitution: 'JHU', historical: true }))

@@ -27,8 +27,19 @@ import {
 } from '../../lib/utils/safe-fetch';
 
 const select = (name, html, domain, opts = {}) => {
-  const { text, identityText, emails } = ContactParser.extractEmailsFromHtml(html);
-  return ContactEnrichmentService._selectGroundedEmail(name, text, emails, domain, { identityText, ...opts });
+  const {
+    text,
+    identityText,
+    titleText,
+    h1Texts,
+    emails,
+  } = ContactParser.extractEmailsFromHtml(html);
+  return ContactEnrichmentService._selectGroundedEmail(name, text, emails, domain, {
+    identityText,
+    titleText,
+    h1Texts,
+    ...opts,
+  });
 };
 
 describe('ContactParser.extractEmailsFromHtml', () => {
@@ -60,10 +71,12 @@ describe('ContactParser.extractEmailsFromHtml', () => {
   });
 
   it('extracts <title> + <h1..3> into identityText', () => {
-    const { identityText } = ContactParser.extractEmailsFromHtml(
+    const { identityText, titleText, h1Texts } = ContactParser.extractEmailsFromHtml(
       '<title>Phil CV</title><h1>Philip Bucksbaum</h1><h2>PULSE</h2>',
     );
     expect(identityText).toBe('Phil CV Philip Bucksbaum PULSE');
+    expect(titleText).toBe('Phil CV');
+    expect(h1Texts).toEqual(['Philip Bucksbaum']);
   });
 });
 
@@ -121,6 +134,68 @@ describe('ContactEnrichmentService._selectGroundedEmail', () => {
     expect(select('David Liu', html, 'harvard.edu', {
       pageUrl: 'https://www.chemistry.harvard.edu/people/david-r-liu',
     })).toBe('liu@chemistry.harvard.edu');
+  });
+
+  it('selects an initials-plus-surname mailbox on a strong single-person profile', () => {
+    const html =
+      '<title>Hemmer, Philip | Texas A&amp;M Engineering</title>' +
+      '<h1>Philip Hemmer</h1>' +
+      '<section><p>Philip Hemmer</p>' +
+      ' '.repeat(800) +
+      '<a href="mailto:prhemmer@tamu.edu">Email</a></section>' +
+      '<footer><a href="mailto:easa@tamu.edu">Department contact</a></footer>';
+    expect(select('Philip Hemmer', html, 'tamu.edu', {
+      pageUrl: 'https://engineering.tamu.edu/electrical/profiles/phemmer.html',
+    })).toBe('prhemmer@tamu.edu');
+  });
+
+  it('does not use an initials-plus-surname mailbox when the candidate appears only in body text', () => {
+    const html =
+      '<title>Faculty directory</title><h1>People</h1>' +
+      '<p>Philip Hemmer — quantum optics</p>' +
+      '<p>Peter Hemmer <a href="mailto:phemmer@tamu.edu">Email</a></p>';
+    expect(select('Philip Hemmer', html, 'tamu.edu', {
+      pageUrl: 'https://engineering.tamu.edu/electrical/faculty.html',
+    })).toBeNull();
+  });
+
+  it('does not confuse same-initial namesakes in a weak directory page', () => {
+    const html =
+      '<title>Faculty directory</title><h1>People</h1>' +
+      '<p>Feng Zhang — genome engineering</p>' +
+      '<p>Fan Zhang <a href="mailto:fzhang@mit.edu">Email</a></p>';
+    expect(select('Feng Zhang', html, 'mit.edu', {
+      pageUrl: 'https://biology.mit.edu/people/',
+    })).toBeNull();
+  });
+
+  it('prefers a full-name mailbox over a lower-ranked surname mailbox', () => {
+    const html =
+      '<title>Jane Doe | Example University</title><h1>Jane Doe</h1>' +
+      '<a href="mailto:jane.doe@example.edu">Jane Doe</a>' +
+      '<footer><a href="mailto:doe@example.edu">Legacy address</a></footer>';
+    expect(select('Jane Doe', html, 'example.edu', {
+      pageUrl: 'https://example.edu/people/jane-doe',
+    })).toBe('jane.doe@example.edu');
+  });
+
+  it('abstains when two mailboxes tie at the best ownership class', () => {
+    const html =
+      '<title>Jane Doe | Example University</title><h1>Jane Doe</h1>' +
+      '<a href="mailto:jane.doe@example.edu">Jane Doe</a>' +
+      '<a href="mailto:janedoe@dept.example.edu">Jane Doe</a>';
+    expect(select('Jane Doe', html, 'example.edu', {
+      pageUrl: 'https://example.edu/people/jane-doe',
+    })).toBeNull();
+  });
+
+  it('supports short surnames when a strong page identity and mailbox class agree', () => {
+    const html =
+      '<title>Guang-Way Li | MIT</title><h1>Guang-Way Li</h1>' +
+      '<a href="mailto:gwli@mit.edu">Email</a>';
+    expect(select('Guang-Way Li', html, 'mit.edu', {
+      pageUrl: 'https://biology.mit.edu/profile/guang-way-li',
+    })).toBe('gwli@mit.edu');
   });
 
   it('abstains on a lab/group page whose sole email is a non-owner admin', () => {
