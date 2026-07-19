@@ -102,6 +102,7 @@ Promote any of these to a per-entity page if app code starts writing to it.
 | External reviewer authoring | `review_drafts` (autosave scratchpad; Dataverse `wmkf_appreviewanswer` is the submitted system of record) | [postgres-review-drafts.md](atlas/postgres-review-drafts.md) |
 | Monitoring | `health_check_history`, `system_alerts`, `maintenance_runs`, `api_usage_log` | same |
 | BILL.com | `bill_webhook_events` (webhook dedup), `bill_onboarding_state` (honorarium onboarding durable state) | same |
+| Reviewer identity shadow observability | `reviewer_identity_shadow_log` (best-effort W2-vs-legacy comparison log; migration 026 **not yet applied** to the live database) | [postgres-reviewer-identity-shadow-log.md](atlas/postgres-reviewer-identity-shadow-log.md) |
 
 ## Adapter inventory (`lib/dataverse/adapters/`)
 

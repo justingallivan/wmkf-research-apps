@@ -2,7 +2,16 @@
  * @jest-environment node
  */
 
+jest.mock('../../lib/services/reviewer-identity-shadow-log', () => ({
+  recordShadowComparison: jest.fn(),
+  recordShadowError: jest.fn(),
+}));
+
 const { OpenAlexService } = require('../../lib/services/openalex-service');
+const {
+  recordShadowComparison,
+  recordShadowError,
+} = require('../../lib/services/reviewer-identity-shadow-log');
 const {
   RESOLVER_MODE,
   _internals,
@@ -30,6 +39,8 @@ describe('reviewer identity runtime seam', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    recordShadowComparison.mockReset();
+    recordShadowError.mockReset();
   });
 
   test('defaults to legacy and never starts W2', async () => {
@@ -253,6 +264,49 @@ describe('reviewer identity runtime seam', () => {
       onShadowError,
     });
     expect(resolverFailure).toBe(legacyResult);
+  });
+
+  test('batch default observers share one durable run id per batch', async () => {
+    jest.spyOn(console, 'info').mockImplementation(() => {});
+    const candidates = [
+      { ...suggestion, name: 'First Candidate' },
+      { ...suggestion, name: 'Second Candidate' },
+    ];
+    const results = await evaluateSuggestionsWithRuntimeSeam(candidates, {}, {
+      mode: RESOLVER_MODE.SHADOW,
+      evaluateLegacy: jest.fn(async () => legacyResult),
+      evaluateWorksFirst: jest.fn(async () => ({
+        decision: 'bind',
+        anchor: 'orcid:0000-0001-8445-2052',
+      })),
+      createAnchorsMatch: () => async () => true,
+    });
+
+    expect(results).toHaveLength(2);
+    expect(recordShadowComparison).toHaveBeenCalledTimes(2);
+    const [first, second] = recordShadowComparison.mock.calls.map(([entry]) => entry);
+    expect(first.runId).toEqual(expect.any(String));
+    expect(first.runId).toBe(second.runId);
+    expect(first.candidateKey).not.toBe(second.candidateKey);
+  });
+
+  test('a throwing durable logger cannot change the legacy result', async () => {
+    jest.spyOn(console, 'info').mockImplementation(() => {});
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    recordShadowComparison.mockImplementation(() => {
+      throw new Error('durable logger exploded');
+    });
+    const result = await evaluateWithRuntimeSeam(suggestion, {}, {
+      mode: RESOLVER_MODE.SHADOW,
+      evaluateLegacy: jest.fn(async () => legacyResult),
+      evaluateWorksFirst: jest.fn(async () => ({
+        decision: 'bind',
+        anchor: 'orcid:0000-0001-8445-2052',
+      })),
+      createAnchorsMatch: () => async () => true,
+    });
+    expect(result).toBe(legacyResult);
+    expect(recordShadowError).toHaveBeenCalled();
   });
 
   test('only shadow is opt-in; unset and unknown configuration are legacy', () => {
