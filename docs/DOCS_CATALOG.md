@@ -113,7 +113,7 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [EMAIL_TOKEN_SYNTAX_UNIFICATION_PLAN.md](EMAIL_TOKEN_SYNTAX_UNIFICATION_PLAN.md) | plan | active |  | - Verify: post-migration dry-run reports adminChanged=0 preferenceChanged=0 — zero bracket tokens remain in any stored value. | 2026-07-02 |
-| [RESOLVED_PAGE_EMAIL_TIER_DESIGN.md](RESOLVED_PAGE_EMAIL_TIER_DESIGN.md) | spec | active |  | - Private-IP block covers IPv6 (::, 0.0.0.0, IPv4-mapped incl. hex-form, fe80::/10, AAAA records); the dns.lookup→connect TOCTOU window is CLOSED... | 2026-07-02 |
+| [RESOLVED_PAGE_EMAIL_TIER_DESIGN.md](RESOLVED_PAGE_EMAIL_TIER_DESIGN.md) | spec | active |  | Guarded page fetch plus deterministic mailbox ranking; only a unique grounded winner receives the invitation-ready institution_page source. | 2026-07-02 |
 | [TODO_EMAIL_NOTIFICATIONS.md](TODO_EMAIL_NOTIFICATIONS.md) | plan | draft |  | System-alert emails are wired to the Dynamics email transport (DynamicsService.createAndSendEmail). When NOTIFICATION_EMAIL_FROM is set, the... | 2026-07-02 |
 | [UNIFIED_EMAIL_SIGNATURE_PLAN.md](UNIFIED_EMAIL_SIGNATURE_PLAN.md) | plan | active |  | - The grantee invite/reminder need a signature; titles are NOT in Dataverse, so the signature must come from a per-user store with a sensible... | 2026-07-02 |
 

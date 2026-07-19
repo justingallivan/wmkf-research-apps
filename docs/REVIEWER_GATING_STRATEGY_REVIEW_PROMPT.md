@@ -152,10 +152,9 @@ guards:
    2026-07-03 Phase-C read-only flag exception for single low-trust contradicted
    strings.
 6. OpenAlex bibliometrics + verified-domain (the domain source behind guard #1/#2 above).
-7. Faculty-page recovery fetch tier — **default OFF** behind
-   `REVIEWER_PAGE_EMAIL_TIER_ENABLED` (design: `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`).
-   Note this flag is configured in Production but its current value was not read for
-   this brief — treat its on/off state as unknown and call out where it matters.
+7. Faculty-page recovery fetch tier — code-default OFF behind
+   `REVIEWER_PAGE_EMAIL_TIER_ENABLED`, explicitly enabled in production since
+   2026-07-03 (design: `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`).
 8. Work-grounding rescue (additive, forename-gated).
 
 **Scope of redesign:** contracts **1, 3, 6, 7** and the two email guards are in the

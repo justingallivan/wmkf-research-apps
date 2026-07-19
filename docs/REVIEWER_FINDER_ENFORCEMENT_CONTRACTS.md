@@ -242,27 +242,34 @@ toggle. It writes the `tierResults.openalex_author` DTO that the resolver re-pro
 
 ---
 
-## 7. Faculty-page email recovery — default zero-SSRF; opt-in guarded fetch (S265) `[VERIFIED 2026-06-17]`
+## 7. Faculty-page email recovery — guarded fetch + ranked mailbox ownership `[VERIFIED 2026-07-19]`
 
-**Contract.** By DEFAULT the faculty-page path is still the **ZERO-SSRF path — no server-side fetch.**
-`my-candidates` GET returns `facultyPageUrl` (selects `wmkf_facultypageurl`); `ReviewerInvitePanel` shows
-a "find on faculty page →" link on no-email candidates; staff read the address there and enter it via
-`CandidateEditModal` → manual stamp (`emailSource='manual'`, reads LOW per Contract 3) → Slice-G confirm.
-
-**S265 reversal (opt-in only).** The automated server-side fetch the S235 decision declined was BUILT,
-behind the `REVIEWER_PAGE_EMAIL_TIER_ENABLED` flag (**default OFF — production behavior unchanged**).
-When enabled, `_attachEmailFromResolvedPage` (`contact-enrichment-service.js:934`) runs inside
+**Contract.** `my-candidates` still returns `facultyPageUrl`, and staff can manually enter an
+address when automation abstains. The automated path is guarded by
+`REVIEWER_PAGE_EMAIL_TIER_ENABLED`: code fails closed when unset, while production explicitly
+enables the tier. When enabled, `_attachEmailFromResolvedPage` runs inside
 `_finalize` (after `_attachOpenAlexMetrics`, before the verified-domain guard) and recovers a
 page-grounded email via `safeFetchInstitutionPage` (`lib/utils/safe-fetch.js`) with the named SSRF
 mechanism Codex required: HTTPS-only, host = exact-or-subdomain of `verifiedInstitutionDomain` ONLY,
 DNS private/reserved-IP block incl. IPv6, **undici IP-pinning dispatcher** (closes the DNS-rebind
-TOCTOU), per-hop redirect re-validation, content-type + 512 KB + timeout caps. The email is stamped
-`emailSource='institution_page'` ONLY when page-grounded (unique candidate association via
-preceding-name adjacency, personal-URL owner proof, or page identity plus an exact bare-surname
-mailbox; `_selectGroundedEmail`) — `institution_page` is HIGH-trust per Contract 3. Rationale + full design:
+TOCTOU), per-hop redirect re-validation, content-type + 512 KB + timeout caps.
+
+The email is stamped `emailSource='institution_page'` ONLY when deterministic ownership ranking
+has one best address: exact full-name mailbox; initials+surname, surname+initials, or exact surname
+on a page whose title or sole H1 names the candidate; then exact personal-URL slug and narrow
+full-forename directional adjacency as fallbacks. Equal-best ties, body-only weak mailbox forms,
+domain-only matches, and unmatched role addresses abstain. `ContactParser.isNameConsistentEmail`
+is not used because its surname-containment rule is appropriate only for quarantined search leads.
+`institution_page` remains HIGH-trust per Contract 3. Rationale + full design:
 `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md` (supersedes `REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md` §D).
 Do NOT enable without that mechanism intact; multi-domain institutions (e.g. Kansas State `ksu.edu` vs
 OpenAlex `k-state.edu`) are an intentional v1 gap (the fetch is refused, not relaxed).
+
+`emailEvidence` records the official source URL, match class, ownership proof, and bounded
+alternatives. `pruneCandidateForRoster` preserves that compact evidence in Postgres
+`reviewer_find_roster`, and `CandidateCard` shows the source and explanation after reload.
+Dataverse and the send gate do not consume the detailed proof: invitation authorization remains
+the binary persisted `institution_page` source and is recomputed server-side.
 
 **Related verified-domain guard (S321 contests; 2026-07-18 policy makes contests research-only).**
 `_validateEmailAgainstVerifiedDomain` (`contact-enrichment-service.js:419`) now validates against
@@ -280,13 +287,14 @@ SSRF-bound to the **anchored** set only (fallback: the single `verifiedInstituti
 the anchored set is empty — today's bound). Design + review history:
 `docs/REVIEWER_GATING_STRATEGY_REDESIGN.md`.
 
-**Enforcement points.** Default no-fetch/manual-link boundary: `pages/api/reviewer-finder/my-candidates.js:189`
-(returns `facultyPageUrl`, no fetch) · `shared/components/reviewers/ReviewerInvitePanel.js:275-287` (staff-facing
-"find on faculty page →" link). Opt-in guarded fetch (flag-gated): `lib/utils/safe-fetch.js`
+**Enforcement points.** `lib/utils/safe-fetch.js`
 (`safeFetchInstitutionPage`, `hostWithinDomain`, `isPrivateAddress`) ·
-`lib/services/contact-enrichment-service.js:934` (`_attachEmailFromResolvedPage`) +
-`_selectGroundedEmail`. The related verified-domain guard:
-`lib/services/contact-enrichment-service.js:223, 770`. Audit:
+`lib/services/contact-enrichment/page-email.js`
+(`attachEmailFromResolvedPage`, `selectGroundedEmailWithEvidence`) ·
+`lib/utils/contact-parser.js` (`extractEmailsFromHtml`) ·
+`shared/components/reviewers/reviewer-search-logic.js` (`pruneEmailEvidence`) ·
+`shared/components/reviewers/ReviewerSearchSection.js` (`CandidateCard`). The related
+verified-domain guard remains in the contact-enrichment finalization path. Audit:
 `tests/unit/resolved-page-email-grounding.test.js`, `tests/unit/resolved-page-email-tier-service.test.js`.
 Design: `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`.
 
@@ -327,5 +335,5 @@ exported `:568`). **Audit:** `tests/unit/reviewer-identity-evidence.test.js`
 | 4 | Structured-PI fail-open/augment-only | `proposal-pi-identity.js:125+` + `reviewer-identity-evidence.js:316-321` |
 | 5 | S240 institution COI default hard drop + flagged exception | `save-candidates.js:116,150-160` + `discover.js`/`DiscoveryService` `partitionConflicts` + `reviewer-roster-store.js` `recordCoiDropped` |
 | 6 | OpenAlex bibliometrics/verified-domain | `contact-enrichment-service.js:676-790` |
-| 7 | Faculty-page: default zero-SSRF; opt-in guarded fetch (flag) | `my-candidates.js:189` + `ReviewerInvitePanel.js:275-287` (default) · `safe-fetch.js` `safeFetchInstitutionPage` + `contact-enrichment-service.js:934` (opt-in) |
+| 7 | Faculty-page guarded fetch + ranked mailbox ownership | `safe-fetch.js` + `contact-enrichment/page-email.js` + roster/UI evidence projection |
 | 8 | Work-grounding rescue | `reviewer-identity-evidence.js:212-271` |

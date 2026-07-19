@@ -345,11 +345,23 @@ export function pruneEmailEvidence(evidence) {
           : [],
       }))
     : [];
+  const alternatives = Array.isArray(evidence.alternatives)
+    ? evidence.alternatives
+        .slice(0, 8)
+        .map((alternative) => ({
+          email: alternative?.email ? String(alternative.email).slice(0, 320) : null,
+          matchClass: alternative?.matchClass ? String(alternative.matchClass).slice(0, 80) : null,
+        }))
+        .filter((alternative) => alternative.email)
+    : [];
   return {
     sourceKind: evidence.sourceKind ? String(evidence.sourceKind).slice(0, 80) : null,
     sourceUrl: evidence.sourceUrl ? String(evidence.sourceUrl).slice(0, 500) : null,
     action: evidence.action ? String(evidence.action).slice(0, 40) : null,
     ownership: evidence.ownership ? String(evidence.ownership).slice(0, 80) : null,
+    ownershipProof: evidence.ownershipProof ? String(evidence.ownershipProof).slice(0, 100) : null,
+    matchClass: evidence.matchClass ? String(evidence.matchClass).slice(0, 80) : null,
+    alternatives,
     affiliationMatched: evidence.affiliationMatched === true,
     publicationCount: Number.isFinite(evidence.publicationCount) ? evidence.publicationCount : publications.length,
     providers: Array.isArray(evidence.providers) ? evidence.providers.slice(0, 3).map(String) : [],

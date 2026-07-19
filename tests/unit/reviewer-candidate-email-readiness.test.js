@@ -50,6 +50,31 @@ describe('CandidateCard email readiness', () => {
     expect(screen.getByText(/Evidence: 2 recent works/)).toHaveTextContent('2025');
   });
 
+  test('explains an institution-page ownership decision after roster reload', () => {
+    renderCandidate({
+      email: 'prhemmer@tamu.edu',
+      contactEnrichment: {
+        emailSource: 'institution_page',
+        emailEvidence: {
+          sourceKind: 'institution_page',
+          sourceUrl: 'https://engineering.tamu.edu/electrical/profiles/phemmer.html',
+          ownershipProof: 'mailbox_initials_surname_unverified_middle',
+          matchClass: 'initials_surname',
+          alternatives: [{ email: 'easa@tamu.edu', matchClass: 'unmatched' }],
+        },
+      },
+    });
+
+    expect(screen.getByText('✓ High-confidence email')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'official profile' })).toHaveAttribute(
+      'href',
+      'https://engineering.tamu.edu/electrical/profiles/phemmer.html',
+    );
+    expect(screen.getByText(/initials \+ surname mailbox match/)).toHaveTextContent(
+      '1 other page address not selected',
+    );
+  });
+
   test('surfaces manual and unknown provenance as needing confirmation', () => {
     renderCandidate({
       email: 'manual@example.edu',
