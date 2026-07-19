@@ -8,16 +8,18 @@
 Durable copy of the shadow W2-vs-legacy comparisons that
 `lib/services/reviewer-identity-runtime.js` previously emitted only to
 `console.info` — Vercel runtime logs expire within minutes, which made shadow
-cohort observation impossible after the fact. Rows support a **delta-only
-report**: `WHERE legacy_decision IS DISTINCT FROM works_decision` (partial
-index provided), grouped by `run_id` (one UUID per shadow batch).
+cohort observation impossible after the fact. Rows support arm-disagreement,
+authoritative combined-outcome, and error reporting, grouped by `run_id` (one
+UUID per resolver batch).
 
 ## Source of truth
 
 - Schema: `lib/db/migrations/026_reviewer_identity_shadow_log.sql` (fresh-install mirror: `scripts/setup-database.js` v36 block).
-- Writer: `lib/services/reviewer-identity-shadow-log.js` — sole write path, called only from the default shadow observers in `reviewer-identity-runtime.js`.
+- Writer: `lib/services/reviewer-identity-shadow-log.js` — sole write path, called only from the default shadow/combined observers in `reviewer-identity-runtime.js`.
 - Cleanup: `MaintenanceService.cleanupReviewerIdentityShadowLog` (daily `/api/cron/maintenance`; `retention:reviewer_identity_shadow_log_days` Dataverse setting, default 90 days, plus a 200k hard row cap).
-- Readers: none in application code — ad-hoc SQL only.
+- Readers: no application decision path. The canonical operator read path is
+  `node scripts/report-reviewer-identity-shadow-log.js`; it supports
+  run-, mode-, and time-scoped text/JSON reports.
 
 ## Invariants
 
@@ -36,7 +38,8 @@ index provided), grouped by `run_id` (one UUID per shadow batch).
   16-hex-char truncated SHA-256 of normalized `name|institution` —
   recomputable and dictionary-testable by a party holding the roster. Treat it
   as pseudonymous personal data, not anonymous data. Error rows store a stable
-  `error_code` only, never messages.
+  `error_code` only, never messages; they retain the pseudonymous candidate key
+  so batch failures remain attributable.
 - **Bounded.** Text values clamped to 120 chars at the writer; lifetime
   bounded by retention + row cap in the maintenance cron.
 

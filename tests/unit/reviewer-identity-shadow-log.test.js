@@ -63,10 +63,12 @@ describe('reviewer identity shadow log (durable, best-effort)', () => {
   test('error rows store a stable code, never the error message', async () => {
     await recordShadowError({
       runId: 'run-2',
+      candidateKey: 'abcd1234abcd1234',
       errorCode: 'reviewer_identity_shadow_timeout',
     });
     const values = lastInsertValues();
     expect(values[2]).toBe('error');
+    expect(values[3]).toBe('abcd1234abcd1234');
     expect(values[9]).toBe('reviewer_identity_shadow_timeout');
   });
 

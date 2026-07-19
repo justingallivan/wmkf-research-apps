@@ -138,6 +138,25 @@ describe('reviewer identity runtime seam', () => {
     }));
   });
 
+  test('default shadow errors retain run, mode, and candidate attribution', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const result = await evaluateWithRuntimeSeam(suggestion, {}, {
+      mode: RESOLVER_MODE.SHADOW,
+      evaluateLegacy: jest.fn(async () => legacyResult),
+      evaluateWorksFirst: jest.fn(async () => {
+        throw new Error('provider unavailable');
+      }),
+    });
+
+    expect(result).toBe(legacyResult);
+    expect(recordShadowError).toHaveBeenCalledWith(expect.objectContaining({
+      runId: expect.any(String),
+      resolverMode: RESOLVER_MODE.SHADOW,
+      candidateKey: expect.stringMatching(/^[a-f0-9]{16}$/),
+      errorCode: 'Error',
+    }));
+  });
+
   test('legacy failure preserves the pre-seam rejection contract', async () => {
     const error = new Error('legacy failed');
     const evaluateWorksFirst = jest.fn();
@@ -443,6 +462,43 @@ describe('reviewer identity runtime seam', () => {
     expect(result).toBe(legacy);
     expect(onShadowError).toHaveBeenCalledWith(expect.objectContaining({
       code: 'reviewer_identity_shadow_timeout',
+    }));
+  });
+
+  test('default combined hydration errors retain candidate attribution', async () => {
+    jest.spyOn(console, 'info').mockImplementation(() => {});
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    recordShadowComparison.mockResolvedValue('inserted');
+    recordShadowError.mockResolvedValue('inserted');
+    const legacy = { status: 'abstain', reason: 'legacy-safe-result' };
+    const result = await evaluateCombinedAgainstLegacy(
+      suggestion,
+      {},
+      legacy,
+      {
+        runId: 'combined-run',
+        shadowTimeoutMs: 5,
+        evaluateWorksFirst: jest.fn(async () => ({
+          decision: 'bind',
+          anchor: 'orcid:0000-0003-2195-6258',
+          evidenceBundle: {
+            orcids: ['0000-0003-2195-6258'],
+            anchorDois: ['10.1000/one'],
+            rors: [],
+            openAlexAuthorIds: ['A100'],
+          },
+        })),
+        createAnchorsMatch: () => async () => false,
+        getAuthorByOrcid: jest.fn(() => new Promise(() => {})),
+      },
+    );
+
+    expect(result).toBe(legacy);
+    expect(recordShadowError).toHaveBeenCalledWith(expect.objectContaining({
+      runId: 'combined-run',
+      resolverMode: RESOLVER_MODE.COMBINED,
+      candidateKey: expect.stringMatching(/^[a-f0-9]{16}$/),
+      errorCode: 'reviewer_identity_shadow_timeout',
     }));
   });
 

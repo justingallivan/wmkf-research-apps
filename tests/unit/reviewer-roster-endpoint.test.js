@@ -83,11 +83,19 @@ describe('POST recordSurfaced', () => {
     expect(passed).toHaveLength(1);
     expect(passed[0].name).toBe('Ann Lee');
     expect(passed[0].hIndex).toBe(9);
-    // A render-safe contactEnrichment SUBSET is kept (email), but raw resolver
-    // internals (tierResults / identity) are NOT persisted.
+    // A render-safe contactEnrichment subset is kept. Raw resolver internals
+    // and tierResults are dropped, while the compact identity decision needed
+    // by the W4.1 save boundary survives the roster round trip.
     expect(passed[0].contactEnrichment.email).toBe('a@x.edu');
     expect(passed[0].contactEnrichment.tierResults).toBeUndefined();
-    expect(passed[0].contactEnrichment.identity).toBeUndefined();
+    expect(passed[0].contactEnrichment.identity).toEqual({
+      status: 'unresolved',
+      confidenceBand: null,
+      resolverVersion: null,
+      resolvedAt: null,
+      evidenceSummary: null,
+      anchors: null,
+    });
     expect(passed[0].tierResults).toBeUndefined();
     // The resolver verdict survives as a safe boolean flag (unresolved → block).
     expect(passed[0].identityPersistAllowed).toBe(false);

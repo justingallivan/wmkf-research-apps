@@ -46,7 +46,9 @@ Files:
   `reportShadowComparison`/`reportShadowError` observers to the writer and
   minted one shared `crypto.randomUUID()` per batch. The later Codex integration
   preserved that observer contract while adding resolver-mode attribution and
-  the explicit owner-gated combined path.
+  the explicit owner-gated combined path. Comparison and error rows now both
+  carry the pseudonymous candidate key, so a failed candidate remains
+  attributable within a shared batch run.
 - `lib/services/maintenance-service.js` + `pages/api/cron/maintenance.js` —
   `cleanupReviewerIdentityShadowLog` (default 90-day retention via Dataverse
   setting `retention:reviewer_identity_shadow_log_days`, plus 200k hard row
@@ -56,7 +58,7 @@ Files:
   redaction whitelist, clamping, breaker, seam integration under storage
   outage) and additions to `tests/unit/reviewer-identity-runtime.test.js`
   (per-batch run-id sharing; a throwing durable logger cannot change the
-  legacy result). The integrated focused suites pass 31/31.
+  legacy result), plus direct retention/row-cap and report-contract coverage.
 - Docs: `docs/atlas/postgres-reviewer-identity-shadow-log.md`, Atlas registry
   row, service catalog entries.
 
@@ -75,16 +77,20 @@ Files:
 - Bounded retention (90d default), row cap (200k), and value clamping (120
   chars) are all defined.
 
-## Delta-only report
+## Canonical report
 
-```sql
-SELECT run_id, candidate_key, legacy_decision, works_decision,
-       combined_decision, combined_reason, anchors_agree, created_at
-FROM reviewer_identity_shadow_log
-WHERE event_type = 'comparison'
-  AND legacy_decision IS DISTINCT FROM works_decision
-ORDER BY created_at DESC;
+```bash
+node scripts/report-reviewer-identity-shadow-log.js
+node scripts/report-reviewer-identity-shadow-log.js --run <run-id>
+node scripts/report-reviewer-identity-shadow-log.js --mode combined --days 7
+node scripts/report-reviewer-identity-shadow-log.js --all --json
 ```
+
+The default report separates legacy-vs-works arm disagreements, authoritative
+combined-mode outcomes, and errors. It includes every combined-mode row plus
+shadow disagreements/errors; `--all` also includes shadow agreements.
+`--run` scopes both the summary and transcript to that run. Every detail row
+shows `resolver_mode` and candidate key, including errors.
 
 `candidate_key` is recomputable from a roster candidate
 (SHA-256 of NFKC-lowercased `name|institution`, first 16 hex chars) to map

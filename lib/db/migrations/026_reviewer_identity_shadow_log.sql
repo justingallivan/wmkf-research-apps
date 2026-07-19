@@ -3,8 +3,8 @@
 -- Writer: lib/services/reviewer-identity-shadow-log.js (best-effort,
 -- non-throwing, and awaited with a 2-second cap by the default shadow
 -- observers in lib/services/reviewer-identity-runtime.js).
--- Reader: ad-hoc delta reports (legacy_decision IS DISTINCT FROM
--- works_decision) — no application read path.
+-- Reader: scripts/report-reviewer-identity-shadow-log.js — a read-only
+-- operator report; no application decision path.
 -- Cleanup: MaintenanceService.cleanupReviewerIdentityShadowLog (daily
 -- maintenance cron; retention window plus hard row cap).
 --
