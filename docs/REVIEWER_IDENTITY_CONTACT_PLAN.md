@@ -63,19 +63,17 @@ plan's Wave 13 binding model rather than duplicating it.
   zero genuine wrong-person binds, and three misses. Eleven automatic outcomes
   changed; the two changed review cases are the already-labeled unsafe
   initials-only A. Patel and J. Kim cases, so the run created no new mandatory
-  human adjudication. The evaluation/scoring client made 160 OpenAlex requests
+  human adjudication. The evaluation/scoring client made 176 OpenAlex requests
   costing $0.104; this explicitly excludes the current spine's internal
   OpenAlex requests and is not a total-run cost. `[VERIFIED 2026-07-19 via
-  recorded npm run eval:reviewer-identity:w2 output before shared-module
-  extraction; the gitignored raw path was later overwritten by the invalid
-  throttled rerun described next]`
-- The first post-extraction rerun matched the clean run through its first 30
-  cases, then OpenAlex returned 429 for five late cases. That attempt is not
-  treated as evaluation evidence. The runner now rate-paces requests and makes
-  zero provider failures a hard gate, so a throttled run cannot pass by
-  misclassifying source failures as ordinary misses. A clean full rerun remains
-  required before shadow enablement or cutover. `[VERIFIED 2026-07-19 via
-  attempted npm run eval:reviewer-identity:w2 and provider-failure gate tests]`
+  clean post-extraction npm run eval:reviewer-identity:w2 output]`
+- An earlier post-extraction attempt hit five late OpenAlex 429s and remains
+  invalid historical evidence. The runner rate-paces requests and makes zero
+  provider failures a hard gate, so throttling cannot pass by being
+  misclassified as ordinary misses. The subsequent clean full rerun satisfied
+  that gate with zero provider failures. `[VERIFIED 2026-07-19 via clean
+  post-extraction npm run eval:reviewer-identity:w2 output and
+  provider-failure gate tests]`
 - Before W1, the COI matcher matched shared institution id/name with no umbrella
   exemption and the alias table folded Janelia into HHMI. W1 now exempts
   Broad/HHMI-only overlap and separates Janelia. `[HISTORICAL finding; VERIFIED

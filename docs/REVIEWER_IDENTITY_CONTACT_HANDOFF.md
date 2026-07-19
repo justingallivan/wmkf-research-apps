@@ -62,7 +62,7 @@ gitignored.
 The corrected run changed 11 automatic outcomes. Its only two mandatory review
 cases are the already-labeled unsafe initials-only A. Patel and J. Kim cases;
 seven additional review leads do not alter automatic behavior. The
-evaluation/scoring client used 160 OpenAlex requests at $0.104, excluding the
+evaluation/scoring client used 176 OpenAlex requests at $0.104, excluding the
 current spine's internal OpenAlex traffic.
 
 The required fresh-agent adversarial reviews found and closed twelve defects
@@ -73,15 +73,13 @@ provider-failure accounting, evaluator drift from W0 institution resolution,
 observer exceptions that could escape the shadow seam, cross-candidate provider
 contention, swallowed evaluation-provider failures, and a cooperative rather
 than hard shadow deadline, plus per-request timeout leakage into retry backoff.
-Focused tests and the original clean 40-case rerun are green. A post-extraction
-rerun matched the first 30 cases, then hit five late OpenAlex 429s. That attempt
-is invalid rather than a new score: the runner now rate-paces requests and
-requires zero provider failures, preventing throttling from passing as misses.
+Focused tests and the clean post-extraction 40-case rerun are green. The runner
+rate-paces requests and requires zero provider failures, preventing throttling
+from passing as misses.
 
 ## Next product choice
 
-First rerun the full pinned benchmark after OpenAlex throttling clears. W2's
-next optional product step is then an owner-approved shadow observation period by
+W2's next optional product step is an owner-approved shadow observation period by
 setting `REVIEWER_IDENTITY_RESOLVER_MODE=shadow` in a chosen environment and
 redeploying. Do not set it as part of this build. Authoritative cutover requires
 a later reviewed code change because the current mode allowlist contains only

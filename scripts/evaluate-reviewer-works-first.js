@@ -12,6 +12,7 @@ const {
   resolveWorksFirst,
   scoreDecision,
   shortOpenAlexAuthorId,
+  shortOpenAlexInstitutionId,
 } = require('../lib/services/reviewer-works-first');
 const {
   createInstitutionIdentityResolver,
@@ -483,6 +484,7 @@ module.exports = {
   FROZEN_EQUIVALENCE_OVERLAY_SHA256,
   createAnchorMatcher,
   createEvaluationInstitutionResolver,
+  createOpenAlexClient,
   createRightPersonPolicyMatcher,
   parseCli,
   readEquivalenceOverlay,

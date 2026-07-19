@@ -16,6 +16,7 @@ const {
   DEFAULT_EQUIVALENCE_OVERLAY,
   createAnchorMatcher,
   createEvaluationInstitutionResolver,
+  createOpenAlexClient,
   parseCli,
   readEquivalenceOverlay,
   readFrozenBenchmark,
@@ -484,6 +485,32 @@ describe('works-first identity evaluation', () => {
       displayName: 'Example University',
     }]);
     await expect(resolver.resolve('Example University')).resolves.toBeNull();
+  });
+
+  test('the evaluator OpenAlex client normalizes and hydrates institution IDs', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      status: 200,
+      ok: true,
+      headers: { get: jest.fn(() => null) },
+      json: jest.fn(async () => ({
+        id: 'https://openalex.org/I123',
+        display_name: 'Example University',
+        country_code: 'US',
+        associated_institutions: [],
+      })),
+    });
+    const client = createOpenAlexClient();
+
+    await expect(client.getInstitution('https://openalex.org/I123')).resolves.toMatchObject({
+      openAlexId: 'https://openalex.org/I123',
+      displayName: 'Example University',
+      country: 'US',
+    });
+    expect(new URL(fetchSpy.mock.calls[0][0]).pathname).toBe('/institutions/I123');
+    await expect(client.getInstitution('not-an-openalex-id')).resolves.toBeNull();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    fetchSpy.mockRestore();
   });
 
   test('evaluation adapters propagate hidden provider failures instead of scoring them', async () => {
