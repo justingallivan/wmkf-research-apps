@@ -10,6 +10,7 @@
  *   PATCH { requestId, action:'promote', candidateKey } → excluded → active (returns blob)
  *   PATCH { requestId, action:'saved', candidates }  → graduated to the Dataverse pool
  *   PATCH { requestId, action:'confirm_identity', candidate } → staff attestation
+ *   PATCH { requestId, action:'remove_previous_results' } → delete active search history
  *
  * App-key tuple matches my-candidates.js so the Find tab's `reviewers`/
  * `reviewer-finder` grants both reach it.
@@ -23,6 +24,7 @@ import {
   confirmIdentity,
   markSaved,
   listForRequest,
+  removePreviousActiveSearchResults,
 } from '../../../lib/services/reviewer-roster-store';
 import { pruneCandidateForRoster } from '../../../shared/components/reviewers/reviewer-search-logic';
 
@@ -30,6 +32,9 @@ const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // Cap candidates per POST — a Find run asks for at most 25, but guard against an
 // oversized body regardless.
 const MAX_CANDIDATES_PER_POST = 100;
+// The store retains up to 300 active/saved rows per request. A single removal
+// action must therefore be able to carry every visible prior-result key.
+const MAX_PREVIOUS_RESULT_KEYS = 300;
 
 export const config = {
   api: { bodyParser: { sizeLimit: '2mb' } },
@@ -146,5 +151,26 @@ async function handlePatch(req, res, access) {
     return res.status(200).json({ success: true, ...confirmed });
   }
 
-  return res.status(400).json({ error: 'Unknown action (expected exclude | promote | saved | confirm_identity)' });
+  if (action === 'remove_previous_results') {
+    const { candidateRefs } = req.body;
+    const invalidRefs = !Array.isArray(candidateRefs)
+      || candidateRefs.length === 0
+      || candidateRefs.length > MAX_PREVIOUS_RESULT_KEYS
+      || candidateRefs.some((ref) => (
+        !ref
+        || typeof ref.candidateKey !== 'string'
+        || !ref.candidateKey.trim()
+        || ref.candidateKey.length > 256
+        || typeof ref.updatedAt !== 'string'
+        || !ref.updatedAt.trim()
+        || ref.updatedAt.length > 80
+      ));
+    if (invalidRefs) {
+      return res.status(400).json({ error: `candidateRefs[] must contain 1-${MAX_PREVIOUS_RESULT_KEYS} valid key/timestamp pairs` });
+    }
+    const result = await removePreviousActiveSearchResults(requestId, candidateRefs);
+    return res.status(200).json({ success: true, ...result });
+  }
+
+  return res.status(400).json({ error: 'Unknown action (expected exclude | promote | saved | confirm_identity | remove_previous_results)' });
 }

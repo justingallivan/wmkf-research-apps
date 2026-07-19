@@ -44,6 +44,71 @@ describe('listForRequest', () => {
   });
 });
 
+describe('removePreviousActiveSearchResults', () => {
+  test('deletes only active allowlisted search provenance and returns the count', async () => {
+    sql.mockResolvedValueOnce({ rows: [{
+      removed: 2,
+      removed_keys: ['candidate:a', 'candidate:b'],
+      roster_rows: [
+        { status: 'active', display_name: 'Applicant Person', candidate: { name: 'Applicant Person' }, updated_at_token: '2026-07-19 15:00:00.123456+00' },
+        { status: 'excluded', display_name: 'Excluded Person', candidate: { name: 'Excluded Person' } },
+        { status: 'saved', display_name: 'Saved Person', candidate: { name: 'Saved Person' } },
+        { status: 'active', display_name: 'Flagged COI Person', candidate: { name: 'Flagged COI Person', hasInstitutionCOI: true }, updated_at_token: '2026-07-19 14:00:00.654321+00' },
+        { status: 'coi_dropped', display_name: 'COI Ledger Person', candidate: { name: 'COI Ledger Person' } },
+      ],
+    }] });
+
+    const out = await store.removePreviousActiveSearchResults(
+      REQ,
+      [
+        { candidateKey: 'candidate:a', updatedAt: '2026-07-19T12:00:00.000Z' },
+        { candidateKey: 'candidate:b', updatedAt: '2026-07-19T13:00:00.000Z' },
+        { candidateKey: 'candidate:a', updatedAt: '2026-07-19T12:00:00.000Z' },
+      ],
+    );
+    expect(out.removed).toBe(2);
+    expect(out.removedKeys).toEqual(['candidate:a', 'candidate:b']);
+    expect(out.active.map((candidate) => candidate.name)).toEqual(['Applicant Person', 'Flagged COI Person']);
+    expect(out.active[0].rosterUpdatedAt).toBe('2026-07-19 15:00:00.123456+00');
+    expect(out.excluded.map((candidate) => candidate.name)).toEqual(['Excluded Person']);
+    expect(out.allNames).toEqual(['Applicant Person', 'Excluded Person', 'Saved Person', 'Flagged COI Person', 'COI Ledger Person']);
+
+    const text = queryTextOf(0);
+    expect(text).toMatch(/DELETE FROM reviewer_find_roster/);
+    expect(text).toMatch(/roster\.status = 'active'/);
+    expect(text).toMatch(/jsonb_to_recordset/);
+    expect(text).toMatch(/roster\.updated_at::text = target\.updated_at_token/);
+    expect(text).toMatch(/hasInstitutionCOI.*IS DISTINCT FROM 'true'/);
+    expect(text).toMatch(/candidate_key NOT IN \(SELECT candidate_key FROM deleted\)/);
+    expect(text).toMatch(/source_kind IN/);
+    expect(text).toMatch(/'literature_retrieved'/);
+    expect(text).toMatch(/'referred'/);
+    expect(text).toMatch(/'claude_verified'/);
+    expect(text).not.toMatch(/'applicant_suggested'/);
+    expect(text).not.toMatch(/status IN/);
+    expect(allInterpolations()).toContain(REQ);
+    expect(allInterpolations()).toContain(JSON.stringify([
+      { candidate_key: 'candidate:a', updated_at_token: '2026-07-19T12:00:00.000Z' },
+      { candidate_key: 'candidate:b', updated_at_token: '2026-07-19T13:00:00.000Z' },
+    ]));
+  });
+
+  test('an empty candidate-ref set performs only the roster read', async () => {
+    sql.mockResolvedValueOnce({ rows: [
+      { status: 'active', display_name: 'Applicant Person', candidate: { name: 'Applicant Person' } },
+    ] });
+    const out = await store.removePreviousActiveSearchResults(REQ, []);
+    expect(out.removed).toBe(0);
+    expect(out.removedKeys).toEqual([]);
+    expect(out.active.map((candidate) => candidate.name)).toEqual(['Applicant Person']);
+    expect(out.excluded).toEqual([]);
+    expect(out.allNames).toEqual(['Applicant Person']);
+    expect(sql).toHaveBeenCalledTimes(1);
+    expect(queryTextOf(0)).toMatch(/SELECT candidate_key, status/);
+    expect(queryTextOf(0)).not.toMatch(/DELETE/);
+  });
+});
+
 describe('recordSurfaced', () => {
   test('records named candidates (normalized) and skips unnamed/blank ones', async () => {
     const n = await store.recordSurfaced(REQ, [
