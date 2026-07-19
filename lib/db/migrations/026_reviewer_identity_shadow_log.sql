@@ -1,7 +1,7 @@
 -- 026: Durable shadow-comparison log for the reviewer identity runtime seam.
 --
--- Writer: lib/services/reviewer-identity-shadow-log.js (best-effort, never
--- awaited on the reviewer request path; called from the default shadow
+-- Writer: lib/services/reviewer-identity-shadow-log.js (best-effort,
+-- non-throwing, and awaited with a 2-second cap by the default shadow
 -- observers in lib/services/reviewer-identity-runtime.js).
 -- Reader: ad-hoc delta reports (legacy_decision IS DISTINCT FROM
 -- works_decision) — no application read path.
@@ -10,8 +10,8 @@
 --
 -- Privacy contract: rows carry NO candidate names, emails, proposal content,
 -- provider payloads, or identity anchors. candidate_key is a 16-hex-char
--- truncated SHA-256 of the normalized name|institution pair, recomputable
--- from a roster candidate for correlation but not reversible from the log.
+-- truncated SHA-256 of the normalized name|institution pair. It omits raw
+-- identity text but remains pseudonymous/dictionary-testable by a roster holder.
 
 CREATE TABLE IF NOT EXISTS reviewer_identity_shadow_log (
   id BIGSERIAL PRIMARY KEY,

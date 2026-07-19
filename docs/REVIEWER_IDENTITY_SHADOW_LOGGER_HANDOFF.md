@@ -3,7 +3,7 @@ title: Reviewer Identity Shadow Logger — Handoff
 domain: reviewer-identity
 kind: runbook
 status: active
-summary: "Durable Postgres shadow-comparison logger; runtime-seam ownership returns to Codex; migration 026 deliberately not applied."
+summary: "Durable Postgres resolver-comparison logger integrated into the Codex W2/W4 branch; migration 026 deliberately not applied."
 canonical: false
 cataloged: 2026-07-19
 owner: product-engineering
@@ -18,10 +18,11 @@ related:
 at `7e8a8ced`). Built 2026-07-19 by Claude. Not merged, not deployed, not
 pushed to `main`; migration **not applied** anywhere.
 
-**Ownership:** `lib/services/reviewer-identity-runtime.js` was temporarily
-Claude-owned for this single integration and **returns to Codex on this
-handoff**. Claude retains the logger (`reviewer-identity-shadow-log.js`), its
-tests, and docs.
+**Integration update:** commit `908c6f32` was cherry-picked into
+`codex/w2-cutover-w4-evidence` and the runtime seam returned to Codex. Codex
+then made normal inserts awaited (while preserving the non-throwing result
+contract), added resolver-mode attribution, and integrated the explicit
+owner-gated combined path. Migration 026 remains unapplied.
 
 ## What was built
 
@@ -37,15 +38,15 @@ Files:
   run/created indexes, and a partial index on
   `legacy_decision IS DISTINCT FROM works_decision` for delta-only reports.
 - `lib/services/reviewer-identity-shadow-log.js` — sole writer. Whitelisted
-  redacted scalars only; length-clamped; never awaited on the request path;
-  never throws (sync or async); circuit breaker (5 consecutive failures →
-  60s suspension).
+  data-minimized scalars only; length-clamped; always resolves; circuit breaker
+  (5 consecutive failures → 60s suspension); each awaited insert is capped at
+  2 seconds.
 - `lib/services/reviewer-identity-runtime.js` — integration seam only:
-  default `reportShadowComparison`/`reportShadowError` now also call the
-  writer, and each shadow batch mints one `crypto.randomUUID()` run id shared
-  by its rows. Injected custom observers are untouched (same
-  single-argument contract), and no W2/W4 decision logic, mode handling,
-  `reviewer-works-first.js`, or env-var behavior changed.
+  Claude's logger commit connected the default
+  `reportShadowComparison`/`reportShadowError` observers to the writer and
+  minted one shared `crypto.randomUUID()` per batch. The later Codex integration
+  preserved that observer contract while adding resolver-mode attribution and
+  the explicit owner-gated combined path.
 - `lib/services/maintenance-service.js` + `pages/api/cron/maintenance.js` —
   `cleanupReviewerIdentityShadowLog` (default 90-day retention via Dataverse
   setting `retention:reviewer_identity_shadow_log_days`, plus 200k hard row
@@ -55,19 +56,22 @@ Files:
   redaction whitelist, clamping, breaker, seam integration under storage
   outage) and additions to `tests/unit/reviewer-identity-runtime.test.js`
   (per-batch run-id sharing; a throwing durable logger cannot change the
-  legacy result). 25/25 passing.
+  legacy result). The integrated focused suites pass 31/31.
 - Docs: `docs/atlas/postgres-reviewer-identity-shadow-log.md`, Atlas registry
   row, service catalog entries.
 
 ## Invariants held (verify before extending)
 
 - Logging is non-authoritative and best-effort; no application read path.
-- Logger failure/timeout/storage outage never alters or delays the legacy
-  result (tested at both the writer and seam layers).
+- Logger failure/timeout/storage outage never alters the reviewer decision.
+  Normal inserts are awaited so a Vercel function cannot finish before the
+  insert settles; the writer's 2-second deadline bounds that database latency
+  in shadow or combined mode.
 - No proposal content, names, email addresses, provider payloads, anchors, or
   secrets are stored — `candidate_key` is the runtime's existing 16-hex
   truncated SHA-256; error rows store `error_code` only, never messages. The
-  pre-existing no-PII serialization test still passes unchanged.
+  candidate key is pseudonymous and dictionary-testable by anyone holding the
+  roster; it is data-minimized personal data, not anonymous data.
 - Bounded retention (90d default), row cap (200k), and value clamping (120
   chars) are all defined.
 
@@ -84,12 +88,14 @@ ORDER BY created_at DESC;
 
 `candidate_key` is recomputable from a roster candidate
 (SHA-256 of NFKC-lowercased `name|institution`, first 16 hex chars) to map
-deltas back to candidates without storing PII.
+deltas back to candidates without storing raw names or institutions. The key
+is pseudonymous, not anonymous.
 
 ## Deliberately not done
 
 - Migration 026 is **not applied** to any database (`node
   scripts/apply-migrations.js` when the owner is ready).
-- No environment variables added or changed; `REVIEWER_IDENTITY_RESOLVER_MODE`
-  semantics untouched (unknown values still collapse to legacy).
-- No W2 cutover, no W4 changes, no production deploys.
+- No environment variables were changed; unknown values still collapse to
+  legacy. Code now recognizes explicit `combined`, but no deployed environment
+  enables it.
+- No W2 production cutover, migration apply, or production deploy.

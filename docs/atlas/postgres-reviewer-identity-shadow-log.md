@@ -23,16 +23,20 @@ index provided), grouped by `run_id` (one UUID per shadow batch).
 
 - **Non-authoritative.** Nothing on any reviewer decision path reads this
   table; deleting every row at any time is safe.
-- **Best-effort writes.** The writer is never awaited on the request path,
-  never throws, and opens a circuit breaker (60s) after 5 consecutive insert
-  failures. Logger/storage failure must never alter or delay the legacy
-  reviewer result (tested in `tests/unit/reviewer-identity-shadow-log.test.js`
-  and `tests/unit/reviewer-identity-runtime.test.js`).
-- **No PII.** No candidate names, email addresses, proposal content, provider
+- **Best-effort writes.** The writer always resolves and opens a circuit breaker
+  (60s) after 5 consecutive insert failures. Runtime observers await each
+  best-effort insert, capped at 2 seconds, so normal writes settle before
+  function completion without an unbounded observability wait;
+  logger/storage failure must never alter the reviewer decision (tested in
+  `tests/unit/reviewer-identity-shadow-log.test.js` and
+  `tests/unit/reviewer-identity-runtime.test.js`).
+- **Data-minimized pseudonymous identifier.** No raw candidate names, email
+  addresses, proposal content, provider
   payloads, identity anchors, or secrets. `candidate_key` is the runtime's
   16-hex-char truncated SHA-256 of normalized `name|institution` —
-  recomputable from a roster candidate for correlation, not reversible from
-  the log. Error rows store a stable `error_code` only, never messages.
+  recomputable and dictionary-testable by a party holding the roster. Treat it
+  as pseudonymous personal data, not anonymous data. Error rows store a stable
+  `error_code` only, never messages.
 - **Bounded.** Text values clamped to 120 chars at the writer; lifetime
   bounded by retention + row cap in the maintenance cron.
 

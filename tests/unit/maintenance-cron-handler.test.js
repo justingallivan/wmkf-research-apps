@@ -67,6 +67,31 @@ function makeRes() {
 beforeEach(() => { jest.clearAllMocks(); });
 
 describe('maintenance cron — maintenance_runs retention step wiring', () => {
+  it('runs reviewer identity shadow retention and folds its count into totalDeleted', async () => {
+    MaintenanceService.cleanupReviewerIdentityShadowLog.mockResolvedValueOnce(6);
+    const res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+
+    expect(MaintenanceService.cleanupReviewerIdentityShadowLog).toHaveBeenCalledWith(90);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.results.reviewerIdentityShadowLog).toBe(6);
+    expect(res.body.totalDeleted).toBe(6);
+    expect(res.body.failedSubtasks).not.toContain('reviewerIdentityShadowLog');
+  });
+
+  it('surfaces reviewer identity shadow cleanup failure without skipping later steps', async () => {
+    MaintenanceService.cleanupReviewerIdentityShadowLog
+      .mockRejectedValueOnce(new Error('shadow cleanup failed'));
+    const res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+
+    expect(res.body.ok).toBe(false);
+    expect(res.body.results.reviewerIdentityShadowLog)
+      .toEqual({ error: 'shadow cleanup failed' });
+    expect(res.body.failedSubtasks).toContain('reviewerIdentityShadowLog');
+    expect(MaintenanceService.cleanupExpiredCache).toHaveBeenCalled();
+  });
+
   it('passes the configured retention and folds the deleted count into totalDeleted', async () => {
     MaintenanceService.cleanupMaintenanceRuns.mockResolvedValueOnce(17);
     const res = makeRes();

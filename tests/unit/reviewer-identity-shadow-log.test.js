@@ -30,6 +30,7 @@ describe('reviewer identity shadow log (durable, best-effort)', () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
@@ -50,7 +51,7 @@ describe('reviewer identity shadow log (durable, best-effort)', () => {
     expect(outcome).toBe('inserted');
     const values = lastInsertValues();
     expect(values).toEqual([
-      'run-1', 'comparison', 'abcd1234abcd1234',
+      'run-1', 'shadow', 'comparison', 'abcd1234abcd1234',
       'bind', 'review', 'review', 'anchor_disagreement', false, null,
     ]);
     const serialized = JSON.stringify(values);
@@ -65,14 +66,14 @@ describe('reviewer identity shadow log (durable, best-effort)', () => {
       errorCode: 'reviewer_identity_shadow_timeout',
     });
     const values = lastInsertValues();
-    expect(values[1]).toBe('error');
-    expect(values[8]).toBe('reviewer_identity_shadow_timeout');
+    expect(values[2]).toBe('error');
+    expect(values[9]).toBe('reviewer_identity_shadow_timeout');
   });
 
   test('clamps oversized text values', async () => {
     await recordShadowComparison({ combinedReason: 'x'.repeat(5000) });
     const values = lastInsertValues();
-    expect(values[6]).toHaveLength(_internals.MAX_TEXT);
+    expect(values[7]).toHaveLength(_internals.MAX_TEXT);
   });
 
   test('storage failure resolves without throwing', async () => {
@@ -87,6 +88,17 @@ describe('reviewer identity shadow log (durable, best-effort)', () => {
       throw new Error('client not configured');
     });
     await expect(recordShadowComparison({ runId: 'run-4' })).resolves.toBe('failed');
+  });
+
+  test('an insert that never settles is bounded and resolves as failed', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    sqlMock.mockImplementation(() => new Promise(() => {}));
+
+    const outcome = recordShadowComparison({ runId: 'run-timeout' });
+    await jest.advanceTimersByTimeAsync(_internals.INSERT_TIMEOUT_MS);
+
+    await expect(outcome).resolves.toBe('failed');
   });
 
   test('circuit breaker suspends writes after consecutive failures, then recovers', async () => {
@@ -138,8 +150,9 @@ describe('reviewer identity shadow log (durable, best-effort)', () => {
       expect(sqlMock).toHaveBeenCalledTimes(1);
       const values = lastInsertValues();
       expect(values[0]).toEqual(expect.any(String)); // minted run id
-      expect(values[1]).toBe('comparison');
-      expect(values[2]).toMatch(/^[a-f0-9]{16}$/);
+      expect(values[1]).toBe('shadow');
+      expect(values[2]).toBe('comparison');
+      expect(values[3]).toMatch(/^[a-f0-9]{16}$/);
       const serialized = JSON.stringify(values);
       expect(serialized).not.toContain('Harcombe');
       expect(serialized).not.toContain('0000-0001-8445-2052');

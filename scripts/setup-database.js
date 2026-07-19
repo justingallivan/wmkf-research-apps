@@ -515,8 +515,8 @@ const v35Statements = [
 
 // V36: durable reviewer-identity shadow comparison log. Existing databases
 // use migration 026_reviewer_identity_shadow_log.sql; this fresh-install
-// block creates the same table directly. No PII: candidate_key is a
-// truncated hash; anchors/emails/proposal content are never stored.
+// block creates the same table directly. candidate_key is a pseudonymous
+// truncated hash; raw names, anchors, emails, and proposal content are omitted.
 const v36Statements = [
   `CREATE TABLE IF NOT EXISTS reviewer_identity_shadow_log (
     id BIGSERIAL PRIMARY KEY,

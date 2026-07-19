@@ -74,6 +74,47 @@ describe('pruneCandidateForRoster — referred seed anchors survive reload', () 
   });
 });
 
+describe('pruneCandidateForRoster — W4.1 identity evidence survives reload', () => {
+  test('retains only the server-attested identity fields used by persistence', () => {
+    const pruned = pruneCandidateForRoster({
+      name: 'Taekjip Ha',
+      contactEnrichment: {
+        identity: {
+          status: 'probable',
+          confidenceBand: 'medium',
+          resolverVersion: '2.0.0-works-first',
+          resolvedAt: '2026-07-19T12:00:00.000Z',
+          evidenceSummary: 'probable — authorship grounded',
+          anchors: [{
+            type: 'authorship_grounded',
+            canonicalKey: 'openalex:A100',
+            sourceUrl: 'https://openalex.org/A100',
+            verifier: 'reviewerWorksFirst@2.0.0-works-first',
+            parserOutput: { rawProviderPayload: 'drop-me' },
+          }],
+          rejectedAnchors: [{ raw: 'drop-me' }],
+        },
+      },
+    });
+
+    expect(pruned.contactEnrichment.identity).toEqual({
+      status: 'probable',
+      confidenceBand: 'medium',
+      resolverVersion: '2.0.0-works-first',
+      resolvedAt: '2026-07-19T12:00:00.000Z',
+      evidenceSummary: 'probable — authorship grounded',
+      anchors: [{
+        type: 'authorship_grounded',
+        canonicalKey: 'openalex:A100',
+        sourceUrl: 'https://openalex.org/A100',
+        verifier: 'reviewerWorksFirst@2.0.0-works-first',
+      }],
+    });
+    expect(pruned.contactEnrichment.identity).not.toHaveProperty('rejectedAnchors');
+    expect(JSON.stringify(pruned)).not.toContain('rawProviderPayload');
+  });
+});
+
 describe('scholarly email evidence survives a bounded roster round-trip', () => {
   test('keeps action + compact publication provenance and drops extra works', () => {
     const evidence = {

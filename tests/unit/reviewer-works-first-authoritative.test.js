@@ -3,8 +3,10 @@
  */
 
 const {
+  MAX_PERSISTED_IDENTITY_ANCHORS,
   WORKS_FIRST_RESOLVER_VERSION,
   adaptCombinedIdentityResult,
+  anchorsFromEvidenceBundle,
   extractEvidenceBundle,
 } = require('../../lib/services/reviewer-works-first-authoritative');
 const {
@@ -27,6 +29,23 @@ function worksRescue() {
 }
 
 describe('works-first authoritative result adapter', () => {
+  test('caps a hostile or drifted evidence bundle at the save contract maximum', () => {
+    const anchors = anchorsFromEvidenceBundle({
+      orcids: ['0000-0003-2195-6258'],
+      openAlexAuthorIds: Array.from({ length: 30 }, (_, index) => `A${index + 1}`),
+      anchorDois: Array.from({ length: 30 }, (_, index) => `10.1000/${index + 1}`),
+      rors: Array.from({ length: 30 }, (_, index) =>
+        `https://ror.org/${String(index + 1).padStart(9, '0')}`),
+    }, NOW);
+
+    expect(anchors).toHaveLength(MAX_PERSISTED_IDENTITY_ANCHORS);
+    expect(anchors[0].canonicalKey).toBe('orcid:0000-0003-2195-6258');
+    expect(anchors[1]).toMatchObject({
+      type: 'authorship_grounded',
+      canonicalKey: 'openalex:A1',
+    });
+  });
+
   test('preserves the exact legacy object when W2 does not rescue', async () => {
     const legacyResult = { status: 'probable', selectedRecord: { openAlexId: 'A1' } };
     const result = await adaptCombinedIdentityResult({

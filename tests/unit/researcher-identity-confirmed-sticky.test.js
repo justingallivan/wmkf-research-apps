@@ -31,6 +31,36 @@ function mockStoredState(storedState) {
 }
 
 describe('writeIdentityDecision — origin × incoming status × stored state', () => {
+  test('automated W4.1 anchors reach the existing verified-anchors memo intact', async () => {
+    mockStoredState('probable');
+    const updateRecord = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    const input = {
+      ...decision('probable'),
+      confidenceBand: 'medium',
+      resolverVersion: '2.0.0-works-first',
+      anchors: [{
+        type: 'authorship_grounded',
+        canonicalKey: 'openalex:A100',
+        sourceUrl: 'https://openalex.org/A100',
+        verifier: 'reviewerWorksFirst@2.0.0-works-first',
+        parserOutput: { anchorDois: ['10.1000/one'] },
+      }],
+    };
+
+    await writeIdentityDecision('pr-1', input, {
+      identityOrigin: IDENTITY_DECISION_ORIGIN.AUTOMATED,
+    });
+
+    expect(JSON.parse(
+      updateRecord.mock.calls[0][2].wmkf_identityverifiedanchorsjson,
+    )).toEqual([{
+      type: 'authorship_grounded',
+      canonicalKey: 'openalex:A100',
+      sourceUrl: 'https://openalex.org/A100',
+      verifier: 'reviewerWorksFirst@2.0.0-works-first',
+    }]);
+  });
+
   describe.each(['confirmed', 'probable', 'read_failure'])('self_report, stored=%s', (storedState) => {
     test('confirmed writes a fresh attestation without reading stored state', async () => {
       const getRecord = mockStoredState(storedState);
