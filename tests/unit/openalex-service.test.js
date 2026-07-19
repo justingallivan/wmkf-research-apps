@@ -97,6 +97,51 @@ describe('OpenAlexService.searchAuthors', () => {
     expect(safeFetch).toHaveBeenCalledTimes(3);
   });
 
+  test('caller abort interrupts retry backoff without another provider call', async () => {
+    const controller = new AbortController();
+    safeFetch.mockResolvedValue(jsonResponse(
+      { error: 'busy' },
+      429,
+      { 'retry-after': '5' },
+    ));
+    const pending = OpenAlexService.searchAuthors('Robert Sang', {
+      signal: controller.signal,
+    });
+    setTimeout(() => {
+      controller.abort(Object.assign(new Error('stop retrying'), { name: 'AbortError' }));
+    }, 0);
+
+    await expect(pending).rejects.toMatchObject({
+      name: 'AbortError',
+      message: 'stop retrying',
+    });
+    expect(safeFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('request timeout is cleaned before a maximum retry delay', async () => {
+    jest.useFakeTimers();
+    try {
+      safeFetch
+        .mockResolvedValueOnce(jsonResponse(
+          { error: 'busy' },
+          429,
+          { 'retry-after': '5' },
+        ))
+        .mockResolvedValueOnce(jsonResponse({ meta: { count: 0 }, results: [] }));
+
+      const pending = OpenAlexService.searchAuthors('Robert Sang', { timeoutMs: 5000 });
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(safeFetch).toHaveBeenCalledTimes(1);
+
+      await jest.advanceTimersByTimeAsync(5000);
+      await expect(pending).resolves.toMatchObject({ totalCount: 0, records: [] });
+      expect(safeFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test('authenticates requests with OPENALEX_API_KEY', async () => {
     process.env.OPENALEX_API_KEY = 'oa-test-key';
     safeFetch.mockResolvedValue(jsonResponse({ meta: { count: 0 }, results: [] }));
@@ -155,6 +200,42 @@ describe('OpenAlexService work lookup', () => {
     const url = safeFetch.mock.calls[0][0];
     expect(url).toContain('search=Exact+title');
     expect(url).not.toContain('filter=');
+  });
+
+  test('raw-author work lookup uses the byline filter and returns mapped authorships', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({
+      meta: { count: 1 },
+      results: [{
+        id: 'https://openalex.org/W2',
+        display_name: 'A recent work',
+        authorships: [{
+          raw_author_name: 'Will Harcombe',
+          author: {
+            id: 'https://openalex.org/A2',
+            display_name: 'William Harcombe',
+            orcid: 'https://orcid.org/0000-0001-8445-2052',
+          },
+          institutions: [{
+            id: 'https://openalex.org/I2',
+            display_name: 'University of Minnesota',
+          }],
+        }],
+      }],
+    }));
+
+    const out = await OpenAlexService.searchWorksByRawAuthorName('Dr. Will Harcombe');
+
+    const url = new URL(safeFetch.mock.calls[0][0]);
+    expect(url.searchParams.get('filter')).toBe(
+      'raw_author_name.search:"Will Harcombe",type:!paratext',
+    );
+    expect(url.searchParams.get('sort')).toBe('publication_date:desc');
+    expect(out.records[0].authorships[0]).toMatchObject({
+      openAlexAuthorId: 'https://openalex.org/A2',
+      displayName: 'William Harcombe',
+      orcid: '0000-0001-8445-2052',
+    });
+    expect(out.records[0].authorships[0].raw.raw_author_name).toBe('Will Harcombe');
   });
 });
 

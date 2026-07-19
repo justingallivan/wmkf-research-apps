@@ -175,6 +175,7 @@ Automated BILL onboarding is disabled unless `BILL_ENABLED=true`; the current no
 | `WAVE1_BACKEND_APP_ACCESS` | Dispatch flag for app-access backend. Default Dataverse since 2026-05-12. | `dataverse` (implicit) |
 | `WAVE1_BACKEND_PREFS` | Dispatch flag for user-preferences backend. Default Dataverse since 2026-05-12. | `dataverse` (implicit) |
 | `DEBUG_REVIEWER_FINDER` | Verbose logging for Reviewer Finder pipeline | unset |
+| `REVIEWER_IDENTITY_RESOLVER_MODE` | Server-owned W2 identity resolver seam. `shadow` runs works-first comparison telemetry but still returns the exact legacy result. Unknown values, including `w2`/`cutover`, fail back to legacy; no authoritative W2 mode exists. | unset / `legacy`; do not set in production without an owner-approved shadow observation |
 | `REVIEWER_PAGE_EMAIL_TIER_ENABLED` | Enables the guarded faculty/profile-page email recovery tier in `ContactEnrichmentService._attachEmailFromResolvedPage()`. The tier is SSRF-bound to anchored institution domains and only runs when no trusted email is present. | unset/`false` locally; production enabled 2026-07-03 |
 | `DRAIN_BATCH_SIZE` | Intake drain cron batch size for `/api/cron/drain-submissions`. | `5` |
 | `DRAIN_LOCK_TTL_SECONDS` | Intake drain lease length; cron cadence and retry behavior assume this is much larger than the 2-minute schedule. | `600` |

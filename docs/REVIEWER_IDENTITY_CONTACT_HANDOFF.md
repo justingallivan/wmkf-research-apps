@@ -3,7 +3,7 @@ title: Reviewer Identity & Contact — Codex Build Handoff
 domain: reviewer-identity
 kind: runbook
 status: active
-summary: "Continuation handoff: W0/W1 are live and W2 passed its offline identity gate; production cutover remains owner-gated."
+summary: "Continuation handoff: W0/W1 are live and W2 has a legacy-default runtime seam; authoritative cutover remains owner-gated."
 canonical: false
 cataloged: 2026-07-19
 owner: product-engineering
@@ -35,12 +35,18 @@ This is the continuation entry point for the
 - The authoritative save path recomputes against both candidate evidence and
   trusted CRM reuse affiliations before its first write; a direct CRM match
   outranks a Broad/HHMI exemption.
-- **W2 `[OFFLINE GATE PASSED; RUNTIME UNCHANGED]`:** the evaluation-only
+- **W2 `[LEGACY-DEFAULT RUNTIME SEAM; CUTOVER NOT BUILT]`:** the
   works-first resolver passed the pinned 40-case benchmark with +9 correct
   binds, zero genuine wrong-person binds, one unchanged right-person-policy
   bind, and three remaining misses. Same-ORCID fragments collapse; distinct
   ORCIDs always go to review. The scoring overlay cannot affect resolver
   consensus.
+- `ReviewerIdentityRuntime` now owns the production Track-A spine call. Unset,
+  `legacy`, and unknown `REVIEWER_IDENTITY_RESOLVER_MODE` values execute legacy
+  only. `shadow` settles every legacy candidate in the batch first, then runs
+  each W2 comparison under an independent hard 15-second deadline, but returns
+  the exact legacy objects. Observer failures are contained. No authoritative
+  W2 mode exists.
 
 ## Verification state
 
@@ -50,25 +56,36 @@ Whitehead/MIT consistency, IAS/Princeton separation, same-hospital matching,
 provider abstention, and the no-widening firewall. Relevant existing route and
 partial-batch tests remain green.
 
-The W2 evaluation package is offline-only: no Dataverse/Postgres/Blob writes,
-no production resolver behavior change, and raw output remains gitignored.
+The W2 evaluator and shadow arm have no Dataverse/Postgres/Blob writes. Default
+production resolver behavior is unchanged, and raw benchmark output remains
+gitignored.
 The corrected run changed 11 automatic outcomes. Its only two mandatory review
 cases are the already-labeled unsafe initials-only A. Patel and J. Kim cases;
 seven additional review leads do not alter automatic behavior. The
 evaluation/scoring client used 160 OpenAlex requests at $0.104, excluding the
 current spine's internal OpenAlex traffic.
 
-The required fresh-agent adversarial review found and closed three defects
+The required fresh-agent adversarial reviews found and closed twelve defects
 before promotion: scoring-label leakage into resolver consensus, unqualified
-request accounting, and an unsafe shared-title duplicate-ORCID heuristic.
-Focused tests and the full 40-case rerun are green.
+request accounting, an unsafe shared-title duplicate-ORCID heuristic, shadow
+provider contention, runtime/evaluator anchor-comparison drift, incomplete
+provider-failure accounting, evaluator drift from W0 institution resolution,
+observer exceptions that could escape the shadow seam, cross-candidate provider
+contention, swallowed evaluation-provider failures, and a cooperative rather
+than hard shadow deadline, plus per-request timeout leakage into retry backoff.
+Focused tests and the original clean 40-case rerun are green. A post-extraction
+rerun matched the first 30 cases, then hit five late OpenAlex 429s. That attempt
+is invalid rather than a new score: the runner now rate-paces requests and
+requires zero provider failures, preventing throttling from passing as misses.
 
 ## Next product choice
 
-W2's next step is an owner decision to authorize a runtime implementation behind
-a legacy-default seam. That implementation must preserve the evaluation's
-fail-closed distinct-ORCID behavior and rerun the same pinned gate before any
-cutover. The separate open policy questions are whether to add any umbrella
+First rerun the full pinned benchmark after OpenAlex throttling clears. W2's
+next optional product step is then an owner-approved shadow observation period by
+setting `REVIEWER_IDENTITY_RESOLVER_MODE=shadow` in a chosen environment and
+redeploying. Do not set it as part of this build. Authoritative cutover requires
+a later reviewed code change because the current mode allowlist contains only
+`legacy` and `shadow`. The separate open policy questions are whether to add any umbrella
 organization beyond HHMI/Broad and whether the benchmark should credit a
 correct-but-flagged bind for fragmented famous names. The buy-vs-build question
 is closed: continue the in-house resolver and do not evaluate Prophy.

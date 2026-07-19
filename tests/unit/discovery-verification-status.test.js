@@ -8,15 +8,26 @@ jest.mock('../../lib/services/pubmed-service', () => ({
   },
 }));
 
-jest.mock('../../lib/services/reviewer-identity-evidence', () => ({
-  ReviewerIdentityEvidence: {
-    evaluateSuggestion: jest.fn(),
-  },
-}));
+jest.mock('../../lib/services/reviewer-identity-runtime', () => {
+  const evaluateSuggestion = jest.fn();
+  return {
+    ReviewerIdentityRuntime: {
+      evaluateSuggestion,
+      evaluateSuggestions: jest.fn(async (suggestions, options, hooks = {}) => {
+        const results = [];
+        for (let index = 0; index < suggestions.length; index += 1) {
+          hooks.onBeforeLegacy?.(suggestions[index], index, suggestions.length);
+          results.push(await evaluateSuggestion(suggestions[index], options));
+        }
+        return results;
+      }),
+    },
+  };
+});
 
 const { DiscoveryService } = require('../../lib/services/discovery-service');
 const { PubMedService } = require('../../lib/services/pubmed-service');
-const { ReviewerIdentityEvidence } = require('../../lib/services/reviewer-identity-evidence');
+const { ReviewerIdentityRuntime } = require('../../lib/services/reviewer-identity-runtime');
 
 // Default to a UNIQUE title per pmid: distinct real papers have distinct titles, and the
 // discovery pipeline now title-dedups a candidate's article list (collapses a preprint +
@@ -50,7 +61,7 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    ReviewerIdentityEvidence.evaluateSuggestion.mockResolvedValue({
+    ReviewerIdentityRuntime.evaluateSuggestion.mockResolvedValue({
       status: 'abstain',
       resolverStatus: 'unresolved',
       orcid: null,
@@ -204,7 +215,7 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
   });
 
   test('PubMed-off verification runs OpenAlex/ORCID spine and can verify', async () => {
-    ReviewerIdentityEvidence.evaluateSuggestion.mockResolvedValueOnce({
+    ReviewerIdentityRuntime.evaluateSuggestion.mockResolvedValueOnce({
       status: 'confirmed',
       resolverStatus: 'confirmed',
       orcid: '0000-0002-1825-0097',
@@ -225,7 +236,7 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
     );
 
     expect(PubMedService.search).not.toHaveBeenCalled();
-    expect(ReviewerIdentityEvidence.evaluateSuggestion).toHaveBeenCalledWith(
+    expect(ReviewerIdentityRuntime.evaluateSuggestion).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Robert Sang' }),
       expect.objectContaining({ proposalInfo: { primaryResearchArea: 'Physics' } }),
     );
@@ -250,7 +261,7 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
     // Codex S236 post-impl CHECK 4: deduplication-service scans former-institution
     // COI only when affiliationHistory is an array. The spine path must supply it
     // (from ORCID employments) or non-biomedical reviewers silently skip that check.
-    ReviewerIdentityEvidence.evaluateSuggestion.mockResolvedValueOnce({
+    ReviewerIdentityRuntime.evaluateSuggestion.mockResolvedValueOnce({
       status: 'confirmed',
       resolverStatus: 'confirmed',
       orcid: '0000-0002-1825-0097',
@@ -274,7 +285,7 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
   });
 
   test('spine-verified candidate with no ORCID history falls back to current institution array', async () => {
-    ReviewerIdentityEvidence.evaluateSuggestion.mockResolvedValueOnce({
+    ReviewerIdentityRuntime.evaluateSuggestion.mockResolvedValueOnce({
       status: 'confirmed',
       resolverStatus: 'confirmed',
       orcid: '0000-0002-1825-0097',
@@ -337,7 +348,7 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
 
     // PubMed is NOT consulted for a physics proposal; the spine is.
     expect(PubMedService.search).not.toHaveBeenCalled();
-    expect(ReviewerIdentityEvidence.evaluateSuggestion).toHaveBeenCalledWith(
+    expect(ReviewerIdentityRuntime.evaluateSuggestion).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Robert Sang' }),
       expect.objectContaining({ proposalInfo: { primaryResearchArea: 'Physics' } }),
     );

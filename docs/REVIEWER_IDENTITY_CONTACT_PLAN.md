@@ -3,7 +3,7 @@ title: Reviewer Identity & Contact — Disambiguation, Affiliation/COI, and Emai
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "W0/W1 and three email improvements are live; the W2 works-first resolver passed its offline gate, while production cutover and durable identity remain gated."
+summary: "W0/W1 and three email improvements are live; W2 has a legacy-default runtime seam, while authoritative cutover and durable identity remain gated."
 canonical: false
 cataloged: 2026-07-19
 owner: product-engineering
@@ -14,6 +14,8 @@ related:
   - docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md
   - docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md
   - lib/services/reviewer-identity-evidence.js
+  - lib/services/reviewer-identity-runtime.js
+  - lib/services/reviewer-works-first.js
   - lib/services/reviewer-identity-resolver.js
   - lib/services/institution-identity-resolver.js
   - lib/services/deduplication-service.js
@@ -30,9 +32,11 @@ the 2026-07-18 assessment. W3.1's NCBI + Europe PMC core-record tier and W3.2's
 narrow current-affiliation alternate tie-break are live. The W3.1 full-text
 fallback and W3.4 page-first cascade completed evaluation and were not promoted.
 W0's additive institution-identity substrate and W1's affiliation/COI correction
-are implemented. W2's evaluation-only works-first resolver passed its frozen
-40-case gate on 2026-07-19; production behavior is unchanged and cutover remains
-owner-gated. Broader email-alternate handling and W4 remain `[PLANNED]`.
+are implemented. W2's works-first resolver passed its frozen 40-case gate and
+now sits behind a server-owned runtime seam. The seam defaults to legacy,
+supports comparison-only shadow execution, and has no authoritative W2 mode;
+production behavior is unchanged and cutover remains owner-gated. Broader
+email-alternate handling and W4 remain `[PLANNED]`.
 Rationale and evidence live in the companion audit
 (`docs/audits/reviewer-disambiguation-email-external-alternatives-fable-2026-07-18.md`,
 §§1–5b); this plan holds the *what, in what order, behind which gate*, and does
@@ -62,8 +66,16 @@ plan's Wave 13 binding model rather than duplicating it.
   human adjudication. The evaluation/scoring client made 160 OpenAlex requests
   costing $0.104; this explicitly excludes the current spine's internal
   OpenAlex requests and is not a total-run cost. `[VERIFIED 2026-07-19 via
-  npm run eval:reviewer-identity:w2 and
-  outputs/reviewer-holistic-m1/reviewer-identity-works-first-w2-v1.json]`
+  recorded npm run eval:reviewer-identity:w2 output before shared-module
+  extraction; the gitignored raw path was later overwritten by the invalid
+  throttled rerun described next]`
+- The first post-extraction rerun matched the clean run through its first 30
+  cases, then OpenAlex returned 429 for five late cases. That attempt is not
+  treated as evaluation evidence. The runner now rate-paces requests and makes
+  zero provider failures a hard gate, so a throttled run cannot pass by
+  misclassifying source failures as ordinary misses. A clean full rerun remains
+  required before shadow enablement or cutover. `[VERIFIED 2026-07-19 via
+  attempted npm run eval:reviewer-identity:w2 and provider-failure gate tests]`
 - Before W1, the COI matcher matched shared institution id/name with no umbrella
   exemption and the alias table folded Janelia into HHMI. W1 now exempts
   Broad/HHMI-only overlap and separates Janelia. `[HISTORICAL finding; VERIFIED
@@ -127,7 +139,8 @@ plan's Wave 13 binding model rather than duplicating it.
 country, displayName, associatedInstitutions[] }`, reusing
 `OpenAlexService.searchInstitutions`/`getInstitution`. The resolver is additive
 and request-scoped. W1 now opts in from COI narrowing, mismatch-alert, and
-identity-corroboration paths; the production W2 runtime has not opted in.
+identity-corroboration paths; the W2 shadow arm now uses it for fail-closed
+institution-id disambiguation.
 
 **Selection contract.** Normalize the affiliation, rank exact name above
 multi-token whole-phrase containment above an explicit acronym, optionally
@@ -188,23 +201,31 @@ drop. The exempt set remains exactly HHMI + Broad. Any additional umbrella org
 requires a later owner decision.
 
 ## W2 — Works-first disambiguation resolver v2
-`[EVALUATION IMPLEMENTED; OFFLINE GATE PASSED 2026-07-19; PRODUCTION NOT CUT OVER]`
+`[RUNTIME SEAM IMPLEMENTED; LEGACY DEFAULT; PRODUCTION NOT CUT OVER]`
 
-The evaluation harness hardens the prototype into a promotion candidate without
-touching the runtime resolver. Production resolution does not switch until a
-separate implementation behind a seam and an owner cutover decision.
+The evaluated resolver is now shared by the pinned runner and the runtime
+shadow arm. `ReviewerIdentityRuntime` is the sole production call seam for
+non-biomedical/PubMed-off Track-A verification. Unset, `legacy`, and every
+unknown value return `ReviewerIdentityEvidence` exactly as before. `shadow`
+settles every authoritative legacy result in the candidate batch first, then
+runs each W2 comparison under an independent hard 15-second deadline, emits a
+redacted decision-only comparison, and still returns the exact legacy objects.
+Shadow observers are non-throwing. There is
+deliberately no authoritative W2 mode, so an environment edit cannot perform
+cutover.
 
-- **W2.1 Works-first candidate generation — EVALUATED.**
+- **W2.1 Works-first candidate generation — IMPLEMENTED BEHIND SHADOW.**
   `raw_author_name.search` byline
   query + institution-id disambiguator (via W0), nickname/CJK variants,
   surname+forename byline gate. (Prototype in audit §5a.)
-- **W2.2 ORCID-as-corroborator — EVALUATED, FAIL-CLOSED.** Same-ORCID OpenAlex
+- **W2.2 ORCID-as-corroborator — IMPLEMENTED BEHIND SHADOW, FAIL-CLOSED.** Same-ORCID OpenAlex
   fragments collapse to the richest cluster. Any set containing distinct
   ORCIDs goes to review: shared institutions or coauthored paper titles are not
   identity-specific enough to merge them automatically. The frozen
-  person-equivalence overlay affects benchmark scoring only and cannot change a
-  resolver decision.
-- **W2.3 Cluster-quality gates — EVALUATED.** ORCID-richest/anchored-cluster preference (fixes
+person-equivalence overlay affects benchmark scoring only and cannot change a
+resolver decision. Runtime consensus and the evaluator share the same
+overlay-free OpenAlex-to-ORCID anchor canonicalizer.
+- **W2.3 Cluster-quality gates — IMPLEMENTED BEHIND SHADOW.** ORCID-richest/anchored-cluster preference (fixes
   the Keller fragment and Tsai merged-cluster false-binds); name-rarity /
   unique-anchor gate (abstain on high-fragmentation names without a unique
   anchor).
@@ -216,13 +237,25 @@ separate implementation behind a seam and an owner cutover decision.
 gains do not regress safety — the eval gate below is the hard bar.
 **Eval gate (hard) — PASSED 2026-07-19.** The pinned runner requires at least
 three additional correct binds, zero genuine false binds, no increase in
-right-person-policy binds, and at most eight misses. The corrected run achieved
-+9 / 0 / no increase / 3. The benchmark and person-equivalence overlay are
-hash-pinned; mutation fails and requires a new version. No new rule without a
-first failing benchmark case (invariant 6).
+right-person-policy binds, at most eight misses, and zero provider failures.
+The corrected clean run achieved +9 / 0 / no increase / 3 / 0. The benchmark
+and person-equivalence overlay are hash-pinned; mutation fails and requires a
+new version. A throttled or partial rerun is invalid, not a regression result.
+The evaluator uses the production W0 institution resolver rather than trusting
+OpenAlex rank one, and a structured author-profile provider failure also fails
+the zero-provider-failure gate. Its W0 and anchor-canonicalization adapters
+propagate otherwise hidden provider failures, invalidating the run rather than
+scoring them. No new rule without a first failing benchmark case (invariant 6).
+**Runtime seam invariant.** `REVIEWER_IDENTITY_RESOLVER_MODE` accepts only
+`shadow` as an opt-in; unset/`legacy`/unknown/authoritative-looking values such
+as `w2` all execute legacy only. Shadow failures never change or replace legacy
+results; the production batch completes all legacy provider work before W2 can
+consume provider quota. OpenAlex retry backoff observes the overall shadow
+abort but is not incorrectly governed by an expired per-request timeout. No new
+persistence or client-provided mode exists.
 **Owner-gate.** The abstain-vs-bind-right-person policy on fragmented famous
-names (changes what the benchmark counts as correct); runtime implementation
-and production cutover.
+names (changes what the benchmark counts as correct); any code change adding an
+authoritative W2 mode; production cutover.
 
 ## W3 — Email discovery `[ACTIVE; W3.1/W3.3/W3.4 DECIDED; W3.2 NARROW RULE LIVE]`
 
@@ -316,15 +349,16 @@ apply is a distinct owner-approved operation).
 |---|---|---|---|---|
 | 1 | W0 substrate `[IMPLEMENTED; ACTIVE FOUNDATION]` | — | branch → main | none |
 | 2 | W1 affiliation/COI `[IMPLEMENTED]` | W0 | branch → main, tests + contract-reconcile | Broad policy closed; future umbrella additions gated |
-| 3 | W2 disambiguation v2 `[OFFLINE GATE PASSED]` | W0 | evaluation branch; runtime seam still unbuilt | cutover |
+| 3 | W2 disambiguation v2 `[LEGACY-DEFAULT SEAM BUILT]` | W0 | runtime seam, legacy authoritative | clean rerun; shadow enablement; cutover |
 | 4 | Broader W3.2 follow-on | W0 | branch → main | co-affiliate policy |
 | 5 | W4 durable model | W2 | additive schema wave | schema apply |
 
 W1 addressed the highest near-term live false-drop bug and remains independent
 of the disambiguation rebuild. W3.1 is closed: keep the live core-record tier
-and do not add the tested full-text fallback. W2 has passed its offline gate;
-the remaining W2 work is the runtime seam, comparator consolidation, and
-owner-approved cutover. W4 underpins persistence and reconciles with Wave 13.
+and do not add the tested full-text fallback. W2 has passed its offline gate and
+the legacy-default seam is built. Remaining W2 work is optional shadow
+observation, comparator consolidation, and owner-approved authoritative cutover.
+W4 underpins persistence and reconciles with Wave 13.
 
 ## Open owner decisions
 

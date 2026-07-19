@@ -6,12 +6,16 @@ const crypto = require('node:crypto');
 const {
   changedCases,
   combineIdentityDecisions,
+  createAnchorMatcher,
   evaluatePromotion,
   normalizeOrcid,
   resolveWorksFirst,
   scoreDecision,
   shortOpenAlexAuthorId,
-} = require('./lib/reviewer-works-first-evaluation');
+} = require('../lib/services/reviewer-works-first');
+const {
+  createInstitutionIdentityResolver,
+} = require('../lib/services/institution-identity-resolver');
 const {
   ReviewerIdentityEvidence,
 } = require('../lib/services/reviewer-identity-evidence');
@@ -141,11 +145,39 @@ function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+function mapInstitutionRecord(record = {}) {
+  return {
+    openAlexId: record.id || null,
+    displayName: record.display_name || null,
+    ror: record.ror || null,
+    country: record.country_code || null,
+    associatedInstitutions: (Array.isArray(record.associated_institutions)
+      ? record.associated_institutions
+      : [])
+      .map((institution) => ({
+        openAlexId: institution?.id || null,
+        displayName: institution?.display_name || null,
+        ror: institution?.ror || null,
+        country: institution?.country_code || null,
+        relationship: institution?.relationship || null,
+      }))
+      .filter((institution) => institution.openAlexId || institution.ror),
+  };
+}
+
 function createOpenAlexClient() {
   let calls = 0;
   let costUsd = 0;
+  let nextRequestAt = 0;
   const authorCache = new Map();
   const institutionCache = new Map();
+  const institutionDetailCache = new Map();
+
+  async function paceRequest() {
+    const waitMs = Math.max(0, nextRequestAt - Date.now());
+    if (waitMs) await delay(waitMs);
+    nextRequestAt = Date.now() + 125;
+  }
 
   async function fetchJson(url) {
     const requestUrl = new URL(url);
@@ -153,6 +185,7 @@ function createOpenAlexClient() {
     if (apiKey) requestUrl.searchParams.set('api_key', apiKey);
     let lastError = null;
     for (let attempt = 0; attempt < 4; attempt += 1) {
+      await paceRequest();
       const response = await fetch(requestUrl, {
         headers: {
           Accept: 'application/json',
@@ -162,7 +195,11 @@ function createOpenAlexClient() {
       calls += 1;
       if (response.status === 429 || response.status >= 500) {
         lastError = new Error(`OpenAlex request failed: ${response.status}`);
-        await delay(500 * (attempt + 1));
+        const retryAfterSeconds = Number(response.headers.get('retry-after'));
+        const retryDelay = Number.isFinite(retryAfterSeconds)
+          ? Math.min(Math.max(retryAfterSeconds * 1000, 0), 10_000)
+          : 1000 * (attempt + 1);
+        await delay(Math.max(retryDelay, 1000 * (attempt + 1)));
         continue;
       }
       if (!response.ok) throw new Error(`OpenAlex request failed: ${response.status}`);
@@ -184,22 +221,32 @@ function createOpenAlexClient() {
       const body = await fetchJson(`${OPENALEX_API}/works?${params.toString()}`);
       return Array.isArray(body?.results) ? body.results : [];
     },
-    async searchInstitution(query) {
+    async searchInstitutions(query, { limit = 10 } = {}) {
       const normalized = String(query || '').trim();
       if (!normalized) return [];
       if (!institutionCache.has(normalized)) {
         const params = new URLSearchParams({
           search: normalized,
-          'per-page': '1',
+          'per-page': String(Math.max(1, Math.min(Number(limit) || 10, 10))),
         });
         const body = await fetchJson(`${OPENALEX_API}/institutions?${params.toString()}`);
         institutionCache.set(normalized, (Array.isArray(body?.results) ? body.results : [])
-          .map((item) => ({
-            openAlexId: item?.id || null,
-            displayName: item?.display_name || null,
-          })));
+          .map(mapInstitutionRecord));
       }
       return institutionCache.get(normalized);
+    },
+    async getInstitution(institutionId) {
+      const normalized = shortOpenAlexInstitutionId(institutionId);
+      if (!normalized) return null;
+      if (!institutionDetailCache.has(normalized)) {
+        const body = await fetchJson(`${OPENALEX_API}/institutions/${normalized}`);
+        const record = Array.isArray(body?.results) ? body.results[0] : body;
+        institutionDetailCache.set(
+          normalized,
+          record?.id ? mapInstitutionRecord(record) : null,
+        );
+      }
+      return institutionDetailCache.get(normalized);
     },
     async getAuthor(authorId) {
       const normalized = shortOpenAlexAuthorId(authorId);
@@ -229,6 +276,16 @@ function createOpenAlexClient() {
   };
 }
 
+function createEvaluationInstitutionResolver(openAlex) {
+  return createInstitutionIdentityResolver({
+    propagateProviderErrors: true,
+    openAlexService: {
+      searchInstitutions: openAlex.searchInstitutions,
+      getInstitution: openAlex.getInstitution,
+    },
+  });
+}
+
 function suggestionFor(candidate) {
   return {
     name: candidate.name,
@@ -254,53 +311,7 @@ async function evaluateSpine(candidate) {
   return {
     decision: bind && anchor ? 'bind' : 'abstain',
     anchor: bind && anchor ? anchor : null,
-    reason: result.status,
-  };
-}
-
-function createAnchorMatcher({
-  equivalenceOverlay = { equivalences: [] },
-  getAuthorById = (authorId) => OpenAlexService.getAuthorById(authorId),
-} = {}) {
-  const cache = new Map();
-  const equivalentPairs = new Set();
-  for (const item of equivalenceOverlay.equivalences || []) {
-    for (let left = 0; left < item.anchors.length; left += 1) {
-      for (let right = left + 1; right < item.anchors.length; right += 1) {
-        equivalentPairs.add([item.anchors[left], item.anchors[right]].sort().join('|'));
-      }
-    }
-  }
-
-  async function canonical(anchor) {
-    if (!anchor) return { orcid: null, authorId: null };
-    if (cache.has(anchor)) return cache.get(anchor);
-    let orcid = null;
-    let authorId = null;
-    if (anchor.startsWith('orcid:')) {
-      orcid = normalizeOrcid(anchor.slice('orcid:'.length));
-    } else if (anchor.startsWith('openalex:')) {
-      authorId = shortOpenAlexAuthorId(anchor.slice('openalex:'.length));
-      try {
-        const profile = await getAuthorById(authorId);
-        orcid = normalizeOrcid(profile?.orcid);
-      } catch {
-        // Fail closed below: unresolved cross-namespace anchors do not match.
-      }
-    }
-    const value = { orcid, authorId };
-    cache.set(anchor, value);
-    return value;
-  }
-
-  return async (left, right) => {
-    if (!left || !right) return false;
-    if (left === right || equivalentPairs.has([left, right].sort().join('|'))) return true;
-    const [a, b] = await Promise.all([canonical(left), canonical(right)]);
-    if (a.orcid && b.orcid) {
-      return a.orcid === b.orcid;
-    }
-    return Boolean(a.authorId && b.authorId && a.authorId === b.authorId);
+    reason: result.reason || result.status,
   };
 }
 
@@ -331,12 +342,15 @@ async function main() {
   }
 
   const openAlex = createOpenAlexClient();
+  const institutionResolver = createEvaluationInstitutionResolver(openAlex);
   const resolverAnchorsMatch = createAnchorMatcher({
     getAuthorById: openAlex.getAuthor,
+    propagateProviderErrors: true,
   });
   const scoringAnchorsMatch = createAnchorMatcher({
     equivalenceOverlay,
     getAuthorById: openAlex.getAuthor,
+    propagateProviderErrors: true,
   });
   const rightPersonPolicyMatch = createRightPersonPolicyMatcher(
     equivalenceOverlay,
@@ -356,7 +370,10 @@ async function main() {
     try {
       works = await resolveWorksFirst(candidate, {
         searchWorks: openAlex.searchWorks,
-        searchInstitution: openAlex.searchInstitution,
+        searchInstitution: async (query) => {
+          const identity = await institutionResolver.resolve(query);
+          return identity ? [identity] : [];
+        },
         getAuthor: openAlex.getAuthor,
       });
     } catch (error) {
@@ -465,6 +482,7 @@ module.exports = {
   FROZEN_BENCHMARK_SHA256,
   FROZEN_EQUIVALENCE_OVERLAY_SHA256,
   createAnchorMatcher,
+  createEvaluationInstitutionResolver,
   createRightPersonPolicyMatcher,
   parseCli,
   readEquivalenceOverlay,

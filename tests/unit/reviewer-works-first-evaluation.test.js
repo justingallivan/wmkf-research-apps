@@ -10,11 +10,12 @@ const {
   resolveWorksFirst,
   scoreDecision,
   worksFirstNameVariants,
-} = require('../../scripts/lib/reviewer-works-first-evaluation');
+} = require('../../lib/services/reviewer-works-first');
 const {
   DEFAULT_BENCHMARK,
   DEFAULT_EQUIVALENCE_OVERLAY,
   createAnchorMatcher,
+  createEvaluationInstitutionResolver,
   parseCli,
   readEquivalenceOverlay,
   readFrozenBenchmark,
@@ -235,6 +236,30 @@ describe('works-first identity evaluation', () => {
     });
   });
 
+  test('marks an OpenAlex author-profile failure for the promotion gate', async () => {
+    const result = await resolveWorksFirst({
+      name: 'Li-Huei Tsai',
+      claimedAffiliation: 'MIT',
+    }, {
+      ...dependencies([{
+        authorships: [authorship({
+          authorId: 'A100',
+          displayName: 'Li-Huei Tsai',
+          orcid: '0000-0001-5607-113X',
+        })],
+      }]),
+      getAuthor: jest.fn(async () => {
+        throw new Error('OpenAlex unavailable');
+      }),
+    });
+
+    expect(result).toMatchObject({
+      decision: 'review',
+      reason: 'author_profile_fetch_failed',
+      providerFailure: 'openalex_author_profile',
+    });
+  });
+
   test('combined policy adds safe rescues and vetoes ambiguous initial-only spine binds', () => {
     const rescued = combineIdentityDecisions(
       { name: 'Will Harcombe' },
@@ -353,6 +378,30 @@ describe('works-first identity evaluation', () => {
 
     rows[0].combined.outcome = 'false_bind';
     expect(evaluatePromotion(rows).pass).toBe(false);
+
+    rows[0].combined.outcome = 'correct_bind';
+    rows[0].works = {
+      decision: 'review',
+      reason: 'error:OpenAlex request failed: 429',
+    };
+    const providerFailure = evaluatePromotion(rows);
+    expect(providerFailure.pass).toBe(false);
+    expect(providerFailure.gates.providerFailures).toEqual({
+      actual: 1,
+      maximum: 0,
+      pass: false,
+    });
+
+    rows[0].works = {
+      decision: 'review',
+      reason: 'author_profile_fetch_failed',
+      providerFailure: 'openalex_author_profile',
+    };
+    expect(evaluatePromotion(rows).gates.providerFailures).toEqual({
+      actual: 1,
+      maximum: 0,
+      pass: false,
+    });
   });
 
   test('CLI and benchmark loading fail closed', () => {
@@ -395,6 +444,81 @@ describe('works-first identity evaluation', () => {
       decision: 'review',
       reason: 'resolver_anchor_disagreement',
     });
+  });
+
+  test('the evaluator routes institution claims through the production W0 resolver', async () => {
+    const openAlex = {
+      searchInstitutions: jest.fn(async () => [{
+        openAlexId: 'https://openalex.org/I1',
+        displayName: 'Massachusetts Institute of Technology',
+      }, {
+        openAlexId: 'https://openalex.org/I2',
+        displayName: 'MIT Media Lab',
+      }]),
+      getInstitution: jest.fn(async () => ({
+        openAlexId: 'https://openalex.org/I1',
+        displayName: 'Massachusetts Institute of Technology',
+        associatedInstitutions: [],
+      })),
+    };
+    const resolver = createEvaluationInstitutionResolver(openAlex);
+
+    await expect(resolver.resolve('MIT')).resolves.toMatchObject({
+      openAlexId: 'https://openalex.org/I1',
+      displayName: 'Massachusetts Institute of Technology',
+    });
+    expect(openAlex.searchInstitutions).toHaveBeenCalledWith(
+      'MIT',
+      { signal: undefined, limit: 10 },
+    );
+    expect(openAlex.getInstitution).toHaveBeenCalledWith(
+      'https://openalex.org/I1',
+      { signal: undefined },
+    );
+
+    openAlex.searchInstitutions.mockResolvedValueOnce([{
+      openAlexId: 'https://openalex.org/I3',
+      displayName: 'Example University',
+    }, {
+      openAlexId: 'https://openalex.org/I4',
+      displayName: 'Example University',
+    }]);
+    await expect(resolver.resolve('Example University')).resolves.toBeNull();
+  });
+
+  test('evaluation adapters propagate hidden provider failures instead of scoring them', async () => {
+    const searchFailure = new Error('institution search unavailable');
+    const strictSearchResolver = createEvaluationInstitutionResolver({
+      searchInstitutions: jest.fn(async () => {
+        throw searchFailure;
+      }),
+      getInstitution: jest.fn(),
+    });
+    await expect(strictSearchResolver.resolve('MIT')).rejects.toBe(searchFailure);
+
+    const hydrationFailure = new Error('institution hydration unavailable');
+    const strictHydrationResolver = createEvaluationInstitutionResolver({
+      searchInstitutions: jest.fn(async () => [{
+        openAlexId: 'https://openalex.org/I1',
+        displayName: 'Massachusetts Institute of Technology',
+      }]),
+      getInstitution: jest.fn(async () => {
+        throw hydrationFailure;
+      }),
+    });
+    await expect(strictHydrationResolver.resolve('MIT')).rejects.toBe(hydrationFailure);
+
+    const canonicalFailure = new Error('author lookup unavailable');
+    const strictAnchorMatcher = createAnchorMatcher({
+      getAuthorById: jest.fn(async () => {
+        throw canonicalFailure;
+      }),
+      propagateProviderErrors: true,
+    });
+    await expect(strictAnchorMatcher(
+      'openalex:A1',
+      'orcid:0000-0001-8445-2052',
+    )).rejects.toBe(canonicalFailure);
   });
 
   test('the artifact labels its OpenAlex accounting as partial, not a total', () => {
