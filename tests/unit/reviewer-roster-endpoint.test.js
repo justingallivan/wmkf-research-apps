@@ -13,6 +13,13 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   promote: jest.fn(async () => ({ name: 'Bob Roe' })),
   confirmIdentity: jest.fn(async () => ({ confirmationId: 'confirm-1', candidate: { name: 'Ann Lee' } })),
   markSaved: jest.fn(async () => 1),
+  removePreviousActiveSearchResults: jest.fn(async () => ({
+    removed: 2,
+    removedKeys: ['candidate:old-a', 'candidate:old-b'],
+    active: [{ name: 'Applicant Person', provenance: { kind: 'applicant_suggested' } }],
+    excluded: [{ name: 'Excluded Person' }],
+    allNames: ['Applicant Person', 'Excluded Person', 'Saved Person'],
+  })),
 }));
 
 import handler from '../../pages/api/workbench/reviewer-roster';
@@ -159,6 +166,66 @@ describe('PATCH', () => {
       candidate: { name: 'Ann Lee', email: 'ann@example.edu' },
     } }, r);
     expect(r.statusCode).toBe(409);
+  });
+
+  it('remove_previous_results deletes only through the scoped store helper and returns the refreshed roster', async () => {
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'remove_previous_results',
+      candidateRefs: [
+        { candidateKey: 'candidate:old-a', updatedAt: '2026-07-19T12:00:00.000Z' },
+        { candidateKey: 'candidate:old-b', updatedAt: '2026-07-19T13:00:00.000Z' },
+      ],
+    } }, r);
+    expect(r.statusCode).toBe(200);
+    expect(store.removePreviousActiveSearchResults).toHaveBeenCalledWith(
+      REQ,
+      [
+        { candidateKey: 'candidate:old-a', updatedAt: '2026-07-19T12:00:00.000Z' },
+        { candidateKey: 'candidate:old-b', updatedAt: '2026-07-19T13:00:00.000Z' },
+      ],
+    );
+    expect(store.listForRequest).not.toHaveBeenCalled();
+    expect(r.body).toMatchObject({
+      success: true,
+      removed: 2,
+      removedKeys: ['candidate:old-a', 'candidate:old-b'],
+      active: [{ name: 'Applicant Person', provenance: { kind: 'applicant_suggested' } }],
+      excluded: [{ name: 'Excluded Person' }],
+      allNames: ['Applicant Person', 'Excluded Person', 'Saved Person'],
+    });
+  });
+
+  it('remove_previous_results rejects a missing candidate-ref scope', async () => {
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'remove_previous_results',
+    } }, r);
+    expect(r.statusCode).toBe(400);
+    expect(store.removePreviousActiveSearchResults).not.toHaveBeenCalled();
+  });
+
+  it('remove_previous_results rejects malformed or oversized candidate-ref scopes', async () => {
+    for (const candidateRefs of [
+      [{ candidateKey: 'candidate:valid', updatedAt: '' }],
+      [{ candidateKey: 'candidate:valid', updatedAt: 12345 }],
+      [{ candidateKey: '', updatedAt: '2026-07-19T12:00:00.000Z' }],
+      Array.from({ length: 301 }, (_, i) => ({
+        candidateKey: `candidate:${i}`,
+        updatedAt: '2026-07-19T12:00:00.000Z',
+      })),
+    ]) {
+      const r = res();
+      await handler({ method: 'PATCH', body: {
+        requestId: REQ,
+        action: 'remove_previous_results',
+        candidateRefs,
+      } }, r);
+      expect(r.statusCode).toBe(400);
+    }
+    expect(store.removePreviousActiveSearchResults).not.toHaveBeenCalled();
   });
 
   it('unknown action → 400', async () => {

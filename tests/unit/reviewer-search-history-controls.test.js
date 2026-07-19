@@ -1,0 +1,477 @@
+/**
+ * @jest-environment jsdom
+ */
+
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import ReviewerSearchSection from '../../shared/components/reviewers/ReviewerSearchSection';
+import { readSseStream } from '../../shared/components/reviewers/sse';
+
+jest.mock('../../shared/components/reviewers/sse', () => ({
+  readSseStream: jest.fn(),
+}));
+
+const REQ = '11111111-1111-1111-1111-111111111111';
+
+const generatedCandidate = {
+  candidateKey: 'candidate:prior-generated',
+  name: 'Prior Generated Reviewer',
+  email: 'prior@example.edu',
+  identityStatus: 'probable',
+  verificationConfidence: 0.8,
+  rosterUpdatedAt: '2026-07-19T16:00:00.000Z',
+  provenance: {
+    kind: 'literature_retrieved',
+    sources: ['openalex'],
+    seedRole: 'query_seed',
+    groundingWorkIds: [],
+  },
+};
+
+const applicantCandidate = {
+  name: 'Applicant Reviewer',
+  email: 'applicant@example.edu',
+  identityStatus: 'probable',
+  isApplicantRecommended: true,
+  enrichedProposalKey: 'proposal',
+  provenance: {
+    kind: 'applicant_suggested',
+    sources: ['applicant_form'],
+    seedRole: 'applicant_suggested',
+    groundingWorkIds: [],
+  },
+};
+
+function response(body, ok = true, status = ok ? 200 : 500) {
+  return { ok, status, json: async () => body, body: {} };
+}
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  window.confirm = jest.fn(() => true);
+});
+
+afterEach(() => {
+  delete window.confirm;
+  global.fetch = jest.fn();
+});
+
+test('labels restored generated rows and removes only the scoped previous results', async () => {
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [generatedCandidate, applicantCandidate],
+        excluded: [],
+        allNames: [generatedCandidate.name, applicantCandidate.name, 'Saved Reviewer'],
+      }));
+    }
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
+      return Promise.resolve(response({
+        success: true,
+        removed: 1,
+        removedKeys: [generatedCandidate.candidateKey],
+        active: [applicantCandidate],
+        excluded: [],
+        allNames: [applicantCandidate.name, 'Saved Reviewer'],
+      }));
+    }
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+
+  expect(await screen.findByText('Previously found')).toBeInTheDocument();
+  expect(screen.getByText(/1 candidate below was restored from an earlier search/i)).toBeInTheDocument();
+  expect(screen.getByText('Applicant recommended')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Remove previous results' }));
+
+  await waitFor(() => expect(screen.queryByText(generatedCandidate.name)).not.toBeInTheDocument());
+  expect(screen.getByText(applicantCandidate.name)).toBeInTheDocument();
+  const removeCall = global.fetch.mock.calls.find(([url, options]) => (
+    url === '/api/workbench/reviewer-roster'
+      && options?.method === 'PATCH'
+      && JSON.parse(options.body).action === 'remove_previous_results'
+  ));
+  expect(removeCall).toBeTruthy();
+  expect(JSON.parse(removeCall[1].body)).toMatchObject({
+    requestId: REQ,
+    action: 'remove_previous_results',
+    candidateRefs: [{
+      candidateKey: expect.any(String),
+      updatedAt: generatedCandidate.rosterUpdatedAt,
+    }],
+  });
+});
+
+test('removal blocks a same-request search until its refreshed roster arrives', async () => {
+  const removal = deferred();
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [generatedCandidate],
+        excluded: [],
+        allNames: [generatedCandidate.name],
+      }));
+    }
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
+      return removal.promise;
+    }
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  await screen.findByText(generatedCandidate.name);
+  fireEvent.click(screen.getByRole('button', { name: 'Remove previous results' }));
+
+  expect(screen.getByRole('button', { name: 'Run reviewer search' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Removing…' })).toBeDisabled();
+
+  await act(async () => {
+    removal.resolve(response({
+      success: true,
+      removed: 1,
+      removedKeys: [generatedCandidate.candidateKey],
+      active: [],
+      excluded: [],
+      allNames: [],
+    }));
+    await removal.promise;
+  });
+});
+
+test('a search blocks prior-result removal until its roster write settles', async () => {
+  const rosterWrite = deferred();
+  const freshCandidate = {
+    ...generatedCandidate,
+    candidateKey: 'candidate:fresh',
+    name: 'Fresh Reviewer',
+    email: 'fresh@example.edu',
+  };
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [generatedCandidate],
+        excluded: [],
+        allNames: [generatedCandidate.name],
+      }));
+    }
+    if (target === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
+    if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
+    if (target === '/api/reviewer-finder/enrich-contacts') return Promise.resolve(response({}));
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
+      return rosterWrite.promise;
+    }
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+
+  readSseStream
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({
+        event: 'result',
+        data: { proposalInfo: { title: 'Proposal', keywords: 'materials', authorInstitution: 'Example U' } },
+      });
+    })
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({ event: 'result', data: { ranked: [freshCandidate], unverified: [] } });
+    })
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({ event: 'complete', data: { type: 'complete', results: [freshCandidate] } });
+    });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  const runButton = await screen.findByRole('button', { name: 'Run reviewer search' });
+  fireEvent.click(runButton);
+
+  await screen.findByLabelText(`Select ${freshCandidate.name}`);
+  expect(screen.getByRole('button', { name: 'Remove previous results' })).toBeDisabled();
+
+  await act(async () => {
+    rosterWrite.resolve(response({ success: true, recorded: 1 }));
+    await rosterWrite.promise;
+  });
+
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: 'Remove previous results' })).toBeEnabled();
+  });
+});
+
+test('a rejected stale roster write cannot change the newly selected request phase', async () => {
+  const requestB = '22222222-2222-2222-2222-222222222222';
+  const rosterWrite = deferred();
+  const freshCandidate = {
+    ...generatedCandidate,
+    candidateKey: 'candidate:fresh',
+    name: 'Fresh Reviewer',
+    email: 'fresh@example.edu',
+  };
+  const requestBCandidate = {
+    ...generatedCandidate,
+    candidateKey: 'candidate:request-b',
+    name: 'Request B Reviewer',
+  };
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      const active = target.includes(requestB) ? [requestBCandidate] : [generatedCandidate];
+      return Promise.resolve(response({
+        success: true,
+        active,
+        excluded: [],
+        allNames: active.map((candidate) => candidate.name),
+      }));
+    }
+    if (target === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
+    if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
+    if (target === '/api/reviewer-finder/enrich-contacts') return Promise.resolve(response({}));
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
+      return rosterWrite.promise;
+    }
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+
+  readSseStream
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({
+        event: 'result',
+        data: { proposalInfo: { title: 'Proposal', keywords: 'materials', authorInstitution: 'Example U' } },
+      });
+    })
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({ event: 'result', data: { ranked: [freshCandidate], unverified: [] } });
+    })
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({ event: 'complete', data: { type: 'complete', results: [freshCandidate] } });
+    });
+
+  const { rerender } = render(
+    <ReviewerSearchSection requestId={REQ} blobUrl="blob-a" proposalKey="proposal-a" />
+  );
+  fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
+  await screen.findByLabelText(`Select ${freshCandidate.name}`);
+
+  await act(async () => {
+    rerender(
+      <ReviewerSearchSection requestId={requestB} blobUrl="blob-b" proposalKey="proposal-b" />
+    );
+  });
+  await screen.findByText(requestBCandidate.name);
+
+  await act(async () => {
+    rosterWrite.reject(new Error('network dropped'));
+    await rosterWrite.promise.catch(() => {});
+  });
+
+  expect(screen.getByRole('button', { name: 'Run reviewer search' })).toBeInTheDocument();
+  expect(screen.getByText(requestBCandidate.name)).toBeInTheDocument();
+});
+
+test('a retained row stays selected when only another submitted key is deleted', async () => {
+  const deletedCandidate = {
+    ...generatedCandidate,
+    candidateKey: 'candidate:deleted',
+    name: 'Deleted Prior Reviewer',
+  };
+  const retainedCandidate = {
+    ...generatedCandidate,
+    candidateKey: 'candidate:retained',
+    name: 'Concurrently Refreshed Reviewer',
+  };
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [deletedCandidate, retainedCandidate],
+        excluded: [],
+        allNames: [deletedCandidate.name, retainedCandidate.name],
+      }));
+    }
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
+      return Promise.resolve(response({
+        success: true,
+        removed: 1,
+        removedKeys: [deletedCandidate.candidateKey],
+        active: [{
+          ...retainedCandidate,
+          rosterUpdatedAt: '2026-07-19T16:05:00.000Z',
+        }],
+        excluded: [],
+        allNames: [retainedCandidate.name],
+      }));
+    }
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  const retainedCheckbox = await screen.findByLabelText(`Select ${retainedCandidate.name}`);
+  fireEvent.click(retainedCheckbox);
+  expect(retainedCheckbox).toBeChecked();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Remove previous results' }));
+
+  await waitFor(() => expect(screen.queryByText(deletedCandidate.name)).not.toBeInTheDocument());
+  expect(screen.getByLabelText(`Select ${retainedCandidate.name}`)).toBeChecked();
+});
+
+test('continues after a terminal discovery read failure when the complete ranked result was received', async () => {
+  const freshCandidate = {
+    ...generatedCandidate,
+    name: 'Fresh Reviewer',
+    email: 'fresh@example.edu',
+  };
+
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({ success: true, active: [], excluded: [], allNames: [] }));
+    }
+    if (target === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
+    if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
+    if (target === '/api/reviewer-finder/enrich-contacts') return Promise.resolve(response({}));
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
+      return Promise.resolve(response({ success: true, recorded: 1 }));
+    }
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+
+  readSseStream
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({
+        event: 'result',
+        data: { proposalInfo: { title: 'Proposal', keywords: 'materials', authorInstitution: 'Example U' } },
+      });
+    })
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({ event: 'result', data: { ranked: [freshCandidate], unverified: [] } });
+      throw new Error('Load failed');
+    })
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({ event: 'complete', data: { type: 'complete', results: [freshCandidate] } });
+    });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  const runButton = await screen.findByRole('button', { name: 'Run reviewer search' });
+
+  await act(async () => {
+    fireEvent.click(runButton);
+  });
+
+  expect(await screen.findByLabelText(`Select ${freshCandidate.name}`)).toBeInTheDocument();
+  expect(screen.queryByText('Load failed')).not.toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/reviewer-roster', expect.objectContaining({
+    method: 'POST',
+  }));
+});
+
+test('a late removal response cannot overwrite a newly selected request', async () => {
+  const requestB = '22222222-2222-2222-2222-222222222222';
+  const requestBCandidate = {
+    ...generatedCandidate,
+    name: 'Request B Reviewer',
+    email: 'request-b@example.edu',
+  };
+  const removal = deferred();
+
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      if (target.includes(REQ)) {
+        return Promise.resolve(response({
+          success: true,
+          active: [generatedCandidate],
+          excluded: [],
+          allNames: [generatedCandidate.name],
+        }));
+      }
+      if (target.includes(requestB)) {
+        return Promise.resolve(response({
+          success: true,
+          active: [requestBCandidate],
+          excluded: [],
+          allNames: [requestBCandidate.name],
+        }));
+      }
+    }
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
+      return removal.promise;
+    }
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+
+  const { rerender } = render(
+    <ReviewerSearchSection requestId={REQ} blobUrl="blob-a" proposalKey="proposal-a" />
+  );
+  await screen.findByText(generatedCandidate.name);
+  fireEvent.click(screen.getByRole('button', { name: 'Remove previous results' }));
+
+  await act(async () => {
+    rerender(
+      <ReviewerSearchSection requestId={requestB} blobUrl="blob-b" proposalKey="proposal-b" />
+    );
+  });
+  await screen.findByText(requestBCandidate.name);
+
+  await act(async () => {
+    removal.resolve(response({
+      success: true,
+      removed: 1,
+      active: [],
+      excluded: [],
+      allNames: [],
+    }));
+    await removal.promise;
+  });
+
+  expect(screen.getByText(requestBCandidate.name)).toBeInTheDocument();
+  expect(screen.queryByText(/previous search result removed/i)).not.toBeInTheDocument();
+});
+
+test('still fails closed when the discovery stream breaks before a ranked result arrives', async () => {
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [generatedCandidate],
+        excluded: [],
+        allNames: [generatedCandidate.name],
+      }));
+    }
+    if (target === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
+    if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  readSseStream
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({
+        event: 'result',
+        data: { proposalInfo: { title: 'Proposal', keywords: 'materials', authorInstitution: 'Example U' } },
+      });
+    })
+    .mockRejectedValueOnce(new Error('Load failed'));
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  const runButton = await screen.findByRole('button', { name: 'Run reviewer search' });
+  fireEvent.click(runButton);
+
+  expect(await screen.findByText('Load failed')).toBeInTheDocument();
+  expect(screen.getByText(/previously found candidates below are unchanged/i)).toBeInTheDocument();
+  expect(screen.getByText(generatedCandidate.name)).toBeInTheDocument();
+});
