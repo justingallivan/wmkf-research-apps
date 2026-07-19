@@ -81,7 +81,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/design-doc-assertion-guard.js\" 2>/dev/null || true",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/design-doc-assertion-guard.js\"",
             "timeout": 10,
             "statusMessage": "design-doc assertion check"
           }
@@ -165,6 +165,12 @@
       {
         "matcher": "Task|Agent",
         "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/session-lifecycle.js\" review-record 2>/dev/null || true",
+            "timeout": 10,
+            "statusMessage": "record adversarial review receipt"
+          },
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/codex-verbatim-reminder.js\" 2>/dev/null || true",

@@ -35,9 +35,9 @@ describe('CandidateEditModal — local (onApply) mode', () => {
     expect(screen.getByDisplayValue('Javier Martinez')).toHaveAttribute('readonly');
   });
 
-  test('local-mode footer flags the manual address as unverified / confirm-before-invite', () => {
+  test('local-mode footer flags the manual address as unverified / quick-check', () => {
     render(<CandidateEditModal candidate={candidate} onApply={jest.fn()} onClose={jest.fn()} nameEditable={false} />);
-    expect(screen.getByText(/marked unverified.*confirm before any invitation/i)).toBeInTheDocument();
+    expect(screen.getByText(/marked unverified.*quick check.*before any invitation/i)).toBeInTheDocument();
   });
 
   test('no changes → just closes, no onApply', async () => {

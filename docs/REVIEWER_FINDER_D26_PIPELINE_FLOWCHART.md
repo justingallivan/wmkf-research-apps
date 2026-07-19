@@ -71,7 +71,7 @@ flowchart TD
     subgraph HUMAN["5 · Human curation & outcome — the load-bearing loop"]
         CUR["Staff curate vs priorities<br/>surfaced papers → drop bad ones"]
         ROSTER["Durable roster + cross-run dedup"]
-        ENR["Contact enrichment (5-tier) + SerpAPI"]
+        ENR["Contact enrichment<br/>NCBI + Europe PMC + guarded web search"]
         SERP["SerpAPI → free-stack"]
         SAVE["Save → Dataverse"]
         INVITE["Invite / email (.eml)"]
@@ -207,7 +207,7 @@ named personnel is a sensible future add — NOT yet implemented.)
 - **Human curation** — staff select against priorities, using each candidate's surfaced
   papers to drop the occasional bad one (the load-bearing, human-in-the-loop step)
 - **Find-tab durable roster** with cross-run dedup (S224)
-- **Contact enrichment** (5-tier), **save to Dataverse**, **email/.eml generation**
+- **Contact enrichment** (identity-anchored structured publication evidence before guarded web search), **save to Dataverse**, **email/.eml generation**
 - Admin-configurable **search time budget** (S223)
 
 ## 🟨 What needs building/fixing (the leverage is downstream)

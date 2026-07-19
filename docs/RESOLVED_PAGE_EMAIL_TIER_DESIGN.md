@@ -188,19 +188,23 @@ _finalize(candidate, result, { persist, onProgress, scholarCandidate, signal, de
   In ALL cases the selected email must be **associated with the candidate**, not merely present on a
   page that names them — "candidate named somewhere + one email" is NOT sufficient (Codex #2/#3: a
   "Philip Bucksbaum Lab" page whose sole email is a lab admin's would otherwise be wrongly trusted).
-  Association evidence = the email's `mailto`/text is adjacent to a candidate-name match (within a
-  small token/DOM window), OR a `mailto` whose link text / preceding label is the candidate's name.
-- **Personal/profile page** (page identity context matches the candidate AND exactly one
-  domain-related email on the page AND that email is candidate-*associated* per above) → **grounded**:
-  trust that email regardless of local-part shape (this is what recovers `phbuck`). Domain-related =
-  passes the `verifiedInstitutionDomain` relation. A lone email NOT adjacent to the candidate's name
-  (e.g. a footer `webmaster@`/lab-admin address) → **abstain**, even on a page titled with their name.
+  Association evidence is directional: the candidate-name match must occur in the small window
+  **before** the email. Looking symmetrically after an address can cross into the next staff/person
+  record and misattribute the preceding email (the live David Liu page exposed exactly this shape:
+  lab-manager email, then “David R. Liu …”). A `mailto` whose link text or preceding label names the
+  candidate satisfies this route.
+- **Personal/profile page** → an opaque mailbox may be recovered through the existing personal-URL
+  owner route when the page identifies the candidate and the URL handle is the mailbox local part
+  (`~phbuck` → `phbuck@…`). A second, deliberately narrow route accepts an exact bare-surname
+  mailbox only when the page identity itself names the candidate (`liu@…` on the official
+  David R. Liu profile). Broader name-shaped local parts still require preceding-name adjacency or
+  URL-owner proof.
 - **Directory/multi-email page** → associate each email with the nearest preceding name block;
-  select only an email whose adjacent name matches the candidate (surname + forename-compatible) AND
-  is the unique such match. **Abstain** if zero or more-than-one candidate-matched emails (Codex
-  Q5.5 — never guess for an invitation tool).
-- `isNameConsistentEmail` is kept ONLY as a soft tiebreaker among already-grounded candidates; it is
-  **never a hard reject** here.
+  select only an email whose preceding name matches the candidate (surname +
+  forename-compatible) and is the unique candidate-associated email. **Abstain** if zero or
+  more-than-one candidate-matched emails.
+- `isNameConsistentEmail` is not a hard gate or a general page-owner shortcut here. Its broader
+  surname containment rule would re-open same-surname/staff ambiguity.
 - Every selected email must still be domain-related to `verifiedInstitutionDomain` (kept by
   `_validateEmailAgainstVerifiedDomain` downstream too).
 

@@ -70,7 +70,7 @@ jest.mock('../../lib/services/discovery-service', () => ({
 }));
 
 jest.mock('../../lib/services/deduplication-service', () => ({
-  DeduplicationService: { markInstitutionCOI: jest.fn((c) => c) },
+  DeduplicationService: { markInstitutionCOIResolved: jest.fn(async (c) => c) },
 }));
 
 const enrichCandidates = jest.fn();

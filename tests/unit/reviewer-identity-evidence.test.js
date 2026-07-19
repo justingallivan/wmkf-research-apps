@@ -8,6 +8,11 @@ jest.mock('../../lib/services/openalex-service', () => ({
     getWorksByAuthor: jest.fn(),
   },
 }));
+jest.mock('../../lib/services/institution-identity-resolver', () => ({
+  createInstitutionIdentityResolver: jest.fn(() => ({
+    resolve: jest.fn(async () => null),
+  })),
+}));
 
 const { OpenAlexService } = require('../../lib/services/openalex-service');
 const { ORCIDService } = require('../../lib/services/orcid-service');
@@ -21,6 +26,35 @@ const record = (overrides = {}) => ({
   topics: ['Attosecond physics'],
   worksCount: 1000,
   ...overrides,
+});
+
+describe('ReviewerIdentityEvidence institution identity scoring', () => {
+  test('one-hop associated institution corroborates an otherwise different affiliation label', () => {
+    const broadIdentity = {
+      openAlexId: 'https://openalex.org/I107606265',
+      displayName: 'Broad Institute',
+      associatedInstitutions: [{
+        openAlexId: 'https://openalex.org/I63966007',
+        displayName: 'Massachusetts Institute of Technology',
+      }],
+    };
+
+    const scored = ReviewerIdentityEvidence._internals.scoreRecord(
+      record({
+        lastKnownInstitution: 'Massachusetts Institute of Technology',
+        lastKnownInstitutionId: 'https://openalex.org/I63966007',
+        topics: [],
+      }),
+      { suggestedInstitution: 'Broad Institute' },
+      '',
+      broadIdentity,
+    );
+
+    expect(scored).toMatchObject({
+      affiliationMatched: true,
+      score: 2,
+    });
+  });
 });
 
 describe('ReviewerIdentityEvidence.evaluateSuggestion', () => {

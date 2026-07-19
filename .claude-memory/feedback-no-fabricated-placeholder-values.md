@@ -13,13 +13,13 @@ metadata:
 When code (especially Codex-generated code) contains an external-facing identifier
 — a contact email, callback URL, account/tenant ID, "from" address, sample data —
 **do not assume it is real.** It is often an invented placeholder. In S232 the
-OpenAlex polite-pool contact shipped as `apps@wmkeck.org`, a mailbox that does not
+OpenAlex API-contact address shipped as `apps@wmkeck.org`, a mailbox that does not
 exist: Codex fabricated it, and Claude propagated it into `CREDENTIALS_RUNBOOK.md`
 without checking, then committed + pushed it to prod. Justin caught it after the
 fact. The real value was `alerts@wmkeck.org`, which he then set as a non-sensitive
 Vercel env var (`OPENALEX_POLITE_MAILTO`).
 
-**Why:** a fake external identifier is worse than none — a bogus polite-pool email
+**Why:** a fake external identifier is worse than none — a bogus API-contact email
 defeats the purpose (the service can't reach anyone) and violates API etiquette;
 the same class of bug applies to any fabricated URL/ID/address. Tests and builds
 pass on fabricated values (they're just strings), so CI never catches it — only a
@@ -29,10 +29,10 @@ human who knows the real value does.
 - In review, flag every external identifier literal and ask "is this a REAL value
   or an invented placeholder?" Verify (hit the live endpoint, ask Justin) before
   shipping. Treat Codex-generated emails/URLs/IDs as suspect by default.
-- For non-secret external contacts (polite-pool email, support address), prefer an
-  **env var with no fabricated default** — unset → degrade safely (common pool / no
-  contact sent), never send a fake one. Keep the literal out of source; let it live
-  in Vercel config + the runbook.
+- For non-secret external contacts (API contact email, support address), prefer an
+  **env var with no fabricated default** — unset means no contact metadata is sent,
+  never a fake value. This is separate from authentication: OpenAlex now requires
+  `OPENALEX_API_KEY`; `OPENALEX_POLITE_MAILTO` provides no quota.
 - Never invent a plausible-looking placeholder to "fill in" a required field; leave
   it null/unset and surface the gap.
 

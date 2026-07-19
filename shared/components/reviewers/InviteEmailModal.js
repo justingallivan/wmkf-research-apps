@@ -57,6 +57,7 @@ function addDaysToTodayYmd(days) {
 function skipReasonLabel(reason) {
   if (reason === 'missing_secure_link') return 'missing secure link';
   if (reason === 'unresolved_placeholder') return 'unfilled {{field}}';
+  if (reason === 'email_research_only') return 'address is research-only, not invite-ready';
   return reason;
 }
 
@@ -313,12 +314,11 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const confirmedSent = results.sent.filter((r) => !r.capturedEmail && r.inviteRecorded !== false);
   const unconfirmedSent = results.sent.filter((r) => !r.capturedEmail && r.inviteRecorded === false);
   const verifyBeforeRetry = [...results.unconfirmed, ...unconfirmedSent];
-  // Slice G — recipients whose email isn't anchored to the resolved identity (manual entry,
-  // affiliation-derived, unknown source, or a search email on an unconfirmed identity). They
-  // are still sendable, but staff must consciously confirm before inviting (guards the S234
-  // wrong-address mistake). The server (send-emails) independently re-derives + enforces this.
-  const lowConfidenceSendable = sendable.filter((d) => d.emailConfidence?.level === 'low');
-  const allLowConfidenceConfirmed = lowConfidenceSendable.every((d) => confirmedLowConfidenceIds[d.suggestionId] === true);
+  // Quick-check recipients are sendable only after a deliberate staff check.
+  // Research-only leads are removed from sendable by the render service and
+  // cannot be promoted by this checkbox.
+  const quickCheckSendable = sendable.filter((d) => d.emailConfidence?.action === 'quick_check');
+  const allQuickChecksConfirmed = quickCheckSendable.every((d) => confirmedLowConfidenceIds[d.suggestionId] === true);
 
   const persistTiming = useCallback(async () => {
     try {
@@ -332,8 +332,8 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
 
   const handleSend = async () => {
     if (sendable.length === 0) { setError('No recipients with an email to send to.'); return; }
-    if (lowConfidenceSendable.length > 0 && !allLowConfidenceConfirmed) {
-      setError('Confirm each low-confidence address before sending.');
+    if (quickCheckSendable.length > 0 && !allQuickChecksConfirmed) {
+      setError('Confirm each quick-check address before sending.');
       return;
     }
     // Irreversible-action confirm for EVERY send. Low-confidence acknowledgement
@@ -367,14 +367,14 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
             respondOffsetDays: timing.respondOffsetDays === '' ? null : Number(timing.respondOffsetDays),
             reviewDueDate: timing.reviewDueDate || null,
           },
-          // Staff acknowledged THESE specific low-confidence addresses via the confirm dialog
+          // Staff acknowledged THESE specific quick-check addresses in the preview
           // above (which named them). Recipient-specific, not a batch boolean: the server only
           // honors the override for these exact suggestionIds, so a row that became LOW after
-          // preview (and was never shown/confirmed) is still refused (`email_unconfirmed`).
+          // preview (and was never shown/acknowledged) is still refused (`email_unconfirmed`).
           // Only the rows the staffer actually ticked — never the whole LOW list —
           // so a regression in the send-button disable logic cannot smuggle an
           // unconfirmed address through as confirmed.
-          confirmedLowConfidenceIds: lowConfidenceSendable
+          confirmedLowConfidenceIds: quickCheckSendable
             .filter((d) => confirmedLowConfidenceIds[d.suggestionId] === true)
             .map((d) => d.suggestionId),
         }),
@@ -542,12 +542,12 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                         <span className="text-sm font-medium text-gray-900">{d.candidateName || '(unnamed)'}</span>
                         <span className="text-xs text-gray-500">{d.candidateEmail || 'no email'}</span>
                       </div>
-                      {!d.skipped && d.emailConfidence?.level === 'low' && (
+                      {!d.skipped && d.emailConfidence?.action === 'quick_check' && (
                         <p className="text-xs text-amber-700 mt-1 flex items-start gap-1">
                           <span aria-hidden="true">⚠</span>
                           <span>
-                            This address wasn’t verified against the reviewer’s identity
-                            {d.emailConfidence?.reason ? ` (${d.emailConfidence.reason})` : ''}. Double-check it before sending.
+                            Quick check recommended
+                            {d.emailConfidence?.reason ? ` (${d.emailConfidence.reason})` : ''}.
                           </span>
                         </p>
                       )}
@@ -570,11 +570,11 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                       )}
                     </div>
                   ))}
-                  {lowConfidenceSendable.length > 0 && (
+                  {quickCheckSendable.length > 0 && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                      <p className="text-sm font-medium text-amber-900">Confirm low-confidence addresses</p>
+                      <p className="text-sm font-medium text-amber-900">Confirm quick-check addresses</p>
                       <div className="mt-2 space-y-2">
-                        {lowConfidenceSendable.map((d) => (
+                        {quickCheckSendable.map((d) => (
                           <label key={d.suggestionId} className="flex items-start gap-2 text-xs text-amber-900">
                             <input
                               type="checkbox"
@@ -674,15 +674,15 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
               <button
                 type="button"
                 onClick={handleSend}
-                disabled={sendable.length === 0 || (lowConfidenceSendable.length > 0 && !allLowConfidenceConfirmed)}
+                disabled={sendable.length === 0 || (quickCheckSendable.length > 0 && !allQuickChecksConfirmed)}
                 className={`px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-40 disabled:cursor-not-allowed ${
-                  lowConfidenceSendable.length > 0 ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-900 hover:bg-gray-800'
+                  quickCheckSendable.length > 0 ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-900 hover:bg-gray-800'
                 }`}
-                title={lowConfidenceSendable.length > 0
-                  ? `${lowConfidenceSendable.length} address(es) couldn’t be verified — you’ll confirm before sending`
+                title={quickCheckSendable.length > 0
+                  ? `${quickCheckSendable.length} address(es) need a quick check before sending`
                   : undefined}
               >
-                {lowConfidenceSendable.length > 0
+                {quickCheckSendable.length > 0
                   ? `Confirm & send ${sendable.length} invitation${sendable.length === 1 ? '' : 's'}`
                   : `Send ${sendable.length > 0 ? sendable.length : ''} invitation${sendable.length === 1 ? '' : 's'}`}
               </button>

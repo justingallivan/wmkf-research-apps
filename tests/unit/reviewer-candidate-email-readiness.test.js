@@ -23,17 +23,31 @@ describe('CandidateCard email readiness', () => {
   test('surfaces a high-confidence email with its authoritative reason', () => {
     renderCandidate({
       email: 'ready@example.edu',
-      contactEnrichment: { emailSource: 'pubmed', emailYear: 2025 },
+      contactEnrichment: {
+        emailSource: 'scholarly_multi',
+        emailYear: 2025,
+        emailEvidence: {
+          publicationCount: 2,
+          publications: [
+            {
+              url: 'https://example.org/work/1',
+              year: 2025,
+              title: 'First corroborating work',
+            },
+          ],
+        },
+      },
     });
 
     expect(screen.getByText('📧 ready@example.edu')).toHaveAttribute(
       'title',
-      'Email (from pubmed, 2025)'
+      'Email (from scholarly_multi, 2025)'
     );
     expect(screen.getByText('✓ High-confidence email')).toHaveAttribute(
       'title',
-      'Address source: pubmed. Confidence reflects address provenance and identity match, not deliverability.'
+      'Address source: scholarly_multi. Confidence reflects address provenance and identity-grounded evidence, not deliverability.'
     );
+    expect(screen.getByText(/Evidence: 2 recent works/)).toHaveTextContent('2025');
   });
 
   test('surfaces manual and unknown provenance as needing confirmation', () => {
@@ -44,7 +58,7 @@ describe('CandidateCard email readiness', () => {
 
     expect(screen.getByText('⚠ Email needs confirmation')).toHaveAttribute(
       'title',
-      'Manually entered — not verified against the reviewer’s identity. Confidence reflects address provenance and identity match, not deliverability.'
+      'Manually entered — not verified against the reviewer’s identity. Confidence reflects address provenance and identity-grounded evidence, not deliverability.'
     );
   });
 
@@ -54,6 +68,18 @@ describe('CandidateCard email readiness', () => {
     expect(screen.getByText('Email not found')).toHaveAttribute(
       'title',
       'No email address found during contact enrichment'
+    );
+  });
+
+  test('keeps search-derived addresses visibly quarantined as research-only', () => {
+    renderCandidate({
+      email: 'lead@example.edu',
+      emailSource: 'serp_search',
+    });
+
+    expect(screen.getByText('⚠ Research only')).toHaveAttribute(
+      'title',
+      'Search lead lacks address-specific first-party evidence. Confidence reflects address provenance and identity-grounded evidence, not deliverability.'
     );
   });
 

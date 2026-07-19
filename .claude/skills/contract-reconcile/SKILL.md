@@ -72,10 +72,20 @@ Write these before any claim. If any field is unknown, read more before proceedi
    Residual risk: none / named.
 ## New Issues
 - SEVERITY — title. Evidence: file:line. Required change: specific action.
+## Recommendation Evidence
+| Recommendation | Current prerequisite | Available at execution point | Evidence actually tested | Disconfirming check | Status |
+|---|---|---|---|---|---|
+| ... | file:line / external source | yes/no + file:line | experiment or NOT TESTED | contrary case checked | VERIFIED / ASSUMED / STALE |
 ## Final Verdict
 READY TO IMPLEMENT | READY WITH NAMED CHANGES | NEEDS REWORK
 Required named changes: ...
 ```
+
+If the review makes no recommendation, write `Recommendation Evidence: N/A`.
+For each recommendation, verify the current prerequisite and the point in the
+real execution path where it must exist. Do not promote a comparison to a
+recommendation unless that comparison was actually tested; name one
+disconfirming check that could refute it.
 
 **Mode B (Implementation):** first write the **invariant table** (a guardrail, not a plan) —
 
@@ -96,7 +106,7 @@ Residual risk: none / named.
 
 ## Step 6 — Stop if evidence is missing
 
-If a claim has no `file:line` / command behind it, label it `[ASSUMED]` and either go get the evidence or hedge — do not assert. For a substantial review or a multi-layer build, an adversarial second pass via `codex:rescue` is the norm, not a luxury.
+If a claim has no `file:line` / command behind it, label it `[ASSUMED]` and either go get the evidence or hedge — do not assert. For a substantial review or a multi-layer build, use the fresh-agent review path (`/codex:adversarial-review --wait` for adversarial review), not `codex:rescue`. When the session lifecycle requires a fingerprinted review receipt, include its exact marker and review contract in that fresh-agent prompt.
 
 ## Anti-patterns this skill blocks (say the evidence, not the phrase)
 

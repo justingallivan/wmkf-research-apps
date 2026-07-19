@@ -97,6 +97,32 @@ describe('ContactEnrichmentService._selectGroundedEmail', () => {
       .toBe('phbuck@stanford.edu');
   });
 
+  it('does not attribute a preceding staff email to the candidate named in the next record', () => {
+    const html =
+      '<p>Laboratory Manager/Administrator: Emily Botelho ' +
+      '<a href="mailto:emilybotelho@fas.harvard.edu">email</a> ' +
+      'David R. Liu is a professor of chemistry.</p>';
+    expect(select('David Liu', html, 'harvard.edu', { pageUrl: 'https://www.chemistry.harvard.edu/people/team' }))
+      .toBeNull();
+  });
+
+  it('selects the page owner on the official David Liu profile despite adjacent staff contacts', () => {
+    const html =
+      '<title>David R. Liu | Harvard Chemistry</title><h1>David R. Liu</h1>' +
+      '<p>David R. Liu, Professor of Chemistry and Chemical Biology</p>' +
+      ' '.repeat(180) +
+      '<p><a href="mailto:liu@chemistry.harvard.edu">Email Professor Liu</a></p>' +
+      '<p>Laboratory Manager/Administrator: Emily Botelho ' +
+      '<a href="mailto:emilybotelho@fas.harvard.edu">email</a> ' +
+      'David R. Liu is a professor of chemistry.</p>' +
+      ' '.repeat(180) +
+      '<footer>Questions about this site: ' +
+      '<a href="mailto:yahya_chaudhry@fas.harvard.edu">contact</a></footer>';
+    expect(select('David Liu', html, 'harvard.edu', {
+      pageUrl: 'https://www.chemistry.harvard.edu/people/david-r-liu',
+    })).toBe('liu@chemistry.harvard.edu');
+  });
+
   it('abstains on a lab/group page whose sole email is a non-owner admin', () => {
     const html =
       '<title>Philip Bucksbaum Lab</title><h1>Philip Bucksbaum Lab</h1>' +

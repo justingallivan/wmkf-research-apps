@@ -6,8 +6,8 @@
  * _applyAffiliationOverride still live on lib/services/contact-enrichment-service.js). Pins:
  *
  *  - Every tier's found/not-found/stale/abort/non-abort-error/skip branch (C9).
- *  - The inter-tier short-circuit boundaries: Tier 0 + Tier 1-recent finalize early;
- *    Tier 2/3/4 always fall through (mutate then continue); Tier 3's abort THROWS instead of
+ *  - The inter-tier short-circuit boundaries: Tier 0 finalizes early; Tier 1 continues
+ *    through structured corroboration; Tier 2/3/4 always fall through; Tier 3's abort THROWS instead of
  *    finalizing.
  *  - `_finalize`'s fixed step order (C12): OpenAlex metrics -> identity resolve ->
  *    institution-domain evidence -> resolved-page email -> domain validation ->
@@ -28,6 +28,7 @@ const openAlexMetrics = require('../../lib/services/contact-enrichment/openalex-
 const domainEvidence = require('../../lib/services/contact-enrichment/domain-evidence');
 const pageEmail = require('../../lib/services/contact-enrichment/page-email');
 const emailAdjudication = require('../../lib/services/contact-enrichment/email-adjudication');
+const scholarlyEmail = require('../../lib/services/contact-enrichment/scholarly-email');
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -40,6 +41,11 @@ function stubFinalizeDeps() {
   jest.spyOn(OpenAlexService, 'getAuthorById').mockResolvedValue(null);
   jest.spyOn(OpenAlexService, 'getInstitution').mockResolvedValue(null);
   jest.spyOn(OpenAlexService, 'searchInstitutions').mockResolvedValue([]);
+  jest.spyOn(scholarlyEmail, 'findScholarlyEmail').mockResolvedValue({
+    status: 'not_found',
+    candidates: [],
+    providerErrors: [],
+  });
 }
 
 describe('Tier 0 — affiliation-embedded email', () => {
@@ -66,7 +72,7 @@ describe('Tier 0 — affiliation-embedded email', () => {
 
   test('not found (no affiliation) -> falls through to Tier 1', async () => {
     const out = await ContactEnrichmentService.enrichCandidate(
-      { name: 'Dr. NoAffil', publications: [{ year: 2024, authors: [{ name: 'Dr. NoAffil', affiliation: 'Some Lab, joe@pubmed.edu (2024)' }] }] },
+      { name: 'Dr. NoAffil', affiliation: 'Some Lab', publications: [{ year: 2024, authors: [{ name: 'Dr. NoAffil', affiliation: 'Some Lab, joe@pubmed.edu (2024)' }] }] },
       { usePubmed: true, useOrcid: false },
     );
     expect(out.contactEnrichment.emailSource).toBe('pubmed');
@@ -76,15 +82,16 @@ describe('Tier 0 — affiliation-embedded email', () => {
 describe('Tier 1 — PubMed', () => {
   beforeEach(stubFinalizeDeps);
 
-  test('recent email found -> finalizes immediately (Tier 2 ORCID never runs)', async () => {
-    const orcidSpy = jest.spyOn(ORCIDService, 'findContact');
+  test('recent legacy email continues through ORCID and structured corroboration', async () => {
+    const orcidSpy = jest.spyOn(ORCIDService, 'findContact').mockResolvedValue(null);
     const out = await ContactEnrichmentService.enrichCandidate(
-      { name: 'Dr. Recent', publications: [{ year: new Date().getFullYear(), authors: [{ name: 'Dr. Recent', affiliation: 'Lab. recent@pubmed.edu' }] }] },
+      { name: 'Dr. Recent', affiliation: 'Recent University', publications: [{ year: new Date().getFullYear(), authors: [{ name: 'Dr. Recent', affiliation: 'Recent University. recent@pubmed.edu' }] }] },
       { useOrcid: true, credentials: { orcidClientId: 'c', orcidClientSecret: 's' } },
     );
     expect(out.contactEnrichment.emailSource).toBe('pubmed');
     expect(out.contactEnrichment.emailIsRecent).toBe(true);
-    expect(orcidSpy).not.toHaveBeenCalled();
+    expect(orcidSpy).toHaveBeenCalled();
+    expect(scholarlyEmail.findScholarlyEmail).toHaveBeenCalled();
   });
 
   test('stale (non-recent) email -> falls through, Tier 2 still runs', async () => {
@@ -114,6 +121,97 @@ describe('Tier 1 — PubMed', () => {
     );
     expect(out.contactEnrichment.tierResults.pubmed).toBeUndefined();
     expect(out.contactEnrichment.tiersUsed).not.toContain('pubmed');
+  });
+
+  test('two-work scholarly evidence becomes invite-ready with bounded provenance', async () => {
+    scholarlyEmail.findScholarlyEmail.mockResolvedValue({
+      status: 'found',
+      email: 'jane@stanford.edu',
+      publicationCount: 2,
+      latestYear: 2026,
+      providers: ['ncbi_pubmed', 'europe_pmc'],
+      publications: [
+        { pmid: '1', title: 'One', year: 2026, url: 'https://pubmed.ncbi.nlm.nih.gov/1/', providers: ['ncbi_pubmed', 'europe_pmc'] },
+        { pmid: '2', title: 'Two', year: 2025, url: 'https://pubmed.ncbi.nlm.nih.gov/2/', providers: ['europe_pmc'] },
+      ],
+      selectionReason: 'unique_affiliation_domain_match',
+      alternates: [{ email: 'jane@former.example.edu', publicationCount: 2 }],
+      providerErrors: [],
+    });
+    const out = await ContactEnrichmentService.enrichCandidate(
+      { name: 'Dr. Jane Roe', affiliation: 'Stanford University', publications: [] },
+      { usePubmed: true, useOrcid: false },
+    );
+    expect(out.contactEnrichment).toMatchObject({
+      email: 'jane@stanford.edu',
+      emailSource: 'scholarly_multi',
+      emailAction: 'ready',
+      emailEvidence: {
+        publicationCount: 2,
+        providers: ['ncbi_pubmed', 'europe_pmc'],
+        selectionReason: 'unique_affiliation_domain_match',
+        alternates: [{ email: 'jane@former.example.edu', publicationCount: 2 }],
+        deliverabilityChecked: false,
+      },
+    });
+  });
+
+  test('structured address conflict clears an earlier legacy PubMed quick-check address', async () => {
+    scholarlyEmail.findScholarlyEmail.mockResolvedValue({
+      status: 'conflict',
+      candidates: [
+        { email: 'jane@old.edu', publicationCount: 2 },
+        { email: 'jane@new.edu', publicationCount: 2 },
+      ],
+      providerErrors: [],
+    });
+    const year = new Date().getFullYear();
+    const out = await ContactEnrichmentService.enrichCandidate(
+      {
+        name: 'Dr. Jane Roe',
+        affiliation: 'Stanford University',
+        publications: [{
+          year,
+          authors: [{
+            name: 'Dr. Jane Roe',
+            affiliation: `Stanford University. jane@old.edu`,
+          }],
+        }],
+      },
+      { usePubmed: true, useOrcid: false },
+    );
+
+    expect(out.contactEnrichment.tierResults.pubmed.email).toBe('jane@old.edu');
+    expect(out.contactEnrichment.tierResults.scholarly_email.status).toBe('conflict');
+    expect(out.contactEnrichment).toMatchObject({
+      email: null,
+      emailSource: null,
+      emailPersistAllowed: false,
+      emailAction: 'missing',
+    });
+  });
+
+  test('total structured-provider failure is surfaced as an error, not a definitive miss', async () => {
+    scholarlyEmail.findScholarlyEmail.mockResolvedValue({
+      status: 'provider_error',
+      candidates: [],
+      providerErrors: [
+        { provider: 'ncbi_pubmed', error: 'NCBI unavailable' },
+        { provider: 'europe_pmc', error: 'Europe PMC unavailable' },
+      ],
+    });
+    const progress = [];
+    const out = await ContactEnrichmentService.enrichCandidate(
+      { name: 'Dr. Jane Roe', affiliation: 'Stanford University', publications: [] },
+      { usePubmed: true, useOrcid: false, onProgress: (event) => progress.push(event) },
+    );
+
+    expect(out.contactEnrichment.tierResults.scholarly_email.status).toBe('provider_error');
+    expect(progress).toContainEqual(expect.objectContaining({
+      tier: 'scholarly',
+      status: 'error',
+      message: expect.stringMatching(/services unavailable/i),
+    }));
   });
 });
 

@@ -13,9 +13,12 @@ import {
   candidateWasSaved,
   getCandidateEmailReadiness,
   pruneCandidateForRoster,
+  pruneEmailEvidence,
   sanitizeInstitutionCOIDetails,
   mergeReferredProvenance,
   dedupeByNamePreferReferred,
+  reviewerCandidateKey,
+  withReviewerCandidateKey,
 } from '../../shared/components/reviewers/reviewer-search-logic.js';
 const { PROVENANCE_KINDS, provenanceGroupOf, provenanceKindOf, provenanceLabelForCandidate } = require('../../lib/utils/reviewer-provenance');
 const { normalizeReviewerName: normName } = require('../../lib/utils/reviewer-name-match');
@@ -68,6 +71,50 @@ describe('pruneCandidateForRoster — referred seed anchors survive reload', () 
       seedIdentityMatchKey: 'email',
       seedIdentityNameConsistent: true,
     }));
+  });
+});
+
+describe('scholarly email evidence survives a bounded roster round-trip', () => {
+  test('keeps action + compact publication provenance and drops extra works', () => {
+    const evidence = {
+      sourceKind: 'scholarly_publication',
+      sourceUrl: 'https://pubmed.ncbi.nlm.nih.gov/1/',
+      action: 'ready',
+      ownership: 'author_affiliation',
+      affiliationMatched: true,
+      publicationCount: 6,
+      providers: ['ncbi_pubmed', 'europe_pmc'],
+      publications: Array.from({ length: 6 }, (_, index) => ({
+        pmid: String(index + 1),
+        title: `Paper ${index + 1}`,
+        year: 2026 - index,
+        url: `https://pubmed.ncbi.nlm.nih.gov/${index + 1}/`,
+        providers: ['ncbi_pubmed'],
+        rawPayload: { shouldNotPersist: true },
+      })),
+      deliverabilityChecked: false,
+      rawProviderResponse: { shouldNotPersist: true },
+    };
+    const compact = pruneEmailEvidence(evidence);
+    expect(compact.publications).toHaveLength(5);
+    expect(compact).not.toHaveProperty('rawProviderResponse');
+    expect(compact.publications[0]).not.toHaveProperty('rawPayload');
+
+    const pruned = pruneCandidateForRoster({
+      name: 'Jane Roe',
+      email: 'jane@stanford.edu',
+      contactEnrichment: {
+        email: 'jane@stanford.edu',
+        emailSource: 'scholarly_multi',
+        emailAction: 'ready',
+        emailActionReason: 'Address source: scholarly_multi',
+        emailEvidence: evidence,
+      },
+    });
+    expect(pruned.contactEnrichment).toMatchObject({
+      emailAction: 'ready',
+      emailEvidence: { publicationCount: 6, action: 'ready' },
+    });
   });
 });
 
@@ -164,6 +211,34 @@ describe('isCandidateSelectable', () => {
 });
 
 describe('mergeEnrichment', () => {
+  test('keeps same-name candidates bound to their own enrichment', () => {
+    const candidates = [
+      withReviewerCandidateKey({ name: 'Dr. Alex Kim', affiliation: 'One University' }),
+      withReviewerCandidateKey({ name: 'Dr. Alex Kim', affiliation: 'Two University' }),
+    ];
+    const enrichment = [
+      {
+        ...candidates[0],
+        contactEnrichment: { email: 'alex.one@one.edu', emailSource: 'serp_search' },
+      },
+      {
+        ...candidates[1],
+        contactEnrichment: { email: 'alex.two@two.edu', emailSource: 'serp_search' },
+      },
+    ];
+
+    const out = mergeEnrichment(candidates, enrichment);
+
+    expect(out.map((c) => c.email)).toEqual(['alex.one@one.edu', 'alex.two@two.edu']);
+    expect(out[0].candidateKey).not.toBe(out[1].candidateKey);
+  });
+
+  test('candidate correlation prefers durable identity anchors over name', () => {
+    expect(reviewerCandidateKey({ name: 'Alex Kim', openAlexId: 'A123' })).toBe('openalex:a123');
+    expect(reviewerCandidateKey({ name: 'Alex Kim', affiliation: 'One University' }))
+      .not.toBe(reviewerCandidateKey({ name: 'Alex Kim', affiliation: 'Two University' }));
+  });
+
   test('preserves the server-signed automated identity receipt', () => {
     const [out] = mergeEnrichment([{ name: 'Dr Receipt' }], [{
       name: 'Dr Receipt',
@@ -303,35 +378,43 @@ describe('mergeEnrichment', () => {
 });
 
 describe('getCandidateEmailReadiness', () => {
-  test('uses the invitation classifier for authoritative and anchored-search emails', () => {
+  test('uses the invitation classifier for identity-owned and multiply corroborated emails', () => {
     expect(getCandidateEmailReadiness({
       email: 'person@example.edu',
-      emailSource: 'pubmed',
-      identityStatus: 'unresolved',
-    })).toMatchObject({ level: 'high' });
+      emailSource: 'institution_page',
+    })).toMatchObject({ level: 'high', action: 'ready' });
 
     expect(getCandidateEmailReadiness({
       email: 'person@example.edu',
       contactEnrichment: {
-        emailSource: 'claude_search',
-        identity: { status: 'probable' },
+        emailSource: 'scholarly_multi',
       },
-    })).toMatchObject({ level: 'high' });
+    })).toMatchObject({ level: 'high', action: 'ready' });
   });
 
-  test('unknown, manual, contested, and unanchored-search emails need confirmation', () => {
-    for (const emailSource of ['manual', 'search_contested', 'unknown_source']) {
+  test('single-work, legacy, manual, and unknown emails need confirmation', () => {
+    for (const emailSource of ['scholarly_single', 'pubmed', 'manual', 'unknown_source']) {
       expect(getCandidateEmailReadiness({
         email: 'person@example.edu',
         emailSource,
         identityStatus: 'confirmed',
-      })).toMatchObject({ level: 'low' });
+      })).toMatchObject({ level: 'low', action: 'quick_check' });
+    }
+  });
+
+  test('search-only and contested emails remain research leads, not sendable addresses', () => {
+    for (const emailSource of ['serp_search', 'claude_search', 'search_contested']) {
+      expect(getCandidateEmailReadiness({
+        email: 'person@example.edu',
+        emailSource,
+        identityStatus: 'confirmed',
+      })).toMatchObject({ level: 'low', action: 'research_only' });
     }
     expect(getCandidateEmailReadiness({
       email: 'person@example.edu',
       emailSource: 'serp_search',
-      identityStatus: 'unresolved',
-    })).toMatchObject({ level: 'low' });
+      identityStatus: 'probable',
+    })).toMatchObject({ level: 'low', action: 'research_only' });
   });
 
   test('preserves the specific contested-contact reason for staff review', () => {
@@ -344,6 +427,7 @@ describe('getCandidateEmailReadiness', () => {
       },
     })).toEqual({
       level: 'low',
+      action: 'research_only',
       reason: 'Email domain conflicts with the verified institution',
     });
   });
@@ -355,6 +439,7 @@ describe('getCandidateEmailReadiness', () => {
       contactEnrichment: { email: null, emailSource: 'orcid' },
     })).toEqual({
       level: 'missing',
+      action: 'missing',
       reason: 'No email address found during contact enrichment',
     });
   });

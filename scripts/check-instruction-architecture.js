@@ -92,6 +92,23 @@ assert(
   settings.hooks.PreToolUse.some((entry) =>
     entry.hooks.some((hook) => hook.command.includes('docs-catalog-format-guard.js'))),
 );
+const designAssertionHook = settings.hooks.PreToolUse
+  .flatMap((entry) => entry.hooks || [])
+  .find((hook) => hook.command.includes('design-doc-assertion-guard.js'));
+assert(
+  'design-doc assertion blocker is wired without an exit-swallow wrapper',
+  !!designAssertionHook &&
+    !designAssertionHook.command.includes('|| true') &&
+    !designAssertionHook.command.includes('2>/dev/null'),
+);
+assert(
+  'PostToolUse adversarial review receipt recorder is wired',
+  settings.hooks.PostToolUse.some((entry) =>
+    entry.matcher === 'Task|Agent' &&
+    entry.hooks.some((hook) => hook.command.includes('session-lifecycle.js') && hook.command.includes('review-record'))) &&
+    !settings.hooks.PreToolUse.some((entry) =>
+      entry.hooks.some((hook) => hook.command.includes('session-lifecycle.js') && hook.command.includes('review-record'))),
+);
 assert(
   'docs-catalog commit guard is wired',
   settings.hooks.PreToolUse.some((entry) =>

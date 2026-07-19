@@ -373,6 +373,33 @@ describe('researcher.upsertByPotentialReviewer — writes bibliometrics onto the
     await upsertByPotentialReviewer('pr-3', { email: 'x@y.edu', emailSource: 'serp_search' });
     expect(update.mock.calls[0][2].wmkf_emailsource).toBeUndefined(); // ordinary search: fill-only, not overwritten
   });
+
+  test('scholarly_multi upgrades only the exact stored email and never displaces a ready source', async () => {
+    const get = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      wmkf_potentialreviewersid: 'pr-4',
+      wmkf_emailaddress: 'same@y.edu',
+      wmkf_emailsource: 'pubmed',
+      _etag: 'W/"4"',
+    });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    await upsertByPotentialReviewer('pr-4', { email: 'same@y.edu', emailSource: 'scholarly_multi' });
+    expect(update.mock.calls[0][2].wmkf_emailsource).toBe('scholarly_multi');
+    expect(update.mock.calls[0][3].ifMatch).toBe('W/"4"');
+
+    update.mockClear();
+    await upsertByPotentialReviewer('pr-4', { email: 'different@y.edu', emailSource: 'scholarly_multi' });
+    expect(update.mock.calls[0][2].wmkf_emailsource).toBeUndefined();
+
+    get.mockResolvedValue({
+      wmkf_potentialreviewersid: 'pr-4',
+      wmkf_emailaddress: 'same@y.edu',
+      wmkf_emailsource: 'orcid',
+    });
+    update.mockClear();
+    await upsertByPotentialReviewer('pr-4', { email: 'same@y.edu', emailSource: 'scholarly_multi' });
+    expect(update.mock.calls[0][2].wmkf_emailsource).toBeUndefined();
+  });
 });
 
 // wmkf_name is stored raw (Dynamics does not recompute it), so the adapter must

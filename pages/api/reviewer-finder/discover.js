@@ -288,6 +288,8 @@ export default async function handler(req, res) {
     });
 
     const { DeduplicationService } = require('../../../lib/services/deduplication-service');
+    const { createInstitutionIdentityResolver } = require('../../../lib/services/institution-identity-resolver');
+    const institutionIdentityResolver = createInstitutionIdentityResolver();
 
     // Filter out proposal authors (PI AND co-investigators) — they should never
     // be reviewers. Derived via the shared helper so this matches the COI set
@@ -338,7 +340,12 @@ export default async function handler(req, res) {
 
     if (coiInstitutions && (Array.isArray(coiInstitutions) ? coiInstitutions.length : true)) {
       const beforeInst = verifiedWithCOI.length;
-      const instPartition = DeduplicationService.partitionConflicts(verifiedWithCOI, coiInstitutions);
+      const instPartition = await DeduplicationService.partitionConflictsResolved(
+        verifiedWithCOI,
+        coiInstitutions,
+        [],
+        { resolver: institutionIdentityResolver, signal: deadlineController.signal },
+      );
       const keptInst = instPartition.filtered;
       const droppedInst = beforeInst - keptInst.length;
       if (droppedInst > 0) {
@@ -442,7 +449,12 @@ export default async function handler(req, res) {
       }
 
       if (coiInstitutions && (Array.isArray(coiInstitutions) ? coiInstitutions.length : true) && referredCandidates.length > 0) {
-        const instPartition = DeduplicationService.partitionConflicts(referredCandidates, coiInstitutions);
+        const instPartition = await DeduplicationService.partitionConflictsResolved(
+          referredCandidates,
+          coiInstitutions,
+          [],
+          { resolver: institutionIdentityResolver, signal: deadlineController.signal },
+        );
         const keptInst = instPartition.filtered;
         const keptNames = new Set(keptInst.map((candidate) => String(candidate.name || '').toLowerCase()));
         for (const seed of referredCandidates) {

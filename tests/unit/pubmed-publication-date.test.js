@@ -47,7 +47,7 @@ describe('PubMedService.parseXML publication date precedence', () => {
       { pmid: '111', year: 2021 },
       { pmid: '222', year: 2019 },
     ]);
-    expect(articles[0].publicationDate.toISOString()).toMatch(/^2021-03-04/);
-    expect(articles[1].publicationDate.toISOString()).toMatch(/^2019-02-06/);
+    expect(articles[0].publicationDate.toISOString()).toBe('2021-03-04T00:00:00.000Z');
+    expect(articles[1].publicationDate.toISOString()).toBe('2019-02-06T00:00:00.000Z');
   });
 });

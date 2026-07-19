@@ -2,12 +2,12 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-07-13 (C0.1 containment: request-scoped staff identity confirmations are stored in the active candidate JSON and re-read by `save-candidates`; automated identity receipts are opaque signed values, not raw resolver evidence).
+**Last verified:** 2026-07-17 (migration 025: durable mutations are keyed by `candidate_key`, so two same-name people cannot share enrichment, status, or identity-confirmation state).
 **Live row count:** 0 (new table; no rows until the Workbench Find tab records a search).
 
 ## NOT a regression of the S219/migration-018 Dataverse cutover
 
-Migration 018 dropped the **canonical reviewer-identity** Postgres tables (`researchers`, `researcher_keywords`, `publications`, `proposal_searches`, `reviewer_suggestions`), whose source of truth is now Dataverse (`wmkf_potentialreviewer` / `wmkf_appreviewersuggestion`). `reviewer_find_roster` is a different concern: **operational, pre-save, per-request working state** for the Workbench Reviewers→Find tab — un-vetted search discoveries plus their render blobs. It is the same class of object as `search_cache`, which migration 018 deliberately KEPT in Postgres. The canonical saved reviewer pool still lives in Dataverse, untouched. This table is name-keyed because search candidates are name-based and frequently email-less at surface time, whereas the canonical pool is email-keyed.
+Migration 018 dropped the **canonical reviewer-identity** Postgres tables (`researchers`, `researcher_keywords`, `publications`, `proposal_searches`, `reviewer_suggestions`), whose source of truth is now Dataverse (`wmkf_potentialreviewer` / `wmkf_appreviewersuggestion`). `reviewer_find_roster` is a different concern: **operational, pre-save, per-request working state** for the Workbench Reviewers→Find tab — un-vetted search discoveries plus their render blobs. It is the same class of object as `search_cache`, which migration 018 deliberately KEPT in Postgres. The canonical saved reviewer pool still lives in Dataverse, untouched. This table is candidate-keyed. `candidate_key` prefers real person anchors already present in the surfaced DTO and otherwise uses a name/email/ORCID/affiliation correlation fingerprint. It is not an identity-resolution claim; it exists to keep same-name rows and their mutations separate. `normalized_name` remains only a conservative cross-run search-exclusion field.
 
 ## Source of truth
 
@@ -19,7 +19,8 @@ Migration 018 dropped the **canonical reviewer-identity** Postgres tables (`rese
 |---|---|---|
 | id | bigint (IDENTITY PK) | |
 | request_id | uuid | akoya_request GUID (per-request scope) |
-| normalized_name | text | `normalizeReviewerName(candidate.name)` — the dedup key |
+| candidate_key | text | Stable surfaced-row correlation key; unique within a request. Not an identity-resolution decision. |
+| normalized_name | text | `normalizeReviewerName(candidate.name)` — conservative cross-run search exclusion only |
 | display_name | text | surface-time `candidate.name` for re-render |
 | status | text | `active` \| `excluded` \| `saved` \| `coi_dropped` (CHECK-constrained) |
 | candidate | jsonb | pruned render DTO (only `CandidateCard`-rendered fields, not raw enrichment internals). Applicant-suggested enrichment rows carry `enrichedProposalKey` (`library::folder::name`) so the UI can restore only same-proposal enrichment. Institution-COI ledger and flagged active rows carry `hasInstitutionCOI` and `institutionCOIDetails` (`piInstitution`, reviewer affiliation, `dropDecision`, corroboration reason, drop stage/source where applicable). An authenticated `confirm_identity` action may add `staffIdentityConfirmation` (opaque id, canonical manual contact, actor ids, timestamp, source) plus its UI marker. Automated candidates may carry a server-signed `automatedIdentityAttestation`; it binds the request and identity-bearing persistence bundle without storing resolver anchors/tier payloads. |
@@ -27,9 +28,9 @@ Migration 018 dropped the **canonical reviewer-identity** Postgres tables (`rese
 | first_seen_at | timestamptz | |
 | updated_at | timestamptz | |
 
-Indexes: `uq_reviewer_find_roster_req_name` UNIQUE `(request_id, normalized_name)` (the dedup key) + `idx_reviewer_find_roster_req_status (request_id, status)`.
+Indexes: `uq_reviewer_find_roster_req_candidate` UNIQUE `(request_id, candidate_key)` + `idx_reviewer_find_roster_req_name (request_id, normalized_name)` + `idx_reviewer_find_roster_req_status (request_id, status)`.
 
-**Status semantics:** `active` = surfaced list row (selectable unless the candidate blob itself carries a read-only gate such as `hasInstitutionCOI`) · `excluded` = staff set-aside (collapsed recoverable section) · `saved` = graduated to the Dataverse pool (not rendered on Find, kept for dedup) · `coi_dropped` = discovery-time institution-COI hard-drop ledger (not rendered as selectable, not recoverable/promotable). The cross-run dedup union = **all roster names for the request, every status**. `recordSurfaced` never downgrades `excluded`/`saved`/`coi_dropped` → `active` (curation and hard-drop ledgers win) and enforces a per-request row cap (oldest `active`/`saved` evicted; never `excluded` or `coi_dropped`).
+**Status semantics:** `active` = surfaced list row (selectable unless the candidate blob itself carries a read-only gate such as `hasInstitutionCOI`) · `excluded` = staff set-aside (collapsed recoverable section) · `saved` = graduated to the Dataverse pool (not rendered on Find, kept for dedup) · `coi_dropped` = discovery-time institution-COI hard-drop ledger (not rendered as selectable, not recoverable/promotable). The cross-run search-exclusion union = **all roster names for the request, every status**; that name union may intentionally suppress a later same-name result, but it never merges two candidates surfaced in the same run or authorizes a row mutation. `recordSurfaced` never downgrades `excluded`/`saved`/`coi_dropped` → `active` for the same candidate key (curation and hard-drop ledgers win) and enforces a per-request row cap (oldest `active`/`saved` evicted; never `excluded` or `coi_dropped`).
 
 **Provenance semantics:** `candidate.provenance` is the durable render DTO for origin/grounding (`kind`, ordered `sources[]`, `seedRole`, `groundingWorkIds[]`). `source_kind` is a queryable copy of `provenance.kind`, not a Claude-vs-database flag. During the migration window, candidate JSON also keeps legacy `source`, `sources`, and `isClaudeSuggestion` fields for downstream compatibility.
 
@@ -39,7 +40,7 @@ Indexes: `uq_reviewer_find_roster_req_name` UNIQUE `(request_id, normalized_name
 
 ## Write paths
 
-- `lib/services/reviewer-roster-store.js` only: `recordSurfaced` (bulk upsert `active`, never-downgrade guard, row cap), `recordCoiDropped` (bulk upsert `coi_dropped`, compact hard-drop ledger, never overwrites active/excluded/saved rows), `setExcluded` (upsert → `excluded`), `promote` (`excluded`→`active`), `confirmIdentity` (active-row-only authenticated staff confirmation), `markSaved` (active/saved → `saved`).
+- `lib/services/reviewer-roster-store.js` only: `recordSurfaced` (candidate-keyed bulk upsert `active`, never-downgrade guard, row cap), `recordCoiDropped` (candidate-keyed bulk upsert `coi_dropped`, compact hard-drop ledger, never overwrites active/excluded/saved rows), `setExcluded` (candidate-keyed upsert → `excluded`), `promote` (exact candidate key, `excluded`→`active`), `confirmIdentity` (exact candidate key, active-row-only authenticated staff confirmation), `markSaved` (exact candidate keys, active/saved → `saved`).
 - `pages/api/workbench/reviewer-roster.js` (POST/PATCH), driven by `ReviewerSearchSection` actions (record-on-results, Exclude, Promote, authenticated identity confirmation, save-graduation after `save-candidates`, applicant-promotion graduation after `promote-applicant-reviewer`).
 - `pages/api/workbench/enrich-recommended.js` records applicant-suggested enrichment output directly via `recordSurfaced(requestId, prunedCandidates)` as `status='active'`, stamped with `candidate.enrichedProposalKey`.
 - `pages/api/reviewer-finder/discover.js` records institution-COI candidates hard-dropped by Track A verified discovery and referred-seed discovery as `status='coi_dropped'`. `lib/services/discovery-service.js` returns Track B institution-COI hard drops to the route for the same request-scoped write. Phase-C flag-not-drop candidates flow through the existing `recordSurfaced` active-row path instead.
@@ -56,4 +57,5 @@ No Dataverse equivalent — operational/ephemeral by design. Crossing points: a 
 - Staff confirmation authority is not the client boolean. `save-candidates` must retrieve the opaque confirmation id under the same request and match the canonical name/email/website/affiliation; missing, mismatched, cross-request, or failed reads stop before writes.
 - Automated `confirmed` / `probable` fields are deny-only without a valid signed receipt. The receipt uses existing `NEXTAUTH_SECRET`, is request- and identity-bundle-bound, and expires after 14 days.
 - Applicant-suggested restore is keyed on `candidate.enrichedProposalKey`, not the proposal Blob URL. `load-proposal` uses `addRandomSuffix:true`, so `blobUrl` changes across reloads and is not a stable cache key.
+- Migration 025 backfills pre-existing rows with their stored `candidate.candidateKey` when present, otherwise an opaque `legacy-row:<id>` key, and writes that key into the candidate JSON so subsequent client actions remain exact.
 - `coi_dropped` is observability-only. Do not expose it as a recover/promote UI bucket without a separate policy decision; Contract 5 still hard-drops current-institution COI by default and save still fail-closes. The only visible discovery exception is the Phase-C contradicted low-trust flag, which remains read-only and unsaveable.

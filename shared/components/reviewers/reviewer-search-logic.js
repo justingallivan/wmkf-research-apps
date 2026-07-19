@@ -12,6 +12,10 @@ import { buildReviewerProvenance, PROVENANCE_KINDS, provenanceGroupOf, provenanc
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import { parseReferredSeeds as _parseReferredSeeds } from '../../../lib/utils/reviewer-referral-seeds';
 import { reviewerSaveKey } from '../../../lib/utils/reviewer-save-key';
+import {
+  reviewerCandidateKey as _reviewerCandidateKey,
+  withReviewerCandidateKey as _withReviewerCandidateKey,
+} from '../../../lib/utils/reviewer-candidate-key';
 import { emailConfidence } from '../../../lib/utils/reviewer-invite';
 
 /**
@@ -47,20 +51,38 @@ export function candidateWasSaved(candidate, savedKeys = [], savedNames = []) {
 }
 
 /**
- * Project the invitation service's authoritative source/identity classifier
+ * Stable correlation key for one surfaced candidate row.
+ *
+ * This is deliberately not a name-only identity claim. Prefer durable person
+ * anchors when discovery has them; otherwise use reviewerSaveKey's composite
+ * name/email/ORCID/affiliation fingerprint. The key is stamped before
+ * enrichment and then preserved, so a promoted current affiliation or newly
+ * found email cannot change selection state or attach another same-name
+ * candidate's enrichment.
+ */
+export const reviewerCandidateKey = _reviewerCandidateKey;
+export const withReviewerCandidateKey = _withReviewerCandidateKey;
+
+/**
+ * Project the invitation service's authoritative address-source classifier
  * onto a Find-tab candidate. "missing" is UI-only: the send path still
  * re-derives high/low from the persisted person row immediately before send.
  *
  * @param {object} candidate
- * @returns {{ level: 'high'|'low'|'missing', reason: string }}
+ * @returns {{ level: 'high'|'low'|'missing', action: 'ready'|'quick_check'|'research_only'|'missing', reason: string }}
  */
 export function getCandidateEmailReadiness(candidate) {
   const enrichment = candidate?.contactEnrichment || {};
   const email = candidate?.email || enrichment.email || null;
   if (!email) {
-    return { level: 'missing', reason: 'No email address found during contact enrichment' };
+    return {
+      level: 'missing',
+      action: 'missing',
+      reason: 'No email address found during contact enrichment',
+    };
   }
   const confidence = emailConfidence({
+    email,
     emailSource: candidate?.emailSource || enrichment.emailSource || null,
     identityStatus: candidate?.identityStatus
       || enrichment.identityStatus
@@ -76,14 +98,40 @@ export function getCandidateEmailReadiness(candidate) {
 export function mergeEnrichment(candidates, enrichmentResults) {
   if (!Array.isArray(candidates)) return [];
   if (!Array.isArray(enrichmentResults) || enrichmentResults.length === 0) return candidates;
+  const byKey = new Map();
+  const candidateNameCounts = new Map();
+  const resultNameCounts = new Map();
   const byName = new Map();
-  for (const r of enrichmentResults) {
-    if (r && r.name && r.contactEnrichment) byName.set(r.name, r);
+  for (const candidate of candidates) {
+    const name = String(candidate?.name || '');
+    candidateNameCounts.set(name, (candidateNameCounts.get(name) || 0) + 1);
   }
-  return candidates.map((c) => {
-    const enriched = byName.get(c.name);
-    if (!enriched) return c;
+  for (const r of enrichmentResults) {
+    const key = reviewerCandidateKey(r);
+    if (key && r?.contactEnrichment) byKey.set(key, r);
+    const name = String(r?.name || '');
+    if (name && r?.contactEnrichment) {
+      resultNameCounts.set(name, (resultNameCounts.get(name) || 0) + 1);
+      byName.set(name, r);
+    }
+  }
+  return candidates.map((candidate, index) => {
+    const c = withReviewerCandidateKey(candidate);
+    const uniqueNameMatch = candidateNameCounts.get(c.name) === 1
+      && resultNameCounts.get(c.name) === 1
+      ? byName.get(c.name)
+      : null;
+    const enriched = byKey.get(c.candidateKey)
+      // Legacy callers sometimes return only name + contactEnrichment. A name
+      // join is safe only when that name is unique on BOTH sides.
+      || uniqueNameMatch
+      // enrichCandidates preserves strict input order. This fallback supports
+      // legacy callers that have not stamped candidateKey yet, but only when
+      // the response is a complete 1:1 list.
+      || (enrichmentResults.length === candidates.length ? enrichmentResults[index] : null);
+    if (!enriched) return candidate;
     const e = enriched.contactEnrichment;
+    if (!e) return c;
     const contactEnrichment = {
       ...e,
       website: ContactParser.sanitizeWebsiteForCandidate(e.website, c.name) || null,
@@ -282,6 +330,34 @@ export function pruneContactLeads(leads) {
     .filter((l) => l.value);
 }
 
+export function pruneEmailEvidence(evidence) {
+  if (!evidence || typeof evidence !== 'object') return null;
+  const publications = Array.isArray(evidence.publications)
+    ? evidence.publications.slice(0, 5).map((publication) => ({
+        pmid: publication?.pmid ? String(publication.pmid).slice(0, 32) : null,
+        pmcid: publication?.pmcid ? String(publication.pmcid).slice(0, 32) : null,
+        doi: publication?.doi ? String(publication.doi).slice(0, 160) : null,
+        title: publication?.title ? String(publication.title).slice(0, 500) : null,
+        year: Number.isFinite(publication?.year) ? publication.year : null,
+        url: publication?.url ? String(publication.url).slice(0, 500) : null,
+        providers: Array.isArray(publication?.providers)
+          ? publication.providers.slice(0, 3).map(String)
+          : [],
+      }))
+    : [];
+  return {
+    sourceKind: evidence.sourceKind ? String(evidence.sourceKind).slice(0, 80) : null,
+    sourceUrl: evidence.sourceUrl ? String(evidence.sourceUrl).slice(0, 500) : null,
+    action: evidence.action ? String(evidence.action).slice(0, 40) : null,
+    ownership: evidence.ownership ? String(evidence.ownership).slice(0, 80) : null,
+    affiliationMatched: evidence.affiliationMatched === true,
+    publicationCount: Number.isFinite(evidence.publicationCount) ? evidence.publicationCount : publications.length,
+    providers: Array.isArray(evidence.providers) ? evidence.providers.slice(0, 3).map(String) : [],
+    publications,
+    deliverabilityChecked: evidence.deliverabilityChecked === true,
+  };
+}
+
 /**
  * Prune an enriched candidate down to the fields `CandidateCard` actually
  * renders, for durable storage in `reviewer_find_roster` (S224). Keeps the card
@@ -329,6 +405,9 @@ export function pruneCandidateForRoster(c) {
       email: e.email || null,
       emailSource: e.emailSource || null,
       emailYear: e.emailYear || null,
+      emailAction: e.emailAction || null,
+      emailActionReason: e.emailActionReason || null,
+      emailEvidence: pruneEmailEvidence(e.emailEvidence),
       contactStatus: e.contactStatus || null,
       contactStatusReason: e.contactStatusReason || null,
       verifiedInstitutionDomain: e.verifiedInstitutionDomain || null,
@@ -414,6 +493,8 @@ export function pruneCandidateForRoster(c) {
     email: c.email || e.email || null,
     emailSource: e.emailSource || null,
     emailYear: e.emailYear || null,
+    emailAction: e.emailAction || null,
+    emailActionReason: e.emailActionReason || null,
     // Defensive: re-guard the persisted website so a document-file URL can't ride
     // through the prune (mirrors mergeEnrichment; sanitized at ingestion too).
     website: ContactParser.sanitizeWebsiteForCandidate(c.website || e.website, c.name) || null,
@@ -434,6 +515,7 @@ export function pruneCandidateForRoster(c) {
       && c.automatedIdentityAttestation.length <= 4096
       ? c.automatedIdentityAttestation
       : null,
+    candidateKey: reviewerCandidateKey(c),
     // UI convenience only. Save-candidates derives authority by looking up the
     // opaque confirmation id in the request-scoped server roster.
     pdIdentityConfirmed: c.pdIdentityConfirmed === true,

@@ -39,7 +39,8 @@ function loadEnvLocal() {
 loadEnvLocal();
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const MAILTO = process.env.OPENALEX_POLITE_MAILTO || 'justingallivan@me.com';
+const MAILTO = process.env.OPENALEX_POLITE_MAILTO || '';
+const OPENALEX_API_KEY = process.env.OPENALEX_API_KEY || '';
 const OA = 'https://api.openalex.org';
 const FV = '@OData.Community.Display.V1.FormattedValue';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -66,7 +67,12 @@ if (args.help || !args.request) {
 
 async function jget(url) {
   try {
-    const r = await fetch(url, { headers: { 'User-Agent': `wmkf-probe (mailto:${MAILTO})` } });
+    const requestUrl = new URL(url);
+    if (requestUrl.hostname === 'api.openalex.org' && OPENALEX_API_KEY) {
+      requestUrl.searchParams.set('api_key', OPENALEX_API_KEY);
+    }
+    const userAgent = MAILTO ? `wmkf-probe (mailto:${MAILTO})` : 'wmkf-probe';
+    const r = await fetch(requestUrl, { headers: { 'User-Agent': userAgent } });
     if (!r.ok) return { __err: r.status };
     return await r.json();
   } catch (e) { return { __err: e.message }; }

@@ -161,18 +161,24 @@ export default async function handler(req, res) {
     const haveCoiInstitutions = Array.isArray(coiInstitutions) ? coiInstitutions.length : !!coiInstitutions;
     if (haveCoiInstitutions && Array.isArray(results?.enriched)) {
       const origList = Array.isArray(candidates) ? candidates : [];
-      results.enriched.forEach((r, idx) => {
-        if (!r || !r.contactEnrichment) return;
+      const coiInputs = results.enriched.map((r, idx) => {
+        if (!r || !r.contactEnrichment) return r || {};
         // enrichCandidates preserves input order, so index is the reliable mapping
         // — matching by name alone cross-wires duplicate names. Fall back to name
         // only if the order ever drifts. (Codex P3.)
         let orig = origList[idx];
         if (!orig || orig.name !== r.name) orig = origList.find((c) => c.name === r.name) || {};
         const effectiveAffiliation = r.contactEnrichment.affiliation || orig.affiliation || null;
-        const [evaluated] = DeduplicationService.markInstitutionCOI(
-          [{ affiliation: effectiveAffiliation }],
-          coiInstitutions
-        );
+        return { affiliation: effectiveAffiliation };
+      });
+      const evaluatedRows = await DeduplicationService.markInstitutionCOIResolved(
+        coiInputs,
+        coiInstitutions,
+        { signal: deadlineController.signal },
+      );
+      results.enriched.forEach((r, idx) => {
+        if (!r || !r.contactEnrichment) return;
+        const evaluated = evaluatedRows[idx] || {};
         r.contactEnrichment.coiRecomputed = true;
         r.contactEnrichment.hasInstitutionCOI = evaluated.hasInstitutionCOI;
         r.contactEnrichment.institutionCOIDetails = evaluated.institutionCOIDetails;

@@ -24,7 +24,7 @@ Complete pipeline for finding and contacting expert reviewers:
 
 1. **Claude Analysis** - Extract proposal metadata (title, abstract, PI, institution) and suggest reviewers
 2. **Database Verification (Track A)** - Claude's suggested names are verified/grounded against PubMed / OpenAlex / ORCID. _The Track-B lane that **discovered NEW candidates** from PubMed/ArXiv/BioRxiv/ChemRxiv searches is **ARCHIVED OFF** (S248, `DiscoveryService.TRACK_B_ENABLED=false`; dormant code) — see `docs/REVIEWER_FINDER_D26_PIPELINE_FLOWCHART.md` + agent-wiki reviewer-origination._
-3. **Contact Enrichment** - 5-tier system to find email addresses and faculty pages
+3. **Contact Enrichment** - Tiered lookup for email addresses and faculty pages, including identity-anchored NCBI PubMed + Europe PMC publication evidence before paid web search
 4. **Email Generation** - Create .eml invitation files with optional AI personalization
 
 ## Key Features

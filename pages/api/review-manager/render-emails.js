@@ -78,7 +78,7 @@ export default async function handler(req, res) {
 
   return withDalContext('review-manager-render', async () => {
     try {
-      const result = await renderEmails({ suggestionIds, template, settings, actingUserSystemId });
+      const result = await renderEmails({ suggestionIds, template, settings, templateType, actingUserSystemId });
       return res.status(200).json(result);
     } catch (error) {
       if (error instanceof ServiceHttpError) {

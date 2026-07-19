@@ -249,8 +249,9 @@ is already on the object).
   non-matching local part can genuinely be a colleague/admin at the same
   institution — the domain proves the institution, not the person. This is exactly
   what the one-click confirm lane is for. (Contrast `_selectGroundedEmail`, which
-  earns full `institution_page` trust only with page-level name adjacency or
-  owner-slug proof, `:988–1024` — that stronger evidence standard is untouched.)
+  earns full `institution_page` trust only with preceding-name adjacency,
+  personal-URL owner proof, or the narrow page-identity + exact bare-surname
+  mailbox route — that stronger evidence standard is untouched.)
 - A name-mismatch reject whose domain matches NOTHING stays a rejected lead
   (unchanged): with no grounding at all, the current posture is right.
 
@@ -271,8 +272,9 @@ rubber-stamp into an actual per-person adjudication.
 (`:1068–1069`, `:1081`) for the §3.1 **anchored set only** — never the plausible
 set. Rationale (Codex R1 blocker 2): a page email earns unconditional HIGH trust
 (`institution_page`, `reviewer-invite.js:82`), and `_selectGroundedEmail`'s
-grounding is name-adjacency/owner-slug (`:988–1024`) — namesakes share names by
-definition, so page grounding cannot discriminate the namesake failure mode; only
+grounding is directional name-adjacency, personal-URL ownership, or the narrow
+page-identity + exact-surname mailbox route — namesakes share names by definition,
+so page grounding cannot discriminate the namesake failure mode; only
 the *domain's* identity anchoring can. Each anchored domain enters the unchanged
 `safeFetchInstitutionPage` SSRF mechanism (HTTPS-only, exact-or-subdomain host,
 private-IP block, IP-pinning dispatcher) exactly as the single domain does today.

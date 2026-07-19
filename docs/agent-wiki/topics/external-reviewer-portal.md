@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-04
+last_verified: 2026-07-18
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -72,8 +72,9 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
 - Review materials and uploaded files route through SharePoint buckets
   (`lib/utils/sharepoint-buckets.js`); confirm the bucket model in
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` before changing file paths.
-- Invite-confidence gating (LOW-confidence recipients require per-recipient
-  acknowledgement) is enforced in `send-emails.js` via `lib/utils/reviewer-invite.js` —
+- Invitation address gating is enforced in `send-emails.js` via
+  `lib/utils/reviewer-invite.js`: quick-check recipients require per-recipient
+  acknowledgement, while research-only addresses are never invitation-sendable —
   see the [Reviewer Identity](reviewer-identity.md) page for the full gate semantics.
 
 ## Operating Notes

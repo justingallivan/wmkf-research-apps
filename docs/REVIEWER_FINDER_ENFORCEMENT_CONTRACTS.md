@@ -103,34 +103,32 @@ invariant (Codex HIGH, S235).
 
 ---
 
-## 3. Slice-G invite-confidence recipient allowlist `[VERIFIED 2026-06-13]`
+## 3. Invitation address-action gate `[VERIFIED 2026-07-18]`
 
-**Contract.** On a first-contact **invitation**, `send-emails.js` independently computes
-`emailConfidence(person)` per recipient and REFUSES a LOW-confidence recipient UNLESS that
-recipient's `suggestionId` is in the request's `confirmedLowConfidenceIds` allowlist. The
-acknowledgement is **recipient-specific, not a batch boolean** — a row that became LOW after
-preview cannot ride on another row's confirmation.
+**Contract.** On a first-contact **invitation**, the server independently computes
+`emailConfidence(person)` and applies one of four actions. A client-provided confidence label
+never authorizes a send.
 
-- **HIGH** = email source `orcid`/`pubmed`/`institution_page`, or `serp_search`/`claude_search`
-  on a `confirmed`/`probable` identity.
-- **LOW** = `manual`, `affiliation`, `search_contested` (a search email the domain guard
-  contested — S321 gating redesign), unknown/null source, or a search email on an unconfirmed
-  identity. `search_contested` stays LOW even on a `confirmed` identity.
+- **Ready** = `orcid`, `institution_page`, or `scholarly_multi` (the same address on at least
+  two distinct recent, identity-matched scholarly works). Sends without an extra address check.
+- **Quick check** = `scholarly_single`, legacy `pubmed`, `manual`, `affiliation`, or unknown/null
+  source. The recipient's `suggestionId` must be in `confirmedLowConfidenceIds`; the
+  acknowledgement is recipient-specific, not a batch boolean.
+- **Research only** = `serp_search`, `claude_search`, or `search_contested`. The server always
+  skips the invitation with `email_research_only`; a checkbox or forged allowlist entry cannot
+  override it.
+- **Missing** = no address. There is nothing to send.
 - **Scope.** Gated to `templateType==='invitation'` only. Post-acceptance materials / followup /
-  thankyou are NOT gated.
+  thankyou are NOT re-gated.
 
-**Enforcement points.** `lib/utils/reviewer-invite.js:70-88` (`emailConfidence`) ·
-`pages/api/review-manager/send-emails.js:120-124` (allowlist captured as a Set) ·
-`send-emails.js:292-294` (per-recipient check, skip reason `email_unconfirmed`). `render-emails.js`
-stamps `emailConfidence` per draft (the modal DTO is too thin to compute it); `InviteEmailModal`
-requires a **per-recipient checkbox** for each LOW address (name + address + reason; send button
-disabled until every one is ticked, and only the ticked suggestionIds are sent as
-`confirmedLowConfidenceIds` — S321, replacing the earlier one-click batch confirm), plus a batch
-irreversible-send `window.confirm`. Manual email edits (`my-candidates.js`) stamp
-`emailSource='manual'` so staff-typed addresses read LOW. The researcher adapter treats `manual`
-AND `search_contested` as authoritative overwrites of `wmkf_emailsource` (fill-only for other
-sources) so a downgraded address can never read HIGH off a stale source
-(`lib/dataverse/adapters/researcher.js:151-156`).
+**Enforcement points.** `lib/utils/reviewer-invite.js` (`emailConfidence`) ·
+`lib/services/review-manager/render-emails-service.js` (server-computed action in preview;
+research-only rows are skipped) · `lib/services/review-manager/send-emails-service.js`
+(fresh server recomputation; hard research-only skip and recipient-specific quick-check
+allowlist) · `shared/components/reviewers/InviteEmailModal.js` (checkboxes for quick-check rows
+only). Manual email edits stamp `emailSource='manual'`. The researcher adapter treats `manual`
+and `search_contested` as authoritative source overwrites so stale provenance cannot make an
+address look more trusted than it is.
 
 **Why.** The API is the enforced boundary — the modal acknowledgement alone is not trusted.
 
@@ -259,22 +257,23 @@ page-grounded email via `safeFetchInstitutionPage` (`lib/utils/safe-fetch.js`) w
 mechanism Codex required: HTTPS-only, host = exact-or-subdomain of `verifiedInstitutionDomain` ONLY,
 DNS private/reserved-IP block incl. IPv6, **undici IP-pinning dispatcher** (closes the DNS-rebind
 TOCTOU), per-hop redirect re-validation, content-type + 512 KB + timeout caps. The email is stamped
-`emailSource='institution_page'` ONLY when page-grounded (candidate-associated, unique, forename-gated;
-`_selectGroundedEmail`) — `institution_page` is HIGH-trust per Contract 3. Rationale + full design:
+`emailSource='institution_page'` ONLY when page-grounded (unique candidate association via
+preceding-name adjacency, personal-URL owner proof, or page identity plus an exact bare-surname
+mailbox; `_selectGroundedEmail`) — `institution_page` is HIGH-trust per Contract 3. Rationale + full design:
 `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md` (supersedes `REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md` §D).
 Do NOT enable without that mechanism intact; multi-domain institutions (e.g. Kansas State `ksu.edu` vs
 OpenAlex `k-state.edu`) are an intentional v1 gap (the fetch is refused, not relaxed).
 
-**Related verified-domain guard (S321 gating redesign — contests, no longer drops).**
+**Related verified-domain guard (S321 contests; 2026-07-18 policy makes contests research-only).**
 `_validateEmailAgainstVerifiedDomain` (`contact-enrichment-service.js:419`) now validates against
 **two domain sets** built in `_finalize` by `_buildInstitutionDomainEvidence` (`:255`):
 *anchored* (identity-proven, ID-resolved: `verifiedInstitutionDomain` + ORCID
 disambiguated-organization RORs → `OpenAlexService.getInstitution`, only on a confirmed/probable
 identity) and *plausible* (anchored + name-resolved via `OpenAlexService.searchInstitutions`,
 lane-routing only). An anchored match confirms persistence; a SEARCH-sourced contradiction is
-re-stamped `emailSource='search_contested'` (`_markEmailContested`, `:303`) — kept, persisted,
-LOW at send per Contract 3, staff-confirmed per recipient — instead of nulled into a rejected
-lead. A `name_mismatch`-rejected email whose domain is plausible is likewise promoted to
+re-stamped `emailSource='search_contested'` (`_markEmailContested`, `:303`) — kept as a visible
+research lead but never invitation-sendable per Contract 3 — instead of nulled into a rejected
+lead. A `name_mismatch`-rejected email whose domain is plausible is likewise retained as
 contested in `_finalize` (`_readjudicateNameMismatchRejectedEmail`, `:312`).
 ORCID/PubMed/affiliation emails still outrank the heuristic. The opt-in fetch tier above is
 SSRF-bound to the **anchored** set only (fallback: the single `verifiedInstitutionDomain` when

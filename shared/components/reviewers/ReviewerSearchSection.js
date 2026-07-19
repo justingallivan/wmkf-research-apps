@@ -55,6 +55,8 @@ import {
   normalizeReviewerName,
   pruneCandidateForRoster,
   dedupeByNamePreferReferred,
+  reviewerCandidateKey,
+  withReviewerCandidateKey,
 } from './reviewer-search-logic';
 import { rankByRelevance } from '../../../lib/utils/relevance-score';
 import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../lib/utils/scholar-url';
@@ -99,14 +101,14 @@ function Pill({ children, tone = 'gray' }) {
   return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tones[tone] || tones.gray}`}>{children}</span>;
 }
 
-// Stable id for a candidate across roster splices + selection (S224): the
-// normalized name — same key the dedup/exclude use, so selection survives a
-// list reorder/splice (the old flat-index selection would corrupt).
+// Stable per-row id across roster splices + selection. Identity anchors win;
+// the fallback includes affiliation, so two different people with the same
+// normalized name cannot share selection or enrichment state.
 function candKey(c) {
-  return normalizeReviewerName(c && c.name);
+  return reviewerCandidateKey(c);
 }
 
-// Dedupe a candidate list by normalized name; first occurrence wins (so a
+// Dedupe a candidate list by candidate identity/correlation key; first occurrence wins (so a
 // freshly-enriched run candidate beats its pruned roster copy). On a collision it
 // grafts referral provenance onto the survivor (S320) so a seeded Externally-Referred
 // reviewer that discovery also finds never loses its badge/referrer to relevance order.
@@ -197,6 +199,16 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const email = c.email || enr.email || null;
   const emailSource = c.emailSource || enr.emailSource || null;
   const emailReadiness = getCandidateEmailReadiness(c);
+  const emailAction = email
+    ? (enr.emailAction || c.emailAction || emailReadiness.action)
+    : 'missing';
+  const emailActionReason = email
+    ? (enr.emailActionReason || c.emailActionReason || emailReadiness.reason)
+    : emailReadiness.reason;
+  const emailEvidence = enr.emailEvidence || null;
+  const evidencePublications = Array.isArray(emailEvidence?.publications)
+    ? emailEvidence.publications.filter((publication) => publication?.url).slice(0, 3)
+    : [];
   const website = c.website || enr.website || null;
   const orcidUrl = c.orcidUrl || enr.orcidUrl || null;
   const scholarUrl = c.googleScholarUrl || enr.googleScholarUrl || buildScholarSearchUrl(c.name, c.affiliation);
@@ -342,30 +354,61 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
           {!identityUnverified && (
             <div className="mt-2 flex items-center flex-wrap gap-2 text-xs">
               {email && (
-                <a
-                  href={`mailto:${email}`}
-                  className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
-                  title={`Email (from ${emailSource || 'unknown source'}${enr.emailYear ? `, ${enr.emailYear}` : ''})`}
-                >
-                  📧 {email}
-                </a>
+                <>
+                  <a
+                    href={`mailto:${email}`}
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
+                    title={`Email (from ${emailSource || 'unknown source'}${enr.emailYear ? `, ${enr.emailYear}` : ''})`}
+                  >
+                    📧 {email}
+                  </a>
+                  {emailEvidence?.publicationCount > 0 && (
+                    <span className="text-gray-600">
+                      Evidence: {emailEvidence.publicationCount} recent {emailEvidence.publicationCount === 1 ? 'work' : 'works'}
+                      {evidencePublications.length > 0 && (
+                        <>
+                          {' ('}
+                          {evidencePublications.map((publication, index) => (
+                            <span key={publication.url}>
+                              {index > 0 ? ', ' : ''}
+                              <a
+                                href={publication.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-700 hover:underline"
+                                title={publication.title || 'Publication evidence'}
+                              >
+                                {publication.year || index + 1}
+                              </a>
+                            </span>
+                          ))}
+                          {')'}
+                        </>
+                      )}
+                    </span>
+                  )}
+                </>
               )}
               <span
                 className={`inline-flex items-center gap-1 px-2 py-1 rounded border ${
-                  emailReadiness.level === 'high'
+                  emailAction === 'ready'
                     ? 'bg-green-50 text-green-800 border-green-200'
-                    : emailReadiness.level === 'low'
-                      ? 'bg-amber-50 text-amber-800 border-amber-200'
-                      : 'bg-gray-50 text-gray-600 border-gray-200'
+                    : emailAction === 'research_only'
+                      ? 'bg-red-50 text-red-800 border-red-200'
+                      : emailAction === 'quick_check'
+                        ? 'bg-amber-50 text-amber-800 border-amber-200'
+                        : 'bg-gray-50 text-gray-600 border-gray-200'
                 }`}
-                title={emailReadiness.level === 'missing'
-                  ? emailReadiness.reason
-                  : `${emailReadiness.reason}. Confidence reflects address provenance and identity match, not deliverability.`}
+                title={emailAction === 'missing'
+                  ? emailActionReason
+                  : `${emailActionReason}. Confidence reflects address provenance and identity-grounded evidence, not deliverability.`}
               >
-                {emailReadiness.level === 'high'
+                {emailAction === 'ready'
                   ? '✓ High-confidence email'
-                  : emailReadiness.level === 'low'
-                    ? '⚠ Email needs confirmation'
+                  : emailAction === 'research_only'
+                    ? '⚠ Research only'
+                    : emailAction === 'quick_check'
+                      ? '⚠ Email needs confirmation'
                     : 'Email not found'}
               </span>
               {website && (
@@ -416,7 +459,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             )}
             {/* Manual contact edit (manage-only): correct a wrong email/website
                 (or affiliation/h-index) by hand. A typed email is stamped manual
-                → low-confidence at invite (confirm-before-send). */}
+                → quick check at invite (per-recipient acknowledgement). */}
             {!readOnly && canManage && onEdit && !identityUnverified && (
               <button
                 type="button"
@@ -504,9 +547,9 @@ export default function ReviewerSearchSection({
   const [candidates, setCandidates] = useState([]);
   const [unverified, setUnverified] = useState([]); // Claude suggestions the searched databases couldn't verify (read-only)
   const [analysis, setAnalysis] = useState(null);
-  // `selected` is keyed by normalizeReviewerName(name) — a STABLE id — not by
-  // flat array index (S224): the durable roster + exclude/promote splice the
-  // candidate list, which would corrupt an index-keyed Set.
+  // `selected` is keyed by the stable per-candidate correlation key, not by a
+  // normalized name or flat array index. Same-name people must remain separate
+  // through enrichment, durable roster actions, and partial-save handling.
   const [selected, setSelected] = useState(() => new Set());
   // Durable per-request roster (reviewer_find_roster via /api/workbench/reviewer-roster):
   // active candidates (selectable, persist across reload), the collapsed Excluded
@@ -716,16 +759,17 @@ export default function ReviewerSearchSection({
       //    email + bibliometrics + ORCID/Scholar show on the cards BEFORE the user
       //    selects. Best-effort: a failure leaves un-enriched cards + a note and
       //    still reaches results — it must never fail the search (Finding 10).
-      let enriched = kept;
+      const keyedKept = kept.map(withReviewerCandidateKey);
+      let enriched = keyedKept;
       let enrichFailed = false;
-      if (kept.length > 0) {
+      if (keyedKept.length > 0) {
         try {
-          pushProgress(`Finding contact info & citation metrics for ${kept.length} reviewer(s)…`);
+          pushProgress(`Finding contact info & citation metrics for ${keyedKept.length} reviewer(s)…`);
           const eRes = await fetch('/api/reviewer-finder/enrich-contacts', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              candidates: kept,
+              candidates: keyedKept,
               options: { usePubmed: true, useOrcid: true, useSerpSearch: true, useClaudeSearch: true },
               // Lets the route re-evaluate institution COI on the post-enrichment
               // affiliation so the badge stays accurate after a current-affiliation
@@ -948,7 +992,7 @@ export default function ReviewerSearchSection({
       const res = await fetch('/api/workbench/reviewer-roster', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, action: 'promote', name: cand.name }),
+        body: JSON.stringify({ requestId, action: 'promote', candidateKey: key }),
       });
       if (!res.ok) throw new Error('promote failed');
     } catch {
@@ -962,7 +1006,7 @@ export default function ReviewerSearchSection({
   // isn't a saved Dataverse record yet). Used by the lead "Use this email"
   // promotion (Slice 4) AND the on-card Edit-contact modal. For email/website it
   // stamps `manual` provenance (so emailConfidence → low → the invite flow requires
-  // explicit confirm-before-send) and clears the contact-layer abstain that
+  // explicit quick-check acknowledgement) and clears the contact-layer abstain that
   // withheld a value (e.g. verified_domain_contradiction) so save can persist it.
   // NEVER touches name (the find-card key) or any identity field. Auto-selects so
   // the edit is included on save.
@@ -1136,7 +1180,7 @@ export default function ReviewerSearchSection({
       }
 
       let promoted = 0;
-      const promotedNames = [];
+      const promotedCandidates = [];
       const contactConflicts = [];
       if (applicantChosen.length > 0) {
         if (isCurrent()) pushProgress(`Promoting ${applicantChosen.length} applicant-referred reviewer(s)…`);
@@ -1174,7 +1218,7 @@ export default function ReviewerSearchSection({
         for (const result of results) {
           if (result.ok) {
             promoted += 1;
-            promotedNames.push(result.candidate.name);
+            promotedCandidates.push(result.candidate);
             if (result.contactError) contactConflicts.push(result.candidate.name || 'a reviewer');
           } else {
             failures.push({ name: result.candidate.name || 'Applicant-referred reviewer', error: result.error });
@@ -1209,6 +1253,7 @@ export default function ReviewerSearchSection({
       // active/selectable. Best-effort — a roster failure doesn't fail the save.
       if (savedNames.length > 0 || savedKeys.length > 0) {
         const wasSaved = (candidate) => candidateWasSaved(candidate, savedKeys, savedNames);
+        const savedRosterCandidates = displayCandidates.filter(wasSaved).map(pruneCandidateForRoster);
         if (isCurrent()) {
           setCandidates((prev) => prev.filter((c) => !wasSaved(c)));
           setRosterActive((prev) => prev.filter((c) => !wasSaved(c)));
@@ -1223,13 +1268,13 @@ export default function ReviewerSearchSection({
             await fetch('/api/workbench/reviewer-roster', {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ requestId, action: 'saved', names: savedNames }),
+              body: JSON.stringify({ requestId, action: 'saved', candidates: savedRosterCandidates }),
             });
           } catch { /* best-effort — savedPoolNames dedup covers re-surfacing */ }
         }
       }
-      if (promotedNames.length > 0) {
-        const promotedKeys = new Set(promotedNames.map((n) => normalizeReviewerName(n)));
+      if (promotedCandidates.length > 0) {
+        const promotedKeys = new Set(promotedCandidates.map(candKey));
         if (isCurrent()) {
           setCandidates((prev) => prev.filter((c) => !promotedKeys.has(candKey(c))));
           setRecCandidates((prev) => prev.filter((c) => !promotedKeys.has(candKey(c))));
@@ -1241,7 +1286,11 @@ export default function ReviewerSearchSection({
             await fetch('/api/workbench/reviewer-roster', {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ requestId, action: 'saved', names: promotedNames }),
+              body: JSON.stringify({
+                requestId,
+                action: 'saved',
+                candidates: promotedCandidates.map(pruneCandidateForRoster),
+              }),
             });
           } catch {
             if (isCurrent()) setRosterNote("Couldn't mark promoted applicant-referred reviewers as saved in the Find roster — they may reappear after reload.");
