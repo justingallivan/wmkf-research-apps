@@ -3,7 +3,7 @@ title: Reviewer Identity Shadow Logger — Handoff
 domain: reviewer-identity
 kind: runbook
 status: active
-summary: "Durable Postgres resolver-comparison logger integrated into the Codex W2/W4 branch; migration 026 deliberately not applied."
+summary: "Durable Postgres resolver-comparison logger deployed with migration 026 applied; combined-mode cutover remains disabled."
 canonical: false
 cataloged: 2026-07-19
 owner: product-engineering
@@ -14,15 +14,22 @@ related:
 
 # Reviewer Identity Shadow Logger — Handoff
 
-**Branch:** `claude/reviewer-identity-shadow-logger` (fresh from `origin/main`
-at `7e8a8ced`). Built 2026-07-19 by Claude. Not merged, not deployed, not
-pushed to `main`; migration **not applied** anywhere.
+**Origin:** `claude/reviewer-identity-shadow-logger` (fresh from `origin/main`
+at `7e8a8ced`), built 2026-07-19 by Claude and subsequently integrated and
+hardened on `codex/w2-cutover-w4-evidence`.
 
-**Integration update:** commit `908c6f32` was cherry-picked into
+**Production state `[VERIFIED 2026-07-19]`:** main merge `8e8a0cfa` landed
+the runtime and reporting code on `main`. The canonical migration runner applied
+`026_reviewer_identity_shadow_log.sql` as the only pending migration; the
+tracker row, 12 columns, and four indexes were verified live. The initial row
+count and one-day canonical report were both zero. No environment setting was
+changed, so combined-mode cutover remains disabled.
+
+**Integration history:** commit `908c6f32` was cherry-picked into
 `codex/w2-cutover-w4-evidence` and the runtime seam returned to Codex. Codex
 then made normal inserts awaited (while preserving the non-throwing result
 contract), added resolver-mode attribution, and integrated the explicit
-owner-gated combined path. Migration 026 remains unapplied.
+owner-gated combined path.
 
 ## What was built
 
@@ -52,8 +59,8 @@ Files:
 - `lib/services/maintenance-service.js` + `pages/api/cron/maintenance.js` —
   `cleanupReviewerIdentityShadowLog` (default 90-day retention via Dataverse
   setting `retention:reviewer_identity_shadow_log_days`, plus 200k hard row
-  cap) wired into the daily cron; returns 0 on `42P01` so the unapplied
-  migration produces no daily errors.
+  cap) wired into the daily cron; returns 0 on `42P01` so a newly provisioned
+  environment does not produce daily errors before its migrations run.
 - Tests: `tests/unit/reviewer-identity-shadow-log.test.js` (writer contract,
   redaction whitelist, clamping, breaker, seam integration under storage
   outage) and additions to `tests/unit/reviewer-identity-runtime.test.js`
@@ -97,11 +104,10 @@ shows `resolver_mode` and candidate key, including errors.
 deltas back to candidates without storing raw names or institutions. The key
 is pseudonymous, not anonymous.
 
-## Deliberately not done
+## Remaining production gate
 
-- Migration 026 is **not applied** to any database (`node
-  scripts/apply-migrations.js` when the owner is ready).
 - No environment variables were changed; unknown values still collapse to
   legacy. Code now recognizes explicit `combined`, but no deployed environment
   enables it.
-- No W2 production cutover, migration apply, or production deploy.
+- No W2 production cutover. Gather shadow observations before any separate
+  owner-approved `REVIEWER_IDENTITY_RESOLVER_MODE=combined` change.

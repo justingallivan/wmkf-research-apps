@@ -1,7 +1,10 @@
 # Atlas: `reviewer_identity_shadow_log` (Postgres — observability only)
 
-**Last verified:** 2026-07-19 — created by migration `026_reviewer_identity_shadow_log.sql` on branch `claude/reviewer-identity-shadow-logger`. **Migration NOT applied to the live database** — application is a deliberate later step; until then the table exists nowhere and all writers/cleanup degrade silently (writer drops rows best-effort; cleanup returns 0 on `42P01`).
-**Live row count:** n/a (table not yet created in any environment).
+**Last verified:** 2026-07-19 — production migration
+`026_reviewer_identity_shadow_log.sql` is tracked as applied. Live catalog
+verification found the expected 12 columns and four indexes.
+**Live row count:** 0 immediately after migration; the one-day canonical
+report also returned zero comparisons, errors, and runs.
 
 ## Purpose
 

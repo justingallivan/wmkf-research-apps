@@ -66,9 +66,10 @@ partial-batch tests remain green.
 
 The W2 evaluator has no writes. The shadow arm's decision behavior remains
 non-authoritative, but its default observer now writes data-minimized,
-pseudonymous comparison rows to migration-026 Postgres when that migration is
-applied. The migration is not applied on this branch. Default production
-resolver behavior is unchanged, and raw benchmark output remains gitignored.
+pseudonymous comparison rows to migration-026 Postgres. Production migration
+026 was applied and catalog-verified on 2026-07-19 after main merge `8e8a0cfa`;
+the initial canonical report contained zero rows. Default production resolver
+behavior is unchanged, and raw benchmark output remains gitignored.
 The corrected run changed 11 automatic outcomes. Its only two mandatory review
 cases are the already-labeled unsafe initials-only A. Patel and J. Kim cases;
 seven additional review leads do not alter automatic behavior. The
@@ -89,10 +90,10 @@ from passing as misses.
 
 ## Next product choice
 
-The next product gates are (1) owner-approved application of Postgres migration
-026 if durable comparison history is wanted and (2) owner-approved
-`REVIEWER_IDENTITY_RESOLVER_MODE=combined` cutover after review. Do not apply
-either as part of this build. `shadow` remains available for comparison-only
+The remaining product gate is an owner-approved
+`REVIEWER_IDENTITY_RESOLVER_MODE=combined` cutover after reviewing durable
+shadow observations. Migration 026 is already live; do not couple its applied
+state to a mode change. `shadow` remains available for comparison-only
 observation; `w2`, `cutover`, typos, and unset values fail back to legacy. The
 separate open policy questions are whether to add any umbrella
 organization beyond HHMI/Broad and whether the benchmark should credit a
