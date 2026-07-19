@@ -2,7 +2,16 @@
  * @jest-environment node
  */
 
+jest.mock('../../lib/services/reviewer-identity-shadow-log', () => ({
+  recordShadowComparison: jest.fn(),
+  recordShadowError: jest.fn(),
+}));
+
 const { OpenAlexService } = require('../../lib/services/openalex-service');
+const {
+  recordShadowComparison,
+  recordShadowError,
+} = require('../../lib/services/reviewer-identity-shadow-log');
 const {
   RESOLVER_MODE,
   _internals,
@@ -10,6 +19,8 @@ const {
 
 const {
   configuredResolverMode,
+  evaluateCombinedAgainstLegacy,
+  evaluateExistingResultWithRuntimeSeam,
   evaluateSuggestionsWithRuntimeSeam,
   evaluateWithRuntimeSeam,
   evaluateWorksFirstSuggestion,
@@ -30,6 +41,8 @@ describe('reviewer identity runtime seam', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    recordShadowComparison.mockReset();
+    recordShadowError.mockReset();
   });
 
   test('defaults to legacy and never starts W2', async () => {
@@ -125,6 +138,25 @@ describe('reviewer identity runtime seam', () => {
     }));
   });
 
+  test('default shadow errors retain run, mode, and candidate attribution', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const result = await evaluateWithRuntimeSeam(suggestion, {}, {
+      mode: RESOLVER_MODE.SHADOW,
+      evaluateLegacy: jest.fn(async () => legacyResult),
+      evaluateWorksFirst: jest.fn(async () => {
+        throw new Error('provider unavailable');
+      }),
+    });
+
+    expect(result).toBe(legacyResult);
+    expect(recordShadowError).toHaveBeenCalledWith(expect.objectContaining({
+      runId: expect.any(String),
+      resolverMode: RESOLVER_MODE.SHADOW,
+      candidateKey: expect.stringMatching(/^[a-f0-9]{16}$/),
+      errorCode: 'Error',
+    }));
+  });
+
   test('legacy failure preserves the pre-seam rejection contract', async () => {
     const error = new Error('legacy failed');
     const evaluateWorksFirst = jest.fn();
@@ -167,6 +199,34 @@ describe('reviewer identity runtime seam', () => {
       'A1',
       { signal: expect.any(AbortSignal) },
     );
+  });
+
+  test('shadow links an exact sparse author fragment through matched byline ORCID evidence', async () => {
+    const onShadowComparison = jest.fn();
+    await evaluateWithRuntimeSeam(suggestion, {}, {
+      mode: RESOLVER_MODE.SHADOW,
+      evaluateLegacy: jest.fn(async () => ({
+        status: 'probable',
+        orcid: null,
+        selectedRecord: { openAlexId: 'https://openalex.org/A5121975749' },
+      })),
+      evaluateWorksFirst: jest.fn(async () => ({
+        decision: 'bind',
+        anchor: 'orcid:0000-0002-7356-4814',
+        candidates: [{
+          authorId: 'A5121975749',
+          orcids: ['0000-0002-7356-4814'],
+        }],
+      })),
+      createAnchorsMatch: () => async () => false,
+      onShadowComparison,
+    });
+
+    expect(onShadowComparison).toHaveBeenCalledWith(expect.objectContaining({
+      anchorsAgree: true,
+      combinedDecision: 'bind',
+      combinedReason: 'spine_works_consensus',
+    }));
   });
 
   test('batch seam settles every legacy candidate before any shadow traffic', async () => {
@@ -255,14 +315,215 @@ describe('reviewer identity runtime seam', () => {
     expect(resolverFailure).toBe(legacyResult);
   });
 
-  test('only shadow is opt-in; unset and unknown configuration are legacy', () => {
+  test('batch default observers share one durable run id per batch', async () => {
+    jest.spyOn(console, 'info').mockImplementation(() => {});
+    const candidates = [
+      { ...suggestion, name: 'First Candidate' },
+      { ...suggestion, name: 'Second Candidate' },
+    ];
+    const results = await evaluateSuggestionsWithRuntimeSeam(candidates, {}, {
+      mode: RESOLVER_MODE.SHADOW,
+      evaluateLegacy: jest.fn(async () => legacyResult),
+      evaluateWorksFirst: jest.fn(async () => ({
+        decision: 'bind',
+        anchor: 'orcid:0000-0001-8445-2052',
+      })),
+      createAnchorsMatch: () => async () => true,
+    });
+
+    expect(results).toHaveLength(2);
+    expect(recordShadowComparison).toHaveBeenCalledTimes(2);
+    const [first, second] = recordShadowComparison.mock.calls.map(([entry]) => entry);
+    expect(first.runId).toEqual(expect.any(String));
+    expect(first.runId).toBe(second.runId);
+    expect(first.candidateKey).not.toBe(second.candidateKey);
+  });
+
+  test('a throwing durable logger cannot change the legacy result', async () => {
+    jest.spyOn(console, 'info').mockImplementation(() => {});
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    recordShadowComparison.mockImplementation(() => {
+      throw new Error('durable logger exploded');
+    });
+    const result = await evaluateWithRuntimeSeam(suggestion, {}, {
+      mode: RESOLVER_MODE.SHADOW,
+      evaluateLegacy: jest.fn(async () => legacyResult),
+      evaluateWorksFirst: jest.fn(async () => ({
+        decision: 'bind',
+        anchor: 'orcid:0000-0001-8445-2052',
+      })),
+      createAnchorsMatch: () => async () => true,
+    });
+    expect(result).toBe(legacyResult);
+    expect(recordShadowError).toHaveBeenCalled();
+  });
+
+  test('default observer settles its durable insert before returning', async () => {
+    jest.spyOn(console, 'info').mockImplementation(() => {});
+    let releaseInsert;
+    recordShadowComparison.mockImplementation(() => new Promise((resolve) => {
+      releaseInsert = resolve;
+    }));
+    let settled = false;
+    const pending = evaluateWithRuntimeSeam(suggestion, {}, {
+      mode: RESOLVER_MODE.SHADOW,
+      evaluateLegacy: jest.fn(async () => legacyResult),
+      evaluateWorksFirst: jest.fn(async () => ({
+        decision: 'bind',
+        anchor: 'orcid:0000-0001-8445-2052',
+      })),
+      createAnchorsMatch: () => async () => true,
+    }).then((value) => {
+      settled = true;
+      return value;
+    });
+
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(settled).toBe(false);
+    releaseInsert('inserted');
+    await expect(pending).resolves.toBe(legacyResult);
+  });
+
+  test('combined mode adapts only a W2 rescue and retains legacy on provider failure', async () => {
+    const worksResult = {
+      decision: 'bind',
+      anchor: 'orcid:0000-0003-2195-6258',
+      evidenceBundle: {
+        orcids: ['0000-0003-2195-6258'],
+        anchorDois: ['10.1000/one', '10.1000/two', '10.1000/three'],
+        rors: ['https://ror.org/05a0ya142'],
+        openAlexAuthorIds: ['A100'],
+      },
+      candidates: [{
+        authorId: 'A100',
+        orcids: ['0000-0003-2195-6258'],
+      }],
+    };
+    const rescued = await evaluateCombinedAgainstLegacy(
+      { name: 'Taekjip Ha', suggestedInstitution: 'Johns Hopkins University' },
+      {},
+      { status: 'abstain' },
+      {
+        evaluateWorksFirst: jest.fn(async () => worksResult),
+        createAnchorsMatch: () => async () => false,
+        onShadowComparison: jest.fn(),
+        getAuthorByOrcid: jest.fn(async () => ({
+          openAlexId: 'https://openalex.org/A100',
+          displayName: 'Taekjip Ha',
+          orcid: '0000-0003-2195-6258',
+          lastKnownInstitution: 'Boston Children’s Hospital',
+        })),
+      },
+    );
+    expect(rescued).toMatchObject({
+      status: 'probable',
+      orcid: '0000-0003-2195-6258',
+      selectedRecord: {
+        lastKnownInstitution: 'Boston Children’s Hospital',
+      },
+    });
+
+    const legacy = { status: 'abstain', reason: 'legacy-safe-result' };
+    const failed = await evaluateCombinedAgainstLegacy(suggestion, {}, legacy, {
+      evaluateWorksFirst: jest.fn(async () => {
+        throw new Error('provider unavailable');
+      }),
+      onShadowError: jest.fn(),
+    });
+    expect(failed).toBe(legacy);
+  });
+
+  test('combined mode retains the exact legacy result when profile hydration exceeds its deadline', async () => {
+    const legacy = { status: 'abstain', reason: 'legacy-safe-result' };
+    const onShadowError = jest.fn();
+    const result = await evaluateCombinedAgainstLegacy(
+      { name: 'Taekjip Ha', suggestedInstitution: 'Johns Hopkins University' },
+      {},
+      legacy,
+      {
+        shadowTimeoutMs: 5,
+        evaluateWorksFirst: jest.fn(async () => ({
+          decision: 'bind',
+          anchor: 'orcid:0000-0003-2195-6258',
+          evidenceBundle: {
+            orcids: ['0000-0003-2195-6258'],
+            anchorDois: ['10.1000/one'],
+            rors: [],
+            openAlexAuthorIds: ['A100'],
+          },
+        })),
+        createAnchorsMatch: () => async () => false,
+        onShadowComparison: jest.fn(),
+        onShadowError,
+        getAuthorByOrcid: jest.fn(() => new Promise(() => {})),
+      },
+    );
+
+    expect(result).toBe(legacy);
+    expect(onShadowError).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'reviewer_identity_shadow_timeout',
+    }));
+  });
+
+  test('default combined hydration errors retain candidate attribution', async () => {
+    jest.spyOn(console, 'info').mockImplementation(() => {});
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    recordShadowComparison.mockResolvedValue('inserted');
+    recordShadowError.mockResolvedValue('inserted');
+    const legacy = { status: 'abstain', reason: 'legacy-safe-result' };
+    const result = await evaluateCombinedAgainstLegacy(
+      suggestion,
+      {},
+      legacy,
+      {
+        runId: 'combined-run',
+        shadowTimeoutMs: 5,
+        evaluateWorksFirst: jest.fn(async () => ({
+          decision: 'bind',
+          anchor: 'orcid:0000-0003-2195-6258',
+          evidenceBundle: {
+            orcids: ['0000-0003-2195-6258'],
+            anchorDois: ['10.1000/one'],
+            rors: [],
+            openAlexAuthorIds: ['A100'],
+          },
+        })),
+        createAnchorsMatch: () => async () => false,
+        getAuthorByOrcid: jest.fn(() => new Promise(() => {})),
+      },
+    );
+
+    expect(result).toBe(legacy);
+    expect(recordShadowError).toHaveBeenCalledWith(expect.objectContaining({
+      runId: 'combined-run',
+      resolverMode: RESOLVER_MODE.COMBINED,
+      candidateKey: expect.stringMatching(/^[a-f0-9]{16}$/),
+      errorCode: 'reviewer_identity_shadow_timeout',
+    }));
+  });
+
+  test('existing enrichment decisions are pass-through unless combined is explicit', async () => {
+    const legacy = { status: 'unresolved', identity: { status: 'unresolved' } };
+    const evaluateWorksFirst = jest.fn();
+    await expect(evaluateExistingResultWithRuntimeSeam(
+      suggestion,
+      legacy,
+      {},
+      { mode: RESOLVER_MODE.SHADOW, evaluateWorksFirst },
+    )).resolves.toBe(legacy);
+    expect(evaluateWorksFirst).not.toHaveBeenCalled();
+  });
+
+  test('only explicit supported modes are opt-in; unset and unknown configuration are legacy', () => {
     expect(configuredResolverMode({})).toBe(RESOLVER_MODE.LEGACY);
     expect(configuredResolverMode({ REVIEWER_IDENTITY_RESOLVER_MODE: 'shadow' }))
       .toBe(RESOLVER_MODE.SHADOW);
+    expect(configuredResolverMode({ REVIEWER_IDENTITY_RESOLVER_MODE: 'combined' }))
+      .toBe(RESOLVER_MODE.COMBINED);
     expect(configuredResolverMode({ REVIEWER_IDENTITY_RESOLVER_MODE: 'W2' }))
       .toBe(RESOLVER_MODE.LEGACY);
     expect(normalizeResolverMode(' SHADOW ')).toBe(RESOLVER_MODE.SHADOW);
-    expect(Object.values(RESOLVER_MODE)).toEqual(['legacy', 'shadow']);
+    expect(Object.values(RESOLVER_MODE)).toEqual(['legacy', 'shadow', 'combined']);
   });
 
   test('runtime W2 adapter resolves mapped OpenAlex authorships', async () => {

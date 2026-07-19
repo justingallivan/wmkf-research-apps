@@ -3,7 +3,7 @@ title: Reviewer Identity & Contact — Disambiguation, Affiliation/COI, and Emai
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "W0/W1 and three email improvements are live; W2 has a legacy-default runtime seam, while authoritative cutover and durable identity remain gated."
+summary: "W0/W1 and three email improvements are live; W2 combined mode and W4.1 persistence are built behind the legacy default, with cutover gated."
 canonical: false
 cataloged: 2026-07-19
 owner: product-engineering
@@ -34,9 +34,12 @@ fallback and W3.4 page-first cascade completed evaluation and were not promoted.
 W0's additive institution-identity substrate and W1's affiliation/COI correction
 are implemented. W2's works-first resolver passed its frozen 40-case gate and
 now sits behind a server-owned runtime seam. The seam defaults to legacy,
-supports comparison-only shadow execution, and has no authoritative W2 mode;
-production behavior is unchanged and cutover remains owner-gated. Broader
-email-alternate handling and W4 remain `[PLANNED]`.
+supports comparison-only shadow execution, and contains an explicit
+owner-gated `combined` mode; no tracked environment enables it, so production
+behavior is unchanged. W4.1's additive evidence-bundle generation and
+persistence path are built on the existing Wave 13 verified-anchors memo;
+re-resolution on later reuse and W4.2 dedup remain `[PLANNED]`. Broader
+email-alternate handling also remains `[PLANNED]`.
 Rationale and evidence live in the companion audit
 (`docs/audits/reviewer-disambiguation-email-external-alternatives-fable-2026-07-18.md`,
 §§1–5b); this plan holds the *what, in what order, behind which gate*, and does
@@ -199,7 +202,7 @@ drop. The exempt set remains exactly HHMI + Broad. Any additional umbrella org
 requires a later owner decision.
 
 ## W2 — Works-first disambiguation resolver v2
-`[RUNTIME SEAM IMPLEMENTED; LEGACY DEFAULT; PRODUCTION NOT CUT OVER]`
+`[COMBINED MODE BUILT; LEGACY DEFAULT; PRODUCTION NOT CUT OVER]`
 
 The evaluated resolver is now shared by the pinned runner and the runtime
 shadow arm. `ReviewerIdentityRuntime` is the sole production call seam for
@@ -208,22 +211,26 @@ unknown value return `ReviewerIdentityEvidence` exactly as before. `shadow`
 settles every authoritative legacy result in the candidate batch first, then
 runs each W2 comparison under an independent hard 15-second deadline, emits a
 redacted decision-only comparison, and still returns the exact legacy objects.
-Shadow observers are non-throwing. There is
-deliberately no authoritative W2 mode, so an environment edit cannot perform
-cutover.
+Shadow observers are non-throwing. The default observers await a best-effort
+Postgres insert so the function cannot finish before a normal insert settles;
+storage failures still cannot alter the reviewer result. The explicit
+`combined` mode adapts W2 rescues into the established result contract with an
+automated `probable` ceiling, uses the current OpenAlex profile rather than
+overwriting it with the claimed affiliation, and fails back to the legacy
+result on W2 provider failure. No tracked environment enables `combined`.
 
-- **W2.1 Works-first candidate generation — IMPLEMENTED BEHIND SHADOW.**
+- **W2.1 Works-first candidate generation — IMPLEMENTED IN RUNTIME SEAM.**
   `raw_author_name.search` byline
   query + institution-id disambiguator (via W0), nickname/CJK variants,
   surname+forename byline gate. (Prototype in audit §5a.)
-- **W2.2 ORCID-as-corroborator — IMPLEMENTED BEHIND SHADOW, FAIL-CLOSED.** Same-ORCID OpenAlex
+- **W2.2 ORCID-as-corroborator — IMPLEMENTED IN RUNTIME SEAM, FAIL-CLOSED.** Same-ORCID OpenAlex
   fragments collapse to the richest cluster. Any set containing distinct
   ORCIDs goes to review: shared institutions or coauthored paper titles are not
   identity-specific enough to merge them automatically. The frozen
 person-equivalence overlay affects benchmark scoring only and cannot change a
 resolver decision. Runtime consensus and the evaluator share the same
 overlay-free OpenAlex-to-ORCID anchor canonicalizer.
-- **W2.3 Cluster-quality gates — IMPLEMENTED BEHIND SHADOW.** ORCID-richest/anchored-cluster preference (fixes
+- **W2.3 Cluster-quality gates — IMPLEMENTED IN RUNTIME SEAM.** ORCID-richest/anchored-cluster preference (fixes
   the Keller fragment and Tsai merged-cluster false-binds); name-rarity /
   unique-anchor gate (abstain on high-fragmentation names without a unique
   anchor).
@@ -244,16 +251,17 @@ OpenAlex rank one, and a structured author-profile provider failure also fails
 the zero-provider-failure gate. Its W0 and anchor-canonicalization adapters
 propagate otherwise hidden provider failures, invalidating the run rather than
 scoring them. No new rule without a first failing benchmark case (invariant 6).
-**Runtime seam invariant.** `REVIEWER_IDENTITY_RESOLVER_MODE` accepts only
-`shadow` as an opt-in; unset/`legacy`/unknown/authoritative-looking values such
-as `w2` all execute legacy only. Shadow failures never change or replace legacy
-results; the production batch completes all legacy provider work before W2 can
-consume provider quota. OpenAlex retry backoff observes the overall shadow
-abort but is not incorrectly governed by an expired per-request timeout. No new
-persistence or client-provided mode exists.
+**Runtime seam invariant.** `REVIEWER_IDENTITY_RESOLVER_MODE` accepts explicit
+`shadow` and `combined`; unset/`legacy`/unknown/authoritative-looking values such
+as `w2` and `cutover` execute legacy only. Shadow failures never change or
+replace legacy results; combined-mode W2 provider failure retains legacy.
+The production batch completes all legacy provider work before W2 can consume
+provider quota. OpenAlex retry backoff observes the overall shadow abort but is
+not incorrectly governed by an expired per-request timeout. No client-provided
+mode exists.
 **Owner-gate.** The abstain-vs-bind-right-person policy on fragmented famous
-names (changes what the benchmark counts as correct); any code change adding an
-authoritative W2 mode; production cutover.
+names (changes what the benchmark counts as correct); enabling `combined` in a
+deployed environment; production cutover.
 
 ## W3 — Email discovery `[ACTIVE; W3.1/W3.3/W3.4 DECIDED; W3.2 NARROW RULE LIVE]`
 
@@ -322,12 +330,20 @@ touched.
 **Owner-gate.** Closed for the tested page-first cascade: do not promote.
 Any materially different paid-tier design requires a new bounded experiment.
 
-## W4 — Durable identity model `[PLANNED]`
+## W4 — Durable identity model `[W4.1 PERSISTENCE BUILT; REUSE + W4.2 PLANNED]`
 
-- **W4.1 Evidence-bundle persistence.** Store `{ ORCID set, 3–5 anchor DOIs, ROR,
-  OpenAlex author-id }` and re-resolve from anchors on reuse (OpenAlex 2026
-  split/merge churn rots bare author-ids). Reconcile with the Wave 13 binding
-  anchor rather than adding a parallel model.
+- **W4.1 Evidence-bundle persistence — BUILT BEHIND COMBINED MODE.** W2 collects
+  `{ ORCID set, up to 5 matched-byline anchor DOIs, ROR set, OpenAlex author-id
+  set }`. The authoritative adapter emits typed canonical anchors, and the
+  server-owned contact-enrichment decision threads them into the existing
+  `wmkf_identityverifiedanchorsjson` persistence boundary. No Dataverse schema
+  addition or parallel binding model was needed. A version-2 server receipt
+  binds every persisted decision field and compact anchors survive the Find
+  roster reload; legacy receipts remain valid only for their previously bound
+  metrics and cannot authorize an identity write. The parser needed for later
+  anchor reuse is built and fail-closed; wiring a future reuse read to
+  re-resolve from those anchors remains `[PLANNED]`. Production's authoritative
+  result remains legacy, so no W4.1 evidence has been written by this path yet.
 - **W4.2 Dedup on the union of anchors** (any shared ORCID, shared author-id,
   strong name+institution+works overlap), storing every observed ORCID — closes
   the duplicate-ORCID duplicate-record hole.
@@ -347,16 +363,17 @@ apply is a distinct owner-approved operation).
 |---|---|---|---|---|
 | 1 | W0 substrate `[IMPLEMENTED; ACTIVE FOUNDATION]` | — | branch → main | none |
 | 2 | W1 affiliation/COI `[IMPLEMENTED]` | W0 | branch → main, tests + contract-reconcile | Broad policy closed; future umbrella additions gated |
-| 3 | W2 disambiguation v2 `[LEGACY-DEFAULT SEAM BUILT]` | W0 | runtime seam, legacy authoritative | clean rerun; shadow enablement; cutover |
+| 3 | W2 disambiguation v2 `[COMBINED BUILT; LEGACY DEFAULT]` | W0 | runtime seam, legacy authoritative in production | combined-mode enablement/cutover |
 | 4 | Broader W3.2 follow-on | W0 | branch → main | co-affiliate policy |
-| 5 | W4 durable model | W2 | additive schema wave | schema apply |
+| 5 | W4.1 evidence persistence `[BUILT BEHIND COMBINED]` | W2 | existing Wave 13 verified-anchors memo | combined-mode enablement |
+| 6 | W4.2 dedup + reuse re-resolution | W4.1 | later branch | policy + any required schema |
 
 W1 addressed the highest near-term live false-drop bug and remains independent
 of the disambiguation rebuild. W3.1 is closed: keep the live core-record tier
 and do not add the tested full-text fallback. W2 has passed its offline gate and
-the legacy-default seam is built. Remaining W2 work is optional shadow
-observation, comparator consolidation, and owner-approved authoritative cutover.
-W4 underpins persistence and reconciles with Wave 13.
+the legacy-default seam, explicit combined mode, and W4.1 evidence persistence
+are built. Remaining W2 work is owner-approved cutover plus optional comparator
+consolidation. W4 reuse re-resolution and W4.2 dedup remain later work.
 
 ## Open owner decisions
 

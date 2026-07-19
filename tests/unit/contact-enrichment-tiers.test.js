@@ -24,6 +24,7 @@ const { ContactParser } = require('../../lib/utils/contact-parser');
 const { ORCIDService } = require('../../lib/services/orcid-service');
 const { SerpContactService } = require('../../lib/services/serp-contact-service');
 const { OpenAlexService } = require('../../lib/services/openalex-service');
+const { ReviewerIdentityRuntime } = require('../../lib/services/reviewer-identity-runtime');
 const openAlexMetrics = require('../../lib/services/contact-enrichment/openalex-metrics');
 const domainEvidence = require('../../lib/services/contact-enrichment/domain-evidence');
 const pageEmail = require('../../lib/services/contact-enrichment/page-email');
@@ -536,5 +537,61 @@ describe('_finalize — step order (C12) + arg fidelity (C9)', () => {
       'metrics', 'domain-evidence', 'page-email',
       'validate-domain', 'readjudicate', 'collect-leads', 'affiliation-override', 'persist',
     ]);
+  });
+
+  test('threads a server-computed combined identity bundle into persistence state', async () => {
+    jest.spyOn(openAlexMetrics, 'attachOpenAlexMetrics').mockResolvedValue(undefined);
+    jest.spyOn(domainEvidence, 'buildInstitutionDomainEvidence').mockResolvedValue(undefined);
+    jest.spyOn(pageEmail, 'attachEmailFromResolvedPage').mockResolvedValue(undefined);
+    jest.spyOn(ContactEnrichmentService, '_applyAffiliationOverride').mockImplementation(() => {});
+    jest.spyOn(ContactEnrichmentService, 'saveToDatabase').mockResolvedValue(undefined);
+    jest.spyOn(ReviewerIdentityRuntime, 'evaluateExistingResult').mockResolvedValue({
+      status: 'probable',
+      resolverStatus: 'probable',
+      orcid: '0000-0003-2195-6258',
+      identity: {
+        status: 'probable',
+        confidenceBand: 'medium',
+        resolverVersion: '2.0.0-works-first',
+        resolvedAt: '2026-07-19T12:00:00.000Z',
+        evidenceSummary: 'probable — work-grounded identity',
+        anchors: [{
+          type: 'works_first_anchor_doi',
+          canonicalKey: 'doi:10.1000/example',
+          sourceUrl: 'https://doi.org/10.1000/example',
+          verifier: 'reviewerWorksFirst@2.0.0-works-first',
+        }],
+      },
+    });
+
+    const out = await ContactEnrichmentService.enrichCandidate({
+      name: 'Taekjip Ha',
+      affiliation: 'Johns Hopkins University',
+      publications: [],
+    }, {
+      usePubmed: false,
+      useOrcid: false,
+    });
+
+    expect(ReviewerIdentityRuntime.evaluateExistingResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Taekjip Ha',
+        suggestedInstitution: 'Johns Hopkins University',
+      }),
+      expect.objectContaining({
+        identity: expect.objectContaining({ status: expect.any(String) }),
+      }),
+      expect.objectContaining({ signal: undefined }),
+    );
+    expect(out.contactEnrichment).toMatchObject({
+      orcidId: '0000-0003-2195-6258',
+      orcidUrl: 'https://orcid.org/0000-0003-2195-6258',
+      identity: {
+        status: 'probable',
+        anchors: [{
+          canonicalKey: 'doi:10.1000/example',
+        }],
+      },
+    });
   });
 });

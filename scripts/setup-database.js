@@ -513,6 +513,35 @@ const v35Statements = [
      ON reviewer_acceptance_jobs (created_at DESC)`,
 ];
 
+// V36: durable reviewer-identity shadow comparison log. Existing databases
+// use migration 026_reviewer_identity_shadow_log.sql; this fresh-install
+// block creates the same table directly. candidate_key is a pseudonymous
+// truncated hash; raw names, anchors, emails, and proposal content are omitted.
+const v36Statements = [
+  `CREATE TABLE IF NOT EXISTS reviewer_identity_shadow_log (
+    id BIGSERIAL PRIMARY KEY,
+    run_id TEXT,
+    resolver_mode TEXT NOT NULL DEFAULT 'shadow',
+    event_type TEXT NOT NULL DEFAULT 'comparison'
+      CHECK (event_type IN ('comparison', 'error')),
+    candidate_key TEXT,
+    legacy_decision TEXT,
+    works_decision TEXT,
+    combined_decision TEXT,
+    combined_reason TEXT,
+    anchors_agree BOOLEAN,
+    error_code TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_reviewer_identity_shadow_log_created
+     ON reviewer_identity_shadow_log (created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_reviewer_identity_shadow_log_run
+     ON reviewer_identity_shadow_log (run_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_reviewer_identity_shadow_log_delta
+     ON reviewer_identity_shadow_log (created_at)
+     WHERE legacy_decision IS DISTINCT FROM works_decision`,
+];
+
 // V32: model pricing audit history (S181).
 // Monthly drift cron (/api/cron/pricing-refresh) writes one row per
 // (model, token_type) per run. Compared against lib/utils/model-pricing.js;
@@ -1160,6 +1189,24 @@ async function runMigration() {
           console.log(`[v32-${i + 1}/${v32Statements.length}] ○ Already exists: ${preview}...`);
         } else {
           console.error(`[v32-${i + 1}/${v32Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V36 table creation (reviewer identity shadow comparison log)
+    console.log(`\nApplying v36 schema updates - Reviewer identity shadow log (${v36Statements.length} statements)...`);
+    for (let i = 0; i < v36Statements.length; i++) {
+      const statement = v36Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v36-${i + 1}/${v36Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v36-${i + 1}/${v36Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v36-${i + 1}/${v36Statements.length}] ✗ Error: ${error.message}`);
           throw error;
         }
       }

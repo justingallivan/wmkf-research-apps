@@ -314,6 +314,7 @@ export function hasValidApplicantEnrichmentCache(rosterActive, proposalKey) {
  * `persistable:false` is re-asserted so a roster round-trip can never flip it.
  */
 export const MAX_ROSTER_CONTACT_LEADS = 8;
+export const MAX_ROSTER_IDENTITY_ANCHORS = 20;
 export function pruneContactLeads(leads) {
   if (!Array.isArray(leads)) return [];
   return leads
@@ -370,12 +371,33 @@ export function pruneEmailEvidence(evidence) {
   };
 }
 
+export function pruneIdentityDecision(identity) {
+  if (!identity || typeof identity !== 'object' || Array.isArray(identity)) return null;
+  return {
+    status: identity.status || null,
+    confidenceBand: identity.confidenceBand || null,
+    resolverVersion: identity.resolverVersion || null,
+    resolvedAt: identity.resolvedAt || null,
+    evidenceSummary: identity.evidenceSummary || null,
+    anchors: Array.isArray(identity.anchors)
+      ? identity.anchors.slice(0, MAX_ROSTER_IDENTITY_ANCHORS).map((anchor) => ({
+          type: anchor?.type || null,
+          canonicalKey: anchor?.canonicalKey || null,
+          sourceUrl: anchor?.sourceUrl || null,
+          verifier: anchor?.verifier || null,
+        }))
+      : null,
+  };
+}
+
 /**
  * Prune an enriched candidate down to the fields `CandidateCard` actually
  * renders, for durable storage in `reviewer_find_roster` (S224). Keeps the card
- * fully renderable after reload while dropping the heavy raw enrichment internals
- * (tierResults, identity-resolver anchors). The SINGLE source for the roster DTO
- * shape so the server store + client merge agree.
+ * fully renderable after reload while dropping heavy raw enrichment internals.
+ * The compact, server-attested identity decision is retained so W4.1 evidence
+ * can reach the save boundary after a reload; raw tierResults remain excluded.
+ * The SINGLE source for the roster DTO shape so the server store + client merge
+ * agree.
  */
 export function pruneCandidateForRoster(c) {
   if (!c || typeof c !== 'object') return c;
@@ -412,8 +434,10 @@ export function pruneCandidateForRoster(c) {
     affiliationPersistAllowed: persistFlag('affiliationPersistAllowed'),
     // A render-safe contactEnrichment SUBSET so CandidateCard's `enr.*` reads
     // (emailSource/emailYear/priorAffiliation/affiliationSource/links/metrics)
-    // still work after reload. NEVER the raw internals (identity/tierResults).
+    // still work after reload. NEVER raw tierResults; identity is reduced to
+    // the exact fields covered by the server receipt and persistence writer.
     contactEnrichment: {
+      identity: pruneIdentityDecision(identity),
       email: e.email || null,
       emailSource: e.emailSource || null,
       emailYear: e.emailYear || null,

@@ -9,6 +9,7 @@ const {
   evaluatePromotion,
   resolveWorksFirst,
   scoreDecision,
+  worksEvidenceLinksAnchor,
   worksFirstNameVariants,
 } = require('../../lib/services/reviewer-works-first');
 const {
@@ -189,6 +190,76 @@ describe('works-first identity evaluation', () => {
         '0000-0002-1689-8041',
       ],
     });
+  });
+
+  test('persists a bounded evidence bundle from exact matched bylines', async () => {
+    const works = Array.from({ length: 7 }, (_, index) => ({
+      doi: `10.1000/example-${index}`,
+      authorships: [authorship({
+        authorId: index % 2 ? 'A200' : 'A100',
+        displayName: 'Dmitry Budker',
+        orcid: '0000-0002-7356-4814',
+      })],
+    }));
+    for (const work of works) {
+      work.authorships[0].institutions[0].ror = 'https://ror.org/012345678';
+    }
+    const deps = dependencies(works, {
+      A100: {
+        displayName: 'Dmitry Budker',
+        orcid: '0000-0002-7356-4814',
+        lastKnownInstitutionId: 'https://openalex.org/I1',
+        worksCount: 500,
+      },
+      A200: {
+        displayName: 'Dmitry Budker',
+        orcid: '0000-0002-7356-4814',
+        lastKnownInstitutionId: 'https://openalex.org/I1',
+        worksCount: 1,
+      },
+    });
+    deps.searchInstitution.mockResolvedValue([{
+      openAlexId: 'https://openalex.org/I1',
+      ror: 'https://ror.org/012345678',
+    }]);
+
+    const result = await resolveWorksFirst({
+      name: 'Dmitry Budker',
+      claimedAffiliation: 'UC Berkeley',
+    }, deps);
+
+    expect(result.evidenceBundle).toEqual({
+      orcids: ['0000-0002-7356-4814'],
+      anchorDois: [
+        '10.1000/example-0',
+        '10.1000/example-2',
+        '10.1000/example-4',
+        '10.1000/example-6',
+        '10.1000/example-1',
+      ],
+      rors: ['https://ror.org/012345678'],
+      openAlexAuthorIds: ['A100', 'A200'],
+    });
+  });
+
+  test('links an exact sparse OpenAlex fragment only through its matched byline ORCID', () => {
+    const worksResult = {
+      decision: 'bind',
+      anchor: 'orcid:0000-0002-7356-4814',
+      candidates: [{
+        authorId: 'A5121975749',
+        orcids: ['0000-0002-7356-4814'],
+      }],
+    };
+    expect(worksEvidenceLinksAnchor('openalex:A5121975749', worksResult)).toBe(true);
+    expect(worksEvidenceLinksAnchor('openalex:A999', worksResult)).toBe(false);
+    expect(worksEvidenceLinksAnchor('openalex:A5121975749', {
+      ...worksResult,
+      candidates: [{
+        authorId: 'A5121975749',
+        orcids: ['0000-0002-7356-4814', '0000-0001-1111-1111'],
+      }],
+    })).toBe(false);
   });
 
   test('fails closed for no durable anchor and high-fragmentation names', async () => {

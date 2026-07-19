@@ -172,6 +172,31 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
   });
 
+  test('legacy receipt keeps its bound metrics but cannot authorize an identity decision write', async () => {
+    verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+      valid: true,
+      source: 'automated_resolver',
+      identityDecisionBound: false,
+    });
+
+    await run({
+      status: 'probable',
+      confidenceBand: 'medium',
+      anchors: [{
+        type: 'authorship_grounded',
+        canonicalKey: 'openalex:A100',
+        sourceUrl: 'https://openalex.org/A100',
+        verifier: 'client-forged',
+      }],
+    });
+
+    const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
+    expect(payload.orcid).toBe('0000-0001');
+    expect(payload.hIndex).toBe(40);
+    expect(researcherAdapter.writeIdentityDecision).not.toHaveBeenCalled();
+    expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
+  });
+
   test('0-100 relevance scores are passed to suggestion upsert unchanged', async () => {
     const req = {
       method: 'POST',

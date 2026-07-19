@@ -2,9 +2,12 @@
  * @jest-environment node
  */
 
-import { decodeJwt } from 'jose';
+import { decodeJwt, SignJWT } from 'jose';
+import crypto from 'crypto';
 import {
+  legacyIdentityAttestationProjection,
   mintAutomatedIdentityAttestation,
+  PROJECTION_VERSION,
   TTL_SECONDS,
   verifyAutomatedIdentityAttestation,
 } from '../../lib/services/reviewer-candidate-attestation';
@@ -43,6 +46,7 @@ test('server receipt carries the owner-approved 14-day lifetime', async () => {
 
   expect(TTL_SECONDS).toBe(14 * 24 * 60 * 60);
   expect(payload.exp - payload.iat).toBe(TTL_SECONDS);
+  expect(payload.projectionVersion).toBe(PROJECTION_VERSION);
 });
 
 test('absent receipt fails closed', async () => {
@@ -80,7 +84,11 @@ test('server receipt verifies only for the bound request and identity bundle', a
   await expect(verifyAutomatedIdentityAttestation(token, {
     requestId: REQUEST,
     candidate: CANDIDATE,
-  })).resolves.toMatchObject({ valid: true, source: 'automated_resolver' });
+  })).resolves.toMatchObject({
+    valid: true,
+    source: 'automated_resolver',
+    identityDecisionBound: true,
+  });
 
   await expect(verifyAutomatedIdentityAttestation(token, {
     requestId: '22222222-2222-2222-2222-222222222222',
@@ -91,6 +99,77 @@ test('server receipt verifies only for the bound request and identity bundle', a
     requestId: REQUEST,
     candidate: { ...CANDIDATE, orcid: '0000-0001-5109-3700' },
   })).resolves.toMatchObject({ valid: false, reason: 'claim_mismatch' });
+});
+
+test('receipt binds every field that the automated identity writer persists', async () => {
+  const candidate = {
+    ...CANDIDATE,
+    contactEnrichment: {
+      ...CANDIDATE.contactEnrichment,
+      identity: {
+        status: 'probable',
+        confidenceBand: 'medium',
+        resolverVersion: '2.0.0-works-first',
+        resolvedAt: '2026-07-19T12:00:00.000Z',
+        evidenceSummary: 'probable — authorship grounded',
+        anchors: [{
+          type: 'authorship_grounded',
+          canonicalKey: 'openalex:A100',
+          sourceUrl: 'https://openalex.org/A100',
+          verifier: 'reviewerWorksFirst@2.0.0-works-first',
+        }],
+      },
+    },
+  };
+  const token = await mintAutomatedIdentityAttestation({ requestId: REQUEST, candidate });
+
+  const mutations = [
+    { ...candidate.contactEnrichment.identity, confidenceBand: 'high' },
+    { ...candidate.contactEnrichment.identity, resolverVersion: 'client-forged' },
+    { ...candidate.contactEnrichment.identity, evidenceSummary: 'client-forged' },
+    {
+      ...candidate.contactEnrichment.identity,
+      anchors: [{
+        ...candidate.contactEnrichment.identity.anchors[0],
+        canonicalKey: 'orcid:0000-0001-5109-3700',
+      }],
+    },
+  ];
+  for (const identity of mutations) {
+    await expect(verifyAutomatedIdentityAttestation(token, {
+      requestId: REQUEST,
+      candidate: {
+        ...candidate,
+        contactEnrichment: { ...candidate.contactEnrichment, identity },
+      },
+    })).resolves.toMatchObject({ valid: false, reason: 'claim_mismatch' });
+  }
+});
+
+test('legacy receipts remain valid for bound metrics but cannot authorize identity writes', async () => {
+  const projection = legacyIdentityAttestationProjection(CANDIDATE);
+  const identityDigest = crypto.createHash('sha256')
+    .update(JSON.stringify(projection))
+    .digest('base64url');
+  const token = await new SignJWT({
+    typ: 'reviewer-auto-identity',
+    requestId: REQUEST,
+    candidateKey: projection.candidateKey,
+    identityDigest,
+  })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuedAt()
+    .setExpirationTime(Math.floor(Date.now() / 1000) + TTL_SECONDS)
+    .sign(new TextEncoder().encode(process.env.NEXTAUTH_SECRET));
+
+  await expect(verifyAutomatedIdentityAttestation(token, {
+    requestId: REQUEST,
+    candidate: CANDIDATE,
+  })).resolves.toEqual({
+    valid: true,
+    source: 'automated_resolver',
+    identityDecisionBound: false,
+  });
 });
 
 test('contact changes invalidate a receipt bound to the submitted candidate key', async () => {
@@ -132,5 +211,8 @@ test('receipt survives the real enrichment merge and roster pruning shape', asyn
   await expect(verifyAutomatedIdentityAttestation(token, {
     requestId: REQUEST,
     candidate: reloaded,
-  })).resolves.toMatchObject({ valid: true });
+  })).resolves.toMatchObject({
+    valid: true,
+    identityDecisionBound: true,
+  });
 });
