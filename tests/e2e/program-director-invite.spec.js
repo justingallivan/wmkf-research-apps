@@ -411,7 +411,7 @@ test.describe('Program Director reviewer invitation flow', () => {
       suggestionId: '22222222-2222-4222-8222-222222222222',
       name: 'Dr. Low Confidence',
       email: TEST_EMAIL,
-      emailConfidence: { level: 'low', reason: 'manual' },
+      emailConfidence: { level: 'low', action: 'quick_check', reason: 'manual' },
     });
     const missingEmail = makeCandidate({
       suggestionId: '33333333-3333-4333-8333-333333333333',
@@ -432,8 +432,8 @@ test.describe('Program Director reviewer invitation flow', () => {
     await page.getByLabel('Select Dr. Low Confidence').check();
     await page.getByRole('button', { name: /send invitation \(1\)/i }).click();
 
-    // Batch preview flags the unverified address; the no-email row never reaches it.
-    await expect(page.getByText(/this address wasn.t verified/i)).toBeVisible();
+    // Batch preview flags the address for a quick check; the no-email row never reaches it.
+    await expect(page.getByText(/quick check recommended/i)).toBeVisible();
 
     // Send is gated until each low-confidence address is explicitly confirmed. The
     // confirm checkbox's accessible name starts with the candidate name; anchor to
@@ -491,7 +491,7 @@ test.describe('Program Director reviewer invitation flow', () => {
     expect(campaignReads).toEqual([REQUEST_ID]);
     expect(campaignWrites).toEqual([{
       requestId: REQUEST_ID,
-      config: { respondOffsetDays: 14, reviewDueDate: '2026-08-05' },
+      config: { respondOffsetDays: 14, reviewDueDate: '2026-08-05', desiredCount: 2 },
     }]);
   });
 
