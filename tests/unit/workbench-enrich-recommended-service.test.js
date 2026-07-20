@@ -74,6 +74,13 @@ jest.mock('../../lib/services/reviewer-identity-resolver', () => ({
   RESOLVER_SOURCED_FIELDS: ['wmkf_orcid'],
 }));
 
+const areInstitutionsConsistent = jest.fn(async () => false);
+jest.mock('../../lib/services/institution-affiliation-consistency', () => ({
+  createInstitutionConsistencyChecker: jest.fn(() => ({
+    areConsistent: (...a) => areInstitutionsConsistent(...a),
+  })),
+}));
+
 jest.mock('../../lib/services/backprop-reviewer-orcid', () => ({
   backPropReviewerOrcidToContact: jest.fn(async () => {}),
 }));
@@ -128,6 +135,7 @@ const args = (over = {}) => ({
 beforeEach(() => {
   jest.clearAllMocks();
   ContactParser.isNameConsistentEmail.mockReturnValue(true);
+  areInstitutionsConsistent.mockResolvedValue(false);
   getReviewerTimeBudgetSeconds.mockResolvedValue(600);
   findApplicantRecommendedByRequest.mockResolvedValue([
     { _wmkf_potentialreviewer_value: PR, _wmkf_potentialreviewer_value_formatted: 'Dr. Rec One', wmkf_appreviewersuggestionid: SUG },
@@ -333,6 +341,47 @@ test('an institution contradiction overrides a probable identity verdict and lea
   expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
   expect(writeIdentityDecision).not.toHaveBeenCalled();
   expect(setMatchReason).not.toHaveBeenCalled();
+});
+
+test('a resolved co-affiliation suppresses the string mismatch instead of creating staff work', async () => {
+  areInstitutionsConsistent.mockResolvedValue(true);
+  verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
+    verified: suggestions.map((s) => ({
+      ...s,
+      verified: true,
+      institutionMismatch: true,
+      suggestedInstitution: 'Broad Institute',
+      affiliation: 'Massachusetts Institute of Technology',
+      publications: [],
+    })),
+    unverified: [],
+  }));
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      email: 'reviewer@mit.edu',
+      contactEnrichment: {
+        email: 'reviewer@mit.edu',
+        emailSource: 'affiliation',
+        identity: { status: 'probable' },
+      },
+    })),
+  }));
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  expect(areInstitutionsConsistent).toHaveBeenCalledWith(
+    'Broad Institute',
+    'Massachusetts Institute of Technology',
+    expect.objectContaining({ signal: expect.anything() }),
+  );
+  expect(events.at(-1).data.recommended[0]).toMatchObject({
+    needsIdentification: false,
+    identityStatus: 'probable',
+    email: 'reviewer@mit.edu',
+  });
+  expect(upsertByPotentialReviewer).toHaveBeenCalled();
 });
 
 test('pipeline throw: resolves (never throws) with one generic terminal error', async () => {
