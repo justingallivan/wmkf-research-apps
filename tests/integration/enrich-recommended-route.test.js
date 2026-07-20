@@ -58,7 +58,11 @@ jest.mock('../../lib/dataverse/adapters/researcher', () => ({
 }));
 
 const verifyClaudeSuggestions = jest.fn();
-const checkCoauthorshipsForCandidates = jest.fn(async (c) => c);
+const checkCoauthorshipsForCandidates = jest.fn(async (c) => c.map((candidate) => ({
+  ...candidate,
+  coauthorCheckStatus: 'complete',
+  coauthorCheckFailures: [],
+})));
 jest.mock('../../lib/services/discovery-service', () => ({
   DiscoveryService: {
     pubMedVerificationContract: jest.fn(({ searchPubmed }) => ({ enabled: !!searchPubmed })),
@@ -94,8 +98,9 @@ jest.mock('../../lib/services/proposal-pi-identity', () => ({
   piInstitutions: jest.fn(() => []),
 }));
 
+const deriveProposalAuthorNames = jest.fn(() => ['Dr. PI']);
 jest.mock('../../lib/utils/proposal-authors', () => ({
-  deriveProposalAuthorNames: jest.fn(() => []),
+  deriveProposalAuthorNames: (...a) => deriveProposalAuthorNames(...a),
 }));
 
 jest.mock('../../lib/services/reviewer-identity-resolver', () => ({
@@ -339,6 +344,8 @@ describe('happy path (progress ordering + full card payload)', () => {
       hasCoauthorCOI: false,
       institutionCOIDetails: null,
       coauthorships: [],
+      coauthorCheckStatus: 'complete',
+      coauthorCheckFailures: [],
       institutionMismatch: false,
       suggestedInstitution: null,
       expertiseMismatch: false,

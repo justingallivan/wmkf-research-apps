@@ -837,11 +837,23 @@ describe('pruneCandidateForRoster — S238 graded-COI + warning markers survive 
       coauthorCOIStrength: 'possible',
       coauthorSharedPaperTotal: 2,
       coauthorMaxWithOneAuthor: 1,
+      coauthorCheckStatus: 'incomplete',
+      coauthorCheckFailures: [{
+        proposalAuthor: 'Dr Proposal Author',
+        status: 429,
+        reason: 'rate_limited',
+      }],
     });
     expect(pruned.hasCoauthorCOI).toBe(true);
     expect(pruned.coauthorCOIStrength).toBe('possible');
     expect(pruned.coauthorSharedPaperTotal).toBe(2);
     expect(pruned.coauthorMaxWithOneAuthor).toBe(1);
+    expect(pruned.coauthorCheckStatus).toBe('incomplete');
+    expect(pruned.coauthorCheckFailures).toEqual([{
+      proposalAuthor: 'Dr Proposal Author',
+      status: 429,
+      reason: 'rate_limited',
+    }]);
   });
 
   it('preserves aiFlaggedNotRelevant and lowPublicationCount warnings', () => {
@@ -859,6 +871,8 @@ describe('pruneCandidateForRoster — S238 graded-COI + warning markers survive 
   it('defaults the markers to false/null when absent (no accidental flags)', () => {
     const pruned = pruneCandidateForRoster({ name: 'Jane Smith', affiliation: 'MIT' });
     expect(pruned.coauthorCOIStrength).toBeNull();
+    expect(pruned.coauthorCheckStatus).toBeNull();
+    expect(pruned.coauthorCheckFailures).toEqual([]);
     expect(pruned.aiFlaggedNotRelevant).toBe(false);
     expect(pruned.lowPublicationCount).toBe(false);
   });

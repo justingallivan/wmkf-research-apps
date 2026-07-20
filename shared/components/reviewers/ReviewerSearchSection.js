@@ -1038,6 +1038,14 @@ export default function ReviewerSearchSection({
       updatedAt: candidate.rosterUpdatedAt,
     })), [previousSearchCandidates]);
   const displayCandidates = dedupeByName([...recCandidates, ...candidates, ...displayRosterActive].map((c) => withReviewerProvenance(c)));
+  const incompleteCoiCandidates = dedupeByName([...displayCandidates, ...rosterIneligible])
+    .filter((candidate) => candidate.coauthorCheckStatus === 'incomplete');
+  const incompleteCoiNames = incompleteCoiCandidates.map((candidate) => candidate.name).filter(Boolean);
+  const incompleteCoiLabel = incompleteCoiNames.length === 0
+    ? `${incompleteCoiCandidates.length} reviewer${incompleteCoiCandidates.length === 1 ? '' : 's'}`
+    : incompleteCoiNames.length <= 3
+      ? incompleteCoiNames.join(', ')
+      : `${incompleteCoiNames.slice(0, 3).join(', ')} and ${incompleteCoiNames.length - 3} others`;
 
   // Slice E: a candidate the system could not identity-resolve (deferred Track-B or
   // an unresolved verdict) is visible but NOT selectable/savable as a vetted reviewer
@@ -1765,6 +1773,12 @@ export default function ReviewerSearchSection({
             <div className="space-y-3 mt-3">
               {savedMsg && <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm">{savedMsg}</div>}
               {enrichNote && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{enrichNote}</div>}
+              {incompleteCoiCandidates.length > 0 && (
+                <div className="p-3 bg-amber-50 text-amber-800 rounded-lg text-sm">
+                  PubMed coauthor checks were incomplete after automatic retries for {incompleteCoiLabel}.
+                  {' '}A missing coauthor warning is not conclusive for {incompleteCoiCandidates.length === 1 ? 'that reviewer' : 'those reviewers'}.
+                </div>
+              )}
               {rosterNote && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{rosterNote}</div>}
               {previousSearchKeys.size > 0 && (
                 <div className="flex items-center justify-between gap-3 p-3 bg-blue-50 text-blue-800 rounded-lg text-sm">
