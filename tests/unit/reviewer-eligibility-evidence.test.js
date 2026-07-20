@@ -27,6 +27,18 @@ describe('reviewer eligibility evidence', () => {
     });
   });
 
+  test.each([
+    ['middle initial', 'Patricia A. Thiel, age 67, died on September 7.'],
+    ['parenthetical nickname', 'Patricia (Pat) Thiel passed away on September 7.'],
+  ])('accepts a conservative %s in candidate-bound evidence', (_label, snippet) => {
+    const out = classifyEligibilitySearchLeads('Patricia Thiel', [{
+      title: 'Department notice',
+      link: 'https://www.chem.iastate.edu/news/patricia-thiel',
+      snippet,
+    }], ['iastate.edu'], CHECKED_AT);
+    expect(out.status).toBe('deceased');
+  });
+
   test('classifies direct first-party emeritus evidence', () => {
     const out = classifyEligibilitySearchLeads('Michael Feiss', [{
       title: 'Michael Feiss | Professor Emeritus',
@@ -119,6 +131,40 @@ describe('reviewer eligibility evidence', () => {
         status: 'deceased',
         sourceDomain: 'ameslab.gov',
         checkedAt: CHECKED_AT,
+      },
+    });
+  });
+
+  test('accepts a nickname headline when the fetched first-party body directly binds the full name', async () => {
+    const result = {
+      name: 'Patricia Thiel',
+      contactEnrichment: {
+        identity: { status: 'probable' },
+        anchoredInstitutionDomains: ['iastate.edu'],
+      },
+    };
+    await attachEligibilityEvidence(result, result, {
+      useSerpSearch: true,
+      credentials: { serpApiKey: 'test-key' },
+      searchOrganicResults: async () => [{
+        title: 'Dr. Pat Thiel | Department of Chemistry',
+        link: 'https://www.chem.iastate.edu/news/2020/dr-pat-thiel',
+        snippet: 'Patricia A. Thiel, age 67, died on Monday, September 7, 2020.',
+      }],
+      fetchInstitutionPage: async () => ({
+        ok: true,
+        finalUrl: 'https://www.chem.iastate.edu/news/2020/dr-pat-thiel',
+        text: '<html><head><title>Dr. Pat Thiel | Department of Chemistry</title></head><body><h1>Dr. Pat Thiel</h1><p>Patricia A. Thiel, age 67, died on Monday, September 7, 2020.</p></body></html>',
+      }),
+      now: () => CHECKED_AT,
+    });
+
+    expect(result).toMatchObject({
+      eligibilityStatus: 'deceased',
+      eligibilityEvidence: {
+        status: 'deceased',
+        sourceDomain: 'chem.iastate.edu',
+        snippet: expect.stringContaining('Patricia A. Thiel'),
       },
     });
   });
