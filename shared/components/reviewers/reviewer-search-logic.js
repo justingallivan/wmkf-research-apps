@@ -410,6 +410,17 @@ export function pruneEligibilityEvidence(evidence) {
   };
 }
 
+function pruneCoauthorCheckFailures(failures) {
+  if (!Array.isArray(failures)) return [];
+  return failures.slice(0, 12).map((failure) => ({
+    proposalAuthor: typeof failure?.proposalAuthor === 'string'
+      ? failure.proposalAuthor.slice(0, 200)
+      : null,
+    status: Number.isFinite(failure?.status) ? failure.status : null,
+    reason: failure?.reason === 'rate_limited' ? 'rate_limited' : 'unavailable',
+  }));
+}
+
 /**
  * Prune an enriched candidate down to the fields `CandidateCard` actually
  * renders, for durable storage in `reviewer_find_roster` (S224). Keeps the card
@@ -527,6 +538,10 @@ export function pruneCandidateForRoster(c) {
     institutionCOIDetails: sanitizeInstitutionCOIDetails(c.institutionCOIDetails),
     hasCoauthorCOI: !!c.hasCoauthorCOI,
     coauthorships: Array.isArray(c.coauthorships) ? c.coauthorships : [],
+    coauthorCheckStatus: c.coauthorCheckStatus === 'complete' || c.coauthorCheckStatus === 'incomplete'
+      ? c.coauthorCheckStatus
+      : null,
+    coauthorCheckFailures: pruneCoauthorCheckFailures(c.coauthorCheckFailures),
     // S238 graded coauthor COI + thin-evidence/off-topic warnings — persist so the
     // card's severity and warnings survive a roster reload (else a 'possible' overlap
     // regresses to red via the UI fallback, and the warnings vanish entirely).

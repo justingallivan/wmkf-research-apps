@@ -385,17 +385,10 @@ export default async function handler(req, res) {
         verifiedWithCOI = await DiscoveryService.checkCoauthorshipsForCandidates(
           verifiedWithCOI,
           proposalAuthors,
-          (progress) => sendEvent('progress', progress)
+          (progress) => sendEvent('progress', progress),
+          { signal: deadlineController.signal }
         );
 
-        const coiCount = verifiedWithCOI.filter(c => c.hasCoauthorCOI).length;
-        sendEvent('progress', {
-          stage: 'coi_check',
-          status: 'complete',
-          message: coiCount > 0
-            ? `Found ${coiCount} candidate(s) with coauthorship history`
-            : 'No coauthorship conflicts found'
-        });
       } else if (!pubmedVerificationContract.enabled && proposalAuthors.length > 0 && verifiedWithCOI.length > 0) {
         sendEvent('progress', {
           stage: 'coi_check',
@@ -472,7 +465,8 @@ export default async function handler(req, res) {
         referredCandidates = await DiscoveryService.checkCoauthorshipsForCandidates(
           referredCandidates,
           proposalAuthors,
-          (progress) => sendEvent('progress', progress)
+          (progress) => sendEvent('progress', progress),
+          { signal: deadlineController.signal }
         );
       }
 
@@ -484,6 +478,28 @@ export default async function handler(req, res) {
         });
       }
       verifiedWithCOI = [...referredCandidates, ...verifiedWithCOI];
+    }
+
+    // Reconcile once after every PubMed-eligible Track-A candidate (including
+    // referred seeds) has settled. This avoids an early clean-negative message
+    // that a later referred-seed failure would invalidate.
+    {
+      const pubmedVerificationContract = DiscoveryService.pubMedVerificationContract({
+        searchPubmed,
+        proposalInfo: analysisResult.proposalInfo,
+      });
+      const checkedCandidates = verifiedWithCOI.filter(
+        (candidate) => candidate.coauthorCheckStatus === 'complete'
+          || candidate.coauthorCheckStatus === 'incomplete'
+      );
+      if (pubmedVerificationContract.enabled && checkedCandidates.length > 0) {
+        const coiSummary = DiscoveryService.summarizeCoauthorChecks(checkedCandidates);
+        sendEvent('progress', {
+          stage: 'coi_check',
+          status: coiSummary.status,
+          message: coiSummary.message,
+        });
+      }
     }
 
     sendEvent('progress', {

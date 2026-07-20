@@ -65,6 +65,40 @@ afterEach(() => {
   global.fetch = jest.fn();
 });
 
+test('restored incomplete PubMed COI checks remain selectable but show one compact warning', async () => {
+  const incompleteCandidate = {
+    ...generatedCandidate,
+    candidateKey: 'candidate:partial-coi',
+    name: 'Partially Checked Reviewer',
+    coauthorCheckStatus: 'incomplete',
+    coauthorCheckFailures: [{
+      proposalAuthor: 'Proposal Author',
+      status: 429,
+      reason: 'rate_limited',
+    }],
+  };
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [incompleteCandidate],
+        excluded: [],
+        ineligible: [],
+        allNames: [incompleteCandidate.name],
+      }));
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+
+  expect(await screen.findByText(
+    /PubMed coauthor checks were incomplete after automatic retries for Partially Checked Reviewer/i
+  )).toBeInTheDocument();
+  expect(screen.getByLabelText(`Select ${incompleteCandidate.name}`)).toBeInTheDocument();
+});
+
 test('labels restored generated rows and removes only the scoped previous results', async () => {
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
