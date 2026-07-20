@@ -17,6 +17,7 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   confirmIdentity: jest.fn(async () => ({ confirmationId: 'confirm-1', candidate: { name: 'Ann Lee' } })),
   markSaved: jest.fn(async () => 1),
   findCandidateBySuggestion: jest.fn(async () => null),
+  findCandidatesByKeys: jest.fn(async () => []),
   removePreviousActiveSearchResults: jest.fn(async () => ({
     removed: 2,
     removedKeys: ['candidate:old-a', 'candidate:old-b'],
@@ -42,6 +43,7 @@ beforeEach(() => {
   requireAppAccess.mockResolvedValue({ profileId: 5 });
   verifyAutomatedIdentityAttestation.mockResolvedValue({ valid: false, reason: 'no_token' });
   store.findCandidateBySuggestion.mockResolvedValue(null);
+  store.findCandidatesByKeys.mockResolvedValue([]);
 });
 
 describe('auth', () => {
@@ -152,6 +154,44 @@ describe('POST recordSurfaced', () => {
     expect(passed[0].pdIdentityConfirmationId).toBeUndefined();
     expect(passed[0].manualContactFields).toBeUndefined();
     expect(passed[0].staffIdentityConfirmation).toBeUndefined();
+  });
+
+  it('preserves a server-stored confirmation when a discovered row resurfaces', async () => {
+    store.findCandidatesByKeys.mockResolvedValueOnce([{
+      name: 'Ann Lee',
+      candidateKey: 'candidate:ann',
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'confirm-1',
+      manualContactFields: ['email', 'website', 'affiliation'],
+      staffIdentityConfirmation: {
+        confirmationId: 'confirm-1',
+        source: 'staff_confirmed',
+        normalizedName: 'ann lee',
+        email: 'verified@example.edu',
+        website: 'https://example.edu/ann',
+        affiliation: 'Example University',
+        actorProfileId: 5,
+      },
+    }]);
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [{
+      name: 'Ann Lee',
+      candidateKey: 'candidate:ann',
+      email: 'automated@example.net',
+    }] } }, r);
+
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed[0]).toMatchObject({
+      email: 'verified@example.edu',
+      website: 'https://example.edu/ann',
+      affiliation: 'Example University',
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'confirm-1',
+      staffIdentityConfirmation: expect.objectContaining({
+        confirmationId: 'confirm-1',
+        actorProfileId: 5,
+      }),
+    });
   });
 
   it('strips a browser-forged deceased claim without a bound server receipt', async () => {
@@ -279,6 +319,37 @@ describe('PATCH', () => {
     expect(persisted).not.toHaveProperty('pdIdentityConfirmationId');
     expect(persisted).not.toHaveProperty('manualContactFields');
     expect(persisted).not.toHaveProperty('staffIdentityConfirmation');
+  });
+
+  it('preserves the canonical server confirmation on a non-applicant exclude', async () => {
+    store.findCandidatesByKeys.mockResolvedValueOnce([{
+      name: 'Bob Roe',
+      candidateKey: 'candidate:bob',
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'confirm-1',
+      manualContactFields: ['email'],
+      staffIdentityConfirmation: {
+        confirmationId: 'confirm-1',
+        source: 'staff_confirmed',
+        normalizedName: 'bob roe',
+        email: 'verified@example.edu',
+        website: '',
+        affiliation: 'Example University',
+        actorSystemUserId: 'system-5',
+      },
+    }]);
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'exclude',
+      candidate: { name: 'Bob Roe', candidateKey: 'candidate:bob', email: 'forged@example.net' },
+    } }, r);
+
+    expect(store.setExcluded).toHaveBeenCalledWith(REQ, expect.objectContaining({
+      email: 'verified@example.edu',
+      pdIdentityConfirmationId: 'confirm-1',
+      staffIdentityConfirmation: expect.objectContaining({ actorSystemUserId: 'system-5' }),
+    }));
   });
 
   it('exclude → 400 without a candidate', async () => {

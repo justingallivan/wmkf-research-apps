@@ -26,6 +26,7 @@ import {
   markSaved,
   listForRequest,
   findCandidateBySuggestion,
+  findCandidatesByKeys,
   removePreviousActiveSearchResults,
 } from '../../../lib/services/reviewer-roster-store';
 import { verifyAutomatedIdentityAttestation } from '../../../lib/services/reviewer-candidate-attestation';
@@ -95,6 +96,55 @@ function stripClientRosterAuthority(candidate) {
   return safe;
 }
 
+function hasStoredStaffAuthority(candidate) {
+  const confirmationId = candidate?.pdIdentityConfirmationId;
+  return candidate?.pdIdentityConfirmed === true
+    && typeof confirmationId === 'string'
+    && confirmationId.length > 0
+    && candidate?.staffIdentityConfirmation?.source === 'staff_confirmed'
+    && candidate.staffIdentityConfirmation.confirmationId === confirmationId;
+}
+
+async function preserveStoredRosterAuthority(requestId, candidates) {
+  const list = Array.isArray(candidates) ? candidates : [];
+  const storedRows = await findCandidatesByKeys(
+    requestId,
+    list.map((candidate) => candidate?.candidateKey).filter(Boolean),
+  );
+  const storedByKey = new Map(storedRows.map((candidate) => [candidate.candidateKey, candidate]));
+  return list.map((candidate) => {
+    const stored = storedByKey.get(candidate?.candidateKey);
+    if (!stored || !hasStoredStaffAuthority(stored)) return candidate;
+    const confirmation = stored.staffIdentityConfirmation;
+    const email = confirmation.email || null;
+    const website = confirmation.website || null;
+    const affiliation = confirmation.affiliation || null;
+    return pruneCandidateForRoster({
+      ...candidate,
+      name: stored.name || candidate.name,
+      email,
+      emailSource: email ? 'manual' : null,
+      website,
+      websiteSource: website ? 'manual' : null,
+      affiliation,
+      affiliationSource: 'staff_manual',
+      manualContactFields: stored.manualContactFields,
+      contactEnrichment: {
+        ...(candidate.contactEnrichment || {}),
+        email,
+        emailSource: email ? 'manual' : null,
+        website,
+        websiteSource: website ? 'manual' : null,
+        affiliation,
+        affiliationSource: 'staff_manual',
+      },
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: stored.pdIdentityConfirmationId,
+      staffIdentityConfirmation: confirmation,
+    });
+  });
+}
+
 async function handleGet(req, res) {
   const { requestId } = req.query;
   if (!validRequestId(requestId)) {
@@ -149,7 +199,8 @@ async function handlePost(req, res) {
       },
     };
   }))).filter(Boolean);
-  const recorded = await recordSurfaced(requestId, pruned);
+  const authoritativePruned = await preserveStoredRosterAuthority(requestId, pruned);
+  const recorded = await recordSurfaced(requestId, authoritativePruned);
   return res.status(200).json({ success: true, recorded });
 }
 
@@ -170,6 +221,8 @@ async function handlePatch(req, res, access) {
       if (!candidateToExclude) {
         return res.status(409).json({ error: 'Applicant reviewer row is stale or missing; reload before excluding it.' });
       }
+    } else {
+      [candidateToExclude] = await preserveStoredRosterAuthority(requestId, [candidateToExclude]);
     }
     await setExcluded(requestId, candidateToExclude);
     return res.status(200).json({ success: true });
@@ -201,7 +254,8 @@ async function handlePatch(req, res, access) {
     if (pruned.length !== candidates.length) {
       return res.status(400).json({ error: 'Every saved candidate requires name and candidateKey' });
     }
-    const saved = await markSaved(requestId, pruned);
+    const authoritativePruned = await preserveStoredRosterAuthority(requestId, pruned);
+    const saved = await markSaved(requestId, authoritativePruned);
     return res.status(200).json({ success: true, saved });
   }
 
@@ -210,7 +264,7 @@ async function handlePatch(req, res, access) {
     if (!candidate?.name || !candidate?.email) {
       return res.status(400).json({ error: 'candidate name and email are required to confirm identity' });
     }
-    let authoritativeCandidate = candidate;
+    let authoritativeCandidate = stripClientRosterAuthority(pruneCandidateForRoster(candidate));
     if (isServerManagedApplicantCandidate(candidate)) {
       authoritativeCandidate = await authoritativeApplicantCandidate(requestId, candidate);
       if (!authoritativeCandidate) {

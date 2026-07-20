@@ -70,6 +70,35 @@ describe('findCandidateBySuggestion', () => {
   });
 });
 
+describe('findCandidatesByKeys', () => {
+  test('returns exact request-scoped roster rows with status and concurrency tokens', async () => {
+    sql.mockResolvedValueOnce({ rows: [{
+      candidate_key: 'candidate:ann',
+      status: 'active',
+      display_name: 'Ann Lee',
+      candidate: { name: 'Ann Lee' },
+      source_kind: 'literature_retrieved',
+      updated_at_token: '2026-07-20 11:00:00+00',
+    }] });
+
+    await expect(store.findCandidatesByKeys(REQ, [
+      'candidate:ann',
+      'candidate:ann',
+      '',
+    ])).resolves.toEqual([expect.objectContaining({
+      name: 'Ann Lee',
+      candidateKey: 'candidate:ann',
+      rosterStatus: 'active',
+      rosterUpdatedAt: '2026-07-20 11:00:00+00',
+    })]);
+    expect(queryTextOf(0)).toMatch(/jsonb_array_elements_text/);
+    expect(allInterpolations()).toEqual(expect.arrayContaining([
+      REQ,
+      JSON.stringify(['candidate:ann']),
+    ]));
+  });
+});
+
 describe('removePreviousActiveSearchResults', () => {
   test('deletes only active allowlisted search provenance and returns the count', async () => {
     sql.mockResolvedValueOnce({ rows: [{
