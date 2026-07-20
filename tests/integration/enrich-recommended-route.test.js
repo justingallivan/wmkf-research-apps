@@ -190,7 +190,11 @@ beforeEach(() => {
     enriched: candidates.map((c) => ({
       ...c,
       email: 'rec.one@rec.edu',
-      contactEnrichment: { emailSource: 'claude_search', website: 'https://rec.edu/one' },
+      contactEnrichment: {
+        emailSource: 'claude_search',
+        website: 'https://rec.edu/one',
+        identity: { status: 'probable' },
+      },
     })),
   }));
   upsertByPotentialReviewer.mockResolvedValue({});
@@ -332,6 +336,8 @@ describe('happy path (progress ordering + full card payload)', () => {
       suggestionId: SUG,
       enrichedProposalKey: 'blob-key-1',
       name: 'Dr. Rec One',
+      identityStatus: 'probable',
+      needsIdentification: false,
       affiliation: 'Rec University',
       seniorityEstimate: null,
       verified: true,
@@ -347,7 +353,7 @@ describe('happy path (progress ordering + full card payload)', () => {
       coauthorCheckStatus: 'complete',
       coauthorCheckFailures: [],
       institutionMismatch: false,
-      suggestedInstitution: null,
+      suggestedInstitution: 'Rec University',
       expertiseMismatch: false,
       expertiseAreas: [],
       email: 'rec.one@rec.edu',
@@ -386,7 +392,11 @@ describe('happy path (progress ordering + full card payload)', () => {
     expect(setMatchReason).not.toHaveBeenCalled();
 
     enrichCandidates.mockImplementation(async (candidates) => ({
-      enriched: candidates.map((c) => ({ ...c, hasInstitutionCOI: true, contactEnrichment: {} })),
+      enriched: candidates.map((c) => ({
+        ...c,
+        hasInstitutionCOI: true,
+        contactEnrichment: { identity: { status: 'probable' } },
+      })),
     }));
     const res2 = sseRes();
     await handler(post(baseBody()), res2);

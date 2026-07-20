@@ -306,9 +306,23 @@ export function filterExcluded(candidates, excludedNames) {
 
 export function hasValidApplicantEnrichmentCache(rosterActive, proposalKey) {
   if (!proposalKey) return false;
-  return (Array.isArray(rosterActive) ? rosterActive : []).some((c) => (
+  const applicantRows = (Array.isArray(rosterActive) ? rosterActive : []).filter((c) => (
     c?.enrichedProposalKey === proposalKey
       && (c.isApplicantRecommended || provenanceKindOf(c) === PROVENANCE_KINDS.APPLICANT_SUGGESTED)
+  ));
+  if (applicantRows.length === 0) return false;
+
+  // Applicant enrichment now fails closed unless every non-deceased row has an
+  // explicit identity-gate result. Rows written by the older affiliation-bypass
+  // contract lack this marker, so they are re-enriched once after deployment
+  // instead of remaining a permanently "valid" cache with potentially namesake
+  // contact data.
+  return applicantRows.every((c) => (
+    c?.eligibilityStatus === 'deceased'
+      || c?.pdIdentityConfirmed === true
+      || c?.identityStatus === 'confirmed'
+      || c?.identityStatus === 'probable'
+      || c?.identityStatus === 'unresolved'
   ));
 }
 

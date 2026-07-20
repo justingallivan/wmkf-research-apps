@@ -219,10 +219,12 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
   });
 
-  test('does NOT backfill an identity-unresolved candidate even if persistOk', async () => {
+  test('rejects identity-unresolved promotion before lifecycle or contact writes', async () => {
     findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'x@y.edu', emailSource: 'affiliation', emailPersistAllowed: true, needsIdentification: true });
     const res = await promote();
-    expect(res.body.savedFields).not.toContain('email');
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toMatchObject({ code: 'identity_confirmation_required' });
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
   });
 

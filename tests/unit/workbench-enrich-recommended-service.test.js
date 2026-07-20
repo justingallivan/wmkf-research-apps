@@ -138,7 +138,10 @@ beforeEach(() => {
     unverified: [],
   }));
   enrichCandidates.mockImplementation(async (candidates) => ({
-    enriched: candidates.map((c) => ({ ...c, contactEnrichment: {} })),
+    enriched: candidates.map((c) => ({
+      ...c,
+      contactEnrichment: { identity: { status: 'probable' } },
+    })),
   }));
   upsertByPotentialReviewer.mockResolvedValue({});
 });
@@ -204,6 +207,7 @@ test('structured author-affiliation evidence preserves an opaque scholarly email
       contactEnrichment: {
         email: 'lab-director@stanford.edu',
         emailSource: 'scholarly_multi',
+        identity: { status: 'probable' },
       },
     })),
   }));
@@ -229,6 +233,7 @@ test('a top-level email cannot borrow the scholarly name-guard bypass for anothe
       contactEnrichment: {
         email: 'proven-address@stanford.edu',
         emailSource: 'scholarly_multi',
+        identity: { status: 'probable' },
       },
     })),
   }));
@@ -243,6 +248,91 @@ test('a top-level email cannot borrow the scholarly name-guard bypass for anothe
     }),
     expect.anything(),
   );
+});
+
+test('a stored affiliation does not exempt an applicant reviewer from the identity gate', async () => {
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      email: 'namesake@wrong.edu',
+      affiliation: 'Wrong University',
+      hIndex: 99,
+      expertiseAreas: ['wrong-person topic'],
+      contactEnrichment: {
+        email: 'namesake@wrong.edu',
+        emailSource: 'claude_search',
+        website: 'https://wrong.edu/namesake',
+      },
+    })),
+  }));
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  const candidate = events.at(-1).data.recommended[0];
+  expect(candidate).toMatchObject({
+    name: 'Dr. Rec One',
+    needsIdentification: true,
+    identityStatus: 'unresolved',
+    verificationStatus: 'unresolved',
+    affiliation: null,
+    email: null,
+    hIndex: null,
+  });
+  expect(candidate.reasoning).toMatch(/identity resolver did not establish a probable match/i);
+  expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(writeIdentityDecision).not.toHaveBeenCalled();
+  expect(clearIdentityFields).not.toHaveBeenCalled();
+  expect(setMatchReason).not.toHaveBeenCalled();
+  expect(recordSurfaced).toHaveBeenCalledWith(
+    REQ,
+    [expect.objectContaining({ needsIdentification: true, identityStatus: 'unresolved', email: null })],
+  );
+});
+
+test('an institution contradiction overrides a probable identity verdict and leaves Dataverse unchanged', async () => {
+  verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
+    verified: suggestions.map((s) => ({
+      ...s,
+      verified: true,
+      institutionMismatch: true,
+      suggestedInstitution: 'Expected University',
+      affiliation: 'Different University',
+      publications: [{ title: 'Namesake paper', year: 2025 }],
+    })),
+    unverified: [],
+  }));
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      email: 'namesake@different.edu',
+      hasInstitutionCOI: true,
+      contactEnrichment: {
+        email: 'namesake@different.edu',
+        emailSource: 'claude_search',
+        identity: { status: 'probable' },
+      },
+    })),
+  }));
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  const candidate = events.at(-1).data.recommended[0];
+  expect(candidate).toMatchObject({
+    needsIdentification: true,
+    identityStatus: 'unresolved',
+    verificationStatus: 'unresolved',
+    institutionMismatch: true,
+    suggestedInstitution: 'Expected University',
+    affiliation: null,
+    email: null,
+    hasInstitutionCOI: false,
+  });
+  expect(candidate.reasoning).toMatch(/contradict the listed institution/i);
+  expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(writeIdentityDecision).not.toHaveBeenCalled();
+  expect(setMatchReason).not.toHaveBeenCalled();
 });
 
 test('pipeline throw: resolves (never throws) with one generic terminal error', async () => {

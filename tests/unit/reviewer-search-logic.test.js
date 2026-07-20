@@ -809,20 +809,36 @@ describe('hasValidApplicantEnrichmentCache', () => {
 
   test('requires a non-null proposal key and same-key applicant-origin roster row', () => {
     expect(hasValidApplicantEnrichmentCache([
-      { name: 'Dr Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey },
+      { name: 'Dr Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey, identityStatus: 'probable' },
     ], proposalKey)).toBe(true);
 
     expect(hasValidApplicantEnrichmentCache([
-      { name: 'Dr Applicant', isApplicantRecommended: true, enrichedProposalKey: 'Other::Proposal.pdf' },
+      { name: 'Dr Applicant', isApplicantRecommended: true, enrichedProposalKey: 'Other::Proposal.pdf', identityStatus: 'probable' },
     ], proposalKey)).toBe(false);
 
     expect(hasValidApplicantEnrichmentCache([
-      { name: 'Dr Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey },
+      { name: 'Dr Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey, identityStatus: 'probable' },
     ], null)).toBe(false);
 
     expect(hasValidApplicantEnrichmentCache([
-      { name: 'Dr Literature', enrichedProposalKey: proposalKey },
+      { name: 'Dr Literature', enrichedProposalKey: proposalKey, identityStatus: 'probable' },
     ], proposalKey)).toBe(false);
+  });
+
+  test('invalidates legacy affiliation-bypass rows and requires every applicant row to carry a gate result', () => {
+    expect(hasValidApplicantEnrichmentCache([
+      { name: 'Legacy Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey },
+    ], proposalKey)).toBe(false);
+
+    expect(hasValidApplicantEnrichmentCache([
+      { name: 'Resolved Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey, identityStatus: 'probable' },
+      { name: 'Legacy Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey },
+    ], proposalKey)).toBe(false);
+
+    expect(hasValidApplicantEnrichmentCache([
+      { name: 'Needs Review', isApplicantRecommended: true, enrichedProposalKey: proposalKey, identityStatus: 'unresolved', needsIdentification: true },
+      { name: 'Deceased Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey, eligibilityStatus: 'deceased' },
+    ], proposalKey)).toBe(true);
   });
 });
 

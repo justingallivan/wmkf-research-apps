@@ -121,6 +121,37 @@ test('durable ineligible status blocks promotion even when the candidate blob la
   expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
+test('identity-review applicant is rejected before lifecycle promotion without server confirmation', async () => {
+  findCandidateBySuggestion.mockResolvedValue({
+    name: 'Dr Namesake',
+    suggestionId: SUG,
+    needsIdentification: true,
+    identityStatus: 'unresolved',
+    verificationStatus: 'unresolved',
+  });
+  const err = await promoteApplicantReviewer(args()).catch((error) => error);
+  expect(err).toBeInstanceOf(ServiceHttpError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({ code: 'identity_confirmation_required' });
+  expect(updateLifecycle).not.toHaveBeenCalled();
+  expect(update).not.toHaveBeenCalled();
+});
+
+test('server-recorded staff confirmation permits promotion of an identity-review applicant', async () => {
+  findCandidateBySuggestion.mockResolvedValue({
+    name: 'Dr Namesake',
+    suggestionId: SUG,
+    needsIdentification: true,
+    identityStatus: 'unresolved',
+    pdIdentityConfirmed: true,
+    pdIdentityConfirmationId: 'confirm-1',
+    staffIdentityConfirmation: { confirmationId: 'confirm-1', source: 'staff_confirmed' },
+  });
+  const body = await promoteApplicantReviewer(args());
+  expect(body.success).toBe(true);
+  expect(updateLifecycle).toHaveBeenCalledWith(SUG, { selected: true }, { actingUserSystemId: 'u-1' });
+});
+
 test('manual email collision: promotion stands, partialSuccess + email_conflict, backfill skipped', async () => {
   update.mockImplementation(async (_id, updates) => {
     if (updates && 'email' in updates) throw new Error('alt-key duplicate');
