@@ -126,7 +126,7 @@ jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
   pruneCandidateForRoster: jest.fn((c) => c),
 }));
 
-const recordSurfaced = jest.fn(async () => {});
+const recordSurfaced = jest.fn(async () => 1);
 const findCandidateBySuggestion = jest.fn(async () => null);
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   recordSurfaced: (...a) => recordSurfaced(...a),
@@ -373,7 +373,11 @@ describe('happy path (progress ordering + full card payload)', () => {
 
     // Writeback + roster persistence happened (id-keyed, best-effort).
     expect(upsertByPotentialReviewer).toHaveBeenCalledWith(PR, expect.objectContaining({ email: 'rec.one@rec.edu' }), { actingUserSystemId: 'u-1' });
-    expect(recordSurfaced).toHaveBeenCalledWith(REQ, [expect.objectContaining({ name: 'Dr. Rec One' })]);
+    expect(recordSurfaced).toHaveBeenCalledWith(
+      REQ,
+      [expect.objectContaining({ name: 'Dr. Rec One' })],
+      { expectedUpdatedAt: null },
+    );
     expect(res.ended).toBe(true);
   });
 

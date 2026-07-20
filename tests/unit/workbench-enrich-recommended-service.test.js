@@ -98,7 +98,7 @@ jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
   pruneCandidateForRoster: jest.fn((c) => c),
 }));
 
-const recordSurfaced = jest.fn(async () => {});
+const recordSurfaced = jest.fn(async () => 1);
 const findCandidateBySuggestion = jest.fn(async () => null);
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   recordSurfaced: (...a) => recordSurfaced(...a),
@@ -176,6 +176,31 @@ test('happy path: progress frames strictly precede one terminal complete; never 
   expect(recordSurfaced).toHaveBeenCalledTimes(1);
 });
 
+test('an enrichment write uses the pre-run roster token and leaves a concurrently changed row untouched', async () => {
+  findCandidateBySuggestion.mockResolvedValueOnce({
+    candidateKey: `suggestion:${SUG}`,
+    suggestionId: SUG,
+    name: 'Dr. Rec One',
+    identityStatus: 'unresolved',
+    rosterUpdatedAt: '2026-07-20 10:00:00+00',
+  });
+  recordSurfaced.mockResolvedValueOnce(0);
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  expect(recordSurfaced).toHaveBeenCalledWith(
+    REQ,
+    [expect.objectContaining({ suggestionId: SUG })],
+    { expectedUpdatedAt: '2026-07-20 10:00:00+00' },
+  );
+  expect(events).toContainEqual({
+    event: 'progress',
+    data: { message: '1 reviewer row(s) changed while enrichment was running and were left unchanged.' },
+  });
+  expect(events.at(-1).event).toBe('complete');
+});
+
 test('rerun preserves an authenticated staff-confirmed row without automated overwrite', async () => {
   findCandidateBySuggestion.mockResolvedValue({
     candidateKey: 'suggestion:33333333-3333-3333-3333-333333333333',
@@ -214,6 +239,7 @@ test('rerun preserves an authenticated staff-confirmed row without automated ove
       pdIdentityConfirmed: true,
       pdIdentityConfirmationId: 'confirm-1',
     })],
+    { expectedUpdatedAt: null },
   );
 });
 
@@ -339,6 +365,7 @@ test('a stored affiliation does not exempt an applicant reviewer from the identi
   expect(recordSurfaced).toHaveBeenCalledWith(
     REQ,
     [expect.objectContaining({ needsIdentification: true, identityStatus: 'unresolved', email: null })],
+    { expectedUpdatedAt: null },
   );
 });
 

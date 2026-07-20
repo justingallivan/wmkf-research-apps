@@ -8,6 +8,7 @@ import {
   parseExcludeList,
   parseReferredSeeds,
   filterExcluded,
+  applicantTerminalSuggestionKeys,
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
   candidateWasSaved,
@@ -858,6 +859,68 @@ describe('hasValidApplicantEnrichmentCache', () => {
     expect(hasValidApplicantEnrichmentCache([
       { ...canonical, identityStatus: null, eligibilityStatus: 'deceased' },
     ], proposalKey, expected)).toBe(true);
+  });
+
+  test('treats canonical saved/excluded suggestions as terminal without hiding unknown missing rows', () => {
+    const secondExpected = [{ suggestionId: 'SUG-1' }, { suggestionId: 'SUG-2' }];
+    const excluded = [{
+      name: 'Excluded Applicant',
+      suggestionId: 'SUG-1',
+      candidateKey: 'suggestion:sug-1',
+    }];
+    const terminal = applicantTerminalSuggestionKeys(excluded, ['suggestion:sug-2']);
+    expect(hasValidApplicantEnrichmentCache([], proposalKey, secondExpected, terminal)).toBe(true);
+
+    const unknownOnly = applicantTerminalSuggestionKeys([], ['suggestion:other']);
+    expect(hasValidApplicantEnrichmentCache([], proposalKey, expected, unknownOnly)).toBe(false);
+  });
+
+  test('rejects non-canonical excluded/saved keys as terminal authority', () => {
+    const terminal = applicantTerminalSuggestionKeys(
+      [{ suggestionId: 'SUG-1', candidateKey: 'candidate:forged' }],
+      ['suggestion:SUG-1', 'candidate:other'],
+    );
+    expect(Array.from(terminal)).toEqual([]);
+    expect(hasValidApplicantEnrichmentCache([], proposalKey, expected, terminal)).toBe(false);
+  });
+});
+
+describe('pruneCandidateForRoster — server identity confirmation survives reload', () => {
+  test('keeps only the bounded confirmation/manual-contact shape', () => {
+    const pruned = pruneCandidateForRoster({
+      name: 'Ann Lee',
+      email: 'ann@example.edu',
+      contactEnrichment: { email: 'ann@example.edu', websiteSource: 'manual' },
+      manualContactFields: ['email', 'website', 'email', 'forged'],
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'confirm-1',
+      staffIdentityConfirmation: {
+        confirmationId: 'confirm-1',
+        source: 'staff_confirmed',
+        normalizedName: 'ann lee',
+        email: 'ann@example.edu',
+        website: 'https://example.edu/ann',
+        affiliation: 'Example University',
+        actorProfileId: 5,
+        actorSystemUserId: 'system-5',
+        confirmedAt: '2026-07-20T12:00:00.000Z',
+        forgedExtra: 'drop me',
+      },
+    });
+
+    expect(pruned.manualContactFields).toEqual(['email', 'website']);
+    expect(pruned.contactEnrichment.websiteSource).toBe('manual');
+    expect(pruned.staffIdentityConfirmation).toEqual({
+      confirmationId: 'confirm-1',
+      source: 'staff_confirmed',
+      normalizedName: 'ann lee',
+      email: 'ann@example.edu',
+      website: 'https://example.edu/ann',
+      affiliation: 'Example University',
+      actorProfileId: 5,
+      actorSystemUserId: 'system-5',
+      confirmedAt: '2026-07-20T12:00:00.000Z',
+    });
   });
 });
 

@@ -4,7 +4,7 @@
  * (`reviewer_find_roster` via `reviewer-roster-store`); no Dataverse, so no
  * `bypassDynamicsRestrictions` needed. See docs/atlas/postgres-reviewer-find-roster.md.
  *
- *   GET   ?requestId            → { active, excluded, ineligible, allNames }
+ *   GET   ?requestId            → { active, excluded, ineligible, savedKeys, allNames }
  *   POST  { requestId, candidates }                  → record surfaced
  *     (active, or ineligible only with a bound server eligibility receipt)
  *   PATCH { requestId, action:'exclude', candidate } → set aside
@@ -83,6 +83,18 @@ async function authoritativeApplicantCandidate(requestId, candidate) {
   return pruneCandidateForRoster(stored);
 }
 
+function stripClientRosterAuthority(candidate) {
+  if (!candidate || typeof candidate !== 'object') return candidate;
+  const {
+    staffIdentityConfirmation: _staffIdentityConfirmation,
+    manualContactFields: _manualContactFields,
+    pdIdentityConfirmed: _pdIdentityConfirmed,
+    pdIdentityConfirmationId: _pdIdentityConfirmationId,
+    ...safe
+  } = candidate;
+  return safe;
+}
+
 async function handleGet(req, res) {
   const { requestId } = req.query;
   if (!validRequestId(requestId)) {
@@ -113,7 +125,7 @@ async function handlePost(req, res) {
   // client sent them. Eligibility is server-issued evidence: overwrite the
   // browser's fields from the request/candidate-bound receipt, or clear them.
   const pruned = (await Promise.all(candidates.map(async (candidate) => {
-    const compact = pruneCandidateForRoster(candidate);
+    const compact = stripClientRosterAuthority(pruneCandidateForRoster(candidate));
     if (!compact?.name) return null;
     const receipt = await verifyAutomatedIdentityAttestation(
       compact.automatedIdentityAttestation,
@@ -152,7 +164,7 @@ async function handlePatch(req, res, access) {
     if (!candidate || !candidate.name) {
       return res.status(400).json({ error: 'candidate (with name) is required to exclude' });
     }
-    let candidateToExclude = pruneCandidateForRoster(candidate);
+    let candidateToExclude = stripClientRosterAuthority(pruneCandidateForRoster(candidate));
     if (isServerManagedApplicantCandidate(candidate)) {
       candidateToExclude = await authoritativeApplicantCandidate(requestId, candidate);
       if (!candidateToExclude) {
@@ -177,7 +189,7 @@ async function handlePatch(req, res, access) {
     }
     const pruned = [];
     for (const candidate of candidates) {
-      let safeCandidate = pruneCandidateForRoster(candidate);
+      let safeCandidate = stripClientRosterAuthority(pruneCandidateForRoster(candidate));
       if (isServerManagedApplicantCandidate(candidate)) {
         safeCandidate = await authoritativeApplicantCandidate(requestId, candidate);
         if (!safeCandidate) {

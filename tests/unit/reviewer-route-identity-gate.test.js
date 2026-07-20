@@ -1131,7 +1131,7 @@ describe('enrich-recommended route — applicant identity gate', () => {
         enrichedProposalKey: 'Library::Folder::Proposal.pdf',
         isApplicantRecommended: true,
       }),
-    ]);
+    ], { expectedUpdatedAt: null });
     const completeCall = res.write.mock.calls.find((call) => call[0] === 'event: complete\n');
     expect(completeCall).toBeTruthy();
     expect(rosterStore.recordSurfaced.mock.invocationCallOrder[0])

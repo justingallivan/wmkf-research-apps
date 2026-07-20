@@ -48,6 +48,7 @@ import {
   parseExcludeList,
   parseReferredSeeds,
   filterExcluded,
+  applicantTerminalSuggestionKeys,
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
   candidateWasSaved,
@@ -610,6 +611,7 @@ export default function ReviewerSearchSection({
   const [rosterActive, setRosterActive] = useState([]);
   const [rosterExcluded, setRosterExcluded] = useState([]);
   const [rosterIneligible, setRosterIneligible] = useState([]);
+  const [rosterSavedKeys, setRosterSavedKeys] = useState([]);
   const [rosterNames, setRosterNames] = useState([]);
   // Gates the search button until the roster GET resolves, so a run can't skip
   // the cross-run dedup by firing before rosterNames is loaded (Codex post-impl).
@@ -663,7 +665,7 @@ export default function ReviewerSearchSection({
     setPhase('idle'); setProgress([]); setCandidates([]); setUnverified([]); setAnalysis(null);
     setSelected(new Set()); setError(null); setErrorMeta(null); setSavedMsg(null); setEnrichNote(null); setExportError(null);
     setExcludedRemoved(0); setRosterNote(null); setRemovingPrevious(false);
-    setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false);
+    setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterSavedKeys([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false);
     setSearchSources({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
     setReviewerCount(DEFAULT_REVIEWER_COUNT);
     setAdditionalNotes('');
@@ -688,6 +690,7 @@ export default function ReviewerSearchSection({
             setRosterActive(Array.isArray(data.active) ? data.active : []);
             setRosterExcluded(Array.isArray(data.excluded) ? data.excluded : []);
             setRosterIneligible(Array.isArray(data.ineligible) ? data.ineligible : []);
+            setRosterSavedKeys(Array.isArray(data.savedKeys) ? data.savedKeys : []);
             setRosterNames(Array.isArray(data.allNames) ? data.allNames : []);
           }
         } catch { /* best-effort — a missing roster just means no dedup/restore this load */ }
@@ -998,10 +1001,15 @@ export default function ReviewerSearchSection({
   // ingested recommendations are ready. Runs independently of the Claude search —
   // enrichment uses blobUrl directly for COI if no prior analysis result exists.
   // Defined after enrichRecommended to avoid a temporal dead zone reference error.
+  const terminalApplicantKeys = useMemo(
+    () => applicantTerminalSuggestionKeys(rosterExcluded, rosterSavedKeys),
+    [rosterExcluded, rosterSavedKeys],
+  );
   const haveValidCache = hasValidApplicantEnrichmentCache(
     [...rosterActive, ...rosterIneligible],
     proposalKey,
     recommended,
+    terminalApplicantKeys,
   );
   useEffect(() => {
     const selectableCount = recommended.length;
@@ -1023,9 +1031,12 @@ export default function ReviewerSearchSection({
   const displayRosterActive = useMemo(() => rosterActive.filter((c) => (
     !isApplicantOriginCandidate(c) || (!!proposalKey && c.enrichedProposalKey === proposalKey)
   )), [rosterActive, proposalKey]);
+  const visibleRecCandidates = useMemo(() => recCandidates.filter((candidate) => (
+    !terminalApplicantKeys.has(candKey(candidate))
+  )), [recCandidates, terminalApplicantKeys]);
   const currentRunKeys = useMemo(() => new Set(
-    [...recCandidates, ...candidates].map(candKey).filter(Boolean)
-  ), [recCandidates, candidates]);
+    [...visibleRecCandidates, ...candidates].map(candKey).filter(Boolean)
+  ), [visibleRecCandidates, candidates]);
   const previousSearchCandidates = useMemo(() => (
     displayRosterActive
       .filter((c) => !isApplicantOriginCandidate(c) && !currentRunKeys.has(candKey(c)))
@@ -1041,7 +1052,7 @@ export default function ReviewerSearchSection({
       candidateKey: candKey(candidate),
       updatedAt: candidate.rosterUpdatedAt,
     })), [previousSearchCandidates]);
-  const displayCandidates = dedupeByName([...recCandidates, ...candidates, ...displayRosterActive].map((c) => withReviewerProvenance(c)));
+  const displayCandidates = dedupeByName([...visibleRecCandidates, ...candidates, ...displayRosterActive].map((c) => withReviewerProvenance(c)));
   const incompleteCoiCandidates = dedupeByName([...displayCandidates, ...rosterIneligible])
     .filter((candidate) => candidate.coauthorCheckStatus === 'incomplete');
   const incompleteCoiNames = incompleteCoiCandidates.map((candidate) => candidate.name).filter(Boolean);
@@ -1158,6 +1169,7 @@ export default function ReviewerSearchSection({
       setRosterActive(Array.isArray(data.active) ? data.active : []);
       setRosterExcluded(Array.isArray(data.excluded) ? data.excluded : []);
       setRosterIneligible(Array.isArray(data.ineligible) ? data.ineligible : []);
+      setRosterSavedKeys(Array.isArray(data.savedKeys) ? data.savedKeys : []);
       setRosterNames(Array.isArray(data.allNames) ? data.allNames : []);
       setSelected((prev) => {
         const next = new Set(prev);
@@ -1455,7 +1467,7 @@ export default function ReviewerSearchSection({
         }
         if (requestId) {
           try {
-            await fetch('/api/workbench/reviewer-roster', {
+            const rosterResponse = await fetch('/api/workbench/reviewer-roster', {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -1464,6 +1476,10 @@ export default function ReviewerSearchSection({
                 candidates: promotedCandidates.map(pruneCandidateForRoster),
               }),
             });
+            if (!rosterResponse.ok) throw new Error('mark saved failed');
+            if (isCurrent()) {
+              setRosterSavedKeys((prev) => Array.from(new Set([...prev, ...promotedKeys])));
+            }
           } catch {
             if (isCurrent()) setRosterNote("Couldn't mark promoted applicant-referred reviewers as saved in the Find roster — they may reappear after reload.");
           }

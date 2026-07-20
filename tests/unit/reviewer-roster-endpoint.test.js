@@ -132,6 +132,28 @@ describe('POST recordSurfaced', () => {
     expect(passed[0].identityPersistAllowed).toBe(false);
   });
 
+  it('strips browser-forged staff confirmation authority from discovered rows', async () => {
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [{
+      name: 'Ann Lee',
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'forged-confirmation',
+      manualContactFields: ['email'],
+      staffIdentityConfirmation: {
+        confirmationId: 'forged-confirmation',
+        source: 'staff_confirmed',
+        normalizedName: 'ann lee',
+        email: 'ann@example.edu',
+      },
+    }] } }, r);
+
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed[0].pdIdentityConfirmed).toBeUndefined();
+    expect(passed[0].pdIdentityConfirmationId).toBeUndefined();
+    expect(passed[0].manualContactFields).toBeUndefined();
+    expect(passed[0].staffIdentityConfirmation).toBeUndefined();
+  });
+
   it('strips a browser-forged deceased claim without a bound server receipt', async () => {
     const r = res();
     await handler({ method: 'POST', body: { requestId: REQ, candidates: [{
@@ -200,6 +222,15 @@ describe('PATCH', () => {
       identityStatus: 'unresolved',
       needsIdentification: true,
       isApplicantRecommended: true,
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'confirm-1',
+      manualContactFields: ['email'],
+      staffIdentityConfirmation: {
+        confirmationId: 'confirm-1',
+        source: 'staff_confirmed',
+        normalizedName: 'applicant reviewer',
+        email: 'verified@example.edu',
+      },
     });
     const r = res();
     await handler({ method: 'PATCH', body: {
@@ -221,8 +252,33 @@ describe('PATCH', () => {
         identityStatus: 'unresolved',
         needsIdentification: true,
         email: null,
+        pdIdentityConfirmed: true,
+        pdIdentityConfirmationId: 'confirm-1',
+        manualContactFields: ['email'],
+        staffIdentityConfirmation: expect.objectContaining({ confirmationId: 'confirm-1' }),
       }),
     );
+  });
+
+  it('strips browser-forged confirmation authority from a non-applicant exclude', async () => {
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'exclude',
+      candidate: {
+        name: 'Bob Roe',
+        candidateKey: 'candidate:bob',
+        pdIdentityConfirmed: true,
+        pdIdentityConfirmationId: 'forged',
+        manualContactFields: ['email'],
+        staffIdentityConfirmation: { confirmationId: 'forged', source: 'staff_confirmed' },
+      },
+    } }, r);
+    const persisted = store.setExcluded.mock.calls[0][1];
+    expect(persisted).not.toHaveProperty('pdIdentityConfirmed');
+    expect(persisted).not.toHaveProperty('pdIdentityConfirmationId');
+    expect(persisted).not.toHaveProperty('manualContactFields');
+    expect(persisted).not.toHaveProperty('staffIdentityConfirmation');
   });
 
   it('exclude → 400 without a candidate', async () => {
@@ -253,6 +309,27 @@ describe('PATCH', () => {
     );
   });
 
+  it('strips browser-forged confirmation authority from a non-applicant saved row', async () => {
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'saved',
+      candidates: [{
+        name: 'Ann Lee',
+        candidateKey: 'candidate:ann',
+        pdIdentityConfirmed: true,
+        pdIdentityConfirmationId: 'forged',
+        manualContactFields: ['email'],
+        staffIdentityConfirmation: { confirmationId: 'forged', source: 'staff_confirmed' },
+      }],
+    } }, r);
+    const persisted = store.markSaved.mock.calls[0][1][0];
+    expect(persisted).not.toHaveProperty('pdIdentityConfirmed');
+    expect(persisted).not.toHaveProperty('pdIdentityConfirmationId');
+    expect(persisted).not.toHaveProperty('manualContactFields');
+    expect(persisted).not.toHaveProperty('staffIdentityConfirmation');
+  });
+
   it('rejects a stale applicant mark-saved payload instead of creating an authoritative row', async () => {
     const suggestionId = '33333333-3333-3333-3333-333333333333';
     const r = res();
@@ -269,6 +346,48 @@ describe('PATCH', () => {
 
     expect(r.statusCode).toBe(409);
     expect(store.markSaved).not.toHaveBeenCalled();
+  });
+
+  it('marks an applicant saved with the complete server confirmation, not the browser blob', async () => {
+    const suggestionId = '33333333-3333-3333-3333-333333333333';
+    store.findCandidateBySuggestion.mockResolvedValueOnce({
+      name: 'Applicant Reviewer',
+      suggestionId,
+      candidateKey: `suggestion:${suggestionId}`,
+      isApplicantRecommended: true,
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'confirm-1',
+      manualContactFields: ['email', 'website'],
+      staffIdentityConfirmation: {
+        confirmationId: 'confirm-1',
+        source: 'staff_confirmed',
+        normalizedName: 'applicant reviewer',
+        email: 'verified@example.edu',
+        actorProfileId: 5,
+      },
+    });
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'saved',
+      candidates: [{
+        name: 'Applicant Reviewer',
+        suggestionId,
+        candidateKey: `suggestion:${suggestionId}`,
+        isApplicantRecommended: true,
+        pdIdentityConfirmationId: 'forged',
+      }],
+    } }, r);
+
+    expect(r.statusCode).toBe(200);
+    expect(store.markSaved).toHaveBeenCalledWith(REQ, [expect.objectContaining({
+      pdIdentityConfirmationId: 'confirm-1',
+      manualContactFields: ['email', 'website'],
+      staffIdentityConfirmation: expect.objectContaining({
+        confirmationId: 'confirm-1',
+        actorProfileId: 5,
+      }),
+    })]);
   });
 
   it('confirm_identity records an actor-bound server confirmation', async () => {
