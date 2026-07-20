@@ -14,6 +14,7 @@ import { parseReferredSeeds as _parseReferredSeeds } from '../../../lib/utils/re
 import { reviewerSaveKey } from '../../../lib/utils/reviewer-save-key';
 import {
   reviewerCandidateKey as _reviewerCandidateKey,
+  reviewerSuggestionCandidateKey,
   withReviewerCandidateKey as _withReviewerCandidateKey,
 } from '../../../lib/utils/reviewer-candidate-key';
 import { emailConfidence } from '../../../lib/utils/reviewer-invite';
@@ -304,20 +305,36 @@ export function filterExcluded(candidates, excludedNames) {
   return partitionByExcluded(candidates, excludedNames, (c) => c && c.name);
 }
 
-export function hasValidApplicantEnrichmentCache(rosterActive, proposalKey) {
-  if (!proposalKey) return false;
-  const applicantRows = (Array.isArray(rosterActive) ? rosterActive : []).filter((c) => (
-    c?.enrichedProposalKey === proposalKey
-      && (c.isApplicantRecommended || provenanceKindOf(c) === PROVENANCE_KINDS.APPLICANT_SUGGESTED)
-  ));
-  if (applicantRows.length === 0) return false;
+export function hasValidApplicantEnrichmentCache(rosterActive, proposalKey, expectedRecommendations) {
+  if (!proposalKey || !Array.isArray(expectedRecommendations) || expectedRecommendations.length === 0) {
+    return false;
+  }
+  const expectedKeys = new Set(expectedRecommendations
+    .map((candidate) => reviewerSuggestionCandidateKey(candidate?.suggestionId))
+    .filter(Boolean));
+  if (expectedKeys.size !== expectedRecommendations.length) return false;
+
+  const canonicalRowsByKey = new Map();
+  for (const candidate of Array.isArray(rosterActive) ? rosterActive : []) {
+    const canonicalKey = reviewerSuggestionCandidateKey(candidate?.suggestionId);
+    if (
+      canonicalKey
+      && expectedKeys.has(canonicalKey)
+      && candidate?.candidateKey === canonicalKey
+      && candidate?.enrichedProposalKey === proposalKey
+      && (candidate.isApplicantRecommended || provenanceKindOf(candidate) === PROVENANCE_KINDS.APPLICANT_SUGGESTED)
+    ) {
+      canonicalRowsByKey.set(canonicalKey, candidate);
+    }
+  }
+  if (canonicalRowsByKey.size !== expectedKeys.size) return false;
 
   // Applicant enrichment now fails closed unless every non-deceased row has an
-  // explicit identity-gate result. Rows written by the older affiliation-bypass
-  // contract lack this marker, so they are re-enriched once after deployment
-  // instead of remaining a permanently "valid" cache with potentially namesake
-  // contact data.
-  return applicantRows.every((c) => (
+  // explicit identity-gate result. Only the exact canonical suggestion rows for
+  // the current recommendation set count: legacy candidate keys cannot poison a
+  // newly written cache, and a partial roster write cannot masquerade as a
+  // complete batch.
+  return Array.from(canonicalRowsByKey.values()).every((c) => (
     c?.eligibilityStatus === 'deceased'
       || c?.pdIdentityConfirmed === true
       || c?.identityStatus === 'confirmed'

@@ -27,6 +27,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 
 import handler from '../../pages/api/workbench/promote-applicant-reviewer';
 import { requireAppAccess } from '../../lib/utils/auth';
+import { findCandidateBySuggestion } from '../../lib/services/reviewer-roster-store';
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const OTHER_REQUEST_ID = '22222222-2222-2222-2222-222222222222';
@@ -54,6 +55,11 @@ beforeEach(() => {
     wmkf_appreviewersuggestionid: SUGGESTION_ID,
     _wmkf_request_value: REQUEST_ID,
     wmkf_applicantdisposition: 100000000,
+  });
+  findCandidateBySuggestion.mockResolvedValue({
+    suggestionId: SUGGESTION_ID,
+    identityStatus: 'probable',
+    needsIdentification: false,
   });
 });
 

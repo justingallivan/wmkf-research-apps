@@ -127,8 +127,10 @@ jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
 }));
 
 const recordSurfaced = jest.fn(async () => {});
+const findCandidateBySuggestion = jest.fn(async () => null);
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   recordSurfaced: (...a) => recordSurfaced(...a),
+  findCandidateBySuggestion: (...a) => findCandidateBySuggestion(...a),
 }));
 
 jest.mock('../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn() }));

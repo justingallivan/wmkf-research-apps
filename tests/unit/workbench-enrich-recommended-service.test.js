@@ -99,8 +99,10 @@ jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
 }));
 
 const recordSurfaced = jest.fn(async () => {});
+const findCandidateBySuggestion = jest.fn(async () => null);
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   recordSurfaced: (...a) => recordSurfaced(...a),
+  findCandidateBySuggestion: (...a) => findCandidateBySuggestion(...a),
 }));
 
 jest.mock('../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn() }));
@@ -137,6 +139,7 @@ beforeEach(() => {
   ContactParser.isNameConsistentEmail.mockReturnValue(true);
   areInstitutionsConsistent.mockResolvedValue(false);
   getReviewerTimeBudgetSeconds.mockResolvedValue(600);
+  findCandidateBySuggestion.mockResolvedValue(null);
   findApplicantRecommendedByRequest.mockResolvedValue([
     { _wmkf_potentialreviewer_value: PR, _wmkf_potentialreviewer_value_formatted: 'Dr. Rec One', wmkf_appreviewersuggestionid: SUG },
   ]);
@@ -171,6 +174,47 @@ test('happy path: progress frames strictly precede one terminal complete; never 
     isApplicantRecommended: true,
   });
   expect(recordSurfaced).toHaveBeenCalledTimes(1);
+});
+
+test('rerun preserves an authenticated staff-confirmed row without automated overwrite', async () => {
+  findCandidateBySuggestion.mockResolvedValue({
+    candidateKey: 'suggestion:33333333-3333-3333-3333-333333333333',
+    suggestionId: SUG,
+    name: 'Dr. Rec One',
+    email: 'staff-confirmed@example.edu',
+    identityStatus: 'unresolved',
+    needsIdentification: true,
+    isApplicantRecommended: true,
+    pdIdentityConfirmed: true,
+    pdIdentityConfirmationId: 'confirm-1',
+    staffIdentityConfirmation: { confirmationId: 'confirm-1', source: 'staff_confirmed' },
+  });
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args({ analysisResult: undefined, apiKey: undefined }), onEvent);
+
+  expect(verifyClaudeSuggestions).not.toHaveBeenCalled();
+  expect(enrichCandidates).not.toHaveBeenCalled();
+  expect(events).toEqual([{
+    event: 'complete',
+    data: {
+      recommended: [expect.objectContaining({
+        candidateKey: 'suggestion:33333333-3333-3333-3333-333333333333',
+        enrichedProposalKey: 'key-1',
+        email: 'staff-confirmed@example.edu',
+        pdIdentityConfirmed: true,
+        pdIdentityConfirmationId: 'confirm-1',
+      })],
+    },
+  }]);
+  expect(recordSurfaced).toHaveBeenCalledWith(
+    REQ,
+    [expect.objectContaining({
+      email: 'staff-confirmed@example.edu',
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'confirm-1',
+    })],
+  );
 });
 
 test('empty frames: no junction rows, and rows yielding no valid suggestions → complete { recommended: [] }', async () => {
@@ -382,6 +426,71 @@ test('a resolved co-affiliation suppresses the string mismatch instead of creati
     email: 'reviewer@mit.edu',
   });
   expect(upsertByPotentialReviewer).toHaveBeenCalled();
+});
+
+test('a co-affiliation checker error keeps the contradiction gated and emits a retryable progress reason', async () => {
+  areInstitutionsConsistent.mockRejectedValue(new Error('OpenAlex unavailable'));
+  verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
+    verified: suggestions.map((s) => ({
+      ...s,
+      verified: true,
+      institutionMismatch: true,
+      suggestedInstitution: 'Broad Institute',
+      affiliation: 'Massachusetts Institute of Technology',
+      publications: [],
+    })),
+    unverified: [],
+  }));
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      contactEnrichment: { identity: { status: 'probable' } },
+    })),
+  }));
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  expect(events).toContainEqual({
+    event: 'progress',
+    data: { message: 'Could not reconcile institution affiliations for Dr. Rec One: OpenAlex unavailable' },
+  });
+  expect(events.at(-1).data.recommended[0]).toMatchObject({
+    identityStatus: 'unresolved',
+    needsIdentification: true,
+    institutionMismatch: true,
+  });
+  expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(writeIdentityDecision).not.toHaveBeenCalled();
+});
+
+test('a deadline abort during co-affiliation checking remains a terminal timeout', async () => {
+  getReviewerTimeBudgetSeconds.mockResolvedValue(0);
+  verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
+    verified: suggestions.map((s) => ({
+      ...s,
+      verified: true,
+      institutionMismatch: true,
+      suggestedInstitution: 'Broad Institute',
+      affiliation: 'Massachusetts Institute of Technology',
+      publications: [],
+    })),
+    unverified: [],
+  }));
+  areInstitutionsConsistent.mockImplementation(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    throw new Error('checker aborted');
+  });
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  expect(events.at(-1)).toMatchObject({
+    event: 'error',
+    data: { timeout: true },
+  });
+  expect(events.some((event) => event.event === 'complete')).toBe(false);
+  expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
 });
 
 test('pipeline throw: resolves (never throws) with one generic terminal error', async () => {

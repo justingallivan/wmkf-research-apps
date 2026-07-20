@@ -998,7 +998,11 @@ export default function ReviewerSearchSection({
   // ingested recommendations are ready. Runs independently of the Claude search —
   // enrichment uses blobUrl directly for COI if no prior analysis result exists.
   // Defined after enrichRecommended to avoid a temporal dead zone reference error.
-  const haveValidCache = hasValidApplicantEnrichmentCache([...rosterActive, ...rosterIneligible], proposalKey);
+  const haveValidCache = hasValidApplicantEnrichmentCache(
+    [...rosterActive, ...rosterIneligible],
+    proposalKey,
+    recommended,
+  );
   useEffect(() => {
     const selectableCount = recommended.length;
     if (recPhase !== 'idle' || recRunningRef.current) return;
@@ -1585,8 +1589,14 @@ export default function ReviewerSearchSection({
   // Candidates with needsIdentification:true route to needs_identity_review, not
   // applicant_suggested — split the done-message count accordingly.
   const applicantDisplayCandidates = displayCandidates.filter(isApplicantOriginCandidate);
-  const recVerifiedCount = applicantDisplayCandidates.filter((c) => provenanceGroupOf(withReviewerProvenance(c)) === 'applicant_suggested').length;
-  const recIdentityReviewCount = applicantDisplayCandidates.filter((c) => provenanceGroupOf(withReviewerProvenance(c)) === 'needs_identity_review').length;
+  const recVerifiedCount = applicantDisplayCandidates.filter((c) => (
+    provenanceGroupOf(withReviewerProvenance(c)) === 'applicant_suggested'
+      || c?.pdIdentityConfirmed === true
+  )).length;
+  const recIdentityReviewCount = applicantDisplayCandidates.filter((c) => (
+    provenanceGroupOf(withReviewerProvenance(c)) === 'needs_identity_review'
+      && c?.pdIdentityConfirmed !== true
+  )).length;
 
   return (
     <>
@@ -2063,24 +2073,36 @@ export default function ReviewerSearchSection({
             </div>
           )}
           {recPhase === 'done' && (
-            <p className="text-sm text-gray-600">
-              {recVerifiedCount === 0 && recIdentityReviewCount === 0
-                ? 'No applicant-referred reviewers could be verified.'
-                : <>
-                    {recVerifiedCount > 0
-                      ? `${recVerifiedCount} applicant-referred reviewer${recVerifiedCount === 1 ? '' : 's'} verified — see the Applicant-referred section above`
-                      : 'No reviewers added to the Applicant-referred section'}
-                    {recIdentityReviewCount > 0 && <>; {recIdentityReviewCount} could not be confirmed — see the Identity review section</>}.
-                  </>
-              }
-            </p>
+            <div className="space-y-2">
+              <p className="text-sm text-gray-600">
+                {recVerifiedCount === 0 && recIdentityReviewCount === 0
+                  ? 'No applicant-referred reviewers could be verified.'
+                  : <>
+                      {recVerifiedCount > 0
+                        ? `${recVerifiedCount} applicant-referred reviewer${recVerifiedCount === 1 ? '' : 's'} verified — see the Applicant-referred section above`
+                        : 'No reviewers added to the Applicant-referred section'}
+                      {recIdentityReviewCount > 0 && <>; {recIdentityReviewCount} could not be confirmed — see the Identity review section</>}.
+                    </>
+                }
+              </p>
+              {recIdentityReviewCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => enrichRecommended()}
+                  disabled={!blobUrl || !proposalKey}
+                  className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Retry automatic identification
+                </button>
+              )}
+            </div>
           )}
           {recPhase === 'error' && (
             <div className="space-y-2">
               <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{recError}</div>
               <button
                 type="button"
-                onClick={enrichRecommended}
+                onClick={() => enrichRecommended()}
                 disabled={!blobUrl || !proposalKey}
                 className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
               >

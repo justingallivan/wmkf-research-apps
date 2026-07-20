@@ -49,6 +49,7 @@ describe('listForRequest', () => {
 describe('findCandidateBySuggestion', () => {
   test('returns the server-owned roster status with the candidate blob', async () => {
     sql.mockResolvedValueOnce({ rows: [{
+      candidate_key: 'suggestion:sug-1',
       status: 'ineligible',
       display_name: 'Pat Thiel',
       candidate: { name: 'Pat Thiel', suggestionId: 'SUG-1' },
@@ -58,8 +59,11 @@ describe('findCandidateBySuggestion', () => {
     await expect(store.findCandidateBySuggestion(REQ, 'SUG-1')).resolves.toMatchObject({
       name: 'Pat Thiel',
       suggestionId: 'SUG-1',
+      candidateKey: 'suggestion:sug-1',
       rosterStatus: 'ineligible',
     });
+    expect(queryTextOf(0)).toMatch(/candidate_key\s*=/);
+    expect(allInterpolations()).toContain('suggestion:sug-1');
   });
 });
 

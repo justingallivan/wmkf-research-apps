@@ -58,7 +58,11 @@ beforeEach(() => {
   update.mockResolvedValue(undefined);
   updateById.mockResolvedValue(undefined);
   getById.mockResolvedValue({});
-  findCandidateBySuggestion.mockResolvedValue(null);
+  findCandidateBySuggestion.mockResolvedValue({
+    suggestionId: SUG,
+    identityStatus: 'probable',
+    needsIdentification: false,
+  });
   translateDuplicateKeyError.mockReturnValue(null);
 });
 
@@ -94,6 +98,15 @@ test('plain promote: selected flipped, empty clean result', async () => {
   const body = await promoteApplicantReviewer(args());
   expect(updateLifecycle).toHaveBeenCalledWith(SUG, { selected: true }, { actingUserSystemId: 'u-1' });
   expect(body).toEqual({ success: true, suggestionId: SUG, savedFields: [], partialSuccess: false, contactError: null });
+});
+
+test('missing authoritative roster row is rejected before lifecycle promotion', async () => {
+  findCandidateBySuggestion.mockResolvedValue(null);
+  const err = await promoteApplicantReviewer(args()).catch((error) => error);
+  expect(err).toBeInstanceOf(ServiceHttpError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({ code: 'identity_verification_required' });
+  expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
 test('deceased applicant-recommended reviewer is rejected before lifecycle promotion', async () => {

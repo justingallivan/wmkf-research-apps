@@ -25,6 +25,7 @@ import {
   confirmIdentity,
   markSaved,
   listForRequest,
+  findCandidateBySuggestion,
   removePreviousActiveSearchResults,
 } from '../../../lib/services/reviewer-roster-store';
 import { verifyAutomatedIdentityAttestation } from '../../../lib/services/reviewer-candidate-attestation';
@@ -61,6 +62,27 @@ function validRequestId(requestId) {
   return typeof requestId === 'string' && GUID_RE.test(requestId);
 }
 
+function isServerManagedApplicantCandidate(candidate) {
+  return !!(
+    candidate
+    && typeof candidate === 'object'
+    && (
+      candidate.suggestionId
+      || (typeof candidate.candidateKey === 'string' && candidate.candidateKey.startsWith('suggestion:'))
+      || candidate.isApplicantRecommended === true
+      || candidate.enrichedProposalKey
+      || candidate.provenance?.kind === 'applicant_suggested'
+    )
+  );
+}
+
+async function authoritativeApplicantCandidate(requestId, candidate) {
+  if (!candidate?.suggestionId) return null;
+  const stored = await findCandidateBySuggestion(requestId, candidate.suggestionId);
+  if (!stored || stored.candidateKey !== candidate.candidateKey) return null;
+  return pruneCandidateForRoster(stored);
+}
+
 async function handleGet(req, res) {
   const { requestId } = req.query;
   if (!validRequestId(requestId)) {
@@ -80,6 +102,12 @@ async function handlePost(req, res) {
   }
   if (candidates.length > MAX_CANDIDATES_PER_POST) {
     return res.status(400).json({ error: `Too many candidates (max ${MAX_CANDIDATES_PER_POST})` });
+  }
+  if (candidates.some(isServerManagedApplicantCandidate)) {
+    return res.status(400).json({
+      error: 'Applicant-recommended roster rows are server-managed',
+      code: 'server_managed_applicant_candidate',
+    });
   }
   // Prune server-side too — never persist raw enrichment internals even if a
   // client sent them. Eligibility is server-issued evidence: overwrite the
@@ -124,7 +152,14 @@ async function handlePatch(req, res, access) {
     if (!candidate || !candidate.name) {
       return res.status(400).json({ error: 'candidate (with name) is required to exclude' });
     }
-    await setExcluded(requestId, pruneCandidateForRoster(candidate));
+    let candidateToExclude = pruneCandidateForRoster(candidate);
+    if (isServerManagedApplicantCandidate(candidate)) {
+      candidateToExclude = await authoritativeApplicantCandidate(requestId, candidate);
+      if (!candidateToExclude) {
+        return res.status(409).json({ error: 'Applicant reviewer row is stale or missing; reload before excluding it.' });
+      }
+    }
+    await setExcluded(requestId, candidateToExclude);
     return res.status(200).json({ success: true });
   }
 
@@ -140,7 +175,17 @@ async function handlePatch(req, res, access) {
     if (!Array.isArray(candidates) || candidates.length === 0) {
       return res.status(400).json({ error: 'candidates[] is required to mark saved' });
     }
-    const pruned = candidates.map(pruneCandidateForRoster).filter((candidate) => candidate?.name && candidate?.candidateKey);
+    const pruned = [];
+    for (const candidate of candidates) {
+      let safeCandidate = pruneCandidateForRoster(candidate);
+      if (isServerManagedApplicantCandidate(candidate)) {
+        safeCandidate = await authoritativeApplicantCandidate(requestId, candidate);
+        if (!safeCandidate) {
+          return res.status(409).json({ error: 'Applicant reviewer row is stale or missing; reload before marking it saved.' });
+        }
+      }
+      if (safeCandidate?.name && safeCandidate?.candidateKey) pruned.push(safeCandidate);
+    }
     if (pruned.length !== candidates.length) {
       return res.status(400).json({ error: 'Every saved candidate requires name and candidateKey' });
     }
@@ -153,13 +198,23 @@ async function handlePatch(req, res, access) {
     if (!candidate?.name || !candidate?.email) {
       return res.status(400).json({ error: 'candidate name and email are required to confirm identity' });
     }
+    let authoritativeCandidate = candidate;
+    if (isServerManagedApplicantCandidate(candidate)) {
+      authoritativeCandidate = await authoritativeApplicantCandidate(requestId, candidate);
+      if (!authoritativeCandidate) {
+        return res.status(409).json({ error: 'Applicant reviewer row is stale or missing; reload before confirming identity.' });
+      }
+    }
     const manualCandidate = {
-      ...candidate,
+      ...authoritativeCandidate,
+      email: candidate.email,
       emailSource: 'manual',
+      website: candidate.website || null,
       websiteSource: candidate.website ? 'manual' : null,
+      affiliation: candidate.affiliation || null,
       affiliationSource: 'staff_manual',
       contactEnrichment: {
-        ...(candidate.contactEnrichment || {}),
+        ...(authoritativeCandidate.contactEnrichment || {}),
         email: candidate.email,
         emailSource: 'manual',
         website: candidate.website || null,

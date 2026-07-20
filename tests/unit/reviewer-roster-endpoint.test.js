@@ -16,6 +16,7 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   promote: jest.fn(async () => ({ name: 'Bob Roe' })),
   confirmIdentity: jest.fn(async () => ({ confirmationId: 'confirm-1', candidate: { name: 'Ann Lee' } })),
   markSaved: jest.fn(async () => 1),
+  findCandidateBySuggestion: jest.fn(async () => null),
   removePreviousActiveSearchResults: jest.fn(async () => ({
     removed: 2,
     removedKeys: ['candidate:old-a', 'candidate:old-b'],
@@ -40,6 +41,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   requireAppAccess.mockResolvedValue({ profileId: 5 });
   verifyAutomatedIdentityAttestation.mockResolvedValue({ valid: false, reason: 'no_token' });
+  store.findCandidateBySuggestion.mockResolvedValue(null);
 });
 
 describe('auth', () => {
@@ -81,6 +83,23 @@ describe('POST recordSurfaced', () => {
     const r = res();
     await handler({ method: 'POST', body: { requestId: REQ, candidates: many } }, r);
     expect(r.statusCode).toBe(400);
+    expect(store.recordSurfaced).not.toHaveBeenCalled();
+  });
+
+  it('rejects browser attempts to mint server-managed applicant suggestion rows', async () => {
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [{
+      name: 'Applicant Reviewer',
+      suggestionId: '33333333-3333-3333-3333-333333333333',
+      candidateKey: 'suggestion:33333333-3333-3333-3333-333333333333',
+      isApplicantRecommended: true,
+      identityStatus: 'probable',
+      email: 'forged@example.edu',
+      emailPersistAllowed: true,
+    }] } }, r);
+
+    expect(r.statusCode).toBe(400);
+    expect(r.body).toMatchObject({ code: 'server_managed_applicant_candidate' });
     expect(store.recordSurfaced).not.toHaveBeenCalled();
   });
 
@@ -172,6 +191,40 @@ describe('PATCH', () => {
     expect(store.setExcluded).toHaveBeenCalledWith(REQ, expect.objectContaining({ name: 'Bob Roe' }));
   });
 
+  it('exclude of an applicant row uses the existing server blob, not the browser blob', async () => {
+    const suggestionId = '33333333-3333-3333-3333-333333333333';
+    store.findCandidateBySuggestion.mockResolvedValueOnce({
+      name: 'Applicant Reviewer',
+      suggestionId,
+      candidateKey: `suggestion:${suggestionId}`,
+      identityStatus: 'unresolved',
+      needsIdentification: true,
+      isApplicantRecommended: true,
+    });
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'exclude',
+      candidate: {
+        name: 'Applicant Reviewer',
+        suggestionId,
+        candidateKey: `suggestion:${suggestionId}`,
+        identityStatus: 'probable',
+        email: 'forged@example.edu',
+      },
+    } }, r);
+
+    expect(r.statusCode).toBe(200);
+    expect(store.setExcluded).toHaveBeenCalledWith(
+      REQ,
+      expect.objectContaining({
+        identityStatus: 'unresolved',
+        needsIdentification: true,
+        email: null,
+      }),
+    );
+  });
+
   it('exclude → 400 without a candidate', async () => {
     const r = res();
     await handler({ method: 'PATCH', body: { requestId: REQ, action: 'exclude' } }, r);
@@ -200,6 +253,24 @@ describe('PATCH', () => {
     );
   });
 
+  it('rejects a stale applicant mark-saved payload instead of creating an authoritative row', async () => {
+    const suggestionId = '33333333-3333-3333-3333-333333333333';
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'saved',
+      candidates: [{
+        name: 'Applicant Reviewer',
+        suggestionId,
+        candidateKey: `suggestion:${suggestionId}`,
+        isApplicantRecommended: true,
+      }],
+    } }, r);
+
+    expect(r.statusCode).toBe(409);
+    expect(store.markSaved).not.toHaveBeenCalled();
+  });
+
   it('confirm_identity records an actor-bound server confirmation', async () => {
     requireAppAccess.mockResolvedValueOnce({
       profileId: 5,
@@ -218,6 +289,45 @@ describe('PATCH', () => {
       { actorProfileId: 5, actorSystemUserId: 'SYS-5' },
     );
     expect(r.body.confirmationId).toBe('confirm-1');
+  });
+
+  it('confirm_identity keeps applicant identity evidence from the server row', async () => {
+    const suggestionId = '33333333-3333-3333-3333-333333333333';
+    store.findCandidateBySuggestion.mockResolvedValueOnce({
+      name: 'Applicant Reviewer',
+      suggestionId,
+      candidateKey: `suggestion:${suggestionId}`,
+      identityStatus: 'unresolved',
+      verificationStatus: 'unresolved',
+      needsIdentification: true,
+      isApplicantRecommended: true,
+    });
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'confirm_identity',
+      candidate: {
+        name: 'Applicant Reviewer',
+        email: 'verified@example.edu',
+        suggestionId,
+        candidateKey: `suggestion:${suggestionId}`,
+        identityStatus: 'probable',
+        needsIdentification: false,
+      },
+    } }, r);
+
+    expect(r.statusCode).toBe(200);
+    expect(store.confirmIdentity).toHaveBeenCalledWith(
+      REQ,
+      expect.objectContaining({
+        suggestionId,
+        identityStatus: 'unresolved',
+        verificationStatus: 'unresolved',
+        needsIdentification: true,
+        email: 'verified@example.edu',
+      }),
+      expect.anything(),
+    );
   });
 
   it('confirm_identity returns 409 when the active roster row is gone', async () => {

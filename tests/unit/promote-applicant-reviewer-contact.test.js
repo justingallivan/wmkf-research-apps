@@ -46,6 +46,11 @@ const { findCandidateBySuggestion } = require('../../lib/services/reviewer-roste
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const SUGGESTION_ID = '33333333-3333-3333-3333-333333333333';
 const PERSON_ID = '22222222-2222-2222-2222-222222222222';
+const SAFE_ROSTER_CANDIDATE = {
+  suggestionId: SUGGESTION_ID,
+  identityStatus: 'probable',
+  needsIdentification: false,
+};
 
 function mockRes() {
   const res = {};
@@ -72,6 +77,7 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
       _wmkf_potentialreviewer_value: PERSON_ID,
       wmkf_applicantdisposition: 100000000, // recommended
     });
+    findCandidateBySuggestion.mockResolvedValue(SAFE_ROSTER_CANDIDATE);
   });
 
   test('flips selected and persists the marked contact, stamping email manual', async () => {
@@ -183,6 +189,7 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
       wmkf_applicantdisposition: 100000000,
     });
     potentialReviewerAdapter.getById.mockResolvedValue({}); // person has no email
+    findCandidateBySuggestion.mockResolvedValue(SAFE_ROSTER_CANDIDATE);
   });
 
   const promote = async () => {
@@ -265,10 +272,12 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(SUGGESTION_ID, { selected: true }, expect.anything());
   });
 
-  test('no roster row (legacy / no id anchor): plain promote, no write', async () => {
+  test('no roster row (legacy / no id anchor): fails closed before promotion', async () => {
     findCandidateBySuggestion.mockResolvedValue(null);
     const res = await promote();
-    expect(res.body.savedFields).toEqual([]);
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toMatchObject({ code: 'identity_verification_required' });
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
   });
 

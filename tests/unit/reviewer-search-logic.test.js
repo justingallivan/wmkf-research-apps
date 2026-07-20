@@ -806,39 +806,58 @@ describe('pruneCandidateForRoster — applicant enrichment cache fields survive 
 
 describe('hasValidApplicantEnrichmentCache', () => {
   const proposalKey = 'Library::Folder::Proposal.pdf';
+  const expected = [{ suggestionId: 'SUG-1' }];
+  const canonical = {
+    name: 'Dr Applicant',
+    suggestionId: 'SUG-1',
+    candidateKey: 'suggestion:sug-1',
+    isApplicantRecommended: true,
+    enrichedProposalKey: proposalKey,
+    identityStatus: 'probable',
+  };
 
-  test('requires a non-null proposal key and same-key applicant-origin roster row', () => {
-    expect(hasValidApplicantEnrichmentCache([
-      { name: 'Dr Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey, identityStatus: 'probable' },
-    ], proposalKey)).toBe(true);
+  test('requires a non-null proposal key and the exact expected canonical suggestion row', () => {
+    expect(hasValidApplicantEnrichmentCache([canonical], proposalKey, expected)).toBe(true);
 
     expect(hasValidApplicantEnrichmentCache([
-      { name: 'Dr Applicant', isApplicantRecommended: true, enrichedProposalKey: 'Other::Proposal.pdf', identityStatus: 'probable' },
-    ], proposalKey)).toBe(false);
+      { ...canonical, enrichedProposalKey: 'Other::Proposal.pdf' },
+    ], proposalKey, expected)).toBe(false);
+
+    expect(hasValidApplicantEnrichmentCache([canonical], null, expected)).toBe(false);
+    expect(hasValidApplicantEnrichmentCache([canonical], proposalKey, [])).toBe(false);
 
     expect(hasValidApplicantEnrichmentCache([
-      { name: 'Dr Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey, identityStatus: 'probable' },
-    ], null)).toBe(false);
-
-    expect(hasValidApplicantEnrichmentCache([
-      { name: 'Dr Literature', enrichedProposalKey: proposalKey, identityStatus: 'probable' },
-    ], proposalKey)).toBe(false);
+      { ...canonical, isApplicantRecommended: false, provenance: { kind: 'literature_retrieved' } },
+    ], proposalKey, expected)).toBe(false);
   });
 
-  test('invalidates legacy affiliation-bypass rows and requires every applicant row to carry a gate result', () => {
+  test('ignores legacy-key rows once the canonical row exists and rejects partial canonical batches', () => {
     expect(hasValidApplicantEnrichmentCache([
-      { name: 'Legacy Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey },
-    ], proposalKey)).toBe(false);
+      { ...canonical, candidateKey: 'person:legacy', identityStatus: null },
+    ], proposalKey, expected)).toBe(false);
 
     expect(hasValidApplicantEnrichmentCache([
-      { name: 'Resolved Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey, identityStatus: 'probable' },
-      { name: 'Legacy Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey },
-    ], proposalKey)).toBe(false);
+      canonical,
+      { ...canonical, candidateKey: 'person:legacy', identityStatus: null },
+    ], proposalKey, expected)).toBe(true);
 
     expect(hasValidApplicantEnrichmentCache([
-      { name: 'Needs Review', isApplicantRecommended: true, enrichedProposalKey: proposalKey, identityStatus: 'unresolved', needsIdentification: true },
-      { name: 'Deceased Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey, eligibilityStatus: 'deceased' },
-    ], proposalKey)).toBe(true);
+      canonical,
+    ], proposalKey, [{ suggestionId: 'SUG-1' }, { suggestionId: 'SUG-2' }])).toBe(false);
+  });
+
+  test('requires every canonical applicant row to carry a terminal gate result', () => {
+    expect(hasValidApplicantEnrichmentCache([
+      { ...canonical, identityStatus: null },
+    ], proposalKey, expected)).toBe(false);
+
+    expect(hasValidApplicantEnrichmentCache([
+      { ...canonical, identityStatus: 'unresolved', needsIdentification: true },
+    ], proposalKey, expected)).toBe(true);
+
+    expect(hasValidApplicantEnrichmentCache([
+      { ...canonical, identityStatus: null, eligibilityStatus: 'deceased' },
+    ], proposalKey, expected)).toBe(true);
   });
 });
 
