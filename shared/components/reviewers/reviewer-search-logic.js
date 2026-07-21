@@ -19,6 +19,11 @@ import {
 } from '../../../lib/utils/reviewer-candidate-key';
 import { emailConfidence } from '../../../lib/utils/reviewer-invite';
 
+// Increment when applicant-recommended enrichment semantics change in a way
+// that requires existing roster JSON to be recomputed. Unversioned legacy rows
+// deliberately miss the cache once and are stamped by the enrichment service.
+export const APPLICANT_ENRICHMENT_CACHE_VERSION = 1;
+
 /**
  * Merge contact-enrichment results (from /enrich-contacts) back onto the chosen
  * candidates by name, mirroring the standalone Reviewer Finder's save mapping.
@@ -346,6 +351,7 @@ export function hasValidApplicantEnrichmentCache(
       && expectedKeys.has(canonicalKey)
       && candidate?.candidateKey === canonicalKey
       && candidate?.enrichedProposalKey === proposalKey
+      && candidate?.applicantEnrichmentCacheVersion === APPLICANT_ENRICHMENT_CACHE_VERSION
       && (candidate.isApplicantRecommended || provenanceKindOf(candidate) === PROVENANCE_KINDS.APPLICANT_SUGGESTED)
     ) {
       canonicalRowsByKey.set(canonicalKey, candidate);
@@ -655,6 +661,9 @@ export function pruneCandidateForRoster(c) {
     seedIdentityNameConsistent: c.seedIdentityNameConsistent === false ? false : (c.seedIdentityNameConsistent === true ? true : null),
     isApplicantRecommended: !!c.isApplicantRecommended,
     enrichedProposalKey: c.enrichedProposalKey || null,
+    applicantEnrichmentCacheVersion: Number.isInteger(c.applicantEnrichmentCacheVersion)
+      ? c.applicantEnrichmentCacheVersion
+      : null,
     suggestionId: c.suggestionId || null,
     // COI + mismatch detail.
     hasInstitutionCOI: !!c.hasInstitutionCOI,

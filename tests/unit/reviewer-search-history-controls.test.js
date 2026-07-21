@@ -5,6 +5,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ReviewerSearchSection from '../../shared/components/reviewers/ReviewerSearchSection';
 import { readSseStream } from '../../shared/components/reviewers/sse';
+import { APPLICANT_ENRICHMENT_CACHE_VERSION } from '../../shared/components/reviewers/reviewer-search-logic';
 
 jest.mock('../../shared/components/reviewers/sse', () => ({
   readSseStream: jest.fn(),
@@ -33,6 +34,7 @@ const applicantCandidate = {
   identityStatus: 'probable',
   isApplicantRecommended: true,
   enrichedProposalKey: 'proposal',
+  applicantEnrichmentCacheVersion: APPLICANT_ENRICHMENT_CACHE_VERSION,
   provenance: {
     kind: 'applicant_suggested',
     sources: ['applicant_form'],
