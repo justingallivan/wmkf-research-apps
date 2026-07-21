@@ -22,7 +22,7 @@ import { emailConfidence } from '../../../lib/utils/reviewer-invite';
 // Increment when applicant-recommended enrichment semantics change in a way
 // that requires existing roster JSON to be recomputed. Unversioned legacy rows
 // deliberately miss the cache once and are stamped by the enrichment service.
-export const APPLICANT_ENRICHMENT_CACHE_VERSION = 1;
+export const APPLICANT_ENRICHMENT_CACHE_VERSION = 2;
 
 /**
  * Merge contact-enrichment results (from /enrich-contacts) back onto the chosen

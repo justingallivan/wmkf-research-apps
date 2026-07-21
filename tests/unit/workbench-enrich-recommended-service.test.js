@@ -104,7 +104,7 @@ jest.mock('../../lib/services/reviewer-request-context', () => ({
 }));
 
 jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
-  APPLICANT_ENRICHMENT_CACHE_VERSION: 1,
+  APPLICANT_ENRICHMENT_CACHE_VERSION: 2,
   pruneCandidateForRoster: jest.fn((c) => c),
 }));
 
@@ -186,7 +186,7 @@ test('happy path: progress frames strictly precede one terminal complete; never 
   expect(recordSurfaced).toHaveBeenCalledTimes(1);
   expect(recordSurfaced).toHaveBeenCalledWith(
     REQ,
-    [expect.objectContaining({ applicantEnrichmentCacheVersion: 1 })],
+    [expect.objectContaining({ applicantEnrichmentCacheVersion: 2 })],
     { expectedUpdatedAt: null },
   );
 });
@@ -557,6 +557,57 @@ test('current-run PubMed evidence prevents a previously contaminated affiliation
   });
   expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
   expect(writeIdentityDecision).not.toHaveBeenCalled();
+});
+
+test('current-run verifier institution is not vetoed by a stale stored applicant institution', async () => {
+  getPersonById.mockResolvedValue({ wmkf_primaryaffiliation: 'York University' });
+  areInstitutionsConsistent.mockImplementation(async (left, right) =>
+    institutionDirectMatch(left, right));
+  verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
+    verified: suggestions.map((s) => ({
+      ...s,
+      verified: true,
+      verificationSource: 'pubmed',
+      institutionMismatch: true,
+      affiliation: 'University of Illinois Urbana-Champaign',
+      affiliationHistory: ['University of Illinois Urbana-Champaign'],
+      publications: [{ title: 'Illinois biomedical paper', year: 2025 }],
+    })),
+    unverified: [],
+  }));
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      affiliation: 'University of Illinois Urbana-Champaign',
+      email: 'rbashir@illinois.edu',
+      hIndex: 4,
+      contactEnrichment: {
+        email: 'rbashir@illinois.edu',
+        emailSource: 'pubmed',
+        orcidAffiliation: 'University of Illinois Urbana-Champaign',
+        identity: { status: 'probable' },
+        tierResults: {
+          orcid: {
+            affiliations: [{ organization: 'University of Illinois Urbana-Champaign', current: true }],
+          },
+        },
+      },
+    })),
+  }));
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  expect(areInstitutionsConsistent).not.toHaveBeenCalled();
+  expect(events.at(-1).data.recommended[0]).toMatchObject({
+    needsIdentification: false,
+    identityStatus: 'probable',
+    affiliation: 'University of Illinois Urbana-Champaign',
+    email: 'rbashir@illinois.edu',
+    hIndex: 4,
+  });
+  expect(upsertByPotentialReviewer).toHaveBeenCalled();
+  expect(writeIdentityDecision).toHaveBeenCalled();
 });
 
 test('ORCID employment history connects a legitimate institutional move without a network reconciliation call', async () => {
