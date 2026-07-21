@@ -567,3 +567,38 @@ test('still fails closed when the discovery stream breaks before a ranked result
   expect(screen.getByText(/previously found candidates below are unchanged/i)).toBeInTheDocument();
   expect(screen.getByText(generatedCandidate.name)).toBeInTheDocument();
 });
+
+test('a model refusal is shown as non-retryable guidance', async () => {
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [],
+        excluded: [],
+        allNames: [],
+      }));
+    }
+    if (target === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  readSseStream.mockImplementationOnce(async (_response, onEvent) => {
+    onEvent({
+      event: 'error',
+      data: {
+        status: 'analysis_refused',
+        retryable: false,
+        message: 'The analysis model declined this request.',
+      },
+    });
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
+
+  expect(await screen.findByText('The analysis model declined this request.')).toBeInTheDocument();
+  expect(screen.getByText(/This proposal needs an alternate analysis path/i)).toBeInTheDocument();
+  expect(screen.queryByText(/Use Try again to rerun the analysis/i)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Alternate analysis required' })).toBeDisabled();
+});

@@ -236,6 +236,13 @@ export default async function handler(req, res) {
           message: 'The proposal analysis response was incomplete or unreliable. Please retry the analysis.',
           details: result,
         });
+      } else if (result.status === 'analysis_refused') {
+        sendEvent('error', {
+          status: 'analysis_refused',
+          retryable: false,
+          message: 'The analysis model declined this request. Retrying is unlikely to help; this proposal needs an alternate analysis path. Please contact an administrator.',
+          details: result,
+        });
       } else {
         sendEvent('error', { message: 'Analysis failed', details: result });
       }
