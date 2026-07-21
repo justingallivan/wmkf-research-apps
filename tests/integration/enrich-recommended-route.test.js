@@ -74,7 +74,14 @@ jest.mock('../../lib/services/discovery-service', () => ({
 }));
 
 jest.mock('../../lib/services/deduplication-service', () => ({
-  DeduplicationService: { markInstitutionCOIResolved: jest.fn(async (c) => c) },
+  DeduplicationService: {
+    markInstitutionCOIResolved: jest.fn(async (c) => c),
+    institutionDirectMatch: jest.fn((left, right) => {
+      const l = String(left || '').trim().toLowerCase();
+      const r = String(right || '').trim().toLowerCase();
+      return !!l && !!r && (l === r || l.includes(r) || r.includes(l));
+    }),
+  },
 }));
 
 const enrichCandidates = jest.fn();
