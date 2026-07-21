@@ -220,7 +220,7 @@ Co-PI reads skipped for save-time COI context) · `discover.js` (`partitionConfl
 
 ## 6. OpenAlex bibliometrics + verified-domain source `[VERIFIED 2026-06-13]`
 
-**Contract.** Bibliometrics (h-index/i10/citations), the current-affiliation candidate, and the
+**Contract.** Bibliometrics (h-index/i10/citations), the OpenAlex last-known-affiliation candidate, and the
 verified-email domain all source from **OpenAlex, NOT SerpAPI Scholar** (Slice 1b, S251 free-stack
 migration). `ContactEnrichmentService._attachOpenAlexMetrics` (was `_attachScholarMetrics`) uses
 the ORCID path (`getAuthorByOrcid`) or the discovery-resolved author id carried on the candidate

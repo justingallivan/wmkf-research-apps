@@ -68,6 +68,22 @@ function affiliationFromReviewerRow(row) {
   return row?.wmkf_primaryaffiliation || row?.wmkf_organizationname || null;
 }
 
+function institutionEvidenceFromReviewerRow(row) {
+  const entries = [
+    { value: row?.wmkf_maininstitution, source: 'staff_confirmed' },
+    { value: row?.wmkf_primaryaffiliation, source: 'primary_affiliation' },
+    { value: row?.wmkf_organizationname, source: 'organization' },
+  ];
+  const seen = new Set();
+  return entries.flatMap((entry) => {
+    const value = typeof entry.value === 'string' ? entry.value.trim() : '';
+    const key = value.toLowerCase();
+    if (!value || seen.has(key)) return [];
+    seen.add(key);
+    return [{ value, source: entry.source }];
+  });
+}
+
 function nameOnly(signals) {
   return signals.size > 0 && [...signals].every((signal) => signal === 'name');
 }
@@ -103,6 +119,7 @@ function expectedRefsFromFixtures(fixtures = []) {
     referencedReviewers: [...reviewers.values()].map((entry) => ({
       reviewerId: entry.id,
       affiliation: affiliationFromReviewerRow(entry.row),
+      institutions: institutionEvidenceFromReviewerRow(entry.row),
       viaNameMatch: nameOnly(entry.signals),
     })),
     referencedContacts: [...contacts.values()].map((entry) => ({
@@ -484,5 +501,53 @@ describe('lookupReviewerIdentity referencedReviewers invariant', () => {
 
     expect(out.outcome).toBe('none');
     expectDeclaredFixtureRefs(out, []);
+  });
+
+  test('exact-key-only mode does not fall back to either name search', async () => {
+    potentialReviewerAdapter.searchByName.mockResolvedValueOnce([reviewerRow(REVIEWER_A)]);
+    contactAdapter.searchByName.mockResolvedValueOnce([contactRow(CONTACT_A)]);
+
+    const out = await lookupReviewerIdentity(
+      { name: 'Ada Lovelace', email: 'missing@example.edu', orcid: null },
+      { allowNameFallback: false },
+    );
+
+    expect(out).toMatchObject({ outcome: 'none' });
+    expect(potentialReviewerAdapter.searchByName).not.toHaveBeenCalled();
+    expect(contactAdapter.searchByName).not.toHaveBeenCalled();
+  });
+
+  test('default mode retains the existing name fallback', async () => {
+    potentialReviewerAdapter.searchByName.mockResolvedValueOnce([reviewerRow(REVIEWER_A)]);
+
+    const out = await lookupReviewerIdentity({ name: 'Ada Lovelace', email: null, orcid: null });
+
+    expect(out.outcome).toBe('candidates');
+    expect(potentialReviewerAdapter.searchByName).toHaveBeenCalled();
+    expect(contactAdapter.searchByName).toHaveBeenCalled();
+  });
+
+  test('separate staff, primary, and organization institutions are projected without raw rows', async () => {
+    potentialReviewerAdapter.findByEmailCandidates.mockResolvedValueOnce({
+      one: true,
+      id: REVIEWER_A,
+      row: reviewerRow(REVIEWER_A, {
+        wmkf_maininstitution: 'Stanford University',
+        wmkf_primaryaffiliation: 'Northwestern University',
+        wmkf_organizationname: 'Stanford University',
+        secretField: 'must-not-leak',
+      }),
+    });
+
+    const out = await lookupReviewerIdentity(
+      { name: 'Ada Lovelace', email: 'ada@example.edu', orcid: null },
+      { allowNameFallback: false },
+    );
+
+    expect(out.referencedReviewers[0].institutions).toEqual([
+      { value: 'Stanford University', source: 'staff_confirmed' },
+      { value: 'Northwestern University', source: 'primary_affiliation' },
+    ]);
+    expect(JSON.stringify(out)).not.toContain('secretField');
   });
 });

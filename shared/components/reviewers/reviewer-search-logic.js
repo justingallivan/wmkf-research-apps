@@ -60,7 +60,7 @@ export function candidateWasSaved(candidate, savedKeys = [], savedNames = []) {
  * This is deliberately not a name-only identity claim. Prefer durable person
  * anchors when discovery has them; otherwise use reviewerSaveKey's composite
  * name/email/ORCID/affiliation fingerprint. The key is stamped before
- * enrichment and then preserved, so a promoted current affiliation or newly
+ * enrichment and then preserved, so promoted affiliation evidence or a newly
  * found email cannot change selection state or attach another same-name
  * candidate's enrichment.
  */
@@ -167,9 +167,9 @@ export function mergeEnrichment(candidates, enrichmentResults) {
       hIndex: e.hIndex ?? c.hIndex,
       i10Index: e.i10Index ?? c.i10Index,
       totalCitations: e.totalCitations ?? c.totalCitations,
-      // Current-affiliation pin (S224 #16): enrichment may have replaced the
-      // discovery affiliation with an identity-trusted ORCID/Scholar current
-      // one. Promote it + its provenance so the card shows "per ORCID" and the
+      // Affiliation-evidence pin (S224 #16): enrichment may have replaced the
+      // discovery affiliation with identity-trusted ORCID-current or OpenAlex-
+      // last-known evidence. Promote it + its provenance so the card labels the source and the
       // client re-rank scores the same affiliation the server persisted.
       affiliation: e.affiliation || c.affiliation,
       affiliationSource: e.affiliationSource || c.affiliationSource,
@@ -465,6 +465,42 @@ export function pruneEligibilityEvidence(evidence) {
   };
 }
 
+export function pruneDataverseContactEvidence(evidence) {
+  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) return null;
+  const statuses = new Set(['known', 'review_required', 'none', 'unavailable']);
+  const reasons = new Set([
+    'provisional_orcid_match',
+    'ambiguous_or_name_mismatch',
+    'orcid_email_split',
+    'contact_linked_elsewhere',
+    'email_mismatch',
+    'identity_conflict',
+    'lookup_unavailable',
+    'partial_enrichment',
+    'deadline_exceeded',
+  ]);
+  const institutionSources = new Set(['staff_confirmed', 'primary_affiliation', 'organization']);
+  const recordKinds = Array.isArray(evidence.recordKinds)
+    ? Array.from(new Set(evidence.recordKinds.filter((kind) => kind === 'contact' || kind === 'potential_reviewer'))).slice(0, 2)
+    : [];
+  const institutions = Array.isArray(evidence.institutions)
+    ? evidence.institutions.slice(0, 8).flatMap((entry) => {
+        const value = boundedText(entry?.value, 500);
+        const source = institutionSources.has(entry?.source) ? entry.source : null;
+        return value && source ? [{ value, source }] : [];
+      })
+    : [];
+  return {
+    status: statuses.has(evidence.status) ? evidence.status : 'unavailable',
+    matchKey: evidence.matchKey === 'email' || evidence.matchKey === 'orcid' ? evidence.matchKey : null,
+    recordKinds,
+    nameConsistent: evidence.nameConsistent === true ? true : evidence.nameConsistent === false ? false : null,
+    institutions,
+    reason: reasons.has(evidence.reason) ? evidence.reason : null,
+    checkedAt: boundedText(evidence.checkedAt, 80),
+  };
+}
+
 function pruneCoauthorCheckFailures(failures) {
   if (!Array.isArray(failures)) return [];
   return failures.slice(0, 12).map((failure) => ({
@@ -588,6 +624,7 @@ export function pruneCandidateForRoster(c) {
       eligibilityStatus: e.eligibilityStatus || c.eligibilityStatus || 'unknown',
       eligibilityReason: e.eligibilityReason || c.eligibilityReason || null,
       eligibilityEvidence: pruneEligibilityEvidence(e.eligibilityEvidence || c.eligibilityEvidence),
+      dataverseContactEvidence: pruneDataverseContactEvidence(e.dataverseContactEvidence),
     },
     name: c.name,
     affiliation: c.affiliation || null,

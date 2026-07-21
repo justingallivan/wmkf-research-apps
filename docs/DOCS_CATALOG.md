@@ -240,6 +240,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
+| [REVIEWER_AFFILIATION_CONTACT_RECONCILIATION_PLAN.md](REVIEWER_AFFILIATION_CONTACT_RECONCILIATION_PLAN.md) | plan | active |  | Surface exact-key Dataverse contact evidence and honest affiliation provenance without auto-merging people or treating stale records as current truth. |  |
 | [REVIEWER_COI_PRECISION_PLAN.md](REVIEWER_COI_PRECISION_PLAN.md) | plan | active |  | Institution-COI ledger, precision matcher, and provenance-gated flag-not-drop policy. | 2026-07-03 |
 
 ## reviewer-identity

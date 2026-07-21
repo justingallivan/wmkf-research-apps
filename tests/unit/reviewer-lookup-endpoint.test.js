@@ -115,7 +115,12 @@ describe('outcomes', () => {
     await handler(post({ name: 'Ada Lovelace', email: 'ada@example.edu', orcid: ORCID }), r);
     expect(r.statusCode).toBe(200);
     expect(r.body).toMatchObject({ outcome: 'conflict', reason: 'orcid_email_split' });
-    expect(r.body.referencedReviewers).toEqual([{ reviewerId: PR, affiliation: null, viaNameMatch: false }]);
+    expect(r.body.referencedReviewers).toEqual([{
+      reviewerId: PR,
+      affiliation: null,
+      institutions: [],
+      viaNameMatch: false,
+    }]);
     expect(r.body.referencedContacts).toEqual([{ contactId: CONTACT, viaNameMatch: false }]);
   });
 

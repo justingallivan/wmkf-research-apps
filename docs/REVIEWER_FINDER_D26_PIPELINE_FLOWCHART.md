@@ -202,7 +202,8 @@ named personnel is a sensible future add — NOT yet implemented.)
 - **Track A — verify/ground** Claude's names against PubMed/OpenAlex/ORCID,
   **✓ forename-gated** (the Laederach failure is closed)
 - **Identity resolution** on the OpenAlex/ORCID/PubMed spine + **dedup/union coverage**
-- **Recency-weighted ranking** (S224: recency > citations, current-affiliation pinning)
+- **Recency-weighted ranking** (S224: recency > citations; affiliation evidence
+  pins ORCID current > OpenAlex last-known > recent-publication affiliation)
 - **COI grading** (S240: self-disclosure + current same-institution)
 - **Human curation** — staff select against priorities, using each candidate's surfaced
   papers to drop the occasional bad one (the load-bearing, human-in-the-loop step)

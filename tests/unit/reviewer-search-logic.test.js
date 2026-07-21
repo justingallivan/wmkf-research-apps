@@ -15,6 +15,7 @@ import {
   getCandidateEmailReadiness,
   pruneCandidateForRoster,
   pruneEmailEvidence,
+  pruneDataverseContactEvidence,
   sanitizeInstitutionCOIDetails,
   mergeReferredProvenance,
   dedupeByNamePreferReferred,
@@ -200,6 +201,46 @@ describe('institution-page ownership evidence survives a bounded roster round-tr
       },
     });
     expect(pruned.contactEnrichment.emailEvidence).toEqual(compact);
+  });
+});
+
+describe('Dataverse contact evidence survives a bounded roster round-trip', () => {
+  test('keeps compact display evidence and drops unknown fields', () => {
+    const raw = {
+      status: 'known',
+      matchKey: 'email',
+      recordKinds: ['potential_reviewer', 'contact', 'unknown'],
+      nameConsistent: true,
+      institutions: [
+        { value: 'Stanford University', source: 'staff_confirmed', raw: 'drop' },
+        { value: 'Northwestern University', source: 'primary_affiliation' },
+        { value: 'Ignore', source: 'unknown' },
+      ],
+      reason: null,
+      checkedAt: '2026-07-21T12:00:00.000Z',
+      reviewerId: 'must-not-survive',
+    };
+
+    expect(pruneDataverseContactEvidence(raw)).toEqual({
+      status: 'known',
+      matchKey: 'email',
+      recordKinds: ['potential_reviewer', 'contact'],
+      nameConsistent: true,
+      institutions: [
+        { value: 'Stanford University', source: 'staff_confirmed' },
+        { value: 'Northwestern University', source: 'primary_affiliation' },
+      ],
+      reason: null,
+      checkedAt: '2026-07-21T12:00:00.000Z',
+    });
+
+    const pruned = pruneCandidateForRoster({
+      name: 'Michael Jewett',
+      contactEnrichment: { dataverseContactEvidence: raw },
+    });
+    expect(pruned.contactEnrichment.dataverseContactEvidence)
+      .toEqual(pruneDataverseContactEvidence(raw));
+    expect(JSON.stringify(pruned)).not.toContain('must-not-survive');
   });
 });
 

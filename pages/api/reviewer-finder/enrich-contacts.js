@@ -30,6 +30,7 @@ import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-tim
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { resolveProposalPI, piInstitutions } from '../../../lib/services/proposal-pi-identity';
 import { mintAutomatedIdentityAttestation } from '../../../lib/services/reviewer-candidate-attestation';
+import { reconcileReviewerContacts } from '../../../lib/services/reviewer-contact-reconciliation';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -151,10 +152,11 @@ export default async function handler(req, res) {
     }
 
     // Re-evaluate institution COI on the POST-enrichment affiliation. Enrichment may
-    // promote an identity-trusted current affiliation (ORCID/Scholar) over the
+    // promote identity-trusted ORCID-current or OpenAlex-last-known evidence over the
     // PubMed-recency one /discover computed COI against, which would otherwise leave
     // hasInstitutionCOI / institutionCOIDetails stale relative to the affiliation the
-    // card now shows. CURRENT-affiliation only (S240 — historical no longer counts).
+    // card now shows. The COI policy consumes the effective displayed affiliation;
+    // provenance controls whether a weak match can be contradicted/flagged (S240).
     // The `coiRecomputed` marker lets the client merge override a now-false COI (vs.
     // when we didn't run, when no institution is known, leaving the discover value
     // intact). (Codex P2#1, S229.)
@@ -191,6 +193,26 @@ export default async function handler(req, res) {
     // The full audit also rides on stats below for the client.
     if (results?.stats?.contactAudit) {
       console.log('[enrich-contacts] contact-leads audit:', JSON.stringify(results.stats.contactAudit));
+    }
+
+    // Read-only, exact-key reconciliation against Dataverse. This is display
+    // evidence only: it never changes contact fields, identity, COI, or save
+    // authority. Keep lookups sequential inside the service to avoid a burst,
+    // and do no Dataverse reads for an already-partial/timed-out enrichment.
+    if (Array.isArray(results?.enriched)) {
+      try {
+        await withDalContext(
+          'reviewer-enrich-contacts-reconcile',
+          () => reconcileReviewerContacts(results.enriched, {
+            signal: deadlineController.signal,
+            skip: !!results.partial || !!results.timeout,
+          }),
+        );
+      } catch (error) {
+        // Reconciliation is optional display evidence. An unexpected setup-level
+        // failure must not discard otherwise-successful enrichment results.
+        console.error('[enrich-contacts] Dataverse reconciliation failed (fail-open):', error.message);
+      }
     }
 
     // Bind the server-computed identity bundle to this request before returning
