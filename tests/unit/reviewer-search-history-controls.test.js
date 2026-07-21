@@ -101,7 +101,7 @@ test('restored incomplete PubMed COI checks remain selectable but show one compa
   expect(screen.getByLabelText(`Select ${incompleteCandidate.name}`)).toBeInTheDocument();
 });
 
-test('a completed unresolved applicant run offers a manual automatic-identification retry', async () => {
+test('a completed unresolved applicant run offers a manual applicant-suggestion update', async () => {
   const suggestionId = '33333333-3333-3333-3333-333333333333';
   const unresolvedApplicant = {
     ...applicantCandidate,
@@ -148,15 +148,66 @@ test('a completed unresolved applicant run offers a manual automatic-identificat
     />,
   );
 
-  const retry = await screen.findByRole('button', { name: 'Retry automatic identification' });
+  const retry = await screen.findByRole('button', { name: 'Update applicant suggestions' });
   fireEvent.click(retry);
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
     '/api/workbench/enrich-recommended',
     expect.objectContaining({ method: 'POST' }),
   ));
-  await waitFor(() => expect(screen.queryByRole('button', { name: 'Retry automatic identification' })).not.toBeInTheDocument());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Update applicant suggestions' })).toBeInTheDocument());
   expect(screen.getByText(/1 applicant-referred reviewer verified/i)).toBeInTheDocument();
+});
+
+test('a completed resolved applicant cache can be refreshed manually', async () => {
+  const suggestionId = '44444444-4444-4444-4444-444444444444';
+  const resolvedApplicant = {
+    ...applicantCandidate,
+    candidateKey: `suggestion:${suggestionId}`,
+    suggestionId,
+  };
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [resolvedApplicant],
+        excluded: [],
+        ineligible: [],
+        allNames: [resolvedApplicant.name],
+      }));
+    }
+    if (target === '/api/workbench/enrich-recommended' && options.method === 'POST') {
+      return Promise.resolve(response({}));
+    }
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+  readSseStream.mockImplementation(async (_res, onEvent) => {
+    onEvent({ event: 'complete', data: { recommended: [resolvedApplicant] } });
+  });
+
+  render(
+    <ReviewerSearchSection
+      requestId={REQ}
+      blobUrl="blob"
+      proposalKey="proposal"
+      recommended={[{ suggestionId, name: resolvedApplicant.name }]}
+    />,
+  );
+
+  const update = await screen.findByRole('button', { name: 'Update applicant suggestions' });
+  expect(global.fetch).not.toHaveBeenCalledWith(
+    '/api/workbench/enrich-recommended',
+    expect.objectContaining({ method: 'POST' }),
+  );
+
+  fireEvent.click(update);
+
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+    '/api/workbench/enrich-recommended',
+    expect.objectContaining({ method: 'POST' }),
+  ));
+  await waitFor(() => expect(screen.getByText(/1 applicant-referred reviewer verified/i)).toBeInTheDocument());
 });
 
 test('labels restored generated rows and removes only the scoped previous results', async () => {
