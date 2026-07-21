@@ -41,6 +41,14 @@ function extractObjectKeys(src, name) {
   return keys;
 }
 
+// String values of `const NAME = { KEY: 'value', ... }`. Used when the
+// producer's wire vocabulary lives in object values rather than its symbolic keys.
+function extractObjectStringValues(src, name) {
+  const m = src.match(new RegExp(`(?:const|export const)\\s+${name}\\s*=\\s*\\{([\\s\\S]*?)\\n\\}`));
+  if (!m) return null;
+  return [...m[1].matchAll(/:\s*['"]([^'"]+)['"]/g)].map((x) => x[1]);
+}
+
 // String members of `const NAME = [ 'a', 'b' ]`.
 function extractArrayStrings(src, name) {
   const m = src.match(new RegExp(`(?:const|export const)\\s+${name}\\s*=\\s*\\[([\\s\\S]*?)\\]`));
@@ -121,6 +129,22 @@ function registry() {
     });
   }
 
+  // 3. Discovery verification verdicts → save-candidate top-level identity
+  //    allowlist (subset). A missing `verified` here blocked the strongest PubMed-
+  //    verified candidates from moving from Find to Candidate in production.
+  {
+    const discovery = read('lib/services/discovery/constants.js');
+    const save = read('lib/services/reviewer-finder/save-candidates-service.js');
+    checks.push({
+      name: 'discovery verification statuses ⊆ save-candidate identity statuses',
+      producer: 'VERIFICATION_STATUSES values (discovery/constants.js)',
+      consumer: 'DISCOVERY_IDENTITY_STATUSES values (save-candidates-service.js)',
+      produced: extractObjectStringValues(discovery, 'VERIFICATION_STATUSES'),
+      consumed: extractArrayStrings(save, 'DISCOVERY_IDENTITY_STATUSES'),
+      rule: 'subset',
+    });
+  }
+
   // NOTE — reviewer email template parity (TEMPLATE_TYPES ↔ DEFAULT_TEMPLATES ↔
   // TEMPLATE_TYPE_LABELS) is intentionally NOT registered here: it's already enforced
   // at RUNTIME (mergeTemplates dereferences DEFAULT_TEMPLATES[type] and throws on a
@@ -167,6 +191,7 @@ function selfTest() {
 
   // extractors
   ok('extractObjectKeys', JSON.stringify(extractObjectKeys('const M = {\n  a: 1,\n  "b-c": 2,\n};', 'M')) === JSON.stringify(['a', 'b-c']));
+  ok('extractObjectStringValues', JSON.stringify(extractObjectStringValues("const M = {\n  A: 'alpha',\n  B: 'beta',\n};", 'M')) === JSON.stringify(['alpha', 'beta']));
   ok('extractArrayStrings', JSON.stringify(extractArrayStrings("const T = ['x', 'y'];", 'T')) === JSON.stringify(['x', 'y']));
   ok('extractReturnedStrings', JSON.stringify(extractReturnedStrings("function f(c) {\n  if (c) return 'held';\n  return 'find';\n}", 'f')) === JSON.stringify(['held', 'find']));
   ok('missing extractor → null', extractObjectKeys('const Z = 1;', 'M') === null);

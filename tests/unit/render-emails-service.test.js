@@ -99,7 +99,7 @@ test('invitation render refuses a research-only search address', async () => {
   getReviewerByIdWithSelect.mockResolvedValueOnce(person({ wmkf_emailsource: 'serp_search' }));
   const out = await renderEmails({
     suggestionIds: [SUG1],
-    template: TEMPLATE,
+    template: { subject: 'Review request', body: 'Respond: {{externalLink}}' },
     settings: {},
     templateType: 'invitation',
     actingUserSystemId: null,
@@ -108,7 +108,9 @@ test('invitation render refuses a research-only search address', async () => {
   expect(out.drafts[0]).toMatchObject({
     skipped: 'email_research_only',
     emailConfidence: { action: 'research_only' },
+    manualLink: 'https://x/review?token=abc',
   });
+  expect(mintAndStore).toHaveBeenCalledTimes(1);
 });
 
 test('post-engagement render does not re-gate a research-only source', async () => {

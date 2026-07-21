@@ -90,4 +90,67 @@ describe('InviteEmailModal capture-mode result display', () => {
       drafts: [{ suggestionId: 'S1', subject: 'Invitation' }],
     });
   });
+
+  test('explains a research-only skip and offers a manual secure-link fallback without sending', async () => {
+    const researchOnlyDraft = {
+      suggestionId: 'S1',
+      candidateName: 'Joan S. Brugge',
+      candidateEmail: 'joan_brugge@hms.harvard.edu',
+      skipped: 'email_research_only',
+      emailConfidence: { action: 'research_only' },
+      manualLink: 'https://reviews.wmkeck.org/external/review/manual.token',
+    };
+    const writeText = jest.fn(async () => {});
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    const onClose = jest.fn();
+    const onSent = jest.fn();
+    global.fetch.mockImplementation(async (url, options = {}) => {
+      if (String(url).startsWith('/api/user-preferences')) return mockJson({});
+      if (url === '/api/review-manager/campaign-timeline-defaults') {
+        return mockJson({ timeline: {}, isDefault: true, malformed: false });
+      }
+      if (url === '/api/review-manager/render-emails') return mockJson({ drafts: [researchOnlyDraft] });
+      if (url === '/api/reviewer-finder/my-candidates' && options.method === 'PATCH') {
+        return mockJson({ success: true, manualInviteRecorded: true });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    render(
+      <InviteEmailModal
+        candidates={[{ suggestionId: 'S1', name: 'Joan S. Brugge', email: 'joan_brugge@hms.harvard.edu' }]}
+        settings={{ signature: 'Program Director' }}
+        onClose={onClose}
+        onSent={onSent}
+      />,
+    );
+
+    expect(await screen.findByText(/address is research-only, not invite-ready/i)).toBeInTheDocument();
+    expect(screen.queryByText(/email_research_only/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^send invitations$/i })).toBeDisabled();
+
+    const link = screen.getByLabelText('Secure invitation link for Joan S. Brugge');
+    expect(link).toHaveValue('https://reviews.wmkeck.org/external/review/manual.token');
+    fireEvent.click(screen.getByRole('button', { name: /copy secure invitation link/i }));
+    expect(await screen.findByRole('status')).toHaveTextContent(/copied to the clipboard/i);
+    expect(writeText).toHaveBeenCalledWith('https://reviews.wmkeck.org/external/review/manual.token');
+    expect(screen.getByText(/copying sends nothing/i)).toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalledWith('/api/review-manager/send-emails', expect.anything());
+
+    fireEvent.click(screen.getByRole('button', { name: /mark manually sent/i }));
+    await waitFor(() => expect(onSent).toHaveBeenCalledTimes(1));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    const markCall = global.fetch.mock.calls.find(([url, options]) => (
+      url === '/api/reviewer-finder/my-candidates' && options.method === 'PATCH'
+    ));
+    expect(JSON.parse(markCall[1].body)).toEqual({
+      suggestionId: 'S1',
+      markManualInviteSent: true,
+      manualLink: 'https://reviews.wmkeck.org/external/review/manual.token',
+    });
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/starts the normal reminder timeline/i));
+  });
 });

@@ -128,6 +128,18 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const [abstractDraft, setAbstractDraft] = useState('');
   const [abstractSaving, setAbstractSaving] = useState(false);
   const [abstractError, setAbstractError] = useState(null);
+  // Per-recipient clipboard feedback for the manual recovery path offered only
+  // when the server classifies an address as research-only. The render service
+  // already minted the link using the normal invitation expiry policy; copying
+  // it does not send email or stamp the suggestion invited. A separate,
+  // confirmed action records the invitation only after staff sends it.
+  const [manualLinkCopyState, setManualLinkCopyState] = useState({});
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // Stable across renders (candidates is a fresh array each parent render, so a
   // raw .map() would give renderPreviews a new identity every render and the
@@ -207,7 +219,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     // is in the deps below) with the resolved template.
     if (!templateLoaded) return;
     const gen = ++renderGenRef.current;
-    setError(null); setRawDrafts([]);
+    setError(null); setRawDrafts([]); setManualLinkCopyState({});
     setProgress({ current: 0, total: suggestionIds.length, message: 'Rendering previews…' });
     try {
       const res = await fetch('/api/review-manager/render-emails', {
@@ -256,6 +268,60 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
 
   const updateEdit = (suggestionId, field, value) =>
     setEdits((prev) => ({ ...prev, [suggestionId]: { ...prev[suggestionId], [field]: value } }));
+
+  const copyManualLink = async (draft) => {
+    if (!draft?.suggestionId || !draft?.manualLink) return;
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard access is unavailable in this browser.');
+      await navigator.clipboard.writeText(draft.manualLink);
+      if (!mountedRef.current) return;
+      setManualLinkCopyState((prev) => ({
+        ...prev,
+        [draft.suggestionId]: { copied: true, error: null },
+      }));
+    } catch (e) {
+      if (!mountedRef.current) return;
+      setManualLinkCopyState((prev) => ({
+        ...prev,
+        [draft.suggestionId]: { copied: false, error: e.message },
+      }));
+    }
+  };
+
+  const markManualInviteSent = async (draft) => {
+    if (!draft?.suggestionId || !draft?.manualLink) return;
+    const ok = window.confirm(
+      `Only continue after you have sent the invitation to ${draft.candidateName || 'this reviewer'} yourself. `
+      + 'This records the reviewer as invited and starts the normal reminder timeline.'
+    );
+    if (!ok) return;
+    setManualLinkCopyState((prev) => ({
+      ...prev,
+      [draft.suggestionId]: { ...prev[draft.suggestionId], marking: true, markError: null },
+    }));
+    try {
+      const res = await fetch('/api/reviewer-finder/my-candidates', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          suggestionId: draft.suggestionId,
+          markManualInviteSent: true,
+          manualLink: draft.manualLink,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not record the manual invitation.');
+      if (!mountedRef.current) return;
+      if (onSent) onSent();
+      onClose();
+    } catch (e) {
+      if (!mountedRef.current) return;
+      setManualLinkCopyState((prev) => ({
+        ...prev,
+        [draft.suggestionId]: { ...prev[draft.suggestionId], marking: false, markError: e.message },
+      }));
+    }
+  };
 
   const handleSaveAbstract = async () => {
     if (!flaggedAbstract || !abstractDraft.trim()) return;
@@ -534,7 +600,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
               ) : (
                 <div className="space-y-3">
                   <p className="text-xs text-gray-500">
-                    Review each invitation below; the secure accept/decline link is embedded. Edit if needed, then send.
+                    Review each recipient below. Sendable invitations include a secure accept/decline link; edit if needed, then send.
                   </p>
                   {drafts.map((d) => (
                     <div key={d.suggestionId} className={`border rounded-lg p-3 ${d.skipped ? 'border-amber-200 bg-amber-50' : 'border-gray-200'}`}>
@@ -552,7 +618,71 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                         </p>
                       )}
                       {d.skipped ? (
-                        <p className="text-xs text-amber-700 mt-1">Skipped ({d.skipped === 'no_email' ? 'no email address' : d.skipped}).</p>
+                        <div className="mt-1 text-xs text-amber-800">
+                          <p>{d.skipped === 'no_email' ? 'Skipped — no email address.' : `Skipped — ${skipReasonLabel(d.skipped)}.`}</p>
+                          {d.skipped === 'email_research_only' && (
+                            <div className="mt-2 rounded border border-amber-200 bg-white/70 p-2">
+                              <p>
+                                The app will not send to an address found only through web search. If you independently
+                                verify it, use Edit contact after closing this window. Or copy the secure link below
+                                and paste it into a message you send yourself.
+                              </p>
+                              <p className="mt-1 text-[11px] text-amber-700">
+                                Copying sends nothing. After you send the message yourself, record it below so the
+                                app does not invite the reviewer again and can follow the normal reminder timeline.
+                              </p>
+                              {d.manualLink ? (
+                                <div className="mt-2">
+                                  <label className="block font-medium text-amber-900">
+                                    Secure invitation link
+                                    <input
+                                      readOnly
+                                      aria-label={`Secure invitation link for ${d.candidateName || 'reviewer'}`}
+                                      value={d.manualLink}
+                                      onFocus={(e) => e.target.select()}
+                                      className="mt-1 w-full rounded border border-amber-300 bg-white px-2 py-1 font-mono text-[11px] text-gray-700"
+                                    />
+                                  </label>
+                                  <button
+                                    type="button"
+                                    onClick={() => copyManualLink(d)}
+                                    className="mt-2 rounded border border-amber-300 bg-amber-100 px-2.5 py-1 font-medium text-amber-900 hover:bg-amber-200"
+                                  >
+                                    Copy secure invitation link
+                                  </button>
+                                  {manualLinkCopyState[d.suggestionId]?.copied && (
+                                    <p role="status" aria-live="polite" className="mt-1 text-[11px] text-amber-700">Copied to the clipboard.</p>
+                                  )}
+                                  {manualLinkCopyState[d.suggestionId]?.error && (
+                                    <p role="alert" className="mt-1 text-[11px] text-amber-700">
+                                      {manualLinkCopyState[d.suggestionId].error} Select and copy the link from the field above.
+                                    </p>
+                                  )}
+                                  <p className="mt-2 text-[11px] text-amber-700">
+                                    If you reload or regenerate this preview before recording the send, copy the newest link.
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => markManualInviteSent(d)}
+                                    disabled={manualLinkCopyState[d.suggestionId]?.marking === true}
+                                    className="mt-2 rounded bg-amber-800 px-2.5 py-1 font-medium text-white hover:bg-amber-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    {manualLinkCopyState[d.suggestionId]?.marking ? 'Recording…' : 'I sent it — mark manually sent'}
+                                  </button>
+                                  {manualLinkCopyState[d.suggestionId]?.markError && (
+                                    <p role="alert" className="mt-1 text-[11px] text-red-700">
+                                      {manualLinkCopyState[d.suggestionId].markError}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="mt-2 text-red-700">
+                                  A secure link could not be generated. Close this window and try again.
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <div className="mt-2 space-y-2">
                           <input

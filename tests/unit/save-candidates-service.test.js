@@ -71,6 +71,7 @@ const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity
 const { loadCoiContext } = require('../../lib/services/reviewer-request-context');
 const { createInstitutionIdentityResolver } = require('../../lib/services/institution-identity-resolver');
 const { ServiceHttpError } = require('../../lib/services/service-http-error');
+const { VERIFICATION_STATUSES } = require('../../lib/services/discovery/constants');
 const {
   saveCandidates,
   SaveCandidatesError,
@@ -307,6 +308,47 @@ test('per-row validation rejects malformed rows before any adapter write', async
   ]);
   expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledTimes(1);
   expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalledTimes(1);
+});
+
+test.each(Object.values(VERIFICATION_STATUSES))(
+  'top-level discovery identityStatus %s is accepted by candidate validation',
+  (identityStatus) => {
+    expect(validateCandidateInput({ name: `Dr ${identityStatus}`, identityStatus }, 0)).toMatchObject({ ok: true });
+  },
+);
+
+test('PubMed-verified discovery candidate saves without broadening the nested resolver vocabulary', async () => {
+  const sheena = {
+    name: 'Sheena Radford',
+    email: 's.e.radford@leeds.ac.uk',
+    affiliation: 'University of Leeds',
+    verified: true,
+    verificationStatus: VERIFICATION_STATUSES.VERIFIED,
+    identityStatus: VERIFICATION_STATUSES.VERIFIED,
+    verificationSource: 'pubmed',
+    emailSource: 'pubmed',
+    publications: 17,
+    hIndex: 96,
+    totalCitations: 32094,
+  };
+
+  const out = await saveCandidates({ ...BASE, candidates: [sheena] });
+
+  expect(out).toMatchObject({
+    success: true,
+    savedCount: 1,
+    savedNames: ['Sheena Radford'],
+    totalRequested: 1,
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledTimes(1);
+  expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalledTimes(1);
+  expect(validateCandidateInput({
+    name: 'Nested discovery status',
+    contactEnrichment: { identity: { status: VERIFICATION_STATUSES.VERIFIED } },
+  }, 0)).toMatchObject({
+    ok: false,
+    error: { error: 'contactEnrichment.identity.status is not supported.' },
+  });
 });
 
 test('duplicate candidate keys are rejected per row without graduating the failed sibling', async () => {
