@@ -72,6 +72,7 @@ describe('findCandidateBySuggestion', () => {
 
 describe('findCandidatesByKeys', () => {
   test('returns exact request-scoped roster rows with status and concurrency tokens', async () => {
+    const longGeneratedKey = `candidate:${'a'.repeat(680)}`;
     sql.mockResolvedValueOnce({ rows: [{
       candidate_key: 'candidate:ann',
       status: 'active',
@@ -84,6 +85,7 @@ describe('findCandidatesByKeys', () => {
     await expect(store.findCandidatesByKeys(REQ, [
       'candidate:ann',
       'candidate:ann',
+      longGeneratedKey,
       '',
     ])).resolves.toEqual([expect.objectContaining({
       name: 'Ann Lee',
@@ -94,7 +96,7 @@ describe('findCandidatesByKeys', () => {
     expect(queryTextOf(0)).toMatch(/jsonb_array_elements_text/);
     expect(allInterpolations()).toEqual(expect.arrayContaining([
       REQ,
-      JSON.stringify(['candidate:ann']),
+      JSON.stringify(['candidate:ann', longGeneratedKey]),
     ]));
   });
 });
