@@ -127,3 +127,61 @@ describe('CandidateCard email readiness', () => {
     expect(screen.getByText(/Verify identity — no contact saved until confirmed/)).toBeInTheDocument();
   });
 });
+
+describe('CandidateCard affiliation and Dataverse evidence', () => {
+  test('labels publication and OpenAlex evidence without claiming both are current', () => {
+    const { rerender } = renderCandidate({ affiliationSource: 'pubmed_recency' });
+    expect(screen.getByText(/publication affiliation/)).toBeInTheDocument();
+
+    rerender(
+      <CandidateCard
+        candidate={{ ...baseCandidate, affiliationSource: 'openalex_current' }}
+        checked={false}
+        onToggle={jest.fn()}
+      />
+    );
+    expect(screen.getByText(/last known \(per OpenAlex\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/current \(per OpenAlex\)/)).not.toBeInTheDocument();
+  });
+
+  test('surfaces exact-key known status and multiple institution records neutrally', () => {
+    renderCandidate({
+      affiliation: 'Northwestern University',
+      affiliationSource: 'pubmed_recency',
+      contactEnrichment: {
+        dataverseContactEvidence: {
+          status: 'known',
+          matchKey: 'email',
+          checkedAt: '2026-07-21T12:00:00.000Z',
+          institutions: [
+            { value: 'Stanford University', source: 'organization' },
+            { value: 'Northwestern University', source: 'primary_affiliation' },
+          ],
+        },
+      },
+    });
+
+    expect(screen.getByText(/Known in Dataverse by exact email/)).toBeInTheDocument();
+    expect(screen.getByText(/Multiple affiliation records/)).toHaveTextContent(
+      'may include co-affiliations or history',
+    );
+    expect(screen.getByText(/Multiple affiliation records/)).toHaveTextContent('Stanford University');
+    expect(screen.getByText(/Multiple affiliation records/)).toHaveTextContent('Northwestern University');
+  });
+
+  test('surfaces review-required exact-key reconciliation without making a known claim', () => {
+    renderCandidate({
+      contactEnrichment: {
+        dataverseContactEvidence: {
+          status: 'review_required',
+          matchKey: 'orcid',
+          checkedAt: '2026-07-21T12:00:00.000Z',
+          institutions: [],
+        },
+      },
+    });
+
+    expect(screen.getByText('⚠ Dataverse identity needs review')).toBeInTheDocument();
+    expect(screen.queryByText(/Known in Dataverse/)).not.toBeInTheDocument();
+  });
+});

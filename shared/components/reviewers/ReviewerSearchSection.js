@@ -129,19 +129,26 @@ function formatSaveFailureDetails(errors = []) {
   return `${name}: ${error}`;
 }
 
-// Affiliation-pin provenance (S224 #16). enrichment may replace the discovery
-// (PubMed-recency) affiliation with an identity-trusted CURRENT one from ORCID
-// or OpenAlex (Slice 1b; `scholar_current` kept for legacy roster rows). Return a
-// short source label for the "current (per X)" badge, or null for the default
-// pubmed_recency / unset case (no badge — it's the norm).
-function affiliationProvenance(source) {
-  if (source === 'orcid_current') return 'ORCID';
-  if (source === 'openalex_current') return 'OpenAlex';
-  if (source === 'scholar_current') return 'Scholar'; // legacy roster rows (pre-Slice-1b)
+// State exactly what each affiliation source can support. PubMed is historical
+// publication evidence; OpenAlex exposes a last-known institution, not a current
+// employment guarantee. Only ORCID-current / staff-confirmed evidence says current.
+function affiliationEvidenceLabel(source) {
+  if (source === 'pubmed_recency') return 'publication affiliation';
+  if (source === 'orcid_current') return 'current (per ORCID)';
+  if (source === 'openalex_current') return 'last known (per OpenAlex)';
+  if (source === 'scholar_current') return 'reported by Scholar'; // legacy roster rows
+  if (source === 'staff_manual' || source === 'staff_confirmed') return 'staff confirmed';
   return null;
 }
 function affiliationSourceLabel(source) {
-  return affiliationProvenance(source) || 'recent publications';
+  return affiliationEvidenceLabel(source) || 'unspecified source';
+}
+
+function dataverseInstitutionSourceLabel(source) {
+  if (source === 'staff_confirmed') return 'staff confirmed';
+  if (source === 'primary_affiliation') return 'primary affiliation';
+  if (source === 'organization') return 'organization';
+  return null;
 }
 
 function emailOwnershipLabel(evidence) {
@@ -237,6 +244,10 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const coauthorships = Array.isArray(c.coauthorships) ? c.coauthorships : [];
   const eligibilityStatus = c.eligibilityStatus || enr.eligibilityStatus || 'unknown';
   const eligibilityEvidence = c.eligibilityEvidence || enr.eligibilityEvidence || null;
+  const dataverseEvidence = enr.dataverseContactEvidence || null;
+  const dataverseInstitutions = Array.isArray(dataverseEvidence?.institutions)
+    ? dataverseEvidence.institutions.filter((entry) => entry?.value && dataverseInstitutionSourceLabel(entry.source))
+    : [];
 
   // A cited/PI-named candidate the spine couldn't auto-verify is selectable (the PI vouched for
   // them) but its contact/bibliometrics are force-nulled at save (save-candidates) until identity
@@ -274,12 +285,41 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             )}
           </div>
           {!identityUnverified && c.affiliation && (
-            <p className="text-xs text-gray-500 mt-0.5 truncate" title={enr.priorAffiliation ? `Current affiliation (per ${affiliationSourceLabel(c.affiliationSource || enr.affiliationSource)}); previously: ${enr.priorAffiliation}` : undefined}>
+            <p className="text-xs text-gray-500 mt-0.5 truncate" title={`Affiliation evidence: ${affiliationSourceLabel(c.affiliationSource || enr.affiliationSource)}${enr.priorAffiliation ? `; previous search value: ${enr.priorAffiliation}` : ''}`}>
               {c.affiliation}
-              {affiliationProvenance(c.affiliationSource || enr.affiliationSource) && (
-                <span className="ml-1 text-gray-400">· current (per {affiliationProvenance(c.affiliationSource || enr.affiliationSource)})</span>
+              {affiliationEvidenceLabel(c.affiliationSource || enr.affiliationSource) && (
+                <span className="ml-1 text-gray-400">· {affiliationEvidenceLabel(c.affiliationSource || enr.affiliationSource)}</span>
               )}
             </p>
+          )}
+
+          {!identityUnverified && dataverseEvidence?.status === 'known' && (
+            <div
+              className="mt-2 text-xs text-emerald-700"
+              title={dataverseEvidence.checkedAt ? `Dataverse checked ${dataverseEvidence.checkedAt}` : undefined}
+            >
+              ✓ Known in Dataverse by exact {dataverseEvidence.matchKey || 'key'} (checked during this search)
+            </div>
+          )}
+          {!identityUnverified && dataverseEvidence?.status === 'review_required' && (
+            <div
+              className="mt-2 p-2 border rounded text-xs bg-amber-50 border-amber-300 text-amber-800"
+              title={dataverseEvidence.checkedAt ? `Dataverse checked ${dataverseEvidence.checkedAt}` : undefined}
+            >
+              ⚠ Dataverse identity needs review
+            </div>
+          )}
+          {!identityUnverified && dataverseInstitutions.length > 0 && (
+            <div className={`mt-1 text-xs ${dataverseInstitutions.length > 1 ? 'text-amber-700' : 'text-gray-500'}`}>
+              {dataverseInstitutions.length > 1
+                ? 'Multiple affiliation records (may include co-affiliations or history): '
+                : 'Dataverse institution: '}
+              {dataverseInstitutions.map((entry, index) => (
+                <span key={`${entry.source}:${entry.value}`}>
+                  {index > 0 ? '; ' : ''}{entry.value} ({dataverseInstitutionSourceLabel(entry.source)})
+                </span>
+              ))}
+            </div>
           )}
 
           {hasInstitutionCOI && (
@@ -845,7 +885,7 @@ export default function ReviewerSearchSection({
               candidates: keyedKept,
               options: { usePubmed: true, useOrcid: true, useSerpSearch: true, useClaudeSearch: true },
               // Lets the route re-evaluate institution COI on the post-enrichment
-              // affiliation so the badge stays accurate after a current-affiliation
+              // affiliation so the badge stays accurate after an affiliation-evidence
               // promotion (Codex P2#1). requestId lets the server use the structured
               // PI-institution union, matching discover's hard drop (S240).
               authorInstitution: analysisResult?.proposalInfo?.authorInstitution || null,

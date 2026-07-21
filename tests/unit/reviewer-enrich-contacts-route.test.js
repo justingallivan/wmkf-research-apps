@@ -41,9 +41,14 @@ jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
   mintAutomatedIdentityAttestation: jest.fn(async ({ candidate }) => `receipt:${candidate.name}`),
 }));
 
+jest.mock('../../lib/services/reviewer-contact-reconciliation', () => ({
+  reconcileReviewerContacts: jest.fn(async (candidates) => candidates),
+}));
+
 import handler from '../../pages/api/reviewer-finder/enrich-contacts';
 import { ContactEnrichmentService } from '../../lib/services/contact-enrichment-service';
 import { mintAutomatedIdentityAttestation } from '../../lib/services/reviewer-candidate-attestation';
+import { reconcileReviewerContacts } from '../../lib/services/reviewer-contact-reconciliation';
 
 function mockRes() {
   return {
@@ -108,6 +113,10 @@ test('opts into partial abort results and streams partial complete metadata', as
     },
   ]);
   expect(res.ended).toBe(true);
+  expect(reconcileReviewerContacts).toHaveBeenCalledWith(
+    expect.any(Array),
+    expect.objectContaining({ skip: true }),
+  );
 });
 
 test('adds a server identity receipt to enriched candidates when requestId is present', async () => {
@@ -128,4 +137,33 @@ test('adds a server identity receipt to enriched candidates when requestId is pr
   const complete = res.frames.find((frame) => frame.type === 'complete');
   expect(mintAutomatedIdentityAttestation).toHaveBeenCalled();
   expect(complete.results[0].automatedIdentityAttestation).toBe('receipt:Dr. A');
+  expect(reconcileReviewerContacts).toHaveBeenCalledWith(
+    expect.any(Array),
+    expect.objectContaining({ skip: false }),
+  );
+});
+
+test('fails open when reconciliation setup throws and still streams complete results', async () => {
+  const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  ContactEnrichmentService.enrichCandidates.mockResolvedValue({
+    enriched: [{ name: 'Dr. A', contactEnrichment: { email: 'a@example.edu' } }],
+    stats: {},
+  });
+  reconcileReviewerContacts.mockRejectedValueOnce(new Error('unexpected setup failure'));
+
+  const res = mockRes();
+  await handler({
+    method: 'POST',
+    body: { candidates: [{ name: 'Dr. A' }], options: {} },
+  }, res);
+
+  expect(res.frames.some((frame) => frame.type === 'error')).toBe(false);
+  expect(res.frames.find((frame) => frame.type === 'complete')).toMatchObject({
+    results: [{ name: 'Dr. A', contactEnrichment: { email: 'a@example.edu' } }],
+  });
+  expect(errorSpy).toHaveBeenCalledWith(
+    '[enrich-contacts] Dataverse reconciliation failed (fail-open):',
+    'unexpected setup failure',
+  );
+  errorSpy.mockRestore();
 });

@@ -15,6 +15,7 @@
 const { ContactEnrichmentService } = require('../../lib/services/contact-enrichment-service');
 const { OpenAlexService } = require('../../lib/services/openalex-service');
 const { ContactParser } = require('../../lib/utils/contact-parser');
+const ScholarlyEmail = require('../../lib/services/contact-enrichment/scholarly-email');
 
 const ORCID = '0000-0002-1825-0097';
 const AUTHOR = {
@@ -38,6 +39,12 @@ describe('enrichCandidate — OpenAlex metrics fetched even for early-email cand
 
   beforeEach(() => {
     jest.spyOn(ContactEnrichmentService, 'saveToDatabase').mockResolvedValue(undefined);
+    // This unit suite exercises the metrics/finalization seam, not live scholarly
+    // provider retries. Keep the structured tier deterministic and offline.
+    jest.spyOn(ScholarlyEmail, 'findScholarlyEmail').mockResolvedValue({
+      status: 'not_found',
+      evidence: [],
+    });
     byOrcidSpy = jest.spyOn(OpenAlexService, 'getAuthorByOrcid').mockResolvedValue(AUTHOR);
     // S266: ORCID metrics path resolves via getRichestAuthorByOrcid; delegate to the
     // getAuthorByOrcid mock (richest-selection is unit-tested in openalex-service.test.js).
