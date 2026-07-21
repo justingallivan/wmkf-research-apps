@@ -534,7 +534,7 @@ test('a late removal response cannot overwrite a newly selected request', async 
   expect(screen.queryByText(/previous search result removed/i)).not.toBeInTheDocument();
 });
 
-test('still fails closed when the discovery stream breaks before a ranked result arrives', async () => {
+test('fails closed with stage-specific guidance when the discovery stream breaks before a ranked result arrives', async () => {
   global.fetch = jest.fn((url) => {
     const target = String(url);
     if (target.includes('/api/workbench/reviewer-roster?')) {
@@ -563,9 +563,50 @@ test('still fails closed when the discovery stream breaks before a ranked result
   const runButton = await screen.findByRole('button', { name: 'Run reviewer search' });
   fireEvent.click(runButton);
 
-  expect(await screen.findByText('Load failed')).toBeInTheDocument();
+  expect(await screen.findByText('The candidate discovery connection was interrupted before results arrived. Please run the search again.')).toBeInTheDocument();
+  expect(screen.queryByText('Load failed')).not.toBeInTheDocument();
   expect(screen.getByText(/previously found candidates below are unchanged/i)).toBeInTheDocument();
   expect(screen.getByText(generatedCandidate.name)).toBeInTheDocument();
+});
+
+test('replaces a raw analysis stream transport error with stage-specific retry guidance', async () => {
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({ success: true, active: [], excluded: [], allNames: [] }));
+    }
+    if (target === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  readSseStream.mockRejectedValueOnce(new Error('Load failed'));
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  const runButton = await screen.findByRole('button', { name: 'Run reviewer search' });
+  fireEvent.click(runButton);
+
+  expect(await screen.findByText('The proposal analysis connection was interrupted before results arrived. Please run the search again.')).toBeInTheDocument();
+  expect(screen.queryByText('Load failed')).not.toBeInTheDocument();
+  expect(global.fetch).not.toHaveBeenCalledWith('/api/reviewer-finder/discover', expect.anything());
+});
+
+test('replaces a raw browser fetch error before analysis starts with retry guidance', async () => {
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({ success: true, active: [], excluded: [], allNames: [] }));
+    }
+    if (target === '/api/reviewer-finder/analyze') return Promise.reject(new Error('Load failed'));
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  const runButton = await screen.findByRole('button', { name: 'Run reviewer search' });
+  fireEvent.click(runButton);
+
+  expect(await screen.findByText('The reviewer search connection was interrupted before results arrived. Please run the search again.')).toBeInTheDocument();
+  expect(screen.queryByText('Load failed')).not.toBeInTheDocument();
+  expect(readSseStream).not.toHaveBeenCalled();
 });
 
 test('a model refusal is shown as non-retryable guidance', async () => {
