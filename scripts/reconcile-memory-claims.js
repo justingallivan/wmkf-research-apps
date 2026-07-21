@@ -96,6 +96,41 @@ function parseClaimAudit() {
   return claims;
 }
 
+function buildHistoricalClaimAudit(claims) {
+  return {
+    source_file: rel(auditFile),
+    audit_date: '2026-05-14',
+    status: 'historical_snapshot',
+    note: 'These classifications reproduce the dated S154 audit for provenance. They are not current drift and are excluded from the live summary and gate result.',
+    summary: {
+      total_claims_at_audit: claims.length,
+      stale_at_audit: claims.filter((claim) => claim.status === 'stale').length,
+      verified_at_audit: claims.filter((claim) => claim.status === 'verified').length,
+      unknown_at_audit: claims.filter((claim) => claim.status === 'unknown').length,
+    },
+    claims,
+  };
+}
+
+function buildLiveSummary({
+  specWithoutEntity,
+  entityWithoutAtlas,
+  staleRowCount,
+  docLabelCollisions,
+  postgresTableMismatch,
+  probeErrors,
+}) {
+  return {
+    live_drift_findings:
+      specWithoutEntity.length
+      + entityWithoutAtlas.length
+      + staleRowCount.length
+      + docLabelCollisions.length
+      + postgresTableMismatch.length,
+    probe_errors: probeErrors,
+  };
+}
+
 function logicalFromSchemaName(schemaName) {
   if (!schemaName) return null;
   return schemaName.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
@@ -234,7 +269,7 @@ function extractAtlasFacts() {
 
     let currentEntity = null;
     for (const line of src.split('\n')) {
-      const h = line.match(/^#{1,3}\s+`([^`]+)`/);
+      const h = line.match(/^#{1,3}\s+(?:Atlas:\s*)?`([^`]+)`/);
       if (h) {
         currentEntity = h[1].toLowerCase();
         facts.logicalEntities.add(currentEntity);
@@ -247,16 +282,17 @@ function extractAtlasFacts() {
         if (currentEntity) facts.entitySetByLogical.set(currentEntity, entitySet);
       }
 
-      const rowClaim = line.match(/(?:\*\*Live row count:\*\*|live state:|holds|has|is also empty|counterpart .* has|###\s+`?([a-z0-9_]+)`?)?[^0-9]*(\d[\d,]*)\s+rows?\b/i);
+      const rowClaim = line.match(/\*\*Live row count:\*\*\s+\**(\d[\d,]*)\**\b/i)
+        || line.match(/\b(?:live state:|holds|has|counterpart .* has)[^0-9]*(\d[\d,]*)\s+rows?\b/i);
       if (rowClaim) {
-        const count = Number(rowClaim[2].replace(/,/g, ''));
-        const entity = (currentEntity || rowClaim[1] || inferEntityNearLine(line) || '').toLowerCase();
+        const count = Number(rowClaim[1].replace(/,/g, ''));
+        const entity = (currentEntity || inferEntityNearLine(line) || '').toLowerCase();
         if (entity) {
           facts.rowClaims.push({ entity, atlas_claim: count, source_file: source, claim_text: line.trim() });
         }
       }
 
-      const noRows = line.match(/`([^`]+)`[^.\n]*(?:0 rows|empty|EMPTY)/i);
+      const noRows = line.match(/`([^`]+)`[^.\n]*(?:\b0 rows\b|\bempty\b)/i);
       if (noRows) {
         facts.rowClaims.push({ entity: noRows[1].toLowerCase(), atlas_claim: 0, source_file: source, claim_text: line.trim() });
       }
@@ -502,13 +538,30 @@ function nearestAtlasClaim(entity, rowClaims) {
     const e = c.entity.replace(/_/g, '');
     return e === compact || e === `${compact}s` || `${e}s` === compact || compact.includes(e) || e.includes(compact);
   });
-  return claims.length ? claims[claims.length - 1] : null;
+  if (!claims.length) return null;
+
+  // Prefer the entity's canonical Atlas page over incidental count mentions
+  // in historical/cross-system pages. Dataverse has unconventional plurals
+  // (`wmkf_potentialreviewerses`), so compare both singularized entity-set
+  // variants against the normalized page basename.
+  const entityVariants = new Set([compact]);
+  if (compact.endsWith('es')) entityVariants.add(compact.slice(0, -2));
+  if (compact.endsWith('s')) entityVariants.add(compact.slice(0, -1));
+  const exactEntityClaims = claims.filter((claim) => entityVariants.has(claim.entity.replace(/_/g, '')));
+  const preferredClaims = exactEntityClaims.length ? exactEntityClaims : claims;
+  const canonical = preferredClaims.filter((claim) => {
+    const sourceStem = path.basename(claim.source_file, '.md')
+      .replace(/^(?:dataverse|postgres)-/, '')
+      .replace(/[^a-z0-9]/g, '');
+    return entityVariants.has(sourceStem);
+  });
+  return (canonical.length ? canonical : preferredClaims).at(-1);
 }
 
 async function main() {
   loadEnvFiles();
 
-  const claimAudit = parseClaimAudit();
+  const historicalClaims = parseClaimAudit();
   const specs = loadWave2Specs();
   const schemaSqlTables = parseSchemaSqlTables();
   const migrationTables = parseMigrationTables();
@@ -593,13 +646,15 @@ async function main() {
   }
 
   const probeErrors = [...dataverseResults.values()].filter((r) => r.status === 'unknown').length + (postgres.skipped ? 1 : 0);
-  const summary = {
-    total_claims: claimAudit.length,
-    stale: claimAudit.filter((c) => c.status === 'stale').length,
-    verified: claimAudit.filter((c) => c.status === 'verified').length,
-    unknown: claimAudit.filter((c) => c.status === 'unknown').length,
-    probe_errors: probeErrors,
-  };
+  const docLabelCollisions = buildLabelCollisions(atlasFacts);
+  const summary = buildLiveSummary({
+    specWithoutEntity,
+    entityWithoutAtlas,
+    staleRowCount,
+    docLabelCollisions,
+    postgresTableMismatch,
+    probeErrors,
+  });
 
   // bucket_meta is a self-documenting header so future auditors don't have
   // to re-derive which buckets are gate-blocking vs. informational by
@@ -630,10 +685,10 @@ async function main() {
       spec_without_entity: specWithoutEntity,
       entity_without_atlas: entityWithoutAtlas,
       stale_row_count: staleRowCount,
-      doc_label_collision: buildLabelCollisions(atlasFacts),
+      doc_label_collision: docLabelCollisions,
       postgres_table_mismatch: postgresTableMismatch,
     },
-    claim_audit: claimAudit,
+    historical_claim_audit: buildHistoricalClaimAudit(historicalClaims),
   };
   report.probe_notes.dataverse = dataverseWarning
     ? (dataverseWarning.startsWith('probe_error:') ? dataverseWarning : `probe_skipped: ${dataverseWarning}`)
@@ -642,7 +697,8 @@ async function main() {
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
 
   console.log(`Wrote ${rel(reportPath)}`);
-  console.log(`Claims: ${summary.total_claims} total, ${summary.verified} verified, ${summary.stale} stale, ${summary.unknown} unknown`);
+  console.log(`Live drift findings: ${summary.live_drift_findings}; probe errors: ${summary.probe_errors}`);
+  console.log(`Historical audit preserved: ${historicalClaims.length} findings from 2026-05-14 (excluded from current drift)`);
   console.log(`Drift: ${specWithoutEntity.length} spec_without_entity, ${staleRowCount.length} stale_row_count, ${entityWithoutAtlas.length} entity_without_atlas, ${postgresTableMismatch.length} postgres_table_mismatch`);
   if (dataverseWarning) {
     const label = dataverseWarning.startsWith('probe_error:') ? 'Dataverse probe error' : 'Dataverse probes skipped';
@@ -653,7 +709,14 @@ async function main() {
 
 // Export testable helpers for unit tests. Guard main() so requiring this
 // module does not auto-run the script.
-module.exports = { probeEntitySetCount };
+module.exports = {
+  buildHistoricalClaimAudit,
+  buildLiveSummary,
+  extractAtlasFacts,
+  nearestAtlasClaim,
+  parseClaimAudit,
+  probeEntitySetCount,
+};
 
 if (require.main === module) {
   main().catch((e) => {

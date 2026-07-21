@@ -54,8 +54,8 @@ The canonical reference for the live state of the application's data layer.
 | Entity | Rows | Status | Page |
 |---|---:|---|---|
 | `wmkf_appresearcher` | — | **DROPPED S213** — bibliometric sidecar collapsed into `wmkf_potentialreviewers` (17 fields folded onto the person); see `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md` | (page removed) |
-| `wmkf_appreviewersuggestion` | 662 | active lifecycle ledger | [dataverse-wmkf-appreviewersuggestion.md](atlas/dataverse-wmkf-appreviewersuggestion.md) |
-| `wmkf_potentialreviewers` (vendor + ext.) | 4,416 | per-person scratch+history; **now also carries the bibliometric fields** (affiliation/h-index/citations/scholar/orcid/etc.) folded in from the dropped sidecar (S213) | [dataverse-wmkf-potentialreviewers.md](atlas/dataverse-wmkf-potentialreviewers.md) |
+| `wmkf_appreviewersuggestion` | 710 | active lifecycle ledger | [dataverse-wmkf-appreviewersuggestion.md](atlas/dataverse-wmkf-appreviewersuggestion.md) |
+| `wmkf_potentialreviewers` (vendor + ext.) | 4,423 | per-person scratch+history; **now also carries the bibliometric fields** (affiliation/h-index/citations/scholar/orcid/etc.) folded in from the dropped sidecar (S213) | [dataverse-wmkf-potentialreviewers.md](atlas/dataverse-wmkf-potentialreviewers.md) |
 | `wmkf_apppublication` | — | **DROPPED S213** (was 0 rows, no callers) — went down with the appresearcher collapse | (page section removed) |
 | `wmkf_appgrantcycle` | 10 | Dataverse-primary post-W3 (2026-05-12); full 11-attr schema deployed; consumed by reviewer-finder/grant-cycles + review-manager render/send-emails + maintenance-service blob-cleanup | same page |
 | `wmkf_appproposalsearch` | 0 | DEPLOYED (S185), entity set is the unconventional `wmkf_appproposalsearchs`; verified S188 audit re-sweep 2026-05-25 | same page |
@@ -74,7 +74,7 @@ The canonical reference for the live state of the application's data layer.
 | `systemuser` | 222 | internal staff | (used for impersonation; see `dataverse-identity-map.js`) |
 | `wmkf_ai_run` | 351 | append-only AI invocation audit ledger | [dataverse-wmkf-ai-run-and-prompt.md](atlas/dataverse-wmkf-ai-run-and-prompt.md) |
 | `wmkf_ai_prompt` | 17 | staff-editable prompt rows for Executor | same page |
-| `wmkf_granteedeliverable` | 0 expected at cutover | **[PLANNED S271]** grantee deliverable package lifecycle/image/date side table; schema-as-code added, live Dataverse apply/admin privilege grant not performed by this task | [dataverse-wmkf-granteedeliverable.md](atlas/dataverse-wmkf-granteedeliverable.md) |
+| `wmkf_granteedeliverable` | 3 | **LIVE S271** grantee deliverable package lifecycle/image/date side table; production schema and service-principal CRUD verified | [dataverse-wmkf-granteedeliverable.md](atlas/dataverse-wmkf-granteedeliverable.md) |
 
 ### Vendor entities — Dynamics Explorer read-only
 
@@ -178,7 +178,7 @@ Useful summary of how Postgres ↔ Dataverse currently join (or will join post-c
 | Entity | Schema-as-code | Live deployment | Has data |
 |---|---|---|---|
 | `wmkf_appresearcher` | — | **DROPPED S213** (collapsed into `wmkf_potentialreviewers`) | — |
-| `wmkf_appreviewersuggestion` | extension manifest | ✅ 52 attrs | ✅ 662 rows |
+| `wmkf_appreviewersuggestion` | extension manifest | ✅ 52 attrs | ✅ 710 rows |
 | `wmkf_apppublication` | — | **DROPPED S213** | — |
 | `wmkf_appgrantcycle` | ✅ 8 attrs | ✅ 10 attrs (different gap from Postgres) | ✅ 10 rows (2026-05-14 audit) |
 | `wmkf_appproposalsearch` | ✅ | ✅ (entity set `wmkf_appproposalsearchs`, NOT `-es`) | empty |

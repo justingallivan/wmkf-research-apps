@@ -21,7 +21,14 @@
  *   - $top=1 200 + $count 200 — status:200 with row_count populated.
  */
 
-const { probeEntitySetCount } = require('../../scripts/reconcile-memory-claims.js');
+const {
+  buildHistoricalClaimAudit,
+  buildLiveSummary,
+  extractAtlasFacts,
+  nearestAtlasClaim,
+  parseClaimAudit,
+  probeEntitySetCount,
+} = require('../../scripts/reconcile-memory-claims.js');
 
 // Minimal Response-shaped stub. fetchWithTimeout returns a Response;
 // production code reads .status, .ok, .text(), and .json() on it.
@@ -132,5 +139,68 @@ describe('probeEntitySetCount', () => {
     expect(r.status).toBe(200);
     expect(r.row_count).toBeNull();
     expect(r.count_error).toMatch(/500/);
+  });
+});
+
+describe('reconciliation report semantics', () => {
+  test('keeps historical classifications out of the current live summary', () => {
+    const historical = buildHistoricalClaimAudit([
+      { status: 'stale' },
+      { status: 'verified' },
+      { status: 'unknown' },
+    ]);
+    const live = buildLiveSummary({
+      specWithoutEntity: [],
+      entityWithoutAtlas: [],
+      staleRowCount: [{ entity: 'example' }],
+      docLabelCollisions: [],
+      postgresTableMismatch: [],
+      probeErrors: 0,
+    });
+
+    expect(live).toEqual({ live_drift_findings: 1, probe_errors: 0 });
+    expect(live).not.toHaveProperty('stale');
+    expect(live).not.toHaveProperty('verified');
+    expect(live).not.toHaveProperty('unknown');
+    expect(historical).toMatchObject({
+      audit_date: '2026-05-14',
+      status: 'historical_snapshot',
+      summary: {
+        total_claims_at_audit: 3,
+        stale_at_audit: 1,
+        verified_at_audit: 1,
+        unknown_at_audit: 1,
+      },
+    });
+  });
+
+  test('labels the actual S154 source as historical provenance', () => {
+    const historical = buildHistoricalClaimAudit(parseClaimAudit());
+
+    expect(historical.source_file).toBe('docs/AUDIT_S154_MEMORY_V2.md');
+    expect(historical.status).toBe('historical_snapshot');
+    expect(historical.note).toMatch(/not current drift/i);
+    expect(historical.claims.length).toBeGreaterThan(0);
+  });
+
+  test('prefers the canonical entity Atlas page over historical count mentions', () => {
+    const atlasFacts = extractAtlasFacts();
+    const claim = nearestAtlasClaim('wmkf_appreviewersuggestions', atlasFacts.rowClaims);
+
+    expect(claim).toMatchObject({
+      entity: 'wmkf_appreviewersuggestion',
+      atlas_claim: 710,
+      source_file: 'docs/atlas/dataverse-wmkf-appreviewersuggestion.md',
+    });
+  });
+
+  test('parses explicit live counts from multi-entity Atlas sections', () => {
+    const atlasFacts = extractAtlasFacts();
+
+    expect(nearestAtlasClaim('wmkf_appgrantcycles', atlasFacts.rowClaims)).toMatchObject({
+      entity: 'wmkf_appgrantcycle',
+      atlas_claim: 10,
+      source_file: 'docs/atlas/dataverse-wmkf-apppublication-and-appgrantcycle.md',
+    });
   });
 });
