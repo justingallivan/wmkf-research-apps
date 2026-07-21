@@ -104,6 +104,7 @@ jest.mock('../../lib/services/reviewer-request-context', () => ({
 }));
 
 jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
+  APPLICANT_ENRICHMENT_CACHE_VERSION: 1,
   pruneCandidateForRoster: jest.fn((c) => c),
 }));
 
@@ -183,6 +184,11 @@ test('happy path: progress frames strictly precede one terminal complete; never 
     isApplicantRecommended: true,
   });
   expect(recordSurfaced).toHaveBeenCalledTimes(1);
+  expect(recordSurfaced).toHaveBeenCalledWith(
+    REQ,
+    [expect.objectContaining({ applicantEnrichmentCacheVersion: 1 })],
+    { expectedUpdatedAt: null },
+  );
 });
 
 test('an enrichment write uses the pre-run roster token and leaves a concurrently changed row untouched', async () => {

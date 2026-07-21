@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 import {
+  APPLICANT_ENRICHMENT_CACHE_VERSION,
   mergeEnrichment,
   asPercent,
   normalizeReviewerName,
@@ -807,6 +808,7 @@ describe('pruneCandidateForRoster — applicant enrichment cache fields survive 
       name: 'Dr Applicant',
       suggestionId: '22222222-2222-4222-8222-222222222222',
       enrichedProposalKey: 'Library::Folder::Proposal.pdf',
+      applicantEnrichmentCacheVersion: APPLICANT_ENRICHMENT_CACHE_VERSION,
       isApplicantRecommended: true,
       provenance: { kind: PROVENANCE_KINDS.APPLICANT_SUGGESTED, sources: ['applicant'] },
       hasInstitutionCOI: true,
@@ -826,6 +828,7 @@ describe('pruneCandidateForRoster — applicant enrichment cache fields survive 
     });
 
     expect(pruned.enrichedProposalKey).toBe('Library::Folder::Proposal.pdf');
+    expect(pruned.applicantEnrichmentCacheVersion).toBe(APPLICANT_ENRICHMENT_CACHE_VERSION);
     expect(pruned.suggestionId).toBe('22222222-2222-4222-8222-222222222222');
     expect(pruned.isApplicantRecommended).toBe(true);
     expect(pruned.provenance.kind).toBe(PROVENANCE_KINDS.APPLICANT_SUGGESTED);
@@ -855,6 +858,7 @@ describe('hasValidApplicantEnrichmentCache', () => {
     candidateKey: 'suggestion:sug-1',
     isApplicantRecommended: true,
     enrichedProposalKey: proposalKey,
+    applicantEnrichmentCacheVersion: APPLICANT_ENRICHMENT_CACHE_VERSION,
     identityStatus: 'probable',
   };
 
@@ -870,6 +874,16 @@ describe('hasValidApplicantEnrichmentCache', () => {
 
     expect(hasValidApplicantEnrichmentCache([
       { ...canonical, isApplicantRecommended: false, provenance: { kind: 'literature_retrieved' } },
+    ], proposalKey, expected)).toBe(false);
+  });
+
+  test('rejects unversioned and older applicant enrichment rows', () => {
+    expect(hasValidApplicantEnrichmentCache([
+      { ...canonical, applicantEnrichmentCacheVersion: undefined },
+    ], proposalKey, expected)).toBe(false);
+
+    expect(hasValidApplicantEnrichmentCache([
+      { ...canonical, applicantEnrichmentCacheVersion: APPLICANT_ENRICHMENT_CACHE_VERSION - 1 },
     ], proposalKey, expected)).toBe(false);
   });
 
