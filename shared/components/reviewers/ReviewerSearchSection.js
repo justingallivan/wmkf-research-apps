@@ -2158,14 +2158,14 @@ export default function ReviewerSearchSection({
                     </>
                 }
               </p>
-              {recIdentityReviewCount > 0 && (
+              {recCount > 0 && (
                 <button
                   type="button"
                   onClick={() => enrichRecommended()}
                   disabled={!blobUrl || !proposalKey}
                   className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  Retry automatic identification
+                  Update applicant suggestions
                 </button>
               )}
             </div>
