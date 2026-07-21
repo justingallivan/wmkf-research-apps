@@ -223,6 +223,8 @@ Together with `:fact-consistency`, scalar values + the generated doc + cross-doc
 
 Added S154. Runs `scripts/reconcile-memory-claims.js`. Fails on `spec_without_entity`, large `stale_row_count`, `doc_label_collision`, or any `probe_errors`.
 
+The report's top-level `summary` describes current live drift only. The dated 2026-05-14 S154 classifications remain under `historical_claim_audit` for provenance and are explicitly excluded from the current summary and gate result.
+
 - Historical hazard: the Set D label collision that previously kept this gate red was resolved 2026-05-26 (Connor walkthrough — fit-assessment fields relabeled to Set E). Current state is whatever `npm run check:memory-drift` shows — verify before assuming.
 - The Codex-flagged `incompatible_shape` drift bucket is a planned addition (not yet built).
 - Promotion to the P0 set above is reasonable once the bucket lands AND the gate has been green continuously for a stretch of sessions.

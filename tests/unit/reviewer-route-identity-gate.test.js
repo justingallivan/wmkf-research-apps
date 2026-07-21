@@ -74,6 +74,7 @@ jest.mock('../../lib/services/contact-enrichment-service', () => ({
 }));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   recordSurfaced: jest.fn(async () => 1),
+  findCandidateBySuggestion: jest.fn(async () => null),
   findEligibilityByCandidateKey: jest.fn(async () => null),
   stampSuggestionAnchor: jest.fn(async () => ({ updated: 1 })),
   findIdentityConfirmation: jest.fn(async () => null),
@@ -1065,7 +1066,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
 });
 
 // ── /api/workbench/enrich-recommended ─────────────────────────────────────────
-describe('enrich-recommended route — identity gate + clear-on-downgrade', () => {
+describe('enrich-recommended route — applicant identity gate', () => {
   const GUID = '11111111-1111-4111-8111-111111111111';
   let handler, reviewerSuggestionAdapter, ContactEnrichmentService;
   beforeAll(() => {
@@ -1093,15 +1094,22 @@ describe('enrich-recommended route — identity gate + clear-on-downgrade', () =
     return handler(req, res).then(() => res);
   };
 
-  test('unresolved verdict → ORCID/Scholar nulled in writeback, decision written, stale fields CLEARED', async () => {
-    await run({ status: 'unresolved' });
-    expect(researcherAdapter.upsertByPotentialReviewer).toHaveBeenCalled();
-    const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
-    expect(payload.orcid).toBeNull();
-    expect(payload.googleScholarId).toBeNull();
-    expect(payload.hIndex).toBeNull();
-    expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith('PID-1', expect.objectContaining({ status: 'unresolved' }), expect.objectContaining({ identityOrigin: 'automated' }));
-    expect(researcherAdapter.clearIdentityFields).toHaveBeenCalledWith('PID-1', RESOLVER_SOURCED_FIELDS, expect.objectContaining({ identityOrigin: 'automated' }));
+  test('unresolved verdict → no Dataverse mutation and a needs-review card', async () => {
+    const res = await run({ status: 'unresolved' });
+    expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
+    expect(researcherAdapter.writeIdentityDecision).not.toHaveBeenCalled();
+    expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
+    const dataFrames = res.write.mock.calls
+      .map(([chunk]) => chunk)
+      .filter((chunk) => typeof chunk === 'string' && chunk.startsWith('data: '));
+    const complete = JSON.parse(dataFrames.at(-1).slice('data: '.length));
+    expect(complete.recommended[0]).toMatchObject({
+      needsIdentification: true,
+      identityStatus: 'unresolved',
+      verificationStatus: 'unresolved',
+      email: null,
+      affiliation: null,
+    });
   });
 
   test('probable verdict → ORCID/Scholar persisted, decision written, NO clear', async () => {
@@ -1123,7 +1131,7 @@ describe('enrich-recommended route — identity gate + clear-on-downgrade', () =
         enrichedProposalKey: 'Library::Folder::Proposal.pdf',
         isApplicantRecommended: true,
       }),
-    ]);
+    ], { expectedUpdatedAt: null });
     const completeCall = res.write.mock.calls.find((call) => call[0] === 'event: complete\n');
     expect(completeCall).toBeTruthy();
     expect(rosterStore.recordSurfaced.mock.invocationCallOrder[0])
@@ -1165,20 +1173,22 @@ describe('enrich-recommended route — identity gate + clear-on-downgrade', () =
     const res = mockRes();
     await handler(req, res);
 
-    const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
-    expect(payload.email).toBeNull();
-    expect(payload.website).toBeNull();
-    expect(payload.facultyPageUrl).toBeNull();
-    expect(payload.department).toBeNull();
-    expect(payload.affiliation).toBeNull();
-    expect(payload.keywords).toBeNull();
+    expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
+    expect(researcherAdapter.writeIdentityDecision).not.toHaveBeenCalled();
+    expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
 
-    // Codex S221 Bug 1 residual: the resolver decision is still recorded (status),
-    // but the stranger's anchors + evidence are stripped before persistence so
-    // wmkf_identityverifiedanchorsjson can't leak their Scholar/ORCID URL.
-    const decisionArg = researcherAdapter.writeIdentityDecision.mock.calls[0][1];
-    expect(decisionArg.status).toBe('unresolved');
-    expect(decisionArg.anchors).toEqual([]);
-    expect(decisionArg.evidenceSummary).not.toMatch(/STRANGER/);
+    const dataFrames = res.write.mock.calls
+      .map(([chunk]) => chunk)
+      .filter((chunk) => typeof chunk === 'string' && chunk.startsWith('data: '));
+    const complete = JSON.parse(dataFrames.at(-1).slice('data: '.length));
+    expect(complete.recommended[0]).toMatchObject({
+      needsIdentification: true,
+      identityStatus: 'unresolved',
+      email: null,
+      website: null,
+      affiliation: null,
+      hIndex: null,
+    });
+    expect(JSON.stringify(complete.recommended[0])).not.toMatch(/STRANGER|stranger/i);
   });
 });

@@ -14,6 +14,7 @@ import { parseReferredSeeds as _parseReferredSeeds } from '../../../lib/utils/re
 import { reviewerSaveKey } from '../../../lib/utils/reviewer-save-key';
 import {
   reviewerCandidateKey as _reviewerCandidateKey,
+  reviewerSuggestionCandidateKey,
   withReviewerCandidateKey as _withReviewerCandidateKey,
 } from '../../../lib/utils/reviewer-candidate-key';
 import { emailConfidence } from '../../../lib/utils/reviewer-invite';
@@ -304,11 +305,65 @@ export function filterExcluded(candidates, excludedNames) {
   return partitionByExcluded(candidates, excludedNames, (c) => c && c.name);
 }
 
-export function hasValidApplicantEnrichmentCache(rosterActive, proposalKey) {
-  if (!proposalKey) return false;
-  return (Array.isArray(rosterActive) ? rosterActive : []).some((c) => (
-    c?.enrichedProposalKey === proposalKey
-      && (c.isApplicantRecommended || provenanceKindOf(c) === PROVENANCE_KINDS.APPLICANT_SUGGESTED)
+export function applicantTerminalSuggestionKeys(rosterExcluded, savedKeys) {
+  const terminal = new Set();
+  for (const candidate of Array.isArray(rosterExcluded) ? rosterExcluded : []) {
+    const canonicalKey = reviewerSuggestionCandidateKey(candidate?.suggestionId);
+    if (canonicalKey && candidate?.candidateKey === canonicalKey) terminal.add(canonicalKey);
+  }
+  for (const key of Array.isArray(savedKeys) ? savedKeys : []) {
+    if (typeof key !== 'string' || !key.startsWith('suggestion:')) continue;
+    const canonicalKey = reviewerSuggestionCandidateKey(key.slice('suggestion:'.length));
+    if (canonicalKey === key) terminal.add(key);
+  }
+  return terminal;
+}
+
+export function hasValidApplicantEnrichmentCache(
+  rosterActive,
+  proposalKey,
+  expectedRecommendations,
+  terminalSuggestionKeys = [],
+) {
+  if (!proposalKey || !Array.isArray(expectedRecommendations) || expectedRecommendations.length === 0) {
+    return false;
+  }
+  const expectedKeys = new Set(expectedRecommendations
+    .map((candidate) => reviewerSuggestionCandidateKey(candidate?.suggestionId))
+    .filter(Boolean));
+  if (expectedKeys.size !== expectedRecommendations.length) return false;
+
+  for (const key of terminalSuggestionKeys || []) {
+    if (expectedKeys.has(key)) expectedKeys.delete(key);
+  }
+  if (expectedKeys.size === 0) return true;
+
+  const canonicalRowsByKey = new Map();
+  for (const candidate of Array.isArray(rosterActive) ? rosterActive : []) {
+    const canonicalKey = reviewerSuggestionCandidateKey(candidate?.suggestionId);
+    if (
+      canonicalKey
+      && expectedKeys.has(canonicalKey)
+      && candidate?.candidateKey === canonicalKey
+      && candidate?.enrichedProposalKey === proposalKey
+      && (candidate.isApplicantRecommended || provenanceKindOf(candidate) === PROVENANCE_KINDS.APPLICANT_SUGGESTED)
+    ) {
+      canonicalRowsByKey.set(canonicalKey, candidate);
+    }
+  }
+  if (canonicalRowsByKey.size !== expectedKeys.size) return false;
+
+  // Applicant enrichment now fails closed unless every non-deceased row has an
+  // explicit identity-gate result. Only the exact canonical suggestion rows for
+  // the current recommendation set count: legacy candidate keys cannot poison a
+  // newly written cache, and a partial roster write cannot masquerade as a
+  // complete batch.
+  return Array.from(canonicalRowsByKey.values()).every((c) => (
+    c?.eligibilityStatus === 'deceased'
+      || c?.pdIdentityConfirmed === true
+      || c?.identityStatus === 'confirmed'
+      || c?.identityStatus === 'probable'
+      || c?.identityStatus === 'unresolved'
   ));
 }
 
@@ -421,6 +476,36 @@ function pruneCoauthorCheckFailures(failures) {
   }));
 }
 
+function pruneManualContactFields(fields) {
+  const allowed = new Set(['email', 'website', 'affiliation', 'hIndex']);
+  return Array.isArray(fields)
+    ? Array.from(new Set(fields.filter((field) => allowed.has(field)))).slice(0, 4)
+    : [];
+}
+
+function boundedText(value, maxLength) {
+  return typeof value === 'string' ? value.slice(0, maxLength) : null;
+}
+
+function pruneStaffIdentityConfirmation(confirmation) {
+  if (!confirmation || typeof confirmation !== 'object' || Array.isArray(confirmation)) return null;
+  const confirmationId = boundedText(confirmation.confirmationId, 100);
+  if (!confirmationId || confirmation.source !== 'staff_confirmed') return null;
+  return {
+    confirmationId,
+    source: 'staff_confirmed',
+    normalizedName: boundedText(confirmation.normalizedName, 300),
+    email: boundedText(confirmation.email, 320),
+    website: boundedText(confirmation.website, 500),
+    affiliation: boundedText(confirmation.affiliation, 500),
+    actorProfileId: typeof confirmation.actorProfileId === 'number'
+      ? confirmation.actorProfileId
+      : boundedText(confirmation.actorProfileId, 100),
+    actorSystemUserId: boundedText(confirmation.actorSystemUserId, 100),
+    confirmedAt: boundedText(confirmation.confirmedAt, 80),
+  };
+}
+
 /**
  * Prune an enriched candidate down to the fields `CandidateCard` actually
  * renders, for durable storage in `reviewer_find_roster` (S224). Keeps the card
@@ -481,6 +566,7 @@ export function pruneCandidateForRoster(c) {
       anchoredInstitutionDomains: Array.isArray(e.anchoredInstitutionDomains) ? e.anchoredInstitutionDomains.slice(0, 8) : [],
       plausibleInstitutionDomains: Array.isArray(e.plausibleInstitutionDomains) ? e.plausibleInstitutionDomains.slice(0, 12) : [],
       website: ContactParser.sanitizeWebsiteForCandidate(e.website, c.name) || null,
+      websiteSource: e.websiteSource === 'manual' ? 'manual' : (e.websiteSource || null),
       orcid: e.orcid || e.orcidId || null,
       orcidId: e.orcidId || null,
       orcidUrl: e.orcidUrl || null,
@@ -593,11 +679,13 @@ export function pruneCandidateForRoster(c) {
       ? c.automatedIdentityAttestation
       : null,
     candidateKey: reviewerCandidateKey(c),
+    manualContactFields: pruneManualContactFields(c.manualContactFields),
     // UI convenience only. Save-candidates derives authority by looking up the
     // opaque confirmation id in the request-scoped server roster.
     pdIdentityConfirmed: c.pdIdentityConfirmed === true,
     pdIdentityConfirmationId: typeof c.pdIdentityConfirmationId === 'string'
       ? c.pdIdentityConfirmationId
       : null,
+    staffIdentityConfirmation: pruneStaffIdentityConfirmation(c.staffIdentityConfirmation),
   };
 }

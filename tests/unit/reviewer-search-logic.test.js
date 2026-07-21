@@ -8,6 +8,7 @@ import {
   parseExcludeList,
   parseReferredSeeds,
   filterExcluded,
+  applicantTerminalSuggestionKeys,
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
   candidateWasSaved,
@@ -806,23 +807,120 @@ describe('pruneCandidateForRoster — applicant enrichment cache fields survive 
 
 describe('hasValidApplicantEnrichmentCache', () => {
   const proposalKey = 'Library::Folder::Proposal.pdf';
+  const expected = [{ suggestionId: 'SUG-1' }];
+  const canonical = {
+    name: 'Dr Applicant',
+    suggestionId: 'SUG-1',
+    candidateKey: 'suggestion:sug-1',
+    isApplicantRecommended: true,
+    enrichedProposalKey: proposalKey,
+    identityStatus: 'probable',
+  };
 
-  test('requires a non-null proposal key and same-key applicant-origin roster row', () => {
-    expect(hasValidApplicantEnrichmentCache([
-      { name: 'Dr Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey },
-    ], proposalKey)).toBe(true);
+  test('requires a non-null proposal key and the exact expected canonical suggestion row', () => {
+    expect(hasValidApplicantEnrichmentCache([canonical], proposalKey, expected)).toBe(true);
 
     expect(hasValidApplicantEnrichmentCache([
-      { name: 'Dr Applicant', isApplicantRecommended: true, enrichedProposalKey: 'Other::Proposal.pdf' },
-    ], proposalKey)).toBe(false);
+      { ...canonical, enrichedProposalKey: 'Other::Proposal.pdf' },
+    ], proposalKey, expected)).toBe(false);
+
+    expect(hasValidApplicantEnrichmentCache([canonical], null, expected)).toBe(false);
+    expect(hasValidApplicantEnrichmentCache([canonical], proposalKey, [])).toBe(false);
 
     expect(hasValidApplicantEnrichmentCache([
-      { name: 'Dr Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey },
-    ], null)).toBe(false);
+      { ...canonical, isApplicantRecommended: false, provenance: { kind: 'literature_retrieved' } },
+    ], proposalKey, expected)).toBe(false);
+  });
+
+  test('ignores legacy-key rows once the canonical row exists and rejects partial canonical batches', () => {
+    expect(hasValidApplicantEnrichmentCache([
+      { ...canonical, candidateKey: 'person:legacy', identityStatus: null },
+    ], proposalKey, expected)).toBe(false);
 
     expect(hasValidApplicantEnrichmentCache([
-      { name: 'Dr Literature', enrichedProposalKey: proposalKey },
-    ], proposalKey)).toBe(false);
+      canonical,
+      { ...canonical, candidateKey: 'person:legacy', identityStatus: null },
+    ], proposalKey, expected)).toBe(true);
+
+    expect(hasValidApplicantEnrichmentCache([
+      canonical,
+    ], proposalKey, [{ suggestionId: 'SUG-1' }, { suggestionId: 'SUG-2' }])).toBe(false);
+  });
+
+  test('requires every canonical applicant row to carry a terminal gate result', () => {
+    expect(hasValidApplicantEnrichmentCache([
+      { ...canonical, identityStatus: null },
+    ], proposalKey, expected)).toBe(false);
+
+    expect(hasValidApplicantEnrichmentCache([
+      { ...canonical, identityStatus: 'unresolved', needsIdentification: true },
+    ], proposalKey, expected)).toBe(true);
+
+    expect(hasValidApplicantEnrichmentCache([
+      { ...canonical, identityStatus: null, eligibilityStatus: 'deceased' },
+    ], proposalKey, expected)).toBe(true);
+  });
+
+  test('treats canonical saved/excluded suggestions as terminal without hiding unknown missing rows', () => {
+    const secondExpected = [{ suggestionId: 'SUG-1' }, { suggestionId: 'SUG-2' }];
+    const excluded = [{
+      name: 'Excluded Applicant',
+      suggestionId: 'SUG-1',
+      candidateKey: 'suggestion:sug-1',
+    }];
+    const terminal = applicantTerminalSuggestionKeys(excluded, ['suggestion:sug-2']);
+    expect(hasValidApplicantEnrichmentCache([], proposalKey, secondExpected, terminal)).toBe(true);
+
+    const unknownOnly = applicantTerminalSuggestionKeys([], ['suggestion:other']);
+    expect(hasValidApplicantEnrichmentCache([], proposalKey, expected, unknownOnly)).toBe(false);
+  });
+
+  test('rejects non-canonical excluded/saved keys as terminal authority', () => {
+    const terminal = applicantTerminalSuggestionKeys(
+      [{ suggestionId: 'SUG-1', candidateKey: 'candidate:forged' }],
+      ['suggestion:SUG-1', 'candidate:other'],
+    );
+    expect(Array.from(terminal)).toEqual([]);
+    expect(hasValidApplicantEnrichmentCache([], proposalKey, expected, terminal)).toBe(false);
+  });
+});
+
+describe('pruneCandidateForRoster — server identity confirmation survives reload', () => {
+  test('keeps only the bounded confirmation/manual-contact shape', () => {
+    const pruned = pruneCandidateForRoster({
+      name: 'Ann Lee',
+      email: 'ann@example.edu',
+      contactEnrichment: { email: 'ann@example.edu', websiteSource: 'manual' },
+      manualContactFields: ['email', 'website', 'email', 'forged'],
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'confirm-1',
+      staffIdentityConfirmation: {
+        confirmationId: 'confirm-1',
+        source: 'staff_confirmed',
+        normalizedName: 'ann lee',
+        email: 'ann@example.edu',
+        website: 'https://example.edu/ann',
+        affiliation: 'Example University',
+        actorProfileId: 5,
+        actorSystemUserId: 'system-5',
+        confirmedAt: '2026-07-20T12:00:00.000Z',
+        forgedExtra: 'drop me',
+      },
+    });
+
+    expect(pruned.manualContactFields).toEqual(['email', 'website']);
+    expect(pruned.contactEnrichment.websiteSource).toBe('manual');
+    expect(pruned.staffIdentityConfirmation).toEqual({
+      confirmationId: 'confirm-1',
+      source: 'staff_confirmed',
+      normalizedName: 'ann lee',
+      email: 'ann@example.edu',
+      website: 'https://example.edu/ann',
+      affiliation: 'Example University',
+      actorProfileId: 5,
+      actorSystemUserId: 'system-5',
+      confirmedAt: '2026-07-20T12:00:00.000Z',
+    });
   });
 });
 

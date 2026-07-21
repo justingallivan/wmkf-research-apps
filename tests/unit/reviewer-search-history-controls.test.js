@@ -99,6 +99,64 @@ test('restored incomplete PubMed COI checks remain selectable but show one compa
   expect(screen.getByLabelText(`Select ${incompleteCandidate.name}`)).toBeInTheDocument();
 });
 
+test('a completed unresolved applicant run offers a manual automatic-identification retry', async () => {
+  const suggestionId = '33333333-3333-3333-3333-333333333333';
+  const unresolvedApplicant = {
+    ...applicantCandidate,
+    candidateKey: `suggestion:${suggestionId}`,
+    suggestionId,
+    email: null,
+    identityStatus: 'unresolved',
+    verificationStatus: 'unresolved',
+    needsIdentification: true,
+  };
+  const resolvedApplicant = {
+    ...unresolvedApplicant,
+    email: 'applicant@example.edu',
+    identityStatus: 'probable',
+    verificationStatus: 'verified',
+    needsIdentification: false,
+  };
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [unresolvedApplicant],
+        excluded: [],
+        ineligible: [],
+        allNames: [unresolvedApplicant.name],
+      }));
+    }
+    if (target === '/api/workbench/enrich-recommended' && options.method === 'POST') {
+      return Promise.resolve(response({}));
+    }
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+  readSseStream.mockImplementation(async (_res, onEvent) => {
+    onEvent({ event: 'complete', data: { recommended: [resolvedApplicant] } });
+  });
+
+  render(
+    <ReviewerSearchSection
+      requestId={REQ}
+      blobUrl="blob"
+      proposalKey="proposal"
+      recommended={[{ suggestionId, name: unresolvedApplicant.name }]}
+    />,
+  );
+
+  const retry = await screen.findByRole('button', { name: 'Retry automatic identification' });
+  fireEvent.click(retry);
+
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+    '/api/workbench/enrich-recommended',
+    expect.objectContaining({ method: 'POST' }),
+  ));
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Retry automatic identification' })).not.toBeInTheDocument());
+  expect(screen.getByText(/1 applicant-referred reviewer verified/i)).toBeInTheDocument();
+});
+
 test('labels restored generated rows and removes only the scoped previous results', async () => {
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);

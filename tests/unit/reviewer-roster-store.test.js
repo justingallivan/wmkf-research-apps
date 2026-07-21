@@ -34,13 +34,14 @@ describe('listForRequest', () => {
       { status: 'active', display_name: 'Ann Lee', candidate: { name: 'Ann Lee' } },
       { status: 'excluded', display_name: 'Bob Roe', candidate: { name: 'Bob Roe' } },
       { status: 'ineligible', display_name: 'Pat Thiel', candidate: { name: 'Pat Thiel', eligibilityStatus: 'deceased' } },
-      { status: 'saved', display_name: 'Cy Poe', candidate: { name: 'Cy Poe' } },
+      { status: 'saved', candidate_key: 'suggestion:sug-9', display_name: 'Cy Poe', candidate: { name: 'Cy Poe', suggestionId: 'SUG-9' } },
       { status: 'coi_dropped', display_name: 'Dee Coe', candidate: { name: 'Dee Coe', hasInstitutionCOI: true } },
     ] });
     const out = await store.listForRequest(REQ);
     expect(out.active.map((c) => c.name)).toEqual(['Ann Lee']);
     expect(out.excluded.map((c) => c.name)).toEqual(['Bob Roe']);
     expect(out.ineligible.map((c) => c.name)).toEqual(['Pat Thiel']);
+    expect(out.savedKeys).toEqual(['suggestion:sug-9']);
     // allNames is the cross-run dedup union — must include saved + excluded + coi_dropped too.
     expect(out.allNames).toEqual(['Ann Lee', 'Bob Roe', 'Pat Thiel', 'Cy Poe', 'Dee Coe']);
   });
@@ -49,17 +50,52 @@ describe('listForRequest', () => {
 describe('findCandidateBySuggestion', () => {
   test('returns the server-owned roster status with the candidate blob', async () => {
     sql.mockResolvedValueOnce({ rows: [{
+      candidate_key: 'suggestion:sug-1',
       status: 'ineligible',
       display_name: 'Pat Thiel',
       candidate: { name: 'Pat Thiel', suggestionId: 'SUG-1' },
       source_kind: 'applicant_suggested',
+      updated_at_token: '2026-07-20 10:00:00+00',
     }] });
 
     await expect(store.findCandidateBySuggestion(REQ, 'SUG-1')).resolves.toMatchObject({
       name: 'Pat Thiel',
       suggestionId: 'SUG-1',
+      candidateKey: 'suggestion:sug-1',
       rosterStatus: 'ineligible',
+      rosterUpdatedAt: '2026-07-20 10:00:00+00',
     });
+    expect(queryTextOf(0)).toMatch(/candidate_key\s*=/);
+    expect(allInterpolations()).toContain('suggestion:sug-1');
+  });
+});
+
+describe('findCandidatesByKeys', () => {
+  test('returns exact request-scoped roster rows with status and concurrency tokens', async () => {
+    sql.mockResolvedValueOnce({ rows: [{
+      candidate_key: 'candidate:ann',
+      status: 'active',
+      display_name: 'Ann Lee',
+      candidate: { name: 'Ann Lee' },
+      source_kind: 'literature_retrieved',
+      updated_at_token: '2026-07-20 11:00:00+00',
+    }] });
+
+    await expect(store.findCandidatesByKeys(REQ, [
+      'candidate:ann',
+      'candidate:ann',
+      '',
+    ])).resolves.toEqual([expect.objectContaining({
+      name: 'Ann Lee',
+      candidateKey: 'candidate:ann',
+      rosterStatus: 'active',
+      rosterUpdatedAt: '2026-07-20 11:00:00+00',
+    })]);
+    expect(queryTextOf(0)).toMatch(/jsonb_array_elements_text/);
+    expect(allInterpolations()).toEqual(expect.arrayContaining([
+      REQ,
+      JSON.stringify(['candidate:ann']),
+    ]));
   });
 });
 
@@ -129,6 +165,10 @@ describe('removePreviousActiveSearchResults', () => {
 });
 
 describe('recordSurfaced', () => {
+  beforeEach(() => {
+    sql.mockResolvedValue({ rows: [], rowCount: 1 });
+  });
+
   test('records named candidates (normalized) and skips unnamed/blank ones', async () => {
     const n = await store.recordSurfaced(REQ, [
       { name: 'Dr. Ann Lee' }, { name: '' }, { name: '   ' }, { name: 'Bob' },
@@ -175,6 +215,32 @@ describe('recordSurfaced', () => {
     expect(keys[1]).toBeTruthy();
     expect(keys[0]).not.toBe(keys[1]);
     expect(inserts[0][0].join(' ')).toMatch(/ON CONFLICT \(request_id, candidate_key\)/);
+  });
+
+  test('uses the snapshot token for conflict updates and reports a stale no-op', async () => {
+    sql.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    const n = await store.recordSurfaced(
+      REQ,
+      [{ name: 'Ann Lee', suggestionId: 'SUG-1' }],
+      { expectedUpdatedAt: '2026-07-20 10:00:00+00' },
+    );
+    expect(n).toBe(0);
+    expect(queryTextOf(0)).toMatch(/reviewer_find_roster\.updated_at::text/);
+    expect(allInterpolations()).toEqual(expect.arrayContaining([
+      true,
+      '2026-07-20 10:00:00+00',
+    ]));
+  });
+
+  test('allows a first insert while refusing a conflict when the snapshot had no row', async () => {
+    const n = await store.recordSurfaced(
+      REQ,
+      [{ name: 'Ann Lee', suggestionId: 'SUG-1' }],
+      { expectedUpdatedAt: null },
+    );
+    expect(n).toBe(1);
+    expect(queryTextOf(0)).toMatch(/INSERT INTO reviewer_find_roster/);
+    expect(allInterpolations()).toEqual(expect.arrayContaining([false, '']));
   });
 });
 

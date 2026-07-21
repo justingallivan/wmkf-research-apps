@@ -58,7 +58,11 @@ beforeEach(() => {
   update.mockResolvedValue(undefined);
   updateById.mockResolvedValue(undefined);
   getById.mockResolvedValue({});
-  findCandidateBySuggestion.mockResolvedValue(null);
+  findCandidateBySuggestion.mockResolvedValue({
+    suggestionId: SUG,
+    identityStatus: 'probable',
+    needsIdentification: false,
+  });
   translateDuplicateKeyError.mockReturnValue(null);
 });
 
@@ -96,6 +100,15 @@ test('plain promote: selected flipped, empty clean result', async () => {
   expect(body).toEqual({ success: true, suggestionId: SUG, savedFields: [], partialSuccess: false, contactError: null });
 });
 
+test('missing authoritative roster row is rejected before lifecycle promotion', async () => {
+  findCandidateBySuggestion.mockResolvedValue(null);
+  const err = await promoteApplicantReviewer(args()).catch((error) => error);
+  expect(err).toBeInstanceOf(ServiceHttpError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({ code: 'identity_verification_required' });
+  expect(updateLifecycle).not.toHaveBeenCalled();
+});
+
 test('deceased applicant-recommended reviewer is rejected before lifecycle promotion', async () => {
   findCandidateBySuggestion.mockResolvedValue({
     name: 'Dr Deceased',
@@ -119,6 +132,37 @@ test('durable ineligible status blocks promotion even when the candidate blob la
   expect(err).toBeInstanceOf(ServiceHttpError);
   expect(err.httpStatus).toBe(422);
   expect(updateLifecycle).not.toHaveBeenCalled();
+});
+
+test('identity-review applicant is rejected before lifecycle promotion without server confirmation', async () => {
+  findCandidateBySuggestion.mockResolvedValue({
+    name: 'Dr Namesake',
+    suggestionId: SUG,
+    needsIdentification: true,
+    identityStatus: 'unresolved',
+    verificationStatus: 'unresolved',
+  });
+  const err = await promoteApplicantReviewer(args()).catch((error) => error);
+  expect(err).toBeInstanceOf(ServiceHttpError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({ code: 'identity_confirmation_required' });
+  expect(updateLifecycle).not.toHaveBeenCalled();
+  expect(update).not.toHaveBeenCalled();
+});
+
+test('server-recorded staff confirmation permits promotion of an identity-review applicant', async () => {
+  findCandidateBySuggestion.mockResolvedValue({
+    name: 'Dr Namesake',
+    suggestionId: SUG,
+    needsIdentification: true,
+    identityStatus: 'unresolved',
+    pdIdentityConfirmed: true,
+    pdIdentityConfirmationId: 'confirm-1',
+    staffIdentityConfirmation: { confirmationId: 'confirm-1', source: 'staff_confirmed' },
+  });
+  const body = await promoteApplicantReviewer(args());
+  expect(body.success).toBe(true);
+  expect(updateLifecycle).toHaveBeenCalledWith(SUG, { selected: true }, { actingUserSystemId: 'u-1' });
 });
 
 test('manual email collision: promotion stands, partialSuccess + email_conflict, backfill skipped', async () => {
