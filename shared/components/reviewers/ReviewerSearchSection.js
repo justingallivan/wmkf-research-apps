@@ -1760,6 +1760,11 @@ export default function ReviewerSearchSection({
                       The proposal analysis response was incomplete or unreliable. Please retry the analysis.
                       {errorMeta.retryable && <span className="block text-xs mt-1">Use Try again to rerun the analysis.</span>}
                     </>
+                  ) : errorMeta?.status === 'analysis_refused' ? (
+                    <>
+                      The analysis model declined this request.
+                      <span className="block text-xs mt-1">Retrying is unlikely to help. This proposal needs an alternate analysis path; please contact an administrator.</span>
+                    </>
                   ) : (
                     <>
                       {error}
@@ -1775,10 +1780,14 @@ export default function ReviewerSearchSection({
               <button
                 type="button"
                 onClick={runSearch}
-                disabled={noSourcesSelected || !rosterLoaded || removingPrevious}
+                disabled={noSourcesSelected || !rosterLoaded || removingPrevious || errorMeta?.status === 'analysis_refused'}
                 className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {!rosterLoaded ? 'Loading existing candidates…' : phase === 'error' ? 'Try again' : 'Run reviewer search'}
+                {!rosterLoaded
+                  ? 'Loading existing candidates…'
+                  : errorMeta?.status === 'analysis_refused'
+                    ? 'Alternate analysis required'
+                    : phase === 'error' ? 'Try again' : 'Run reviewer search'}
               </button>
             </div>
           )}
