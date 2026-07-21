@@ -560,6 +560,22 @@ describe('PATCH', () => {
     });
   });
 
+  it('remove_previous_results accepts bounded generated keys longer than 256 characters', async () => {
+    const candidateKey = `candidate:${'a'.repeat(680)}`;
+    const candidateRefs = [{
+      candidateKey,
+      updatedAt: '2026-07-19T12:00:00.000Z',
+    }];
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'remove_previous_results',
+      candidateRefs,
+    } }, r);
+    expect(r.statusCode).toBe(200);
+    expect(store.removePreviousActiveSearchResults).toHaveBeenCalledWith(REQ, candidateRefs);
+  });
+
   it('remove_previous_results rejects a missing candidate-ref scope', async () => {
     const r = res();
     await handler({ method: 'PATCH', body: {

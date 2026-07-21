@@ -301,6 +301,10 @@ async function handlePatch(req, res, access) {
 
   if (action === 'remove_previous_results') {
     const { candidateRefs } = req.body;
+    // Do not impose a per-key character cap: server-generated fallback keys
+    // contain an encoded affiliation fingerprint and can legitimately be long.
+    // Aggregate input remains bounded by MAX_PREVIOUS_RESULT_KEYS + the 2 MB body
+    // limit, and the store requires an exact request/key/timestamp match.
     const invalidRefs = !Array.isArray(candidateRefs)
       || candidateRefs.length === 0
       || candidateRefs.length > MAX_PREVIOUS_RESULT_KEYS
@@ -308,7 +312,6 @@ async function handlePatch(req, res, access) {
         !ref
         || typeof ref.candidateKey !== 'string'
         || !ref.candidateKey.trim()
-        || ref.candidateKey.length > 256
         || typeof ref.updatedAt !== 'string'
         || !ref.updatedAt.trim()
         || ref.updatedAt.length > 80
