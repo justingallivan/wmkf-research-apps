@@ -802,7 +802,9 @@ export default function ReviewerSearchSection({
         err.retryable = !!streamError.retryable;
         throw err;
       }
-      if (analysisTransportError && !analysisResult) throw analysisTransportError;
+      if (analysisTransportError && !analysisResult) {
+        throw new Error('The proposal analysis connection was interrupted before results arrived. Please run the search again.');
+      }
       if (analysisTransportError) pushProgress('Analysis results received; continuing after the connection closed.');
       // Stream ended cleanly but no result frame arrived — almost always a
       // timed-out or dropped connection during the long Claude analysis, not a
@@ -855,7 +857,9 @@ export default function ReviewerSearchSection({
         discoveryTransportError = transportError;
       }
       if (streamError) throw new Error(streamError);
-      if (discoveryTransportError && !ranked) throw discoveryTransportError;
+      if (discoveryTransportError && !ranked) {
+        throw new Error('The candidate discovery connection was interrupted before results arrived. Please run the search again.');
+      }
       if (discoveryTransportError) pushProgress('Candidate results received; continuing after the connection closed.');
       if (!ranked) throw new Error('Discovery returned no candidates.');
       if (genRef.current !== myGen) return; // context changed — abort
@@ -982,8 +986,12 @@ export default function ReviewerSearchSection({
       setPhase('results');
     } catch (e) {
       if (genRef.current === myGen) {
-        setError(e.message);
-        setErrorMeta({ status: e.status, retryable: !!e.retryable });
+        const rawMessage = e?.message || 'Reviewer search failed.';
+        const message = /^(load failed|failed to fetch|networkerror when attempting to fetch resource\.?)$/i.test(rawMessage)
+          ? 'The reviewer search connection was interrupted before results arrived. Please run the search again.'
+          : rawMessage;
+        setError(message);
+        setErrorMeta({ status: e?.status, retryable: !!e?.retryable });
         setPhase('error');
       }
     } finally {
