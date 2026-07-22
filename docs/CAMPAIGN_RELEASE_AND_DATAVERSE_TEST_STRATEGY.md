@@ -168,10 +168,10 @@ behavior, but all Dataverse writes are denied at the shared service boundary.
 Shadow outputs go to logs or a dedicated non-production comparison store; they never
 update the source record or trigger email.
 
-**[PLANNED]** The repository does not yet have the general Dataverse target/write
-interlock described in section 6. Until it does, pointing a preview or local app at
-production Dataverse is not safely read-only merely because the operator intends it
-to be.
+**[CURRENT — enforced 2026-07-22]** The general Dataverse target/write interlock
+described in section 6 is active in local, Preview, and Production. Preview/local
+production reads still require explicit `DATAVERSE_ALLOW_PROD_READS=yes`; production
+writes from those deployment classes remain denied at the shared boundary.
 
 ### Mode C — Dataverse sandbox
 
@@ -208,14 +208,13 @@ Requirements:
 
 ## 6. Dataverse Target and Write Interlock
 
-**[PLANNED — highest-priority enabling control]** Add a centralized, fail-closed
-interlock at the trusted Dataverse write boundary. UI warnings and route-specific
-flags are not sufficient. Concrete design (modules, policy matrix, hook points,
+**[CURRENT — enforced 2026-07-22]** A centralized, fail-closed interlock runs at
+the shared Dataverse HTTP boundaries; UI warnings and route-specific flags are not
+trusted as substitutes. Concrete design (modules, policy matrix, hook points,
 rollout): `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md` (S355; Stage-1 policy
-module merged at e113b4bf, Stage-2 hook wiring merged at 8067de3a; `warn` mode
-live in `.env.local` + Vercel Production/Preview since 2026-07-11 — observing,
-never blocking; the flip to `on` is the remaining deliberate step after
-observation per plan §5).
+module merged at e113b4bf, Stage-2 hook wiring merged at 8067de3a, observability
+merged at 2585f980; `on` in `.env.local` + Vercel Production/Preview after positive
+warn-mode observation and a signed-in production Workbench smoke).
 
 The decision must combine server-known facts:
 
@@ -395,9 +394,9 @@ The strategy can begin without waiting for a platform rebuild:
 1. **Now — operating discipline:** adopt risk tiers, campaign windows, the readiness
    checklist, named test records, recipient allowlists, and rollback records; make
    `/start` and `/stop` branch-aware before treating them as feature-branch automation.
-2. **Next — fail-closed Dataverse interlock:** implement and characterize the
-   deployment-target/write matrix in section 6.
-3. **Then — sandbox parity:** re-probe, provision reviewer schema/config, and maintain
+2. **Complete 2026-07-22 — fail-closed Dataverse interlock:** the
+   deployment-target/write matrix in section 6 is enforced.
+3. **Next — sandbox parity:** re-probe, provision reviewer schema/config, and maintain
    a resettable integration dataset.
 4. **Then — deterministic rollout:** add the smallest server-authoritative cohort
    seam needed for the first major refactor and capture old/new comparison results.

@@ -4,18 +4,17 @@
 
 Execute the owner-approved sequence in `docs/CURRENT_WORK_QUEUE.md` without turning optional or
 parked plans into implied commitments. The current branch is
-`codex/documentation-code-reconciliation`; `main` auto-deploys, so runtime stages remain isolated
-from the documentation stage and require their named promotion decisions.
+`codex/dataverse-interlock-enforcement-evidence`; `main` auto-deploys, so runtime stages remain
+isolated and require their named promotion decisions.
 
 ## Ordered stages
 
-1. **Documentation ground truth — in progress.** Publish the reconciled documentation branch,
-   establish `docs/CURRENT_WORK_QUEUE.md` as the priority authority, and route strategy/catalog
-   readers to it. Documentation status describes document lifecycle, not backlog priority.
-2. **Dataverse interlock — next.** Inspect `warn` observations from normal staff use and cron
-   execution. Do not flip `DATAVERSE_TARGET_INTERLOCK` to `on` without the explicit decision in the
-   plan.
-3. **Reviewer operational safety tools.** Build the full structured staff review-entry rescue
+1. **Documentation ground truth — complete 2026-07-22.** The reconciled documentation branch is
+   merged, `docs/CURRENT_WORK_QUEUE.md` is the priority authority, and documentation gates passed.
+2. **Dataverse interlock — complete 2026-07-22.** Positive warn-mode production observation,
+   explicit owner approval, staged local/Preview/Production flip, and signed-in post-flip Workbench
+   smoke completed. `DATAVERSE_TARGET_INTERLOCK=on` is enforced everywhere.
+3. **Reviewer operational safety tools — current.** Build the full structured staff review-entry rescue
    surface first, then the closeout payability/did-not-serve disposition. Use `/contract-reconcile`
    for both; keep pre-accept reset and post-accept financial annotation separate.
 4. **Campaign evidence window.** Keep the legacy reviewer resolver authoritative. Prepare durable,

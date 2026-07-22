@@ -31,11 +31,17 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Documentation ground-truth reconciliation | Publish the reconciled documentation branch; route planning through this queue; keep historical implementation plans out of the backlog. | Documentation gates green and this queue linked from the strategy router. |
-| 2 | Dataverse target/write interlock | Stages 1–2 are shipped in `warn`; inspect normal-use and cron observations. Do not change the environment flag during evidence gathering. | Explicit owner decision whether to change `DATAVERSE_TARGET_INTERLOCK` to `on`. |
-| 3 | Reviewer operational safety tools | Build a full structured staff review-entry rescue surface, then add a closeout disposition for payable / not payable / did not serve. Keep pre-accept reset separate from post-accept financial annotation. | Each feature independently verified through UI → route → service → Dataverse → consumer, then deliberately promoted. |
-| 4 | Reviewer campaign evidence window | Keep the legacy resolver authoritative during the upcoming run. Record W2 shadow disagreements, wrong/missed identity outcomes, email confirmation, staff corrections, invitations, and review completion. | Post-run evidence review; no automatic cutover. |
-| 5 | Optional reviewer UX triage | Select only improvements supported by observed staff friction. Current candidates: campaign-settings discoverability/defaults, review-output formatting, and global reviewer notes/flags or a Reviewer Pool. | Separate owner choice for each item; absence from this selection means no build. |
+| 1 | Reviewer operational safety tools | Build a full structured staff review-entry rescue surface, then add a closeout disposition for payable / not payable / did not serve. Keep pre-accept reset separate from post-accept financial annotation. | Each feature independently verified through UI → route → service → Dataverse → consumer, then deliberately promoted. |
+| 2 | Reviewer campaign evidence window | Keep the legacy resolver authoritative during the upcoming run. Record W2 shadow disagreements, wrong/missed identity outcomes, email confirmation, staff corrections, invitations, and review completion. | Post-run evidence review; no automatic cutover. |
+| 3 | Optional reviewer UX triage | Select only improvements supported by observed staff friction. Current candidates: campaign-settings discoverability/defaults, review-output formatting, and global reviewer notes/flags or a Reviewer Pool. | Separate owner choice for each item; absence from this selection means no build. |
+
+## Completed in this execution
+
+- Documentation ground-truth reconciliation: merged to `main` on 2026-07-22; this queue is the
+  priority authority and the documentation gates were green.
+- Dataverse target/write interlock: positive warn-mode production observation, explicit owner
+  approval, staged local/Preview/Production flip, and signed-in post-flip Workbench smoke completed
+  2026-07-22. Production logged `mode=on deployment=production target=production` and no denial.
 
 ## Reviewer redesign gates
 
