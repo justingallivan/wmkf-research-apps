@@ -203,6 +203,7 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
         responseType: undefined, // RESPONSE_TYPE_BY_VALUE is mocked to {} in this suite
         materialsSentAt: '2026-06-20T00:00:00Z',
         reviewDueDateAtSend: '2026-09-15',
+        reviewDueDateLastSent: null,
         daysSinceMaterialsSent: expect.any(Number),
         reminderSentAt: '2026-06-22T00:00:00Z',
         reminderCount: 1,

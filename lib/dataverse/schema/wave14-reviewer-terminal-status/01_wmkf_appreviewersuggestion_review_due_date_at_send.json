@@ -11,6 +11,14 @@
       "format": "DateOnly",
       "behavior": "DateOnly",
       "description": "The effective review due date rendered into the materials email, stamped once on the engagement row immediately after the first successful materials send. Re-sends never overwrite it."
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ReviewDueDateLastSent",
+      "displayName": "Review Due Date Last Sent",
+      "format": "DateOnly",
+      "behavior": "DateOnly",
+      "description": "The effective review due date rendered into the MOST RECENT materials email; overwritten on every successful materials send. Paired with wmkf_ReviewDueDateAtSend (set-once) so reliability scoring can ask either question: the deadline first committed to, or the deadline last communicated. Owner decision S369 — a set-once stamp alone marks a reviewer late when WMKF itself extended the deadline and re-sent, which is the same 'never penalize a reviewer for WMKF scheduling' principle behind withdrew-vs-released. Neither date is recoverable after the fact, so both are captured now."
     }
   ]
 }

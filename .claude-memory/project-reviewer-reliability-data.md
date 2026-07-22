@@ -85,11 +85,16 @@ and halts the corruption. A new status must be added to `STATUS_PIPELINE`,
 now gate-enforced:** `check:status-enum-parity` compares
 `REVIEW_STATUS_MAP` ⇔ `STATUS_PIPELINE` and `REVIEW_STATUS_MAP` ⇔
 `REVIEW_STATUS_BY_VALUE`; `reviewer-modes.test.js` points at the service that
-owns the inverse map. The terminal service is the only intended entry path, but
-no transition-out policy is defined: the generic reviewers PATCH rejects a
-terminal *target* yet can still move an already-terminal row to a non-terminal
-target such as `under_review`. The set-once due-date stamp likewise preserves
-the first materials deadline even if a second materials email communicates a
-later campaign date. Both are named policy residuals for owner resolution, not
-silent implementation assumptions. Cross-layer + new durable column uses
+owns the inverse map. **Both policy residuals were RESOLVED by the owner
+2026-07-22 and implemented:** (1) terminal is irreversible — the source-state
+guard lives in `updateLifecycle`, not the route, so the unguarded batch PATCH
+path inherits it; a terminal row refuses any status change while non-status
+writes still succeed. Correcting a mistaken terminal transition is a data-repair
+operation, not a UI affordance. (2) Two DateOnly columns are provisioned rather
+than one — `wmkf_ReviewDueDateAtSend` (set once, the deadline first committed
+to) and `wmkf_ReviewDueDateLastSent` (overwritten each send, the deadline last
+communicated) — because a set-once stamp alone marks a reviewer late whenever
+WMKF extended the deadline and re-sent, which is the same principle that split
+`withdrew` from `released`. The repair route's former different-date 409 is gone;
+`atSend` is structurally immutable instead. Cross-layer + new durable column uses
 `/contract-reconcile` and Atlas coverage. See [[reviewer-workbench-lifecycle]].

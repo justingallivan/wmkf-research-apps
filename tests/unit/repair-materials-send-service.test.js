@@ -49,9 +49,10 @@ beforeEach(() => {
   updateLifecycle.mockResolvedValue(undefined);
 });
 
-test('repairs without re-sending and uses the fresh row ETag', async () => {
+test('first repair stamps BOTH dates and uses the fresh row ETag', async () => {
   await expect(repair()).resolves.toEqual({ ok: true, status: 'repaired', suggestionId: SUGGESTION });
   expect(updateLifecycle).toHaveBeenCalledWith(SUGGESTION, {
+    reviewDueDateLastSent: '2026-09-15',
     reviewDueDateAtSend: '2026-09-15',
     materialsSentAt: SENT_AT,
     reviewStatus: 'materials_sent',
@@ -59,15 +60,29 @@ test('repairs without re-sending and uses the fresh row ETag', async () => {
 });
 
 test('same already-recorded due date is an idempotent no-op', async () => {
-  findById.mockResolvedValue(row({ wmkf_reviewduedateatsend: '2026-09-15' }));
+  findById.mockResolvedValue(row({
+    wmkf_reviewduedateatsend: '2026-09-15',
+    wmkf_reviewduedatelastsent: '2026-09-15',
+  }));
   await expect(repair()).resolves.toEqual({ ok: true, status: 'already_recorded', suggestionId: SUGGESTION });
   expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
-test('never overwrites a different recorded due date', async () => {
-  findById.mockResolvedValue(row({ wmkf_reviewduedateatsend: '2026-09-14' }));
-  await expect(repair()).rejects.toMatchObject({ httpStatus: 409 });
-  expect(updateLifecycle).not.toHaveBeenCalled();
+// S369 two-date model: a repair for a SECOND send at a CHANGED deadline is the
+// case this endpoint exists for. It must advance lastSent while leaving the
+// first commitment (atSend) untouched — the old single-date contract rejected
+// this with a 409 and left the row permanently unrepairable.
+test('repairing a changed deadline advances lastSent and never rewrites atSend', async () => {
+  findById.mockResolvedValue(row({
+    wmkf_reviewduedateatsend: '2026-09-14',
+    wmkf_reviewduedatelastsent: '2026-09-14',
+    wmkf_materialssentat: SENT_AT,
+    wmkf_reviewstatus: 100000001,
+  }));
+  await expect(repair()).resolves.toEqual({ ok: true, status: 'repaired', suggestionId: SUGGESTION });
+  const [, payload] = updateLifecycle.mock.calls[0];
+  expect(payload.reviewDueDateLastSent).toBe('2026-09-15');
+  expect(payload).not.toHaveProperty('reviewDueDateAtSend');
 });
 
 test.each([

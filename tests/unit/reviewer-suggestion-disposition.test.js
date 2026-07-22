@@ -30,6 +30,7 @@ const {
   restore,
   APPLICANT_DISPOSITION_EXCLUDED,
   APPLICANT_DISPOSITION_MAP,
+  REVIEW_STATUS_MAP,
 } = suggestionAdapter;
 
 const REVIEW_STATUS_COMPLETE = 100000004;
@@ -172,6 +173,66 @@ describe('list readers carry the disposition guard', () => {
     expect(query.select).toContain('wmkf_appreviewersuggestionid');
     expect(query.orderby).toBe('createdon desc');
     expect(query.top).toBe(200);
+  });
+});
+
+// S369 residual 1. Terminality was a UI-only convention: StatusDropdown hides
+// itself on terminal rows and the generic PATCH rejected a terminal TARGET, but
+// nothing inspected the SOURCE. `{reviewStatus:'complete'}` on a withdrawn row
+// therefore reached the close-out branch below and stamped
+// wmkf_reviewreceivedat — re-creating the exact aggregateReviewHistory false
+// positive the terminal status exists to eliminate. Guarded in the adapter so
+// the unguarded batch PATCH path inherits it too.
+describe('updateLifecycle refuses to reopen a terminal engagement', () => {
+  test.each([
+    ['complete', REVIEW_STATUS_MAP.withdrew],
+    ['under_review', REVIEW_STATUS_MAP.withdrew],
+    ['complete', REVIEW_STATUS_MAP.released],
+  ])('refuses %s on a row already in terminal status %s', async (target, terminalValue) => {
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      wmkf_completedat: null,
+      wmkf_reviewreceivedat: null,
+      wmkf_applicantdisposition: null,
+      wmkf_reviewstatus: terminalValue,
+    });
+
+    await expect(updateLifecycle(SUGGESTION_ID, { reviewStatus: target }))
+      .rejects.toThrow(/out of a terminal review status/);
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('allows a non-status write (e.g. notes) on a terminal row', async () => {
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      wmkf_completedat: null,
+      wmkf_reviewreceivedat: null,
+      wmkf_applicantdisposition: null,
+      wmkf_reviewstatus: REVIEW_STATUS_MAP.withdrew,
+    });
+
+    await updateLifecycle(SUGGESTION_ID, { notes: 'declined by email' });
+
+    expect(DynamicsService.updateRecord).toHaveBeenCalled();
+  });
+
+  test('allows the terminal transition itself (non-terminal source)', async () => {
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      wmkf_completedat: null,
+      wmkf_reviewreceivedat: null,
+      wmkf_applicantdisposition: null,
+      wmkf_reviewstatus: REVIEW_STATUS_MAP.under_review,
+    });
+
+    await updateLifecycle(SUGGESTION_ID, { reviewStatus: 'withdrew' });
+
+    const payload = DynamicsService.updateRecord.mock.calls[0][2];
+    expect(payload.wmkf_reviewstatus).toBe(REVIEW_STATUS_MAP.withdrew);
+    // The close-out stamp branch is keyed strictly to `complete`, so a terminal
+    // transition must NOT fabricate a received/completed timestamp.
+    expect(payload.wmkf_reviewreceivedat).toBeUndefined();
+    expect(payload.wmkf_completedat).toBeUndefined();
   });
 });
 

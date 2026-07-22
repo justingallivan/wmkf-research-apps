@@ -295,6 +295,47 @@ response for whole-request cases — fail closed, never a silent skip.
 5. **Tier 1–3 runtime work.** Branch and deliberate promotion per
    `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`; not direct-to-main.
 
+## Revision 3 — owner resolution of the two policy residuals (2026-07-22)
+
+The build surfaced two residuals the spec had not settled. Both are now decided
+and implemented; this section supersedes the single-column and target-only-guard
+wording above.
+
+**Residual 1 — terminal reopenability. RESOLVED: terminal is irreversible.**
+`patchReviewers` rejected a terminal *target* but never inspected the *source*,
+and `updateLifecycle` had no source predicate, so `{reviewStatus:'complete'}` on
+a withdrawn row reached the close-out branch and stamped
+`wmkf_reviewreceivedat` — re-creating the exact `aggregateReviewHistory` false
+positive this feature exists to eliminate. The batch PATCH path was worse: one
+status applied to N rows with no per-row inspection. Fixed in `updateLifecycle`
+(not the route) so every caller — single, batch, service, future — inherits it.
+A terminal row now refuses any *status* change; non-status writes (notes) still
+succeed. Correcting a mistaken terminal transition is deliberately a
+data-repair operation, not a UI affordance.
+
+**Residual 2 — deadline on re-send. RESOLVED: store both dates.**
+A set-once stamp marks a reviewer late whenever WMKF extended the deadline and
+re-sent materials — the same "never penalize a reviewer for WMKF's own
+scheduling" principle that split `withdrew` from `released`. Wave 14 therefore
+provisions **two** DateOnly columns:
+
+- `wmkf_ReviewDueDateAtSend` — set once; the deadline first committed to.
+- `wmkf_ReviewDueDateLastSent` — overwritten every send; the deadline last
+  communicated.
+
+Reliability scoring can then ask either question rather than being locked into
+the first by a schema decision. Neither value is recoverable after the fact,
+which is why both are captured now instead of deferred to the metric design
+session.
+
+Consequence for the repair route: its former "a different review due date is
+already recorded" 409 is removed. Under one column that guarded the stamp; it
+also refused the legitimate case the route exists for — a second send, at a
+changed deadline, whose inline stamp failed, leaving the row permanently
+unrepairable. The protection is preserved structurally instead: `atSend` is only
+ever written when empty, so the client-supplied `effectiveReviewDueDate` can
+never rewrite the first commitment; it can only advance `lastSent`.
+
 ## Review history
 
 Revision 2 (2026-07-22) incorporates a Codex adversarial review of revision 1,
