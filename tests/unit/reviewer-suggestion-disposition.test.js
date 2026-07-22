@@ -227,6 +227,19 @@ describe('updateLifecycle stamps close-out timestamps on EVERY complete transiti
     expect(payload.wmkf_completedat).toBeUndefined();
     expect(payload.wmkf_reviewreceivedat).toBeUndefined();
   });
+
+  test.each(['withdrew', 'released'])('%s transition stamps no completion timestamps', async (reviewStatus) => {
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_applicantdisposition: null,
+      wmkf_completedat: null,
+      wmkf_reviewreceivedat: null,
+    });
+    await updateLifecycle(SUGGESTION_ID, { reviewStatus });
+    const payload = DynamicsService.updateRecord.mock.calls[0][2];
+    expect(payload.wmkf_reviewstatus).toBe(suggestionAdapter.REVIEW_STATUS_MAP[reviewStatus]);
+    expect(payload.wmkf_completedat).toBeUndefined();
+    expect(payload.wmkf_reviewreceivedat).toBeUndefined();
+  });
 });
 
 describe('updateLifecycle fails closed on excluded rows for EVERY write', () => {

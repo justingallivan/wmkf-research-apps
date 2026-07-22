@@ -92,6 +92,15 @@ describe('patchReviewers', () => {
     expect(updateLifecycle).toHaveBeenCalledWith(IDS[0], { reviewStatus: 'complete', notes: 'n' }, { actingUserSystemId: 'su-1' });
     expect(out).toEqual({ success: true, message: 'Reviewer updated' });
   });
+
+  test.each(['withdrew', 'released'])('generic PATCH service refuses terminal status %s', async (reviewStatus) => {
+    await expect(patchReviewers({
+      suggestionId: IDS[0],
+      lifecycle: { reviewStatus },
+      actingUserSystemId: 'su-1',
+    })).rejects.toMatchObject({ httpStatus: 400 });
+    expect(updateLifecycle).not.toHaveBeenCalled();
+  });
 });
 
 describe('getReviewers', () => {

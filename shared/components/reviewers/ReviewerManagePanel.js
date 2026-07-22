@@ -26,7 +26,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Card, Button } from '../Layout';
-import { STATUS_PIPELINE, getStatusInfo, filterByMode } from './reviewer-modes';
+import {
+  STATUS_PIPELINE,
+  getStatusInfo,
+  filterByMode,
+  TERMINAL_REVIEW_STATUSES,
+  canTransitionToTerminal,
+} from './reviewer-modes';
 import { EMPTY_TEMPLATES, loadEmailTemplates, saveEmailTemplates } from './email-template-store';
 
 // Pure status-pipeline / mode-bucketing logic lives in ./reviewer-modes
@@ -201,7 +207,9 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
   const [step, setStep] = useState('compose'); // compose | preview | sending | sent
   const [progress, setProgress] = useState({ current: 0, total: 0, message: '' });
   const [drafts, setDrafts] = useState([]); // [{ suggestionId, candidateName, candidateEmail, requestNumber, subject, body, skipped? }]
-  const [sentResults, setSentResults] = useState({ sent: [], failed: [], skipped: [] });
+  const [sentResults, setSentResults] = useState({
+    sent: [], failed: [], skipped: [], sentButUnrecorded: [],
+  });
   const [error, setError] = useState(null);
   const [emailFields, setEmailFields] = useState({
     reviewDueDate: '',
@@ -244,7 +252,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
       setStep('compose');
       setProgress({ current: 0, total: 0, message: '' });
       setDrafts([]);
-      setSentResults({ sent: [], failed: [], skipped: [] });
+      setSentResults({ sent: [], failed: [], skipped: [], sentButUnrecorded: [] });
       setError(null);
     }
   }, [isOpen]);
@@ -526,7 +534,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
     setStep('sending');
     setProgress({ current: 0, total: sendable.length, message: 'Starting...' });
     setError(null);
-    setSentResults({ sent: [], failed: [], skipped: [] });
+    setSentResults({ sent: [], failed: [], skipped: [], sentButUnrecorded: [] });
 
     try {
       // Attach-proposal-email OFF (default): never send attachmentUrls — the
@@ -546,6 +554,8 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
             suggestionId: d.suggestionId,
             subject: d.subject,
             body: d.body,
+            effectiveReviewDueDate: d.effectiveReviewDueDate,
+            effectiveReviewDueDateSource: d.effectiveReviewDueDateSource,
           })),
           templateType,
           attachmentUrls,
@@ -578,11 +588,17 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                 setSentResults(prev => ({ ...prev, sent: [...prev.sent, data] }));
               } else if (currentEvent === 'email_failed') {
                 setSentResults(prev => ({ ...prev, failed: [...prev.failed, data] }));
+              } else if (currentEvent === 'email_sent_but_unrecorded') {
+                setSentResults(prev => ({
+                  ...prev,
+                  sentButUnrecorded: [...prev.sentButUnrecorded, data],
+                }));
               } else if (currentEvent === 'result') {
                 setSentResults({
                   sent: data.sent || [],
                   failed: data.failed || [],
                   skipped: data.skipped || [],
+                  sentButUnrecorded: data.sentButUnrecorded || [],
                 });
               } else if (currentEvent === 'complete') {
                 setStep('sent');
@@ -599,6 +615,30 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
     } catch (err) {
       setError(err.message);
       setStep('preview');
+    }
+  };
+
+  const repairMaterialsRecord = async (result) => {
+    try {
+      const response = await fetch(result.repairEndpoint || '/api/review-manager/repair-materials-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId,
+          suggestionId: result.suggestionId,
+          effectiveReviewDueDate: result.effectiveReviewDueDate,
+          materialsSentAt: result.materialsSentAt,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.error || `Repair failed (${response.status})`);
+      setSentResults(prev => ({
+        ...prev,
+        sentButUnrecorded: prev.sentButUnrecorded.filter((row) => row.suggestionId !== result.suggestionId),
+      }));
+      if (onEmailsSent) onEmailsSent();
+    } catch (repairError) {
+      setError(repairError.message);
     }
   };
 
@@ -922,7 +962,9 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                 )}
                 <p className="text-sm text-gray-500">{progress.current} / {progress.total}</p>
               </div>
-              {(sentResults.sent.length > 0 || sentResults.failed.length > 0) && (
+              {(sentResults.sent.length > 0
+                || sentResults.failed.length > 0
+                || sentResults.sentButUnrecorded.length > 0) && (
                 <div className="border-t border-gray-200 pt-3 space-y-1 max-h-48 overflow-y-auto">
                   {sentResults.sent.map(s => (
                     <div key={`s-${s.suggestionId}`} className="flex items-center gap-2 text-sm text-green-700">
@@ -934,6 +976,12 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                       <span>✗</span><span>{f.candidateName}</span><span className="text-red-500 text-xs">{f.error}</span>
                     </div>
                   ))}
+                  {sentResults.sentButUnrecorded.map(s => (
+                    <div key={`u-${s.suggestionId}`} className="flex items-center gap-2 text-sm text-amber-700">
+                      <span>!</span><span>{s.candidateName}</span>
+                      <span className="text-amber-600 text-xs">sent, tracking repair required</span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -943,9 +991,11 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
             <div className="space-y-4">
               <div className="text-center py-4">
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${
-                  sentResults.failed.length === 0 ? 'bg-green-100' : 'bg-yellow-100'
+                  sentResults.failed.length === 0 && sentResults.sentButUnrecorded.length === 0
+                    ? 'bg-green-100'
+                    : 'bg-yellow-100'
                 }`}>
-                  <svg className={`w-6 h-6 ${sentResults.failed.length === 0 ? 'text-green-600' : 'text-yellow-600'}`}
+                  <svg className={`w-6 h-6 ${sentResults.failed.length === 0 && sentResults.sentButUnrecorded.length === 0 ? 'text-green-600' : 'text-yellow-600'}`}
                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
@@ -954,6 +1004,8 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                   {sentResults.sent.length} sent
                   {sentResults.failed.length > 0 && `, ${sentResults.failed.length} failed`}
                   {sentResults.skipped.length > 0 && `, ${sentResults.skipped.length} skipped`}
+                  {sentResults.sentButUnrecorded.length > 0
+                    && `, ${sentResults.sentButUnrecorded.length} sent but not recorded`}
                 </p>
               </div>
               <div className="space-y-1">
@@ -977,11 +1029,30 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                     <p className="text-xs text-red-700 ml-6">{f.error}</p>
                   </div>
                 ))}
+                {sentResults.sentButUnrecorded.map(s => (
+                  <div key={`u-${s.suggestionId}`} className="p-2 bg-amber-50 rounded text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <span className="font-medium text-gray-900">{s.candidateName}</span>
+                        <p className="text-xs text-amber-800">
+                          Email sent, but the due-date/lifecycle stamp was not recorded. Do not resend.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => repairMaterialsRecord(s)}
+                        className="shrink-0 px-2 py-1 text-xs font-medium text-amber-900 border border-amber-300 rounded hover:bg-amber-100"
+                      >
+                        Repair recording
+                      </button>
+                    </div>
+                  </div>
+                ))}
                 {sentResults.skipped.map(s => (
                   <div key={`sk-${s.suggestionId}`} className="flex items-center gap-2 p-2 bg-gray-50 rounded text-sm text-gray-600">
                     <span>—</span>
                     <span className="font-medium">{s.candidateName}</span>
-                    <span className="text-xs">skipped (no email)</span>
+                    <span className="text-xs">skipped ({s.reason || 'not sent'})</span>
                   </div>
                 ))}
               </div>
@@ -1036,7 +1107,10 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
 // ─── Status Dropdown ──────────────────────────────────────────────────────
 
 function StatusDropdown({ currentStatus, onChange }) {
-  const settableStatuses = STATUS_PIPELINE.filter(s => s.key !== 'accepted');
+  const settableStatuses = STATUS_PIPELINE.filter(
+    s => s.key !== 'accepted' && !TERMINAL_REVIEW_STATUSES.includes(s.key),
+  );
+  if (TERMINAL_REVIEW_STATUSES.includes(currentStatus)) return null;
   return (
     <label className="inline-flex flex-col items-start gap-0.5 text-left">
       <span className="text-[10px] uppercase text-gray-400 leading-none">Correct status</span>
@@ -1053,6 +1127,30 @@ function StatusDropdown({ currentStatus, onChange }) {
         ))}
       </select>
     </label>
+  );
+}
+
+function TerminalActions({ reviewer, onTransition }) {
+  if (!canTransitionToTerminal(reviewer)) return null;
+  return (
+    <div className="inline-flex items-center gap-1 ml-1" aria-label="End reviewer engagement">
+      <button
+        type="button"
+        onClick={() => onTransition('withdrew')}
+        className="px-1.5 py-1 text-xs font-medium text-red-700 border border-red-200 rounded hover:bg-red-50"
+        title="Reviewer withdrew after accepting"
+      >
+        Withdrew
+      </button>
+      <button
+        type="button"
+        onClick={() => onTransition('released')}
+        className="px-1.5 py-1 text-xs font-medium text-slate-700 border border-slate-300 rounded hover:bg-slate-50"
+        title="WMKF released the reviewer after accepting"
+      >
+        Released
+      </button>
+    </div>
   );
 }
 
@@ -1352,6 +1450,33 @@ export default function ReviewerManagePanel({
     }
   };
 
+  const transitionTerminal = async (reviewer, terminalStatus) => {
+    const outcome = terminalStatus === 'withdrew'
+      ? 'withdrew after accepting'
+      : 'was released by WMKF';
+    if (!confirm(`Confirm that ${reviewer.name || 'this reviewer'} ${outcome}? This ends the engagement.`)) return;
+    try {
+      const response = await fetch('/api/review-manager/terminal-transition', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: proposal.proposalId,
+          suggestionIds: [reviewer.suggestionId],
+          terminalStatus,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.transitioned !== 1) {
+        const reason = data.results?.[0]?.status || data.error || response.status;
+        alert(`Could not end the engagement: ${reason}. Reload and try again.`);
+        return;
+      }
+      if (onRefresh) onRefresh();
+    } catch (transitionError) {
+      alert(`Network error ending engagement: ${transitionError.message}`);
+    }
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -1569,6 +1694,10 @@ export default function ReviewerManagePanel({
                           <StatusDropdown
                             currentStatus={r.reviewStatus}
                             onChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
+                          />
+                          <TerminalActions
+                            reviewer={r}
+                            onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
                           />
                           {/* Download received review from SharePoint via Graph. */}
                           {r.reviewSharePointFolder && (

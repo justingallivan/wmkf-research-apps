@@ -22,6 +22,7 @@ const updateLifecycle = jest.fn(async () => {});
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findById: (...a) => findById(...a),
   updateLifecycle: (...a) => updateLifecycle(...a),
+  REVIEW_STATUS_MAP: { accepted: 100000000, materials_sent: 100000001, under_review: 100000002 },
 }));
 const getPersonById = jest.fn(async (id) => PERSONS[id] ?? null);
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
@@ -77,6 +78,7 @@ function suggestion(id, over = {}) {
     wmkf_accepted: false,
     wmkf_invited: false,
     wmkf_reviewstatus: null,
+    _etag: 'W/"1"',
     ...over,
   };
 }
@@ -115,7 +117,13 @@ const resultOf = (emitted) => emitted.find((e) => e.event === 'result')?.data;
 // Body carries a secure-review link by default so invitation-templateType
 // drafts clear the body-integrity gate (missing_secure_link / unresolved_placeholder)
 // and exercise the real send path — tests of the gate itself override body.
-const draft = (id) => ({ suggestionId: id, subject: 'S', body: 'B https://reviews.example.org/external/review/tok-1' });
+const draft = (id) => ({
+  suggestionId: id,
+  subject: 'S',
+  body: 'B https://reviews.example.org/external/review/tok-1',
+  effectiveReviewDueDate: '2026-08-01',
+  effectiveReviewDueDateSource: 'settings',
+});
 
 describe('send-emails-service — fail-closed templateType', () => {
   test('unknown templateType: ONE error event, resolves, no result/complete, no adapter work', async () => {
@@ -251,6 +259,80 @@ describe('send-emails-service — lifecycle-after-send ordering', () => {
   });
 });
 
+describe('send-emails-service — materials due-date stamp', () => {
+  beforeEach(() => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, {
+      wmkf_accepted: true,
+      wmkf_reviewstatus: 100000000,
+      wmkf_reviewduedateatsend: null,
+    });
+  });
+
+  test('stamps the exact rendered due date inline with the fresh-row ETag', async () => {
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(updateLifecycle).toHaveBeenCalledWith(
+      SUG_OK,
+      expect.objectContaining({
+        reviewDueDateAtSend: '2026-08-01',
+        reviewStatus: 'materials_sent',
+        materialsSentAt: expect.any(String),
+      }),
+      { actingUserSystemId: 'u-1', ifMatch: 'W/"1"' },
+    );
+    expect(resultOf(emitted).sentButUnrecorded).toEqual([]);
+  });
+
+  test('re-send never overwrites an existing due-date stamp', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, {
+      wmkf_accepted: true,
+      wmkf_reviewstatus: 100000001,
+      wmkf_reviewduedateatsend: '2026-07-15',
+    });
+    await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+    expect(updateLifecycle.mock.calls[0][1]).not.toHaveProperty('reviewDueDateAtSend');
+  });
+
+  test('inline stamp failure is sent_but_unrecorded and the batch is not clean success', async () => {
+    updateLifecycle.mockRejectedValueOnce(new Error('Dataverse unavailable'));
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+    const result = resultOf(emitted);
+    expect(result.sent).toHaveLength(1);
+    expect(result.sentButUnrecorded).toEqual([
+      expect.objectContaining({
+        suggestionId: SUG_OK,
+        status: 'sent_but_unrecorded',
+        effectiveReviewDueDate: '2026-08-01',
+        repairEndpoint: '/api/review-manager/repair-materials-send',
+      }),
+    ]);
+    expect(result.stats.sentButUnrecorded).toBe(1);
+    expect(names(emitted)).toContain('email_sent_but_unrecorded');
+    expect(emitted.find((event) => event.event === 'complete').data.message)
+      .toContain('sent but not recorded');
+  });
+
+  test('stale request-sourced draft is rejected before email dispatch', async () => {
+    REQUEST = { ...REQUEST, wmkf_reviewduedate: '2026-09-01' };
+    const stale = { ...draft(SUG_OK), effectiveReviewDueDateSource: 'request' };
+    const emitted = await run({ drafts: [stale], templateType: 'materials' });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(resultOf(emitted).skipped[0]).toMatchObject({ reason: 'stale_due_date' });
+  });
+});
+
+describe('send-emails-service — terminal thank-you guard', () => {
+  test.each([100000005, 100000006])('thank-you does not resurrect terminal status %s', async (terminalValue) => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true, wmkf_reviewstatus: terminalValue });
+    await run({ drafts: [draft(SUG_OK)], templateType: 'thankyou' });
+    expect(updateLifecycle).toHaveBeenCalledWith(
+      SUG_OK,
+      { thankYouSentAt: expect.any(String) },
+      { actingUserSystemId: 'u-1' },
+    );
+  });
+});
+
 describe('send-emails-service — invitation body-integrity gate', () => {
   test('an invitation with no secure link is skipped missing_secure_link and never sent', async () => {
     const emitted = await run({
@@ -282,7 +364,13 @@ describe('send-emails-service — invitation body-integrity gate', () => {
   test('the body-integrity gate does not apply to non-invitation templateTypes', async () => {
     SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
     const emitted = await run({
-      drafts: [{ suggestionId: SUG_OK, subject: 'S', body: 'No link here.' }],
+      drafts: [{
+        suggestionId: SUG_OK,
+        subject: 'S',
+        body: 'No link here.',
+        effectiveReviewDueDate: '2026-08-01',
+        effectiveReviewDueDateSource: 'settings',
+      }],
       templateType: 'materials',
     });
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
@@ -371,6 +459,7 @@ describe('cycle-config-loader — per-caller projection shape', () => {
       short_code: 'CYC',
       review_template_blob_url: 'https://blob/template.docx',
       additional_attachments: [{ pathname: 'cycle-materials/p.pdf' }],
+      review_deadline: undefined,
     });
   });
 

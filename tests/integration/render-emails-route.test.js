@@ -244,6 +244,76 @@ describe('render-emails — characterization: method, auth, envelope, domain err
   });
 });
 
+describe('render-emails — effective due-date contract', () => {
+  test('the validated server-resolved date is both rendered and carried to send', async () => {
+    const requestId = '55555555-5555-4555-8555-555555555555';
+    findById.mockResolvedValue({
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      _wmkf_potentialreviewer_value: 'person-1',
+      _wmkf_request_value: requestId,
+    });
+    const { DynamicsService } = require('../../lib/services/dynamics-service');
+    DynamicsService.getRecord.mockImplementation(async (set) => {
+      if (set === 'wmkf_potentialreviewerses') {
+        return { wmkf_name: 'Reviewer', wmkf_emailaddress: 'reviewer@example.org' };
+      }
+      if (set === 'akoya_requests') {
+        return { akoya_requestid: requestId, wmkf_reviewduedate: '2026-08-10' };
+      }
+      return null;
+    });
+    const { fetchCoPIs } = require('../../lib/services/proposal-participants');
+    fetchCoPIs.mockResolvedValue([]);
+
+    const req = createMockReq({
+      method: 'POST',
+      body: {
+        suggestionIds: [SUGGESTION_ID],
+        templateType: 'materials',
+        template: { subject: 'Due {{reviewDueDate}}', body: 'Return by {{reviewDueDate}}' },
+        settings: { reviewDueDate: '2026-08-20' },
+      },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    const rendered = res.json.mock.calls[0][0].drafts[0];
+    expect(rendered).toMatchObject({
+      effectiveReviewDueDate: '2026-08-20',
+      effectiveReviewDueDateSource: 'settings',
+    });
+    expect(rendered.subject).toContain('August 20, 2026');
+    expect(rendered.body).toContain('August 20, 2026');
+  });
+
+  test('invalid non-empty due date fails closed', async () => {
+    findById.mockResolvedValue({
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      _wmkf_potentialreviewer_value: 'person-1',
+      _wmkf_request_value: '66666666-6666-4666-8666-666666666666',
+    });
+    const { DynamicsService } = require('../../lib/services/dynamics-service');
+    DynamicsService.getRecord.mockImplementation(async (set) => (
+      set === 'wmkf_potentialreviewerses'
+        ? { wmkf_name: 'Reviewer', wmkf_emailaddress: 'reviewer@example.org' }
+        : { akoya_requestid: '66666666-6666-4666-8666-666666666666' }
+    ));
+    const { fetchCoPIs } = require('../../lib/services/proposal-participants');
+    fetchCoPIs.mockResolvedValue([]);
+    const req = createMockReq({
+      method: 'POST',
+      body: {
+        suggestionIds: [SUGGESTION_ID],
+        templateType: 'materials',
+        template: { subject: 'Subject', body: 'Body' },
+        settings: { reviewDueDate: '2026-02-31' },
+      },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(409);
+  });
+});
+
 describe('render-emails — retired template types fail closed', () => {
   for (const templateType of ['hold', 'finalize']) {
     test(`${templateType} is rejected before recipient hydration/token mint`, async () => {

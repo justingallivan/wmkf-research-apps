@@ -56,6 +56,15 @@ function extractArrayStrings(src, name) {
   return [...m[1].matchAll(/['"]([^'"]+)['"]/g)].map((x) => x[1]);
 }
 
+// String values for one property across object literals in a const array,
+// e.g. STATUS_PIPELINE = [{ key: 'accepted' }, ...].
+function extractArrayObjectPropertyStrings(src, name, property) {
+  const m = src.match(new RegExp(`(?:const|export const)\\s+${name}\\s*=\\s*\\[([\\s\\S]*?)\\];`));
+  if (!m) return null;
+  return [...m[1].matchAll(new RegExp(`${property}\\s*:\\s*['\"]([^'\"]+)['\"]`, 'g'))]
+    .map((x) => x[1]);
+}
+
 // String literals returned by `function NAME(...) { ... }` (single-quoted returns).
 function extractReturnedStrings(src, name) {
   const m = src.match(new RegExp(`function\\s+${name}\\s*\\([^)]*\\)\\s*\\{([\\s\\S]*?)\\n\\}`));
@@ -152,6 +161,32 @@ function registry() {
   // only when nothing else enforces it. (email-template-store is ESM → not require-able
   // from this plain-node gate anyway.)
 
+  // 4. Reviewer status write map ⇔ UI pipeline ⇔ service reverse-read map.
+  //    All three must remain total: a missing pipeline key hides the row from
+  //    Workbench modes; a missing inverse value emits undefined from the API.
+  {
+    const adapter = read('lib/dataverse/adapters/reviewer-suggestion.js');
+    const modes = read('shared/components/reviewers/reviewer-modes.js');
+    const service = read('lib/services/review-manager/reviewers-service.js');
+    const produced = extractObjectKeys(adapter, 'REVIEW_STATUS_MAP');
+    checks.push({
+      name: 'REVIEW_STATUS_MAP ⇔ STATUS_PIPELINE',
+      producer: 'REVIEW_STATUS_MAP keys (reviewer-suggestion.js)',
+      consumer: 'STATUS_PIPELINE key values (reviewer-modes.js)',
+      produced,
+      consumed: extractArrayObjectPropertyStrings(modes, 'STATUS_PIPELINE', 'key'),
+      rule: 'equal',
+    });
+    checks.push({
+      name: 'REVIEW_STATUS_MAP ⇔ REVIEW_STATUS_BY_VALUE',
+      producer: 'REVIEW_STATUS_MAP keys (reviewer-suggestion.js)',
+      consumer: 'REVIEW_STATUS_BY_VALUE string values (reviewers-service.js)',
+      produced,
+      consumed: extractObjectStringValues(service, 'REVIEW_STATUS_BY_VALUE'),
+      rule: 'equal',
+    });
+  }
+
   return checks;
 }
 
@@ -193,6 +228,9 @@ function selfTest() {
   ok('extractObjectKeys', JSON.stringify(extractObjectKeys('const M = {\n  a: 1,\n  "b-c": 2,\n};', 'M')) === JSON.stringify(['a', 'b-c']));
   ok('extractObjectStringValues', JSON.stringify(extractObjectStringValues("const M = {\n  A: 'alpha',\n  B: 'beta',\n};", 'M')) === JSON.stringify(['alpha', 'beta']));
   ok('extractArrayStrings', JSON.stringify(extractArrayStrings("const T = ['x', 'y'];", 'T')) === JSON.stringify(['x', 'y']));
+  ok('extractArrayObjectPropertyStrings', JSON.stringify(extractArrayObjectPropertyStrings(
+    "export const T = [{ key: 'x' }, { key: 'y' }];", 'T', 'key',
+  )) === JSON.stringify(['x', 'y']));
   ok('extractReturnedStrings', JSON.stringify(extractReturnedStrings("function f(c) {\n  if (c) return 'held';\n  return 'find';\n}", 'f')) === JSON.stringify(['held', 'find']));
   ok('missing extractor → null', extractObjectKeys('const Z = 1;', 'M') === null);
 

@@ -1,0 +1,16 @@
+{
+  "name": "wmkf_appreviewersuggestion-review-due-date-at-send",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_appreviewersuggestion",
+  "_comment": "Additive reviewer reliability ledger field. Creation-only wave: this file deliberately does not attempt to extend wmkf_reviewstatus because schema-apply skips existing attributes. Provisioning is owner-gated and separate from code deployment.",
+  "attributes": [
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ReviewDueDateAtSend",
+      "displayName": "Review Due Date At Send",
+      "format": "DateOnly",
+      "behavior": "DateOnly",
+      "description": "The effective review due date rendered into the materials email, stamped once on the engagement row immediately after the first successful materials send. Re-sends never overwrite it."
+    }
+  ]
+}

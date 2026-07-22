@@ -359,6 +359,16 @@ describe('sweepReviewDueReminders', () => {
     expect(email.body).toContain('Your review is due by');
   });
 
+  test('candidate query allowlists materials_sent/under_review and excludes both terminal values', async () => {
+    queryAllRecords.mockResolvedValue({ records: [] });
+    await sweepReviewDueReminders();
+    const options = queryAllRecords.mock.calls[0][1];
+    expect(options.filter).toContain('wmkf_reviewstatus eq 100000001');
+    expect(options.filter).toContain('wmkf_reviewstatus eq 100000002');
+    expect(options.filter).not.toContain('100000005');
+    expect(options.filter).not.toContain('100000006');
+  });
+
   test('default read is applied to review-due reminder subject and body', async () => {
     getSettingStrict.mockImplementation(async (key) => {
       if (key === REVIEW_DUE_SUBJECT_KEY) return { found: true, value: 'Custom review due subject' };

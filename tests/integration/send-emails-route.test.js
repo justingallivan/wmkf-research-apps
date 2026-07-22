@@ -41,6 +41,7 @@ const updateLifecycle = jest.fn(async () => {});
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findById: (...a) => findById(...a),
   updateLifecycle: (...a) => updateLifecycle(...a),
+  REVIEW_STATUS_MAP: { accepted: 100000000, materials_sent: 100000001, under_review: 100000002 },
 }));
 const mockFindOrCreateByEmail = jest.fn(async () => ({ id: 'c-1', created: false }));
 const mockSetContactLink = jest.fn(async () => {});
@@ -117,6 +118,7 @@ function baseSuggestion(over = {}) {
     wmkf_responsetype: null,
     wmkf_reviewstatus: null,
     wmkf_honorariumoptout: false,
+    _etag: 'W/"1"',
     ...over,
   };
 }
@@ -191,7 +193,13 @@ async function run(body) {
 // Body carries a secure-review link by default so invitation-templateType
 // drafts clear the body-integrity gate (missing_secure_link / unresolved_placeholder)
 // and exercise the real send path — tests of the gate itself override body.
-const draft = (id = SUG_1) => ({ suggestionId: id, subject: 'S', body: 'B https://reviews.example.org/external/review/tok-1' });
+const draft = (id = SUG_1) => ({
+  suggestionId: id,
+  subject: 'S',
+  body: 'B https://reviews.example.org/external/review/tok-1',
+  effectiveReviewDueDate: '2026-08-01',
+  effectiveReviewDueDateSource: 'settings',
+});
 
 describe('send-emails — reviewer portal HTML links', () => {
   test('refuses to send when the outgoing subject/body contains the internal request number', async () => {
