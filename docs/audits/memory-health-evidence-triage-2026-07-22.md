@@ -31,14 +31,14 @@ change.
 
 ## Baseline and result
 
-| Advisory signal | Before | After | Triage result |
-|---|---:|---:|---|
-| Unique files flagged | 117 | 98 | The reduction reflects verified repairs and targeted formatting improvements, not a claim that the remaining 98 files are stale. |
-| `shadow-atlas` | 38 | 33 | Remaining entries require claim-by-claim evidence work; the signal alone does not prove drift. |
-| `weak-basis` | 66 | 55 | Remaining entries are a verification queue, not known factual defects. |
-| `no-recall-rule` | 58 | 45 | Pure routing/format debt unless a content review finds a separate problem. |
-| `oversize-routed` | 6 | 1 | The single residual is the reviewer holistic-redesign memory described below. |
-| `stale-routed` | 0 | 0 | No stale/superseded memory remains directly routed. |
+| Advisory signal | Before | Initial triage | After residual audit | Triage result |
+|---|---:|---:|---:|---|
+| Unique files flagged | 117 | 98 | 97 | The reduction reflects verified repairs and targeted formatting improvements, not a claim that the remaining files are stale. |
+| `shadow-atlas` | 38 | 33 | 33 | Remaining entries require claim-by-claim evidence work; the signal alone does not prove drift. |
+| `weak-basis` | 66 | 55 | 55 | Remaining entries are a verification queue, not known factual defects. |
+| `no-recall-rule` | 58 | 45 | 45 | Pure routing/format debt unless a content review finds a separate problem. |
+| `oversize-routed` | 6 | 1 | 0 | The sole initial residual was source-audited and compressed in the follow-up below. |
+| `stale-routed` | 0 | 0 | 0 | No stale/superseded memory remains directly routed. |
 
 The initial 117-file queue contained 77 routed and 40 unrouted files. Unrouted
 files have lower routine exposure, so the pass prioritized routed operational
@@ -105,15 +105,15 @@ against their named source, Atlas, tests, or probe evidence:
 These edits add recall rules and evidence dates where useful, but do not convert
 historical decisions into claims about current production state.
 
-## Intentional residual
+## Follow-up resolution of the residual
 
-`.claude-memory/project-reviewer-holistic-redesign-parallel-build.md` remains the
-only `oversize-routed` warning. It is a large, current architectural memory whose
-claims span the holistic reviewer plan and multiple later implementation
-commits. Compressing or re-verifying it safely requires a dedicated end-to-end
-review of the full plan and current source. It was deliberately not mass-edited
-in this triage. The residual warning is actionable verification debt, not a
-verified defect.
+The routed `.claude-memory/project-reviewer-holistic-redesign-parallel-build.md`
+was subsequently audited end to end on 2026-07-22 against the full umbrella
+plan, the newer identity/contact plan, runtime seams and callers, binding-writer
+consumers, evaluation-only pipeline location, and dormant Track B switch. It is
+now a compact current routing contract; detailed implementation chronology
+remains in the controlling plans, audits, and git history. The dedicated record
+is `docs/audits/reviewer-holistic-memory-reconciliation-2026-07-22.md`.
 
 ## Sweep report
 
