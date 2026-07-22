@@ -22,9 +22,12 @@ Stage-2 branch tip). WIRED and in `warn` mode everywhere: the §5 Stage-2
 rollout ran 2026-07-11 — `DATAVERSE_TARGET_INTERLOCK=warn` set in `.env.local`
 and Vercel Production + Preview (verified via `vercel env ls`), production
 redeployed and Ready (aliased `reviews.wmkeck.org`), zero
-`[dataverse-interlock]` lines in initial logs. `warn` never blocks; the
-remaining §5 step is observation across normal staff use + one cron cycle,
-then the deliberate flip to `on` (§5 Stage 3).**
+`[dataverse-interlock]` lines in initial logs. A 2026-07-22 no-branch production
+query confirmed normal staff/cron traffic and zero warning lines, but also
+exposed that warning-only logging could not prove the mode was active.
+The same-day observability patch adds one non-secret `active:` record per
+function instance for non-off modes; deploy and observe that positive signal
+before the deliberate flip to `on` (§5 Stage 3). `warn` never blocks.**
 [RECHECKED after lib/dataverse/core/interlock.js + lib/dataverse/core/target-registry.js changes — VERIFIED via the merge diffs and four Codex adversarial review rounds (eight findings total: 2+2+3+1 across rounds, all fixed and personally diff-reviewed). This doc describes the interlock at stage/contract level, not line level.] This document turns
 `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` §6 — the
 "[PLANNED — highest-priority enabling control]" — into a concrete, buildable
@@ -249,6 +252,14 @@ throws an error whose message names the deployment class, target class,
 method, callerLabel, and the flag to consult — same actionable shape as
 `assertTrustedDalContext`.
 
+**[BUILT 2026-07-22, pending production observation]** After URL scoping, the
+first inspected Dataverse call in a non-off mode logs one non-secret activation
+line per function instance: mode, deployment class, target class, and caller
+label only. It excludes the URL, environment value, record id, and request
+data. This positive signal distinguishes a clean zero-warning window from an
+interlock that is effectively off. `off` and parseable non-Dataverse URLs remain
+strictly silent.
+
 ### 3.5 Hook points — three, matching the §2 inventory
 
 **[MERGED to `main` at 8067de3a, 2026-07-11 S355 — wired but inert until
@@ -332,7 +343,10 @@ deliberately (strategy §4).
    sites from §3.5; set `DATAVERSE_TARGET_INTERLOCK=warn` in production,
    preview, and `.env.local`. Observe logs across normal staff use **including
    at least one full cron cycle**; every warn line is either a real hazard or
-   a policy gap to fix before Stage 3.
+   a policy gap to fix before Stage 3. **2026-07-22 observation amendment:**
+   require at least one `active: mode=warn deployment=production
+   target=production` record as positive proof that the observation window is
+   real; absence of `would deny` lines alone is insufficient.
 3. **Stage 3 — flip `on`**, preview/local first, then production. Update
    strategy doc §6 from [PLANNED] to [CURRENT], the CLAUDE.md safety
    invariants, and the agent-wiki Dataverse topic in the same pass (`/sweep`).
