@@ -3,35 +3,35 @@ title: "Grantee Deliverables Portal — Spec"
 domain: grantee-portal
 kind: spec
 status: active
-summary: "S269 added the edited-title generator + server-side document-assembly design (below + build-plan chunks 7–8, pending Codex pre-impl review); the..."
+summary: "As-built grantee deliverables contract: abstract text on akoya_request; package state, image, caption, and waiver evidence on the child row."
 canonical: true
 cataloged: 2026-07-02
 owner: product-engineering
 related:
   - docs/atlas/dataverse-akoya-request.md
-  - lib/dataverse/schema-apply.js
+  - docs/atlas/dataverse-wmkf-granteedeliverable.md
   - "pages/workbench/[requestId].js"
-  - lib/services/review-upload.js
+  - lib/services/grantee-upload.js
 ---
 
 # Grantee Deliverables Portal — Spec
 
-Status: **PORTAL BUILT + SHIPPED (S268); EDITED-TITLE + ASSEMBLY DESIGNED (S269).** Owner-confirmed
-decisions folded in from the S268 Codex design review + owner clarifications. The **S268 Dataverse
-field wave is LIVE in prod** (5/5 fields created 2026-06-18, re-probe shows 5/5 EXACT) and the **portal
-application is built end-to-end** — Awardee-tab trigger, abstract generation, external grantee portal,
-SharePoint upload/return, and the status write-path all shipped S268 (see build-plan chunks 1–5, 3b–3d).
-**S269 added the edited-title generator + server-side document-assembly design** (below + build-plan
-chunks 7–8, pending Codex pre-impl review); the edited-title field is a **new wave, NOT yet deployed**.
-Label new state claims `[VERIFIED]`/`[ASSUMED]` as implementation lands.
+Status: **BUILT + LIVE.** The Awardee-tab trigger, abstract/title generation, external grantee
+portal, SharePoint image upload, server-side document assembly, and cycle outputs are implemented.
+The current data contract is split across two Dataverse rows: `akoya_request` owns the generated and
+approved abstract text; one related `wmkf_granteedeliverable` row owns package lifecycle, image,
+caption, invite/reminder dates, and versioned waiver evidence. The Atlas pages linked above are the
+field-level authority; the dated S268/S269 chronology below explains how the design arrived here.
 
 ## Purpose
 
 At the **last stages of a grant cycle**, a **staff member** initiates collection of publication/impact
 deliverables from a recent grantee: we generate a style-guide-conforming abstract from the
 applicant's own submitted abstract, email the grantee a magic-link to edit/approve it, and collect a
-graphical image + caption + a publish-my-image checkbox (a client-side submit gate), then capture the returned
-materials into Dataverse (binaries to SharePoint). Reuses the external **reviewer-portal** primitives
+graphical image + caption + a versioned publication-consent acknowledgment, then capture the returned
+materials into Dataverse (binaries to SharePoint). The client acknowledgment gates submit, and the
+server verifies the signed waiver-render token and persists the exact version, timestamp, and body
+hash. Reuses the external **reviewer-portal** primitives
 (magic-link, token lifecycle, M365 email, SharePoint upload, fail-closed external auth) — but as a
 **parallel grantee variant**, not by mutating the reviewer code (see Reuse).
 
@@ -60,26 +60,22 @@ Per grantee, exactly:
 
 ## Resolved design decisions (S268)
 
-- **D1 — Abstract chain (3 fields, 2 new).** Source is the **existing** `wmkf_abstract` (the
+- **D1 — Abstract chain (3 fields, 2 added).** Source is the **existing** `wmkf_abstract` (the
   *applicant-drafted* abstract captured at proposal submission — `docs/atlas/dataverse-akoya-request.md:47`).
   We generate a **style-guide-conforming** version into a **new** field
-  (`wmkf_abstract_formatted` — owner's suggested name). The grantee's **edited/approved** version
-  lands in a **separate new** field (`wmkf_abstract_approved`) so we preserve provenance:
+  (`wmkf_abstractformatted`). The grantee's **edited/approved** version
+  lands in a **separate** field (`wmkf_abstractapproved`) so we preserve provenance:
   *what we generated* vs *what the grantee signed off on*. The AI-formatted field is NOT overwritten
   by the grantee edit.
-  - ⚠️ Dataverse logical-name caveat: a schemaName's logical name is lowercased and the publisher
-    underscore is the only safe underscore. Confirm at preflight whether `wmkf_abstract_formatted`
-    (mid-name underscore) is accepted, or use schemaName `wmkf_AbstractFormatted` →
-    `wmkf_abstractformatted`. Honor owner naming intent; resolve the exact literal at build.
-- **D2 — Storage split.** Abstracts and caption are Dataverse `Memo`/text on `akoya_request`;
-  the image binary lives in SharePoint with a Dataverse text reference field. (Dataverse file
-  columns are not supported by the current `schema-apply` type switch — `lib/dataverse/schema-apply.js:45-152`.)
+- **D2 — Storage split.** Abstracts are Dataverse `Memo` fields on `akoya_request`. Lifecycle,
+  caption, and the SharePoint image reference live on the related `wmkf_granteedeliverable` row;
+  image bytes live in SharePoint. This child-row cutover superseded the original flat request-field
+  design and is authoritative in `docs/atlas/dataverse-wmkf-granteedeliverable.md`.
 - **D3 — Eligibility is STAFF-INITIATED. No proposal-status keying.** Staff know when to run the
   workflow; we do NOT filter on the messy/polymorphic `akoya_requeststatus`. This removes the
   status-probe work Codex flagged — it does not apply.
-- **D4 — Trigger surface = the Awardee tab.** Launched from the currently-empty **Awardee tab** in
-  the workbench (`pages/workbench/[requestId].js:41` — `{ key: 'awardee', label: 'Awardee' }`,
-  defined with no render branch today). This tab gets populated as part of the build.
+- **D4 — Trigger surface = the Awardee tab.** The live Workbench Awardee tab launches and manages
+  the workflow.
 - **D5 — Scope = RESEARCH only; recipients = TWO contacts (owner-confirmed S268).** The portal runs
   on research grants only (the deliverable is a research output), so there is NO program-family
   branching. The invite addresses the **PI** (`akoya_request.wmkf_projectleader` → `contact`) in **`To`**
@@ -87,16 +83,16 @@ Per grantee, exactly:
   foundation liaison / grant steward, NOT the PI). Both are auto-resolved (`emailaddress1` + name); staff
   confirm/override and preview the email before send. The earlier program-aware SoCal/Discretionary
   mapping is superseded. (`docs/atlas/dataverse-akoya-request.md:135-160`.)
-- **D6 — Schema home: extend `akoya_request` inline.** One staff-run package per grant, no
-  resubmission rounds planned, so add fields directly to `akoya_request` (matches Atlas "lifecycle
-  additions stay merged into the vendor entity" — `docs/atlas/dataverse-akoya-request.md:11-15,144-147`).
-  Revisit a child entity only if resubmissions/version history become first-class.
+- **D6 — Schema home: split text from package state.** `akoya_request` retains the two abstract
+  fields. A one-per-request `wmkf_granteedeliverable` child row owns package state and evidence,
+  enforced by its alternate request key. This is the shipped replacement for the original inline
+  status/image/caption fields.
 
 ## Flow (intended)
 
 1. **Trigger:** staff opens a grant's **Awardee tab** and starts the grantee-deliverables workflow.
 2. **Draft:** Claude generates a style-guide abstract from `wmkf_abstract` via the Executor/prompt
-   pipeline into `wmkf_abstract_formatted`. *(Concrete prompt/template TBD — see Open items.)*
+   pipeline into `wmkf_abstractformatted`.
 3. **Invite:** staff confirm the two auto-resolved recipients (PI + liaison) and preview/edit the email,
    then email the PI (`To`) and Cc the liaison (PD mailbox via Dynamics 365 / M365) a magic-link to
    `/external/grantee/...` (one link per request — both share it), asking them to edit & approve the abstract and upload image +
@@ -129,30 +125,22 @@ writes `wmkf_review*` fields, uses the `Reviewer_Uploads` folder, validates revi
 tightens reviewer-token expiry (`lib/services/review-upload.js:106-120,172-175,203-238`). Copying
 either as-is is the copy-paste-drift trap.
 
-## Dataverse field schema (wave JSON) — DEPLOYED S268
+## Dataverse schema — as built
 
-File: `lib/dataverse/schema/wave2-grantee-deliverables/akoya_request-grantee-deliverables.json`,
-`kind: "extensions-on-existing"` on `akoya_request`, publisher prefix `wmkf`. Isolated wave so
-`apply-dataverse-schema --wave=2-grantee-deliverables` creates ONLY these fields. **Applied to prod
-2026-06-18** (`--execute`); preflight re-probe confirms 5/5 EXACT.
+The existing applicant source `akoya_request.wmkf_abstract` is unchanged.
 
-New fields (the existing `wmkf_abstract` is the source and is NOT created):
-
-| schemaName (resolve underscore at build) | type | purpose |
+| Owner | Field | Purpose |
 |---|---|---|
-| `wmkf_abstract_formatted` | Memo (~32k) | AI style-guide abstract drafted from `wmkf_abstract`. Not overwritten by grantee edit. |
-| `wmkf_abstract_approved` | Memo (~32k) | Grantee-edited/approved abstract (in-portal text). |
-| `wmkf_GranteeImageFileRef` | String/Url (1000) | SharePoint reference for the graphical image. |
-| `wmkf_GranteeImageCaption` | Memo (4000) | Free-text image caption. |
-| `wmkf_GranteeDeliverableStatus` | Picklist | Package lifecycle (below). Mirrors `shared/config/granteeDeliverableStatus.js`. |
+| `akoya_request` | `wmkf_abstractformatted` | AI style-guide draft; staff may refine it before invitation. |
+| `akoya_request` | `wmkf_abstractapproved` | Grantee-approved body; post-submit staff corrections preserve it as the published version. |
+| `wmkf_granteedeliverable` | `wmkf_deliverablestatus` | Package lifecycle. |
+| `wmkf_granteedeliverable` | `wmkf_imagefileref` / `wmkf_imagecaption` | Private SharePoint reference and caption. |
+| `wmkf_granteedeliverable` | `wmkf_WaiverPolicyVersion` / `wmkf_waiverackedat` / `wmkf_waiverbodyhash` | Exact consent version, acknowledgment time, and SHA-256 of the displayed body. |
+| `wmkf_granteedeliverable` | invite/reminder date fields | Delivery cadence and reminder state. |
 
-**Consent fields — UPDATED 2026-07-09.** The original S268 schema deliberately stored no consent
-fields. That was reversed at owner request: the waiver is now versioned in the `grantee-waiver`
-policy slot, and the acknowledged version is persisted on the `wmkf_granteedeliverable` package row
-via `wmkf_WaiverPolicyVersion` (lookup → `wmkf_policyversion`) + `wmkf_WaiverAckedAt` (DateTime) +
-`wmkf_WaiverBodyHash` (String, SHA-256 of the acknowledged body, audit aid). Those three columns are
-added by the standalone `wave12-grantee-waiver-consent` schema wave; the abstract content fields and
-status picklist are unchanged. See `docs/GRANTEE_WAIVER_VERSIONING_PLAN.md`.
+The old flat request fields `wmkf_granteedeliverablestatus`, `wmkf_granteeimagefileref`, and
+`wmkf_granteeimagecaption` are retired from application reads/writes. See the two Atlas pages and
+`lib/services/grantee-upload.js` for the atomic two-row write contract.
 
 Status picklist option set (mirror in `shared/config/granteeDeliverableStatus.js` — keep symmetric):
 `Drafted` (100000000), `Invited` (100000001), `Reminder Sent` (100000002), `Submitted` (100000003),
@@ -167,14 +155,14 @@ Status picklist option set (mirror in `shared/config/granteeDeliverableStatus.js
   `scripts/preflight-triagestatus-field.mjs` — absent OK, exact match OK, divergent existing aborts).
 - **No Power Automate trigger.** Verify post-deploy that writes limited to these new fields fire no
   AkoyaGO/PA flow (`docs/atlas/dataverse-akoya-request.md:63`).
-- **Image magic-byte validation is a GAP.** The shared validator handles PDF/DOCX/XLSX, not images
-  (`lib/utils/file-magic.js:15-20,132-160`) — add image-format magic-byte checks before storing.
+- **Image validation is fail-closed.** `validateGranteeImage` enforces JPEG/PNG/WEBP signatures,
+  extension agreement, and size before virus scanning and storage.
 - **Atomic submit + rollback** across SharePoint and Dataverse (see Flow step 5).
 - **Status constants symmetric** — wave JSON option set and `shared/config/granteeDeliverableStatus.js`
   must stay aligned (triage precedent: `shared/config/triageStatus.js`).
-- **Waiver is a UI gate, not server-validated state** — the submit button is disabled until the box
-  is checked. Since nothing is persisted, the gate lives in the portal form; the submit route does
-  not (and need not) record or re-check consent.
+- **Waiver proof crosses the trust boundary.** The client must echo the signed render token for the
+  displayed policy version. The submit route rejects a missing, invalid, mismatched, or unbound token;
+  the successful changeset persists the exact version, acknowledgment timestamp, and body hash.
 
 ## Edited title + server-side document assembly (S269 — design)
 

@@ -6,6 +6,7 @@ stale_after_days: 60
 owner: dynamics-platform
 source_files:
   - lib/services/dynamics-service.js
+  - lib/services/dynamics/email.js
   - lib/services/dynamics-context.js
   - lib/services/dynamics-odata-validator.js
   - lib/services/dynamics-identity-service.js
@@ -63,8 +64,9 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   live in ALL environments; initial runtime-log scan clean.
   **Resolved (Session 330, 2026-07-04):** the email-write helpers
   `createEmailActivity`/`addEmailAttachment`/`sendEmail` in
-  `dynamics-service.js` now call `assertTrustedDalContext` as their first
-  statement, matching entity-write enforcement (Codex post-impl review,
+  `lib/services/dynamics/email.js` call `assertTrustedDalContext` as their first
+  statement; `dynamics-service.js` remains the public facade that delegates to them. This matches
+  entity-write enforcement (Codex post-impl review,
   2026-07-05, flagged this gap; closed same session per stage log). Stage 8's
   gate still exempts their method names as `non-entity-transport` — that
   exemption is unchanged and intentional (they're guarded at runtime instead

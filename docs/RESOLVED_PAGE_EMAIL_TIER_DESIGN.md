@@ -16,7 +16,9 @@ related:
 
 # Resolved-Page Email Tier — Design Plan (rev 4)
 
-**Status:** IMPLEMENTED (rev 4 ownership ranking; production promotion remains deliberate)
+**Status:** IMPLEMENTED and enabled in Production as of the dated 2026-07-03 configuration
+attestation. Environment configuration is external mutable state: re-verify the live flag before a
+new rollout or incident diagnosis rather than treating this document as a permanent guarantee.
 **Author:** Claude (S265)
 **Scope:** guarded fetch, contact parsing, mailbox ownership selection, roster evidence, and candidate-card explanation
 
@@ -149,9 +151,10 @@ Enforced, on the initial request **and every redirect hop** (manual redirect loo
    `maxBytes` cutoff; require `Content-Type` `text/html` or `text/plain`.
 5. No cookies/credentials; `redirect: 'manual'`; descriptive `User-Agent`.
 
-**Feature flag:** `REVIEWER_PAGE_EMAIL_TIER_ENABLED`. The code fails closed when unset; production
-has explicitly enabled the tier since 2026-07-03. Therefore a selector merge is a production
-behavior change and requires deliberate promotion. No coarse academic-TLD allowlist — the OpenAlex
+**Feature flag:** `REVIEWER_PAGE_EMAIL_TIER_ENABLED`. The code fails closed when unset. Production
+was explicitly verified enabled on 2026-07-03; that is a dated configuration attestation, not a
+permanent repo fact. Re-verify live configuration before promotion. A selector merge changes
+production behavior whenever the flag is enabled and requires deliberate promotion. No coarse academic-TLD allowlist — the OpenAlex
 domain binding is strictly better and avoids `.org/.gov/.de` false negatives. (Codex Q5.1/Q5.2:
 domain-binding + caps acceptable; IP-pinning IMPLEMENTED in the post-impl pass — the TOCTOU
 residual is closed, not merely documented.)

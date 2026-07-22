@@ -131,7 +131,7 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [BILL_CHUNK_4_DESIGN.md](BILL_CHUNK_4_DESIGN.md) | spec | historical |  | Historical BILL onboarding chunk design; automated BILL integration was tabled by the owner on 2026-07-12. | 2026-07-02 |
-| [BILL_CHUNK_6_ENDPOINT_DESIGN.md](BILL_CHUNK_6_ENDPOINT_DESIGN.md) | spec | active |  | Always 200 on auth+validation success. Outcome lives in the body. | 2026-07-02 |
+| [BILL_CHUNK_6_ENDPOINT_DESIGN.md](BILL_CHUNK_6_ENDPOINT_DESIGN.md) | spec | historical |  | Historical pre-implementation endpoint design. The service and route shipped with deviations, and automated BILL onboarding is now tabled/dormant. | 2026-07-02 |
 | [BILL_HONORARIUM_INTEGRATION_DESIGN.md](BILL_HONORARIUM_INTEGRATION_DESIGN.md) | spec | historical |  | Historical reviewer BILL onboarding design; automated BILL integration was tabled by the owner on 2026-07-12. | 2026-07-02 |
 | [BILL_integration_handoff.md](BILL_integration_handoff.md) | history | historical |  | Historical BILL.com integration handoff; automated BILL integration was tabled by the owner on 2026-07-12. | 2026-07-02 |
 | [BILL_LIB_DESIGN.md](BILL_LIB_DESIGN.md) | spec | historical |  | Historical BILL API wrapper design retained as implementation history; automated BILL integration was tabled on 2026-07-12. | 2026-07-02 |
@@ -160,8 +160,8 @@ related:
 |---|---|---|---|---|---|
 | [GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md](GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md) | plan | active |  | - The 14-day-to-respond / remind-at-day-12 cadence needs an anchor: when was the invite sent? Nothing records that today. | 2026-07-02 |
 | [GRANTEE_INVITE_BODY_CUSTOM_PLAN.md](GRANTEE_INVITE_BODY_CUSTOM_PLAN.md) | plan | historical |  | Historical record of the completed per-PD grantee-invite-body preference and Awardee-tab edit affordance. | 2026-07-02 |
-| [GRANTEE_PORTAL_BUILD_PLAN.md](GRANTEE_PORTAL_BUILD_PLAN.md) | plan | active |  | - Option A — Stateless signed JWT (no new fields). Mint a short-expiry HS256 token via the shared external-token.js primitive; verify is... | 2026-07-02 |
-| [GRANTEE_PORTAL_SPEC.md](GRANTEE_PORTAL_SPEC.md) | spec | active | yes | S269 added the edited-title generator + server-side document-assembly design (below + build-plan chunks 7–8, pending Codex pre-impl review); the... | 2026-07-02 |
+| [GRANTEE_PORTAL_BUILD_PLAN.md](GRANTEE_PORTAL_BUILD_PLAN.md) | plan | active |  | As-built implementation chronology for the grantee deliverables portal; current field ownership and consent behavior defer to GRANTEE_PORTAL_SPEC and the Atlas. | 2026-07-02 |
+| [GRANTEE_PORTAL_SPEC.md](GRANTEE_PORTAL_SPEC.md) | spec | active | yes | As-built grantee deliverables contract: abstract text on akoya_request; package state, image, caption, and waiver evidence on the child row. | 2026-07-02 |
 
 ## intake-portal
 
@@ -177,7 +177,7 @@ related:
 | [INTAKE_PORTAL_BUDGET_AGGREGATE_RECOMPUTE_DECISION.md](INTAKE_PORTAL_BUDGET_AGGREGATE_RECOMPUTE_DECISION.md) | decision | active |  | Q2 answer: \"Yes, with the narrow exception language.\" → Boundary-rule exception accepted with the three non-negotiable preconditions documented in... | 2026-07-02 |
 | [INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md](INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md) | status | canonical | yes | This is the single status entry point for intake portal budget/roster reconciliation, the slice-0 schema deploy, and the related PA recompute flow. | 2026-07-02 |
 | [INTAKE_PORTAL_CONNOR_Q1_Q4_DRAFT.md](INTAKE_PORTAL_CONNOR_Q1_Q4_DRAFT.md) | draft | draft |  | Status: Connor sign-off received in S189 walkthrough 2026-05-26. Answers folded inline under each question. Email never sent — superseded by live... | 2026-07-02 |
-| [INTAKE_PORTAL_DESIGN.md](INTAKE_PORTAL_DESIGN.md) | spec | active |  | 1. Long-term target: full GOapply replacement across all funding lines, on a 12-18 month horizon. | 2026-07-02 |
+| [INTAKE_PORTAL_DESIGN.md](INTAKE_PORTAL_DESIGN.md) | spec | historical |  | Historical design for the cancelled June 2026 Phase II intake pilot. The product build is parked; use the intake wiki and Atlas for current state. | 2026-07-02 |
 | [INTAKE_PORTAL_DRAIN_PLAN.md](INTAKE_PORTAL_DRAIN_PLAN.md) | plan | historical |  | Historical implementation and rollout record for the intake portal drain, now deployed. | 2026-07-02 |
 | [INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md](INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md) | history | historical |  | 1. Confirm maker-portal access to the sandbox environment, not production. | 2026-07-02 |
 | [INTAKE_PORTAL_ITEM_6_CONNOR_EMAIL.md](INTAKE_PORTAL_ITEM_6_CONNOR_EMAIL.md) | draft | draft |  | Send-ready. Consistent with the committed handout INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md and the locked Select-columns=blank decision. Attach... | 2026-07-02 |
@@ -261,7 +261,7 @@ related:
 | [REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md](REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md) | source-of-truth | canonical | yes | - Part B — Field Primer + Prompt Decomposition (was REVIEWER_FINDER_PROMPT_DECOMPOSITION_DESIGN.md): the async-precomputed field primer and its... | 2026-07-02 |
 | [REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md](REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md) | plan | historical |  | Completed S250–S251 SerpAPI migration; retained as the historical migration record. | 2026-07-02 |
 | [REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md](REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md) | plan | active |  | An anchor is an evidence item extracted from or derived from the proposal. It may seed work resolution, literature expansion, identity resolution,... | 2026-07-02 |
-| [REVIEWER_FINDER.md](REVIEWER_FINDER.md) | source-of-truth | canonical | yes | The Reviewer Finder is the flagship application for finding and contacting expert reviewers for grant proposals. | 2026-07-02 |
+| [REVIEWER_FINDER.md](REVIEWER_FINDER.md) | source-of-truth | canonical | yes | Current reviewer discovery, identity/contact enrichment, persistence, and Workbench invitation workflow. | 2026-07-22 |
 | [REVIEWER_HOLISTIC_REDESIGN_ADVERSARIAL_FINDINGS_HANDOFF.md](REVIEWER_HOLISTIC_REDESIGN_ADVERSARIAL_FINDINGS_HANDOFF.md) | audit | historical |  | Completed remediation record for the eight findings from the 2026-07-13 adversarial review. | 2026-07-12 |
 | [REVIEWER_HOLISTIC_REDESIGN_ADVERSARIAL_REVIEW_PROMPT.md](REVIEWER_HOLISTIC_REDESIGN_ADVERSARIAL_REVIEW_PROMPT.md) | audit | historical |  | Historical read-only Claude review brief for the B0/C0/I1 implementation through commit 75d26a22, completed before the first caller promotion. | 2026-07-12 |
 | [REVIEWER_HOLISTIC_REVIEW_CODEX_PROMPT.md](REVIEWER_HOLISTIC_REVIEW_CODEX_PROMPT.md) | audit | draft |  | Pointer-based prompt for a CODEX session to holistically reassess reviewer finding and disambiguation — reframe-first, full latitude, curated reading map. | 2026-07-08 |
@@ -350,7 +350,7 @@ related:
 | [AUTHENTICATION_SETUP.md](AUTHENTICATION_SETUP.md) | runbook | active |  | This guide explains how to configure Azure AD (Microsoft Entra ID) authentication to restrict app access to your organization only. | 2026-07-02 |
 | [CREDENTIALS_RUNBOOK.md](CREDENTIALS_RUNBOOK.md) | runbook | canonical | yes | *Quick reference for managing environment variables, rotating secrets, and diagnosing auth failures.*. | 2026-07-02 |
 | [DFT_VIRUS_SCAN_QUESTIONS_DRAFT.md](DFT_VIRUS_SCAN_QUESTIONS_DRAFT.md) | draft | draft |  | Send-ready. Specific asks with reply template; questions are answerable from Microsoft 365 admin center without needing context on our application... | 2026-07-02 |
-| [SECURITY_ARCHITECTURE.md](SECURITY_ARCHITECTURE.md) | spec | active |  | Prepared for: IT Security Review Application: Document Processing Multi-App System Date: March 2026 (last significant update); status banner... | 2026-07-02 |
+| [SECURITY_ARCHITECTURE.md](SECURITY_ARCHITECTURE.md) | spec | historical |  | Historical March 2026 IT security-review snapshot. Use the authentication, route-security, credentials, and operating docs for current posture. | 2026-07-02 |
 | [SECURITY_OPERATING_PLAN.md](SECURITY_OPERATING_PLAN.md) | runbook | canonical | yes | - docs/API_ROUTE_SECURITY_MATRIX.md — who can call each API route and what boundary protects it. | 2026-07-02 |
 | [SECURITY_ROLE_WAVE1.md](SECURITY_ROLE_WAVE1.md) | history | active |  | For: Connor Environment: WM Keck Sandbox (https://orgd9e66399.crm.dynamics.com) first, then prod when we cut over Status: Schema is live in... | 2026-07-02 |
 | [THIRD_PARTY_LLM_AUDIT_FOLLOWUP_PROMPT.md](THIRD_PARTY_LLM_AUDIT_FOLLOWUP_PROMPT.md) | audit | draft |  | Severity: P0/P1/P2/P3 Prior-report status: unchanged / narrowed / expanded / retracted / split. | 2026-07-02 |

@@ -8,21 +8,20 @@ canonical: true
 cataloged: 2026-07-02
 owner: product-engineering
 related:
-  - docs/SYSTEM_OVERVIEW.md
   - docs/STRATEGY.md
   - docs/APPLICATION_STATE_ATLAS.md
+  - docs/CANONICAL_COUNTS.md
   - docs/atlas/
+  - shared/config/appRegistry.js
 ---
 
 # WMKF System Model
 
-**Status:** Canonical conceptual model, v2 (synthesized S197, 2026-05-28, after an outside-review
-pass by Codex). This is the **architecture/decomposition** layer — the *why* and *how it fits
-together*. For the live feature catalog see `docs/SYSTEM_OVERVIEW.md`; for the strategic narrative
-see `docs/STRATEGY.md`; for the system-of-record matrix see `docs/APPLICATION_STATE_ATLAS.md` (+
-`docs/atlas/`). **Where this doc conflicts with an older doc on the points below, this doc wins** —
-but a full reconciliation of stale "pilot"/phasing references across the repo is **still pending**
-(see "Drift reconciliation status").
+**Status:** Canonical conceptual model, refreshed 2026-07-22 against source. This is the
+**architecture/decomposition** layer — the *why* and *how it fits together*. The live app registry is
+`shared/config/appRegistry.js`; code-derived counts live in `docs/CANONICAL_COUNTS.md`; the
+system-of-record matrix is `docs/APPLICATION_STATE_ATLAS.md` plus `docs/atlas/`; strategic direction
+is `docs/STRATEGY.md`. `docs/SYSTEM_OVERVIEW.md` is a dated inventory, not a live authority.
 
 ---
 
@@ -50,15 +49,17 @@ them):
 - **PA (PowerAutomate)** — Microsoft's backend automation engine; flows built by the vendor + Connor.
 - **PD** — Program Director (the staff member who owns a grant request).
 - **Request** — a grant request record (`akoya_request`); the unit of work a PD acts on.
-- **Workbench** — the planned per-request staff surface (`/workbench/[requestId]`) that unifies
-  per-request operations (proposal viewer, reviewer lifecycle, analyses, etc.).
+- **Workbench** — the live per-request staff surface (`/workbench/[requestId]`) that unifies
+  proposal, reviewer, status, AI-content, and awardee operations.
 - **Reviewer Pool** — a planned request-agnostic surface for browsing/managing the reusable reviewer roster.
-- **Executor / Executor contract** — the written spec for "run one prompt"; implemented twice
-  (Vercel JS `executePrompt()`; a PA child flow). See `docs/EXECUTOR_CONTRACT.md`.
+- **Executor / Executor contract** — the written spec for "run one prompt"; implemented in Vercel
+  JS as `executePrompt()`. A Power Automate child-flow implementation remains deferred. See
+  `docs/EXECUTOR_CONTRACT.md`.
 - **Thin adapter** — the small amount of input-gathering + output-routing code wrapped around a
   shared prompt; what's left of an "app" once the prompt lives in Dataverse.
-- **Sidecar entity** — a 1:1 satellite table holding extra fields for a parent record (e.g., the
-  reviewer bibliometric sidecar slated for collapse).
+- **Sidecar entity** — a 1:1 satellite table holding extra fields for a parent record. The former
+  reviewer bibliometric sidecar was collapsed and dropped in S213; bibliometrics now live on
+  `wmkf_potentialreviewer`.
 - **Mode 1 / Mode 2** — the two interaction modes (orthogonal to where data comes from). **Mode 1**
   is a *declarative task*: a fixed canonical prompt → a defined Dataverse/SharePoint output, governed
   by the Executor contract. **Mode 2** is an *interactive session*: an open-ended chat/agent loop with
@@ -144,9 +145,10 @@ hangs off events and state transitions:
 
 - **Lifecycle events:** `proposal-submitted (Phase I)`, `phase-advanced (→ Phase II)`,
   `review-submitted`, `review-closed`, `payout-*`.
-- **Reviewer state machine:** `find → invite → onboard(agree-terms · BILL setup · proposal
-  distributed · progress tracked) → review-intake → closeout → payout`. **This state machine is the
-  core of the reviewer capability — its absence is the main gap, not a sub-feature.**
+- **Reviewer state machine:** `find → invite → onboard(agree-terms · address/honorarium capture ·
+  proposal distributed · progress tracked) → review-intake → closeout → offline payment handling`.
+  The Workbench and external reviewer portal implement this lifecycle. Automated BILL onboarding is
+  deliberately dormant and is not part of the current operating path.
 - **Backend automation** subscribes to lifecycle events to materialize artifacts (below).
 
 ---
@@ -155,24 +157,19 @@ hangs off events and state transitions:
 
 1. **The prompt contract.** Every *shared* LLM call uses the **same prompt** regardless of who
    initiated it or where output goes. Shared prompts live in Dataverse (`wmkf_ai_prompt`). The
-   **Executor contract** is implemented **twice, independently** — Vercel JS `executePrompt()` (the
-   reference implementation) and a PA child flow. **Neither calls the other**; both read the prompt
-   from Dataverse and call the Claude API directly, kept aligned by the spec + a byte-identical
-   conformance test. *(Verified in-repo on the Vercel side at `execute-prompt.js`; the PA
-   implementation is Connor's, off-repo, so "neither calls the other" is per-contract, not
-   repo-verified.)*
-   - *Operational risk (un-hand-waved):* two independent implementations means **release ordering,
-     version compatibility, drift detection, and rollback** across runtimes are real concerns. The
-     conformance test is the drift detector; release-ordering/rollback ownership is **not yet
-     defined** and should be before the PA side ships broadly.
-   - *Status:* contract shipped (Vercel). Today **one live route** (`/api/phase-i-dynamics/summarize-v2`)
-     reads its prompt from Dataverse via the Executor; the rest still use bundled in-repo prompts —
+   **Executor contract** is implemented by Vercel JS `executePrompt()` in this repository. A PA child
+   flow is a deferred target consumer; there is no current second implementation to claim or test
+   for byte-identical conformance. If PA adopts the contract, it must match the same steps and pass
+   the conformance oracle before production use.
+   - *Status:* contract shipped (Vercel). The Phase I summary route plus live grantee, field-primer,
+     and review services read prompts from Dataverse via the Executor; many other AI paths still use bundled in-repo prompts —
      which live in **three places** per the A7 surface taxonomy: `shared/config/prompts/`,
      route-local, and service-local (e.g. `panel-review-service.js`). **Prompt migration is a named workstream, not a background detail.**
      Migration is **demand-driven**: a prompt moves to Dataverse when it becomes **shared** (a second
      caller, esp. PA). *(Open fork: does staff-editability* also *force a Dataverse home, or only
-     cross-surface sharing? — unresolved.)* (Counts: the canonical **app count is 17**; the A7
-     prompt-injection **input-surface registry is 24** — different denominators, don't conflate.)
+     cross-surface sharing? — unresolved.)* The live application-definition count is
+     [12](CANONICAL_COUNTS.md#app-definition-count); do not copy that scalar into prose without the
+     canonical pointer.
 2. **Identity & access scoping** — who sees what (per-app grants, active-user checks, superuser;
    dual-provider auth for staff vs. applicants). **Applies to documents too** (see resolution).
 
@@ -193,18 +190,15 @@ hangs off events and state transitions:
 
 Numbering dropped (v1's `2+3`/no-`4` was confusing inherited cruft).
 
-- **Applicant Intake** (`/apply/*`) — the front door. One Phase I submission: text fields +
-  document uploads + a budget form. *Auth/attach/draft-drain shipped; form schema + child-record
-  creation in flight.* Build for next cycle; **testable sooner.**
+- **Applicant Intake** (`/apply/*`) — foundation infrastructure exists (auth, draft, attachment,
+  submit/drain pieces), but the product build is **parked** while WMKF evaluates Connor's GOApply
+  re-engineering. Treat the full intake product as neither live nor an active delivery commitment.
 - **Reviewer Lifecycle → Request Workbench + Reviewer Pool** — *the core work for a while.* The
   **workflow** (the reviewer state machine above) realized through the **surface**: a per-request
-  Workbench plus a request-agnostic Reviewer Pool. **BILL.com is a first-class set of workflow
-  states**, not a "bookend" — vendor setup, payment eligibility, failed payouts, reconciliation,
-  tax/compliance, and human exceptions are real states (see `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`;
-  banking PII stays at BILL, never Dataverse). *Most activities have built pieces scattered across
-  three surfaces (staff Reviewer Finder, staff Review Manager, reviewer-facing token flow); the
-  connective state machine + unifying UI are missing; the finding engine works but is
-  workflow-incompatible with a bad UI → needs rework.*
+  **live Workbench** plus a still-planned request-agnostic Reviewer Pool. Finding, invitation,
+  external acceptance, material delivery, review intake, and closeout are integrated. The portal
+  creates honorarium request rows, but automated BILL onboarding is tabled; payment remains an
+  offline operations process. Banking PII never belongs in Dataverse.
 - **CRM Access & Power Tools** — the unified data/document view AkoyaGO can't give: NL CRM chat
   (Dynamics Explorer), bulk export + find/fix, staff-expertise matching. *(Acknowledged as a broad
   bucket; revisit if it needs splitting.)*
@@ -315,10 +309,9 @@ legacy corpus hardens through use.
 
 ## Substrate (enabling, not capabilities)
 
-- **Data-model consolidation** ("keep everything in Dynamics"): multi-wave Postgres→Dataverse
-  migration; remaining cleanup includes the reviewer bibliometric **sidecar collapse**
-  (`docs/archive/APPRESEARCHER_COLLAPSE_PLAN.md`). This sits *under* the Reviewer capability, so its real
-  gate is **"the reviewer Workbench has stabilized," not the (defunct) intake pilot.**
+- **Data-model consolidation** ("keep everything in Dynamics"): the reviewer bibliometric sidecar
+  collapse and reviewer Postgres drain are complete. The Atlas records the few remaining
+  staging/historical stores and is the authority for future cleanup.
 - **Auth & security:** dual-provider auth, prompt-injection hardening (shipped), virus scanning.
 - **System-of-record matrix:** already exists — the **Application State Atlas** (per-entity
   source-of-truth / read-paths / write-paths). Use it; don't restate it here.
@@ -326,9 +319,9 @@ legacy corpus hardens through use.
 ## Stakeholders
 
 PDs, applicants, reviewers, Connor (PA/CRM), and the vendor are well-represented. **Under-represented
-and owning real decisions:** **finance/accounting** (payouts, reconciliation), **compliance/security**
-(records, audit, access), **grants operations**, **admins**, and **leadership** (the rote/thinking
-mandate). A stakeholder pass is owed, especially around BILL payout and records/audit.
+and owning real decisions:** **finance/accounting** (offline honorarium processing and any future
+payment automation), **compliance/security** (records, audit, access), **grants operations**,
+**admins**, and **leadership** (the rote/thinking mandate).
 
 ---
 

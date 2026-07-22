@@ -2,8 +2,8 @@
 title: "BILL Chunk 6 Design — `/api/bill/onboard-reviewer` Endpoint"
 domain: finance-honoraria
 kind: spec
-status: active
-summary: "Always 200 on auth+validation success. Outcome lives in the body."
+status: historical
+summary: "Historical pre-implementation endpoint design. The service and route shipped with deviations, and automated BILL onboarding is now tabled/dormant."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -16,12 +16,15 @@ related:
 
 # BILL Chunk 6 Design — `/api/bill/onboard-reviewer` Endpoint
 
-**Status:** draft for pre-impl Codex review
-**⚠️ Current-cycle (2026-07-01):** automated BILL onboarding is DEFERRED — `onboardReviewer()` returns `status: 'deferred'` (no BILL call, NO alert) when `BILL_ONBOARDING_DEFERRED=true`, at higher precedence than the `alert_only` fallback documented below. The no-BILL honorarium path can still create the `akoya_request`; this endpoint/tail stays skipped until BILL onboarding is re-enabled. The status union and alert-only section below predate the `deferred` gate; the parent doc and `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` are authoritative.
+**Status:** **HISTORICAL pre-implementation design.** Chunk 6 shipped, and the acceptance pipeline
+calls `onboardReviewer()` in-process rather than self-POSTing this endpoint. Automated BILL
+onboarding was subsequently tabled for several months, possibly permanently; current production
+uses the no-BILL honorarium-creation path and `BILL_ONBOARDING_DEFERRED=true`. The contracts,
+pending-chunk list, dates, and open questions below record the old design and are not current work.
+Use `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md`,
+`docs/agent-wiki/topics/finance-honoraria.md`, and source for current behavior.
 **Parent:** `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md` (the umbrella plan)
-**Sibling shipped chunks:** 2-3 (`lib/bill/`), 7a (`pages/api/webhooks/bill.js` scaffold)
-**Sibling pending chunks:** 4 (extend `respond.js` accept path — blocked on Connor's `wmkf_HonorariumRequest` junction lookup), 5 (Stage 2a UI address inputs)
-**Target ready:** 2026-06-10. First reviewer invitations ≥ 2026-06-17.
+**Historical sibling state at authorship:** chunks 2-3 and 7a shipped; chunks 4-5 were then pending.
 
 ## Scope
 

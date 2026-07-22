@@ -2,8 +2,8 @@
 title: Semantic Documentation Inspection — 2026-07-22
 domain: docs-governance
 kind: audit
-status: active
-summary: Three-agent, code-grounded semantic inspection of the live documentation corpus, with adversarial cross-review and a targeted repair queue.
+status: historical
+summary: Code-grounded semantic inspection that identified 14 documentation findings; the targeted reconciliation was completed on 2026-07-22.
 canonical: false
 owner: product-engineering
 last_verified: 2026-07-22
@@ -17,15 +17,29 @@ related:
 
 ## Verdict
 
-**NEEDS TARGETED RECONCILIATION.** The documentation system is structurally sound,
-but the semantic inspection found two P1 documentation-contract failures, nine P2
-current-state or status defects, and three P3 navigation/precision defects. No
-runtime defect was found during this inspection.
+**TARGETED RECONCILIATION COMPLETED 2026-07-22.** The inspection found two P1
+documentation-contract failures, nine P2 current-state or status defects, and three P3
+navigation/precision defects. No runtime defect was found. All 14 findings were reconciled in the
+subsequent documentation pass; the findings below remain as the audit record.
 
 The right response is a narrow documentation repair pass, not a broad rewrite.
 Most drift is concentrated in older active/canonical documents that predate shipped
 work. Mechanical gates remained green because the paths and symbols still exist;
 the prose around them is what became false.
+
+## Remediation record
+
+- Reconciled the grantee spec/build plan to the signed waiver-token flow, two-row Dataverse
+  ownership, and deployed logical field names.
+- Refreshed the System Model, Reviewer Finder, Reviewer Data Model, Executor contract, AI data-flow
+  matrix, Atlas route-count pointer, and current session handoff.
+- Marked the March security report, cancelled intake-pilot design, and BILL chunk-6 pre-implementation
+  design historical, with current-authority routing in the agent wiki and root instructions.
+- Corrected the interlock unset behavior, Dynamics email-helper source path, and resolved-page email
+  deployment language.
+- Regenerated the documentation catalog. Relevant documentation, symbol, build-claim, fact,
+  canonical-pointer, wiki, instruction, Atlas, and API-matrix gates and their self-tests passed.
+  Five focused grantee-waiver/current-invitation suites passed 29/29.
 
 ## Method and coverage
 
@@ -263,4 +277,3 @@ from future UI, and mark BILL Chunk 6 as implemented-but-dormant/owner-tabled.
 4. Apply the three small P3 precision/navigation changes.
 5. Run a fact sweep for each changed claim, regenerate the catalog, and run the
    relevant doc, instruction, Atlas, API-matrix, and focused feature gates.
-

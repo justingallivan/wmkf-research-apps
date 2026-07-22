@@ -16,7 +16,7 @@ canonical_docs:
   - docs/API_ROUTE_SECURITY_MATRIX.md
   - docs/CREDENTIALS_RUNBOOK.md
   - docs/AUTHENTICATION_SETUP.md
-  - docs/SECURITY_ARCHITECTURE.md
+  - docs/SECURITY_OPERATING_PLAN.md
   - docs/APPLICATION_STATE_ATLAS.md
 watch_paths:
   - pages/api/**
@@ -35,6 +35,8 @@ update_triggers:
 
 Use this page for app access, admin routes, API security, tracked secrets,
 private Blob/file access, prompt-injection hardening, and download proxy patterns.
+`docs/SECURITY_ARCHITECTURE.md` is a historical March 2026 IT-review snapshot,
+not a current authority.
 
 ## Ground Rules
 

@@ -3,7 +3,7 @@ title: "Grantee Deliverables Portal — Build Plan"
 domain: grantee-portal
 kind: plan
 status: active
-summary: "- Option A — Stateless signed JWT (no new fields). Mint a short-expiry HS256 token via the shared external-token.js primitive; verify is..."
+summary: "As-built implementation chronology for the grantee deliverables portal; current field ownership and consent behavior defer to GRANTEE_PORTAL_SPEC and the Atlas."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -16,9 +16,11 @@ related:
 
 # Grantee Deliverables Portal — Build Plan
 
-Status: **IN PROGRESS — core portal implementation and chunk-8 outputs shipped.** This plan remains the record for the portal's remaining work and open decisions; the historical S268/S269 chunk chronology is retained below. Implementation plan for the portal whose design is resolved in
-`docs/GRANTEE_PORTAL_SPEC.md` and whose Dataverse field wave is LIVE in prod (5 fields on
-`akoya_request`). This plan decomposes the build into reviewable chunks (the proven
+Status: **IMPLEMENTED CHRONOLOGY — limited follow-ups remain.** Current behavior is defined by
+`docs/GRANTEE_PORTAL_SPEC.md`, the two grantee Atlas pages, and source. The original S268 flat
+five-field request design below was superseded: only `wmkf_abstractformatted` and
+`wmkf_abstractapproved` remain on `akoya_request`; lifecycle, image, caption, dates, and waiver
+evidence live on `wmkf_granteedeliverable`. This plan decomposed the build into reviewable chunks (the proven
 design→Codex-pre-impl→implement→Codex-post-impl loop) and frames the open decisions per chunk.
 
 Grounding: the reviewer external portal was mapped in full this session (token primitive, lifecycle,
@@ -80,12 +82,13 @@ state lives — or whether we keep tokens stateless.
 ### Q3 — Token payload shape.
 - Reviewer JWT: `{ sub: suggestionId, req: requestId, ops, iat, exp, jti }`. Grantee analog:
   `{ sub: requestId, aud: 'grantee', ops: ['edit_abstract','upload_image'], iat, exp, jti }` — `sub`
-  is the `akoya_requestid` itself (the package lives on the request; no per-grantee child row).
+  is the `akoya_requestid` itself. The token remains request-bound even though package state now
+  lives on the one-per-request `wmkf_granteedeliverable` child row.
   Confirm `ops` set and whether `jti` is needed without stored-hash revocation.
 
 ### RESOLVED (S268, owner + Codex pre-impl review)
 - **Q1 → Option A (stateless JWT), 30-day expiry.** No token-state fields, no 2nd schema wave.
-  **Mandatory compensating guard (chunk 5):** the submit route re-loads `wmkf_granteedeliverablestatus`
+  **Mandatory compensating guard (chunk 5):** the submit route re-loads child-row `wmkf_deliverablestatus`
   and **refuses to write once status is `Complete`** (protects finalized packages from a leaked/stale link).
 - **Q2 → reuse `EXTERNAL_LINK_SECRET`** (rotation-aware) **+ an `aud:'grantee'` claim.** Codex confirmed
   the shared primitive neither mints nor surfaces `aud` today, so we additively extend
@@ -93,10 +96,11 @@ state lives — or whether we keep tokens stateless.
   reviewer `mintToken` untouched) and surface `aud`/`subject` on verify. The grantee verifier rejects
   any token whose `aud !== 'grantee'` — including reviewer tokens (which have no `aud`). Absent `aud`
   is NOT legacy-compatible on the grantee surface.
-- **Q3 → `sub = akoya_requestid`** (deliverable lives inline on the request). `jti` kept (audit
+- **Q3 → `sub = akoya_requestid`** (request-bound token; current package state is on the related
+  child row). `jti` kept (audit
   correlation, harmless). `ops = ['edit_abstract','upload_image']` carried for primitive compatibility
   but NOT relied on for authz in chunk 1 — the route + status allowlist are the real guards.
-- **Fail-closed:** unknown/missing `wmkf_granteedeliverablestatus` must NOT default to editable; use an
+- **Fail-closed:** unknown/missing child-row `wmkf_deliverablestatus` must NOT default to editable; use an
   explicit editable-status allowlist. Route ordering: method → `checkRateLimit` → verify →
   `recordTokenOutcome` → fail-fast → only then fetch request context.
 - **Base URL:** new `getGranteePortalBaseUrl()` = `GRANTEE_PORTAL_BASE_URL || NEXTAUTH_URL` (independent
@@ -184,8 +188,8 @@ Recipient-resolution, send-invite (token mint + M365 email), and the Awardee-tab
   (matches the triage workbench-write precedent), `requestId` GUID-validated straight off `req.body`
   (trust-boundary gate), optional `regenerate`. Register in the security matrix.
 - **Flow:** reuse-existing → (idempotency guard) → read `wmkf_abstract` source → `generateGranteeAbstract`
-  (chunk-2 service) → persist `wmkf_abstractformatted` + `wmkf_granteedeliverablestatus` → `Drafted`,
-  conditionally on a fresh ETag → return the abstract. `bypassDynamicsRestrictions` (external/trusted read).
+  (chunk-2 service) → conditionally persist `wmkf_abstractformatted` on the request and move the
+  child deliverable to `Drafted` without downgrading later states → return the abstract.
 
 ### Q1 — Idempotency: full lease/nonce vs reuse + ETag-conditional write?
 Field-primer stores its lease sentinel IN its result field because that field is a JSON envelope.
@@ -208,9 +212,9 @@ Six required behaviors baked into the route:
 1. **No write without `_etag`** — `getRecord` surfaces `_etag`; if absent, fail closed (503), never a bare PATCH.
 2. **412 handling** — on `err.status === 412`, re-read `wmkf_abstractformatted`; if now populated → 200
    `{reused:true, concurrent:true}`; if still empty → 409 (retryable). Never surface raw 412.
-3. **Status non-downgrade** — read current `wmkf_granteedeliverablestatus`; include `Drafted` in the
-   patch ONLY when current is null/empty or already Drafted; for Invited/Reminder/Submitted/Staff
-   Review/Revision/Complete/Closed, preserve status and update only the abstract field.
+3. **Status non-downgrade** — read current child-row `wmkf_deliverablestatus`; set `Drafted` ONLY
+   when current is null/empty or already Drafted; for Invited/Reminder/Submitted/Staff
+   Review/Revision/Complete/Closed, preserve status and update only the request abstract field.
 4. **Missing source** — validate `wmkf_abstract` after the read; missing/too-short → 400 (not a 500).
 5. **`actingUserSystemId`** passed on the write (caller attribution, like triage).
 6. **GUID-validate off `req.body.requestId`** (trust-boundary gate) + **register in the security matrix**.
@@ -229,13 +233,15 @@ numeric-string status non-downgrade, non-412 update→500, 503-skips-generation,
 - **Tests:** reuse-existing skips generation; first write succeeds + sets Drafted; a stale-ETag write
   412s and does NOT clobber; GUID/method/auth guards; missing-source 400; regenerate overwrites.
 
-## Chunk 4 — Grantee portal edit UI (DONE, S268)
+## Chunk 4 — Grantee portal edit UI (DONE; waiver contract updated 2026-07-09)
 
 `shared/components/external/GranteeDeliverableForm.js`, rendered in the `view==='edit'` branch of
 `pages/external/grantee/[token].js`. Abstract editor (prefilled from `abstractApproved || abstractFormatted`),
 image upload, caption, and the **publish-image waiver checkbox as a client-side submit gate**: the
 submit button is disabled until the waiver is checked AND abstract + caption + an image (new upload or
-one already on file) are present. The waiver is NEVER sent — a submitted package is the consent record.
+one already on file) are present. The client also sends the signed waiver render token. The server
+verifies that token and persists the bound policy version, acknowledgment timestamp, and body hash;
+the package alone is not treated as proof of consent.
 On success the form renders a thank-you state. 5 RTL tests (waiver gate, image-required, multipart
 contract, thank-you, error re-enable). The waiver wording is the owner-provided publication-consent
 text (S278) — covers the abstract, project title, name + institution, and image + caption in
@@ -243,12 +249,13 @@ award-announcement materials, and confirms image-sharing rights.
 
 **Submit contract (defined here; chunk 5 implements it):**
 `POST /api/external/grantee/{token}/submit` — `multipart/form-data` with `editedAbstract` (text),
-`caption` (text), `image` (File; optional only if one is already on file). Returns `{ ok: true }` on
+`caption` (text), `waiverToken` (signed token for the displayed version), and `image` (File; optional
+only if one is already on file). Returns `{ ok: true }` on
 success, else `{ error }`. The route MUST: verify the grantee token (chunk 1, `aud` guard);
-**refuse once status is `Complete`** (the chunk-1 carried guard); image magic-byte validate (file-magic.js
-needs image support added) + virus-scan; upload the image to SharePoint and PATCH Dataverse
-(`wmkf_abstractapproved`, `wmkf_granteeimagecaption`, `wmkf_granteeimagefileref`, status→`Submitted`)
-**atomically with rollback** (mirror `lib/services/review-upload.js`).
+**refuse once status is `Complete`** (the chunk-1 carried guard); image magic-byte validate
+(`validateGranteeImage`, now implemented) + virus-scan; upload the image to SharePoint and PATCH Dataverse
+(`akoya_request.wmkf_abstractapproved` plus the child row's caption, image reference, status, waiver
+version, acknowledgment time, and body hash) in one Dataverse changeset after SharePoint upload.
 
 ## Chunk 3b/3c — Recipient resolution + send invite (design RESOLVED, owner S268)
 
@@ -289,8 +296,8 @@ new endpoints). 4 RTL tests. (Self-reviewed + tested like chunk 4; a Codex pass 
 
 ### Codex post-impl folded (3b/3c, S268)
 CLEAN on security (server-minted link injection, body HTML-escaped, GUID validation, no log/header
-injection, render escaping). Three REAL issues fixed: (1) **NaN bypass** — a non-numeric
-`wmkf_granteedeliverablestatus` made every guard comparison false and would mint/send; now a
+injection, render escaping). Three REAL issues fixed: (1) **NaN bypass** — a non-numeric child-row
+`wmkf_deliverablestatus` made every guard comparison false and would mint/send; now a
 non-null `NaN` status → 500 (fail loud). (2) **False status report** — a failed status write after a
 successful send used to return `status: Invited`; now returns the ACTUAL durable status (stays
 Drafted) + a `statusPersisted:false` flag. (3) added tests for NaN-bypass, numeric-string coercion,
@@ -309,32 +316,32 @@ PARALLEL grantee variant — not a mutation of the reviewer path.
 - **Auth/order:** token-authed (NOT app-authed). method → `checkRateLimit` → `verifyGranteeToken`
   (chunk 1, `aud` guard) → `recordTokenOutcome` → fail-fast → parse → validate → scan → upload → PATCH.
   `config.api.bodyParser = false` (busboy needs the raw stream).
-- **Status guard (fail-closed):** refuse unless the request's `wmkf_granteedeliverablestatus` is in the
+- **Status guard (fail-closed):** refuse unless the child row's `wmkf_deliverablestatus` is in the
   EDITABLE allowlist (Drafted / Invited / Reminder Sent / Revision Requested) — same set the context
   route renders editable. This subsumes the chunk-1 carried **Complete guard** (Submitted / Staff
   Review / Complete / Closed / null / unknown all refuse → 409). On success → status `Submitted`.
 - **Multipart (busboy):** fields `editedAbstract` (text, required, min length), `caption` (text,
   required); ONE `image` file (≤ a sane cap, 10 MB; `limits.files: 1`). Image is required UNLESS
-  one is already on file (`wmkf_granteeimagefileref` present) — then a new upload replaces it.
-- **Image validation:** add image magic-byte support to `lib/utils/file-magic.js`
+  one is already on file (`wmkf_imagefileref` present) — then a new upload replaces it.
+- **Image validation:** image magic-byte support is implemented in `lib/utils/file-magic.js`
   (`validateGranteeImage` — PNG/JPEG/WEBP signatures + extension match; GIF dropped S278 for award
   images, though `sniffImageType` still detects GIF so a GIF disguised with an allowed extension fails
-  the magic-byte check) — the gap Codex flagged in
-  chunk 1. Then virus-scan via `scanBytes` (Cloudmersive, gated on `VIRUS_SCAN_ENABLED`), same
+  the magic-byte check). Then virus-scan via `scanBytes` (Cloudmersive, gated on `VIRUS_SCAN_ENABLED`), same
   fail-closed posture as review-upload.
 - **SharePoint:** upload to the `akoya_request` library under
   `{requestNumber}_{guidNoHyphensUpper}/Grantee_Uploads/` (parallel to `Reviewer_Uploads/`). Track the
   uploaded item for rollback.
-- **Atomic PATCH + rollback:** `updateRecord('akoya_requests', requestId, { wmkf_abstractapproved,
-  wmkf_granteeimagecaption, wmkf_granteeimagefileref, wmkf_granteedeliverablestatus: Submitted })`. On
-  PATCH failure, `cleanupSharePointItems` (delete the just-uploaded image) so no orphan file. No
+- **Atomic Dataverse changeset + rollback:** PATCH `akoya_request.wmkf_abstractapproved` and the
+  related `wmkf_granteedeliverable` package fields together with per-row `If-Match`. On a non-412
+  Dataverse failure, re-read before deciding whether the just-uploaded SharePoint image is safe to
+  delete. No
   `actingUserSystemId` (external/grantee, no staff identity) — runs in `bypassDynamicsRestrictions`.
 - **Service:** `lib/services/grantee-upload.js` (`writeGranteeDeliverables`) holds validate→scan→
   upload→PATCH→rollback; the route does token+status+multipart. Keeps the service text/buffer-testable.
 - **Tests:** image magic accept/reject; status allowlist (Complete/Submitted → 409, Drafted → ok);
   edited-abstract/caption required; image required when none on file / optional when one exists;
   SharePoint-fail → no PATCH; PATCH-fail → rollback (image deleted); token aud-reject; happy path
-  writes all four fields + Submitted.
+  writes both rows, including waiver evidence, + Submitted.
 
 ### RESOLVED (S268, Codex pre-impl — READY WITH NAMED CHANGES)
 1. **ETag/If-Match on the submit PATCH** (TOCTOU: staff could change status between the guard read and
@@ -555,7 +562,7 @@ fetchCoPIs, role=Co-PI 100000001]`
 - **Co-PI read (Codex ISSUE).** PI = `wmkf_projectleader`; Co-PIs = `fetchCoPIs(requestId)` (junction
   role=Co-PI only). Name-join "A and B" / "A, B, and C". (See Assembly inputs above.)
 - **Website/cycle image + auth boundary (Codex ISSUE).** The website + cycle export are **staff-authed,
-  server-side** (`requireAppAccess('reviewers')`), so they read `wmkf_granteeimagefileref` directly —
+  server-side** (`requireAppAccess('reviewers')`), so they read child-row `wmkf_imagefileref` directly —
   the portal context route's `hasImage`-only rule is a constraint on the **external grantee-token**
   surface, not on staff exports. State this boundary explicitly in the route headers.
 - **Cycle export scope + access** — keyed by `cycleCode` (`cycleCodeToOdataFilter` on `wmkf_meetingdate`,
@@ -607,11 +614,12 @@ fetchCoPIs, role=Co-PI 100000001]`
 ## Open (later chunks)
 - **Public image serving — DEFERRED to Connor (owner decision S271).** The website/cycle HTML emits the
   grantee image as a `<figure>` placeholder with the SharePoint ref in a comment, never a public
-  `<img src>` (the upload lands in private SharePoint via `grantee-upload.js` → `wmkf_granteeimagefileref`).
+  `<img src>` (the upload lands in private SharePoint via `grantee-upload.js` → child-row `wmkf_imagefileref`).
   Closing the gap (signed proxy route that streams the private image vs. manual CMS upload) is **Connor's
   call as the website builder** — he owns how images get published. Left open pending his approach; no
   build this session.
-- Chunk 6: reminder cadence/deadline + exact waiver/T&C wording.
+- Chunk 6: reminder cadence/deadline. Waiver wording is now staff-managed through the versioned
+  `grantee-waiver` policy slot; the code persists the exact acknowledged version.
   - **Invitation email default — LANDED (S271).** the grantee-invite default copy (admin-editable settings
     store, seeded from `lib/seed/email-defaults/grantee-invite.js`, fetched via
     `/api/email-defaults/grantee-invite`; a PD may override with a saved custom body) carries
@@ -623,9 +631,8 @@ fetchCoPIs, role=Co-PI 100000001]`
     appended server-side (`resolveSignatureForRequest` + `appendSignatureBlock`), never a body
     placeholder. Full design + hazards: `docs/GRANTEE_INVITE_BODY_CUSTOM_PLAN.md`. Only the
     cadence/signature-policy decisions below remain open. Voice + structure: `project-grantee-deliverable-email-voice`.
-  - **Still open:** reminder cadence (count/timing/recipients, auto-cron vs. manual "Send reminder" button)
-    and the publish-image **waiver/T&C wording** (owner reviewing a toned-down redline with counsel —
-    `~/Downloads/WMKF_Consent_Redline_Handout.pdf`, S271). The reminder send is NOT built pending cadence.
+  - **Still open:** reminder cadence (count/timing/recipients, auto-cron vs. manual "Send reminder" button).
+    The reminder send is NOT built pending cadence.
 - Optional **auto-on-award cron** (PA-free) — a `pages/api/cron/*` route on the awardee eligibility
   filter (`granteeResearchPrograms.js`) that pre-generates **abstracts** for newly-`Active` research
   awardees; idempotent. (Distinct from the chunk-7 title cron, which fires earlier on the `Invited`
