@@ -10,6 +10,31 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Dataverse target/write interlock enforced in production (Session 368)
+
+**Milestone:** The deployment × target-hostname × operation interlock moved from observed warn mode
+to explicit fail-closed enforcement in local, Preview, and Production.
+**Sessions:** 355 (architecture/warn rollout), 368 (positive observation and enforcement).
+**Ship state:**
+- PR #73 added positive activation logs; production showed the expected production target and no would-deny outcomes.
+- Owner-approved `DATAVERSE_TARGET_INTERLOCK=on` was applied in all environments.
+- A signed-in Workbench smoke logged `mode=on deployment=production target=production` without denial.
+- PR #74 merged as `a3ae8d31`; the enforced contract is reconciled in `CLAUDE.md` and the rollout plan.
+**Why it matters:** a mis-targeted Dataverse write now fails at the shared transport boundary instead of relying on operator vigilance.
+**Pointers:** `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md`; merges `2585f980`, `a3ae8d31`.
+
+## July 2026 — Full structured staff review rescue shipped (Session 368)
+
+**Milestone:** Staff can record a complete review from the Reviews tab when the external portal cannot be used.
+**Sessions:** 368.
+**Ship state:**
+- PR #75 added the live-question form, rich-text answers, full validation, and canonical answer snapshots.
+- The dedicated staff path commits parent + child rows atomically with question-version and ETag guards.
+- Legacy file/partial receipt paths remain unchanged; stale portal-draft cleanup occurs only after commit.
+- Merge `0226f7eb` reached Ready as production deployment `dpl_BjkM3tjopMpRWPMwn3NRgtB4CHSU` with all checks green.
+**Why it matters:** portal breakage no longer forces staff into incomplete PDF-era representations or manual database repair.
+**Pointers:** `.claude-memory/project-staff-review-rescue-tool.md`; `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`; commit `050fb397`.
+
 ## July 2026 — Wave 13 reviewer identity binding proven in production (Sessions 362–363)
 
 **Milestone:** The first controlled positive test of the deployed acceptance-drain → self-report capture → Wave 13 binding-writer chain passed in production after four adversarial review rounds.
