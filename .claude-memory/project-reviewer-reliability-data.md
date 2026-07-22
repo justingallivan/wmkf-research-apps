@@ -74,8 +74,17 @@ status nor the stamped due date can be retrofitted onto history.
 **How to apply:** build the terminal status ahead of the payability flag in
 [[project-reviewer-closeout-payability]] — it is smaller, unblocks the metric,
 and halts the corruption. A new status must be added to `STATUS_PIPELINE`,
-`MODE_STATUSES`, and the label map together (`reviewer-modes.js` "no
-fallthrough" invariant, enforced by `reviewer-modes.test.js` and
-`check:status-enum-parity`), excluded from `MODE_WORK_REMAINING`, and must NOT
-stamp the completion timestamps. Cross-layer + new durable column → use
+`MODE_STATUSES`, and the label map together, excluded from
+`MODE_WORK_REMAINING`, and must NOT stamp the completion timestamps.
+**[VERIFIED 2026-07-22] The "no fallthrough" invariant is WEAKLY enforced:**
+`check:status-enum-parity` registers four pairs and this is not one of them;
+the only guard is `tests/unit/reviewer-modes.test.js`, which compares
+`STATUS_PIPELINE` against a HARDCODED `API_STATUSES` literal (whose comment
+still points at `pages/api/review-manager/reviewers.js`, though
+`REVIEW_STATUS_BY_VALUE` now lives in
+`lib/services/review-manager/reviewers-service.js`). Adding a status to the
+adapter/service but NOT to `reviewer-modes.js` therefore passes every gate
+while the reviewer vanishes from all sub-tabs — the exact failure the
+invariant exists to stop. Register the pair in `check:status-enum-parity` as
+part of the build. Cross-layer + new durable column → use
 `/contract-reconcile` and Atlas coverage. See [[reviewer-workbench-lifecycle]].
