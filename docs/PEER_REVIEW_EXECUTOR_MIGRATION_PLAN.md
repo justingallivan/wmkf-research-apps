@@ -2,8 +2,8 @@
 title: "Peer-Review Summarizer → Executor Migration Plan"
 domain: prompt-executor
 kind: plan
-status: active
-summary: "Wire process-peer-reviews.js to executePrompt() so the peer-review-summarizer admin rows drive the live app, preserving per-review A7 wrapping."
+status: historical
+summary: "Historical record of the completed peer-review-summarizer Executor migration and A7 fail-closed hardening."
 canonical: false
 cataloged: 2026-07-08
 owner: product-engineering
@@ -21,6 +21,11 @@ related:
 # Peer-Review Summarizer → Executor Migration Plan
 
 ## Status: IMPLEMENTED + VERIFIED (S344, 2026-07-08)
+
+> **Current routing/outcome:** `process-peer-reviews.js` uses the editable
+> `peer-review-summarizer.*` prompt rows through `executePrompt()`. This document preserves
+> migration, parity, and adversarial-review evidence; consult source and `EXECUTOR_CONTRACT.md`
+> for current behavior.
 
 Shipped. `process-peer-reviews.js` now calls `executePrompt()` for both the
 analyze and questions passes; the `peer-review-summarizer.*` rows were re-seeded

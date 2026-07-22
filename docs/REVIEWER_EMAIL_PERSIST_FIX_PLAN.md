@@ -2,8 +2,8 @@
 title: "Reviewer Email-Persist Fix Plan (S317)"
 domain: reviewers
 kind: plan
-status: active
-summary: "Reviewer Invite-tab no-email fixes shipped; unbuilt follow-ups in this plan are closed-deprecated, not active work."
+status: historical
+summary: "Shipped reviewer email-persist fixes; remaining follow-ups are closed-deprecated."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,6 +15,12 @@ related:
 ---
 
 # Reviewer Email-Persist Fix Plan (S317)
+
+> **Completed outcome:** B1, A, and B2 shipped; this plan's remaining reconsideration
+> tail is closed-deprecated. Retained as the historical fix record.
+>
+> **Current routing:** Use [Reviewer Workbench & Lifecycle](agent-wiki/topics/reviewer-workbench-lifecycle.md)
+> and [Reviewer Identity](agent-wiki/topics/reviewer-identity.md) for current behavior.
 
 Fixes reviewers landing on the workbench **Invite Reviewers** tab with an empty
 email when the enrichment-discovered address existed but never reached Dataverse.

@@ -2,8 +2,8 @@
 title: "Reviewer Search Time-Budget Plan (S223)"
 domain: reviewer-workbench
 kind: plan
-status: active
-summary: "Status: IMPLEMENTED — pre-impl Codex design review + post-impl Codex review (findings #1–#5 fixed, see \"Post-impl\" below). 1943 tests + 10 gates +..."
+status: historical
+summary: "Shipped reviewer search time-budget implementation and follow-up fixes; retained as historical record."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,6 +15,12 @@ related:
 ---
 
 # Reviewer Search Time-Budget Plan (S223)
+
+> **Completed outcome:** The time-budget implementation and follow-up fixes shipped.
+> This document is retained as the historical plan and verification record.
+>
+> **Current routing:** Use [Reviewer Workbench & Lifecycle](agent-wiki/topics/reviewer-workbench-lifecycle.md)
+> and the live service contracts for current runtime behavior.
 
 **Status:** IMPLEMENTED — pre-impl Codex design review + **post-impl Codex review (findings #1–#5 fixed, see "Post-impl" below)**. 1943 tests + 10 gates + lint green.
 **Owner task:** Topic #1 from `project-reviewer-finder-next-topics` — "extend / make-configurable the Claude reviewer-call timeout." Justin nearly lost a reviewer search to a timeout.

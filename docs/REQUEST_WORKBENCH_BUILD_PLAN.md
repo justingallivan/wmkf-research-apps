@@ -16,7 +16,7 @@ related:
 
 # Request Workbench (D26 reviewer dashboard) — build plan
 
-> **Status:** Implementation plan, drafted 2026-05-31 (Session 207). Complements the shareable scoping doc `docs/REQUEST_WORKBENCH_SCOPING.md` (the *what/why*) with the *how* — file paths, signatures, phasing. Pre-implementation; **for Codex review before any code is written.** Live-state claims are marked verified where probed.
+> **Status:** Living implementation roadmap, drafted 2026-05-31 (Session 207). Major Reviewer, Proposal, and Status work has shipped; this document retains their implementation record and scopes the remaining lifecycle tabs. It complements the historical scoping doc `docs/REQUEST_WORKBENCH_SCOPING.md` (the *what/why*) with the *how* — file paths, signatures, phasing. Live-state claims are marked verified where probed.
 >
 > **v2 (2026-05-31): Codex review round 1 folded in.** Accepted: expanded junction-reader audit (§Phase 0.7), allowlist `scope=my` + string-quoting fix (§Phase 1), race-safe upsert + exclude-resolution + conflict rules (§Phase 3), `summaryBlobUrl` removal blast-radius (§Find-mod 6), grant-assignment step (§Phase 1), `wmkf_selected=false` for excluded rows, `wrongApp` test fix. **Pushed back (already in-plan, reviewer missed): the API-route-matrix rows + Atlas-page update are in §"CI gates + doc updates"; `wmkf_completedat` is adapter-wiring-only (not a deploy).**
 >

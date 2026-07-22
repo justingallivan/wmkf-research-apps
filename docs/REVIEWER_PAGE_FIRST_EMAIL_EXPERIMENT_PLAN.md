@@ -2,7 +2,7 @@
 title: Reviewer Page-First Email Experiment Plan
 domain: reviewer-identity
 kind: plan
-status: active
+status: historical
 summary: "Completed staged page-first email experiment: safe but only +1/20 on the fresh cohort, so the cascade was not promoted."
 canonical: false
 cataloged: 2026-07-18
@@ -17,6 +17,12 @@ related:
 ---
 
 # Reviewer Page-First Email Experiment Plan
+
+> **Completed outcome:** The experiment completed and its proposed promotion was not
+> adopted. This document is retained as historical evidence.
+>
+> **Current routing:** Use [Resolved Page Email Tier Design](RESOLVED_PAGE_EMAIL_TIER_DESIGN.md)
+> and [Reviewer Identity](agent-wiki/topics/reviewer-identity.md) for the live page-email policy.
 
 ## Outcome — complete, do not promote (2026-07-18)
 

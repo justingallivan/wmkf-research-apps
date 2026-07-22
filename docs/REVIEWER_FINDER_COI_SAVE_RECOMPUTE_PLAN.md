@@ -2,11 +2,17 @@
 title: Reviewer Finder — Save-Time Institution-COI Server Recompute (F2 + F4)
 domain: reviewer-origination
 kind: plan
-status: active
-summary: "Implemented save-time institution COI recompute with fail-closed context, retryable PI lookup failures, and 7/7 analyze-script request-context coverage."
+status: historical
+summary: "Implemented save-time institution-COI recompute; retained as the historical implementation record."
 ---
 
 # Reviewer Finder — Save-Time Institution-COI Server Recompute (F2 + F4) — Implemented Plan
+
+> **Completed outcome:** The save-time COI recompute is implemented. This document is
+> retained for its design and verification history.
+>
+> **Current routing:** Use [Reviewer Finder Enforcement Contracts](REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md)
+> for the live save-time gate contract.
 
 > Author: Claude (senior-architect pass, 2026-07-06). Status: IMPLEMENTED 2026-07-06.
 > Addresses adversarial-review findings **F2** (client-flag-driven save COI gate is bypassable) and

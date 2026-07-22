@@ -16,7 +16,7 @@ related:
 
 # Grantee Deliverables Portal — Build Plan
 
-Status: **IN PROGRESS (S268; chunks 7–8 designed S269, pending Codex pre-impl review).** Implementation plan for the portal whose design is resolved in
+Status: **IN PROGRESS — core portal implementation and chunk-8 outputs shipped.** This plan remains the record for the portal's remaining work and open decisions; the historical S268/S269 chunk chronology is retained below. Implementation plan for the portal whose design is resolved in
 `docs/GRANTEE_PORTAL_SPEC.md` and whose Dataverse field wave is LIVE in prod (5 fields on
 `akoya_request`). This plan decomposes the build into reviewable chunks (the proven
 design→Codex-pre-impl→implement→Codex-post-impl loop) and frames the open decisions per chunk.

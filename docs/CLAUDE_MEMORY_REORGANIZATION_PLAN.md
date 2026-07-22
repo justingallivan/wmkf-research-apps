@@ -2,8 +2,8 @@
 title: Claude Memory Reorganization Plan
 domain: agent-harness
 kind: plan
-status: active
-summary: The problem is not absence of memory. The problem is density and retrieval.
+status: historical
+summary: Historical implementation plan for the memory-router reorganization and its drift controls.
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,6 +15,8 @@ related:
 ---
 
 # Claude Memory Reorganization Plan
+
+> **Current routing:** Historical implementation record. The memory router and its hardening shipped; use `.claude-memory/MEMORY.md`, the active memory files, and the current harness gates for live operation.
 
 **Created:** 2026-06-04  
 **Audience:** Claude, the project orchestrator  

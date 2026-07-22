@@ -3,7 +3,7 @@ title: DiscoveryService Decomposition Plan
 domain: architecture
 kind: plan
 status: active
-summary: "COMPLETE (S335): DiscoveryService decomposed from 2,348 L into 13 lib/services/discovery/*.js modules behind a thin delegating facade (668 L). Behavior-freeze."
+summary: "COMPLETE (S335): split DiscoveryService into 13 modules behind a 668-L facade at completion (684 L at the 2026-07-22 audit)."
 canonical: true
 owner: product-engineering
 related:
@@ -15,8 +15,9 @@ related:
 # DiscoveryService Decomposition Plan
 
 **Status: COMPLETE (S335) — all 6 stages executed and Codex-reviewed SATISFIED. `DiscoveryService`
-decomposed into 13 `lib/services/discovery/*.js` modules behind a thin delegating facade; facade
-2,348 → 668 L (~72%). Full suite green (436 suites / 4849 tests); behavior-freeze held throughout
+decomposed into 13 `lib/services/discovery/*.js` modules behind a thin delegating facade; at
+completion the facade fell 2,348 → 668 L (~72%). Subsequent feature work brought the current facade
+to 684 L at the 2026-07-22 audit. Full suite green (436 suites / 4849 tests); behavior-freeze held throughout
 (the one Codex finding — a Stage-5 default-param C1 regression — was caught and fixed). See stage
 notes for per-stage detail.**
 

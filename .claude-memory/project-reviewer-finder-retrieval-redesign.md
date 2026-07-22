@@ -1,19 +1,24 @@
 ---
 name: project-reviewer-finder-retrieval-redesign
-description: "Reviewer-finder redesign direction (S231): demote Claude from candidate GENERATOR (stale/senior-biased/hallucinated) to query-planner + synthesizer; candidates ORIGINATE from field-routed retrieval (fan-out/fan-in). Full plan: docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md. NOT BUILT."
+description: "Historical S231 retrieval-first redesign proposal. S246 retained Claude-assisted origination as the primary engine and deferred retrieval-first cutover."
 metadata:
   node_type: memory
   type: project
-  status: active
+  status: superseded
   scope: reviewer
   last_verified: 2026-06-07
 ---
 
-## Recall Rule
-Read before any reviewer candidate-sourcing / verification / discovery work. The
-durable design lives in `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` (read it
-in full; this is the routing + intent layer). Status: **DESIGN, NOT BUILT** as of
-S231.
+## Current Routing
+
+This is a historical S231 proposal, superseded as the primary-engine direction by
+the S246 experiment result. For current reviewer sourcing, read
+`../docs/agent-wiki/topics/reviewer-origination.md` and
+`project-reviewer-origination-experiment-result`; retrieval-first cutover remains
+deferred. The original design below remains useful only when reconsidering a
+targeted sparse-tail retrieval experiment.
+
+## Historical Record
 
 ## The realization (why this exists)
 The root liability is using an LLM as the *candidate generator* (Stage-1 `analyze`

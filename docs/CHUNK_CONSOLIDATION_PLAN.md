@@ -19,7 +19,7 @@ related:
 **Execution status: STAGES 0-2 COMPLETE (2026-07-05).** The docs-catalog frontmatter `status` enum
 has no "completed" value; per the `ODATA_ESCAPE_CONSOLIDATION_PLAN` precedent this body line records
 completion and frontmatter moved from `draft` to the live enum value `active`. Stage 3 (the optional
-chunk-loop lint/gate law) remains an OWNER DECISION and was not built. See the Stage Log for
+chunk-loop lint/gate law) was declined by owner decision (S332) and remains unbuilt. See the Stage Log for
 probes/counts.
 
 Staleness rechecks — the file mentions below changed BECAUSE this plan was executed (commits

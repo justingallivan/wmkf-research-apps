@@ -2,7 +2,7 @@
 title: "Reviewer Referral Seeding & Provenance Plan"
 domain: reviewers
 kind: plan
-status: active
+status: historical
 summary: "Implemented build plan: guarantee externally-referred seed names into the reviewer pool (seed-only, folded-in); relabel two existing kinds, no new enum."
 canonical: false
 cataloged: 2026-07-02
@@ -17,6 +17,12 @@ related:
 ---
 
 # Reviewer Referral Seeding & Provenance Plan
+
+> **Completed outcome:** Referral seeding and its S320 collision correction are implemented.
+> This document is retained as the historical design record.
+>
+> **Current routing:** Use [Reviewer Workbench & Lifecycle](agent-wiki/topics/reviewer-workbench-lifecycle.md)
+> and [Reviewer Origination](agent-wiki/topics/reviewer-origination.md) for live referral behavior.
 
 **Status: IMPLEMENTED (Codex build on `codex/referral-seeding-build`; S319 safety
 review folded in).** All design questions resolved (see §Locked decisions);

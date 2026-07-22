@@ -3,7 +3,7 @@ title: Route→Service Consolidation Plan
 domain: architecture
 kind: plan
 status: active
-summary: "Staged extraction of business logic from pages/api routes into per-domain services; routes become thin shells. Every stage leaves the build green."
+summary: "COMPLETE (S331): route-to-service boundary census fell from 49 to 0; check:route-service-boundary is permanent law."
 canonical: true
 cataloged: 2026-07-04
 owner: product-engineering
@@ -16,7 +16,7 @@ related:
 
 # Route→Service Consolidation Plan
 
-**Objective.** Today 49 `pages/api` route files reach the Dataverse layer directly (47 import
+**Objective.** At the 2026-07-04 baseline, 49 `pages/api` route files reached the Dataverse layer directly (47 import
 adapters; 2 more import `DynamicsService` only) and carry inline
 business logic — the largest are 20-40 KB route files, some streaming (SSE) and at least one
 multi-verb (`my-candidates.js` dispatches GET/PATCH/DELETE) (`review-manager/send-emails.js` 39.5 KB,
@@ -24,8 +24,8 @@ multi-verb (`my-candidates.js` dispatches GET/PATCH/DELETE) (`review-manager/sen
 `[VERIFIED 2026-07-04 via ls]`). This plan moves that logic into per-domain services under
 `lib/services/<domain>/`, leaving each route a thin shell: **guard → validate input → establish DAL
 context → call service → map result/error to HTTP.** The DAL migration (Stages 0-8, complete)
-cleaned the layer *below* (adapters); this campaign cleans the layer *above* (routes). It ends,
-like the DAL campaign, with a census gate that becomes law.
+cleaned the layer *below* (adapters); this campaign cleaned the layer *above* (routes) and
+ended, like the DAL campaign, with a census gate that became law.
 
 **Execution status: ALL STAGES 0–7 COMPLETE (S331, 2026-07-05).** Written Session 330 (2026-07-04); passed the P0
 adversarial plan review (Codex, 3 rounds, SATISFIED with zero live-state errors). Executed

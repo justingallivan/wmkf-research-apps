@@ -3,7 +3,7 @@ title: Long-Term Plan: Event-Driven Backend Automation via PowerAutomate
 domain: general
 kind: plan
 status: active
-summary: "Status: Planning — architecture finalized Session 94, ready to begin implementation."
+summary: "Active PowerAutomate roadmap: Vercel prompt-storage and Executor foundations shipped; PA-owned automation and remaining execution extensions are still planned."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -16,7 +16,10 @@ related:
 
 # Long-Term Plan: Event-Driven Backend Automation via PowerAutomate
 
-**Status:** Planning — architecture finalized Session 94, ready to begin implementation.
+**Status:** Active roadmap. The Vercel-side prompt-storage and Executor foundation shipped;
+the remaining work is Connor-owned PowerAutomate composition/operation plus the extensions
+needed for backend-first automation. This plan retains the earlier architecture discussion as
+historical context.
 **Created:** Session 90, 2026-03-28
 **Last Updated:** Session 94, 2026-04-08
 **Stakeholders:** Justin (prompt development, Vercel app), Connor (PowerAutomate flows, Dynamics admin)
@@ -50,7 +53,11 @@ See `docs/GRANT_CYCLE_LIFECYCLE.md` for the full proposal lifecycle with stage-b
 > **Update — Session 103, 2026-04-17:** Three empirical findings affect PA flow design:
 >
 > 1. **`{{var}}` interpolation syntax verified on the Next.js side** (still needs a PA-side confirmation). Dataverse Memo fields holding `{{proposal_text}}`-style placeholders round-trip cleanly through OData — `{{` is not interpreted as an expression. See `docs/archive/CONNOR_QUESTIONS_2026-04-15.md` Q3.
-> 2. **Sonnet 4.6's empirical cache minimum is ~2,048 tokens** (docs say 1,024). PA flows should only bother assembling `cache_control` JSON when the stable prefix (tools + system + cached user blocks) comfortably exceeds 2K tokens. For smaller prompts the marker is a no-op. See `docs/PROMPT_CACHING_PLAN.md`.
+> 2. **Historical Sonnet 4.6 observation (Session 103):** the April test measured an
+> ~2,048-token effective floor. That is not current guidance: Anthropic now documents a
+> 1,024-token minimum for Sonnet 4.6. PA flows must check the concrete model's current floor
+> in [Anthropic's prompt-caching documentation](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
+> before deciding whether a marker is useful.
 > 3. **Image handling creates a path asymmetry.** PA backend strips images in a pre-filter (lean, text-only); user-side Vercel paths likely keep PDFs with images intact. The cached content profiles differ significantly — a user-side PDF with figures may be 12–20K tokens vs. 5–7K text-only. Caching ROI is correspondingly higher on the user-side path.
 >
 > Related: Session 103 shipped a working prototype of the Dynamics-stored-prompt pattern against the Phase I test endpoint — see the "Session 103 prototype findings" section of `PROMPT_STORAGE_DESIGN.md`. **Update:** the Executor (`lib/services/execute-prompt.js`) is now the live prompt-execution path — it reads current prompt rows from Dataverse entity set `wmkf_ai_prompts` and writes audit rows to `wmkf_ai_runs`. The earlier `PromptResolver` service is a Session 103 holdover that reads a scratch row on `wmkf_ai_runs`; it is still in tree but is used only by scripts, not by live API routes.

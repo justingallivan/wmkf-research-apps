@@ -18,6 +18,18 @@ related:
 
 Planning only. No feature code, migrations, API routes, or schema files were created for this pass.
 
+## Status Matrix (reconciled 2026-07-22)
+
+| Area | Status | Current routing |
+| --- | --- | --- |
+| Candidate export | **Shipped** | Existing Find-tab export; see Reviewer Workbench & Lifecycle. |
+| Board-writeup identity capture | **Shipped** | Acceptance/staff repair behavior is documented in Reviewer Workbench & Lifecycle. |
+| Invite-card review history | **Shipped** | Use the current Invite Reviewers card behavior. |
+| Reviewer feedback, global flags, and searchable person notes | **Open decisions** | Retain this plan's scoped options pending product direction. |
+
+The historical detail below is retained for the remaining open decisions; do not
+read its pre-shipment export, identity-capture, or review-history proposals as active work.
+
 ## Grounding
 
 - [VERIFIED via `docs/agent-wiki/index.md:39-40`] The relevant retrieval hubs are Reviewer Identity and Reviewer Workbench & Lifecycle, followed by `docs/APPLICATION_STATE_ATLAS.md` and the two reviewer Dataverse Atlas pages.

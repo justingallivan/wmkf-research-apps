@@ -65,7 +65,7 @@
 - Reviewer institution → CRM linking / affiliation-mismatch alert / institution typeahead (PARKED S354 — pending Connor+Sarah account cleanup; ROR/OpenAlex canonical spine): project-reviewer-affiliation-institution-linking.md
 - Deferred cleanup / dead-code session: project-deferred-code-cleanup.md
 - Whack-a-mole review (owner reconciliation pending; do not execute): ../docs/WHACK_A_MOLE_REMEDIATION_PLAN.md; ../docs/audits/whack-a-mole-independent-review-codex-2026-07-09.md
-- Parked: project-wide prompt-caching audit (Anthropic flagged low cache-hit rate, S339): project-cache-hit-rate-review.md
+- Partial remediation shipped: prompt-cache audit/root mitigation completed (S341); remaining R4 cross-document Executor composition and conditional R5 measurement: project-cache-hit-rate-review.md
 - RESOLVED (S350): spec-audit design-docs recovered to main (1420d79c); accept-fast-response verified SHIPPED; quota-PD-email BUILT S352 (+admin default 4, modal prefill, first-send seed): project-spec-audit-docs-recovery-parked.md
 - Private-repo CI (why CodeQL gone, Semgrep split, Pro needed for branch protection): project-private-repo-ci-visibility.md
 - E2E reviewer suite re-baseline (RESOLVED 2026-07-04, 23/23 green; client-UX drift lesson): project-e2e-reviewer-rebaseline-parked.md

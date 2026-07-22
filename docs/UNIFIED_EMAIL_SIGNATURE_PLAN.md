@@ -2,8 +2,8 @@
 title: "Plan: Unified per-user email signature (profile-settings) (S271)"
 domain: email
 kind: plan
-status: active
-summary: "- The grantee invite/reminder need a signature; titles are NOT in Dataverse, so the signature must come from a per-user store with a sensible..."
+status: historical
+summary: Historical Phase-1 plan for the unified per-user email signature, now implemented.
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -16,8 +16,10 @@ related:
 
 # Plan: Unified per-user email signature (profile-settings) (S271)
 
-> **Status: PLAN v3 — Codex reviews #1 + #2 folded; READY FOR IMPLEMENTATION (Codex implements, Claude
-> reviews — owner decision S271).** Owner wants ONE editable signature block per user, edited in the
+> **Current routing:** Historical Phase-1 implementation plan. Use `lib/services/email-signature.js` and current email-template services for live behavior; any further signature UI consolidation needs a new scoped plan.
+
+> **Status at planning: PLAN v3 — Codex reviews #1 + #2 folded; READY FOR IMPLEMENTATION (Codex implements, Claude
+> reviews — owner decision S271).** Phase 1 subsequently shipped. Owner wants ONE editable signature block per user, edited in the
 > central **Profile Settings** page, consumed by BOTH reviewer-invitation and grantee (invite + reminder)
 > emails — unifying today's reviewer-only bespoke sender-info UI. Also fixes a live reminder-cron bug.
 >

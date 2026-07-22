@@ -1,13 +1,25 @@
 ---
 name: Reviewer Lifecycle Automation Plan
-description: Phased plan for automating the full reviewer lifecycle — from discovery through review filing. Pain is distributed across all stages.
+description: Historical S87 phased plan for reviewer lifecycle automation; superseded as a live router by the reviewer workbench/lifecycle topic.
 type: project
-status: active
+status: superseded
 scope: reviewer
 last_verified: 2026-05-12 via memory-content (not re-probed 2026-06-04)
 ---
 
-## Recall Rule
+## Current Routing
+
+This is an S87 historical record, not a current lifecycle plan. For live reviewer
+invitation, reminder, portal, roster, referral, and workbench behavior, read
+`../docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` and its linked Atlas
+pages before acting.
+
+## Historical Record
+
+The remainder preserves the original S87 rationale and phased design; its current-
+state and future-work statements are not live implementation claims.
+
+### Original Recall Rule
 
 Read this when: planning any reviewer-lifecycle automation (invitations, reminders, intake, status dashboard) or its phasing.
 

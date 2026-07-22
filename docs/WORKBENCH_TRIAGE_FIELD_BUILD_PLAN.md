@@ -2,8 +2,8 @@
 title: "Workbench Triage Field — build plan (S260)"
 domain: architecture
 kind: plan
-status: active
-summary: "v4 (2026-06-15): Codex review round 3 folded in."
+status: historical
+summary: Historical S261 build plan for the Workbench triage field, built and deployed.
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,6 +15,8 @@ related:
 ---
 
 # Workbench Triage Field — build plan (S260)
+
+> **Current routing:** Historical S261 implementation record. Use the current Workbench triage service, route, and schema contracts for changes.
 
 > **Status:** Stages 0–4 BUILT + DEPLOYED (S261, 2026-06-15) — field live in prod, D26 backfill applied
 > (35 Advancing + 170 Set aside, 205 rows, idempotent). §3 dashboard switch DONE (S261) — the dashboard reads

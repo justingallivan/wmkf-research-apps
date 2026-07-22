@@ -39,7 +39,12 @@ Three amplifiers push the ROI higher than raw per-call savings suggest:
 
 Note: this is **not a prompt-caching play** — it's a pre-extraction play. The two are complementary. Caching helps within a session (same prompt prefix reused within the 5-min TTL). Pre-extraction helps across days/weeks (context extracted once, reused forever).
 
-Worth knowing: Session 103 measured Sonnet 4.6's empirical cache minimum at ~2,048 tokens (not the docs-stated 1,024). That makes caching unhelpful for small individual downstream calls — but once the extraction lives in Dynamics, those downstream calls are *designed* to be small (~1.5K tokens of curated fields), so they'd fall below the cache threshold anyway. The architecture naturally separates the two strategies: the ingest call is big and benefits from caching during its own session; the downstream calls are small and don't need caching because the big content is already compressed into structured fields. See `docs/PROMPT_CACHING_PLAN.md`.
+Worth knowing: Session 103's ~2,048-token Sonnet 4.6 result is a dated empirical observation,
+not current model guidance. Anthropic now documents a 1,024-token minimum for Sonnet 4.6; use
+the concrete model's current floor from [Anthropic's prompt-caching documentation](https://platform.claude.com/docs/en/build-with-claude/prompt-caching).
+The architectural point still holds: once extraction lives in Dynamics, downstream calls are
+designed to be small (~1.5K tokens of curated fields) and do not need full-proposal context.
+See `docs/PROMPT_CACHING_AUDIT.md`.
 
 ## What to capture in the initial pass
 

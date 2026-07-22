@@ -2,8 +2,8 @@
 title: Reviewer Institution COI Precision Plan
 domain: reviewer-finder
 kind: plan
-status: active
-summary: "Institution-COI ledger, precision matcher, and provenance-gated flag-not-drop policy."
+status: historical
+summary: "Completed institution-COI precision implementation; retained as the historical plan and evidence record."
 canonical: false
 cataloged: 2026-07-03
 owner: product-engineering
@@ -15,6 +15,12 @@ related:
 ---
 
 # Reviewer Institution COI Precision Plan
+
+> **Completed outcome:** Phases A–C, including the provenance-gated flag-not-drop
+> policy, are implemented. This document is retained as the historical build record.
+>
+> **Current routing:** Use [Reviewer Finder Enforcement Contracts](REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md)
+> and [Reviewer Gating Strategy Redesign](REVIEWER_GATING_STRATEGY_REDESIGN.md) for live COI policy.
 
 ## Scope
 

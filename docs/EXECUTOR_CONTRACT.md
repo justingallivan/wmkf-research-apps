@@ -158,7 +158,13 @@ Executor throws (Vercel) or sets failure status (PA) on: prompt not found, varia
 
 **Placement attribute (Phase 0 — present but single-valued):** v0 only supports `placement: "user"`. Phase 2 adds `placement: "system"` for context-block variables that need to be part of the cacheable system-array prefix.
 
-**`cacheable` flag:** Phase 0 honors this for *within-prompt* cache alignment (rerunning the same prompt on the same request hits the Claude cache). Cross-prompt cache alignment (e.g., summary + compliance sharing the bundle) requires context blocks in Phase 2.
+**`cacheable` flag:** Phase 0 stores this declaration but does not use it to place variables
+relative to the cache boundary. `composeMessages()` interpolates variables wherever their
+placeholders occur in the stored system/body templates, and `callClaude()` marks the completed
+system block. An identical rerun can be cache-eligible when its composed prefix is unchanged
+(including stable nonces for opted-in untrusted variables), but a cache hit must be verified
+from response usage rather than assumed. Cross-prompt alignment still requires Phase-2 context
+blocks.
 
 **Data classification + payload boundary (added 2026-05-04):** A variable can declare two additional optional fields to opt into the shared AI payload-boundary helper:
 
@@ -259,16 +265,19 @@ Each output may declare a `guard` policy that the Executor applies in step 4 (pr
 
 **Byte-identical prefixes across callers are the whole point of cache alignment.** If PA and Vercel produce different bytes before the first `cache_control` marker, they land in different cache buckets and neither call benefits from the other.
 
-The Executor always:
+The current Phase-0 Executor:
 
 1. Sends `system` and `user` as separate blocks (requires the `wmkf_ai_systemprompt` + `wmkf_ai_promptbody` split — added by Connor in Phase 0, confirmed live 2026-04-24).
-2. For each variable marked `cacheable: true`, places it **before** the last `cache_control` marker.
-3. For each variable marked `cacheable: false`, places it **after** the marker (in the non-cached tail).
-4. Emits exactly one `cache_control: {type: "ephemeral"}` at the boundary.
+2. Interpolates each variable wherever its placeholder occurs in the stored system/body templates; it does not branch on `cacheable` or `placement` to move that value across the boundary.
+3. Emits one `cache_control: {type: "ephemeral"}` on the completed system block.
 
-Any change to the prompt body, the system prompt, or a cacheable variable splits the cache — that's correct behavior. The cache is only safe to rely on when nothing in the prefix has changed.
+Any change before that marker, including a variable interpolated into the system text, splits the
+prefix. A repeat is cache-eligible only when the resulting prefix is byte-identical and meets
+the active model's requirements; response usage is the proof of a realized hit.
 
-**Within-prompt caching (Phase 0):** rerunning `phase-i.summary` on the same `requestId` with the same PDF content will hit cache on repeat invocations within the 5-min TTL.
+**Within-prompt caching (Phase 0):** rerunning `phase-i.summary` on the same `requestId` with
+the same PDF content may be cache-eligible when its composed prefix is unchanged; confirm a
+realized hit through `usage.cache_read_input_tokens`.
 
 **Cross-prompt caching (Phase 2):** `phase-i.summary` and `phase-i.compliance` both reference a shared `context_block` placed in `system`, so a back-to-back invocation of both prompts on one request hits cache on the second call for the document tokens.
 
@@ -342,9 +351,10 @@ A small test prompt `test.echo`:
 - Output schema: `{ echo: string }` with target `kind: none`
 - System prompt: `"Echo the inputs verbatim as JSON."`
 
-Both executors must:
+Both executors should be evaluated for:
 1. Invoked with identical `requestId` and `overrideVariables`, produce byte-identical `wmkf_ai_rawoutput`
-2. On second invocation, `cacheHit` is `true` regardless of which caller went first
+2. Cache eligibility and actual `cacheHit` behavior under the active model, using response usage
+   rather than treating a second invocation as proof
 
 If either assertion fails, the two implementations have drifted and must be reconciled before building more prompts on top.
 
