@@ -46,6 +46,7 @@
 - Campaign settings / reminder-config UX revisit (owner ask, S326): project-campaign-settings-ux-revisit.md
 - Review rendition formatting pass — courtesy copy + staff DOCX/PDF (owner ask, S328): project-review-output-formatting.md
 - Reviewer limbo / "back to square one": closeout payability flag (owner ask, S343) + potential/invited reset button: project-reviewer-closeout-payability.md
+- Reviewer reliability data / on-time / terminal withdrew-vs-released status / stamped due date (owner goal S369; design deferred to its own session): project-reviewer-reliability-data.md
 - Staff "manually enter a review" rescue tool (owner ask, S347; off Track Reviewers panel, full structured form): project-staff-review-rescue-tool.md; project-reviewer-upload-dormant-not-deleted.md
 - Intake portal / attachments / institution match / virus scan (BUILD PARKED S348 — Connor re-engineering GOApply): project-intake-portal-parked.md; ../docs/agent-wiki/topics/intake-portal.md
 - Dataverse / Dynamics / Explorer / Power Tools / CRM facts / grant lifecycle fields: ../docs/agent-wiki/topics/dataverse-dynamics.md
