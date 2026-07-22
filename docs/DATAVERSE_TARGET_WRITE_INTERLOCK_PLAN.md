@@ -25,9 +25,13 @@ redeployed and Ready (aliased `reviews.wmkeck.org`), zero
 `[dataverse-interlock]` lines in initial logs. A 2026-07-22 no-branch production
 query confirmed normal staff/cron traffic and zero warning lines, but also
 exposed that warning-only logging could not prove the mode was active.
-The same-day observability patch adds one non-secret `active:` record per
-function instance for non-off modes; deploy and observe that positive signal
-before the deliberate flip to `on` (§5 Stage 3). `warn` never blocks.**
+The same-day observability patch added one non-secret `active:` record per
+function instance for non-off modes and was merged at 2585f980. A signed-in
+production Workbench load then emitted five `active: mode=warn
+deployment=production target=production` records across normal reviewer API
+paths and zero `would deny` records. The positive-mode requirement is now
+satisfied; the explicit owner decision and staged flip to `on` (§5 Stage 3)
+remain. `warn` never blocks.**
 [RECHECKED after lib/dataverse/core/interlock.js + lib/dataverse/core/target-registry.js changes — VERIFIED via the merge diffs and four Codex adversarial review rounds (eight findings total: 2+2+3+1 across rounds, all fixed and personally diff-reviewed). This doc describes the interlock at stage/contract level, not line level.] This document turns
 `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` §6 — the
 "[PLANNED — highest-priority enabling control]" — into a concrete, buildable
@@ -252,7 +256,7 @@ throws an error whose message names the deployment class, target class,
 method, callerLabel, and the flag to consult — same actionable shape as
 `assertTrustedDalContext`.
 
-**[BUILT 2026-07-22, pending production observation]** After URL scoping, the
+**[BUILT AND PRODUCTION-OBSERVED 2026-07-22]** After URL scoping, the
 first inspected Dataverse call in a non-off mode logs one non-secret activation
 line per function instance: mode, deployment class, target class, and caller
 label only. It excludes the URL, environment value, record id, and request
@@ -346,7 +350,9 @@ deliberately (strategy §4).
    a policy gap to fix before Stage 3. **2026-07-22 observation amendment:**
    require at least one `active: mode=warn deployment=production
    target=production` record as positive proof that the observation window is
-   real; absence of `would deny` lines alone is insufficient.
+   real; absence of `would deny` lines alone is insufficient. **Satisfied
+   2026-07-22:** five normal Workbench/reviewer API invocations emitted that
+   activation shape, with zero `would deny` records in the same query window.
 3. **Stage 3 — flip `on`**, preview/local first, then production. Update
    strategy doc §6 from [PLANNED] to [CURRENT], the CLAUDE.md safety
    invariants, and the agent-wiki Dataverse topic in the same pass (`/sweep`).
