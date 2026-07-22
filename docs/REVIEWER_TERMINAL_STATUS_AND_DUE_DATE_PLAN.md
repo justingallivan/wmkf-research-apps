@@ -110,20 +110,39 @@ Registering this pair in `check:status-enum-parity` is therefore **in scope**.
 
 ## Implementation
 
-### Stage 1 — schema (provisioning, reviewed commit)
+### Stage 1 — schema (two DIFFERENT provisioning mechanisms)
 
-New wave dir `lib/dataverse/schema/wave14-reviewer-terminal-status/`, following
-the wave6 picklist precedent
-`[VERIFIED via lib/dataverse/schema/wave6/*.json]` (`kind:
-"extensions-on-existing"`, idempotent `ensureAttribute`):
+**A schema wave CANNOT extend an existing picklist.**
+`[VERIFIED via lib/dataverse/schema-apply.js:264-274]` `ensureAttribute()` returns
+`{created: false}` the moment the attribute exists, so option-adds via a wave spec
+are a **silent no-op**. `[VERIFIED via
+lib/dataverse/schema/wave4-existing/wmkf_apprequestperson-roster-fields.json:5]`
+the repo already documents this trap verbatim: "schema-apply.js is creation-only
+… option-adds to an existing picklist are a silent no-op via a wave spec." The
+wave6 precedent this plan originally cited *created* a new picklist attribute; it
+did not extend one. Splitting accordingly:
 
-- Extend the `wmkf_ReviewStatus` picklist with two new values, `Withdrew` and
-  `Released`. `[ASSUMED]` the next free option values follow the existing
-  contiguous block — confirm against the live option set before applying (Risk 1).
-- Add `wmkf_ReviewDueDateAtSend` (DateOnly) to `wmkf_appreviewersuggestion`.
+**1a — new column via a wave (creation-only).** New wave dir
+`lib/dataverse/schema/wave14-reviewer-terminal-status/` containing **only**
+`wmkf_ReviewDueDateAtSend` (DateOnly) on `wmkf_appreviewersuggestion`. Apply with
+`node scripts/apply-dataverse-schema.js --target=<env> --wave=14 --execute`.
 
-Apply with `node scripts/apply-dataverse-schema.js --target=<env> --wave=14
---execute`. Preview first; production only after the code is verified.
+**1b — picklist options via a standalone idempotent script.** Model on
+`[VERIFIED via scripts/extend-responsetype-picklist-held.mjs]`, which extends a
+picklist on this same entity and is the closest precedent. It must, in order:
+probe the LIVE option set and print it; **refuse to no-op on a label collision**
+(value present with a different label → exit 1); `InsertOptionValue` with the
+solution header; **assert the returned `NewOptionValue` equals the requested
+value** (a publisher option-value-prefix remap would silently invalidate
+`REVIEW_STATUS_MAP`); `PublishAllXml`; then re-read and verify the option is
+present, failing if not.
+
+Do **not** hand-assert the option integers — the script probes for the next free
+value. `[ASSUMED]` the contiguous block continues past `100000004`; the live probe
+is what settles it.
+
+**Ordering:** 1a and 1b must both succeed in an environment before any Stage 2
+code that writes the new statuses is deployed to it, or status writes fail.
 
 ### Stage 2 — data layer
 
@@ -145,22 +164,85 @@ Apply with `node scripts/apply-dataverse-schema.js --target=<env> --wave=14
 
 - `reviewers-service.js`: `REVIEW_STATUS_BY_VALUE` += both; project
   `reviewDueDateAtSend` into the DTO.
-- `send-emails-service.js` materials branch: stamp `reviewDueDateAtSend` from the
-  request's `wmkf_reviewduedate` when empty.
 - `send-emails-service.js` thankyou branch: **do not** bump a terminal row to
   `complete`.
-- `[VERIFIED via pages/api/review-manager/reviewers.js:118]` the PATCH passes
-  `reviewStatus` straight through, and `mapPicklist` throws on unknown values, so
-  both values are accepted once Stage 2 lands. Confirm no allowlist elsewhere
-  rejects them.
+
+#### 3a — the due date must be the date the reviewer was actually told
+
+The naive "re-read `wmkf_reviewduedate` at send" is **wrong**, for the reasons
+verified below:
+
+- `[VERIFIED via lib/services/review-manager/render-emails-service.js:256-258]`
+  the draft renders from `settings.reviewDueDate || cycle.review_deadline`, a
+  caller-supplied value with a cycle fallback — not necessarily the request
+  column. `[VERIFIED via lib/services/review-manager/send-emails-service.js:511-524]`
+  send transmits `draft.subject` / `draft.body` verbatim, and staff can edit the
+  rendered body first. So the emailed deadline and the request column can
+  legitimately differ, and stamping the column would record a date the reviewer
+  never saw.
+- `[VERIFIED via lib/services/review-manager/send-emails-service.js:706-712]`
+  the post-loop lifecycle write catches its own failure, logs a warning, and the
+  stream continues — so the stamp can be silently absent after a real send.
+
+**Resolve one server-authoritative effective due date** (the same precedence the
+renderer uses) and thread that single value through render → send → persist, so
+the stored date is provably the rendered one. Reject a send whose draft was
+rendered against a different effective due date than the one now resolved
+(stale-draft conflict) rather than silently stamping the newer value.
+
+**Stamp inline per recipient, not in the post-loop batch.**
+`[VERIFIED via lib/services/review-manager/send-emails-service.js:699-705]` the
+`invitation` path already made exactly this move — its lifecycle stamp runs inline
+immediately after each successful send precisely so "a mid-batch timeout can't
+leave already-sent invites unstamped." Follow that precedent. Where the write still
+fails, surface a per-recipient `sent_but_unrecorded` result (the
+`withdraw-sufficient` per-row status vocabulary is the model) instead of a warning
+the caller cannot act on, and provide a repair path.
+
+Set-once semantics are enforced with the row's ETag, not a read-then-write.
+
+### Stage 3b — terminal transitions need their own fail-closed service
+
+**Do not send terminal statuses through the generic reviewers PATCH.**
+`[VERIFIED via pages/api/review-manager/reviewers.js:118]` that endpoint forwards
+any mapped `reviewStatus` unchanged. `[VERIFIED via
+lib/dataverse/adapters/reviewer-suggestion.js:1231-1258]` `updateLifecycle()`
+guards applicant-exclusion and special-cases `complete`, and carries no post-accept
+lifecycle predicate: it does not require `wmkf_accepted`, reject a row with a
+received or completed review, constrain the source state, or apply an ETag unless
+the caller passes one. A direct request, or a race against the ETag-guarded
+review-submission changeset, could therefore mark an unaccepted or already-submitted
+engagement `withdrew` and corrupt the denominator this plan exists to create.
+
+Add a dedicated endpoint + service modelled on
+`[VERIFIED via lib/services/review-manager/withdraw-sufficient-service.js:54-130]`,
+which already has the shape required — fresh per-row read, a state predicate, an
+`ifMatch` conditional write that fails closed on concurrent change, and per-row
+partial-success statuses. The terminal-transition predicate is the post-accept
+mirror of `isStillPending()`:
+
+- **require** `wmkf_accepted === true`;
+- **reject** rows with `wmkf_reviewreceivedat` or `wmkf_completedat` set;
+- **reject** rows already in a terminal status;
+- **allow** in-flight post-accept source states
+  (`accepted` / `materials_sent` / `under_review`) and no others;
+- write with the ETag from that read; a precondition failure becomes
+  `changed_skipped`.
+
+Each rejection is an explicit per-row status, and the endpoint returns a conflict
+response for whole-request cases — fail closed, never a silent skip.
 
 ### Stage 4 — UI
 
 - `reviewer-modes.js`: add to `STATUS_PIPELINE` (label + color) and
   `MODE_STATUSES.track`; **exclude from `MODE_WORK_REMAINING.track`**.
 - `[VERIFIED via shared/components/reviewers/ReviewerManagePanel.js:1038]`
-  `StatusDropdown` offers both. Terminal choices should be visually distinct and
-  confirmed, since they end an engagement.
+  `StatusDropdown` currently offers every pipeline status from every state and
+  posts through the generic PATCH. The terminal values must **not** be added to
+  that generic list — they route to the Stage 3b endpoint instead, are offered only
+  on rows the predicate would accept, are visually distinct, and require a
+  confirmation step since they end an engagement. The UI gate is a convenience;
+  the server predicate is the authority.
 
 ### Stage 5 — gates and docs
 
@@ -175,6 +257,17 @@ Apply with `node scripts/apply-dataverse-schema.js --target=<env> --wave=14
 - Unit: terminal transition stamps no completion timestamps; `MODE_WORK_REMAINING`
   excludes both; reminder sweep excludes both; thank-you does not resurrect a
   terminal row; the due date stamps once and is not overwritten on re-send.
+- Unit, Stage 3b predicate — each rejection case asserted separately: pre-accept
+  row, row with `wmkf_reviewreceivedat` set, row with `wmkf_completedat` set, row
+  already terminal, and an out-of-range source state.
+- **Race test:** a terminal transition concurrent with the ETag-guarded review
+  submission must fail closed on the stale ETag, never overwrite a submitted
+  review. This is the specific corruption the plan exists to prevent, so it gets
+  an explicit test rather than an assumption.
+- Partial-failure test: when the inline post-send write fails, the recipient is
+  reported `sent_but_unrecorded` and the batch does not report clean success.
+- Provisioning dry-run: the Stage 1b script no-ops cleanly on a second run, and
+  exits non-zero on a label collision or an unexpected `NewOptionValue`.
 - `npm test` plus the full `check:*` gate set.
 - Preview: exercise UI → route → service → Dataverse; confirm the row shows the
   terminal status, carries no `wmkf_reviewreceivedat`, and leaves the
@@ -183,15 +276,37 @@ Apply with `node scripts/apply-dataverse-schema.js --target=<env> --wave=14
 
 ## Risks
 
-1. **Option values are permanent** and cannot be renumbered once rows exist.
-   `[ASSUMED]` the values proposed in Stage 1 are unused — verify against the
-   deployed picklist before applying.
-2. **Numeric-ordering coupling.** `review-engagement-state.js` compares statuses
+1. **Option values are permanent** and cannot be renumbered once rows exist. The
+   Stage 1b script probes the live option set, refuses a label collision, and
+   asserts the returned value matches the requested one — a publisher
+   option-value-prefix remap would otherwise leave `REVIEW_STATUS_MAP` silently
+   wrong.
+2. **Provisioning is environment-gated.** Stage 1a and 1b both mutate Dataverse
+   metadata. They run against Preview first and reach production only by a
+   deliberate, separately approved step under the target/write interlock — never
+   as part of a code merge, and never by an agent acting on its own initiative.
+3. **Numeric-ordering coupling.** `review-engagement-state.js` compares statuses
    by magnitude, so any future status inserted *below* `materials_sent` would break
    the portal lock. Out of scope here; worth a source comment.
-3. **Backfill is out of scope.** Rows already falsely marked `complete` are not
+4. **Backfill is out of scope.** Rows already falsely marked `complete` are not
    corrected. Identifying them (`complete` with no `wmkf_reviewfilename` and no
    answer snapshot) is a separate owner decision — do not silently mutate
    historical rows.
-4. **Tier 1–3 runtime work.** Branch and deliberate promotion per
+5. **Tier 1–3 runtime work.** Branch and deliberate promotion per
    `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`; not direct-to-main.
+
+## Review history
+
+Revision 2 (2026-07-22) incorporates a Codex adversarial review of revision 1,
+which returned **needs-attention** with three `[high]` findings, all upheld:
+
+1. The wave-based picklist extension was a silent no-op — the repo already
+   documents this trap. Stage 1 is now split into a creation-only wave plus a
+   standalone `InsertOptionValue` script.
+2. The due-date stamp could record a deadline the reviewer was never shown, and
+   could be silently dropped after a successful send. Stage 3a now defines a single
+   server-authoritative effective due date threaded through render → send →
+   persist, stamped inline with an observable partial-failure result.
+3. Terminal transitions had no server-side lifecycle guard. Stage 3b adds a
+   dedicated fail-closed endpoint and service with an explicit source-state
+   predicate and ETag-guarded write.
