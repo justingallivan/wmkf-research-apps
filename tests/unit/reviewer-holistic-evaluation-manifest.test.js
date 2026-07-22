@@ -52,10 +52,9 @@ describe('reviewer holistic evaluation manifest', () => {
   test('manifest v2 changes only its timestamp and identity fixture contract', () => {
     const historicalContract = clone(historicalManifest);
     const activeContract = clone(trackedManifest);
-    delete historicalContract.createdAt;
-    delete activeContract.createdAt;
-    delete historicalContract.identityBenchmark;
-    delete activeContract.identityBenchmark;
+    historicalContract.createdAt = activeContract.createdAt;
+    historicalContract.identityBenchmark.fixtureVersion =
+      activeContract.identityBenchmark.fixtureVersion;
     expect(activeContract).toEqual(historicalContract);
   });
 

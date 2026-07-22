@@ -3,6 +3,9 @@ const path = require('path');
 const identityDraft = require('../../docs/audits/reviewer-holistic-identity-benchmark-v1.json');
 const activeIdentity = require('../../docs/audits/reviewer-holistic-identity-benchmark-v2.json');
 const identityLabelingImport = require('../../docs/audits/reviewer-holistic-identity-labeling-import-v1.json');
+const activeIdentityLabelingImport = require(
+  '../../docs/audits/reviewer-holistic-identity-labeling-import-v2.json'
+);
 const evaluationManifest = require('../../docs/audits/reviewer-holistic-evaluation-manifest-v1.json');
 const activeEvaluationManifest = require('../../docs/audits/reviewer-holistic-evaluation-manifest-v2.json');
 const proposalCohortProposal = require('../../docs/audits/reviewer-holistic-proposal-cohort-proposal-v1.json');
@@ -168,12 +171,22 @@ describe('M1 evaluation assets', () => {
       ok: true,
       errors: [],
     });
+    expect(validateIdentityLabelingImport(activeIdentityLabelingImport, activeIdentity)).toEqual({
+      ok: true,
+      errors: [],
+    });
 
     const drifted = clone(activeIdentity);
     drifted.benchmarkVersion = 'reviewer-identity-v1';
     expect(validateIdentityManifestConsistency(activeEvaluationManifest, drifted).errors).toContainEqual({
       path: 'identity.benchmarkVersion',
       message: 'must match manifest.identityBenchmark.fixtureVersion',
+    });
+    const driftedImport = clone(activeIdentityLabelingImport);
+    driftedImport.benchmarkVersion = 'reviewer-identity-v1';
+    expect(validateIdentityLabelingImport(driftedImport, activeIdentity).errors).toContainEqual({
+      path: 'benchmarkVersion',
+      message: 'must match the referenced benchmark',
     });
     const unfrozen = clone(activeIdentity);
     unfrozen.status = 'draft';

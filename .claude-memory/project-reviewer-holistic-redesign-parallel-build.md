@@ -132,10 +132,11 @@ owner-approved ten-proposal cohort is
 
 Historical manifest v1 retains `reviewer-identity-v1`; active manifest v2
 records `reviewer-identity-v2` while preserving the same proposal, runtime,
-rubric, and execution contract. Default manifest and M1 asset validation derive
-the v2 benchmark/import paths from the active manifest and fail closed on
-missing, non-frozen, or version-mismatched assets. The historical run plan,
-runtime probe, and paid executor remain explicitly pinned to manifest v1. Both
+rubric, and execution contract. Default manifest validation validates manifest
+v2 itself. Default M1 asset validation derives the v2 benchmark/import paths
+from the active manifest and fails closed on missing, non-frozen, or
+version-mismatched assets. The historical run plan, runtime probe, and paid
+executor remain explicitly pinned to manifest v1. Both
 manifests pin post-containment `origin/main` commit
 `50140eb62dd8f3c04f6d3ab5e131d96711f804d7`, redesign implementation
 `166800a3142179db642af3beefd67b8dcc381173`, executor implementation

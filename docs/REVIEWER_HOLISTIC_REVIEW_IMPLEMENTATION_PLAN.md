@@ -184,11 +184,13 @@ fixture `reviewer-identity-v1`. The owner-clarified identity revision is
 recorded separately at
 `docs/audits/reviewer-holistic-evaluation-manifest-v2.json`, which changes only
 the manifest timestamp and identity fixture contract. `npm run
-eval:reviewer-holistic:manifest` and `npm run eval:reviewer-holistic:m1` default
-to v2 and fail closed if its derived benchmark/import pair is absent,
-non-frozen, or version-mismatched. Historical run-plan, runtime-probe, and paid
-executor entry points stay explicitly pinned to manifest v1 because the
-completed proposal execution was recorded under that path and identity is
+eval:reviewer-holistic:manifest` defaults to and validates manifest v2 itself.
+`npm run eval:reviewer-holistic:m1` also defaults to v2, derives the
+benchmark/import pair from its fixture version, and fails closed if either
+asset is absent, non-frozen, or version-mismatched. Historical run-plan,
+runtime-probe, and paid executor entry points stay explicitly pinned to
+manifest v1 because the completed proposal execution was recorded under that
+path and identity is
 outside its fingerprint. Before any new comparison run, the applicable
 versioned manifest must pass
 `node scripts/validate-reviewer-holistic-evaluation-manifest.js
