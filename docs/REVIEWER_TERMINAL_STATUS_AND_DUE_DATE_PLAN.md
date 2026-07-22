@@ -78,6 +78,22 @@ first held to — matching the idempotent-stamp convention already used in
 
 ## Verified fan-out
 
+> **[RECHECKED after lib/dataverse/adapters/reviewer-suggestion.js and
+> lib/services/review-manager/send-emails-service.js changed: anchors re-derived
+> post-build]** The source citations in this section and in Stage 3 describe the
+> **pre-build** state that motivated the design, and both have since been edited
+> by the build and by the residual fixes recorded below. The behaviours cited are
+> still described accurately, but their line anchors have moved. Current
+> positions: `REVIEW_STATUS_MAP` `reviewer-suggestion.js:49`;
+> `aggregateReviewHistory()` `:353`; `updateLifecycle()` `:1190`, with the
+> terminal-source guard at `:1269` and the `complete`-only stamp branch at
+> `:1273`. In `send-emails-service.js`, the verbatim-body send is `:568`; the
+> materials branch — now stamping **inline**, which is exactly the change Stage
+> 3a called for — is `:588`; the `thankyou` branch is `:790`, and the post-loop
+> warning path `:806` (followup and thankyou remain post-loop by design;
+> materials no longer does). Read the source, not these anchors, before relying
+> on either.
+
 Non-test consumers of `reviewStatus` were fully enumerated — 26 files, 15 runtime + 11 under `scripts/` [DERIVED-FROM: `grep -rln 'reviewStatus\|wmkf_reviewstatus' lib/ pages/ shared/ scripts/` minus tests, 2026-07-22; counted directly from that output, independent of the Stage 1 option-value TBD]. Findings that change the design:
 
 | Site | Behavior | Consequence |
