@@ -38,6 +38,7 @@ import { composeReviewReport } from '../../utils/review-report';
 import { generateReviewReportDocx } from '../../utils/review-report-docx';
 import { generateReviewReportPdf } from '../../utils/review-report-pdf';
 import { downloadPdf } from '../../utils/pdf-export';
+import ManualReviewEntryForm from './ManualReviewEntryForm';
 
 function formatDate(iso) {
   if (!iso) return null;
@@ -461,7 +462,7 @@ function isOutstanding(r) {
   return !r.reviewReceivedAt;
 }
 
-function OutstandingRow({ reviewer, requestId, onSent }) {
+function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const lastReminder = formatDate(reviewer.reminderSentAt);
@@ -510,7 +511,7 @@ function OutstandingRow({ reviewer, requestId, onSent }) {
           <div className={`text-xs mt-1 ${feedback.ok ? 'text-green-600' : 'text-amber-600'}`}>{feedback.message}</div>
         )}
       </div>
-      <div className="shrink-0">
+      <div className="shrink-0 flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={handleSend}
@@ -519,6 +520,13 @@ function OutstandingRow({ reviewer, requestId, onSent }) {
           className="inline-flex items-center gap-1 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {sending ? 'Sending…' : 'Send reminder now'}
+        </button>
+        <button
+          type="button"
+          onClick={() => onManualEntry(reviewer)}
+          className="inline-flex items-center gap-1 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5"
+        >
+          Enter review manually
         </button>
       </div>
     </div>
@@ -537,6 +545,7 @@ export default function ReviewsTab({ requestId }) {
   // existing, unchanged default rendering; "compare" is the new schema-free
   // matrix.
   const [view, setView] = useState('cards');
+  const [manualEntry, setManualEntry] = useState(null);
 
   // Monotonic fetch id: [requestId].js is a dynamic page, so switching between
   // two workbench requests re-renders this component rather than remounting it
@@ -571,6 +580,11 @@ export default function ReviewsTab({ requestId }) {
     load();
   }, [load]);
 
+  const handleManualSubmitted = useCallback(async () => {
+    await load();
+    setManualEntry(null);
+  }, [load]);
+
   const reviewers = proposal?.reviewers || [];
   // A submitted review is signalled by reviewReceivedAt (set on both the
   // file-upload and the staff "mark received (no file)" paths) — same signal
@@ -585,6 +599,9 @@ export default function ReviewsTab({ requestId }) {
     .filter(isOutstanding)
     .sort((a, b) => (b.daysSinceMaterialsSent ?? -1) - (a.daysSinceMaterialsSent ?? -1));
   const acceptedCount = reviewers.length;
+  const manualEntryReviewer = manualEntry?.requestId === requestId
+    ? manualEntry.reviewer
+    : null;
 
   if (loading) {
     return (
@@ -627,10 +644,24 @@ export default function ReviewsTab({ requestId }) {
           </p>
           <div>
             {outstanding.map((r) => (
-              <OutstandingRow key={r.suggestionId} reviewer={r} requestId={requestId} onSent={load} />
+              <OutstandingRow
+                key={r.suggestionId}
+                reviewer={r}
+                requestId={requestId}
+                onSent={load}
+                onManualEntry={(reviewer) => setManualEntry({ requestId, reviewer })}
+              />
             ))}
           </div>
         </Card>
+      )}
+      {manualEntryReviewer && (
+        <ManualReviewEntryForm
+          key={manualEntryReviewer.suggestionId}
+          reviewer={manualEntryReviewer}
+          onCancel={() => setManualEntry(null)}
+          onSubmitted={handleManualSubmitted}
+        />
       )}
       {submitted.length === 0 ? (
         <Card hover={false}>

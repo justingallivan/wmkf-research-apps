@@ -247,8 +247,8 @@ from future UI, and mark BILL Chunk 6 as implemented-but-dormant/owner-tabled.
 
 ## Confirmed high-risk contracts
 
-- The Dataverse Atlas and API-matrix gates are healthy: 33 Postgres tables, 31
-  Dataverse entity sets, and 147 API route files at inspection time.
+- The Dataverse Atlas and API-matrix gates were healthy at inspection time;
+  current machine-derived counts live in `docs/CANONICAL_COUNTS.md`.
 - DAL trust establishment and email mutation assertions are implemented and tested.
 - Reviewer search history, durable roster, applicant enrichment/promotion, and
   invitation UI paths have dedicated tests and match their current focused docs.

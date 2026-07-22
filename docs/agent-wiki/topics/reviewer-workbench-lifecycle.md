@@ -183,6 +183,19 @@ manual and cron sends share one fire-once marker and can never double-send.
 Unlike the cron, a manual re-send when the marker is already set IS allowed
 (staff-initiated); a claim conflict (412) returns an error without sending.
 
+**Structured staff review rescue:** each accepted, not-yet-submitted reviewer in
+the Reviews tab also offers "Enter review manually" for cases where the external
+portal cannot be used. `ManualReviewEntryForm` loads the current Dataverse
+question set from `GET /api/review-manager/manual-review-entry` and renders it
+through the external form's shared `ReviewQuestionFields`, including the same
+rich-text editor. `POST` re-reads eligibility and the parent ETag, rejects a
+stale question-set version, sanitizes narratives, runs the full external review
+validator and `buildReviewSubmission()`, then atomically upserts every answer
+row and records the parent receipt/status/affiliation with
+`wmkf_reviewuploadedbystaff=true`. Draft cleanup happens only after commit and
+is best effort. This is deliberately separate from the legacy partial
+`mark-received-no-file` and file-upload paths.
+
 **Thank-you sweep (automated):** `/api/cron/send-review-thankyous` (daily,
 `30 10 * * *` — offset from the 10:00 reminder cron) →
 `lib/services/reviewer-thankyou-sweep.js#sweepReviewThankYous`. Eligibility keys
