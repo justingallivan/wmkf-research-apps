@@ -13,7 +13,7 @@
 - Live-state index for data-layer work: ../docs/APPLICATION_STATE_ATLAS.md
 - Ground-truth / self-correction rules: ../docs/CLAUDE_REMEDIATION_PLAN.md
 - Memory storage invariant: memory-store-propagation.md
-- Memory routing contract: ../docs/CLAUDE_MEMORY_REORGANIZATION_PLAN.md; project-memory-router-trap-prevention.md
+- Memory routing contract: project-memory-router-trap-prevention.md; ../.claude/rules/durable-docs.md
 
 ## Always-Read Guardrails
 - Carryover / bulk actions: feedback-verify-before-destructive-carryover.md; feedback-list-and-confirm-before-bulk-deletes.md; feedback-verify-additive-carryover-not-just-destructive.md
@@ -32,7 +32,7 @@
 - Refactor / behavior-freeze extraction: feedback-behavior-freeze-passthrough-no-default.md; ../docs/DISCOVERY_SERVICE_DECOMPOSITION_PLAN.md (facade+modules decomposition playbook)
 - Tone / user context: feedback-no-performative-contrition.md; feedback-no-time-pressure-commentary.md; feedback-stakeholder-email-tone.md; feedback-review-panel-tone.md
 - React / memory lookup / handoff summary: feedback-profile-context-runtime-bugs.md; feedback-check-memory-before-asking-user.md; feedback-dont-resurface-parked-items.md
-- Codex delegation: feedback-codex-model-gpt55.md (ALWAYS --model gpt-5.5 unless owner says otherwise); reference-codex-detached-exec-protocol.md; project-codex-design-pre-impl-iteration.md; project-codex-recurring-review.md; feedback-commit-before-delegating-to-worktree-agent.md; reference-codex-rescue-plan-task-runs-readonly.md; reference-codex-plugin-job-tracking-bugs.md; reference-codex-rescue-pkill-overstep.md; feedback-pause-for-codex-on-high-stakes.md; feedback-codex-build-gate-turbopack-sandbox.md; feedback-dont-tune-against-hook-source.md
+- Multi-agent delegation/review: ../docs/AGENT_COLLABORATION_PLAN.md; project-codex-recurring-review.md; feedback-commit-before-delegating-to-worktree-agent.md; feedback-pause-for-codex-on-high-stakes.md; feedback-codex-build-gate-turbopack-sandbox.md; feedback-dont-tune-against-hook-source.md
 - Search / schema language: feedback-grep-general-codebase-terms.md; feedback-human-legibility-schema-principle.md
 
 ## Task Routing
@@ -68,7 +68,6 @@
 - Partial remediation shipped: prompt-cache audit/root mitigation completed (S341); remaining R4 cross-document Executor composition and conditional R5 measurement: project-cache-hit-rate-review.md
 - RESOLVED (S350): spec-audit design-docs recovered to main (1420d79c); accept-fast-response verified SHIPPED; quota-PD-email BUILT S352 (+admin default 4, modal prefill, first-send seed): project-spec-audit-docs-recovery-parked.md
 - Private-repo CI (why CodeQL gone, Semgrep split, Pro needed for branch protection): project-private-repo-ci-visibility.md
-- E2E reviewer suite re-baseline (RESOLVED 2026-07-04, 23/23 green; client-UX drift lesson): project-e2e-reviewer-rebaseline-parked.md
 
 ## Archive
-- Closed & shipped work index: project-closed-work-archive.md
+- Closed & shipped work index: project-closed-work-archive.md (includes the resolved reviewer E2E re-baseline)

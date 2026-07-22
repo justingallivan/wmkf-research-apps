@@ -1,36 +1,41 @@
 ---
-name: Codex as recurring code review surface
-description: Justin runs Codex periodically as a sanity-check reviewer; expect more reviews and use them to calibrate priorities
+name: Independent agent review as a recurring verification surface
+description: Use independent agent reviews to challenge implementation claims, while source evidence, owner priorities, and current coordination rules remain authoritative.
 type: project
 originSessionId: 87c3bedf-c936-4b4d-bdb8-69e4062e9249
 status: active
 scope: global
-last_verified: S181 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-22 via docs/AGENT_COLLABORATION_PLAN.md and the active agent-coordination skill
 ---
 
 ## Recall Rule
 
-Read this when: a Codex (or similar third-party) review lands, or you're deciding how to act on its findings.
+Read this when: an independent Claude/Codex review lands, or when deciding how
+to commission and apply an adversarial review.
 
 Do:
-- Mirror the response shape in `docs/archive/CODE_REVIEW_RESPONSE_2026-04-30.md`: independently verify each finding against the code, push back where Codex missed context, sequence in waves.
-- Treat findings overlapping your existing plan as confirming signal (note it explicitly); record drift markers in the living doc.
-- Use the broker-driven `codex:codex-rescue` subagent as the default review path (back up per S181); offer a copy-pasteable prompt when Justin asks.
+- Follow `docs/AGENT_COLLABORATION_PLAN.md`: one editing owner per surface;
+  review is read-only unless Justin transfers ownership.
+- Independently verify every finding against current source, Atlas, tests, or a
+  probe. Push back when the reviewer missed context.
+- Use the active runtime's supported model/default unless Justin explicitly
+  requests another model.
+- Treat overlap with an existing plan as evidence, not automatic priority.
 
 Do not:
-- Let the review become the to-do list — it's input, prioritized against the user's actual goals.
-- Trust the stale S179/S180 "Codex unreliable" guidance — that was a transient broker outage, now superseded.
+- Let a review become the to-do list; prioritize it against the user's actual goal.
+- Resume a read-only review as an editing task without an explicit ownership
+  transfer and a write-capable fresh run where the runtime requires one.
+- Hard-code a retired model or shell/plugin transport as the universal default.
 
-Ground truth: `docs/API_ROUTE_SECURITY_MATRIX.md` (living, CI-gated via `check:api-routes`), `docs/archive/CODE_REVIEW_RESPONSE_2026-04-30.md`. Related: [[project-codex-design-pre-impl-iteration]], [[feedback-share-codex-verbatim]].
+Ground truth: `docs/AGENT_COLLABORATION_PLAN.md`, the active
+`agent-coordination` skill, and the relevant source/Atlas/gates for the reviewed
+surface. Related: [[project-codex-design-pre-impl-iteration]],
+[[feedback-share-codex-verbatim]]. `[VERIFIED via current collaboration contract]`
 
-Justin plans to run Codex (or similar third-party static review) periodically as a sanity check on the codebase. The 2026-04-30 review (`docs/archive/CODE_REVIEW_FRAGILITY_FINDINGS_2026-04-30.md`) is the first one; my response is in `docs/archive/CODE_REVIEW_RESPONSE_2026-04-30.md`.
+## Historical note
 
-**Why:** independent eyes catch architectural drift the active developer (and I) miss. Codex doesn't see conversation context, so it sometimes flags things we've already planned to fix — that's still useful confirming signal.
-
-**How to apply:**
-- When a new Codex (or similar) review lands, mirror the response shape used in `docs/archive/CODE_REVIEW_RESPONSE_2026-04-30.md`: independently verify each finding against the code, push back where Codex missed context, propose sequencing in waves, save addenda as decisions land.
-- Treat findings that overlap with our existing plan as confirming signal, not duplication — note that explicitly.
-- Treat findings about properties that have shifted since the last review (e.g., "Postgres user_profile_id filter" after a Dataverse cutover) as architectural-drift markers worth recording in the doc.
-- Don't let the review become the to-do list — use it as input, prioritize against the user's actual goals (Wave 1 / 2 / 3 framing).
-- **Session 129 update (2026-05-04):** Codex shifted from one-shot reviews to ongoing security-audit cadence. `docs/API_ROUTE_SECURITY_MATRIX.md` is the living artifact — now **tracked in the repo** and CI-gated via `npm run check:api-routes` (per `CLAUDE.md:245`); PRs touching `pages/api/**` fail without a matrix update. Justin pastes findings to me, I act on them. When responding, write the response as a copy-pasteable message so Justin can take it back to the Codex session unchanged.
-- **Session 181 update (2026-05-23):** broker-driven Codex (via `codex:codex-rescue` subagent) is BACK UP per Justin. Use it as the default review path. Earlier S179/S180 "unreliable" guidance is superseded — those failures were a transient broker outage, not a permanent regression. Local-terminal Codex remains a viable alternative when Justin asks for a copy-pasteable prompt.
+The 2026-04-30 review and response remain useful examples at
+`docs/archive/CODE_REVIEW_FRAGILITY_FINDINGS_2026-04-30.md` and
+`docs/archive/CODE_REVIEW_RESPONSE_2026-04-30.md`. Their transport and model
+instructions are historical; their verify-before-accepting discipline remains.

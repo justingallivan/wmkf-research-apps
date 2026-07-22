@@ -20,7 +20,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [AGENT_COLLABORATION_PLAN.md](AGENT_COLLABORATION_PLAN.md) | plan | active |  | Status: Draft operating contract Purpose: Keep Justin, Claude, and Codex from stepping on each other's work while using the same repo across... | 2026-07-02 |
+| [AGENT_COLLABORATION_PLAN.md](AGENT_COLLABORATION_PLAN.md) | plan | active |  | Active operating contract for coordinating Justin, Claude, and Codex across branches, worktrees, reviews, and handoffs. | 2026-07-02 |
 | [AGENT_HARNESS_STYLE_GUIDE.md](AGENT_HARNESS_STYLE_GUIDE.md) | spec | active |  | This guide keeps agent-facing instructions precise, confident, and low-noise. | 2026-07-02 |
 | [AGENT_INSTRUCTION_AUDIT_S322.md](AGENT_INSTRUCTION_AUDIT_S322.md) | audit | active |  | Audit of CLAUDE.md, AGENTS.md, and .claude/rules/ for size, duplication, unread content, broken imports, and lint restatement. Findings + outcomes. |  |
 | [AGENT_SELF_VERIFICATION_ENFORCEMENT.md](AGENT_SELF_VERIFICATION_ENFORCEMENT.md) | spec | active |  | Narrow blockers and fingerprinted review receipts enforce evidence where advisory reminders repeatedly failed. | 2026-07-18 |
@@ -130,11 +130,11 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [BILL_CHUNK_4_DESIGN.md](BILL_CHUNK_4_DESIGN.md) | spec | active |  | This chunk has three threads, decided with the user S199:. | 2026-07-02 |
+| [BILL_CHUNK_4_DESIGN.md](BILL_CHUNK_4_DESIGN.md) | spec | historical |  | Historical BILL onboarding chunk design; automated BILL integration was tabled by the owner on 2026-07-12. | 2026-07-02 |
 | [BILL_CHUNK_6_ENDPOINT_DESIGN.md](BILL_CHUNK_6_ENDPOINT_DESIGN.md) | spec | active |  | Always 200 on auth+validation success. Outcome lives in the body. | 2026-07-02 |
-| [BILL_HONORARIUM_INTEGRATION_DESIGN.md](BILL_HONORARIUM_INTEGRATION_DESIGN.md) | spec | active |  | Target: Ready by 2026-06-10 for the cycle whose reviewer invitations go out ≥ 2026-06-17. | 2026-07-02 |
-| [BILL_integration_handoff.md](BILL_integration_handoff.md) | history | active |  | The project was approved after an Ops Team review meeting (May 2026). | 2026-07-02 |
-| [BILL_LIB_DESIGN.md](BILL_LIB_DESIGN.md) | spec | active |  | WebFetch of developer.bill.com (notably developer.bill.com/llms.txt) surfaced several discrepancies vs. the original BILL_integration_handoff.md:. | 2026-07-02 |
+| [BILL_HONORARIUM_INTEGRATION_DESIGN.md](BILL_HONORARIUM_INTEGRATION_DESIGN.md) | spec | historical |  | Historical reviewer BILL onboarding design; automated BILL integration was tabled by the owner on 2026-07-12. | 2026-07-02 |
+| [BILL_integration_handoff.md](BILL_integration_handoff.md) | history | historical |  | Historical BILL.com integration handoff; automated BILL integration was tabled by the owner on 2026-07-12. | 2026-07-02 |
+| [BILL_LIB_DESIGN.md](BILL_LIB_DESIGN.md) | spec | historical |  | Historical BILL API wrapper design retained as implementation history; automated BILL integration was tabled on 2026-07-12. | 2026-07-02 |
 | [HONORARIUM_PORTAL_CREATION_STRATEGY.md](HONORARIUM_PORTAL_CREATION_STRATEGY.md) | plan | active |  | No-BILL honorarium creation LIVE in Production 2026-07-02 (BILL deferred); self-lookup + backfill hardening done; capture-only backfill unneeded. | 2026-07-02 |
 
 ## general

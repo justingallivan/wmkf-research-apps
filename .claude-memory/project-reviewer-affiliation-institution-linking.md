@@ -5,8 +5,16 @@ status: active
 metadata: 
   node_type: memory
   type: project
+  last_verified: 2026-07-22 via alert service, acceptance drain, OpenAlex institution search, and IRS-BMF refresh source; backlog counts remain the 2026-07-10 probe
   originSessionId: c3f606e9-2cc7-43e5-a6e6-f74614c159f9
 ---
+
+## Recall Rule
+
+Read before auto-linking a reviewer contact to a CRM Account or changing the
+affiliation-mismatch alert. Do not auto-resolve free text to an Account until
+Connor/Sarah complete the account canonicalization decision; re-run the probe
+before quoting backlog or match-rate counts.
 
 Owner (S354, 2026-07-10) wants reviewers' institutions added to their CRM
 contacts to stop the recurring `reviewer_contact_affiliation_mismatch` System
@@ -35,27 +43,13 @@ no writes). Findings:
 **Root cause = messy account data, not matching.** Missing + duplicated Account
 targets, so no matching cleverness fixes it.
 
-**Design options discussed (all PARKED, nothing built):**
-1. Auto-link only the exact-single-match subset (~30%). Low yield.
-2. Auto-write reported affiliation to free-text `adx_organizationname` on accept
-   (fill-only) — safe, 100% coverage, silences alert, but NOT the structured
-   Company (`parentcustomerid`) lookup staff normally see.
-3. Suppress the pure-absence alert; keep alerting only on true conflicts.
-4. **Institution typeahead backed by an AKA dictionary** (owner's preferred
-   direction). Pieces already in repo: `OpenAlexService.searchInstitutions()`
-   (openalex-service.js:479) → OpenAlex institutions carry `display_name` +
-   `display_name_alternatives` (aliases) + `display_name_acronyms` + `ror` +
-   country = a ready canonical+AKA dictionary. Cache/refresh precedent =
-   `pages/api/cron/refresh-irs-bmf.js` (external dataset → PG staging table →
-   atomic swap, used for name matching).
-
-**Key catch:** a typeahead resolves to a *canonical institution identity* (ROR),
-NOT to a CRM Account. Setting `parentcustomerid` still needs an Account, and 62%
-don't exist → choose free-text/ROR identity write vs auto-create Accounts from
-ROR (safer than free-text since ROR-keyed dedup, but a governance decision to
-mint hundreds of accounts). Cache-vs-Dataverse note: typeahead→OpenAlex never
-touches Dataverse (no cache needed for latency); typeahead→your-Accounts is
-where a cached local copy avoids per-keystroke Dataverse slowness.
+**Options remain parked:** exact-single-match auto-linking is low-yield; writing
+only `adx_organizationname` would not populate the structured Company lookup;
+suppressing absence-only alerts changes monitoring rather than fixing data; and
+an alias-backed typeahead still needs a canonical CRM Account target. Source
+building blocks exist in `OpenAlexService.searchInstitutions()` and
+`pages/api/cron/refresh-irs-bmf.js`, but neither resolves the governance decision
+to create/dedupe Accounts.
 
 **Owner insight (S354) that settles the architecture — TWO NAMESPACES:**
 OpenAlex/ROR hold *research-affiliation* names ("University of California, Los
@@ -82,7 +76,5 @@ match, `save-candidates` account lookup, intake institution match). Do NOT build
 the typeahead/cache before the account cleanup — it paints over messy targets.
 Justified as shared institution-resolution infrastructure, not an 8-alert fix.
 
-Unrelated: the S354 decline-referral one-click add fix (`ef97fcd`) shipped
-independently and is not blocked by any of this. See
-[[project-reviewer-verify-fail-dangerous]] for the namesake identity hazard that
-motivates human-confirmed (not auto) resolution.
+See [[project-reviewer-verify-fail-dangerous]] for the identity hazard behind
+human-confirmed rather than automatic resolution.

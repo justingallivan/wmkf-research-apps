@@ -2,8 +2,8 @@
 title: "BILL Chunk 4 Design — respond.js accept-path extension + amount-as-setting + Full-real-fix hardening"
 domain: finance-honoraria
 kind: spec
-status: active
-summary: "This chunk has three threads, decided with the user S199:."
+status: historical
+summary: "Historical BILL onboarding chunk design; automated BILL integration was tabled by the owner on 2026-07-12."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,6 +15,10 @@ related:
 ---
 
 # BILL Chunk 4 Design — respond.js accept-path extension + amount-as-setting + Full-real-fix hardening
+
+> **Historical design.** Automated BILL API integration was tabled by the owner
+> on 2026-07-12 and must not be revived without a new owner decision. The current
+> no-BILL contract is `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md`.
 
 **Status:** draft for pre-impl Codex review (S199, 2026-05-29)
 **⚠️ Current-cycle (2026-07-01):** automated BILL onboarding remains DEFERRED — `onboardReviewer()` short-circuits to `status: 'deferred'` (no BILL, NO alert) when `BILL_ONBOARDING_DEFERRED=true`. The no-BILL target is now app-created honorarium requests: configure the three honorarium discriminator GUIDs, unset `HONORARIUM_ONBOARDING_DEFERRED`, set `honorarium.default_amount`, and keep `BILL_ONBOARDING_DEFERRED=true`. Parent doc plus `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` are authoritative.

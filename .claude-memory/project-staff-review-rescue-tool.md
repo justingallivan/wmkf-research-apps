@@ -5,7 +5,14 @@ metadata:
   type: project
   status: active
   scope: reviewer
+  last_verified: 2026-07-22 via current workbench UI search and retained staff review routes/services
 ---
+
+## Recall Rule
+
+Read when staff need to enter a review outside the reviewer portal. The dedicated
+full-form rescue UI is still unbuilt; retained upload/mark-received endpoints are
+not proof that a complete structured-entry surface exists.
 
 ## The ask (owner, S347, 2026-07-08)
 

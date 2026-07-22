@@ -5,7 +5,7 @@ metadata:
   type: reference
   status: closed
   scope: docs
-  last_verified: S209 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-22 via routed closed-memory reconciliation
 ---
 
 ## Recall Rule
@@ -33,6 +33,7 @@ These items are **done, closed, or point-in-time** and no longer earn a slot in 
 - **Dynamics Explorer**: multi-library + subfolder document listing ([[project-dynamics-explorer-archive-libs]], `lib/utils/sharepoint-buckets.js`); tool-result serializer ([[project-dynamics-explorer-serializer-deferred]], `lib/utils/dynamics-explorer-serializer.js`); Search API + perf — 77K+ docs, inline schemas, parallel exec, SSE ([[project-dynamics-explorer-details]]). Still in the index as thin pointers: schema-diff tool preference, Power-Tools reuse direction, thumbs-feedback admin anti-rebuild guardrail.
 - **Dynamics identity reconciliation** (SHIPPED S127–129) — DB bridge + MSCRMCallerID + adapter chain + token lifecycle; delegate role granted 2026-05-06, impersonation smoke PASS. [[project-dynamics-identity-reconciliation]].
 - **External reviewer file access** (SHIPPED 2026-05-03) — token primitive, `/external/*` endpoints, SharePoint upload, event-driven token expiry. [[project-external-reviewer-file-access]].
+- **Reviewer E2E re-baseline** (RESOLVED 2026-07-04) — 23/23 green after client-UX fixture updates for board identity, missing email, and low-confidence confirmation. [[project-e2e-reviewer-rebaseline-parked]].
 
 ## Point-in-time status snapshots (superseded by live SESSION_PROMPT handoffs)
 - **Intake pilot decisions 2026-05-06** — six-decision walkthrough; items 1C+1D superseded by the 2026-05-13 Track-1 decisions (still in index). [[project-intake-portal-pilot-decisions-2026-05-06]].

@@ -2,8 +2,8 @@
 title: "Reviewer Honorarium Onboarding — Design Doc for Connor"
 domain: finance-honoraria
 kind: spec
-status: active
-summary: "Target: Ready by 2026-06-10 for the cycle whose reviewer invitations go out ≥ 2026-06-17."
+status: historical
+summary: "Historical reviewer BILL onboarding design; automated BILL integration was tabled by the owner on 2026-07-12."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,6 +15,10 @@ related:
 ---
 
 # Reviewer Honorarium Onboarding — Design Doc for Connor
+
+> **Historical design.** Automated BILL API integration was tabled by the owner
+> on 2026-07-12 and must not be revived without a new owner decision. The current
+> no-BILL contract is `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md`.
 
 **Author:** Justin Gallivan
 **Date:** 2026-05-25

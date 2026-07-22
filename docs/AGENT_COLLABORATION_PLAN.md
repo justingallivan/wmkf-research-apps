@@ -3,7 +3,7 @@ title: Multi-Agent Collaboration Plan
 domain: agent-harness
 kind: plan
 status: active
-summary: "Status: Draft operating contract Purpose: Keep Justin, Claude, and Codex from stepping on each other's work while using the same repo across..."
+summary: "Active operating contract for coordinating Justin, Claude, and Codex across branches, worktrees, reviews, and handoffs."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -13,7 +13,7 @@ related:
 
 # Multi-Agent Collaboration Plan
 
-**Status:** Draft operating contract  
+**Status:** Active operating contract; the shared `agent-coordination` skill is implemented.  
 **Purpose:** Keep Justin, Claude, and Codex from stepping on each other's work while using the same repo across multiple computers.
 
 ## Part 1 - Justin Checklist
@@ -140,9 +140,9 @@ Dirty worktree: clean | listed files and ownership
 Next owner/action: <who should do what next>
 ```
 
-### Proposed Skill Support
+### Implemented Skill Support
 
-Add one lightweight skill, `agent-coordination`, shared through `.claude/skills` and `.agents/skills`, so either agent can be asked:
+The lightweight `agent-coordination` skill is shared through `.claude/skills` and `.agents/skills`, so either agent can be asked:
 
 - "use agent-coordination before starting"
 - "prepare a multi-agent handoff"

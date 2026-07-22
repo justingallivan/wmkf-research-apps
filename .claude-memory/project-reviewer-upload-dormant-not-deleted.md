@@ -5,6 +5,7 @@ metadata:
   type: project
   status: active
   scope: external-reviewers
+  last_verified: 2026-07-22 via retained upload/mark-received routes and current MaterialsView/ReviewAuthoringForm source
 ---
 
 ## Recall Rule

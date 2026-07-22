@@ -11,6 +11,12 @@ metadata:
   originSessionId: 6abd9b3c-dcfa-4228-b8f3-e277128aaeae
 ---
 
+## Recall Rule
+
+Read before choosing a branch or pushing `main`. Apply the risk tier in
+`docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`; a `main` push is a
+production release, not a preservation step. `[VERIFIED via current repo release contract]`
+
 The old convention was to **commit directly to `main` and push**. That is now
 superseded by the risk-tiered workflow in
 `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` because `main` auto-deploys

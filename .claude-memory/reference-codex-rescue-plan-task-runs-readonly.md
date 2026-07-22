@@ -4,7 +4,14 @@ description: A codex:codex-rescue agent launched for a plan/review/read-only tas
 metadata:
   type: reference
   status: active
+  last_verified: 2026-07-22 via installed codex-cli-runtime/SKILL.md
 ---
+
+## Recall Rule
+
+Read only when deliberately using the Claude Code `codex:codex-rescue` fallback.
+For normal multi-agent work, use `docs/AGENT_COLLABORATION_PLAN.md` and the active
+agent runtime instead. `[VERIFIED 2026-07-22 via the installed codex companion runtime]`
 
 The `codex:codex-rescue` runtime (`codex-cli-runtime/SKILL.md:24,39`) adds `--write` to
 make Codex write-capable **unless the task reads as "review, diagnosis, or research

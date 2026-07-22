@@ -4,7 +4,14 @@ description: Grantee publication waiver is VERSIONED (SHIPPED S350) — staff ed
 metadata:
   type: project
 status: active
+last_verified: 2026-07-22 via grantee context/submit services, policy admin service, schema wave, and Atlas
 ---
+
+## Recall Rule
+
+Read before changing the grantee waiver, its render token, or deliverable submit
+path. Preserve the exact-version/body-hash binding and provision schema plus the
+policy slot before deploying fail-closed readers.
 
 SHIPPED S350 (2026-07-09). The grantee publication-consent waiver is no longer a
 hardcoded frontend constant — it is a versioned policy in the same
