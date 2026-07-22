@@ -104,16 +104,17 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 | `SHAREPOINT_SITE_URL` | SharePoint Graph base | e.g., `https://appriver3651007194.sharepoint.com/sites/akoyaGO` |
 | `REVIEWER_MATERIALS_FOLDERS` | Allowlist for external reviewer file visibility | Manual (default `Reviewer_Downloads`) |
 
-### Optional — Dataverse target/write interlock (Stages 1+2 merged — wired, inert; see `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md` §3.6)
+### Dataverse target/write interlock (enforced; see `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md`)
 
-None are secrets. The hook sites are wired (merge 8067de3a) and
-`DATAVERSE_TARGET_INTERLOCK=warn` is live in `.env.local` + Vercel
-Production/Preview since 2026-07-11 (observe-only, never blocks); the flip to
-`on` follows observation per plan §5.
+None are secrets. The hook sites are wired (merge 8067de3a), and
+`DATAVERSE_TARGET_INTERLOCK=on` is live in `.env.local` + Vercel
+Production/Preview since 2026-07-22. Production was flipped only after a
+positive `mode=warn deployment=production target=production` observation;
+the post-flip Workbench smoke emitted `mode=on` and no denial.
 
 | Variable | Purpose | Source |
 |----------|---------|--------|
-| `DATAVERSE_TARGET_INTERLOCK` | Enforcement mode: `off`/`warn`/`on`. Unset/empty → `off`; any other invalid value fails closed to `on` with a console.warn | Manual, per environment; rollout `warn` → `on` per plan §5 |
+| `DATAVERSE_TARGET_INTERLOCK` | Enforcement mode: `off`/`warn`/`on`. Unset/empty → `off`; any other invalid value fails closed to `on` with a console.warn | Manual, per environment; current value `on` in local, Preview, and Production; rollback to `warn` only for a diagnosed incident |
 | `DATAVERSE_ALLOW_PROD_READS` | `yes` allows preview/local reads of production Dataverse (Mode B shadow-reads); anything else denies | Manual, preview/local only, set when a shadow comparison is actually running |
 | `DATAVERSE_PROD_WRITE_ACK` | `"<purpose> <YYYY-MM-DD>"` — operator ack for local scripts writing prod; honored only for deployment class `local` and only when the date is today (UTC) | Per-invocation operator shell only — never committed, never set in Vercel |
 | `DATAVERSE_REHEARSAL_GRANT` | JSON Mode-D rehearsal grant (`purpose`/`ops`/`entitySets`/`recordIds` (GUID-only)/`expiresAt`); `$batch` and alternate-key writes are never grant-coverable | Per-rehearsal, removed after; never in production env unless a Mode-D rehearsal is live |

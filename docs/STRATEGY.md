@@ -123,11 +123,12 @@ Now we have read access to Dynamics and SharePoint, and leadership buy-in to use
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
 
-1. publish the reconciled documentation and planning queue;
-2. finish observing the Dataverse target/write interlock before an explicit `on` decision;
-3. add the structured staff-review rescue surface and closeout payability disposition;
-4. use the upcoming reviewer campaign as an evidence window while the legacy resolver remains authoritative;
-5. select optional reviewer UX work only from demonstrated staff friction.
+1. add the structured staff-review rescue surface and closeout payability disposition;
+2. use the upcoming reviewer campaign as an evidence window while the legacy resolver remains authoritative;
+3. select optional reviewer UX work only from demonstrated staff friction.
+
+The documentation reconciliation and Dataverse target/write interlock enforcement stages completed
+2026-07-22; see `docs/CURRENT_WORK_QUEUE.md` for the evidence and remaining order.
 
 Power Automate automation, the applicant-intake product, automated BILL onboarding, and broader
 reviewer cleanup have separate dependency or owner gates. They are not implied next steps.

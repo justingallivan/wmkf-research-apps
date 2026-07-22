@@ -113,16 +113,17 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   shapes. Plan + full stage log: `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`.
   See the resolved email-helper note above for the runtime guard layered under
   the static gate exemption.
-- **Dataverse target/write interlock: Stages 1+2 merged — WIRED but INERT
-  (S355, 2026-07-11).** `lib/dataverse/core/interlock.js` + `target-registry.js`
+- **Dataverse target/write interlock: ENFORCED
+  (S355 wiring; Production `on` 2026-07-22).** `lib/dataverse/core/interlock.js` + `target-registry.js`
   (tracked hostname registry: prod `wmkf.crm.dynamics.com`, sandbox
   `orgd9e66399.crm.dynamics.com`) implement the deployment×target×op policy
   from `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md`; the three hook
   families (dynamics/http.js `fetchWithTimeout`, dataverse/client.js `call()`,
   dataverse-export) call `assertDataverseOperationAllowed` unconditionally
-  (merge 8067de3a). `DATAVERSE_TARGET_INTERLOCK=warn` live in `.env.local` +
-  Vercel Production/Preview since 2026-07-11 (observe-only — logs would-deny
-  lines, never blocks); flip to `on` after observation per plan §5. A
+  (merge 8067de3a). `DATAVERSE_TARGET_INTERLOCK=on` is live in `.env.local` +
+  Vercel Production/Preview since 2026-07-22. The production flip followed a
+  positive warn-mode observation; the post-flip signed-in Workbench smoke
+  loaded normally and logged `mode=on` with no denial. A denied
   `[dataverse-interlock]` line in prod logs means env misconfig or an
   unregistered target — investigate, don't extend the registry blindly.
   Set-but-invalid

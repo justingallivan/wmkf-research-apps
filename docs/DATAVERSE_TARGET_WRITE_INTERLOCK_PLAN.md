@@ -3,7 +3,7 @@ title: Dataverse Target and Write Interlock Design
 domain: engineering-process
 kind: plan
 status: active
-summary: "Stages 1–2 shipped in warn mode; Stage 3 observation and the deliberate Dataverse target-interlock on-mode decision remain."
+summary: "Stages 1–3 shipped; the Dataverse target/write interlock is enforced in local, Preview, and Production."
 canonical: false
 cataloged: 2026-07-11
 owner: product-engineering
@@ -25,9 +25,15 @@ redeployed and Ready (aliased `reviews.wmkeck.org`), zero
 `[dataverse-interlock]` lines in initial logs. A 2026-07-22 no-branch production
 query confirmed normal staff/cron traffic and zero warning lines, but also
 exposed that warning-only logging could not prove the mode was active.
-The same-day observability patch adds one non-secret `active:` record per
-function instance for non-off modes; deploy and observe that positive signal
-before the deliberate flip to `on` (§5 Stage 3). `warn` never blocks.**
+The same-day observability patch added one non-secret `active:` record per
+function instance for non-off modes and was merged at 2585f980. A signed-in
+production Workbench load then emitted five `active: mode=warn
+deployment=production target=production` records across normal reviewer API
+paths and zero `would deny` records. The owner then explicitly approved Stage 3:
+local tests passed 115/115, Preview deployed Ready, and Production was redeployed
+with `DATAVERSE_TARGET_INTERLOCK=on`. A signed-in Workbench smoke loaded all 13
+visible requests; two dashboard invocations logged `mode=on
+deployment=production target=production` and no denial. Stages 1–3 are complete.**
 [RECHECKED after lib/dataverse/core/interlock.js + lib/dataverse/core/target-registry.js changes — VERIFIED via the merge diffs and four Codex adversarial review rounds (eight findings total: 2+2+3+1 across rounds, all fixed and personally diff-reviewed). This doc describes the interlock at stage/contract level, not line level.] This document turns
 `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` §6 — the
 "[PLANNED — highest-priority enabling control]" — into a concrete, buildable
@@ -252,7 +258,7 @@ throws an error whose message names the deployment class, target class,
 method, callerLabel, and the flag to consult — same actionable shape as
 `assertTrustedDalContext`.
 
-**[BUILT 2026-07-22, pending production observation]** After URL scoping, the
+**[BUILT AND PRODUCTION-OBSERVED 2026-07-22]** After URL scoping, the
 first inspected Dataverse call in a non-off mode logs one non-secret activation
 line per function instance: mode, deployment class, target class, and caller
 label only. It excludes the URL, environment value, record id, and request
@@ -262,8 +268,8 @@ strictly silent.
 
 ### 3.5 Hook points — three, matching the §2 inventory
 
-**[MERGED to `main` at 8067de3a, 2026-07-11 S355 — wired but inert until
-the env flag is set; enforcement still requires the §5 Stage-2 `warn` rollout.]**
+**[MERGED to `main` at 8067de3a, 2026-07-11 S355; enforced in all environments
+since 2026-07-22.]**
 [RECHECKED after lib/services/dynamics/http.js + lib/dataverse/client.js + lib/services/dataverse-export/fetch-client.js + lib/services/dataverse-export/live-taxonomy.js change: all four hook sites call assertDataverseOperationAllowed unconditionally per this section (commit 8278d170 + the export denial-preservation fix); denial-contract wiring tests in tests/unit/dataverse-interlock-wiring.test.js; diffs reviewed.]
 
 1. **`fetchWithTimeout` in `lib/services/dynamics/http.js:23`.** One seam
@@ -346,10 +352,16 @@ deliberately (strategy §4).
    a policy gap to fix before Stage 3. **2026-07-22 observation amendment:**
    require at least one `active: mode=warn deployment=production
    target=production` record as positive proof that the observation window is
-   real; absence of `would deny` lines alone is insufficient.
-3. **Stage 3 — flip `on`**, preview/local first, then production. Update
+   real; absence of `would deny` lines alone is insufficient. **Satisfied
+   2026-07-22:** five normal Workbench/reviewer API invocations emitted that
+   activation shape, with zero `would deny` records in the same query window.
+3. **Stage 3 — flip `on` — DONE 2026-07-22**, preview/local first, then production. Update
    strategy doc §6 from [PLANNED] to [CURRENT], the CLAUDE.md safety
    invariants, and the agent-wiki Dataverse topic in the same pass (`/sweep`).
+   Local tests passed 115/115; the Git-triggered Preview deployment was Ready;
+   Production was redeployed and a signed-in Workbench smoke loaded normally.
+   Production logs showed `mode=on deployment=production target=production`
+   with no denial.
 4. **Stage 4 (optional, later)** — a `check:dataverse-interlock` CI gate +
    self-test asserting the hook sites still call
    `assertDataverseOperationAllowed`, so a refactor can't silently drop the
