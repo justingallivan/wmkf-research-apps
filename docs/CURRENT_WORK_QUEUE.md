@@ -1,0 +1,84 @@
+---
+title: Current Work Queue
+domain: architecture
+kind: source-of-truth
+status: canonical
+summary: Canonical priority queue separating current commitments, evidence windows, optional work, external dependencies, and parked programs.
+canonical: true
+cataloged: 2026-07-22
+last_verified: 2026-07-22
+owner: product-engineering
+related:
+  - docs/SYSTEM_MODEL.md
+  - docs/STRATEGY.md
+  - docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md
+  - docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md
+  - docs/REVIEWER_IDENTITY_CONTACT_PLAN.md
+  - docs/REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md
+---
+
+# Current Work Queue
+
+This document owns **work priority**, not runtime truth. Source, the Application State Atlas,
+live probes, and current tests own what the system does. `docs/DOCS_CATALOG.md` inventories
+documents; an `active` catalog status means the document remains useful, not that every task in
+it is approved backlog.
+
+## Current sequence
+
+Work these items in order unless an operational incident or explicit owner decision changes the
+sequence.
+
+| Order | Work | Current boundary | Completion decision |
+| --- | --- | --- | --- |
+| 1 | Documentation ground-truth reconciliation | Publish the reconciled documentation branch; route planning through this queue; keep historical implementation plans out of the backlog. | Documentation gates green and this queue linked from the strategy router. |
+| 2 | Dataverse target/write interlock | Stages 1–2 are shipped in `warn`; inspect normal-use and cron observations. Do not change the environment flag during evidence gathering. | Explicit owner decision whether to change `DATAVERSE_TARGET_INTERLOCK` to `on`. |
+| 3 | Reviewer operational safety tools | Build a full structured staff review-entry rescue surface, then add a closeout disposition for payable / not payable / did not serve. Keep pre-accept reset separate from post-accept financial annotation. | Each feature independently verified through UI → route → service → Dataverse → consumer, then deliberately promoted. |
+| 4 | Reviewer campaign evidence window | Keep the legacy resolver authoritative during the upcoming run. Record W2 shadow disagreements, wrong/missed identity outcomes, email confirmation, staff corrections, invitations, and review completion. | Post-run evidence review; no automatic cutover. |
+| 5 | Optional reviewer UX triage | Select only improvements supported by observed staff friction. Current candidates: campaign-settings discoverability/defaults, review-output formatting, and global reviewer notes/flags or a Reviewer Pool. | Separate owner choice for each item; absence from this selection means no build. |
+
+## Reviewer redesign gates
+
+The reviewer redesign is an active **measured program**, not authorization for continuous tuning.
+
+- W2 `combined` mode remains owner-gated. Shadow output never changes the authoritative result.
+- Wave 13 action-policy reader/backfill/send enforcement remains a separate migration.
+- The applicant-neighborhood finding arm remains evaluation-only under `scripts/`; production
+  assignment and attribution require an explicit pilot decision.
+- Do not delete legacy readers, Track B, or old heuristics until the applicable promotion decision
+  and one complete campaign of observation.
+
+## External or dependency-bound work
+
+These are valid directions but are not current app-team delivery commitments:
+
+- Power Automate Executor parity and status-driven backend automation — Connor-owned and dependent
+  on grant-cycle sequencing.
+- Group B writeup spine and related dashboard automation — blocked on the documented Dataverse and
+  Power Automate inputs.
+- Proposal-context extraction and staged-pipeline evolution — later-cycle work, not part of the
+  current reviewer campaign.
+
+## Parked — do not resurface without a new decision
+
+- Applicant intake product build — parked while WMKF evaluates the GOApply re-engineering.
+- Automated BILL onboarding — tabled, possibly permanently; honorarium payment remains an offline
+  operations process.
+- Whack-a-mole remediation workstreams — independent review returned `NEEDS REWORK`; owner
+  reconciliation is required before execution.
+- Reviewer institution-to-CRM linking/typeahead — parked pending Connor/Sarah account cleanup.
+- Destructive reviewer cleanup — gated by promotion plus one full campaign.
+
+## Completed implementation records — not backlog
+
+Plans describing the Workbench build, Postgres-to-Dataverse reviewer migration, staff-editable
+review questions, reviewer search timeout controls, service decompositions, route/service
+consolidation, OData/chunk consolidation, prompt migrations, grantee portal construction, and
+honorarium portal construction are implementation history or current operating references. They do
+not become current work merely because their document status remains `active`.
+
+## Queue maintenance rule
+
+When priority changes, update this file, `docs/STRATEGY.md`, the strategy wiki router, and the
+current `SESSION_PROMPT.md` in the same reconciliation pass. Detailed implementation plans may
+remain where they are; link them from the queue instead of duplicating their contracts here.

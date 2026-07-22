@@ -57,7 +57,7 @@
 - Auth / admin / access / security / private Blob / file download: ../docs/agent-wiki/topics/security-auth.md
 - Integrity screener / Retraction Watch / PubPeer / News: ../docs/agent-wiki/topics/integrity-screener.md
 - Dev environment / secrets / Vercel deploy / local build: ../docs/agent-wiki/topics/dev-environment.md; ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
-- Strategy / system model / roadmap / phasing / Virtual Review Panel: ../docs/agent-wiki/topics/strategy-roadmap.md
+- Strategy / current queue / system model / roadmap / phasing / Virtual Review Panel: ../docs/CURRENT_WORK_QUEUE.md; ../docs/agent-wiki/topics/strategy-roadmap.md
 - Proposal docs / phasing / Phase I-II: project-j27-doc-capture-evolution.md; project-grant-phasing-evolution.md; project-phaseistatus-decision-lifecycle.md
 - Grantee and email templates: project-grantee-deliverable-email-voice.md; project-email-template-token-syntax.md
 - Grantee publication waiver (versioned, staff-editable in admin Policies; SHIPPED S350; ack modal S351): project-grantee-waiver-versioning.md; ../docs/GRANTEE_WAIVER_VERSIONING_PLAN.md
