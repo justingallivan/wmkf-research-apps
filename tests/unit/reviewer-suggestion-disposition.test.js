@@ -52,6 +52,10 @@ const ENGAGEMENT_STAMP_RESET_PAYLOAD = {
   wmkf_completedat: null,
   wmkf_withdrawnsufficientat: null,
   wmkf_proposalfirstaccessed: null,
+  // S369: the due-date ledger is engagement state and must reset with the rest,
+  // else a restore + re-send scores the new engagement against the old deadline.
+  wmkf_reviewduedateatsend: null,
+  wmkf_reviewduedatelastsent: null,
 };
 
 let original;
@@ -541,5 +545,68 @@ describe('upsert relevance-score range guard', () => {
 
     expect(DynamicsService.createRecord.mock.calls[0][1].wmkf_relevancescore).toBe(100);
     expect(DynamicsService.createRecord.mock.calls[1][1].wmkf_relevancescore).toBe(0);
+  });
+});
+
+// S369 adversarial findings (all confirmed against source before fixing).
+describe('terminal engagements survive the other write paths', () => {
+  test('softDelete refuses a terminal row instead of erasing its status', async () => {
+    DynamicsService.getRecord.mockResolvedValue({ wmkf_reviewstatus: REVIEW_STATUS_MAP.released, _etag: 'W/"9"' });
+    await expect(suggestionAdapter.softDelete(SUGGESTION_ID))
+      .rejects.toThrow(/terminal review status/);
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('softDelete still removes a non-terminal row, bound to the fresh ETag', async () => {
+    DynamicsService.getRecord.mockResolvedValue({ wmkf_reviewstatus: REVIEW_STATUS_MAP.accepted, _etag: 'W/"9"' });
+    await suggestionAdapter.softDelete(SUGGESTION_ID);
+    const [, , payload, opts] = DynamicsService.updateRecord.mock.calls[0];
+    expect(payload.wmkf_reviewstatus).toBeNull();
+    expect(opts.ifMatch).toBe('W/"9"');
+  });
+
+  // Without the ETag fallback the terminal guard was pure TOCTOU: the generic
+  // batch PATCH supplies no ifMatch, so it could read a non-terminal row, lose
+  // the race to a concurrent transition, then overwrite the new terminal status.
+  test('a status write with no caller ETag binds to the guard read', async () => {
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_completedat: null,
+      wmkf_reviewreceivedat: null,
+      wmkf_applicantdisposition: null,
+      wmkf_reviewstatus: REVIEW_STATUS_MAP.under_review,
+      _etag: 'W/"33"',
+    });
+    await updateLifecycle(SUGGESTION_ID, { reviewStatus: 'complete' });
+    const opts = DynamicsService.updateRecord.mock.calls[0][3];
+    expect(opts.ifMatch).toBe('W/"33"');
+  });
+
+  test('a caller-supplied ETag still wins over the guard read', async () => {
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_completedat: null,
+      wmkf_reviewreceivedat: null,
+      wmkf_applicantdisposition: null,
+      wmkf_reviewstatus: REVIEW_STATUS_MAP.under_review,
+      _etag: 'W/"33"',
+    });
+    await updateLifecycle(SUGGESTION_ID, { reviewStatus: 'complete' }, { ifMatch: 'W/"1"' });
+    const opts = DynamicsService.updateRecord.mock.calls[0][3];
+    expect(opts.ifMatch).toBe('W/"1"');
+  });
+
+  test('restore clears BOTH due-date ledger columns', async () => {
+    // A restore that leaves atSend behind makes the send path treat the new
+    // engagement as already stamped, scoring it against the old deadline.
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_selected: false,
+      wmkf_applicantdisposition: null,
+      wmkf_reviewduedateatsend: '2026-01-01',
+      wmkf_reviewduedatelastsent: '2026-01-01',
+      _etag: 'W/\"42\"',
+    });
+    await restore(SUGGESTION_ID, { actingUserSystemId: 'SYS-1' });
+    const patched = DynamicsService.updateRecord.mock.calls.find((c) => c[2] && 'wmkf_selected' in c[2]);
+    expect(patched[2].wmkf_reviewduedateatsend).toBeNull();
+    expect(patched[2].wmkf_reviewduedatelastsent).toBeNull();
   });
 });

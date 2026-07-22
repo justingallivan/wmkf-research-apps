@@ -94,7 +94,7 @@ Non-test consumers of `reviewStatus` were fully enumerated — 26 files, 15 runt
 
 | Site | Behavior | Consequence |
 |---|---|---|
-| `[VERIFIED via lib/external/review-engagement-state.js:40,48]` | **Numeric ordering**: `reviewStatus < REVIEW_STATUS_MATERIALS_SENT` and `>= REVIEW_STATUS_MATERIALS_SENT` gate the portal reversibility lock | New values sort ≥ materials_sent, so the portal refuses to flip a terminal row — desirable, but must be **asserted deliberately**, not inherited by accident |
+| `[VERIFIED via lib/external/review-engagement-state.js:40,48]` | **Numeric ordering**: `reviewStatus < REVIEW_STATUS_MATERIALS_SENT` and `>= REVIEW_STATUS_MATERIALS_SENT` gate the portal | ~~New values sort ≥ materials_sent, so the portal refuses to flip a terminal row — desirable~~ **THIS WAS WRONG — see revision 4.** The `>=` branch does not lock anything; it assigns `view = 'stage2b'`, the live review form. Sorting above materials_sent therefore handed a withdrawn reviewer a working form. The claim was inferred from the shape of the comparison without reading the branch body |
 | `[VERIFIED via lib/services/reviewer-reminder-sweep.js:192]` and `reviewer-manual-reminder.js:76` | Chase only `materials_sent` / `under_review` | Terminal rows leave reminder chasing automatically — no change, assert it |
 | `[VERIFIED via lib/services/reviewer-rollup.js:69]` | `completed += 1` only on `COMPLETE` | Terminal rows are not counted as completed — no change, assert it |
 | `[VERIFIED via lib/services/review-manager/send-emails-service.js:693-697]` | The `thankyou` branch writes `reviewStatus: 'complete'` **unconditionally** | A thank-you to a terminal row resurrects it and stamps the false positive. **Must guard.** |
@@ -347,6 +347,53 @@ changed deadline, whose inline stamp failed, leaving the row permanently
 unrepairable. The protection is preserved structurally instead: `atSend` is only
 ever written when empty, so the client-supplied `effectiveReviewDueDate` can
 never rewrite the first commitment; it can only advance `lastSent`.
+
+## Revision 4 — adversarial review of the branch (2026-07-22)
+
+A Codex adversarial review of the full branch returned **needs-attention** with
+four `[high]` and one `[medium]`. All five were reproduced against source before
+any fix. Sources touched by the fixes, each re-read after the change:
+
+[RECHECKED after lib/external/review-engagement-state.js change: terminal values tested BEFORE the `>= REVIEW_STATUS_MATERIALS_SENT` branch and excluded from canFlipState; regressions in tests/unit/compute-engagement-state.test.js]
+
+[RECHECKED after lib/services/review-upload.js change: terminal statuses rejected by identity as `engagement_ended` ahead of the `status < MATERIALS_SENT` magnitude gate]
+
+[RECHECKED after lib/services/review-manager/terminal-transition-service.js change: the transition now also writes externalTokenRevoked in the same atomic ETag-guarded write; adapter field map gained that key or the write would have been silently dropped]
+
+[RECHECKED after lib/services/review-manager/repair-materials-send-service.js change: client date confirmed against the request's own wmkf_reviewduedate, replay and arbitrary-date regressions in tests/unit/repair-materials-send-service.test.js]
+
+1. **Terminal reviewers could still submit.** The worst finding, and it
+   falsified a claim in the fan-out table above. Terminal option values sort
+   above `materials_sent`, and that branch assigns `view = 'stage2b'` — the live
+   review form — so a withdrawn reviewer kept a working form, and submit writes
+   `review_received` through a raw changeset that never reaches
+   `updateLifecycle`. The upload gate had the same magnitude bug. Fixed by
+   testing terminal values *before* the numeric branch, rejecting them in the
+   upload gate by identity rather than magnitude, and revoking the magic link in
+   the same atomic write that ends the engagement — so the portal fails closed
+   at the token, with the per-surface checks as defence in depth.
+2. **The adapter guard was TOCTOU.** `updateLifecycle` read the source status
+   but only sent `If-Match` when a caller supplied one, and the generic
+   single/batch PATCH supplies none — so it could read a non-terminal row, lose
+   the race to a transition, and overwrite the new terminal status. Status-
+   changing writes now bind to the guard read's own ETag; a caller-supplied
+   (older, stricter) ETag still wins.
+3. **The repair route accepted arbitrary dates.** ETag locking stops concurrent
+   writes, not sequential replay, so an authorized caller could walk `lastSent`
+   anywhere and permanently fix a null `atSend` on the first request. The date is
+   now confirmed against the request's own `wmkf_reviewduedate`. **Deliberate
+   limitation:** a render-time staff override that differs from the request
+   column can no longer be repaired and must be re-sent — failing closed on an
+   unverifiable date is the right trade for a field feeding reliability scoring,
+   but it is an owner-visible behaviour change.
+4. **`softDelete` erased terminal status outside the guard.** It writes
+   `wmkf_reviewstatus: null` through `updateRecord`, bypassing `updateLifecycle`
+   entirely, so ordinary candidate removal could reopen a closed engagement. It
+   now fresh-reads, refuses terminal rows, and binds its write to that ETag.
+5. **Restore left stale ledger dates.** `ENGAGEMENT_STAMP_RESET` omitted both new
+   columns while `softDelete` preserves them, so restore + re-send would treat
+   the new engagement as already stamped and score it against the old deadline.
+   Both columns now reset, on both re-add paths.
 
 ## Review history
 

@@ -54,7 +54,10 @@ test('eligible row transitions with the ETag from the fresh read', async () => {
   });
   expect(updateLifecycle).toHaveBeenCalledWith(
     SUGGESTION,
-    { reviewStatus: 'withdrew' },
+    // The magic link is revoked in the SAME atomic ETag-guarded write that ends
+    // the engagement — the portal must fail closed at the token, not rely on
+    // every downstream surface re-deriving terminality.
+    { reviewStatus: 'withdrew', externalTokenRevoked: true },
     { actingUserSystemId: 'staff-1', ifMatch: 'W/"7"' },
   );
 });

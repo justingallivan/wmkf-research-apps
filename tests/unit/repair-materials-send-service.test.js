@@ -12,6 +12,14 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   },
 }));
 
+// S369 hardening: the repair now confirms the client-supplied date against the
+// request's own review due date, so an authorized caller cannot walk the ledger
+// to an arbitrary deadline with no email ever sent.
+const getRequestById = jest.fn();
+jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
+  getById: (...args) => getRequestById(...args),
+}));
+
 const { repairMaterialsSendStamp } = require('../../lib/services/review-manager/repair-materials-send-service');
 
 const REQUEST = '11111111-1111-4111-8111-111111111111';
@@ -47,6 +55,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   findById.mockResolvedValue(row());
   updateLifecycle.mockResolvedValue(undefined);
+  getRequestById.mockResolvedValue({ akoya_requestid: REQUEST, wmkf_reviewduedate: '2026-09-15' });
 });
 
 test('first repair stamps BOTH dates and uses the fresh row ETag', async () => {
@@ -95,4 +104,35 @@ test.each([
   findById.mockResolvedValue(row(overrides));
   await expect(repair()).rejects.toMatchObject({ httpStatus: 409 });
   expect(updateLifecycle).not.toHaveBeenCalled();
+});
+
+// S369 adversarial finding: effectiveReviewDueDate is client-supplied and ETag
+// locking stops concurrent writes but not sequential replay. Without a
+// server-side confirmation an authorized caller could walk lastSent to any
+// valid date with no email sent, and fix a null atSend permanently on the
+// first request.
+test('refuses a date the request does not actually hold (no arbitrary ledger writes)', async () => {
+  getRequestById.mockResolvedValue({ akoya_requestid: REQUEST, wmkf_reviewduedate: '2026-09-15' });
+  await expect(repair({ effectiveReviewDueDate: '2027-01-01' }))
+    .rejects.toMatchObject({ httpStatus: 409 });
+  expect(updateLifecycle).not.toHaveBeenCalled();
+});
+
+test('refuses when the request has no due date to confirm against', async () => {
+  getRequestById.mockResolvedValue({ akoya_requestid: REQUEST, wmkf_reviewduedate: null });
+  await expect(repair()).rejects.toMatchObject({ httpStatus: 409 });
+  expect(updateLifecycle).not.toHaveBeenCalled();
+});
+
+test('replaying the same repair cannot re-write an already-set atSend', async () => {
+  findById.mockResolvedValue(row({
+    wmkf_reviewduedateatsend: '2026-09-01',
+    wmkf_reviewduedatelastsent: '2026-09-01',
+    wmkf_materialssentat: SENT_AT,
+    wmkf_reviewstatus: 100000001,
+  }));
+  await repair();
+  const [, payload] = updateLifecycle.mock.calls[0];
+  expect(payload).not.toHaveProperty('reviewDueDateAtSend');
+  expect(payload.reviewDueDateLastSent).toBe('2026-09-15');
 });
