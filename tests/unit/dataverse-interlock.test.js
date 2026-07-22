@@ -1,8 +1,8 @@
 /**
  * Stage 1 (docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md) — table-driven
- * tests for the pure policy module `lib/dataverse/core/interlock.js`. No
- * hook wiring exists yet (Stage 2); this suite only exercises the exported
- * policy functions directly. Follows the style of
+ * tests for the pure policy module `lib/dataverse/core/interlock.js`. Stage 2
+ * hook wiring has shipped; this suite exercises the exported policy functions
+ * directly while `dataverse-interlock-wiring.test.js` covers the seams. Follows the style of
  * tests/unit/dal-enforcement.test.js (save/restore env in beforeEach/afterEach).
  *
  * @jest-environment node
@@ -57,6 +57,7 @@ beforeEach(() => {
   // The prod-write-ack log gate is once-per-process by design; reset it so
   // one test's ack-allowed call doesn't silence the next test's assertion.
   _resetInterlockStateForTests();
+  jest.spyOn(console, 'info').mockImplementation(() => {});
 });
 
 afterEach(() => {
@@ -216,10 +217,61 @@ describe('assertDataverseOperationAllowed — off mode is a strict no-op', () =>
     process.env.DATAVERSE_TARGET_INTERLOCK = 'off';
     setDeployment('production');
     const spy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const infoSpy = console.info;
     expect(() =>
       assertDataverseOperationAllowed({ url: SANDBOX_URL, method: 'POST', callerLabel: 'test' }),
     ).not.toThrow();
     expect(spy).not.toHaveBeenCalled();
+    expect(infoSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('interlock activation observation', () => {
+  test('warn mode logs one non-secret activation record across repeated allowed calls', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'warn';
+    setDeployment('production');
+    const infoSpy = console.info;
+
+    assertDataverseOperationAllowed({ url: PROD_URL, method: 'GET', callerLabel: 'first-caller' });
+    assertDataverseOperationAllowed({ url: PROD_RECORD_URL, method: 'PATCH', callerLabel: 'second-caller' });
+
+    expect(infoSpy).toHaveBeenCalledTimes(1);
+    expect(infoSpy.mock.calls[0][0]).toBe(
+      '[dataverse-interlock] active: mode=warn deployment=production target=production caller=first-caller',
+    );
+    expect(infoSpy.mock.calls[0][0]).not.toContain(PRODUCTION_HOSTS[0]);
+    expect(infoSpy.mock.calls[0][0]).not.toContain('11111111-1111-1111-1111-111111111111');
+  });
+
+  test('on mode logs activation before a denied call and still throws', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    setDeployment('preview');
+    const infoSpy = console.info;
+
+    expect(() =>
+      assertDataverseOperationAllowed({ url: UNKNOWN_URL, method: 'POST', callerLabel: 'denied-caller' }),
+    ).toThrow(/\[dataverse-interlock\] denied/);
+
+    expect(infoSpy).toHaveBeenCalledTimes(1);
+    expect(infoSpy.mock.calls[0][0]).toBe(
+      '[dataverse-interlock] active: mode=on deployment=preview target=unknown caller=denied-caller',
+    );
+  });
+
+  test('parseable non-Dataverse URLs remain silent in a non-off mode', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    setDeployment('preview');
+    const infoSpy = console.info;
+
+    expect(() =>
+      assertDataverseOperationAllowed({
+        url: 'https://login.microsoftonline.com/token',
+        method: 'POST',
+        callerLabel: 'token-fetch',
+      }),
+    ).not.toThrow();
+
+    expect(infoSpy).not.toHaveBeenCalled();
   });
 });
 

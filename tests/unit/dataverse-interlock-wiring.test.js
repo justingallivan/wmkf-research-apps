@@ -46,6 +46,7 @@ beforeEach(() => {
   // for these wiring tests (policy correctness itself is Stage 1's job).
   delete process.env.VERCEL_ENV;
   _resetInterlockStateForTests();
+  jest.spyOn(console, 'info').mockImplementation(() => {});
   global.fetch = jest.fn(() => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}), text: () => Promise.resolve('') }));
 });
 
