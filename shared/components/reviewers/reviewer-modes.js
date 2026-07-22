@@ -9,7 +9,7 @@
  */
 
 // The full reviewer lifecycle, in order. Every wmkf_reviewstatus the API can
-// return (REVIEW_STATUS_BY_VALUE in pages/api/review-manager/reviewers.js) MUST
+// return (REVIEW_STATUS_BY_VALUE in lib/services/review-manager/reviewers-service.js) MUST
 // have a key here, and MUST land in exactly one MODE_STATUSES bucket — otherwise
 // a reviewer in that state would vanish from all sub-tabs. The
 // reviewer-modes.test.js "no fallthrough" assertion enforces this invariant.

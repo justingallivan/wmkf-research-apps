@@ -5,7 +5,7 @@ status: active
 metadata: 
   node_type: memory
   type: project
-  last_verified: 2026-07-22 via aggregateReviewHistory, updateLifecycle, campaign-config-service, reviewer-modes
+  last_verified: 2026-07-22 via terminal-transition-service, send-emails-service, reviewer-modes, status-enum-parity
   originSessionId: a7559eb5-34f5-41fd-b0cb-f1a84da8d8d0
 ---
 
@@ -42,15 +42,20 @@ queue.
   row remove is a `softDelete` that adjudicates nothing) — but it is the only
   terminal-looking one, so it is the natural choice and the silent trap. Worst
   deliverers are the most likely to be misrecorded as reliable.
-- **No terminal state for a post-accept dropout.** `REVIEW_STATUS_MAP` is
-  `accepted → materials_sent → under_review → review_received → complete`.
+- **No LIVE terminal state for a post-accept dropout; implementation is authored but not provisioned.** The feature branch extends `REVIEW_STATUS_MAP` with
+  `withdrew`/`released`, adds a dedicated fresh-read/ETag transition service, and
+  excludes both from work-remaining. The live Dataverse option set still ends at
+  `complete`; the owner-gated picklist script and Wave 14 due-date column have
+  deliberately not been run.
   `withdrawn_sufficient` is hard-guarded to still-pending rows by
   `isStillPending()` in `lib/services/review-manager/withdraw-sufficient-service.js`
   (`wmkf_accepted !== true`), so it cannot express an accepted reviewer bailing.
-- **On-time is not measurable durably yet.** `wmkf_reviewduedate` lives on
+- **On-time is not measurable durably in production yet.** `wmkf_reviewduedate` lives on
   `akoya_request` and is writable via `campaign-config-service.js`, so it is a
-  mutable current value. Extending a deadline retroactively rewrites every
-  timeliness verdict on that proposal.
+  mutable current value. The feature branch authors a DateOnly
+  `wmkf_reviewduedateatsend` field and an inline ETag-guarded set-once writer,
+  but the column is not provisioned. Extending a deadline therefore still
+  retroactively rewrites every live timeliness verdict on that proposal.
 - Signals already captured per engagement that feed the metric:
   `wmkf_responsereceivedat` (invite responsiveness), `wmkf_remindercount`
   (chasing required), `wmkf_proposalfirstaccessed` (engagement),
@@ -76,15 +81,15 @@ status nor the stamped due date can be retrofitted onto history.
 and halts the corruption. A new status must be added to `STATUS_PIPELINE`,
 `MODE_STATUSES`, and the label map together, excluded from
 `MODE_WORK_REMAINING`, and must NOT stamp the completion timestamps.
-**[VERIFIED 2026-07-22] The "no fallthrough" invariant is WEAKLY enforced:**
-`check:status-enum-parity` registers four pairs and this is not one of them;
-the only guard is `tests/unit/reviewer-modes.test.js`, which compares
-`STATUS_PIPELINE` against a HARDCODED `API_STATUSES` literal (whose comment
-still points at `pages/api/review-manager/reviewers.js`, though
-`REVIEW_STATUS_BY_VALUE` now lives in
-`lib/services/review-manager/reviewers-service.js`). Adding a status to the
-adapter/service but NOT to `reviewer-modes.js` therefore passes every gate
-while the reviewer vanishes from all sub-tabs — the exact failure the
-invariant exists to stop. Register the pair in `check:status-enum-parity` as
-part of the build. Cross-layer + new durable column → use
+**[VERIFIED 2026-07-22 on the feature branch] The no-fallthrough invariant is
+now gate-enforced:** `check:status-enum-parity` compares
+`REVIEW_STATUS_MAP` ⇔ `STATUS_PIPELINE` and `REVIEW_STATUS_MAP` ⇔
+`REVIEW_STATUS_BY_VALUE`; `reviewer-modes.test.js` points at the service that
+owns the inverse map. The terminal service is the only intended entry path, but
+no transition-out policy is defined: the generic reviewers PATCH rejects a
+terminal *target* yet can still move an already-terminal row to a non-terminal
+target such as `under_review`. The set-once due-date stamp likewise preserves
+the first materials deadline even if a second materials email communicates a
+later campaign date. Both are named policy residuals for owner resolution, not
+silent implementation assumptions. Cross-layer + new durable column uses
 `/contract-reconcile` and Atlas coverage. See [[reviewer-workbench-lifecycle]].

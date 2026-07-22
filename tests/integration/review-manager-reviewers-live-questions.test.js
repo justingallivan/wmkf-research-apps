@@ -149,6 +149,7 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
     wmkf_reviewsharepointfolder: 'https://sharepoint/example',
     wmkf_reviewuploadedbystaff: true,
     wmkf_revieweraffiliation: 'Reviewer University',
+    wmkf_reviewduedateatsend: '2026-09-15',
   }]);
   DynamicsService.queryRecords.mockResolvedValue({
     records: [{
@@ -201,6 +202,7 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
         reviewStatus: 'review_received',
         responseType: undefined, // RESPONSE_TYPE_BY_VALUE is mocked to {} in this suite
         materialsSentAt: '2026-06-20T00:00:00Z',
+        reviewDueDateAtSend: '2026-09-15',
         daysSinceMaterialsSent: expect.any(Number),
         reminderSentAt: '2026-06-22T00:00:00Z',
         reminderCount: 1,

@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-20
+last_verified: 2026-07-22
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -23,12 +23,16 @@ source_files:
   - pages/api/reviewer-finder/enrich-contacts.js
   - pages/api/reviewer-finder/save-candidates.js
   - pages/api/review-manager/campaign-timeline-defaults.js
+  - pages/api/review-manager/repair-materials-send.js
+  - pages/api/review-manager/terminal-transition.js
   - pages/api/workbench/enrich-recommended.js
   - pages/api/workbench/applicant-reviewers.js
   - pages/api/workbench/promote-applicant-reviewer.js
   - pages/api/workbench/export-candidates.js
   - lib/services/reviewer-candidate-export.js
   - lib/services/reviewer-campaign-timeline.js
+  - lib/services/review-manager/repair-materials-send-service.js
+  - lib/services/review-manager/terminal-transition-service.js
   - lib/services/reviewer-roster-store.js
   - lib/services/contact-enrichment-service.js
 canonical_docs:
@@ -147,7 +151,7 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
 
 **Review history on the Invite card (S308):** the Invite-tab candidate DTO (`my-candidates` GET) carries `priorReviewCount` + `lastReviewAt`, derived (not stored) from `suggestionAdapter.aggregateReviewHistory(personIds)` — one batched query over `wmkf_appreviewersuggestion` filtered to received-only rows (`wmkf_reviewreceivedat ne null`) for the request's candidate person-ids. "Completed a review" = the reviewer's review was **received** (`wmkf_reviewreceivedat`), NOT the PD's closeout stamp (`wmkf_completedat`). `ReviewerInvitePanel` renders "reviewed N× · last <date>" only when `priorReviewCount > 0`. The aggregation is supplementary — its query failure is caught non-fatally in `my-candidates` (degrades to no history; never 500s the candidate list). Not yet surfaced on Track Reviewers (fast-follow).
 
-**HAZARD — the received-vs-closeout distinction above is currently defeated by the writer.** `updateLifecycle` stamps `wmkf_reviewreceivedat` (when empty) on ANY transition to `reviewStatus=complete`, so a PD marking a post-accept dropout `complete` writes a permanent false positive into that person's `priorReviewCount` for every future cycle. `complete` is the natural choice because it is the pipeline's only terminal-looking state, but it is not the only badge-clearing one: `review_received` also drops out of `MODE_WORK_REMAINING` (and does NOT stamp, since the stamp branch tests `=== REVIEW_STATUS_MAP.complete`), and the row-level remove is a `softDelete` that hides the row without adjudicating it. Do not treat `priorReviewCount` as a reliability signal until the terminal `withdrew`/`released` status lands; any new terminal status must be excluded from `MODE_WORK_REMAINING` and must NOT stamp the completion timestamps. Owner goal and decisions: `.claude-memory/project-reviewer-reliability-data.md`.
+**Terminal-status implementation authored; NOT LIVE until owner-gated provisioning and deliberate promotion.** The feature branch adds `withdrew` and `released` to the Track pipeline, excludes both from `MODE_WORK_REMAINING`, and routes the visually distinct confirmed actions through `/api/review-manager/terminal-transition`. The service freshly reads each row, accepts only accepted/materials-sent/under-review rows with no received/completed stamp, and writes with that ETag; a concurrent submission therefore wins. Neither terminal value enters `updateLifecycle`'s strict `reviewStatus=complete` timestamp branch. The generic reviewers PATCH refuses requests whose *target* is terminal, but there is currently no server-defined transition-out policy: a direct generic PATCH can target `under_review` from a terminal row even though the UI hides that control. Resolve that policy before calling terminality irreversible. The live production hazard remains until the Wave 14 DateOnly column and the owner-gated picklist extension are provisioned and this branch is promoted. Owner goal and decisions: `.claude-memory/project-reviewer-reliability-data.md`.
 
 **Export to Excel (S264; Invite-tab export + Expertise-tags column S308):** Two surfaces post to `POST /api/workbench/export-candidates`. (1) **Find tab** — a bottom-row "Export to Excel (N)" button (next to Save) exports the **selected** search candidates; (2) **Invite Reviewers tab** (`ReviewerInvitePanel`) — a header "⬇ Export to Excel" button exports the **full saved candidate list** (all non-removed rows on the tab; accepted/invited/declined included), mapping the persisted DTO into the same slim per-row shape. Both send a slim per-row DTO; the route fetches request metadata (number/institution/PI) authoritatively by `requestId` and streams back a two-sheet `.xlsx` (Request Info + Candidates). Column formatting (Source/Why/**Expertise tags**/Conflicts/ORCID/Scholar) lives in `lib/services/reviewer-candidate-export.js` so the sheet and the cards agree; the Expertise-tags column reads `keywords` (Find tab joins `expertiseAreas`; Invite tab uses the persisted `keywords`). Invite-tab exports carry only invite-stage fields — search-time COI / 5-yr-pub-count / seniority aren't persisted, so those columns read "None noted"/blank (board-writeup identity is captured at acceptance, not here). On the Find tab, `needs_identity_review` rows aren't selectable (so naturally excluded) UNLESS a PD used the S285 identity override ("✓ This is the right person") to confirm + add one, which makes it selectable and thus exportable. The "reviewer diversity"/temperature slider was removed the S264 cycle (search runs at the server default 0.3).
 
@@ -362,7 +366,13 @@ Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
   link (`missing_secure_link`) or carries an unresolved `{{token}}` (`unresolved_placeholder`) rather
   than ship a broken first-contact email. `InviteEmailModal` renders the "verify before retry" set
   and lists who was sent/failed/skipped; a terminal error no longer shows green success. Re-sendable
-  templateTypes (materials/followup/thankyou) keep their prior `failed[]` + post-loop-stamp semantics.
+  templates keep their prior `failed[]` send semantics. Materials now stamps the exact rendered
+  effective due date inline with `wmkf_materialssentat`, using the fresh row ETag; a failed write
+  returns a per-recipient `sent_but_unrecorded` result and offers a no-resend repair action. The
+  due-date field is set once: a later materials email can render a newly changed campaign date while
+  the stored stamp remains the first-send date. That preserves the first communicated obligation,
+  but the authoritative meaning of a later changed-date resend is an unresolved policy question,
+  not an overwrite behavior to infer. Followup/thankyou retain the post-loop stamp.
   Rendering quality (also S340, `lib/utils/email-generator.js`): the greeting drops trailing
   name suffixes (Jr./Sr./III/PhD/MD) for the surname and falls back to "Dear Reviewer" on an empty
   name; `{{proposalAbstract}}` is soft-unwrapped (`softUnwrapProse`) so a fixed-column hard-wrapped
