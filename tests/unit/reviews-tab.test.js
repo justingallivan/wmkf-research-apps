@@ -5,13 +5,24 @@
  * /api/review-manager/reviewers GET: shows only reviewers with a submitted
  * review (reviewReceivedAt), decodes the ratings, and links the file download.
  */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import ReviewsTab from '../../shared/components/workbench/ReviewsTab';
 
 jest.mock('../../shared/components/Layout', () => ({
   __esModule: true,
   default: ({ children }) => <div>{children}</div>,
   Card: ({ children }) => <div>{children}</div>,
+}));
+jest.mock('../../shared/components/external/RichReviewEditor', () => ({
+  __esModule: true,
+  default: ({ value, onChange, ariaLabel, disabled }) => (
+    <textarea
+      aria-label={ariaLabel}
+      value={value}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  ),
 }));
 
 const REVIEWERS = [
@@ -135,4 +146,65 @@ test('Phase 3: the Export affordance appears once a review is submitted', async 
   expect(await screen.findByText('Export:')).toBeInTheDocument();
   expect(screen.getByText('Word (.docx)')).toBeInTheDocument();
   expect(screen.getByText('PDF')).toBeInTheDocument();
+});
+
+test('opens the dedicated full manual-entry rescue from Outstanding and refreshes after success', async () => {
+  const pending = {
+    suggestionId: '11111111-1111-4111-8111-111111111111',
+    name: 'Dr. Portal Trouble',
+    affiliation: 'Original University',
+    reviewStatus: 'materials_sent',
+  };
+  fetch
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true, proposals: [{ proposalId: 'req1', reviewers: [pending] }] }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        setVersion: 'v1',
+        affiliation: 'Authoritative University',
+        questions: [
+          { key: 'affiliation', order: 0, label: 'Affiliation', type: 'string', required: true },
+          { key: 'comments', order: 1, label: 'Comments', type: 'richtext', required: true },
+        ],
+      }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ok: true, receivedAt: '2026-07-22T12:00:00Z' }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        proposals: [{
+          proposalId: 'req1',
+          reviewers: [{ ...pending, reviewReceivedAt: '2026-07-22T12:00:00Z', answers: [] }],
+        }],
+      }),
+    });
+
+  render(<ReviewsTab requestId="req1" />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Enter review manually' }));
+
+  expect(await screen.findByText(/Recording a complete review for Dr. Portal Trouble/i)).toBeInTheDocument();
+  expect(screen.getByRole('textbox', { name: /Affiliation/i })).toHaveValue('Authoritative University');
+  fireEvent.change(screen.getByRole('textbox', { name: /Comments/i }), { target: { value: '<p>Review received by email.</p>' } });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Record review as received' }));
+  expect(await screen.findByText(/1 of 1 accepted reviewer submitted a review/i)).toBeInTheDocument();
+
+  const post = fetch.mock.calls.find(([url, options]) =>
+    url === '/api/review-manager/manual-review-entry' && options?.method === 'POST');
+  expect(JSON.parse(post[1].body)).toEqual({
+    suggestionId: pending.suggestionId,
+    answers: {
+      affiliation: 'Authoritative University',
+      comments: '<p>Review received by email.</p>',
+    },
+    setVersion: 'v1',
+  });
 });

@@ -4,7 +4,7 @@
 
 Execute the owner-approved sequence in `docs/CURRENT_WORK_QUEUE.md` without turning optional or
 parked plans into implied commitments. The current branch is
-`codex/dataverse-interlock-enforcement-evidence`; `main` auto-deploys, so runtime stages remain
+`codex/staff-structured-review-rescue`; `main` auto-deploys, so runtime stages remain
 isolated and require their named promotion decisions.
 
 ## Ordered stages
@@ -14,9 +14,10 @@ isolated and require their named promotion decisions.
 2. **Dataverse interlock — complete 2026-07-22.** Positive warn-mode production observation,
    explicit owner approval, staged local/Preview/Production flip, and signed-in post-flip Workbench
    smoke completed. `DATAVERSE_TARGET_INTERLOCK=on` is enforced everywhere.
-3. **Reviewer operational safety tools — current.** Build the full structured staff review-entry rescue
-   surface first, then the closeout payability/did-not-serve disposition. Use `/contract-reconcile`
-   for both; keep pre-accept reset and post-accept financial annotation separate.
+3. **Reviewer operational safety tools — current.** The full structured staff review-entry rescue is
+   implemented and gate/build-verified on its isolated branch; deliberate production promotion is
+   pending. After promotion, build the closeout payability/did-not-serve disposition. Use
+   `/contract-reconcile` for both; keep pre-accept reset and post-accept financial annotation separate.
 4. **Campaign evidence window.** Keep the legacy reviewer resolver authoritative. Prepare durable,
    bounded observation of W2 disagreements, identity/email outcomes, staff corrections, and
    downstream invitation/review results. No automatic cutover.

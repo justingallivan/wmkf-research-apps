@@ -153,6 +153,7 @@ Write (verified 2026-05-07; +Phase 3 ingestion S210):
 - `pages/api/review-manager/send-emails.js` — adapter `updateLifecycle` (sets `wmkf_emailsentat`, etc.)
 - `pages/api/review-manager/regenerate-token.js` — `mintAndStore` from `lib/external/token-lifecycle.js`; sets `wmkf_externaltoken*` fields
 - `pages/api/review-manager/revoke-token.js` — `revoke` from same; flips `wmkf_externaltokenrevoked`
+- `pages/api/review-manager/manual-review-entry.js` — accepted/not-received staff rescue; `lib/services/review-manager/manual-review-entry-service.js` atomically ETag-patches affiliation + review-received timestamp/status + `wmkf_reviewuploadedbystaff=true` alongside the complete `wmkf_appreviewanswer` snapshot produced by `buildReviewSubmission()`
 - `pages/api/review-manager/mark-received-no-file.js` — direct `DynamicsService.updateRecord('wmkf_appreviewersuggestions', ...)` for review-received marker
 - `lib/services/review-upload.js` `writeReviewFiles` — direct `DynamicsService.updateRecord` setting `wmkf_reviewsharepointfolder` + `wmkf_reviewfilename` + `wmkf_reviewreceivedat` + `wmkf_reviewuploadedbystaff` after SharePoint write (with rollback). Also calls `extendForPostSubmissionWindow` which patches `wmkf_externaltokenexpires` to enable the 7-day post-submission edit window.
 - `pages/api/external/review/[token]/context.js` — best-effort `wmkf_proposalfirstaccessed` stamp on first reviewer access (non-fatal on failure)

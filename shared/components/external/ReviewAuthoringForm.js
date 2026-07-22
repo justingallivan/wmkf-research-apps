@@ -32,7 +32,7 @@ import RichReviewEditor from './RichReviewEditor';
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
 
-function buildInitialValues(fields, prefill = {}, draftJson = {}) {
+export function buildInitialValues(fields, prefill = {}, draftJson = {}) {
   const values = {};
   for (const field of (fields || [])) {
     if (field.type === 'richtext') {
@@ -78,7 +78,7 @@ function hasText(html) {
   return String(html || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim().length > 0;
 }
 
-function isComplete(fields, values) {
+export function isComplete(fields, values) {
   for (const field of (fields || [])) {
     if (!field.required) continue;
     const v = values[field.key];
@@ -334,11 +334,13 @@ export default function ReviewAuthoringForm({ data, token }) {
         Answer each question below. Your work saves automatically as you go.
       </p>
 
-      <div className="mt-6 space-y-6">
-        {fields.map((field) => (
-          <FieldRow key={field.key} field={field} value={values[field.key]} onChange={update} disabled={frozen} />
-        ))}
-      </div>
+      <ReviewQuestionFields
+        fields={fields}
+        values={values}
+        onChange={update}
+        disabled={frozen}
+        className="mt-6 space-y-6"
+      />
 
       {submitState === 'error' && submitErrors.length > 0 && (
         <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4" role="alert">
@@ -369,6 +371,22 @@ export default function ReviewAuthoringForm({ data, token }) {
           {submitting ? 'Submitting…' : 'Submit review'}
         </button>
       </div>
+    </div>
+  );
+}
+
+export function ReviewQuestionFields({ fields, values, onChange, disabled = false, className = 'space-y-6' }) {
+  return (
+    <div className={className}>
+      {(fields || []).map((field) => (
+        <FieldRow
+          key={field.key}
+          field={field}
+          value={values?.[field.key]}
+          onChange={onChange}
+          disabled={disabled}
+        />
+      ))}
     </div>
   );
 }

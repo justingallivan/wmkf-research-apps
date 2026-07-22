@@ -41,6 +41,8 @@ Data:
 
 **LIVE (Phase 3, S302).** `/api/external/review/[token]/submit` upserts the N answer rows by alternate key (lookup addressed as `_wmkf_appreviewersuggestion_value=<guid>` — memory `reference-dataverse-altkey-lookup-upsert-url`) inside an all-or-nothing `DynamicsService.executeChangeset` changeset, alongside the parent affiliation/`wmkf_reviewreceivedat` PATCH (If-Match-guarded). Post-E1 the parent PATCH no longer carries the rating columns — the rating rows in this snapshot are their only home.
 
+**Structured staff rescue.** `/api/review-manager/manual-review-entry` uses the same live question fetcher, rich-text sanitizer, full validator, `buildReviewSubmission()` producer, and atomic parent/child changeset as external submission. It writes the complete answer snapshot (ratings and narratives), rejects stale question-set versions, and ETag-guards the parent PATCH. The legacy staff paths below remain intentionally partial.
+
 **LIVE (Phase D, S305).** The two legacy staff writers — `lib/services/review-upload.js` (file upload) and `pages/api/review-manager/mark-received-no-file.js` — now also upsert the **rating** snapshot rows atomically with their parent PATCH (shared `buildRatingSnapshotRows` + `answerRowUrl`/`answerRowBody`), so staff-entered ratings are in the snapshot too. They write only the rating rows (narrative answers live in the uploaded PDF); the informal-feedback no-file path writes none. One-time backfill `scripts/backfill-rating-snapshot-rows.mjs` filled historical parent-only rows (1 in prod).
 
 ## Open Questions / Gotchas
