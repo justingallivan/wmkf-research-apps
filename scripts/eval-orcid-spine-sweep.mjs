@@ -36,7 +36,8 @@ function loadEnvLocal() {
 loadEnvLocal();
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const MAILTO = process.env.OPENALEX_POLITE_MAILTO || ''; // polite pool only if a real mailbox is configured
+const MAILTO = process.env.OPENALEX_POLITE_MAILTO || '';
+const OPENALEX_API_KEY = process.env.OPENALEX_API_KEY || '';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function parseArgs(argv) {
@@ -94,7 +95,8 @@ const clean = (n) => (n || '').replace(/^(dr\.?|prof\.?|professor)\s+/i, '').tri
 const fam = (n) => clean(n).split(' ').slice(-1)[0];
 const giv = (n) => clean(n).split(' ').slice(0, -1).join(' ');
 const normOrcid = (x) => (x ? String(x).match(/(\d{4}-\d{4}-\d{4}-[\dX]{4})/)?.[1] || null : null);
-async function jget(url, opts) { try { const r = await fetch(url, opts); if (!r.ok) return { __err: r.status }; return await r.json(); } catch (e) { return { __err: e.message }; } }
+function withOpenAlexAuth(url) { const u = new URL(url); if (u.hostname === 'api.openalex.org' && OPENALEX_API_KEY) u.searchParams.set('api_key', OPENALEX_API_KEY); return u.toString(); }
+async function jget(url, opts) { try { const r = await fetch(withOpenAlexAuth(url), opts); if (!r.ok) return { __err: r.status }; return await r.json(); } catch (e) { return { __err: e.message }; } }
 
 async function openalex(name) {
   const j = await jget(`https://api.openalex.org/authors?search=${encodeURIComponent(clean(name))}&per_page=3${MAILTO ? `&mailto=${MAILTO}` : ''}`);

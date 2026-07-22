@@ -58,7 +58,11 @@ jest.mock('../../lib/dataverse/adapters/researcher', () => ({
 }));
 
 const verifyClaudeSuggestions = jest.fn();
-const checkCoauthorshipsForCandidates = jest.fn(async (c) => c);
+const checkCoauthorshipsForCandidates = jest.fn(async (c) => c.map((candidate) => ({
+  ...candidate,
+  coauthorCheckStatus: 'complete',
+  coauthorCheckFailures: [],
+})));
 jest.mock('../../lib/services/discovery-service', () => ({
   DiscoveryService: {
     pubMedVerificationContract: jest.fn(({ searchPubmed }) => ({ enabled: !!searchPubmed })),
@@ -70,7 +74,14 @@ jest.mock('../../lib/services/discovery-service', () => ({
 }));
 
 jest.mock('../../lib/services/deduplication-service', () => ({
-  DeduplicationService: { markInstitutionCOI: jest.fn((c) => c) },
+  DeduplicationService: {
+    markInstitutionCOIResolved: jest.fn(async (c) => c),
+    institutionDirectMatch: jest.fn((left, right) => {
+      const l = String(left || '').trim().toLowerCase();
+      const r = String(right || '').trim().toLowerCase();
+      return !!l && !!r && (l === r || l.includes(r) || r.includes(l));
+    }),
+  },
 }));
 
 const enrichCandidates = jest.fn();
@@ -94,8 +105,9 @@ jest.mock('../../lib/services/proposal-pi-identity', () => ({
   piInstitutions: jest.fn(() => []),
 }));
 
+const deriveProposalAuthorNames = jest.fn(() => ['Dr. PI']);
 jest.mock('../../lib/utils/proposal-authors', () => ({
-  deriveProposalAuthorNames: jest.fn(() => []),
+  deriveProposalAuthorNames: (...a) => deriveProposalAuthorNames(...a),
 }));
 
 jest.mock('../../lib/services/reviewer-identity-resolver', () => ({
@@ -121,9 +133,11 @@ jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
   pruneCandidateForRoster: jest.fn((c) => c),
 }));
 
-const recordSurfaced = jest.fn(async () => {});
+const recordSurfaced = jest.fn(async () => 1);
+const findCandidateBySuggestion = jest.fn(async () => null);
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   recordSurfaced: (...a) => recordSurfaced(...a),
+  findCandidateBySuggestion: (...a) => findCandidateBySuggestion(...a),
 }));
 
 jest.mock('../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn() }));
@@ -185,7 +199,11 @@ beforeEach(() => {
     enriched: candidates.map((c) => ({
       ...c,
       email: 'rec.one@rec.edu',
-      contactEnrichment: { emailSource: 'claude_search', website: 'https://rec.edu/one' },
+      contactEnrichment: {
+        emailSource: 'claude_search',
+        website: 'https://rec.edu/one',
+        identity: { status: 'probable' },
+      },
     })),
   }));
   upsertByPotentialReviewer.mockResolvedValue({});
@@ -327,6 +345,8 @@ describe('happy path (progress ordering + full card payload)', () => {
       suggestionId: SUG,
       enrichedProposalKey: 'blob-key-1',
       name: 'Dr. Rec One',
+      identityStatus: 'probable',
+      needsIdentification: false,
       affiliation: 'Rec University',
       seniorityEstimate: null,
       verified: true,
@@ -339,8 +359,10 @@ describe('happy path (progress ordering + full card payload)', () => {
       hasCoauthorCOI: false,
       institutionCOIDetails: null,
       coauthorships: [],
+      coauthorCheckStatus: 'complete',
+      coauthorCheckFailures: [],
       institutionMismatch: false,
-      suggestedInstitution: null,
+      suggestedInstitution: 'Rec University',
       expertiseMismatch: false,
       expertiseAreas: [],
       email: 'rec.one@rec.edu',
@@ -350,12 +372,19 @@ describe('happy path (progress ordering + full card payload)', () => {
       googleScholarUrl: null,
       hIndex: null,
       totalCitations: null,
+      eligibilityStatus: 'unknown',
+      eligibilityReason: null,
+      eligibilityEvidence: null,
       isApplicantRecommended: true,
     });
 
     // Writeback + roster persistence happened (id-keyed, best-effort).
     expect(upsertByPotentialReviewer).toHaveBeenCalledWith(PR, expect.objectContaining({ email: 'rec.one@rec.edu' }), { actingUserSystemId: 'u-1' });
-    expect(recordSurfaced).toHaveBeenCalledWith(REQ, [expect.objectContaining({ name: 'Dr. Rec One' })]);
+    expect(recordSurfaced).toHaveBeenCalledWith(
+      REQ,
+      [expect.objectContaining({ name: 'Dr. Rec One' })],
+      { expectedUpdatedAt: null },
+    );
     expect(res.ended).toBe(true);
   });
 
@@ -376,7 +405,11 @@ describe('happy path (progress ordering + full card payload)', () => {
     expect(setMatchReason).not.toHaveBeenCalled();
 
     enrichCandidates.mockImplementation(async (candidates) => ({
-      enriched: candidates.map((c) => ({ ...c, hasInstitutionCOI: true, contactEnrichment: {} })),
+      enriched: candidates.map((c) => ({
+        ...c,
+        hasInstitutionCOI: true,
+        contactEnrichment: { identity: { status: 'probable' } },
+      })),
     }));
     const res2 = sseRes();
     await handler(post(baseBody()), res2);

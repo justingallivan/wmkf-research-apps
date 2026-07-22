@@ -42,8 +42,17 @@ jest.mock('../../lib/services/discovery-service', () => ({
   },
 }));
 
+const institutionDirectMatch = jest.fn((left, right) => {
+  const normalize = (value) => String(value || '').trim().toLowerCase();
+  const l = normalize(left);
+  const r = normalize(right);
+  return !!l && !!r && (l === r || l.includes(r) || r.includes(l));
+});
 jest.mock('../../lib/services/deduplication-service', () => ({
-  DeduplicationService: { markInstitutionCOI: jest.fn((c) => c) },
+  DeduplicationService: {
+    markInstitutionCOIResolved: jest.fn(async (c) => c),
+    institutionDirectMatch: (...a) => institutionDirectMatch(...a),
+  },
 }));
 
 const enrichCandidates = jest.fn();
@@ -74,6 +83,13 @@ jest.mock('../../lib/services/reviewer-identity-resolver', () => ({
   RESOLVER_SOURCED_FIELDS: ['wmkf_orcid'],
 }));
 
+const areInstitutionsConsistent = jest.fn(async () => false);
+jest.mock('../../lib/services/institution-affiliation-consistency', () => ({
+  createInstitutionConsistencyChecker: jest.fn(() => ({
+    areConsistent: (...a) => areInstitutionsConsistent(...a),
+  })),
+}));
+
 jest.mock('../../lib/services/backprop-reviewer-orcid', () => ({
   backPropReviewerOrcidToContact: jest.fn(async () => {}),
 }));
@@ -88,12 +104,15 @@ jest.mock('../../lib/services/reviewer-request-context', () => ({
 }));
 
 jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
+  APPLICANT_ENRICHMENT_CACHE_VERSION: 2,
   pruneCandidateForRoster: jest.fn((c) => c),
 }));
 
-const recordSurfaced = jest.fn(async () => {});
+const recordSurfaced = jest.fn(async () => 1);
+const findCandidateBySuggestion = jest.fn(async () => null);
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   recordSurfaced: (...a) => recordSurfaced(...a),
+  findCandidateBySuggestion: (...a) => findCandidateBySuggestion(...a),
 }));
 
 jest.mock('../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn() }));
@@ -102,6 +121,7 @@ jest.mock('../../lib/utils/contact-parser', () => ({
 }));
 jest.mock('../../lib/utils/name-normalization', () => ({ normalizeName: (n) => String(n).toLowerCase() }));
 
+const { ContactParser } = require('../../lib/utils/contact-parser');
 import { enrichRecommended } from '../../lib/services/workbench/enrich-recommended-service';
 
 const REQ = '11111111-1111-1111-1111-111111111111';
@@ -126,7 +146,10 @@ const args = (over = {}) => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  ContactParser.isNameConsistentEmail.mockReturnValue(true);
+  areInstitutionsConsistent.mockResolvedValue(false);
   getReviewerTimeBudgetSeconds.mockResolvedValue(600);
+  findCandidateBySuggestion.mockResolvedValue(null);
   findApplicantRecommendedByRequest.mockResolvedValue([
     { _wmkf_potentialreviewer_value: PR, _wmkf_potentialreviewer_value_formatted: 'Dr. Rec One', wmkf_appreviewersuggestionid: SUG },
   ]);
@@ -136,7 +159,10 @@ beforeEach(() => {
     unverified: [],
   }));
   enrichCandidates.mockImplementation(async (candidates) => ({
-    enriched: candidates.map((c) => ({ ...c, contactEnrichment: {} })),
+    enriched: candidates.map((c) => ({
+      ...c,
+      contactEnrichment: { identity: { status: 'probable' } },
+    })),
   }));
   upsertByPotentialReviewer.mockResolvedValue({});
 });
@@ -158,6 +184,78 @@ test('happy path: progress frames strictly precede one terminal complete; never 
     isApplicantRecommended: true,
   });
   expect(recordSurfaced).toHaveBeenCalledTimes(1);
+  expect(recordSurfaced).toHaveBeenCalledWith(
+    REQ,
+    [expect.objectContaining({ applicantEnrichmentCacheVersion: 2 })],
+    { expectedUpdatedAt: null },
+  );
+});
+
+test('an enrichment write uses the pre-run roster token and leaves a concurrently changed row untouched', async () => {
+  findCandidateBySuggestion.mockResolvedValueOnce({
+    candidateKey: `suggestion:${SUG}`,
+    suggestionId: SUG,
+    name: 'Dr. Rec One',
+    identityStatus: 'unresolved',
+    rosterUpdatedAt: '2026-07-20 10:00:00+00',
+  });
+  recordSurfaced.mockResolvedValueOnce(0);
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  expect(recordSurfaced).toHaveBeenCalledWith(
+    REQ,
+    [expect.objectContaining({ suggestionId: SUG })],
+    { expectedUpdatedAt: '2026-07-20 10:00:00+00' },
+  );
+  expect(events).toContainEqual({
+    event: 'progress',
+    data: { message: '1 reviewer row(s) changed while enrichment was running and were left unchanged.' },
+  });
+  expect(events.at(-1).event).toBe('complete');
+});
+
+test('rerun preserves an authenticated staff-confirmed row without automated overwrite', async () => {
+  findCandidateBySuggestion.mockResolvedValue({
+    candidateKey: 'suggestion:33333333-3333-3333-3333-333333333333',
+    suggestionId: SUG,
+    name: 'Dr. Rec One',
+    email: 'staff-confirmed@example.edu',
+    identityStatus: 'unresolved',
+    needsIdentification: true,
+    isApplicantRecommended: true,
+    pdIdentityConfirmed: true,
+    pdIdentityConfirmationId: 'confirm-1',
+    staffIdentityConfirmation: { confirmationId: 'confirm-1', source: 'staff_confirmed' },
+  });
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args({ analysisResult: undefined, apiKey: undefined }), onEvent);
+
+  expect(verifyClaudeSuggestions).not.toHaveBeenCalled();
+  expect(enrichCandidates).not.toHaveBeenCalled();
+  expect(events).toEqual([{
+    event: 'complete',
+    data: {
+      recommended: [expect.objectContaining({
+        candidateKey: 'suggestion:33333333-3333-3333-3333-333333333333',
+        enrichedProposalKey: 'key-1',
+        email: 'staff-confirmed@example.edu',
+        pdIdentityConfirmed: true,
+        pdIdentityConfirmationId: 'confirm-1',
+      })],
+    },
+  }]);
+  expect(recordSurfaced).toHaveBeenCalledWith(
+    REQ,
+    [expect.objectContaining({
+      email: 'staff-confirmed@example.edu',
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'confirm-1',
+    })],
+    { expectedUpdatedAt: null },
+  );
 });
 
 test('empty frames: no junction rows, and rows yielding no valid suggestions → complete { recommended: [] }', async () => {
@@ -191,6 +289,481 @@ test('mid-stream per-candidate writeback failure is a NON-terminal progress fram
   await enrichRecommended(args(), onEvent);
   expect(events.some((e) => e.event === 'progress' && /Could not save metrics for Dr\. Rec One: sidecar down/.test(e.data.message))).toBe(true);
   expect(events[events.length - 1].event).toBe('complete');
+});
+
+test('structured author-affiliation evidence preserves an opaque scholarly email local part', async () => {
+  ContactParser.isNameConsistentEmail.mockReturnValue(false);
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      email: 'lab-director@stanford.edu',
+      contactEnrichment: {
+        email: 'lab-director@stanford.edu',
+        emailSource: 'scholarly_multi',
+        identity: { status: 'probable' },
+      },
+    })),
+  }));
+
+  const { onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+  expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
+    PR,
+    expect.objectContaining({
+      email: 'lab-director@stanford.edu',
+      emailSource: 'scholarly_multi',
+    }),
+    expect.anything(),
+  );
+});
+
+test('a top-level email cannot borrow the scholarly name-guard bypass for another address', async () => {
+  ContactParser.isNameConsistentEmail.mockReturnValue(false);
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      email: 'unproven-address@stanford.edu',
+      contactEnrichment: {
+        email: 'proven-address@stanford.edu',
+        emailSource: 'scholarly_multi',
+        identity: { status: 'probable' },
+      },
+    })),
+  }));
+
+  const { onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+  expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
+    PR,
+    expect.objectContaining({
+      email: null,
+      emailSource: null,
+    }),
+    expect.anything(),
+  );
+});
+
+test('a stored affiliation does not exempt an applicant reviewer from the identity gate', async () => {
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      email: 'namesake@wrong.edu',
+      affiliation: 'Wrong University',
+      hIndex: 99,
+      expertiseAreas: ['wrong-person topic'],
+      contactEnrichment: {
+        email: 'namesake@wrong.edu',
+        emailSource: 'claude_search',
+        website: 'https://wrong.edu/namesake',
+      },
+    })),
+  }));
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  const candidate = events.at(-1).data.recommended[0];
+  expect(candidate).toMatchObject({
+    name: 'Dr. Rec One',
+    needsIdentification: true,
+    identityStatus: 'unresolved',
+    verificationStatus: 'unresolved',
+    affiliation: null,
+    email: null,
+    hIndex: null,
+  });
+  expect(candidate.reasoning).toMatch(/identity resolver did not establish a probable match/i);
+  expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(writeIdentityDecision).not.toHaveBeenCalled();
+  expect(clearIdentityFields).not.toHaveBeenCalled();
+  expect(setMatchReason).not.toHaveBeenCalled();
+  expect(recordSurfaced).toHaveBeenCalledWith(
+    REQ,
+    [expect.objectContaining({ needsIdentification: true, identityStatus: 'unresolved', email: null })],
+    { expectedUpdatedAt: null },
+  );
+});
+
+test('an institution contradiction overrides a probable identity verdict and leaves Dataverse unchanged', async () => {
+  verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
+    verified: suggestions.map((s) => ({
+      ...s,
+      verified: true,
+      institutionMismatch: true,
+      suggestedInstitution: 'Expected University',
+      affiliation: 'Different University',
+      publications: [{ title: 'Namesake paper', year: 2025 }],
+    })),
+    unverified: [],
+  }));
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      email: 'namesake@different.edu',
+      hasInstitutionCOI: true,
+      contactEnrichment: {
+        email: 'namesake@different.edu',
+        emailSource: 'claude_search',
+        identity: { status: 'probable' },
+      },
+    })),
+  }));
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  const candidate = events.at(-1).data.recommended[0];
+  expect(candidate).toMatchObject({
+    needsIdentification: true,
+    identityStatus: 'unresolved',
+    verificationStatus: 'unresolved',
+    institutionMismatch: true,
+    suggestedInstitution: 'Expected University',
+    affiliation: null,
+    email: null,
+    hasInstitutionCOI: false,
+  });
+  expect(candidate.reasoning).toMatch(/contradict the listed institution/i);
+  expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(writeIdentityDecision).not.toHaveBeenCalled();
+  expect(setMatchReason).not.toHaveBeenCalled();
+});
+
+test('a late namesake substitution is rejected even when PubMed matched the listed institution before enrichment', async () => {
+  getPersonById.mockResolvedValue({
+    wmkf_primaryaffiliation: 'University of Illinois Urbana-Champaign',
+  });
+  verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
+    verified: suggestions.map((s) => ({
+      ...s,
+      verified: true,
+      verificationSource: 'pubmed',
+      institutionMismatch: false,
+      affiliation: 'University of Illinois Urbana-Champaign',
+      affiliationHistory: ['University of Illinois Urbana-Champaign'],
+      publications: [{ title: 'Illinois biomedical paper', year: 2025 }],
+    })),
+    unverified: [],
+  }));
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      affiliation: 'York University',
+      email: 'rbashir@illinois.edu',
+      website: 'https://lassonde.yorku.ca/users/rashid-bashir',
+      hIndex: 4,
+      totalCitations: 69,
+      contactEnrichment: {
+        email: 'rbashir@illinois.edu',
+        emailSource: 'pubmed',
+        website: 'https://lassonde.yorku.ca/users/rashid-bashir',
+        orcidId: '0000-0002-2089-7957',
+        orcidUrl: 'https://orcid.org/0000-0002-2089-7957',
+        orcidAffiliation: 'York University',
+        identity: { status: 'probable' },
+        tierResults: {
+          orcid: {
+            affiliations: [{ organization: 'York University', current: true }],
+          },
+        },
+      },
+    })),
+  }));
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  expect(areInstitutionsConsistent).toHaveBeenCalledTimes(1);
+  expect(areInstitutionsConsistent).toHaveBeenCalledWith(
+    'University of Illinois Urbana-Champaign',
+    'York University',
+    expect.objectContaining({ signal: expect.anything() }),
+  );
+  expect(events.at(-1).data.recommended[0]).toMatchObject({
+    name: 'Dr. Rec One',
+    needsIdentification: true,
+    identityStatus: 'unresolved',
+    affiliation: null,
+    email: null,
+    website: null,
+    orcidUrl: null,
+    hIndex: null,
+    totalCitations: null,
+    publications: [],
+  });
+  expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(writeIdentityDecision).not.toHaveBeenCalled();
+  expect(setMatchReason).not.toHaveBeenCalled();
+});
+
+test('current-run PubMed evidence prevents a previously contaminated affiliation from self-confirming on rerun', async () => {
+  // Simulate the persisted shape after the original bad run: automated
+  // enrichment filled primary affiliation with York, while PubMed still finds
+  // the intended Illinois researcher during this run.
+  getPersonById.mockResolvedValue({
+    wmkf_primaryaffiliation: 'York University',
+    wmkf_organizationname: 'University of Illinois Urbana-Champaign',
+  });
+  // The legacy final gate compared only the stored suggestion (York) with the
+  // final affiliation (York), cleared the earlier PubMed mismatch, and accepted.
+  // Pair-sensitive behavior makes this test fail if the new current-run PubMed
+  // comparison is removed.
+  areInstitutionsConsistent.mockImplementation(async (left, right) =>
+    institutionDirectMatch(left, right));
+  verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
+    verified: suggestions.map((s) => ({
+      ...s,
+      verified: true,
+      verificationSource: 'pubmed',
+      institutionMismatch: true,
+      affiliation: 'University of Illinois Urbana-Champaign',
+      affiliationHistory: ['University of Illinois Urbana-Champaign'],
+      publications: [{ title: 'Illinois biomedical paper', year: 2025 }],
+    })),
+    unverified: [],
+  }));
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      affiliation: 'York University',
+      website: 'https://lassonde.yorku.ca/users/rashid-bashir',
+      hIndex: 4,
+      contactEnrichment: {
+        website: 'https://lassonde.yorku.ca/users/rashid-bashir',
+        orcidId: '0000-0002-2089-7957',
+        orcidUrl: 'https://orcid.org/0000-0002-2089-7957',
+        orcidAffiliation: 'York University',
+        identity: { status: 'probable' },
+        tierResults: {
+          orcid: {
+            affiliations: [{ organization: 'York University', current: true }],
+          },
+        },
+      },
+    })),
+  }));
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  expect(events.at(-1).data.recommended[0]).toMatchObject({
+    needsIdentification: true,
+    identityStatus: 'unresolved',
+    affiliation: null,
+    website: null,
+    orcidUrl: null,
+    hIndex: null,
+    publications: [],
+  });
+  expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(writeIdentityDecision).not.toHaveBeenCalled();
+});
+
+test('current-run verifier institution is not vetoed by a stale stored applicant institution', async () => {
+  getPersonById.mockResolvedValue({ wmkf_primaryaffiliation: 'York University' });
+  areInstitutionsConsistent.mockImplementation(async (left, right) =>
+    institutionDirectMatch(left, right));
+  verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
+    verified: suggestions.map((s) => ({
+      ...s,
+      verified: true,
+      verificationSource: 'pubmed',
+      institutionMismatch: true,
+      affiliation: 'University of Illinois Urbana-Champaign',
+      affiliationHistory: ['University of Illinois Urbana-Champaign'],
+      publications: [{ title: 'Illinois biomedical paper', year: 2025 }],
+    })),
+    unverified: [],
+  }));
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      affiliation: 'University of Illinois Urbana-Champaign',
+      email: 'rbashir@illinois.edu',
+      hIndex: 4,
+      contactEnrichment: {
+        email: 'rbashir@illinois.edu',
+        emailSource: 'pubmed',
+        orcidAffiliation: 'University of Illinois Urbana-Champaign',
+        identity: { status: 'probable' },
+        tierResults: {
+          orcid: {
+            affiliations: [{ organization: 'University of Illinois Urbana-Champaign', current: true }],
+          },
+        },
+      },
+    })),
+  }));
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  expect(areInstitutionsConsistent).not.toHaveBeenCalled();
+  expect(events.at(-1).data.recommended[0]).toMatchObject({
+    needsIdentification: false,
+    identityStatus: 'probable',
+    affiliation: 'University of Illinois Urbana-Champaign',
+    email: 'rbashir@illinois.edu',
+    hIndex: 4,
+  });
+  expect(upsertByPotentialReviewer).toHaveBeenCalled();
+  expect(writeIdentityDecision).toHaveBeenCalled();
+});
+
+test('ORCID employment history connects a legitimate institutional move without a network reconciliation call', async () => {
+  getPersonById.mockResolvedValue({ wmkf_primaryaffiliation: 'Northwestern University' });
+  verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
+    verified: suggestions.map((s) => ({
+      ...s,
+      verified: true,
+      verificationSource: 'pubmed',
+      institutionMismatch: true,
+      affiliation: 'Stanford University',
+      affiliationHistory: ['Stanford University', 'Northwestern University'],
+      publications: [{ title: 'Current Stanford paper', year: 2025 }],
+    })),
+    unverified: [],
+  }));
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      affiliation: 'Stanford University',
+      email: 'mover@stanford.edu',
+      contactEnrichment: {
+        email: 'mover@stanford.edu',
+        emailSource: 'orcid',
+        orcidAffiliation: 'Stanford University',
+        identity: { status: 'probable' },
+        tierResults: {
+          orcid: {
+            affiliations: [
+              { organization: 'Stanford University', current: true },
+              { organization: 'Northwestern University', current: false, endYear: 2023 },
+            ],
+          },
+        },
+      },
+    })),
+  }));
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  expect(areInstitutionsConsistent).not.toHaveBeenCalled();
+  expect(events.at(-1).data.recommended[0]).toMatchObject({
+    needsIdentification: false,
+    identityStatus: 'probable',
+    affiliation: 'Stanford University',
+    email: 'mover@stanford.edu',
+  });
+  expect(upsertByPotentialReviewer).toHaveBeenCalled();
+  expect(writeIdentityDecision).toHaveBeenCalled();
+});
+
+test('a resolved co-affiliation suppresses the string mismatch instead of creating staff work', async () => {
+  areInstitutionsConsistent.mockResolvedValue(true);
+  verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
+    verified: suggestions.map((s) => ({
+      ...s,
+      verified: true,
+      institutionMismatch: true,
+      suggestedInstitution: 'Broad Institute',
+      affiliation: 'Massachusetts Institute of Technology',
+      publications: [],
+    })),
+    unverified: [],
+  }));
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      email: 'reviewer@mit.edu',
+      contactEnrichment: {
+        email: 'reviewer@mit.edu',
+        emailSource: 'affiliation',
+        identity: { status: 'probable' },
+      },
+    })),
+  }));
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  expect(areInstitutionsConsistent).toHaveBeenCalledWith(
+    'Broad Institute',
+    'Massachusetts Institute of Technology',
+    expect.objectContaining({ signal: expect.anything() }),
+  );
+  expect(events.at(-1).data.recommended[0]).toMatchObject({
+    needsIdentification: false,
+    identityStatus: 'probable',
+    email: 'reviewer@mit.edu',
+  });
+  expect(upsertByPotentialReviewer).toHaveBeenCalled();
+});
+
+test('a co-affiliation checker error keeps the contradiction gated and emits a retryable progress reason', async () => {
+  areInstitutionsConsistent.mockRejectedValue(new Error('OpenAlex unavailable'));
+  verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
+    verified: suggestions.map((s) => ({
+      ...s,
+      verified: true,
+      institutionMismatch: true,
+      suggestedInstitution: 'Broad Institute',
+      affiliation: 'Massachusetts Institute of Technology',
+      publications: [],
+    })),
+    unverified: [],
+  }));
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      contactEnrichment: { identity: { status: 'probable' } },
+    })),
+  }));
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  expect(events).toContainEqual({
+    event: 'progress',
+    data: { message: 'Could not reconcile institution affiliations for Dr. Rec One: OpenAlex unavailable' },
+  });
+  expect(events.at(-1).data.recommended[0]).toMatchObject({
+    identityStatus: 'unresolved',
+    needsIdentification: true,
+    institutionMismatch: true,
+  });
+  expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(writeIdentityDecision).not.toHaveBeenCalled();
+});
+
+test('a deadline abort during co-affiliation checking remains a terminal timeout', async () => {
+  getReviewerTimeBudgetSeconds.mockResolvedValue(0);
+  verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
+    verified: suggestions.map((s) => ({
+      ...s,
+      verified: true,
+      institutionMismatch: true,
+      suggestedInstitution: 'Broad Institute',
+      affiliation: 'Massachusetts Institute of Technology',
+      publications: [],
+    })),
+    unverified: [],
+  }));
+  areInstitutionsConsistent.mockImplementation(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    throw new Error('checker aborted');
+  });
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  expect(events.at(-1)).toMatchObject({
+    event: 'error',
+    data: { timeout: true },
+  });
+  expect(events.some((event) => event.event === 'complete')).toBe(false);
+  expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
 });
 
 test('pipeline throw: resolves (never throws) with one generic terminal error', async () => {

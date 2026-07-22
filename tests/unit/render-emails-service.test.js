@@ -94,6 +94,39 @@ test('per-recipient skip: no-email recipient yields skipped:"no_email" row insid
   for (const d of out.drafts) expect(d.emailConfidence).toBeDefined();
 });
 
+test('invitation render refuses a research-only search address', async () => {
+  findById.mockResolvedValueOnce(suggestion());
+  getReviewerByIdWithSelect.mockResolvedValueOnce(person({ wmkf_emailsource: 'serp_search' }));
+  const out = await renderEmails({
+    suggestionIds: [SUG1],
+    template: { subject: 'Review request', body: 'Respond: {{externalLink}}' },
+    settings: {},
+    templateType: 'invitation',
+    actingUserSystemId: null,
+  });
+  expect(out.stats).toEqual({ total: 1, ready: 0, skipped: 1 });
+  expect(out.drafts[0]).toMatchObject({
+    skipped: 'email_research_only',
+    emailConfidence: { action: 'research_only' },
+    manualLink: 'https://x/review?token=abc',
+  });
+  expect(mintAndStore).toHaveBeenCalledTimes(1);
+});
+
+test('post-engagement render does not re-gate a research-only source', async () => {
+  findById.mockResolvedValueOnce(suggestion());
+  getReviewerByIdWithSelect.mockResolvedValueOnce(person({ wmkf_emailsource: 'serp_search' }));
+  const out = await renderEmails({
+    suggestionIds: [SUG1],
+    template: TEMPLATE,
+    settings: {},
+    templateType: 'materials',
+    actingUserSystemId: null,
+  });
+  expect(out.stats.ready).toBe(1);
+  expect(out.drafts[0].skipped).toBeUndefined();
+});
+
 test('mint only when the template references {{externalLink}}; failure is BEST-EFFORT per recipient (empty link, no throw)', async () => {
   // No placeholder → no mint at all.
   findById.mockResolvedValueOnce(suggestion());

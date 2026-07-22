@@ -10,6 +10,9 @@
  */
 
 const { ContactEnrichmentService: S } = require('../../lib/services/contact-enrichment-service');
+const { OpenAlexService } = require('../../lib/services/openalex-service');
+
+afterEach(() => jest.restoreAllMocks());
 
 describe('ContactEnrichmentService domain-evidence cluster (characterization)', () => {
   describe('_normalizeDomain', () => {
@@ -106,11 +109,64 @@ describe('ContactEnrichmentService domain-evidence cluster (characterization)', 
     });
   });
 
+  describe('_currentOrcidInstitutionNames', () => {
+    it('returns every unique current ORCID employment, including non-ROR affiliations', () => {
+      const ce = { tierResults: { orcid: { affiliations: [
+        { current: true, organization: 'Ames Laboratory', disambiguationSource: 'RINGGOLD' },
+        { current: true, organization: 'Iowa State University' },
+        { current: false, organization: 'Former University' },
+        { current: true, organization: 'Iowa State University' },
+      ] } } };
+      expect(S._currentOrcidInstitutionNames(ce))
+        .toEqual(['Ames Laboratory', 'Iowa State University']);
+    });
+  });
+
   describe('_strongInstitutionDisplayMatch', () => {
     it('matches on normalized equality/inclusion, false otherwise', () => {
       expect(S._strongInstitutionDisplayMatch('MIT', 'mit')).toBe(true);
       expect(S._strongInstitutionDisplayMatch('MIT', 'Harvard')).toBe(false);
       expect(S._strongInstitutionDisplayMatch('', 'x')).toBe(false);
+    });
+  });
+
+  describe('_buildInstitutionDomainEvidence', () => {
+    it('anchors every strongly resolved current ORCID co-affiliation', async () => {
+      jest.spyOn(OpenAlexService, 'searchInstitutions').mockImplementation(async (name) => {
+        if (name === 'Iowa State University') {
+          return [{ displayName: 'Iowa State University', domain: 'iastate.edu' }];
+        }
+        if (name === 'University of Saskatchewan') {
+          return [{ displayName: 'University of Saskatchewan', domain: 'usask.ca' }];
+        }
+        return [{ displayName: 'Ames National Laboratory', domain: 'ameslab.gov' }];
+      });
+      const result = {
+        contactEnrichment: {
+          identity: { status: 'probable' },
+          verifiedInstitutionDomain: 'usask.ca',
+          orcidAffiliation: 'Ames Laboratory',
+          openAlexAffiliation: 'University of Saskatchewan',
+          tierResults: {
+            orcid: {
+              affiliations: [
+                { current: true, organization: 'Ames Laboratory', disambiguationSource: 'RINGGOLD' },
+                { current: true, organization: 'Iowa State University' },
+              ],
+            },
+          },
+        },
+      };
+
+      await S._buildInstitutionDomainEvidence(
+        { affiliation: 'University of Saskatchewan' },
+        result,
+      );
+
+      expect(result.contactEnrichment.anchoredInstitutionDomains)
+        .toEqual(expect.arrayContaining(['usask.ca', 'iastate.edu']));
+      expect(result.contactEnrichment.plausibleInstitutionDomains)
+        .toEqual(expect.arrayContaining(['usask.ca', 'iastate.edu']));
     });
   });
 });

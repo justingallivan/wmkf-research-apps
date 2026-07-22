@@ -249,8 +249,9 @@ is already on the object).
   non-matching local part can genuinely be a colleague/admin at the same
   institution — the domain proves the institution, not the person. This is exactly
   what the one-click confirm lane is for. (Contrast `_selectGroundedEmail`, which
-  earns full `institution_page` trust only with page-level name adjacency or
-  owner-slug proof, `:988–1024` — that stronger evidence standard is untouched.)
+  earns full `institution_page` trust only from a unique deterministic ownership
+  winner: full-name mailbox; strong-page initials/surname or exact surname; then
+  personal-URL ownership or narrow full-forename adjacency as fallbacks.)
 - A name-mismatch reject whose domain matches NOTHING stays a rejected lead
   (unchanged): with no grounding at all, the current posture is right.
 
@@ -271,8 +272,9 @@ rubber-stamp into an actual per-person adjudication.
 (`:1068–1069`, `:1081`) for the §3.1 **anchored set only** — never the plausible
 set. Rationale (Codex R1 blocker 2): a page email earns unconditional HIGH trust
 (`institution_page`, `reviewer-invite.js:82`), and `_selectGroundedEmail`'s
-grounding is name-adjacency/owner-slug (`:988–1024`) — namesakes share names by
-definition, so page grounding cannot discriminate the namesake failure mode; only
+grounding uses deterministic mailbox classes plus page identity, personal-URL
+ownership, or narrow full-forename adjacency — namesakes share names by definition,
+so the anchored institution domain remains load-bearing; only
 the *domain's* identity anchoring can. Each anchored domain enters the unchanged
 `safeFetchInstitutionPage` SSRF mechanism (HTTPS-only, exact-or-subdomain host,
 private-IP block, IP-pinning dispatcher) exactly as the single domain does today.
@@ -282,8 +284,9 @@ existing evidence standard) → **recovered**. Whether to enable
 `REVIEWER_PAGE_EMAIL_TIER_ENABLED` in prod was the owner's call — **enabled
 2026-07-03** after this redesign shipped; with the flag OFF, case 5 keeps today's
 manual lane (faculty-page link + staff entry). Structurally the tier stays an
-opt-in tier — page-grounding-as-core-adjudication is not needed once §3.1–3.3
-land, and keeping the fetch behind the flag preserves the zero-SSRF default.
+opt-in code path; production currently opts in. Page-grounding-as-core-adjudication
+is not needed once §3.1–3.3 land, and disabling the flag remains the rollback to
+the zero-SSRF manual path.
 
 ## 4. Migration / rollout
 
@@ -333,7 +336,7 @@ contested-vs-rejected lead split.
 - The identity resolver, anchor requirements for paid search, and the
   anchor-contradiction reject — these are the namesake protections proper.
 - `_selectGroundedEmail`'s evidence standard for full `institution_page` trust.
-- The zero-SSRF default posture of Contract 7 (flag stays; owner decides).
+- Contract 7's feature flag (the code-default-off rollback stays; production is enabled).
 
 **Residual risks:**
 - **Same-institution wrong person.** A contested email on the right domain can

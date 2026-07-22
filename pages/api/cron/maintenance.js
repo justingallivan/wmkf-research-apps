@@ -54,6 +54,15 @@ export default async function handler(req, res) {
       results.queryLog = { error: error.message };
     }
 
+    // 2b. Reviewer identity shadow log cleanup (retention window + row cap)
+    try {
+      results.reviewerIdentityShadowLog =
+        await MaintenanceService.cleanupReviewerIdentityShadowLog(config.reviewer_identity_shadow_log_days);
+      totalDeleted += results.reviewerIdentityShadowLog;
+    } catch (error) {
+      results.reviewerIdentityShadowLog = { error: error.message };
+    }
+
     // 3. Expired cache cleanup
     try {
       results.cache = await MaintenanceService.cleanupExpiredCache();

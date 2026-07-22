@@ -103,34 +103,32 @@ invariant (Codex HIGH, S235).
 
 ---
 
-## 3. Slice-G invite-confidence recipient allowlist `[VERIFIED 2026-06-13]`
+## 3. Invitation address-action gate `[VERIFIED 2026-07-18]`
 
-**Contract.** On a first-contact **invitation**, `send-emails.js` independently computes
-`emailConfidence(person)` per recipient and REFUSES a LOW-confidence recipient UNLESS that
-recipient's `suggestionId` is in the request's `confirmedLowConfidenceIds` allowlist. The
-acknowledgement is **recipient-specific, not a batch boolean** — a row that became LOW after
-preview cannot ride on another row's confirmation.
+**Contract.** On a first-contact **invitation**, the server independently computes
+`emailConfidence(person)` and applies one of four actions. A client-provided confidence label
+never authorizes a send.
 
-- **HIGH** = email source `orcid`/`pubmed`/`institution_page`, or `serp_search`/`claude_search`
-  on a `confirmed`/`probable` identity.
-- **LOW** = `manual`, `affiliation`, `search_contested` (a search email the domain guard
-  contested — S321 gating redesign), unknown/null source, or a search email on an unconfirmed
-  identity. `search_contested` stays LOW even on a `confirmed` identity.
+- **Ready** = `orcid`, `institution_page`, or `scholarly_multi` (the same address on at least
+  two distinct recent, identity-matched scholarly works). Sends without an extra address check.
+- **Quick check** = `scholarly_single`, legacy `pubmed`, `manual`, `affiliation`, or unknown/null
+  source. The recipient's `suggestionId` must be in `confirmedLowConfidenceIds`; the
+  acknowledgement is recipient-specific, not a batch boolean.
+- **Research only** = `serp_search`, `claude_search`, or `search_contested`. The server always
+  skips the invitation with `email_research_only`; a checkbox or forged allowlist entry cannot
+  override it.
+- **Missing** = no address. There is nothing to send.
 - **Scope.** Gated to `templateType==='invitation'` only. Post-acceptance materials / followup /
-  thankyou are NOT gated.
+  thankyou are NOT re-gated.
 
-**Enforcement points.** `lib/utils/reviewer-invite.js:70-88` (`emailConfidence`) ·
-`pages/api/review-manager/send-emails.js:120-124` (allowlist captured as a Set) ·
-`send-emails.js:292-294` (per-recipient check, skip reason `email_unconfirmed`). `render-emails.js`
-stamps `emailConfidence` per draft (the modal DTO is too thin to compute it); `InviteEmailModal`
-requires a **per-recipient checkbox** for each LOW address (name + address + reason; send button
-disabled until every one is ticked, and only the ticked suggestionIds are sent as
-`confirmedLowConfidenceIds` — S321, replacing the earlier one-click batch confirm), plus a batch
-irreversible-send `window.confirm`. Manual email edits (`my-candidates.js`) stamp
-`emailSource='manual'` so staff-typed addresses read LOW. The researcher adapter treats `manual`
-AND `search_contested` as authoritative overwrites of `wmkf_emailsource` (fill-only for other
-sources) so a downgraded address can never read HIGH off a stale source
-(`lib/dataverse/adapters/researcher.js:151-156`).
+**Enforcement points.** `lib/utils/reviewer-invite.js` (`emailConfidence`) ·
+`lib/services/review-manager/render-emails-service.js` (server-computed action in preview;
+research-only rows are skipped) · `lib/services/review-manager/send-emails-service.js`
+(fresh server recomputation; hard research-only skip and recipient-specific quick-check
+allowlist) · `shared/components/reviewers/InviteEmailModal.js` (checkboxes for quick-check rows
+only). Manual email edits stamp `emailSource='manual'`. The researcher adapter treats `manual`
+and `search_contested` as authoritative source overwrites so stale provenance cannot make an
+address look more trusted than it is.
 
 **Why.** The API is the enforced boundary — the modal acknowledgement alone is not trusted.
 
@@ -222,7 +220,7 @@ Co-PI reads skipped for save-time COI context) · `discover.js` (`partitionConfl
 
 ## 6. OpenAlex bibliometrics + verified-domain source `[VERIFIED 2026-06-13]`
 
-**Contract.** Bibliometrics (h-index/i10/citations), the current-affiliation candidate, and the
+**Contract.** Bibliometrics (h-index/i10/citations), the OpenAlex last-known-affiliation candidate, and the
 verified-email domain all source from **OpenAlex, NOT SerpAPI Scholar** (Slice 1b, S251 free-stack
 migration). `ContactEnrichmentService._attachOpenAlexMetrics` (was `_attachScholarMetrics`) uses
 the ORCID path (`getAuthorByOrcid`) or the discovery-resolved author id carried on the candidate
@@ -244,50 +242,59 @@ toggle. It writes the `tierResults.openalex_author` DTO that the resolver re-pro
 
 ---
 
-## 7. Faculty-page email recovery — default zero-SSRF; opt-in guarded fetch (S265) `[VERIFIED 2026-06-17]`
+## 7. Faculty-page email recovery — guarded fetch + ranked mailbox ownership `[VERIFIED 2026-07-19]`
 
-**Contract.** By DEFAULT the faculty-page path is still the **ZERO-SSRF path — no server-side fetch.**
-`my-candidates` GET returns `facultyPageUrl` (selects `wmkf_facultypageurl`); `ReviewerInvitePanel` shows
-a "find on faculty page →" link on no-email candidates; staff read the address there and enter it via
-`CandidateEditModal` → manual stamp (`emailSource='manual'`, reads LOW per Contract 3) → Slice-G confirm.
-
-**S265 reversal (opt-in only).** The automated server-side fetch the S235 decision declined was BUILT,
-behind the `REVIEWER_PAGE_EMAIL_TIER_ENABLED` flag (**default OFF — production behavior unchanged**).
-When enabled, `_attachEmailFromResolvedPage` (`contact-enrichment-service.js:934`) runs inside
+**Contract.** `my-candidates` still returns `facultyPageUrl`, and staff can manually enter an
+address when automation abstains. The automated path is guarded by
+`REVIEWER_PAGE_EMAIL_TIER_ENABLED`: code fails closed when unset, while production explicitly
+enables the tier. When enabled, `_attachEmailFromResolvedPage` runs inside
 `_finalize` (after `_attachOpenAlexMetrics`, before the verified-domain guard) and recovers a
 page-grounded email via `safeFetchInstitutionPage` (`lib/utils/safe-fetch.js`) with the named SSRF
 mechanism Codex required: HTTPS-only, host = exact-or-subdomain of `verifiedInstitutionDomain` ONLY,
 DNS private/reserved-IP block incl. IPv6, **undici IP-pinning dispatcher** (closes the DNS-rebind
-TOCTOU), per-hop redirect re-validation, content-type + 512 KB + timeout caps. The email is stamped
-`emailSource='institution_page'` ONLY when page-grounded (candidate-associated, unique, forename-gated;
-`_selectGroundedEmail`) — `institution_page` is HIGH-trust per Contract 3. Rationale + full design:
+TOCTOU), per-hop redirect re-validation, content-type + 512 KB + timeout caps.
+
+The email is stamped `emailSource='institution_page'` ONLY when deterministic ownership ranking
+has one best address: exact full-name mailbox; initials+surname, surname+initials, or exact surname
+on a page whose title or sole H1 names the candidate; then exact personal-URL slug and narrow
+full-forename directional adjacency as fallbacks. Equal-best ties, body-only weak mailbox forms,
+domain-only matches, and unmatched role addresses abstain. `ContactParser.isNameConsistentEmail`
+is not used because its surname-containment rule is appropriate only for quarantined search leads.
+`institution_page` remains HIGH-trust per Contract 3. Rationale + full design:
 `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md` (supersedes `REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md` §D).
 Do NOT enable without that mechanism intact; multi-domain institutions (e.g. Kansas State `ksu.edu` vs
 OpenAlex `k-state.edu`) are an intentional v1 gap (the fetch is refused, not relaxed).
 
-**Related verified-domain guard (S321 gating redesign — contests, no longer drops).**
+`emailEvidence` records the official source URL, match class, ownership proof, and bounded
+alternatives. `pruneCandidateForRoster` preserves that compact evidence in Postgres
+`reviewer_find_roster`, and `CandidateCard` shows the source and explanation after reload.
+Dataverse and the send gate do not consume the detailed proof: invitation authorization remains
+the binary persisted `institution_page` source and is recomputed server-side.
+
+**Related verified-domain guard (S321 contests; 2026-07-18 policy makes contests research-only).**
 `_validateEmailAgainstVerifiedDomain` (`contact-enrichment-service.js:419`) now validates against
 **two domain sets** built in `_finalize` by `_buildInstitutionDomainEvidence` (`:255`):
 *anchored* (identity-proven, ID-resolved: `verifiedInstitutionDomain` + ORCID
 disambiguated-organization RORs → `OpenAlexService.getInstitution`, only on a confirmed/probable
 identity) and *plausible* (anchored + name-resolved via `OpenAlexService.searchInstitutions`,
 lane-routing only). An anchored match confirms persistence; a SEARCH-sourced contradiction is
-re-stamped `emailSource='search_contested'` (`_markEmailContested`, `:303`) — kept, persisted,
-LOW at send per Contract 3, staff-confirmed per recipient — instead of nulled into a rejected
-lead. A `name_mismatch`-rejected email whose domain is plausible is likewise promoted to
+re-stamped `emailSource='search_contested'` (`_markEmailContested`, `:303`) — kept as a visible
+research lead but never invitation-sendable per Contract 3 — instead of nulled into a rejected
+lead. A `name_mismatch`-rejected email whose domain is plausible is likewise retained as
 contested in `_finalize` (`_readjudicateNameMismatchRejectedEmail`, `:312`).
 ORCID/PubMed/affiliation emails still outrank the heuristic. The opt-in fetch tier above is
 SSRF-bound to the **anchored** set only (fallback: the single `verifiedInstitutionDomain` when
 the anchored set is empty — today's bound). Design + review history:
 `docs/REVIEWER_GATING_STRATEGY_REDESIGN.md`.
 
-**Enforcement points.** Default no-fetch/manual-link boundary: `pages/api/reviewer-finder/my-candidates.js:189`
-(returns `facultyPageUrl`, no fetch) · `shared/components/reviewers/ReviewerInvitePanel.js:275-287` (staff-facing
-"find on faculty page →" link). Opt-in guarded fetch (flag-gated): `lib/utils/safe-fetch.js`
+**Enforcement points.** `lib/utils/safe-fetch.js`
 (`safeFetchInstitutionPage`, `hostWithinDomain`, `isPrivateAddress`) ·
-`lib/services/contact-enrichment-service.js:934` (`_attachEmailFromResolvedPage`) +
-`_selectGroundedEmail`. The related verified-domain guard:
-`lib/services/contact-enrichment-service.js:223, 770`. Audit:
+`lib/services/contact-enrichment/page-email.js`
+(`attachEmailFromResolvedPage`, `selectGroundedEmailWithEvidence`) ·
+`lib/utils/contact-parser.js` (`extractEmailsFromHtml`) ·
+`shared/components/reviewers/reviewer-search-logic.js` (`pruneEmailEvidence`) ·
+`shared/components/reviewers/ReviewerSearchSection.js` (`CandidateCard`). The related
+verified-domain guard remains in the contact-enrichment finalization path. Audit:
 `tests/unit/resolved-page-email-grounding.test.js`, `tests/unit/resolved-page-email-tier-service.test.js`.
 Design: `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`.
 
@@ -328,5 +335,5 @@ exported `:568`). **Audit:** `tests/unit/reviewer-identity-evidence.test.js`
 | 4 | Structured-PI fail-open/augment-only | `proposal-pi-identity.js:125+` + `reviewer-identity-evidence.js:316-321` |
 | 5 | S240 institution COI default hard drop + flagged exception | `save-candidates.js:116,150-160` + `discover.js`/`DiscoveryService` `partitionConflicts` + `reviewer-roster-store.js` `recordCoiDropped` |
 | 6 | OpenAlex bibliometrics/verified-domain | `contact-enrichment-service.js:676-790` |
-| 7 | Faculty-page: default zero-SSRF; opt-in guarded fetch (flag) | `my-candidates.js:189` + `ReviewerInvitePanel.js:275-287` (default) · `safe-fetch.js` `safeFetchInstitutionPage` + `contact-enrichment-service.js:934` (opt-in) |
+| 7 | Faculty-page guarded fetch + ranked mailbox ownership | `safe-fetch.js` + `contact-enrichment/page-email.js` + roster/UI evidence projection |
 | 8 | Work-grounding rescue | `reviewer-identity-evidence.js:212-271` |

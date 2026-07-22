@@ -23,6 +23,7 @@ related:
 | [AGENT_COLLABORATION_PLAN.md](AGENT_COLLABORATION_PLAN.md) | plan | active |  | Status: Draft operating contract Purpose: Keep Justin, Claude, and Codex from stepping on each other's work while using the same repo across... | 2026-07-02 |
 | [AGENT_HARNESS_STYLE_GUIDE.md](AGENT_HARNESS_STYLE_GUIDE.md) | spec | active |  | This guide keeps agent-facing instructions precise, confident, and low-noise. | 2026-07-02 |
 | [AGENT_INSTRUCTION_AUDIT_S322.md](AGENT_INSTRUCTION_AUDIT_S322.md) | audit | active |  | Audit of CLAUDE.md, AGENTS.md, and .claude/rules/ for size, duplication, unread content, broken imports, and lint restatement. Findings + outcomes. |  |
+| [AGENT_SELF_VERIFICATION_ENFORCEMENT.md](AGENT_SELF_VERIFICATION_ENFORCEMENT.md) | spec | active |  | Narrow blockers and fingerprinted review receipts enforce evidence where advisory reminders repeatedly failed. | 2026-07-18 |
 | [CLAUDE_COVERAGE_LESSONS.md](CLAUDE_COVERAGE_LESSONS.md) | plan | historical |  | Created: 2026-05-07 (S137) after a Codex stress-test cycle where each round caught a slightly different syntactic pattern the previous round... | 2026-07-02 |
 | [CLAUDE_INSTRUCTION_AUTHORITY.md](CLAUDE_INSTRUCTION_AUTHORITY.md) | source-of-truth | canonical | yes | Status: Active Last verified: 2026-06-05 Purpose: Identify the authoritative definition and enforcement mirror for must-follow agent instructions. | 2026-07-02 |
 | [CLAUDE_MEMORY_REORGANIZATION_PLAN.md](CLAUDE_MEMORY_REORGANIZATION_PLAN.md) | plan | active |  | The problem is not absence of memory. The problem is density and retrieval. | 2026-07-02 |
@@ -112,7 +113,7 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [EMAIL_TOKEN_SYNTAX_UNIFICATION_PLAN.md](EMAIL_TOKEN_SYNTAX_UNIFICATION_PLAN.md) | plan | active |  | - Verify: post-migration dry-run reports adminChanged=0 preferenceChanged=0 — zero bracket tokens remain in any stored value. | 2026-07-02 |
-| [RESOLVED_PAGE_EMAIL_TIER_DESIGN.md](RESOLVED_PAGE_EMAIL_TIER_DESIGN.md) | spec | active |  | - Private-IP block covers IPv6 (::, 0.0.0.0, IPv4-mapped incl. hex-form, fe80::/10, AAAA records); the dns.lookup→connect TOCTOU window is CLOSED... | 2026-07-02 |
+| [RESOLVED_PAGE_EMAIL_TIER_DESIGN.md](RESOLVED_PAGE_EMAIL_TIER_DESIGN.md) | spec | active |  | Guarded page fetch plus deterministic mailbox ranking; only a unique grounded winner receives the invitation-ready institution_page source. | 2026-07-02 |
 | [TODO_EMAIL_NOTIFICATIONS.md](TODO_EMAIL_NOTIFICATIONS.md) | plan | draft |  | System-alert emails are wired to the Dynamics email transport (DynamicsService.createAndSendEmail). When NOTIFICATION_EMAIL_FROM is set, the... | 2026-07-02 |
 | [UNIFIED_EMAIL_SIGNATURE_PLAN.md](UNIFIED_EMAIL_SIGNATURE_PLAN.md) | plan | active |  | - The grantee invite/reminder need a signature; titles are NOT in Dataverse, so the signature must come from a per-user store with a sensible... | 2026-07-02 |
 
@@ -239,6 +240,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
+| [REVIEWER_AFFILIATION_CONTACT_RECONCILIATION_PLAN.md](REVIEWER_AFFILIATION_CONTACT_RECONCILIATION_PLAN.md) | plan | active |  | Surface exact-key Dataverse contact evidence and honest affiliation provenance without auto-merging people or treating stale records as current truth. |  |
 | [REVIEWER_COI_PRECISION_PLAN.md](REVIEWER_COI_PRECISION_PLAN.md) | plan | active |  | Institution-COI ledger, precision matcher, and provenance-gated flag-not-drop policy. | 2026-07-03 |
 
 ## reviewer-identity
@@ -266,14 +268,18 @@ related:
 | [REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md](REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md) | audit | draft |  | Pointer-based prompt for a Fable session to holistically reassess reviewer finding and disambiguation — reframe-first, full latitude, curated reading map. | 2026-07-08 |
 | [REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md](REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Active hybrid plan: safe slices reach main behind legacy-default seams; identity containment, measured rollout, and post-campaign cleanup. | 2026-07-12 |
 | [REVIEWER_IDENTITY_BINDING_PRODUCTION_SMOKE_ADVERSARIAL_REVIEW_HANDOFF.md](REVIEWER_IDENTITY_BINDING_PRODUCTION_SMOKE_ADVERSARIAL_REVIEW_HANDOFF.md) | audit | historical |  | Historical read-only review brief that led to the dedicated reviewer-binding smoke; implementation and production execution are complete. | 2026-07-13 |
+| [REVIEWER_IDENTITY_CONTACT_HANDOFF.md](REVIEWER_IDENTITY_CONTACT_HANDOFF.md) | runbook | active |  | Continuation handoff: W0/W1 are live; W2 combined mode and W4.1 evidence persistence are built behind the legacy production default. | 2026-07-19 |
+| [REVIEWER_IDENTITY_CONTACT_PLAN.md](REVIEWER_IDENTITY_CONTACT_PLAN.md) | plan | active |  | W0/W1 and three email improvements are live; W2 combined mode and W4.1 persistence are built behind the legacy default, with cutover gated. | 2026-07-19 |
 | [REVIEWER_IDENTITY_ORCID_EMPLOYMENT_PROMOTION_DESIGN.md](REVIEWER_IDENTITY_ORCID_EMPLOYMENT_PROMOTION_DESIGN.md) | spec | active |  | 2. Promotion rule (reviewer-identity-resolver.js classifySpineEvidence): strong orcid_employment_corroborated + topic_match + spine.forenameAgrees... | 2026-07-02 |
 | [REVIEWER_IDENTITY_RECONCILIATION_EDITS.md](REVIEWER_IDENTITY_RECONCILIATION_EDITS.md) | history | active |  | Related write-up: docs/REVIEWER_IDENTITY_STRATEGY_EVALUATION.md. | 2026-07-02 |
 | [REVIEWER_IDENTITY_RESOLUTION_PLAN.md](REVIEWER_IDENTITY_RESOLUTION_PLAN.md) | plan | active |  | Status: Design proposal as originally authored by Codex (S213, 2026-06-02) — now shipped; see the supersession banner above. Written at the user's... | 2026-07-02 |
 | [REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md](REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md) | spec | active |  | - confirmed is explicitly NOT reachable in PR1 (needs the deferred faculty-page + publication-cluster evidence). PR1 tops out at probable. | 2026-07-02 |
+| [REVIEWER_IDENTITY_SHADOW_LOGGER_HANDOFF.md](REVIEWER_IDENTITY_SHADOW_LOGGER_HANDOFF.md) | runbook | active |  | Durable Postgres resolver-comparison logger deployed with migration 026 applied; combined-mode cutover remains disabled. | 2026-07-19 |
 | [REVIEWER_IDENTITY_STRATEGY_EVALUATION.md](REVIEWER_IDENTITY_STRATEGY_EVALUATION.md) | decision | active |  | Scope: strategy-level evaluation of reviewer identity/contact enrichment failures for request 1002794, grounded in HEAD versions of:. | 2026-07-02 |
 | [REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md](REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md) | spec | active |  | Author: S216. Depends on: S214/S215 identity resolver + ORCID backfill (docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md, memory... | 2026-07-02 |
 | [REVIEWER_ORCID_NAME_PROMOTION_DESIGN.md](REVIEWER_ORCID_NAME_PROMOTION_DESIGN.md) | spec | active |  | - (C) Identity note. Add orcid_name_confirmed to buildIdentityNote() corroboration list (evidence.js:421-436), e.g. \"ORCID profile name\". | 2026-07-02 |
 | [REVIEWER_ORCID_SPINE_SPEC.md](REVIEWER_ORCID_SPINE_SPEC.md) | spec | active |  | - [NEW] lib/services/openalex-service.js — author search only (presence + ORCID discovery + institution + topics). NEVER trusted for... | 2026-07-02 |
+| [REVIEWER_PAGE_FIRST_EMAIL_EXPERIMENT_PLAN.md](REVIEWER_PAGE_FIRST_EMAIL_EXPERIMENT_PLAN.md) | plan | active |  | Completed staged page-first email experiment: safe but only +1/20 on the fresh cohort, so the cascade was not promoted. | 2026-07-18 |
 | [REVIEWER_PROVENANCE_MODEL.md](REVIEWER_PROVENANCE_MODEL.md) | source-of-truth | canonical | yes | In the old model there was a binary axis: a candidate was either a *Claude suggestion* or a *database discovery*, and being Claude-suggested... | 2026-07-02 |
 | [REVIEWER_RECENCY_WEIGHTING_PLAN.md](REVIEWER_RECENCY_WEIGHTING_PLAN.md) | plan | active |  | Owner task: Topic #2 from project-reviewer-finder-next-topics. Decisions locked with Justin S223 (see... | 2026-07-02 |
 | [REVIEWER_TRACK_B_IDENTITY_SPEC.md](REVIEWER_TRACK_B_IDENTITY_SPEC.md) | spec | active |  | Original status: PROPOSED. Builds on the shipped S232 ORCID spine (Track A), the S233 honorific + topic-threshold fixes (Fixes 1/2), and the S233... | 2026-07-02 |

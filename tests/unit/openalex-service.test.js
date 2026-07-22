@@ -8,16 +8,20 @@ jest.mock('../../lib/utils/safe-fetch.js', () => ({
 
 const { safeFetch } = require('../../lib/utils/safe-fetch.js');
 const { OpenAlexService, registrableDomainFromUrl, reconstructAbstract } = require('../../lib/services/openalex-service');
+const originalOpenAlexApiKey = process.env.OPENALEX_API_KEY;
 
-const jsonResponse = (payload, status = 200) => ({
+const jsonResponse = (payload, status = 200, headers = {}) => ({
   ok: status >= 200 && status < 300,
   status,
+  headers: { get: (name) => headers[String(name).toLowerCase()] || null },
   json: jest.fn(async () => payload),
 });
 
 describe('OpenAlexService.searchAuthors', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    if (originalOpenAlexApiKey === undefined) delete process.env.OPENALEX_API_KEY;
+    else process.env.OPENALEX_API_KEY = originalOpenAlexApiKey;
   });
 
   test('parses author response into spine records', async () => {
@@ -86,10 +90,66 @@ describe('OpenAlexService.searchAuthors', () => {
   test('throws on source outage after retry so adapter can abstain', async () => {
     safeFetch
       .mockResolvedValueOnce(jsonResponse({ error: 'busy' }, 503))
+      .mockResolvedValueOnce(jsonResponse({ error: 'busy' }, 503))
       .mockResolvedValueOnce(jsonResponse({ error: 'busy' }, 503));
 
     await expect(OpenAlexService.searchAuthors('Robert Sang')).rejects.toThrow(/OpenAlex request failed/);
-    expect(safeFetch).toHaveBeenCalledTimes(2);
+    expect(safeFetch).toHaveBeenCalledTimes(3);
+  });
+
+  test('caller abort interrupts retry backoff without another provider call', async () => {
+    const controller = new AbortController();
+    safeFetch.mockResolvedValue(jsonResponse(
+      { error: 'busy' },
+      429,
+      { 'retry-after': '5' },
+    ));
+    const pending = OpenAlexService.searchAuthors('Robert Sang', {
+      signal: controller.signal,
+    });
+    setTimeout(() => {
+      controller.abort(Object.assign(new Error('stop retrying'), { name: 'AbortError' }));
+    }, 0);
+
+    await expect(pending).rejects.toMatchObject({
+      name: 'AbortError',
+      message: 'stop retrying',
+    });
+    expect(safeFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('request timeout is cleaned before a maximum retry delay', async () => {
+    jest.useFakeTimers();
+    try {
+      safeFetch
+        .mockResolvedValueOnce(jsonResponse(
+          { error: 'busy' },
+          429,
+          { 'retry-after': '5' },
+        ))
+        .mockResolvedValueOnce(jsonResponse({ meta: { count: 0 }, results: [] }));
+
+      const pending = OpenAlexService.searchAuthors('Robert Sang', { timeoutMs: 5000 });
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(safeFetch).toHaveBeenCalledTimes(1);
+
+      await jest.advanceTimersByTimeAsync(5000);
+      await expect(pending).resolves.toMatchObject({ totalCount: 0, records: [] });
+      expect(safeFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('authenticates requests with OPENALEX_API_KEY', async () => {
+    process.env.OPENALEX_API_KEY = 'oa-test-key';
+    safeFetch.mockResolvedValue(jsonResponse({ meta: { count: 0 }, results: [] }));
+
+    await OpenAlexService.searchAuthors('Robert Sang');
+
+    const url = new URL(safeFetch.mock.calls[0][0]);
+    expect(url.searchParams.get('api_key')).toBe('oa-test-key');
   });
 });
 
@@ -140,6 +200,42 @@ describe('OpenAlexService work lookup', () => {
     const url = safeFetch.mock.calls[0][0];
     expect(url).toContain('search=Exact+title');
     expect(url).not.toContain('filter=');
+  });
+
+  test('raw-author work lookup uses the byline filter and returns mapped authorships', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({
+      meta: { count: 1 },
+      results: [{
+        id: 'https://openalex.org/W2',
+        display_name: 'A recent work',
+        authorships: [{
+          raw_author_name: 'Will Harcombe',
+          author: {
+            id: 'https://openalex.org/A2',
+            display_name: 'William Harcombe',
+            orcid: 'https://orcid.org/0000-0001-8445-2052',
+          },
+          institutions: [{
+            id: 'https://openalex.org/I2',
+            display_name: 'University of Minnesota',
+          }],
+        }],
+      }],
+    }));
+
+    const out = await OpenAlexService.searchWorksByRawAuthorName('Dr. Will Harcombe');
+
+    const url = new URL(safeFetch.mock.calls[0][0]);
+    expect(url.searchParams.get('filter')).toBe(
+      'raw_author_name.search:"Will Harcombe",type:!paratext',
+    );
+    expect(url.searchParams.get('sort')).toBe('publication_date:desc');
+    expect(out.records[0].authorships[0]).toMatchObject({
+      openAlexAuthorId: 'https://openalex.org/A2',
+      displayName: 'William Harcombe',
+      orcid: '0000-0001-8445-2052',
+    });
+    expect(out.records[0].authorships[0].raw.raw_author_name).toBe('Will Harcombe');
   });
 });
 
@@ -224,14 +320,28 @@ describe('OpenAlexService institution lookup', () => {
         id: 'https://openalex.org/I123',
         display_name: 'Princeton University',
         ror: 'https://ror.org/00hx57361',
+        country_code: 'US',
         homepage_url: 'https://www.princeton.edu/',
+        associated_institutions: [{
+          id: 'https://openalex.org/I456',
+          display_name: 'Princeton Plasma Physics Laboratory',
+          ror: 'https://ror.org/03vn1ts68',
+          country_code: 'US',
+          relationship: 'related',
+        }],
       }],
     }));
     const out = await OpenAlexService.searchInstitutions('Princeton University', { limit: 1 });
     expect(out).toEqual([expect.objectContaining({
       displayName: 'Princeton University',
       ror: 'https://ror.org/00hx57361',
+      country: 'US',
       domain: 'princeton.edu',
+      associatedInstitutions: [expect.objectContaining({
+        openAlexId: 'https://openalex.org/I456',
+        country: 'US',
+        relationship: 'related',
+      })],
     })]);
     expect(safeFetch.mock.calls[0][0]).toMatch(/api\.openalex\.org\/institutions\?search=Princeton\+University/);
   });
@@ -400,10 +510,29 @@ describe('OpenAlexService.getInstitution (Slice 1b verified-domain source)', () 
       id: 'https://openalex.org/I63966007',
       display_name: 'Massachusetts Institute of Technology',
       ror: 'https://ror.org/042nb2s44',
+      country_code: 'US',
       homepage_url: 'https://web.mit.edu',
+      associated_institutions: [{
+        id: 'https://openalex.org/I107606265',
+        display_name: 'Broad Institute',
+        ror: 'https://ror.org/05a0ya142',
+        country_code: 'US',
+        relationship: 'related',
+      }],
     }));
     const out = await OpenAlexService.getInstitution('https://openalex.org/I63966007');
-    expect(out).toMatchObject({ displayName: 'Massachusetts Institute of Technology', domain: 'mit.edu' });
+    expect(out).toMatchObject({
+      displayName: 'Massachusetts Institute of Technology',
+      country: 'US',
+      domain: 'mit.edu',
+      associatedInstitutions: [{
+        openAlexId: 'https://openalex.org/I107606265',
+        displayName: 'Broad Institute',
+        ror: 'https://ror.org/05a0ya142',
+        country: 'US',
+        relationship: 'related',
+      }],
+    });
     expect(safeFetch.mock.calls[0][0]).toContain('/institutions/I63966007');
   });
 

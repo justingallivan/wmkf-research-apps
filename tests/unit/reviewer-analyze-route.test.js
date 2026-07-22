@@ -104,6 +104,36 @@ describe('/api/reviewer-finder/analyze', () => {
     expect(loadReviewerRequestContext).toHaveBeenCalledWith(REQUEST_ID);
   });
 
+  test('analysis_refused emits a non-retryable typed error SSE', async () => {
+    ClaudeReviewerService.analyzeProposal.mockResolvedValue({
+      success: false,
+      status: 'analysis_refused',
+      attempt: 1,
+      stopReason: 'refusal',
+      usedFallback: false,
+      model: 'claude-test',
+    });
+
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: REQUEST_ID,
+        proposalText: 'This proposal has enough text for analysis. '.repeat(10),
+        reviewerCount: 6,
+      },
+    };
+    const res = mockRes();
+
+    await handler(req, res);
+
+    const stream = res.write.mock.calls.map(call => call[0]).join('');
+    expect(stream).toContain('event: error\n');
+    expect(stream).toContain('"status":"analysis_refused"');
+    expect(stream).toContain('"retryable":false');
+    expect(stream).not.toContain('event: result\n');
+    expect(stream).not.toContain('event: complete\n');
+  });
+
   test('missing requestId emits an SSE error without calling Claude', async () => {
     const req = {
       method: 'POST',

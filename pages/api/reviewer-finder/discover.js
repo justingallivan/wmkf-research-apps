@@ -288,6 +288,8 @@ export default async function handler(req, res) {
     });
 
     const { DeduplicationService } = require('../../../lib/services/deduplication-service');
+    const { createInstitutionIdentityResolver } = require('../../../lib/services/institution-identity-resolver');
+    const institutionIdentityResolver = createInstitutionIdentityResolver();
 
     // Filter out proposal authors (PI AND co-investigators) — they should never
     // be reviewers. Derived via the shared helper so this matches the COI set
@@ -338,7 +340,12 @@ export default async function handler(req, res) {
 
     if (coiInstitutions && (Array.isArray(coiInstitutions) ? coiInstitutions.length : true)) {
       const beforeInst = verifiedWithCOI.length;
-      const instPartition = DeduplicationService.partitionConflicts(verifiedWithCOI, coiInstitutions);
+      const instPartition = await DeduplicationService.partitionConflictsResolved(
+        verifiedWithCOI,
+        coiInstitutions,
+        [],
+        { resolver: institutionIdentityResolver, signal: deadlineController.signal },
+      );
       const keptInst = instPartition.filtered;
       const droppedInst = beforeInst - keptInst.length;
       if (droppedInst > 0) {
@@ -378,17 +385,10 @@ export default async function handler(req, res) {
         verifiedWithCOI = await DiscoveryService.checkCoauthorshipsForCandidates(
           verifiedWithCOI,
           proposalAuthors,
-          (progress) => sendEvent('progress', progress)
+          (progress) => sendEvent('progress', progress),
+          { signal: deadlineController.signal }
         );
 
-        const coiCount = verifiedWithCOI.filter(c => c.hasCoauthorCOI).length;
-        sendEvent('progress', {
-          stage: 'coi_check',
-          status: 'complete',
-          message: coiCount > 0
-            ? `Found ${coiCount} candidate(s) with coauthorship history`
-            : 'No coauthorship conflicts found'
-        });
       } else if (!pubmedVerificationContract.enabled && proposalAuthors.length > 0 && verifiedWithCOI.length > 0) {
         sendEvent('progress', {
           stage: 'coi_check',
@@ -442,7 +442,12 @@ export default async function handler(req, res) {
       }
 
       if (coiInstitutions && (Array.isArray(coiInstitutions) ? coiInstitutions.length : true) && referredCandidates.length > 0) {
-        const instPartition = DeduplicationService.partitionConflicts(referredCandidates, coiInstitutions);
+        const instPartition = await DeduplicationService.partitionConflictsResolved(
+          referredCandidates,
+          coiInstitutions,
+          [],
+          { resolver: institutionIdentityResolver, signal: deadlineController.signal },
+        );
         const keptInst = instPartition.filtered;
         const keptNames = new Set(keptInst.map((candidate) => String(candidate.name || '').toLowerCase()));
         for (const seed of referredCandidates) {
@@ -460,7 +465,8 @@ export default async function handler(req, res) {
         referredCandidates = await DiscoveryService.checkCoauthorshipsForCandidates(
           referredCandidates,
           proposalAuthors,
-          (progress) => sendEvent('progress', progress)
+          (progress) => sendEvent('progress', progress),
+          { signal: deadlineController.signal }
         );
       }
 
@@ -472,6 +478,28 @@ export default async function handler(req, res) {
         });
       }
       verifiedWithCOI = [...referredCandidates, ...verifiedWithCOI];
+    }
+
+    // Reconcile once after every PubMed-eligible Track-A candidate (including
+    // referred seeds) has settled. This avoids an early clean-negative message
+    // that a later referred-seed failure would invalidate.
+    {
+      const pubmedVerificationContract = DiscoveryService.pubMedVerificationContract({
+        searchPubmed,
+        proposalInfo: analysisResult.proposalInfo,
+      });
+      const checkedCandidates = verifiedWithCOI.filter(
+        (candidate) => candidate.coauthorCheckStatus === 'complete'
+          || candidate.coauthorCheckStatus === 'incomplete'
+      );
+      if (pubmedVerificationContract.enabled && checkedCandidates.length > 0) {
+        const coiSummary = DiscoveryService.summarizeCoauthorChecks(checkedCandidates);
+        sendEvent('progress', {
+          stage: 'coi_check',
+          status: coiSummary.status,
+          message: coiSummary.message,
+        });
+      }
     }
 
     sendEvent('progress', {

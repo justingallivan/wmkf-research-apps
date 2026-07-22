@@ -24,6 +24,7 @@
     "eval:reviewer-holistic:m1-execute": "node --import ./scripts/lib/use-extensionless.mjs scripts/run-reviewer-holistic-m1.mjs",
     "collect:reviewer-holistic:m1-identities": "node scripts/collect-reviewer-holistic-identity-cases.js",
     "probe:reviewer-holistic:channels": "node scripts/probe-reviewer-channel-baseline.js",
+    "eval:reviewer-identity:w2": "node scripts/evaluate-reviewer-works-first.js",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:unit": "jest tests/unit",

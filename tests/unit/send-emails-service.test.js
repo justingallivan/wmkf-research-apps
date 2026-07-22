@@ -290,6 +290,45 @@ describe('send-emails-service — invitation body-integrity gate', () => {
   });
 });
 
+describe('send-emails-service — address action gate', () => {
+  test('quick-check address requires recipient-specific confirmation', async () => {
+    PERSONS[`person-${SUG_OK}`] = person(`person-${SUG_OK}`, { wmkf_emailsource: 'scholarly_single' });
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(resultOf(emitted).skipped[0]).toMatchObject({
+      suggestionId: SUG_OK,
+      reason: 'email_unconfirmed',
+      emailConfidence: { action: 'quick_check' },
+    });
+  });
+
+  test('confirmed quick-check address may be invited', async () => {
+    PERSONS[`person-${SUG_OK}`] = person(`person-${SUG_OK}`, { wmkf_emailsource: 'scholarly_single' });
+    const emitted = await run({
+      drafts: [draft(SUG_OK)],
+      templateType: 'invitation',
+      confirmedLowConfidenceIds: [SUG_OK],
+    });
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(resultOf(emitted).sent).toHaveLength(1);
+  });
+
+  test('research-only address cannot be invited even when client claims confirmation', async () => {
+    PERSONS[`person-${SUG_OK}`] = person(`person-${SUG_OK}`, { wmkf_emailsource: 'serp_search' });
+    const emitted = await run({
+      drafts: [draft(SUG_OK)],
+      templateType: 'invitation',
+      confirmedLowConfidenceIds: [SUG_OK],
+    });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(resultOf(emitted).skipped[0]).toMatchObject({
+      suggestionId: SUG_OK,
+      reason: 'email_research_only',
+      emailConfidence: { action: 'research_only' },
+    });
+  });
+});
+
 describe('send-emails-service — complete event message wording', () => {
   test('unconfirmed count appends "; N possibly sent (verify before retry)"; skipped wording drops "(no email)"', async () => {
     SUGGESTIONS = {

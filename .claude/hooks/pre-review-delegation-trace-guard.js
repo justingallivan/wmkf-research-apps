@@ -73,7 +73,11 @@ process.stdin.on('end', () => {
     const ti = data.tool_input || {};
     const subagent = typeof ti.subagent_type === 'string' ? ti.subagent_type : '';
     const prompt = typeof ti.prompt === 'string' ? ti.prompt : '';
-    const { findUntracedDiscoveryAsks } = require('./lib/document-guards');
+    const {
+      extractAdversarialReviewReceiptPaths,
+      findUntracedDiscoveryAsks,
+      isQualifiedAdversarialReviewPrompt,
+    } = require('./lib/document-guards');
 
     // (a) Any Codex subagent. Check the structured field, then fall back to scanning
     // the whole tool_input so a renamed field still trips it (parity with the sibling
@@ -91,6 +95,20 @@ process.stdin.on('end', () => {
       /\b(pre[- ]?impl(?:ementation)?|post[- ]?impl(?:ementation)?|design review|code review|review (?:this|the|my|our|these)|re-?review|confirm[- ]?(?:or|\/)[- ]?refute|adversarial|red[- ]?team|critique|sanity[- ]?check|audit (?:this|the|my)|validate (?:this|the|my)|verify (?:this|the|these|my|our)|check (?:my|the) reasoning|look(?:ing)? for (?:regressions|bugs)|find(?: the)? bugs?|scrutin)/i
         .test(prompt);
     if (!looksCodex && !looksReview) return;
+
+    const receiptPaths = extractAdversarialReviewReceiptPaths(prompt);
+    const malformedReceiptPaths = receiptPaths.filter(
+      (relativePath) => !isQualifiedAdversarialReviewPrompt(prompt, relativePath)
+    );
+    if (malformedReceiptPaths.length) {
+      console.error(
+        'BLOCKED: an adversarial-review receipt marker was requested without the full review contract.\n' +
+        `Affected artifact(s): ${malformedReceiptPaths.join(', ')}\n` +
+        'The same prompt must ask for an adversarial/refuting review, file:line evidence, ' +
+        'a disconfirming check for each recommendation, and use the phrase "for each recommendation".'
+      );
+      process.exit(2);
+    }
 
     if (looksCodexRescue &&
       looksLikeCodexReviewRequest(prompt) &&

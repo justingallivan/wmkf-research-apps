@@ -106,14 +106,14 @@ function LeadRow({ lead, onUse }) {
         </a>
       )}
       {/* Slice 4: manage-only promotion. Sets the value as a MANUAL contact —
-          stamped manual provenance, so the invite flow still treats it as
-          low-confidence and requires explicit confirm-before-send. */}
+          stamped manual provenance, so the invite flow requires a quick check
+          and explicit per-recipient acknowledgement before sending. */}
       {onUse && (
         <button
           type="button"
           onClick={() => onUse(lead)}
           className="ml-2 text-blue-700 hover:text-blue-900 underline"
-          title="Set this as the reviewer's contact (manual — you'll confirm before any invite is sent)"
+          title="Set this as the reviewer's contact (manual — a quick check is required before inviting)"
         >
           {isEmail ? 'Use this email' : 'Use this page'}
         </button>

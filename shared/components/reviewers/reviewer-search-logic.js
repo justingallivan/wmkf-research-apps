@@ -12,6 +12,17 @@ import { buildReviewerProvenance, PROVENANCE_KINDS, provenanceGroupOf, provenanc
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import { parseReferredSeeds as _parseReferredSeeds } from '../../../lib/utils/reviewer-referral-seeds';
 import { reviewerSaveKey } from '../../../lib/utils/reviewer-save-key';
+import {
+  reviewerCandidateKey as _reviewerCandidateKey,
+  reviewerSuggestionCandidateKey,
+  withReviewerCandidateKey as _withReviewerCandidateKey,
+} from '../../../lib/utils/reviewer-candidate-key';
+import { emailConfidence } from '../../../lib/utils/reviewer-invite';
+
+// Increment when applicant-recommended enrichment semantics change in a way
+// that requires existing roster JSON to be recomputed. Unversioned legacy rows
+// deliberately miss the cache once and are stamped by the enrichment service.
+export const APPLICANT_ENRICHMENT_CACHE_VERSION = 2;
 
 /**
  * Merge contact-enrichment results (from /enrich-contacts) back onto the chosen
@@ -35,7 +46,10 @@ import { reviewerSaveKey } from '../../../lib/utils/reviewer-save-key';
 export const sanitizeInstitutionCOIDetails = _sanitizeInstitutionCOIDetails;
 
 export function isCandidateSelectable(c) {
-  return (provenanceGroupOf(c) !== 'needs_identity_review' || c?.pdIdentityConfirmed === true) && !c?.hasInstitutionCOI;
+  const eligibilityStatus = c?.eligibilityStatus || c?.contactEnrichment?.eligibilityStatus || 'unknown';
+  return eligibilityStatus !== 'deceased'
+    && (provenanceGroupOf(c) !== 'needs_identity_review' || c?.pdIdentityConfirmed === true)
+    && !c?.hasInstitutionCOI;
 }
 
 export function candidateWasSaved(candidate, savedKeys = [], savedNames = []) {
@@ -45,17 +59,88 @@ export function candidateWasSaved(candidate, savedKeys = [], savedNames = []) {
   return legacyNames.has(_normalizeReviewerName(candidate?.name));
 }
 
+/**
+ * Stable correlation key for one surfaced candidate row.
+ *
+ * This is deliberately not a name-only identity claim. Prefer durable person
+ * anchors when discovery has them; otherwise use reviewerSaveKey's composite
+ * name/email/ORCID/affiliation fingerprint. The key is stamped before
+ * enrichment and then preserved, so promoted affiliation evidence or a newly
+ * found email cannot change selection state or attach another same-name
+ * candidate's enrichment.
+ */
+export const reviewerCandidateKey = _reviewerCandidateKey;
+export const withReviewerCandidateKey = _withReviewerCandidateKey;
+
+/**
+ * Project the invitation service's authoritative address-source classifier
+ * onto a Find-tab candidate. "missing" is UI-only: the send path still
+ * re-derives high/low from the persisted person row immediately before send.
+ *
+ * @param {object} candidate
+ * @returns {{ level: 'high'|'low'|'missing', action: 'ready'|'quick_check'|'research_only'|'missing', reason: string }}
+ */
+export function getCandidateEmailReadiness(candidate) {
+  const enrichment = candidate?.contactEnrichment || {};
+  const email = candidate?.email || enrichment.email || null;
+  if (!email) {
+    return {
+      level: 'missing',
+      action: 'missing',
+      reason: 'No email address found during contact enrichment',
+    };
+  }
+  const confidence = emailConfidence({
+    email,
+    emailSource: candidate?.emailSource || enrichment.emailSource || null,
+    identityStatus: candidate?.identityStatus
+      || enrichment.identityStatus
+      || enrichment.identity?.status
+      || null,
+  });
+  if (confidence.level === 'low' && enrichment.contactStatusReason) {
+    return { ...confidence, reason: enrichment.contactStatusReason };
+  }
+  return confidence;
+}
+
 export function mergeEnrichment(candidates, enrichmentResults) {
   if (!Array.isArray(candidates)) return [];
   if (!Array.isArray(enrichmentResults) || enrichmentResults.length === 0) return candidates;
+  const byKey = new Map();
+  const candidateNameCounts = new Map();
+  const resultNameCounts = new Map();
   const byName = new Map();
-  for (const r of enrichmentResults) {
-    if (r && r.name && r.contactEnrichment) byName.set(r.name, r);
+  for (const candidate of candidates) {
+    const name = String(candidate?.name || '');
+    candidateNameCounts.set(name, (candidateNameCounts.get(name) || 0) + 1);
   }
-  return candidates.map((c) => {
-    const enriched = byName.get(c.name);
-    if (!enriched) return c;
+  for (const r of enrichmentResults) {
+    const key = reviewerCandidateKey(r);
+    if (key && r?.contactEnrichment) byKey.set(key, r);
+    const name = String(r?.name || '');
+    if (name && r?.contactEnrichment) {
+      resultNameCounts.set(name, (resultNameCounts.get(name) || 0) + 1);
+      byName.set(name, r);
+    }
+  }
+  return candidates.map((candidate, index) => {
+    const c = withReviewerCandidateKey(candidate);
+    const uniqueNameMatch = candidateNameCounts.get(c.name) === 1
+      && resultNameCounts.get(c.name) === 1
+      ? byName.get(c.name)
+      : null;
+    const enriched = byKey.get(c.candidateKey)
+      // Legacy callers sometimes return only name + contactEnrichment. A name
+      // join is safe only when that name is unique on BOTH sides.
+      || uniqueNameMatch
+      // enrichCandidates preserves strict input order. This fallback supports
+      // legacy callers that have not stamped candidateKey yet, but only when
+      // the response is a complete 1:1 list.
+      || (enrichmentResults.length === candidates.length ? enrichmentResults[index] : null);
+    if (!enriched) return candidate;
     const e = enriched.contactEnrichment;
+    if (!e) return c;
     const contactEnrichment = {
       ...e,
       website: ContactParser.sanitizeWebsiteForCandidate(e.website, c.name) || null,
@@ -64,6 +149,9 @@ export function mergeEnrichment(candidates, enrichmentResults) {
       ...c,
       automatedIdentityAttestation: enriched.automatedIdentityAttestation || null,
       contactEnrichment,
+      eligibilityStatus: e.eligibilityStatus || enriched.eligibilityStatus || c.eligibilityStatus || 'unknown',
+      eligibilityReason: e.eligibilityReason || enriched.eligibilityReason || c.eligibilityReason || null,
+      eligibilityEvidence: e.eligibilityEvidence || enriched.eligibilityEvidence || c.eligibilityEvidence || null,
       // Institution COI re-evaluated server-side against the post-enrichment
       // affiliation (enrich-contacts). `coiRecomputed` distinguishes "ran and
       // found none" (override the discover value) from "didn't run" (keep it).
@@ -84,9 +172,9 @@ export function mergeEnrichment(candidates, enrichmentResults) {
       hIndex: e.hIndex ?? c.hIndex,
       i10Index: e.i10Index ?? c.i10Index,
       totalCitations: e.totalCitations ?? c.totalCitations,
-      // Current-affiliation pin (S224 #16): enrichment may have replaced the
-      // discovery affiliation with an identity-trusted ORCID/Scholar current
-      // one. Promote it + its provenance so the card shows "per ORCID" and the
+      // Affiliation-evidence pin (S224 #16): enrichment may have replaced the
+      // discovery affiliation with identity-trusted ORCID-current or OpenAlex-
+      // last-known evidence. Promote it + its provenance so the card labels the source and the
       // client re-rank scores the same affiliation the server persisted.
       affiliation: e.affiliation || c.affiliation,
       affiliationSource: e.affiliationSource || c.affiliationSource,
@@ -222,11 +310,66 @@ export function filterExcluded(candidates, excludedNames) {
   return partitionByExcluded(candidates, excludedNames, (c) => c && c.name);
 }
 
-export function hasValidApplicantEnrichmentCache(rosterActive, proposalKey) {
-  if (!proposalKey) return false;
-  return (Array.isArray(rosterActive) ? rosterActive : []).some((c) => (
-    c?.enrichedProposalKey === proposalKey
-      && (c.isApplicantRecommended || provenanceKindOf(c) === PROVENANCE_KINDS.APPLICANT_SUGGESTED)
+export function applicantTerminalSuggestionKeys(rosterExcluded, savedKeys) {
+  const terminal = new Set();
+  for (const candidate of Array.isArray(rosterExcluded) ? rosterExcluded : []) {
+    const canonicalKey = reviewerSuggestionCandidateKey(candidate?.suggestionId);
+    if (canonicalKey && candidate?.candidateKey === canonicalKey) terminal.add(canonicalKey);
+  }
+  for (const key of Array.isArray(savedKeys) ? savedKeys : []) {
+    if (typeof key !== 'string' || !key.startsWith('suggestion:')) continue;
+    const canonicalKey = reviewerSuggestionCandidateKey(key.slice('suggestion:'.length));
+    if (canonicalKey === key) terminal.add(key);
+  }
+  return terminal;
+}
+
+export function hasValidApplicantEnrichmentCache(
+  rosterActive,
+  proposalKey,
+  expectedRecommendations,
+  terminalSuggestionKeys = [],
+) {
+  if (!proposalKey || !Array.isArray(expectedRecommendations) || expectedRecommendations.length === 0) {
+    return false;
+  }
+  const expectedKeys = new Set(expectedRecommendations
+    .map((candidate) => reviewerSuggestionCandidateKey(candidate?.suggestionId))
+    .filter(Boolean));
+  if (expectedKeys.size !== expectedRecommendations.length) return false;
+
+  for (const key of terminalSuggestionKeys || []) {
+    if (expectedKeys.has(key)) expectedKeys.delete(key);
+  }
+  if (expectedKeys.size === 0) return true;
+
+  const canonicalRowsByKey = new Map();
+  for (const candidate of Array.isArray(rosterActive) ? rosterActive : []) {
+    const canonicalKey = reviewerSuggestionCandidateKey(candidate?.suggestionId);
+    if (
+      canonicalKey
+      && expectedKeys.has(canonicalKey)
+      && candidate?.candidateKey === canonicalKey
+      && candidate?.enrichedProposalKey === proposalKey
+      && candidate?.applicantEnrichmentCacheVersion === APPLICANT_ENRICHMENT_CACHE_VERSION
+      && (candidate.isApplicantRecommended || provenanceKindOf(candidate) === PROVENANCE_KINDS.APPLICANT_SUGGESTED)
+    ) {
+      canonicalRowsByKey.set(canonicalKey, candidate);
+    }
+  }
+  if (canonicalRowsByKey.size !== expectedKeys.size) return false;
+
+  // Applicant enrichment now fails closed unless every non-deceased row has an
+  // explicit identity-gate result. Only the exact canonical suggestion rows for
+  // the current recommendation set count: legacy candidate keys cannot poison a
+  // newly written cache, and a partial roster write cannot masquerade as a
+  // complete batch.
+  return Array.from(canonicalRowsByKey.values()).every((c) => (
+    c?.eligibilityStatus === 'deceased'
+      || c?.pdIdentityConfirmed === true
+      || c?.identityStatus === 'confirmed'
+      || c?.identityStatus === 'probable'
+      || c?.identityStatus === 'unresolved'
   ));
 }
 
@@ -238,6 +381,7 @@ export function hasValidApplicantEnrichmentCache(rosterActive, proposalKey) {
  * `persistable:false` is re-asserted so a roster round-trip can never flip it.
  */
 export const MAX_ROSTER_CONTACT_LEADS = 8;
+export const MAX_ROSTER_IDENTITY_ANCHORS = 20;
 export function pruneContactLeads(leads) {
   if (!Array.isArray(leads)) return [];
   return leads
@@ -254,12 +398,164 @@ export function pruneContactLeads(leads) {
     .filter((l) => l.value);
 }
 
+export function pruneEmailEvidence(evidence) {
+  if (!evidence || typeof evidence !== 'object') return null;
+  const publications = Array.isArray(evidence.publications)
+    ? evidence.publications.slice(0, 5).map((publication) => ({
+        pmid: publication?.pmid ? String(publication.pmid).slice(0, 32) : null,
+        pmcid: publication?.pmcid ? String(publication.pmcid).slice(0, 32) : null,
+        doi: publication?.doi ? String(publication.doi).slice(0, 160) : null,
+        title: publication?.title ? String(publication.title).slice(0, 500) : null,
+        year: Number.isFinite(publication?.year) ? publication.year : null,
+        url: publication?.url ? String(publication.url).slice(0, 500) : null,
+        providers: Array.isArray(publication?.providers)
+          ? publication.providers.slice(0, 3).map(String)
+          : [],
+      }))
+    : [];
+  const alternatives = Array.isArray(evidence.alternatives)
+    ? evidence.alternatives
+        .slice(0, 8)
+        .map((alternative) => ({
+          email: alternative?.email ? String(alternative.email).slice(0, 320) : null,
+          matchClass: alternative?.matchClass ? String(alternative.matchClass).slice(0, 80) : null,
+        }))
+        .filter((alternative) => alternative.email)
+    : [];
+  return {
+    sourceKind: evidence.sourceKind ? String(evidence.sourceKind).slice(0, 80) : null,
+    sourceUrl: evidence.sourceUrl ? String(evidence.sourceUrl).slice(0, 500) : null,
+    action: evidence.action ? String(evidence.action).slice(0, 40) : null,
+    ownership: evidence.ownership ? String(evidence.ownership).slice(0, 80) : null,
+    ownershipProof: evidence.ownershipProof ? String(evidence.ownershipProof).slice(0, 100) : null,
+    matchClass: evidence.matchClass ? String(evidence.matchClass).slice(0, 80) : null,
+    alternatives,
+    affiliationMatched: evidence.affiliationMatched === true,
+    publicationCount: Number.isFinite(evidence.publicationCount) ? evidence.publicationCount : publications.length,
+    providers: Array.isArray(evidence.providers) ? evidence.providers.slice(0, 3).map(String) : [],
+    publications,
+    deliverabilityChecked: evidence.deliverabilityChecked === true,
+  };
+}
+
+export function pruneIdentityDecision(identity) {
+  if (!identity || typeof identity !== 'object' || Array.isArray(identity)) return null;
+  return {
+    status: identity.status || null,
+    confidenceBand: identity.confidenceBand || null,
+    resolverVersion: identity.resolverVersion || null,
+    resolvedAt: identity.resolvedAt || null,
+    evidenceSummary: identity.evidenceSummary || null,
+    anchors: Array.isArray(identity.anchors)
+      ? identity.anchors.slice(0, MAX_ROSTER_IDENTITY_ANCHORS).map((anchor) => ({
+          type: anchor?.type || null,
+          canonicalKey: anchor?.canonicalKey || null,
+          sourceUrl: anchor?.sourceUrl || null,
+          verifier: anchor?.verifier || null,
+        }))
+      : null,
+  };
+}
+
+export function pruneEligibilityEvidence(evidence) {
+  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) return null;
+  return {
+    status: evidence.status === 'deceased' || evidence.status === 'emeritus'
+      ? evidence.status
+      : null,
+    url: typeof evidence.url === 'string' ? evidence.url.slice(0, 500) : null,
+    title: typeof evidence.title === 'string' ? evidence.title.slice(0, 500) : null,
+    snippet: typeof evidence.snippet === 'string' ? evidence.snippet.slice(0, 800) : null,
+    sourceDomain: typeof evidence.sourceDomain === 'string' ? evidence.sourceDomain.slice(0, 255) : null,
+    checkedAt: typeof evidence.checkedAt === 'string' ? evidence.checkedAt.slice(0, 80) : null,
+  };
+}
+
+export function pruneDataverseContactEvidence(evidence) {
+  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) return null;
+  const statuses = new Set(['known', 'review_required', 'none', 'unavailable']);
+  const reasons = new Set([
+    'provisional_orcid_match',
+    'ambiguous_or_name_mismatch',
+    'orcid_email_split',
+    'contact_linked_elsewhere',
+    'email_mismatch',
+    'identity_conflict',
+    'lookup_unavailable',
+    'partial_enrichment',
+    'deadline_exceeded',
+  ]);
+  const institutionSources = new Set(['staff_confirmed', 'primary_affiliation', 'organization']);
+  const recordKinds = Array.isArray(evidence.recordKinds)
+    ? Array.from(new Set(evidence.recordKinds.filter((kind) => kind === 'contact' || kind === 'potential_reviewer'))).slice(0, 2)
+    : [];
+  const institutions = Array.isArray(evidence.institutions)
+    ? evidence.institutions.slice(0, 8).flatMap((entry) => {
+        const value = boundedText(entry?.value, 500);
+        const source = institutionSources.has(entry?.source) ? entry.source : null;
+        return value && source ? [{ value, source }] : [];
+      })
+    : [];
+  return {
+    status: statuses.has(evidence.status) ? evidence.status : 'unavailable',
+    matchKey: evidence.matchKey === 'email' || evidence.matchKey === 'orcid' ? evidence.matchKey : null,
+    recordKinds,
+    nameConsistent: evidence.nameConsistent === true ? true : evidence.nameConsistent === false ? false : null,
+    institutions,
+    reason: reasons.has(evidence.reason) ? evidence.reason : null,
+    checkedAt: boundedText(evidence.checkedAt, 80),
+  };
+}
+
+function pruneCoauthorCheckFailures(failures) {
+  if (!Array.isArray(failures)) return [];
+  return failures.slice(0, 12).map((failure) => ({
+    proposalAuthor: typeof failure?.proposalAuthor === 'string'
+      ? failure.proposalAuthor.slice(0, 200)
+      : null,
+    status: Number.isFinite(failure?.status) ? failure.status : null,
+    reason: failure?.reason === 'rate_limited' ? 'rate_limited' : 'unavailable',
+  }));
+}
+
+function pruneManualContactFields(fields) {
+  const allowed = new Set(['email', 'website', 'affiliation', 'hIndex']);
+  return Array.isArray(fields)
+    ? Array.from(new Set(fields.filter((field) => allowed.has(field)))).slice(0, 4)
+    : [];
+}
+
+function boundedText(value, maxLength) {
+  return typeof value === 'string' ? value.slice(0, maxLength) : null;
+}
+
+function pruneStaffIdentityConfirmation(confirmation) {
+  if (!confirmation || typeof confirmation !== 'object' || Array.isArray(confirmation)) return null;
+  const confirmationId = boundedText(confirmation.confirmationId, 100);
+  if (!confirmationId || confirmation.source !== 'staff_confirmed') return null;
+  return {
+    confirmationId,
+    source: 'staff_confirmed',
+    normalizedName: boundedText(confirmation.normalizedName, 300),
+    email: boundedText(confirmation.email, 320),
+    website: boundedText(confirmation.website, 500),
+    affiliation: boundedText(confirmation.affiliation, 500),
+    actorProfileId: typeof confirmation.actorProfileId === 'number'
+      ? confirmation.actorProfileId
+      : boundedText(confirmation.actorProfileId, 100),
+    actorSystemUserId: boundedText(confirmation.actorSystemUserId, 100),
+    confirmedAt: boundedText(confirmation.confirmedAt, 80),
+  };
+}
+
 /**
  * Prune an enriched candidate down to the fields `CandidateCard` actually
  * renders, for durable storage in `reviewer_find_roster` (S224). Keeps the card
- * fully renderable after reload while dropping the heavy raw enrichment internals
- * (tierResults, identity-resolver anchors). The SINGLE source for the roster DTO
- * shape so the server store + client merge agree.
+ * fully renderable after reload while dropping heavy raw enrichment internals.
+ * The compact, server-attested identity decision is retained so W4.1 evidence
+ * can reach the save boundary after a reload; raw tierResults remain excluded.
+ * The SINGLE source for the roster DTO shape so the server store + client merge
+ * agree.
  */
 export function pruneCandidateForRoster(c) {
   if (!c || typeof c !== 'object') return c;
@@ -296,17 +592,23 @@ export function pruneCandidateForRoster(c) {
     affiliationPersistAllowed: persistFlag('affiliationPersistAllowed'),
     // A render-safe contactEnrichment SUBSET so CandidateCard's `enr.*` reads
     // (emailSource/emailYear/priorAffiliation/affiliationSource/links/metrics)
-    // still work after reload. NEVER the raw internals (identity/tierResults).
+    // still work after reload. NEVER raw tierResults; identity is reduced to
+    // the exact fields covered by the server receipt and persistence writer.
     contactEnrichment: {
+      identity: pruneIdentityDecision(identity),
       email: e.email || null,
       emailSource: e.emailSource || null,
       emailYear: e.emailYear || null,
+      emailAction: e.emailAction || null,
+      emailActionReason: e.emailActionReason || null,
+      emailEvidence: pruneEmailEvidence(e.emailEvidence),
       contactStatus: e.contactStatus || null,
       contactStatusReason: e.contactStatusReason || null,
       verifiedInstitutionDomain: e.verifiedInstitutionDomain || null,
       anchoredInstitutionDomains: Array.isArray(e.anchoredInstitutionDomains) ? e.anchoredInstitutionDomains.slice(0, 8) : [],
       plausibleInstitutionDomains: Array.isArray(e.plausibleInstitutionDomains) ? e.plausibleInstitutionDomains.slice(0, 12) : [],
       website: ContactParser.sanitizeWebsiteForCandidate(e.website, c.name) || null,
+      websiteSource: e.websiteSource === 'manual' ? 'manual' : (e.websiteSource || null),
       orcid: e.orcid || e.orcidId || null,
       orcidId: e.orcidId || null,
       orcidUrl: e.orcidUrl || null,
@@ -325,6 +627,10 @@ export function pruneCandidateForRoster(c) {
       // Slice 5: compact quarantined leads so the ContactLeads section survives a
       // roster reload. Bounded + stripped of raw payloads; persistable stays false.
       contactLeads: pruneContactLeads(e.contactLeads),
+      eligibilityStatus: e.eligibilityStatus || c.eligibilityStatus || 'unknown',
+      eligibilityReason: e.eligibilityReason || c.eligibilityReason || null,
+      eligibilityEvidence: pruneEligibilityEvidence(e.eligibilityEvidence || c.eligibilityEvidence),
+      dataverseContactEvidence: pruneDataverseContactEvidence(e.dataverseContactEvidence),
     },
     name: c.name,
     affiliation: c.affiliation || null,
@@ -337,6 +643,9 @@ export function pruneCandidateForRoster(c) {
     // surfaced-active loses its marker and becomes silently selectable again on reload
     // (the gate would only hold for the live run). Persist all three the group test reads.
     identityStatus: c.identityStatus || e.identity?.status || null,
+    eligibilityStatus: c.eligibilityStatus || e.eligibilityStatus || 'unknown',
+    eligibilityReason: c.eligibilityReason || e.eligibilityReason || null,
+    eligibilityEvidence: pruneEligibilityEvidence(c.eligibilityEvidence || e.eligibilityEvidence),
     needsIdentification: !!c.needsIdentification,
     verificationStatus: c.verificationStatus || null,
     // Source / provenance flags the card branches on.
@@ -352,12 +661,19 @@ export function pruneCandidateForRoster(c) {
     seedIdentityNameConsistent: c.seedIdentityNameConsistent === false ? false : (c.seedIdentityNameConsistent === true ? true : null),
     isApplicantRecommended: !!c.isApplicantRecommended,
     enrichedProposalKey: c.enrichedProposalKey || null,
+    applicantEnrichmentCacheVersion: Number.isInteger(c.applicantEnrichmentCacheVersion)
+      ? c.applicantEnrichmentCacheVersion
+      : null,
     suggestionId: c.suggestionId || null,
     // COI + mismatch detail.
     hasInstitutionCOI: !!c.hasInstitutionCOI,
     institutionCOIDetails: sanitizeInstitutionCOIDetails(c.institutionCOIDetails),
     hasCoauthorCOI: !!c.hasCoauthorCOI,
     coauthorships: Array.isArray(c.coauthorships) ? c.coauthorships : [],
+    coauthorCheckStatus: c.coauthorCheckStatus === 'complete' || c.coauthorCheckStatus === 'incomplete'
+      ? c.coauthorCheckStatus
+      : null,
+    coauthorCheckFailures: pruneCoauthorCheckFailures(c.coauthorCheckFailures),
     // S238 graded coauthor COI + thin-evidence/off-topic warnings — persist so the
     // card's severity and warnings survive a roster reload (else a 'possible' overlap
     // regresses to red via the UI fallback, and the warnings vanish entirely).
@@ -386,6 +702,8 @@ export function pruneCandidateForRoster(c) {
     email: c.email || e.email || null,
     emailSource: e.emailSource || null,
     emailYear: e.emailYear || null,
+    emailAction: e.emailAction || null,
+    emailActionReason: e.emailActionReason || null,
     // Defensive: re-guard the persisted website so a document-file URL can't ride
     // through the prune (mirrors mergeEnrichment; sanitized at ingestion too).
     website: ContactParser.sanitizeWebsiteForCandidate(c.website || e.website, c.name) || null,
@@ -406,11 +724,14 @@ export function pruneCandidateForRoster(c) {
       && c.automatedIdentityAttestation.length <= 4096
       ? c.automatedIdentityAttestation
       : null,
+    candidateKey: reviewerCandidateKey(c),
+    manualContactFields: pruneManualContactFields(c.manualContactFields),
     // UI convenience only. Save-candidates derives authority by looking up the
     // opaque confirmation id in the request-scoped server roster.
     pdIdentityConfirmed: c.pdIdentityConfirmed === true,
     pdIdentityConfirmationId: typeof c.pdIdentityConfirmationId === 'string'
       ? c.pdIdentityConfirmationId
       : null,
+    staffIdentityConfirmation: pruneStaffIdentityConfirmation(c.staffIdentityConfirmation),
   };
 }

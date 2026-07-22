@@ -19,6 +19,7 @@ describe('ContactEnrichmentService.estimateCost (characterization)', () => {
       breakdown: {
         pubmed: { count: 4, cost: 0 }, orcid: { count: 4, cost: 0 },
         claude_search: { count: 0, cost: 0 }, serp_search: { count: 0, cost: 0 },
+        eligibility_evidence: { count: 0, cost: 0 },
       },
     });
   });
@@ -30,17 +31,20 @@ describe('ContactEnrichmentService.estimateCost (characterization)', () => {
     expect(e.estimatedCost).toBeCloseTo(0.03, 10);
   });
 
-  it('serp only: ~50% (ceil) serp searches at SERP_GOOGLE_SEARCH each', () => {
+  it('serp only: contact estimate plus one conservative eligibility query per candidate', () => {
     const e = S.estimateCost(mk(4), { useSerpSearch: true });
     expect(e.breakdown.serp_search).toEqual({ count: 2, cost: 0.01 });
-    expect(e.estimatedCost).toBeCloseTo(0.01, 10);
+    expect(e.breakdown.eligibility_evidence).toEqual({ count: 4, cost: 0.02 });
+    expect(e.paidOperations).toBe(6);
+    expect(e.estimatedCost).toBeCloseTo(0.03, 10);
   });
 
   it('both: claude on ~50%, then serp on ~20% of that remainder', () => {
     const e = S.estimateCost(mk(10), { useClaudeSearch: true, useSerpSearch: true });
     expect(e.breakdown.claude_search).toEqual({ count: 5, cost: 0.075 });
     expect(e.breakdown.serp_search).toEqual({ count: 1, cost: 0.005 });
-    expect(e.paidOperations).toBe(6);
-    expect(e.estimatedCost).toBeCloseTo(0.08, 10);
+    expect(e.breakdown.eligibility_evidence).toEqual({ count: 10, cost: 0.05 });
+    expect(e.paidOperations).toBe(16);
+    expect(e.estimatedCost).toBeCloseTo(0.13, 10);
   });
 });

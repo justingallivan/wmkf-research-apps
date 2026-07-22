@@ -2,19 +2,26 @@
  * @jest-environment node
  */
 import {
+  APPLICANT_ENRICHMENT_CACHE_VERSION,
   mergeEnrichment,
   asPercent,
   normalizeReviewerName,
   parseExcludeList,
   parseReferredSeeds,
   filterExcluded,
+  applicantTerminalSuggestionKeys,
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
   candidateWasSaved,
+  getCandidateEmailReadiness,
   pruneCandidateForRoster,
+  pruneEmailEvidence,
+  pruneDataverseContactEvidence,
   sanitizeInstitutionCOIDetails,
   mergeReferredProvenance,
   dedupeByNamePreferReferred,
+  reviewerCandidateKey,
+  withReviewerCandidateKey,
 } from '../../shared/components/reviewers/reviewer-search-logic.js';
 const { PROVENANCE_KINDS, provenanceGroupOf, provenanceKindOf, provenanceLabelForCandidate } = require('../../lib/utils/reviewer-provenance');
 const { normalizeReviewerName: normName } = require('../../lib/utils/reviewer-name-match');
@@ -67,6 +74,174 @@ describe('pruneCandidateForRoster — referred seed anchors survive reload', () 
       seedIdentityMatchKey: 'email',
       seedIdentityNameConsistent: true,
     }));
+  });
+});
+
+describe('pruneCandidateForRoster — W4.1 identity evidence survives reload', () => {
+  test('retains only the server-attested identity fields used by persistence', () => {
+    const pruned = pruneCandidateForRoster({
+      name: 'Taekjip Ha',
+      contactEnrichment: {
+        identity: {
+          status: 'probable',
+          confidenceBand: 'medium',
+          resolverVersion: '2.0.0-works-first',
+          resolvedAt: '2026-07-19T12:00:00.000Z',
+          evidenceSummary: 'probable — authorship grounded',
+          anchors: [{
+            type: 'authorship_grounded',
+            canonicalKey: 'openalex:A100',
+            sourceUrl: 'https://openalex.org/A100',
+            verifier: 'reviewerWorksFirst@2.0.0-works-first',
+            parserOutput: { rawProviderPayload: 'drop-me' },
+          }],
+          rejectedAnchors: [{ raw: 'drop-me' }],
+        },
+      },
+    });
+
+    expect(pruned.contactEnrichment.identity).toEqual({
+      status: 'probable',
+      confidenceBand: 'medium',
+      resolverVersion: '2.0.0-works-first',
+      resolvedAt: '2026-07-19T12:00:00.000Z',
+      evidenceSummary: 'probable — authorship grounded',
+      anchors: [{
+        type: 'authorship_grounded',
+        canonicalKey: 'openalex:A100',
+        sourceUrl: 'https://openalex.org/A100',
+        verifier: 'reviewerWorksFirst@2.0.0-works-first',
+      }],
+    });
+    expect(pruned.contactEnrichment.identity).not.toHaveProperty('rejectedAnchors');
+    expect(JSON.stringify(pruned)).not.toContain('rawProviderPayload');
+  });
+});
+
+describe('scholarly email evidence survives a bounded roster round-trip', () => {
+  test('keeps action + compact publication provenance and drops extra works', () => {
+    const evidence = {
+      sourceKind: 'scholarly_publication',
+      sourceUrl: 'https://pubmed.ncbi.nlm.nih.gov/1/',
+      action: 'ready',
+      ownership: 'author_affiliation',
+      affiliationMatched: true,
+      publicationCount: 6,
+      providers: ['ncbi_pubmed', 'europe_pmc'],
+      publications: Array.from({ length: 6 }, (_, index) => ({
+        pmid: String(index + 1),
+        title: `Paper ${index + 1}`,
+        year: 2026 - index,
+        url: `https://pubmed.ncbi.nlm.nih.gov/${index + 1}/`,
+        providers: ['ncbi_pubmed'],
+        rawPayload: { shouldNotPersist: true },
+      })),
+      deliverabilityChecked: false,
+      rawProviderResponse: { shouldNotPersist: true },
+    };
+    const compact = pruneEmailEvidence(evidence);
+    expect(compact.publications).toHaveLength(5);
+    expect(compact).not.toHaveProperty('rawProviderResponse');
+    expect(compact.publications[0]).not.toHaveProperty('rawPayload');
+
+    const pruned = pruneCandidateForRoster({
+      name: 'Jane Roe',
+      email: 'jane@stanford.edu',
+      contactEnrichment: {
+        email: 'jane@stanford.edu',
+        emailSource: 'scholarly_multi',
+        emailAction: 'ready',
+        emailActionReason: 'Address source: scholarly_multi',
+        emailEvidence: evidence,
+      },
+    });
+    expect(pruned.contactEnrichment).toMatchObject({
+      emailAction: 'ready',
+      emailEvidence: { publicationCount: 6, action: 'ready' },
+    });
+  });
+});
+
+describe('institution-page ownership evidence survives a bounded roster round-trip', () => {
+  test('keeps the proof, official source, and only eight compact alternatives', () => {
+    const evidence = {
+      sourceKind: 'institution_page',
+      sourceUrl: 'https://engineering.tamu.edu/electrical/profiles/phemmer.html',
+      ownershipProof: 'mailbox_initials_surname_unverified_middle',
+      matchClass: 'initials_surname',
+      alternatives: Array.from({ length: 10 }, (_, index) => ({
+        email: `role${index}@tamu.edu`,
+        matchClass: 'unmatched',
+        rawPageContext: { shouldNotPersist: true },
+      })),
+      rawHtml: '<html>should not persist</html>',
+    };
+
+    const compact = pruneEmailEvidence(evidence);
+    expect(compact).toMatchObject({
+      sourceKind: 'institution_page',
+      sourceUrl: evidence.sourceUrl,
+      ownershipProof: 'mailbox_initials_surname_unverified_middle',
+      matchClass: 'initials_surname',
+    });
+    expect(compact.alternatives).toHaveLength(8);
+    expect(compact.alternatives[0]).toEqual({
+      email: 'role0@tamu.edu',
+      matchClass: 'unmatched',
+    });
+    expect(compact).not.toHaveProperty('rawHtml');
+    expect(compact.alternatives[0]).not.toHaveProperty('rawPageContext');
+
+    const pruned = pruneCandidateForRoster({
+      name: 'Philip Hemmer',
+      email: 'prhemmer@tamu.edu',
+      contactEnrichment: {
+        email: 'prhemmer@tamu.edu',
+        emailSource: 'institution_page',
+        emailEvidence: evidence,
+      },
+    });
+    expect(pruned.contactEnrichment.emailEvidence).toEqual(compact);
+  });
+});
+
+describe('Dataverse contact evidence survives a bounded roster round-trip', () => {
+  test('keeps compact display evidence and drops unknown fields', () => {
+    const raw = {
+      status: 'known',
+      matchKey: 'email',
+      recordKinds: ['potential_reviewer', 'contact', 'unknown'],
+      nameConsistent: true,
+      institutions: [
+        { value: 'Stanford University', source: 'staff_confirmed', raw: 'drop' },
+        { value: 'Northwestern University', source: 'primary_affiliation' },
+        { value: 'Ignore', source: 'unknown' },
+      ],
+      reason: null,
+      checkedAt: '2026-07-21T12:00:00.000Z',
+      reviewerId: 'must-not-survive',
+    };
+
+    expect(pruneDataverseContactEvidence(raw)).toEqual({
+      status: 'known',
+      matchKey: 'email',
+      recordKinds: ['potential_reviewer', 'contact'],
+      nameConsistent: true,
+      institutions: [
+        { value: 'Stanford University', source: 'staff_confirmed' },
+        { value: 'Northwestern University', source: 'primary_affiliation' },
+      ],
+      reason: null,
+      checkedAt: '2026-07-21T12:00:00.000Z',
+    });
+
+    const pruned = pruneCandidateForRoster({
+      name: 'Michael Jewett',
+      contactEnrichment: { dataverseContactEvidence: raw },
+    });
+    expect(pruned.contactEnrichment.dataverseContactEvidence)
+      .toEqual(pruneDataverseContactEvidence(raw));
+    expect(JSON.stringify(pruned)).not.toContain('must-not-survive');
   });
 });
 
@@ -160,9 +335,46 @@ describe('isCandidateSelectable', () => {
       provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
     })).toBe(true);
   });
+
+  test('deceased rows are never selectable, including after PD identity confirmation', () => {
+    expect(isCandidateSelectable({
+      name: 'Deceased',
+      pdIdentityConfirmed: true,
+      eligibilityStatus: 'deceased',
+      provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
+    })).toBe(false);
+  });
 });
 
 describe('mergeEnrichment', () => {
+  test('keeps same-name candidates bound to their own enrichment', () => {
+    const candidates = [
+      withReviewerCandidateKey({ name: 'Dr. Alex Kim', affiliation: 'One University' }),
+      withReviewerCandidateKey({ name: 'Dr. Alex Kim', affiliation: 'Two University' }),
+    ];
+    const enrichment = [
+      {
+        ...candidates[0],
+        contactEnrichment: { email: 'alex.one@one.edu', emailSource: 'serp_search' },
+      },
+      {
+        ...candidates[1],
+        contactEnrichment: { email: 'alex.two@two.edu', emailSource: 'serp_search' },
+      },
+    ];
+
+    const out = mergeEnrichment(candidates, enrichment);
+
+    expect(out.map((c) => c.email)).toEqual(['alex.one@one.edu', 'alex.two@two.edu']);
+    expect(out[0].candidateKey).not.toBe(out[1].candidateKey);
+  });
+
+  test('candidate correlation prefers durable identity anchors over name', () => {
+    expect(reviewerCandidateKey({ name: 'Alex Kim', openAlexId: 'A123' })).toBe('openalex:a123');
+    expect(reviewerCandidateKey({ name: 'Alex Kim', affiliation: 'One University' }))
+      .not.toBe(reviewerCandidateKey({ name: 'Alex Kim', affiliation: 'Two University' }));
+  });
+
   test('preserves the server-signed automated identity receipt', () => {
     const [out] = mergeEnrichment([{ name: 'Dr Receipt' }], [{
       name: 'Dr Receipt',
@@ -171,6 +383,33 @@ describe('mergeEnrichment', () => {
     }]);
     expect(out.automatedIdentityAttestation).toBe('signed-receipt');
     expect(pruneCandidateForRoster(out).automatedIdentityAttestation).toBe('signed-receipt');
+  });
+
+  test('promotes and prunes eligibility evidence for durable reload', () => {
+    const [out] = mergeEnrichment([{ name: 'Dr Emeritus' }], [{
+      name: 'Dr Emeritus',
+      contactEnrichment: {
+        eligibilityStatus: 'emeritus',
+        eligibilityReason: 'Official profile says emeritus.',
+        eligibilityEvidence: {
+          status: 'emeritus',
+          url: 'https://example.edu/people/emeritus',
+          title: 'Dr Emeritus | Professor Emeritus',
+          snippet: 'Dr Emeritus is Professor Emeritus.',
+          sourceDomain: 'example.edu',
+          checkedAt: '2026-07-19T12:00:00.000Z',
+        },
+      },
+    }]);
+    expect(out.eligibilityStatus).toBe('emeritus');
+    expect(pruneCandidateForRoster(out)).toMatchObject({
+      eligibilityStatus: 'emeritus',
+      eligibilityEvidence: { sourceDomain: 'example.edu' },
+      contactEnrichment: {
+        eligibilityStatus: 'emeritus',
+        eligibilityEvidence: { url: 'https://example.edu/people/emeritus' },
+      },
+    });
   });
   const candidates = [
     { name: 'Dr. A', email: null, website: null, relevanceScore: 90 },
@@ -298,6 +537,74 @@ describe('mergeEnrichment', () => {
     expect(out[0].hasInstitutionCOI).toBe(true);
     expect(out[0].institutionCOIDetails).toEqual({ piInstitution: 'JHU', reviewerInstitution: 'JHU' });
     expect(out[0].institutionCOIDetails).not.toHaveProperty('historical');
+  });
+});
+
+describe('getCandidateEmailReadiness', () => {
+  test('uses the invitation classifier for identity-owned and multiply corroborated emails', () => {
+    expect(getCandidateEmailReadiness({
+      email: 'person@example.edu',
+      emailSource: 'institution_page',
+    })).toMatchObject({ level: 'high', action: 'ready' });
+
+    expect(getCandidateEmailReadiness({
+      email: 'person@example.edu',
+      contactEnrichment: {
+        emailSource: 'scholarly_multi',
+      },
+    })).toMatchObject({ level: 'high', action: 'ready' });
+  });
+
+  test('single-work, legacy, manual, and unknown emails need confirmation', () => {
+    for (const emailSource of ['scholarly_single', 'pubmed', 'manual', 'unknown_source']) {
+      expect(getCandidateEmailReadiness({
+        email: 'person@example.edu',
+        emailSource,
+        identityStatus: 'confirmed',
+      })).toMatchObject({ level: 'low', action: 'quick_check' });
+    }
+  });
+
+  test('search-only and contested emails remain research leads, not sendable addresses', () => {
+    for (const emailSource of ['serp_search', 'claude_search', 'search_contested']) {
+      expect(getCandidateEmailReadiness({
+        email: 'person@example.edu',
+        emailSource,
+        identityStatus: 'confirmed',
+      })).toMatchObject({ level: 'low', action: 'research_only' });
+    }
+    expect(getCandidateEmailReadiness({
+      email: 'person@example.edu',
+      emailSource: 'serp_search',
+      identityStatus: 'probable',
+    })).toMatchObject({ level: 'low', action: 'research_only' });
+  });
+
+  test('preserves the specific contested-contact reason for staff review', () => {
+    expect(getCandidateEmailReadiness({
+      email: 'person@other-domain.example',
+      identityStatus: 'confirmed',
+      contactEnrichment: {
+        emailSource: 'search_contested',
+        contactStatusReason: 'Email domain conflicts with the verified institution',
+      },
+    })).toEqual({
+      level: 'low',
+      action: 'research_only',
+      reason: 'Email domain conflicts with the verified institution',
+    });
+  });
+
+  test('no address is reported as missing even if stale provenance remains', () => {
+    expect(getCandidateEmailReadiness({
+      email: null,
+      emailSource: 'orcid',
+      contactEnrichment: { email: null, emailSource: 'orcid' },
+    })).toEqual({
+      level: 'missing',
+      action: 'missing',
+      reason: 'No email address found during contact enrichment',
+    });
   });
 });
 
@@ -501,6 +808,7 @@ describe('pruneCandidateForRoster — applicant enrichment cache fields survive 
       name: 'Dr Applicant',
       suggestionId: '22222222-2222-4222-8222-222222222222',
       enrichedProposalKey: 'Library::Folder::Proposal.pdf',
+      applicantEnrichmentCacheVersion: APPLICANT_ENRICHMENT_CACHE_VERSION,
       isApplicantRecommended: true,
       provenance: { kind: PROVENANCE_KINDS.APPLICANT_SUGGESTED, sources: ['applicant'] },
       hasInstitutionCOI: true,
@@ -520,6 +828,7 @@ describe('pruneCandidateForRoster — applicant enrichment cache fields survive 
     });
 
     expect(pruned.enrichedProposalKey).toBe('Library::Folder::Proposal.pdf');
+    expect(pruned.applicantEnrichmentCacheVersion).toBe(APPLICANT_ENRICHMENT_CACHE_VERSION);
     expect(pruned.suggestionId).toBe('22222222-2222-4222-8222-222222222222');
     expect(pruned.isApplicantRecommended).toBe(true);
     expect(pruned.provenance.kind).toBe(PROVENANCE_KINDS.APPLICANT_SUGGESTED);
@@ -542,23 +851,131 @@ describe('pruneCandidateForRoster — applicant enrichment cache fields survive 
 
 describe('hasValidApplicantEnrichmentCache', () => {
   const proposalKey = 'Library::Folder::Proposal.pdf';
+  const expected = [{ suggestionId: 'SUG-1' }];
+  const canonical = {
+    name: 'Dr Applicant',
+    suggestionId: 'SUG-1',
+    candidateKey: 'suggestion:sug-1',
+    isApplicantRecommended: true,
+    enrichedProposalKey: proposalKey,
+    applicantEnrichmentCacheVersion: APPLICANT_ENRICHMENT_CACHE_VERSION,
+    identityStatus: 'probable',
+  };
 
-  test('requires a non-null proposal key and same-key applicant-origin roster row', () => {
-    expect(hasValidApplicantEnrichmentCache([
-      { name: 'Dr Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey },
-    ], proposalKey)).toBe(true);
+  test('requires a non-null proposal key and the exact expected canonical suggestion row', () => {
+    expect(hasValidApplicantEnrichmentCache([canonical], proposalKey, expected)).toBe(true);
 
     expect(hasValidApplicantEnrichmentCache([
-      { name: 'Dr Applicant', isApplicantRecommended: true, enrichedProposalKey: 'Other::Proposal.pdf' },
-    ], proposalKey)).toBe(false);
+      { ...canonical, enrichedProposalKey: 'Other::Proposal.pdf' },
+    ], proposalKey, expected)).toBe(false);
+
+    expect(hasValidApplicantEnrichmentCache([canonical], null, expected)).toBe(false);
+    expect(hasValidApplicantEnrichmentCache([canonical], proposalKey, [])).toBe(false);
 
     expect(hasValidApplicantEnrichmentCache([
-      { name: 'Dr Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey },
-    ], null)).toBe(false);
+      { ...canonical, isApplicantRecommended: false, provenance: { kind: 'literature_retrieved' } },
+    ], proposalKey, expected)).toBe(false);
+  });
+
+  test('rejects unversioned and older applicant enrichment rows', () => {
+    expect(hasValidApplicantEnrichmentCache([
+      { ...canonical, applicantEnrichmentCacheVersion: undefined },
+    ], proposalKey, expected)).toBe(false);
 
     expect(hasValidApplicantEnrichmentCache([
-      { name: 'Dr Literature', enrichedProposalKey: proposalKey },
-    ], proposalKey)).toBe(false);
+      { ...canonical, applicantEnrichmentCacheVersion: APPLICANT_ENRICHMENT_CACHE_VERSION - 1 },
+    ], proposalKey, expected)).toBe(false);
+  });
+
+  test('ignores legacy-key rows once the canonical row exists and rejects partial canonical batches', () => {
+    expect(hasValidApplicantEnrichmentCache([
+      { ...canonical, candidateKey: 'person:legacy', identityStatus: null },
+    ], proposalKey, expected)).toBe(false);
+
+    expect(hasValidApplicantEnrichmentCache([
+      canonical,
+      { ...canonical, candidateKey: 'person:legacy', identityStatus: null },
+    ], proposalKey, expected)).toBe(true);
+
+    expect(hasValidApplicantEnrichmentCache([
+      canonical,
+    ], proposalKey, [{ suggestionId: 'SUG-1' }, { suggestionId: 'SUG-2' }])).toBe(false);
+  });
+
+  test('requires every canonical applicant row to carry a terminal gate result', () => {
+    expect(hasValidApplicantEnrichmentCache([
+      { ...canonical, identityStatus: null },
+    ], proposalKey, expected)).toBe(false);
+
+    expect(hasValidApplicantEnrichmentCache([
+      { ...canonical, identityStatus: 'unresolved', needsIdentification: true },
+    ], proposalKey, expected)).toBe(true);
+
+    expect(hasValidApplicantEnrichmentCache([
+      { ...canonical, identityStatus: null, eligibilityStatus: 'deceased' },
+    ], proposalKey, expected)).toBe(true);
+  });
+
+  test('treats canonical saved/excluded suggestions as terminal without hiding unknown missing rows', () => {
+    const secondExpected = [{ suggestionId: 'SUG-1' }, { suggestionId: 'SUG-2' }];
+    const excluded = [{
+      name: 'Excluded Applicant',
+      suggestionId: 'SUG-1',
+      candidateKey: 'suggestion:sug-1',
+    }];
+    const terminal = applicantTerminalSuggestionKeys(excluded, ['suggestion:sug-2']);
+    expect(hasValidApplicantEnrichmentCache([], proposalKey, secondExpected, terminal)).toBe(true);
+
+    const unknownOnly = applicantTerminalSuggestionKeys([], ['suggestion:other']);
+    expect(hasValidApplicantEnrichmentCache([], proposalKey, expected, unknownOnly)).toBe(false);
+  });
+
+  test('rejects non-canonical excluded/saved keys as terminal authority', () => {
+    const terminal = applicantTerminalSuggestionKeys(
+      [{ suggestionId: 'SUG-1', candidateKey: 'candidate:forged' }],
+      ['suggestion:SUG-1', 'candidate:other'],
+    );
+    expect(Array.from(terminal)).toEqual([]);
+    expect(hasValidApplicantEnrichmentCache([], proposalKey, expected, terminal)).toBe(false);
+  });
+});
+
+describe('pruneCandidateForRoster — server identity confirmation survives reload', () => {
+  test('keeps only the bounded confirmation/manual-contact shape', () => {
+    const pruned = pruneCandidateForRoster({
+      name: 'Ann Lee',
+      email: 'ann@example.edu',
+      contactEnrichment: { email: 'ann@example.edu', websiteSource: 'manual' },
+      manualContactFields: ['email', 'website', 'email', 'forged'],
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'confirm-1',
+      staffIdentityConfirmation: {
+        confirmationId: 'confirm-1',
+        source: 'staff_confirmed',
+        normalizedName: 'ann lee',
+        email: 'ann@example.edu',
+        website: 'https://example.edu/ann',
+        affiliation: 'Example University',
+        actorProfileId: 5,
+        actorSystemUserId: 'system-5',
+        confirmedAt: '2026-07-20T12:00:00.000Z',
+        forgedExtra: 'drop me',
+      },
+    });
+
+    expect(pruned.manualContactFields).toEqual(['email', 'website']);
+    expect(pruned.contactEnrichment.websiteSource).toBe('manual');
+    expect(pruned.staffIdentityConfirmation).toEqual({
+      confirmationId: 'confirm-1',
+      source: 'staff_confirmed',
+      normalizedName: 'ann lee',
+      email: 'ann@example.edu',
+      website: 'https://example.edu/ann',
+      affiliation: 'Example University',
+      actorProfileId: 5,
+      actorSystemUserId: 'system-5',
+      confirmedAt: '2026-07-20T12:00:00.000Z',
+    });
   });
 });
 
@@ -573,11 +990,23 @@ describe('pruneCandidateForRoster — S238 graded-COI + warning markers survive 
       coauthorCOIStrength: 'possible',
       coauthorSharedPaperTotal: 2,
       coauthorMaxWithOneAuthor: 1,
+      coauthorCheckStatus: 'incomplete',
+      coauthorCheckFailures: [{
+        proposalAuthor: 'Dr Proposal Author',
+        status: 429,
+        reason: 'rate_limited',
+      }],
     });
     expect(pruned.hasCoauthorCOI).toBe(true);
     expect(pruned.coauthorCOIStrength).toBe('possible');
     expect(pruned.coauthorSharedPaperTotal).toBe(2);
     expect(pruned.coauthorMaxWithOneAuthor).toBe(1);
+    expect(pruned.coauthorCheckStatus).toBe('incomplete');
+    expect(pruned.coauthorCheckFailures).toEqual([{
+      proposalAuthor: 'Dr Proposal Author',
+      status: 429,
+      reason: 'rate_limited',
+    }]);
   });
 
   it('preserves aiFlaggedNotRelevant and lowPublicationCount warnings', () => {
@@ -595,6 +1024,8 @@ describe('pruneCandidateForRoster — S238 graded-COI + warning markers survive 
   it('defaults the markers to false/null when absent (no accidental flags)', () => {
     const pruned = pruneCandidateForRoster({ name: 'Jane Smith', affiliation: 'MIT' });
     expect(pruned.coauthorCOIStrength).toBeNull();
+    expect(pruned.coauthorCheckStatus).toBeNull();
+    expect(pruned.coauthorCheckFailures).toEqual([]);
     expect(pruned.aiFlaggedNotRelevant).toBe(false);
     expect(pruned.lowPublicationCount).toBe(false);
   });

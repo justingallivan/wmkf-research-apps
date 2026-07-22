@@ -9,11 +9,15 @@ const { execFileSync, spawnSync } = require('child_process');
 const { checkAgentInvariants } = require('../../scripts/check-agent-invariants');
 const {
   docMentionsChangedSource,
+  extractAdversarialReviewReceiptPaths,
+  hasAdversarialReviewWaiver,
   hasStalenessAck,
+  isHighRiskReviewArtifact,
+  isQualifiedAdversarialReviewPrompt,
   isPlanOrDesignDoc,
 } = require('./lib/document-guards');
 
-const STATE_VERSION = 2;
+const STATE_VERSION = 3;
 const GATE_MAP = [
   { test: /^pages\/api\//, gates: ['check:api-routes'] },
   { test: /^(lib\/db\/|docs\/atlas\/|docs\/APPLICATION_STATE_ATLAS\.md|scripts\/audit-(?:postgres|dataverse)-state\.js)/, gates: ['check:atlas'] },
@@ -134,6 +138,12 @@ function initStateCollections(state) {
   if (!Array.isArray(state.touched)) state.touched = [];
   if (!Array.isArray(state.touchLog)) state.touchLog = [];
   if (!Array.isArray(state.staleDocWarnings)) state.staleDocWarnings = [];
+  if (!state.adversarialReviewRequirements || typeof state.adversarialReviewRequirements !== 'object') {
+    state.adversarialReviewRequirements = {};
+  }
+  if (!state.adversarialReviewReceipts || typeof state.adversarialReviewReceipts !== 'object') {
+    state.adversarialReviewReceipts = {};
+  }
 }
 
 function isSourceStalenessPath(relativePath) {
@@ -203,6 +213,62 @@ function staleDocWarningMessage(warnings, changedPath) {
   );
 }
 
+function updateAdversarialReviewRequirement(root, state, relativePath) {
+  if (!isDocsMarkdown(relativePath)) return;
+  const text = readText(root, relativePath);
+  if (!text || !isHighRiskReviewArtifact(relativePath, text)) {
+    delete state.adversarialReviewRequirements[relativePath];
+    delete state.adversarialReviewReceipts[relativePath];
+    return;
+  }
+  state.adversarialReviewRequirements[relativePath] = {
+    fingerprint: fingerprint(root, relativePath),
+    requiredAt: new Date().toISOString(),
+  };
+}
+
+function recordAdversarialReview(input, root, file) {
+  const state = loadState(file);
+  if (!state) return;
+  initStateCollections(state);
+  const prompt = typeof input?.tool_input?.prompt === 'string' ? input.tool_input.prompt : '';
+  if (!prompt) return;
+
+  let changed = false;
+  for (const relativePath of extractAdversarialReviewReceiptPaths(prompt)) {
+    const text = readText(root, relativePath);
+    if (!text || !isHighRiskReviewArtifact(relativePath, text)) continue;
+    if (!isQualifiedAdversarialReviewPrompt(prompt, relativePath)) continue;
+    state.adversarialReviewReceipts[relativePath] = {
+      fingerprint: fingerprint(root, relativePath),
+      reviewedAt: new Date().toISOString(),
+      promptHash: hash(prompt),
+    };
+    changed = true;
+  }
+  if (changed) saveState(file, state);
+}
+
+function unresolvedAdversarialReviewRequirements(root, state) {
+  initStateCollections(state);
+  const unresolved = [];
+  for (const [relativePath, requirement] of Object.entries(state.adversarialReviewRequirements)) {
+    const text = readText(root, relativePath);
+    if (!text || !isHighRiskReviewArtifact(relativePath, text)) continue;
+    if (hasAdversarialReviewWaiver(text)) continue;
+    const currentFingerprint = fingerprint(root, relativePath);
+    const receipt = state.adversarialReviewReceipts[relativePath];
+    if (receipt && receipt.fingerprint === currentFingerprint) continue;
+    unresolved.push({
+      relativePath,
+      requiredFingerprint: requirement?.fingerprint || null,
+      currentFingerprint,
+      reviewedFingerprint: receipt?.fingerprint || null,
+    });
+  }
+  return unresolved;
+}
+
 // Once-per-session-open: route domain work to the agent wiki (discoverability —
 // the wiki is the retrieval launch-pad, but only if agents are reminded to read
 // it during planning, not just when a watched path is edited) and surface memory
@@ -244,6 +310,8 @@ function start(input, root, file) {
     touched: [],
     touchLog: [],
     staleDocWarnings: [],
+    adversarialReviewRequirements: {},
+    adversarialReviewReceipts: {},
     gateCache: {},
   };
   saveState(file, state);
@@ -267,6 +335,7 @@ function record(input, root, file) {
   if (!state.touched.includes(relativePath)) state.touched.push(relativePath);
   state.touchLog.push({ path: relativePath, at: new Date().toISOString() });
   state.staleDocWarnings.push(...newWarnings);
+  updateAdversarialReviewRequirement(root, state, relativePath);
   saveState(file, state);
   if (newWarnings.length) additionalContext('PostToolUse', staleDocWarningMessage(newWarnings, relativePath));
 }
@@ -324,6 +393,22 @@ function stop(input, root, file) {
     process.exit(2);
   }
 
+  const unresolvedReviews = unresolvedAdversarialReviewRequirements(root, state);
+  if (unresolvedReviews.length) {
+    const summary = unresolvedReviews.map(({ relativePath }) => `  - ${relativePath}`).join('\n');
+    console.error(
+      'Adversarial review receipt missing or stale for consequential review artifact(s):\n' +
+      `${summary}\n` +
+      'Run a fresh Task/Agent review after the latest edit. The prompt must include:\n' +
+      '  [ADVERSARIAL-REVIEW-RECEIPT: <docs/path.md>]\n' +
+      '  Ask the fresh agent to be adversarial/refute, verify for each recommendation with file:line evidence, ' +
+      'and run a disconfirming check.\n' +
+      'If the owner deliberately accepts the residual, add a visible document marker: ' +
+      '<!-- adversarial-review:waived reason=<specific reason> -->'
+    );
+    process.exit(2);
+  }
+
   const gates = gatesForPaths(owned);
   if (gates.length === 0) return;
 
@@ -366,6 +451,7 @@ async function main() {
   try {
     if (mode === 'start') start(input, root, file);
     else if (mode === 'record') record(input, root, file);
+    else if (mode === 'review-record') recordAdversarialReview(input, root, file);
     else if (mode === 'stop') stop(input, root, file);
   } catch (error) {
     if (mode === 'stop') additionalContext('Stop', `Instruction-architecture hook failed safely: ${error.message}. Verification is advisory until the hook is repaired.`);
@@ -380,6 +466,10 @@ module.exports = {
   dirtyPaths,
   fingerprint,
   gatesForPaths,
+  record,
+  recordAdversarialReview,
+  statePath,
+  unresolvedAdversarialReviewRequirements,
   unresolvedStaleDocWarnings,
   snapshot,
 };

@@ -45,7 +45,13 @@ jest.mock('../../lib/dataverse/adapters/researcher', () => ({
   __esModule: true,
   updateById: jest.fn(async () => {}),
 }));
-jest.mock('../../lib/external/token-lifecycle', () => ({ ensureToken: jest.fn(async () => {}) }));
+jest.mock('../../lib/external/token-lifecycle', () => ({
+  ensureToken: jest.fn(async () => {}),
+  buildExternalUrl: jest.fn((token) => `https://reviews.wmkeck.org/external/review/${token}`),
+}));
+jest.mock('../../lib/services/external-token', () => ({
+  hashToken: jest.fn((token) => `hash:${token}`),
+}));
 jest.mock('../../lib/dataverse/duplicate-key', () => ({ translateDuplicateKeyError: jest.fn(() => null) }));
 
 const { resolveByEmail } = require('../../lib/services/program-director-resolver');
@@ -286,6 +292,111 @@ describe('patchMyCandidates', () => {
     });
     expect(suggestionAdapter.restore).toHaveBeenCalledWith(SUGGESTION_ID, { actingUserSystemId: SYS });
     expect(out).toEqual({ success: true, message: 'Candidate restored' });
+  });
+
+  test('manual invitation: verifies the current official link and records the normal invite lifecycle with an optimistic lock', async () => {
+    suggestionAdapter.findById.mockResolvedValue({
+      _etag: 'W/"7"',
+      wmkf_selected: true,
+      wmkf_invited: false,
+      wmkf_accepted: false,
+      wmkf_declined: false,
+      wmkf_responsetype: null,
+      wmkf_externaltokenhash: 'hash:manual.token',
+      wmkf_externaltokenrevoked: false,
+      wmkf_externaltokenexpires: '2099-01-01T00:00:00.000Z',
+    });
+
+    const out = await patchMyCandidates({
+      body: {
+        suggestionId: SUGGESTION_ID,
+        markManualInviteSent: true,
+        manualLink: 'https://reviews.wmkeck.org/external/review/manual.token',
+      },
+      actingUserSystemId: SYS,
+    });
+
+    expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(
+      SUGGESTION_ID,
+      expect.objectContaining({ invited: true, emailSentAt: expect.any(String), respondReminderSentAt: null }),
+      { actingUserSystemId: SYS, ifMatch: 'W/"7"' },
+    );
+    expect(out).toMatchObject({
+      success: true,
+      message: 'Manual invitation recorded',
+      manualInviteRecorded: true,
+      updated: { suggestionId: SUGGESTION_ID, invited: true },
+    });
+  });
+
+  test('manual invitation: rejects a replaced link without changing lifecycle state', async () => {
+    suggestionAdapter.findById.mockResolvedValue({
+      _etag: 'W/"7"',
+      wmkf_selected: true,
+      wmkf_externaltokenhash: 'hash:newer.token',
+      wmkf_externaltokenrevoked: false,
+      wmkf_externaltokenexpires: '2099-01-01T00:00:00.000Z',
+    });
+
+    await expect(patchMyCandidates({
+      body: {
+        suggestionId: SUGGESTION_ID,
+        markManualInviteSent: true,
+        manualLink: 'https://reviews.wmkeck.org/external/review/older.token',
+      },
+    })).rejects.toMatchObject({
+      httpStatus: 409,
+      body: { code: 'stale_manual_link' },
+    });
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['not selected', { wmkf_selected: false }, 'candidate_not_selected'],
+    ['already invited', { wmkf_selected: true, wmkf_invited: true }, 'already_invited'],
+    ['already responded', { wmkf_selected: true, wmkf_accepted: true }, 'already_responded'],
+    ['revoked link', { wmkf_selected: true, wmkf_externaltokenrevoked: true }, 'stale_manual_link'],
+  ])('manual invitation: rejects %s', async (_label, override, expectedCode) => {
+    suggestionAdapter.findById.mockResolvedValue({
+      _etag: 'W/"7"',
+      wmkf_selected: true,
+      wmkf_invited: false,
+      wmkf_accepted: false,
+      wmkf_declined: false,
+      wmkf_responsetype: null,
+      wmkf_externaltokenhash: 'hash:manual.token',
+      wmkf_externaltokenrevoked: false,
+      wmkf_externaltokenexpires: '2099-01-01T00:00:00.000Z',
+      ...override,
+    });
+
+    await expect(patchMyCandidates({
+      body: {
+        suggestionId: SUGGESTION_ID,
+        markManualInviteSent: true,
+        manualLink: 'https://reviews.wmkeck.org/external/review/manual.token',
+      },
+    })).rejects.toMatchObject({ httpStatus: 409, body: { code: expectedCode } });
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  });
+
+  test('manual invitation: translates a concurrent token/lifecycle change into a stale-link recovery response', async () => {
+    suggestionAdapter.findById.mockResolvedValue({
+      _etag: 'W/"7"',
+      wmkf_selected: true,
+      wmkf_externaltokenhash: 'hash:manual.token',
+      wmkf_externaltokenrevoked: false,
+      wmkf_externaltokenexpires: '2099-01-01T00:00:00.000Z',
+    });
+    suggestionAdapter.updateLifecycle.mockRejectedValue(Object.assign(new Error('precondition failed'), { status: 412 }));
+
+    await expect(patchMyCandidates({
+      body: {
+        suggestionId: SUGGESTION_ID,
+        markManualInviteSent: true,
+        manualLink: 'https://reviews.wmkeck.org/external/review/manual.token',
+      },
+    })).rejects.toMatchObject({ httpStatus: 409, body: { code: 'stale_manual_link' } });
   });
 
   test('validation: neither id → 400; bad GUIDs → 400; no supported fields → 400; missing person link → 404', async () => {

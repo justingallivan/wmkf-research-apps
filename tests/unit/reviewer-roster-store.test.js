@@ -29,22 +29,148 @@ function queryTextOf(callIndex) {
 }
 
 describe('listForRequest', () => {
-  test('partitions active/excluded and collects allNames across EVERY status', async () => {
+  test('partitions active/excluded/ineligible and collects allNames across EVERY status', async () => {
     sql.mockResolvedValueOnce({ rows: [
       { status: 'active', display_name: 'Ann Lee', candidate: { name: 'Ann Lee' } },
       { status: 'excluded', display_name: 'Bob Roe', candidate: { name: 'Bob Roe' } },
-      { status: 'saved', display_name: 'Cy Poe', candidate: { name: 'Cy Poe' } },
+      { status: 'ineligible', display_name: 'Pat Thiel', candidate: { name: 'Pat Thiel', eligibilityStatus: 'deceased' } },
+      { status: 'saved', candidate_key: 'suggestion:sug-9', display_name: 'Cy Poe', candidate: { name: 'Cy Poe', suggestionId: 'SUG-9' } },
       { status: 'coi_dropped', display_name: 'Dee Coe', candidate: { name: 'Dee Coe', hasInstitutionCOI: true } },
     ] });
     const out = await store.listForRequest(REQ);
     expect(out.active.map((c) => c.name)).toEqual(['Ann Lee']);
     expect(out.excluded.map((c) => c.name)).toEqual(['Bob Roe']);
+    expect(out.ineligible.map((c) => c.name)).toEqual(['Pat Thiel']);
+    expect(out.savedKeys).toEqual(['suggestion:sug-9']);
     // allNames is the cross-run dedup union — must include saved + excluded + coi_dropped too.
-    expect(out.allNames).toEqual(['Ann Lee', 'Bob Roe', 'Cy Poe', 'Dee Coe']);
+    expect(out.allNames).toEqual(['Ann Lee', 'Bob Roe', 'Pat Thiel', 'Cy Poe', 'Dee Coe']);
+  });
+});
+
+describe('findCandidateBySuggestion', () => {
+  test('returns the server-owned roster status with the candidate blob', async () => {
+    sql.mockResolvedValueOnce({ rows: [{
+      candidate_key: 'suggestion:sug-1',
+      status: 'ineligible',
+      display_name: 'Pat Thiel',
+      candidate: { name: 'Pat Thiel', suggestionId: 'SUG-1' },
+      source_kind: 'applicant_suggested',
+      updated_at_token: '2026-07-20 10:00:00+00',
+    }] });
+
+    await expect(store.findCandidateBySuggestion(REQ, 'SUG-1')).resolves.toMatchObject({
+      name: 'Pat Thiel',
+      suggestionId: 'SUG-1',
+      candidateKey: 'suggestion:sug-1',
+      rosterStatus: 'ineligible',
+      rosterUpdatedAt: '2026-07-20 10:00:00+00',
+    });
+    expect(queryTextOf(0)).toMatch(/candidate_key\s*=/);
+    expect(allInterpolations()).toContain('suggestion:sug-1');
+  });
+});
+
+describe('findCandidatesByKeys', () => {
+  test('returns exact request-scoped roster rows with status and concurrency tokens', async () => {
+    const longGeneratedKey = `candidate:${'a'.repeat(680)}`;
+    sql.mockResolvedValueOnce({ rows: [{
+      candidate_key: 'candidate:ann',
+      status: 'active',
+      display_name: 'Ann Lee',
+      candidate: { name: 'Ann Lee' },
+      source_kind: 'literature_retrieved',
+      updated_at_token: '2026-07-20 11:00:00+00',
+    }] });
+
+    await expect(store.findCandidatesByKeys(REQ, [
+      'candidate:ann',
+      'candidate:ann',
+      longGeneratedKey,
+      '',
+    ])).resolves.toEqual([expect.objectContaining({
+      name: 'Ann Lee',
+      candidateKey: 'candidate:ann',
+      rosterStatus: 'active',
+      rosterUpdatedAt: '2026-07-20 11:00:00+00',
+    })]);
+    expect(queryTextOf(0)).toMatch(/jsonb_array_elements_text/);
+    expect(allInterpolations()).toEqual(expect.arrayContaining([
+      REQ,
+      JSON.stringify(['candidate:ann', longGeneratedKey]),
+    ]));
+  });
+});
+
+describe('removePreviousActiveSearchResults', () => {
+  test('deletes only active allowlisted search provenance and returns the count', async () => {
+    sql.mockResolvedValueOnce({ rows: [{
+      removed: 2,
+      removed_keys: ['candidate:a', 'candidate:b'],
+      roster_rows: [
+        { status: 'active', display_name: 'Applicant Person', candidate: { name: 'Applicant Person' }, updated_at_token: '2026-07-19 15:00:00.123456+00' },
+        { status: 'excluded', display_name: 'Excluded Person', candidate: { name: 'Excluded Person' } },
+        { status: 'saved', display_name: 'Saved Person', candidate: { name: 'Saved Person' } },
+        { status: 'active', display_name: 'Flagged COI Person', candidate: { name: 'Flagged COI Person', hasInstitutionCOI: true }, updated_at_token: '2026-07-19 14:00:00.654321+00' },
+        { status: 'coi_dropped', display_name: 'COI Ledger Person', candidate: { name: 'COI Ledger Person' } },
+      ],
+    }] });
+
+    const out = await store.removePreviousActiveSearchResults(
+      REQ,
+      [
+        { candidateKey: 'candidate:a', updatedAt: '2026-07-19T12:00:00.000Z' },
+        { candidateKey: 'candidate:b', updatedAt: '2026-07-19T13:00:00.000Z' },
+        { candidateKey: 'candidate:a', updatedAt: '2026-07-19T12:00:00.000Z' },
+      ],
+    );
+    expect(out.removed).toBe(2);
+    expect(out.removedKeys).toEqual(['candidate:a', 'candidate:b']);
+    expect(out.active.map((candidate) => candidate.name)).toEqual(['Applicant Person', 'Flagged COI Person']);
+    expect(out.active[0].rosterUpdatedAt).toBe('2026-07-19 15:00:00.123456+00');
+    expect(out.excluded.map((candidate) => candidate.name)).toEqual(['Excluded Person']);
+    expect(out.allNames).toEqual(['Applicant Person', 'Excluded Person', 'Saved Person', 'Flagged COI Person', 'COI Ledger Person']);
+
+    const text = queryTextOf(0);
+    expect(text).toMatch(/DELETE FROM reviewer_find_roster/);
+    expect(text).toMatch(/roster\.status = 'active'/);
+    expect(text).toMatch(/jsonb_to_recordset/);
+    expect(text).toMatch(/roster\.updated_at::text = target\.updated_at_token/);
+    expect(text).toMatch(/hasInstitutionCOI.*IS DISTINCT FROM 'true'/);
+    expect(text).toMatch(/candidate_key NOT IN \(SELECT candidate_key FROM deleted\)/);
+    expect(text).toMatch(/source_kind IN/);
+    expect(text).toMatch(/'literature_retrieved'/);
+    expect(text).toMatch(/'referred'/);
+    expect(text).toMatch(/'claude_verified'/);
+    expect(text).not.toMatch(/'applicant_suggested'/);
+    expect(text).not.toMatch(/status IN/);
+    expect(allInterpolations()).toContain(REQ);
+    expect(allInterpolations()).toContain(JSON.stringify([
+      { candidate_key: 'candidate:a', updated_at_token: '2026-07-19T12:00:00.000Z' },
+      { candidate_key: 'candidate:b', updated_at_token: '2026-07-19T13:00:00.000Z' },
+    ]));
+  });
+
+  test('an empty candidate-ref set performs only the roster read', async () => {
+    sql.mockResolvedValueOnce({ rows: [
+      { status: 'active', display_name: 'Applicant Person', candidate: { name: 'Applicant Person' } },
+    ] });
+    const out = await store.removePreviousActiveSearchResults(REQ, []);
+    expect(out.removed).toBe(0);
+    expect(out.removedKeys).toEqual([]);
+    expect(out.active.map((candidate) => candidate.name)).toEqual(['Applicant Person']);
+    expect(out.excluded).toEqual([]);
+    expect(out.allNames).toEqual(['Applicant Person']);
+    expect(sql).toHaveBeenCalledTimes(1);
+    expect(queryTextOf(0)).toMatch(/SELECT candidate_key, status/);
+    expect(queryTextOf(0)).not.toMatch(/DELETE/);
   });
 });
 
 describe('recordSurfaced', () => {
+  beforeEach(() => {
+    sql.mockResolvedValue({ rows: [], rowCount: 1 });
+  });
+
   test('records named candidates (normalized) and skips unnamed/blank ones', async () => {
     const n = await store.recordSurfaced(REQ, [
       { name: 'Dr. Ann Lee' }, { name: '' }, { name: '   ' }, { name: 'Bob' },
@@ -63,6 +189,60 @@ describe('recordSurfaced', () => {
       Array.isArray(c[0]) && c[0].join(' ').includes('INSERT INTO reviewer_find_roster'));
     expect(insertCall).toBeGreaterThanOrEqual(0);
     expect(queryTextOf(insertCall)).toMatch(/status = 'active'/);
+  });
+
+  test('records direct deceased evidence as monotonic ineligible status', async () => {
+    await store.recordSurfaced(REQ, [{
+      name: 'Patricia Thiel',
+      eligibilityStatus: 'deceased',
+      eligibilityEvidence: { url: 'https://ameslab.gov/pat-thiel' },
+    }]);
+    const text = queryTextOf(0);
+    expect(allInterpolations()).toContain('ineligible');
+    expect(text).toMatch(/EXCLUDED\.status = 'ineligible'/);
+    expect(text).toMatch(/reviewer_find_roster\.status = 'ineligible'/);
+  });
+
+  test('keeps same-name candidates with different affiliations in separate roster rows', async () => {
+    await store.recordSurfaced(REQ, [
+      { name: 'Alex Kim', affiliation: 'University One' },
+      { name: 'Alex Kim', affiliation: 'University Two' },
+    ]);
+    const inserts = sql.mock.calls.filter((call) => queryTextOf(sql.mock.calls.indexOf(call)).includes('INSERT INTO reviewer_find_roster'));
+    expect(inserts).toHaveLength(2);
+    const keys = inserts.map((call) => call.slice(1).find((value) => (
+      typeof value === 'string' && value.startsWith('candidate:')
+    )));
+    expect(keys[0]).toBeTruthy();
+    expect(keys[1]).toBeTruthy();
+    expect(keys[0]).not.toBe(keys[1]);
+    expect(inserts[0][0].join(' ')).toMatch(/ON CONFLICT \(request_id, candidate_key\)/);
+  });
+
+  test('uses the snapshot token for conflict updates and reports a stale no-op', async () => {
+    sql.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    const n = await store.recordSurfaced(
+      REQ,
+      [{ name: 'Ann Lee', suggestionId: 'SUG-1' }],
+      { expectedUpdatedAt: '2026-07-20 10:00:00+00' },
+    );
+    expect(n).toBe(0);
+    expect(queryTextOf(0)).toMatch(/reviewer_find_roster\.updated_at::text/);
+    expect(allInterpolations()).toEqual(expect.arrayContaining([
+      true,
+      '2026-07-20 10:00:00+00',
+    ]));
+  });
+
+  test('allows a first insert while refusing a conflict when the snapshot had no row', async () => {
+    const n = await store.recordSurfaced(
+      REQ,
+      [{ name: 'Ann Lee', suggestionId: 'SUG-1' }],
+      { expectedUpdatedAt: null },
+    );
+    expect(n).toBe(1);
+    expect(queryTextOf(0)).toMatch(/INSERT INTO reviewer_find_roster/);
+    expect(allInterpolations()).toEqual(expect.arrayContaining([false, '']));
   });
 });
 
@@ -110,21 +290,23 @@ describe('setExcluded', () => {
   });
 
   test('throws on a nameless candidate', async () => {
-    await expect(store.setExcluded(REQ, { name: '' })).rejects.toThrow(/name required/);
+    await expect(store.setExcluded(REQ, { name: '' })).rejects.toThrow(/name\/key required/);
   });
 });
 
 describe('promote', () => {
   test('returns the stored candidate blob on success', async () => {
     sql.mockResolvedValueOnce({ rows: [{ candidate: { name: 'Bob Roe', hIndex: 9 } }] });
-    const blob = await store.promote(REQ, 'Bob Roe');
+    const blob = await store.promote(REQ, 'candidate:bob');
     expect(blob).toEqual({ name: 'Bob Roe', hIndex: 9 });
     expect(queryTextOf(0)).toMatch(/status = 'excluded'/); // only promotes from excluded
+    expect(queryTextOf(0)).toMatch(/candidate_key =/);
+    expect(allInterpolations()).toContain('candidate:bob');
   });
 
   test('no-op (null) when the row is gone (cap eviction)', async () => {
     sql.mockResolvedValueOnce({ rows: [] });
-    expect(await store.promote(REQ, 'Ghost')).toBeNull();
+    expect(await store.promote(REQ, 'candidate:ghost')).toBeNull();
   });
 });
 
@@ -142,6 +324,7 @@ describe('staff identity confirmation', () => {
     const text = queryTextOf(0);
     expect(text).toMatch(/status = 'active'/);
     expect(text).toMatch(/candidate = candidate \|\|/);
+    expect(text).toMatch(/candidate_key =/);
     const stored = JSON.parse(allInterpolations().find((entry) => (
       typeof entry === 'string' && entry.includes('staffIdentityConfirmation')
     )));
@@ -170,28 +353,36 @@ describe('staff identity confirmation', () => {
 });
 
 describe('markSaved', () => {
-  test('upserts each named row to saved (eviction-tolerant, leaving excluded untouched)', async () => {
-    const n = await store.markSaved(REQ, ['Ann Lee', 'Bob Roe', '']);
+  test('upserts each exact candidate row to saved (eviction-tolerant, leaving excluded untouched)', async () => {
+    const n = await store.markSaved(REQ, [
+      { name: 'Ann Lee', candidateKey: 'candidate:ann' },
+      { name: 'Bob Roe', candidateKey: 'candidate:bob' },
+      { name: '' },
+    ]);
     expect(n).toBe(2); // one upsert per valid name; blank dropped
     expect(sql).toHaveBeenCalledTimes(2);
     const text = queryTextOf(0);
     expect(text).toMatch(/INSERT INTO reviewer_find_roster/); // upsert, not bare UPDATE → eviction-tolerant
     expect(text).toMatch(/status = 'saved'/);
     expect(text).toMatch(/status IN \('active', 'saved'\)/);
-    expect(allInterpolations()).toEqual(expect.arrayContaining(['ann lee', 'bob roe']));
+    expect(text).toMatch(/ON CONFLICT \(request_id, candidate_key\)/);
+    expect(allInterpolations()).toEqual(expect.arrayContaining([
+      'ann lee', 'bob roe', 'candidate:ann', 'candidate:bob',
+    ]));
   });
 
-  test('no-op (0) on an empty name list — no sql issued', async () => {
-    const n = await store.markSaved(REQ, ['', '   ']);
+  test('no-op (0) on an empty candidate list — no sql issued', async () => {
+    const n = await store.markSaved(REQ, [{ name: '' }, null]);
     expect(n).toBe(0);
     expect(sql).not.toHaveBeenCalled();
   });
 });
 
 describe('stampSuggestionAnchor', () => {
-  test('updates the candidate JSON by request + normalized name with suggestion/person ids', async () => {
+  test('updates the candidate JSON by request + exact candidate key with suggestion/person ids', async () => {
     sql.mockResolvedValueOnce({ rows: [{ id: 123 }], rowCount: 1 });
     const out = await store.stampSuggestionAnchor(REQ, 'Prof. Anchor Name', {
+      candidateKey: 'candidate:anchor',
       suggestionId: 'SUG-1',
       potentialReviewerId: 'PID-1',
     });
@@ -201,17 +392,17 @@ describe('stampSuggestionAnchor', () => {
     expect(text).toMatch(/UPDATE reviewer_find_roster/);
     expect(text).toMatch(/candidate = candidate \|\|/);
     expect(text).toMatch(/request_id =/);
-    expect(text).toMatch(/normalized_name =/);
+    expect(text).toMatch(/candidate_key =/);
     expect(allInterpolations()).toEqual(expect.arrayContaining([
       REQ,
-      'anchor name',
+      'candidate:anchor',
       JSON.stringify({ suggestionId: 'SUG-1', potentialReviewerId: 'PID-1' }),
     ]));
   });
 
   test('missing suggestionId or normalized name is a no-op', async () => {
     await expect(store.stampSuggestionAnchor(REQ, 'No Id', {})).resolves.toEqual({ updated: 0 });
-    await expect(store.stampSuggestionAnchor(REQ, '', { suggestionId: 'SUG-1' })).resolves.toEqual({ updated: 0 });
+    await expect(store.stampSuggestionAnchor(REQ, 'No Key', { suggestionId: 'SUG-1' })).resolves.toEqual({ updated: 0 });
     expect(sql).not.toHaveBeenCalled();
   });
 });

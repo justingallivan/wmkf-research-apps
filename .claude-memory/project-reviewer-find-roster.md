@@ -6,7 +6,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-06-14
+  last_verified: 2026-07-19
 ---
 
 ## Recall Rule
@@ -17,13 +17,14 @@ Find-tab search candidates are no longer ephemeral. Every candidate a search sur
 
 ## Load-bearing design facts (don't relearn the hard way)
 - **`reviewer_find_roster` is OPERATIONAL / pre-save / per-request working state, NOT canonical reviewer identity.** Same class as the retained `search_cache`. Canonical saved reviewers stay in Dataverse `wmkf_appreviewersuggestion`. So adding this Postgres table is NOT a regression of the S219/migration-018 Postgres→Dataverse cutover. **Do not act on a "drop reviewer Postgres tables" carryover against it** (see [[feedback-verify-before-destructive-carryover]]).
-- **Why Postgres not Dataverse:** search candidates are name-based and often email-less at surface time; the canonical pool is email-keyed (`upsertByEmail`), so they can't cleanly become Dataverse rows — and shouldn't (it'd pollute the vetted pool). Name-keyed, `unique(request_id, normalized_name)` = the dedup key.
+- **Why Postgres not Dataverse:** search candidates are often email-less at surface time; the canonical pool is email-keyed (`upsertByEmail`), so they can't cleanly become Dataverse rows — and shouldn't (it'd pollute the vetted pool). Durable mutations are keyed by `unique(request_id, candidate_key)` so same-name people remain distinct; `normalized_name` is only the conservative cross-run search-exclusion aid.
 - **The dedup is server-side in `/discover`** (before `generateDiscoveredReasoning`) — that's what actually saves tokens; client `filterExcluded` is defense-in-depth only. Exact-match (`partitionByExcluded`) is a SEPARATE pass from the fuzzy `filterProposalAuthors` — never merge them.
-- **Status model:** `active|excluded|saved`. `recordSurfaced` never downgrades excluded/saved → active (`ON CONFLICT ... WHERE status='active'`). PATCH handlers are eviction-tolerant (per-request cap=300 evicts oldest non-excluded; upsert/no-op so an evicted row's card action can't 404).
+- **Status model:** `active|excluded|ineligible|saved|coi_dropped`. A resolved identity plus a successfully fetched, candidate-anchored first-party page may record `ineligible`; browser roster POST additionally requires the server receipt to bind the request, immutable roster key, and eligibility evidence. It stays visible with its source, cannot be selected/saved/promoted, remains in cross-run dedup, and cannot be reactivated by a later unknown result. `recordSurfaced` never downgrades excluded/saved/COI-ledger curation. The cap evicts oldest active/saved only; durable excluded/ineligible/COI rows remain until future TTL cleanup.
 - **Identity-guard hazard (Codex post-impl HIGH):** `pruneCandidateForRoster` drops `contactEnrichment.identity`/`tierResults` but carries safe `identityPersistAllowed`/`scholarPersistAllowed` flags so a roster-RELOADED save still honors the resolver gate in `save-candidates.js`. If you change the prune DTO or the save gate, keep those flags wired.
+- **Eligibility receipt boundary:** new roster-managed save payloads require a valid server receipt carrying the immutable pre-enrichment `candidateKey`; missing/expired or legacy receipts without that key return `identity_attestation_required`. Only bare pre-roster payloads with neither an explicit roster candidate key nor an automated receipt retain the legacy correlation path.
 
 ## Files
-Store `lib/services/reviewer-roster-store.js`; route `pages/api/workbench/reviewer-roster.js`; shared name-match `lib/utils/reviewer-name-match.js` (CJS, server+client); `pruneCandidateForRoster` in `shared/components/reviewers/reviewer-search-logic.js`; UI `ReviewerSearchSection.js` (displayCandidates refactor, selection keyed by normalized name). Atlas `docs/atlas/postgres-reviewer-find-roster.md`. Plan `~/.claude/plans/cosmic-yawning-starlight.md`.
+Store `lib/services/reviewer-roster-store.js`; route `pages/api/workbench/reviewer-roster.js`; shared name-match `lib/utils/reviewer-name-match.js` (CJS, server+client); `pruneCandidateForRoster` in `shared/components/reviewers/reviewer-search-logic.js`; UI `ReviewerSearchSection.js` (display candidates and selection keyed by `candidateKey`). Atlas `docs/atlas/postgres-reviewer-find-roster.md`. Plan `~/.claude/plans/cosmic-yawning-starlight.md`.
 
 ## Clearing / resetting a request's reviewers — USE THE EXISTING SCRIPT
 `scripts/reset-request-reviewers.mjs` (commit `89b24fb`) already does per-request reviewer teardown — **don't hand-roll probes/SQL for this.** Dry-run by default; its dry-run **already prints the roster breakdown** (status counts) so you don't need a separate counting probe.

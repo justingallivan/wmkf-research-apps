@@ -20,6 +20,7 @@ jest.mock('../../lib/services/reviewer-prompt-resolver.js', () => {
 });
 
 import { ClaudeReviewerService, buildAnalyzeRepairInstructions } from '../../lib/services/claude-reviewer-service.js';
+import { LLMClient } from '../../lib/services/llm-client.js';
 import { REVIEWER_FINDER_PROPOSAL_MAX_CHARS } from '../../lib/utils/ai-payload-boundary.js';
 import { validateReviewerAnalysis } from '../../shared/config/prompts/reviewer-finder.js';
 
@@ -179,6 +180,8 @@ describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
     });
 
     expect(ClaudeReviewerService._callLLM).toHaveBeenCalledTimes(2);
+    expect(ClaudeReviewerService._callLLM.mock.calls[0][0].forceFallback).toBe(false);
+    expect(ClaudeReviewerService._callLLM.mock.calls[1][0].forceFallback).toBe(true);
     expect(result).toMatchObject({
       success: false,
       status: 'analysis_invalid',
@@ -186,6 +189,107 @@ describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
       maxTokens: ClaudeReviewerService.MAX_TOKENS,
     });
     expect(result.validation.issues.map(i => i.code)).toContain('empty_parse_failure');
+  });
+
+  test('model refusal fails closed without retrying or falling back', async () => {
+    ClaudeReviewerService._callLLM = jest.fn(async () => ({
+      text: '',
+      usedFallback: false,
+      model: 'claude-test',
+      stopReason: 'refusal',
+      refused: true,
+      contentTypes: [],
+      usage: { outputTokens: 1 },
+    }));
+
+    const result = await ClaudeReviewerService.analyzeProposal('A useful proposal body'.repeat(20), 'sk-ant-test', {
+      reviewerCount: 3,
+      requestContext: REQUEST_CONTEXT,
+    });
+
+    expect(ClaudeReviewerService._callLLM).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      success: false,
+      status: 'analysis_refused',
+      attempt: 1,
+      stopReason: 'refusal',
+    });
+  });
+
+  test('an empty max-token response uses truncation repair rather than fallback routing', async () => {
+    ClaudeReviewerService._callLLM = jest
+      .fn()
+      .mockResolvedValueOnce({
+        text: '',
+        usedFallback: false,
+        model: 'claude-test',
+        stopReason: 'max_tokens',
+      })
+      .mockResolvedValueOnce({
+        text: analysisResponse({ reviewers: [reviewer('Dr. One Reviewer'), reviewer('Dr. Two Reviewer'), reviewer('Dr. Three Reviewer')] }),
+        usedFallback: false,
+        model: 'claude-test',
+        stopReason: 'end_turn',
+      });
+
+    const result = await ClaudeReviewerService.analyzeProposal('A useful proposal body'.repeat(20), 'sk-ant-test', {
+      reviewerCount: 3,
+      requestContext: REQUEST_CONTEXT,
+    });
+
+    expect(result.success).toBe(true);
+    expect(ClaudeReviewerService._callLLM.mock.calls[1][0]).toEqual(expect.objectContaining({
+      forceFallback: false,
+      maxTokens: 8192,
+    }));
+  });
+
+  test('an empty response does not start fallback when the deadline cannot fund another attempt', async () => {
+    ClaudeReviewerService._callLLM = jest.fn(async () => ({
+      text: '',
+      usedFallback: false,
+      model: 'claude-test',
+      stopReason: 'end_turn',
+    }));
+
+    const result = await ClaudeReviewerService.analyzeProposal('A useful proposal body'.repeat(20), 'sk-ant-test', {
+      reviewerCount: 3,
+      deadlineAt: Date.now() + 1000,
+      requestContext: REQUEST_CONTEXT,
+    });
+
+    expect(result.status).toBe('analysis_invalid');
+    expect(ClaudeReviewerService._callLLM).toHaveBeenCalledTimes(1);
+  });
+
+  test('_callLLM forceFallback starts directly on the configured fallback model', async () => {
+    const seen = [];
+    const complete = jest.spyOn(LLMClient.prototype, 'complete').mockImplementation(async function completeStub() {
+      seen.push({ model: this.model, fallbackModel: this.fallbackModel });
+      return {
+        text: 'OK',
+        model: this.model,
+        stopReason: 'end_turn',
+        refused: false,
+        content: [{ type: 'text', text: 'OK' }],
+        usage: { outputTokens: 1 },
+      };
+    });
+
+    try {
+      const result = await originalCallLLM.call(ClaudeReviewerService, {
+        prompt: 'test',
+        apiKey: 'sk-ant-test',
+        maxTokens: 32,
+        temperature: 0.3,
+        forceFallback: true,
+      });
+
+      expect(seen).toEqual([{ model: ClaudeReviewerService.FALLBACK_MODEL, fallbackModel: null }]);
+      expect(result).toMatchObject({ usedFallback: true, text: 'OK' });
+    } finally {
+      complete.mockRestore();
+    }
   });
 
   test('below-floor response retries and succeeds when repaired response is valid', async () => {

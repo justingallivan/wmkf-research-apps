@@ -68,13 +68,13 @@ name, NOT client-supplied) and persists the email through the same gates
 
 | Invariant | Enforcement |
 |---|---|
-| Read is server-side + id-anchored (no client trust, no name match) | `findCandidateBySuggestion(requestId, suggestionId)`; `candidate->>'suggestionId'` |
+| Read is server-side + id-anchored (no client trust, no name match) | `findCandidateBySuggestion(requestId, suggestionId)` requires both canonical `candidate_key='suggestion:<id>'` and the embedded suggestion id |
 | Persist only a vetted email | `emailPersistAllowed===true` (top-level or `contactEnrichment`) |
 | Never persist a namesake's email | skip if `needsIdentification` / `identityStatus`=`unresolved` / `verificationStatus`=`unresolved` |
 | Idempotent; manual correction always wins | skip if `savedFields` already has `email`; skip if `getById` shows a non-empty `wmkf_emailaddress` |
 | Source is the vetted provenance, not forged 'manual' | write the roster `emailSource` to `wmkf_emailsource` |
 | Duplicate-email collision is non-fatal | `translateDuplicateKeyError` → `contactError` `email_conflict`; promotion stands |
-| Legacy rows without a `suggestionId` anchor | `findCandidateBySuggestion` returns null → skip, never name-fallback |
+| Missing or legacy non-canonical roster row | promotion fails closed with 422 `identity_verification_required`; never name-fallback |
 
 Tests: `tests/unit/promote-applicant-reviewer-contact.test.js` (B1 describe). Matrix
 updated + `check:api-routes` green.

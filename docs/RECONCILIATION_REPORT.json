@@ -1,10 +1,7 @@
 {
-  "generated": "2026-07-12T17:06:32.461Z",
+  "generated": "2026-07-21T05:54:16.487Z",
   "summary": {
-    "total_claims": 157,
-    "stale": 38,
-    "verified": 88,
-    "unknown": 31,
+    "live_drift_findings": 0,
     "probe_errors": 0
   },
   "bucket_meta": {
@@ -37,7 +34,7 @@
   "probe_notes": {
     "dataverse": "completed",
     "postgres": "completed",
-    "dataverse_count_capped": "Dataverse $count returned the 5000-row cap for: akoya_requests, wmkf_app_request_person, wmkf_apprequestpersons. Real counts unknown via OData $count; consult Atlas / FetchXML aggregates."
+    "dataverse_count_capped": "Dataverse $count returned the 5000-row cap for: akoya_request, akoya_requests, wmkf_app_request_person, wmkf_apprequestperson, wmkf_apprequestpersons. Real counts unknown via OData $count; consult Atlas / FetchXML aggregates."
   },
   "drift_buckets": {
     "spec_without_entity": [],
@@ -46,948 +43,960 @@
     "doc_label_collision": [],
     "postgres_table_mismatch": []
   },
-  "claim_audit": [
-    {
-      "claim_text": "**Line 74:** \"Reviewer Finder Dataverse-native entry path — per-proposal picker + save-candidates SHIPPED; **Postgres reviewer tables still load-bearing until migration ships**\" — **STALE.** The \"still load-bearing\" framing is wrong. `pages/api/reviewer-finder/researchers.js` was deleted W6 (per `docs/atlas/postgres-researchers.md:51`); `extract-summary.js` was retired W5 step 5 (per `docs/atlas/postgres-other-reviewer-tables.md:23`). `generate-emails.js` has zero `@vercel/postgres` imports today. The picker, save-candidates, grant-cycles, and contact-history are all Dataverse-only.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "MEMORY.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "All other index entries: links resolve to files that exist; descriptions match (modulo per-file findings below).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "MEMORY.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "Verified — behavioral rule. Single historical reference (`project_intake_portal_external_id_foundation.md` content) confirmed. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "feedback_check_memory_before_asking_user.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified — `codex:codex-rescue` skill is present at `~/.claude/plugins/cache/openai-codex/codex/1.0.4/agents/codex-rescue.md` and is callable via the `Skill`/`Agent` tools (used live in this session). Codex V1 audit marked this VAGUE because it couldn't find the skill path; in this workspace it's reachable. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "feedback_codex_verbatim_output.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Behavioral rule + filename regex guidance. Supporting context (\"Phase I may be eliminated\") is now confirmed by `project_grant_phasing_evolution.md` — concepts ARE going away next cycle. The \"may shift\" hedge is softer than reality.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "feedback_concepts_vs_phase_i.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "**Suggested edit:** tighten hedge to \"concepts going away next cycle (confirmed); rule applies through current J26/D26.\"",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "feedback_concepts_vs_phase_i.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "CLEAN with hedge-softening opportunity.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "feedback_concepts_vs_phase_i.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified — `docs/EXECUTOR_CONTRACT.md` exists; Reviewer Finder is a normal app entry in `shared/config/appRegistry.js`; no PA-trigger plan for it. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "feedback_cycle_vs_executor_scope.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "**Line 16 example STALE.** Uses `wmkf_proposalroster` as an example of \"still right\" new-entity. But `wmkf_proposalroster` was rejected (2026-05-14, per `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md:40`). The example now contradicts the rule's *application*. Principle stands; example must change.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "feedback_human_legibility_schema_principle.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "**Suggested edit:** swap to a different example or add \"(was a candidate; ultimately decided against — see `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`)\".",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "feedback_human_legibility_schema_principle.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "Verified rest: 2026-05-14 schema review doc exists.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "feedback_human_legibility_schema_principle.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified — `CLAUDE.md:30-34` codifies the rule; `wmkf_apprequestpersons` Atlas page now exists (`docs/atlas/dataverse-wmkf-apprequestperson.md`). CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "feedback_red_gates_are_p0.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Behavioral rule. `shared/config/prompts/virtual-review-panel.js` exists for application. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "feedback_review_panel_tone.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Pure behavioral rule. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "feedback_surface_full_review_findings.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Pure behavioral rule. The S141 doc-currency reference (`docs/archive/DOC_TRIAGE_2026-05-07.md`) exists. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "feedback_thoroughness_default.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Behavioral rule, codified at `CLAUDE.md:11-17`. The historical \"20+ live UPDATE sites\" can't be re-verified post-W5/W6 retirement, but the rule stands. CLEAN as a rule.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "feedback_verify_before_destructive_carryover.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Pure behavioral rule. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "feedback_verify_external_platform_claims.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "**Line 13:** \"Justin (id=2) is superuser\" — verified through `pages/admin.js` and admin routes; `user_profiles.id` is auto-increment and stable per DB instance.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_admin_dashboard.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified: `/admin` page exists, `api_usage_log` referenced from `lib/utils/usage-logger.js` and 5 other files, `CLAUDE_API_KEY` centralization in code.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_admin_dashboard.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "**Minor:** \"id=2\" is brittle across DB rebuilds. Add a lookup-by-email hint? Not required.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_admin_dashboard.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_admin_dashboard.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified field names against `docs/atlas/dataverse-akoya-request.md:37` — match.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_akoya_request_pd_fields.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Filter pattern verified in `pages/api/reviewer-finder/my-proposals.js:124-130`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_akoya_request_pd_fields.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "`lib/utils/cycle-code.js` confirms `wmkf_meetingdate` is the cycle-derivation field.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_akoya_request_pd_fields.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "**One field claim I did NOT independently verify:** \"`ownerid` is `# BCO akoyaGO Integration` service account\" — requires live Dataverse probe, not repo-checkable. Memory says \"On real prod data (request 1002379)\" — historical sample, can't re-prove from repo.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_akoya_request_pd_fields.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "CLEAN for repo-verifiable claims; one external-platform claim left as marked.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_akoya_request_pd_fields.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified: `pages/api/cron/spend-check.js` exists (158 lines), `scripts/update-balance-anchor.sh` exists, `parseClaudeStream` in `pages/api/dynamics-explorer/chat.js:403-404, 1776-1777` captures both `cache_creation_input_tokens` and `cache_read_input_tokens` on `r.usage`. Memory's bug-fix-and-fix-confirmation narrative checks out.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_api_credit_monitoring.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Commit `5d53a32` referenced in memory — not re-checked via git but body code matches.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_api_credit_monitoring.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_api_credit_monitoring.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "**Line 11 STALE:** \"single source of truth for all **15 app definitions**\" — actual count is **16** (verified `grep -c \"^ key: '\" shared/config/appRegistry.js`). Expertise Finder added since memory was written.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_app_access_control.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "**Line 14 STALE:** \"`requireAppAccess(req, res, ...appKeys)` on **all ~30 app endpoints**\" — actual count is **48** (verified `grep -rln \"requireAppAccess\" pages/api/ | wc -l`).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_app_access_control.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "Verified: `wmkf_appuserappaccesses` entity (Wave 1 cutover); `shared/context/AppAccessContext.js` exists; `DEFAULT_APP_GRANTS = ['dynamics-explorer']` at `shared/config/appRegistry.js:168`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_app_access_control.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "**STALE framing on Concept Evaluator:** \"Concept Evaluator — being deprecated... Eventually remove from `appRegistry.js`, archive `pages/concept-evaluator.js`...\" All three actions have **already happened**: page archived to `_archived/pages/concept-evaluator.js`, API archived to `_archived/pages/api/evaluate-concepts.js`, key removed from `appRegistry.js` (residual comment line 12 only). Memory still reads as future work.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_app_roadmap_2026-04-25.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "Doc tail item: `docs/AI_PROMPTS_DETAILED.md`, `docs/SYSTEM_OVERVIEW.md`, `docs/PDF_EXPORT.md`, `docs/AI_PROMPTS_OVERVIEW.md` still reference Concept Evaluator. Tail cleanup is real, but the headline action is done.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_app_roadmap_2026-04-25.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "Other app status claims (Grant Reporting, Integrity Screener, Reviewer Finder, Phase II Writeup, Peer Review Summarizer, Phase I winddown) all align with current code + atlas. CLEAN for those.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_app_roadmap_2026-04-25.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Direction memory, no breakable refs. The named new fields on `akoya_request` (`wmkf_ai_summary`, `wmkf_ai_structured_data`, ...) — only `wmkf_ai_summary` exactly matches v3 spec; `structured_data` was renamed to `wmkf_ai_dataextract` per `project_dynamics_ai_writeback.md` and Atlas. Stale field-name list inside a direction memo.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_backend_automation.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "**Minor STALE:** the field-name list (lines 14-15) uses old v2-era names. Per `project_dynamics_ai_writeback.md` they were renamed in v3.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_backend_automation.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "**Line 7 STALE path:** references `docs/CODE_REVIEW_FRAGILITY_FINDINGS_2026-04-30.md` and `docs/CODE_REVIEW_RESPONSE_2026-04-30.md`. Both moved to `docs/archive/`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_codex_recurring_review.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "**Line 16 STALE:** \"`docs/API_ROUTE_SECURITY_MATRIX.md` is the living artifact (**untracked in our repo, owned by the Codex session**)\" — file is tracked in the repo today (`docs/API_ROUTE_SECURITY_MATRIX.md` exists), and `CLAUDE.md:245` calls it \"the full route catalogue, CI-gated via `npm run check:api-routes`\". The \"untracked, owned by Codex session\" framing is wrong.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_codex_recurring_review.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "Verified: `pages/api/review-manager/send-emails.js` has the promotion block (~line 247-265, off by ~10 from the memory's \"~line 247\"). `_wmkf_contact_value` null-check + link logic present.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_contact_promotion_permission.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "**Line 13 STALE path:** \"Tracked in `docs/PENDING_ADMIN_REQUESTS.md` Section 4\" — moved to `docs/archive/PENDING_ADMIN_REQUESTS.md`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_contact_promotion_permission.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "Policy memory; `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` exists as the running audit catalog. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dataverse_creator_privileges.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "All four gotchas hold: - `MAX_EXPORT_RECORDS = 5000` at `lib/services/dynamics-service.js:77` ✓ - `wmkf_ai_Prompt@odata.bind` (PascalCase) at `lib/services/execute-prompt.js:592` ✓ - 429 throttling pattern (operational, not in code; preserved as warning) - Logical-name lowercasing (operational pattern)",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_dataverse_schema_deploy_gotchas.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dataverse_schema_deploy_gotchas.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified: `.env.local` exists, contains `WAVE1_BACKEND_SETTINGS=dataverse`, `WAVE1_BACKEND_APP_ACCESS=dataverse`, `WAVE1_BACKEND_PREFS=dataverse`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dev_environment.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Fail-loud dispatcher confirmed at `lib/services/{settings,app-access,database}-service.js:35/44/47`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dev_environment.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dev_environment.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified all 4 named test scripts exist (`test-dynamics-write.js`, `test-dynamics-email.js`, `test-log-ai-run.js`, `inspect-ai-fields.js`).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dynamics_ai_writeback.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified field-name claims match Atlas at `docs/atlas/dataverse-akoya-request.md:48-50`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dynamics_ai_writeback.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "**Line 60 STALE TODO:** \"Justin owes: exclude `wmkf_ai_run` from search results and schema suggestions in the Dynamics Explorer chat tool\" — `wmkf_ai_run` is **not** in `TABLE_ANNOTATIONS` (verified `grep \"wmkf_ai_run\\b\" shared/config/prompts/dynamics-explorer.js` returns no entries in the entitySet enumeration). TODO is DONE; memory should remove.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_dynamics_ai_writeback.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "**External contradiction surfaced (not in this memory but adjacent):** `docs/atlas/dataverse-akoya-request.md:50` labels `wmkf_ai_fitassessment + wmkf_ai_fitrationale` as \"Field Set D: ready,\" but `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md:107` says Field Set D is PD Assignment (no new fields). This memory aligns with v3. The Atlas labeling is the inconsistent one. Worth resolving in Atlas, not in this memory.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_dynamics_ai_writeback.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "Strategic direction memory. `wmkf_ai_prompt` table real (Atlas: `docs/atlas/dataverse-wmkf-ai-run-and-prompt.md`); `lib/services/execute-prompt.js` exists. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dynamics_as_prompt_ground_truth.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Platform behavior; not repo-verifiable but consistent with code that works around these limits (no `$skip` in `DynamicsService` queries; uses `$count=true` not `/$count` endpoint). CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dynamics_crm_limitations.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Counts (16 staff, ~180 service accounts) require Dynamics admin probe to verify; not repo-verifiable. CLEAN as user-supplied context.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dynamics_crm_users.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified all 5 named service methods exist in `lib/services/dynamics-service.js:1033,1045,1116,1151,1176`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dynamics_email.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Test surfaces: `pages/test-email.js` + `pages/api/test-email.js` exist. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dynamics_email.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified: `getRequestSharePointBuckets` in `lib/utils/sharepoint-buckets.js`. `list_documents` and `search_documents` in `pages/api/dynamics-explorer/chat.js` use it. Sample request numbers (`993879`, `993347`, `1001289`) — historical, can't re-prove. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dynamics_explorer_archive_libs.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Search API claims (77K+ docs, 154MB index) are external state, not repo-verifiable. Code references (`Microsoft.Dynamics.CRM` annotations, top-4 inline schemas, SSE streaming) present in `pages/api/dynamics-explorer/chat.js`. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dynamics_explorer_details.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Both scripts exist (`scripts/dynamics-schema-diff.js`, `scripts/dynamics-schema-map.js`). Commit `25d91e4` referenced — not git-verified but body matches. `TABLE_ANNOTATIONS` confirmed live in prompt config. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dynamics_explorer_schema_diff.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified: `lib/utils/dynamics-explorer-serializer.js`, `tests/unit/dynamics-explorer-serializer.test.js`, `tests/integration/dynamics-explorer-tool-serialization.test.js` all exist. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dynamics_explorer_serializer_deferred.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified all named files: `lib/services/dynamics-identity-service.js`, `scripts/reconcile-dynamics-identities.js`, `pages/api/cron/reconcile-identities.js`, `lib/services/dynamics-service.js:167` impersonation gate.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dynamics_identity_reconciliation.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "7 endpoints listed as plumbed — verified `actingUserSystemId` reaches each: `phase-i-dynamics/summarize.js`, `phase-i-dynamics/summarize-v2.js`, `grant-reporting/extract.js`, `review-manager/{send-emails,mark-received-no-file,upload-review}.js`, `test-email.js` (all exist).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dynamics_identity_reconciliation.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "8 endpoints from S129: verified all 8 take `actingUserSystemId` (`reviewer-finder/{save-candidates,my-candidates}`, `review-manager/{render-emails,send-emails,regenerate-token,revoke-token,reviewers,upload-review}`).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dynamics_identity_reconciliation.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "All 4 adapters take `actingUserSystemId`: verified (`grep -l \"actingUserSystemId\" lib/dataverse/adapters/*.js` returns all 4).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dynamics_identity_reconciliation.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "`tests/unit/dynamics-service-caller-id.test.js` and `tests/unit/adapters-caller-id.test.js` exist.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_dynamics_identity_reconciliation.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "Live \"Delegate role granted\" status is external Dataverse state — not repo-verifiable. Memory's description tag says \"Remaining: full /phase-i-dynamics overwrite=true run + flip prod env flag DYNAMICS_IMPERSONATION_ENABLED=true.\" Active still per `CLAUDE.md:163` (\"off by default for safe rollout\").",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_dynamics_identity_reconciliation.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_dynamics_identity_reconciliation.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified all 4 `lib/external/` primitives: `token-lifecycle.js`, `verify-suggestion-token.js`, `reviewer-materials.js`, `review-form-schema.js` (also `policy-fetcher.js` exists — memory didn't mention it, harmless omission).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_external_reviewer_file_access.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified `pages/external/review/[token].js` + endpoints `context.js`, `proposal.js`, `upload.js`, `respond.js` (memory listed 3; respond.js exists too — added since memory).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_external_reviewer_file_access.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "`/api/external/*` middleware allowlist at `middleware.js:131-133` ✓.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_external_reviewer_file_access.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "Commit `2277d23` (Vercel Blob retirement) in `git log` history. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_external_reviewer_file_access.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified filter `akoya_requeststatus eq 'Phase II Pending'` at `pages/api/reviewer-finder/my-proposals.js:127`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_grant_lifecycle_states_confirmed.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "**STALE FALSE CLAIM (this is C1 from V1, now verified again):** \"**`wmkf_potentialreviewer1..5` do NOT exist on `akoya_request`** — got a schema error querying.\" This contradicts Atlas (`docs/atlas/dataverse-akoya-request.md:36`: \"`wmkf_potentialreviewer1..5` → `wmkf_potentialreviewers` (legacy slots)\") AND contradicts `project_akoya_request_pd_fields.md` and `project_reviewer_count_invariant.md`. The slots DO exist on `akoya_request`; live code doesn't read them anymore (verified: `grep -rn \"wmkf_potentialreviewer[1-5]\" pages/ lib/ scripts/ shared/` returns nothing), but they're real Dataverse fields.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_grant_lifecycle_states_confirmed.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "D26 production sample counts — historical, not repo-verifiable.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_grant_lifecycle_states_confirmed.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "Strategic direction; aligns with `project_intake_portal_pilot_decisions_2026-05-13.md` and intake design docs. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_grant_phasing_evolution.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Trigger date 2026-05-27 — not yet due (today is 2026-05-14). Agenda file `docs/INTAKE_PORTAL_MEETING_AGENDA_2026-05-13.md` still present. CLEAN, correctly waiting.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_intake_meeting_agenda_cleanup.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified all tenant facts in `pages/api/auth/[...nextauth].js:10-11,37,63`: `wmkeckapply` tenant, `entra-external` provider id, env-var triplet.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_intake_portal_external_id_foundation.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Sign-in auto-dispatch verified at `pages/auth/signin.js:24-29`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_intake_portal_external_id_foundation.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "`/apply` exclusion in `_app.js:23` ✓.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_intake_portal_external_id_foundation.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "**Line 40 STALE path:** `docs/IT_ENTRA_EXTERNAL_TENANT_REQUEST_2026-05-04.md` moved to `docs/archive/`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_intake_portal_external_id_foundation.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "Self-marks items 2 and 6 as superseded by 2026-05-13 ✓.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_intake_portal_pilot_decisions_2026-05-06.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "**Line 9 STALE path:** `docs/CONNOR_INTAKE_PORTAL_SYNC.md` moved to `docs/archive/`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_intake_portal_pilot_decisions_2026-05-06.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "**Line 28 STALE entity list:** `wmkf_budgetline, wmkf_personnel, wmkf_priorsupport, wmkf_milestone` — superseded by 2026-05-14 (`wmkf_proposalbudgetline` only; roster extends `wmkf_apprequestperson`; milestones/prior-support deferred). Memory's own top-of-file warning catches the 2026-05-13 supersession but not the 2026-05-14 one.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_intake_portal_pilot_decisions_2026-05-06.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "**THIS MEMORY IS ONE-DAY STALE.** The 2026-05-14 schema review (`docs/archive/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md` at 11:40 today, `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` at 14:05 today, `docs/INTAKE_PORTAL_DESIGN.md:587-588` at 14:05 today) supersedes this memory.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_intake_portal_pilot_decisions_2026-05-13.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "**Line 20 STALE:** \"narrowed scope to budget + roster only. JSON specs drafted by 2026-05-15, applied by 2026-05-18.\" — refined to: budget = new `wmkf_proposalbudgetline`; roster extends `wmkf_apprequestperson`; no new `wmkf_proposalroster` (per `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md:40`).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_intake_portal_pilot_decisions_2026-05-13.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "**Line 30 STALE path:** \"Two JSON schema specs under `lib/dataverse/schema/intake/`\" — that directory does NOT exist (verified `find lib/dataverse/schema -maxdepth 3 -type d` returns `roles, wave1, wave2, wave2-existing, wave3` only). Budget spec landed at `docs/BUDGET_FORM_SPEC.md` instead.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_intake_portal_pilot_decisions_2026-05-13.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "**Line 24 STALE:** \"Naming alignment is open... between `wmkf_proposalroster` and `wmkf_personnel`\" — closed 2026-05-14: no new roster entity at all.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_intake_portal_pilot_decisions_2026-05-13.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "Verified `docs/INTAKE_PORTAL_DESIGN.md` exists at root (not archive). CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_intake_portal_skinny_scope.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified `pages/api/grant-reporting/extract.js` exists; SharePoint write granted 2026-04-15 (per `project_dynamics_ai_writeback.md`); `getRequestSharePointBuckets` and `lib/utils/sharepoint-buckets.js` exist. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_interim_report_automation.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified every named file (5/5): `lib/db/migrations/008_irs_exempt_orgs.sql`, `lib/services/irs-bmf-service.js`, `pages/api/cron/refresh-irs-bmf.js`, `pages/api/irs/verify-ein.js`, `scripts/import-irs-bmf.js`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_irs_exempt_verification.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified cron schedule `0 6 15 1,4,7,10 *` in `vercel.json`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_irs_exempt_verification.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified middleware allowlist at `middleware.js:131`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_irs_exempt_verification.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified `IRS_VERIFY_SECRET` in `docs/CREDENTIALS_RUNBOOK.md:41`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_irs_exempt_verification.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "\"First load not yet run\" — external state, can't verify. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_irs_exempt_verification.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified `shared/forms/phase-ii-research-2026-06/` exists with `schema.js`, `validate.js`, `map-to-dynamics.js`. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_machine_legible_form_capture.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Vague planning memory. Compliance screening (Field Set C) and PD Assignment (Field Set D) ARE deployed per Atlas — memory frames them as future, but pieces have already shipped. Same issue I flagged in V1.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_new_ai_capabilities.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "Conceptual; not repo-tied. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_pdf_processing_tiers.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified all 4 named scripts/pages exist (`pages/phase-i-dynamics.js`, `scripts/compare-phase-i-v1-v2.js`, `scripts/ab-phase-i-prompts.js`, `scripts/audit-system-prompt-sizes.js`).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_phase_i_summary_app_winddown.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "`pages/api/phase-i-dynamics/{summarize,summarize-v2}.js` ✓. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_phase_i_summary_app_winddown.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified `docs/EXECUTOR_CONTRACT.md`, `docs/PROMPT_STORAGE_DESIGN.md`, `docs/WORKFLOW_CHAINING_DESIGN.md` exist.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_prompt_storage_strategy.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified `wmkf_ai_Prompt@odata.bind` at `execute-prompt.js:592`; `wmkf_ai_systemprompt` field used at `execute-prompt.js:197,389`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_prompt_storage_strategy.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Plan file at `/Users/gallivan/.claude/plans/ok-claude-connor-is-precious-dove.md` — not verified (out of repo).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_prompt_storage_strategy.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "**Lines 32-36 STALE framing:** Phase 0 \"by May 1 2026\" listed as in-progress. Already shipped (Executor live; `summarize-v2` uses it; Atlas confirms `wmkf_ai_prompt` v3 path live). Same staleness as V1, confirmed.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_prompt_storage_strategy.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "Verified `docs/PROPOSAL_CONTEXT_EXTRACTION_PLAN.md` exists. CLEAN as deferred plan.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_proposal_context_extraction.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "**STALE — main claim wrong.** Memory says \"What is NOT yet built: Dedicated Accept / Decline buttons... auto-fill of `response_received_at`/`accepted`/`declined` from a click action.\" Reality: `pages/api/external/review/[token]/respond.js` exists (verified `ls`); writes `wmkf_accepted`, `wmkf_declined`, `wmkf_responsetype`, `wmkf_responsereceivedat` per `lib/dataverse/adapters/reviewer-suggestion.js:444-469`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_reviewer_accept_decline_links.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "Filename-specific claim (\"`pages/review-response.js` and `pages/api/review-response/confirm.js` were never created\") still technically true — those exact filenames don't exist. But the capability moved to `respond.js`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_reviewer_accept_decline_links.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "Codex caught this in V1; I missed it. Confirmed.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_reviewer_accept_decline_links.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Business invariant memory. The slot existence claim aligns with Atlas (slots do exist on `akoya_request`; not read by current code). CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_reviewer_count_invariant.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "**MATERIALLY STALE — central claim wrong.** Memory line 12: \"Postgres reviewer tables are NOT dormant... `researchers.js` (browse/manage), `extract-summary.js`, `generate-emails.js`, `grant-cycles.js`, and `my-proposals.js` all still read/write Postgres.\" - `researchers.js`: **deleted W6 step 1 2026-05-12** (per `docs/atlas/postgres-researchers.md:51,59,70`). - `extract-summary.js`: **retired W5 step 5 2026-05-12** (per `docs/atlas/postgres-other-reviewer-tables.md:23`). - `grant-cycles.js`: Dataverse-only since W3 cutover 2026-05-12 (header at `pages/api/reviewer-finder/grant-cycles.js:9`). - `generate-emails.js`: zero `@vercel/postgres` imports (`grep -c \"@vercel/postgres\" pages/api/reviewer-finder/generate-emails.js` → 0). - `my-proposals.js`: Dataverse-only (builds OData filter; verified line 124-130).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_reviewer_finder_dataverse_entry_path.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "**Line 17 STALE:** \"Do NOT drop the Postgres reviewer tables without a broader migration.\" That migration completed (W3–W6); the four drain-only tables (`researchers`, `researcher_keywords`, `publications`, `proposal_searches`) are scheduled for post-pilot one-shot DELETE per `project_w6_table_drop_pending.md`. The \"do not drop\" carryover this memory created is now itself a risk: someone reading it might leave dead tables in place indefinitely.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_reviewer_finder_dataverse_entry_path.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "Picker (`ProposalPickerCard`) + save-candidates writeback claims still hold (verified earlier).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_reviewer_finder_dataverse_entry_path.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Codex caught this in V1; I missed it. **This was the most dangerous miss of V1** — acting on this memory's \"do not drop\" would block legitimate cleanup; treating its \"Postgres still load-bearing\" framing as current would mislead architectural plans.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_reviewer_finder_dataverse_entry_path.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "Pre-J26 absence claim is historical and not repo-verifiable. Underlying logic (Postgres `reviewer_suggestions` was the writer, only used J26+) holds. CLEAN as historical context.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_reviewer_history_data_quality.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Direction memory. Wave 2 schema decisions (`wmkf_review_status` choice, `wmkf_response_type` choice) align with deployed `wmkf_appreviewersuggestion` per Atlas. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_reviewer_lifecycle_automation.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Phase A (CRM send) shipped per `project_contact_promotion_permission.md` (live 2026-05-01).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_reviewer_lifecycle.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "Phase C (review intake to SharePoint) shipped per `project_external_reviewer_file_access.md` (live 2026-05-03).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_reviewer_lifecycle.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "Reviewer Portal concept (\"`/review/[token]` token-based link\") shipped as `/external/review/[token]` — different URL, but same primitive.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_reviewer_lifecycle.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "**Memory frames it all as future work plan**, but multiple pieces shipped via other memories. Same issue I flagged in V1.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_reviewer_lifecycle.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "**Line 61 stale ref:** \"Add Researcher modal (reviewer-finder.js:2802)\" — `pages/reviewer-finder.js` is 3645 lines now; line 2802 may or may not still hit the modal. Specific line numbers in long-lived files rot.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_reviewer_lifecycle.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "**Line 22 STALE:** \"Cleanup cron runs weekly; only acts twice a year.\" Cron was **deferred** per `project_w6_table_drop_pending.md`; verified `grep -rln \"reviewer-cleanup\\|reviewerCleanup\\|cleanupReviewer\" pages/api/ lib/ scripts/` returns nothing. No such cron exists or is planned in the W6 path.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_reviewer_postgres_to_dataverse_migration.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "**Line 33 STALE:** \"Batched lookup: new endpoint `/api/reviewer-finder/contact-history` POST `{ contactIds }`.\" Actual route is **GET single-contact** (`pages/api/reviewer-finder/contact-history.js:4` says \"GET — PI / co-PI history for a single contact\"; `:62-64` rejects non-GET).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_reviewer_postgres_to_dataverse_migration.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "**Line 66-75 STALE as current state:** S136 live-state probe describes Postgres \"$reviewer_suggestions: 337 rows, grant_cycles: 13 rows...\" Subsequent W3–W6 migrations changed this. Atlas page `docs/atlas/postgres-grant-cycles.md:8` says Dataverse counterpart has 0 rows but live reads are Dataverse-only per the W3 cutover. Memory's row-count snapshot is historical.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_reviewer_postgres_to_dataverse_migration.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "Other content (locked decisions, S136 codex stress-test addressed) is historical and useful.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_reviewer_postgres_to_dataverse_migration.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "Codex caught these in V1; I missed them.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_reviewer_postgres_to_dataverse_migration.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "Verified site URL, library names (`akoya_request` + 3 archives), `lib/services/graph-service.js` exists, `scripts/probe-sharepoint-write.js` exists.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_sharepoint_integration.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "**Line 17 STALE path:** \"IT security response: `docs/IT_SECURITY_RESPONSE.md`\" — moved to `docs/archive/IT_SECURITY_RESPONSE.md`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_sharepoint_integration.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "Site URL and Graph API claims not repo-verifiable but consistent with code that uses them.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_sharepoint_integration.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "Both plan docs exist (`docs/STAGED_REVIEW_PIPELINE.md`, `docs/STAGED_PIPELINE_IMPLEMENTATION_PLAN.md`). VRP service files exist. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_staged_review_pipeline.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "**Line 11 STALE temporal hedge:** \"Connor partnership: Will flesh out backend vision together **in coming weeks (from ~March 12, 2026)**\" — that's ~2 months ago today. Strategic direction (Dynamics-first, backend triggers, AkoyaGO minimize) confirmed by other memories. Temporal framing rots; principles stand.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_strategy_direction.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "`docs/STRATEGY.md` exists. CLEAN with hedge-softening opportunity.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_strategy_direction.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified appRegistry entry (`shared/config/appRegistry.js:142`), page (`pages/virtual-review-panel.js`), API (`pages/api/virtual-review-panel.js`), services (`lib/services/multi-llm-service.js`, `lib/services/panel-review-service.js`), prompts (`shared/config/prompts/virtual-review-panel.js`), migration (`lib/db/migrations/003_virtual_review_panel.sql`). All exist.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_virtual_review_panel.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Env-var claims (`OPENAI_API_KEY`, `GOOGLE_AI_API_KEY`, `PERPLEXITY_API_KEY`) not env-probed but referenced in `docs/CREDENTIALS_RUNBOOK.md`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_virtual_review_panel.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_virtual_review_panel.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Trigger date 2026-07-01 — not yet due. Tables `researchers`, `researcher_keywords`, `publications`, `proposal_searches` all still exist per `docs/atlas/postgres-researchers.md` and `postgres-other-reviewer-tables.md`.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_w6_table_drop_pending.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "**Line 33 references stale Atlas:** \"`proposal_searches` JOIN site mentioned in `docs/atlas/postgres-other-reviewer-tables.md:25`\" — Atlas page line 25 still says JOIN is load-bearing in `grant-cycles.js`. But `pages/api/reviewer-finder/grant-cycles.js` shows the route is Dataverse-only (the JOIN comment at line 100 is past-tense). **The Atlas page itself is stale.** Memory's instruction is \"verify it was killed in W3\" — verification result is YES, killed. Memory is fine; Atlas needs correcting.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "project_w6_table_drop_pending.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "Verified: `lib/services/onboarding.js` does NOT exist (memory correctly says \"to be created\").",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_wave1_onboarding.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified: `lib/services/dataverse-identity-map.js` exists.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_wave1_onboarding.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified: `lib/dataverse/role-apply.js` exists.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_wave1_onboarding.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified: `scripts/apply-security-role.js` exists.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_wave1_onboarding.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "`grantDefaultApps` at `pages/api/auth/[...nextauth].js:157,178,313` ✓. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_wave1_onboarding.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified: `lib/db/migrations/007_drop_wave1_tables.sql` exists.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_wave1_pending.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified: `docs/WAVE1_REVERT_TEMP_ELEVATIONS.md` exists.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_wave1_pending.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "Verified fail-loud dispatcher in 3 services.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_wave1_pending.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "App-user GUID `53e97fb3-a006-f111-8406-000d3a352682` — external state, not repo-verifiable.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "project_wave1_pending.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "project_wave1_pending.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "User-supplied context; no repo claims. CLEAN.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "verified",
-      "evidence": "user_powerautomate.md; audit text classified as verified"
-    },
-    {
-      "claim_text": "✅ `project_reviewer_finder_dataverse_entry_path.md` central claim wrong (researchers.js, extract-summary.js deleted; generate-emails.js Postgres-free).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "user_powerautomate.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "✅ `project_reviewer_accept_decline_links.md` \"NOT yet built\" wrong (`respond.js` exists).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "user_powerautomate.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "✅ `project_reviewer_postgres_to_dataverse_migration.md` two stale items (cleanup cron deferred; contact-history is GET single-contact, not POST batched).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "user_powerautomate.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "✅ `project_intake_portal_pilot_decisions_2026-05-13.md` one-day stale per 2026-05-14 schema docs; `lib/dataverse/schema/intake/` doesn't exist.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "user_powerautomate.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "✅ `feedback_human_legibility_schema_principle.md` example `wmkf_proposalroster` now self-contradicting.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "user_powerautomate.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "✅ All archive-path moves (S8–S11 in V1).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "user_powerautomate.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "✅ Concept Evaluator already removed (V1 caught this; V2 confirms `_archived/` location).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "user_powerautomate.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "The C1 three-way contradiction on `wmkf_potentialreviewer1..5` (Codex marked this VAGUE; my V1 caught the contradiction; V2 confirms with grep evidence that slots exist in Atlas but no live code reads them).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "user_powerautomate.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "The Atlas-vs-code drift items (1, 2, 3 above) — Codex marked the `proposal_searches` Atlas note as stale; V2 found two more.",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "stale",
-      "evidence": "user_powerautomate.md; audit text classified as stale"
-    },
-    {
-      "claim_text": "App count 16 not 15; `requireAppAccess` count 48 not 30 (V1 caught these; Codex VAGUE'd them).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "user_powerautomate.md; not conclusively classified by audit text"
-    },
-    {
-      "claim_text": "`project_backend_automation.md` field-name list (`wmkf_ai_structured_data`) is v2-era; renamed in v3 (V1 didn't flag this; V2 catches it cross-checking against v3 spec).",
-      "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
-      "status": "unknown",
-      "evidence": "user_powerautomate.md; not conclusively classified by audit text"
-    }
-  ]
+  "historical_claim_audit": {
+    "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+    "audit_date": "2026-05-14",
+    "status": "historical_snapshot",
+    "note": "These classifications reproduce the dated S154 audit for provenance. They are not current drift and are excluded from the live summary and gate result.",
+    "summary": {
+      "total_claims_at_audit": 157,
+      "stale_at_audit": 38,
+      "verified_at_audit": 88,
+      "unknown_at_audit": 31
+    },
+    "claims": [
+      {
+        "claim_text": "**Line 74:** \"Reviewer Finder Dataverse-native entry path — per-proposal picker + save-candidates SHIPPED; **Postgres reviewer tables still load-bearing until migration ships**\" — **STALE.** The \"still load-bearing\" framing is wrong. `pages/api/reviewer-finder/researchers.js` was deleted W6 (per `docs/atlas/postgres-researchers.md:51`); `extract-summary.js` was retired W5 step 5 (per `docs/atlas/postgres-other-reviewer-tables.md:23`). `generate-emails.js` has zero `@vercel/postgres` imports today. The picker, save-candidates, grant-cycles, and contact-history are all Dataverse-only.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "MEMORY.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "All other index entries: links resolve to files that exist; descriptions match (modulo per-file findings below).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "MEMORY.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "Verified — behavioral rule. Single historical reference (`project_intake_portal_external_id_foundation.md` content) confirmed. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "feedback_check_memory_before_asking_user.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified — `codex:codex-rescue` skill is present at `~/.claude/plugins/cache/openai-codex/codex/1.0.4/agents/codex-rescue.md` and is callable via the `Skill`/`Agent` tools (used live in this session). Codex V1 audit marked this VAGUE because it couldn't find the skill path; in this workspace it's reachable. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "feedback_codex_verbatim_output.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Behavioral rule + filename regex guidance. Supporting context (\"Phase I may be eliminated\") is now confirmed by `project_grant_phasing_evolution.md` — concepts ARE going away next cycle. The \"may shift\" hedge is softer than reality.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "feedback_concepts_vs_phase_i.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "**Suggested edit:** tighten hedge to \"concepts going away next cycle (confirmed); rule applies through current J26/D26.\"",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "feedback_concepts_vs_phase_i.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "CLEAN with hedge-softening opportunity.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "feedback_concepts_vs_phase_i.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified — `docs/EXECUTOR_CONTRACT.md` exists; Reviewer Finder is a normal app entry in `shared/config/appRegistry.js`; no PA-trigger plan for it. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "feedback_cycle_vs_executor_scope.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "**Line 16 example STALE.** Uses `wmkf_proposalroster` as an example of \"still right\" new-entity. But `wmkf_proposalroster` was rejected (2026-05-14, per `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md:40`). The example now contradicts the rule's *application*. Principle stands; example must change.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "feedback_human_legibility_schema_principle.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "**Suggested edit:** swap to a different example or add \"(was a candidate; ultimately decided against — see `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`)\".",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "feedback_human_legibility_schema_principle.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "Verified rest: 2026-05-14 schema review doc exists.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "feedback_human_legibility_schema_principle.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified — `CLAUDE.md:30-34` codifies the rule; `wmkf_apprequestpersons` Atlas page now exists (`docs/atlas/dataverse-wmkf-apprequestperson.md`). CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "feedback_red_gates_are_p0.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Behavioral rule. `shared/config/prompts/virtual-review-panel.js` exists for application. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "feedback_review_panel_tone.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Pure behavioral rule. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "feedback_surface_full_review_findings.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Pure behavioral rule. The S141 doc-currency reference (`docs/archive/DOC_TRIAGE_2026-05-07.md`) exists. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "feedback_thoroughness_default.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Behavioral rule, codified at `CLAUDE.md:11-17`. The historical \"20+ live UPDATE sites\" can't be re-verified post-W5/W6 retirement, but the rule stands. CLEAN as a rule.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "feedback_verify_before_destructive_carryover.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Pure behavioral rule. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "feedback_verify_external_platform_claims.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "**Line 13:** \"Justin (id=2) is superuser\" — verified through `pages/admin.js` and admin routes; `user_profiles.id` is auto-increment and stable per DB instance.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_admin_dashboard.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified: `/admin` page exists, `api_usage_log` referenced from `lib/utils/usage-logger.js` and 5 other files, `CLAUDE_API_KEY` centralization in code.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_admin_dashboard.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "**Minor:** \"id=2\" is brittle across DB rebuilds. Add a lookup-by-email hint? Not required.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_admin_dashboard.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_admin_dashboard.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified field names against `docs/atlas/dataverse-akoya-request.md:37` — match.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_akoya_request_pd_fields.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Filter pattern verified in `pages/api/reviewer-finder/my-proposals.js:124-130`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_akoya_request_pd_fields.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "`lib/utils/cycle-code.js` confirms `wmkf_meetingdate` is the cycle-derivation field.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_akoya_request_pd_fields.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "**One field claim I did NOT independently verify:** \"`ownerid` is `# BCO akoyaGO Integration` service account\" — requires live Dataverse probe, not repo-checkable. Memory says \"On real prod data (request 1002379)\" — historical sample, can't re-prove from repo.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_akoya_request_pd_fields.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "CLEAN for repo-verifiable claims; one external-platform claim left as marked.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_akoya_request_pd_fields.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified: `pages/api/cron/spend-check.js` exists (158 lines), `scripts/update-balance-anchor.sh` exists, `parseClaudeStream` in `pages/api/dynamics-explorer/chat.js:403-404, 1776-1777` captures both `cache_creation_input_tokens` and `cache_read_input_tokens` on `r.usage`. Memory's bug-fix-and-fix-confirmation narrative checks out.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_api_credit_monitoring.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Commit `5d53a32` referenced in memory — not re-checked via git but body code matches.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_api_credit_monitoring.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_api_credit_monitoring.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "**Line 11 STALE:** \"single source of truth for all **15 app definitions**\" — actual count is **16** (verified `grep -c \"^ key: '\" shared/config/appRegistry.js`). Expertise Finder added since memory was written.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_app_access_control.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "**Line 14 STALE:** \"`requireAppAccess(req, res, ...appKeys)` on **all ~30 app endpoints**\" — actual count is **48** (verified `grep -rln \"requireAppAccess\" pages/api/ | wc -l`).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_app_access_control.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "Verified: `wmkf_appuserappaccesses` entity (Wave 1 cutover); `shared/context/AppAccessContext.js` exists; `DEFAULT_APP_GRANTS = ['dynamics-explorer']` at `shared/config/appRegistry.js:168`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_app_access_control.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "**STALE framing on Concept Evaluator:** \"Concept Evaluator — being deprecated... Eventually remove from `appRegistry.js`, archive `pages/concept-evaluator.js`...\" All three actions have **already happened**: page archived to `_archived/pages/concept-evaluator.js`, API archived to `_archived/pages/api/evaluate-concepts.js`, key removed from `appRegistry.js` (residual comment line 12 only). Memory still reads as future work.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_app_roadmap_2026-04-25.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "Doc tail item: `docs/AI_PROMPTS_DETAILED.md`, `docs/SYSTEM_OVERVIEW.md`, `docs/PDF_EXPORT.md`, `docs/AI_PROMPTS_OVERVIEW.md` still reference Concept Evaluator. Tail cleanup is real, but the headline action is done.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_app_roadmap_2026-04-25.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "Other app status claims (Grant Reporting, Integrity Screener, Reviewer Finder, Phase II Writeup, Peer Review Summarizer, Phase I winddown) all align with current code + atlas. CLEAN for those.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_app_roadmap_2026-04-25.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Direction memory, no breakable refs. The named new fields on `akoya_request` (`wmkf_ai_summary`, `wmkf_ai_structured_data`, ...) — only `wmkf_ai_summary` exactly matches v3 spec; `structured_data` was renamed to `wmkf_ai_dataextract` per `project_dynamics_ai_writeback.md` and Atlas. Stale field-name list inside a direction memo.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_backend_automation.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "**Minor STALE:** the field-name list (lines 14-15) uses old v2-era names. Per `project_dynamics_ai_writeback.md` they were renamed in v3.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_backend_automation.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "**Line 7 STALE path:** references `docs/CODE_REVIEW_FRAGILITY_FINDINGS_2026-04-30.md` and `docs/CODE_REVIEW_RESPONSE_2026-04-30.md`. Both moved to `docs/archive/`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_codex_recurring_review.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "**Line 16 STALE:** \"`docs/API_ROUTE_SECURITY_MATRIX.md` is the living artifact (**untracked in our repo, owned by the Codex session**)\" — file is tracked in the repo today (`docs/API_ROUTE_SECURITY_MATRIX.md` exists), and `CLAUDE.md:245` calls it \"the full route catalogue, CI-gated via `npm run check:api-routes`\". The \"untracked, owned by Codex session\" framing is wrong.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_codex_recurring_review.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "Verified: `pages/api/review-manager/send-emails.js` has the promotion block (~line 247-265, off by ~10 from the memory's \"~line 247\"). `_wmkf_contact_value` null-check + link logic present.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_contact_promotion_permission.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "**Line 13 STALE path:** \"Tracked in `docs/PENDING_ADMIN_REQUESTS.md` Section 4\" — moved to `docs/archive/PENDING_ADMIN_REQUESTS.md`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_contact_promotion_permission.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "Policy memory; `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` exists as the running audit catalog. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dataverse_creator_privileges.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "All four gotchas hold: - `MAX_EXPORT_RECORDS = 5000` at `lib/services/dynamics-service.js:77` ✓ - `wmkf_ai_Prompt@odata.bind` (PascalCase) at `lib/services/execute-prompt.js:592` ✓ - 429 throttling pattern (operational, not in code; preserved as warning) - Logical-name lowercasing (operational pattern)",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_dataverse_schema_deploy_gotchas.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dataverse_schema_deploy_gotchas.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified: `.env.local` exists, contains `WAVE1_BACKEND_SETTINGS=dataverse`, `WAVE1_BACKEND_APP_ACCESS=dataverse`, `WAVE1_BACKEND_PREFS=dataverse`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dev_environment.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Fail-loud dispatcher confirmed at `lib/services/{settings,app-access,database}-service.js:35/44/47`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dev_environment.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dev_environment.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified all 4 named test scripts exist (`test-dynamics-write.js`, `test-dynamics-email.js`, `test-log-ai-run.js`, `inspect-ai-fields.js`).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dynamics_ai_writeback.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified field-name claims match Atlas at `docs/atlas/dataverse-akoya-request.md:48-50`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dynamics_ai_writeback.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "**Line 60 STALE TODO:** \"Justin owes: exclude `wmkf_ai_run` from search results and schema suggestions in the Dynamics Explorer chat tool\" — `wmkf_ai_run` is **not** in `TABLE_ANNOTATIONS` (verified `grep \"wmkf_ai_run\\b\" shared/config/prompts/dynamics-explorer.js` returns no entries in the entitySet enumeration). TODO is DONE; memory should remove.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_dynamics_ai_writeback.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "**External contradiction surfaced (not in this memory but adjacent):** `docs/atlas/dataverse-akoya-request.md:50` labels `wmkf_ai_fitassessment + wmkf_ai_fitrationale` as \"Field Set D: ready,\" but `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md:107` says Field Set D is PD Assignment (no new fields). This memory aligns with v3. The Atlas labeling is the inconsistent one. Worth resolving in Atlas, not in this memory.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_dynamics_ai_writeback.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "Strategic direction memory. `wmkf_ai_prompt` table real (Atlas: `docs/atlas/dataverse-wmkf-ai-run-and-prompt.md`); `lib/services/execute-prompt.js` exists. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dynamics_as_prompt_ground_truth.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Platform behavior; not repo-verifiable but consistent with code that works around these limits (no `$skip` in `DynamicsService` queries; uses `$count=true` not `/$count` endpoint). CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dynamics_crm_limitations.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Counts (16 staff, ~180 service accounts) require Dynamics admin probe to verify; not repo-verifiable. CLEAN as user-supplied context.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dynamics_crm_users.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified all 5 named service methods exist in `lib/services/dynamics-service.js:1033,1045,1116,1151,1176`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dynamics_email.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Test surfaces: `pages/test-email.js` + `pages/api/test-email.js` exist. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dynamics_email.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified: `getRequestSharePointBuckets` in `lib/utils/sharepoint-buckets.js`. `list_documents` and `search_documents` in `pages/api/dynamics-explorer/chat.js` use it. Sample request numbers (`993879`, `993347`, `1001289`) — historical, can't re-prove. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dynamics_explorer_archive_libs.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Search API claims (77K+ docs, 154MB index) are external state, not repo-verifiable. Code references (`Microsoft.Dynamics.CRM` annotations, top-4 inline schemas, SSE streaming) present in `pages/api/dynamics-explorer/chat.js`. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dynamics_explorer_details.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Both scripts exist (`scripts/dynamics-schema-diff.js`, `scripts/dynamics-schema-map.js`). Commit `25d91e4` referenced — not git-verified but body matches. `TABLE_ANNOTATIONS` confirmed live in prompt config. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dynamics_explorer_schema_diff.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified: `lib/utils/dynamics-explorer-serializer.js`, `tests/unit/dynamics-explorer-serializer.test.js`, `tests/integration/dynamics-explorer-tool-serialization.test.js` all exist. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dynamics_explorer_serializer_deferred.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified all named files: `lib/services/dynamics-identity-service.js`, `scripts/reconcile-dynamics-identities.js`, `pages/api/cron/reconcile-identities.js`, `lib/services/dynamics-service.js:167` impersonation gate.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dynamics_identity_reconciliation.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "7 endpoints listed as plumbed — verified `actingUserSystemId` reaches each: `phase-i-dynamics/summarize.js`, `phase-i-dynamics/summarize-v2.js`, `grant-reporting/extract.js`, `review-manager/{send-emails,mark-received-no-file,upload-review}.js`, `test-email.js` (all exist).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dynamics_identity_reconciliation.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "8 endpoints from S129: verified all 8 take `actingUserSystemId` (`reviewer-finder/{save-candidates,my-candidates}`, `review-manager/{render-emails,send-emails,regenerate-token,revoke-token,reviewers,upload-review}`).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dynamics_identity_reconciliation.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "All 4 adapters take `actingUserSystemId`: verified (`grep -l \"actingUserSystemId\" lib/dataverse/adapters/*.js` returns all 4).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dynamics_identity_reconciliation.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "`tests/unit/dynamics-service-caller-id.test.js` and `tests/unit/adapters-caller-id.test.js` exist.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_dynamics_identity_reconciliation.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "Live \"Delegate role granted\" status is external Dataverse state — not repo-verifiable. Memory's description tag says \"Remaining: full /phase-i-dynamics overwrite=true run + flip prod env flag DYNAMICS_IMPERSONATION_ENABLED=true.\" Active still per `CLAUDE.md:163` (\"off by default for safe rollout\").",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_dynamics_identity_reconciliation.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_dynamics_identity_reconciliation.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified all 4 `lib/external/` primitives: `token-lifecycle.js`, `verify-suggestion-token.js`, `reviewer-materials.js`, `review-form-schema.js` (also `policy-fetcher.js` exists — memory didn't mention it, harmless omission).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_external_reviewer_file_access.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified `pages/external/review/[token].js` + endpoints `context.js`, `proposal.js`, `upload.js`, `respond.js` (memory listed 3; respond.js exists too — added since memory).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_external_reviewer_file_access.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "`/api/external/*` middleware allowlist at `middleware.js:131-133` ✓.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_external_reviewer_file_access.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "Commit `2277d23` (Vercel Blob retirement) in `git log` history. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_external_reviewer_file_access.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified filter `akoya_requeststatus eq 'Phase II Pending'` at `pages/api/reviewer-finder/my-proposals.js:127`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_grant_lifecycle_states_confirmed.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "**STALE FALSE CLAIM (this is C1 from V1, now verified again):** \"**`wmkf_potentialreviewer1..5` do NOT exist on `akoya_request`** — got a schema error querying.\" This contradicts Atlas (`docs/atlas/dataverse-akoya-request.md:36`: \"`wmkf_potentialreviewer1..5` → `wmkf_potentialreviewers` (legacy slots)\") AND contradicts `project_akoya_request_pd_fields.md` and `project_reviewer_count_invariant.md`. The slots DO exist on `akoya_request`; live code doesn't read them anymore (verified: `grep -rn \"wmkf_potentialreviewer[1-5]\" pages/ lib/ scripts/ shared/` returns nothing), but they're real Dataverse fields.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_grant_lifecycle_states_confirmed.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "D26 production sample counts — historical, not repo-verifiable.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_grant_lifecycle_states_confirmed.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "Strategic direction; aligns with `project_intake_portal_pilot_decisions_2026-05-13.md` and intake design docs. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_grant_phasing_evolution.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Trigger date 2026-05-27 — not yet due (today is 2026-05-14). Agenda file `docs/INTAKE_PORTAL_MEETING_AGENDA_2026-05-13.md` still present. CLEAN, correctly waiting.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_intake_meeting_agenda_cleanup.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified all tenant facts in `pages/api/auth/[...nextauth].js:10-11,37,63`: `wmkeckapply` tenant, `entra-external` provider id, env-var triplet.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_intake_portal_external_id_foundation.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Sign-in auto-dispatch verified at `pages/auth/signin.js:24-29`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_intake_portal_external_id_foundation.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "`/apply` exclusion in `_app.js:23` ✓.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_intake_portal_external_id_foundation.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "**Line 40 STALE path:** `docs/IT_ENTRA_EXTERNAL_TENANT_REQUEST_2026-05-04.md` moved to `docs/archive/`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_intake_portal_external_id_foundation.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "Self-marks items 2 and 6 as superseded by 2026-05-13 ✓.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_intake_portal_pilot_decisions_2026-05-06.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "**Line 9 STALE path:** `docs/CONNOR_INTAKE_PORTAL_SYNC.md` moved to `docs/archive/`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_intake_portal_pilot_decisions_2026-05-06.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "**Line 28 STALE entity list:** `wmkf_budgetline, wmkf_personnel, wmkf_priorsupport, wmkf_milestone` — superseded by 2026-05-14 (`wmkf_proposalbudgetline` only; roster extends `wmkf_apprequestperson`; milestones/prior-support deferred). Memory's own top-of-file warning catches the 2026-05-13 supersession but not the 2026-05-14 one.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_intake_portal_pilot_decisions_2026-05-06.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "**THIS MEMORY IS ONE-DAY STALE.** The 2026-05-14 schema review (`docs/archive/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md` at 11:40 today, `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` at 14:05 today, `docs/INTAKE_PORTAL_DESIGN.md:587-588` at 14:05 today) supersedes this memory.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_intake_portal_pilot_decisions_2026-05-13.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "**Line 20 STALE:** \"narrowed scope to budget + roster only. JSON specs drafted by 2026-05-15, applied by 2026-05-18.\" — refined to: budget = new `wmkf_proposalbudgetline`; roster extends `wmkf_apprequestperson`; no new `wmkf_proposalroster` (per `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md:40`).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_intake_portal_pilot_decisions_2026-05-13.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "**Line 30 STALE path:** \"Two JSON schema specs under `lib/dataverse/schema/intake/`\" — that directory does NOT exist (verified `find lib/dataverse/schema -maxdepth 3 -type d` returns `roles, wave1, wave2, wave2-existing, wave3` only). Budget spec landed at `docs/BUDGET_FORM_SPEC.md` instead.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_intake_portal_pilot_decisions_2026-05-13.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "**Line 24 STALE:** \"Naming alignment is open... between `wmkf_proposalroster` and `wmkf_personnel`\" — closed 2026-05-14: no new roster entity at all.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_intake_portal_pilot_decisions_2026-05-13.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "Verified `docs/INTAKE_PORTAL_DESIGN.md` exists at root (not archive). CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_intake_portal_skinny_scope.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified `pages/api/grant-reporting/extract.js` exists; SharePoint write granted 2026-04-15 (per `project_dynamics_ai_writeback.md`); `getRequestSharePointBuckets` and `lib/utils/sharepoint-buckets.js` exist. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_interim_report_automation.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified every named file (5/5): `lib/db/migrations/008_irs_exempt_orgs.sql`, `lib/services/irs-bmf-service.js`, `pages/api/cron/refresh-irs-bmf.js`, `pages/api/irs/verify-ein.js`, `scripts/import-irs-bmf.js`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_irs_exempt_verification.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified cron schedule `0 6 15 1,4,7,10 *` in `vercel.json`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_irs_exempt_verification.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified middleware allowlist at `middleware.js:131`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_irs_exempt_verification.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified `IRS_VERIFY_SECRET` in `docs/CREDENTIALS_RUNBOOK.md:41`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_irs_exempt_verification.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "\"First load not yet run\" — external state, can't verify. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_irs_exempt_verification.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified `shared/forms/phase-ii-research-2026-06/` exists with `schema.js`, `validate.js`, `map-to-dynamics.js`. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_machine_legible_form_capture.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Vague planning memory. Compliance screening (Field Set C) and PD Assignment (Field Set D) ARE deployed per Atlas — memory frames them as future, but pieces have already shipped. Same issue I flagged in V1.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_new_ai_capabilities.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "Conceptual; not repo-tied. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_pdf_processing_tiers.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified all 4 named scripts/pages exist (`pages/phase-i-dynamics.js`, `scripts/compare-phase-i-v1-v2.js`, `scripts/ab-phase-i-prompts.js`, `scripts/audit-system-prompt-sizes.js`).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_phase_i_summary_app_winddown.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "`pages/api/phase-i-dynamics/{summarize,summarize-v2}.js` ✓. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_phase_i_summary_app_winddown.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified `docs/EXECUTOR_CONTRACT.md`, `docs/PROMPT_STORAGE_DESIGN.md`, `docs/WORKFLOW_CHAINING_DESIGN.md` exist.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_prompt_storage_strategy.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified `wmkf_ai_Prompt@odata.bind` at `execute-prompt.js:592`; `wmkf_ai_systemprompt` field used at `execute-prompt.js:197,389`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_prompt_storage_strategy.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Plan file at `/Users/gallivan/.claude/plans/ok-claude-connor-is-precious-dove.md` — not verified (out of repo).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_prompt_storage_strategy.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "**Lines 32-36 STALE framing:** Phase 0 \"by May 1 2026\" listed as in-progress. Already shipped (Executor live; `summarize-v2` uses it; Atlas confirms `wmkf_ai_prompt` v3 path live). Same staleness as V1, confirmed.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_prompt_storage_strategy.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "Verified `docs/PROPOSAL_CONTEXT_EXTRACTION_PLAN.md` exists. CLEAN as deferred plan.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_proposal_context_extraction.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "**STALE — main claim wrong.** Memory says \"What is NOT yet built: Dedicated Accept / Decline buttons... auto-fill of `response_received_at`/`accepted`/`declined` from a click action.\" Reality: `pages/api/external/review/[token]/respond.js` exists (verified `ls`); writes `wmkf_accepted`, `wmkf_declined`, `wmkf_responsetype`, `wmkf_responsereceivedat` per `lib/dataverse/adapters/reviewer-suggestion.js:444-469`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_reviewer_accept_decline_links.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "Filename-specific claim (\"`pages/review-response.js` and `pages/api/review-response/confirm.js` were never created\") still technically true — those exact filenames don't exist. But the capability moved to `respond.js`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_reviewer_accept_decline_links.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "Codex caught this in V1; I missed it. Confirmed.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_reviewer_accept_decline_links.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Business invariant memory. The slot existence claim aligns with Atlas (slots do exist on `akoya_request`; not read by current code). CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_reviewer_count_invariant.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "**MATERIALLY STALE — central claim wrong.** Memory line 12: \"Postgres reviewer tables are NOT dormant... `researchers.js` (browse/manage), `extract-summary.js`, `generate-emails.js`, `grant-cycles.js`, and `my-proposals.js` all still read/write Postgres.\" - `researchers.js`: **deleted W6 step 1 2026-05-12** (per `docs/atlas/postgres-researchers.md:51,59,70`). - `extract-summary.js`: **retired W5 step 5 2026-05-12** (per `docs/atlas/postgres-other-reviewer-tables.md:23`). - `grant-cycles.js`: Dataverse-only since W3 cutover 2026-05-12 (header at `pages/api/reviewer-finder/grant-cycles.js:9`). - `generate-emails.js`: zero `@vercel/postgres` imports (`grep -c \"@vercel/postgres\" pages/api/reviewer-finder/generate-emails.js` → 0). - `my-proposals.js`: Dataverse-only (builds OData filter; verified line 124-130).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_reviewer_finder_dataverse_entry_path.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "**Line 17 STALE:** \"Do NOT drop the Postgres reviewer tables without a broader migration.\" That migration completed (W3–W6); the four drain-only tables (`researchers`, `researcher_keywords`, `publications`, `proposal_searches`) are scheduled for post-pilot one-shot DELETE per `project_w6_table_drop_pending.md`. The \"do not drop\" carryover this memory created is now itself a risk: someone reading it might leave dead tables in place indefinitely.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_reviewer_finder_dataverse_entry_path.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "Picker (`ProposalPickerCard`) + save-candidates writeback claims still hold (verified earlier).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_reviewer_finder_dataverse_entry_path.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Codex caught this in V1; I missed it. **This was the most dangerous miss of V1** — acting on this memory's \"do not drop\" would block legitimate cleanup; treating its \"Postgres still load-bearing\" framing as current would mislead architectural plans.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_reviewer_finder_dataverse_entry_path.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "Pre-J26 absence claim is historical and not repo-verifiable. Underlying logic (Postgres `reviewer_suggestions` was the writer, only used J26+) holds. CLEAN as historical context.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_reviewer_history_data_quality.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Direction memory. Wave 2 schema decisions (`wmkf_review_status` choice, `wmkf_response_type` choice) align with deployed `wmkf_appreviewersuggestion` per Atlas. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_reviewer_lifecycle_automation.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Phase A (CRM send) shipped per `project_contact_promotion_permission.md` (live 2026-05-01).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_reviewer_lifecycle.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "Phase C (review intake to SharePoint) shipped per `project_external_reviewer_file_access.md` (live 2026-05-03).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_reviewer_lifecycle.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "Reviewer Portal concept (\"`/review/[token]` token-based link\") shipped as `/external/review/[token]` — different URL, but same primitive.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_reviewer_lifecycle.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "**Memory frames it all as future work plan**, but multiple pieces shipped via other memories. Same issue I flagged in V1.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_reviewer_lifecycle.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "**Line 61 stale ref:** \"Add Researcher modal (reviewer-finder.js:2802)\" — `pages/reviewer-finder.js` is 3645 lines now; line 2802 may or may not still hit the modal. Specific line numbers in long-lived files rot.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_reviewer_lifecycle.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "**Line 22 STALE:** \"Cleanup cron runs weekly; only acts twice a year.\" Cron was **deferred** per `project_w6_table_drop_pending.md`; verified `grep -rln \"reviewer-cleanup\\|reviewerCleanup\\|cleanupReviewer\" pages/api/ lib/ scripts/` returns nothing. No such cron exists or is planned in the W6 path.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_reviewer_postgres_to_dataverse_migration.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "**Line 33 STALE:** \"Batched lookup: new endpoint `/api/reviewer-finder/contact-history` POST `{ contactIds }`.\" Actual route is **GET single-contact** (`pages/api/reviewer-finder/contact-history.js:4` says \"GET — PI / co-PI history for a single contact\"; `:62-64` rejects non-GET).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_reviewer_postgres_to_dataverse_migration.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "**Line 66-75 STALE as current state:** S136 live-state probe describes Postgres \"$reviewer_suggestions: 337 rows, grant_cycles: 13 rows...\" Subsequent W3–W6 migrations changed this. Atlas page `docs/atlas/postgres-grant-cycles.md:8` says Dataverse counterpart has 0 rows but live reads are Dataverse-only per the W3 cutover. Memory's row-count snapshot is historical.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_reviewer_postgres_to_dataverse_migration.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "Other content (locked decisions, S136 codex stress-test addressed) is historical and useful.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_reviewer_postgres_to_dataverse_migration.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "Codex caught these in V1; I missed them.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_reviewer_postgres_to_dataverse_migration.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "Verified site URL, library names (`akoya_request` + 3 archives), `lib/services/graph-service.js` exists, `scripts/probe-sharepoint-write.js` exists.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_sharepoint_integration.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "**Line 17 STALE path:** \"IT security response: `docs/IT_SECURITY_RESPONSE.md`\" — moved to `docs/archive/IT_SECURITY_RESPONSE.md`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_sharepoint_integration.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "Site URL and Graph API claims not repo-verifiable but consistent with code that uses them.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_sharepoint_integration.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "Both plan docs exist (`docs/STAGED_REVIEW_PIPELINE.md`, `docs/STAGED_PIPELINE_IMPLEMENTATION_PLAN.md`). VRP service files exist. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_staged_review_pipeline.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "**Line 11 STALE temporal hedge:** \"Connor partnership: Will flesh out backend vision together **in coming weeks (from ~March 12, 2026)**\" — that's ~2 months ago today. Strategic direction (Dynamics-first, backend triggers, AkoyaGO minimize) confirmed by other memories. Temporal framing rots; principles stand.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_strategy_direction.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "`docs/STRATEGY.md` exists. CLEAN with hedge-softening opportunity.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_strategy_direction.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified appRegistry entry (`shared/config/appRegistry.js:142`), page (`pages/virtual-review-panel.js`), API (`pages/api/virtual-review-panel.js`), services (`lib/services/multi-llm-service.js`, `lib/services/panel-review-service.js`), prompts (`shared/config/prompts/virtual-review-panel.js`), migration (`lib/db/migrations/003_virtual_review_panel.sql`). All exist.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_virtual_review_panel.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Env-var claims (`OPENAI_API_KEY`, `GOOGLE_AI_API_KEY`, `PERPLEXITY_API_KEY`) not env-probed but referenced in `docs/CREDENTIALS_RUNBOOK.md`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_virtual_review_panel.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_virtual_review_panel.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Trigger date 2026-07-01 — not yet due. Tables `researchers`, `researcher_keywords`, `publications`, `proposal_searches` all still exist per `docs/atlas/postgres-researchers.md` and `postgres-other-reviewer-tables.md`.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_w6_table_drop_pending.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "**Line 33 references stale Atlas:** \"`proposal_searches` JOIN site mentioned in `docs/atlas/postgres-other-reviewer-tables.md:25`\" — Atlas page line 25 still says JOIN is load-bearing in `grant-cycles.js`. But `pages/api/reviewer-finder/grant-cycles.js` shows the route is Dataverse-only (the JOIN comment at line 100 is past-tense). **The Atlas page itself is stale.** Memory's instruction is \"verify it was killed in W3\" — verification result is YES, killed. Memory is fine; Atlas needs correcting.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "project_w6_table_drop_pending.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "Verified: `lib/services/onboarding.js` does NOT exist (memory correctly says \"to be created\").",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_wave1_onboarding.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified: `lib/services/dataverse-identity-map.js` exists.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_wave1_onboarding.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified: `lib/dataverse/role-apply.js` exists.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_wave1_onboarding.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified: `scripts/apply-security-role.js` exists.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_wave1_onboarding.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "`grantDefaultApps` at `pages/api/auth/[...nextauth].js:157,178,313` ✓. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_wave1_onboarding.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified: `lib/db/migrations/007_drop_wave1_tables.sql` exists.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_wave1_pending.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified: `docs/WAVE1_REVERT_TEMP_ELEVATIONS.md` exists.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_wave1_pending.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "Verified fail-loud dispatcher in 3 services.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_wave1_pending.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "App-user GUID `53e97fb3-a006-f111-8406-000d3a352682` — external state, not repo-verifiable.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "project_wave1_pending.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "project_wave1_pending.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "User-supplied context; no repo claims. CLEAN.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "verified",
+        "evidence": "user_powerautomate.md; audit text classified as verified"
+      },
+      {
+        "claim_text": "✅ `project_reviewer_finder_dataverse_entry_path.md` central claim wrong (researchers.js, extract-summary.js deleted; generate-emails.js Postgres-free).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "user_powerautomate.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "✅ `project_reviewer_accept_decline_links.md` \"NOT yet built\" wrong (`respond.js` exists).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "user_powerautomate.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "✅ `project_reviewer_postgres_to_dataverse_migration.md` two stale items (cleanup cron deferred; contact-history is GET single-contact, not POST batched).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "user_powerautomate.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "✅ `project_intake_portal_pilot_decisions_2026-05-13.md` one-day stale per 2026-05-14 schema docs; `lib/dataverse/schema/intake/` doesn't exist.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "user_powerautomate.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "✅ `feedback_human_legibility_schema_principle.md` example `wmkf_proposalroster` now self-contradicting.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "user_powerautomate.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "✅ All archive-path moves (S8–S11 in V1).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "user_powerautomate.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "✅ Concept Evaluator already removed (V1 caught this; V2 confirms `_archived/` location).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "user_powerautomate.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "The C1 three-way contradiction on `wmkf_potentialreviewer1..5` (Codex marked this VAGUE; my V1 caught the contradiction; V2 confirms with grep evidence that slots exist in Atlas but no live code reads them).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "user_powerautomate.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "The Atlas-vs-code drift items (1, 2, 3 above) — Codex marked the `proposal_searches` Atlas note as stale; V2 found two more.",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "stale",
+        "evidence": "user_powerautomate.md; audit text classified as stale"
+      },
+      {
+        "claim_text": "App count 16 not 15; `requireAppAccess` count 48 not 30 (V1 caught these; Codex VAGUE'd them).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "user_powerautomate.md; not conclusively classified by audit text"
+      },
+      {
+        "claim_text": "`project_backend_automation.md` field-name list (`wmkf_ai_structured_data`) is v2-era; renamed in v3 (V1 didn't flag this; V2 catches it cross-checking against v3 spec).",
+        "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
+        "status": "unknown",
+        "evidence": "user_powerautomate.md; not conclusively classified by audit text"
+      }
+    ]
+  }
 }

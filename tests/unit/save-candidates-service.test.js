@@ -36,6 +36,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   stampSuggestionAnchor: jest.fn(async () => ({ updated: 1 })),
   findIdentityConfirmation: jest.fn(async () => null),
+  findEligibilityByCandidateKey: jest.fn(async () => null),
 }));
 jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
   verifyAutomatedIdentityAttestation: jest.fn(async () => ({ valid: true, source: 'automated_resolver' })),
@@ -49,6 +50,11 @@ jest.mock('../../lib/services/reviewer-request-context', () => ({
     institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
   })),
 }));
+jest.mock('../../lib/services/institution-identity-resolver', () => ({
+  createInstitutionIdentityResolver: jest.fn(() => ({
+    resolve: jest.fn(async () => null),
+  })),
+}));
 jest.mock('../../lib/services/notification-service', () => ({
   __esModule: true,
   default: { notify: jest.fn(async () => ({ id: 'alert-1' })) },
@@ -59,9 +65,13 @@ const contactAdapter = require('../../lib/dataverse/adapters/contact');
 const accountAdapter = require('../../lib/dataverse/adapters/account');
 const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
+const reviewerRosterStore = require('../../lib/services/reviewer-roster-store');
+const { verifyAutomatedIdentityAttestation } = require('../../lib/services/reviewer-candidate-attestation');
 const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity-lookup');
 const { loadCoiContext } = require('../../lib/services/reviewer-request-context');
+const { createInstitutionIdentityResolver } = require('../../lib/services/institution-identity-resolver');
 const { ServiceHttpError } = require('../../lib/services/service-http-error');
+const { VERIFICATION_STATUSES } = require('../../lib/services/discovery/constants');
 const {
   saveCandidates,
   SaveCandidatesError,
@@ -107,6 +117,7 @@ test('422 SaveCandidatesError with the full body (both rejected counts always pr
     rejectedInvalid: 0,
     rejectedUnresolved: 1,
     rejectedInstitutionCOI: 1,
+    rejectedIneligible: 0,
     errors: [
       {
         name: 'Dr Unresolved',
@@ -126,6 +137,81 @@ test('422 SaveCandidatesError with the full body (both rejected counts always pr
   });
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
   expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+});
+
+test('direct deceased evidence is rejected before any Dataverse write', async () => {
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{ name: 'Dr Deceased', eligibilityStatus: 'deceased' }],
+  }).catch((error) => error);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    rejectedIneligible: 1,
+    errors: [expect.objectContaining({
+      name: 'Dr Deceased',
+      code: 'candidate_ineligible',
+    })],
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+});
+
+test('durable eligibility lookup uses the signed pre-enrichment roster key', async () => {
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+    valid: true,
+    source: 'automated_resolver',
+    eligibilityStatus: 'unknown',
+    rosterCandidateKey: 'candidate:pre-enrichment',
+  });
+  reviewerRosterStore.findEligibilityByCandidateKey.mockResolvedValueOnce({
+    rosterStatus: 'ineligible',
+    eligibilityStatus: 'deceased',
+  });
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Changed',
+      candidateKey: 'candidate:pre-enrichment',
+      email: 'new.email@example.edu',
+      affiliation: 'New University',
+      automatedIdentityAttestation: 'signed',
+    }],
+  }).catch((error) => error);
+
+  expect(reviewerRosterStore.findEligibilityByCandidateKey)
+    .toHaveBeenCalledWith(BASE.requestId, 'candidate:pre-enrichment');
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.body).toMatchObject({ rejectedIneligible: 1 });
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['missing', { valid: false, reason: 'no_token' }],
+  ['legacy receipt without a signed roster key', { valid: true, source: 'automated_resolver' }],
+])('roster-managed candidate fails closed with %s eligibility receipt', async (_label, receipt) => {
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce(receipt);
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Managed',
+      candidateKey: 'candidate:pre-enrichment',
+      eligibilityStatus: 'unknown',
+      automatedIdentityAttestation: receipt.valid ? 'legacy-signed' : null,
+    }],
+  }).catch((error) => error);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    rejectedUnresolved: 1,
+    errors: [expect.objectContaining({ code: 'identity_attestation_required' })],
+  });
+  expect(reviewerRosterStore.findEligibilityByCandidateKey).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
 });
 
 test('500 SaveCandidatesError when nothing saved for non-rejection reasons; rejected* keys stay undefined', async () => {
@@ -222,6 +308,47 @@ test('per-row validation rejects malformed rows before any adapter write', async
   ]);
   expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledTimes(1);
   expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalledTimes(1);
+});
+
+test.each(Object.values(VERIFICATION_STATUSES))(
+  'top-level discovery identityStatus %s is accepted by candidate validation',
+  (identityStatus) => {
+    expect(validateCandidateInput({ name: `Dr ${identityStatus}`, identityStatus }, 0)).toMatchObject({ ok: true });
+  },
+);
+
+test('PubMed-verified discovery candidate saves without broadening the nested resolver vocabulary', async () => {
+  const sheena = {
+    name: 'Sheena Radford',
+    email: 's.e.radford@leeds.ac.uk',
+    affiliation: 'University of Leeds',
+    verified: true,
+    verificationStatus: VERIFICATION_STATUSES.VERIFIED,
+    identityStatus: VERIFICATION_STATUSES.VERIFIED,
+    verificationSource: 'pubmed',
+    emailSource: 'pubmed',
+    publications: 17,
+    hIndex: 96,
+    totalCitations: 32094,
+  };
+
+  const out = await saveCandidates({ ...BASE, candidates: [sheena] });
+
+  expect(out).toMatchObject({
+    success: true,
+    savedCount: 1,
+    savedNames: ['Sheena Radford'],
+    totalRequested: 1,
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledTimes(1);
+  expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalledTimes(1);
+  expect(validateCandidateInput({
+    name: 'Nested discovery status',
+    contactEnrichment: { identity: { status: VERIFICATION_STATUSES.VERIFIED } },
+  }, 0)).toMatchObject({
+    ok: false,
+    error: { error: 'contactEnrichment.identity.status is not supported.' },
+  });
 });
 
 test('duplicate candidate keys are rejected per row without graduating the failed sibling', async () => {
@@ -512,6 +639,202 @@ test('a late per-candidate failure (suggestion upsert) does not abort the batch 
     index: 1,
     error: 'suggestion write failed',
   })]);
+});
+
+test.each([
+  ['Broad Institute', 'The Broad Institute'],
+  ['HHMI', 'Howard Hughes Medical Institute'],
+])('shared exempt institution %s remains visible but does not block save', async (
+  candidateAffiliation,
+  piAffiliation,
+) => {
+  loadCoiContext.mockResolvedValueOnce({
+    applicantInstitutionContext: { state: 'complete', names: [piAffiliation] },
+    piResolution: { state: 'ok', reason: null },
+    institutionEntries: [{ identity: piAffiliation, display: piAffiliation }],
+  });
+
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: `Dr ${candidateAffiliation}`,
+      email: 'shared@example.edu',
+      affiliation: candidateAffiliation,
+      hasInstitutionCOI: true,
+    }],
+  });
+
+  expect(out).toMatchObject({
+    success: true,
+    savedCount: 1,
+  });
+  expect(out.rejectedInstitutionCOI).toBeUndefined();
+  expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledTimes(1);
+});
+
+test('server-resolved distinct institution ids clear a stale client COI flag', async () => {
+  loadCoiContext.mockResolvedValueOnce({
+    applicantInstitutionContext: { state: 'complete', names: ['University of Michigan'] },
+    piResolution: { state: 'ok', reason: null },
+    institutionEntries: [{
+      identity: 'University of Michigan',
+      display: 'University of Michigan',
+    }],
+  });
+  createInstitutionIdentityResolver.mockReturnValueOnce({
+    resolve: jest.fn(async (name) => (
+      name === 'University of Michigan Ann Arbor'
+        ? {
+            openAlexId: 'I111111111',
+            ror: null,
+            displayName: name,
+          }
+        : {
+            openAlexId: 'I222222222',
+            ror: null,
+            displayName: name,
+          }
+    )),
+  });
+
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Refuted COI',
+      email: 'refuted@example.edu',
+      affiliation: 'University of Michigan Ann Arbor',
+      hasInstitutionCOI: true,
+      contactEnrichment: {
+        coiRecomputed: true,
+        hasInstitutionCOI: true,
+      },
+    }],
+  });
+
+  expect(out).toMatchObject({
+    success: true,
+    savedCount: 1,
+    savedNames: ['Dr Refuted COI'],
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledTimes(1);
+});
+
+test('pre-existing distinct institution ids clear a stale client COI flag', async () => {
+  loadCoiContext.mockResolvedValueOnce({
+    applicantInstitutionContext: { state: 'complete', names: ['Example University'] },
+    piResolution: { state: 'ok', reason: null },
+    institutionEntries: [{
+      identity: {
+        name: 'Example University',
+        openAlexId: 'I222222222',
+      },
+      display: 'Example University',
+    }],
+  });
+
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Existing ID Refutation',
+      email: 'existing-id-refutation@example.edu',
+      affiliation: 'Example University',
+      affiliationOpenAlexId: 'I111111111',
+      hasInstitutionCOI: true,
+      contactEnrichment: {
+        coiRecomputed: true,
+        hasInstitutionCOI: true,
+      },
+    }],
+  });
+
+  expect(out).toMatchObject({
+    success: true,
+    savedCount: 1,
+    savedNames: ['Dr Existing ID Refutation'],
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledTimes(1);
+});
+
+test('institution resolver abstention preserves the lexical COI hard block', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  loadCoiContext.mockResolvedValueOnce({
+    applicantInstitutionContext: { state: 'complete', names: ['University of Michigan'] },
+    piResolution: { state: 'ok', reason: null },
+    institutionEntries: [{
+      identity: 'University of Michigan',
+      display: 'University of Michigan',
+    }],
+  });
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Unresolved COI',
+      email: 'unresolved-coi@example.edu',
+      affiliation: 'University of Michigan Ann Arbor',
+      hasInstitutionCOI: true,
+    }],
+  }).catch((error) => error);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    rejectedInstitutionCOI: 1,
+    errors: [{
+      name: 'Dr Unresolved COI',
+      code: 'institution_coi',
+      serverRecomputed: true,
+      decisionSource: 'candidate_payload',
+    }],
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  warn.mockRestore();
+});
+
+test('direct shared MIT affiliation hard-blocks even when the payload also has exempt Broad affiliation', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  loadCoiContext.mockResolvedValueOnce({
+    applicantInstitutionContext: {
+      state: 'complete',
+      names: ['Broad Institute', 'MIT'],
+    },
+    piResolution: { state: 'ok', reason: null },
+    institutionEntries: [
+      { identity: 'Broad Institute', display: 'Broad Institute' },
+      { identity: 'MIT', display: 'MIT' },
+    ],
+  });
+  potentialReviewerAdapter.getByEmail.mockResolvedValueOnce({
+    wmkf_potentialreviewersid: 'PID-DUAL',
+    wmkf_primaryaffiliation: 'Massachusetts Institute of Technology',
+  });
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Broad and MIT',
+      email: 'dual@example.edu',
+      affiliation: 'Broad Institute',
+      hasInstitutionCOI: true,
+    }],
+  }).catch((error) => error);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    rejectedInstitutionCOI: 1,
+    errors: [{
+      decisionSource: 'server_reviewer_identity_affiliation',
+      institutionCOIDetails: {
+        piInstitution: 'MIT',
+        reviewerInstitution: 'Massachusetts Institute of Technology',
+      },
+    }],
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  warn.mockRestore();
 });
 
 test('server recomputes institution COI from the reused reviewer CRM affiliation (getByEmail) before any save write', async () => {

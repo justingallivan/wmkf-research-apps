@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "status": "frozen",
+  "overlayVersion": "reviewer-identity-w2-person-equivalence-v1",
+  "benchmarkVersion": "reviewer-identity-v2",
+  "frozenAt": "2026-07-19T00:00:00.000Z",
+  "equivalences": [
+    {
+      "identity": "Li-Huei Tsai",
+      "caseIds": [
+        "hazard-05-li-huei-tsai",
+        "hazard-19-li-huei-tsai-correction"
+      ],
+      "anchors": [
+        "orcid:0000-0001-5607-113X",
+        "orcid:0000-0003-1262-0592"
+      ],
+      "evidence": [
+        {
+          "url": "https://orcid.org/0000-0001-5607-113X",
+          "claim": "The benchmark anchor carries Li-Huei Tsai publications and a current MIT employment."
+        },
+        {
+          "url": "https://www.nature.com/articles/s41582-019-0165-5",
+          "claim": "The publisher record identifies MIT neuroscientist Li-Huei Tsai with ORCID 0000-0003-1262-0592."
+        },
+        {
+          "url": "https://journals.plos.org/plosbiology/article?id=10.1371/journal.pbio.3003046",
+          "claim": "A second publisher record identifies Li-Huei Tsai with ORCID 0000-0003-1262-0592."
+        }
+      ],
+      "reason": "The identifiers share an exact ORCID work title and independent publisher records attach the second identifier to the same MIT researcher. The overlay changes anchor-equivalence scoring only; it does not mutate the frozen benchmark or production identity state."
+    }
+  ],
+  "rightPersonPolicyReviews": [
+    {
+      "caseId": "hazard-07-joshua-weitz",
+      "anchors": [
+        "orcid:0000-0002-3433-8312"
+      ],
+      "reason": "The frozen label requires abstention because another same-name ORCID exists, while the selected anchor is the right University of Maryland researcher. Count separately from genuine wrong-person binds."
+    },
+    {
+      "caseId": "clean-13-fei-fei-li",
+      "anchors": [
+        "orcid:0000-0002-7481-0810"
+      ],
+      "reason": "The works arm found the right Stanford researcher, but the frozen policy requires review for the highly fragmented name."
+    },
+    {
+      "caseId": "clean-14-emmanuelle-charpentier",
+      "anchors": [
+        "orcid:0000-0002-0254-0778"
+      ],
+      "reason": "The works arm found the right Max Planck researcher, but another same-name ORCID makes the automatic policy abstain."
+    }
+  ]
+}

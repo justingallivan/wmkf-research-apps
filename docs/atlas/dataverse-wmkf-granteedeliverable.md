@@ -1,7 +1,7 @@
 # Atlas: `wmkf_granteedeliverable` (Dataverse, WMKF child entity)
 
-**Last verified:** 2026-06-20 via source/code review for S271 implementation. **[PLANNED]** Schema-as-code added; live Dataverse schema application is a deploy-time admin step and was not run in this implementation.
-**Live row count:** 0 expected at cutover. **[VERIFIED via `docs/GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md`]** Pre-cutover probe found 0 `akoya_request` rows with any old deliverable status/image/caption data, so no backfill is planned.
+**Last verified:** 2026-07-21 via `scripts/reconcile-memory-claims.js` (live entity probe and row count); production schema application and service-principal CRUD were previously verified in S271 (`docs/GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md`).
+**Live row count:** 3
 **Entity set:** `wmkf_granteedeliverables`
 **Schema spec:** `lib/dataverse/schema/wave3-grantee-deliverable-table/wmkf_granteedeliverable.json`
 **Lookup `@odata.bind` key:** `wmkf_Request@odata.bind` (→ `akoya_request`) — PascalCase per schema-apply convention and sibling child entities.
@@ -69,7 +69,6 @@ Straight cutover, no backfill. The old flat request fields `wmkf_granteedelivera
 
 ## Open Questions / Gotchas
 
-- **Live schema not applied by this code change.** Run `scripts/preflight-grantee-deliverable-table.mjs` before applying `--wave=3-grantee-deliverable-table`.
-- **Service principal privilege grant is still required** before cutover code writes this table in production.
+- **Schema and write privilege are live.** S271 applied the production schema and verified full service-principal CRUD with `scripts/smoke-grantee-deliverable-write.mjs`; the 2026-07-21 reconciliation probe found 3 durable rows.
 - **External paths are fail-closed.** `getDeliverableForRequest()` never creates; missing row means not editable.
 - **No silent impersonation fallback for reminders.** The cron passes `noFallback:true` and reports send failures rather than sending from the service principal.

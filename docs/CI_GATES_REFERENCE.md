@@ -223,6 +223,8 @@ Together with `:fact-consistency`, scalar values + the generated doc + cross-doc
 
 Added S154. Runs `scripts/reconcile-memory-claims.js`. Fails on `spec_without_entity`, large `stale_row_count`, `doc_label_collision`, or any `probe_errors`.
 
+The report's top-level `summary` describes current live drift only. The dated 2026-05-14 S154 classifications remain under `historical_claim_audit` for provenance and are explicitly excluded from the current summary and gate result.
+
 - Historical hazard: the Set D label collision that previously kept this gate red was resolved 2026-05-26 (Connor walkthrough — fit-assessment fields relabeled to Set E). Current state is whatever `npm run check:memory-drift` shows — verify before assuming.
 - The Codex-flagged `incompatible_shape` drift bucket is a planned addition (not yet built).
 - Promotion to the P0 set above is reasonable once the bucket lands AND the gate has been green continuously for a stretch of sessions.
@@ -267,7 +269,7 @@ Scans active agent-facing harness surfaces for self-focused failure framing whil
 
 ### `check:status-enum-parity` — producer↔consumer key parity (S257)
 
-Guards the "producer-without-consumer-sweep" defect class: a value added to a producer set (an enum / status / `workRemaining` stage) but NOT to a consumer that maps/labels/buckets it, so the new value falls through unstyled / uncounted / unhandled. Enforces a registry of producer↔consumer key-parity invariants (currently `deriveWorkRemaining` stages ⊆ `STAGE_META` chips). **Extend the registry** when adding a producer set whose values must be mirrored by a consumer (label map / filter bucket / count rollup); runtime- or test-enforced pairs (derived inverses, throwing merges) need no entry.
+Guards the "producer-without-consumer-sweep" defect class: a value added to a producer set (an enum / status / `workRemaining` stage) but NOT to a consumer that maps/labels/buckets it, so the new value falls through unstyled / uncounted / unhandled. Enforces four registered contracts: `deriveWorkRemaining` stages against both `STAGE_META` chips and `WORK_REMAINING_LABEL`; `STATUS_CLASS` against Status-tab `CLASS_META`; and discovery `VERIFICATION_STATUSES` against the save-candidate identity allowlist. **Extend the registry** when adding a producer set whose values must be mirrored by a consumer (label map / filter bucket / count rollup); runtime- or test-enforced pairs (derived inverses, throwing merges) need no entry.
 
 - Scope: `scripts/check-status-enum-parity.js`, `.claude/hooks/enum-parity-commit-guard.js`.
 - **Commit control:** a PreToolUse(Bash) hook runs the gate on `git commit` and BLOCKS (exit 2) on drift — the deterministic enforcement behind the contract-reconcile "complement & fan-out" rule (`feedback-scrutinize-exemptions-and-fallthrough`).

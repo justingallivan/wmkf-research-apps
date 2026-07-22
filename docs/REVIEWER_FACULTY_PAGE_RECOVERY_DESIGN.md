@@ -21,8 +21,9 @@ Status: **SUPERSEDED by `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md` (S265).** The 
 recorded here was to ship the zero-SSRF manual alternative (§D) and NOT build the automated
 fetch (§2–§5). S265 revisited that and BUILT the automated fetch — with the exact SSRF
 mechanism §4/§Q1 called for (undici IP-pinning, `verifiedInstitutionDomain`-only allowlist,
-IPv6 private-IP block) — but **behind `REVIEWER_PAGE_EMAIL_TIER_ENABLED` (default OFF), so the
-live default is still the zero-SSRF manual path in §D.** Retained as the S235 record + the
+IPv6 private-IP block) — behind `REVIEWER_PAGE_EMAIL_TIER_ENABLED` (code-default OFF; production
+explicitly enabled 2026-07-03). The ownership selector was subsequently hardened 2026-07-19.
+Retained as the S235 record + the
 SSRF-mechanism rationale; the live design is `RESOLVED_PAGE_EMAIL_TIER_DESIGN.md` and the
 contract is #7 in `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`. Implements Slice F of
 `docs/REVIEWER_CONTACT_INVITE_FOLLOWON_PLAN.md` §3.

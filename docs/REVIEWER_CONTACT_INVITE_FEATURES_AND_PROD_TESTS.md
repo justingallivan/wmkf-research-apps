@@ -25,6 +25,17 @@ This document (1) describes every feature shipped across the two sessions and (2
 concrete tests to validate each one **in production**. All features below are merged to `main`
 and deployed.
 
+> **Current-policy update (2026-07-18).** The S235 HIGH/LOW policy documented below is
+> historical. The current server-enforced invitation actions are **Ready / Quick check /
+> Research only / Missing**. `manual`, `affiliation`, one structured scholarly work, and
+> legacy `pubmed` are Quick check and use the recipient-specific
+> `confirmedLowConfidenceIds` acknowledgement. Web-search sources (`serp_search`,
+> `claude_search`, `search_contested`) are Research only and cannot be sent as an invitation,
+> even if a client supplies that allowlist. Two distinct identity-matched recent works
+> (`scholarly_multi`), ORCID, and institution-page evidence are Ready. See current Contract 3
+> in `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`; the remainder of this document preserves
+> the S234/S235 release record and its original validation plan.
+
 > **How to read the test plan.** Each test gives a *precondition*, *steps*, *expected result*,
 > and *where to verify*. Most are manual UI walkthroughs in the Workbench plus a Dataverse
 > field check (via the Dynamics Explorer or an OData probe). Known live examples come from
@@ -265,7 +276,8 @@ When a confirmed/anchored reviewer has **no** accepted email, staff get a one-cl
 institution's own page to find and enter the address — with **no** server-side page fetch.
 **Commits:** `f6b5bd4`, merged `c5a4a0a`.
 **S265 update:** the automated fetch was subsequently built behind `REVIEWER_PAGE_EMAIL_TIER_ENABLED`
-(**default OFF — this manual path is still the live default**); live design
+(code-default OFF; production explicitly enabled 2026-07-03). Its page-email ownership selector
+was hardened 2026-07-19 with ranked mailbox classes and unique-best abstention; live design
 `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`, contract #7 in `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`
 (supersedes `docs/REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md`).
 

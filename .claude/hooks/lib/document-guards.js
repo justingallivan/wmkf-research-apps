@@ -5,9 +5,118 @@ const path = require('path');
 
 const SOURCE_PATH_RE = /(?:^|[\s([`'"])((?:pages|lib)\/[A-Za-z0-9._~@/[\]-]+\.(?:js|jsx|ts|tsx|mjs|cjs))(?:[:#]\d+)?/g;
 const PATH_LINE_RE = /\b(?:pages|lib|scripts|shared|docs)\/[^\s)`,;]+:\d+\b/;
+const EMAIL_ADDRESS_RE = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/ig;
+const EMAIL_OWNERSHIP_CLAIM_RE =
+  /\b(?:almost certainly|certainly|definitely|undoubtedly|surely|belongs? to|namesake|role mailbox|generic mailbox|shared mailbox|personal (?:email|address)|published (?:email|address)|real (?:email|address)|correct(?:-person)? (?:email|address)|wrong(?:-person)? (?:email|address)|different [A-Z][\p{L}'’-]+)\b/iu;
+const CLAIM_HEDGE_RE =
+  /\b(?:likely|appears?|may|might|probably|possibly|unclear|unverified|not (?:yet )?verified|could be|cannot confirm|we did not verify)\b/i;
+const CLAIM_ASSUMED_RE = /\[ASSUMED(?:[:\]\s])/i;
+const CLAIM_VERIFIED_RE =
+  /\[VERIFIED via (?:https?:\/\/|(?:pages|lib|scripts|shared|docs)\/)[^\]]+\]/i;
+const CLAIM_URL_RE = /https?:\/\/[^\s)>\]]+/i;
+const CLAIM_EXEMPT_RE =
+  /<!--\s*assertion-exempt:\s*(?:quoted-example|hypothetical|template)\s*-->/i;
+const ADVERSARIAL_REVIEW_WAIVER_RE =
+  /<!--\s*adversarial-review:waived\s+reason=([^>]{5,})-->/i;
+const ADVERSARIAL_REVIEW_RECEIPT_RE =
+  /\[ADVERSARIAL-REVIEW-RECEIPT:\s*(docs\/[^\]\r\n]+\.md)\s*\]/gi;
 
 function normalizeSlashes(value) {
   return String(value || '').replace(/\\/g, '/');
+}
+
+function withoutFencedCode(text) {
+  let inFence = false;
+  return String(text || '').split(/\r?\n/).map((line) => {
+    if (/^\s*```/.test(line)) {
+      inFence = !inFence;
+      return '';
+    }
+    return inFence ? '' : line;
+  }).join('\n');
+}
+
+function proseSentences(text) {
+  const prose = withoutFencedCode(text)
+    .replace(/\r?\n(?!\s*\r?\n)/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!prose) return [];
+  return prose
+    .split(/(?<=[.!?])\s+(?=(?:[-*]\s+|[#>*_`]*[A-Z]))/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+}
+
+function isExampleEmail(email) {
+  const domain = String(email || '').split('@')[1]?.toLowerCase() || '';
+  return /^(?:example\.(?:com|org|net)|example|test|invalid)$/.test(domain) ||
+    /\.(?:test|invalid)$/.test(domain);
+}
+
+function hasClaimEvidenceOrHedge(sentence) {
+  return CLAIM_ASSUMED_RE.test(sentence) ||
+    CLAIM_VERIFIED_RE.test(sentence) ||
+    CLAIM_URL_RE.test(sentence) ||
+    PATH_LINE_RE.test(sentence) ||
+    CLAIM_HEDGE_RE.test(sentence) ||
+    CLAIM_EXEMPT_RE.test(sentence);
+}
+
+/**
+ * Detect the narrow incident class that motivated the blocker: a durable prose
+ * sentence asserts ownership/identity of a real email address without evidence,
+ * an uncertainty label, or an explicitly enumerated non-claim exemption.
+ *
+ * This intentionally does NOT treat "clearly" or bare copulas as confidence
+ * markers; both are too common in ordinary documentation to block precisely.
+ */
+function findUnverifiedReviewerEmailOwnershipClaims(text) {
+  const claims = [];
+  for (const sentence of proseSentences(text)) {
+    const emails = [...sentence.matchAll(EMAIL_ADDRESS_RE)]
+      .map((match) => match[0])
+      .filter((email) => !isExampleEmail(email));
+    if (!emails.length || !EMAIL_OWNERSHIP_CLAIM_RE.test(sentence)) continue;
+    if (hasClaimEvidenceOrHedge(sentence)) continue;
+    claims.push({ sentence, emails: [...new Set(emails.map((email) => email.toLowerCase()))] });
+  }
+  return claims;
+}
+
+function isHighRiskReviewArtifact(relativePath, text) {
+  const rel = normalizeSlashes(relativePath);
+  if (!/^docs\/.+\.md$/i.test(rel)) return false;
+  const prose = withoutFencedCode(text);
+  const hasVerdict = /^#{1,3}\s+(?:Final\s+)?Verdict\b/im.test(prose);
+  const hasFindings = /^#{1,3}\s+(?:Prioritized\s+)?Findings\b/im.test(prose);
+  const hasRecommendation =
+    /\b(?:recommend(?:ation|ed|s)?|required (?:change|named changes)|correction)\b/i.test(prose);
+  return hasVerdict && hasFindings && hasRecommendation;
+}
+
+function hasAdversarialReviewWaiver(text) {
+  return ADVERSARIAL_REVIEW_WAIVER_RE.test(String(text || ''));
+}
+
+function extractAdversarialReviewReceiptPaths(prompt) {
+  const paths = new Set();
+  const body = String(prompt || '');
+  let match;
+  while ((match = ADVERSARIAL_REVIEW_RECEIPT_RE.exec(body)) !== null) {
+    paths.add(normalizeSlashes(match[1].trim()));
+  }
+  return [...paths].sort();
+}
+
+function isQualifiedAdversarialReviewPrompt(prompt, relativePath) {
+  const body = String(prompt || '');
+  const rel = normalizeSlashes(relativePath);
+  return extractAdversarialReviewReceiptPaths(body).includes(rel) &&
+    /\b(?:adversarial|refut(?:e|ation)|find what is wrong|disconfirm)\b/i.test(body) &&
+    /\bfor each recommendation\b/i.test(body) &&
+    /\bfile:line\b/i.test(body) &&
+    /\bdisconfirming check\b/i.test(body);
 }
 
 function repoRelative(root, filePath) {
@@ -264,12 +373,17 @@ function findUntracedDiscoveryAsks(prompt) {
 
 module.exports = {
   docMentionsChangedSource,
+  extractAdversarialReviewReceiptPaths,
   newlyIntroducedText,
   extractNamedSourcePaths,
   findAssumptionQuantityLeaks,
+  findUnverifiedReviewerEmailOwnershipClaims,
   findUntracedDiscoveryAsks,
+  hasAdversarialReviewWaiver,
   hasNotReadEscape,
   hasStalenessAck,
+  isHighRiskReviewArtifact,
+  isQualifiedAdversarialReviewPrompt,
   isPlanDoc,
   isPlanOrDesignDoc,
   proposedTextForTool,

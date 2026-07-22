@@ -98,7 +98,6 @@ function main() {
 
   const summary = report.summary || {};
   const probeErrors = Number(summary.probe_errors) || 0;
-  const unknownClaims = Number(summary.unknown) || 0;
   if (probeErrors > 0) {
     console.error(`memory drift check failed: ${probeErrors} probe error(s) — report is non-authoritative until probes succeed`);
     const notes = report.probe_notes || {};
@@ -110,7 +109,10 @@ function main() {
     process.exit(1);
   }
 
-  console.log(`memory drift clean: ${summary.total_claims || 0} claims audited; ${specWithoutEntity.length} spec/entity blockers; ${largeStaleCounts.length} large row-count drifts; ${docCollisions.length} doc collisions; ${probeErrors} probe errors; ${unknownClaims} unknown.`);
+  const liveDriftFindings = Number.isFinite(Number(summary.live_drift_findings))
+    ? Number(summary.live_drift_findings)
+    : Object.values(buckets).reduce((total, bucket) => total + (Array.isArray(bucket) ? bucket.length : 0), 0);
+  console.log(`memory drift clean: ${liveDriftFindings} live drift findings; ${specWithoutEntity.length} spec/entity blockers; ${largeStaleCounts.length} large row-count drifts; ${docCollisions.length} doc collisions; ${probeErrors} probe errors.`);
 }
 
 main();

@@ -71,7 +71,7 @@ flowchart TD
     subgraph HUMAN["5 · Human curation & outcome — the load-bearing loop"]
         CUR["Staff curate vs priorities<br/>surfaced papers → drop bad ones"]
         ROSTER["Durable roster + cross-run dedup"]
-        ENR["Contact enrichment (5-tier) + SerpAPI"]
+        ENR["Contact enrichment<br/>NCBI + Europe PMC + guarded web search"]
         SERP["SerpAPI → free-stack"]
         SAVE["Save → Dataverse"]
         INVITE["Invite / email (.eml)"]
@@ -202,12 +202,13 @@ named personnel is a sensible future add — NOT yet implemented.)
 - **Track A — verify/ground** Claude's names against PubMed/OpenAlex/ORCID,
   **✓ forename-gated** (the Laederach failure is closed)
 - **Identity resolution** on the OpenAlex/ORCID/PubMed spine + **dedup/union coverage**
-- **Recency-weighted ranking** (S224: recency > citations, current-affiliation pinning)
+- **Recency-weighted ranking** (S224: recency > citations; affiliation evidence
+  pins ORCID current > OpenAlex last-known > recent-publication affiliation)
 - **COI grading** (S240: self-disclosure + current same-institution)
 - **Human curation** — staff select against priorities, using each candidate's surfaced
   papers to drop the occasional bad one (the load-bearing, human-in-the-loop step)
 - **Find-tab durable roster** with cross-run dedup (S224)
-- **Contact enrichment** (5-tier), **save to Dataverse**, **email/.eml generation**
+- **Contact enrichment** (identity-anchored structured publication evidence before guarded web search), **save to Dataverse**, **email/.eml generation**
 - Admin-configurable **search time budget** (S223)
 
 ## 🟨 What needs building/fixing (the leverage is downstream)

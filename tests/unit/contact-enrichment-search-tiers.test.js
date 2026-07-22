@@ -137,6 +137,31 @@ describe('ContactEnrichmentService.claudeWebSearch (characterization)', () => {
     });
   });
 
+  it('retains the citation that contains the returned email as address evidence', async () => {
+    completeMock.mockResolvedValueOnce({
+      text: '{"email":"jgallivan@mit.edu","facultyPageUrl":null,"website":null}',
+      content: [{
+        type: 'text',
+        text: '{"email":"jgallivan@mit.edu","facultyPageUrl":null,"website":null}',
+        citations: [{
+          type: 'web_search_result_location',
+          url: 'https://biology.mit.edu/people/jane-gallivan',
+          title: 'Jane Gallivan',
+          cited_text: 'Contact Jane Gallivan at jgallivan@mit.edu.',
+        }],
+      }],
+    });
+
+    const result = await S.claudeWebSearch(candidate, 'sk-ant-test');
+
+    expect(result.emailEvidence).toMatchObject({
+      sourceKind: 'claude_web_search_citation',
+      sourceUrl: 'https://biology.mit.edu/people/jane-gallivan',
+      citedText: expect.stringContaining('jgallivan@mit.edu'),
+    });
+    expect(result.facultyPageUrl).toBe('https://biology.mit.edu/people/jane-gallivan');
+  });
+
   it('rejects (nulls) an email whose local part is not name-consistent, and records the rejection', async () => {
     completeMock.mockResolvedValueOnce({
       text: '{"email":"totallyunrelated@mit.edu","facultyPageUrl":null,"website":null}',
