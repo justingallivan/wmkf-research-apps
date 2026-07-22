@@ -63,6 +63,7 @@ const { loadCycleConfigs } = require('../../lib/services/review-manager/cycle-co
 const SUG_OK = '11111111-1111-4111-8111-111111111111';
 const SUG_NO_EMAIL = '22222222-2222-4222-8222-222222222222';
 const SUG_MISSING = '33333333-3333-4333-8333-333333333333';
+const REQUEST_ID = '44444444-4444-4444-8444-444444444444';
 
 let SUGGESTIONS;
 let PERSONS;
@@ -74,7 +75,7 @@ function suggestion(id, over = {}) {
   return {
     wmkf_appreviewersuggestionid: id,
     _wmkf_potentialreviewer_value: `person-${id}`,
-    _wmkf_request_value: 'req-1',
+    _wmkf_request_value: REQUEST_ID,
     wmkf_accepted: false,
     wmkf_invited: false,
     wmkf_reviewstatus: null,
@@ -98,10 +99,11 @@ beforeEach(() => {
   jest.clearAllMocks();
   SUGGESTIONS = { [SUG_OK]: suggestion(SUG_OK) };
   PERSONS = { [`person-${SUG_OK}`]: person(`person-${SUG_OK}`) };
-  REQUEST = { akoya_requestid: 'req-1', akoya_requestnum: 'REQ-001', wmkf_meetingdate: null };
+  REQUEST = { akoya_requestid: REQUEST_ID, akoya_requestnum: 'REQ-001', wmkf_meetingdate: null };
   CYCLE_CODE = null;
   CYCLE = null;
   delete process.env.REVIEWER_EMAIL_DELIVERY_MODE;
+  process.env.NEXTAUTH_SECRET = 'test-nextauth-secret-materials-repair';
 });
 
 async function run(requestBody) {
@@ -268,6 +270,14 @@ describe('send-emails-service — materials due-date stamp', () => {
     });
   });
 
+  test('missing receipt-signing secret fails before dispatch', async () => {
+    delete process.env.NEXTAUTH_SECRET;
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+    expect(names(emitted)).toEqual(['error']);
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
+  });
+
   test('stamps the exact rendered due date inline with the fresh-row ETag', async () => {
     const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
@@ -302,7 +312,7 @@ describe('send-emails-service — materials due-date stamp', () => {
       expect.objectContaining({
         suggestionId: SUG_OK,
         status: 'sent_but_unrecorded',
-        effectiveReviewDueDate: '2026-08-01',
+        repairReceipt: expect.any(String),
         repairEndpoint: '/api/review-manager/repair-materials-send',
       }),
     ]);

@@ -360,7 +360,7 @@ any fix. Sources touched by the fixes, each re-read after the change:
 
 [RECHECKED after lib/services/review-manager/terminal-transition-service.js change: the transition now also writes externalTokenRevoked in the same atomic ETag-guarded write; adapter field map gained that key or the write would have been silently dropped]
 
-[RECHECKED after lib/services/review-manager/repair-materials-send-service.js change: client date confirmed against the request's own wmkf_reviewduedate, replay and arbitrary-date regressions in tests/unit/repair-materials-send-service.test.js]
+[RECHECKED after rescue: repair accepts only a short-lived server-signed dispatch receipt binding request + suggestion + rendered date + dispatch timestamp + pre-dispatch ETag; replay, tamper, expiry, and render-time override regressions live in tests/unit/repair-materials-send-service.test.js]
 
 1. **Terminal reviewers could still submit.** The worst finding, and it
    falsified a claim in the fan-out table above. Terminal option values sort
@@ -380,12 +380,13 @@ any fix. Sources touched by the fixes, each re-read after the change:
    (older, stricter) ETag still wins.
 3. **The repair route accepted arbitrary dates.** ETag locking stops concurrent
    writes, not sequential replay, so an authorized caller could walk `lastSent`
-   anywhere and permanently fix a null `atSend` on the first request. The date is
-   now confirmed against the request's own `wmkf_reviewduedate`. **Deliberate
-   limitation:** a render-time staff override that differs from the request
-   column can no longer be repaired and must be re-sent — failing closed on an
-   unverifiable date is the right trade for a field feeding reliability scoring,
-   but it is an owner-visible behaviour change.
+   anywhere and permanently fix a null `atSend` on the first request. The final
+   repair contract no longer accepts those fields as client assertions:
+   `send-emails` mints a 15-minute signed receipt only after dispatch succeeds,
+   binding the request, suggestion, exact rendered due date, dispatch timestamp,
+   and the pre-dispatch ETag. Repair verifies the receipt and spends that ETag;
+   the successful write changes the row version, so concurrent/replayed use fails
+   closed. A legitimate render-time staff override remains recoverable.
 4. **`softDelete` erased terminal status outside the guard.** It writes
    `wmkf_reviewstatus: null` through `updateRecord`, bypassing `updateLifecycle`
    entirely, so ordinary candidate removal could reopen a closed engagement. It
@@ -394,6 +395,28 @@ any fix. Sources touched by the fixes, each re-read after the change:
    columns while `softDelete` preserves them, so restore + re-send would treat
    the new engagement as already stamped and score it against the old deadline.
    Both columns now reset, on both re-add paths.
+
+## Revision 5 — receipt-sink rescue (2026-07-22)
+
+The entry gates and token revocation from Revision 4 were necessary but not
+sufficient: receipt writes bypass `updateLifecycle`, so an accepted terminal row
+could still be recorded through staff manual entry, mark-without-file, staff
+upload, or an already-in-flight self-token upload/submit.
+
+All request-time receipt sinks now use one server-side
+`authorizeReviewReceipt()` guard. It rejects terminal, already-received,
+unaccepted/declined, and missing-ETag rows. The exact ETag returned by the read
+that passed the guard is carried into the parent PATCH/atomic changeset. A terminal
+transition that wins mid-request therefore makes the receipt write fail with 412;
+upload paths clean up their new SharePoint items and classify the result as
+`engagement_ended` (or generic `conflict` when the winner cannot be identified).
+The missing-ETag submit fallback selects and checks `wmkf_reviewstatus` before
+using the fresh ETag. Workbench Outstanding excludes `withdrew` and `released`.
+
+The repair evidence is the signed receipt described in Revision 4 item 3. It
+requires no new persistence: Dataverse row-version change is the one-use marker.
+The send route verifies receipt signing is configured before dispatch, so a
+successful email cannot be left with an unmintable repair action.
 
 ## Review history
 

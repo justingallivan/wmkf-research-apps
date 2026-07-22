@@ -40,6 +40,13 @@ describe('respondForFailedReviewUpload', () => {
     expect(res.body.message).toMatch(/have not been released/i);
   });
 
+  test('engagement_ended → 409 for both upload routes', () => {
+    const res = makeRes();
+    respondForFailedReviewUpload(res, { ok: false, reason: 'engagement_ended' });
+    expect(res.statusCode).toBe(409);
+    expect(res.body).toMatchObject({ ok: false, reason: 'engagement_ended' });
+  });
+
   test('infected → 422, echoes the file-level errors (caller-actionable)', () => {
     const res = makeRes();
     respondForFailedReviewUpload(res, {

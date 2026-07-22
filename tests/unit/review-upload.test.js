@@ -101,6 +101,10 @@ function mockSuggestionFound() {
     // materials_sent (100000001): a normal reviewer who has been released materials and
     // may upload. The Phase-2 self-token guard rejects anything below this value.
     wmkf_reviewstatus: 100000001,
+    wmkf_accepted: true,
+    wmkf_declined: false,
+    wmkf_reviewreceivedat: null,
+    _etag: 'W/"upload-1"',
     wmkf_Request: { akoya_requestid: REQUEST_ID, akoya_requestnum: REQUEST_NUMBER },
   });
 }
@@ -153,6 +157,10 @@ describe('writeReviewFiles — materials-sent upload gate (Phase 2)', () => {
     wmkf_appreviewersuggestionid: SUGGESTION_ID,
     _wmkf_request_value: REQUEST_ID,
     wmkf_reviewstatus,
+    wmkf_accepted: true,
+    wmkf_declined: false,
+    wmkf_reviewreceivedat: null,
+    _etag: 'W/"upload-1"',
     wmkf_Request: { akoya_requestid: REQUEST_ID, akoya_requestnum: REQUEST_NUMBER },
   });
 
@@ -180,6 +188,16 @@ describe('writeReviewFiles — materials-sent upload gate (Phase 2)', () => {
     const r = await writeReviewFiles(validInput({ opts: { source: 'staff_upload', actingUserSystemId: 'sys-1' } }));
     expect(r.ok).toBe(true);
   });
+
+  test.each(['reviewer_self_token', 'staff_upload'])(
+    '%s rejects a terminal engagement before any SharePoint write',
+    async (source) => {
+      withStatus(100000006);
+      const r = await writeReviewFiles(validInput({ opts: { source, actingUserSystemId: 'sys-1' } }));
+      expect(r).toEqual({ ok: false, reason: 'engagement_ended' });
+      expect(GraphService.uploadFile).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('writeReviewFiles — file validation', () => {
@@ -353,6 +371,32 @@ describe('writeReviewFiles — failure paths', () => {
     expect(r.cleanedUp).toBe(false);
     expect(errSpy).toHaveBeenCalled();
     errSpy.mockRestore();
+  });
+
+  test('terminal transition racing the receipt changeset fails closed and cleans up SharePoint', async () => {
+    const initial = {
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_reviewstatus: 100000001,
+      wmkf_accepted: true,
+      wmkf_declined: false,
+      wmkf_reviewreceivedat: null,
+      _etag: 'W/"upload-1"',
+      wmkf_Request: { akoya_requestid: REQUEST_ID, akoya_requestnum: REQUEST_NUMBER },
+    };
+    DynamicsService.getRecord
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce({ wmkf_reviewstatus: 100000005, wmkf_reviewreceivedat: null, _etag: 'W/"terminal"' });
+    DynamicsService.executeChangeset.mockRejectedValueOnce(
+      Object.assign(new Error('precondition failed'), { status: 412 }),
+    );
+
+    const result = await writeReviewFiles(validInput());
+
+    expect(result).toMatchObject({ ok: false, reason: 'engagement_ended', cleanedUp: true });
+    expect(GraphService.deleteFile).toHaveBeenCalledWith('drive-id-123', 'item-1');
+    const [operations] = DynamicsService.executeChangeset.mock.calls[0];
+    expect(operations[operations.length - 1].ifMatch).toBe('W/"upload-1"');
   });
 });
 

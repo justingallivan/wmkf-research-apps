@@ -106,6 +106,7 @@ let CYCLE_CODE;     // meetingDateToCycleCode() → this
 let CYCLE_CONFIG;   // findByShortCode() → this (cycle materials live here)
 let ORIGINAL_REVIEWER_EMAIL_DELIVERY_MODE;
 let ORIGINAL_VERCEL_ENV;
+let ORIGINAL_NEXTAUTH_SECRET;
 
 function baseSuggestion(over = {}) {
   return {
@@ -143,6 +144,7 @@ let handler;
 beforeAll(async () => {
   ORIGINAL_REVIEWER_EMAIL_DELIVERY_MODE = process.env.REVIEWER_EMAIL_DELIVERY_MODE;
   ORIGINAL_VERCEL_ENV = process.env.VERCEL_ENV;
+  ORIGINAL_NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET;
   handler = (await import('../../pages/api/review-manager/send-emails')).default;
 });
 beforeEach(() => {
@@ -166,6 +168,11 @@ beforeEach(() => {
   else process.env.REVIEWER_EMAIL_DELIVERY_MODE = ORIGINAL_REVIEWER_EMAIL_DELIVERY_MODE;
   if (ORIGINAL_VERCEL_ENV === undefined) delete process.env.VERCEL_ENV;
   else process.env.VERCEL_ENV = ORIGINAL_VERCEL_ENV;
+  process.env.NEXTAUTH_SECRET = 'send-emails-route-test-signing-secret';
+});
+afterAll(() => {
+  if (ORIGINAL_NEXTAUTH_SECRET === undefined) delete process.env.NEXTAUTH_SECRET;
+  else process.env.NEXTAUTH_SECRET = ORIGINAL_NEXTAUTH_SECRET;
 });
 
 // Parse the SSE writes into {event, data} pairs.

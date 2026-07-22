@@ -64,10 +64,12 @@ If you're touching a service or utility, read its header before this catalog. If
 ### Reviewer / honorarium
 
 - **`review-manager/effective-review-due-date.js`** — Pure resolver for the one server-authoritative materials deadline carried render → send → set-once lifecycle stamp; invalid non-empty dates fail closed.
-- **`review-manager/repair-materials-send-service.js`** — No-resend recovery for a dispatched materials email whose inline lifecycle stamp failed. Fresh-row lifecycle predicate + ETag write; never overwrites a recorded due date.
+- **`review-receipt-guard.js`** — Shared terminal/finality/accepted/ETag authorization for every request-time review-receipt sink; classifiers turn a lost If-Match race into `engagement_ended`, `review_received_locked`, or `conflict`.
+- **`review-manager/materials-send-repair-receipt.js`** — Fifteen-minute `NEXTAUTH_SECRET`-signed proof of a successful materials dispatch, binding request, suggestion, rendered due date, dispatch timestamp, and source ETag. The ETag-changing repair makes it one-use without another table.
+- **`review-manager/repair-materials-send-service.js`** — No-resend recovery for a dispatched materials email whose inline lifecycle stamp failed. Accepts only the signed dispatch receipt, re-checks fresh-row lifecycle/request/ETag, preserves set-once `atSend`, and advances `lastSent` to the rendered override carried by the receipt.
 - **`review-manager/terminal-transition-service.js`** — Dedicated fail-closed post-accept `withdrew`/`released` transition. Fresh per-row eligibility read, explicit partial-success statuses, and ETag-conditional writes so a concurrent submission wins.
 - **`review-manager/manual-review-entry-service.js`** — Staff rescue for recording a complete structured review from the Workbench Reviews tab. Reuses the external review question set, sanitizer, validator, canonical submission producer, and atomic ETag-guarded parent/answer-row changeset; deletes a stale external draft only after commit.
-- **`review-upload.js`** — Shared `writeReviewFiles` core for staff + reviewer-self upload paths; SharePoint write + Dataverse PATCH + rollback.
+- **`review-upload.js`** — Shared `writeReviewFiles` core for staff + reviewer-self upload paths; shared receipt authorization, ETag-bound SharePoint/Dataverse write, and SharePoint rollback on conflict/failure.
 - **`reviewer-campaign-timeline.js`** — Dataverse `wmkf_appsystemsettings` reader/writer for current-cycle reviewer invitation timeline defaults (`reviewer.campaign_timeline_defaults`); admin-editable, read by `InviteEmailModal` before request-level campaign config.
 - **`external-token.js`** — HS256 HMAC JWT primitive for external-reviewer magic links; hash-only storage for cheap revocation. 32+ char `EXTERNAL_LINK_SECRET`; rotation supported via `EXTERNAL_LINK_SECRET_PREVIOUS`.
 

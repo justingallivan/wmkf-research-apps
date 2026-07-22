@@ -39,6 +39,7 @@ import { generateReviewReportDocx } from '../../utils/review-report-docx';
 import { generateReviewReportPdf } from '../../utils/review-report-pdf';
 import { downloadPdf } from '../../utils/pdf-export';
 import ManualReviewEntryForm from './ManualReviewEntryForm';
+import { isTerminalReviewStatus } from '../../config/reviewerStatus';
 
 function formatDate(iso) {
   if (!iso) return null;
@@ -459,7 +460,7 @@ function SynthesisCard({ requestId, synthesis, onUpdated }) {
 // `submitted` field is derived from the same column, but sharing one signal
 // here removes the dual-source fragility).
 function isOutstanding(r) {
-  return !r.reviewReceivedAt;
+  return !r.reviewReceivedAt && !isTerminalReviewStatus(r.reviewStatus);
 }
 
 function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {

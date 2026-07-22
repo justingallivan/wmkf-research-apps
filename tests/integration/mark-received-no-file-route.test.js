@@ -24,6 +24,7 @@ jest.mock('../../lib/services/dynamics-context', () => ({
 }));
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
+    getRecord: jest.fn(),
     updateRecord: jest.fn(),
     resolveEntitySetName: jest.fn(),
     executeChangeset: jest.fn(),
@@ -44,6 +45,13 @@ beforeAll(async () => {
 beforeEach(() => {
   jest.clearAllMocks();
   requireAppAccess.mockResolvedValue({ session: { user: { dynamicsSystemuserId: 'staff-1' } } });
+  DynamicsService.getRecord.mockResolvedValue({
+    wmkf_accepted: true,
+    wmkf_declined: false,
+    wmkf_reviewreceivedat: null,
+    wmkf_reviewstatus: 100000002,
+    _etag: 'W/"receipt-authorized"',
+  });
   DynamicsService.updateRecord.mockResolvedValue(undefined);
   DynamicsService.resolveEntitySetName.mockResolvedValue('wmkf_appreviewanswers');
   DynamicsService.executeChangeset.mockResolvedValue({ ok: true, operations: [] });

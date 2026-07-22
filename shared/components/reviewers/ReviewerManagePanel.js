@@ -624,10 +624,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          requestId,
-          suggestionId: result.suggestionId,
-          effectiveReviewDueDate: result.effectiveReviewDueDate,
-          materialsSentAt: result.materialsSentAt,
+          repairReceipt: result.repairReceipt,
         }),
       });
       const data = await response.json().catch(() => ({}));
