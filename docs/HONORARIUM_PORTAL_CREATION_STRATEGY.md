@@ -16,8 +16,7 @@ related:
 
 # Honorarium Portal-Creation Strategy (no-BILL cycle)
 
-**Status:** Go-live plan + config-gated draft implementation — verified against live
-prod Dataverse; not live until the env/config flip plus deployment/restart.
+**Status:** No-BILL honorarium creation is live in Production (2026-07-02); BILL onboarding remains deferred. The historical config-flip plan below is retained for its rollout record.
 **Date:** 2026-07-01 · **Context:** Justin + Connor decision; Claude session 314.
 **Scope:** How reviewer honorarium `akoya_request` records get created when full
 BILL.com integration is deferred and reviewers no longer self-register through

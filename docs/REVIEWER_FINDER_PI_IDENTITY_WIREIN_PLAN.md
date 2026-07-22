@@ -2,8 +2,8 @@
 title: "Reviewer Finder — Structured-ORCID PI Identity Wire-In (Design / Pre-Impl)"
 domain: reviewer-identity
 kind: plan
-status: active
-summary: "Author: Claude (S240, 2026-06-10). Canonical strategy: docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md §12 (esp. §12.2, §12.8)."
+status: historical
+summary: "Shipped structured-ORCID PI identity wire-in; retained as the historical build plan."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,6 +15,12 @@ related:
 ---
 
 # Reviewer Finder — Structured-ORCID PI Identity Wire-In (Design / Pre-Impl)
+
+> **Completed outcome:** The structured-ORCID PI identity wire-in shipped in S253.
+> This document is retained as the pre-build and implementation record.
+>
+> **Current routing:** Use [Reviewer Finder Enforcement Contracts](REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md)
+> and [Sparse Proposal Anchor Strategy](REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md) for current policy.
 
 > Status (updated S253, 2026-06-13): **SHIPPED.** The structured-ORCID PI wire-in described here
 > is live — `resolveProposalPI` (`lib/services/proposal-pi-identity.js`) is called from
@@ -299,4 +305,3 @@ it's the canonical PD-unverifiable inferred flag (remove capture/render/persist 
 the COI→POTENTIAL_CONCERNS instruction); (2) **keep** co-author COI grading — shared-paper counts are
 factual/verifiable. So Chunk 2 = {structured institution into the current-institution hard drop; remove
 historical-institution COI; retire POTENTIAL_CONCERNS; keep co-author COI}. Chunk 1 is unaffected.
-

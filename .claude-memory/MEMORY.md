@@ -13,7 +13,7 @@
 - Live-state index for data-layer work: ../docs/APPLICATION_STATE_ATLAS.md
 - Ground-truth / self-correction rules: ../docs/CLAUDE_REMEDIATION_PLAN.md
 - Memory storage invariant: memory-store-propagation.md
-- Memory routing contract: ../docs/CLAUDE_MEMORY_REORGANIZATION_PLAN.md; project-memory-router-trap-prevention.md
+- Memory routing contract: project-memory-router-trap-prevention.md; ../.claude/rules/durable-docs.md
 
 ## Always-Read Guardrails
 - Carryover / bulk actions: feedback-verify-before-destructive-carryover.md; feedback-list-and-confirm-before-bulk-deletes.md; feedback-verify-additive-carryover-not-just-destructive.md
@@ -32,12 +32,12 @@
 - Refactor / behavior-freeze extraction: feedback-behavior-freeze-passthrough-no-default.md; ../docs/DISCOVERY_SERVICE_DECOMPOSITION_PLAN.md (facade+modules decomposition playbook)
 - Tone / user context: feedback-no-performative-contrition.md; feedback-no-time-pressure-commentary.md; feedback-stakeholder-email-tone.md; feedback-review-panel-tone.md
 - React / memory lookup / handoff summary: feedback-profile-context-runtime-bugs.md; feedback-check-memory-before-asking-user.md; feedback-dont-resurface-parked-items.md
-- Codex delegation: feedback-codex-model-gpt55.md (ALWAYS --model gpt-5.5 unless owner says otherwise); reference-codex-detached-exec-protocol.md; project-codex-design-pre-impl-iteration.md; project-codex-recurring-review.md; feedback-commit-before-delegating-to-worktree-agent.md; reference-codex-rescue-plan-task-runs-readonly.md; reference-codex-plugin-job-tracking-bugs.md; reference-codex-rescue-pkill-overstep.md; feedback-pause-for-codex-on-high-stakes.md; feedback-codex-build-gate-turbopack-sandbox.md; feedback-dont-tune-against-hook-source.md
+- Multi-agent delegation/review: ../docs/AGENT_COLLABORATION_PLAN.md; project-codex-recurring-review.md; feedback-commit-before-delegating-to-worktree-agent.md; feedback-pause-for-codex-on-high-stakes.md; feedback-codex-build-gate-turbopack-sandbox.md; feedback-dont-tune-against-hook-source.md
 - Search / schema language: feedback-grep-general-codebase-terms.md; feedback-human-legibility-schema-principle.md
 
 ## Task Routing
 - Reviewer origination / retrieval: ../docs/agent-wiki/topics/reviewer-origination.md; project-reviewer-sourcing-constraints.md (owner: ~1 applicant rec/panel recent policy; reuse per-PD practice; referral multiplies the engine)
-- Reviewer finding/identity holistic redesign (ACTIVE hybrid; short legacy-default slices → main, cohort switches, cleanup after observation): project-reviewer-holistic-redesign-parallel-build.md; ../docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md
+- Reviewer identity/finding roadmap (legacy-authoritative; cutover, policy migration, pilot, cleanup gated): project-reviewer-holistic-redesign-parallel-build.md; ../docs/REVIEWER_IDENTITY_CONTACT_PLAN.md; ../docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md
 - Reviewer identity / ORCID / contact / COI / PI identity: ../docs/agent-wiki/topics/reviewer-identity.md; project-reviewer-verify-fail-dangerous.md
 - Reviewer workbench / lifecycle / roster / referral: ../docs/agent-wiki/topics/reviewer-workbench-lifecycle.md; project-workbench-consolidation-rollout.md
 - Reviewer-invite local testing / capture mode side effects: reviewer-invite-capture-mode-not-full-sandbox.md
@@ -57,7 +57,7 @@
 - Auth / admin / access / security / private Blob / file download: ../docs/agent-wiki/topics/security-auth.md
 - Integrity screener / Retraction Watch / PubPeer / News: ../docs/agent-wiki/topics/integrity-screener.md
 - Dev environment / secrets / Vercel deploy / local build: ../docs/agent-wiki/topics/dev-environment.md; ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
-- Strategy / system model / roadmap / phasing / Virtual Review Panel: ../docs/agent-wiki/topics/strategy-roadmap.md
+- Strategy / current queue / system model / roadmap / phasing / Virtual Review Panel: ../docs/CURRENT_WORK_QUEUE.md; ../docs/agent-wiki/topics/strategy-roadmap.md
 - Proposal docs / phasing / Phase I-II: project-j27-doc-capture-evolution.md; project-grant-phasing-evolution.md; project-phaseistatus-decision-lifecycle.md
 - Grantee and email templates: project-grantee-deliverable-email-voice.md; project-email-template-token-syntax.md
 - Grantee publication waiver (versioned, staff-editable in admin Policies; SHIPPED S350; ack modal S351): project-grantee-waiver-versioning.md; ../docs/GRANTEE_WAIVER_VERSIONING_PLAN.md
@@ -65,10 +65,9 @@
 - Reviewer institution → CRM linking / affiliation-mismatch alert / institution typeahead (PARKED S354 — pending Connor+Sarah account cleanup; ROR/OpenAlex canonical spine): project-reviewer-affiliation-institution-linking.md
 - Deferred cleanup / dead-code session: project-deferred-code-cleanup.md
 - Whack-a-mole review (owner reconciliation pending; do not execute): ../docs/WHACK_A_MOLE_REMEDIATION_PLAN.md; ../docs/audits/whack-a-mole-independent-review-codex-2026-07-09.md
-- Parked: project-wide prompt-caching audit (Anthropic flagged low cache-hit rate, S339): project-cache-hit-rate-review.md
+- Partial remediation shipped: prompt-cache audit/root mitigation completed (S341); remaining R4 cross-document Executor composition and conditional R5 measurement: project-cache-hit-rate-review.md
 - RESOLVED (S350): spec-audit design-docs recovered to main (1420d79c); accept-fast-response verified SHIPPED; quota-PD-email BUILT S352 (+admin default 4, modal prefill, first-send seed): project-spec-audit-docs-recovery-parked.md
 - Private-repo CI (why CodeQL gone, Semgrep split, Pro needed for branch protection): project-private-repo-ci-visibility.md
-- E2E reviewer suite re-baseline (RESOLVED 2026-07-04, 23/23 green; client-UX drift lesson): project-e2e-reviewer-rebaseline-parked.md
 
 ## Archive
-- Closed & shipped work index: project-closed-work-archive.md
+- Closed & shipped work index: project-closed-work-archive.md (includes the resolved reviewer E2E re-baseline)

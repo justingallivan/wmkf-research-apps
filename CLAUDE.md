@@ -25,7 +25,7 @@ This is a Next.js multi-application system for grant and document workflows, dep
 - Use `lib/services/llm-client.js` for provider calls and `lib/services/execute-prompt.js` for the shared Executor contract.
 - Use explicit Dynamics restriction context; preserve fail-closed auth and restriction behavior. Post-auth entry points establish it via `lib/dataverse/core/context.js` `withDalContext`; entity writes fail closed outside a trusted context under `DATAVERSE_DAL_ENFORCEMENT` (on in ALL environments — prod flipped to explicit `on` 2026-07-04/S330; unset would still mean on outside production). Closed (Session 330, 2026-07-04): `DynamicsService.createEmailActivity`/`addEmailAttachment`/`sendEmail` now call `assertTrustedDalContext` first, matching entity-write enforcement — see `docs/agent-wiki/topics/dataverse-dynamics.md` and `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` stage log.
 - Private intake Blob operations use `INTAKE_BLOB_RW_TOKEN`, never the shared Blob token.
-- The Dataverse target/write interlock (`lib/dataverse/core/interlock.js`, wired at all runtime Dataverse HTTP seams since S355) classifies deployment × target-hostname × operation and fails closed on unknowns; `DATAVERSE_TARGET_INTERLOCK=warn` is live everywhere (flip to `on` pending log observation). Never bypass it via a client-supplied flag; hostname classification lives in the tracked `target-registry.js` — extending it is a reviewed commit, not an env edit. See `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md`.
+- The Dataverse target/write interlock (`lib/dataverse/core/interlock.js`, wired at all runtime Dataverse HTTP seams since S355) classifies deployment × target-hostname × operation and fails closed on unknowns when enabled. `DATAVERSE_TARGET_INTERLOCK=warn` is live everywhere (flip to `on` pending log observation); **unset/empty resolves to `off`**, while an invalid set value fails closed to `on`, so explicit per-environment configuration is required. Never bypass it via a client-supplied flag; hostname classification lives in the tracked `target-registry.js` — extending it is a reviewed commit, not an env edit. See `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md`.
 
 ## High-Risk Workflows
 
@@ -51,7 +51,7 @@ Task-specific conventions load from `.claude/rules/` when matching files are rea
 - Postgres fresh-install shape: `scripts/setup-database.js`
 - Existing-DB migrations: `lib/db/migrations/*.sql`, `lib/db/migrations-manifest.json`, and `schema_migrations`
 - Live data ownership/read/write paths: `docs/APPLICATION_STATE_ATLAS.md` and `docs/atlas/`
-- Authentication architecture: `docs/AUTHENTICATION_SETUP.md` and `docs/SECURITY_ARCHITECTURE.md`
+- Authentication architecture: `docs/AUTHENTICATION_SETUP.md`; route guards: `docs/API_ROUTE_SECURITY_MATRIX.md`; active security work: `docs/SECURITY_OPERATING_PLAN.md` (`docs/SECURITY_ARCHITECTURE.md` is a historical March 2026 review snapshot)
 - Environment variables and rotation: `docs/CREDENTIALS_RUNBOOK.md`
 - Operational gate details: `docs/CI_GATES_REFERENCE.md`
 - Agent instruction framing and rationale sidecars: `docs/AGENT_HARNESS_STYLE_GUIDE.md`

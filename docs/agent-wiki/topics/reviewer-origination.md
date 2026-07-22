@@ -170,8 +170,8 @@ lane therefore needs the queries regenerated too (see "To re-enable" below).
   (≈3× a Track-A-only run; one example local run). Archiving reclaims it.
 - Recall is now served by **Claude recall-sampling** — the default candidate count was
   raised **12→15 (SHIPPED S249**, single deeper draw; `DEFAULT_REVIEWER_COUNT` in
-  `shared/config/reviewerFinderPreferences.js`) — plus **referral capture (still pending)**,
-  not a grounded keyword lane.
+  `shared/config/reviewerFinderPreferences.js`) — plus **shipped referral capture**
+  (manual referral and decline-referral one-click add), not a grounded keyword lane.
 
 **To re-enable / repurpose:** flipping `TRACK_B_ENABLED = true` is **no longer sufficient on its
 own** — the analyze prompt's PART 3 query generation was removed S253, so the lane would run

@@ -8,6 +8,13 @@ metadata:
   originSessionId: 1547b988-36b8-49bc-aae5-7f8e624e8043
 ---
 
+## Recall Rule
+
+Use this only when a user explicitly chooses the native Codex CLI fallback.
+The normal path is the current in-app/subagent runtime plus
+`docs/AGENT_COLLABORATION_PLAN.md`; do not prefer this historical shell protocol
+over an available managed agent surface.
+
 Protocol for delegating reviews to Codex without hangs or kills (established S331, used ~8 times S331–S332 without a failure):
 
 1. **Never host `codex exec` inside a harness background Bash task** — the harness pair-kills the shell and codex together (observed twice S331). Launch DETACHED instead:

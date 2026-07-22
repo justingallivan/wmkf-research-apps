@@ -5,7 +5,14 @@ metadata:
   node_type: memory
   status: active
   type: project
+  last_verified: 2026-07-22 via process-peer-reviews.js and execute-prompt.js
 ---
+
+## Recall Rule
+
+Read before changing the peer-review summarizer prompt path or Executor A7
+assertions. Preserve route-owned wrapping plus `assertSystemIncludes`; the
+Dataverse prompt rows are live input, not documentation.
 
 **Shipped S344 (2026-07-08).** `pages/api/process-peer-reviews.js` now runs the
 `peer-review-summarizer.analyze`/`.questions` `wmkf_ai_prompt` rows via

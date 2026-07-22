@@ -2,8 +2,8 @@
 title: "Claude Skill Remediation Plan — Whole-Flow Verification"
 domain: agent-harness
 kind: plan
-status: active
-summary: Created: 2026-06-05 Audience: Future Claude / skill authors / reviewers Scope: Improve Claude-authored skills and operating checklists so they...
+status: historical
+summary: Historical rationale for whole-flow skill remediation; the core contract-reconcile deliverable shipped.
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -12,6 +12,8 @@ related:
 ---
 
 # Claude Skill Remediation Plan — Whole-Flow Verification
+
+> **Current routing:** Historical design rationale. The core deliverable is `.claude/skills/contract-reconcile/SKILL.md`; use that skill and current repository rules for live verification work.
 
 **Created:** 2026-06-05
 **Audience:** Future Claude / skill authors / reviewers

@@ -2,14 +2,18 @@
 title: "BILL.com Honorarium Integration — Claude Code Handoff"
 domain: finance-honoraria
 kind: history
-status: active
-summary: "The project was approved after an Ops Team review meeting (May 2026)."
+status: historical
+summary: "Historical BILL.com integration handoff; automated BILL integration was tabled by the owner on 2026-07-12."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
 ---
 
 # BILL.com Honorarium Integration — Claude Code Handoff
+
+> **Historical handoff.** Automated BILL API integration was tabled by the owner
+> on 2026-07-12 and must not be revived without a new owner decision. The current
+> no-BILL contract is `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md`.
 
 ## Project Overview
 

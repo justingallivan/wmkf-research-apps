@@ -188,7 +188,7 @@ Today these live in Next.js services. Once PA composes, PA owns them (or delegat
 
 - **PDF/DOCX text extraction** — `lib/utils/file-loader.js` on the Vercel side. PA has its own PDF preprocessing capability, so both callers can handle extraction independently — no cross-boundary helper needed.
 - **Anthropic retry / backoff on 529s and rate limits.** PA has built-in retry but it's coarse; needs per-flow configuration.
-- **Prompt caching with `cache_control` markers.** Doable in PA's HTTP action but the JSON assembly is ugly. Measured 2026-04-17: **Sonnet 4.6's effective cache minimum is ~2,048 tokens, not the docs-stated 1,024.** PA flows should only bother with `cache_control` when the stable prefix (tools + system + any cached user blocks) comfortably exceeds that floor — otherwise the marker is a no-op and the JSON ceremony is wasted. See `docs/PROMPT_CACHING_PLAN.md` for per-app threshold analysis.
+- **Prompt caching with `cache_control` markers.** Doable in PA's HTTP action but the JSON assembly is ugly. The ~2,048-token Sonnet 4.6 result measured on 2026-04-17 is historical, not a current universal floor. Use the concrete model's current minimum from [Anthropic's prompt-caching documentation](https://platform.claude.com/docs/en/build-with-claude/prompt-caching), then see `docs/PROMPT_CACHING_AUDIT.md` for this project's July remediation status.
 - **Token counting + cost estimation.**
 - **Logging to `wmkf_ai_run`.** PA can do this natively (it's the same Dataverse table it already writes to), so this one is easy.
 
@@ -504,7 +504,7 @@ Files shipped:
 
 ### What the prototype revealed we didn't know
 
-1. **Sonnet 4.6's empirical cache minimum is ~2,048 tokens, not the docs-stated 1,024.** Follow-up binary search confirmed: 1,210-token prompts do not cache, 2,403-token prompts do. The Phase I system block at ~1,650 tokens **does not fire `cache_control`** at all. See `docs/PROMPT_CACHING_PLAN.md` for the detailed measurement and per-app implications.
+1. **Historical 2026-04-22 Sonnet 4.6 observation:** follow-up binary search then found no cache at 1,210 tokens and a write at 2,403 tokens. Do not use that as current model guidance: Anthropic now documents a 1,024-token minimum for Sonnet 4.6. See [the official prompt-caching documentation](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) and `docs/PROMPT_CACHING_AUDIT.md` before acting on a threshold.
 2. **For small system prompts, `cache_control` is a no-op.** The system/user split should be justified on other grounds for such apps: editor-safety (the split isolates editable rules from machinery), mix-and-match (one system message can serve several user templates), and the measured tighter-output effect. Caching ROI for small prompts is noise.
 3. **Image handling creates two distinct cost profiles.** A user-side PDF with figures can be 2–3× larger in tokens than a PA-backend text-stripped equivalent. Caching becomes much more valuable on the user-side. The prototype was done on a .docx (text-only); we don't yet have measurements for the vision-input path. Flagged in the caching plan.
 

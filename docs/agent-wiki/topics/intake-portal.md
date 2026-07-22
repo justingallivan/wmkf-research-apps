@@ -14,7 +14,8 @@ source_files:
   - lib/intake/rate-limit.js
   - lib/utils/intake-blob.js
 canonical_docs:
-  - docs/INTAKE_PORTAL_DESIGN.md
+  - docs/INTAKE_PORTAL_SCHEMA_CHANGES.md
+  - docs/INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md
   - docs/INTAKE_PORTAL_SCHEMA_CHANGES.md
   - docs/APPLICATION_STATE_ATLAS.md
   - docs/atlas/dataverse-akoya-request.md
@@ -40,6 +41,8 @@ update_triggers:
 > are intentionally unbuilt. The design memories are retained for revival, not stale.
 > See `.claude-memory/project-intake-portal-parked.md`. (The intake Blob/draft/submit
 > infrastructure below already exists and remains live.)
+> `docs/INTAKE_PORTAL_DESIGN.md` is the historical cancelled-pilot design, not
+> an active plan.
 
 Use this page before work on applicant intake: draft capture, submit, attachment
 handling, intake Blob storage, auth/external identity, institution match, and

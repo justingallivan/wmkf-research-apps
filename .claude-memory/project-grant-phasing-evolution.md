@@ -5,7 +5,7 @@ type: project
 originSessionId: 8d412c2f-d6c6-4080-a43c-79e0e04e9653
 status: active
 scope: strategy
-last_verified: S197 (2026-05-28) via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-22 via my-proposals-service.js, dashboard-service.js, and the akoya-request Atlas; J27 shape remains owner-confirmed planning context
 ---
 
 ## Recall Rule
@@ -21,7 +21,10 @@ Do not:
 - Hard-code "Phase II is a different file than Phase I" — next cycle they're the same relabeled document.
 - Assume concepts persist — the concept stage is going away.
 
-Ground truth: `docs/SYSTEM_MODEL.md`, [[project-system-model]], [[project-reviewer-apps-redesign-direction]], `project-strategy-direction.md`.
+Ground truth: `lib/services/reviewer-finder/my-proposals-service.js`,
+`lib/services/workbench/dashboard-service.js`, `docs/atlas/dataverse-akoya-request.md`,
+and `docs/SYSTEM_MODEL.md`. The current `Phase II Pending` gate is source-verified;
+the future J27 submission shape is an owner-confirmed plan, not code state.
 
 **Reviewer-finding gate (today and going forward):** Only proposals that advance to **Phase II** get sent to outside reviewers. So the actionable filter for Reviewer Finder is `akoya_requeststatus = 'Phase II Pending'` (or whatever the live "in Phase II" status is in a given cycle). Concepts and Phase I never need outside reviewers.
 

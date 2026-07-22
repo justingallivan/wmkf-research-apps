@@ -2,8 +2,8 @@
 title: "`lib/bill.js` — Design (v3)"
 domain: finance-honoraria
 kind: spec
-status: active
-summary: "WebFetch of developer.bill.com (notably developer.bill.com/llms.txt) surfaced several discrepancies vs. the original BILL_integration_handoff.md:."
+status: historical
+summary: "Historical BILL API wrapper design retained as implementation history; automated BILL integration was tabled on 2026-07-12."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,6 +15,10 @@ related:
 ---
 
 # `lib/bill.js` — Design (v3)
+
+> **Historical design.** Automated BILL API integration was tabled by the owner
+> on 2026-07-12 and must not be revived without a new owner decision. Retain this
+> document only as implementation history for the dormant code.
 
 **Author:** Justin Gallivan
 **Date:** 2026-05-25 (v3 — second Codex pre-impl review folded)

@@ -7,11 +7,11 @@
  * (forthcoming) PowerAutomate `ExecutePrompt` child flow. See
  * docs/EXECUTOR_CONTRACT.md § "Test oracle":
  *
- *   Both executors must:
- *     1. Invoked with identical requestId and overrideVariables, produce
- *        byte-identical wmkf_ai_rawoutput
- *     2. On second invocation, cacheHit is true regardless of which caller
- *        went first
+ *   The oracle checks:
+ *     1. Identical requestId and overrideVariables produce byte-identical
+ *        wmkf_ai_rawoutput across executors.
+ *     2. Repeating a byte-identical eligible prefix within the cache TTL can
+ *        produce a cache read, proved by response usage rather than assumed.
  *
  * Shape (per contract):
  *   - Two variables: one `dynamics`, one `override`
@@ -20,7 +20,7 @@
  *
  * Determinism levers:
  *   - temperature = 0
- *   - haiku 4.5 (cheap; smoke test, not a real AI task)
+ *   - sonnet 4.6 (the model pinned on the seeded row)
  *   - System prompt pins exact output shape; parseMode=json validates the
  *     'echo' key landed
  *
@@ -76,13 +76,13 @@ const PROMPTSTATUS_PUBLISHED = 682090001;
 //
 // PADDING NOTE: Anthropic ephemeral prompt caching only engages when the
 // cached block crosses a model-specific minimum token count (1024 tokens for
-// Sonnet/Opus, 2048 for Haiku). Without crossing that floor, the
-// `cache_control` marker is silently ignored and the contract's "cacheHit on
-// second invocation" assertion cannot be satisfied. To exercise the cache
+// this pinned Sonnet 4.6; 4096 for current Haiku 4.5). Without crossing that floor, the
+// `cache_control` marker is silently ignored and the cache observation cannot
+// exercise a realized read. To exercise the cache
 // path with a tiny operational prompt, the section below adds stable,
 // deterministic filler that pushes the system block past ~1024 tokens. The
 // filler is content-free (it explains the oracle's own purpose) — but it is
-// CACHE-LOAD-BEARING. Do not strip it: assertion 2 in the contract depends
+// CACHE-LOAD-BEARING. Do not strip it: the cache observation depends
 // on it. If you genuinely shrink the prompt, switch the model to one with a
 // lower threshold or document the cache assertion as N/A here.
 // ────────────────────────────────────────────────────────────────────────────
@@ -99,10 +99,11 @@ equivalent on identical inputs:
   2. The PowerAutomate \`ExecutePrompt\` child flow (Phase 1)
 
 When both executors run this prompt against the same (requestId, echo_text)
-pair, the resulting wmkf_ai_run rows must satisfy two assertions:
+pair, compare the resulting wmkf_ai_run rows on two dimensions:
 
   Assertion 1 (parity): both runs persist identical wmkf_ai_rawoutput strings.
-  Assertion 2 (cache): the second run reports cacheHit=true.
+  Observation 2 (cache): an immediate byte-identical rerun is cache-eligible;
+  cacheHit=true is evidence of a realized read, not a parity invariant.
 
 Assertion 1 catches behavioral drift between the two implementations: variable
 resolution, message composition, request shaping, and output persistence. If
@@ -269,8 +270,8 @@ const recordData = {
   // PA<->Vercel parity-test prompt and its own body instructs that the model
   // be pinned so both executors run an identical model (a tier alias could
   // resolve differently between the two runs). Bump this id deliberately when
-  // re-baselining the parity test. (1024-token cache threshold matches
-  // phase-i.summary; the padding above clears it so cache_control engages.)
+  // re-baselining the parity test. (The pinned Sonnet 4.6 has a 1024-token
+  // cache threshold; the padding above clears it so cache_control engages.)
   wmkf_ai_model: 'claude-sonnet-4-6',
   wmkf_ai_temperature: 0,
   wmkf_ai_maxtokens: 256,
@@ -421,7 +422,7 @@ try {
   }
   console.log('\n✓ All verification checks passed.');
   console.log('\nNext: run executePrompt({ promptName: "executor.echo-parity", requestId, runSource: "Vercel Test" })');
-  console.log('twice — second run should report cacheHit=true and byte-identical wmkf_ai_rawoutput.');
+  console.log('twice — compare byte-identical wmkf_ai_rawoutput and inspect cacheHit for a realized cache read.');
 } catch (err) {
   console.error('✗ Verification read failed:', err.message);
   process.exit(1);

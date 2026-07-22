@@ -1,84 +1,64 @@
 ---
 name: project-reviewer-verify-fail-dangerous
-description: "HAZARD (verified S231): the reviewer verify path confirmed a fabricated wrong-forename against a real same-initial namesake, no forename gate. LARGELY CLOSED S235-S236: forename gates now on BOTH verify paths (PubMed nameEvidence/hasFullForenameMatch demotes to unresolved; spine promotions classifySpineEvidence :172/:175 gated on forenameContradicts!==true — blocks a full-forename CONTRADICTION, not an initial-only record, after a same-session regression where forenameAgrees!==false over-blocked real reviewers stored as initials). Principle still a forward guard for new identity work."
+description: Active reviewer-identity guardrail: a full-forename contradiction must fail closed; initial-only evidence needs an independent affiliation/ORCID signal rather than automatic rejection or promotion.
 metadata:
   node_type: memory
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-06-08
+  last_verified: 2026-07-22 via discovery verification, identity resolver/evidence source, and focused regression tests
 ---
 
-## Status update (S236) — forename gate now on both verify paths
-The original S231 reproduction was on the PubMed path; it is now gated. As of S236
-BOTH verify paths fail-close on a wrong forename:
-- **PubMed path:** `evaluateNameEvidence`/`hasFullForenameMatch` demotes a no-full-
-  forename-match suggestion to `unresolved` (test `fabricated Alfred Laederach does
-  not verify` in `discovery-verification-status.test.js`).
-- **Spine path (S236):** `classifySpineEvidence` promotions `:172` (confirmed) and
-  `:175` (probable) are gated on `spine.forenameContradicts !== true`
-  ([[project-reviewer-field-aware-verification]] / `docs/REVIEWER_FIELD_AWARE_VERIFICATION_DESIGN.md`).
-  **The gate blocks only a forename CONTRADICTION (both full + different, e.g.
-  "Alfred" vs "Alain"), NOT an initial-only record.** The first cut shipped
-  `forenameAgrees !== false`, which hard-failed initial-only records and demoted
-  REAL strongly-corroborated reviewers (Ursula Keller → OpenAlex "U. Keller",
-  Robert Sang → "R. T. Sang") from confirmed → unresolved despite
-  affiliation_match[strong] + orcid_employment_corroborated[strong] — a regression,
-  fixed same session. Rationale: these promotions already require affiliation_match
-  (the "2nd independent signal" that makes an initial-only match safe per the rule
-  below), so only an explicit full-forename contradiction should demote. `!== true`
-  so non-Track-A callers (forenameContradicts undefined) and initial-only records
-  both pass. The `:188` ORCID-employment-only path (no affiliation_match) keeps the
-  stricter `forenameAgrees === true`.
-This memory stays `active` because the **principle** (fail-closed forename gate;
-initial-only must not verify a full-name candidate without a 2nd signal) remains
-the guard for any future identity/name-matching/COI work.
-
 ## Recall Rule
-Read before touching reviewer verification / name-matching / COI in
-`lib/services/discovery-service.js` or extending the identity resolver. The
-original hazard is largely closed (see status update above); treat the fix
-direction below as the standing invariant, not unbuilt work.
 
-## The hazard (reproduced live, S231)
-A **fabricated wrong-forename of a real, active researcher verifies as that real
-person.** Demonstrated: running the real `verifyClaudeSuggestions` on a synthetic
-"Dr. Alfred Laederach" (the real person is **Alain** Laederach) returned VERIFIED,
-`confidence 100%`, with Alain's 8 papers + real UNC affiliation attached and
-`institutionMismatch=false`.
+Read before changing reviewer verification, name matching, ORCID/OpenAlex
+promotion, or COI identity logic. Preserve both sides of the invariant: block a
+full-forename contradiction, but do not treat an initial-only record as a
+contradiction when independent evidence supports the person.
 
-Mechanism (all in source):
-- `generateNameVariants` emits an initial variant ("A Laederach"); PubMed
-  `[Author]` is order-insensitive ("A Laederach" == "Laederach A"); `namesMatch`
-  matches "a laederach" == "alain laederach" via a first-initial rule
-  (`discovery-service.js:~1102`).
-- Verify accepts on `>= MIN_PUBLICATIONS` (=3) with **no forename check**
-  (`:~327`). `institutionMismatch`/`expertiseMismatch` only set a field — the
-  candidate is still pushed to `verified:true` (`:~337,363`). Both safeguards miss
-  because only the *forename* was wrong (institution/field were right).
+## Current invariant
 
-Why "≥N papers by LastName+initial" is unsafe as identity (VERIFIED): PubMed
-returns paper CITATIONS, not person records. For common names it conflates
-namesakes (e.g. "David Yong" = 1 real ASTRO-3D paper + 8 biomedical namesakes →
-mis-verifies with a wrong affiliation); for distinctive names it can be
-sparse-real but below threshold (false-negative). Related: `pubmed-service.js:226`
-derives `year` from `DateCompleted||DateRevised||PubDate` (record-maintenance
-dates, not publication date) → corrupts recency.
+The original S231 bug allowed a fabricated full forename to verify against a
+real same-initial researcher. Both live verification paths now contain explicit
+forename controls:
 
-Also seen in the wild (analyze output): wrong-forename hallucinations on real
-people — "Phillip"/Peter Clote, "Matthew"/Michael Pluth, "Sigal"/Shalev Itzkovitz;
-~20% of analyze runs fail/degrade (empty response or 1 suggestion); placeholder
-padding.
+- **PubMed verification:** `lib/services/discovery/verification.js` requires
+  `evaluateNameEvidence(...).hasFullForenameMatch`; the Alfred/Alain regression
+  remains covered in `tests/unit/discovery-verification-status.test.js`.
+- **Identity spine:** `lib/services/reviewer-identity-evidence.js` derives both
+  `forenameAgrees` and `forenameContradicts`. Promotion branches in
+  `lib/services/reviewer-identity-resolver.js` reject an explicit contradiction.
+  Branches with only ORCID-employment evidence keep the stricter full-agreement
+  requirement.
 
-## How to apply (fix direction)
-- **Forename-equality gate, fail closed:** a full-name suggestion verifies only if
-  a recent topical cluster's author forename *exactly* matches (initials Claude
-  itself supplied / nicknames / accents allowed). **Initial-only matches must
-  never verify a full-name candidate** without a 2nd independent signal
-  (ORCID / co-author / affiliation).
-- **Demote `institutionMismatch`/`expertiseMismatch`** from advisory to
-  confidence-lowering / `unresolved` — route verify through identity STATES, not
-  bare `verified:true`. Reuse/extend `lib/services/reviewer-identity-resolver.js`.
-- Cross-source-zero (PubMed+OpenAlex+ORCID+S2 all zero) is the reliable
-  hallucination filter; a single source's zero is not.
-- Full analysis + plan: `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` §2,§5.
+The distinction is load-bearing. OpenAlex may represent a real full-name person
+as initials (for example `U. Keller`). The first S236 fix used
+`forenameAgrees !== false` and incorrectly demoted those cases. Current branches
+use `forenameContradicts !== true` only when affiliation/topic or comparable
+independent evidence already exists; an explicit full-name mismatch still blocks.
+
+## Do
+
+- Treat a full-forename contradiction as identity-disqualifying unless a human
+  explicitly corrects the identity.
+- Require a second independent signal before promoting an initial-only match for
+  a full-name candidate.
+- Keep PubMed citations separate from person identity: paper-count thresholds do
+  not disambiguate common surnames/initials.
+- Add complement tests for contradiction, initial-only, missing evidence, and
+  fully agreeing forenames whenever a promotion rule changes.
+
+## Do not
+
+- Reintroduce bare surname+initial verification.
+- Convert `institutionMismatch` or topic overlap alone into proof of identity.
+- Apply one forename predicate uniformly to branches with different independent
+  evidence; preserve the resolver's branch-specific safety conditions.
+
+## Historical evidence and design
+
+The original Alfred/Alain reproduction and broader retrieval analysis are
+preserved in git history and `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md`.
+Current field-aware rationale is in
+`docs/REVIEWER_FIELD_AWARE_VERIFICATION_DESIGN.md`; live source and regression
+tests remain authoritative.

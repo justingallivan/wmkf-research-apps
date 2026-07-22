@@ -2,8 +2,8 @@
 title: "Reviewer Web-Grounded Discovery (Perplexity Track C) — Build Plan"
 domain: reviewer-identity
 kind: plan
-status: active
-summary: "- *Probe (not in the app):* scripts/probe-perplexity-reviewer-agent.mjs — one sonar-pro chat call that BOTH searches and reasons, returning..."
+status: historical
+summary: "Evaluated and abandoned Perplexity web discovery; retained as historical safety and evidence record."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,6 +15,12 @@ related:
 ---
 
 # Reviewer Web-Grounded Discovery (Perplexity Track C) — Build Plan
+
+> **Retired outcome:** The Perplexity web-discovery path was evaluated and abandoned in
+> S230. This document is retained only as the historical safety/evidence record.
+>
+> **Current routing:** Use [Reviewer Origination](agent-wiki/topics/reviewer-origination.md)
+> for the current reviewer-discovery posture.
 
 > ## 🛑 OUTCOME (S230, 2026-06-06): EVALUATED → ABANDONED
 > The shipped read-only web-suggestions panel — and a follow-on probe of a single

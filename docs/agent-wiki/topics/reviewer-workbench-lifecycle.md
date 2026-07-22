@@ -265,7 +265,7 @@ number/title/institution/PI) uses whatever `proposals[0]` already carries
 DTO has no dedicated `piName` field, so `proposalAuthors` (project
 leader/applicant) stands in as the best-available PI identity.
 
-**Phase 4 BUILT (2026-07-03) — pending schema provisioning + prompt seed + first-submission verification:**
+**Phase 4 BUILT (2026-07-03) — pending prompt seed + first-submission verification:**
 Executor-based AI synthesis of a proposal's submitted reviews. New Tier-1
 prompt `review-synthesis.generate` (`shared/config/prompts/review-synthesis.js`,
 create-only seed `scripts/seed-review-synthesis-prompt.js` — NOT yet run
@@ -287,8 +287,8 @@ always-overwrite, regeneration gating is enforced at THIS route instead — 409
 review is submitted) with a Generate/Regenerate action, plain-text only (no
 `dangerouslySetInnerHTML`); `composeReviewReport` accepts an optional
 `synthesis` param rendered additively in both export formats. Same
-verification boundary as Phases 2-3: unit-tested only until the schema wave +
-prompt seed are applied to an environment and a real review is synthesized.
+verification boundary as Phases 2-3: unit-tested only until the prompt seed is
+applied to an environment and a real review is synthesized.
 Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 ## Email templates (admin org default + per-PD override)

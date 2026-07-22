@@ -2,8 +2,8 @@
 title: Reviewer Finder Origination Plan
 domain: reviewer-identity
 kind: plan
-status: active
-summary: Supersedes: docs/archive/REVIEWER_FINDER_ORIGINATION_EVIDENCE_2026-06-12.md section 6.
+status: historical
+summary: "Completed S246 origination experiment; retained as historical decision evidence."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,6 +15,12 @@ related:
 ---
 
 # Reviewer Finder Origination Plan
+
+> **Completed outcome:** The S246 experiment selected Claude-assisted discovery as the
+> practical primary path. This is retained as the historical experiment/decision record.
+>
+> **Current routing:** Use [Reviewer Origination](agent-wiki/topics/reviewer-origination.md)
+> for current policy; the sparse-tail design remains in [Sparse Proposal Anchor Strategy](REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md).
 
 Date: 2026-06-12
 

@@ -2,8 +2,8 @@
 title: "WMKF Grant Intake Portal — Design Document"
 domain: intake-portal
 kind: spec
-status: active
-summary: "1. Long-term target: full GOapply replacement across all funding lines, on a 12-18 month horizon."
+status: historical
+summary: "Historical design for the cancelled June 2026 Phase II intake pilot. The product build is parked; use the intake wiki and Atlas for current state."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -16,7 +16,13 @@ related:
 
 # WMKF Grant Intake Portal — Design Document
 
-**Status:** ⚠️ **SUPERSEDED PLAN — retained as design reference.** This document describes the cancelled **June 2026 Phase II Research intake pilot**. The live direction is a **single Phase I intake for the next cycle** (one applicant submission entered as Phase I; "Phase II" is an internal status flip with no separate submission) — see `docs/SYSTEM_MODEL.md` and `docs/INTAKE_PORTAL_DRAIN_PLAN.md` for current state. The detailed design below has NOT been rewritten to the new model; treat it as a record of the earlier pilot pending the next-cycle form redesign. The budget-form scoping in `docs/BUDGET_FORM_SPEC.md` carries forward. Foundation pieces remain valid: **Entra External ID foundation SHIPPED S129** (tenant provisioned, `entra-external` NextAuth provider, `/apply` route round-trip verified). Sarah is back from conference travel. Remaining work is iterative pilot build: form field inventory with Sarah, structured-tables persistence pattern (defer or implement), `wmkf_portalmembership` entity creation under delegated authority (`project_dataverse_creator_privileges`, summary-after model), virus scanning wiring, PA trigger confirmation. See "Open questions / open work" for full list.
+**Status:** ⚠️ **HISTORICAL / SUPERSEDED — do not execute as an active plan.** This document describes
+the cancelled June 2026 Phase II Research intake pilot. On 2026-07-08 the owner parked the intake
+product build while WMKF evaluates Connor's GOApply re-engineering. Some foundation infrastructure
+(Entra External ID, draft/attachment/submit services, schema work) exists and remains live, but that
+does not make the product plan active. For current status use
+`docs/agent-wiki/topics/intake-portal.md`, `.claude-memory/project-intake-portal-parked.md`, the Atlas,
+and source. The body below is retained for design history and must not be read as a delivery queue.
 
 **Related:**
 - `docs/EXTERNAL_REVIEWER_INTAKE_PLAN.md` — reference implementation pattern for token-authenticated public surface
@@ -640,7 +646,7 @@ This list lives here, not in `scripts/`, because passing the smokes is necessary
 
 ---
 
-## Immediate next steps (in order, refreshed 2026-05-12)
+## Historical next steps (superseded; do not execute without a new owner decision)
 
 1. ~~**Wait for IT response on Entra tenant.**~~ Done — foundation shipped S129. `/apply` route auth round-trip verified.
 2. **Sarah session** — Phase II Research field inventory; structured-vs-narrative tradeoffs per field; UI must-haves. (Sarah is back from conference travel.)
@@ -648,4 +654,5 @@ This list lives here, not in `scripts/`, because passing the smokes is necessary
 4. **Schema work** — under existing delegated authority, create `wmkf_portalmembership` + `contact.wmkf_portal_oid` + `akoya_request.wmkf_phaseiisubmittedat` / `wmkf_phaseiisubmittedby` + form fields. Catalog in `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`.
 5. **Form module + `/apply` dashboard build-out** — first form (`phase-ii-research-2026-06`) iteratively. Aim for end-to-end click-through (auth → dashboard → form → submit → land in Dynamics) before polishing any single screen.
 
-Hard target: pilot accepting submissions by **2026-06-01** for the mid-June Phase II Research cycle. The external (IT) blocker is resolved; remaining slip risk is the Sarah field inventory + Connor sync timing.
+The former target was **2026-06-01** for a mid-June 2026 pilot. That date and pilot were cancelled;
+there is no current launch target.

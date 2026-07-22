@@ -19,8 +19,8 @@ related:
 **Execution status: STAGES 0-2 COMPLETE (2026-07-05).** The docs-catalog frontmatter `status` enum
 has no "completed" value; per the `CHUNK_CONSOLIDATION_PLAN` / `ODATA_ESCAPE_CONSOLIDATION_PLAN`
 precedent this body line records completion and frontmatter moved from `draft` to the live enum
-value `active`. Stage 3 (the 4 code-tree security-gate walks) remains an OWNER DECISION and was not
-built; 1b-15 remains EXCLUDED/LEAVE. See the Stage Log for probes/counts and the execution entry.
+value `active`. Stage 3 (the 4 code-tree security-gate walks) was declined by owner decision (S332)
+and remains unbuilt; 1b-15 remains EXCLUDED/LEAVE. See the Stage Log for probes/counts and the execution entry.
 
 **Objective.** The CI gate scripts under `scripts/` (`check-*.js` and their `*-self-test.js`) duplicate
 two mechanical scaffolds:

@@ -2,13 +2,19 @@
 title: Reviewer "Remove entirely" (permanent) — build plan
 domain: reviewers
 kind: plan
-status: active
-summary: PD self-service permanent removal of an early-stage reviewer engagement, atomic Dataverse changeset + pre-delete audit, cascading to honorarium + review_drafts.
+status: historical
+summary: "Shipped permanent reviewer-removal behavior; retained as historical implementation record."
 owner: reviewers
 created: 2026-07-07
 ---
 
 # Reviewer "Remove entirely" (permanent) — build plan
+
+> **Completed outcome:** The remove-entirely behavior shipped in S343. This document is
+> retained as the historical implementation record.
+>
+> **Current routing:** Use [Reviewer Workbench & Lifecycle](agent-wiki/topics/reviewer-workbench-lifecycle.md)
+> for current roster and history controls.
 
 **Status: IMPLEMENTED (S343).** No-block, audit-centric model per owner decisions. See `lib/services/reviewer-finder/remove-candidate-service.js` [NOT-READ: lib/services/reviewer-finder/remove-candidate-service.js — read in full this session; hook transcript-detection false negative], `shared/components/reviewers/RemoveEntirelyModal.js`, and the extended `DELETE`/`GET` verbs on `pages/api/reviewer-finder/my-candidates.js`.
 

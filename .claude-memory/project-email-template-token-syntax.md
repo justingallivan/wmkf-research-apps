@@ -6,9 +6,15 @@ metadata:
   type: project
   status: active
   scope: dataverse
-  last_verified: 2026-07-01 (S311) — migration executed, verified 0 brackets remain
+  last_verified: 2026-07-22 via live resolver source; dual-syntax aliases remain
   originSessionId: b4f727da-b275-4ffe-a50a-250fc68727a9
 ---
+
+## Recall Rule
+
+Read before changing admin-editable email tokens or removing bracket aliases.
+Use mustache for new templates; preserve dual-syntax resolution until the
+separate cleanup decision is made.
 
 **DONE 2026-07-01 (S311).** Every admin-editable email template now uses mustache
 `{{token}}`. Two token engines existed historically, split by pipeline:

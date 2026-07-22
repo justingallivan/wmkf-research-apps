@@ -2,8 +2,8 @@
 title: "Reviewer Identity Resolution — redesign plan"
 domain: reviewer-identity
 kind: plan
-status: active
-summary: "Status: Design proposal as originally authored by Codex (S213, 2026-06-02) — now shipped; see the supersession banner above. Written at the user's..."
+status: historical
+summary: "Shipped reviewer identity-resolution redesign; retained as historical design rationale."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,6 +15,12 @@ related:
 ---
 
 # Reviewer Identity Resolution — redesign plan
+
+> **Completed outcome:** Both documented identity-resolution phases shipped and the
+> Scholar path was retired. This document is retained as the historical plan.
+>
+> **Current routing:** Use [Reviewer Identity](agent-wiki/topics/reviewer-identity.md)
+> for the live resolver contract and tier posture.
 
 > **⚠ SUPERSEDED — status banner (S253, 2026-06-13): the "no code yet" framing below is HISTORICAL.** Both recommended phases have since shipped: Phase 1 (Scholar displayed-name guard + do-not-persist-metrics-without-an-identity-confidence-status) and the Phase 2 shared identity resolver — see `docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md` (PR1 S214 + S215 extension SHIPPED) and live `lib/services/reviewer-identity-resolver.js` (the `mayPersistIdentity` gate is enforced at `pages/api/reviewer-finder/save-candidates.js`). The Scholar enrichment path this doc critiques was itself retired in the S251 OpenAlex migration (`_attachScholarMetrics`→`_attachOpenAlexMetrics`). The live enforcement contract is owned by `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`. Read below as the original problem analysis + design rationale, not as open work.
 

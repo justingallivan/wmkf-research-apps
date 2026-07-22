@@ -3,228 +3,102 @@ title: Reviewer Finder Documentation
 domain: reviewer-identity
 kind: source-of-truth
 status: canonical
-summary: The Reviewer Finder is the flagship application for finding and contacting expert reviewers for grant proposals.
+summary: Current reviewer discovery, identity/contact enrichment, persistence, and Workbench invitation workflow.
 canonical: true
-cataloged: 2026-07-02
+cataloged: 2026-07-22
 owner: product-engineering
 related:
   - docs/REVIEWER_FINDER_D26_PIPELINE_FLOWCHART.md
   - docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md
-  - shared/config/reviewerFinderPreferences.js
-  - docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md
+  - docs/REVIEWER_DATA_MODEL.md
+  - shared/components/reviewers/ReviewerInvitePanel.js
+  - shared/components/reviewers/InviteEmailModal.js
 ---
 
-# Reviewer Finder Documentation
+# Reviewer Finder
 
-The Reviewer Finder is the flagship application for finding and contacting expert reviewers for grant proposals.
+The Reviewer Finder is the discovery and evidence pipeline behind the Request Workbench reviewer
+workflow. It proposes candidates, grounds their identity and expertise, resolves contact evidence,
+and saves the selected people and per-request engagements to Dataverse. Staff invite saved candidates
+from the Workbench; the current UI does not ask staff to download or forward `.eml` files.
 
-## Overview
+## Current flow
 
-Complete pipeline for finding and contacting expert reviewers:
+1. **Analyze proposal** — extract proposal metadata and produce a set of named reviewer suggestions.
+2. **Verify identity and expertise** — ground suggested names with OpenAlex, ORCID, PubMed, and
+   related publication evidence. The former Track-B literature lane that originated additional
+   people is archived off (`DiscoveryService.TRACK_B_ENABLED=false`).
+3. **Resolve contact evidence** — run the tiered resolver, including identity-anchored PubMed and
+   Europe PMC evidence, first-party institution-page parsing, and bounded paid web search. Email
+   readiness is evidence-based and fails closed when identity or ownership is ambiguous.
+4. **Save to Dataverse** — upsert the global person in `wmkf_potentialreviewer` and the per-request
+   engagement in `wmkf_appreviewersuggestion`. Bibliometrics live on the person; there is no
+   `wmkf_appresearcher` sidecar.
+5. **Invite in the Workbench** — `ReviewerInvitePanel` opens `InviteEmailModal`. The modal calls
+   `/api/review-manager/render-emails` to mint secure links and render editable drafts, then calls
+   `/api/review-manager/send-emails` to send through Dynamics/Microsoft 365 and advance lifecycle
+   state. Candidates without a sendable email remain blocked.
+6. **Track response and review** — accepted reviewers move through the external portal, materials,
+   review intake, and Workbench closeout lifecycle.
 
-1. **Claude Analysis** - Extract proposal metadata (title, abstract, PI, institution) and suggest reviewers
-2. **Database Verification (Track A)** - Claude's suggested names are verified/grounded against PubMed / OpenAlex / ORCID. _The Track-B lane that **discovered NEW candidates** from PubMed/ArXiv/BioRxiv/ChemRxiv searches is **ARCHIVED OFF** (S248, `DiscoveryService.TRACK_B_ENABLED=false`; dormant code) — see `docs/REVIEWER_FINDER_D26_PIPELINE_FLOWCHART.md` + agent-wiki reviewer-origination._
-3. **Contact Enrichment** - Tiered lookup for email addresses and faculty pages, including identity-anchored NCBI PubMed + Europe PMC publication evidence before paid web search
-4. **Email Generation** - Create .eml invitation files with optional AI personalization
+## Candidate evidence shown to staff
 
-## Key Features
+- Identity and affiliation confidence, including ambiguity/research-only explanations.
+- Expertise/relevance evidence and bibliometrics from grounded sources.
+- Email source, confidence/readiness, and first-party ownership evidence where available.
+- Faculty/official page, ORCID, Scholar search, and recent-publication links when present.
+- Applicant-recommended and staff-manual provenance, kept separate from machine-discovered origin.
 
-- Institution/expertise mismatch warnings
-- Google Scholar **search** links for all candidates (name+institution pre-filled; exact `user=ID` profile deep-links were dropped in the S251 OpenAlex migration, `googleScholarId=null` — bibliometrics now source from OpenAlex, see `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md`)
-- PI/author self-suggestion prevention
-- Claude retry logic with Haiku fallback on rate limits
-- Temperature control (0.3-1.0) and configurable reviewer count
-- Save candidates to database with edit capability
-- Multi-select operations (save, delete, email)
+The candidate card is an explanation surface, not the final authorization boundary. Server routes
+recompute invitation readiness from persisted evidence before rendering or sending.
 
----
+## Data ownership
 
-## Email Generation Workflow
+| Concern | Current owner |
+|---|---|
+| Person identity, email, affiliation, bibliometrics | `wmkf_potentialreviewer` |
+| Per-request selection, invite/response/review lifecycle | `wmkf_appreviewersuggestion` |
+| Canonical CRM contact after promotion | `contact` |
+| Search-session roster and history | Postgres `reviewer_find_roster` |
+| Invitation templates and campaign configuration | Dataverse settings/cycle records consumed by `render-emails` and `send-emails` |
 
-### Setup (Before First Grant Cycle)
+See `docs/REVIEWER_DATA_MODEL.md` and the entity Atlas pages for field-level ownership.
 
-1. **Click the gear icon** next to the tab navigation to open Settings
-2. **Configure Grant Cycle settings:**
-   - Program Name (e.g., "W. M. Keck Foundation")
-   - Review Deadline
-   - Summary Pages - which page(s) to extract from proposals (default: "2")
-   - Custom date fields (Proposal Due Date, Send Date, Commit Date, Honorarium)
-3. **Upload Review Template** in Attachments section (PDF or Word document)
-4. **Configure Sender Info:**
-   - Your Name
-   - Your Email
-   - Signature block
-5. **Customize Email Template** (optional - default is Keck Foundation format)
+## Invitation templates and timing
 
-### Email Generation Process
+The Workbench invitation modal loads the current invitation template, lets staff edit each rendered
+draft, substitutes campaign timing fields, and previews the secure reviewer link before sending.
+The server injects the honorarium amount and other authoritative values and rejects unresolved
+placeholders or a missing secure-link contract. Invitation state is stamped only by the send path.
 
-1. **Upload Proposal** - Summary page(s) are automatically extracted based on settings
-2. **Find Reviewers** - Run discovery to find candidates
-3. **Enrich Contacts** - Get email addresses for selected candidates
-4. **Save Candidates** - Store to My Candidates with summary attachment link
-5. **Generate Emails:**
-   - Select candidates in My Candidates tab
-   - Click "Email Selected"
-   - Review options (Claude personalization available)
-   - Click Generate → Download .eml files
-   - Open in email client and send
+Default template management lives in the Workbench email-template surface. Per-send dates can be
+adjusted in `InviteEmailModal`; server-side campaign and signature resolution remain authoritative.
 
-### Re-extracting Summaries
+## Legacy email-generation route
 
-If you need to change which pages are extracted:
-1. Update "Summary Pages" in Settings → Grant Cycle
-2. Go to My Candidates tab
-3. Click "Re-extract" or "Extract Summary" button on the proposal card
-4. Upload the proposal PDF again
-5. New summary will be extracted using updated settings
+`POST /api/reviewer-finder/generate-emails` and its service remain in the repository for compatibility
+and have auth/isolation coverage. They are **retained legacy code, not the primary UI workflow**.
+Do not describe `.eml` download/forward behavior as the current reviewer-invitation process, and do
+not remove the route without first verifying external callers and migration obligations.
 
----
+## Key implementation surfaces
 
-## Template Placeholders
+- `shared/components/reviewers/ReviewersTab.js` — Workbench reviewer surface.
+- `shared/components/reviewers/ReviewerInvitePanel.js` — saved-candidate invitation list and gates.
+- `shared/components/reviewers/InviteEmailModal.js` — preview/edit/send orchestration.
+- `pages/api/review-manager/render-emails.js` and
+  `lib/services/review-manager/render-emails-service.js` — authoritative draft rendering and token
+  minting.
+- `pages/api/review-manager/send-emails.js` and
+  `lib/services/review-manager/send-emails-service.js` — Dynamics/M365 delivery and lifecycle writes.
+- `lib/services/contact-enrichment-service.js` — tier orchestration for contact resolution.
+- `lib/utils/reviewer-invite.js` — invitation-readiness trust policy.
 
-Available placeholders for email templates:
+## Current limitations and deliberate boundaries
 
-| Placeholder | Description |
-|-------------|-------------|
-| `{{greeting}}` | "Dear Dr. LastName" |
-| `{{recipientName}}` | Full name without honorific |
-| `{{recipientFirstName}}` | First name |
-| `{{recipientLastName}}` | Last name |
-| `{{salutation}}` | "Dr." or detected honorific |
-| `{{recipientAffiliation}}` | Institution |
-| `{{proposalTitle}}` | Proposal title |
-| `{{piName}}` | Principal Investigator name |
-| `{{piInstitution}}` | PI institution |
-| `{{coInvestigators}}` | Co-PI names (comma-separated) |
-| `{{coInvestigatorCount}}` | Number of Co-PIs |
-| `{{investigatorTeam}}` | Formatted PI + Co-PIs (e.g., "the PI Dr. Smith and 2 co-investigators...") |
-| `{{investigatorVerb}}` | "was" (singular PI) or "were" (PI + Co-PIs) for verb agreement |
-| `{{programName}}` | From Grant Cycle settings |
-| `{{reviewDeadline}}` | Formatted deadline date |
-| `{{signature}}` | Sender signature block |
-| `{{customField:fieldName}}` | Custom field from Grant Cycle |
-
----
-
-## Email Attachments
-
-Each generated email can include:
-- **Review Template** - Uploaded via Settings → Attachments
-- **Project Summary** - Auto-extracted from proposal during analysis
-- **Additional Attachments** - Optional files uploaded via Settings → Attachments
-
-Attachments are encoded in MIME multipart/mixed format, compatible with all major email clients.
-
----
-
-## Email Workflow Note
-
-Generated .eml files open as "received" messages in email clients. To send:
-1. Open the .eml file
-2. **Forward** to the recipient and remove "Fwd:" from the subject line, OR
-3. Copy the email content into a new message
-
-This is a limitation of the .eml format - it's designed for message import/export, not drafts.
-
----
-
-## Settings Storage
-
-Reviewer Finder settings are stored per-profile in Dataverse (`wmkf_appuserpreferences`, via the `database-service.js` dispatcher) when a profile is selected, with localStorage fallback when no profile is active. (The Postgres `user_preferences` table was retired 2026-05-12 — see Behavior below.)
-
-**Settings stored per-profile:**
-
-| Setting | Preference Key | Description |
-|---------|---------------|-------------|
-| Sender Info | `reviewer_finder_sender_info` | Name, email, signature |
-| Grant Cycle Settings | `reviewer_finder_grant_cycle_settings` | Program name, deadline, attachments, summary pages |
-| Email Template | `reviewer_finder_email_template` | Custom email subject and body |
-| Current Cycle ID | `reviewer_finder_current_cycle_id` | Active grant cycle selection |
-
-**Behavior:**
-- When a user profile is active, settings are saved to Dataverse `wmkf_appuserpreferences` (via the `database-service.js` dispatcher; Wave 1 retired the Postgres `user_preferences` table 2026-05-12)
-- When no profile is active, settings fall back to localStorage (base64 encoded)
-- On first profile selection, localStorage data auto-migrates to profile preferences
-- Profile switching loads that profile's saved settings
-
-**Key Files:**
-- `shared/config/reviewerFinderPreferences.js` - Preference key constants
-- `shared/components/SettingsModal.js` - Main settings UI with dual storage
-- `shared/components/EmailTemplateEditor.js` - Template editor with dual storage
-- `shared/components/EmailGeneratorModal.js` - Loads settings from profile/localStorage
-
----
-
-## ~~Database Tab~~ (RETIRED 2026-05-12, W6 step 1)
-
-The Database tab and its Postgres-backed researcher CRUD (`pages/api/reviewer-finder/researchers.js` + the `researchers` / `researcher_keywords` Postgres tables) were retired in W6 of the Postgres→Dataverse migration. The UI is now a two-tab interface (Find Reviewers + My Candidates); saved-candidate state lives in Dataverse `wmkf_potentialreviewer` (person + bibliometrics, S213) / `wmkf_appreviewersuggestion`. An `add-candidate-manual` endpoint that replaces the in-place Add Researcher flow is spec'd as post-pilot work — see `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`.
-
----
-
-## Future: Direct Email Sending
-
-When this app is integrated with a CRM or email service, consider implementing direct email sending:
-
-**Email Service Options:**
-- SendGrid, AWS SES, Mailgun, Postmark
-
-**CRM Integration:**
-- Salesforce, HubSpot, or custom CRM APIs
-
-**Benefits:**
-- Skip the .eml workflow
-- Send directly from the app with tracking
-
-**Requirements:**
-- SMTP credentials or API keys
-- Sender verification
-- Bounce handling
-
-**Privacy:**
-- Consider data handling implications when sending through third-party services
-
----
-
-## Future: Microsoft Dynamics 365 Integration
-
-The organization uses Microsoft Dynamics, making **Dynamics 365 Customer Insights - Journeys** the preferred future integration for email sending and tracking.
-
-### How Dynamics Email Tracking Works
-
-- Embeds a unique, transparent 1x1 tracking pixel in each email
-- When recipient opens and loads images, the open is registered
-- Tracks: opens, clicks, forwards, bounces, spam reports, unsubscribes
-
-### Available Metrics from Dynamics
-
-| Metric | Description |
-|--------|-------------|
-| Delivery rate | Successfully delivered vs. bounced |
-| Open rate | Recipients who opened the email |
-| Click rate | Recipients who clicked links |
-| Click-to-open rate | Clicks relative to opens |
-| Spam reports | Marked as spam count |
-| Unsubscribes | Opt-out count |
-
-### Integration Architecture
-
-1. **Send emails via Dynamics** instead of generating .eml files
-2. **Webhook endpoint** - Dynamics POSTs open/click events to this app
-3. **Update tracking fields** - Populate `email_opened_at`, `response_type`, etc. automatically
-4. **Dataverse API** - Query email interaction data programmatically
-
-### Database Field Ready
-
-Tracking-field equivalents (`wmkf_emailopenedat`, `wmkf_responsetype`, etc.) live on Dataverse `wmkf_appreviewersuggestion`, available for future webhook population. The legacy Postgres `reviewer_suggestions.email_opened_at` field is drain-only post-W3-W6.
-
-### Limitations to Consider
-
-- Apple Mail Privacy Protection (iOS 15+) auto-loads images, inflating open rates
-- Privacy blockers increasingly prevent tracking pixels
-- Data retention: 12 months for insights views, 2 years for Dataverse entities
-
-### Resources
-
-- [Email insights - Dynamics 365 Customer Insights](https://learn.microsoft.com/en-us/dynamics365/customer-insights/journeys/email-insights)
-- [Use webhooks in Dynamics 365](https://learn.microsoft.com/en-us/dynamics365/customerengagement/on-premises/developer/use-webhooks)
-- [Dataverse API reference](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/webapi/overview)
+- Google Scholar links are searches unless an exact profile is independently known; OpenAlex owns
+  bibliometrics.
+- Ambiguous identities and ungrounded/search-only email leads are not automatically sendable.
+- Search history can be retained, labeled, or removed independently of selected Dataverse rows.
+- Reviewer Pool remains a planned request-agnostic surface; current staff work is request-scoped in
+  the Workbench.

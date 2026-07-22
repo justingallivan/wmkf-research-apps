@@ -2,8 +2,8 @@
 title: Prompt Caching Plan
 domain: prompt-executor
 kind: draft
-status: draft
-summary: "Created: 2026-04-17 (Session 103) Last updated: 2026-04-22 (Session 106) — audit via count_tokens across all apps confirmed the 2048 floor Status:..."
+status: historical
+summary: "Historical April 2026 prompt-caching experiments and early plan. Superseded for current remediation status by PROMPT_CACHING_AUDIT.md."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -18,11 +18,21 @@ related:
 
 **Created:** 2026-04-17 (Session 103)
 **Last updated:** 2026-04-22 (Session 106) — audit via `count_tokens` across all apps confirmed the 2048 floor
-**Status:** Partial — Dynamics Explorer fixed; other work queued
+**Status:** Historical early plan. Preserve the experiments and decisions below as their
+April 2026 record; use `docs/PROMPT_CACHING_AUDIT.md` for the July 2026 census, merged
+remediation status, and remaining work.
+
+> **Historical threshold notice:** the 2,048-token Sonnet 4.6 findings below record this
+> plan's April 2026 measurements; they are not current model guidance. Check the concrete
+> model against [Anthropic's prompt-caching documentation](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
+> before acting on a threshold.
 
 ## Context
 
-Anthropic's prompt cache stores a prefix of an API request on their servers with a 5-minute TTL (or 1 hour at 2x write cost). Writes cost 1.25x base input; reads cost 0.1x base input. Break-even is ~2 reads within the TTL. Minimum cacheable prefix: 1024 tokens (Sonnet/Opus), 2048 tokens (Haiku).
+At the time of this April plan, the working summary was a 1,024-token minimum for
+Sonnet/Opus and 2,048 for Haiku. Those generic family-level figures are historical;
+current minimums are model-specific and must be checked through the official guidance
+linked above.
 
 Caching is activated by placing `cache_control: { type: 'ephemeral' }` on a content block. Everything *before* that block in the order `tools → system → messages` is cached together.
 
@@ -152,8 +162,12 @@ logUsage({
 ## Non-obvious gotchas
 
 1. **Cache TTL resets on read.** Each cache hit extends the TTL by 5 min (standard) or 1 hour (extended). Long agentic sessions keep the cache warm indefinitely.
-2. **Sonnet 4.6 cache minimum is exactly 2,048 tokens.** Anthropic's docs list 1024 for Sonnet/Opus, and Sonnet 4.5 honored that (1,421-token system block caches fine). Sonnet 4.6 doubled the floor to 2,048 without public documentation. Confirmed by bisection on 2026-04-22: 2,019 tokens → no cache write; 2,058 tokens → cache writes; 2,110+ tokens → cache writes. Dead zone is 1,024–2,047 tokens. Beta header `prompt-caching-2024-07-31` does not help. The `cache_control` marker is accepted in the request but silently dropped by the billing side. **Treat 2,048 as the working floor for all current models.**
-3. **Haiku requires 2048-token minimum** (per docs, and consistent with the empirical Sonnet observation above).
+2. **Historical April 2026 working assumption: Sonnet 4.6's floor was 2,048 tokens.** The
+   bisection then observed no write at 2,019 tokens and writes at 2,058+; the plan therefore
+   treated 2,048 as a working floor. That assumption is **not current guidance**. Check the
+   concrete model against [Anthropic's prompt-caching documentation](https://platform.claude.com/docs/en/build-with-claude/prompt-caching).
+3. **Historical plan assumption about Haiku:** the earlier 2,048-token statement is not current
+   guidance; the concrete model's official floor controls.
 4. **Order matters.** `tools → system → messages`. A `cache_control` marker on `system` caches tools + system together (good). A marker on a content block inside `messages` caches everything before it, including tools + system.
 5. **Up to 4 cache breakpoints per request.** Useful for incremental caching in growing conversations (mark the last assistant turn on each round so the growing history stays cached).
 6. **Marker placement doesn't change behavior** — it's purely a billing hint. Anthropic silently ignores it if the prefix is too short or cache is disabled.

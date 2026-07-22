@@ -2,8 +2,8 @@
 title: "Security Architecture & Data Flow Report"
 domain: security-auth
 kind: spec
-status: active
-summary: "Prepared for: IT Security Review Application: Document Processing Multi-App System Date: March 2026 (last significant update); status banner..."
+status: historical
+summary: "Historical March 2026 IT security-review snapshot. Use the authentication, route-security, credentials, and operating docs for current posture."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,6 +15,14 @@ related:
 ---
 
 # Security Architecture & Data Flow Report
+
+> **HISTORICAL SNAPSHOT — not current authority (2026-07-22).** This report is retained as the
+> March 2026 IT-review artifact. Its app inventory, framework version, route/table counts, storage
+> descriptions, and several control narratives have drifted as the system evolved. For current
+> authentication use `docs/AUTHENTICATION_SETUP.md`; for route guards use
+> `docs/API_ROUTE_SECURITY_MATRIX.md`; for secrets use `docs/CREDENTIALS_RUNBOOK.md`; for the active
+> security program use `docs/SECURITY_OPERATING_PLAN.md`; for data ownership use the Atlas. Verify
+> operational claims against source and those authorities rather than refreshing isolated facts here.
 
 **Prepared for:** IT Security Review
 **Application:** Document Processing Multi-App System
@@ -1385,4 +1393,5 @@ openssl rand -hex 32
 
 ---
 
-*Report generated from comprehensive codebase audit. All findings verified against source code as of March 2026.*
+*Historical report generated from a March 2026 codebase audit. It is not a statement of current
+runtime posture; use the authority pointers at the top of this document.*

@@ -3,7 +3,7 @@ title: ContactEnrichmentService Decomposition Plan
 domain: architecture
 kind: plan
 status: active
-summary: "DONE (S337): ContactEnrichmentService (1,776 L) split into lib/services/contact-enrichment/*.js behind a facade. All 10 stages executed; some reviews pending."
+summary: "DONE (S337): split ContactEnrichmentService into 13 modules behind a 549-L facade; all 10 stages executed, with some reviews pending."
 canonical: true
 owner: product-engineering
 related:
@@ -19,7 +19,9 @@ related:
 (Stages 1, 2, 4, 7) + Checkpoint A2 (Stage 6) + Checkpoint B (Stages 3, 5) + Stage 8 (Checkpoint C) +
 Stage 9/10 (Checkpoint D) all EXECUTED.** The dedicated Codex reviews for Checkpoints A2, B, C, and D
 are still pending (batched-review cadence — see "Execution cadence" below; each checkpoint's own
-characterization suite + gates are green independent of that review). This applies the exact
+characterization suite + gates are green independent of that review). At Stage-10 completion the
+facade was 529 L; subsequent reviewer work brought it to 549 L and the directory to 13 modules at the
+2026-07-22 audit. This applies the exact
 cadence proven on the DiscoveryService decomposition (S335, `docs/DISCOVERY_SERVICE_DECOMPOSITION_PLAN.md`):
 strategy chosen up front (facade + extracted modules), then leaf-first staged extraction, each cluster
 characterization-covered (baselined green pre-extraction, mutation-proven) BEFORE the code moves, each
@@ -416,7 +418,7 @@ modules first so the facade delegates incrementally and the DAG never breaks. Th
   Dedicated Checkpoint D Codex review still pending.
 - **Stage 10 — facade finalize / dead-import cleanup. ✅ EXECUTED (S337, `e4fe8ec9`).** Dropped the
   facade's now-dead `ContactParser`/`ORCIDService`/`SerpContactService`/`reviewer-identity-resolver`
-  imports (moved into `tiers.js` in Stage 9). Facade is now the `enrichCandidate` shell +
+  imports (moved into `tiers.js` in Stage 9). At Stage-10 completion, the facade was the `enrichCandidate` shell +
   `enrichCandidates` + delegating wrappers + `COSTS` re-export, **529 lines** — over the plan's ~350 L
   forward estimate; the gap is the ~55-line result-object literal in `enrichCandidate` plus JSDoc, not
   unextracted method bodies (verified: no tier/finalize logic remains on the facade past the delegating

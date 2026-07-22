@@ -9,9 +9,9 @@ cataloged: 2026-07-02
 owner: product-engineering
 related:
   - docs/REVIEWER_INTERACTION_DESIGN.md
-  - docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md
-  - docs/archive/APPRESEARCHER_COLLAPSE_PLAN.md
   - docs/atlas/dataverse-wmkf-appreviewersuggestion.md
+  - docs/atlas/dataverse-wmkf-potentialreviewers.md
+  - docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md
 ---
 
 # Reviewer Data Model
@@ -49,19 +49,18 @@ Visual orientation for the reviewer-domain Dataverse entities and how they conne
 | `contact` | The **CRM contact**. Where canonical identity ultimately lives. | Promoted from `wmkf_potentialreviewer` on first staff outreach. | (vendor table — many) |
 | `wmkf_appreviewersuggestion` | The **per-(reviewer, request) engagement**. Lifecycle ledger — every state, timestamp, decline reason, policy ack, review content lives here. | Reviewer Finder save-candidates creates one per (person, request). | 710 |
 | `akoya_request` (grant) | The **proposal being reviewed**. | Created when WMKF intakes a grant request. | 25,473+ |
-| `akoya_request` (honorarium) | The **payment to the reviewer**. Same entity class as the grant, distinct row-purpose. | Created at reviewer accept time by the portal (BILL chunk 4). | (subset of the same 25,473) |
+| `akoya_request` (honorarium) | The **honorarium request for the reviewer**. Same entity class as the grant, distinct row-purpose. | Created at reviewer accept time by the portal when honorarium creation is enabled; BILL onboarding remains deferred. | (subset of the same 25,473) |
 | `wmkf_policy` / `wmkf_policyversion` | Versioned policy text (COI, AI use). | Staff edits in admin UI. | 2 / 8 |
 
 ---
 
 ## View 1 — Reviewer-domain only
 
-### The minimum picture: who the reviewer is, the engagement, the bibliometric sidecar, policy acks. No grant, no honorarium.
+### The minimum picture: who the reviewer is, the engagement, and policy acknowledgments. No grant, no honorarium.
 
 ```mermaid
 erDiagram
     POTENTIALREVIEWER ||--o| CONTACT : "promoted via wmkf_contact lookup (on first outreach)"
-    POTENTIALREVIEWER ||--|| APPRESEARCHER : "1:1 sidecar (bibliometrics)"
     POTENTIALREVIEWER ||--o{ APPREVIEWERSUGGESTION : "per engagement (one person, many requests over time)"
 
     APPREVIEWERSUGGESTION }o--o| POLICYVERSION_COI : "wmkf_coipolicyversion (which COI text reviewer saw)"
@@ -74,22 +73,18 @@ erDiagram
         string wmkf_emailaddress "dedup key"
         string wmkf_name
         string wmkf_organizationname
-        lookup wmkf_contact "→ contact, when promoted"
-    }
-    APPRESEARCHER {
-        guid wmkf_appresearcherid PK
-        lookup wmkf_potentialreviewer "→ POTENTIALREVIEWER (1:1)"
         string wmkf_orcid
         int    wmkf_hindex
         int    wmkf_totalcitations
         string wmkf_primaryaffiliation
+        lookup wmkf_contact "→ contact, when promoted"
     }
     CONTACT {
         guid contactid PK
         string firstname
         string lastname
         string emailaddress1
-        string wmkf_billcomid "set at BILL onboarding"
+        string wmkf_billcomid "dormant BILL vendor id, usually unset"
     }
     APPREVIEWERSUGGESTION {
         guid wmkf_appreviewersuggestionid PK
@@ -128,7 +123,6 @@ Adds the two `akoya_request` flavors (the grant being reviewed and the honorariu
 ```mermaid
 erDiagram
     POTENTIALREVIEWER ||--o| CONTACT : "promoted"
-    POTENTIALREVIEWER ||--|| APPRESEARCHER : "1:1 sidecar"
     POTENTIALREVIEWER ||--o{ APPREVIEWERSUGGESTION : "many engagements over time"
 
     GRANT_REQUEST ||--o{ APPREVIEWERSUGGESTION : "one grant has many reviewer engagements"
@@ -145,18 +139,14 @@ erDiagram
         guid wmkf_potentialreviewersid PK
         string wmkf_emailaddress
         string wmkf_name
-        lookup wmkf_contact "→ CONTACT (promotion)"
-    }
-    APPRESEARCHER {
-        guid wmkf_appresearcherid PK
-        lookup wmkf_potentialreviewer "1:1"
         string wmkf_orcid
         int wmkf_hindex
+        lookup wmkf_contact "→ CONTACT (promotion)"
     }
     CONTACT {
         guid contactid PK
         string emailaddress1
-        string wmkf_billcomid "BILL vendor id"
+        string wmkf_billcomid "dormant BILL vendor id"
         bool akoya_isvendor
     }
     APPREVIEWERSUGGESTION {
@@ -212,7 +202,7 @@ flowchart TD
 
     S1w --> S2A{"Stage 2a — Reviewer responds"}
     S2A -->|Accept| S2acc["WRITES on wmkf_appreviewersuggestion:<br/>• accepted=true, wmkf_responsereceivedat, wmkf_responsetype<br/>• engagement-scope contact corrections (wmkf_reviewerfirstname, lastname, email, ORCID, title)<br/>• wmkf_coiackedat + wmkf_coipolicyversion<br/>• wmkf_aiuseackedat + wmkf_aiusepolicyversion<br/>• wmkf_honorariumoptout"]
-    S2acc --> S2hon["Honorarium chain (BILL chunk 4):<br/>• akoya_request CREATED (honorarium row)<br/>• wmkf_appreviewersuggestion.wmkf_HonorariumRequest set (S196 link)<br/>• contact.wmkf_billcomid + akoya_isvendor if first onboarding<br/>• honorarium.wmkf_paymentnetworkidpni from BILL search<br/>• honorarium.wmkf_exisitngbillcomaccount = Yes/No"]
+    S2acc --> S2hon["Current no-BILL honorarium chain:<br/>• akoya_request CREATED (honorarium row)<br/>• wmkf_appreviewersuggestion.wmkf_HonorariumRequest set<br/>• honorarium links to reviewed proposal<br/>• mailing address/phone remain on contact<br/>• BILL onboarding returns deferred (no vendor/network call)"]
 
     S2A -->|Decline| S2dec["WRITES on wmkf_appreviewersuggestion:<br/>• declined=true, wmkf_responsetype<br/>• wmkf_declinereasonpicklist + wmkf_declinereason (free text)<br/>• wmkf_declinereferral (free text)"]
 
@@ -228,12 +218,8 @@ flowchart TD
     S5w --> S6["Stage 6 — PD closes out (Request Workbench, S196)"]
     S6 --> S6w["WRITES on wmkf_appreviewersuggestion:<br/>• wmkf_reviewstatus = complete<br/>• wmkf_completedat<br/><br/>Row drops off PD dashboard."]
 
-    S6w --> S7["Stage 7 — Steph authorizes payment (independent gate)"]
-    S7 --> S7w["WRITES on honorarium akoya_request:<br/>• wmkf_authorizationtoremitpaymentflag = true<br/>• akoya_folio = PAID (after BILL routes)"]
-
-    %% async BILL webhook
-    S2hon -.->|"hours/days async"| WH["Webhook: vendor.updated"]
-    WH --> WHw["PENDING 7b write on honorarium akoya_request:<br/>• wmkf_exisitngbillcomaccount = Recently Confirmed"]
+    S6w --> S7["Stage 7 — finance processes payment offline"]
+    S7 --> S7w["Honorarium request remains the CRM record;<br/>automated BILL vendor/network/webhook tail is dormant"]
 ```
 
 ---
@@ -253,8 +239,8 @@ flowchart TD
 | Honorarium amount | `akoya_request.akoya_request` (on the honorarium row) | Field name = entity name. Yes, confusing. |
 | Is payment authorized? | `akoya_request.wmkf_authorizationtoremitpaymentflag` (honorarium row) | Steph's manual final gate |
 | Has payment been sent? | `akoya_request.akoya_folio = 'PAID'` (honorarium row) | NOT `akoya_paymentsent` — empirically not a payment gate |
-| BILL vendor id for a reviewer | `contact.wmkf_billcomid` | Set at first BILL onboarding, reused next cycle |
-| BILL network state | `akoya_request.wmkf_exisitngbillcomaccount` (honorarium row, sic spelling) | Yes / No / Recently Confirmed |
+| BILL vendor id for a reviewer | `contact.wmkf_billcomid` | Retained dormant field; automated BILL onboarding is tabled |
+| BILL network state | `akoya_request.wmkf_exisitngbillcomaccount` (honorarium row, sic spelling) | Retained dormant field; not the current payment path |
 | Submitted review file | `wmkf_appreviewersuggestion.wmkf_reviewbloburl` + `.wmkf_reviewfilename` + `.wmkf_reviewsharepointfolder` | |
 | Reviewer's overall rating | `wmkf_appreviewersuggestion.wmkf_revieweroverallrating` (picklist) | Companions: `wmkf_reviewerimpact`, `wmkf_reviewerrisk` |
 | External access token (magic link) | `wmkf_appreviewersuggestion.wmkf_externaltokenhash` + `.wmkf_externaltokenissued` / `expires` / `revoked` | Stored as HMAC hash, never plaintext |
@@ -266,7 +252,7 @@ flowchart TD
 
 ## What changed
 
-**`wmkf_appresearcher` collapse — ✅ SHIPPED S213 (2026-06-02).** The bibliometric sidecar was structural redundancy (split off to keep h-index refreshes from churning the identity row, but with no historical-snapshot need and `wmkf_potentialreviewer` confirmed custom-not-vendor, the fields belonged on the person). It was collapsed: 17 bibliometric fields added to `wmkf_potentialreviewer`, all 339 sidecar rows backfilled onto their persons, `adapters/researcher.js` repointed to write the person, callers cut over, and `wmkf_appresearcher` + the two empty `wmkf_apppublication`/`wmkf_apppublicationauthor` tables **DROPPED**. Bibliometrics (affiliation/h-index/citations/ORCID/scholar/etc.) now live directly on `wmkf_potentialreviewer`. As-executed record: `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md` (the S196 `docs/archive/APPRESEARCHER_COLLAPSE_PLAN.md` is the original design). **The two ER diagrams above + the entity table predate the collapse — read the `APPRESEARCHER` entity there as folded into `POTENTIALREVIEWER`.**
+**`wmkf_appresearcher` collapse — ✅ SHIPPED S213 (2026-06-02).** The bibliometric sidecar was structural redundancy. Seventeen fields were added to `wmkf_potentialreviewer`, all sidecar rows were backfilled, `adapters/researcher.js` was repointed to the person, callers were cut over, and `wmkf_appresearcher` plus the two empty publication tables were dropped. The diagrams above show the resulting two-table reviewer core directly; the as-executed history remains in `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md`.
 
 ---
 
@@ -288,5 +274,5 @@ flowchart TD
 - `docs/atlas/dataverse-wmkf-policy-and-policy-version.md` — policy versioning
 - `docs/atlas/dataverse-akoya-request.md` — grant + honorarium row shape
 - `docs/REVIEWER_INTERACTION_DESIGN.md` — full reviewer-journey design
-- `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md` — honorarium creation + BILL onboarding
+- `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` — live no-BILL honorarium creation posture
 - `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` — running audit of schema-creation history

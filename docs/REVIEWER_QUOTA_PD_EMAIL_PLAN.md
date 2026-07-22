@@ -2,7 +2,7 @@
 title: "Reviewer Quota PD Email Plan"
 domain: reviewer-workbench
 kind: plan
-status: active
+status: historical
 summary: "SHIPPED S352 (2026-07-09): the reviewer quota threshold alert now emails the lead Program Director, and the quota target is settable/seeded end-to-end."
 owner: product-engineering
 related:
@@ -14,6 +14,12 @@ related:
 ---
 
 # Reviewer Quota PD Email Plan
+
+> **Completed outcome:** The quota/PD email change shipped in S352. This document is
+> retained as the historical implementation record.
+>
+> **Current routing:** Use [Reviewer Workbench & Lifecycle](agent-wiki/topics/reviewer-workbench-lifecycle.md)
+> for current reviewer engagement behavior.
 
 ## Status: SHIPPED (S352, 2026-07-09)
 

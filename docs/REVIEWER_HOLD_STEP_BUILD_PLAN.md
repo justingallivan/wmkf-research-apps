@@ -2,7 +2,7 @@
 title: "Reviewer \"Hold Step\" Build Plan"
 domain: reviewer-workbench
 kind: plan
-status: active
+status: historical
 summary: "## ⚠️ RETIRED (S279) — this plan describes a feature that has been REMOVED."
 canonical: false
 cataloged: 2026-07-02
@@ -15,6 +15,12 @@ related:
 ---
 
 # Reviewer "Hold Step" Build Plan
+
+> **Retired outcome:** The hold step was removed in S279 and is retained only for
+> historical context.
+>
+> **Current routing:** Use [Reviewer Engagement Spec](REVIEWER_ENGAGEMENT_SPEC.md)
+> and [Reviewer Workbench & Lifecycle](agent-wiki/topics/reviewer-workbench-lifecycle.md).
 
 > ## ⚠️ RETIRED (S279) — this plan describes a feature that has been REMOVED.
 > The hold/agree-in-principle step this plan designed never went live in practice

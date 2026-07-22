@@ -2,7 +2,7 @@
 title: "Postgres → Dataverse Migration Map"
 domain: dataverse
 kind: plan
-status: active
+status: historical
 summary: "Target: prod wmkf.crm.dynamics.com (the akoyaGO org). Sandbox used for Wave 1 staging; cutover to prod 2026-04-24, drop 2026-05-12."
 canonical: false
 cataloged: 2026-07-02
@@ -15,6 +15,8 @@ related:
 ---
 
 # Postgres → Dataverse Migration Map
+
+> **Current routing:** Historical Wave-1 migration record. Live data ownership is in the Atlas; reviewer migration work is tracked separately.
 
 **Created:** 2026-04-22 (Session 106)
 **Status:** **Wave 1 COMPLETE 2026-05-12** (Postgres tables dropped). Wave 2 in progress (per `REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`). This document remains as historical schema-design context; live state lives in the Atlas.

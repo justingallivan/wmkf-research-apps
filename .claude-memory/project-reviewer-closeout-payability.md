@@ -5,8 +5,15 @@ status: active
 metadata: 
   node_type: memory
   type: project
+  last_verified: 2026-07-22 via reviewer-suggestion adapter, Atlas, and repo-wide payability search
   originSessionId: 4eb6d1fe-c277-43b8-977b-92cc18644286
 ---
+
+## Recall Rule
+
+Read when scoping reviewer reset/closeout or an Ops payment signal. Keep the
+pre-accept reset and post-accept payability annotation separate; never delete a
+financial honorarium request as a reset mechanism.
 
 Owner-endorsed direction (Justin, S343, 2026-07-07). Two-part framing for the
 "reviewer/test-case gets promoted to a state we can't undo" problem:
@@ -31,7 +38,8 @@ offline by check until … separately approved and verified"), so an annotation 
 sufficient — it decouples limbo/reset (data side, potential/invited) from
 don't-pay (annotation, accept side) and never touches the money path.
 
-**How to apply:** closeout today only writes `wmkf_reviewstatus=complete` +
+**[VERIFIED via source/Atlas, 2026-07-22]:** no payability/did-not-serve field exists in
+the adapter or Atlas; this remains unbuilt. Closeout today only writes `wmkf_reviewstatus=complete` +
 `wmkf_completedat` (a binary "done" marker — no payability). This is ADDITIVE: one
 new field (payability disposition or boolean) on `wmkf_appreviewersuggestion`, set
 in the existing closeout UI, surfaced wherever ops views honorarium requests. Low

@@ -2,8 +2,8 @@
 title: Reviewer Affiliation and Existing-Contact Reconciliation Plan
 domain: reviewer-finder
 kind: plan
-status: active
-summary: "Surface exact-key Dataverse contact evidence and honest affiliation provenance without auto-merging people or treating stale records as current truth."
+status: historical
+summary: "Completed reconciliation implementation; retained as the historical design and evidence record."
 canonical: false
 owner: product-engineering
 related:
@@ -14,6 +14,13 @@ related:
 ---
 
 # Reviewer Affiliation and Existing-Contact Reconciliation Plan
+
+> **Completed outcome:** The affiliation and existing-contact reconciliation shipped in
+> `3f0ff88b`. This document is retained for its implementation evidence.
+>
+> **Current routing:** Use [Reviewer Identity](agent-wiki/topics/reviewer-identity.md)
+> for live identity/contact behavior and [Reviewer Workbench & Lifecycle](agent-wiki/topics/reviewer-workbench-lifecycle.md)
+> for staff-facing behavior.
 
 ## Objective
 

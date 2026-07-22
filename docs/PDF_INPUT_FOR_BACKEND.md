@@ -2,7 +2,7 @@
 title: "PDF Input to Claude — Findings for Backend Architecture"
 domain: architecture
 kind: history
-status: active
+status: historical
 summary: "2. PDF prompt-caching cuts subsequent calls by 90% and is verified working. The staged 3-pass pipeline drops from $0.39 → $0.20 per proposal and..."
 canonical: false
 cataloged: 2026-07-02
@@ -101,12 +101,17 @@ For 300 proposals/year × 3 stages, caching saves ~$60/year and 5 hours of cumul
 
 ## System-prompt caching caveat (new — 2026-04-22)
 
-**Sonnet 4.6 requires ≥ 2,048 tokens in a cache breakpoint for caching to fire.** Anthropic's public docs list 1,024 for Sonnet, but the 4.6 generation silently doubled it without announcement. Verified by bisection: 2,019 tokens → no cache write; 2,058 tokens → cache writes. The `cache_control` marker is accepted in the request regardless, but the cache is not populated — so `cache_creation_input_tokens` is `0` even when everything looks wired correctly.
+**Historical observation (2026-04-22):** this test run observed no write at 2,019 tokens and a
+write at 2,058 tokens for Sonnet 4.6. It is not current model guidance. Anthropic's current
+[prompt-caching documentation](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
+lists a 1,024-token minimum for Sonnet 4.6; check the concrete model before applying a floor.
 
 **What this means for the PA flow:**
 
 - **PDF document blocks always clear the floor** — a typical 19-page Phase I proposal is ~38K tokens. Cache fires reliably.
-- **System-prompt-only caching (without a PDF in the request) is fragile.** Our current Phase I system prompt is ~1,419 tokens — in the dead zone. If the PA flow ever sends just `system + short user text` (no PDF block), the cache won't fire. Padding the system prompt to > 2,048 tokens is the fix, ideally with useful content (in-context examples, expanded guidance).
+- **System-prompt-only caching (without a PDF in the request) needs current-model verification.**
+  The April test observed a ~1,419-token Phase I system prompt below its empirical threshold;
+  use the official floor for the concrete model rather than treating that result as universal.
 - **The recommended PA flow in this doc is unaffected.** The PDF is the cache anchor — system block piggybacks on it. That's fine and it works.
 
 **If we ever add a chained "PDF once, small follow-up questions" pattern:** the follow-up calls without the PDF will lose cache unless we keep the PDF in the request (which is the Anthropic-recommended pattern anyway — cache reads on the PDF block cost 10% of base input).
@@ -208,7 +213,8 @@ Comparison outputs (gitignored) under `tmp/phase-i-comparison/`.
 
 ### Still open
 
-5. **2048-token cache floor on Sonnet 4.6** — confirmed by our testing, undocumented by Anthropic. Worth flagging in any Anthropic support thread if you hit it. Doesn't affect the recommended PDF-anchored flow, but bites any "small system prompt, small request" pattern.
+5. **Historical 2048-token Sonnet 4.6 observation** — preserved from the April test record,
+   but superseded as current guidance by Anthropic's documented 1024-token Sonnet 4.6 minimum.
 
 ---
 
@@ -219,11 +225,11 @@ Connor flagged (2026-04-22) a separate use case we'll hit later: **one prompt ap
 | Optimization | Applies to Phase 1 (sequential singles)? | Applies to future batch? |
 |---|---|---|
 | **PDF caching** (`cache_control` on document block) | No — each request is a different PDF | No — each file is different |
-| **System-prompt caching** (`cache_control` on system block, > 2048 tokens) | Minimal — requests arrive minutes or hours apart, cache TTL expires | **Yes, significant.** All calls share the system prompt. One cold write + N−1 warm reads if calls fire within 5 min of each other |
+| **System-prompt caching** (`cache_control` on a system block above the concrete model's floor) | Minimal — requests arrive minutes or hours apart, cache TTL expires | **Yes, significant.** All calls share the system prompt. One cold write + N−1 warm reads if calls fire within 5 min of each other |
 | **Batch API** (`/v1/messages/batches`, async, 24h turnaround) | No — need synchronous writeback | **Yes, 50% off list price.** Ideal for "process last cycle's 300 proposals overnight." |
 
 **Implications when the batch use case arrives:**
 
-- The v2 system prompt's 2048-token shortfall becomes real cost. Fixing it (padding with in-context examples) unlocks system-prompt caching for the batch regime.
+- Evaluate the v2 system prompt against the concrete model's current documented floor before treating padding as necessary for caching.
 - Anthropic's Batch API is the correct tool for bulk historical analysis, not ephemeral caching — batches run async at 50% list, complete within 24h, and results come back as a downloadable JSONL. No PA HTTP polling concerns.
 - Batch API + system-prompt caching stack: a batch of 300 proposals × cached system prompt = ~50% (batch) × ~90% (cache read on system tokens) = much cheaper than a naive loop.

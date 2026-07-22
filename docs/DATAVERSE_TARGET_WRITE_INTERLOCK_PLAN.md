@@ -3,7 +3,7 @@ title: Dataverse Target and Write Interlock Design
 domain: engineering-process
 kind: plan
 status: active
-summary: "Fail-closed design for the deployment-class x Dataverse-target x operation-class interlock from the campaign release strategy §6. Design only, not built."
+summary: "Stages 1–2 shipped in warn mode; Stage 3 observation and the deliberate Dataverse target-interlock on-mode decision remain."
 canonical: false
 cataloged: 2026-07-11
 owner: product-engineering

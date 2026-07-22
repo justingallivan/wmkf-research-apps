@@ -2,8 +2,8 @@
 title: "Reviewer-Finder SerpAPI → Free-Stack Migration Plan"
 domain: reviewer-identity
 kind: plan
-status: active
-summary: "Source memories: project-serpapi-capability-erosion, project-serpapi-budget-latency."
+status: historical
+summary: "Completed S250–S251 SerpAPI migration; retained as the historical migration record."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,6 +15,12 @@ related:
 ---
 
 # Reviewer-Finder SerpAPI → Free-Stack Migration Plan
+
+> **Completed outcome:** The reviewer metrics and literature migration shipped in S250–S251.
+> The PubPeer contingency is not an active migration slice. This document is historical.
+>
+> **Current routing:** Use [Reviewer Identity](agent-wiki/topics/reviewer-identity.md)
+> and the integrity-screener topic for current provider behavior.
 
 > **Status:** **COMPLETE** — Slices 1a + 1b + 2 SHIPPED (S250–S251). The reviewer-finder metrics +
 > literature paths are off SerpAPI. PubPeer integrity (#6) stays on SerpAPI: no public PubPeer API

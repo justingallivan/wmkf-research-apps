@@ -2,8 +2,8 @@
 title: "Reviewer Recency-Weighting Plan (S223, Topic #2)"
 domain: reviewer-identity
 kind: plan
-status: active
-summary: "Owner task: Topic #2 from project-reviewer-finder-next-topics. Decisions locked with Justin S223 (see..."
+status: historical
+summary: "Shipped reviewer recency weighting; retained as historical implementation and evidence record."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,6 +15,12 @@ related:
 ---
 
 # Reviewer Recency-Weighting Plan (S223, Topic #2)
+
+> **Completed outcome:** The recency-weighting work shipped in S223/S224. This document
+> is retained as the historical plan and evidence record.
+>
+> **Current routing:** Use [Reviewer Identity](agent-wiki/topics/reviewer-identity.md)
+> for current reviewer ranking and evidence behavior.
 
 **Status:** SHIPPED — pieces 1–2 (ranking rebalance + recency-weighted PubMed affiliation) committed S223 (`c694bcb`); pieces 3–6 (current-affiliation pinning: ORCID always-fetch-profile, Scholar author block, identity-gated `_finalize` override, UI provenance) built + Codex-confirmed S224. Two Codex post-impl rounds (HIGH: ORCID ended-employment fallback; MEDIUM: Scholar no-metrics-table author-block loss) — both fixed and re-confirmed READY TO SHIP.
 **Owner task:** Topic #2 from `project-reviewer-finder-next-topics`. Decisions locked with Justin S223 (see [[project-reviewer-ranking-recency-over-citations]]).

@@ -2,8 +2,8 @@
 title: "Intake Attach Endpoint — Build Scoping (S184)"
 domain: intake-portal
 kind: plan
-status: active
-summary: shared/forms/phase-ii-research-2026-06/schema.js is the only live form schema. Shape:.
+status: historical
+summary: Historical build scoping for the intake attachment flow, now implemented.
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -16,6 +16,8 @@ related:
 
 # Intake Attach Endpoint — Build Scoping (S184)
 
+> **Current routing:** Historical scoping record. The live attachment contract is implemented by `pages/api/intake/draft/attach.js` and its supporting intake services/tests.
+
 Scoping pass before implementing the three-call dance for applicant
 attachments. The contract baseline is `INTAKE_PORTAL_DRAIN_PLAN.md`
 §"Attachment upload — three-call dance" (lines 341–~450). This doc
@@ -23,8 +25,8 @@ captures the audit, **decisions locked after Codex review**, build
 sequence, test plan, and production hazards surfaced during scoping
 that extend (or amend) the locked contract.
 
-Status: **scoped — ready to implement**. Codex round-1 of scoping
-review folded in.
+Status at drafting: **scoped — ready to implement**. Codex round-1 of scoping
+review was folded in; the implementation subsequently shipped (see Current routing above).
 
 ## 1. Audit findings
 

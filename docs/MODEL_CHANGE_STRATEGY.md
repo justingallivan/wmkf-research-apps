@@ -3,7 +3,7 @@ title: Model-Change Strategy
 domain: prompt-executor
 kind: plan
 status: active
-summary: "Guiding principle: model drift must fail LOUD in CI, never silently in prod."
+summary: "Active policy: model registry, validation, request shaping, retry, canary, and replay shipped; future model changes still use this runbook."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -16,13 +16,11 @@ related:
 
 # Model-Change Strategy
 
-**Status: PARTIALLY IMPLEMENTED (S286/S287, 2026-06-25).** This documents a durable
-approach for navigating future Anthropic model changes (new releases, parameter
-deprecations, capability differences, refusal semantics, retention classes). S286
-shipped the interim Opus 4.8 hardening in §1. S287 shipped the first registry/gate
-slice in §1.5. Transport, admin write-path, resolver ergonomics, canary expansion,
-the deprecated-parameter retry safety net, Admin Models read-only registry status,
-and replay artifacts/runbook have since landed.
+**Status: Active policy/runbook.** The core safeguards have shipped: capability/pricing
+registry and CI validation, reviewed admin overrides, capability-aware request shaping,
+deprecated-parameter retry, discovery canary, Admin Models status, and replay artifacts.
+This document remains active because each future model change still needs its review,
+validation, rollout, and replay procedure.
 
 Authority note: this is a design doc. Live behavior is governed by source —
 `lib/services/llm-client.js`, `lib/services/model-capabilities.js`,

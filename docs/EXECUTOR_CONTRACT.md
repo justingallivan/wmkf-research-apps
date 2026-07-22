@@ -16,22 +16,28 @@ related:
 
 # Executor Contract
 
-**Status:** SHIPPED on the Vercel side — this doc describes the contract that `lib/services/execute-prompt.js` implements in production today (consumed by `/api/phase-i-dynamics/summarize-v2`). PowerAutomate implementation is Connor's; pacing tracked outside this doc. The original "May 1 2026 cycle target" framing is historical; that target has passed.
+**Status:** SHIPPED on the Vercel side — this doc describes the contract that
+`lib/services/execute-prompt.js` implements in production today (used by the Phase I summary route
+and multiple live grantee, field-primer, and review services). A Power Automate implementation is a deferred target, not a
+second current implementation. The original "May 1 2026 cycle target" framing is historical.
 **Created:** 2026-04-24 (Session 109, reconciliation pass)
 **Last status update:** 2026-05-25 (S188, B6-F2 readiness-audit drift refresh)
-**Owners:** Justin (Vercel implementation — shipped), Connor (PowerAutomate implementation)
+**Owners:** Justin (Vercel implementation — shipped); Connor would own any future Power Automate implementation
 **Related docs:** `docs/PROMPT_STORAGE_DESIGN.md`, `docs/BACKEND_AUTOMATION_PLAN.md`, `docs/WORKFLOW_CHAINING_DESIGN.md`, `docs/GRANT_CYCLE_LIFECYCLE.md`
 
 ---
 
 ## Purpose
 
-The Executor is the shared **contract** between the PowerAutomate `ExecutePrompt` child flow and the Vercel `executePrompt()` service function. Both implementations do the same nine things with the same inputs and same outputs, so that:
+The Executor is the contract implemented by the Vercel `executePrompt()` service function and
+reserved for a future Power Automate `ExecutePrompt` child flow. Today, only the Vercel
+implementation exists. A future PA implementation must perform the same ten steps with the same
+inputs and outputs so that:
 
-- A prompt row authored once in `wmkf_ai_prompt` serves both callers without duplication
-- Cache prefixes are byte-identical across callers (prompt cache hits work)
-- `wmkf_ai_run` rows written by either caller are structurally identical (audit trail stays coherent)
-- Adding a new prompt means editing a Dynamics row — not authoring new code in two places
+- A prompt row authored once in `wmkf_ai_prompt` can serve both caller types without duplication.
+- Cache prefixes can be made byte-identical if/when a second runtime exists.
+- `wmkf_ai_run` rows from either runtime will remain structurally coherent.
+- Adding a shared prompt does not require maintaining divergent prompt bodies in two runtimes.
 
 The Executor is the **function invoker**. The prompt row is the **function definition**. Chains and triggers are the **Flow's** job, not the Executor's.
 
@@ -84,7 +90,9 @@ The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-onl
 
 ### Errors
 
-Executor throws (Vercel) or sets failure status (PA) on: prompt not found, variable resolution failure, Claude API error, output parse failure, target write failure.
+The Vercel Executor throws on: prompt not found, variable resolution failure, Claude API error,
+output parse failure, or target write failure. A future PA implementation must represent the same
+failures while still writing the required failed run row.
 
 **Invariant:** a `wmkf_ai_run` row is **always** written — even on failure — with `wmkf_ai_status = Failed` and `wmkf_ai_notes = <error summary>`. This preserves audit completeness.
 
@@ -92,7 +100,7 @@ Executor throws (Vercel) or sets failure status (PA) on: prompt not found, varia
 
 ## The 10 steps
 
-| # | Step | PA action | Vercel equivalent |
+| # | Step | Future PA action (target contract) | Current Vercel implementation |
 |---|---|---|---|
 | 1 | Resolve prompt | HTTP GET `wmkf_ai_prompts?$filter=wmkf_ai_promptname eq '<name>' and wmkf_ai_iscurrent eq true&$top=1` | `execute-prompt.js` queries `wmkf_ai_prompts` directly via Dataverse (NOT via `PromptResolver` — that's the legacy `wmkf_ai_runs` scratch-row path, used now only by audit scripts) |
 | 2 | Parse variable declarations | Parse JSON on `wmkf_ai_promptvariables` | `JSON.parse(row.wmkf_ai_promptvariables)` |
@@ -154,11 +162,17 @@ Executor throws (Vercel) or sets failure status (PA) on: prompt not found, varia
 | `prior_output` | Value from a field a prior Execution wrote (implicit chaining via Dynamics) | Phase 1 |
 | `context_block` | Recursively assemble another prompt row tagged as `Context` | Phase 2 |
 
-**Preprocess hints (Phase 0):** `pdf_to_text` only — the live `execute-prompt.js` throws on any other hint. `docx_to_text`, `truncate_tokens:N`, `strip_images` are deferred until needed. Adding a new hint requires updating both Executor implementations.
+**Preprocess hints (Phase 0):** `pdf_to_text` only — the live `execute-prompt.js` throws on any other hint. `docx_to_text`, `truncate_tokens:N`, `strip_images` are deferred until needed. If a PA implementation is added, every supported hint must be implemented and tested in both runtimes.
 
 **Placement attribute (Phase 0 — present but single-valued):** v0 only supports `placement: "user"`. Phase 2 adds `placement: "system"` for context-block variables that need to be part of the cacheable system-array prefix.
 
-**`cacheable` flag:** Phase 0 honors this for *within-prompt* cache alignment (rerunning the same prompt on the same request hits the Claude cache). Cross-prompt cache alignment (e.g., summary + compliance sharing the bundle) requires context blocks in Phase 2.
+**`cacheable` flag:** Phase 0 stores this declaration but does not use it to place variables
+relative to the cache boundary. `composeMessages()` interpolates variables wherever their
+placeholders occur in the stored system/body templates, and `callClaude()` marks the completed
+system block. An identical rerun can be cache-eligible when its composed prefix is unchanged
+(including stable nonces for opted-in untrusted variables), but a cache hit must be verified
+from response usage rather than assumed. Cross-prompt alignment still requires Phase-2 context
+blocks.
 
 **Data classification + payload boundary (added 2026-05-04):** A variable can declare two additional optional fields to opt into the shared AI payload-boundary helper:
 
@@ -257,20 +271,27 @@ Each output may declare a `guard` policy that the Executor applies in step 4 (pr
 
 ## Caching contract
 
-**Byte-identical prefixes across callers are the whole point of cache alignment.** If PA and Vercel produce different bytes before the first `cache_control` marker, they land in different cache buckets and neither call benefits from the other.
+**Byte-identical prefixes are the target contract for any future second runtime.** Today there is no
+PA prefix to compare. If PA is implemented and it produces different bytes before the first
+`cache_control` marker, the two callers will land in different cache buckets.
 
-The Executor always:
+The current Phase-0 Executor:
 
 1. Sends `system` and `user` as separate blocks (requires the `wmkf_ai_systemprompt` + `wmkf_ai_promptbody` split — added by Connor in Phase 0, confirmed live 2026-04-24).
-2. For each variable marked `cacheable: true`, places it **before** the last `cache_control` marker.
-3. For each variable marked `cacheable: false`, places it **after** the marker (in the non-cached tail).
-4. Emits exactly one `cache_control: {type: "ephemeral"}` at the boundary.
+2. Interpolates each variable wherever its placeholder occurs in the stored system/body templates; it does not branch on `cacheable` or `placement` to move that value across the boundary.
+3. Emits one `cache_control: {type: "ephemeral"}` on the completed system block.
 
-Any change to the prompt body, the system prompt, or a cacheable variable splits the cache — that's correct behavior. The cache is only safe to rely on when nothing in the prefix has changed.
+Any change before that marker, including a variable interpolated into the system text, splits the
+prefix. A repeat is cache-eligible only when the resulting prefix is byte-identical and meets
+the active model's requirements; response usage is the proof of a realized hit.
 
-**Within-prompt caching (Phase 0):** rerunning `phase-i.summary` on the same `requestId` with the same PDF content will hit cache on repeat invocations within the 5-min TTL.
+**Within-prompt caching (Phase 0):** rerunning `phase-i.summary` on the same `requestId` with
+the same PDF content may be cache-eligible when its composed prefix is unchanged; confirm a
+realized hit through `usage.cache_read_input_tokens`.
 
-**Cross-prompt caching (Phase 2):** `phase-i.summary` and `phase-i.compliance` both reference a shared `context_block` placed in `system`, so a back-to-back invocation of both prompts on one request hits cache on the second call for the document tokens.
+**Cross-prompt caching (Phase 2 target, not built):** the planned shape has `phase-i.summary` and
+`phase-i.compliance` reference a shared `context_block` placed in `system`, allowing a back-to-back
+invocation to reuse the document prefix. `context_block` remains deferred.
 
 ---
 
@@ -310,7 +331,9 @@ Each caller decides whether the user invoking it can clobber populated target fi
 | Vercel test harness | `true` | Test runs use clean fixtures or controlled overwrites. |
 | PowerAutomate manual-button flow ("Re-run summary on this row") | `true` | The user clicked a button literally meaning "redo this." |
 
-**For Connor's PA flows (Phase 1):** every parent flow that calls `ExecutePrompt` must explicitly pass `forceOverwrite` as an input parameter. Don't default it to either value at the child-flow level — make the parent flow author declare intent. A bulk re-summarization flow and a first-pass intake flow have opposite correct defaults; the contract should not pick.
+**For any future PA flows (Phase 1):** every parent flow that calls `ExecutePrompt` must explicitly
+pass `forceOverwrite`. Do not default it at the child-flow level: a bulk re-summarization flow and a
+first-pass intake flow have opposite correct defaults.
 
 ### 2. Output `guard` — set once on the prompt row
 
@@ -328,7 +351,9 @@ A prompt row with `guard: "always-overwrite"` on every output ignores `forceOver
 - **Does not orchestrate chains.** The caller (parent PA flow or Vercel API route) decides which prompts run in what order. Executor runs exactly one prompt per invocation.
 - **Does not branch on output.** Business-logic conditions ("if compliance failed, notify staff") live in the caller's Flow.
 - **Does not retry.** Caller decides retry policy. Executor returns failure; caller decides whether to re-invoke.
-- **Does not handle arbitrary code.** Preprocessing, source kinds, and target kinds are closed enums. Weird cases require a new enum value implemented in both executors — not an "exec arbitrary script" escape hatch.
+- **Does not handle arbitrary code.** Preprocessing, source kinds, and target kinds are closed enums.
+  A new case requires a new enum value in the live Executor and, if PA is later implemented, its
+  conformance implementation — not an "exec arbitrary script" escape hatch.
 - **Does not write to SharePoint.** Phase 0 is Dynamics-only for persistence.
 - **Does not manage prompt lifecycle.** Draft/publish/retire is a separate dashboard concern.
 - **Does not stream.** Streaming Executor variant (`executePromptStream`) deferred; today's streaming routes stay outside the contract.
@@ -342,9 +367,12 @@ A small test prompt `test.echo`:
 - Output schema: `{ echo: string }` with target `kind: none`
 - System prompt: `"Echo the inputs verbatim as JSON."`
 
-Both executors must:
-1. Invoked with identical `requestId` and `overrideVariables`, produce byte-identical `wmkf_ai_rawoutput`
-2. On second invocation, `cacheHit` is `true` regardless of which caller went first
+The Vercel implementation uses this as a characterization fixture. If a PA implementation is added,
+evaluate both runtimes for:
+1. Identical composed request bytes and structurally equivalent `wmkf_ai_run` output for identical
+   `requestId` and `overrideVariables`.
+2. Cache eligibility and actual `cacheHit` behavior under the active model, using response usage
+   rather than treating a second invocation as proof.
 
 If either assertion fails, the two implementations have drifted and must be reconciled before building more prompts on top.
 

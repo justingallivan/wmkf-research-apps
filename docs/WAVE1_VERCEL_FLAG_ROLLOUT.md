@@ -2,7 +2,7 @@
 title: "Wave 1 — Vercel Flag Rollout (HISTORICAL — closed 2026-05-12)"
 domain: security-auth
 kind: plan
-status: active
+status: historical
 summary: "Status: ✅ CLOSED 2026-05-12. This runbook is preserved as the historical record of how the flags were flipped and the trailing-newline gotcha that..."
 canonical: false
 cataloged: 2026-07-02
@@ -17,6 +17,10 @@ related:
 # Wave 1 — Vercel Flag Rollout (HISTORICAL — closed 2026-05-12)
 
 **Status:** ✅ **CLOSED 2026-05-12.** This runbook is preserved as the historical record of how the flags were flipped and the trailing-newline gotcha that was caught + corrected. Do not follow it as a live procedure.
+
+> **Current routing/outcome:** The Wave 1 Postgres tables and fallback dispatch are gone;
+> settings, preferences, and app access route to Dataverse. Use the live service headers and
+> migration records for current behavior, not the rollout steps below.
 
 - 2026-05-03 — three `WAVE1_BACKEND_*` env vars set to `dataverse` in Vercel prod after correcting a trailing-newline regression (see `Lessons learned` below).
 - 2026-05-12 — Postgres tables dropped via `lib/db/migrations/007_drop_wave1_tables.sql`; dispatcher defaults flipped to Dataverse in `lib/services/{settings,app-access,database}-service.js`.

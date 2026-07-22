@@ -2,8 +2,8 @@
 title: "Reviewer Follow-on Plan: Deferred-Candidate Gating (Fix E) + Invite-Confidence + Faculty-Page Email Recovery"
 domain: reviewer-workbench
 kind: plan
-status: active
-summary: "Date: 2026-06-08 corrections folded in (see \"## R. Codex review corrections\")."
+status: historical
+summary: "Completed/deferred follow-on slices retained as a historical reviewer-contact plan."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,6 +15,13 @@ related:
 ---
 
 # Reviewer Follow-on Plan: Deferred-Candidate Gating (Fix E) + Invite-Confidence + Faculty-Page Email Recovery
+
+> **Historical outcome:** The implemented follow-on slices are retained here as their
+> build record. The proposed faculty-page approach in this document is not the current
+> page-email policy.
+>
+> **Current routing:** Use [Reviewer Identity](agent-wiki/topics/reviewer-identity.md)
+> and [Resolved Page Email Tier Design](RESOLVED_PAGE_EMAIL_TIER_DESIGN.md) for the live guarded page-email tier.
 
 Date: 2026-06-08
 Status: Slice E IMPLEMENTED 2026-06-08 (S235, see §2); Slices G/F PROPOSED — Codex-reviewed 2026-06-08;

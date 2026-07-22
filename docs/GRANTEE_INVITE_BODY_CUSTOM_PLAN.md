@@ -2,8 +2,8 @@
 title: "Per-PD Custom Grantee-Invitation Email Body + Edit Affordance (S272)"
 domain: grantee-portal
 kind: plan
-status: active
-summary: "This mirrors the S271 unified-signature pattern (one per-user Dataverse preference, edited in Profile Settings) — see..."
+status: historical
+summary: "Historical record of the completed per-PD grantee-invite-body preference and Awardee-tab edit affordance."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -17,6 +17,10 @@ related:
 # Per-PD Custom Grantee-Invitation Email Body + Edit Affordance (S272)
 
 **Status:** IMPLEMENTED (commit 56da01e3) + post-impl fixes shipped: compose-state model (#1/#2), review-round-2 boundary fixes (NI-4 initial-profile-resolution, NI-5 cross-request leak), and #5 (per-key save rollback) + #6 (`replaceAll`) — see §11. No grantee-invite open items remain; the only red suites are pre-existing and unrelated (`bill`, `discovery-verification-status`).
+
+> **Current routing/outcome:** The feature is live through the Awardee tab, Profile Settings,
+> and `grantee_invite_body` preference path. Treat this document as the implementation and
+> review record, not an active work queue.
 **Owner ask (S272):** Give Program Directors a *saved* custom grantee-invitation
 email body, plus a clearer edit affordance on the Awardee tab. Current source reads
 editable grantee invite defaults (`email.grantee_invite.subject` / `email.grantee_invite.body`)

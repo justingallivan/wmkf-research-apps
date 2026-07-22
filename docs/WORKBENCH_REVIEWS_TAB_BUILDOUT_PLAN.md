@@ -3,7 +3,7 @@ title: "Workbench Reviews Tab — Consumption Build-Out Plan"
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Four-phase Reviews tab build-out: outstanding tracking + nudge, schema-free comparison matrix, panel-prep export, AI synthesis. Consumption side only."
+summary: "All four Reviews-tab phases are built and deployed. The remaining verification boundary is the first real submitted review (or a staged test submission)."
 canonical: false
 cataloged: 2026-07-03
 owner: product-engineering

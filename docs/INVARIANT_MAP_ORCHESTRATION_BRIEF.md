@@ -2,11 +2,13 @@
 title: Closeable-Class Invariant Map — Fable Orchestration Brief
 domain: architecture
 kind: plan
-status: active
-summary: "Fable orchestrator brief: map bug classes to the structural changes that close them by construction, ranked by blast radius, then execute the queue."
+status: historical
+summary: Historical orchestration brief that produced the Closeable-Class Invariant Map.
 ---
 
 # Closeable-Class Invariant Map — Fable Orchestration Brief
+
+> **Current routing:** Historical orchestration brief. Its deliverable is `docs/CLOSEABLE_CLASS_INVARIANT_MAP.md`; do not execute this brief's dated queue without a fresh current-state audit.
 
 > Audience: a superior orchestrator model (Fable) for one high-value session. This brief scopes the work;
 > the **owner's charter, given at session start, governs** — where they conflict, the charter wins, and this
@@ -135,13 +137,11 @@ stand alone.
 Once the map is delivered and (in a future session) implemented, execute these in order — but if the map's
 blast-radius ranking disagrees, follow the map:
 
-1. **Project-wide prompt-caching audit + standardized remediation.** External trigger: Anthropic flagged this
-   project's cache-hit rate as *low* — it is bleeding input cost now. Holistic, not piecemeal: audit every LLM
-   call site from `lib/services/llm-client.js` consumers, fix cache-busting ordering (dynamic content ahead of
-   the stable prefix) and missing `cache_control` at the largest stable boundary, and standardize. Starting
-   context (verify it): `.claude-memory/project-cache-hit-rate-review.md` reports markers today only in
-   `execute-prompt.js` and `batch-match-service.js`, and the reviewer-finder analyze path re-sending the full
-   proposal at full price on every repair retry.
+1. **Project-wide prompt-caching audit + root remediation — COMPLETED (S340/S341).** The July audit and
+   keyed stable-nonce remediation are recorded in `docs/PROMPT_CACHING_AUDIT.md`; the earlier claim that only
+   two call sites had markers was a pre-audit snapshot. Remaining work is narrower: optional R4
+   cross-document Executor composition and conditional R5 measurement, tracked in
+   `.claude-memory/project-cache-hit-rate-review.md`.
 2. **Holistic prod-safety review of everything that shipped to `main` today.** Three security/correctness-
    critical things landed in hours and only had incremental/diff review: the reviewer-finder COI enforcement
    (ours), the **Q9 prefs/app-access DAL migration** (PR #49 — auth hot path, `grantDefaultApps` on sign-in),

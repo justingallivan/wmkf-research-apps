@@ -2,8 +2,8 @@
 title: "Reviewer Board-Writeup Identity Capture — Build Plan (PERSON-SCOPE)"
 domain: reviewer-workbench
 kind: plan
-status: active
-summary: "(engagement-scope v1, then person-scope v2). Supersedes the engagement-scope v1 (storage changed from per-request to person-level per owner..."
+status: historical
+summary: "Completed board-writeup identity capture; retained as the historical build plan."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,6 +15,12 @@ related:
 ---
 
 # Reviewer Board-Writeup Identity Capture — Build Plan (PERSON-SCOPE)
+
+> **Completed outcome:** Board-writeup identity capture and staff repair support shipped
+> in S308. This document is retained as the historical build record.
+>
+> **Current routing:** Use [Reviewer Workbench & Lifecycle](agent-wiki/topics/reviewer-workbench-lifecycle.md)
+> for current acceptance and staff-edit behavior.
 
 Status: **DESIGN LOCKED — implementing S308.** Two Codex design passes complete
 (engagement-scope v1, then person-scope v2). Supersedes the engagement-scope v1
@@ -71,7 +77,7 @@ click a reviewer in the workbench. Stored at **person level** (canonical, curren
 | New column (schemaName) | logical name | Type | Max | Meaning | Prefill source |
 |---|---|---|---|---|---|
 | `wmkf_AcademicRank` | `wmkf_academicrank` | String | 200 | Reviewer-confirmed current academic rank (Professor / Assoc / Asst Prof / Member / Investigator / Group Leader…). NOT an administrative title. | none (blank) |
-| `wmkf_ReviewerPrimaryDepartment` | `wmkf_reviewerprimarydepartment` | String | 255 | PRIMARY department only. | person `wmkf_department` (enrichment) |
+| `wmkf_PrimaryDepartment` | `wmkf_primarydepartment` | String | 255 | PRIMARY department only. | person `wmkf_department` (enrichment) |
 | `wmkf_MainInstitution` | `wmkf_maininstitution` | String | 255 | MAIN institution (parent org, not a Center/Institute within it). | person `wmkf_primaryaffiliation` (enrichment) |
 
 **Why new fields, not reuse:** the person already has enrichment-sourced
@@ -119,7 +125,7 @@ enforced in the accept UI + route only. [VERIFIED creation-without-fields concer
    so the reviewer record carries them.
 6. **`pages/api/external/review/[token]/context.js buildStage2aPrefill`** [VERIFIED `:293-320`] —
    add `academicRank: reviewer?.wmkf_academicrank || ''`,
-   `department: firstNonEmpty(reviewer?.wmkf_reviewerprimarydepartment, reviewer?.wmkf_department)`,
+   `department: firstNonEmpty(reviewer?.wmkf_primarydepartment, reviewer?.wmkf_department)`,
    `institution: firstNonEmpty(reviewer?.wmkf_maininstitution, reviewer?.wmkf_primaryaffiliation, reviewer?.wmkf_organizationname)`.
    (On a re-accept the reviewer's prior confirmed value wins; first time, the enrichment value seeds it.)
 

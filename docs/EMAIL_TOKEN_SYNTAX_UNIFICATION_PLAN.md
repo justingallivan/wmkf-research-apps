@@ -2,8 +2,8 @@
 title: Email Template Token-Syntax Unification Plan v2
 domain: email
 kind: plan
-status: active
-summary: "- Verify: post-migration dry-run reports adminChanged=0 preferenceChanged=0 — zero bracket tokens remain in any stored value."
+status: historical
+summary: "Historical record of the completed July 2026 mustache-token migration; current template behavior lives in the resolver source and seed defaults."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -18,6 +18,11 @@ related:
 
 **Created:** 2026-07-01 (S311)  
 **Status:** ✅ EXECUTED 2026-07-01 — build shipped, deployed to prod, and the data migration ran successfully (see "Execution record" below). Plan authored v2 by Codex, reviewed against source by Claude (two strengthenings folded in: whole-token/longest-first matching guard; `fillInviteBody` missing-data fallback spec), owner-confirmed the grantee-invite-subject decision = IMPLEMENT resolution.  
+
+> **Current routing/outcome:** The migration is complete. Use the live email resolvers, seed
+> defaults, and `scripts/migrate-email-token-syntax.mjs` for current behavior; this document
+> preserves the rollout and migration evidence. Legacy-alias removal, if ever wanted, is a
+> separate scoped cleanup.
 
 ## Execution record (2026-07-01, S311)
 

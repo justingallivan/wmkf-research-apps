@@ -7,6 +7,7 @@ summary: "Active hybrid plan: safe slices reach main behind legacy-default seams
 canonical: false
 cataloged: 2026-07-12
 owner: product-engineering
+last_verified: 2026-07-22
 related:
   - docs/audits/reviewer-holistic-review-comparison-2026-07-09.md
   - docs/audits/reviewer-holistic-review-codex-2026-07-09.md
@@ -51,6 +52,20 @@ migration. Vercel deployment `dpl_4YpnVVdRmDHyuzgPVSKXNcx22bKu` is READY.
 
 The original Fable review remains useful for strategy and prioritization. It is
 not controlling evidence for current code state.
+
+**Current execution snapshot `[VERIFIED 2026-07-22 via source and linked
+plans]`:** C0.1/C0.2 and the M1 evaluation foundation are shipped. Wave 13's ten
+fields are deployed, but `capture-self-reported-orcid.js` remains the binding
+writer's only production-service caller; writer results are explicitly not
+downstream-eligible, and the broader backfill/policy-reader/C0.4 migration is
+still pending. The newer works-first W2 implementation is governed by
+`docs/REVIEWER_IDENTITY_CONTACT_PLAN.md`: its legacy-default runtime seam,
+non-authoritative shadow mode, and owner-gated `combined` mode are built. The
+applicant-neighborhood origination arm remains under `scripts/` only; no
+production route selects it, F2 has not started, and D1 cleanup remains gated.
+Recent reviewer save, applicant-suggestion, enrichment, eligibility, and search-
+history fixes are operational hardening, not evidence of W2 cutover or F2
+promotion.
 
 ## Evidence labels
 

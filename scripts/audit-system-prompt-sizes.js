@@ -1,11 +1,10 @@
 /**
- * Audit: token-count every app's system block against Sonnet 4.6's 2048-token
+ * Audit: token-count every app's system block against Sonnet 4.6's current 1024-token
  * cache floor. Measures what's ACTUALLY sent to Claude, built from each app's
  * real prompt-construction code.
  *
- * Dead zone: 1024–2047 tokens. In that range, `cache_control` is accepted but
- * silently ignored — the app pays full input price even when everything
- * downstream looks correctly wired.
+ * The floor is model-specific; this script is pinned to Sonnet 4.6. Confirm
+ * future model floors against Anthropic's prompt-caching documentation.
  */
 
 const fs = require('fs');
@@ -21,7 +20,7 @@ fs.readFileSync(envPath, 'utf8').split('\n').forEach(line => {
 });
 
 const MODEL = 'claude-sonnet-4-6';
-const FLOOR = 2048;
+const FLOOR = 1024;
 
 (async () => {
   const apiKey = process.env.CLAUDE_API_KEY;
@@ -47,9 +46,8 @@ const FLOOR = 2048;
   };
 
   const verdict = (n) => {
-    if (n < 1024) return 'TOO_SMALL (below any cache floor)';
-    if (n < FLOOR) return 'DEAD_ZONE (cache_control silently ignored on Sonnet 4.6)';
-    return 'ABOVE_FLOOR (cache fires)';
+    if (n < FLOOR) return 'TOO_SMALL (below Sonnet 4.6 cache floor)';
+    return 'MEETS_FLOOR (cache-eligible; usage proves realized writes/reads)';
   };
 
   const rows = [];
@@ -157,11 +155,11 @@ const FLOOR = 2048;
     console.log(`  ${r.app}: ${r.desc}`);
   }
 
-  // Summary of dead-zone apps
-  const dead = rows.filter(r => r.tokens != null && r.tokens >= 1024 && r.tokens < FLOOR);
-  if (dead.length) {
-    console.log('\n⚠️  Dead-zone apps (cache_control is a no-op):');
-    for (const r of dead) console.log(`    - ${r.app} (${r.tokens} tok)`);
+  // Summary of below-floor apps
+  const belowFloor = rows.filter(r => r.tokens != null && r.tokens < FLOOR);
+  if (belowFloor.length) {
+    console.log('\n⚠️  Below-floor apps (cache_control is a no-op):');
+    for (const r of belowFloor) console.log(`    - ${r.app} (${r.tokens} tok)`);
   }
 })().catch(e => { console.error('FATAL:', e.message); console.error(e.stack); process.exit(1); });
 

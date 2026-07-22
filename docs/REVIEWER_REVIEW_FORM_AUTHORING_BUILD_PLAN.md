@@ -2,8 +2,8 @@
 title: "Reviewer Review-Form — In-Browser Authoring Build Plan"
 domain: reviewer-workbench
 kind: plan
-status: active
-summary: "3. Editor = full WYSIWYG (tiptap) → HTML, sanitized server-side with sanitize-html. Each narrative answer is stored twice: sanitized HTML (rich..."
+status: historical
+summary: "Completed in-browser review-form authoring; retained as historical build and schema record."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,6 +15,12 @@ related:
 ---
 
 # Reviewer Review-Form — In-Browser Authoring Build Plan
+
+> **Completed outcome:** The documented authoring phases are complete. This document is
+> retained as the historical build and schema record.
+>
+> **Current routing:** Use [Reviewer Workbench & Lifecycle](agent-wiki/topics/reviewer-workbench-lifecycle.md)
+> and the relevant Atlas pages for current review-authoring behavior and data shape.
 
 **Status:** **COMPLETE — PHASES 0–5 + Phase 2.5 DONE (S301–S302, 2026-06-28).** Reviewers author + finalize in-browser; staff read the narrative answers back in the workbench; draft lifecycle (submit / token revoke+regenerate / cron GC) is wired. Every phase was Codex-reviewed and its findings folded in. Phase 3 shipped the submit path: `validateReviewSubmission`/`buildReviewSubmission` (the single producer, 21 unit tests), the `/submit` route (finality precheck + atomic `executeChangeset` with the prod-verified `_wmkf_appreviewersuggestion_value=` alt-key upsert + fail-closed parent `If-Match`, 13 integration tests), the `upload.js` P0-1 finality guard, and the wired Submit button (stage2b E2E: submit → read-only). Phase 4 shipped the workbench read-back: `/api/review-manager/reviewers` attaches the re-sanitized `answers[]` snapshot per submitted reviewer (keyed child read), rendered by `ReviewsTab`. The Dataverse `$batch` atomic-changeset feasibility spike PASSED in prod (`scripts/probe-dataverse-batch-changeset.mjs`: multi-op commit + atomic rollback + per-op `If-Match` all confirmed), so Phase 3 uses the clean atomic path and the §5a non-atomic fallback is dropped. Phase 1 shipped the data layer + sanitizer (`sanitize-review-html.js` + 36-case bypass suite, migration `021_review_drafts.sql` applied to the live DB, `review-draft-service.js`, the draft GET/PUT route with server-sanitize + finality/stage gates). Phase 2 shipped the UI: the 8 rich-text schema questions, the tiptap `RichReviewEditor`, and the controlled `ReviewAuthoringForm` with autosave — now the stage2b surface in `MaterialsView` (file-upload UI removed; route/infra retained server-side). **Phase 3 wired final submit** (`/submit` + the Dataverse `executeChangeset` atomic write): the Submit button is live, gated on a completeness check, and locks the form read-only on success. `npm run build` green. See §8 for per-phase detail. The `wmkf_appreviewanswer` child table, its 7 columns + `wmkf_Name` primary, the `wmkf_appreviewanswer_suggestion` N:1 lookup to `wmkf_appreviewersuggestion`, and the `wmkf_appreviewanswer_suggestion_question_key` alternate key on `(wmkf_appreviewersuggestion, wmkf_questionkey)` were created in **prod** via schema-as-code ([VERIFIED via `lib/dataverse/schema/wave8-review-answer-snapshot/01_wmkf_appreviewanswer.json`] + `scripts/apply-dataverse-schema.js --target=prod --wave=8-review-answer-snapshot --execute`). The sandbox could not host it (schema-stale — parent `wmkf_appreviewersuggestion` 404s there; memory `project-dynamics-sandbox-state`), so prod dry-run → execute was the path. Drafted 2026-06-28 (Session 300); revised same session after **three** Codex design-review passes and a data-model pivot to a point-in-time **answer-snapshot child table**. All findings folded in: pass-1 (P0-1/P0-2/P1-1..4/P2-1..3), pass-2 pivot findings (P0-N1/P0-N2/P1-N3/P1-N4), pass-3 (P1-R3 rating validity, P1-R4 explicit token guards, and the §5a-fallback hardening P0-R1/P0-R2). Codex pass-3 verdict: **"Yes with conditions — Phase 0 can start"**; the two open P0s (P0-R1/P0-R2) gate **only the non-atomic fallback**, which is marked do-not-ship until they're designed — the primary changeset path is sound. Key build prerequisite **now satisfied**: the Dataverse changeset helper `DynamicsService.executeChangeset` was built S302 ([VERIFIED via `lib/services/dynamics-service.js` `executeChangeset` + `tests/unit/dynamics-service-changeset.test.js`, 17 tests green]) — §5a, Phase 2.5 complete. Codex post-impl review: no P0; the P1 (parser must fail closed when it can't confirm a 2xx per op) and two P2s (real-204 create shape, LF/case-insensitive wire tolerance) are folded in.
 

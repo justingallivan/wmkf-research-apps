@@ -2,8 +2,8 @@
 title: "Intake Portal — Postgres → Dataverse Drain Plan (v7)"
 domain: intake-portal
 kind: plan
-status: active
-summary: "- BLOCKER fix: request_created state now has explicit duplicate-PK recovery: on collision, GET the parent row, persist akoya_requestnum, then..."
+status: historical
+summary: Historical implementation and rollout record for the intake portal drain, now deployed.
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -16,7 +16,9 @@ related:
 
 # Intake Portal — Postgres → Dataverse Drain Plan (v7)
 
-**Status:** S179 v7 (2026-05-22). Codex round-7 findings folded in (5 findings: 0 BLOCKER / 5 MOD/GAPS / 0 LOW — narrow delta sanity check). Rounds 8 + 9 reviewed the P0 build commit + the round-8 fold; round-9 caught 2 small doc-drift items (P0 SQL snippet had stale non-idempotent forms; no migration-apply runbook). Both folded into this v7. Build-ready.
+> **Current routing:** Historical rollout record. Use the live intake draft/submit/attachment APIs and `drain-submissions` service for current behavior.
+
+**Status at final planning review:** S179 v7 (2026-05-22). Codex round-7 findings folded in (5 findings: 0 BLOCKER / 5 MOD/GAPS / 0 LOW — narrow delta sanity check). Rounds 8 + 9 reviewed the P0 build commit + the round-8 fold; round-9 caught 2 small doc-drift items (P0 SQL snippet had stale non-idempotent forms; no migration-apply runbook). Both folded into this v7. The plan was build-ready and the drain subsequently deployed.
 
 **Changes from v6 (round-7-driven, sanity-check pass):**
 - **GAPS fix:** Duplicate-PK recovery's 0-rows-affected re-read only accepted `request_created` as a safe convergence state. Another worker could have advanced further (`files_moved` → `completed`) before this stale worker got there, which would have thrown spuriously. v7 accepts any state at-or-after `request_created` with `akoya_requestnum` populated.

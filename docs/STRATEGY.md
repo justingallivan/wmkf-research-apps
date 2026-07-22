@@ -3,12 +3,14 @@ title: "Where We're Headed"
 domain: architecture
 kind: plan
 status: active
-summary: "Last updated: 2026-05-08 (previously 2026-03-12) — living document, updated as things evolve."
+summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
+last_verified: 2026-07-22
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
+  - docs/CURRENT_WORK_QUEUE.md
   - docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md
   - lib/utils/sharepoint-buckets.js
   - scripts/probe-sharepoint-write.js
@@ -16,7 +18,9 @@ related:
 
 # Where We're Headed
 
-**Last updated: 2026-05-08** (previously 2026-03-12) — living document, updated as things evolve.
+**Last verified: 2026-07-22.** This document owns long-term direction and principles. The
+ordered, current delivery agenda lives in `docs/CURRENT_WORK_QUEUE.md`; this document is not a
+backlog.
 
 ---
 
@@ -34,7 +38,7 @@ Six systems support WMKF's grant workflow:
 
 5. **SharePoint** — Cloud document storage. Two primary areas: the AkoyaGO site (where AkoyaGO stores documents, not meant for direct user access) and the WMKF site (shared staff documents with multiple sub-sites).
 
-6. **Vercel App Suite** (this project) — a dozen purpose-built tools that summarize proposals, find reviewers, screen applicant integrity, explore CRM data, and more. Originally standalone, now with expanding connections to the other systems. The applicant intake portal (`/apply/*`) is being built for the **next cycle's Phase I intake** — a single applicant submission entered as Phase I (the earlier "mid-June 2026 Phase II Research pilot" framing is superseded; see `docs/SYSTEM_MODEL.md`).
+6. **Vercel App Suite** (this project) — purpose-built tools that summarize proposals, find reviewers, screen applicant integrity, explore CRM data, and more. Originally standalone, they now have expanding connections to the other systems. Applicant-intake foundation infrastructure exists under `/apply/*`, but the product build is parked while WMKF evaluates the GOApply re-engineering; see `docs/SYSTEM_MODEL.md`.
 
 ---
 
@@ -78,7 +82,7 @@ Now we have read access to Dynamics and SharePoint, and leadership buy-in to use
 
 ## Principles
 
-**Keep everything in Dynamics.** Avoid creating secondary databases in the apps. Dataverse write access landed 2026-04-14 (`prvUpdate` on `akoya_request`, `prvCreate`/`prvUpdate` on `wmkf_ai_run`); the migration of organization data from Postgres to Dataverse is now in progress (Wave 1 cut over 2026-04-24; Wave 2 reviewer migration in progress per `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`). Some data currently in Postgres — like researcher profiles, publications, and reviewer candidates — is valuable organizational knowledge that belongs in the CRM long-term. Researchers are a reusable resource (good reviewers get called upon repeatedly), and discovery results represent paid API calls worth preserving. Other data is purely app-operational (usage logs, screening history, system alerts, panel reviews, intake drafts/audit) and stays in Postgres permanently. Long-term, most organizational data should live in Dataverse, with freshness metadata (e.g., "contact info current as of [date]") to enable automated refresh of stale records.
+**Keep everything in Dynamics.** Avoid creating secondary databases in the apps. Dataverse write access and the Wave 1/Wave 2 organizational-data migrations are complete; reviewer people and request engagements now live in Dataverse. App-operational data — logs, screening history, alerts, panel reviews, intake drafts/audit, and bounded evaluation evidence — remains in Postgres. Long-term organizational data should carry freshness and provenance rather than silently forking CRM truth.
 <!-- [STALE-ACCEPTED: lib/dataverse/adapters/researcher.js — the word "researcher" above is prose about researcher profiles/candidates, unrelated to the adapter file; the S348 researcher.js change was comment-only, so nothing here is stale.] -->
 
 **Keep things modular.** The grant cycle is changing and we don't know exactly what it'll look like yet. Each app and service should work independently so we can rearrange them as the process takes shape. Don't build a rigid pipeline for a process that's still being defined.
@@ -115,29 +119,18 @@ Now we have read access to Dynamics and SharePoint, and leadership buy-in to use
 <!-- [STALE-ACCEPTED: lib/services/execute-prompt.js — S344 added the additive, backward-compatible assertSystemIncludes option; the "Vercel done" Executor-contract status here is unchanged.] -->
 
 
-## What We Need Next
+## Current execution
 
-| What | Blocked on |
-|------|-----------|
-| ~~**Wave 1 prod retirement**~~ | **DONE 2026-05-12.** Tables dropped via migration 007; dispatcher defaults flipped to Dataverse. Remaining tail: elevation revert on prod app user (deferred until pilot iteration settles). |
-| **Wave 2 reviewer migration completion** — finish reviewer Postgres-to-Dataverse drain (`docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`) | Cycle gating; partial Wave 2 build set landed S139 |
-| **Connor's PA flows** — `akoya_request` create/update flows (file org, AI check-in, staff version) + PA-side `ExecutePrompt` parity oracle | Connor's queue |
-| **Status-driven triggers** — auto-start processing when proposals reach certain stages | Connor's PA flows above; cycle redesign signal |
-| **Cycle-redesigned Reviewer Finder + Staged Pipeline** — adapt to single-package cycle, build fit-screen → intelligence → panel pipeline | Cycle redesign locking with Sarah/Connor |
-| **Intake portal** — applicant submission via `/apply/*` for the **next cycle's Phase I intake** (single submission; the June 2026 Phase II Research pilot is superseded — see `docs/SYSTEM_MODEL.md`) | Form schema + child entity creation + Calendly integration; auth foundation SHIPPED S129 |
+The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
 
----
+1. publish the reconciled documentation and planning queue;
+2. finish observing the Dataverse target/write interlock before an explicit `on` decision;
+3. add the structured staff-review rescue surface and closeout payability disposition;
+4. use the upcoming reviewer campaign as an evidence window while the legacy resolver remains authoritative;
+5. select optional reviewer UX work only from demonstrated staff friction.
 
-## Rough Sequence
-
-### First: Get proposals into our apps from Dynamics
-No more PDF exports. Users browse proposals from within the app suite, metadata comes from CRM fields, documents come from SharePoint. Start with the Reviewer Finder since it has the most moving parts.
-
-### Then: Get results back into Dynamics
-Writeups, summaries, and other outputs go directly to SharePoint and Dataverse instead of being downloaded and re-uploaded. Staff still review and edit — the drafts just show up where they need to be.
-
-### Later: Automate the routine triggers
-When a proposal hits a certain status, kick off the appropriate processing. Notify staff when something needs their attention. These will likely use the same API calls the app suite already makes, but triggered from the backend rather than by users. This phase requires close collaboration with Connor and alignment on the PowerAutomate flows and Dynamics business logic.
+Power Automate automation, the applicant-intake product, automated BILL onboarding, and broader
+reviewer cleanup have separate dependency or owner gates. They are not implied next steps.
 
 ---
 
@@ -158,6 +151,10 @@ AkoyaGO's vendor provides a license for Dynamics/Dataverse. While WMKF owns its 
 ---
 
 ## IT Dependencies
+
+The table below is the **2026-05-08 dependency snapshot**, retained for context rather than current
+priority. Re-probe external state before relying on it; current work priority is in
+`docs/CURRENT_WORK_QUEUE.md`.
 
 | What | Who | Status |
 |------|-----|--------|
