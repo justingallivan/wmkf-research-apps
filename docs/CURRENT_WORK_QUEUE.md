@@ -31,7 +31,7 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Reviewer operational safety tools | Structured staff review entry is implemented and verified on an isolated branch, pending deliberate promotion. After promotion, add a closeout disposition for payable / not payable / did not serve. Keep pre-accept reset separate from post-accept financial annotation. | Each feature independently verified through UI → route → service → Dataverse → consumer, then deliberately promoted. |
+| 1 | Reviewer operational safety tools | Structured staff review entry is live in production. Next add a closeout disposition for payable / not payable / did not serve. Keep pre-accept reset separate from post-accept financial annotation. | Each feature independently verified through UI → route → service → Dataverse → consumer, then deliberately promoted. |
 | 2 | Reviewer campaign evidence window | Keep the legacy resolver authoritative during the upcoming run. Record W2 shadow disagreements, wrong/missed identity outcomes, email confirmation, staff corrections, invitations, and review completion. | Post-run evidence review; no automatic cutover. |
 | 3 | Optional reviewer UX triage | Select only improvements supported by observed staff friction. Current candidates: campaign-settings discoverability/defaults, review-output formatting, and global reviewer notes/flags or a Reviewer Pool. | Separate owner choice for each item; absence from this selection means no build. |
 
@@ -44,8 +44,9 @@ sequence.
   2026-07-22. Production logged `mode=on deployment=production target=production` and no denial.
 - Structured staff review-entry rescue: complete live-question/rich-text UI, dedicated authenticated
   route/service, canonical full-review producer, ETag/version guards, and atomic parent/answer writes
-  are test- and production-build-verified on `codex/staff-structured-review-rescue`; production
-  promotion remains pending.
+  shipped through PR #75 / merge `0226f7eb` to production deployment
+  `dpl_BjkM3tjopMpRWPMwn3NRgtB4CHSU` on 2026-07-22. All PR checks passed; Vercel reported Ready,
+  the unauthenticated route smoke redirected to sign-in, and the post-deploy error scan was clean.
 
 ## Reviewer redesign gates
 

@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-22 via ReviewsTab → manual-review-entry route/service → canonical review submission producer tests
+  last_verified: 2026-07-22 via PR 75 checks + production deployment dpl_BjkM3tjopMpRWPMwn3NRgtB4CHSU Ready + auth-boundary smoke
 ---
 
 ## Recall Rule
@@ -43,6 +43,9 @@ Track Reviewers panel**. This is that action item.
   + `getActiveQuestionSet`), not a resurrected `ReviewFormFields`.
 
 ## Implemented contract (2026-07-22)
+
+**Ship state:** live in production via PR #75 / merge `0226f7eb`; exact Vercel
+deployment `dpl_BjkM3tjopMpRWPMwn3NRgtB4CHSU` reported Ready and holds the live aliases.
 
 - `ReviewsTab` offers **Enter review manually** only on accepted, outstanding rows.
 - `ManualReviewEntryForm` GETs the authoritative live question set/version and current
