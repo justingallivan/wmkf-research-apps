@@ -37,8 +37,11 @@ queue.
   `wmkf_reviewreceivedat` (and `wmkf_completedat`) on any transition to
   `reviewStatus=complete` when empty. A PD clearing a dropout by marking it
   complete therefore writes a permanent false positive into that person's review
-  count, in every future cycle — silently, via the only action available.
-  Worst deliverers are the most likely to be misrecorded as reliable.
+  count, in every future cycle. `complete` is not the only badge-clearing action
+  (`review_received` also leaves `MODE_WORK_REMAINING` without stamping, and the
+  row remove is a `softDelete` that adjudicates nothing) — but it is the only
+  terminal-looking one, so it is the natural choice and the silent trap. Worst
+  deliverers are the most likely to be misrecorded as reliable.
 - **No terminal state for a post-accept dropout.** `REVIEW_STATUS_MAP` is
   `accepted → materials_sent → under_review → review_received → complete`.
   `withdrawn_sufficient` is hard-guarded to still-pending rows by

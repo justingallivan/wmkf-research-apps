@@ -27,9 +27,13 @@ Owner-endorsed direction (Justin, S343, 2026-07-07). Two-part framing for the
 
 2. **Accept-side "oops, don't pay" → annotation, NOT teardown (THIS action item).**
    Never delete the honorarium `akoya_request` (a financial record) for a bad/test
-   accept. Instead, extend the **review closeout** so a PD marks payability:
-   e.g. `completed_payable` / `completed_not_payable` / `did_not_serve`. Ops reads
-   that flag when deciding payment.
+   accept. Instead, extend the **review closeout** so a PD marks payability.
+   **SUPERSEDED IN PART (owner, S369, 2026-07-22):** `did_not_serve` is NOT a
+   payability value — it is the missing terminal *status*, split into
+   `withdrew` (reviewer bailed) vs `released` (PD stood them down). Payability
+   therefore narrows to the genuinely-completed path, and the terminal status
+   is built FIRST. See [[project-reviewer-reliability-data]]. Ops reads the
+   payability flag when deciding payment.
 
 **Why:** post-accept resets are rare and dangerous (they orphan honorarium
 requests, uploaded reviews, review-answer snapshots). Payment is already manual +

@@ -123,7 +123,8 @@ Now we have read access to Dynamics and SharePoint, and leadership buy-in to use
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
 
-1. add the structured staff-review rescue surface and closeout payability disposition;
+1. add the structured staff-review rescue surface, then the terminal post-accept reviewer status
+   (`withdrew` vs `released`) and stamped review due date, then the closeout payability disposition;
 2. use the upcoming reviewer campaign as an evidence window while the legacy resolver remains authoritative;
 3. select optional reviewer UX work only from demonstrated staff friction.
 
