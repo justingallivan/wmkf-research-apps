@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-22
+last_verified: 2026-07-23
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -40,6 +40,9 @@ document inventory, and individual implementation plans do not establish priorit
 ## Durable Memory
 
 - Current priorities: `docs/CURRENT_WORK_QUEUE.md`.
+- Current reviewer reliability boundary: terminal post-accept status is the active slice; deadline
+  evidence and completed-review payability are separate designs. See
+  `docs/REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md`.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel: `project-virtual-review-panel`.
 - Roadmap snapshots: `project-app-roadmap-2026-04-25`, `project-phase-i-summary-app-winddown`.

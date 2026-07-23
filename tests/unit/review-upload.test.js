@@ -413,7 +413,7 @@ describe('writeReviewFiles — failure paths', () => {
     expect(operations[operations.length - 1].ifMatch).toBe('W/"upload-1"');
   });
 
-  test('concurrent same-filename race preserves a shared Graph item referenced by the winner', async () => {
+  test('concurrent same-filename race orphans the loser and preserves the winner', async () => {
     const initial = {
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
       _wmkf_request_value: REQUEST_ID,
@@ -435,16 +435,12 @@ describe('writeReviewFiles — failure paths', () => {
     };
 
     // Model Graph's replace identity hazard directly: both same-name uploads
-    // receive the same drive-item id. The service's unique attempt folders
-    // prevent path collision; the winner-folder identity check is the final
-    // guard that keeps cleanup from deleting a referenced item.
+    // receive the same drive-item id. Unique attempt folders prevent path
+    // collision, and the 412 loser is always orphaned rather than deleted.
     GraphService.uploadFile.mockImplementation(async (_library, folder, filename, buffer) => {
       uploadsByFolder.set(`${folder}/${filename}`, buffer);
       return sharedItem;
     });
-    GraphService.listFiles.mockImplementation(async (_library, folder) => (
-      folder === winnerFolder && sharedItemPresent ? [sharedItem] : []
-    ));
     GraphService.deleteFile.mockImplementation(async (_driveId, itemId) => {
       if (itemId === sharedItem.id) sharedItemPresent = false;
     });
@@ -461,11 +457,10 @@ describe('writeReviewFiles — failure paths', () => {
       };
     });
     DynamicsService.getRecord.mockImplementation(async (_entitySet, _id, options = {}) => {
-      if (String(options.select || '').includes('wmkf_reviewsharepointfolder')) {
+      if (String(options.select || '') === 'wmkf_appreviewersuggestionid,wmkf_reviewreceivedat,wmkf_reviewstatus') {
         return {
           wmkf_reviewstatus: 100000001,
           wmkf_reviewreceivedat: '2026-07-22T10:00:00.000Z',
-          wmkf_reviewsharepointfolder: winnerFolder,
           _etag: 'W/"winner"',
         };
       }
@@ -491,7 +486,7 @@ describe('writeReviewFiles — failure paths', () => {
     expect(loser).toMatchObject({
       ok: false,
       reason: 'review_received_locked',
-      cleanedUp: true,
+      cleanedUp: false,
     });
     const attemptedFolders = GraphService.uploadFile.mock.calls.map((call) => call[1]);
     expect(new Set(attemptedFolders).size).toBe(2);
@@ -502,9 +497,8 @@ describe('writeReviewFiles — failure paths', () => {
     ).resolves.toMatchObject({ filename: 'review.pdf', buffer: expect.any(Buffer) });
   });
 
-  // Codex S369 fourth-pass finding: on a 412, if the winner re-read fails or the
-  // winning row carries no folder yet, we cannot prove ownership of a shared
-  // Graph item — so the losing attempt must orphan, never blind-delete.
+  // Any 412 means another lifecycle or receipt write won. The unique losing
+  // attempt is always orphaned; winner inspection is only for classification.
   function setup412WithSharedItem() {
     const sharedItem = {
       id: 'graph-replaced-item',
@@ -522,7 +516,7 @@ describe('writeReviewFiles — failure paths', () => {
   test('412 with a failed winner re-read orphans the attempt instead of deleting the shared item', async () => {
     const sharedItem = setup412WithSharedItem();
     DynamicsService.getRecord.mockImplementation(async (_entitySet, _id, options = {}) => {
-      if (String(options.select || '').includes('wmkf_reviewsharepointfolder')) {
+      if (String(options.select || '') === 'wmkf_appreviewersuggestionid,wmkf_reviewreceivedat,wmkf_reviewstatus') {
         throw new Error('transient read failure');
       }
       return {
@@ -544,11 +538,11 @@ describe('writeReviewFiles — failure paths', () => {
     expect(GraphService.deleteFile).not.toHaveBeenCalledWith('drive-id-123', sharedItem.id);
   });
 
-  test('412 where the winning row has no folder yet orphans the attempt', async () => {
+  test('412 with a readable winner still orphans the attempt', async () => {
     const sharedItem = setup412WithSharedItem();
     DynamicsService.getRecord.mockImplementation(async (_entitySet, _id, options = {}) => {
-      if (String(options.select || '').includes('wmkf_reviewsharepointfolder')) {
-        return { wmkf_reviewstatus: 100000001, wmkf_reviewreceivedat: null, wmkf_reviewsharepointfolder: null, _etag: 'W/"winner"' };
+      if (String(options.select || '') === 'wmkf_appreviewersuggestionid,wmkf_reviewreceivedat,wmkf_reviewstatus') {
+        return { wmkf_reviewstatus: 100000001, wmkf_reviewreceivedat: null, _etag: 'W/"winner"' };
       }
       return {
         wmkf_appreviewersuggestionid: SUGGESTION_ID,

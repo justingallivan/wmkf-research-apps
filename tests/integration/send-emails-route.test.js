@@ -204,8 +204,6 @@ const draft = (id = SUG_1) => ({
   suggestionId: id,
   subject: 'S',
   body: 'B https://reviews.example.org/external/review/tok-1',
-  effectiveReviewDueDate: '2026-08-01',
-  effectiveReviewDueDateSource: 'settings',
 });
 
 describe('send-emails — reviewer portal HTML links', () => {

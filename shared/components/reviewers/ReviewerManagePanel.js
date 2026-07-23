@@ -207,9 +207,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
   const [step, setStep] = useState('compose'); // compose | preview | sending | sent
   const [progress, setProgress] = useState({ current: 0, total: 0, message: '' });
   const [drafts, setDrafts] = useState([]); // [{ suggestionId, candidateName, candidateEmail, requestNumber, subject, body, skipped? }]
-  const [sentResults, setSentResults] = useState({
-    sent: [], failed: [], skipped: [], sentButUnrecorded: [],
-  });
+  const [sentResults, setSentResults] = useState({ sent: [], failed: [], skipped: [] });
   const [error, setError] = useState(null);
   const [emailFields, setEmailFields] = useState({
     reviewDueDate: '',
@@ -252,7 +250,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
       setStep('compose');
       setProgress({ current: 0, total: 0, message: '' });
       setDrafts([]);
-      setSentResults({ sent: [], failed: [], skipped: [], sentButUnrecorded: [] });
+      setSentResults({ sent: [], failed: [], skipped: [] });
       setError(null);
     }
   }, [isOpen]);
@@ -534,7 +532,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
     setStep('sending');
     setProgress({ current: 0, total: sendable.length, message: 'Starting...' });
     setError(null);
-    setSentResults({ sent: [], failed: [], skipped: [], sentButUnrecorded: [] });
+    setSentResults({ sent: [], failed: [], skipped: [] });
 
     try {
       // Attach-proposal-email OFF (default): never send attachmentUrls — the
@@ -554,8 +552,6 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
             suggestionId: d.suggestionId,
             subject: d.subject,
             body: d.body,
-            effectiveReviewDueDate: d.effectiveReviewDueDate,
-            effectiveReviewDueDateSource: d.effectiveReviewDueDateSource,
           })),
           templateType,
           attachmentUrls,
@@ -588,17 +584,11 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                 setSentResults(prev => ({ ...prev, sent: [...prev.sent, data] }));
               } else if (currentEvent === 'email_failed') {
                 setSentResults(prev => ({ ...prev, failed: [...prev.failed, data] }));
-              } else if (currentEvent === 'email_sent_but_unrecorded') {
-                setSentResults(prev => ({
-                  ...prev,
-                  sentButUnrecorded: [...prev.sentButUnrecorded, data],
-                }));
               } else if (currentEvent === 'result') {
                 setSentResults({
                   sent: data.sent || [],
                   failed: data.failed || [],
                   skipped: data.skipped || [],
-                  sentButUnrecorded: data.sentButUnrecorded || [],
                 });
               } else if (currentEvent === 'complete') {
                 setStep('sent');
@@ -615,27 +605,6 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
     } catch (err) {
       setError(err.message);
       setStep('preview');
-    }
-  };
-
-  const repairMaterialsRecord = async (result) => {
-    try {
-      const response = await fetch(result.repairEndpoint || '/api/review-manager/repair-materials-send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          repairReceipt: result.repairReceipt,
-        }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.ok) throw new Error(data.error || `Repair failed (${response.status})`);
-      setSentResults(prev => ({
-        ...prev,
-        sentButUnrecorded: prev.sentButUnrecorded.filter((row) => row.suggestionId !== result.suggestionId),
-      }));
-      if (onEmailsSent) onEmailsSent();
-    } catch (repairError) {
-      setError(repairError.message);
     }
   };
 
@@ -959,9 +928,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                 )}
                 <p className="text-sm text-gray-500">{progress.current} / {progress.total}</p>
               </div>
-              {(sentResults.sent.length > 0
-                || sentResults.failed.length > 0
-                || sentResults.sentButUnrecorded.length > 0) && (
+              {(sentResults.sent.length > 0 || sentResults.failed.length > 0) && (
                 <div className="border-t border-gray-200 pt-3 space-y-1 max-h-48 overflow-y-auto">
                   {sentResults.sent.map(s => (
                     <div key={`s-${s.suggestionId}`} className="flex items-center gap-2 text-sm text-green-700">
@@ -973,12 +940,6 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                       <span>✗</span><span>{f.candidateName}</span><span className="text-red-500 text-xs">{f.error}</span>
                     </div>
                   ))}
-                  {sentResults.sentButUnrecorded.map(s => (
-                    <div key={`u-${s.suggestionId}`} className="flex items-center gap-2 text-sm text-amber-700">
-                      <span>!</span><span>{s.candidateName}</span>
-                      <span className="text-amber-600 text-xs">sent, tracking repair required</span>
-                    </div>
-                  ))}
                 </div>
               )}
             </div>
@@ -988,11 +949,9 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
             <div className="space-y-4">
               <div className="text-center py-4">
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${
-                  sentResults.failed.length === 0 && sentResults.sentButUnrecorded.length === 0
-                    ? 'bg-green-100'
-                    : 'bg-yellow-100'
-                }`}>
-                  <svg className={`w-6 h-6 ${sentResults.failed.length === 0 && sentResults.sentButUnrecorded.length === 0 ? 'text-green-600' : 'text-yellow-600'}`}
+                  sentResults.failed.length === 0 ? 'bg-green-100' : 'bg-yellow-100'
+                  }`}>
+                  <svg className={`w-6 h-6 ${sentResults.failed.length === 0 ? 'text-green-600' : 'text-yellow-600'}`}
                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
@@ -1001,8 +960,6 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                   {sentResults.sent.length} sent
                   {sentResults.failed.length > 0 && `, ${sentResults.failed.length} failed`}
                   {sentResults.skipped.length > 0 && `, ${sentResults.skipped.length} skipped`}
-                  {sentResults.sentButUnrecorded.length > 0
-                    && `, ${sentResults.sentButUnrecorded.length} sent but not recorded`}
                 </p>
               </div>
               <div className="space-y-1">
@@ -1024,25 +981,6 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                       <span className="text-gray-500 text-xs">{f.candidateEmail}</span>
                     </div>
                     <p className="text-xs text-red-700 ml-6">{f.error}</p>
-                  </div>
-                ))}
-                {sentResults.sentButUnrecorded.map(s => (
-                  <div key={`u-${s.suggestionId}`} className="p-2 bg-amber-50 rounded text-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <span className="font-medium text-gray-900">{s.candidateName}</span>
-                        <p className="text-xs text-amber-800">
-                          Email sent, but the due-date/lifecycle stamp was not recorded. Do not resend.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => repairMaterialsRecord(s)}
-                        className="shrink-0 px-2 py-1 text-xs font-medium text-amber-900 border border-amber-300 rounded hover:bg-amber-100"
-                      >
-                        Repair recording
-                      </button>
-                    </div>
                   </div>
                 ))}
                 {sentResults.skipped.map(s => (

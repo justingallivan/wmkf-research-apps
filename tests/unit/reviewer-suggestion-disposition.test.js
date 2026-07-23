@@ -52,10 +52,6 @@ const ENGAGEMENT_STAMP_RESET_PAYLOAD = {
   wmkf_completedat: null,
   wmkf_withdrawnsufficientat: null,
   wmkf_proposalfirstaccessed: null,
-  // S369: the due-date ledger is engagement state and must reset with the rest,
-  // else a restore + re-send scores the new engagement against the old deadline.
-  wmkf_reviewduedateatsend: null,
-  wmkf_reviewduedatelastsent: null,
 };
 
 let original;
@@ -594,19 +590,4 @@ describe('terminal engagements survive the other write paths', () => {
     expect(opts.ifMatch).toBe('W/"1"');
   });
 
-  test('restore clears BOTH due-date ledger columns', async () => {
-    // A restore that leaves atSend behind makes the send path treat the new
-    // engagement as already stamped, scoring it against the old deadline.
-    DynamicsService.getRecord.mockResolvedValue({
-      wmkf_selected: false,
-      wmkf_applicantdisposition: null,
-      wmkf_reviewduedateatsend: '2026-01-01',
-      wmkf_reviewduedatelastsent: '2026-01-01',
-      _etag: 'W/\"42\"',
-    });
-    await restore(SUGGESTION_ID, { actingUserSystemId: 'SYS-1' });
-    const patched = DynamicsService.updateRecord.mock.calls.find((c) => c[2] && 'wmkf_selected' in c[2]);
-    expect(patched[2].wmkf_reviewduedateatsend).toBeNull();
-    expect(patched[2].wmkf_reviewduedatelastsent).toBeNull();
-  });
 });

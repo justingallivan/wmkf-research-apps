@@ -32,12 +32,6 @@ const ENGAGEMENT_STAMP_RESET_PAYLOAD = {
   wmkf_completedat: null,
   wmkf_withdrawnsufficientat: null,
   wmkf_proposalfirstaccessed: null,
-  // S369: the due-date ledger resets with the rest of the engagement stamps, on
-  // BOTH re-add paths (staff manual re-add and Removed-list restore). Leaving
-  // them behind would make the send path treat a re-added candidate as already
-  // stamped and score the new engagement against the previous deadline.
-  wmkf_reviewduedateatsend: null,
-  wmkf_reviewduedatelastsent: null,
 };
 const ENGAGEMENT_STAMP_RESET_FIELDS = Object.keys(ENGAGEMENT_STAMP_RESET_PAYLOAD);
 

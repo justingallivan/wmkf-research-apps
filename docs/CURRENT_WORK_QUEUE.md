@@ -6,12 +6,13 @@ status: canonical
 summary: Canonical priority queue separating current commitments, evidence windows, optional work, external dependencies, and parked programs.
 canonical: true
 cataloged: 2026-07-22
-last_verified: 2026-07-22
+last_verified: 2026-07-23
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
   - docs/STRATEGY.md
   - docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md
+  - docs/REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md
   - docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md
   - docs/REVIEWER_IDENTITY_CONTACT_PLAN.md
   - docs/REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md
@@ -31,7 +32,7 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Reviewer operational safety tools | Structured staff review entry is live in production. Next add the terminal post-accept status (`withdrew` vs `released`) plus a due date stamped onto the engagement row, then the payability disposition on the completed path. Keep pre-accept reset separate from post-accept financial annotation. | Each feature independently verified through UI → route → service → Dataverse → consumer, then deliberately promoted. |
+| 1 | Reviewer operational safety tools | Structured staff review entry is live in production. The active branch adds only the terminal post-accept status (`withdrew` vs `released`). Deadline evidence is a separate owner-reviewed design based on durable, ordered materials dispatches; completed-review payability remains another independent feature. Keep pre-accept reset separate from both terminal status and post-accept financial annotation. | Each feature independently verified through UI → route → service → Dataverse → consumer, then deliberately promoted. |
 | 2 | Reviewer campaign evidence window | Keep the legacy resolver authoritative during the upcoming run. Record W2 shadow disagreements, wrong/missed identity outcomes, email confirmation, staff corrections, invitations, and review completion. | Post-run evidence review; no automatic cutover. |
 | 3 | Optional reviewer UX triage | Select only improvements supported by observed staff friction. Current candidates: campaign-settings discoverability/defaults, review-output formatting, and global reviewer notes/flags or a Reviewer Pool. | Separate owner choice for each item; absence from this selection means no build. |
 

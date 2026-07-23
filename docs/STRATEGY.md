@@ -6,7 +6,7 @@ status: active
 summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-07-22
+last_verified: 2026-07-23
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -123,8 +123,9 @@ Now we have read access to Dynamics and SharePoint, and leadership buy-in to use
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
 
-1. add the structured staff-review rescue surface, then the terminal post-accept reviewer status
-   (`withdrew` vs `released`) and stamped review due date, then the closeout payability disposition;
+1. ship the terminal post-accept reviewer status (`withdrew` vs `released`) independently; design
+   deadline evidence separately around durable, ordered materials dispatches; keep completed-review
+   payability as another independent feature;
 2. use the upcoming reviewer campaign as an evidence window while the legacy resolver remains authoritative;
 3. select optional reviewer UX work only from demonstrated staff friction.
 
