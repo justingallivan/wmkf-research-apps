@@ -381,7 +381,7 @@ describe('writeReviewFiles — failure paths', () => {
     errSpy.mockRestore();
   });
 
-  test('terminal transition racing the receipt changeset fails closed and cleans up SharePoint', async () => {
+  test('terminal transition racing the receipt changeset fails closed and orphans its attempt', async () => {
     const initial = {
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
       _wmkf_request_value: REQUEST_ID,
@@ -392,17 +392,23 @@ describe('writeReviewFiles — failure paths', () => {
       _etag: 'W/"upload-1"',
       wmkf_Request: { akoya_requestid: REQUEST_ID, akoya_requestnum: REQUEST_NUMBER },
     };
+    // The winner here is a STATUS change (terminal transition), so the row
+    // carries no reviewsharepointfolder. Post fourth-pass fix the service cannot
+    // prove which files the winner owns from a 412 alone, so it orphans the
+    // losing attempt rather than risk deleting a shared Graph item — a few
+    // orphaned files in a token-scoped attempt folder beat deleting a winner's
+    // referenced review. Classification is still engagement_ended.
     DynamicsService.getRecord
       .mockResolvedValueOnce(initial)
-      .mockResolvedValueOnce({ wmkf_reviewstatus: 100000005, wmkf_reviewreceivedat: null, _etag: 'W/"terminal"' });
+      .mockResolvedValueOnce({ wmkf_reviewstatus: 100000005, wmkf_reviewreceivedat: null, wmkf_reviewsharepointfolder: null, _etag: 'W/"terminal"' });
     DynamicsService.executeChangeset.mockRejectedValueOnce(
       Object.assign(new Error('precondition failed'), { status: 412 }),
     );
 
     const result = await writeReviewFiles(validInput());
 
-    expect(result).toMatchObject({ ok: false, reason: 'engagement_ended', cleanedUp: true });
-    expect(GraphService.deleteFile).toHaveBeenCalledWith('drive-id-123', 'item-1');
+    expect(result).toMatchObject({ ok: false, reason: 'engagement_ended', cleanedUp: false });
+    expect(GraphService.deleteFile).not.toHaveBeenCalled();
     const [operations] = DynamicsService.executeChangeset.mock.calls[0];
     expect(operations[operations.length - 1].ifMatch).toBe('W/"upload-1"');
   });
@@ -494,6 +500,73 @@ describe('writeReviewFiles — failure paths', () => {
     await expect(
       GraphService.downloadFileByPath('akoya_request', winnerFolder, 'review.pdf'),
     ).resolves.toMatchObject({ filename: 'review.pdf', buffer: expect.any(Buffer) });
+  });
+
+  // Codex S369 fourth-pass finding: on a 412, if the winner re-read fails or the
+  // winning row carries no folder yet, we cannot prove ownership of a shared
+  // Graph item — so the losing attempt must orphan, never blind-delete.
+  function setup412WithSharedItem() {
+    const sharedItem = {
+      id: 'graph-replaced-item',
+      name: 'review.pdf',
+      size: PDF_BYTES.length,
+      webUrl: 'https://example/shared',
+    };
+    GraphService.uploadFile.mockResolvedValue(sharedItem);
+    DynamicsService.executeChangeset.mockRejectedValue(
+      Object.assign(new Error('precondition failed'), { status: 412 }),
+    );
+    return sharedItem;
+  }
+
+  test('412 with a failed winner re-read orphans the attempt instead of deleting the shared item', async () => {
+    const sharedItem = setup412WithSharedItem();
+    DynamicsService.getRecord.mockImplementation(async (_entitySet, _id, options = {}) => {
+      if (String(options.select || '').includes('wmkf_reviewsharepointfolder')) {
+        throw new Error('transient read failure');
+      }
+      return {
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        _wmkf_request_value: REQUEST_ID,
+        wmkf_reviewstatus: 100000001,
+        wmkf_accepted: true,
+        wmkf_declined: false,
+        wmkf_reviewreceivedat: null,
+        _etag: 'W/"upload-1"',
+        wmkf_Request: { akoya_requestid: REQUEST_ID, akoya_requestnum: REQUEST_NUMBER },
+      };
+    });
+
+    const result = await writeReviewFiles(validInput({ files: [{ filename: 'review.pdf', buffer: PDF_BYTES }] }));
+
+    expect(result.ok).toBe(false);
+    expect(result.cleanedUp).toBe(false);
+    expect(GraphService.deleteFile).not.toHaveBeenCalledWith('drive-id-123', sharedItem.id);
+  });
+
+  test('412 where the winning row has no folder yet orphans the attempt', async () => {
+    const sharedItem = setup412WithSharedItem();
+    DynamicsService.getRecord.mockImplementation(async (_entitySet, _id, options = {}) => {
+      if (String(options.select || '').includes('wmkf_reviewsharepointfolder')) {
+        return { wmkf_reviewstatus: 100000001, wmkf_reviewreceivedat: null, wmkf_reviewsharepointfolder: null, _etag: 'W/"winner"' };
+      }
+      return {
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        _wmkf_request_value: REQUEST_ID,
+        wmkf_reviewstatus: 100000001,
+        wmkf_accepted: true,
+        wmkf_declined: false,
+        wmkf_reviewreceivedat: null,
+        _etag: 'W/"upload-1"',
+        wmkf_Request: { akoya_requestid: REQUEST_ID, akoya_requestnum: REQUEST_NUMBER },
+      };
+    });
+
+    const result = await writeReviewFiles(validInput({ files: [{ filename: 'review.pdf', buffer: PDF_BYTES }] }));
+
+    expect(result.ok).toBe(false);
+    expect(result.cleanedUp).toBe(false);
+    expect(GraphService.deleteFile).not.toHaveBeenCalledWith('drive-id-123', sharedItem.id);
   });
 });
 

@@ -445,6 +445,47 @@ unaccepted states still fail closed. The signed nonce remains validated receipt
 entropy and the pre-dispatch ETag remains signed source evidence; neither is the
 durable idempotency key.
 
+## Revision 7 — fourth-pass fix and one deferred limitation (2026-07-23)
+
+A fourth adversarial pass raised two `[high]` findings. Severity has been
+narrowing each round (3 → 4 → 2 → 2) and both were now second-order — edge cases
+of the Revision 6 fixes on a path that no row can reach until provisioning.
+
+**Fixed here — upload cleanup could still delete a winner on an unverifiable
+412.** The Revision 6 cleanup fell through to an unconditional delete when the
+winner re-read returned null or the winning row carried no folder yet. That is
+now keyed on the failure type: a non-412 failure means this attempt is the sole
+writer (safe to clean up its own items); a 412 deletes only when the winner
+folder was read and listed, and otherwise **orphans** the losing attempt rather
+than risk deleting a shared Graph item. Consequence, asserted by test: a terminal
+transition (or any status-change) winning the receipt race now leaves the loser's
+files orphaned in its token-scoped `attempt_<uuid>` folder — storage litter, not
+a content leak, and strictly safer than the prior blind delete.
+
+**Deferred — repair ordering and cross-engagement replay need durable dispatch
+identity (owner review, metric session).** Two residuals remain, both requiring
+schema that is intentionally frozen, so they are recorded rather than patched:
+
+1. **Out-of-order repair of two failed dispatches.** Idempotency keys on the
+   mutable `wmkf_materialssentat` / `wmkf_reviewduedatelastsent`. If two sends
+   both fail their inline stamp and the *newer* receipt is repaired first, the
+   set-once `atSend` binds to the newer deadline and the older receipt is then
+   rejected as stale — losing the true first commitment. In practice this needs
+   two failed inline stamps on one engagement plus reverse-order repair.
+2. **Restore-then-replay across engagements.** `ENGAGEMENT_STAMP_RESET` clears
+   both due-date columns on restore, so an unexpired receipt minted before a
+   removal could be replayed after re-acceptance; neither the signed nonce nor
+   the pre-dispatch ETag is bound to an engagement generation.
+
+The correct fix for both is a **durable per-dispatch identity / engagement
+generation** (a persisted nonce ledger or an email-activity id), from which
+`atSend` derives from the earliest dispatch and `lastSent` from the latest within
+a generation. That is a new durable surface, so it belongs with the Wave 14
+provisioning decision and the reliability-metric design, not ahead of them. Until
+then the receipt window is 15 minutes and both scenarios require a specific
+multi-step operator sequence on an unprovisioned feature. Tracked in
+`.claude-memory/project-reviewer-reliability-data.md`.
+
 ## Review history
 
 Revision 2 (2026-07-22) incorporates a Codex adversarial review of revision 1,

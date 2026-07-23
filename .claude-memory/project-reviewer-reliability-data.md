@@ -113,5 +113,27 @@ added because the tuple is already represented by the suggestion id plus
 **[VERIFIED 2026-07-23 on the feature branch] Review uploads are attempt-owned.**
 Each attempt uses a unique SharePoint `attempt_<uuid>` subfolder and persists
 that exact folder on the winning row. A 412 loser rolls back only its attempt
-and excludes item ids visible in the winner's persisted folder, so Graph
-replace/shared-identity behavior cannot delete the winner's downloadable file.
+and excludes item ids visible in the winner's persisted folder; when winner
+ownership cannot be verified (winner re-read fails, or the winning row carries no
+folder yet — e.g. a status-change won the race) it orphans rather than delete, so
+Graph replace/shared-identity behavior cannot delete the winner's downloadable
+file.
+
+**DEFERRED to this metric session — repair ordering + cross-engagement replay
+need durable dispatch identity (owner review).** Two residuals from the S369
+fourth adversarial pass require schema that is intentionally frozen, so they are
+recorded, not patched: (1) if two materials sends both fail their inline stamp
+and the NEWER receipt is repaired first, set-once `atSend` binds to the newer
+deadline and the older receipt is rejected as stale — losing the true first
+commitment; (2) `ENGAGEMENT_STAMP_RESET` clears both due-date columns on restore,
+so an unexpired receipt from a prior engagement could replay after re-acceptance
+(neither the signed nonce nor the pre-dispatch ETag is bound to an engagement
+generation). Both need a durable per-dispatch identity / engagement generation
+(persisted nonce ledger or email-activity id) from which `atSend` derives from
+the earliest dispatch and `lastSent` from the latest — a NEW durable surface that
+belongs with the Wave 14 provisioning decision, not ahead of it. Receipt window
+is 15 min; both scenarios need a specific multi-step operator sequence on an
+unprovisioned feature. Full detail: `docs/REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md`
+Revision 7. The S369 fix/review loop was deliberately STOPPED here (owner,
+2026-07-23): severity was converging to exotic concurrency corners on an
+unreachable path whose real fix is provisioning-gated anyway.
