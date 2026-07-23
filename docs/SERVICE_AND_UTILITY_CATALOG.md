@@ -63,8 +63,10 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ### Reviewer / honorarium
 
+- **`review-receipt-guard.js`** — Shared terminal/finality/accepted/ETag authorization for every request-time review-receipt sink; classifiers turn a lost If-Match race into `engagement_ended`, `review_received_locked`, or `conflict`.
+- **`review-manager/terminal-transition-service.js`** — Dedicated fail-closed post-accept `withdrew`/`released` transition. Fresh per-row eligibility read, explicit partial-success statuses, and ETag-conditional writes so a concurrent submission wins.
 - **`review-manager/manual-review-entry-service.js`** — Staff rescue for recording a complete structured review from the Workbench Reviews tab. Reuses the external review question set, sanitizer, validator, canonical submission producer, and atomic ETag-guarded parent/answer-row changeset; deletes a stale external draft only after commit.
-- **`review-upload.js`** — Shared `writeReviewFiles` core for staff + reviewer-self upload paths; SharePoint write + Dataverse PATCH + rollback.
+- **`review-upload.js`** — Shared `writeReviewFiles` core for staff + reviewer-self upload paths; shared receipt authorization, unique per-attempt SharePoint folders persisted on the winning row, and an ETag-bound Dataverse write. Ordinary Dataverse failures clean up the caller's attempt; every 412 race loser is orphaned and never deleted because winner ownership cannot be inferred safely.
 - **`reviewer-campaign-timeline.js`** — Dataverse `wmkf_appsystemsettings` reader/writer for current-cycle reviewer invitation timeline defaults (`reviewer.campaign_timeline_defaults`); admin-editable, read by `InviteEmailModal` before request-level campaign config.
 - **`external-token.js`** — HS256 HMAC JWT primitive for external-reviewer magic links; hash-only storage for cheap revocation. 32+ char `EXTERNAL_LINK_SECRET`; rotation supported via `EXTERNAL_LINK_SECRET_PREVIOUS`.
 

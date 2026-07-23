@@ -135,6 +135,30 @@ test('shows an empty state when no reviewer has submitted', async () => {
   expect(screen.queryByText('Export:')).not.toBeInTheDocument();
 });
 
+test('terminal reviewers are excluded from Outstanding even without reviewReceivedAt', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewers: [
+          { suggestionId: 'pending', name: 'Dr. Pending', reviewStatus: 'materials_sent' },
+          { suggestionId: 'withdrew', name: 'Dr. Withdrew', reviewStatus: 'withdrew' },
+          { suggestionId: 'released', name: 'Dr. Released', reviewStatus: 'released' },
+        ],
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+
+  expect(await screen.findByText(/Outstanding \(1\)/)).toBeInTheDocument();
+  expect(screen.getByText('Dr. Pending')).toBeInTheDocument();
+  expect(screen.queryByText('Dr. Withdrew')).not.toBeInTheDocument();
+  expect(screen.queryByText('Dr. Released')).not.toBeInTheDocument();
+});
+
 test('Phase 3: the Export affordance appears once a review is submitted', async () => {
   fetch.mockResolvedValue({
     ok: true,

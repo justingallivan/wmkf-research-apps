@@ -380,7 +380,7 @@ describe('concurrency + failure mapping', () => {
 describe('fail-closed on missing parent etag (Codex P1)', () => {
   it('re-reads for a fresh etag when the verified suggestion lacks one, then writes guarded', async () => {
     verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion({ _etag: undefined }), payload: { ops: ['download_proposal', 'upload_review'] } });
-    DynamicsService.getRecord.mockResolvedValue({ _etag: 'W/"reread"' });
+    DynamicsService.getRecord.mockResolvedValue(suggestion({ _etag: 'W/"reread"' }));
     const { req, res } = post({ answers: validAnswers() });
     await handler(req, res);
 
@@ -419,13 +419,34 @@ describe('fail-closed on missing parent etag (Codex P1)', () => {
     expect(ReviewDraftService.deleteBySuggestion).not.toHaveBeenCalled();
   });
 
+  it('missing-etag fallback rejects a terminal transition instead of acquiring its fresh ETag', async () => {
+    verifySuggestionToken.mockResolvedValue({
+      ok: true,
+      suggestion: suggestion({ _etag: undefined }),
+      payload: { ops: ['download_proposal', 'upload_review'] },
+    });
+    DynamicsService.getRecord.mockResolvedValue(suggestion({
+      _etag: 'W/"terminal"',
+      wmkf_reviewstatus: 100000006,
+      wmkf_reviewreceivedat: null,
+    }));
+
+    const { req, res } = post({ answers: validAnswers() });
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(409);
+    expect(res._data).toMatchObject({ reason: 'engagement_ended' });
+    expect(DynamicsService.executeChangeset).not.toHaveBeenCalled();
+  });
+
   it('re-read selects both the etag and receivedat (so the finality re-check is possible)', async () => {
     verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion({ _etag: undefined }), payload: { ops: ['download_proposal', 'upload_review'] } });
-    DynamicsService.getRecord.mockResolvedValue({ _etag: 'W/"reread"' });
+    DynamicsService.getRecord.mockResolvedValue(suggestion({ _etag: 'W/"reread"' }));
     const { req, res } = post({ answers: validAnswers() });
     await handler(req, res);
     expect(res.statusCode).toBe(200);
     const selectArg = DynamicsService.getRecord.mock.calls[0][2].select;
     expect(selectArg).toContain('wmkf_reviewreceivedat');
+    expect(selectArg).toContain('wmkf_reviewstatus');
   });
 });

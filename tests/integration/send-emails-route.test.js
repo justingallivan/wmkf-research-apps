@@ -41,6 +41,7 @@ const updateLifecycle = jest.fn(async () => {});
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findById: (...a) => findById(...a),
   updateLifecycle: (...a) => updateLifecycle(...a),
+  REVIEW_STATUS_MAP: { accepted: 100000000, materials_sent: 100000001, under_review: 100000002 },
 }));
 const mockFindOrCreateByEmail = jest.fn(async () => ({ id: 'c-1', created: false }));
 const mockSetContactLink = jest.fn(async () => {});
@@ -105,6 +106,7 @@ let CYCLE_CODE;     // meetingDateToCycleCode() → this
 let CYCLE_CONFIG;   // findByShortCode() → this (cycle materials live here)
 let ORIGINAL_REVIEWER_EMAIL_DELIVERY_MODE;
 let ORIGINAL_VERCEL_ENV;
+let ORIGINAL_NEXTAUTH_SECRET;
 
 function baseSuggestion(over = {}) {
   return {
@@ -117,6 +119,7 @@ function baseSuggestion(over = {}) {
     wmkf_responsetype: null,
     wmkf_reviewstatus: null,
     wmkf_honorariumoptout: false,
+    _etag: 'W/"1"',
     ...over,
   };
 }
@@ -141,6 +144,7 @@ let handler;
 beforeAll(async () => {
   ORIGINAL_REVIEWER_EMAIL_DELIVERY_MODE = process.env.REVIEWER_EMAIL_DELIVERY_MODE;
   ORIGINAL_VERCEL_ENV = process.env.VERCEL_ENV;
+  ORIGINAL_NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET;
   handler = (await import('../../pages/api/review-manager/send-emails')).default;
 });
 beforeEach(() => {
@@ -164,6 +168,11 @@ beforeEach(() => {
   else process.env.REVIEWER_EMAIL_DELIVERY_MODE = ORIGINAL_REVIEWER_EMAIL_DELIVERY_MODE;
   if (ORIGINAL_VERCEL_ENV === undefined) delete process.env.VERCEL_ENV;
   else process.env.VERCEL_ENV = ORIGINAL_VERCEL_ENV;
+  process.env.NEXTAUTH_SECRET = 'send-emails-route-test-signing-secret';
+});
+afterAll(() => {
+  if (ORIGINAL_NEXTAUTH_SECRET === undefined) delete process.env.NEXTAUTH_SECRET;
+  else process.env.NEXTAUTH_SECRET = ORIGINAL_NEXTAUTH_SECRET;
 });
 
 // Parse the SSE writes into {event, data} pairs.
@@ -191,7 +200,11 @@ async function run(body) {
 // Body carries a secure-review link by default so invitation-templateType
 // drafts clear the body-integrity gate (missing_secure_link / unresolved_placeholder)
 // and exercise the real send path — tests of the gate itself override body.
-const draft = (id = SUG_1) => ({ suggestionId: id, subject: 'S', body: 'B https://reviews.example.org/external/review/tok-1' });
+const draft = (id = SUG_1) => ({
+  suggestionId: id,
+  subject: 'S',
+  body: 'B https://reviews.example.org/external/review/tok-1',
+});
 
 describe('send-emails — reviewer portal HTML links', () => {
   test('refuses to send when the outgoing subject/body contains the internal request number', async () => {

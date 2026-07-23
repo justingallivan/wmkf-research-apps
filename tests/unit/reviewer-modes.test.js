@@ -18,11 +18,12 @@ const {
   workRemainingForMode,
   computeDefaultSub,
   computeCanManage,
+  canTransitionToTerminal,
 } = require('../../shared/components/reviewers/reviewer-modes.js');
 
-// Mirror of REVIEW_STATUS_BY_VALUE in pages/api/review-manager/reviewers.js —
+// Mirror of REVIEW_STATUS_BY_VALUE in lib/services/review-manager/reviewers-service.js —
 // the authoritative set of statuses the GET can emit.
-const API_STATUSES = ['accepted', 'materials_sent', 'under_review', 'review_received', 'complete'];
+const API_STATUSES = ['accepted', 'materials_sent', 'under_review', 'review_received', 'complete', 'withdrew', 'released'];
 
 const rev = (reviewStatus) => ({ suggestionId: `s-${reviewStatus}-${Math.random()}`, reviewStatus });
 
@@ -70,14 +71,14 @@ describe('filterByMode', () => {
   const all = API_STATUSES.map(rev);
 
   it('returns everything for "all" / undefined / unknown mode', () => {
-    expect(filterByMode(all, 'all')).toHaveLength(5);
-    expect(filterByMode(all, undefined)).toHaveLength(5);
-    expect(filterByMode(all, 'nonsense')).toHaveLength(5);
+    expect(filterByMode(all, 'all')).toHaveLength(7);
+    expect(filterByMode(all, undefined)).toHaveLength(7);
+    expect(filterByMode(all, 'nonsense')).toHaveLength(7);
   });
 
   it('scopes to the mode bucket', () => {
     expect(filterByMode(all, 'track').map(r => r.reviewStatus))
-      .toEqual(['accepted', 'materials_sent', 'under_review', 'review_received', 'complete']);
+      .toEqual(['accepted', 'materials_sent', 'under_review', 'review_received', 'complete', 'withdrew', 'released']);
   });
 
   it('tolerates null/empty input', () => {
@@ -91,10 +92,13 @@ describe('filterByMode', () => {
 });
 
 describe('countForMode / workRemainingForMode', () => {
-  const reviewers = [rev('accepted'), rev('accepted'), rev('materials_sent'), rev('review_received'), rev('complete')];
+  const reviewers = [
+    rev('accepted'), rev('accepted'), rev('materials_sent'), rev('review_received'),
+    rev('complete'), rev('withdrew'), rev('released'),
+  ];
 
   it('counts visible reviewers per mode', () => {
-    expect(countForMode(reviewers, 'track')).toBe(5);
+    expect(countForMode(reviewers, 'track')).toBe(7);
   });
 
   it('work-remaining excludes done-in-stage statuses', () => {
@@ -104,6 +108,21 @@ describe('countForMode / workRemainingForMode', () => {
   it('handles empty/null', () => {
     expect(countForMode([], 'track')).toBe(0);
     expect(workRemainingForMode(null, 'track')).toBe(0);
+  });
+});
+
+describe('terminal transition convenience predicate', () => {
+  it.each(['accepted', 'materials_sent', 'under_review'])('allows in-flight source %s', (reviewStatus) => {
+    expect(canTransitionToTerminal({ reviewStatus, submitted: false, reviewReceivedAt: null })).toBe(true);
+  });
+
+  it.each(['review_received', 'complete', 'withdrew', 'released'])('rejects non-source %s', (reviewStatus) => {
+    expect(canTransitionToTerminal({ reviewStatus, submitted: false, reviewReceivedAt: null })).toBe(false);
+  });
+
+  it('rejects a submitted/received row even if its displayed status is stale', () => {
+    expect(canTransitionToTerminal({ reviewStatus: 'under_review', submitted: true })).toBe(false);
+    expect(canTransitionToTerminal({ reviewStatus: 'under_review', reviewReceivedAt: '2026-07-22' })).toBe(false);
   });
 });
 

@@ -22,6 +22,7 @@ const updateLifecycle = jest.fn(async () => {});
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findById: (...a) => findById(...a),
   updateLifecycle: (...a) => updateLifecycle(...a),
+  REVIEW_STATUS_MAP: { accepted: 100000000, materials_sent: 100000001, under_review: 100000002 },
 }));
 const getPersonById = jest.fn(async (id) => PERSONS[id] ?? null);
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
@@ -62,6 +63,7 @@ const { loadCycleConfigs } = require('../../lib/services/review-manager/cycle-co
 const SUG_OK = '11111111-1111-4111-8111-111111111111';
 const SUG_NO_EMAIL = '22222222-2222-4222-8222-222222222222';
 const SUG_MISSING = '33333333-3333-4333-8333-333333333333';
+const REQUEST_ID = '44444444-4444-4444-8444-444444444444';
 
 let SUGGESTIONS;
 let PERSONS;
@@ -73,10 +75,11 @@ function suggestion(id, over = {}) {
   return {
     wmkf_appreviewersuggestionid: id,
     _wmkf_potentialreviewer_value: `person-${id}`,
-    _wmkf_request_value: 'req-1',
+    _wmkf_request_value: REQUEST_ID,
     wmkf_accepted: false,
     wmkf_invited: false,
     wmkf_reviewstatus: null,
+    _etag: 'W/"1"',
     ...over,
   };
 }
@@ -96,7 +99,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   SUGGESTIONS = { [SUG_OK]: suggestion(SUG_OK) };
   PERSONS = { [`person-${SUG_OK}`]: person(`person-${SUG_OK}`) };
-  REQUEST = { akoya_requestid: 'req-1', akoya_requestnum: 'REQ-001', wmkf_meetingdate: null };
+  REQUEST = { akoya_requestid: REQUEST_ID, akoya_requestnum: 'REQ-001', wmkf_meetingdate: null };
   CYCLE_CODE = null;
   CYCLE = null;
   delete process.env.REVIEWER_EMAIL_DELIVERY_MODE;
@@ -115,7 +118,11 @@ const resultOf = (emitted) => emitted.find((e) => e.event === 'result')?.data;
 // Body carries a secure-review link by default so invitation-templateType
 // drafts clear the body-integrity gate (missing_secure_link / unresolved_placeholder)
 // and exercise the real send path — tests of the gate itself override body.
-const draft = (id) => ({ suggestionId: id, subject: 'S', body: 'B https://reviews.example.org/external/review/tok-1' });
+const draft = (id) => ({
+  suggestionId: id,
+  subject: 'S',
+  body: 'B https://reviews.example.org/external/review/tok-1',
+});
 
 describe('send-emails-service — fail-closed templateType', () => {
   test('unknown templateType: ONE error event, resolves, no result/complete, no adapter work', async () => {
@@ -251,6 +258,18 @@ describe('send-emails-service — lifecycle-after-send ordering', () => {
   });
 });
 
+describe('send-emails-service — terminal thank-you guard', () => {
+  test.each([100000005, 100000006])('thank-you does not resurrect terminal status %s', async (terminalValue) => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true, wmkf_reviewstatus: terminalValue });
+    await run({ drafts: [draft(SUG_OK)], templateType: 'thankyou' });
+    expect(updateLifecycle).toHaveBeenCalledWith(
+      SUG_OK,
+      { thankYouSentAt: expect.any(String) },
+      { actingUserSystemId: 'u-1' },
+    );
+  });
+});
+
 describe('send-emails-service — invitation body-integrity gate', () => {
   test('an invitation with no secure link is skipped missing_secure_link and never sent', async () => {
     const emitted = await run({
@@ -282,7 +301,11 @@ describe('send-emails-service — invitation body-integrity gate', () => {
   test('the body-integrity gate does not apply to non-invitation templateTypes', async () => {
     SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
     const emitted = await run({
-      drafts: [{ suggestionId: SUG_OK, subject: 'S', body: 'No link here.' }],
+      drafts: [{
+        suggestionId: SUG_OK,
+        subject: 'S',
+        body: 'No link here.',
+      }],
       templateType: 'materials',
     });
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
@@ -371,6 +394,7 @@ describe('cycle-config-loader — per-caller projection shape', () => {
       short_code: 'CYC',
       review_template_blob_url: 'https://blob/template.docx',
       additional_attachments: [{ pathname: 'cycle-materials/p.pdf' }],
+      review_deadline: undefined,
     });
   });
 

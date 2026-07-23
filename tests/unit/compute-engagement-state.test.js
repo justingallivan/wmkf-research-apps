@@ -91,3 +91,33 @@ describe('computeEngagementState — anomalous held+terminal rows keep terminal 
     expect(r.view).toBe('stage2b');
   });
 });
+
+// S369 adversarial finding (confirmed): 100000005/100000006 are numerically
+// ABOVE materials_sent, so the `>= REVIEW_STATUS_MATERIALS_SENT` branch
+// classified terminal rows as active stage2b reviewers and handed a withdrawn
+// reviewer the live review form — fabricating the very review history the
+// terminal status exists to prevent.
+describe('terminal statuses never reach the review form (S369)', () => {
+  test.each([
+    ['withdrew', 100000005],
+    ['released', 100000006],
+  ])('%s is not stage2b and cannot flip state', (_label, statusValue) => {
+    const state = computeEngagementState({
+      wmkf_reviewstatus: statusValue,
+      wmkf_accepted: true,
+      wmkf_reviewreceivedat: null,
+    });
+    expect(state.view).not.toBe('stage2b');
+    expect(state.view).toBe('withdrawn-sufficient');
+    expect(state.canFlipState).toBe(false);
+  });
+
+  test('an already-submitted row still shows its submission', () => {
+    const state = computeEngagementState({
+      wmkf_reviewstatus: 100000005,
+      wmkf_accepted: true,
+      wmkf_reviewreceivedat: '2026-07-01T00:00:00Z',
+    });
+    expect(state.view).toBe('submitted');
+  });
+});

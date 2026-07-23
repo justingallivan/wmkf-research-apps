@@ -21,8 +21,10 @@ jest.mock('../../lib/external/review-answer-snapshot', () => ({
   buildRatingSnapshotRows: (...a) => buildRatingSnapshotRows(...a),
 }));
 const patchReviewReceipt = jest.fn(async () => {});
+const getByIdWithSelect = jest.fn();
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   patchReviewReceipt: (...a) => patchReviewReceipt(...a),
+  getByIdWithSelect: (...a) => getByIdWithSelect(...a),
   ENTITY_SET_NAME: 'wmkf_appreviewersuggestions',
 }));
 const answerUpsertDescriptor = jest.fn((suggestionId, row) => ({ upsertFor: row.key }));
@@ -55,6 +57,14 @@ beforeAll(async () => {
 beforeEach(() => {
   jest.clearAllMocks();
   getActiveQuestionSet.mockResolvedValue(QUESTIONS);
+  getByIdWithSelect.mockResolvedValue({
+    wmkf_appreviewersuggestionid: SUG,
+    wmkf_accepted: true,
+    wmkf_declined: false,
+    wmkf_reviewreceivedat: null,
+    wmkf_reviewstatus: 100000001,
+    _etag: 'W/"receipt-1"',
+  });
 });
 
 test('0 rating rows → single patchReviewReceipt PATCH, no changeset', async () => {
@@ -67,7 +77,7 @@ test('0 rating rows → single patchReviewReceipt PATCH, no changeset', async ()
   expect(id).toBe(SUG);
   expect(patch.wmkf_reviewuploadedbystaff).toBe(true);
   expect(typeof patch.wmkf_reviewreceivedat).toBe('string');
-  expect(opts).toEqual({ actingUserSystemId: ACTOR });
+  expect(opts).toEqual({ actingUserSystemId: ACTOR, ifMatch: 'W/"receipt-1"' });
   expect(runChangeset).not.toHaveBeenCalled();
 });
 
@@ -87,6 +97,7 @@ test('≥1 rating row → ONE atomic changeset (parent PATCH + answer upserts), 
     method: 'PATCH',
     entitySet: 'wmkf_appreviewersuggestions',
     key: SUG,
+    ifMatch: 'W/"receipt-1"',
   });
   expect(atomicArg.parent.body.wmkf_affiliation).toBe(1);
   expect(atomicArg.children).toEqual([{ upsertFor: 'impact' }]);
@@ -127,4 +138,28 @@ test('non-404 write failure propagates untyped (shell maps to 500)', async () =>
     .catch((e) => e);
   expect(err).not.toBeInstanceOf(MarkReceivedNoFileError);
   expect(err.message).toBe('dataverse 503');
+});
+
+test.each([100000005, 100000006])('terminal status %s is rejected before any receipt write', async (status) => {
+  validateReviewForm.mockReturnValueOnce({ ok: true, dataverseValues: {}, ratings: {} });
+  buildRatingSnapshotRows.mockReturnValueOnce([]);
+  getByIdWithSelect.mockResolvedValueOnce({
+    wmkf_accepted: true,
+    wmkf_declined: false,
+    wmkf_reviewreceivedat: null,
+    wmkf_reviewstatus: status,
+    _etag: 'W/"terminal"',
+  });
+  await expect(markReceivedNoFile({ suggestionId: SUG, actingUserSystemId: ACTOR }))
+    .rejects.toMatchObject({ httpStatus: 409, body: { ok: false, reason: 'engagement_ended' } });
+  expect(patchReviewReceipt).not.toHaveBeenCalled();
+  expect(runChangeset).not.toHaveBeenCalled();
+});
+
+test('precondition failure maps to a receipt conflict', async () => {
+  validateReviewForm.mockReturnValueOnce({ ok: true, dataverseValues: {}, ratings: {} });
+  buildRatingSnapshotRows.mockReturnValueOnce([]);
+  patchReviewReceipt.mockRejectedValueOnce(Object.assign(new Error('precondition failed'), { status: 412 }));
+  await expect(markReceivedNoFile({ suggestionId: SUG, actingUserSystemId: ACTOR }))
+    .rejects.toMatchObject({ httpStatus: 409, body: { ok: false, reason: 'conflict' } });
 });

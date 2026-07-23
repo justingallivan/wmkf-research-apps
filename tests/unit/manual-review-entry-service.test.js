@@ -56,6 +56,7 @@ beforeEach(() => {
     wmkf_accepted: true,
     wmkf_declined: false,
     wmkf_reviewreceivedat: null,
+    wmkf_reviewstatus: 100000001,
     wmkf_revieweraffiliation: 'Existing University',
     _etag: 'W/"7"',
   });
@@ -152,6 +153,19 @@ test('refuses an already-recorded or non-accepted reviewer before loading the fo
   });
   await expect(getManualReviewEntryForm({ suggestionId: SUGGESTION_ID }))
     .rejects.toMatchObject({ httpStatus: 409, body: expect.objectContaining({ reason: 'not_eligible' }) });
+  expect(getActiveQuestionSet).not.toHaveBeenCalled();
+});
+
+test.each([100000005, 100000006])('refuses terminal reviewer status %s before loading the form', async (status) => {
+  getByIdWithSelect.mockResolvedValueOnce({
+    wmkf_accepted: true,
+    wmkf_declined: false,
+    wmkf_reviewreceivedat: null,
+    wmkf_reviewstatus: status,
+    _etag: 'W/"terminal"',
+  });
+  await expect(getManualReviewEntryForm({ suggestionId: SUGGESTION_ID }))
+    .rejects.toMatchObject({ httpStatus: 409, body: expect.objectContaining({ reason: 'engagement_ended' }) });
   expect(getActiveQuestionSet).not.toHaveBeenCalled();
 });
 

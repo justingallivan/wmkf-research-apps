@@ -126,6 +126,7 @@ related:
 |---|---|---|---|---|---|
 | [CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md](CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md) | decision | active |  | Campaign-aware release, rehearsal, Dataverse isolation, promotion, and rollback strategy for the twice-yearly proposal-review workflow. | 2026-07-09 |
 | [DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md](DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md) | plan | active |  | Stages 1–3 shipped; the Dataverse target/write interlock is enforced in local, Preview, and Production. | 2026-07-11 |
+| [REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md](REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md) | plan | active |  | Ship terminal post-accept reviewer statuses independently; design durable deadline evidence around Dynamics email activities before adding schema. | 2026-07-22 |
 | [WHACK_A_MOLE_META_REVIEW_FABLE_PROMPT.md](WHACK_A_MOLE_META_REVIEW_FABLE_PROMPT.md) | draft | draft |  | Fresh-eyes Fable prompt: given the S349 whack-a-mole audit, propose codebase-wide structural + process changes that prevent the patch-then-re-patch class. | 2026-07-08 |
 | [WHACK_A_MOLE_REMEDIATION_PLAN.md](WHACK_A_MOLE_REMEDIATION_PLAN.md) | plan | active |  | Original code-verified workstream proposal; independent Codex review returned NEEDS REWORK and owner reconciliation is pending before execution. | 2026-07-08 |
 

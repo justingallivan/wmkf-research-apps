@@ -26,7 +26,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Card, Button } from '../Layout';
-import { STATUS_PIPELINE, getStatusInfo, filterByMode } from './reviewer-modes';
+import {
+  STATUS_PIPELINE,
+  getStatusInfo,
+  filterByMode,
+  TERMINAL_REVIEW_STATUSES,
+  canTransitionToTerminal,
+} from './reviewer-modes';
 import { EMPTY_TEMPLATES, loadEmailTemplates, saveEmailTemplates } from './email-template-store';
 
 // Pure status-pipeline / mode-bucketing logic lives in ./reviewer-modes
@@ -944,7 +950,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
               <div className="text-center py-4">
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${
                   sentResults.failed.length === 0 ? 'bg-green-100' : 'bg-yellow-100'
-                }`}>
+                  }`}>
                   <svg className={`w-6 h-6 ${sentResults.failed.length === 0 ? 'text-green-600' : 'text-yellow-600'}`}
                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -981,7 +987,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                   <div key={`sk-${s.suggestionId}`} className="flex items-center gap-2 p-2 bg-gray-50 rounded text-sm text-gray-600">
                     <span>—</span>
                     <span className="font-medium">{s.candidateName}</span>
-                    <span className="text-xs">skipped (no email)</span>
+                    <span className="text-xs">skipped ({s.reason || 'not sent'})</span>
                   </div>
                 ))}
               </div>
@@ -1036,7 +1042,10 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
 // ─── Status Dropdown ──────────────────────────────────────────────────────
 
 function StatusDropdown({ currentStatus, onChange }) {
-  const settableStatuses = STATUS_PIPELINE.filter(s => s.key !== 'accepted');
+  const settableStatuses = STATUS_PIPELINE.filter(
+    s => s.key !== 'accepted' && !TERMINAL_REVIEW_STATUSES.includes(s.key),
+  );
+  if (TERMINAL_REVIEW_STATUSES.includes(currentStatus)) return null;
   return (
     <label className="inline-flex flex-col items-start gap-0.5 text-left">
       <span className="text-[10px] uppercase text-gray-400 leading-none">Correct status</span>
@@ -1053,6 +1062,30 @@ function StatusDropdown({ currentStatus, onChange }) {
         ))}
       </select>
     </label>
+  );
+}
+
+function TerminalActions({ reviewer, onTransition }) {
+  if (!canTransitionToTerminal(reviewer)) return null;
+  return (
+    <div className="inline-flex items-center gap-1 ml-1" aria-label="End reviewer engagement">
+      <button
+        type="button"
+        onClick={() => onTransition('withdrew')}
+        className="px-1.5 py-1 text-xs font-medium text-red-700 border border-red-200 rounded hover:bg-red-50"
+        title="Reviewer withdrew after accepting"
+      >
+        Withdrew
+      </button>
+      <button
+        type="button"
+        onClick={() => onTransition('released')}
+        className="px-1.5 py-1 text-xs font-medium text-slate-700 border border-slate-300 rounded hover:bg-slate-50"
+        title="WMKF released the reviewer after accepting"
+      >
+        Released
+      </button>
+    </div>
   );
 }
 
@@ -1352,6 +1385,33 @@ export default function ReviewerManagePanel({
     }
   };
 
+  const transitionTerminal = async (reviewer, terminalStatus) => {
+    const outcome = terminalStatus === 'withdrew'
+      ? 'withdrew after accepting'
+      : 'was released by WMKF';
+    if (!confirm(`Confirm that ${reviewer.name || 'this reviewer'} ${outcome}? This ends the engagement.`)) return;
+    try {
+      const response = await fetch('/api/review-manager/terminal-transition', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: proposal.proposalId,
+          suggestionIds: [reviewer.suggestionId],
+          terminalStatus,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.transitioned !== 1) {
+        const reason = data.results?.[0]?.status || data.error || response.status;
+        alert(`Could not end the engagement: ${reason}. Reload and try again.`);
+        return;
+      }
+      if (onRefresh) onRefresh();
+    } catch (transitionError) {
+      alert(`Network error ending engagement: ${transitionError.message}`);
+    }
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -1569,6 +1629,10 @@ export default function ReviewerManagePanel({
                           <StatusDropdown
                             currentStatus={r.reviewStatus}
                             onChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
+                          />
+                          <TerminalActions
+                            reviewer={r}
+                            onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
                           />
                           {/* Download received review from SharePoint via Graph. */}
                           {r.reviewSharePointFolder && (

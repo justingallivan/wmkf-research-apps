@@ -70,11 +70,11 @@ describe('stampProposalFirstAccessed', () => {
 });
 
 describe('getForSubmitFinalityCheck', () => {
-  it('reads id + wmkf_reviewreceivedat (etag re-read that also re-checks finality)', async () => {
+  it('reads all receipt eligibility fields with the fresh etag', async () => {
     const spy = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ _etag: 'W/"reread"' });
     await getForSubmitFinalityCheck(SUGGESTION_ID);
     expect(spy).toHaveBeenCalledWith('wmkf_appreviewersuggestions', SUGGESTION_ID, {
-      select: 'wmkf_appreviewersuggestionid,wmkf_reviewreceivedat',
+      select: 'wmkf_appreviewersuggestionid,wmkf_accepted,wmkf_declined,wmkf_reviewreceivedat,wmkf_reviewstatus',
     });
   });
 });

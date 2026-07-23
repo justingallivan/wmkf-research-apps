@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-20
+last_verified: 2026-07-23
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -23,12 +23,15 @@ source_files:
   - pages/api/reviewer-finder/enrich-contacts.js
   - pages/api/reviewer-finder/save-candidates.js
   - pages/api/review-manager/campaign-timeline-defaults.js
+  - pages/api/review-manager/terminal-transition.js
   - pages/api/workbench/enrich-recommended.js
   - pages/api/workbench/applicant-reviewers.js
   - pages/api/workbench/promote-applicant-reviewer.js
   - pages/api/workbench/export-candidates.js
   - lib/services/reviewer-candidate-export.js
   - lib/services/reviewer-campaign-timeline.js
+  - lib/services/review-manager/terminal-transition-service.js
+  - lib/services/review-receipt-guard.js
   - lib/services/reviewer-roster-store.js
   - lib/services/contact-enrichment-service.js
 canonical_docs:
@@ -146,6 +149,8 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
 **Board-writeup identity edit (S308):** clicking a reviewer in the workbench opens `CandidateEditModal`, which now also edits three person-level confirmed fields — academic rank, primary department, main institution (saved-candidate edit mode only; hidden in the pre-save Find-card `onApply` + `confirmMode` paths). They PATCH `my-candidates` → `potentialReviewerAdapter.update` (server-derived `personId`, never client-supplied) → dedicated person columns (`wmkf_academicrank`/`wmkf_primarydepartment`/`wmkf_maininstitution`), emitted on the candidate DTO. These are first captured (required) at Stage 2a accept (see external-reviewer-portal topic). **Main-institution fallback (S310):** when `wmkf_maininstitution` is empty the modal prefills Main institution from the enrichment Affiliation (`mainInstitutionFallback` = `candidate.mainInstitution ‖ candidate.affiliation`), mirroring the reviewer accept-form prefill (`context.js buildStage2aPrefill`) so staff see the same value the reviewer will. The same fallback is the change-comparison baseline, so opening + saving never silently writes the affiliation into the dedicated column — only a genuine staff edit persists. (h-index was dropped from the modal S310 — auto-fetched, not staff-editable.) See reviewer-identity for the field rationale.
 
 **Review history on the Invite card (S308):** the Invite-tab candidate DTO (`my-candidates` GET) carries `priorReviewCount` + `lastReviewAt`, derived (not stored) from `suggestionAdapter.aggregateReviewHistory(personIds)` — one batched query over `wmkf_appreviewersuggestion` filtered to received-only rows (`wmkf_reviewreceivedat ne null`) for the request's candidate person-ids. "Completed a review" = the reviewer's review was **received** (`wmkf_reviewreceivedat`), NOT the PD's closeout stamp (`wmkf_completedat`). `ReviewerInvitePanel` renders "reviewed N× · last <date>" only when `priorReviewCount > 0`. The aggregation is supplementary — its query failure is caught non-fatally in `my-candidates` (degrades to no history; never 500s the candidate list). Not yet surfaced on Track Reviewers (fast-follow).
+
+**Terminal-status implementation authored; production picklist provisioned 2026-07-23; runtime NOT LIVE until deliberate promotion.** The feature branch adds `withdrew` and `released` to the Track pipeline, excludes both from `MODE_WORK_REMAINING` and the Reviews-tab Outstanding list, and routes the visually distinct confirmed actions through `/api/review-manager/terminal-transition`. The service freshly reads each row, accepts only accepted/materials-sent/under-review rows with no received/completed stamp, and writes the status plus external-token revocation with that ETag; a concurrent submission therefore wins. Neither terminal value enters `updateLifecycle`'s strict `reviewStatus=complete` timestamp branch. Terminality is server-enforced in BOTH directions (owner resolution S369): the generic reviewers PATCH refuses a terminal *target*, and `updateLifecycle` refuses any status change on a row whose *source* is already terminal. Raw receipt writes bypass that adapter, so `lib/services/review-receipt-guard.js` independently protects manual entry, mark-without-file, staff/self-token upload, and external submit: each rejects terminal/final/non-accepted rows and carries the authorizing read's ETag into its PATCH/changeset. Upload attempts use unique SharePoint subfolders. A non-412 Dataverse failure cleans up only its own attempt; a 412 loser is always orphaned and never deleted because the service cannot safely infer which files another winner committed. The active slice adds no due-date column or repair endpoint. Durable deadline evidence is deferred to a separate owner-reviewed design around ordered materials dispatches, preferably the existing Dynamics email activity and returned `emailId`. Production metadata now carries the verified terminal options; the remaining live-production gate is deliberate code promotion. Owner goal and decisions: `.claude-memory/project-reviewer-reliability-data.md`.
 
 **Export to Excel (S264; Invite-tab export + Expertise-tags column S308):** Two surfaces post to `POST /api/workbench/export-candidates`. (1) **Find tab** — a bottom-row "Export to Excel (N)" button (next to Save) exports the **selected** search candidates; (2) **Invite Reviewers tab** (`ReviewerInvitePanel`) — a header "⬇ Export to Excel" button exports the **full saved candidate list** (all non-removed rows on the tab; accepted/invited/declined included), mapping the persisted DTO into the same slim per-row shape. Both send a slim per-row DTO; the route fetches request metadata (number/institution/PI) authoritatively by `requestId` and streams back a two-sheet `.xlsx` (Request Info + Candidates). Column formatting (Source/Why/**Expertise tags**/Conflicts/ORCID/Scholar) lives in `lib/services/reviewer-candidate-export.js` so the sheet and the cards agree; the Expertise-tags column reads `keywords` (Find tab joins `expertiseAreas`; Invite tab uses the persisted `keywords`). Invite-tab exports carry only invite-stage fields — search-time COI / 5-yr-pub-count / seniority aren't persisted, so those columns read "None noted"/blank (board-writeup identity is captured at acceptance, not here). On the Find tab, `needs_identity_review` rows aren't selectable (so naturally excluded) UNLESS a PD used the S285 identity override ("✓ This is the right person") to confirm + add one, which makes it selectable and thus exportable. The "reviewer diversity"/temperature slider was removed the S264 cycle (search runs at the server default 0.3).
 
@@ -360,7 +365,10 @@ Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
   link (`missing_secure_link`) or carries an unresolved `{{token}}` (`unresolved_placeholder`) rather
   than ship a broken first-contact email. `InviteEmailModal` renders the "verify before retry" set
   and lists who was sent/failed/skipped; a terminal error no longer shows green success. Re-sendable
-  templateTypes (materials/followup/thankyou) keep their prior `failed[]` + post-loop-stamp semantics.
+  templates keep their prior `failed[]` send semantics. Materials/followup/thankyou retain the
+  established post-loop best-effort lifecycle stamp; thank-you additionally refuses terminal rows.
+  Durable per-dispatch deadline evidence is not part of the terminal-status branch and requires a
+  separate design around ordered Dynamics email activities or an append-only dispatch entity.
   Rendering quality (also S340, `lib/utils/email-generator.js`): the greeting drops trailing
   name suffixes (Jr./Sr./III/PhD/MD) for the surname and falls back to "Dear Reviewer" on an empty
   name; `{{proposalAbstract}}` is soft-unwrapped (`softUnwrapProse`) so a fixed-column hard-wrapped
