@@ -35,6 +35,17 @@ The HMAC materials-repair endpoint, due-date columns, and inline due-date stamp
 are not part of the active slice. Git history preserves the discarded design;
 this document owns the current boundary.
 
+## Production provisioning — 2026-07-23
+
+[VERIFIED via the live metadata preflight and
+`scripts/extend-reviewstatus-picklist-terminal.mjs`] Production Dataverse now
+contains `withdrew=100000005` and `released=100000006`. Both insert operations
+returned the exact requested `NewOptionValue`, `PublishAllXml` returned HTTP
+204, and the post-publish metadata read returned both labels and values.
+
+The schema prerequisite is complete. Runtime behavior remains branch-only until
+deliberate code promotion and release verification.
+
 ## Problem being solved now
 
 [VERIFIED via `lib/dataverse/adapters/reviewer-suggestion.js`] A reviewer who

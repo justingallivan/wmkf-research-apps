@@ -31,9 +31,11 @@ The terminal contract is:
 - every upload 412 loser leaves its unique SharePoint attempt orphaned and never deletes it;
 - terminal rows leave outstanding/reminder/thank-you work without counting as completed reviews.
 
-The only Dataverse provisioning in this slice is the owner-gated extension of the existing
+The only Dataverse provisioning in this slice is the extension of the existing
 `wmkf_reviewstatus` picklist through
-`scripts/extend-reviewstatus-picklist-terminal.mjs`.
+`scripts/extend-reviewstatus-picklist-terminal.mjs`. Production provisioning
+completed and was post-publish verified 2026-07-23:
+`withdrew=100000005`, `released=100000006`.
 
 ## Deferred deadline-evidence design
 
@@ -55,10 +57,11 @@ activity. Do not restore the expiring HMAC receipt or mutable first/last due-dat
 
 ## Release boundary
 
-This is Tier 2 runtime work. Do not merge or deploy automatically. Provision the terminal picklist
-values before deliberately promoting code that can write them, then rehearse the approved
-UI → route → service → Dataverse path and verify that the row has no received/completed stamp and
-no longer appears as outstanding.
+This is Tier 2 runtime work. Production terminal picklist values are provisioned.
+Before deliberately promoting the code, complete the approved rehearsal and
+record the last-known-good deployment. After promotion, verify the
+UI → route → service → Dataverse path and confirm that the row has no
+received/completed stamp and no longer appears as outstanding.
 
 ## Key files
 

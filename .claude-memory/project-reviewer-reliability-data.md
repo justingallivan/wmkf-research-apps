@@ -27,9 +27,10 @@ whether reviewers are on time and reliable — not just participation counts.
 - Marking a dropout `complete` stamps `wmkf_reviewreceivedat`, creating a false
   successful review in future history.
 - The active feature branch adds `withdrew` and `released` as post-accept
-  terminal statuses without completion/receipt timestamps. The live Dataverse
-  option set still ends at `complete`; the owner-gated picklist extension has
-  not been provisioned.
+  terminal statuses without completion/receipt timestamps. Production
+  Dataverse was provisioned and verified 2026-07-23 with
+  `withdrew=100000005` and `released=100000006`; the runtime code is not live
+  until deliberate branch promotion.
 - `wmkf_reviewduedate` is request-level mutable state, so production still lacks
   durable evidence of the deadline communicated for each materials dispatch.
 - Dynamics email sending already creates a durable email activity and returns
