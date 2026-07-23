@@ -47,7 +47,7 @@ function parentPatch() {
 const originals = {};
 function installMocks() {
   for (const [obj, names] of [
-    [GraphService, ['getDriveId', 'uploadFile', 'deleteFile']],
+    [GraphService, ['getDriveId', 'listFiles', 'uploadFile', 'downloadFileByPath', 'deleteFile']],
     [DynamicsService, ['getRecord', 'updateRecord', 'resolveEntitySetName', 'executeChangeset']],
   ]) {
     for (const name of names) {
@@ -58,7 +58,7 @@ function installMocks() {
 }
 function restoreMocks() {
   for (const [obj, names] of [
-    [GraphService, ['getDriveId', 'uploadFile', 'deleteFile']],
+    [GraphService, ['getDriveId', 'listFiles', 'uploadFile', 'downloadFileByPath', 'deleteFile']],
     [DynamicsService, ['getRecord', 'updateRecord', 'resolveEntitySetName', 'executeChangeset']],
   ]) {
     for (const name of names) {
@@ -77,7 +77,8 @@ const REQUEST_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const REQUEST_NUMBER = '1001289';
 // First 8 chars of suggestion GUID (no hyphens) → 'aaaaaaaa'.
 // With no reviewer name in the mocked row, sanitizer falls back to short-id-only.
-const EXPECTED_FOLDER = `${REQUEST_NUMBER}_${REQUEST_ID.replace(/-/g, '').toUpperCase()}/Reviewer_Uploads/aaaaaaaa`;
+const EXPECTED_FOLDER_BASE =
+  `${REQUEST_NUMBER}_${REQUEST_ID.replace(/-/g, '').toUpperCase()}/Reviewer_Uploads/aaaaaaaa`;
 
 function validInput(overrides = {}) {
   return {
@@ -118,8 +119,15 @@ function mockSuggestionNotFound() {
 beforeEach(() => {
   installMocks();
   GraphService.getDriveId.mockResolvedValue('drive-id-123');
+  GraphService.listFiles.mockResolvedValue([]);
   GraphService.uploadFile.mockResolvedValue({
     id: 'item-1', name: 'review.pdf', size: PDF_BYTES.length, webUrl: 'https://example/x',
+  });
+  GraphService.downloadFileByPath.mockResolvedValue({
+    buffer: PDF_BYTES,
+    mimeType: 'application/pdf',
+    filename: 'review.pdf',
+    size: PDF_BYTES.length,
   });
   GraphService.deleteFile.mockResolvedValue(undefined);
   DynamicsService.updateRecord.mockResolvedValue(undefined);
@@ -250,10 +258,10 @@ describe('writeReviewFiles — happy paths', () => {
     mockSuggestionFound();
     const r = await writeReviewFiles(validInput());
     expect(r.ok).toBe(true);
-    expect(r.folder).toBe(EXPECTED_FOLDER);
+    expect(r.folder).toMatch(new RegExp(`^${EXPECTED_FOLDER_BASE}/attempt_[0-9a-f]{32}$`));
     expect(GraphService.uploadFile).toHaveBeenCalledWith(
       'akoya_request',
-      EXPECTED_FOLDER,
+      r.folder,
       'review.pdf',
       PDF_BYTES,
       'application/pdf',
@@ -261,7 +269,7 @@ describe('writeReviewFiles — happy paths', () => {
     const patch = parentPatch();
     expect(patch).toMatchObject({
       wmkf_revieweraffiliation: 'Prof X, U of Example',
-      wmkf_reviewsharepointfolder: EXPECTED_FOLDER,
+      wmkf_reviewsharepointfolder: r.folder,
       wmkf_reviewfilename: 'review.pdf',
       wmkf_reviewuploadedbystaff: false,
     });
@@ -397,6 +405,95 @@ describe('writeReviewFiles — failure paths', () => {
     expect(GraphService.deleteFile).toHaveBeenCalledWith('drive-id-123', 'item-1');
     const [operations] = DynamicsService.executeChangeset.mock.calls[0];
     expect(operations[operations.length - 1].ifMatch).toBe('W/"upload-1"');
+  });
+
+  test('concurrent same-filename race preserves a shared Graph item referenced by the winner', async () => {
+    const initial = {
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_reviewstatus: 100000001,
+      wmkf_accepted: true,
+      wmkf_declined: false,
+      wmkf_reviewreceivedat: null,
+      _etag: 'W/"upload-1"',
+      wmkf_Request: { akoya_requestid: REQUEST_ID, akoya_requestnum: REQUEST_NUMBER },
+    };
+    let winnerFolder;
+    let sharedItemPresent = true;
+    const uploadsByFolder = new Map();
+    const sharedItem = {
+      id: 'graph-replaced-item',
+      name: 'review.pdf',
+      size: PDF_BYTES.length,
+      webUrl: 'https://example/shared',
+    };
+
+    // Model Graph's replace identity hazard directly: both same-name uploads
+    // receive the same drive-item id. The service's unique attempt folders
+    // prevent path collision; the winner-folder identity check is the final
+    // guard that keeps cleanup from deleting a referenced item.
+    GraphService.uploadFile.mockImplementation(async (_library, folder, filename, buffer) => {
+      uploadsByFolder.set(`${folder}/${filename}`, buffer);
+      return sharedItem;
+    });
+    GraphService.listFiles.mockImplementation(async (_library, folder) => (
+      folder === winnerFolder && sharedItemPresent ? [sharedItem] : []
+    ));
+    GraphService.deleteFile.mockImplementation(async (_driveId, itemId) => {
+      if (itemId === sharedItem.id) sharedItemPresent = false;
+    });
+    GraphService.downloadFileByPath.mockImplementation(async (_library, folder, filename) => {
+      const buffer = uploadsByFolder.get(`${folder}/${filename}`);
+      if (!sharedItemPresent || folder !== winnerFolder || !buffer) {
+        throw new Error('not found');
+      }
+      return {
+        buffer,
+        mimeType: 'application/pdf',
+        filename,
+        size: buffer.length,
+      };
+    });
+    DynamicsService.getRecord.mockImplementation(async (_entitySet, _id, options = {}) => {
+      if (String(options.select || '').includes('wmkf_reviewsharepointfolder')) {
+        return {
+          wmkf_reviewstatus: 100000001,
+          wmkf_reviewreceivedat: '2026-07-22T10:00:00.000Z',
+          wmkf_reviewsharepointfolder: winnerFolder,
+          _etag: 'W/"winner"',
+        };
+      }
+      return initial;
+    });
+    DynamicsService.executeChangeset
+      .mockImplementationOnce(async (operations) => {
+        winnerFolder = operations[operations.length - 1].body.wmkf_reviewsharepointfolder;
+        return { ok: true, operations: [] };
+      })
+      .mockRejectedValueOnce(Object.assign(new Error('precondition failed'), { status: 412 }));
+
+    const firstBytes = Buffer.concat([PDF_BYTES, Buffer.from('first')]);
+    const secondBytes = Buffer.concat([PDF_BYTES, Buffer.from('second')]);
+    const [first, second] = await Promise.all([
+      writeReviewFiles(validInput({ files: [{ filename: 'review.pdf', buffer: firstBytes }] })),
+      writeReviewFiles(validInput({ files: [{ filename: 'review.pdf', buffer: secondBytes }] })),
+    ]);
+
+    const winner = [first, second].find((result) => result.ok);
+    const loser = [first, second].find((result) => !result.ok);
+    expect(winner.folder).toBe(winnerFolder);
+    expect(loser).toMatchObject({
+      ok: false,
+      reason: 'review_received_locked',
+      cleanedUp: true,
+    });
+    const attemptedFolders = GraphService.uploadFile.mock.calls.map((call) => call[1]);
+    expect(new Set(attemptedFolders).size).toBe(2);
+    expect(attemptedFolders[0]).not.toBe(attemptedFolders[1]);
+    expect(GraphService.deleteFile).not.toHaveBeenCalledWith('drive-id-123', sharedItem.id);
+    await expect(
+      GraphService.downloadFileByPath('akoya_request', winnerFolder, 'review.pdf'),
+    ).resolves.toMatchObject({ filename: 'review.pdf', buffer: expect.any(Buffer) });
   });
 });
 

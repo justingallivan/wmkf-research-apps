@@ -418,6 +418,33 @@ requires no new persistence: Dataverse row-version change is the one-use marker.
 The send route verifies receipt signing is configured before dispatch, so a
 successful email cannot be left with an unmintable repair action.
 
+## Revision 6 — upload ownership and per-dispatch repair idempotency (2026-07-23)
+
+This revision supersedes Revision 4 item 3 and Revision 5's description of the
+pre-dispatch ETag as a one-use repair marker.
+
+Every review-file receipt attempt now uploads into its own
+`Reviewer_Uploads/<reviewer>/attempt_<uuid>/` SharePoint subfolder and persists
+that exact folder in the winning Dataverse receipt write. A 412 loser owns only
+its unique attempt. Before rollback it re-reads the winning persisted folder and
+excludes any Graph item id visible there; if that ownership check cannot be
+completed, cleanup fails safe rather than risk deleting a winning file. The
+concurrency regression deliberately makes Graph return the same item identity
+for two same-filename uploads and proves the winner remains downloadable.
+
+Materials-send repair idempotency is the HMAC-verified
+`(suggestionId, materialsSentAt, effectiveReviewDueDate)` tuple. These values
+are durable after a successful inline stamp or repair in the suggestion id,
+`wmkf_materialssentat`, and `wmkf_reviewduedatelastsent`, so no new table or
+Dataverse column is needed. An exact match returns `already_recorded`, including
+after a commit-success/response-loss retry or a concurrent same-receipt 412
+followed by re-read. A receipt older than the recorded dispatch is rejected; a
+newer signed dispatch may advance `lastSent` under the row's fresh ETag while
+`atSend` stays set-once. Terminal, submitted, completed, foreign-request, and
+unaccepted states still fail closed. The signed nonce remains validated receipt
+entropy and the pre-dispatch ETag remains signed source evidence; neither is the
+durable idempotency key.
+
 ## Review history
 
 Revision 2 (2026-07-22) incorporates a Codex adversarial review of revision 1,

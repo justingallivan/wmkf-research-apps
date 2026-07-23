@@ -45,7 +45,7 @@ queue.
 - **No LIVE terminal state for a post-accept dropout; implementation is authored but not provisioned.** The feature branch extends `REVIEW_STATUS_MAP` with
   `withdrew`/`released`, adds a dedicated fresh-read/ETag transition service, and
   excludes both from work-remaining. The live Dataverse option set still ends at
-  `complete`; the owner-gated picklist script and Wave 14 due-date column have
+  `complete`; the owner-gated picklist script and both Wave 14 due-date columns have
   deliberately not been run.
   `withdrawn_sufficient` is hard-guarded to still-pending rows by
   `isStillPending()` in `lib/services/review-manager/withdraw-sufficient-service.js`
@@ -53,8 +53,9 @@ queue.
 - **On-time is not measurable durably in production yet.** `wmkf_reviewduedate` lives on
   `akoya_request` and is writable via `campaign-config-service.js`, so it is a
   mutable current value. The feature branch authors a DateOnly
-  `wmkf_reviewduedateatsend` field and an inline ETag-guarded set-once writer,
-  but the column is not provisioned. Extending a deadline therefore still
+  `wmkf_reviewduedateatsend` / `wmkf_reviewduedatelastsent` fields and inline
+  ETag-guarded set-once/every-send writers, but the columns are not provisioned.
+  Extending a deadline therefore still
   retroactively rewrites every live timeliness verdict on that proposal.
 - Signals already captured per engagement that feed the metric:
   `wmkf_responsereceivedat` (invite responsiveness), `wmkf_remindercount`
@@ -98,3 +99,19 @@ WMKF extended the deadline and re-sent, which is the same principle that split
 `withdrew` from `released`. The repair route's former different-date 409 is gone;
 `atSend` is structurally immutable instead. Cross-layer + new durable column uses
 `/contract-reconcile` and Atlas coverage. See [[reviewer-workbench-lifecycle]].
+
+**[VERIFIED 2026-07-23 on the feature branch] Repair is idempotent per signed
+dispatch, not per row version.** The exact key is the HMAC-verified
+`(suggestionId, materialsSentAt, effectiveReviewDueDate)` tuple. A durable exact
+match returns `already_recorded` (including a concurrent 412 loser after
+re-read), an older receipt is rejected, and a newer signed dispatch advances
+`lastSent` using the current ETag while preserving set-once `atSend`. The signed
+nonce and pre-dispatch ETag remain receipt evidence; no new persistence was
+added because the tuple is already represented by the suggestion id plus
+`wmkf_materialssentat` and `wmkf_reviewduedatelastsent`.
+
+**[VERIFIED 2026-07-23 on the feature branch] Review uploads are attempt-owned.**
+Each attempt uses a unique SharePoint `attempt_<uuid>` subfolder and persists
+that exact folder on the winning row. A 412 loser rolls back only its attempt
+and excludes item ids visible in the winner's persisted folder, so Graph
+replace/shared-identity behavior cannot delete the winner's downloadable file.
