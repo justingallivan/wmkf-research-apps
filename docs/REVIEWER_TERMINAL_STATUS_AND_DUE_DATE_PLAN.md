@@ -95,9 +95,18 @@ The transition service freshly reads each suggestion and requires:
 - a nonterminal source status;
 - an ETag.
 
-The conditional write sets the terminal status and revokes the external token
-atomically. A concurrent review receipt wins by changing the ETag; the terminal
-transition then reports `changed_skipped`.
+For `released`, the conditional write sets the terminal status and revokes the
+external token atomically. For a PD-recorded `withdrew`, the same endpoint
+performs the reviewer-withdrawal correction: one ETag-guarded Dataverse
+changeset sets `accepted=false`, `declined=true`, the declined response type,
+the `withdrew` audit status, and token revocation, while deleting the exact
+server-read linked honorarium request. It then cancels unlocked acceptance jobs;
+a leased worker re-reads declined state and compensates any honorarium it
+created after the changeset. The ordinary staff flow does not request alternate
+reviewer suggestions because the reviewer is not completing that form.
+
+A concurrent review receipt wins by changing the ETag; the terminal transition
+then reports `changed_skipped`.
 
 `updateLifecycle()` separately refuses every status change out of a terminal
 source and binds status-changing writes to its guard read's ETag. `softDelete()`
@@ -176,7 +185,9 @@ Promotion:
 - production deployment reached Ready at exact merge SHA `fd610837`;
 - controlled invite/accept plus same-service production transition confirmed no
   review-received/completed timestamp and terminal exclusion from outstanding
-  action state;
+  action state. That historical smoke preserved `accepted=true`; the subsequent
+  staff-withdrawal cleanup on this feature branch deliberately corrects it to
+  `accepted=false` / `declined=true` and is not production-deployed yet;
 - Workbench showed `Withdrew` and `Revoked`;
 - no due-date schema or repair endpoint was provisioned.
 
@@ -192,4 +203,6 @@ remaining route-level observation without an explicit owner request.
 - Historical correction of rows falsely marked complete.
 - Payability disposition.
 - Pre-accept reset.
-- Any deletion of honorarium, review-answer, or historical engagement records.
+- Any deletion of review-answer or historical engagement records. Exact linked
+  honorarium deletion is now part of reviewer withdrawal because the reviewer
+  will not complete the payable obligation.

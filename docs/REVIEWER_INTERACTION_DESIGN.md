@@ -290,6 +290,15 @@ Three new entities, designed to be flexible:
 
 For PDs who prefer email replies over in-email accept/decline buttons, the Review Manager must offer **one-click status update affordances** on the reviewer row that fire the same workflow as button clicks (timestamp, status flip, thank-you/ack email back to reviewer). Inline on the row, no modal, single click with optional reason. The implicit competitor here is AkoyaGO; if updating status in our app is harder than in AkoyaGO, PDs will use AkoyaGO and the data benefits are lost.
 
+For a reviewer who already accepted but later tells the PD they cannot complete
+the assignment, the Track Reviewers **Withdrew** action performs the same
+response-state and financial cleanup as reviewer self-service: accepted becomes
+false, declined becomes true, portal access closes, the exact linked honorarium
+request is deleted, acceptance follow-up stops, and every count/dashboard
+re-derives from the corrected fields. The staff action does not ask the reviewer
+for alternate suggestions; self-service withdrawal still routes through the
+ordinary decline form so the reviewer may supply them.
+
 ### Admin view
 
 A general state-of-affairs view at the cycle level — totals, slot fill rates, in-flight invitations. **No PD-comparative metrics, no leaderboards.** The tool serves PDs, not management surveillance.

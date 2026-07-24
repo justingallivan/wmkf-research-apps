@@ -64,13 +64,16 @@ posture, not a plan; a real honorarium `akoya_request` was created
 - keep payment offline by check until the person-payee/BILL tail is separately
   approved and verified.
 
-If an accepted reviewer self-withdraws before materials release, the portal
-removes that engagement's exact linked honorarium `akoya_request` automatically
-in the same Dataverse changeset that flips the suggestion to declined. The
-reviewer/contact and suggestion history remain. The acceptance-job drain
+If an accepted reviewer withdraws before review receipt, either the reviewer
+can use portal self-service or a PD can record **Withdrew** in Track Reviewers.
+Both remove that engagement's exact linked honorarium `akoya_request`
+automatically in the same Dataverse changeset that flips the suggestion to
+declined and revokes portal access. The reviewer/contact and suggestion history
+remain. The staff action also cancels unlocked acceptance jobs; the drain
 re-checks after honorarium creation and compensates for a concurrent withdrawal,
 so a late worker cannot leave or recreate an honorarium for an unfulfilled
-review obligation.
+review obligation. The staff-cleanup behavior is current branch source and is
+not production-deployed yet.
 
 The 2026-06-22 production lock was capture-only:
 `HONORARIUM_ONBOARDING_DEFERRED=true` with the discriminator GUIDs unset. Treat

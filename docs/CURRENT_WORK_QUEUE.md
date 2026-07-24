@@ -51,7 +51,10 @@ sequence.
 - Reviewer terminal statuses: `withdrew` and `released` shipped through PR #78 plus the accepted/null
   repair in PR #79 / merge `fd610837` on 2026-07-24. Production Dataverse and Workbench readback
   verified `Withdrew`, token revoked, accepted preserved, and no review-received/completed timestamp.
-  Deadline evidence and completed-review payability remain separate.
+  That is the historical production baseline. The current feature branch (not production-deployed)
+  changes PD-recorded `Withdrew` to the full withdrawal contract: accepted false, declined true,
+  token revoked, exact linked honorarium deleted, and acceptance follow-up cancelled. Deadline
+  evidence and completed-review payability remain separate.
 
 ## Reviewer redesign gates
 

@@ -2,14 +2,21 @@
 
 const findById = jest.fn();
 const updateLifecycle = jest.fn();
+const applyStaffReviewerWithdrawal = jest.fn();
+const cancelReviewerAcceptanceJobsForSuggestion = jest.fn();
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findById: (...args) => findById(...args),
   updateLifecycle: (...args) => updateLifecycle(...args),
+  applyStaffReviewerWithdrawal: (...args) => applyStaffReviewerWithdrawal(...args),
   REVIEW_STATUS_MAP: {
     accepted: 100000000,
     materials_sent: 100000001,
     under_review: 100000002,
   },
+}));
+jest.mock('../../lib/services/reviewer-acceptance-job-service', () => ({
+  cancelReviewerAcceptanceJobsForSuggestion: (...args) =>
+    cancelReviewerAcceptanceJobsForSuggestion(...args),
 }));
 
 const { transitionReviewersTerminal } = require('../../lib/services/review-manager/terminal-transition-service');
@@ -23,9 +30,11 @@ function row(overrides = {}) {
     wmkf_appreviewersuggestionid: SUGGESTION,
     _wmkf_request_value: REQUEST,
     wmkf_accepted: true,
+    wmkf_declined: false,
     wmkf_reviewstatus: 100000001,
     wmkf_reviewreceivedat: null,
     wmkf_completedat: null,
+    _wmkf_honorariumrequest_value: null,
     _etag: 'W/"7"',
     ...overrides,
   };
@@ -43,23 +52,36 @@ beforeEach(() => {
   jest.clearAllMocks();
   findById.mockResolvedValue(row());
   updateLifecycle.mockResolvedValue(undefined);
+  applyStaffReviewerWithdrawal.mockResolvedValue(undefined);
+  cancelReviewerAcceptanceJobsForSuggestion.mockResolvedValue([]);
 });
 
-test('eligible row transitions with the ETag from the fresh read', async () => {
+test('eligible staff-recorded withdrawal corrects response state with the fresh ETag', async () => {
   const result = await transitionReviewersTerminal(args());
   expect(result).toEqual({
     ok: true,
     transitioned: 1,
-    results: [{ suggestionId: SUGGESTION, status: 'transitioned', terminalStatus: 'withdrew' }],
+    results: [{
+      suggestionId: SUGGESTION,
+      status: 'transitioned',
+      terminalStatus: 'withdrew',
+      honorariumDeleted: false,
+      acceptanceJobsCancelled: 0,
+    }],
   });
-  expect(updateLifecycle).toHaveBeenCalledWith(
+  expect(applyStaffReviewerWithdrawal).toHaveBeenCalledWith(
     SUGGESTION,
-    // The magic link is revoked in the SAME atomic ETag-guarded write that ends
-    // the engagement — the portal must fail closed at the token, not rely on
-    // every downstream surface re-deriving terminality.
-    { reviewStatus: 'withdrew', externalTokenRevoked: true },
-    { actingUserSystemId: 'staff-1', ifMatch: 'W/"7"' },
+    {
+      actingUserSystemId: 'staff-1',
+      ifMatch: 'W/"7"',
+      deleteHonorariumRequestId: null,
+    },
   );
+  expect(cancelReviewerAcceptanceJobsForSuggestion).toHaveBeenCalledWith(
+    SUGGESTION,
+    'program_director_recorded_reviewer_withdrawal',
+  );
+  expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
 test('accepted row with a persisted null review status transitions', async () => {
@@ -69,17 +91,70 @@ test('accepted row with a persisted null review status transitions', async () =>
 
   expect(result.transitioned).toBe(1);
   expect(result.results).toEqual([
-    { suggestionId: SUGGESTION, status: 'transitioned', terminalStatus: 'withdrew' },
+    {
+      suggestionId: SUGGESTION,
+      status: 'transitioned',
+      terminalStatus: 'withdrew',
+      honorariumDeleted: false,
+      acceptanceJobsCancelled: 0,
+    },
   ]);
-  expect(updateLifecycle).toHaveBeenCalledWith(
+  expect(applyStaffReviewerWithdrawal).toHaveBeenCalledWith(
     SUGGESTION,
-    { reviewStatus: 'withdrew', externalTokenRevoked: true },
-    { actingUserSystemId: 'staff-1', ifMatch: 'W/"7"' },
+    {
+      actingUserSystemId: 'staff-1',
+      ifMatch: 'W/"7"',
+      deleteHonorariumRequestId: null,
+    },
   );
+});
+
+test('staff-recorded withdrawal deletes the exact linked honorarium and reports it', async () => {
+  const honorariumId = '44444444-4444-4444-8444-444444444444';
+  findById.mockResolvedValue(row({ _wmkf_honorariumrequest_value: honorariumId }));
+  cancelReviewerAcceptanceJobsForSuggestion.mockResolvedValue([{ id: 9 }]);
+
+  const result = await transitionReviewersTerminal(args());
+
+  expect(applyStaffReviewerWithdrawal).toHaveBeenCalledWith(
+    SUGGESTION,
+    {
+      actingUserSystemId: 'staff-1',
+      ifMatch: 'W/"7"',
+      deleteHonorariumRequestId: honorariumId,
+    },
+  );
+  expect(result.results[0]).toMatchObject({
+    suggestionId: SUGGESTION,
+    status: 'transitioned',
+    terminalStatus: 'withdrew',
+    honorariumDeleted: true,
+    acceptanceJobsCancelled: 1,
+  });
+});
+
+test('a post-commit job-cancellation failure is reported without disguising the successful withdrawal', async () => {
+  const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  cancelReviewerAcceptanceJobsForSuggestion.mockRejectedValue(new Error('Postgres unavailable'));
+
+  const result = await transitionReviewersTerminal(args());
+
+  expect(result.transitioned).toBe(1);
+  expect(result.results[0]).toMatchObject({
+    suggestionId: SUGGESTION,
+    status: 'transitioned',
+    terminalStatus: 'withdrew',
+    honorariumDeleted: false,
+    warning: 'acceptance_job_cancellation_failed',
+  });
+  expect(result.results[0]).not.toHaveProperty('acceptanceJobsCancelled');
+  expect(warning).toHaveBeenCalled();
+  warning.mockRestore();
 });
 
 test.each([
   ['pre-accept row', { wmkf_accepted: false }, 'not_accepted'],
+  ['already-declined row', { wmkf_accepted: false, wmkf_declined: true }, 'already_declined'],
   ['review-received row', { wmkf_reviewreceivedat: '2026-07-22T10:00:00Z' }, 'review_received'],
   ['completed row', { wmkf_completedat: '2026-07-22T10:00:00Z' }, 'completed'],
   ['already-withdrew row', { wmkf_reviewstatus: 100000005 }, 'already_terminal'],
@@ -93,12 +168,13 @@ test.each([
   expect(result.transitioned).toBe(0);
   expect(result.results).toEqual([{ suggestionId: SUGGESTION, status: expectedStatus }]);
   expect(updateLifecycle).not.toHaveBeenCalled();
+  expect(applyStaffReviewerWithdrawal).not.toHaveBeenCalled();
 });
 
 test('race: concurrent ETag-guarded submission wins and terminal transition never overwrites it', async () => {
   const durable = row();
   findById.mockResolvedValue({ ...durable });
-  updateLifecycle.mockImplementation(async (_id, _patch, options) => {
+  applyStaffReviewerWithdrawal.mockImplementation(async (_id, options) => {
     // The review-submission changeset commits after the service read and changes
     // the row ETag before the terminal PATCH reaches Dataverse.
     durable.wmkf_reviewreceivedat = '2026-07-22T10:00:00Z';
@@ -129,4 +205,11 @@ test('partial failure keeps successful row identifiers and failed row retryable'
     { suggestionId: SUGGESTION, status: 'transitioned', terminalStatus: 'released' },
     { suggestionId: SECOND, status: 'completed' },
   ]);
+  expect(updateLifecycle).toHaveBeenCalledWith(
+    SUGGESTION,
+    { reviewStatus: 'released', externalTokenRevoked: true },
+    { actingUserSystemId: 'staff-1', ifMatch: 'W/"7"' },
+  );
+  expect(applyStaffReviewerWithdrawal).not.toHaveBeenCalled();
+  expect(cancelReviewerAcceptanceJobsForSuggestion).not.toHaveBeenCalled();
 });

@@ -1389,7 +1389,10 @@ export default function ReviewerManagePanel({
     const outcome = terminalStatus === 'withdrew'
       ? 'withdrew after accepting'
       : 'was released by WMKF';
-    if (!confirm(`Confirm that ${reviewer.name || 'this reviewer'} ${outcome}? This ends the engagement.`)) return;
+    const consequence = terminalStatus === 'withdrew'
+      ? 'This changes their response to declined, updates reviewer counts, revokes their portal link, and removes any linked honorarium request.'
+      : 'This ends the engagement and revokes their portal link.';
+    if (!confirm(`Confirm that ${reviewer.name || 'this reviewer'} ${outcome}?\n\n${consequence}`)) return;
     try {
       const response = await fetch('/api/review-manager/terminal-transition', {
         method: 'POST',
