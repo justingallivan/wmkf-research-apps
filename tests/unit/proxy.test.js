@@ -64,8 +64,9 @@ afterEach(() => {
 
 // A request whose headers Next would clone. The CSP fn reads req.headers via
 // `new Headers(req.headers)`; a plain object is an accepted Headers init.
-function makeReq(headers = {}) {
-  return { headers };
+function makeReq(headers = {}, url = 'https://applications.wmkeck.org/workbench') {
+  const nextUrl = new URL(url);
+  return { headers, nextUrl };
 }
 
 // Pull the request-side x-nonce / CSP off the captured NextResponse.next init.
@@ -106,6 +107,29 @@ describe('proxy CSP function', () => {
     expect(csp).toContain('upgrade-insecure-requests');
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain("default-src 'self'");
+  });
+
+  test.each([
+    ['localhost', 'http://localhost:3000/external/review/token'],
+    ['IPv4 loopback', 'http://127.0.0.1:3000/external/review/token'],
+    ['IPv6 loopback', 'http://[::1]:3000/external/review/token'],
+  ])('production CSP keeps strict scripts but does not upgrade HTTP %s assets', (_label, url) => {
+    process.env.NODE_ENV = 'production';
+    const res = proxyFn(makeReq({}, url));
+    const csp = res.headers.get('Content-Security-Policy');
+
+    const scriptSrc = csp.split('; ').find(d => d.startsWith('script-src'));
+    expect(scriptSrc).toMatch(/'self' 'nonce-[^']+' https:\/\/va\.vercel-scripts\.com/);
+    expect(scriptSrc).not.toContain("'unsafe-inline'");
+    expect(scriptSrc).not.toContain("'unsafe-eval'");
+    expect(csp).not.toContain('upgrade-insecure-requests');
+  });
+
+  test('production CSP still upgrades an HTTP hostname that merely contains localhost', () => {
+    process.env.NODE_ENV = 'production';
+    const res = proxyFn(makeReq({}, 'http://localhost.example.org/external/review/token'));
+
+    expect(res.headers.get('Content-Security-Policy')).toContain('upgrade-insecure-requests');
   });
 
   test('development CSP relaxes script-src and drops upgrade-insecure-requests', () => {
