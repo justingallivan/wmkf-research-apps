@@ -155,7 +155,7 @@ function Dispatcher({ data, token, viewOverride, onRequestDecline, onRequestFlip
       );
 
     case 'accepted-pre-materials':
-      return <AcceptedConfirmationView />;
+      return <AcceptedConfirmationView programDirector={data.programDirector} />;
 
     case 'declined':
       return (

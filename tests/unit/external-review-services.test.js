@@ -24,6 +24,9 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 jest.mock('../../lib/dataverse/adapters/contact', () => ({
   getByIdWithSelect: jest.fn(async () => null),
 }));
+jest.mock('../../lib/dataverse/adapters/system-user', () => ({
+  getByIdWithSelect: jest.fn(async () => null),
+}));
 jest.mock('../../lib/dataverse/adapters/review-answer', () => ({
   answerUpsertDescriptor: jest.fn((id, row) => ({ method: 'PATCH', url: `answers(${row.key})`, body: row })),
 }));
@@ -69,6 +72,7 @@ import {
   applyStage2aResponse,
   getForSubmitFinalityCheck,
 } from '../../lib/dataverse/adapters/reviewer-suggestion';
+import { getByIdWithSelect as getSystemUserByIdWithSelect } from '../../lib/dataverse/adapters/system-user';
 import { runChangeset } from '../../lib/dataverse/core/changeset';
 import { getActivePolicies } from '../../lib/external/policy-fetcher';
 import {
@@ -131,6 +135,98 @@ describe('buildReviewContext', () => {
       suggestion: baseSuggestion({ wmkf_accepted: true, wmkf_reviewstatus: 100000001 }),
       request, reviewer,
     })).rejects.toThrow('fetch cap');
+  });
+
+  it('returns the active assigned Program Director contact for accepted-pre-materials', async () => {
+    getSystemUserByIdWithSelect.mockResolvedValueOnce({
+      systemuserid: 'pd-1',
+      fullname: 'Jane Director',
+      internalemailaddress: 'jane.director@wmkeck.org',
+      isdisabled: false,
+    });
+
+    const payload = await buildReviewContext({
+      suggestion: baseSuggestion({ wmkf_accepted: true }),
+      request: { ...request, _wmkf_programdirector_value: 'pd-1' },
+      reviewer,
+    });
+
+    expect(withDalContext).toHaveBeenCalledWith(
+      'external-context-program-director',
+      expect.any(Function),
+    );
+    expect(getSystemUserByIdWithSelect).toHaveBeenCalledWith('pd-1', [
+      'systemuserid', 'fullname', 'internalemailaddress', 'isdisabled',
+    ]);
+    expect(payload.programDirector).toEqual({
+      name: 'Jane Director',
+      email: 'jane.director@wmkeck.org',
+    });
+  });
+
+  it.each([
+    {
+      label: 'disabled',
+      staff: {
+        fullname: 'Former Director',
+        internalemailaddress: 'former@wmkeck.org',
+        isdisabled: true,
+      },
+    },
+    {
+      label: 'missing email',
+      staff: {
+        fullname: 'Jane Director',
+        internalemailaddress: '',
+        isdisabled: false,
+      },
+    },
+    {
+      label: 'missing name',
+      staff: {
+        fullname: '',
+        internalemailaddress: 'jane.director@wmkeck.org',
+        isdisabled: false,
+      },
+    },
+  ])('omits a $label Program Director contact without failing the page', async ({ staff }) => {
+    getSystemUserByIdWithSelect.mockResolvedValueOnce(staff);
+
+    const payload = await buildReviewContext({
+      suggestion: baseSuggestion({ wmkf_accepted: true }),
+      request: { ...request, _wmkf_programdirector_value: 'pd-1' },
+      reviewer,
+    });
+
+    expect(payload.programDirector).toBeNull();
+  });
+
+  it('keeps the accepted page available when the Program Director lookup fails', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    getSystemUserByIdWithSelect.mockRejectedValueOnce(new Error('transient Dataverse failure'));
+
+    const payload = await buildReviewContext({
+      suggestion: baseSuggestion({ wmkf_accepted: true }),
+      request: { ...request, _wmkf_programdirector_value: 'pd-1' },
+      reviewer,
+    });
+
+    expect(payload.programDirector).toBeNull();
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[external context] program director lookup failed:',
+      'transient Dataverse failure',
+    );
+    errorSpy.mockRestore();
+  });
+
+  it('does not load Program Director contact for views that do not render the confirmation', async () => {
+    await buildReviewContext({
+      suggestion: baseSuggestion(),
+      request: { ...request, _wmkf_programdirector_value: 'pd-1' },
+      reviewer,
+    });
+
+    expect(getSystemUserByIdWithSelect).not.toHaveBeenCalled();
   });
 });
 

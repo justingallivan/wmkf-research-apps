@@ -6,8 +6,11 @@
 
 import { useEffect, useRef } from 'react';
 
-export default function AcceptedConfirmationView() {
+export default function AcceptedConfirmationView({ programDirector = null }) {
   const headingRef = useRef(null);
+  const hasProgramDirectorContact = Boolean(
+    programDirector?.name && programDirector?.email,
+  );
 
   useEffect(() => {
     if (headingRef.current) headingRef.current.focus();
@@ -33,8 +36,19 @@ export default function AcceptedConfirmationView() {
         </p>
         <p>
           If something changes — calendar conflict, conflict of interest you
-          spotted, anything — please reach out to your Program Director rather
-          than waiting until materials are released.
+          spotted, anything — please reach out to your Program Director
+          {hasProgramDirectorContact && (
+            <>
+              {' '}({programDirector.name},{' '}
+              <a
+                href={`mailto:${programDirector.email}`}
+                className="text-blue-700 underline hover:text-blue-900"
+              >
+                {programDirector.email}
+              </a>)
+            </>
+          )}{' '}
+          rather than waiting until materials are released.
         </p>
       </div>
 

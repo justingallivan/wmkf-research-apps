@@ -213,6 +213,46 @@ describe('/api/external/review/[token]/context', () => {
     expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'not_found' });
   });
 
+  it('returns the assigned Program Director contact for accepted-pre-materials', async () => {
+    verifySuggestionToken.mockResolvedValue({
+      ...verifiedSuggestion,
+      suggestion: {
+        ...verifiedSuggestion.suggestion,
+        wmkf_accepted: true,
+        wmkf_reviewstatus: null,
+        wmkf_proposalfirstaccessed: '2026-05-01T00:00:00.000Z',
+      },
+      request: {
+        ...verifiedSuggestion.request,
+        _wmkf_programdirector_value: 'pd-1',
+      },
+    });
+    DynamicsService.getRecord.mockImplementation(async (entitySet) => {
+      if (entitySet === 'systemusers') {
+        return {
+          systemuserid: 'pd-1',
+          fullname: 'Jane Director',
+          internalemailaddress: 'jane.director@wmkeck.org',
+          isdisabled: false,
+        };
+      }
+      return null;
+    });
+
+    const req = createMockReq({ method: 'GET', query: { token: 'good-token' } });
+    const res = createMockRes();
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(DynamicsService.getRecord).toHaveBeenCalledWith('systemusers', 'pd-1', {
+      select: 'systemuserid,fullname,internalemailaddress,isdisabled',
+    });
+    expect(res._data.programDirector).toEqual({
+      name: 'Jane Director',
+      email: 'jane.director@wmkeck.org',
+    });
+  });
+
   it('only returns files from reviewer-materials folders for the verified request', async () => {
     verifySuggestionToken.mockResolvedValue(verifiedSuggestion);
     getRequestSharePointBuckets.mockResolvedValue([
@@ -410,8 +450,8 @@ describe('/api/external/review/[token]/context', () => {
     expect(res.status).toHaveBeenCalledWith(200);
     expect(Object.keys(res._data).sort()).toEqual([
       'engagementState', 'etag', 'files', 'ok', 'policies', 'prefill',
-      'proposal', 'questionSetVersion', 'questions', 'reviewer', 'submission',
-      'tokenExpiresAt',
+      'programDirector', 'proposal', 'questionSetVersion', 'questions', 'reviewer',
+      'submission', 'tokenExpiresAt',
     ]);
     expect(res._data.ok).toBe(true);
     expect(res._data.engagementState.view).toBe('stage2a');
