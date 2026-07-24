@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-23
+last_verified: 2026-07-24
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -16,6 +16,8 @@ source_files:
   - shared/components/reviewers/ReviewerFindPanel.js
   - shared/components/reviewers/ReviewerSearchSection.js
   - shared/components/reviewers/ReviewerManagePanel.js
+  - lib/services/review-manager/send-emails-service.js
+  - pages/external/review/[token].js
   - shared/components/reviewers/reviewer-search-logic.js
   - pages/api/reviewer-finder/my-candidates.js
   - lib/services/reviewer-finder/remove-candidate-service.js
@@ -44,11 +46,13 @@ watch_paths:
   - shared/components/reviewers/**
   - pages/api/reviewer-finder/**
   - pages/api/review-manager/**
+  - pages/external/review/**
   - pages/api/workbench/enrich-recommended.js
   - pages/api/workbench/applicant-reviewers.js
   - pages/api/workbench/promote-applicant-reviewer.js
   - pages/api/workbench/export-candidates.js
   - lib/services/reviewer-candidate-export.js
+  - lib/services/review-manager/**
   - lib/services/reviewer-roster-store.js
 update_triggers:
   - reviewer workbench UX or lifecycle changes
@@ -335,22 +339,25 @@ Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
   - **Recovery of a fat-fingered blank** is parked for Connor: enable Dataverse
     table-level auditing on `wmkf_appsystemsetting` — see
     `project-dataverse-settings-audit-enablement`.
-  - **Secure-link button label is stage-aware (S311).** The blue call-to-action button
-    is generated at SEND time by `send-emails.js` (`reviewPortalButtonHtml`, triggered
-    when a body contains a `/external/review/` URL) — NOT in the preview (`render-emails`
-    leaves the raw link, so the PD preview shows the link, not the button). Its text is
-    read per `templateType` from admin setting `email.reviewer_<type>.button_label`
-    (`invitation`→"Respond to Invitation", `materials`→"Start Review", `followup`→"Go to
-    Review"), seeded + editable in the same Email Defaults panel as subject/body.
-    Admin-default only (NO per-PD override — the button is server-generated) and
-    HTML-escaped at the interpolation site (S311 review — stored setting, not a literal).
-    Blank/unavailable for a stage WITH a fallback → non-empty stage default in
-    `send-emails.js` `DEFAULT_REVIEW_BUTTON_LABELS` (a button must never render empty),
-    a deliberate contrast with subject/body's blank-renders-blank rule. A stage with NO
-    fallback entry (`thankyou`) resolves to '' → the button is SUPPRESSED: if such a body
-    ever contains a review link (the editor advertises `{{externalLink}}` for all types),
-    it renders as a plain link, never a CTA button and never dropped (`plainTextToHtml`
-    gates on `isExternalReviewUrl(url) && reviewButtonLabel`).
+  - **Invitation paired response actions (2026-07-24).** At SEND time,
+    `send-emails-service.js` replaces the editable body's first secure-link position
+    with table-based, inline-CSS `Yes, I Can Review` / `No, Not This Time` buttons and
+    repeats that pair below the editable body. Accept deep-links to the existing Stage
+    2a form with `?action=accept`; decline deep-links to the existing decline/referral
+    form with `?action=decline`. Those query values only choose the initial view: GET
+    never records a response, and the existing portal POST remains the mutation
+    boundary. The structural button labels/footer are fixed; subject/body and
+    per-recipient preview edits remain editable. The assigned active Program Director
+    must have an email address: invitation transport sends as that PD and otherwise
+    fails closed with `program_director_sender_unavailable`. The footer renders the
+    PD name and clickable email plus the generic secure-link fallback.
+  - **Other secure-link button labels remain stage-aware (S311).** Materials and
+    follow-up use the admin settings `email.reviewer_<type>.button_label`
+    (`materials`→"Start Review", `followup`→"Go to Review") with non-empty
+    stage fallbacks. A type with no fallback (`thankyou`) keeps a review URL as a
+    plain link. The former invitation button-label setting may remain in existing
+    Dataverse baselines but is no longer exposed or consumed as editable invitation
+    copy because invitations require the fixed paired labels.
   (The `hold` + `finalize` templates were **REMOVED in S279** along with the rest of
   the hold path — see `project-reviewer-hold-step-decouple`.)
 - **Invitation send-safety semantics (S340, `send-emails.js`).** First-external-send hardening,
@@ -410,10 +417,13 @@ Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
   Institution — empty lines dropped, composed in `lib/utils/email-generator.js`) and
   the full `{{proposalAbstract}}`. Co-PI names come from the `wmkf_apprequestperson`
   junction (`fetchCoPIs`); PI is `_wmkf_projectleader_value_formatted` ONLY (never the
-  applicant org). Timeline tokens are client-substituted and line-dropped by
-  `applyTiming` (which keys on the literal "Review timeline:" header). The
-  invitation modal loads timing in this order: built-in fallback, per-user sticky
-  `reviewer_invite_timing`, admin cycle defaults, then request campaign config.
+  applicant org). Timeline tokens are client-substituted from the existing campaign
+  system; the modal blocks a send when proposal release precedes response deadline
+  or the review due date is not after release. It loads timing in this order:
+  built-in fallback, per-user sticky `reviewer_invite_timing`, admin cycle defaults,
+  then request campaign config. The redesigned seed is init data, not a runtime
+  fallback: promotion must deliberately rebaseline the admin default, and existing
+  per-PD subject/body overrides remain intact until reset or edited.
 
 ## Operating Notes
 

@@ -41,10 +41,10 @@ function formatDate(ymd) {
 // shows a concrete respond-by DATE — computed here as today + offset, which closely
 // tracks the per-reviewer deadline the Phase-3 cron derives server-side from each
 // suggestion's real emailSentAt + respondOffsetDays. Returns YYYY-MM-DD (local).
-function addDaysToTodayYmd(days) {
+function addDaysToTodayYmd(days, today = new Date()) {
   const n = Number(days);
   if (days === '' || days == null || !Number.isFinite(n) || n < 0) return '';
-  const dt = new Date();
+  const dt = new Date(today);
   dt.setDate(dt.getDate() + Math.round(n));
   const y = dt.getFullYear();
   const m = String(dt.getMonth() + 1).padStart(2, '0');
@@ -58,6 +58,7 @@ function skipReasonLabel(reason) {
   if (reason === 'missing_secure_link') return 'missing secure link';
   if (reason === 'unresolved_placeholder') return 'unfilled {{field}}';
   if (reason === 'email_research_only') return 'address is research-only, not invite-ready';
+  if (reason === 'program_director_sender_unavailable') return 'assigned Program Director cannot send email';
   return reason;
 }
 
@@ -112,6 +113,38 @@ function applyTiming(body, timing) {
   return out.join('\n');
 }
 
+// The existing campaign fields remain authoritative; this only prevents an
+// invitation from presenting the configured dates in an impossible order.
+// Blank dates retain the existing behavior (their copy line is omitted).
+export function validateInvitationTimeline(timing, today = new Date()) {
+  const respondBy = addDaysToTodayYmd(timing.respondOffsetDays, today);
+  const proposalDelivery = timing.proposalSendDate || '';
+  const reviewDue = timing.reviewDueDate || '';
+
+  if (respondBy && proposalDelivery && proposalDelivery < respondBy) {
+    return 'Proposal release cannot be earlier than the response deadline.';
+  }
+  if (proposalDelivery && reviewDue && reviewDue <= proposalDelivery) {
+    return 'The review due date must be after the proposal release date.';
+  }
+  if (!proposalDelivery && respondBy && reviewDue && reviewDue <= respondBy) {
+    return 'The review due date must be after the response deadline.';
+  }
+  return null;
+}
+
+// Invitation subjects may use {{respondBy}}. When a campaign intentionally has
+// no response offset, drop the "Action needed by …" prefix rather than leaking a
+// literal token or producing an awkward empty date.
+export function applySubjectTiming(subject, timing) {
+  const respondBy = timingTokenValues(timing)['{{respondBy}}'];
+  if (respondBy) return String(subject || '').split('{{respondBy}}').join(respondBy);
+  return String(subject || '')
+    .replace(/Action needed by\s*\{\{respondBy\}\}\s*:\s*/i, '')
+    .replace(/\{\{respondBy\}\}/g, '')
+    .trim();
+}
+
 export default function InviteEmailModal({ requestId = null, candidates = [], settings = {}, allowResend = false, onClose, onSent }) {
   const [step, setStep] = useState('preview'); // preview | sending | sent | error
   const [rawDrafts, setRawDrafts] = useState([]); // from render-emails, timing tokens still literal
@@ -135,6 +168,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   // confirmed action records the invitation only after staff sends it.
   const [manualLinkCopyState, setManualLinkCopyState] = useState({});
   const mountedRef = useRef(true);
+  const timelineError = validateInvitationTimeline(timing);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -256,7 +290,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   // has manually edited that field (edits win; changing dates won't clobber them).
   const draftView = (d) => ({
     ...d,
-    subject: edits[d.suggestionId]?.subject ?? d.subject,
+    subject: edits[d.suggestionId]?.subject ?? applySubjectTiming(d.subject, timing),
     body: edits[d.suggestionId]?.body ?? (d.skipped ? d.body : applyTiming(d.body, timing)),
   });
   const drafts = rawDrafts.map(draftView);
@@ -398,6 +432,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
 
   const handleSend = async () => {
     if (sendable.length === 0) { setError('No recipients with an email to send to.'); return; }
+    if (timelineError) { setError(timelineError); return; }
     if (quickCheckSendable.length > 0 && !allQuickChecksConfirmed) {
       setError('Confirm each quick-check address before sending.');
       return;
@@ -528,6 +563,9 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                     <p className="text-[11px] text-gray-400 mt-2">
                       Days to respond and reviews due are request-level campaign settings when saved. Proposal release is email-only copy for this invitation. A blank field omits its line.
                     </p>
+                    {timelineError ? (
+                      <p role="alert" className="text-xs text-red-700 mt-2">{timelineError}</p>
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -600,7 +638,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
               ) : (
                 <div className="space-y-3">
                   <p className="text-xs text-gray-500">
-                    Review each recipient below. Sendable invitations include a secure accept/decline link; edit if needed, then send.
+                    Review each recipient below. The secure-link position renders as paired accept/decline buttons in the sent email, with a second paired set repeated below the editable text.
                   </p>
                   {drafts.map((d) => (
                     <div key={d.suggestionId} className={`border rounded-lg p-3 ${d.skipped ? 'border-amber-200 bg-amber-50' : 'border-gray-200'}`}>
@@ -804,13 +842,13 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
               <button
                 type="button"
                 onClick={handleSend}
-                disabled={sendable.length === 0 || (quickCheckSendable.length > 0 && !allQuickChecksConfirmed)}
+                disabled={sendable.length === 0 || !!timelineError || (quickCheckSendable.length > 0 && !allQuickChecksConfirmed)}
                 className={`px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-40 disabled:cursor-not-allowed ${
                   quickCheckSendable.length > 0 ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-900 hover:bg-gray-800'
                 }`}
-                title={quickCheckSendable.length > 0
+                title={timelineError || (quickCheckSendable.length > 0
                   ? `${quickCheckSendable.length} address(es) need a quick check before sending`
-                  : undefined}
+                  : undefined)}
               >
                 {quickCheckSendable.length > 0
                   ? `Confirm & send ${sendable.length} invitation${sendable.length === 1 ? '' : 's'}`

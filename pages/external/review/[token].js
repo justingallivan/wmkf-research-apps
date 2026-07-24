@@ -15,10 +15,11 @@
  *   submitted             → same as stage2b but with submitted-state notice
  *   withdrawn-sufficient  → terminal "no longer needed" view
  *
- * One client-only view exists (`decline-form`) that the dispatcher routes
- * to when the reviewer clicks Decline on Stage 2a. It's pushed into
- * window.history so browser back returns to Stage 2a; refresh on this view
- * lands deterministically back on the server-derived view.
+ * One client-only view exists (`decline-form`). It is reached either from the
+ * Stage 2a Decline button (with a history entry) or from the invitation email's
+ * `?action=decline` link (derived view, no GET-side write). The email's
+ * `?action=accept` link opens the existing Stage 2a accept form. Terminal server
+ * views always take precedence over either email hint.
  */
 
 import { useEffect, useState, useCallback } from 'react';
@@ -32,10 +33,14 @@ import MaterialsView from '../../../shared/components/external/MaterialsView';
 
 export default function ExternalReviewPage() {
   const router = useRouter();
-  const { token } = router.query;
+  const { token, action } = router.query;
   const [state, setState] = useState({ status: 'loading' });
   // viewOverride: client-only state for `decline-form`. null = use server view.
   const [viewOverride, setViewOverride] = useState(null);
+  // A reviewer may dismiss an email-deep-linked decline form and return to the
+  // invitation. Key this by token so a later client-side navigation to a different
+  // invitation still honors that new link's action.
+  const [dismissedEmailActionToken, setDismissedEmailActionToken] = useState(null);
 
   const fetchContext = useCallback(async () => {
     try {
@@ -86,6 +91,25 @@ export default function ExternalReviewPage() {
     }
   }
 
+  const emailActionView = state.status === 'ready'
+    ? deriveEmailActionView({
+      action,
+      serverView: state.data.engagementState?.view,
+      dismissed: dismissedEmailActionToken === token,
+    })
+    : null;
+
+  function cancelCurrentOverride() {
+    // An action=decline email link has no pushed history entry. Dismiss that
+    // derived view locally; ordinary in-portal navigation keeps the existing
+    // browser-back behavior.
+    if (!viewOverride && emailActionView === 'decline-form') {
+      setDismissedEmailActionToken(token);
+      return;
+    }
+    popOverrideView();
+  }
+
   // After accept/decline submit succeeds, refresh server context. The new
   // view will be driven by the updated engagementState (e.g.,
   // accepted-pre-materials or declined). Returns the fetch promise so
@@ -118,9 +142,10 @@ export default function ExternalReviewPage() {
             data={state.data}
             token={token}
             viewOverride={viewOverride}
+            emailActionView={emailActionView}
             onRequestDecline={() => pushOverrideView('decline-form')}
             onRequestFlipToAccept={() => pushOverrideView('stage2a')}
-            onCancelOverride={popOverrideView}
+            onCancelOverride={cancelCurrentOverride}
             onResponseSubmitted={onResponseSubmitted}
           />
         )}
@@ -129,9 +154,16 @@ export default function ExternalReviewPage() {
   );
 }
 
-function Dispatcher({ data, token, viewOverride, onRequestDecline, onRequestFlipToAccept, onCancelOverride, onResponseSubmitted }) {
+export function deriveEmailActionView({ action, serverView, dismissed = false }) {
+  if (dismissed || serverView !== 'stage2a') return null;
+  if (action === 'accept') return 'stage2a';
+  if (action === 'decline') return 'decline-form';
+  return null;
+}
+
+function Dispatcher({ data, token, viewOverride, emailActionView, onRequestDecline, onRequestFlipToAccept, onCancelOverride, onResponseSubmitted }) {
   // Client-only views take precedence; otherwise dispatch on server-derived view.
-  const view = viewOverride || data.engagementState?.view || 'stage2a';
+  const view = viewOverride || emailActionView || data.engagementState?.view || 'stage2a';
 
   switch (view) {
     case 'decline-form':

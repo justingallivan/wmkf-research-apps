@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-18
+last_verified: 2026-07-24
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -25,6 +25,7 @@ source_files:
   - lib/services/review-draft-service.js
   - lib/external/review-engagement-state.js
   - pages/api/review-manager/send-emails.js
+  - lib/services/review-manager/send-emails-service.js
   - pages/api/review-manager/regenerate-token.js
   - pages/api/review-manager/revoke-token.js
   - pages/api/review-manager/release-settings.js
@@ -79,6 +80,15 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
 
 ## Operating Notes
 
+- **Invitation email actions are view hints, never GET mutations (2026-07-24).**
+  The paired invitation buttons use the same signed portal token with
+  `?action=accept` or `?action=decline`. On a fresh `stage2a` engagement, accept
+  opens the existing Stage 2a form and decline opens the existing decline form,
+  including its optional referral field. `pages/external/review/[token].js`
+  ignores those hints for every non-`stage2a` server view, so a reopened email
+  cannot override accepted, declined, materials, submitted, or terminal state.
+  The query string itself performs no write; the existing response POST remains
+  the only mutation boundary, which protects against email-link scanner fetches.
 - **The stage2b "submit your review" surface is now in-browser authoring, not file upload (S301, Phase 2).**
   `MaterialsView` renders `ReviewAuthoringForm` (controlled) with the staff-editable
   question set (seeded as the 11 questions — 3 rating radios + 8 `RichReviewEditor`

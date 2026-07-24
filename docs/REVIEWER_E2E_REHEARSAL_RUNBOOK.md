@@ -85,7 +85,9 @@ Expected:
 - The modal previews the rendered invitation.
 - Sending in capture mode shows "Captured ... invitation email(s) for rehearsal."
 - The result says no Dynamics email was sent.
-- The captured artifact includes the HTML body with the `Respond to Invitation` link (the invitation-stage button label; `materials`/`followup` use "Start Review"/"Go to Review").
+- The captured artifact includes paired `Yes, I Can Review` / `No, Not This Time`
+  buttons above and below the editable invitation body. The accept link carries
+  `?action=accept`; the decline link carries `?action=decline`.
 - The send route returns captured email artifacts and does not call Dynamics.
 
 Run the reviewer portal browser rehearsal:
@@ -102,7 +104,8 @@ npx playwright test \
 Expected:
 
 - Stage 2a accept UX works, including policy acknowledgment gates.
-- A captured `Respond to Invitation` button opens the real external reviewer portal page.
+- A captured `Yes, I Can Review` button opens the existing Stage 2a accept form,
+  while `No, Not This Time` opens the existing decline/referral form.
 - Reviewer accept posts the expected payload.
 - Stage 2b return flow shows materials, accepts a review file, collects structured ratings, and posts multipart upload data to a browser mock instead of SharePoint/Dataverse.
 - The Program Director reviewer-engagement rehearsal drives the real Workbench Reviewers tab through captured invite, campaign-settings edit, accepted-reviewer release, and "no longer needed" withdraw flows with all data routes mocked in the browser.
@@ -155,7 +158,9 @@ For a capture-mode rehearsal against local/live APIs instead of browser route mo
    - recipient
    - subject
    - HTML body
-   - `Respond to Invitation` button/link (invitation-stage label)
+   - paired `Yes, I Can Review` / `No, Not This Time` buttons above and below the body
+   - `?action=accept` / `?action=decline` destinations
+   - assigned Program Director name and clickable email in the secure-link footer
    - fallback full URL
 
 Expected: no real Dynamics email is sent. The captured artifact is the testable
@@ -248,7 +253,7 @@ should delete that contact manually before reusing the same smoke email.
 
 Use the captured artifact from the director-side rehearsal:
 
-1. Copy the `Respond to Invitation` link from the captured HTML.
+1. Copy the `Yes, I Can Review` link from the captured HTML.
 2. Open it in a browser.
 3. Confirm the domain shown in the address bar is the intended reviewer domain.
 4. Accept the invitation.
@@ -257,6 +262,11 @@ Use the captured artifact from the director-side rehearsal:
 7. For a Stage 2b test token/context, upload a small PDF/DOCX test file and complete the structured rating fields.
 
 Expected: the reviewer-facing UX is understandable, links are branded as expected, and upload/structured-review controls behave correctly.
+
+Repeat with `No, Not This Time` and confirm the existing decline form still
+offers the optional referral field. Merely fetching either email URL must not
+record a response; the existing portal POST remains the only state-changing
+step.
 
 ---
 

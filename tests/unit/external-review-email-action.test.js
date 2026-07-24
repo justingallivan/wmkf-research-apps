@@ -1,0 +1,42 @@
+/**
+ * @jest-environment jsdom
+ */
+
+import { deriveEmailActionView } from '../../pages/external/review/[token]';
+
+describe('reviewer email action deep links', () => {
+  test('fresh invitation accept opens the existing Stage 2a accept form', () => {
+    expect(deriveEmailActionView({
+      action: 'accept',
+      serverView: 'stage2a',
+    })).toBe('stage2a');
+  });
+
+  test('fresh invitation decline opens the existing suggestion/reason path', () => {
+    expect(deriveEmailActionView({
+      action: 'decline',
+      serverView: 'stage2a',
+    })).toBe('decline-form');
+  });
+
+  test.each([
+    'accepted-pre-materials',
+    'declined',
+    'stage2b',
+    'submitted',
+    'withdrawn-sufficient',
+  ])('action query never overrides server state %s', (serverView) => {
+    expect(deriveEmailActionView({ action: 'accept', serverView })).toBeNull();
+    expect(deriveEmailActionView({ action: 'decline', serverView })).toBeNull();
+  });
+
+  test('unknown, repeated-array, or dismissed actions fall through safely', () => {
+    expect(deriveEmailActionView({ action: 'other', serverView: 'stage2a' })).toBeNull();
+    expect(deriveEmailActionView({ action: ['decline'], serverView: 'stage2a' })).toBeNull();
+    expect(deriveEmailActionView({
+      action: 'decline',
+      serverView: 'stage2a',
+      dismissed: true,
+    })).toBeNull();
+  });
+});

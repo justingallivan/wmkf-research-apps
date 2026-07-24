@@ -87,21 +87,14 @@ export const EDITABLE_TEXT_DEFAULTS = [
     label: 'Reviewer invitation subject',
     description: 'Default subject line for the reviewer invitation email (per-PD editable; this is the org default). Mustache {{tokens}}, not [brackets].',
     multiline: false,
-    placeholders: ['{{proposalTitle}}'],
+    placeholders: ['{{respondBy}}', '{{proposalTitle}}'],
   },
   {
     key: 'email.reviewer_invitation.body',
     label: 'Reviewer invitation body',
     description: 'Default body for the reviewer invitation email. The honorarium amount is injected server-side from the admin honorarium setting via {{customField:honorarium}}; the timeline tokens are filled in when the PD sends.',
     multiline: true,
-    placeholders: ['{{greeting}}', '{{proposalDetails}}', '{{proposalAbstract}}', '{{externalLink}}', '{{respondBy}}', '{{proposalDelivery}}', '{{reviewDue}}', '{{customField:honorarium}}', '{{signature}}'],
-  },
-  {
-    key: 'email.reviewer_invitation.button_label',
-    label: 'Reviewer invitation button label',
-    description: 'Text on the secure-link button in the invitation email — the accept/decline stage, so not "Start Review". Blank falls back to a stage default.',
-    multiline: false,
-    placeholders: [],
+    placeholders: ['{{greeting}}', '{{proposalTitle}}', '{{piName}}', '{{piInstitution}}', '{{proposalDetails}}', '{{proposalAbstract}}', '{{externalLink}}', '{{respondBy}}', '{{proposalDelivery}}', '{{reviewDue}}', '{{customField:honorarium}}', '{{signature}}'],
   },
   {
     key: 'email.reviewer_materials.subject',
