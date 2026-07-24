@@ -6,7 +6,7 @@ status: canonical
 summary: Canonical priority queue separating current commitments, evidence windows, optional work, external dependencies, and parked programs.
 canonical: true
 cataloged: 2026-07-22
-last_verified: 2026-07-23
+last_verified: 2026-07-24
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -32,7 +32,7 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Reviewer operational safety tools | Structured staff review entry is live in production. The active branch adds only the terminal post-accept status (`withdrew` vs `released`). Deadline evidence is a separate owner-reviewed design based on durable, ordered materials dispatches; completed-review payability remains another independent feature. Keep pre-accept reset separate from both terminal status and post-accept financial annotation. | Each feature independently verified through UI → route → service → Dataverse → consumer, then deliberately promoted. |
+| 1 | Reviewer reliability evidence design | Structured staff review entry and post-accept terminal statuses (`withdrew` vs `released`) are live in production. The next allowed step is a read-only probe of whether Dynamics email activities can serve as durable, ordered materials-dispatch evidence. Completed-review payability remains a separate feature; keep pre-accept reset separate from both terminal status and post-accept financial annotation. | Owner-reviewed evidence design before any schema or metric build. |
 | 2 | Reviewer campaign evidence window | Keep the legacy resolver authoritative during the upcoming run. Record W2 shadow disagreements, wrong/missed identity outcomes, email confirmation, staff corrections, invitations, and review completion. | Post-run evidence review; no automatic cutover. |
 | 3 | Optional reviewer UX triage | Select only improvements supported by observed staff friction. Current candidates: campaign-settings discoverability/defaults, review-output formatting, and global reviewer notes/flags or a Reviewer Pool. | Separate owner choice for each item; absence from this selection means no build. |
 
@@ -48,6 +48,10 @@ sequence.
   shipped through PR #75 / merge `0226f7eb` to production deployment
   `dpl_BjkM3tjopMpRWPMwn3NRgtB4CHSU` on 2026-07-22. All PR checks passed; Vercel reported Ready,
   the unauthenticated route smoke redirected to sign-in, and the post-deploy error scan was clean.
+- Reviewer terminal statuses: `withdrew` and `released` shipped through PR #78 plus the accepted/null
+  repair in PR #79 / merge `fd610837` on 2026-07-24. Production Dataverse and Workbench readback
+  verified `Withdrew`, token revoked, accepted preserved, and no review-received/completed timestamp.
+  Deadline evidence and completed-review payability remain separate.
 
 ## Reviewer redesign gates
 

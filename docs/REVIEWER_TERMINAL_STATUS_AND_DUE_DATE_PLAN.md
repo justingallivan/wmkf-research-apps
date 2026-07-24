@@ -3,7 +3,7 @@ title: Reviewer Terminal Status and Dispatch Evidence
 domain: engineering-process
 kind: plan
 status: active
-summary: "Ship terminal post-accept reviewer statuses independently; design durable deadline evidence around Dynamics email activities before adding schema."
+summary: "Terminal post-accept reviewer statuses are live; design durable deadline evidence around Dynamics email activities before adding schema."
 canonical: false
 cataloged: 2026-07-22
 owner: product-engineering
@@ -26,7 +26,7 @@ durably represent dispatch order or engagement generation.
 
 The implementation is now split:
 
-1. **Active slice:** terminal post-accept statuses `withdrew` and `released`.
+1. **Shipped slice:** terminal post-accept statuses `withdrew` and `released`.
 2. **Deferred design:** deadline evidence based on a durable, ordered materials
    dispatch identity.
 3. **Separate later feature:** completed-review payability disposition.
@@ -35,7 +35,7 @@ The HMAC materials-repair endpoint, due-date columns, and inline due-date stamp
 are not part of the active slice. Git history preserves the discarded design;
 this document owns the current boundary.
 
-## Production provisioning — 2026-07-23
+## Production release — 2026-07-24
 
 [VERIFIED via the live metadata preflight and
 `scripts/extend-reviewstatus-picklist-terminal.mjs`] Production Dataverse now
@@ -43,10 +43,14 @@ contains `withdrew=100000005` and `released=100000006`. Both insert operations
 returned the exact requested `NewOptionValue`, `PublishAllXml` returned HTTP
 204, and the post-publish metadata read returned both labels and values.
 
-The schema prerequisite is complete. Runtime behavior remains branch-only until
-deliberate code promotion and release verification.
+The schema prerequisite completed 2026-07-23. Runtime code shipped through PR
+#78 plus the accepted/null-status repair in PR #79 / merge `fd610837` on
+2026-07-24. A controlled production smoke reproduced
+`wmkf_accepted=true` with persisted `wmkf_reviewstatus=null`, transitioned the
+row to `Withdrew`, and read back token revoked with no received/completed stamp.
+Workbench rendered `Withdrew` and `Revoked`.
 
-## Problem being solved now
+## Problem solved by the shipped slice
 
 [VERIFIED via `lib/dataverse/adapters/reviewer-suggestion.js`] A reviewer who
 accepts and later does not deliver has no accurate terminal state. Marking that
@@ -63,7 +67,7 @@ The required semantics are:
 - terminal rows cannot submit a review, upload a review, or remain in outstanding
   work/reminder buckets.
 
-## Active terminal-status contract
+## Shipped terminal-status contract
 
 ### Entry points
 
@@ -151,10 +155,10 @@ The future model must derive first/last communicated deadlines from ordered
 dispatch records within one engagement generation. It must not rely on an
 expiring repair receipt or two mutable fields as the source of truth.
 
-This design requires a separate owner-reviewed schema plan and is not a blocker
-for the terminal-status release.
+This design requires a separate owner-reviewed schema plan and did not block the
+terminal-status release.
 
-## Verification and release boundary
+## Verification and release record
 
 Automated:
 
@@ -167,12 +171,20 @@ Automated:
 
 Promotion:
 
-- Tier 2 branch and deliberate promotion;
-- provision terminal picklist values before deploying code that writes them;
-- rehearse UI → route → service → Dataverse on an approved target;
-- confirm the row has no review-received/completed timestamp and disappears from
-  Outstanding;
-- no due-date schema or repair endpoint is provisioned.
+- Tier 2 PRs #78 and #79 deliberately promoted to `main`;
+- terminal picklist values were provisioned before runtime deployment;
+- production deployment reached Ready at exact merge SHA `fd610837`;
+- controlled invite/accept plus same-service production transition confirmed no
+  review-received/completed timestamp and terminal exclusion from outstanding
+  action state;
+- Workbench showed `Withdrew` and `Revoked`;
+- no due-date schema or repair endpoint was provisioned.
+
+The browser controller could not resolve the native confirmation dialog, so the
+signed-in production POST seam was not directly observed during the synthetic
+smoke. Route integration tests passed. Prefer observing the next real staff
+terminal action; do not create another synthetic reviewer solely for that
+remaining route-level observation without an explicit owner request.
 
 ## Explicitly out of scope
 
