@@ -1,134 +1,155 @@
-# Session 371 Prompt: Probe durable reviewer dispatch evidence
+# Session 372 Prompt: Manually verify and promote the reviewer invitation redesign
 
-## Session 370 Summary
+## Session 371 Summary
 
-The reviewer terminal-status slice was reworked to the smallest safe boundary,
-adversarially reviewed, merged, deployed, and smoke-tested. Post-accept
-`withdrew` and `released` are now live without review-received/completed stamps;
-deadline evidence and completed-review payability remain separate features.
+The reviewer invitation email redesign was implemented and verified on
+`codex/reviewer-email-redesign`. The branch is intentionally not merged or
+deployed so Justin can perform manual browser and email-client testing later.
 
 ### What Was Completed
 
-1. **Terminal-status rework and release**
-   - Removed the discarded due-date/HMAC repair design from the active slice.
-   - Added the dedicated terminal route/service, ETag-guarded status plus token
-     revocation, adapter irreversibility, receipt-writer race guards, terminal
-     consumer exclusions, and status-map parity enforcement.
-   - Provisioned and verified production picklist values
-     `withdrew=100000005` and `released=100000006`.
-   - Merged PR #78, then fixed the real acceptance shape where
-     `wmkf_accepted=true` coexists with persisted `wmkf_reviewstatus=null`.
-   - Merged PR #79 to production at `fd610837`.
+1. **Reviewer confirmation page contact**
+   - The accepted/pre-materials confirmation now shows the assigned Program
+     Director's name and email in parentheses.
 
-2. **Production verification**
-   - Vercel deployment `dpl_AH9N4YHnR9jZEu5A9cF1R7EkDdBJ` reached Ready with
-     exact Git SHA `fd610837165906ff53a0cd422c57e2b840c7ae43`.
-   - A controlled invite to `03aero.works@icloud.com` on test request `1002788`
-     reproduced accepted + null status in production.
-   - The same ETag-guarded terminal service transitioned that exact row to
-     `Withdrew`; Dataverse readback showed status `100000005`, token revoked,
-     accepted preserved, and no received/completed timestamp. Workbench rendered
-     `Withdrew` and `Revoked`.
-   - Browser automation could not resolve the native confirmation dialog, so the
-     signed-in production POST seam was not directly observed. Route integration
-     tests passed; do not create another synthetic smoke solely for this unless
-     the owner explicitly asks. A future real staff terminal action can close
-     that last route-level observation.
+2. **Reviewer invitation email redesign**
+   - Replaced the old single generic response button with fixed paired
+     `Yes, I Can Review` / `No, Not This Time` actions above and below the
+     editable invitation body.
+   - Accept opens the existing Stage 2a accept form; decline opens the existing
+     decline form, including its optional referral field.
+   - Email action query parameters only select the initial view. GET requests do
+     not record a response; the existing portal POST remains the write boundary.
+   - Added table-based, inline-CSS email rendering, a generic fallback URL, and a
+     footer with the assigned Program Director's name and clickable email.
+   - Invitations now send from the assigned active Program Director. A missing,
+     disabled, or email-less assigned PD fails closed with
+     `program_director_sender_unavailable`.
+   - Subject/body and per-recipient draft edits remain editable. The paired CTA
+     labels and footer are structural; the obsolete invitation button-label
+     editor is no longer exposed.
 
-3. **Smoke cleanup and housekeeping**
-   - Deleted the synthetic suggestion and potential-reviewer rows and verified
-     both return 404.
-   - Verified the acceptance job completed with zero attempts/errors.
-   - The app identity lacked Contact DeleteAccess; Justin deactivated the marker
-     Contact, verified `Inactive`. The address cannot be reused by the smoke
-     helper.
-   - Cleared local smoke state, removed the temporary test, closed smoke browser
-     tabs, deleted the merged repair branch locally/remotely, and returned the
-     shared checkout to `main`.
+3. **Campaign timeline and copy**
+   - Kept the existing campaign/default fields as the date source.
+   - Added chronological validation so proposal release cannot precede the
+     response deadline and review due must follow release.
+   - Added response-deadline substitution in the subject and the agreed
+     nonresponse copy without any automatic decline.
+   - Updated the shipped seed copy and admin placeholder hints.
+
+4. **Verification and documentation**
+   - 116 focused Jest tests passed; the final email-default catalog subset
+     passed after the placeholder-hint update.
+   - Focused Playwright coverage passed 6/6 for captured invitation navigation
+     and the Program Director workflow.
+   - Type check, lint (existing warning baseline only), production Turbopack
+     build, migration-manifest check, and all relevant data-access/doc gates
+     passed.
+   - Updated the reviewer rehearsal runbook and both reviewer lifecycle wiki
+     topics. The live-doc sweep found no remaining stale reviewer-invitation
+     description.
 
 ### Commits
 
-- `0cf8ba1a` — Merge PR #78: terminal-status rework
-- `0fa3ac91` — Fix accepted/null-status terminal transition
-- `fd610837` — Merge PR #79 to production
+- `2ed336d1` — Show reviewer Program Director contact
+- `658b4fb1` — Redesign reviewer invitation email
 
 ## Next Items
 
 ### Verified Open
 
-1. **Run the read-only dispatch-evidence probe**
-   Evidence: `docs/REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md` and
-   `.claude-memory/project-reviewer-reliability-data.md`.
-   Determine whether the existing Dynamics email activity can durably expose or
-   carry reviewer suggestion identity, engagement generation, communicated due
-   date, ordered sent state, and send timestamp. Do not add schema until an
-   owner-reviewed design exists.
+1. **Run manual headed browser QA**
+   Evidence: `docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md`; automated Playwright
+   coverage passed 6/6 on this branch.
+   Use the local mocked rehearsal first:
 
-2. **Continue the reviewer campaign evidence window**
-   Evidence: `docs/CURRENT_WORK_QUEUE.md`.
-   Keep the legacy resolver authoritative and record W2 shadow disagreements,
-   identity outcomes, staff corrections, invitations, and review completion.
+   ```bash
+   rtk npm run rehearse:reviewer-invite:browser
+   ```
+
+   Confirm the invitation preview, campaign chronology error, captured artifact,
+   assigned-PD footer, Accept path, Decline path, referral field, and accepted
+   confirmation contact.
+
+2. **Test the exact generated email in real clients**
+   Evidence: the renderer in
+   `lib/services/review-manager/send-emails-service.js` is covered by unit and
+   integration tests, but Outlook/Gmail/Apple Mail rendering remains manual.
+   Follow the runbook's capture-mode or allowlisted live-smoke boundary. Capture
+   mode suppresses Dynamics delivery but still mints a token and can stamp
+   invitation lifecycle state, so use throwaway reviewer/request records.
 
 ### Owner Decision Needed
 
-1. **Completed-review payability disposition**
-   Evidence: `docs/REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md`.
-   This annotates genuinely completed reviews and must remain independent of
-   terminal engagement status.
+1. **Promote the feature after manual QA**
+   Evidence: branch `codex/reviewer-email-redesign`, commits `2ed336d1` and
+   `658b4fb1`.
+   Decide whether to merge/promote after browser and email-client review.
 
-2. **Optional reviewer UX selection**
-   Evidence: `docs/CURRENT_WORK_QUEUE.md`.
-   Choose only from observed staff friction; no candidate is authorized merely
-   because it appears in the queue.
+2. **Apply the redesigned Dataverse org default during promotion**
+   Evidence: `lib/seed/email-defaults/reviewer-templates.js` is init data, not a
+   runtime fallback.
+   Run the normal reviewed email-default rebaseline as part of promotion.
+   Existing per-PD subject/body overrides remain unchanged and will continue to
+   win until the PD resets or edits them.
 
 ### Parked
 
-1. Applicant intake product build remains parked during the GOApply evaluation.
-2. Automated BILL onboarding remains tabled; payment is offline/manual.
-3. Destructive reviewer cleanup remains gated by promotion and a full campaign.
+1. The Session 371 dispatch-evidence probe remains open but was not part of this
+   feature branch. Revisit it only after this invitation QA/promotion or an owner
+   reprioritization.
+2. Applicant intake remains parked during the GOApply evaluation.
+3. Automated BILL onboarding remains tabled; payment is offline/manual.
 
 ### Verify Before Acting
 
-1. **Test-request campaign dates**
-   Evidence currently available: the production invitation preview for request
-   `1002788` showed respond-by and review-due dates out of chronological order.
-   Re-read current campaign configuration and timeline defaults before treating
-   this as a product defect; do not edit a dedicated test request silently.
+1. **Production/default-template state**
+   Evidence currently available: code and seed are committed, but no Dataverse
+   rebaseline or deployment was performed in Session 371.
+   Read the live admin default and per-PD override before claiming a deployed
+   reviewer will receive the redesigned copy.
 
-2. **Unrelated reconciliation-report drift**
-   Evidence currently available: `docs/RECONCILIATION_REPORT.json` was modified
-   before this work and intentionally excluded from the release/session commits.
-   Re-run the reconciliation probe and resolve current Atlas counts before
-   staging it; do not commit the dated generated output blindly.
+2. **Real email sender rendering**
+   Evidence currently available: tests prove the Dynamics payload uses the
+   assigned PD email/system-user identity.
+   Confirm the actual display name/domain in a controlled allowlisted inbox
+   before production promotion.
 
 ### Do Not Reopen Without New Decision
 
-1. The discarded HMAC materials-repair receipt and mutable first/last due-date
-   fields remain rejected.
-2. Terminal status, deadline evidence, payability, and pre-accept reset remain
-   separate features.
-3. Do not repeat the synthetic terminal-status smoke solely to exercise the
-   browser confirmation; prefer observation of the next real staff action.
+1. Do not make Accept or Decline mutate state on GET; email security scanners
+   prefetch links.
+2. Do not add a new campaign-date store; the current campaign system remains
+   authoritative.
+3. Do not auto-decline nonresponders; the deadline consequence is copy only.
+4. Do not run a live default rebaseline or send a production invitation as part
+   of routine local browser testing.
 
 ## Key Files Reference
 
 | File | Purpose |
 | --- | --- |
-| `docs/CURRENT_WORK_QUEUE.md` | Canonical priority sequence |
-| `docs/REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md` | Shipped terminal contract and deferred dispatch design |
-| `.claude-memory/project-reviewer-reliability-data.md` | Durable owner goal and feature boundaries |
-| `lib/services/review-manager/terminal-transition-service.js` | Terminal predicate and ETag-guarded write |
-| `lib/services/review-receipt-guard.js` | Shared terminal/race guard |
-| `pages/api/review-manager/terminal-transition.js` | Authenticated terminal route |
-| `scripts/extend-reviewstatus-picklist-terminal.mjs` | Production picklist provisioning |
+| `lib/seed/email-defaults/reviewer-templates.js` | Redesigned default subject/body seed |
+| `lib/services/review-manager/send-emails-service.js` | PD sender resolution and structural invitation HTML |
+| `shared/components/reviewers/InviteEmailModal.js` | Editable preview and campaign-date validation |
+| `pages/external/review/[token].js` | Safe accept/decline email action routing |
+| `shared/components/external/AcceptedPreMaterialsView.js` | Accepted confirmation and PD contact |
+| `docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md` | Safe manual/browser/email rehearsal boundaries |
 
 ## Testing
 
 ```bash
-rtk npm test -- --runInBand tests/unit/terminal-transition-service.test.js tests/integration/terminal-transition-route.test.js
-rtk npm run check:status-enum-parity
-rtk npm run test:status-enum-parity
-rtk npm run check:api-routes
-rtk npm run check:docs
+rtk npm test -- --runInBand \
+  tests/unit/send-emails-service.test.js \
+  tests/integration/send-emails-route.test.js \
+  tests/unit/invite-email-modal-capture.test.js \
+  tests/unit/external-review-email-action.test.js
+
+rtk npx playwright test \
+  tests/e2e/reviewer-captured-invite.spec.js \
+  tests/e2e/program-director-invite.spec.js \
+  --project=chromium
+
+rtk npm run check:types
 rtk npm run build
 ```
