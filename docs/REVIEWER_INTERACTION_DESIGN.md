@@ -148,7 +148,7 @@ The reviewer clicks the magic link. They see one page with several stacked eleme
 
 **Reversibility:**
 
-- Reversible-via-link (clicking the other button flips state) until materials are downloaded
+- Reversible-via-link until materials are released
 - Staff-override only after that point
 
 **Status state machine on `wmkf_potentialreviewer`:**
@@ -157,7 +157,7 @@ The reviewer clicks the magic link. They see one page with several stacked eleme
 - `Invited` → `Declined` (timestamp, reason, referral text)
 - `Invited` → `No Response` (treatment described below)
 - `Accepted` → `Submitted` (later, at Stage 5)
-- `Invited` or `Accepted` → `Withdrawn-Sufficient` (when a PD calls off pending invitations because they have enough confirmed reviewers; see below)
+- `Invited` (still pending only) → `Withdrawn-Sufficient` (when a PD calls off pending invitations because they have enough confirmed reviewers; see below)
 
 ### Stage 4 — Working window (between materials and submission)
 
@@ -199,10 +199,16 @@ When materials become available, the reviewer is notified via a fresh email cont
 - Guidance and rubric framing live in **reviewer instructions delivered with materials**, not on the form
 - By submission time, the reviewer has done the work; the form should not ambush them with new framing
 
-**Withdrawal during the review window:**
+**Withdrawal after acceptance:**
 
-- Self-service withdrawal not exposed
-- "Contact the PD" is the path — the rare case warrants a human conversation
+- Before materials are released, self-service withdrawal is available from the
+  acceptance page and acceptance-confirmation email. It opens the same decline
+  reason/referral form as an initial decline.
+- The accepted→declined write and deletion of the engagement's exact linked
+  honorarium request are one atomic Dataverse changeset. The PD is notified with
+  the reason/referrals, and reviewer rollups immediately derive the new state.
+- Once materials are released (or a review is received), the state is locked and
+  "Contact the PD" remains the path.
 
 ### Stage 5 — Submission form
 

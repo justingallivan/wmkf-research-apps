@@ -64,6 +64,14 @@ posture, not a plan; a real honorarium `akoya_request` was created
 - keep payment offline by check until the person-payee/BILL tail is separately
   approved and verified.
 
+If an accepted reviewer self-withdraws before materials release, the portal
+removes that engagement's exact linked honorarium `akoya_request` automatically
+in the same Dataverse changeset that flips the suggestion to declined. The
+reviewer/contact and suggestion history remain. The acceptance-job drain
+re-checks after honorarium creation and compensates for a concurrent withdrawal,
+so a late worker cannot leave or recreate an honorarium for an unfulfilled
+review obligation.
+
 The 2026-06-22 production lock was capture-only:
 `HONORARIUM_ONBOARDING_DEFERRED=true` with the discriminator GUIDs unset. Treat
 that as the safety/off state before the config flip, not the target operating

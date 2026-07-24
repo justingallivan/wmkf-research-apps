@@ -131,6 +131,16 @@ Methods:
 
 **Permanent removal ("Remove entirely", S343):** `lib/services/reviewer-finder/remove-candidate-service.js` (`removeCandidateEntirely`) hard-deletes the suggestion row itself via a `DELETE` op inside an atomic Dataverse `$batch` changeset (`runChangeset`) alongside the linked `wmkf_appreviewanswer` snapshot rows and the honorarium `akoya_request` (via `wmkf_honorariumrequest`) — NOT via `hardDeleteById`, which is the pre-existing merge-only single-record delete. Cascades a Postgres `review_drafts` cleanup (`ReviewDraftService.deleteBySuggestion`, cross-store, ordered after the changeset commits). Pre-delete `system_alerts` audit breadcrumb; no test/sandbox precondition (owner decision — high-trust, no blocks). Design: `docs/REVIEWER_REMOVE_ENTIRELY_BUILD_PLAN.md`.
 
+**Accepted reviewer self-withdrawal (2026-07-24):** before materials release and
+before review receipt, the token-authenticated reviewer may use the ordinary
+decline reason/referral form. `applyStage2aResponse` atomically PATCHes this row
+to `accepted=false`, `declined=true`, `responsetype=declined` and DELETEs the
+exact server-read `_wmkf_honorariumrequest_value` `akoya_request` in one
+`runChangeset`. No contact, potential-reviewer, suggestion, or response-history
+row is deleted. Rollups read the changed fields directly. The assigned PD is
+notified after commit; idempotent repeats do not re-stamp or re-notify, but do
+clean up a late linked honorarium left by an acceptance-worker race.
+
 Exported helpers (S208): `APPLICANT_DISPOSITION_MAP`, `APPLICANT_DISPOSITION_EXCLUDED`, `notExcludedFilter(field?)`, `isExcluded(row)`.
 
 Picklist maps live in the adapter (`RESPONSE_TYPE_MAP`, `REVIEW_STATUS_MAP`, `APPLICANT_DISPOSITION_MAP`). Callers pass legacy Postgres string values; adapter translates.

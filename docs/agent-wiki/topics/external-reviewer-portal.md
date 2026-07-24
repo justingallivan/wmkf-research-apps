@@ -84,11 +84,20 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   The paired invitation buttons use the same signed portal token with
   `?action=accept` or `?action=decline`. On a fresh `stage2a` engagement, accept
   opens the existing Stage 2a form and decline opens the existing decline form,
-  including its optional referral field. `pages/external/review/[token].js`
-  ignores those hints for every non-`stage2a` server view, so a reopened email
-  cannot override accepted, declined, materials, submitted, or terminal state.
+  including its optional referral field. For `accepted-pre-materials`, only the
+  decline hint is honored: it opens that same form for self-service withdrawal.
+  Accepted→declined remains a POST mutation and is server-locked after materials
+  release or review receipt. Other non-`stage2a` views ignore action hints.
   The query string itself performs no write; the existing response POST remains
   the only mutation boundary, which protects against email-link scanner fetches.
+- **Accepted reviewer self-withdrawal (2026-07-24).** Before materials release,
+  the accepted confirmation view and acceptance email link to the existing
+  decline reason/referral form. The response service atomically flips the
+  suggestion to declined and deletes its exact `_wmkf_honorariumrequest_value`
+  `akoya_request`; it then cancels non-running acceptance jobs and notifies the
+  assigned PD with reason/referrals. A leased acceptance worker re-checks after
+  honorarium creation and compensates by deleting any late-created linked
+  honorarium before it can send confirmation/quota side effects.
 - **The stage2b "submit your review" surface is now in-browser authoring, not file upload (S301, Phase 2).**
   `MaterialsView` renders `ReviewAuthoringForm` (controlled) with the staff-editable
   question set (seeded as the 11 questions — 3 rating radios + 8 `RichReviewEditor`

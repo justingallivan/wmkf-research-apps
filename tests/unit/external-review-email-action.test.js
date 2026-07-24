@@ -19,8 +19,14 @@ describe('reviewer email action deep links', () => {
     })).toBe('decline-form');
   });
 
+  test('accepted reviewer withdrawal link opens the existing suggestion/reason path', () => {
+    expect(deriveEmailActionView({
+      action: 'decline',
+      serverView: 'accepted-pre-materials',
+    })).toBe('decline-form');
+  });
+
   test.each([
-    'accepted-pre-materials',
     'declined',
     'stage2b',
     'submitted',

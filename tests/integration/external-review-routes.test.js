@@ -23,6 +23,7 @@ import {
   enqueueReviewerAcceptanceJob,
   markReviewerAcceptanceJobQueued,
   cancelReviewerAcceptanceJob,
+  cancelReviewerAcceptanceJobsForSuggestion,
 } from '../../lib/services/reviewer-acceptance-job-service';
 
 jest.mock('../../lib/external/verify-suggestion-token', () => ({
@@ -118,6 +119,11 @@ jest.mock('../../lib/services/reviewer-acceptance-job-service', () => ({
   enqueueReviewerAcceptanceJob: jest.fn(async () => ({ id: 101, acceptance_key: 'acceptance-1', status: 'accept_pending' })),
   markReviewerAcceptanceJobQueued: jest.fn(async () => ({ id: 101, status: 'queued' })),
   cancelReviewerAcceptanceJob: jest.fn(async () => ({ id: 101, status: 'cancelled' })),
+  cancelReviewerAcceptanceJobsForSuggestion: jest.fn(async () => [{ id: 101, status: 'cancelled' }]),
+}));
+jest.mock('../../lib/services/reviewer-withdrawal', () => ({
+  deleteLateHonorariumForWithdrawnReviewer: jest.fn(async () => ({ deleted: false })),
+  notifyProgramDirectorOfReviewerWithdrawal: jest.fn(async () => ({ id: 1 })),
 }));
 
 jest.mock('../../lib/services/dynamics-context', () => ({
@@ -930,28 +936,44 @@ describe('/api/external/review/[token]/respond', () => {
     expect(ensureHonorariumOnboarding).not.toHaveBeenCalled();
   });
 
-  it('rejects decline after acceptance with 409 and does not write (PD-only exit)', async () => {
+  it('allows self-service withdrawal before materials and removes the exact linked honorarium', async () => {
     verifySuggestionToken.mockResolvedValue({
       ...fresh,
-      suggestion: { ...fresh.suggestion, wmkf_accepted: true, wmkf_declined: false },
+      suggestion: {
+        ...fresh.suggestion,
+        wmkf_accepted: true,
+        wmkf_declined: false,
+        _wmkf_honorariumrequest_value: 'honorarium-1',
+      },
     });
     const req = createMockReq({
       method: 'POST',
       query: { token: 'good-token' },
       headers: {},
-      body: { action: 'decline', decline: {} },
+      body: {
+        action: 'decline',
+        decline: { reasonPicklist: 'too-busy', referral: 'Dr. Alternate' },
+      },
     });
     const res = createMockRes();
 
     await handler(req, res);
 
-    expect(applyStage2aResponse).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(409);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-      ok: false,
-      reason: 'accepted_decline_locked',
-      message: expect.stringMatching(/Program Director/i),
-    }));
+    expect(applyStage2aResponse).toHaveBeenCalledWith(
+      'suggestion-1',
+      expect.objectContaining({
+        action: 'decline',
+        decline: expect.objectContaining({ referral: 'Dr. Alternate' }),
+      }),
+      expect.objectContaining({
+        deleteHonorariumRequestId: 'honorarium-1',
+      }),
+    );
+    expect(cancelReviewerAcceptanceJobsForSuggestion).toHaveBeenCalledWith(
+      'suggestion-1',
+      'reviewer_withdrew_before_materials',
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 
   it('rejects a malformed address with 400 before any write', async () => {

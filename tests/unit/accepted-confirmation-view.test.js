@@ -6,17 +6,17 @@ import { render, screen } from '@testing-library/react';
 import AcceptedConfirmationView from '../../shared/components/external/AcceptedConfirmationView';
 
 describe('AcceptedConfirmationView', () => {
-  it('does not offer self-decline after acceptance even if context is flippable', () => {
+  it('offers self-service withdrawal before materials release', () => {
+    const onRequestDecline = jest.fn();
     render(
       <AcceptedConfirmationView
-        data={{ engagementState: { view: 'accepted-pre-materials', canFlipState: true } }}
-        onRequestFlipToDecline={jest.fn()}
+        onRequestDecline={onRequestDecline}
       />,
     );
 
     expect(screen.getByRole('heading', { name: /confirmed as a reviewer/i })).toBeInTheDocument();
-    expect(screen.queryByText(/Changed your mind/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Switch to declining/i })).not.toBeInTheDocument();
+    screen.getByRole('button', { name: /I can no longer review/i }).click();
+    expect(onRequestDecline).toHaveBeenCalledTimes(1);
   });
 
   it('shows the assigned Program Director name and actionable email in parentheses', () => {
@@ -26,9 +26,9 @@ describe('AcceptedConfirmationView', () => {
       />,
     );
 
-    const guidance = screen.getByText(/please reach out to your Program Director/i);
+    const guidance = screen.getByText(/reach out to your Program Director/i);
     expect(guidance).toHaveTextContent(
-      'Program Director (Jane Director, jane.director@wmkeck.org) rather than',
+      'Program Director (Jane Director, jane.director@wmkeck.org)',
     );
     expect(screen.getByRole('link', { name: 'jane.director@wmkeck.org' }))
       .toHaveAttribute('href', 'mailto:jane.director@wmkeck.org');
@@ -41,7 +41,7 @@ describe('AcceptedConfirmationView', () => {
       />,
     );
 
-    expect(screen.getByText(/please reach out to your Program Director/i))
+    expect(screen.getByText(/reach out to your Program Director/i))
       .not.toHaveTextContent('Jane Director');
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });

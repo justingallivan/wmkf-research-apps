@@ -320,8 +320,13 @@ Single transaction (rollback on any failure):
 1. Set `wmkf_DeclineReason`, `wmkf_declinereasonpicklist`, `wmkf_declinereferral` from body.
 2. Set `wmkf_accepted = false`, `wmkf_declined = true`, `wmkf_responsetype = declined`, `wmkf_responsereceivedat = now()`.
 3. Leave existing policy-ack lookups intact (they describe the prior accept; not load-bearing while declined; per §4a immutability rules).
-4. Return decline confirmation copy.
-5. **Email triggers deferred** — the design doc's decline-acknowledgment email + referral-deep-link-to-PD email tie to PA workflows that don't exist yet. Stamp the response on the row; trigger emails in a follow-up build.
+4. If this is an accepted→declined transition before materials release, delete
+   the exact linked honorarium `akoya_request` in the same Dataverse changeset,
+   cancel non-running acceptance jobs, and email the assigned PD the reason and
+   referrals. Reviewer counts require no separate write because rollups read the
+   accepted/declined fields directly.
+5. Return decline confirmation copy. An initial decline acknowledgment remains
+   deferred; the PD notification above is specific to post-accept withdrawal.
 
 ### Optimistic locking on the suggestion row
 

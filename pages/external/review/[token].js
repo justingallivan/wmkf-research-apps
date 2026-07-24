@@ -155,9 +155,14 @@ export default function ExternalReviewPage() {
 }
 
 export function deriveEmailActionView({ action, serverView, dismissed = false }) {
-  if (dismissed || serverView !== 'stage2a') return null;
-  if (action === 'accept') return 'stage2a';
-  if (action === 'decline') return 'decline-form';
+  if (dismissed) return null;
+  if (action === 'accept' && serverView === 'stage2a') return 'stage2a';
+  if (
+    action === 'decline'
+    && (serverView === 'stage2a' || serverView === 'accepted-pre-materials')
+  ) {
+    return 'decline-form';
+  }
   return null;
 }
 
@@ -187,7 +192,12 @@ function Dispatcher({ data, token, viewOverride, emailActionView, onRequestDecli
       );
 
     case 'accepted-pre-materials':
-      return <AcceptedConfirmationView programDirector={data.programDirector} />;
+      return (
+        <AcceptedConfirmationView
+          programDirector={data.programDirector}
+          onRequestDecline={onRequestDecline}
+        />
+      );
 
     case 'declined':
       return (

@@ -67,7 +67,7 @@ describe('sendAcceptanceConfirmationEmail — golden path', () => {
 
     expect(out).toEqual({ sent: true });
     expect(getRecord).toHaveBeenCalledWith('systemusers', 'pd-guid', {
-      select: 'systemuserid,internalemailaddress,isdisabled',
+      select: 'systemuserid,fullname,internalemailaddress,isdisabled',
     });
     expect(send).toHaveBeenCalledWith(expect.objectContaining({
       from: 'pd@example.org',
@@ -75,6 +75,33 @@ describe('sendAcceptanceConfirmationEmail — golden path', () => {
       regardingId: 'req-1',
       regardingType: 'akoya_request',
       actingUserSystemId: 'su-1',
+    }));
+  });
+
+  test('includes the secure withdrawal path and PD contact in the rendered email', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      systemuserid: 'su-1',
+      fullname: 'Jane Director',
+      internalemailaddress: 'pd@example.org',
+      isdisabled: false,
+    });
+    const send = jest.spyOn(DynamicsService, 'createAndSendEmail').mockResolvedValue(undefined);
+
+    await sendAcceptanceConfirmationEmail({
+      suggestion: { wmkf_revieweremail: 'reviewer@example.org' },
+      request: {
+        akoya_requestid: 'req-withdraw',
+        akoya_title: 'Test Proposal',
+        _wmkf_programdirector_value: 'pd-guid',
+      },
+      reviewer: { wmkf_name: 'Jane Reviewer' },
+      withdrawUrl: 'https://reviews.wmkeck.org/external/review/token?action=decline',
+    });
+
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
+      body: expect.stringContaining(
+        'https://reviews.wmkeck.org/external/review/token?action=decline',
+      ),
     }));
   });
 

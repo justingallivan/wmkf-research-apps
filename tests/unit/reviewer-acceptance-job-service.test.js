@@ -6,6 +6,7 @@ jest.mock('@vercel/postgres', () => ({ sql: jest.fn() }));
 
 const { sql } = require('@vercel/postgres');
 const store = require('../../lib/services/reviewer-acceptance-job-service');
+const { decrypt } = require('../../lib/utils/encryption');
 
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
@@ -42,6 +43,46 @@ describe('enqueueReviewerAcceptanceJob', () => {
     expect(values).toContain('acceptance-1');
     expect(values).toContain(SUGGESTION_ID);
     expect(values.some((v) => typeof v === 'string' && v.includes('"contactEdits"'))).toBe(true);
+  });
+
+  it('stores the reviewer portal token encrypted for the withdrawal link', async () => {
+    sql.mockResolvedValueOnce({ rows: [{ id: 2, status: 'accept_pending' }] });
+    const rawToken = 'header.payload.signature';
+
+    await store.enqueueReviewerAcceptanceJob({
+      acceptedAt: '2026-07-01T10:00:00.000Z',
+      suggestion: { wmkf_appreviewersuggestionid: SUGGESTION_ID },
+      request: { akoya_requestid: REQUEST_ID },
+      reviewer: { wmkf_potentialreviewersid: REVIEWER_ID },
+      body: {},
+      reviewerPortalToken: rawToken,
+    });
+
+    const [, ...values] = sql.mock.calls[0];
+    const payloadText = values.find((value) =>
+      typeof value === 'string' && value.includes('"schemaVersion":2'));
+    expect(payloadText).toBeTruthy();
+    expect(payloadText).not.toContain(rawToken);
+    const payload = JSON.parse(payloadText);
+    expect(decrypt(payload.reviewerPortalTokenEncrypted)).toBe(rawToken);
+  });
+});
+
+describe('cancelReviewerAcceptanceJobsForSuggestion', () => {
+  it('cancels only active jobs for the exact suggestion id', async () => {
+    sql.mockResolvedValueOnce({ rows: [{ id: 3, status: 'cancelled' }] });
+
+    const rows = await store.cancelReviewerAcceptanceJobsForSuggestion(
+      SUGGESTION_ID,
+      'reviewer_withdrew_before_materials',
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(sqlText(0)).toMatch(/WHERE suggestion_id =/i);
+    expect(sqlText(0)).toMatch(/status = ANY/i);
+    expect(sqlText(0)).toMatch(/lease_token IS NULL OR locked_until < NOW\(\)/i);
+    const [, ...values] = sql.mock.calls[0];
+    expect(values).toContain(SUGGESTION_ID);
   });
 });
 

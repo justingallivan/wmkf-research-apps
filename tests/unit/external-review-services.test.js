@@ -62,6 +62,11 @@ jest.mock('../../lib/services/reviewer-acceptance-job-service', () => ({
   enqueueReviewerAcceptanceJob: jest.fn(async () => ({ id: 101, status: 'accept_pending' })),
   markReviewerAcceptanceJobQueued: jest.fn(async () => ({ id: 101, status: 'queued' })),
   cancelReviewerAcceptanceJob: jest.fn(async () => ({ id: 101, status: 'cancelled' })),
+  cancelReviewerAcceptanceJobsForSuggestion: jest.fn(async () => [{ id: 101, status: 'cancelled' }]),
+}));
+jest.mock('../../lib/services/reviewer-withdrawal', () => ({
+  deleteLateHonorariumForWithdrawnReviewer: jest.fn(async () => ({ deleted: false })),
+  notifyProgramDirectorOfReviewerWithdrawal: jest.fn(async () => ({ id: 1 })),
 }));
 jest.mock('../../lib/services/review-draft-service', () => ({
   deleteBySuggestion: jest.fn(async () => 1),
@@ -80,6 +85,9 @@ import {
   markReviewerAcceptanceJobQueued,
   cancelReviewerAcceptanceJob,
 } from '../../lib/services/reviewer-acceptance-job-service';
+import {
+  deleteLateHonorariumForWithdrawnReviewer,
+} from '../../lib/services/reviewer-withdrawal';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import { buildReviewContext } from '../../lib/services/external-review/context-service';
 import { applyReviewerResponse } from '../../lib/services/external-review/respond-service';
@@ -283,6 +291,24 @@ describe('applyReviewerResponse', () => {
     delete body.address;
     await expect(applyReviewerResponse({ suggestion: baseSuggestion(), request, reviewer, body }))
       .rejects.toMatchObject({ httpStatus: 422, body: expect.objectContaining({ reason: 'payment_contact_required' }) });
+  });
+
+  it('maps a racing late-honorarium cleanup on repeat decline to concurrent_modification', async () => {
+    deleteLateHonorariumForWithdrawnReviewer.mockRejectedValueOnce(
+      Object.assign(new Error('Dataverse returned 412'), { status: 412 }),
+    );
+    await expect(applyReviewerResponse({
+      suggestion: baseSuggestion({
+        wmkf_declined: true,
+        _wmkf_honorariumrequest_value: 'honorarium-1',
+      }),
+      request,
+      reviewer,
+      body: { action: 'decline', decline: {} },
+    })).rejects.toMatchObject({
+      httpStatus: 412,
+      body: { ok: false, reason: 'concurrent_modification' },
+    });
   });
 });
 
