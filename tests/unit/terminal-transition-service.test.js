@@ -62,6 +62,22 @@ test('eligible row transitions with the ETag from the fresh read', async () => {
   );
 });
 
+test('accepted row with a persisted null review status transitions', async () => {
+  findById.mockResolvedValue(row({ wmkf_reviewstatus: null }));
+
+  const result = await transitionReviewersTerminal(args());
+
+  expect(result.transitioned).toBe(1);
+  expect(result.results).toEqual([
+    { suggestionId: SUGGESTION, status: 'transitioned', terminalStatus: 'withdrew' },
+  ]);
+  expect(updateLifecycle).toHaveBeenCalledWith(
+    SUGGESTION,
+    { reviewStatus: 'withdrew', externalTokenRevoked: true },
+    { actingUserSystemId: 'staff-1', ifMatch: 'W/"7"' },
+  );
+});
+
 test.each([
   ['pre-accept row', { wmkf_accepted: false }, 'not_accepted'],
   ['review-received row', { wmkf_reviewreceivedat: '2026-07-22T10:00:00Z' }, 'review_received'],
@@ -69,6 +85,7 @@ test.each([
   ['already-withdrew row', { wmkf_reviewstatus: 100000005 }, 'already_terminal'],
   ['already-released row', { wmkf_reviewstatus: 100000006 }, 'already_terminal'],
   ['out-of-range source', { wmkf_reviewstatus: 100000003 }, 'invalid_source'],
+  ['missing source field', { wmkf_reviewstatus: undefined }, 'invalid_source'],
   ['missing ETag', { _etag: null }, 'missing_etag'],
 ])('rejects %s explicitly', async (_label, overrides, expectedStatus) => {
   findById.mockResolvedValue(row(overrides));
