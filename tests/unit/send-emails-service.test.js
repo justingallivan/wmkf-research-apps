@@ -288,7 +288,7 @@ describe('send-emails-service — terminal thank-you guard', () => {
 });
 
 describe('send-emails-service — invitation body-integrity gate', () => {
-  test('invitation renders paired accept/decline CTAs twice and sends from the assigned Program Director', async () => {
+  test('invitation renders one paired accept/decline CTA and sends from the assigned Program Director', async () => {
     const emitted = await run({
       drafts: [{
         suggestionId: SUG_OK,
@@ -305,8 +305,8 @@ describe('send-emails-service — invitation body-integrity gate', () => {
       body: expect.stringContaining('?action=accept'),
     }));
     const html = createAndSendEmail.mock.calls[0][0].body;
-    expect((html.match(/Yes, I Can Review/g) || [])).toHaveLength(2);
-    expect((html.match(/No, Not This Time/g) || [])).toHaveLength(2);
+    expect((html.match(/Yes, I Can Review/g) || [])).toHaveLength(1);
+    expect((html.match(/No, Not This Time/g) || [])).toHaveLength(1);
     expect(html).toContain('?action=decline');
     expect(html).toContain('PD');
     expect(html).toContain('mailto:pd@wmkeck.org');

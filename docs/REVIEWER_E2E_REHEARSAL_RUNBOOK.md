@@ -85,8 +85,8 @@ Expected:
 - The modal previews the rendered invitation.
 - Sending in capture mode shows "Captured ... invitation email(s) for rehearsal."
 - The result says no Dynamics email was sent.
-- The captured artifact includes paired `Yes, I Can Review` / `No, Not This Time`
-  buttons above and below the editable invitation body. The accept link carries
+- The captured artifact includes one paired `Yes, I Can Review` / `No, Not This Time`
+  action at the secure-link position. The accept link carries
   `?action=accept`; the decline link carries `?action=decline`.
 - The send route returns captured email artifacts and does not call Dynamics.
 
@@ -158,7 +158,7 @@ For a capture-mode rehearsal against local/live APIs instead of browser route mo
    - recipient
    - subject
    - HTML body
-   - paired `Yes, I Can Review` / `No, Not This Time` buttons above and below the body
+   - one paired `Yes, I Can Review` / `No, Not This Time` action at the secure-link position
    - `?action=accept` / `?action=decline` destinations
    - assigned Program Director name and clickable email in the secure-link footer
    - fallback full URL

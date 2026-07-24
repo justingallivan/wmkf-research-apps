@@ -638,7 +638,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
               ) : (
                 <div className="space-y-3">
                   <p className="text-xs text-gray-500">
-                    Review each recipient below. The secure-link position renders as paired accept/decline buttons in the sent email, with a second paired set repeated below the editable text.
+                    Review each recipient below. The secure-link position renders as one pair of accept/decline buttons in the sent email.
                   </p>
                   {drafts.map((d) => (
                     <div key={d.suggestionId} className={`border rounded-lg p-3 ${d.skipped ? 'border-amber-200 bg-amber-50' : 'border-gray-200'}`}>

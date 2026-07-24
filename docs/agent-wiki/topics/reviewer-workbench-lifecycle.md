@@ -341,16 +341,16 @@ Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
     `project-dataverse-settings-audit-enablement`.
   - **Invitation paired response actions (2026-07-24).** At SEND time,
     `send-emails-service.js` replaces the editable body's first secure-link position
-    with table-based, inline-CSS `Yes, I Can Review` / `No, Not This Time` buttons and
-    repeats that pair below the editable body. Accept deep-links to the existing Stage
-    2a form with `?action=accept`; decline deep-links to the existing decline/referral
-    form with `?action=decline`. Those query values only choose the initial view: GET
-    never records a response, and the existing portal POST remains the mutation
-    boundary. The structural button labels/footer are fixed; subject/body and
-    per-recipient preview edits remain editable. The assigned active Program Director
-    must have an email address: invitation transport sends as that PD and otherwise
-    fails closed with `program_director_sender_unavailable`. The footer renders the
-    PD name and clickable email plus the generic secure-link fallback.
+    with one table-based, inline-CSS `Yes, I Can Review` / `No, Not This Time` action
+    pair. Accept deep-links to the existing Stage 2a form with `?action=accept`;
+    decline deep-links to the existing decline/referral form with `?action=decline`.
+    Those query values only choose the initial view: GET never records a response, and
+    the existing portal POST remains the mutation boundary. The structural button
+    labels/footer are fixed; subject/body and per-recipient preview edits remain
+    editable. The assigned active Program Director must have an email address:
+    invitation transport sends as that PD and otherwise fails closed with
+    `program_director_sender_unavailable`. The footer renders the PD name and clickable
+    email plus the generic secure-link fallback.
   - **Other secure-link button labels remain stage-aware (S311).** Materials and
     follow-up use the admin settings `email.reviewer_<type>.button_label`
     (`materials`→"Start Review", `followup`→"Go to Review") with non-empty

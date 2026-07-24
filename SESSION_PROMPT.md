@@ -14,8 +14,8 @@ deployed so Justin can perform manual browser and email-client testing later.
 
 2. **Reviewer invitation email redesign**
    - Replaced the old single generic response button with fixed paired
-     `Yes, I Can Review` / `No, Not This Time` actions above and below the
-     editable invitation body.
+     `Yes, I Can Review` / `No, Not This Time` actions at the editable
+     invitation body's secure-link position.
    - Accept opens the existing Stage 2a accept form; decline opens the existing
      decline form, including its optional referral field.
    - Email action query parameters only select the initial view. GET requests do
@@ -49,6 +49,19 @@ deployed so Justin can perform manual browser and email-client testing later.
      topics. The live-doc sweep found no remaining stale reviewer-invitation
      description.
 
+5. **First live email finding and correction (2026-07-24)**
+   - The first real-client smoke exposed two visible issues: the HTML renderer
+     emitted the fixed Accept/Decline pair twice, and the test request had a
+     review due date before proposal release.
+   - The renderer now emits exactly one pair at the editable body's secure-link
+     position. Unit and integration tests assert each label occurs exactly once.
+   - The dedicated test request now has a valid persisted review due date of
+     September 9, 2026. The corrected preview includes “Your completed reviews
+     would be due by September 9, 2026.”
+   - The first smoke suggestion, person, and promoted contact were deleted. A
+     fresh candidate for `thuds-larks4e@icloud.com` is prepared in the local
+     Workbench preview; the final real-email send remains a manual click.
+
 ### Commits
 
 - `2ed336d1` — Show reviewer Program Director contact
@@ -71,13 +84,14 @@ deployed so Justin can perform manual browser and email-client testing later.
    assigned-PD footer, Accept path, Decline path, referral field, and accepted
    confirmation contact.
 
-2. **Test the exact generated email in real clients**
+2. **Send and inspect the corrected generated email in a real client**
    Evidence: the renderer in
    `lib/services/review-manager/send-emails-service.js` is covered by unit and
-   integration tests, but Outlook/Gmail/Apple Mail rendering remains manual.
-   Follow the runbook's capture-mode or allowlisted live-smoke boundary. Capture
-   mode suppresses Dynamics delivery but still mints a token and can stamp
-   invitation lifecycle state, so use throwaway reviewer/request records.
+   integration tests; the corrected local preview is open for
+   `thuds-larks4e@icloud.com`, with the September 9 review due date present.
+   Check the quick-check acknowledgement, then manually click the final
+   `Confirm & send 1 invitation` action. Confirm the real client shows one
+   Accept/Decline pair and the review due date.
 
 ### Owner Decision Needed
 

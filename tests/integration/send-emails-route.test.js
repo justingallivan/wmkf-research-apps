@@ -226,7 +226,7 @@ describe('send-emails — reviewer portal HTML links', () => {
       .toBe('Email subject/body contains the internal request number.');
   });
 
-  test('invitation secure URL renders paired action buttons twice with a generic fallback link', async () => {
+  test('invitation secure URL renders one paired action set with a generic fallback link', async () => {
     await run({
       drafts: [{
         suggestionId: SUG_1,
@@ -237,8 +237,8 @@ describe('send-emails — reviewer portal HTML links', () => {
     });
 
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
-    expect((htmlBodySent().match(/Yes, I Can Review/g) || [])).toHaveLength(2);
-    expect((htmlBodySent().match(/No, Not This Time/g) || [])).toHaveLength(2);
+    expect((htmlBodySent().match(/Yes, I Can Review/g) || [])).toHaveLength(1);
+    expect((htmlBodySent().match(/No, Not This Time/g) || [])).toHaveLength(1);
     expect(htmlBodySent()).toContain('https://reviews.wmkeck.org/external/review/token.value?action=accept');
     expect(htmlBodySent()).toContain('https://reviews.wmkeck.org/external/review/token.value?action=decline');
     expect(htmlBodySent()).not.toContain('Start Review');
