@@ -148,7 +148,7 @@ The reviewer clicks the magic link. They see one page with several stacked eleme
 
 **Reversibility:**
 
-- Reversible-via-link (clicking the other button flips state) until materials are downloaded
+- Reversible-via-link until materials are released
 - Staff-override only after that point
 
 **Status state machine on `wmkf_potentialreviewer`:**
@@ -157,7 +157,7 @@ The reviewer clicks the magic link. They see one page with several stacked eleme
 - `Invited` → `Declined` (timestamp, reason, referral text)
 - `Invited` → `No Response` (treatment described below)
 - `Accepted` → `Submitted` (later, at Stage 5)
-- `Invited` or `Accepted` → `Withdrawn-Sufficient` (when a PD calls off pending invitations because they have enough confirmed reviewers; see below)
+- `Invited` (still pending only) → `Withdrawn-Sufficient` (when a PD calls off pending invitations because they have enough confirmed reviewers; see below)
 
 ### Stage 4 — Working window (between materials and submission)
 
@@ -199,10 +199,16 @@ When materials become available, the reviewer is notified via a fresh email cont
 - Guidance and rubric framing live in **reviewer instructions delivered with materials**, not on the form
 - By submission time, the reviewer has done the work; the form should not ambush them with new framing
 
-**Withdrawal during the review window:**
+**Withdrawal after acceptance:**
 
-- Self-service withdrawal not exposed
-- "Contact the PD" is the path — the rare case warrants a human conversation
+- Before materials are released, self-service withdrawal is available from the
+  acceptance page and acceptance-confirmation email. It opens the same decline
+  reason/referral form as an initial decline.
+- The accepted→declined write and deletion of the engagement's exact linked
+  honorarium request are one atomic Dataverse changeset. The PD is notified with
+  the reason/referrals, and reviewer rollups immediately derive the new state.
+- Once materials are released (or a review is received), the state is locked and
+  "Contact the PD" remains the path.
 
 ### Stage 5 — Submission form
 
@@ -283,6 +289,15 @@ Three new entities, designed to be flexible:
 ### Staff parity (Review Manager UI)
 
 For PDs who prefer email replies over in-email accept/decline buttons, the Review Manager must offer **one-click status update affordances** on the reviewer row that fire the same workflow as button clicks (timestamp, status flip, thank-you/ack email back to reviewer). Inline on the row, no modal, single click with optional reason. The implicit competitor here is AkoyaGO; if updating status in our app is harder than in AkoyaGO, PDs will use AkoyaGO and the data benefits are lost.
+
+For a reviewer who already accepted but later tells the PD they cannot complete
+the assignment, the Track Reviewers **Withdrew** action performs the same
+response-state and financial cleanup as reviewer self-service: accepted becomes
+false, declined becomes true, portal access closes, the exact linked honorarium
+request is deleted, acceptance follow-up stops, and every count/dashboard
+re-derives from the corrected fields. The staff action does not ask the reviewer
+for alternate suggestions; self-service withdrawal still routes through the
+ordinary decline form so the reviewer may supply them.
 
 ### Admin view
 

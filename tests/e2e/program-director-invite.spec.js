@@ -105,7 +105,7 @@ async function installInviteMocks(context, baseURL, {
   reviewers = [],
   campaignConfig = {
     respondOffsetDays: 10,
-    reviewDueDate: '2026-07-22',
+    reviewDueDate: '2099-07-22',
     respondReminderEnabled: false,
     respondReminderLeadDays: null,
     reviewDueReminderEnabled: false,
@@ -224,11 +224,11 @@ async function installInviteMocks(context, baseURL, {
       body: JSON.stringify({
         key: 'reviewer.campaign_timeline_defaults',
         timeline: {
-          cycleLabel: 'J26',
-          inviteStartDate: '2026-06-17',
+          cycleLabel: 'J99',
+          inviteStartDate: '2099-06-17',
           respondOffsetDays: 14,
-          proposalReleaseDate: '2026-07-08',
-          reviewDueDate: '2026-08-05',
+          proposalReleaseDate: '2099-07-08',
+          reviewDueDate: '2099-08-05',
         },
         isDefault: false,
         malformed: false,
@@ -324,7 +324,7 @@ async function installInviteMocks(context, baseURL, {
           htmlBody: [
             '<main>',
             '<p>The W. M. Keck Foundation invites you to serve as a peer reviewer.</p>',
-            `<table role="presentation"><tr><td><a href="${reviewerUrl}">Respond to Invitation</a></td></tr></table>`,
+            `<table role="presentation"><tr><td><a href="${reviewerUrl}?action=accept">Yes, I Can Review</a></td></tr></table>`,
             `<p>If the button does not work, copy and paste this link: <a href="${reviewerUrl}">${reviewerUrl}</a></p>`,
             '</main>',
           ].join(''),
@@ -368,11 +368,11 @@ test.describe('Program Director reviewer invitation flow', () => {
     await expect(page.getByText('Invite reviewers (1)', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: /reviewer campaign timeline/i }).click();
     await expect(page.getByLabel('Days to respond')).toHaveValue('10');
-    await expect(page.getByLabel('Reviews due')).toHaveValue('2026-07-22');
-    await expect(page.getByLabel('Proposals released to reviewers')).toHaveValue('2026-07-08');
+    await expect(page.getByLabel('Reviews due')).toHaveValue('2099-07-22');
+    await expect(page.getByLabel('Proposals released to reviewers')).toHaveValue('2099-07-08');
     await page.getByLabel('Days to respond').fill('10');
-    await page.getByLabel('Proposals released to reviewers').fill('2026-07-08');
-    await page.getByLabel('Reviews due').fill('2026-07-22');
+    await page.getByLabel('Proposals released to reviewers').fill('2099-07-08');
+    await page.getByLabel('Reviews due').fill('2099-07-22');
 
     page.once('dialog', async (dialog) => {
       expect(dialog.message()).toContain('Send 1 invitation now via Dynamics?');
@@ -381,7 +381,7 @@ test.describe('Program Director reviewer invitation flow', () => {
     await page.getByRole('button', { name: 'Send 1 invitation' }).click();
 
     await expect(page.getByText(/captured 1 invitation email for rehearsal/i)).toBeVisible();
-    await expect(page.locator('textarea[readonly]')).toHaveValue(/Respond to Invitation/);
+    await expect(page.locator('textarea[readonly]')).toHaveValue(/Yes, I Can Review/);
     expect(sentBodies).toHaveLength(1);
     expect(sentBodies[0]).toMatchObject({
       templateType: 'invitation',
@@ -391,11 +391,11 @@ test.describe('Program Director reviewer invitation flow', () => {
       drafts: [{ suggestionId: '11111111-1111-4111-8111-111111111111' }],
       // Phase 1: respond-by is now a "days to respond" offset; the panel sends the
       // per-request campaign config alongside the drafts.
-      campaignConfig: { respondOffsetDays: 10, reviewDueDate: '2026-07-22' },
+      campaignConfig: { respondOffsetDays: 10, reviewDueDate: '2099-07-22' },
     });
     // respond-by date is today + offset (relative), so it's not asserted as a fixed
     // string; the review-due fixed date and the secure link are.
-    expect(sentBodies[0].drafts[0].body).toContain('July 22, 2026');
+    expect(sentBodies[0].drafts[0].body).toContain('July 22, 2099');
     expect(sentBodies[0].drafts[0].body).toContain(reviewerUrl);
 
     const reviewerPage = await context.newPage();
@@ -467,7 +467,7 @@ test.describe('Program Director reviewer invitation flow', () => {
     const { campaignReads, campaignWrites } = await installInviteMocks(context, baseURL, {
       campaignConfig: {
         respondOffsetDays: 7,
-        reviewDueDate: '2026-07-22',
+        reviewDueDate: '2099-07-22',
         respondReminderEnabled: true,
         respondReminderLeadDays: 1,
         reviewDueReminderEnabled: false,
@@ -481,17 +481,17 @@ test.describe('Program Director reviewer invitation flow', () => {
     await page.getByRole('button', { name: /campaign settings/i }).click();
     await expect(page.locator('.fixed').getByText('Campaign settings')).toBeVisible();
     await expect(page.getByLabel('Days to respond')).toHaveValue('7');
-    await expect(page.getByLabel('Review due date')).toHaveValue('2026-07-22');
+    await expect(page.getByLabel('Review due date')).toHaveValue('2099-07-22');
 
     await page.getByLabel('Days to respond').fill('14');
-    await page.getByLabel('Review due date').fill('2026-08-05');
+    await page.getByLabel('Review due date').fill('2099-08-05');
     await page.getByRole('button', { name: 'Save' }).click();
 
     await expect(page.getByRole('button', { name: 'Save' })).toBeHidden();
     expect(campaignReads).toEqual([REQUEST_ID]);
     expect(campaignWrites).toEqual([{
       requestId: REQUEST_ID,
-      config: { respondOffsetDays: 14, reviewDueDate: '2026-08-05', desiredCount: 2 },
+      config: { respondOffsetDays: 14, reviewDueDate: '2099-08-05', desiredCount: 2 },
     }]);
   });
 

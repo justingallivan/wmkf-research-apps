@@ -15,7 +15,7 @@
  *   404  token not found
  *   405  method not POST
  *   409  materials_sent_locked | review_received_locked | withdrawn_sufficient |
- *        accepted_decline_locked
+ *        terminal response locks
  *   412  optimistic-lock conflict
  *   422  payment_contact_required
  *   429  rate limited
@@ -75,6 +75,7 @@ export default async function handler(req, res) {
       reviewer,
       body: req.body || {},
       ifMatch: req.headers['if-match'],
+      reviewerPortalToken: token,
     });
     return res.status(200).json(result);
   } catch (e) {

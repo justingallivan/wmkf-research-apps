@@ -24,6 +24,9 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 jest.mock('../../lib/dataverse/adapters/contact', () => ({
   getByIdWithSelect: jest.fn(async () => null),
 }));
+jest.mock('../../lib/dataverse/adapters/system-user', () => ({
+  getByIdWithSelect: jest.fn(async () => null),
+}));
 jest.mock('../../lib/dataverse/adapters/review-answer', () => ({
   answerUpsertDescriptor: jest.fn((id, row) => ({ method: 'PATCH', url: `answers(${row.key})`, body: row })),
 }));
@@ -59,6 +62,11 @@ jest.mock('../../lib/services/reviewer-acceptance-job-service', () => ({
   enqueueReviewerAcceptanceJob: jest.fn(async () => ({ id: 101, status: 'accept_pending' })),
   markReviewerAcceptanceJobQueued: jest.fn(async () => ({ id: 101, status: 'queued' })),
   cancelReviewerAcceptanceJob: jest.fn(async () => ({ id: 101, status: 'cancelled' })),
+  cancelReviewerAcceptanceJobsForSuggestion: jest.fn(async () => [{ id: 101, status: 'cancelled' }]),
+}));
+jest.mock('../../lib/services/reviewer-withdrawal', () => ({
+  deleteLateHonorariumForWithdrawnReviewer: jest.fn(async () => ({ deleted: false })),
+  notifyProgramDirectorOfReviewerWithdrawal: jest.fn(async () => ({ id: 1 })),
 }));
 jest.mock('../../lib/services/review-draft-service', () => ({
   deleteBySuggestion: jest.fn(async () => 1),
@@ -69,6 +77,7 @@ import {
   applyStage2aResponse,
   getForSubmitFinalityCheck,
 } from '../../lib/dataverse/adapters/reviewer-suggestion';
+import { getByIdWithSelect as getSystemUserByIdWithSelect } from '../../lib/dataverse/adapters/system-user';
 import { runChangeset } from '../../lib/dataverse/core/changeset';
 import { getActivePolicies } from '../../lib/external/policy-fetcher';
 import {
@@ -76,6 +85,9 @@ import {
   markReviewerAcceptanceJobQueued,
   cancelReviewerAcceptanceJob,
 } from '../../lib/services/reviewer-acceptance-job-service';
+import {
+  deleteLateHonorariumForWithdrawnReviewer,
+} from '../../lib/services/reviewer-withdrawal';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import { buildReviewContext } from '../../lib/services/external-review/context-service';
 import { applyReviewerResponse } from '../../lib/services/external-review/respond-service';
@@ -132,6 +144,98 @@ describe('buildReviewContext', () => {
       request, reviewer,
     })).rejects.toThrow('fetch cap');
   });
+
+  it('returns the active assigned Program Director contact for accepted-pre-materials', async () => {
+    getSystemUserByIdWithSelect.mockResolvedValueOnce({
+      systemuserid: 'pd-1',
+      fullname: 'Jane Director',
+      internalemailaddress: 'jane.director@wmkeck.org',
+      isdisabled: false,
+    });
+
+    const payload = await buildReviewContext({
+      suggestion: baseSuggestion({ wmkf_accepted: true }),
+      request: { ...request, _wmkf_programdirector_value: 'pd-1' },
+      reviewer,
+    });
+
+    expect(withDalContext).toHaveBeenCalledWith(
+      'external-context-program-director',
+      expect.any(Function),
+    );
+    expect(getSystemUserByIdWithSelect).toHaveBeenCalledWith('pd-1', [
+      'systemuserid', 'fullname', 'internalemailaddress', 'isdisabled',
+    ]);
+    expect(payload.programDirector).toEqual({
+      name: 'Jane Director',
+      email: 'jane.director@wmkeck.org',
+    });
+  });
+
+  it.each([
+    {
+      label: 'disabled',
+      staff: {
+        fullname: 'Former Director',
+        internalemailaddress: 'former@wmkeck.org',
+        isdisabled: true,
+      },
+    },
+    {
+      label: 'missing email',
+      staff: {
+        fullname: 'Jane Director',
+        internalemailaddress: '',
+        isdisabled: false,
+      },
+    },
+    {
+      label: 'missing name',
+      staff: {
+        fullname: '',
+        internalemailaddress: 'jane.director@wmkeck.org',
+        isdisabled: false,
+      },
+    },
+  ])('omits a $label Program Director contact without failing the page', async ({ staff }) => {
+    getSystemUserByIdWithSelect.mockResolvedValueOnce(staff);
+
+    const payload = await buildReviewContext({
+      suggestion: baseSuggestion({ wmkf_accepted: true }),
+      request: { ...request, _wmkf_programdirector_value: 'pd-1' },
+      reviewer,
+    });
+
+    expect(payload.programDirector).toBeNull();
+  });
+
+  it('keeps the accepted page available when the Program Director lookup fails', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    getSystemUserByIdWithSelect.mockRejectedValueOnce(new Error('transient Dataverse failure'));
+
+    const payload = await buildReviewContext({
+      suggestion: baseSuggestion({ wmkf_accepted: true }),
+      request: { ...request, _wmkf_programdirector_value: 'pd-1' },
+      reviewer,
+    });
+
+    expect(payload.programDirector).toBeNull();
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[external context] program director lookup failed:',
+      'transient Dataverse failure',
+    );
+    errorSpy.mockRestore();
+  });
+
+  it('does not load Program Director contact for views that do not render the confirmation', async () => {
+    await buildReviewContext({
+      suggestion: baseSuggestion(),
+      request: { ...request, _wmkf_programdirector_value: 'pd-1' },
+      reviewer,
+    });
+
+    expect(getSystemUserByIdWithSelect).not.toHaveBeenCalled();
+  });
 });
 
 describe('applyReviewerResponse', () => {
@@ -187,6 +291,24 @@ describe('applyReviewerResponse', () => {
     delete body.address;
     await expect(applyReviewerResponse({ suggestion: baseSuggestion(), request, reviewer, body }))
       .rejects.toMatchObject({ httpStatus: 422, body: expect.objectContaining({ reason: 'payment_contact_required' }) });
+  });
+
+  it('maps a racing late-honorarium cleanup on repeat decline to concurrent_modification', async () => {
+    deleteLateHonorariumForWithdrawnReviewer.mockRejectedValueOnce(
+      Object.assign(new Error('Dataverse returned 412'), { status: 412 }),
+    );
+    await expect(applyReviewerResponse({
+      suggestion: baseSuggestion({
+        wmkf_declined: true,
+        _wmkf_honorariumrequest_value: 'honorarium-1',
+      }),
+      request,
+      reviewer,
+      body: { action: 'decline', decline: {} },
+    })).rejects.toMatchObject({
+      httpStatus: 412,
+      body: { ok: false, reason: 'concurrent_modification' },
+    });
   });
 });
 

@@ -30,6 +30,9 @@ export default withAuth(
     crypto.getRandomValues(nonceBytes);
     const nonce = btoa(String.fromCharCode(...nonceBytes));
     const isDev = process.env.NODE_ENV === 'development';
+    const hostname = req.nextUrl?.hostname;
+    const isLoopbackHttp = req.nextUrl?.protocol === 'http:'
+      && ['localhost', '127.0.0.1', '::1', '[::1]'].includes(hostname);
 
     // Build CSP directives
     // Dev: Turbopack injects inline scripts without nonces, needs unsafe-inline + unsafe-eval.
@@ -61,8 +64,12 @@ export default withAuth(
       `frame-ancestors 'none'`,
     ];
 
-    // Only upgrade insecure requests in production (localhost is HTTP)
-    if (!isDev) {
+    // Production deployments must upgrade insecure requests. A production build
+    // exercised through `next start` on an HTTP loopback address is the sole
+    // exception: Safari honors this directive by rewriting same-origin
+    // `http://localhost/_next/*` scripts to HTTPS, but the local server has no TLS
+    // listener, so the application bundle never loads.
+    if (!isDev && !isLoopbackHttp) {
       directives.push(`upgrade-insecure-requests`);
     }
 

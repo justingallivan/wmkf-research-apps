@@ -6,8 +6,14 @@
 
 import { useEffect, useRef } from 'react';
 
-export default function AcceptedConfirmationView() {
+export default function AcceptedConfirmationView({
+  programDirector = null,
+  onRequestDecline,
+}) {
   const headingRef = useRef(null);
+  const hasProgramDirectorContact = Boolean(
+    programDirector?.name && programDirector?.email,
+  );
 
   useEffect(() => {
     if (headingRef.current) headingRef.current.focus();
@@ -33,10 +39,34 @@ export default function AcceptedConfirmationView() {
         </p>
         <p>
           If something changes — calendar conflict, conflict of interest you
-          spotted, anything — please reach out to your Program Director rather
-          than waiting until materials are released.
+          spotted, anything — please let us know before materials are released.
+          You can withdraw using the button below, or reach out to your Program Director
+          {hasProgramDirectorContact && (
+            <>
+              {' '}({programDirector.name},{' '}
+              <a
+                href={`mailto:${programDirector.email}`}
+                className="text-blue-700 underline hover:text-blue-900"
+              >
+                {programDirector.email}
+              </a>)
+            </>
+          )}{' '}
+          rather than waiting until materials are released.
         </p>
       </div>
+
+      {onRequestDecline && (
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={onRequestDecline}
+            className="text-sm font-semibold text-red-700 hover:text-red-900 underline underline-offset-2"
+          >
+            I can no longer review
+          </button>
+        </div>
+      )}
 
     </div>
   );

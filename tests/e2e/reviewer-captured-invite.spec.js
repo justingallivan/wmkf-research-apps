@@ -3,7 +3,7 @@
 // This composes the non-production email-capture contract with the real reviewer
 // portal page. The send-emails route integration test proves capture mode returns
 // this kind of HTML artifact; this browser spec proves the reviewer-facing UX
-// path from the captured "Respond to Invitation" button into Stage 2a accept works.
+// path from the captured "Yes, I Can Review" button into Stage 2a accept works.
 
 const { test, expect } = require('@playwright/test');
 const { TOKEN, buildContext, mockPortal, portalUrl } = require('./helpers/reviewer-portal');
@@ -27,7 +27,7 @@ async function completeBoardIdentity(page) {
 }
 
 test.describe('Reviewer captured invite rehearsal', () => {
-  test('captured Respond to Invitation button opens the portal and reviewer accepts', async ({ page }, testInfo) => {
+  test('captured Yes, I Can Review button opens the portal and reviewer accepts', async ({ page }, testInfo) => {
     const { respondCalls } = await mockPortal(page, { context: buildContext() });
     const baseURL = testInfo.project.use.baseURL || 'http://localhost:3100';
     const reviewUrl = new URL(portalUrl(TOKEN), baseURL).toString();
@@ -38,7 +38,7 @@ test.describe('Reviewer captured invite rehearsal', () => {
         <table role="presentation" cellspacing="0" cellpadding="0" border="0">
           <tr>
             <td>
-              <a href="${reviewUrl}" style="display:inline-block;padding:12px 18px;">Respond to Invitation</a>
+              <a href="${reviewUrl}?action=accept" style="display:inline-block;padding:12px 18px;">Yes, I Can Review</a>
             </td>
           </tr>
         </table>
@@ -50,9 +50,9 @@ test.describe('Reviewer captured invite rehearsal', () => {
     `;
 
     await page.setContent(capturedEmailHtml);
-    await page.getByRole('link', { name: 'Respond to Invitation' }).click();
+    await page.getByRole('link', { name: 'Yes, I Can Review' }).click();
 
-    await expect(page).toHaveURL(new RegExp(`/external/review/${TOKEN}$`));
+    await expect(page).toHaveURL(new RegExp(`/external/review/${TOKEN}\\?action=accept$`));
     await expect(page.getByText('A Study of Test-Driven Reviewer Onboarding')).toBeVisible();
 
     await acknowledgeBothPolicies(page);

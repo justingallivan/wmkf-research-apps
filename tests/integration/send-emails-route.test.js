@@ -64,7 +64,8 @@ const getReviewerCampaignTimeline = jest.fn(async () => ({ timeline: { desiredCo
 jest.mock('../../lib/services/reviewer-campaign-timeline', () => ({
   getReviewerCampaignTimeline: (...a) => getReviewerCampaignTimeline(...a),
 }));
-// Stage-aware secure-link button label: send-emails reads email.reviewer_<type>.button_label.
+// Stage-aware single-button labels for post-invitation templates. Invitations use
+// fixed paired response labels regardless of a legacy stored invitation setting.
 jest.mock('../../lib/services/settings-service', () => ({
   getSettingStrict: jest.fn(async (key) => {
     const labels = {
@@ -158,6 +159,7 @@ beforeEach(() => {
     _wmkf_programdirector_value: 'pd-1',
   };
   SYSTEMUSER = {
+    systemuserid: 'pd-1',
     fullname: 'Dr. Program Director',
     internalemailaddress: 'pd@wmkeck.org',
     isdisabled: false,
@@ -224,7 +226,7 @@ describe('send-emails — reviewer portal HTML links', () => {
       .toBe('Email subject/body contains the internal request number.');
   });
 
-  test('external reviewer URLs render as a button with a fallback link', async () => {
+  test('invitation secure URL renders one paired action set with a generic fallback link', async () => {
     await run({
       drafts: [{
         suggestionId: SUG_1,
@@ -235,15 +237,18 @@ describe('send-emails — reviewer portal HTML links', () => {
     });
 
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
-    // Invitation stage → commit-appropriate label, not "Start Review".
-    expect(htmlBodySent()).toContain('Respond to Invitation');
+    expect((htmlBodySent().match(/Yes, I Can Review/g) || [])).toHaveLength(1);
+    expect((htmlBodySent().match(/No, Not This Time/g) || [])).toHaveLength(1);
+    expect(htmlBodySent()).toContain('https://reviews.wmkeck.org/external/review/token.value?action=accept');
+    expect(htmlBodySent()).toContain('https://reviews.wmkeck.org/external/review/token.value?action=decline');
     expect(htmlBodySent()).not.toContain('Start Review');
     expect(htmlBodySent()).toContain(
-      'This secure link is unique to you and was sent by W.M. Keck Foundation Program Director Dr. Program Director pd@wmkeck.org. Please contact them with any questions.'
+      'This secure link is unique to you and was sent by W. M. Keck Foundation Program Director Dr. Program Director'
     );
+    expect(htmlBodySent()).toContain('mailto:pd@wmkeck.org');
     expect(htmlBodySent()).toContain('https://reviews.wmkeck.org/external/review/token.value');
     expect(htmlBodySent()).toContain('<table role="presentation"');
-    expect(htmlBodySent()).toContain('<td align="center" valign="middle"');
+    expect(htmlBodySent()).toContain('<td width="48%" align="center" valign="middle"');
     expect(htmlBodySent()).toContain('line-height:20px');
     expect(htmlBodySent()).toContain('text-align:center');
     expect(htmlBodySent()).not.toContain('<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0;"><br>');
@@ -271,8 +276,9 @@ describe('send-emails — reviewer portal HTML links', () => {
     });
 
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
-    expect(htmlBodySent()).toContain('Los Angeles<br><br>Please use your secure personal link');
-    expect(htmlBodySent()).not.toContain('Los Angeles<br><br><br>Please use your secure personal link');
+    expect(htmlBodySent()).toContain('Los Angeles</p><p');
+    expect(htmlBodySent()).toContain('Please use your secure personal link to accept or decline this invitation:');
+    expect(htmlBodySent()).not.toContain('<br><br><br>');
   });
 
   test('ordinary URLs still render as plain links', async () => {
@@ -344,9 +350,9 @@ describe('send-emails — capture delivery mode', () => {
     });
     expect(r.sent[0].capturedEmail).toMatchObject({
       subject: 'Invitation',
-      from: 'staff@wmkeck.org',
+      from: 'pd@wmkeck.org',
       to: 'rev@example.org',
-      htmlBody: expect.stringContaining('Respond to Invitation'),
+      htmlBody: expect.stringContaining('Yes, I Can Review'),
     });
     expect(r.sent[0].capturedEmail.htmlBody).toContain('https://reviews.wmkeck.org/external/review/token.value');
   });

@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-23
+last_verified: 2026-07-24
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -16,6 +16,8 @@ source_files:
   - shared/components/reviewers/ReviewerFindPanel.js
   - shared/components/reviewers/ReviewerSearchSection.js
   - shared/components/reviewers/ReviewerManagePanel.js
+  - lib/services/review-manager/send-emails-service.js
+  - pages/external/review/[token].js
   - shared/components/reviewers/reviewer-search-logic.js
   - pages/api/reviewer-finder/my-candidates.js
   - lib/services/reviewer-finder/remove-candidate-service.js
@@ -44,11 +46,13 @@ watch_paths:
   - shared/components/reviewers/**
   - pages/api/reviewer-finder/**
   - pages/api/review-manager/**
+  - pages/external/review/**
   - pages/api/workbench/enrich-recommended.js
   - pages/api/workbench/applicant-reviewers.js
   - pages/api/workbench/promote-applicant-reviewer.js
   - pages/api/workbench/export-candidates.js
   - lib/services/reviewer-candidate-export.js
+  - lib/services/review-manager/**
   - lib/services/reviewer-roster-store.js
 update_triggers:
   - reviewer workbench UX or lifecycle changes
@@ -150,7 +154,7 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
 
 **Review history on the Invite card (S308):** the Invite-tab candidate DTO (`my-candidates` GET) carries `priorReviewCount` + `lastReviewAt`, derived (not stored) from `suggestionAdapter.aggregateReviewHistory(personIds)` — one batched query over `wmkf_appreviewersuggestion` filtered to received-only rows (`wmkf_reviewreceivedat ne null`) for the request's candidate person-ids. "Completed a review" = the reviewer's review was **received** (`wmkf_reviewreceivedat`), NOT the PD's closeout stamp (`wmkf_completedat`). `ReviewerInvitePanel` renders "reviewed N× · last <date>" only when `priorReviewCount > 0`. The aggregation is supplementary — its query failure is caught non-fatally in `my-candidates` (degrades to no history; never 500s the candidate list). Not yet surfaced on Track Reviewers (fast-follow).
 
-**Terminal-status implementation authored; production picklist provisioned 2026-07-23; runtime NOT LIVE until deliberate promotion.** The feature branch adds `withdrew` and `released` to the Track pipeline, excludes both from `MODE_WORK_REMAINING` and the Reviews-tab Outstanding list, and routes the visually distinct confirmed actions through `/api/review-manager/terminal-transition`. The service freshly reads each row, accepts only accepted/materials-sent/under-review rows with no received/completed stamp, and writes the status plus external-token revocation with that ETag; a concurrent submission therefore wins. Neither terminal value enters `updateLifecycle`'s strict `reviewStatus=complete` timestamp branch. Terminality is server-enforced in BOTH directions (owner resolution S369): the generic reviewers PATCH refuses a terminal *target*, and `updateLifecycle` refuses any status change on a row whose *source* is already terminal. Raw receipt writes bypass that adapter, so `lib/services/review-receipt-guard.js` independently protects manual entry, mark-without-file, staff/self-token upload, and external submit: each rejects terminal/final/non-accepted rows and carries the authorizing read's ETag into its PATCH/changeset. Upload attempts use unique SharePoint subfolders. A non-412 Dataverse failure cleans up only its own attempt; a 412 loser is always orphaned and never deleted because the service cannot safely infer which files another winner committed. The active slice adds no due-date column or repair endpoint. Durable deadline evidence is deferred to a separate owner-reviewed design around ordered materials dispatches, preferably the existing Dynamics email activity and returned `emailId`. Production metadata now carries the verified terminal options; the remaining live-production gate is deliberate code promotion. Owner goal and decisions: `.claude-memory/project-reviewer-reliability-data.md`.
+**Terminal statuses live; staff-withdrawal cleanup is on the current branch and not yet production-deployed.** `withdrew` and `released` are live in the Track pipeline, excluded from `MODE_WORK_REMAINING` and the Reviews-tab Outstanding list, and routed through `/api/review-manager/terminal-transition`. The service freshly reads each row, accepts only accepted/materials-sent/under-review rows with no declined/received/completed stamp, and uses that ETag so a concurrent submission wins. `released` writes only the terminal status plus token revocation. The branch's PD-recorded `withdrew` additionally performs the same lifecycle/financial correction as reviewer self-withdrawal: one Dataverse changeset writes `accepted=false`, `declined=true`, declined response metadata, the `withdrew` audit status, and token revocation while deleting the exact linked honorarium; unlocked acceptance jobs are cancelled, and a leased worker compensates after re-reading declined state. Derived reviewer counts therefore update without a separate counter write. Neither terminal value enters `updateLifecycle`'s strict `reviewStatus=complete` timestamp branch. Terminality is server-enforced in BOTH directions (owner resolution S369): the generic reviewers PATCH refuses a terminal *target*, and `updateLifecycle` refuses any status change on a row whose *source* is already terminal. Raw receipt writes bypass that adapter, so `lib/services/review-receipt-guard.js` independently protects manual entry, mark-without-file, staff/self-token upload, and external submit: each rejects terminal/final/non-accepted rows and carries the authorizing read's ETag into its PATCH/changeset. Upload attempts use unique SharePoint subfolders. A non-412 Dataverse failure cleans up only its own attempt; a 412 loser is always orphaned and never deleted because the service cannot safely infer which files another winner committed. The active slice adds no due-date column or repair endpoint. Durable deadline evidence is deferred to a separate owner-reviewed design around ordered materials dispatches, preferably the existing Dynamics email activity and returned `emailId`. Owner goal and decisions: `.claude-memory/project-reviewer-reliability-data.md`.
 
 **Export to Excel (S264; Invite-tab export + Expertise-tags column S308):** Two surfaces post to `POST /api/workbench/export-candidates`. (1) **Find tab** — a bottom-row "Export to Excel (N)" button (next to Save) exports the **selected** search candidates; (2) **Invite Reviewers tab** (`ReviewerInvitePanel`) — a header "⬇ Export to Excel" button exports the **full saved candidate list** (all non-removed rows on the tab; accepted/invited/declined included), mapping the persisted DTO into the same slim per-row shape. Both send a slim per-row DTO; the route fetches request metadata (number/institution/PI) authoritatively by `requestId` and streams back a two-sheet `.xlsx` (Request Info + Candidates). Column formatting (Source/Why/**Expertise tags**/Conflicts/ORCID/Scholar) lives in `lib/services/reviewer-candidate-export.js` so the sheet and the cards agree; the Expertise-tags column reads `keywords` (Find tab joins `expertiseAreas`; Invite tab uses the persisted `keywords`). Invite-tab exports carry only invite-stage fields — search-time COI / 5-yr-pub-count / seniority aren't persisted, so those columns read "None noted"/blank (board-writeup identity is captured at acceptance, not here). On the Find tab, `needs_identity_review` rows aren't selectable (so naturally excluded) UNLESS a PD used the S285 identity override ("✓ This is the right person") to confirm + add one, which makes it selectable and thus exportable. The "reviewer diversity"/temperature slider was removed the S264 cycle (search runs at the server default 0.3).
 
@@ -335,22 +339,25 @@ Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
   - **Recovery of a fat-fingered blank** is parked for Connor: enable Dataverse
     table-level auditing on `wmkf_appsystemsetting` — see
     `project-dataverse-settings-audit-enablement`.
-  - **Secure-link button label is stage-aware (S311).** The blue call-to-action button
-    is generated at SEND time by `send-emails.js` (`reviewPortalButtonHtml`, triggered
-    when a body contains a `/external/review/` URL) — NOT in the preview (`render-emails`
-    leaves the raw link, so the PD preview shows the link, not the button). Its text is
-    read per `templateType` from admin setting `email.reviewer_<type>.button_label`
-    (`invitation`→"Respond to Invitation", `materials`→"Start Review", `followup`→"Go to
-    Review"), seeded + editable in the same Email Defaults panel as subject/body.
-    Admin-default only (NO per-PD override — the button is server-generated) and
-    HTML-escaped at the interpolation site (S311 review — stored setting, not a literal).
-    Blank/unavailable for a stage WITH a fallback → non-empty stage default in
-    `send-emails.js` `DEFAULT_REVIEW_BUTTON_LABELS` (a button must never render empty),
-    a deliberate contrast with subject/body's blank-renders-blank rule. A stage with NO
-    fallback entry (`thankyou`) resolves to '' → the button is SUPPRESSED: if such a body
-    ever contains a review link (the editor advertises `{{externalLink}}` for all types),
-    it renders as a plain link, never a CTA button and never dropped (`plainTextToHtml`
-    gates on `isExternalReviewUrl(url) && reviewButtonLabel`).
+  - **Invitation paired response actions (2026-07-24).** At SEND time,
+    `send-emails-service.js` replaces the editable body's first secure-link position
+    with one table-based, inline-CSS `Yes, I Can Review` / `No, Not This Time` action
+    pair. Accept deep-links to the existing Stage 2a form with `?action=accept`;
+    decline deep-links to the existing decline/referral form with `?action=decline`.
+    Those query values only choose the initial view: GET never records a response, and
+    the existing portal POST remains the mutation boundary. The structural button
+    labels/footer are fixed; subject/body and per-recipient preview edits remain
+    editable. The assigned active Program Director must have an email address:
+    invitation transport sends as that PD and otherwise fails closed with
+    `program_director_sender_unavailable`. The footer renders the PD name and clickable
+    email plus the generic secure-link fallback.
+  - **Other secure-link button labels remain stage-aware (S311).** Materials and
+    follow-up use the admin settings `email.reviewer_<type>.button_label`
+    (`materials`→"Start Review", `followup`→"Go to Review") with non-empty
+    stage fallbacks. A type with no fallback (`thankyou`) keeps a review URL as a
+    plain link. The former invitation button-label setting may remain in existing
+    Dataverse baselines but is no longer exposed or consumed as editable invitation
+    copy because invitations require the fixed paired labels.
   (The `hold` + `finalize` templates were **REMOVED in S279** along with the rest of
   the hold path — see `project-reviewer-hold-step-decouple`.)
 - **Invitation send-safety semantics (S340, `send-emails.js`).** First-external-send hardening,
@@ -410,10 +417,13 @@ Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
   Institution — empty lines dropped, composed in `lib/utils/email-generator.js`) and
   the full `{{proposalAbstract}}`. Co-PI names come from the `wmkf_apprequestperson`
   junction (`fetchCoPIs`); PI is `_wmkf_projectleader_value_formatted` ONLY (never the
-  applicant org). Timeline tokens are client-substituted and line-dropped by
-  `applyTiming` (which keys on the literal "Review timeline:" header). The
-  invitation modal loads timing in this order: built-in fallback, per-user sticky
-  `reviewer_invite_timing`, admin cycle defaults, then request campaign config.
+  applicant org). Timeline tokens are client-substituted from the existing campaign
+  system; the modal blocks a send when proposal release precedes response deadline
+  or the review due date is not after release. It loads timing in this order:
+  built-in fallback, per-user sticky `reviewer_invite_timing`, admin cycle defaults,
+  then request campaign config. The redesigned seed is init data, not a runtime
+  fallback: promotion must deliberately rebaseline the admin default, and existing
+  per-PD subject/body overrides remain intact until reset or edited.
 
 ## Operating Notes
 

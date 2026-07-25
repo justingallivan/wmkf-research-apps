@@ -310,15 +310,23 @@ Single transaction (rollback on any failure):
 3. Set `wmkf_honorariumoptout = body.honorariumOptOut`.
 4. Set `wmkf_accepted = true`, `wmkf_declined = false`, `wmkf_responsetype = accepted`, `wmkf_responsereceivedat = now()`.
 5. Clear `wmkf_DeclineReason`, `wmkf_declinereasonpicklist`, `wmkf_declinereferral` if a prior decline state existed (transitioning from declined to accepted).
-6. Return confirmation copy + PD contact info (per §8 open question on PD lookup pattern).
+6. Return the accepted engagement state. The subsequent verified `/context`
+   refresh resolves the request's assigned active Program Director to
+   `{ name, email }` for the confirmation view; missing, disabled, incomplete,
+   or unreadable staff data leaves the generic guidance in place.
 
 #### Effects on `decline`
 
 1. Set `wmkf_DeclineReason`, `wmkf_declinereasonpicklist`, `wmkf_declinereferral` from body.
 2. Set `wmkf_accepted = false`, `wmkf_declined = true`, `wmkf_responsetype = declined`, `wmkf_responsereceivedat = now()`.
 3. Leave existing policy-ack lookups intact (they describe the prior accept; not load-bearing while declined; per §4a immutability rules).
-4. Return decline confirmation copy.
-5. **Email triggers deferred** — the design doc's decline-acknowledgment email + referral-deep-link-to-PD email tie to PA workflows that don't exist yet. Stamp the response on the row; trigger emails in a follow-up build.
+4. If this is an accepted→declined transition before materials release, delete
+   the exact linked honorarium `akoya_request` in the same Dataverse changeset,
+   cancel non-running acceptance jobs, and email the assigned PD the reason and
+   referrals. Reviewer counts require no separate write because rollups read the
+   accepted/declined fields directly.
+5. Return decline confirmation copy. An initial decline acknowledgment remains
+   deferred; the PD notification above is specific to post-accept withdrawal.
 
 ### Optimistic locking on the suggestion row
 
@@ -335,7 +343,7 @@ All writes to `wmkf_appreviewersuggestions` use `If-Match` with the row's `_etag
 | Engagement state | View shown |
 |---|---|
 | Not yet accepted/declined, materials not sent | **Stage 2a (this slice)** — proposal summary + contact-correct + honorarium + policy acks + accept/decline |
-| Accepted, materials not sent | Post-accept confirmation (Stage 3 — minimal copy in slice 1; ICS calendar invites deferred) |
+| Accepted, materials not sent | Post-accept confirmation with assigned Program Director name/email when available (ICS calendar invites deferred) |
 | Declined, before any materials access | Post-decline confirmation (Stage 3 — minimal copy in slice 1) |
 | Accepted, materials sent | Stage 2b — current behavior of `pages/external/review/[token].js`, file list + review form (out of scope; existing) |
 | Submitted, within 7-day post-submission window | Read-only review (existing behavior) |
@@ -412,7 +420,17 @@ A repeat of the current action (e.g., already-accepted reviewer clicks accept ag
 ## 8. Open questions
 
 1. ✓ **Dataverse entity audit on `wmkf_appreviewersuggestion`** — enabled in Session A via `scripts/enable-suggestion-audit.mjs`.
-2. **Where does the PD email/name come from on the post-accept confirmation screen?** Per design doc this is "optional," but if shown it has to resolve from somewhere — probably `akoya_request.wmkf_programdirector` → `systemuser.internalemailaddress`. Already in the `verify-suggestion-token` REQUEST_SELECT (Session B); pattern needs locking when post-accept confirmation lands in Session C/D.
+2. ✓ **PD email/name on the post-accept confirmation screen — resolved
+   2026-07-24.** The verified request supplies
+   `akoya_request._wmkf_programdirector_value`; only the
+   `accepted-pre-materials` context branch reads that active `systemuser` for
+   `fullname` + `internalemailaddress`. The page shows both parenthetically
+   with a `mailto:` link. Missing, disabled, incomplete, or failed lookup data
+   is non-fatal and preserves the generic "your Program Director" guidance.
+   `[VERIFIED via lib/services/external-review/context-service.js,
+   pages/external/review/[token].js,
+   shared/components/external/AcceptedConfirmationView.js, and focused
+   service/route/component tests]`
 3. ✓ **`wmkf_DeclineReason` deployment** — shipped in Session A wave 3.
 4. ✓ **`wmkf_responsetype` picklist extension** — `withdrawn_sufficient=100000003` added in Session A via `scripts/extend-responsetype-picklist.mjs`.
 5. **`parentcustomerid` discrepancy signal — backlog framing.** Deferred from slice 1 but should not stay vague indefinitely. Decide before COI tooling builds whether this is a computed staff-visible flag, a discrepancy-detection cron, or a real-time check at COI judgment time.

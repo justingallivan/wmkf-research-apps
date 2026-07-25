@@ -32,8 +32,14 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
 jest.mock('../../lib/dataverse/adapters/contact', () => ({
   findOrCreateByEmail: jest.fn(async () => ({ id: 'c-1', created: false })),
 }));
+const getSystemUserById = jest.fn(async () => ({
+  systemuserid: 'pd-1',
+  fullname: 'PD',
+  internalemailaddress: 'pd@wmkeck.org',
+  isdisabled: false,
+}));
 jest.mock('../../lib/dataverse/adapters/system-user', () => ({
-  getByIdWithSelect: jest.fn(async () => ({ fullname: 'PD', internalemailaddress: 'pd@wmkeck.org', isdisabled: false })),
+  getByIdWithSelect: (...a) => getSystemUserById(...a),
 }));
 const updateRequestById = jest.fn(async () => {});
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
@@ -97,9 +103,20 @@ function person(id, over = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  getSystemUserById.mockResolvedValue({
+    systemuserid: 'pd-1',
+    fullname: 'PD',
+    internalemailaddress: 'pd@wmkeck.org',
+    isdisabled: false,
+  });
   SUGGESTIONS = { [SUG_OK]: suggestion(SUG_OK) };
   PERSONS = { [`person-${SUG_OK}`]: person(`person-${SUG_OK}`) };
-  REQUEST = { akoya_requestid: REQUEST_ID, akoya_requestnum: 'REQ-001', wmkf_meetingdate: null };
+  REQUEST = {
+    akoya_requestid: REQUEST_ID,
+    akoya_requestnum: 'REQ-001',
+    wmkf_meetingdate: null,
+    _wmkf_programdirector_value: 'pd-1',
+  };
   CYCLE_CODE = null;
   CYCLE = null;
   delete process.env.REVIEWER_EMAIL_DELIVERY_MODE;
@@ -271,6 +288,57 @@ describe('send-emails-service — terminal thank-you guard', () => {
 });
 
 describe('send-emails-service — invitation body-integrity gate', () => {
+  test('invitation renders one paired accept/decline CTA and sends from the assigned Program Director', async () => {
+    const emitted = await run({
+      drafts: [{
+        suggestionId: SUG_OK,
+        subject: 'Invitation',
+        body: 'Please respond:\nhttps://reviews.example.org/external/review/tok-1',
+      }],
+      templateType: 'invitation',
+    });
+
+    expect(resultOf(emitted).sent).toHaveLength(1);
+    expect(createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      from: 'pd@wmkeck.org',
+      actingUserSystemId: 'pd-1',
+      body: expect.stringContaining('?action=accept'),
+    }));
+    const html = createAndSendEmail.mock.calls[0][0].body;
+    expect((html.match(/Yes, I Can Review/g) || [])).toHaveLength(1);
+    expect((html.match(/No, Not This Time/g) || [])).toHaveLength(1);
+    expect(html).toContain('?action=decline');
+    expect(html).toContain('PD');
+    expect(html).toContain('mailto:pd@wmkeck.org');
+  });
+
+  test.each([
+    ['missing assignment', { request: { _wmkf_programdirector_value: null }, pd: null }],
+    ['disabled Program Director', { request: {}, pd: { systemuserid: 'pd-1', internalemailaddress: 'pd@wmkeck.org', isdisabled: true } }],
+    ['Program Director without email', { request: {}, pd: { systemuserid: 'pd-1', internalemailaddress: '', isdisabled: false } }],
+  ])('%s fails closed before invitation transport', async (_label, setup) => {
+    REQUEST = { ...REQUEST, ...setup.request };
+    if (setup.pd) getSystemUserById.mockResolvedValue(setup.pd);
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    expect(resultOf(emitted).skipped[0]).toMatchObject({
+      suggestionId: SUG_OK,
+      reason: 'program_director_sender_unavailable',
+    });
+  });
+
+  test('non-invitation email preserves the authenticated staff sender', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+    expect(createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      from: 'staff@wmkeck.org',
+      actingUserSystemId: 'u-1',
+    }));
+  });
+
   test('an invitation with no secure link is skipped missing_secure_link and never sent', async () => {
     const emitted = await run({
       drafts: [{ suggestionId: SUG_OK, subject: 'S', body: 'No link here.' }],

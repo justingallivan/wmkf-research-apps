@@ -158,7 +158,13 @@ Minimum client change:
 - Do not block the modal on `/context` for this transition.
 - Optionally schedule a non-blocking `/context` refresh after the view changes if the page needs fresh server data.
 
-The accepted-pre-materials view currently does not require the full Stage 2a context payload, so the POST response has enough state to remove the submitting modal.
+At design time, the accepted-pre-materials view did not require the full Stage
+2a context payload, so the POST response had enough state to remove the
+submitting modal. As shipped, that optional client transition was not adopted
+(see the status delta above), and the confirmation now consumes the additive
+`programDirector` name/email from a fresh verified `/context` response. Any
+future immediate transition must retain that refresh or carry the same
+server-resolved contact without weakening the token boundary.
 
 ### Durable Follow-Up Worker
 

@@ -3,7 +3,10 @@
  */
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import InviteEmailModal from '../../shared/components/reviewers/InviteEmailModal';
+import InviteEmailModal, {
+  applySubjectTiming,
+  validateInvitationTimeline,
+} from '../../shared/components/reviewers/InviteEmailModal';
 import { readSseStream } from '../../shared/components/reviewers/sse';
 
 jest.mock('../../shared/components/reviewers/sse', () => ({
@@ -47,7 +50,7 @@ beforeEach(() => {
             candidateName: 'Dr. Test Reviewer',
             to: 'reviewer@example.org',
             subject: 'Invitation',
-            htmlBody: '<table><tr><td><a href="https://reviews.wmkeck.org/external/review/token.value">Respond to Invitation</a></td></tr></table>',
+            htmlBody: '<table><tr><td><a href="https://reviews.wmkeck.org/external/review/token.value?action=accept">Yes, I Can Review</a></td></tr></table>',
           },
         }],
         failed: [],
@@ -59,6 +62,39 @@ beforeEach(() => {
 
 afterEach(() => {
   window.confirm.mockRestore();
+});
+
+describe('InviteEmailModal invitation timing contract', () => {
+  const today = new Date(2026, 6, 24);
+
+  test('uses the current campaign fields and accepts a chronological timeline', () => {
+    expect(validateInvitationTimeline({
+      respondOffsetDays: 7,
+      proposalSendDate: '2026-08-18',
+      reviewDueDate: '2026-09-15',
+    }, today)).toBeNull();
+  });
+
+  test('rejects proposal release before response and review due on/before release', () => {
+    expect(validateInvitationTimeline({
+      respondOffsetDays: 7,
+      proposalSendDate: '2026-07-30',
+      reviewDueDate: '2026-09-15',
+    }, today)).toMatch(/release cannot be earlier/i);
+    expect(validateInvitationTimeline({
+      respondOffsetDays: 7,
+      proposalSendDate: '2026-08-18',
+      reviewDueDate: '2026-08-18',
+    }, today)).toMatch(/due date must be after/i);
+  });
+
+  test('renders the campaign response deadline in the subject and degrades cleanly when unset', () => {
+    const subject = 'Action needed by {{respondBy}}: Review invitation from W. M. Keck Foundation';
+    expect(applySubjectTiming(subject, { respondOffsetDays: 7 }))
+      .toMatch(/^Action needed by .+: Review invitation/);
+    expect(applySubjectTiming(subject, { respondOffsetDays: '' }))
+      .toBe('Review invitation from W. M. Keck Foundation');
+  });
 });
 
 describe('InviteEmailModal capture-mode result display', () => {
@@ -82,7 +118,7 @@ describe('InviteEmailModal capture-mode result display', () => {
     await waitFor(() => expect(screen.getByText(/captured 1 invitation email for rehearsal/i)).toBeInTheDocument());
     expect(screen.getByText(/no dynamics email was sent/i)).toBeInTheDocument();
     expect(screen.getByText(/Dr\. Test Reviewer <reviewer@example\.org>/)).toBeInTheDocument();
-    expect(screen.getByDisplayValue(/Respond to Invitation/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/Yes, I Can Review/)).toBeInTheDocument();
 
     const sendCall = global.fetch.mock.calls.find(([url]) => url === '/api/review-manager/send-emails');
     expect(JSON.parse(sendCall[1].body)).toMatchObject({

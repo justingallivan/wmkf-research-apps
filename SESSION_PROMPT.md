@@ -1,134 +1,178 @@
-# Session 371 Prompt: Probe durable reviewer dispatch evidence
+# Session 373 Prompt: Finish reviewer withdrawal QA and decide promotion
 
-## Session 370 Summary
+## Session 372 Summary
 
-The reviewer terminal-status slice was reworked to the smallest safe boundary,
-adversarially reviewed, merged, deployed, and smoke-tested. Post-accept
-`withdrew` and `released` are now live without review-received/completed stamps;
-deadline evidence and completed-review payability remain separate features.
+The reviewer invitation redesign was exercised end to end on
+`codex/reviewer-email-redesign`. A real invitation was accepted from one
+controlled inbox and declined from another. The branch remains intentionally
+unmerged and undeployed pending the remaining withdrawal checks and Justin's
+promotion decision.
 
 ### What Was Completed
 
-1. **Terminal-status rework and release**
-   - Removed the discarded due-date/HMAC repair design from the active slice.
-   - Added the dedicated terminal route/service, ETag-guarded status plus token
-     revocation, adapter irreversibility, receipt-writer race guards, terminal
-     consumer exclusions, and status-map parity enforcement.
-   - Provisioned and verified production picklist values
-     `withdrew=100000005` and `released=100000006`.
-   - Merged PR #78, then fixed the real acceptance shape where
-     `wmkf_accepted=true` coexists with persisted `wmkf_reviewstatus=null`.
-   - Merged PR #79 to production at `fd610837`.
+1. **Safari/local acceptance recovery**
+   - The first acceptance link stalled at “Verifying your link…” because a
+     production-mode local page was loading stale/mixed Next.js assets over an
+     incompatible CSP/HTTPS path.
+   - Local HTTP assets are now preserved by the production CSP. A fresh
+     production build served the reviewer portal correctly in Safari.
+   - The controlled `thuds-larks4e@icloud.com` invitation was accepted and the
+     accepted confirmation page rendered successfully.
 
-2. **Production verification**
-   - Vercel deployment `dpl_AH9N4YHnR9jZEu5A9cF1R7EkDdBJ` reached Ready with
-     exact Git SHA `fd610837165906ff53a0cd422c57e2b840c7ae43`.
-   - A controlled invite to `03aero.works@icloud.com` on test request `1002788`
-     reproduced accepted + null status in production.
-   - The same ETag-guarded terminal service transitioned that exact row to
-     `Withdrew`; Dataverse readback showed status `100000005`, token revoked,
-     accepted preserved, and no received/completed timestamp. Workbench rendered
-     `Withdrew` and `Revoked`.
-   - Browser automation could not resolve the native confirmation dialog, so the
-     signed-in production POST seam was not directly observed. Route integration
-     tests passed; do not create another synthetic smoke solely for this unless
-     the owner explicitly asks. A future real staff terminal action can close
-     that last route-level observation.
+2. **Accepted-reviewer self-service withdrawal**
+   - The acceptance confirmation email now mirrors the accepted page's
+     change-of-circumstances guidance and carries a secure withdrawal link.
+   - Before materials release, that link opens the existing decline form so the
+     reviewer can provide the same optional alternate-reviewer suggestions.
+   - A committed self-withdrawal sets accepted false, records declined/withdrew,
+     revokes the portal token, deletes the exact linked honorarium request,
+     cancels an unlocked acceptance follow-up job, and compensates for an
+     honorarium created by a leased worker after the reviewer withdrew.
+   - The assigned Program Director is notified by email.
 
-3. **Smoke cleanup and housekeeping**
-   - Deleted the synthetic suggestion and potential-reviewer rows and verified
-     both return 404.
-   - Verified the acceptance job completed with zero attempts/errors.
-   - The app identity lacked Contact DeleteAccess; Justin deactivated the marker
-     Contact, verified `Inactive`. The address cannot be reused by the smoke
-     helper.
-   - Cleared local smoke state, removed the temporary test, closed smoke browser
-     tabs, deleted the merged repair branch locally/remotely, and returned the
-     shared checkout to `main`.
+3. **Staff-recorded reviewer withdrawal**
+   - The Workbench `Withdrew` action now uses the same lifecycle and honorarium
+     cleanup contract as reviewer self-withdrawal, without asking staff for
+     alternate suggestions.
+   - Derived dashboards and reviewer counts update from the authoritative
+     suggestion state; there is no separate counter write.
+
+4. **Real decline and referral E2E**
+   - `Test Homer` was reset to pristine test state and sent one real invitation
+     at `ergot_gazebo.0r@icloud.com`.
+   - The generated email contained the September 9, 2026 review due date and one
+     Accept/Decline action pair.
+   - The reviewer declined through the email link and suggested **Simon Blakey
+     at Emory**.
+   - Workbench readback showed `Test Homer` as **Declined**, the active reviewer
+     table still contained the correct two reviewers, and the referral appeared
+     with an **Add as candidate** action.
+
+5. **Safe local rehearsal handling**
+   - The first send attempt correctly failed closed when
+     `EXTERNAL_LINK_SECRET` was absent.
+   - A later attempt used the configured local capture mode; it created no
+     Dynamics email but intentionally advanced the test invitation so its
+     captured link could be exercised. The test reset script restored the row
+     before the one real send.
+   - The real send used an ephemeral local signing secret plus explicit,
+     dated Dataverse production read/write rehearsal authorization.
+   - The temporary local server and its authorization were stopped at session
+     end. Links minted under that ephemeral secret are no longer usable, but the
+     accepted and declined responses are committed in Dataverse.
 
 ### Commits
 
-- `0cf8ba1a` — Merge PR #78: terminal-status rework
-- `0fa3ac91` — Fix accepted/null-status terminal transition
-- `fd610837` — Merge PR #79 to production
+- `40818f32` — Fix duplicate reviewer response action pair
+- `5ea34647` — Preserve local HTTP assets under production CSP
+- `08c718d3` — Allow reviewer self-withdrawal
+- `a4fdd736` — Support staff reviewer withdrawal
 
 ## Next Items
 
 ### Verified Open
 
-1. **Run the read-only dispatch-evidence probe**
-   Evidence: `docs/REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md` and
-   `.claude-memory/project-reviewer-reliability-data.md`.
-   Determine whether the existing Dynamics email activity can durably expose or
-   carry reviewer suggestion identity, engagement generation, communicated due
-   date, ordered sent state, and send timestamp. Do not add schema until an
-   owner-reviewed design exists.
+1. **Exercise the accepted-reviewer withdrawal email end to end**
+   Evidence: `08c718d3`; the accepted confirmation page was tested, but the new
+   acceptance-email withdrawal link was not clicked in a real client.
+   Accept a freshly reset test reviewer, inspect the automatic confirmation
+   email, follow its withdrawal link, submit an alternate suggestion, and verify
+   the PD notification, terminal state, reviewer counts, acceptance-job
+   cancellation, and linked-honorarium removal.
 
-2. **Continue the reviewer campaign evidence window**
-   Evidence: `docs/CURRENT_WORK_QUEUE.md`.
-   Keep the legacy resolver authoritative and record W2 shadow disagreements,
-   identity outcomes, staff corrections, invitations, and review completion.
+2. **Exercise the staff `Withdrew` action end to end**
+   Evidence: `a4fdd736`; source/tests implement the shared cleanup contract, but
+   the Workbench action was not manually completed during Session 372.
+   Use a controlled accepted test reviewer and verify that the PD action asks no
+   referral questions, removes the linked honorarium, revokes the token, and
+   updates every reviewer/dashboard view.
+
+3. **Correct the saved invitation wording**
+   Evidence: the real Session 372 invitation rendered “Your completed reviews
+   would be due by September 9, 2026,” while
+   `lib/seed/email-defaults/reviewer-templates.js` already uses the singular
+   “Your completed review”.
+   Inspect the effective admin/per-PD invitation override and change or reset
+   that saved text; do not make another source-only wording edit.
 
 ### Owner Decision Needed
 
-1. **Completed-review payability disposition**
-   Evidence: `docs/REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md`.
-   This annotates genuinely completed reviews and must remain independent of
-   terminal engagement status.
+1. **Promote the feature branch after the two withdrawal checks**
+   Evidence: branch `codex/reviewer-email-redesign`; real Accept and initial
+   Decline paths passed, while self-withdrawal and staff-withdrawal remain the
+   two manual gaps.
+   Decide whether to merge/promote after those checks.
 
-2. **Optional reviewer UX selection**
-   Evidence: `docs/CURRENT_WORK_QUEUE.md`.
-   Choose only from observed staff friction; no candidate is authorized merely
-   because it appears in the queue.
+2. **Rebaseline effective invitation defaults during promotion**
+   Evidence: tracked seed copy and the effective saved invitation diverged in
+   the real email.
+   Review the org default and Justin's per-PD override before applying the
+   normal email-default rebaseline; saved per-PD overrides continue to win until
+   explicitly reset or edited.
 
 ### Parked
 
-1. Applicant intake product build remains parked during the GOApply evaluation.
-2. Automated BILL onboarding remains tabled; payment is offline/manual.
-3. Destructive reviewer cleanup remains gated by promotion and a full campaign.
+1. The reviewer dispatch-evidence probe remains the next reliability-design
+   step, but it stays parked until this invitation/withdrawal branch is promoted
+   or Justin reprioritizes it.
+2. Applicant intake remains parked during the GOApply evaluation.
+3. Automated BILL onboarding remains tabled; payment is offline/manual.
 
 ### Verify Before Acting
 
-1. **Test-request campaign dates**
-   Evidence currently available: the production invitation preview for request
-   `1002788` showed respond-by and review-due dates out of chronological order.
-   Re-read current campaign configuration and timeline defaults before treating
-   this as a product defect; do not edit a dedicated test request silently.
+1. **Local real-email mode**
+   Evidence currently available: `.env.local` uses reviewer email capture mode
+   and does not contain `EXTERNAL_LINK_SECRET`.
+   A future local real-email rehearsal must deliberately supply a test signing
+   secret, set `REVIEWER_EMAIL_DELIVERY_MODE=send`, use an allowlisted inbox,
+   and retain the explicit dated Dataverse rehearsal authorization until the
+   reviewer-side response is complete.
 
-2. **Unrelated reconciliation-report drift**
-   Evidence currently available: `docs/RECONCILIATION_REPORT.json` was modified
-   before this work and intentionally excluded from the release/session commits.
-   Re-run the reconciliation probe and resolve current Atlas counts before
-   staging it; do not commit the dated generated output blindly.
+2. **Captured invitation state**
+   Evidence currently available: capture mode sends no Dynamics email but
+   records the test invitation so the captured secure link can be exercised.
+   Reset the reusable test reviewer before switching from capture to a real send
+   or the row will already be `Invited`.
+
+3. **Production/default-template state**
+   Evidence currently available: code and seed are committed, but this branch
+   has not been deployed and no production Dataverse rebaseline was performed.
+   Read the effective live default and per-PD override before claiming the
+   redesigned copy or singular wording is production-active.
 
 ### Do Not Reopen Without New Decision
 
-1. The discarded HMAC materials-repair receipt and mutable first/last due-date
-   fields remain rejected.
-2. Terminal status, deadline evidence, payability, and pre-accept reset remain
-   separate features.
-3. Do not repeat the synthetic terminal-status smoke solely to exercise the
-   browser confirmation; prefer observation of the next real staff action.
+1. Do not make Accept, Decline, or Withdrawal mutate state on GET; email
+   security scanners prefetch links.
+2. Do not add a new campaign-date store; the current campaign system remains
+   authoritative.
+3. Do not auto-decline nonresponders; the deadline consequence is copy only.
+4. Do not ask a staff-recorded withdrawal for alternate reviewer suggestions.
 
 ## Key Files Reference
 
 | File | Purpose |
 | --- | --- |
-| `docs/CURRENT_WORK_QUEUE.md` | Canonical priority sequence |
-| `docs/REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md` | Shipped terminal contract and deferred dispatch design |
-| `.claude-memory/project-reviewer-reliability-data.md` | Durable owner goal and feature boundaries |
-| `lib/services/review-manager/terminal-transition-service.js` | Terminal predicate and ETag-guarded write |
-| `lib/services/review-receipt-guard.js` | Shared terminal/race guard |
-| `pages/api/review-manager/terminal-transition.js` | Authenticated terminal route |
-| `scripts/extend-reviewstatus-picklist-terminal.mjs` | Production picklist provisioning |
+| `lib/services/reviewer-withdrawal.js` | Shared self-withdrawal lifecycle, honorarium, and job cleanup |
+| `lib/services/reviewer-acceptance-email.js` | Accepted-reviewer confirmation email and withdrawal link |
+| `shared/components/external/AcceptedConfirmationView.js` | Accepted page change guidance and withdrawal action |
+| `lib/services/review-manager/terminal-transition-service.js` | Staff terminal action orchestration |
+| `lib/dataverse/adapters/reviewer-suggestion.js` | Atomic withdrawal/release state transitions |
+| `scripts/reset-reviewer-for-testing.js` | Safe reusable-reviewer reset for E2E |
+| `docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md` | Browser, capture, and real-email rehearsal boundaries |
 
 ## Testing
 
 ```bash
-rtk npm test -- --runInBand tests/unit/terminal-transition-service.test.js tests/integration/terminal-transition-route.test.js
-rtk npm run check:status-enum-parity
-rtk npm run test:status-enum-parity
-rtk npm run check:api-routes
-rtk npm run check:docs
-rtk npm run build
+rtk npm test -- --runInBand \
+  tests/unit/reviewer-acceptance-email.test.js \
+  tests/unit/reviewer-acceptance-drain.test.js \
+  tests/unit/reviewer-suggestion-withdrawal.test.js \
+  tests/unit/terminal-transition-service.test.js \
+  tests/integration/external-review-routes.test.js
+
+# Read-only state probe around a controlled reviewer test:
+rtk node scripts/probe-review-rehearsal-state.mjs \
+  --requestNumber 1002788 \
+  --email <allowlisted-test-email>
 ```

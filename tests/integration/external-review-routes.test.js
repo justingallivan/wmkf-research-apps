@@ -23,6 +23,7 @@ import {
   enqueueReviewerAcceptanceJob,
   markReviewerAcceptanceJobQueued,
   cancelReviewerAcceptanceJob,
+  cancelReviewerAcceptanceJobsForSuggestion,
 } from '../../lib/services/reviewer-acceptance-job-service';
 
 jest.mock('../../lib/external/verify-suggestion-token', () => ({
@@ -118,6 +119,11 @@ jest.mock('../../lib/services/reviewer-acceptance-job-service', () => ({
   enqueueReviewerAcceptanceJob: jest.fn(async () => ({ id: 101, acceptance_key: 'acceptance-1', status: 'accept_pending' })),
   markReviewerAcceptanceJobQueued: jest.fn(async () => ({ id: 101, status: 'queued' })),
   cancelReviewerAcceptanceJob: jest.fn(async () => ({ id: 101, status: 'cancelled' })),
+  cancelReviewerAcceptanceJobsForSuggestion: jest.fn(async () => [{ id: 101, status: 'cancelled' }]),
+}));
+jest.mock('../../lib/services/reviewer-withdrawal', () => ({
+  deleteLateHonorariumForWithdrawnReviewer: jest.fn(async () => ({ deleted: false })),
+  notifyProgramDirectorOfReviewerWithdrawal: jest.fn(async () => ({ id: 1 })),
 }));
 
 jest.mock('../../lib/services/dynamics-context', () => ({
@@ -211,6 +217,46 @@ describe('/api/external/review/[token]/context', () => {
 
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'not_found' });
+  });
+
+  it('returns the assigned Program Director contact for accepted-pre-materials', async () => {
+    verifySuggestionToken.mockResolvedValue({
+      ...verifiedSuggestion,
+      suggestion: {
+        ...verifiedSuggestion.suggestion,
+        wmkf_accepted: true,
+        wmkf_reviewstatus: null,
+        wmkf_proposalfirstaccessed: '2026-05-01T00:00:00.000Z',
+      },
+      request: {
+        ...verifiedSuggestion.request,
+        _wmkf_programdirector_value: 'pd-1',
+      },
+    });
+    DynamicsService.getRecord.mockImplementation(async (entitySet) => {
+      if (entitySet === 'systemusers') {
+        return {
+          systemuserid: 'pd-1',
+          fullname: 'Jane Director',
+          internalemailaddress: 'jane.director@wmkeck.org',
+          isdisabled: false,
+        };
+      }
+      return null;
+    });
+
+    const req = createMockReq({ method: 'GET', query: { token: 'good-token' } });
+    const res = createMockRes();
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(DynamicsService.getRecord).toHaveBeenCalledWith('systemusers', 'pd-1', {
+      select: 'systemuserid,fullname,internalemailaddress,isdisabled',
+    });
+    expect(res._data.programDirector).toEqual({
+      name: 'Jane Director',
+      email: 'jane.director@wmkeck.org',
+    });
   });
 
   it('only returns files from reviewer-materials folders for the verified request', async () => {
@@ -410,8 +456,8 @@ describe('/api/external/review/[token]/context', () => {
     expect(res.status).toHaveBeenCalledWith(200);
     expect(Object.keys(res._data).sort()).toEqual([
       'engagementState', 'etag', 'files', 'ok', 'policies', 'prefill',
-      'proposal', 'questionSetVersion', 'questions', 'reviewer', 'submission',
-      'tokenExpiresAt',
+      'programDirector', 'proposal', 'questionSetVersion', 'questions', 'reviewer',
+      'submission', 'tokenExpiresAt',
     ]);
     expect(res._data.ok).toBe(true);
     expect(res._data.engagementState.view).toBe('stage2a');
@@ -890,28 +936,44 @@ describe('/api/external/review/[token]/respond', () => {
     expect(ensureHonorariumOnboarding).not.toHaveBeenCalled();
   });
 
-  it('rejects decline after acceptance with 409 and does not write (PD-only exit)', async () => {
+  it('allows self-service withdrawal before materials and removes the exact linked honorarium', async () => {
     verifySuggestionToken.mockResolvedValue({
       ...fresh,
-      suggestion: { ...fresh.suggestion, wmkf_accepted: true, wmkf_declined: false },
+      suggestion: {
+        ...fresh.suggestion,
+        wmkf_accepted: true,
+        wmkf_declined: false,
+        _wmkf_honorariumrequest_value: 'honorarium-1',
+      },
     });
     const req = createMockReq({
       method: 'POST',
       query: { token: 'good-token' },
       headers: {},
-      body: { action: 'decline', decline: {} },
+      body: {
+        action: 'decline',
+        decline: { reasonPicklist: 'too-busy', referral: 'Dr. Alternate' },
+      },
     });
     const res = createMockRes();
 
     await handler(req, res);
 
-    expect(applyStage2aResponse).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(409);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-      ok: false,
-      reason: 'accepted_decline_locked',
-      message: expect.stringMatching(/Program Director/i),
-    }));
+    expect(applyStage2aResponse).toHaveBeenCalledWith(
+      'suggestion-1',
+      expect.objectContaining({
+        action: 'decline',
+        decline: expect.objectContaining({ referral: 'Dr. Alternate' }),
+      }),
+      expect.objectContaining({
+        deleteHonorariumRequestId: 'honorarium-1',
+      }),
+    );
+    expect(cancelReviewerAcceptanceJobsForSuggestion).toHaveBeenCalledWith(
+      'suggestion-1',
+      'reviewer_withdrew_before_materials',
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 
   it('rejects a malformed address with 400 before any write', async () => {

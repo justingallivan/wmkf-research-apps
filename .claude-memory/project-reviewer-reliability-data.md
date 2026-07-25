@@ -31,7 +31,11 @@ whether reviewers are on time and reliable — not just participation counts.
   verified with `withdrew=100000005` and `released=100000006`; PR #79 / merge
   `fd610837` deployed the accepted/null-status repair on 2026-07-24. A controlled
   production smoke read back `Withdrew`, token revoked, accepted preserved, and
-  no received/completed timestamp.
+  no received/completed timestamp. That is the historical production baseline.
+  The current feature branch changes staff-recorded `withdrew` to the full
+  withdrawal contract: `accepted=false`, `declined=true`, token revoked, exact
+  linked honorarium deleted, and acceptance follow-up cancelled. It is not
+  production-deployed yet.
 - `wmkf_reviewduedate` is request-level mutable state, so production still lacks
   durable evidence of the deadline communicated for each materials dispatch.
 - Dynamics email sending already creates a durable email activity and returns
@@ -59,7 +63,9 @@ whether reviewers are on time and reliable — not just participation counts.
 
 - Dedicated UI action and `/api/review-manager/terminal-transition`.
 - Fresh request-ownership and lifecycle predicate.
-- ETag-guarded status + token-revocation write.
+- ETag-guarded status + token-revocation write; staff-recorded `withdrew` also
+  corrects accepted/declined response state and atomically deletes the exact
+  linked honorarium while `released` remains status-only.
 - Adapter-level irreversibility for all status-changing callers.
 - Receipt-writer guards at external submit, manual entry, mark-without-file, and
   staff/reviewer upload.

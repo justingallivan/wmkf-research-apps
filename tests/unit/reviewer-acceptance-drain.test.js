@@ -92,6 +92,7 @@ function deps(currentSuggestion = acceptedSuggestion()) {
     sendAcceptanceEmail: jest.fn(async () => ({ sent: true })),
     notify: jest.fn(async () => ({ id: 1 })),
     quota: jest.fn(async () => ({ notified: false })),
+    deleteLateHonorarium: jest.fn(async () => ({ deleted: true })),
     jobs: {
       mergeReviewerAcceptanceJobStep: jest.fn(async () => ({})),
       completeReviewerAcceptanceJob: jest.fn(async () => ({})),
@@ -196,6 +197,46 @@ describe('processReviewerAcceptanceJob', () => {
     expect(d.captureOrcid).toHaveBeenCalled();
     expect(d.sendAcceptanceEmail).toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).toHaveBeenCalled();
+  });
+
+  it('cancels immediately when the reviewer already withdrew', async () => {
+    const d = deps(acceptedSuggestion({
+      wmkf_accepted: false,
+      wmkf_declined: true,
+    }));
+
+    const result = await processReviewerAcceptanceJob(job(), d);
+
+    expect(result).toMatchObject({
+      status: 'cancelled',
+      reason: 'reviewer_withdrew_before_materials',
+    });
+    expect(d.ensureHonorarium).not.toHaveBeenCalled();
+    expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
+    expect(d.quota).not.toHaveBeenCalled();
+  });
+
+  it('removes a late-created honorarium and stops when withdrawal races the acceptance worker', async () => {
+    const d = deps();
+    d.suggestions.getForAcceptanceDrain
+      .mockResolvedValueOnce(acceptedSuggestion())
+      .mockResolvedValueOnce(acceptedSuggestion({
+        wmkf_accepted: false,
+        wmkf_declined: true,
+        _wmkf_honorariumrequest_value: '55555555-5555-4555-8555-555555555555',
+      }));
+
+    const result = await processReviewerAcceptanceJob(job(), d);
+
+    expect(d.ensureHonorarium).toHaveBeenCalled();
+    expect(d.deleteLateHonorarium).toHaveBeenCalledWith(
+      SUGGESTION_ID,
+      { suggestions: d.suggestions },
+    );
+    expect(result.status).toBe('cancelled');
+    expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
+    expect(d.quota).not.toHaveBeenCalled();
+    expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
   });
 
   it('cancels stale accept_pending jobs when Dataverse never accepted', async () => {

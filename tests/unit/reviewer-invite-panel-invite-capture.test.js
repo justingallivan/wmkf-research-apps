@@ -59,7 +59,7 @@ beforeEach(() => {
           cycleLabel: 'D26',
           inviteStartDate: '2026-06-17',
           respondOffsetDays: 14,
-          proposalReleaseDate: '2026-07-08',
+          proposalReleaseDate: '2099-08-10',
           reviewDueDate: '2026-08-05',
         },
         isDefault: false,
@@ -67,7 +67,7 @@ beforeEach(() => {
       });
     }
     if (String(url).startsWith('/api/review-manager/campaign-config')) {
-      return mockJson({ config: { respondOffsetDays: 7, reviewDueDate: '2026-07-22' } });
+      return mockJson({ config: { respondOffsetDays: 7, reviewDueDate: '2099-08-24' } });
     }
     if (url === '/api/review-manager/render-emails') return mockJson({ drafts: [draft] });
     if (url === '/api/review-manager/send-emails') return { ok: true, body: { getReader: () => ({ read: jest.fn() }) } };
@@ -86,7 +86,7 @@ beforeEach(() => {
             candidateName: 'Dr. Test Reviewer',
             to: 'reviewer@example.org',
             subject: 'Invitation',
-            htmlBody: '<a href="https://reviews.wmkeck.org/external/review/token.value">Respond to Invitation</a>',
+            htmlBody: '<a href="https://reviews.wmkeck.org/external/review/token.value?action=accept">Yes, I Can Review</a>',
           },
         }],
         failed: [],
@@ -118,23 +118,23 @@ describe('ReviewerInvitePanel invitation capture rehearsal', () => {
     await screen.findByDisplayValue('Invitation');
     expect(screen.queryByLabelText('Reviews due')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /reviewer campaign timeline/i }));
-    await waitFor(() => expect(screen.getByLabelText('Reviews due')).toHaveValue('2026-07-22'));
+    await waitFor(() => expect(screen.getByLabelText('Reviews due')).toHaveValue('2099-08-24'));
     expect(screen.getByLabelText('Days to respond')).toHaveValue(7);
-    expect(screen.getByLabelText('Proposals released to reviewers')).toHaveValue('2026-07-08');
+    expect(screen.getByLabelText('Proposals released to reviewers')).toHaveValue('2099-08-10');
     // Reviewer-engagement Phase 1: respond-by is now a "days to respond" offset, not a
     // fixed date. The respond-by date in the email is computed as today + offset, so it
     // can't be asserted as a fixed string here — the campaignConfig payload below is the
     // durable contract. Proposal-delivery and review-due stay fixed dates.
     fireEvent.change(screen.getByLabelText('Days to respond'), { target: { value: '10' } });
-    fireEvent.change(screen.getByLabelText('Proposals released to reviewers'), { target: { value: '2026-07-08' } });
-    fireEvent.change(screen.getByLabelText('Reviews due'), { target: { value: '2026-07-22' } });
+    fireEvent.change(screen.getByLabelText('Proposals released to reviewers'), { target: { value: '2099-08-10' } });
+    fireEvent.change(screen.getByLabelText('Reviews due'), { target: { value: '2099-08-24' } });
     const sendButton = await screen.findByRole('button', { name: /send 1 invitation/i });
     await waitFor(() => expect(sendButton).toBeEnabled());
     fireEvent.click(sendButton);
 
     await waitFor(() => expect(screen.getByText(/captured 1 invitation email for rehearsal/i)).toBeInTheDocument());
     expect(screen.getByText(/no dynamics email was sent/i)).toBeInTheDocument();
-    expect(screen.getByDisplayValue(/Respond to Invitation/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/Yes, I Can Review/)).toBeInTheDocument();
     expect(onRefresh).toHaveBeenCalled();
     expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('This sends a real email with an accept/decline link and cannot be undone.'));
 
@@ -153,10 +153,10 @@ describe('ReviewerInvitePanel invitation capture rehearsal', () => {
       allowResend: false,
       drafts: [{ suggestionId: 'S1', subject: 'Invitation' }],
       // Phase 1: the panel sends the per-request campaign config alongside the drafts.
-      campaignConfig: { respondOffsetDays: 10, reviewDueDate: '2026-07-22' },
+      campaignConfig: { respondOffsetDays: 10, reviewDueDate: '2099-08-24' },
     });
-    expect(JSON.parse(sendCall[1].body).drafts[0].body).toContain('July 8, 2026');
-    expect(JSON.parse(sendCall[1].body).drafts[0].body).toContain('July 22, 2026');
+    expect(JSON.parse(sendCall[1].body).drafts[0].body).toContain('August 10, 2099');
+    expect(JSON.parse(sendCall[1].body).drafts[0].body).toContain('August 24, 2099');
     expect(JSON.parse(sendCall[1].body).drafts[0].body).toContain('https://reviews.wmkeck.org/external/review/token.value');
   });
 });
