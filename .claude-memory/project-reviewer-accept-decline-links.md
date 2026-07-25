@@ -55,7 +55,7 @@ Ground truth: `pages/api/external/review/[token]/respond.js`, `lib/external/toke
   POST-as-only-mutation boundary. Don't add a separate
   `REVIEWER_RESPONSE_SECRET` (use `EXTERNAL_LINK_SECRET`).
 - `response_received_at` auto-fills when the reviewer responds through the
-  landing page. On the current feature branch, a PD can also record an accepted
+  landing page. Production merge `70f51f45` also lets a PD record an accepted
   reviewer's emailed withdrawal through Track Reviewers; that action writes the
   declined response state, revokes access, removes the exact linked honorarium,
   and cancels acceptance follow-up without asking for alternate suggestions.

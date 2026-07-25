@@ -186,8 +186,9 @@ Promotion:
 - controlled invite/accept plus same-service production transition confirmed no
   review-received/completed timestamp and terminal exclusion from outstanding
   action state. That historical smoke preserved `accepted=true`; the subsequent
-  staff-withdrawal cleanup on this feature branch deliberately corrects it to
-  `accepted=false` / `declined=true` and is not production-deployed yet;
+  staff-withdrawal cleanup deliberately corrects it to `accepted=false` /
+  `declined=true` and shipped in merge `70f51f45`, production deployment
+  `dpl_9r2FYkAXhRqSXiJVCwevrXFZ5SzH`, on 2026-07-24;
 - Workbench showed `Withdrew` and `Revoked`;
 - no due-date schema or repair endpoint was provisioned.
 

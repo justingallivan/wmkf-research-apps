@@ -1,12 +1,13 @@
-# Session 373 Prompt: Finish reviewer withdrawal QA and decide promotion
+# Session 373 Prompt: Finish reviewer withdrawal QA and effective-template cleanup
 
 ## Session 372 Summary
 
 The reviewer invitation redesign was exercised end to end on
 `codex/reviewer-email-redesign`. A real invitation was accepted from one
-controlled inbox and declined from another. The branch remains intentionally
-unmerged and undeployed pending the remaining withdrawal checks and Justin's
-promotion decision.
+controlled inbox and declined from another. The branch remains as historical
+reference; its changes are production-live after Justin's 2026-07-24 approval
+in merge
+`70f51f45`, deployment `dpl_9r2FYkAXhRqSXiJVCwevrXFZ5SzH`.
 
 ### What Was Completed
 
@@ -97,13 +98,7 @@ promotion decision.
 
 ### Owner Decision Needed
 
-1. **Promote the feature branch after the two withdrawal checks**
-   Evidence: branch `codex/reviewer-email-redesign`; real Accept and initial
-   Decline paths passed, while self-withdrawal and staff-withdrawal remain the
-   two manual gaps.
-   Decide whether to merge/promote after those checks.
-
-2. **Rebaseline effective invitation defaults during promotion**
+1. **Rebaseline effective invitation defaults**
    Evidence: tracked seed copy and the effective saved invitation diverged in
    the real email.
    Review the org default and Justin's per-PD override before applying the
@@ -135,10 +130,11 @@ promotion decision.
    or the row will already be `Invited`.
 
 3. **Production/default-template state**
-   Evidence currently available: code and seed are committed, but this branch
-   has not been deployed and no production Dataverse rebaseline was performed.
-   Read the effective live default and per-PD override before claiming the
-   redesigned copy or singular wording is production-active.
+   Evidence currently available: merge `70f51f45` is live in production
+   deployment `dpl_9r2FYkAXhRqSXiJVCwevrXFZ5SzH`, but no production Dataverse
+   template rebaseline was performed. Read the effective live default and
+   per-PD override before claiming the singular wording is active; saved
+   per-PD overrides continue to win until reset or edited.
 
 ### Do Not Reopen Without New Decision
 

@@ -72,8 +72,8 @@ declined and revokes portal access. The reviewer/contact and suggestion history
 remain. The staff action also cancels unlocked acceptance jobs; the drain
 re-checks after honorarium creation and compensates for a concurrent withdrawal,
 so a late worker cannot leave or recreate an honorarium for an unfulfilled
-review obligation. The staff-cleanup behavior is current branch source and is
-not production-deployed yet.
+review obligation. The staff-cleanup behavior shipped in merge `70f51f45`,
+production deployment `dpl_9r2FYkAXhRqSXiJVCwevrXFZ5SzH`, on 2026-07-24.
 
 The 2026-06-22 production lock was capture-only:
 `HONORARIUM_ONBOARDING_DEFERRED=true` with the discriminator GUIDs unset. Treat
