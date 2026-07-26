@@ -86,18 +86,39 @@ export function TokenStateBadge({ state, expiresAt, firstAccessedAt }) {
   );
 }
 
-const MENU_WIDTH = 224; // w-56
+const MENU_WIDTH = 288; // w-72
 
-export function TokenActionsMenu({ reviewer, onRegenerate, onRevoke, onRemove }) {
+export function TokenActionsMenu({
+  reviewer,
+  onRegenerate,
+  onRevoke,
+  onRemove,
+  onStatusChange,
+  onTransition,
+}) {
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState(null); // { left, top } in viewport px, or null
   const btnRef = useRef(null);
   const menuRef = useRef(null);
 
   const isActive = reviewer.tokenState === 'active';
-  // 1 (regenerate) + revoke? + remove? — drives the upward-flip height estimate
-  // so the portalled menu never opens off-screen.
+  const canCorrectStatus = Boolean(
+    onStatusChange && !TERMINAL_REVIEW_STATUSES.includes(reviewer.reviewStatus),
+  );
+  const canEndEngagement = Boolean(
+    onTransition && canTransitionToTerminal(reviewer),
+  );
+  const settableStatuses = STATUS_PIPELINE.filter(
+    s => s.key !== 'accepted' && !TERMINAL_REVIEW_STATUSES.includes(s.key),
+  );
+  // The estimate drives the upward flip so the portalled menu never opens
+  // off-screen. Status correction and terminal actions are taller sections;
+  // the remaining items are standard 40px menu rows.
   const itemCount = 1 + (isActive ? 1 : 0) + (onRemove ? 1 : 0);
+  const estimatedMenuHeight = (itemCount * 40)
+    + (canCorrectStatus ? 118 : 0)
+    + (canEndEngagement ? 104 : 0)
+    + 8;
 
   // Position the menu in viewport coords, flipping upward when there isn't room
   // below. Rendered in a portal (see below) so it escapes the table card's
@@ -106,13 +127,13 @@ export function TokenActionsMenu({ reviewer, onRegenerate, onRevoke, onRemove })
     const btn = btnRef.current;
     if (!btn) return;
     const rect = btn.getBoundingClientRect();
-    const estHeight = itemCount * 40 + 8;
-    const openUp = rect.bottom + estHeight > window.innerHeight && rect.top > estHeight;
+    const openUp = rect.bottom + estimatedMenuHeight > window.innerHeight
+      && rect.top > estimatedMenuHeight;
     setCoords({
       left: Math.max(8, rect.right - MENU_WIDTH),
-      top: openUp ? rect.top - estHeight - 4 : rect.bottom + 4,
+      top: openUp ? rect.top - estimatedMenuHeight - 4 : rect.bottom + 4,
     });
-  }, [itemCount]);
+  }, [estimatedMenuHeight]);
 
   useEffect(() => {
     if (!open) return;
@@ -142,7 +163,8 @@ export function TokenActionsMenu({ reviewer, onRegenerate, onRevoke, onRemove })
         ref={btnRef}
         onClick={() => setOpen(o => !o)}
         className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
-        title="Reviewer link actions"
+        title="Manage reviewer"
+        aria-label={`Manage ${reviewer.name || 'reviewer'}`}
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01" />
@@ -154,6 +176,60 @@ export function TokenActionsMenu({ reviewer, onRegenerate, onRevoke, onRemove })
           style={{ position: 'fixed', left: coords.left, top: coords.top, width: MENU_WIDTH }}
           className="bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1 text-sm"
         >
+          {canCorrectStatus && (
+            <div className="px-3 py-2 border-b border-gray-100">
+              <label className="block">
+                <span className="block text-xs font-medium text-gray-700 mb-1">
+                  Correct recorded status
+                </span>
+                <select
+                  value={reviewer.reviewStatus === 'accepted' ? '' : reviewer.reviewStatus}
+                  onChange={(event) => {
+                    const newStatus = event.target.value;
+                    if (!newStatus) return;
+                    setOpen(false);
+                    onStatusChange(newStatus);
+                  }}
+                  className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 text-gray-700 bg-white focus:ring-1 focus:ring-gray-400 focus:outline-none"
+                  aria-label={`Correct status for ${reviewer.name || 'reviewer'}`}
+                >
+                  {reviewer.reviewStatus === 'accepted' && (
+                    <option value="" disabled>Accepted</option>
+                  )}
+                  {settableStatuses.map(status => (
+                    <option key={status.key} value={status.key}>{status.label}</option>
+                  ))}
+                </select>
+              </label>
+              <p className="mt-1.5 text-[11px] leading-4 text-gray-500">
+                Use only to fix the recorded stage. No email is sent.
+              </p>
+            </div>
+          )}
+          {canEndEngagement && (
+            <div className="py-1 border-b border-gray-100">
+              <p className="px-3 pt-1 pb-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                End engagement
+              </p>
+              <button
+                type="button"
+                onClick={() => { setOpen(false); onTransition('withdrew'); }}
+                className="w-full text-left px-3 py-2 hover:bg-red-50 text-red-700"
+              >
+                Record reviewer withdrawal
+              </button>
+              <button
+                type="button"
+                onClick={() => { setOpen(false); onTransition('released'); }}
+                className="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-700"
+              >
+                Release from assignment
+              </button>
+            </div>
+          )}
+          <p className="px-3 pt-2 pb-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-400">
+            Reviewer link
+          </p>
           <button
             onClick={() => { setOpen(false); onRegenerate(); }}
             className="w-full text-left px-3 py-2 hover:bg-gray-50"
@@ -1039,56 +1115,6 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
   );
 }
 
-// ─── Status Dropdown ──────────────────────────────────────────────────────
-
-function StatusDropdown({ currentStatus, onChange }) {
-  const settableStatuses = STATUS_PIPELINE.filter(
-    s => s.key !== 'accepted' && !TERMINAL_REVIEW_STATUSES.includes(s.key),
-  );
-  if (TERMINAL_REVIEW_STATUSES.includes(currentStatus)) return null;
-  return (
-    <label className="inline-flex flex-col items-start gap-0.5 text-left">
-      <span className="text-[10px] uppercase text-gray-400 leading-none">Correct status</span>
-      <select
-        value={currentStatus === 'accepted' ? '' : currentStatus}
-        onChange={e => onChange(e.target.value)}
-        className="text-xs border border-gray-200 rounded px-1.5 py-1 text-gray-600 bg-white hover:border-gray-400 focus:ring-1 focus:ring-gray-400 focus:outline-none cursor-pointer"
-      >
-        {currentStatus === 'accepted' && (
-          <option value="" disabled>Accepted</option>
-        )}
-        {settableStatuses.map(s => (
-          <option key={s.key} value={s.key}>{s.label}</option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function TerminalActions({ reviewer, onTransition }) {
-  if (!canTransitionToTerminal(reviewer)) return null;
-  return (
-    <div className="inline-flex items-center gap-1 ml-1" aria-label="End reviewer engagement">
-      <button
-        type="button"
-        onClick={() => onTransition('withdrew')}
-        className="px-1.5 py-1 text-xs font-medium text-red-700 border border-red-200 rounded hover:bg-red-50"
-        title="Reviewer withdrew after accepting"
-      >
-        Withdrew
-      </button>
-      <button
-        type="button"
-        onClick={() => onTransition('released')}
-        className="px-1.5 py-1 text-xs font-medium text-slate-700 border border-slate-300 rounded hover:bg-slate-50"
-        title="WMKF released the reviewer after accepting"
-      >
-        Released
-      </button>
-    </div>
-  );
-}
-
 // ─── Decline-referral inline add helpers ────────────────────────────────────
 
 // Map an identity-lookup match/candidate to the resolution the manual-reviewer
@@ -1628,15 +1654,6 @@ export default function ReviewerManagePanel({
                     {canManage && (
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {/* Status dropdown */}
-                          <StatusDropdown
-                            currentStatus={r.reviewStatus}
-                            onChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
-                          />
-                          <TerminalActions
-                            reviewer={r}
-                            onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
-                          />
                           {/* Download received review from SharePoint via Graph. */}
                           {r.reviewSharePointFolder && (
                             <a
@@ -1655,6 +1672,8 @@ export default function ReviewerManagePanel({
                             onRegenerate={() => handleRegenerateToken(r.suggestionId)}
                             onRevoke={() => handleRevokeToken(r.suggestionId)}
                             onRemove={() => handleRemoveReviewer(r)}
+                            onStatusChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
+                            onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
                           />
                         </div>
                       </td>
