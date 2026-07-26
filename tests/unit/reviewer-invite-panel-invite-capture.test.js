@@ -159,4 +159,46 @@ describe('ReviewerInvitePanel invitation capture rehearsal', () => {
     expect(JSON.parse(sendCall[1].body).drafts[0].body).toContain('August 24, 2099');
     expect(JSON.parse(sendCall[1].body).drafts[0].body).toContain('https://reviews.wmkeck.org/external/review/token.value');
   });
+
+  test('keeps declined reviewers visible but excludes them from invitation selection and counts', () => {
+    const declinedCandidate = {
+      ...candidate,
+      suggestionId: 'S-DECLINED',
+      name: 'Dr. Declined',
+      invited: true,
+      declined: true,
+      responseType: 'declined',
+    };
+    const pendingCandidate = {
+      ...candidate,
+      suggestionId: 'S-PENDING',
+      name: 'Dr. Pending',
+      invited: true,
+    };
+    const freshCandidate = {
+      ...candidate,
+      suggestionId: 'S-FRESH',
+      name: 'Dr. Fresh',
+    };
+    const acceptedCandidate = {
+      ...candidate,
+      suggestionId: 'S-ACCEPTED',
+      name: 'Dr. Accepted',
+      invited: true,
+      accepted: true,
+    };
+
+    render(
+      <ReviewerInvitePanel
+        requestId="REQ-1"
+        candidates={[declinedCandidate, pendingCandidate, freshCandidate, acceptedCandidate]}
+      />,
+    );
+
+    expect(screen.getByLabelText('Select Dr. Declined')).toBeDisabled();
+    expect(screen.getByLabelText('Select Dr. Pending')).toBeEnabled();
+    expect(screen.getByLabelText('Select Dr. Fresh')).toBeEnabled();
+    expect(screen.getByLabelText('Select Dr. Accepted')).toBeDisabled();
+    expect(screen.getByText('1 invitable · 1 accepted')).toBeInTheDocument();
+  });
 });

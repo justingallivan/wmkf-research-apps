@@ -291,8 +291,10 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
     }
   };
 
-  // Accepted candidates are managed in the Track Reviewers tab; not selectable here.
-  const selectable = candidates.filter((c) => !c.accepted);
+  const invitable = candidates.filter(
+    (c) => !c.invited && !c.accepted && !c.declined && !c.responseType && c.email
+  );
+  const acceptedCount = candidates.filter((c) => c.accepted).length;
   const toggle = (id) => setSelected((prev) => {
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -304,7 +306,9 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
   // row was selected and then edited to clear its email mid-session, it must drop out
   // of the invite count + InviteEmailModal rather than ride along as a doomed,
   // server-skipped send (Codex S290 sanity-check #2 — stale `selected` not pruned).
-  const selectedNotInvited = selectedRows.filter((c) => !c.invited && !c.accepted && c.email);
+  const selectedNotInvited = selectedRows.filter(
+    (c) => !c.invited && !c.accepted && !c.declined && !c.responseType && c.email
+  );
   // Still-pending = invited, no response yet (not accepted/declined, and no resolved
   // responseType — excludes already-withdrawn/no_response). The only rows the PD may
   // "no longer needed"-release (reviewer-engagement Phase 4 §3.C). Server re-guards this.
@@ -391,9 +395,20 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
                   type="checkbox"
                   className="mt-1"
                   checked={selected.has(c.suggestionId)}
-                  disabled={c.accepted || (!c.email && !c.invited)}
+                  disabled={
+                    c.accepted ||
+                    c.declined ||
+                    Boolean(c.responseType) ||
+                    (!c.email && !c.invited)
+                  }
                   onChange={() => toggle(c.suggestionId)}
-                  title={!c.email && !c.invited ? 'Add an email (✏️ Edit contact) before this candidate can be invited' : undefined}
+                  title={
+                    c.declined || c.responseType
+                      ? 'This reviewer has already responded and cannot be invited again'
+                      : !c.email && !c.invited
+                        ? 'Add an email (✏️ Edit contact) before this candidate can be invited'
+                        : undefined
+                  }
                   aria-label={`Select ${c.name}`}
                 />
                 <div className="flex-1 min-w-0">
@@ -544,7 +559,7 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
                 {withdrawing ? 'Releasing…' : `Release ${selectedPending.length} as no longer needed`}
               </button>
             )}
-            <span className="text-xs text-gray-400">{selectable.length} invitable · {candidates.length - selectable.length} accepted</span>
+            <span className="text-xs text-gray-400">{invitable.length} invitable · {acceptedCount} accepted</span>
           </div>
         </>
       )}
