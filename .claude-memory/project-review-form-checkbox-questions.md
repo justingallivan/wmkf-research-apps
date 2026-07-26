@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-26 via implementation source and focused contract tests across fetcher, admin, authoring, four writers, adapter, matrix, reports, and synthesis
+  last_verified: 2026-07-26 via production pre-activation evidence bundle plus implementation source and focused contract tests
 ---
 
 ## Status (2026-07-26 implementation pass)
@@ -15,7 +15,9 @@ row-backward-compatible code was promoted to `main` at `5282cee8` and deployed t
 production as `dpl_7sfTLrMafYPKp7mnYdrEVjs9HmW5`; wave 15 was applied to
 production and read back first on 2026-07-26. Prompt/question publication,
 controlled rehearsal/rollback, fixture disposition, and reviewer exposure are
-deliberately still pending. Target go-live remains 2026-08-15.**
+deliberately still pending. The read-only pre-activation probe found a sent
+thank-you marker on the EICAR fixture, so the frozen cleanup contract stopped
+before deletion authority or cleanup. Target go-live remains 2026-08-15.**
 Read the plan for the release contract; this entry records the current boundary.
 
 Closed owner decisions (do not reopen without a new one):
@@ -106,7 +108,40 @@ row may be activated only through the later controlled publication/rehearsal ste
 Hand-writing a `checkbox` type remains invalid; the supported type name is exactly
 `multiselect`.
 
-## Probed live state (2026-07-25) — do NOT re-infer this
+## Pre-activation evidence (2026-07-26) — cleanup STOP
+
+Committed probe `scripts/probe-review-multiselect-preactivation.mjs` produced
+`outputs/review-form-multiselect/preactivation-evidence-2026-07-26.json`
+(integrity digest
+`a22c5029bdd7341fe81f74d53d4668b37f6f77699fea7370135cba5bd9155e30`).
+It made no production writes.
+
+- The legacy 12-row set remains active at version `119da525418d1d43`; there are
+  no inactive question rows. The encoded target validates at version
+  `347a37e820f73890` and would create 11 rows, retain `affiliation`, and
+  deactivate 11 legacy rows.
+- Four isolated production-target service processes resolved the same active
+  version and stopped before their first write (`set_changed` for portal/manual;
+  validation for legacy upload/mark-received). This is not independently routed
+  production HTTP evidence, so that §9.1(3) gate remains open.
+- The current `review-synthesis.generate` row is version 1,
+  `d97a4a17-6977-f111-ab0f-000d3a306da2`; no prompt publication audit exists for
+  that name. Prompt publication remains pending.
+- The rollback artifact is intentionally a non-executable template. It proves
+  the legacy `impact` row can be reactivated by its existing immutable ID, but
+  cannot supply the future `impactAreas` row ID/ETag or cutover audit until after
+  publication.
+- EICAR fixture `6ad328b4-f044-f111-88b5-000d3a306d45` is selected, accepted,
+  received, report/synthesis-included, owns the three sentinel answers and test
+  file, and has `wmkf_thankyousentat=2026-05-01T01:11:26Z`. The frozen §8
+  contract says a sent thank-you is a stop condition. No deletion approval was
+  requested and nothing was removed.
+- `Gallivan_test` fixture `3c4bb952-e061-f111-a826-000d3a306da2` has no answer,
+  report, synthesis, honorarium, or sent thank-you, but owns the sole Postgres
+  draft. It remains untouched pending resolution of the EICAR stop plus explicit
+  `deleteContact:false` authority.
+
+## Probed live state (2026-07-25) — historical baseline
 
 A Codex adversarial review refuted the first plan's "blank slate" claim, which had been
 inferred from a doc note saying no reviewer had submitted through the *portal*. Probed

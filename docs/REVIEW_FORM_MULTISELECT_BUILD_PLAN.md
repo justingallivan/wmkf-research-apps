@@ -26,7 +26,12 @@ implementation and the additive wave-15 schema package are complete on
 readback completed 2026-07-26, followed by compatible code promotion to `main`
 (`5282cee8`) and a Ready production deployment
 (`dpl_7sfTLrMafYPKp7mnYdrEVjs9HmW5`). Publication, controlled rehearsal/rollback,
-fixture disposition, and reviewer exposure remain pending.
+fixture disposition, and reviewer exposure remain pending. The 2026-07-26
+read-only pre-activation evidence pass found that the EICAR fixture already has a
+sent thank-you timestamp, which is an explicit §8 stop condition; no fixture was
+deleted and cutover remains blocked pending an owner decision on that lifecycle
+history. [VERIFIED via
+`outputs/review-form-multiselect/preactivation-evidence-2026-07-26.json`]
 **Target go-live: 2026-08-15** (owner-set; the date external reviewers first see the
 new form).
 
@@ -40,7 +45,9 @@ were each verified against source rather than taken on assertion.
 
 1. **Re-key the whole set** (§1.1). Draft 4's semantic-retention rule was correct in
    principle but produced four keys pointing at differently-numbered questions
-   forever. With no stored answers, legibility wins. Only `affiliation` keeps its key.
+   forever. The only stored answers belong to the owner-named EICAR fixture and
+   require the separately controlled §8 disposition; no genuine reviewer answer
+   history was identified. Only `affiliation` keeps its key.
 2. **Manual rollback procedure** (§4) rather than building a reusable restore service.
 3. **Sandbox rehearsal dropped**; the controlled production smoke is the primary
    pre-exposure rehearsal (§7, §9).
@@ -89,12 +96,39 @@ received-review suggestions, Postgres drafts, and question-set audit records.
 | `wmkf_reviewquestion` | **12 rows, all active**, byte-identical to the seeded schema. [DERIVED-FROM: `scripts/probe-live-review-questions.mjs` read-only run 2026-07-25; a direct row count, independent of every other figure in this plan] | The active configuration had not diverged from the static seed when measured. [VERIFIED via `scripts/probe-live-review-questions.mjs:23-69`] |
 | `review_question_audit` | **4 rows**, all dated 2026-06-29: **2 pending, 1 failed, 1 completed**. [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §4 read-only run 2026-07-25; a direct row count, independent of every other figure in this plan] | The measurement did not show a later successful admin publication. [VERIFIED via `scripts/probe-review-blank-slate.mjs:106-123`] |
 | `wmkf_appreviewanswer` | **3 rows** on **1 suggestion**, keys `impact`, `risk`, and `overallRating`; each has `answerValue=99` and empty `answerText`. [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §1 read-only run 2026-07-25; a direct row count, independent of every other figure in this plan] | These are sentinel answer snapshots and cannot remain when `impact` is retired. [VERIFIED via `scripts/probe-review-blank-slate.mjs:37-64`] |
-| Suggestions with `wmkf_reviewreceivedat` | **1** — `6ad328b4-f044-f111-88b5-000d3a306d45`, a staff upload named `eicar-test-bytes.pdf`, with no reviewer name/email and affiliation `Dr.`. [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §2 read-only run 2026-07-25; a direct row count, independent of every other figure in this plan] | This is the EICAR fixture suggestion named by the owner, not evidence of an empty answer store. [VERIFIED via `scripts/probe-review-blank-slate.mjs:67-79`] |
+| Suggestions with `wmkf_reviewreceivedat` | **1** — `6ad328b4-f044-f111-88b5-000d3a306d45`, a staff upload named `eicar-test-bytes.pdf`. The narrow 2026-07-25 probe did not select reviewer identity fields; the 2026-07-26 preflight resolved the person as `Justin Gallivan Test` / `justingallivan@me.com`. [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §2 and `scripts/probe-review-multiselect-preactivation.mjs`] | This is the EICAR fixture suggestion named by the owner, not evidence of an empty answer store; its sent thank-you marker now blocks the planned automatic fixture-cleanup progression. [VERIFIED via `outputs/review-form-multiselect/preactivation-evidence-2026-07-26.json`] |
 | `review_drafts` | **1** — suggestion `3c4bb952-e061-f111-a826-000d3a306da2`, updated 2026-07-04, containing every current question key. [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §3 read-only run 2026-07-25; a direct row count, independent of every other figure in this plan] | This is the `Gallivan_test` draft named by the owner and must be removed through the audited suggestion-removal path, not abandoned. [VERIFIED via `scripts/probe-review-blank-slate.mjs:82-104`] |
 
 The table records a point-in-time measurement, not authorization to mutate either
 store. Re-run the read-only ownership/consumer probe in §8 immediately before the
-cutover decision. [PLANNED]
+cutover decision. [COMPLETED 2026-07-26; result is a STOP, not deletion authority]
+
+### 0.1a Pre-activation evidence pass (2026-07-26)
+
+The committed read-only probe
+`scripts/probe-review-multiselect-preactivation.mjs` captured the production
+question rows with immutable IDs/ETags, active version `119da525418d1d43`,
+target version `347a37e820f73890`, current synthesis prompt version 1 and its
+content hash, recent question/prompt publication audits, both fixture consumer
+graphs, four isolated no-write service-boundary checks, and a deliberately blocked
+rollback template. The full JSON evidence digest is
+`a22c5029bdd7341fe81f74d53d4668b37f6f77699fea7370135cba5bd9155e30`.
+[VERIFIED via
+`outputs/review-form-multiselect/preactivation-evidence-2026-07-26.json`]
+
+The four service probes each resolved the same live version in a fresh local
+process targeting production Dataverse and stopped before their first write:
+external submit and manual entry returned `409 set_changed`; legacy upload and
+mark-received returned validation failures. This verifies the service boundaries,
+but it is not the independently routed production HTTP evidence required by
+§9.1(3), so that gate remains open. [VERIFIED service-level / PLANNED HTTP-level]
+
+The EICAR fixture is selected, accepted, received, included by the workbench/report
+and synthesis predicates, owns the three sentinel answers and linked test file,
+and has `wmkf_thankyousentat=2026-05-01T01:11:26Z`. Section 8 says to stop when a
+sent thank-you exists. The `Gallivan_test` fixture has no answers, report,
+synthesis inclusion, honorarium, or sent thank-you, but still owns the sole
+Postgres draft. Neither fixture was changed. [VERIFIED via the same evidence]
 
 ### 0.2 Dependency: question-set coherence at write boundaries — SHIPPED
 
@@ -759,7 +793,14 @@ republish, final smoke, and cleanup sequence is green. [PLANNED]
 No deletion is authorized by this plan. The owner has authorized the read-only
 consumer probe below; its report is the prerequisite for a separate, explicit
 approval naming the exact writes. Cutover is blocked until the cleanup completes.
-[PLANNED]
+[READ-ONLY PROBE COMPLETED 2026-07-26; CLEANUP BLOCKED]
+
+The probe found a sent thank-you marker on
+`6ad328b4-f044-f111-88b5-000d3a306d45`. Per step 2 below, processing stopped:
+no deletion approval was requested, no suggestion/answer/draft/file/contact was
+changed, and cutover remains blocked. The evidence bundle is
+`outputs/review-form-multiselect/preactivation-evidence-2026-07-26.json`.
+[VERIFIED]
 
 The existing hard-removal service performs a preflight, writes a durable system
 alert before deletion, removes answer rows and the suggestion in one Dataverse
@@ -872,14 +913,24 @@ draft, or bypassing the existing removal audit is prohibited. [PLANNED]
 3. Verify from independently routed production requests that each of the four
    write paths resolves the live `questionSetVersion` while the old question set
    is still active. Read paths may still serve a cached set for up to the TTL —
-   that is the accepted residual in §0.2, not a defect. [PLANNED]
+   that is the accepted residual in §0.2, not a defect. Four fresh-process,
+   production-target service probes resolved `119da525418d1d43` and stopped
+   before any write on 2026-07-26; independently routed production **HTTP**
+   evidence remains outstanding. [SERVICE BOUNDARY VERIFIED; HTTP ROUTING PLANNED]
 4. Execute the §8 consumer probe, obtain the separately required deletion
    approval, complete the single audited cleanup procedure, and attach its
-   postconditions. [PLANNED]
+   postconditions. The consumer probe completed 2026-07-26 and found the EICAR
+   fixture's sent thank-you marker, so the mandated stop fired before approval
+   or cleanup. [PROBE COMPLETED; CLEANUP BLOCKED]
 5. Record the active and inactive question rows with IDs/ETags, normalized active
    version, and the completed question audit; record the current synthesis prompt
    identity/content/hash. Produce and review the §4 manual rollback dry-run manifest
-   against the selected prior audit. [PLANNED]
+   against the selected prior audit. The baseline rows, current prompt, and audit
+   history were captured 2026-07-26. The stored template proves `impact` can be
+   reactivated by its existing row ID but deliberately cannot prove the
+   `impactAreas` row-ID deactivation until that row exists after publication;
+   therefore the executable manifest/review remains pending. [BASELINE CAPTURED;
+   EXECUTABLE MANIFEST PLANNED]
 
 ### 9.2 Primary rehearsal, rollback proof, republish, then expose
 
@@ -1026,17 +1077,19 @@ remain release gates and must not be inferred from code completion:
 - [x] `CORE_RATING_KEYS` and `PARENT_BOUND_KEYS` resolve exactly as §1.1 states.
 - [x] `riskLevel` and `overallAssessment` carry the prior ratings' meanings, labels, and
   numeric domains under new keys.
-- [x] The exact §1.2 mapping is encoded: retire `impact`, `q7`, and `q9`; create
-  `priorWork`, `impactAreas`, and `teamCapacity`; retain every other listed key.
+- [x] The exact §1.2 mapping is encoded: retain only `affiliation`; retire the
+  other eleven legacy keys and create all eleven numbered target keys.
 - [x] The additive answer property has a reviewed wave-15 schema package.
-- [ ] The additive answer property is provisioned and read back.
+- [x] The additive answer property is provisioned and read back.
 - [x] The one authoritative canonicalizer owns validation, deduplication, ordering,
   label construction, JSON, and joined text.
 - [x] Every type gate in §3 is implemented and classified.
 - [ ] The real target multiselect configuration and versioned prompt have passed
   the primary controlled-production rehearsal and rollback rehearsal.
 - [ ] Both named test artifacts have passed the consumer probe, received explicit
-  deletion authority, and completed the one audited cleanup procedure.
+  deletion authority, and completed the one audited cleanup procedure. The
+  2026-07-26 probe stopped because the EICAR fixture has a sent thank-you marker;
+  no deletion authority was requested and no cleanup ran.
 - [ ] The prompt is published before production question-set activation.
 - [ ] Controlled production smoke and cleanup are green before external exposure.
 - [ ] Question rollback is executable from the reviewed manual manifest and
