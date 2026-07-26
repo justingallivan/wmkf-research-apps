@@ -1,6 +1,6 @@
 ---
 name: project-review-form-checkbox-questions
-description: Owner reworked the reviewer review form; fixed-option multiselect support, production schema expansion, compatible code deployment, and known-fixture cleanup are complete, while publication, rehearsal, and exposure remain pending.
+description: Owner reworked the reviewer review form; fixed-option multiselect support, production schema expansion, compatible code deployment, known-fixture cleanup, and compatible synthesis-prompt publication are complete, while question publication, rehearsal, and exposure remain pending.
 metadata:
   type: project
   status: active
@@ -13,9 +13,11 @@ metadata:
 **Plan ACCEPTED and FROZEN: `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md`. The
 row-backward-compatible code was promoted to `main` at `5282cee8` and deployed to
 production as `dpl_7sfTLrMafYPKp7mnYdrEVjs9HmW5`; wave 15 was applied to
-production and read back first on 2026-07-26. Prompt/question publication,
-controlled rehearsal/rollback and reviewer exposure are deliberately still
-pending. Fixture disposition completed 2026-07-26. The read-only pre-activation
+production and read back first on 2026-07-26. The backward-compatible
+`review-synthesis.generate` v2 was published through the audited admin route on
+2026-07-26 while the legacy question set remained byte-for-byte unchanged.
+Target-question publication, controlled rehearsal/rollback and reviewer exposure
+are deliberately still pending. Fixture disposition completed 2026-07-26. The read-only pre-activation
 probe found a sent thank-you marker on the EICAR fixture, so the frozen cleanup
 contract stopped before the later deletion authority and cleanup. A follow-up
 read-only investigation traced
@@ -44,8 +46,10 @@ Closed owner decisions (do not reopen without a new one):
 - No sandbox rehearsal — the controlled production smoke replaced it.
 - Production operations are not implied by a green code build. Applying wave 15,
   publishing the prompt or question set, exercising rollback, and opening
-  reviewer exposure remain separately controlled steps. Fixture deletion was a
-  separately controlled step and cleared 2026-07-26.
+  reviewer exposure are separately controlled steps. Wave 15 and compatible
+  prompt publication cleared 2026-07-26; target-question publication, rollback,
+  and exposure remain controlled and pending. Fixture deletion was a separately
+  controlled step and cleared 2026-07-26.
 - Wave 15 is a **pre-deployment** gate, not only a pre-activation gate: readers
   always select `wmkf_answervalues` and writers always emit it, so production
   metadata readback must precede merging/promoting this branch to auto-deploying
@@ -135,9 +139,16 @@ It made no production writes.
   version and stopped before their first write (`set_changed` for portal/manual;
   validation for legacy upload/mark-received). This is not independently routed
   production HTTP evidence, so that §9.1(3) gate remains open.
-- The current `review-synthesis.generate` row is version 1,
-  `d97a4a17-6977-f111-ab0f-000d3a306da2`; no prompt publication audit exists for
-  that name. Prompt publication remains pending.
+- At pre-activation-baseline time, `review-synthesis.generate` was version 1,
+  `d97a4a17-6977-f111-ab0f-000d3a306da2`, with no publication audit for that
+  name. On 2026-07-26 the audited admin route published current v2
+  `7423049a-3f89-f111-ab0f-7ced8d3d15a6` under request
+  `codex-review-synthesis-multiselect-2026-07-26`; the legacy 12-row question
+  set remained version `119da525418d1d43` with the same raw-row digest. The
+  complete v1 rollback content and before/after proof are in
+  `outputs/review-form-multiselect/prompt-publication-evidence-2026-07-26.json`
+  (SHA-256
+  `50b7a4974e6bcd5e7dd1135bf1edd228f300fe42de406d5951c3ca10dbdbe428`).
 - The rollback artifact is intentionally a non-executable template. It proves
   the legacy `impact` row can be reactivated by its existing immutable ID, but
   cannot supply the future `impactAreas` row ID/ETag or cutover audit until after

@@ -1,6 +1,8 @@
 # Atlas: `wmkf_ai_run` + `wmkf_ai_prompt` (Dataverse)
 
-**Last verified:** 2026-07-12 via `scripts/reconcile-memory-claims.js`
+**Last verified:** 2026-07-26 for the `review-synthesis.generate` publication
+record; 2026-07-12 for the broader entity inventory via
+`scripts/reconcile-memory-claims.js`
 **Source spec:** `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` (canonical; v2 archived)
 
 ## `wmkf_ai_run` (351 rows)
@@ -45,7 +47,7 @@ Both written by `execute-prompt.js` `writeRunRow()`. Migration plans touching ei
 
 **Migration disposition:** stays in Dataverse. No Postgres counterpart. Dynamics Explorer treats `wmkf_ai_run` as an operational log, not business data: `pages/api/dynamics-explorer/chat.js` denies direct schema requests for the table and strips `wmkf_ai_run` hits from Dataverse Search results before tool output reaches Claude.
 
-## `wmkf_ai_prompt` (17 rows)
+## `wmkf_ai_prompt`
 
 **Source of truth:** Dataverse-only. Holds prompt rows for the Executor v3 contract.
 
@@ -63,7 +65,19 @@ Both written by `execute-prompt.js` `writeRunRow()`. Migration plans touching ei
 - `scripts/seed-phase-i-summary-prompt.js`, `scripts/seed-phase-ii-prompts.js` (4 `phase-ii.*` rows), `scripts/seed-reviewer-finder-prompts.js` (2 `reviewer-finder.*` rows), `scripts/seed-peer-review-summarizer-prompts.js` (2 `peer-review-summarizer.*` rows) — **upsert** prompt rows keyed on `wmkf_ai_promptname` + `wmkf_ai_iscurrent` (update-in-place when current). LEGACY pattern; not yet converted (a separate audited sweep — S269 Codex review).
 - **Seed governance (S269) — `lib/services/prompt-seed.js`, the GO-FORWARD default for Tier-1 system prompts.** The two grantee seeds (`seed-grantee-title-prompt.js`, `seed-grantee-abstract-prompt.js`) use it: **create-only by default** (refuses if ANY row for the name exists — admin's versioned history is never clobbered; the file is a bootstrap artifact, not the live state), and **`--force` is version-preserving** (publishes `max(version)+1` as a new current row, flips priors with ETag — same invariant as the admin publish path). Stamps `wmkf_ai_publisheddatetime` on every version. **Dataverse `wmkf_ai_prompts` is the source of truth; after bootstrap, `/admin` versioned publish is the governed edit path.** Admin publish clones the prior row's Executor metadata, and rejects an unreviewed concrete Claude `wmkf_ai_model` before writing a new version. Provenance is legible via `createdon` (version created) / `wmkf_ai_publisheddatetime` (domain publish) / `modifiedon` (last touch) / `_modifiedby_value` (seed = app identity, admin = superuser). Rationale: [[project-prompt-governance]].
 - **Two-tier prompt/preference model (S269):** *Tier 1* — shared **system/core** prompts here in `wmkf_ai_prompts`, versioned. *Tier 2* — **per-user** overrides that LAYER over a Tier-1 base: the S222 reviewer-finder override (`pages/api/reviewer-finder/prompt-override.js`, the `PREFERENCE_KEYS` user-preference store), default sourced from the Tier-1 base, `staleOverride` when the base version advances. A new prompt goes in Tier 1 if system/superuser-run; Tier 2 if per-user (e.g. email text).
-- No production runtime writes here.
+- **`review-synthesis.generate` production publication (2026-07-26):** the
+  authenticated superuser admin route published current v2
+  `7423049a-3f89-f111-ab0f-7ced8d3d15a6` and retired v1
+  `d97a4a17-6977-f111-ab0f-000d3a306da2` under request
+  `codex-review-synthesis-multiselect-2026-07-26`. The final
+  `prompt_publish_audit` row is `completed` with no warnings. Only the system
+  prompt changed; v1's complete body/system/variables rollback payload and all
+  before/after hashes are preserved in
+  `outputs/review-form-multiselect/prompt-publication-evidence-2026-07-26.json`
+  (SHA-256
+  `50b7a4974e6bcd5e7dd1135bf1edd228f300fe42de406d5951c3ca10dbdbe428`).
+- Production prompt writes occur through controlled admin publication or seed
+  operations; ordinary prompt execution remains read-only on this entity.
 
 **The two prompt paths (important):**
 
@@ -72,7 +86,7 @@ Both written by `execute-prompt.js` `writeRunRow()`. Migration plans touching ei
 
 These are independent. Don't conflate them.
 
-**Migration disposition:** strategic destination for staff-facing prompts (per memory: *"all staff-facing prompts (content readable/editable by non-technical staff). New prompts default there; migrate user-driven apps when touched"*). 17 rows means light current adoption; expand as Executor-mode apps land.
+**Migration disposition:** strategic destination for staff-facing prompts (per memory: *"all staff-facing prompts (content readable/editable by non-technical staff). New prompts default there; migrate user-driven apps when touched"*). This remains a light-adoption surface; expand as Executor-mode apps land.
 
 ## `prompt_publish_audit` (Postgres — append-only)
 

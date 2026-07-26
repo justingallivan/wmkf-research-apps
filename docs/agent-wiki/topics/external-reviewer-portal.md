@@ -187,7 +187,9 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   `scripts/probe-review-answer-multiselect-field.mjs`. Compatible code was then
   promoted at `5282cee8` and is live in production deployment
   `dpl_7sfTLrMafYPKp7mnYdrEVjs9HmW5`; the prior 12-row question set remains active.
-  Prompt/question publication, controlled rehearsal/rollback, and reviewer
+  The backward-compatible `review-synthesis.generate` v2 publication completed
+  through the audited admin route on 2026-07-26 without changing that legacy
+  set. Target-question publication, controlled rehearsal/rollback, and reviewer
   exposure remain separate release gates. Known-fixture disposition cleared
   2026-07-26 via audited alerts `361`/`362`, with both CRM contacts and an
   initially unclassified Tim Newhouse/St. Jude PDF preserved. The owner later

@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-24
+last_verified: 2026-07-26
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -320,11 +320,13 @@ number/title/institution/PI) uses whatever `proposals[0]` already carries
 DTO has no dedicated `piName` field, so `proposalAuthors` (project
 leader/applicant) stands in as the best-available PI identity.
 
-**Phase 4 BUILT (2026-07-03) — pending prompt seed + first-submission verification:**
+**Phase 4 BUILT (2026-07-03); prompt current in production 2026-07-26 —
+pending first-submission verification:**
 Executor-based AI synthesis of a proposal's submitted reviews. New Tier-1
 prompt `review-synthesis.generate` (`shared/config/prompts/review-synthesis.js`,
-create-only seed `scripts/seed-review-synthesis-prompt.js` — NOT yet run
-against any environment); all-override, single untrusted variable
+initially bootstrapped as v1 and published through the audited admin path as
+backward-compatible current v2
+`7423049a-3f89-f111-ab0f-7ced8d3d15a6` on 2026-07-26); all-override, single untrusted variable
 `reviews_digest` (reviewer `answerText`, never `answerHtml`, composed
 server-side into a plain digest) so the Executor wraps it + injects the A7
 preamble. Output is strict JSON (single output `synthesis`, `validationSchema`
@@ -342,8 +344,8 @@ always-overwrite, regeneration gating is enforced at THIS route instead — 409
 review is submitted) with a Generate/Regenerate action, plain-text only (no
 `dangerouslySetInnerHTML`); `composeReviewReport` accepts an optional
 `synthesis` param rendered additively in both export formats. Same
-verification boundary as Phases 2-3: unit-tested only until the prompt seed is
-applied to an environment and a real review is synthesized.
+verification boundary as Phases 2-3: the production prompt dependency is now
+satisfied, but no real review synthesis has yet been executed for this release.
 Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 ## Email templates (admin org default + per-PD override)

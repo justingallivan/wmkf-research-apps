@@ -28,10 +28,12 @@ order — wave11 column provisioned in prod Dataverse
 (`akoya_request.wmkf_ReviewSynthesisJson`, live-probed selectable HTTP 200),
 code deployed (prod deployment READY on `fc9ab2c7`), and the
 `review-synthesis.generate` prompt seeded as v1 (create-only bootstrap,
-exactly-one-current verified). Same D26 verification-boundary caveat as
-Phases 2-3: the synthesis flow cannot be exercised end-to-end until at least
-one review is submitted (the route correctly 409s `no_submitted_reviews`
-until then); unit tests (mocked Executor/Dataverse) are the coverage today.
+exactly-one-current verified), then advanced through the audited admin route to
+current backward-compatible v2 on 2026-07-26. Same D26
+verification-boundary caveat as Phases 2-3: the synthesis flow cannot be
+exercised end-to-end until at least one review is submitted (the route correctly
+409s `no_submitted_reviews` until then); unit tests (mocked Executor/Dataverse)
+are the coverage today.
 
 **Verification boundary (owner context, S326): the portal is being built AHEAD
 of the December-2026 cycle — no reviewer has ever submitted through it, so the
@@ -162,10 +164,12 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   stands in as the best-available PI identity rather than extending the
   route.
 
-### Phase 4 — AI synthesis (BUILT this session — pending provisioning, see status banner)
+### Phase 4 — AI synthesis (BUILT; provisioned; prompt current in production)
 - Tier-1 prompt `review-synthesis.generate` (`shared/config/prompts/review-synthesis.js`,
-  create-only seed `scripts/seed-review-synthesis-prompt.js`, mirroring the two
-  grantee seeds' governance — NOT yet run against any live environment).
+  initially bootstrapped with create-only
+  `scripts/seed-review-synthesis-prompt.js`, then published through the audited
+  admin route as current backward-compatible v2
+  `7423049a-3f89-f111-ab0f-7ced8d3d15a6` on 2026-07-26).
   All-override; the untrusted variable is `reviews_digest` — reviewer
   `answerText` (never `answerHtml`) composed server-side into a plain digest —
   declared `untrusted: true` so the Executor wraps it + injects the A7

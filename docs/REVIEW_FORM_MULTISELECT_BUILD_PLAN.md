@@ -25,10 +25,12 @@ implementation and the additive wave-15 schema package are complete on
 `codex/review-form-multiselect`; production expansion and exact metadata/select
 readback completed 2026-07-26, followed by compatible code promotion to `main`
 (`5282cee8`) and a Ready production deployment
-(`dpl_7sfTLrMafYPKp7mnYdrEVjs9HmW5`). Publication, controlled rehearsal/rollback,
-and reviewer exposure remain pending; the known fixture disposition completed
-2026-07-26, as did the independently routed production HTTP proof for all four
-review writers. The 2026-07-26
+(`dpl_7sfTLrMafYPKp7mnYdrEVjs9HmW5`). The backward-compatible
+`review-synthesis.generate` v2 publication also completed 2026-07-26 while the
+legacy question set remained unchanged. Target-question publication, controlled
+rehearsal/rollback, and reviewer exposure remain pending; the known fixture
+disposition completed 2026-07-26, as did the independently routed production
+HTTP proof for all four review writers. The 2026-07-26
 read-only pre-activation evidence pass found that the EICAR fixture already has a
 sent thank-you timestamp, which is an explicit §8 stop condition. A follow-up
 provenance probe traced it to the April 30 production validation run: Dynamics
@@ -49,7 +51,10 @@ The gitignored local evidence copy is
 `outputs/review-form-multiselect/fixture-cleanup-evidence-2026-07-26.json`,
 SHA-256 `021c21fc8b2f90aee2651aab3df19f04df3d79d76d36c8385f86a999f5d6666e`;
 it is intentionally not a fresh-clone source of truth because it contains live
-production identifiers and test email addresses.]
+production identifiers and test email addresses. Prompt publication evidence,
+including the complete v1 rollback payload, is
+`outputs/review-form-multiselect/prompt-publication-evidence-2026-07-26.json`,
+SHA-256 `50b7a4974e6bcd5e7dd1135bf1edd228f300fe42de406d5951c3ca10dbdbe428`.]
 **Target go-live: 2026-08-15** (owner-set; the date external reviewers first see the
 new form).
 
@@ -778,8 +783,8 @@ At plan freeze, the bundled prompt described numeric picklist ratings, including
 the prior impact rating. [HISTORICAL baseline verified via
 `shared/config/prompts/review-synthesis.js:43-53`]
 
-Publish a new **backward-compatible** prompt version before production question-set
-activation. It must:
+The new **backward-compatible** prompt version was published before production
+question-set activation. It:
 
 - continue to interpret `riskLevel` and `overallAssessment` as unchanged numeric ratings;
 - treat `impactAreas` as categorical evidence using snapshot labels;
@@ -787,10 +792,19 @@ activation. It must:
 - tolerate the old `impact` picklist during expand and rollback;
 - ignore rows marked unreadable by the server digest.
 
-Before publication, record the current prompt row ID, version, body, system prompt,
-variables, and a content hash in the cutover record. Publish through the existing
-audited prompt publication service, then verify the new row is current and its
-publication audit completed. [PLANNED]
+Before publication, the operator recorded the current prompt row ID, version,
+body, system prompt, variables, and content hashes in the cutover record, then
+published through the existing audited prompt publication service and verified
+the new current row plus its completed audit. **[COMPLETED 2026-07-26]** v1
+`d97a4a17-6977-f111-ab0f-000d3a306da2` was retired and current v2
+`7423049a-3f89-f111-ab0f-7ced8d3d15a6` was created under request
+`codex-review-synthesis-multiselect-2026-07-26`, with a completed final audit
+and no warnings. Only `systemPrompt` changed; body, variables, and output-schema
+hashes remained identical. The legacy question-set version
+`119da525418d1d43` and raw-row digest
+`3803d5a98dd54abff0c25ace8b0d6116c342236a7438086068292625ff661982`
+were identical before/after. [VERIFIED via the prompt-publication evidence
+artifact and SHA-256 recorded in the status block]
 
 Prompt rollback is always another audited publication: copy the recorded prior
 body, system prompt, and variables into a new monotonic version. Never flip or edit
@@ -837,7 +851,9 @@ Execute this sequence with external exposure held closed:
    Tier-2 process. [IMPLEMENTED AND VERIFIED LOCALLY; RELEASE PROMOTION PENDING]
 3. Complete the production expand and baseline capture in §9.1. [PLANNED]
 4. Publish the new synthesis prompt and the exact target question set from §1.2,
-   including the real required `impactAreas` options. [PLANNED]
+   including the real required `impactAreas` options. The compatible prompt
+   publication is complete; target-question publication remains pending.
+   [PROMPT COMPLETED 2026-07-26; QUESTION SET PLANNED]
 5. On a dedicated internal test suggestion, complete an end-to-end review through
    the external authoring UI; save/reload a draft; submit; then exercise staff
    manual entry, legacy upload, and mark-received. External email stays disabled or
@@ -1021,16 +1037,24 @@ cleanup satisfied this invariant. [VERIFIED]
    version, and the completed question audit; record the current synthesis prompt
    identity/content/hash. Produce and review the §4 manual rollback dry-run manifest
    against the selected prior audit. The baseline rows, current prompt, and audit
-   history were captured 2026-07-26. The stored template proves `impact` can be
+   history were captured 2026-07-26. The prior v1 prompt body, system prompt,
+   variables, output-schema hash, and content hashes are now preserved as the
+   audited monotonic rollback input; current v2 and its completed audit were also
+   captured. The stored question template proves `impact` can be
    reactivated by its existing row ID but deliberately cannot prove the
    `impactAreas` row-ID deactivation until that row exists after publication;
    therefore the executable manifest/review remains pending. [BASELINE CAPTURED;
-   EXECUTABLE MANIFEST PLANNED]
+   PROMPT ROLLBACK INPUT CAPTURED; QUESTION MANIFEST PLANNED]
 
 ### 9.2 Primary rehearsal, rollback proof, republish, then expose
 
 1. Publish the backward-compatible synthesis prompt from §5. Verify its current
-   state and completed audit while the old question set is still active. [PLANNED]
+   state and completed audit while the old question set is still active.
+   **[COMPLETED 2026-07-26]** v2
+   `7423049a-3f89-f111-ab0f-7ced8d3d15a6` is the sole current row; v1
+   `d97a4a17-6977-f111-ab0f-000d3a306da2` is retired; the final audit for
+   `codex-review-synthesis-multiselect-2026-07-26` is completed with no warnings.
+   The legacy question-set version/digest/rows were unchanged.
 2. Publish the exact target question set in §1.2 through the admin full-set save.
    Record the publication request ID needed by rollback. [PLANNED]
 3. From independently routed requests, verify the same new
@@ -1187,7 +1211,7 @@ remain release gates and must not be inferred from code completion:
   explicit deletion authority, and completed the audited cleanup procedure on
   2026-07-26. Alerts `361`/`362` are successful with no warnings; contacts and
   the separately preserved Tim Newhouse/St. Jude legacy test PDF were preserved.
-- [ ] The prompt is published before production question-set activation.
+- [x] The prompt is published before production question-set activation.
 - [ ] Controlled production smoke and cleanup are green before external exposure.
 - [ ] Question rollback is executable from the reviewed manual manifest and
   preserved release evidence; prompt rollback is audited; both are ordered and
