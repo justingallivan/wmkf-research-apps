@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-25
+last_verified: 2026-07-26
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -178,6 +178,16 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   all 500 on it, so a hand-added row breaks **every reviewer's portal page**, not just
   that question. The type must ship in code first. Owner ask + scope: memory
   `project-review-form-checkbox-questions`.
+  **Build contract (S375): `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` is ACCEPTED and
+  FROZEN; implementation not started; go-live 2026-08-15, full scope.** Read its §3
+  type-gate inventory and §3.6 raw-comparison closeout before touching any `'picklist'`
+  comparison — every `snapshotKeys` allowlist still filters `picklist || richtext`.
+- **Write paths resolve the question set uncached (S375).** `getAuthoritativeQuestionSet()`
+  is used by portal submit, staff manual entry, legacy upload, and mark-received-no-file,
+  because the module-local cache (5-min TTL, process-local `invalidate()`) let a stale
+  instance agree with a stale client `setVersion` and commit rows against a retired
+  question set. Reads stay cached deliberately — a stale render self-corrects when the
+  write boundary returns `set_changed`.
 - **Prod accept triggers a live automation chain — keep automated tests mocked/fenced.**
   A reviewer accept CREATEs a honorarium `akoya_request`, which fires AkoyaGo plugins
   + classic workflows + a live Bill.com payment flow + a contact→Business-Central sync.

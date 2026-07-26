@@ -8,6 +8,29 @@ metadata:
   last_verified: 2026-07-25 via source read of the full question-type chain (fetcher, admin save/editor, ReviewAuthoringForm, build-review-submission, review-answer adapter, review-matrix)
 ---
 
+## Status (S375, 2026-07-26)
+
+**Plan ACCEPTED and FROZEN: `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md`. Implementation
+NOT started. Target go-live 2026-08-15, full scope — the owner explicitly rejected
+deferring any part of it.** Read the plan, not this file, for the contract; this entry
+records only what a future session would otherwise re-derive or get wrong.
+
+Closed owner decisions (do not reopen without a new one):
+- The whole question set is re-keyed; only `affiliation` keeps its key.
+  `CORE_RATING_KEYS = ['riskLevel','overallAssessment']`; `impactAreas` must never
+  appear in any rating-key list.
+- `riskLevel`/`overallAssessment` carry the prior options and numeric values —
+  a re-key, not a re-scoring. Never renumber option values.
+- Storage: a `wmkf_answervalues` Memo column of `{value,label}` pairs. Row-per-option
+  is impossible (alternate key is suggestion + question key); a Dataverse multi-select
+  Choice column is rejected (options are runtime config, not column metadata).
+- The client sends numeric values only; the server builds the pairs from live options.
+- Only Q3 is multi-select. Q4/Q10 show ☐ in Word but are single-choice. No "Other".
+- No sandbox rehearsal — the controlled production smoke replaced it.
+
+**Do not reconcile the frozen plan against incidental source changes.** It cites 30
+source files; per-change reconciliation cost more than the drift it prevented.
+
 ## Recall Rule
 
 Read before any work on the reviewer review form, the staff review-question editor,

@@ -45,7 +45,7 @@
 - External reviewer portal / accept / forms / SharePoint: ../docs/agent-wiki/topics/external-reviewer-portal.md; project-reviewer-hold-step-decouple.md; ../docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md; ../docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md; project-reviewer-upload-dormant-not-deleted.md
 - Campaign settings / reminder-config UX revisit (owner ask, S326): project-campaign-settings-ux-revisit.md
 - Review rendition formatting pass — courtesy copy + staff DOCX/PDF (owner ask, S328): project-review-output-formatting.md
-- Review-form checkbox questions — check-all-that-apply + "Other" (owner ask, S375; unsupported today): project-review-form-checkbox-questions.md
+- Review-form multiselect (owner ask S375; plan FROZEN, not started, go-live 2026-08-15): project-review-form-checkbox-questions.md; ../docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md
 - Reviewer limbo / "back to square one": closeout payability flag (owner ask, S343) + potential/invited reset button: project-reviewer-closeout-payability.md
 - Reviewer reliability data / on-time / terminal withdrew-vs-released status / durable ordered dispatch evidence (owner goal S369; dispatch design separate from terminal status): project-reviewer-reliability-data.md
 - Staff "manually enter a review" rescue tool (owner ask, S347; off Track Reviewers panel, full structured form): project-staff-review-rescue-tool.md; project-reviewer-upload-dormant-not-deleted.md
