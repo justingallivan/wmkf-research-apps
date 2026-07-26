@@ -6,6 +6,7 @@ import {
 import ReviewDraftService from '../../lib/services/review-draft-service';
 import {
   getActiveQuestionSet,
+  getAuthoritativeQuestionSet,
   questionSetVersion,
 } from '../../lib/external/review-question-fetcher';
 import { getByIdWithSelect } from '../../lib/dataverse/adapters/reviewer-suggestion';
@@ -17,7 +18,10 @@ jest.mock('../../lib/services/review-draft-service', () => ({
   default: { deleteBySuggestion: jest.fn() },
 }));
 jest.mock('../../lib/external/review-question-fetcher', () => ({
+  // The GET form loader reads the cached set; submit re-resolves authoritatively
+  // (write boundary — see getAuthoritativeQuestionSet's contract).
   getActiveQuestionSet: jest.fn(),
+  getAuthoritativeQuestionSet: jest.fn(),
   questionSetVersion: jest.fn(),
 }));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
@@ -61,6 +65,7 @@ beforeEach(() => {
     _etag: 'W/"7"',
   });
   getActiveQuestionSet.mockResolvedValue(QUESTIONS);
+  getAuthoritativeQuestionSet.mockResolvedValue(QUESTIONS);
   questionSetVersion.mockReturnValue('version-1');
   runChangeset.mockResolvedValue({ ok: true });
   ReviewDraftService.deleteBySuggestion.mockResolvedValue(1);

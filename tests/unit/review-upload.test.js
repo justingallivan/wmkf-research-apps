@@ -11,7 +11,9 @@
 // deterministic without a Dataverse round trip. (Hoisted above imports.)
 jest.mock('../../lib/external/review-question-fetcher', () => {
   const { reviewFormSchema } = require('../../lib/external/review-form-schema');
-  return { getActiveQuestionSet: jest.fn(async () => reviewFormSchema.fields) };
+  const resolve = jest.fn(async () => reviewFormSchema.fields);
+  // Upload writes rating snapshot rows, so it uses the authoritative resolver.
+  return { getActiveQuestionSet: resolve, getAuthoritativeQuestionSet: resolve };
 });
 
 import { GraphService } from '../../lib/services/graph-service.js';

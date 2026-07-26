@@ -11,6 +11,9 @@
 const getActiveQuestionSet = jest.fn();
 jest.mock('../../lib/external/review-question-fetcher', () => ({
   getActiveQuestionSet: (...a) => getActiveQuestionSet(...a),
+  // This service writes rating snapshot rows, so it resolves authoritatively.
+  // Same stub — the test cares which SET comes back, not which resolver.
+  getAuthoritativeQuestionSet: (...a) => getActiveQuestionSet(...a),
 }));
 const validateReviewForm = jest.fn();
 jest.mock('../../lib/external/review-form-schema', () => ({

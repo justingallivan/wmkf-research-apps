@@ -49,7 +49,9 @@ jest.mock('../../lib/services/proposal-participants', () => ({
 jest.mock('../../lib/external/review-question-fetcher', () => {
   const { reviewFormSchema } = jest.requireActual('../../lib/external/review-form-schema');
   return {
+    // Context/draft read the cached set; submit re-resolves authoritatively.
     getActiveQuestionSet: jest.fn(async () => reviewFormSchema.fields),
+    getAuthoritativeQuestionSet: jest.fn(async () => reviewFormSchema.fields),
     questionSetVersion: jest.fn(() => 'testver'),
   };
 });

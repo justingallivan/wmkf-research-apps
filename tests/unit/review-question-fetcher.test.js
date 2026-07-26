@@ -8,7 +8,7 @@ jest.mock('../../lib/services/dynamics-context', () => ({
 jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: { queryRecords: jest.fn() } }));
 
 import { DynamicsService } from '../../lib/services/dynamics-service';
-import { getActiveQuestionSet, invalidate, questionSetVersion } from '../../lib/external/review-question-fetcher';
+import { getActiveQuestionSet, getAuthoritativeQuestionSet, invalidate, questionSetVersion } from '../../lib/external/review-question-fetcher';
 
 const rowRich = (key, order, overrides = {}) => ({
   wmkf_reviewquestionid: `id-${key}`,
@@ -223,5 +223,69 @@ describe('questionSetVersion', () => {
     expect(questionSetVersion(clone((c) => { c[0].required = false; }))).not.toBe(questionSetVersion(base));
     expect(questionSetVersion(clone((c) => { c[0].order = 9; }))).not.toBe(questionSetVersion(base));
     expect(questionSetVersion(clone((c) => { c[1].options[0].label = 'Very Low'; }))).not.toBe(questionSetVersion(base));
+  });
+});
+
+// ── Write-boundary authority (cache-coherence fix) ─────────────────────────────
+// The cache is process-local with a 5-minute TTL and invalidate() only clears the
+// process that receives it. On multi-instance serverless an admin publication
+// therefore leaves other instances serving the previous set until their TTL
+// expires. At a WRITE boundary that is a correctness failure, not a stale render:
+// the submitting instance compares the client's setVersion against its own stale
+// set, both agree, the set_changed guard passes, and rows commit against a
+// question set that is no longer live.
+describe('getAuthoritativeQuestionSet (write-boundary resolver)', () => {
+  const oldSet = [rowRich('q2', 1)];
+  const newSet = [rowRich('priorWork', 1)];
+
+  it('bypasses a warm cache and returns the live set', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({ records: oldSet });
+    const cached = await getActiveQuestionSet();
+    expect(cached[0].key).toBe('q2');
+    expect(DynamicsService.queryRecords).toHaveBeenCalledTimes(1);
+
+    // A publication lands on ANOTHER instance: this process is never invalidated.
+    DynamicsService.queryRecords.mockResolvedValue({ records: newSet });
+
+    // The cached resolver still serves the stale set — that is the hazard.
+    expect((await getActiveQuestionSet())[0].key).toBe('q2');
+    expect(DynamicsService.queryRecords).toHaveBeenCalledTimes(1);
+
+    // The authoritative resolver re-reads and sees the live set.
+    const live = await getAuthoritativeQuestionSet();
+    expect(live[0].key).toBe('priorWork');
+    expect(DynamicsService.queryRecords).toHaveBeenCalledTimes(2);
+  });
+
+  it('makes the stale set_changed comparison detect the change', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({ records: oldSet });
+    const clientVersion = questionSetVersion(await getActiveQuestionSet());
+
+    DynamicsService.queryRecords.mockResolvedValue({ records: newSet });
+
+    // Stale path: client and server versions agree, so the guard would pass and
+    // a submit would commit against the retired set.
+    expect(questionSetVersion(await getActiveQuestionSet())).toBe(clientVersion);
+
+    // Authoritative path: the mismatch is detected, so submit returns set_changed.
+    expect(questionSetVersion(await getAuthoritativeQuestionSet())).not.toBe(clientVersion);
+  });
+
+  it('refreshes the cache so later cached reads in this process are current', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({ records: oldSet });
+    await getActiveQuestionSet();
+
+    DynamicsService.queryRecords.mockResolvedValue({ records: newSet });
+    await getAuthoritativeQuestionSet();
+
+    const after = await getActiveQuestionSet();
+    expect(after[0].key).toBe('priorWork');
+    // Served from the refreshed cache — no third round-trip.
+    expect(DynamicsService.queryRecords).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails closed exactly like the cached resolver', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({ records: [] });
+    await expect(getAuthoritativeQuestionSet()).rejects.toThrow(/empty/i);
   });
 });
