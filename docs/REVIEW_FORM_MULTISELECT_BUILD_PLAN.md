@@ -97,6 +97,17 @@ TTL waits, hybrid question sets, or another cache layer to close this residual.
 Full read-path coherence remains available as optional future work; it is **not** a
 prerequisite for this plan.
 
+Per-file recheck of the sources this plan cites, after the 2026-07-26 fix:
+
+- [RECHECKED after lib/external/review-question-fetcher.js change: `getAuthoritativeQuestionSet` added at `:215`; the cached resolver, single-flight guard, generation guard, and fail-closed set validation are unchanged, so every §3 gate that this plan places in the fetcher still applies as written.]
+- [RECHECKED after lib/services/external-review/submit-service.js change: the only edit is the resolver at `:128`; `snapshotKeys` at `:130-132` still filters `picklist || richtext`, so the §3.4 allowlist work this plan requires is still outstanding.]
+- [RECHECKED after lib/services/review-manager/manual-review-entry-service.js change: submit resolves authoritatively at `:138` while the GET form loader at `:118` stays cached; `snapshotKeys` at `:164-168` still filters `picklist || richtext`, so the §3.4 item stands.]
+- [RECHECKED after lib/services/review-upload.js change: resolver only, at `:134`; the legacy rating dual-write and its `snapshotKeys` are untouched, so the §3.4 item stands.]
+- [RECHECKED after lib/services/review-manager/mark-received-no-file-service.js change: resolver only, at `:80`; the legacy rating dual-write and its `snapshotKeys` are untouched, so the §3.4 item stands.]
+
+None of these changes reduce the implementation scope in §3; they change only when
+each path learns about a question-set publication.
+
 ### 0.3 Expand-first is mandatory
 
 The current answer entity has a nullable numeric answer value, text/HTML snapshots,
