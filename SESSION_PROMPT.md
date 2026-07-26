@@ -1,127 +1,119 @@
-# Session 374 Prompt: Finish reviewer workflow QA and effective-template cleanup
+# Session 375 Prompt: Choose the next owner-prioritized workstream
 
-## Session 373 Summary
+## Session 374 Summary
 
-The accepted-reviewer confirmation experience was refined and the complete
-accepted-reviewer self-withdrawal lifecycle was exercised against production
-with a controlled reviewer. Commit `3e8f2055` landed on `main` during the
-session wrap; its resulting production deployment still needs verification.
+The reviewer invitation, decline, withdrawal, and tracking workflow was
+finished through production QA. Declined reviewers now leave the active
+proposal pool automatically, retain their history/referrals, and appear in
+the Invite Reviewers tab's Removed section. The associated UI corrections
+were merged to `main`, deployed successfully, and verified on request
+`1002788`.
 
 ### What Was Completed
 
-1. **Less-prominent withdrawal action after acceptance**
-   - The immediate post-accept confirmation no longer presents “I can no longer
-     review” alongside the success message.
-   - A reload or later revisit still presents the self-service withdrawal
-     action, preserving the change-of-circumstances path without inviting an
-     immediate reversal.
-   - [VERIFIED via focused Jest, Playwright, lint, and production build.]
+1. **Reviewer invitation and acceptance-email QA**
+   - The invitation includes the review due date and only one accept/decline
+     action block.
+   - The automatic acceptance reply mirrors the accepted portal page and
+     retains a later self-service withdrawal path.
+   - Reviewer self-withdrawal routes through the decline/referral form,
+     notifies the Program Director, removes the linked honorarium request,
+     and updates derived reviewer counts.
+   - [VERIFIED via real-email browser rehearsal, Dataverse/Postgres probes,
+     focused tests, and production inspection.]
 
-2. **Accepted-reviewer production E2E**
-   - `thuds-larks4e@icloud.com` was reset and sent one real invitation for
-     request `1002788`, then accepted without opting out of the honorarium.
-   - Acceptance job `51` completed with zero retries and sent the automatic
-     acceptance confirmation.
-   - Honorarium request `1003208` was created and linked to the reviewer
-     suggestion.
-   - [VERIFIED via Postgres `reviewer_acceptance_jobs`, Dataverse suggestion and
-     honorarium reads, and the signed-in Workbench.]
+2. **Staff-recorded reviewer withdrawal**
+   - Track Reviewers exposes the dedicated staff withdrawal action without
+     asking the Program Director for alternate-reviewer suggestions.
+   - The shared withdrawal path revokes the reviewer token, deletes the exact
+     linked honorarium request, records the terminal state, and updates every
+     selected-row-derived dashboard/count.
+   - [VERIFIED via production browser rehearsal and the shared lifecycle
+     contract documented in
+     `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`.]
 
-3. **Self-service withdrawal production E2E**
-   - The reviewer followed the acceptance-email withdrawal link, selected
-     “Too busy,” entered referral **Franklin Cat**, and submitted the existing
-     decline form.
-   - The suggestion now has `accepted=false`, `declined=true`, response type
-     Declined, and the saved referral.
-   - The honorarium lookup was cleared and request `1003208` returns Dataverse
-     404, proving the linked record was deleted rather than merely hidden.
-   - System alert `357` records `honorariumDeleted=true`; Dynamics shows the
-     outgoing PD notification sent to `jgallivan@wmkeck.org`.
-   - Workbench shows the referral with **Add as candidate**, the controlled
-     reviewer as Declined rather than actively tracked, and request `1002788`
-     at **1/3 accepted · 4 found**.
-   - [VERIFIED via read-only production probes, Postgres, Dynamics email
-     activities/parties, and signed-in Workbench browser inspection.]
+3. **Invite and Track Reviewers UI corrections**
+   - Declined rows no longer count as invitable or leave the Send Invitation
+     button in a contradictory state.
+   - Track Reviewers no longer shows a confusing always-visible status
+     dropdown beside separate action buttons; correction/withdrawal/release
+     actions are consolidated under the row's Manage control.
+   - [VERIFIED via focused tests, lint, build, and production browser QA.]
 
-4. **Safe queue handling**
-   - The acceptance job initially remained queued, so no broad production drain
-     was triggered.
-   - Source inspection confirmed the drain has no job-ID filter. Before any
-     manual action, the normal production worker completed job `51`; the active
-     queue was empty.
-   - [VERIFIED via `reviewer_acceptance_jobs` and
-     `lib/services/reviewer-acceptance-job-service.js`.]
+4. **Automatic decline archival**
+   - Initial decline, reviewer self-withdrawal, staff withdrawal, and the
+     honorarium race-compensation path now write `wmkf_selected=false`.
+   - Declined reviewers appear under Removed with a **Reset & restore** action
+     that clears prior engagement state and requires a fresh invitation/token.
+   - Decline referrals remain readable after archival; accepting again before
+     materials release restores `wmkf_selected=true`.
+   - Released/no-longer-needed reviewers remain a distinct non-decline
+     terminal path and are not auto-archived.
+   - [VERIFIED via 190 focused Jest tests, targeted ESLint, production build,
+     contract reconciliation, and durable-fact sweep.]
+
+5. **Production promotion and legacy repair**
+   - Merge `c9ca86b5` deployed READY to production from `main`.
+   - A scoped, operator-authorized Dataverse repair changed only
+     `wmkf_selected` on the two legacy `selected=true, declined=true` rows for
+     request `1002788`.
+   - Postconditions proved zero selected+declined rows remain and both exact
+     suggestion IDs are returned by the Removed query.
+   - Justin refreshed the Workbench and confirmed the result looks correct.
+   - The merged feature branch was deleted locally; no remote feature branch
+     existed. `main` was clean and synchronized at session close.
 
 ### Commits
 
-- `3e8f2055` — Refine reviewer acceptance confirmation
+- `ab2b22f4` — Fix declined reviewer invite eligibility
+- `5584dc90` — Clarify reviewer tracking actions
+- `b6d74d54` — Merge reviewer workflow UI fixes
+- `7e84ff67` — Fix: archive declined reviewers from proposals
+- `c9ca86b5` — Merge declined reviewer archival
 
 ## Next Items
 
 ### Verified Open
 
-1. **Exercise the staff `Withdrew` action end to end**
-   Evidence: `a4fdd736` and
-   `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`; source/tests
-   implement the shared cleanup contract, but no manual Workbench execution was
-   completed in Sessions 372–373.
-   Use a controlled accepted reviewer and verify that the PD action asks no
-   referral questions, deletes the linked honorarium, revokes the token, and
-   updates every reviewer/dashboard view.
-
-2. **Correct the effective saved invitation wording**
-   Evidence: the real Session 372 invitation rendered “Your completed reviews
-   would be due by September 9, 2026,” while
-   `lib/seed/email-defaults/reviewer-templates.js` already uses the singular
-   “Your completed review”.
-   Inspect the effective admin/per-PD invitation override and change or reset
-   that saved text; do not make another source-only wording edit.
-
-3. **Verify production promotion of `3e8f2055`**
-   Evidence: commit `3e8f2055` was fast-forwarded onto `main` during the
-   Session 373 wrap.
-   Confirm the resulting production deployment before treating the immediate
-   post-acceptance withdrawal-action refinement as production-live.
+1. **Correct the effective saved invitation wording**
+   Evidence: the real invitation rendered “Your completed reviews,” while
+   `lib/seed/email-defaults/reviewer-templates.js` already says “Your completed
+   review.” Source wording alone does not control saved admin/per-PD overrides.
+   Read the effective organization default and Justin's per-PD override, then
+   edit or reset the winning saved template.
 
 ### Owner Decision Needed
 
-1. **Rebaseline effective invitation defaults**
-   Evidence: tracked seed copy and the effective saved invitation diverged in
-   the real email.
-   Review the org default and Justin's per-PD override before applying the
-   normal email-default rebaseline; saved per-PD overrides continue to win until
-   explicitly reset or edited.
+1. **Retain or permanently delete reviewer test artifacts**
+   Evidence: request `1002788` still retains the controlled declined reviewer
+   rows (including `ZZZ Smoke Test (DELETE)`) under Removed, plus referral and
+   notification/audit evidence from the production rehearsal. Session 374
+   archived them from the active proposal pool but deliberately did not
+   permanently delete the suggestion/person records.
+   Decide whether those artifacts should remain available for future
+   rehearsals or go through the existing removal preflight and permanent-delete
+   workflow.
 
 ### Parked
 
-1. The reviewer dispatch-evidence probe remains the next reliability-design
-   step, but it stays parked until Justin reprioritizes it.
+1. Reviewer dispatch-evidence reliability design remains parked until Justin
+   reprioritizes it.
 2. Applicant intake remains parked during the GOApply evaluation.
 3. Automated BILL onboarding remains tabled; payment is offline/manual.
 
 ### Verify Before Acting
 
-1. **Production smoke-test artifacts**
-   Evidence currently available: request `1002788` retains the intentionally
-   labeled `ZZZ Smoke Test (DELETE)` declined reviewer, referral **Franklin
-   Cat**, and durable notification/audit evidence. Honorarium request `1003208`
-   has already been deleted.
-   Retain these for future rehearsals or clean them deliberately; do not assume
-   the test request is pristine.
+1. **Production/default-template state**
+   Evidence currently available: tracked singular wording does not prove the
+   effective saved admin/per-PD template is singular.
+   Read both live layers before editing or claiming correction.
 
 2. **Local real-email mode**
-   Evidence currently available: `.env.local` uses reviewer email capture mode
-   and does not contain `EXTERNAL_LINK_SECRET`.
-   A future local real-email rehearsal must deliberately supply a test signing
-   secret, set `REVIEWER_EMAIL_DELIVERY_MODE=send`, use an allowlisted inbox,
-   and retain the explicit dated Dataverse rehearsal authorization until the
-   reviewer-side response is complete.
-
-3. **Production/default-template state**
-   Evidence currently available: the tracked singular wording does not prove
-   the effective saved admin/per-PD template is singular.
-   Read the effective live default and per-PD override before claiming the
-   wording is corrected.
+   Evidence currently available: `.env.local` normally uses capture mode and
+   may not contain a usable external signing secret.
+   A future real-email rehearsal must deliberately enable send mode, use an
+   allowlisted inbox, and carry a dated production-write acknowledgement only
+   for the exact rehearsal operation.
 
 ### Do Not Reopen Without New Decision
 
@@ -129,38 +121,48 @@ session wrap; its resulting production deployment still needs verification.
    security scanners prefetch links.
 2. Do not add a new campaign-date store; the current campaign system remains
    authoritative.
-3. Do not auto-decline nonresponders; the deadline consequence is copy only.
+3. Do not auto-decline nonresponders.
 4. Do not ask a staff-recorded withdrawal for alternate reviewer suggestions.
-5. The accepted-reviewer email withdrawal E2E is complete; do not carry it
-   forward as an untested item without new evidence of regression.
+5. Do not restore declined reviewers implicitly. Restore is an explicit staff
+   reset that clears the prior engagement and requires a fresh invitation.
+6. The reviewer invitation/acceptance/decline/staff-withdrawal production QA is
+   complete; do not carry it forward as untested without new regression
+   evidence.
 
 ## Key Files Reference
 
 | File | Purpose |
 | --- | --- |
-| `pages/external/review/[token].js` | Tracks immediate acceptance vs later/reloaded accepted view |
-| `shared/components/external/AcceptedConfirmationView.js` | Accepted confirmation and subdued later withdrawal action |
-| `lib/services/reviewer-withdrawal.js` | Shared self-withdrawal lifecycle, honorarium, and PD notification |
-| `lib/services/reviewer-acceptance-drain.js` | Durable post-accept honorarium and confirmation processing |
-| `lib/services/reviewer-acceptance-job-service.js` | Acceptance queue claim, lease, retry, and completion state |
-| `scripts/probe-review-rehearsal-state.mjs` | Read-only controlled-reviewer state probe |
-| `docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md` | Browser, capture, and real-email rehearsal boundaries |
+| `lib/dataverse/adapters/reviewer-suggestion.js` | Authoritative decline, withdrawal, selection, Removed-query, and restore writes |
+| `lib/services/external-review/respond-service.js` | External accept/decline state machine and legacy repeat-decline repair |
+| `lib/services/workbench/decline-referrals-service.js` | Reads referrals from active and archived decline rows |
+| `lib/services/reviewer-finder/my-candidates-service.js` | Projects active and Removed candidate DTOs |
+| `shared/components/reviewers/ReviewerInvitePanel.js` | Invite-stage list, Removed section, and Reset & restore UI |
+| `shared/components/reviewers/ReviewerManagePanel.js` | Track-stage reviewer status and Manage actions |
+| `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` | Durable reviewer lifecycle contract |
+| `docs/atlas/dataverse-wmkf-appreviewersuggestion.md` | Dataverse reviewer-suggestion ownership and field semantics |
 
 ## Testing
 
 ```bash
-# Focused confirmation behavior
 rtk npm test -- --runInBand \
-  tests/unit/accepted-confirmation-view.test.js \
-  tests/unit/external-review-email-action.test.js
+  tests/unit/reviewer-adapters-writeback.test.js \
+  tests/unit/reviewer-suggestion-disposition.test.js \
+  tests/unit/reviewer-suggestion-withdrawal.test.js \
+  tests/unit/external-review-services.test.js \
+  tests/integration/external-review-routes.test.js \
+  tests/unit/decline-referrals-service.test.js \
+  tests/unit/my-candidates-service.test.js \
+  tests/unit/reviewer-invite-panel-invite-capture.test.js \
+  tests/unit/terminal-transition-service.test.js
 
-rtk npx playwright test tests/e2e/reviewer-accept.spec.js
-rtk npm run lint
+rtk npx eslint \
+  lib/dataverse/adapters/reviewer-suggestion.js \
+  lib/external/verify-suggestion-token.js \
+  lib/services/external-review/respond-service.js \
+  lib/services/reviewer-finder/my-candidates-service.js \
+  lib/services/workbench/decline-referrals-service.js \
+  shared/components/reviewers/ReviewerInvitePanel.js
+
 rtk npm run build
-
-# Read-only production rehearsal state
-rtk env DATAVERSE_ALLOW_PROD_READS=yes \
-  node scripts/probe-review-rehearsal-state.mjs \
-  --requestNumber 1002788 \
-  --email thuds-larks4e@icloud.com
 ```
