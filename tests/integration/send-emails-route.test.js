@@ -314,7 +314,7 @@ describe('send-emails — reviewer portal HTML links', () => {
     expect(htmlBodySent()).not.toContain('Respond to Invitation');
   });
 
-  test('materials body renders as paragraphs around the portal call-to-action', async () => {
+  test('materials body renders before the portal action and ends with the security fallback', async () => {
     SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_accepted: true }) };
     await run({
       drafts: [{
@@ -333,8 +333,6 @@ describe('send-emails — reviewer portal HTML links', () => {
           'Sincerely,',
           '',
           'Justin Gallivan',
-          '--',
-          'Justin Gallivan',
           'Senior Program Director',
           'W.M. Keck Foundation',
           'Los Angeles',
@@ -348,14 +346,24 @@ describe('send-emails — reviewer portal HTML links', () => {
       '<p style="margin:0 0 16px 0;">Dear Dr. Reviewer,</p>'
     );
     expect(htmlBodySent()).toContain(
-      '<p style="margin:0 0 16px 0;">Please use your secure reviewer link:</p><table role="presentation"'
+      '<p style="margin:0 0 16px 0;">Please use your secure reviewer link:</p>'
     );
     expect(htmlBodySent()).toContain(
-      '</a></p><p style="margin:0 0 16px 0;">This link is unique to you.</p>'
+      '<p style="margin:0 0 16px 0;">This link is unique to you.</p>'
     );
     expect(htmlBodySent()).toContain(
-      '<p style="margin:0 0 16px 0;">Justin Gallivan<br>--<br>Justin Gallivan<br>Senior Program Director<br>W.M. Keck Foundation<br>Los Angeles</p>'
+      '<p style="margin:0 0 16px 0;">Justin Gallivan<br>Senior Program Director<br>W.M. Keck Foundation<br>Los Angeles</p>'
     );
+    const html = htmlBodySent();
+    expect(html.indexOf('Justin Gallivan<br>Senior Program Director'))
+      .toBeLessThan(html.indexOf('<table role="presentation"'));
+    expect(html.indexOf('<table role="presentation"'))
+      .toBeLessThan(html.indexOf('For your security, please do not forward this link.'));
+    expect(html.indexOf('For your security, please do not forward this link.'))
+      .toBeLessThan(html.indexOf('If the button does not work'));
+    expect(html).not.toContain('This secure link is unique to you and was sent by');
+    expect(html).not.toContain('mailto:pd@wmkeck.org');
+    expect(html.endsWith('</a></p>')).toBe(true);
   });
 });
 
