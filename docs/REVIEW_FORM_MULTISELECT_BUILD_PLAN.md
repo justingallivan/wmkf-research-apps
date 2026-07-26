@@ -15,318 +15,905 @@ related:
   - shared/components/workbench/ReviewsTab.js
   - shared/utils/review-matrix.js
   - lib/admin/review-question-save.js
+  - docs/atlas/dataverse-wmkf-appreviewanswer.md
 ---
 
 # Review Form Multi-Select Questions — Build Plan
 
-**Status:** REVISED DRAFT 2 (S375, 2026-07-25). Not started. Draft 1 was reviewed by
-Codex adversarially and returned NO-SHIP; every finding is addressed below, and the
-live-state probes draft 1 deferred have now been run.
+**Status:** DRAFT 4 (S375, 2026-07-26). Not started.
 
-**Draft-1 corrections carried into this draft:**
+This draft is the executable contract for adding a fixed-option, check-all-that-apply
+question to the research review form. It supersedes draft 3. The owner decisions in
+§1 are closed; implementation must not reopen them.
 
-1. The blank-slate premise was asserted from a doc note, not probed. It is now
-   replaced with measured state (§0.1) — the snapshot is **not** empty.
-2. The sequencing rationale ("submits are final, so a rehearsal consumes the blank
-   slate") was wrong: `scripts/reset-reviewer-for-testing.js` supports controlled
-   reset. Sequencing is now expand-first with rehearsal BEFORE activation (§8).
-3. The storage payload (values-only JSON + joined labels) could not preserve
-   per-option value→label mapping across staff option edits. It is now a canonical
-   `{value,label}` array (§3).
-4. Executable type gates were missing from the fan-out (§4).
-5. The seed-script authoring precedent cannot deactivate omitted rows; replaced with
-   full-set reconciliation through the admin save service (§5).
-6. The synthesis prompt lives in a versioned Dataverse prompt row, not in the
-   service (§6).
+## 0. Evidence, boundaries, and prerequisites
 
-## 0. Why this exists
+### 0.1 Measured live state
 
-The owner reworked the research reviewer form
-(`WMKF_Research_Reviewer_Form_markup.docx`, shared 2026-07-25). The new form has a
-**check-all-that-apply** question, which the review-question system cannot express —
-it supports `picklist` (single-choice radios), `richtext`, and `string` only
-[VERIFIED via `review-question-fetcher.js:29`, `review-question-save.js:69`,
-`ReviewAuthoringForm.js:404-447`].
-
-### 0.1 Measured live state (probed 2026-07-25, read-only)
-
-Draft 1 claimed "no answer snapshots, no in-flight sessions." That was an inference
-from a doc note covering only the portal. Replaced with measured counts:
+The probes below were read-only. Their implementations explicitly query Dataverse
+without writes and inspect both active and inactive question rows, answer snapshots,
+received-review suggestions, Postgres drafts, and question-set audit records.
+[VERIFIED via `scripts/probe-live-review-questions.mjs:1-11`,
+`scripts/probe-live-review-questions.mjs:36-49`, and
+`scripts/probe-review-blank-slate.mjs:1-21`]
 
 | Surface | Measured | Interpretation |
 |---|---|---|
-| `wmkf_reviewquestion` | **12 rows, all active**, byte-identical to the seeded schema [DERIVED-FROM: `scripts/probe-live-review-questions.mjs` run 2026-07-25; a direct row count, independent of every other figure in this plan] | No divergence from the seed to reconcile. |
-| `review_question_audit` | 4 rows, all dated 2026-06-29 — 2 pending, 1 failed, 1 completed [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §4 run 2026-07-25; a direct row count, independent of every other figure in this plan] | Last question-set change was 2026-06-29. |
-| `wmkf_appreviewanswer` | **3 rows** on 1 suggestion, keys `impact`/`risk`/`overallRating`, all `answerValue=99`, `answerText=""` [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §1 run 2026-07-25; a direct row count, independent of every other figure in this plan] | NOT empty. `99` is the retired "Unable to answer" sentinel, already outside the live 1–4 domain. |
-| Suggestions with `wmkf_reviewreceivedat` | **1** — `6ad328b4…`, staff upload, file `eicar-test-bytes.pdf`, no name/email, affiliation "Dr." [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §2 run 2026-07-25; a direct row count, independent of every other figure in this plan] | A synthetic fixture from the virus-scan work, not a review. |
-| `review_drafts` | **1** — suggestion `3c4bb952…`, updated 2026-07-04, every current key present [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §3 run 2026-07-25; a direct row count, independent of every other figure in this plan] | Belongs to reviewer lastname **"Gallivan_test"**. |
+| `wmkf_reviewquestion` | **12 rows, all active**, byte-identical to the seeded schema. [DERIVED-FROM: `scripts/probe-live-review-questions.mjs` read-only run 2026-07-25; a direct row count, independent of every other figure in this plan] | The active configuration had not diverged from the static seed when measured. [VERIFIED via `scripts/probe-live-review-questions.mjs:23-69`] |
+| `review_question_audit` | **4 rows**, all dated 2026-06-29: **2 pending, 1 failed, 1 completed**. [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §4 read-only run 2026-07-25; a direct row count, independent of every other figure in this plan] | The measurement did not show a later successful admin publication. [VERIFIED via `scripts/probe-review-blank-slate.mjs:106-123`] |
+| `wmkf_appreviewanswer` | **3 rows** on **1 suggestion**, keys `impact`, `risk`, and `overallRating`; each has `answerValue=99` and empty `answerText`. [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §1 read-only run 2026-07-25; a direct row count, independent of every other figure in this plan] | These are sentinel answer snapshots and cannot remain when `impact` is retired. [VERIFIED via `scripts/probe-review-blank-slate.mjs:37-64`] |
+| Suggestions with `wmkf_reviewreceivedat` | **1** — `6ad328b4-f044-f111-88b5-000d3a306d45`, a staff upload named `eicar-test-bytes.pdf`, with no reviewer name/email and affiliation `Dr.`. [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §2 read-only run 2026-07-25; a direct row count, independent of every other figure in this plan] | This is the EICAR fixture suggestion named by the owner, not evidence of an empty answer store. [VERIFIED via `scripts/probe-review-blank-slate.mjs:67-79`] |
+| `review_drafts` | **1** — suggestion `3c4bb952-e061-f111-a826-000d3a306da2`, updated 2026-07-04, containing every current question key. [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §3 read-only run 2026-07-25; a direct row count, independent of every other figure in this plan] | This is the `Gallivan_test` draft named by the owner and must be removed through the audited suggestion-removal path, not abandoned. [VERIFIED via `scripts/probe-review-blank-slate.mjs:82-104`] |
 
-**Revised premise.** No *real* reviewer data exists: the only answer rows are sentinel
-values on a synthetic fixture, and the only draft belongs to an owner test record. The
-freedom to redefine keys, types, and columns is therefore real — but it is a
-**decision about disposing of known test artifacts**, not the absence of data.
-Draft 1's wording asserted absence and was wrong.
+The table records a point-in-time measurement, not authorization to mutate either
+store. Re-run the read-only ownership/consumer probe in §8 immediately before the
+cutover decision. [PLANNED]
 
-**Explicit disposition (owner decision, §9 item 1):**
-- The sentinel answer rows and their fixture suggestion: delete via
-  `scripts/reset-reviewer-for-testing.js`, or leave orphaned once their keys retire.
-- The `Gallivan_test` draft: it will be discarded by a key change, because
-  `buildInitialValues` drops unrecognized and shape-mismatched values by design.
-  Acceptable, but must be acknowledged rather than discovered.
+### 0.2 Separate blocking dependency: coherent question caching
 
-**This window still closes at the first real submission** — after which key retirement
-orphans genuine review data.
+Today the question fetcher keeps a module-local cache with a five-minute TTL, and
+`invalidateQuestionCache()` clears only the process that receives the call.
+[VERIFIED via `lib/external/review-question-fetcher.js:28-36`,
+`lib/external/review-question-fetcher.js:160-190`, and
+`lib/external/review-question-fetcher.js:197-200`]
 
-## 1. Prerequisite — live question set (DONE)
+The cross-instance cache-coherence correction is **separate work and a hard
+dependency**. It must be deployed and verified before this plan reaches production
+expand or question-set activation. This plan does not add TTL waits, hybrid
+question sets, retry folklore, or another cache layer to compensate for the current
+split brain. [PLANNED]
 
+Dependency acceptance is exact: after one admin publication, independently routed
+requests for context, draft load, portal submit, manual entry, legacy upload, and
+mark-received must resolve the same `questionSetVersion` without waiting for the
+old TTL; invalidation must be coherent across serverless instances. The dependency
+owner must provide a repeatable multi-instance probe and its successful result.
+[PLANNED]
+
+### 0.3 Expand-first is mandatory
+
+The current answer entity has a nullable numeric answer value, text/HTML snapshots,
+and an alternate key on suggestion plus question key; it has no multi-value answer
+property. [VERIFIED via `lib/dataverse/adapters/review-answer.js:43-52`,
+`lib/dataverse/adapters/review-answer.js:173-199`, and
+`docs/atlas/dataverse-wmkf-appreviewanswer.md:21-29`]
+
+The Dataverse sandbox cannot host this rehearsal as currently provisioned. The
+read-only 2026-07-26 probe authenticates to `orgd9e66399.crm.dynamics.com`, probes
+the required entity metadata, and defaults to that tracked host when
+`DYNAMICS_SANDBOX_URL` is unset. That variable was unset locally during the
+measurement. The result was that `akoya_request` is present while
+`wmkf_appreviewersuggestion`, `wmkf_appreviewanswer`,
+`wmkf_reviewquestion`, and `wmkf_potentialreviewer` are absent. This is an
+unprovisioned reviewer chain, not a stale copy of the production chain.
+[VERIFIED via `scripts/probe-sandbox-reviewer-schema.mjs:27-37`,
+`scripts/probe-sandbox-reviewer-schema.mjs:54-78`,
+`docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md:176-198`, and
+`docs/atlas/dataverse-wmkf-appreviewanswer.md:48-51`]
+
+Building that environment would require the reviewer entities and their
+relationships/configuration plus the release gate's independent authentication,
+file, background-job, email, and reset verification. It is a separate environment
+project and is not part of this plan. [VERIFIED via
+`docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md:184-200`]
+
+Therefore the change remains additive first, but the pre-exposure proof moves to
+controlled production: provision the nullable storage property, deploy readers and
+writers that tolerate both old and new rows, then exercise the real `impactAreas`
+configuration and new prompt end-to-end against dedicated internal test records
+before any external reviewer is exposed. [PLANNED]
+
+## 1. Closed product and key decisions
+
+### 1.1 Key contract
+
+Among the current structured ratings, only `impact` is semantically replaced. Its
+successor is the new `impactAreas` multiselect question. The current `risk` and
+`overallRating` keys remain in place with their existing meanings, option labels,
+and numeric domains. [PLANNED]
+
+After the change, these constants must resolve exactly as follows:
+
+```js
+export const CORE_RATING_KEYS = Object.freeze([
+  'risk',
+  'overallRating',
+]);
+
+export const PARENT_BOUND_KEYS = Object.freeze([
+  'affiliation',
+  'risk',
+  'overallRating',
+]);
 ```
-DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-live-review-questions.mjs
-```
 
-Result (2026-07-25): `affiliation`(string, order 0), `impact`(picklist), `q2`,
-`risk`(picklist), `q4`–`q9`, `overallRating`(picklist), `q11` — identical to
-`lib/external/review-form-schema.js`. **No divergence; the seeded schema is a valid
-baseline.**
+`PARENT_BOUND_KEYS` may be implemented as
+`Object.freeze(['affiliation', ...CORE_RATING_KEYS])`, but the resulting values and
+order must be exactly the array above. [PLANNED]
 
-[RECHECKED after scripts/probe-live-review-questions.mjs change: the script was fixed
-mid-session — its first version mis-read the `queryRecords` return shape and then hit
-the mandatory-`$filter` rule — and the result quoted above is from the corrected run,
-not the failed ones. The fixed version pages through `queryAllRecords` with a
-`statecode eq 0 or statecode eq 1` filter, so soft-deleted question rows are visible
-too.]
+The current code instead includes `impact` in `CORE_RATING_KEYS`, derives the
+parent-bound set from it, and exposes rating snapshots for all three current
+rating keys. [VERIFIED via `lib/external/review-form-schema.js:151-181`,
+`lib/admin/review-question-save.js:40-45`,
+`lib/dataverse/adapters/review-answer.js:60-130`, and
+`lib/external/review-answer-snapshot.js:26-38`]
 
-## 2. Target question set (from the owner's document)
+Do not introduce `riskLevel` or `overallAssessment`. Those draft-2 names are
+withdrawn. [PLANNED]
 
-Checkbox glyphs appear on Q3, Q4, and Q10, but **only Q3 is multi-select** — it is the
-one that says "(check all that apply)". Q4 and Q10 are single-choice scales; Word
-simply has no radio glyph [owner-confirmed S375].
+### 1.2 Target question set
 
-| # | Question | Type | Proposed key |
-|---|---|---|---|
-| — | Title & Organization (reviewer identity, unchanged) | `string` | `affiliation` (kept) |
-| 1 | Existing publications, technologies, or prior work addressing part of the proposed work; what distinguishes this proposal | `richtext` | `priorWork` |
-| 2 | Specific significant impacts foreseen; which outcomes may be useful to your work | `richtext` | `foreseenImpacts` |
-| 3 | "If the proposed project is successful in its entirety, it will (check all that apply)" — enabling tools / disciplinary publications / broad publications / revise textbooks | **`multiselect`** | `impactAreas` |
-| 4 | How risky is the project overall — Low / Medium / High / Impossible | `picklist` | `riskLevel` |
-| 5 | What are the risks (technical / hypothesis / scope) | `richtext` | `riskDetail` |
-| 6 | Are methods, data gathering, analysis appropriate | `richtext` | `methodsAppropriate` |
-| 7 | Concerns about team capacity — personnel, infrastructure, **or budget** | `richtext` | `teamCapacity` |
-| 8 | What questions should the Foundation raise with the PI | `richtext` | `questionsForPi` |
-| 9 | Competitive in peer review at a traditional funding agency | `richtext` | `traditionalFunding` |
-| 10 | Overall rating — Excellent / Very Good / Good / Fair / Poor | `picklist` | `overallAssessment` |
-| 11 | Anything else (optional) | `richtext` | `additionalComments` |
+The admin publication must reconcile to this complete ordered set. The content
+column is normative display text and must be authored verbatim; hints are omitted
+unless stated. [PLANNED]
 
-Retired keys: `impact`, `risk`, `overallRating`, `q2`, `q4`, `q5`, `q6`, `q7`, `q8`,
-`q9`, `q11`. `affiliation` is kept as-is — it is the identity field, is unchanged by
-the new document, and is not being redefined, so keeping it is not key reuse.
-`overallRating` is retired rather than kept because sentinel rows already carry that
-key (§0.1) and the atlas forbids reuse.
+Omitted active questions are deactivated by the existing full-set save behavior.
+[VERIFIED via `lib/services/admin/review-questions-service.js:82-145`]
 
-**No "Other" free-text option exists** — verified by searching the document text for
-"Other", "specify", "please list", and fill-in blanks; the only blanks are the header
-identity fields. Q4's "Impossible (there is a fatal flaw; if so, please elaborate
-below)" directs the reviewer to Q5, which already captures it in free text
-[owner-confirmed S375]. So `multiselect` needs **no per-option text payload**.
+Apply one stable-key rule uniformly: keep the current key when revised wording
+still asks the same underlying question and an answer retains the same meaning;
+retire the current key and create a new one when the answer semantics or answer
+type changes. The Atlas prohibits reusing a key for a different question, not
+continued use of the same question after rewording. [VERIFIED via
+`docs/atlas/dataverse-wmkf-reviewquestion.md:24-30`]
 
-### Deltas from the live set
+| Order | Key | Type | Required display text and option contract |
+|---:|---|---|---|
+| — | `affiliation` | `string` | Required: “Title & Organization”; `maxLength: 300`; `prefillFromCrm: true`; hint: “Pre-filled from CRM if known. Edit if your affiliation has changed.” This identity field is unnumbered and has no snapshot order. |
+| 1 | `priorWork` | `richtext` | Required, `maxLength: 50000`: “Q1 — Are there existing publications, technologies, or prior work that address part of the proposed work? What distinguishes this proposal?” |
+| 2 | `q2` | `richtext` | Required, `maxLength: 50000`: “Q2 — What specific significant impacts do you foresee? Which outcomes may be useful to your work?” |
+| 3 | `impactAreas` | `multiselect` | Required: “Q3 — If the proposed project is successful in its entirety, it will (check all that apply)”. Options, in canonical order: `1` Provide enabling tools to the community; `2` Result in publications of disciplinary interest; `3` Result in publications of broad interest; `4` Revise textbooks. |
+| 4 | `risk` | `picklist` | Required: “Q4 — How risky is the project overall?” Hint: “The Keck Foundation is comfortable funding risky projects.” Unchanged domain: `1` Low risk (will likely work in its entirety); `2` Medium risk (parts may succeed, others may fail); `3` High risk (significant risk of failure); `4` Impossible (fatal flaw). |
+| 5 | `q4` | `richtext` | Required, `maxLength: 50000`: “Q5 — What are the risks (technical, hypothesis, or scope)?” |
+| 6 | `q5` | `richtext` | Required, `maxLength: 50000`: “Q6 — Are the proposed methods, data gathering, and analysis appropriate?” |
+| 7 | `teamCapacity` | `richtext` | Required, `maxLength: 50000`: “Q7 — Do you have concerns about the team’s capacity, including personnel, infrastructure, or budget?” |
+| 8 | `q6` | `richtext` | Required, `maxLength: 50000`: “Q8 — What questions should the Foundation raise with the principal investigator?” |
+| 9 | `q8` | `richtext` | Required, `maxLength: 50000`: “Q9 — Would this proposal be competitive in peer review at a traditional funding agency?” |
+| 10 | `overallRating` | `picklist` | Required: “Q10 — Please assign an overall rating to the proposal.” Unchanged domain: `1` Poor; `2` Fair; `3` Good; `4` Very Good; `5` Excellent. Reorder the options array to display Excellent first; array order is display order, but every option retains its existing numeric value and label (`5` Excellent through `1` Poor). Never renumber the values. |
+| 11 | `q11` | `richtext` | Optional, `maxLength: 50000`: “Q11 — Is there anything else you would like to share with the Foundation about the proposal or this review process?” |
 
-- **New:** Q1 (prior work) has no counterpart.
-- **Merged:** `q7` (personnel/infrastructure) + `q9` (budget) → one capacity question.
-- **Retyped + rescoped:** `impact` (single-choice rating) → multi-select categories;
-  loses "Little to no impact", gains "provide enabling tools to the community".
-- **Reworded:** most remaining questions.
-- **Reordered options:** Q10 displays Excellent-first. Keep the numeric **values**
-  as-is (5 = Excellent); array order is display, the number is meaning.
+Only `impactAreas` is check-all-that-apply. `risk` and `overallRating` remain
+single-choice questions even if the source form’s glyphs resemble checkboxes, and
+no option carries an `Other` free-text payload. [PLANNED]
 
-## 3. Design decision — how a multi-select answer is stored
+The numeric option values for `risk` and `overallRating` above are the current
+static-schema values. [VERIFIED via `lib/external/review-form-schema.js:68-82` and
+`lib/external/review-form-schema.js:126-141`]
 
-`wmkf_appreviewanswer` holds one row per question with a single `wmkf_answervalue`
-integer, `wmkf_answertext`, and `wmkf_answerhtml`
-[VERIFIED via `lib/dataverse/adapters/review-answer.js:44-50`].
+The current and target texts show that `q2`, `q4`, `q5`, `q6`, `q8`, and `q11`
+are wording revisions of the same questions, so they keep their keys. `impact`
+changes from a single impact rating to a categorical multiselect, while current
+`q7` and `q9` are replaced by one polarity-changed, combined team-capacity question;
+those answers would not retain the same meaning. [VERIFIED current text via
+`lib/external/review-form-schema.js:42-61`,
+`lib/external/review-form-schema.js:76-123`, and
+`lib/external/review-form-schema.js:138-145`; target disposition is PLANNED]
 
-**One row per selected option is NOT viable.** The upsert alternate key is
-`(_wmkf_appreviewersuggestion_value, wmkf_questionkey)`
-[VERIFIED via `review-answer.js:173-179`], so two rows for one question collide.
-Changing the alternate key would additionally require aggregation across rows and
-deletion of stale option rows in every consumer.
+Retire exactly `impact`, `q7`, and `q9` through the full-set publication. Create
+exactly `priorWork`, `impactAreas`, and `teamCapacity`. Keep `affiliation`, `q2`,
+`risk`, `q4`, `q5`, `q6`, `q8`, `overallRating`, and `q11` under their existing
+immutable keys. [PLANNED]
 
-**A Dataverse multi-select choice column is also rejected**: its options are *column
-metadata*, whereas this system's options are per-question runtime configuration
-editable by staff in `/admin`. The two models are incompatible.
+## 2. Storage and canonical answer contract
 
-**Chosen: a new `wmkf_answervalues` Memo column holding a canonical JSON array of
-`{value,label}` objects**, one row per question.
+### 2.1 Chosen representation
+
+Add nullable Dataverse Memo property `wmkf_answervalues` to
+`wmkf_appreviewanswer`. Store one compact JSON array per multiselect answer:
 
 ```json
-[{"value":1,"label":"Provide enabling tools to the community"},
- {"value":3,"label":"Result in publications of broad interest"}]
+[{"value":1,"label":"Provide enabling tools to the community"},{"value":4,"label":"Revise textbooks"}]
 ```
 
-Storing the label **with** each value is the correction from draft 1. A values-only
-array plus a joined `answerText` string cannot be reversed per option after staff
-rename, reorder, or remove an option, which would defeat the point-in-time snapshot
-invariant in `docs/atlas/dataverse-wmkf-appreviewanswer.md` and mislabel historical
-per-option tallies.
+For a multiselect row:
 
-**Contract:**
-- **Ordering:** stored in the question's option order at submit time, not click order.
-- **Deduplication:** values deduplicated before persist; duplicates are a producer error.
-- **`answerText`:** *derived* from this array (labels joined with "; ") so the human
-  form and machine form cannot disagree. It stays the field synthesis and exports read.
-- **`answerValue`:** null for multiselect rows.
-- **Parse corruption:** a row whose `wmkf_answervalues` fails to parse renders as
-  "unreadable answer" in staff surfaces and is excluded from tallies. It must never
-  throw in a read path — one bad row cannot break a whole request's Reviews tab.
-- **Empty selection:** an optional multiselect with no selections stores `[]`, not null,
-  so "asked and left blank" is distinguishable from "not asked".
-- **Read projection:** `ANSWER_FIELDS` (`review-answer.js:43-52`) must select the new
-  column, and the DTO mapping (`:98-105`) must expose it as `answerValues`. Draft 1
-  omitted the read side entirely.
-- **Tally semantics:** per-option tallies use the **stored** labels, not current
-  question options, so a historical review keeps the wording its reviewer saw.
+- `wmkf_questiontype = "multiselect"`;
+- `wmkf_answervalue = null`;
+- `wmkf_answervalues` is the canonical compact JSON array, including `[]` for an
+  allowed empty selection;
+- `wmkf_answertext` is the same canonical labels joined with `"; "`;
+- `wmkf_answerhtml = null`.
 
-A schema wave is required, following the precedent set by the earlier review-related
-schema waves (snapshot table, question table, synthesis column).
+All legacy picklist, rich-text, and string rows write
+`wmkf_answervalues = null`. [PLANNED]
 
-## 4. Code changes
+Create the additive schema package at
+`lib/dataverse/schema/wave15-review-answer-multiselect/`.
+[DERIVED-FROM: sorted directory listing of `lib/dataverse/schema` on 2026-07-26;
+independent of every other figure in this plan] The package must add a Memo property
+with logical name `wmkf_answervalues` and publish it through the existing schema
+application mechanism. Update the answer adapter field list, row body, DTO, and
+Atlas entry in the same change. [PLANNED]
 
-**Type system**
-- `review-question-fetcher.js:29` — add `multiselect` to `SUPPORTED_TYPES`; reuse the
-  picklist options normalization at `:87-113`.
-- `review-question-save.js:69` — same allowlist; options validation `:165`; the
-  options/diff serialization gated on `row.type === 'picklist'` (`:222`, `:236-237`)
-  must include `multiselect`.
-- `ReviewQuestionsSection.js` — add "Checkboxes (check all that apply)" to the type
-  dropdown (`:25-26`); the option builder gate (`:306`) and the maxLength gate
-  (`:291`) both key off `picklist` and need the new type folded in.
+### 2.2 Rejected representations
 
-**Executable type gates missed in draft 1 — each is a hard failure, not a polish item**
-[all VERIFIED by reading the cited lines]:
+**Do not store one answer row per selected option.** The entity’s alternate key is
+suggestion plus question key, so a second selected option for the same question
+would collide. [VERIFIED via
+`docs/atlas/dataverse-wmkf-appreviewanswer.md:21-23` and
+`lib/dataverse/adapters/review-answer.js:173-178`]
 
-- `ReviewAuthoringForm.isComplete` (`:81-93`) — the trailing
-  `else if (typeof v !== 'string' || v.trim().length === 0) return false` catches an
-  array, so a required multiselect makes Submit **permanently disabled**.
-- `submit-service.js:128-130` — `snapshotKeys` is built from
-  `picklist || richtext` only, so `answerUpsertDescriptor` → `answerRowKeyPredicate`
-  throws `"not a known snapshot question key"` for a multiselect row and the whole
-  submit changeset fails.
-- `validateReviewForm` (`review-form-schema.js:262`, `:289`) — the legacy validator
-  used by the retained staff paths rejects an unrecognized type as unsupported.
-- `review-answer.js:60` `REVIEW_RATING_KEYS` — an additional hardcoded rating-key list
-  beyond those draft 1 named (`CORE_RATING_KEYS` `review-form-schema.js:179`,
-  `REVIEW_RATING_KEYS` `review-answer-snapshot.js:26`, `RATING_KEYS`
-  `ReviewsTab.js:53`).
-- Both `ratingsFromAnswers` implementations (`review-answer-snapshot.js:38`,
-  `review-answer.js:117`) hardcode their output keys independently.
+**Do not add a Dataverse multi-select Choice property.** Review-question options are
+runtime configuration serialized in `wmkf_reviewquestion.wmkf_options`; the admin
+editor owns those option values and labels. Binding answers to solution metadata
+would create a second option authority. [VERIFIED via
+`docs/atlas/dataverse-wmkf-reviewquestion.md:27-35`,
+`lib/external/review-question-fetcher.js:87-116`, and
+`lib/admin/review-question-save.js:165-200`]
 
-**Snapshot writer/reader fan-out**
+### 2.3 One authoritative producer
 
-The column body is written by TWO deliberately mirrored helpers, kept byte-identical
-so a staff-written row is indistinguishable from a reviewer-written one
-[VERIFIED via `review-answer-snapshot.js:1-17`, `review-answer.js:190`]:
-`review-answer.js:191-200` and `review-answer-snapshot.js:95`. A new column must reach
-**both**. The write paths that flow through them:
+Add a pure server helper at `lib/external/review-multiselect.js`:
 
-- `pages/api/external/review/[token]/submit.js` — the reviewer portal.
-- `lib/services/review-manager/manual-review-entry-service.js` — live staff rescue.
-- `lib/services/review-upload.js` — retained legacy, hidden from the UI.
-- `lib/services/review-manager/mark-received-no-file-service.js` — retained legacy.
+```js
+canonicalizeMultiselectSelection(field, submittedValues)
+  -> { values, pairs, answerText }
+```
 
-The last two dual-write ratings via `buildRatingSnapshotRows`
-(`review-answer-snapshot.js:125`). Readers: `ratingsFromAnswers`
-(→ `reviewers-service.js:315`) and `readRatingsBySuggestion` (→ `context-service.js`).
+It is the **only** producer allowed to construct stored `{value,label}` pairs or the
+derived joined text. Its contract is:
 
-**Guards to adjust (ours, not external)**
-- `PARENT_BOUND_KEYS` (`review-question-save.js:44`) / `CORE_RATING_KEYS` — drop
-  `impact` once it is no longer a rating, so the admin editor stops refusing to delete
-  it [VERIFIED via `review-questions-service.js:106-115`].
-- `ratingKeysFor` (`build-review-submission.js:41-43`) needs **no** change: it filters
-  core ratings to keys present *as picklists*, so a retyped or retired `impact` drops
-  out of `assertRatingInvariants` automatically. [Codex confirmed this reading.]
+1. Accept an array of numeric integer values only. Objects, strings, labels, and
+   `{value,label}` input are invalid.
+2. Deduplicate by numeric value.
+3. Reject every value absent from the live `field.options`.
+4. Order the accepted values by the live option order, never request order.
+5. Construct `pairs` from the live options’ numeric values and labels.
+6. Derive `answerText` from those same ordered pairs.
+7. Reject an empty result when the live field is required; preserve `[]` when it
+   is optional.
 
-## 5. Question-set authoring
+The browser request therefore carries numeric values only. The server never accepts
+or trusts a client-supplied label. Both `validateReviewSubmission` and the legacy
+`validateReviewForm` path must call this helper; row emitters consume its result and
+must not reconstruct labels. [PLANNED]
 
-**Key reuse is removed as an option.** `docs/atlas/dataverse-wmkf-reviewquestion.md`
-documents the key as immutable and never reused; reuse would also mislabel the
-historical sentinel rows, because `review-matrix.js:113-116` applies the *live* type to
-historical rows sharing a key. The clean keys are named in the §2 table.
+### 2.4 Defensive reading
 
-**The seed script is not the mechanism.** `scripts/seed-review-questions.mjs` performs
-sequential upserts only: it never deactivates omitted keys, uses no atomic changeset or
-ETags, writes no `review_question_audit` row, and does not invalidate the question
-cache. Using it for a full replacement would leave the old questions active and could
-expose a hybrid set on partial failure.
+Add one parser in `lib/dataverse/adapters/review-answer.js`:
 
-**Use full-set reconciliation through the existing admin save path**
-(`lib/admin/review-question-save.js` planner + `lib/services/admin/review-questions-service.js`),
-which already provides the atomic changeset, per-row ETags, `baseVersion` optimistic
-lock, soft-delete of omitted rows, Postgres audit, and `invalidate()`. A thin script
-may compose the submitted set and call that service; it must not reimplement the write.
-Post-state must be verified by re-running the §1 probe.
+```js
+parseStoredAnswerValues(raw)
+  -> { answerValues, answerValuesUnreadable }
+```
 
-## 6. PD-side read-back
+Valid stored input is an array of unique objects whose `value` is an integer and
+whose `label` is a non-empty string. Preserve stored order and labels because the
+snapshot is historical. On malformed JSON, a wrong top-level shape, duplicate
+values, or an invalid pair, return `answerValues: null` and
+`answerValuesUnreadable: true`; do not fail the entire answer read. The DTO must
+display “Unreadable answer,” exclude the row from multiselect tallies and
+synthesis evidence, and retain enough diagnostics for staff to identify the answer
+row. [PLANNED]
 
-- `review-matrix.js` — `multiselect` must not enter the ratings grid (the grid selects
-  `type === 'picklist'` at `:146`; average/spread over categories is meaningless). Give
-  it its own section: per reviewer the selected labels, plus a **per-option tally**
-  across reviewers, computed from stored labels [owner-chosen S375].
-- `ReviewsTab.js:53-58` — `RATING_KEYS`/`PROJECTION_FIELD` hardcode the ratings;
-  update to those that remain numeric, and render multiselect answers in card view.
-- `review-report.js` / `-docx.js` / `-pdf.js` — render selected labels; exclude
-  multiselect from any averaged column.
-- **Synthesis prompt** — `synthesize-reviews-service.js` only composes the
-  `reviews_digest` input. The prompt text lives in
-  `shared/config/prompts/review-synthesis.js` and production resolves a **versioned
-  Dataverse prompt row**; the current prompt uses `impact` as its rating example and
-  describes picklists as scores. Editing the service alone leaves production behavior
-  unchanged. Required: author a new prompt version, seed/publish it, verify the live
-  current version, and add a synthesis regression test asserting multiselect answers
-  become categorical evidence and never `ratingSummaries`.
+Tallies group by stored `(value,label)` pair rather than by current question
+options. This preserves historical labels if staff later rename an option.
+[PLANNED]
 
-## 7. Verification
+## 3. Complete executable type-gate inventory
 
-- Unit: fetcher normalization, save validation, producer validation/emission,
-  `answerValues` round-trip (including a corrupt-JSON row), matrix derivation, report
-  composition.
-- Integration, with a live multiselect question present, across every write path
-  listed in §4: portal submit, manual entry, legacy upload, mark-received-no-file.
-- E2E (`tests/e2e/reviewer-stage2b-authoring.spec.js`): renders, multi-selects,
-  autosaves an array, rehydrates, required-ness gates on at least one selection, Submit
-  enables (the `isComplete` regression), locks read-only after submit.
-- RTL (`tests/unit/reviews-tab.test.js`): the multiselect section and per-option tally.
+The current review-question pipeline supports `picklist`, `richtext`, and `string`
+through explicit allowlists and raw type comparisons. [VERIFIED via
+`lib/external/review-question-fetcher.js:29`,
+`lib/admin/review-question-save.js:69`, and
+`shared/components/admin/ReviewQuestionsSection.js:24-28`]
 
-## 8. Sequencing — expand-first, rehearse before activation
+Every site below is in the implementation change; none may be handled implicitly.
 
-Draft 1 deferred the integrated rehearsal until after shipping. That was wrong on two
-counts: this is a Tier-2 external-user + Dataverse-write change, and
-`docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` requires integrated rehearsal
-before deliberate production promotion. "Submits are final" is the *reviewer-facing*
-contract only — `scripts/reset-reviewer-for-testing.js` already deletes answer rows,
-drafts, and the synthesis memo for a test reviewer.
+### 3.1 Producers, validation, and row emission
 
-1. Provision the nullable `wmkf_answervalues` column; verify it is selectable.
-2. Deploy backward-compatible code against the **existing** question set — the new type
-   is supported but unused, so behavior is unchanged.
-3. Rehearse the full round trip on a controlled test reviewer: author → submit →
-   Reviews tab → Compare → DOCX/PDF → synthesis. **This is the end-to-end test the
-   session originally set out to run**, and it now happens before activation rather
-   than after.
-4. Reset test state via `reset-reviewer-for-testing.js`, then re-run the §0.1 probes to
-   confirm the post-reset state.
-5. Atomically activate the new question set (§5) with a recorded rollback path (the
-   prior set is recoverable from `review_question_audit.before_json`).
-6. Re-rehearse against the new set, then reset.
+- `lib/external/review-question-fetcher.js`
+  - Extend `SUPPORTED_TYPES` with `multiselect`.
+  - Parse and require option JSON for both `picklist` and `multiselect`.
+  - Keep the fail-closed validation for unsupported types.
+  [VERIFIED current behavior via `lib/external/review-question-fetcher.js:29` and
+  `lib/external/review-question-fetcher.js:87-116`]
+- `lib/external/build-review-submission.js`
+  - In `validateReviewSubmission`, add the `multiselect` branch and call
+    `canonicalizeMultiselectSelection`; the normalized answer carries its returned
+    values, pairs, and text.
+  - In `ratingKeysFor`, remain picklist-only; with the corrected
+    `CORE_RATING_KEYS`, it validates only `risk` and `overallRating`.
+  - In the answer-question filter, admit `multiselect`.
+  - In `buildReviewSubmission`’s row-emission branch, emit one row using the
+    canonical object and set scalar/HTML properties as specified in §2.1.
+  [VERIFIED current gates via `lib/external/build-review-submission.js:41-43`,
+  `lib/external/build-review-submission.js:59-129`, and
+  `lib/external/build-review-submission.js:182-210`]
+- `lib/external/review-form-schema.js`
+  - Change `CORE_RATING_KEYS` exactly as §1.1 states.
+  - Keep `PICKLIST_FIELDS_BY_KEY` picklist-only.
+  - In `validateReviewForm`, call the shared canonicalizer for `multiselect` and
+    expose a normalized multiselect bucket to legacy snapshot writers.
+  - Keep `risk` and `overallRating` option domains unchanged.
+  [VERIFIED current gates via `lib/external/review-form-schema.js:179-200` and
+  `lib/external/review-form-schema.js:250-299`]
+- `lib/external/review-answer-snapshot.js`
+  - Change local `REVIEW_RATING_KEYS` to `risk` and `overallRating`.
+  - Keep `buildRatingSnapshotRows` picklist-only.
+  - Add `buildMultiselectSnapshotRows` that consumes only canonicalized results.
+  - Extend `buildAnswerRowBody` to accept `answerValues`; legacy rows pass null.
+  [VERIFIED current gates via `lib/external/review-answer-snapshot.js:26-38` and
+  `lib/external/review-answer-snapshot.js:95-143`]
+- `lib/dataverse/adapters/review-answer.js`
+  - Select, write, parse, and map `wmkf_answervalues`.
+  - Change local `REVIEW_RATING_KEYS` and `ratings` DTO shape to only `risk` and
+    `overallRating`.
+  - Expose `answerValues` and `answerValuesUnreadable`.
+  [VERIFIED current shape via `lib/dataverse/adapters/review-answer.js:43-60`,
+  `lib/dataverse/adapters/review-answer.js:97-130`, and
+  `lib/dataverse/adapters/review-answer.js:191-199`]
 
-## 9. Open items
+### 3.2 Hydration, completeness, and renderer
 
-1. **Owner decision — test-artifact disposition (§0.1):** delete the sentinel fixture
-   and the `Gallivan_test` draft, or accept them being orphaned/discarded.
-2. **Owner approval of the §2 key names** before authoring.
-3. `/contract-reconcile` after this draft is accepted, before implementation.
-4. **Owner recollection vs. measured state.** The owner recalled editing the question
-   set on 2026-07-25. Both the live set (§1) and the audit table (§0.1) show no change
-   on either surface after 2026-06-29, so the edits did not reach Dataverse. Ask the
-   owner where they were made — the likeliest explanation is an admin-panel save that
-   hit the `missingParentBoundKeys` 400 guard
-   (`review-questions-service.js:106-115`) and surfaced as "Fix the highlighted
-   problems and try again."
+- `shared/components/external/ReviewAuthoringForm.js`
+  - `buildInitialValues`: for `multiselect`, accept only a draft array of numeric
+    values, discard entries absent from live options, deduplicate, and reorder by
+    live option order. Never hydrate labels or object pairs.
+  - `isComplete`: a required multiselect is complete only when its normalized
+    numeric array is non-empty.
+  - `FieldRow`: render `multiselect` as a `<fieldset>` of checkboxes using option
+    labels; toggling updates a numeric array in canonical option order. Preserve
+    the existing radio renderer for `picklist`.
+  - Draft persistence and submission continue to serialize the browser value map;
+    multiselect entries in that map are numeric arrays.
+  [VERIFIED current hydration, completeness, persistence, and renderer gates via
+  `shared/components/external/ReviewAuthoringForm.js:35-94`,
+  `shared/components/external/ReviewAuthoringForm.js:138-195`, and
+  `shared/components/external/ReviewAuthoringForm.js:394-450`]
+
+The checkbox fieldset must expose a legend containing the question text, individual
+label associations, error text connected with `aria-describedby`, and keyboard
+operation through native checkbox semantics. [PLANNED]
+
+### 3.3 Admin serialization and option editing
+
+- `lib/admin/review-question-save.js`
+  - Extend `SUPPORTED_TYPES`.
+  - Set `PARENT_BOUND_KEYS` exactly as §1.1 states.
+  - Apply option validation, duplicate-value rejection, non-empty labels, and JSON
+    serialization to both `picklist` and `multiselect`.
+  - Apply option comparisons in the change diff to both option-bearing types.
+  [VERIFIED current gates via `lib/admin/review-question-save.js:40-69`,
+  `lib/admin/review-question-save.js:128-200`, and
+  `lib/admin/review-question-save.js:222-237`]
+- `shared/components/admin/ReviewQuestionsSection.js`
+  - Add `Multiselect (check all that apply)` to `TYPE_OPTIONS`.
+  - In `toPayload`, serialize `options` for `picklist` and `multiselect`.
+  - Apply the option editor and option-bearing length rules to both types.
+  - A type change initializes or clears type-specific state deterministically;
+    it must never retain invisible stale options.
+  [VERIFIED current gates via
+  `shared/components/admin/ReviewQuestionsSection.js:24-28`,
+  `shared/components/admin/ReviewQuestionsSection.js:50-65`, and
+  `shared/components/admin/ReviewQuestionsSection.js:291-306`]
+
+### 3.4 Every writer allowlist and snapshot-key site
+
+Each writer below must include `multiselect` in `snapshotKeys`, call the same
+validated producer contract, and concatenate multiselect snapshot rows with the
+existing rating/narrative rows. No writer may serialize `{value,label}` pairs from
+request input.
+
+- Portal submit:
+  `lib/services/external-review/submit-service.js` `snapshotKeys`.
+  [VERIFIED via `lib/services/external-review/submit-service.js:128-130`]
+- Staff manual entry:
+  `lib/services/review-manager/manual-review-entry-service.js` `snapshotKeys`.
+  This is the specifically required manual-entry allowlist.
+  [VERIFIED via
+  `lib/services/review-manager/manual-review-entry-service.js:143-167`]
+- Legacy staff review upload:
+  `lib/services/review-upload.js` `snapshotKeys`.
+  [VERIFIED via `lib/services/review-upload.js:267-279`]
+- Staff mark-received-without-file:
+  `lib/services/review-manager/mark-received-no-file-service.js` `snapshotKeys`.
+  [VERIFIED via
+  `lib/services/review-manager/mark-received-no-file-service.js:79-100`]
+
+### 3.5 Consumers and intentional type distinctions
+
+- `shared/utils/review-matrix.js`: keep numeric average/spread strictly
+  `picklist`-only; add a separate `multiselect` branch that produces per-pair
+  selection tallies and reviewer membership from parsed snapshots.
+  [VERIFIED current numeric branch via `shared/utils/review-matrix.js:146-158`]
+- `shared/components/workbench/ReviewsTab.js`: change the hard-coded rating key
+  set and comparison ratings to `risk` and `overallRating`; render multiselect
+  answers as categorical chips/lists in cards and a separate categorical comparison
+  block, not in the numeric rating grid.
+  [VERIFIED current gates via `shared/components/workbench/ReviewsTab.js:53-58`,
+  `shared/components/workbench/ReviewsTab.js:116-145`]
+- `shared/utils/review-report.js`: retain picklist ratings and rich-text narrative
+  sections, and add categorical multiselect sections sourced from parsed answer
+  pairs. Courtesy copy uses the joined snapshot text.
+  [VERIFIED current gates via `shared/utils/review-report.js:286-287` and
+  `shared/utils/review-report.js:395-438`]
+- `shared/utils/review-report-docx.js` and
+  `shared/utils/review-report-pdf.js`: render the new categorical sections and the
+  unreadable-answer marker; do not calculate multiselect averages. [PLANNED]
+- `lib/services/review-manager/reviewers-service.js`: update rating projections to
+  return only `risk` and `overallRating`; pass through parsed multiselect answers
+  through the answer DTO rather than adding a scalar rating. [PLANNED]
+- `lib/services/review-manager/synthesize-reviews-service.js`: select and parse
+  `wmkf_answervalues`; include readable multiselect pairs as categorical evidence;
+  exclude unreadable rows; never place multiselect values in rating summaries.
+  [VERIFIED current answer selection and digest via
+  `lib/services/review-manager/synthesize-reviews-service.js:42-50`,
+  `lib/services/review-manager/synthesize-reviews-service.js:85-95`, and
+  `lib/services/review-manager/synthesize-reviews-service.js:114-135`]
+- `lib/services/reviewer-thankyou-sweep.js`: no eligibility logic changes, but its
+  courtesy copy must render the joined multiselect snapshot through the shared
+  answer/report path.
+  [VERIFIED current reader/copy path via
+  `lib/services/reviewer-thankyou-sweep.js:60-72`]
+
+### 3.6 Raw-comparison closeout
+
+The implementation must sweep all raw `'picklist'` comparisons under `lib/` and
+`shared/`. The pre-change inventory is:
+
+| Path and site | Required disposition |
+|---|---|
+| `lib/services/review-upload.js:276` `snapshotKeys` | Admit `multiselect`. |
+| `shared/components/external/ReviewAuthoringForm.js:44` `buildInitialValues` | Add numeric-array hydration. |
+| `shared/components/external/ReviewAuthoringForm.js:87` `isComplete` | Add required-array rule. |
+| `shared/components/external/ReviewAuthoringForm.js:416` `FieldRow` | Keep radio branch; add checkbox branch. |
+| `shared/components/workbench/ReviewsTab.js:145` comparison ratings | Remain picklist-only; add a separate categorical block. |
+| `lib/external/build-review-submission.js:42` `ratingKeysFor` | Remain picklist-only. |
+| `lib/external/build-review-submission.js:83` `validateReviewSubmission` | Add canonical multiselect branch. |
+| `lib/external/build-review-submission.js:183` answer-question filter | Admit `multiselect`. |
+| `lib/external/build-review-submission.js:205` row emission | Add multiselect row branch. |
+| `lib/external/review-form-schema.js:200` `PICKLIST_FIELDS_BY_KEY` | Remain picklist-only. |
+| `lib/external/review-form-schema.js:289` `validateReviewForm` | Add canonical multiselect branch. |
+| `lib/external/review-question-fetcher.js:87` option parsing | Apply to both option-bearing types. |
+| `shared/components/admin/ReviewQuestionsSection.js:61` `toPayload` | Serialize options for both types. |
+| `shared/components/admin/ReviewQuestionsSection.js:291` max-length gate | Keep max length off option-bearing types. |
+| `shared/components/admin/ReviewQuestionsSection.js:306` option editor gate | Apply to both types. |
+| `lib/external/review-answer-snapshot.js:129` `buildRatingSnapshotRows` | Remain picklist-only; add separate multiselect builder. |
+| `lib/services/external-review/submit-service.js:129` `snapshotKeys` | Admit `multiselect`. |
+| `lib/services/review-manager/mark-received-no-file-service.js:97` `snapshotKeys` | Admit `multiselect`. |
+| `lib/services/review-manager/manual-review-entry-service.js:163` `snapshotKeys` | Admit `multiselect`. |
+| `shared/utils/review-report.js:286` rating partition | Remain picklist-only; add categorical partition. |
+| `lib/admin/review-question-save.js:165` option validation | Apply to both types. |
+| `lib/admin/review-question-save.js:222` option serialization | Apply to both types. |
+| `lib/admin/review-question-save.js:236` current-option diff | Apply to both types. |
+| `lib/admin/review-question-save.js:237` submitted-option diff | Apply to both types. |
+| `shared/utils/review-matrix.js:146` numeric aggregation | Remain picklist-only; add categorical aggregation. |
+
+After implementation, rerun the same repository search. Every surviving
+picklist-only comparison must match an intentional disposition in this table and
+have a test. Any unclassified comparison is a release blocker. [PLANNED]
+
+## 4. Question-set publication and rollback mechanics
+
+The current save service reads active rows, computes a full-set diff, and deactivates
+active rows omitted from the submitted set. It does not read inactive rows into the
+planner. [VERIFIED via
+`lib/services/admin/review-questions-service.js:34-45`,
+`lib/services/admin/review-questions-service.js:117-145`, and
+`lib/admin/review-question-save.js:305-315`]
+
+Consequently, `before_json` by itself is not an executable rollback for immutable
+keys that were deactivated: blindly saving it could try to create a reused key
+instead of reactivating its existing row. [VERIFIED via the active-only reader and
+the alternate-key behavior above:
+`lib/services/admin/review-questions-service.js:34-45` and
+`lib/admin/review-question-save.js:305-315`]
+
+Do **not** put a reusable `restoreQuestionSetFromAudit` service and
+`scripts/restore-review-question-set.mjs` on the first-activation critical path.
+The first cutover has one known before/after mapping, while a general restoration
+service would add a second publication planner, audit lifecycle, CLI contract, and
+test matrix before the multiselect can ship. Use a documented, reviewed manual
+changeset procedure for the first activation; revisit automation only after a
+second operational use demonstrates that the procedure is recurring. [PLANNED]
+
+The manual rollback procedure must:
+
+1. Load the completed cutover publication audit and parse its `before_json`.
+2. Read active and inactive question rows, including immutable row IDs and ETags.
+3. Produce a dry-run manifest that validates the prior set through the updated
+   guards and shows every PATCH before execution.
+4. Execute one Dataverse changeset that reactivates prior-only keys **by row ID**,
+   restores retained rows by row ID, and deactivates new-only keys by row ID. It
+   must never POST an already-existing immutable key.
+5. Preserve the manifest, operator, source publication request ID, request/response
+   evidence, and timestamps in the release record.
+6. Invalidate through the separately delivered coherent cache mechanism.
+7. Read back the active set across independently routed requests and require its
+   normalized version to match the audited prior version.
+
+Before first exposure, rehearse this procedure in production while access remains
+limited to the controlled internal test records: restore the prior set after the
+first target publication, verify it, then republish and verify the target set. The
+dry-run manifest must show `impact` reactivated by its existing row ID and
+`impactAreas` deactivated by its row ID, proving that rollback does not create a
+duplicate immutable key. [PLANNED]
+
+## 5. Versioned synthesis prompt
+
+The synthesis service reads submitted review snapshots, constructs a structured
+digest, and executes `review-synthesis.generate`; the live prompt body is versioned
+outside the service. [VERIFIED via
+`lib/services/review-manager/synthesize-reviews-service.js:170-215` and
+`shared/config/prompts/review-synthesis.js:4-8`]
+
+The current prompt describes numeric picklist ratings, including the current
+impact rating. [VERIFIED via
+`shared/config/prompts/review-synthesis.js:43-53`]
+
+Publish a new **backward-compatible** prompt version before production question-set
+activation. It must:
+
+- continue to interpret `risk` and `overallRating` as unchanged numeric ratings;
+- treat `impactAreas` as categorical evidence using snapshot labels;
+- never average, rank, or infer magnitude from multiselect option values;
+- tolerate the old `impact` picklist during expand and rollback;
+- ignore rows marked unreadable by the server digest.
+
+Before publication, record the current prompt row ID, version, body, system prompt,
+variables, and a content hash in the cutover record. Publish through the existing
+audited prompt publication service, then verify the new row is current and its
+publication audit completed. [PLANNED]
+
+Prompt rollback is always another audited publication: copy the recorded prior
+body, system prompt, and variables into a new monotonic version. Never flip or edit
+a historical prompt row directly. The current publisher creates a new version and
+then retires the prior current row under ETag protection.
+[VERIFIED via `lib/services/admin/prompts-publish-service.js:73-96` and
+`lib/services/admin/prompts-publish-service.js:172-217`]
+
+## 6. Read and presentation behavior
+
+The answer entity remains the historical snapshot authority. Current question
+labels may change later; reports, comparisons, courtesy copies, and synthesis use
+the stored pair labels for submitted multiselect answers. [PLANNED]
+
+Expected presentation:
+
+- Reviewer card: selected labels as a list or chips beneath the question text.
+- Compare view: categorical selection frequency plus reviewer names; no average or
+  spread.
+- DOCX/PDF: a categorical section preserving question order and selected labels.
+- Courtesy copy: the semicolon-joined snapshot text.
+- Synthesis: categorical evidence with attribution; no numeric treatment.
+- Corrupt snapshot: “Unreadable answer,” excluded from aggregation and synthesis,
+  while the rest of the review still renders.
+
+The numeric matrix currently averages every picklist value it receives. A sentinel
+value such as `99` therefore changes the displayed average; this is why the existing
+fixture rows cannot be left orphaned. [VERIFIED via
+`shared/utils/review-matrix.js:146-158`]
+
+## 7. Primary controlled-production rehearsal before exposure
+
+Mode D is the rehearsal venue for this change. It requires a dedicated
+owner-approved test request and throwaway reviewer records, server-side record and
+recipient allowlists, a written write/cleanup inventory, capture mode unless real
+delivery is the test objective, and post-run reconciliation. [VERIFIED via
+`docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md:203-215`]
+
+Execute this sequence with external exposure held closed:
+
+1. Complete and verify the separate coherent-cache dependency in §0.2.
+2. Build and pass isolated automation on a release branch under the repository’s
+   Tier-2 process. [PLANNED]
+3. Complete the production expand and baseline capture in §9.1. [PLANNED]
+4. Publish the new synthesis prompt and the exact target question set from §1.2,
+   including the real required `impactAreas` options. [PLANNED]
+5. On a dedicated internal test suggestion, complete an end-to-end review through
+   the external authoring UI; save/reload a draft; submit; then exercise staff
+   manual entry, legacy upload, and mark-received. External email stays disabled or
+   captured by the sanctioned test mode. Verify canonical storage, DTO hydration,
+   matrix, card, comparison, DOCX, PDF, courtesy copy, and synthesis generated by
+   the new prompt. [PLANNED]
+6. Execute the documented question rollback procedure in §4 and the audited prompt
+   rollback in §5. Verify the exact prior question set and prior prompt, then
+   republish the new prompt and target set and verify them again. [PLANNED]
+7. Run a final controlled smoke against the republished target, then remove/reset
+   all rehearsal records through sanctioned cleanup. Require no remaining test
+   answer, draft, report/file, courtesy-email eligibility, or other unexpected
+   side effect; any synthesis memo follows §8's explicit record-as-stale rule.
+   Attach the evidence to the release record. [PLANNED]
+
+This accepts the residual risk that production is the first environment where the
+new schema, real configuration, prompt, and live integration seams are exercised
+together. Dedicated records, server-side allowlists, captured email, an exposure
+hold, immediate rollback, and reconciled cleanup limit—but do not eliminate—the
+chance of durable test side effects or interference with production traffic.
+[VERIFIED control requirements via
+`docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md:203-215`; residual risk is
+ASSUMED]
+
+No external reviewer is exposed until this exact production rehearsal, rollback,
+republish, final smoke, and cleanup sequence is green. [PLANNED]
+
+## 8. Exact audited cleanup path for the known test artifacts
+
+No deletion is authorized by this plan. The owner has authorized the read-only
+consumer probe below; its report is the prerequisite for a separate, explicit
+approval naming the exact writes. Cutover is blocked until the cleanup completes.
+[PLANNED]
+
+The existing hard-removal service performs a preflight, writes a durable system
+alert before deletion, removes answer rows and the suggestion in one Dataverse
+changeset, removes the Postgres draft, attempts linked file cleanup, and finalizes
+the audit with success or warnings. [VERIFIED via
+`lib/services/reviewer-finder/remove-candidate-service.js:195-234`,
+`lib/services/reviewer-finder/remove-candidate-service.js:246-426`, and
+`pages/api/reviewer-finder/my-candidates.js:129-160`]
+
+Use this **single audited procedure**, once for each exact suggestion ID:
+
+1. Run a read-only preflight for
+   `6ad328b4-f044-f111-88b5-000d3a306d45` and
+   `3c4bb952-e061-f111-a826-000d3a306da2`. Capture one signed report containing:
+   - **Request:** `_wmkf_request_value`, then request
+     `akoya_requestid`, `akoya_requestnum`, `akoya_title`,
+     `wmkf_reviewsynthesisjson`, and `modifiedon`.
+   - **Person:** `_wmkf_potentialreviewer_value`, then person
+     `wmkf_potentialreviewersid`, `wmkf_name`, `wmkf_emailaddress`, and
+     `_wmkf_contact_value`.
+   - **Lifecycle:** `wmkf_selected`, `wmkf_invited`, `wmkf_accepted`,
+     `wmkf_declined`, `wmkf_responsetype`, `wmkf_reviewstatus`,
+     `wmkf_reviewreceivedat`, `wmkf_completedat`, `wmkf_thankyousentat`,
+     `wmkf_reviewuploadedbystaff`, `wmkf_reviewfilename`,
+     `wmkf_reviewsharepointfolder`, `_wmkf_honorariumrequest_value`, and
+     `wmkf_applicantdisposition`.
+   - **Reports:** every answer snapshot’s `wmkf_appreviewanswerid`,
+     `_wmkf_appreviewersuggestion_value`, `wmkf_questionkey`,
+     `wmkf_questiontype`, `wmkf_questiontext`, `wmkf_answervalue`,
+     `wmkf_answertext`, `wmkf_answerhtml`, and `wmkf_answervalues`; review-file
+     pointers; and whether the record is included by the workbench DTO and report
+     composers.
+   - **Synthesis:** whether the suggestion passes the synthesis inclusion filter;
+     the request’s `wmkf_reviewsynthesisjson` content/hash and `modifiedon`; every
+     remaining suggestion included by `selectedOnly`, `wmkf_accepted`, and
+     `wmkf_reviewreceivedat`; and whether the stored synthesis postdates the
+     artifact review.
+   - **Thank-you sweep:** `wmkf_reviewreceivedat`, `wmkf_thankyousentat`, the
+     exclusion-filter result, `_wmkf_request_value`,
+     `_wmkf_potentialreviewer_value`, reviewer `wmkf_emailaddress`, and program
+     director `internalemailaddress` and `systemuserid`.
+2. Require the report to classify each artifact as disposable and enumerate every
+   consumer correction the hard removal will cause. If either artifact has a sent
+   thank-you, honorarium dependency, retained report, or non-test owner, stop.
+   Present that same report for expanded write authority;
+   do not invent an alternate cleanup and do not proceed with cutover.
+3. Obtain explicit owner approval for hard removal of both exact suggestion IDs,
+   their answer rows, their Postgres drafts, and linked test review objects.
+   Approval must also state `deleteContact:false`.
+4. Under the existing superuser/app guard, call
+   `DELETE /api/reviewer-finder/my-candidates` for each artifact with:
+
+   ```json
+   {
+     "suggestionId": "<exact-id-above>",
+     "mode": "hard",
+     "deleteContact": false
+   }
+   ```
+
+   The EICAR suggestion’s sentinel answer rows and the `Gallivan_test` suggestion’s
+   draft are removed as children of the same audited suggestion-removal workflow.
+5. Do not add a synthesis-cleanup service or make request-memo cleanup part of
+   fixture removal. For each affected test request, preserve the preflight
+   synthesis content/hash in the removal record and mark any non-empty memo as
+   potentially stale after deletion. Leave it unchanged. If staff later needs a
+   current synthesis and genuine submitted reviews remain, the existing
+   `synthesizeReviews({ overwrite: true })` path regenerates from the remaining
+   selected, accepted, received reviews and overwrites the memo. With no remaining
+   submitted review, regeneration correctly refuses rather than requiring a
+   bespoke clear operation. [VERIFIED via
+   `lib/services/review-manager/synthesize-reviews-service.js:170-176` and
+   `lib/services/review-manager/synthesize-reviews-service.js:192-215`]
+6. Re-run the read-only probe and require: both suggestion lookups absent; no answer
+   snapshots referencing either ID; no Postgres draft for either ID; no linked test
+   review object; neither artifact eligible for a thank-you; any unchanged synthesis
+   memo is explicitly recorded as potentially stale and regenerable; and both
+   durable removal audits finalized without unresolved warnings. Attach before/after
+   evidence and the owner approval to the cutover record. [PLANNED]
+
+The synthesis inclusion filter requires selected, accepted suggestions with a
+received-review timestamp, while the thank-you sweep evaluates a received review
+with no sent timestamp and additional exclusion/sender conditions. These consumers
+must therefore be probed explicitly rather than inferred from filenames.
+[VERIFIED via
+`lib/services/review-manager/synthesize-reviews-service.js:170-204` and
+`lib/services/reviewer-thankyou-sweep.js:150-185`]
+
+Leaving either artifact orphaned, deleting only the answer rows, deleting only the
+draft, or bypassing the existing removal audit is prohibited. [PLANNED]
+
+## 9. Production expand, activation, exposure, and rollback
+
+### 9.1 Expand and prepare
+
+1. Apply the additive `wmkf_answervalues` schema to production and verify metadata
+   readback. Do not activate a multiselect question yet. [PLANNED]
+2. Deploy the backward-compatible code: old question rows and old answer snapshots
+   must behave exactly as before; new readers tolerate null `wmkf_answervalues`.
+   [PLANNED]
+3. Verify the coherent-cache dependency across independently routed production
+   requests while the old question set remains active. [PLANNED]
+4. Execute the §8 consumer probe, obtain the separately required deletion
+   approval, complete the single audited cleanup procedure, and attach its
+   postconditions. [PLANNED]
+5. Record the active and inactive question rows with IDs/ETags, normalized active
+   version, and the completed question audit; record the current synthesis prompt
+   identity/content/hash. Produce and review the §4 manual rollback dry-run manifest
+   against the selected prior audit. [PLANNED]
+
+### 9.2 Primary rehearsal, rollback proof, republish, then expose
+
+1. Publish the backward-compatible synthesis prompt from §5. Verify its current
+   state and completed audit while the old question set is still active. [PLANNED]
+2. Publish the exact target question set in §1.2 through the admin full-set save.
+   Record the publication request ID needed by rollback. [PLANNED]
+3. From independently routed requests, verify the same new
+   `questionSetVersion`, exact key/type/order/options set, and a clean context,
+   draft, and validation response. Any mixed version triggers immediate rollback.
+   [PLANNED]
+4. Run a controlled production smoke using a dedicated internal test suggestion,
+   with external email disabled or captured by the sanctioned test mode. Exercise
+   the real `impactAreas` configuration and new prompt end-to-end and satisfy every
+   acceptance surface in §7. [PLANNED]
+5. While external exposure remains closed, execute the §4 manual rollback
+   changeset, require exact prior-version readback, and publish the recorded prior
+   prompt as a new audited version. Then republish the new prompt and exact target
+   question set and verify both again. [PLANNED]
+6. Run the final controlled smoke against the republished configuration, then clean
+   every rehearsal record through the sanctioned reset/removal path and reconcile
+   the expected durable writes. [PLANNED]
+7. Only after the primary smoke, rollback rehearsal, republish verification, final
+   smoke, and cleanup evidence are green may external reviewers be exposed to the
+   new form. [PLANNED]
+
+### 9.3 Ordered rollback
+
+If activation or the controlled smoke fails:
+
+1. Stop external exposure and preserve the failed publication and prompt audit IDs.
+2. Execute the reviewed §4 rollback manifest as one changeset, reactivating prior
+   rows by immutable row ID and never POSTing an existing key; require exact
+   prior-version readback across independently routed requests.
+3. Publish a new prompt version containing the recorded prior prompt content and
+   verify it is current.
+4. Only after the old configuration is active may the last known-good application
+   version be promoted; old code must never receive active `multiselect` rows.
+5. Clean the controlled smoke record and reconcile its answer, draft, report,
+   synthesis, and courtesy-email surfaces.
+
+If only the new synthesis prompt fails after the form is otherwise healthy, publish
+the recorded prior prompt as a new version and leave the compatible code and
+question set in place. The nullable answer property remains after every rollback;
+do not contract schema during an incident. [PLANNED]
+
+## 10. Test contract
+
+### 10.1 Canonical producer and corruption tests
+
+Add focused tests proving:
+
+- numeric request values become live-option `{value,label}` pairs;
+- request order is ignored and live option order wins;
+- duplicates are deduplicated;
+- an unknown numeric value is rejected;
+- a label string or `{value,label}` object is rejected as tampered-label input;
+- required empty selection is rejected and optional empty selection becomes `[]`;
+- corrupted stored JSON, a wrong shape, duplicate stored values, and invalid pairs
+  produce the unreadable DTO marker without failing other answers;
+- the row emitter writes `answerValue=null`, canonical JSON, and joined text;
+- picklist/rich-text/string rows write null multiselect storage.
+
+### 10.2 Every entry point
+
+For portal submit, manual entry, legacy upload, and mark-received, prove:
+
+- the same live question set and canonicalizer are used;
+- multiselect rows are emitted once per question;
+- `risk` and `overallRating` remain the only core rating snapshots;
+- partial failure does not leave an answer-only commit outside the existing
+  changeset boundary;
+- draft cleanup remains post-success and does not change answer durability.
+
+The portal builder currently emits answer rows into the submission changeset, and
+the answer alternate key enforces one row per suggestion/question.
+[VERIFIED via `lib/external/build-review-submission.js:182-210` and
+`lib/dataverse/adapters/review-answer.js:173-199`]
+
+### 10.3 UI, admin, and outputs
+
+Add tests for:
+
+- hydration from a numeric-array draft, including stale option removal;
+- native checkbox interaction, required validation, reload, and submission;
+- admin create/edit/reorder/serialize for multiselect options;
+- rejection of duplicate option values and blank labels;
+- parent-bound enforcement with exactly `affiliation`, `risk`, and
+  `overallRating`;
+- numeric matrix averages excluding multiselect rows;
+- categorical tally behavior across historical label changes;
+- card, comparison, DOCX, PDF, courtesy copy, and synthesis rendering;
+- corrupt multiselect storage exclusion from tallies and synthesis;
+- old question-set and old-answer regressions during expand;
+- cache-coherence acceptance across independently routed requests;
+- manual question restore manifest/execution and audited prompt rollback.
+
+### 10.4 Gates
+
+Run the repository’s relevant gate and self-test pairs sequentially, followed by
+type checks, focused tests, the full test suite, and the production build. Gate
+selection and ordering come from the live CI reference at implementation time.
+[VERIFIED via `docs/CI_GATES_REFERENCE.md:1-25`]
+
+At minimum, changed-surface validation includes instruction invariants, docs
+frontmatter/catalog checks, state-Atlas checks, Dataverse schema safety, service
+contracts, prompt governance, security checks for any touched route, lint, tests,
+and build. [PLANNED]
+
+## 11. Durable-surface reconciliation
+
+In the implementation commit, update:
+
+- `docs/atlas/dataverse-wmkf-appreviewanswer.md` for
+  `wmkf_answervalues`, canonical JSON, and corrupt-row behavior;
+- `docs/atlas/dataverse-wmkf-reviewquestion.md` for `multiselect`;
+- `docs/atlas/postgres-review-drafts.md` for numeric-array draft values;
+- source headers and `docs/SERVICE_AND_UTILITY_CATALOG.md` where public service
+  contracts change;
+- prompt governance records for the published synthesis prompt;
+- the active reviewer-form memory so it no longer says the target includes
+  checkbox-plus-free-text `Other` or that test artifacts can be treated as absent.
+
+The older completed-epic authoring plans are historical design records; annotate
+their staleness only if the repository’s durable-doc rule requires it rather than
+rewriting history. [PLANNED]
+
+The current active memory still describes a broader checkbox-plus-`Other` ask and
+states that the test data makes keys freely redefinable. Draft 4 deliberately does
+not rely on either claim. [VERIFIED via
+`.claude-memory/project-review-form-checkbox-questions.md:1-22` and
+`.claude-memory/project-review-form-checkbox-questions.md:59-78`]
+
+## 12. Completion checklist
+
+Implementation is complete only when all of the following are evidenced:
+
+- [ ] The separate coherent-cache dependency is deployed and its multi-instance
+  acceptance probe is green.
+- [ ] `CORE_RATING_KEYS` and `PARENT_BOUND_KEYS` resolve exactly as §1.1 states.
+- [ ] `risk` and `overallRating` retain their current keys, meanings, labels, and
+  numeric domains.
+- [ ] The exact §1.2 mapping is enforced: retire `impact`, `q7`, and `q9`; create
+  `priorWork`, `impactAreas`, and `teamCapacity`; retain every other listed key.
+- [ ] The additive answer property is provisioned and read back.
+- [ ] The one authoritative canonicalizer owns validation, deduplication, ordering,
+  label construction, JSON, and joined text.
+- [ ] Every type gate in §3 is implemented and classified.
+- [ ] The real target multiselect configuration and versioned prompt have passed
+  the primary controlled-production rehearsal and rollback rehearsal.
+- [ ] Both named test artifacts have passed the consumer probe, received explicit
+  deletion authority, and completed the one audited cleanup procedure.
+- [ ] The prompt is published before production question-set activation.
+- [ ] Controlled production smoke and cleanup are green before external exposure.
+- [ ] Question rollback is executable from the reviewed manual manifest and
+  preserved release evidence; prompt rollback is audited; both are ordered and
+  rehearsed.
+- [ ] Corrupt JSON, tampered labels, unknown values, and duplicates are tested.
+- [ ] Matrix, cards, comparisons, DOCX, PDF, courtesy copy, synthesis, and
+  thank-you behavior are verified.
+- [ ] Relevant gates, tests, and build are green.
+- [ ] Atlas, service catalog, prompt records, and active memory agree with shipped
+  behavior.
+
+## 13. Explicit non-goals
+
+- No checkbox-plus-free-text `Other` behavior.
+- No row-per-option answer storage.
+- No Dataverse multi-select Choice property.
+- No schema contraction during rollout or rollback.
+- No client-supplied labels.
+- No orphaned fixture answers or drafts.
+- No deletion without the separately recorded approval required by §8.
+- No workaround for the pre-cutover cache-coherence dependency.
