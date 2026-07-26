@@ -3,11 +3,11 @@
 **Current status (2026-07-26):** the original implementation brief below is
 historical. The compatible multiselect code and production schema expansion are
 complete and deployed; the known-fixture cleanup is also complete. The live next
-work is the remaining pre-activation sequence in
-`docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` §9: target question publication,
-controlled smoke, rollback rehearsal, republish, final smoke, and exposure. The
+work is the remaining pre-exposure sequence in
+`docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` §9: controlled smoke, rollback
+rehearsal, republish, final smoke, and exposure. The target question publication,
 independently routed production HTTP writer gate and backward-compatible
-`review-synthesis.generate` v2 publication both completed 2026-07-26.
+`review-synthesis.generate` v2 publication all completed 2026-07-26.
 
 ## Session 375 Summary
 
@@ -101,14 +101,28 @@ The next session is expected to be Codex implementing against the frozen plan.
 
 1. **Complete the remaining pre-activation release gates.**
    Evidence: `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` records compatible code
-   deployed on `main`, wave 15 read back in production, and the legacy 12-row set
-   still active. The compatible synthesis prompt is current; target question
-   publication, rollback rehearsal, controlled smoke, and exposure remain pending.
+   deployed on `main`, wave 15 read back in production, and the frozen target
+   12-row set active at version `347a37e820f73890`. The compatible synthesis
+   prompt is current; rollback rehearsal, controlled smoke, and exposure remain pending.
    **Target go-live remains 2026-08-15.**
 
 ### Recently Closed
 
-1. **§9.2(1) backward-compatible synthesis prompt publication completed
+1. **§9.2(2) exact target question publication completed 2026-07-26.**
+   The audited production admin full-set route retained `affiliation`, created
+   the eleven frozen target rows, and retired the eleven legacy rows atomically.
+   Production now has exactly 12 active target rows at normalized version
+   `347a37e820f73890` and 11 inactive legacy rows. Audit request
+   `3d0c7160-3a09-4d96-ab9f-36ebe63e0e7a` has the required pending/completed
+   pair, summary `{created:11, updated:0, deleted:11, reordered:0}`, and no
+   warnings. Three independently routed admin reads returned the target version.
+   The synthesis prompt remained current v2 and matched its tracked source. A
+   reviewed 23-PATCH rollback manifest is preserved but has not been executed.
+   Evidence:
+   `outputs/review-form-multiselect/question-publication-evidence-2026-07-26.json`,
+   SHA-256 `9f5dead9ecc9989e2701f7ec6573c6313eb295a68a40b1ebc6992d3faade16cf`.
+
+2. **§9.2(1) backward-compatible synthesis prompt publication completed
    2026-07-26.**
    Production prompt `review-synthesis.generate` advanced monotonically from
    v1 `d97a4a17-6977-f111-ab0f-000d3a306da2` to current v2
@@ -121,7 +135,7 @@ The next session is expected to be Codex implementing against the frozen plan.
    `outputs/review-form-multiselect/prompt-publication-evidence-2026-07-26.json`,
    SHA-256 `50b7a4974e6bcd5e7dd1135bf1edd228f300fe42de406d5951c3ca10dbdbe428`.
 
-2. **§9.1(3) independently routed production HTTP writer evidence completed
+3. **§9.1(3) independently routed production HTTP writer evidence completed
    2026-07-26.**
    The external context and all four writer routes resolved the live legacy
    question-set version `119da525418d1d43` through separate production HTTP
@@ -133,7 +147,7 @@ The next session is expected to be Codex implementing against the frozen plan.
    `outputs/review-form-multiselect/production-http-writer-evidence-2026-07-26.json`,
    SHA-256 `b6885185ab7281c53ac658c62803f831941732f69f75cbb3ee4784960a2c1b62`.
 
-3. **§8 fixture cleanup completed 2026-07-26.**
+4. **§8 fixture cleanup completed 2026-07-26.**
    The owner confirmed both exact records were disposable tests and authorized
    their children/linked test artifacts with `deleteContact:false`. The first
    preflight stopped on a then-unclassified Tim Newhouse/St. Jude PDF in the EICAR

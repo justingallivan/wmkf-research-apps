@@ -3,7 +3,7 @@ title: "Review Form Multi-Select Questions — Build Plan"
 domain: architecture
 kind: plan
 status: active
-summary: "Add a multiselect question type and re-author the review question set from the owner's reworked form, expand-first with rehearsal before activation."
+summary: "Add multiselect end to end and publish the owner's reworked review question set, with rollback rehearsal before reviewer exposure."
 canonical: false
 cataloged: 2026-07-25
 owner: product-engineering
@@ -27,8 +27,10 @@ readback completed 2026-07-26, followed by compatible code promotion to `main`
 (`5282cee8`) and a Ready production deployment
 (`dpl_7sfTLrMafYPKp7mnYdrEVjs9HmW5`). The backward-compatible
 `review-synthesis.generate` v2 publication also completed 2026-07-26 while the
-legacy question set remained unchanged. Target-question publication, controlled
-rehearsal/rollback, and reviewer exposure remain pending; the known fixture
+legacy question set remained unchanged. The exact target question set was then
+published atomically on 2026-07-26 and is active at normalized version
+`347a37e820f73890`; controlled rehearsal/rollback and reviewer exposure remain
+pending. The known fixture
 disposition completed 2026-07-26, as did the independently routed production
 HTTP proof for all four review writers. The 2026-07-26
 read-only pre-activation evidence pass found that the EICAR fixture already has a
@@ -54,7 +56,13 @@ it is intentionally not a fresh-clone source of truth because it contains live
 production identifiers and test email addresses. Prompt publication evidence,
 including the complete v1 rollback payload, is
 `outputs/review-form-multiselect/prompt-publication-evidence-2026-07-26.json`,
-SHA-256 `50b7a4974e6bcd5e7dd1135bf1edd228f300fe42de406d5951c3ca10dbdbe428`.]
+SHA-256 `50b7a4974e6bcd5e7dd1135bf1edd228f300fe42de406d5951c3ca10dbdbe428`.
+Question publication completed under audit request
+`3d0c7160-3a09-4d96-ab9f-36ebe63e0e7a`, with 12 exact target rows active, 11
+legacy rows inactive, no audit warnings, and a preserved 23-PATCH rollback
+manifest. Evidence:
+`outputs/review-form-multiselect/question-publication-evidence-2026-07-26.json`,
+SHA-256 `9f5dead9ecc9989e2701f7ec6573c6313eb295a68a40b1ebc6992d3faade16cf`.]
 **Target go-live: 2026-08-15** (owner-set; the date external reviewers first see the
 new form).
 
@@ -364,17 +372,16 @@ names `riskLevel` and `overallAssessment` is itself withdrawn. [IMPLEMENTED IN S
 
 The admin publication must reconcile to this complete ordered set. The content
 column is normative display text and must be authored verbatim; hints are omitted
-unless stated. [IMPLEMENTED IN SOURCE; PRODUCTION PUBLICATION PENDING]
+unless stated. [IMPLEMENTED IN SOURCE; PRODUCTION PUBLICATION COMPLETED 2026-07-26]
 
 Omitted active questions are deactivated by the existing full-set save behavior.
 [VERIFIED via `lib/services/admin/review-questions-service.js:82-145`]
 
-Apply one stable-key rule uniformly: keep the current key when revised wording
-still asks the same underlying question and an answer retains the same meaning;
-retire the current key and create a new one when the answer semantics or answer
-type changes. The Atlas prohibits reusing a key for a different question, not
-continued use of the same question after rewording. [VERIFIED via
-`docs/atlas/dataverse-wmkf-reviewquestion.md:24-30`]
+The normal stable-key rule is to keep a key when revised wording retains the same
+answer semantics and to create a new key when semantics/type change. For this
+one-time zero-genuine-answer cutover, the owner's explicit §1.1 decision overrides
+that default: every numbered row is re-keyed and only `affiliation` retains its
+key. The retired rows remain inactive and their keys are never reused.
 
 | Order | Key | Type | Required display text and option contract |
 |---:|---|---|---|
@@ -400,14 +407,10 @@ unchanged from the current `risk` and `overallRating` rows; only the keys change
 static-schema values. [VERIFIED via `lib/external/review-form-schema.js:68-82` and
 `lib/external/review-form-schema.js:126-141`]
 
-The current and target texts show that `q2`, `q4`, `q5`, `q6`, `q8`, and `q11`
-are wording revisions of the same questions, so they keep their keys. `impact`
-changes from a single impact rating to a categorical multiselect, while current
-`q7` and `q9` are replaced by one polarity-changed, combined team-capacity question;
-those answers would not retain the same meaning. [VERIFIED current text via
-`lib/external/review-form-schema.js:42-61`,
-`lib/external/review-form-schema.js:76-123`, and
-`lib/external/review-form-schema.js:138-145`; target disposition is PLANNED]
+An earlier draft would have retained `q2`, `q4`, `q5`, `q6`, `q8`, and `q11`
+under the normal semantic rule. That disposition was explicitly withdrawn when
+the owner chose whole-set re-keying for human legibility (§1.1); it is historical,
+not the publication contract.
 
 Retire every current key except `affiliation` through the full-set publication —
 `impact`, `risk`, `overallRating`, `q2`, `q4`, `q5`, `q6`, `q7`, `q8`, `q9`, and
@@ -417,12 +420,12 @@ Retire every current key except `affiliation` through the full-set publication �
 `affiliation` alone keeps its existing immutable key, because it is the
 reviewer-identity field, is unchanged by the new form, and is the one key still bound
 to a parent column through `reviewParentColumnByKey`. [IMPLEMENTED IN SOURCE;
-PRODUCTION PUBLICATION PENDING]
+PRODUCTION PUBLICATION COMPLETED 2026-07-26]
 
 Two rating questions change key but not meaning: the `risk` row's options and hint
 carry onto `riskLevel`, and the `overallRating` row's five options carry onto
 `overallAssessment`, values unchanged. This is a re-key, not a re-scoring.
-[IMPLEMENTED IN SOURCE; PRODUCTION PUBLICATION PENDING]
+[IMPLEMENTED IN SOURCE; PRODUCTION PUBLICATION COMPLETED 2026-07-26]
 
 ## 2. Storage and canonical answer contract
 
@@ -771,6 +774,14 @@ dry-run manifest must show `impact` reactivated by its existing row ID and
 `impactAreas` deactivated by its row ID, proving that rollback does not create a
 duplicate immutable key. [PLANNED]
 
+The publication evidence now contains the reviewed executable dry-run manifest:
+23 operations, all PATCHes, sourced from completed audit request
+`3d0c7160-3a09-4d96-ab9f-36ebe63e0e7a`. It reactivates `impact` by its existing
+inactive row ID, restores retained `affiliation`, and deactivates `impactAreas`
+by its newly created row ID, all with fresh ETags. The manifest is captured and
+validated but has not been executed; the production rollback rehearsal remains
+pending. [MANIFEST COMPLETED 2026-07-26; REHEARSAL PLANNED]
+
 ## 5. Versioned synthesis prompt
 
 The synthesis service reads submitted review snapshots, constructs a structured
@@ -852,8 +863,8 @@ Execute this sequence with external exposure held closed:
 3. Complete the production expand and baseline capture in §9.1. [PLANNED]
 4. Publish the new synthesis prompt and the exact target question set from §1.2,
    including the real required `impactAreas` options. The compatible prompt
-   publication is complete; target-question publication remains pending.
-   [PROMPT COMPLETED 2026-07-26; QUESTION SET PLANNED]
+   and exact target-question publications are complete.
+   [COMPLETED 2026-07-26]
 5. On a dedicated internal test suggestion, complete an end-to-end review through
    the external authoring UI; save/reload a draft; submit; then exercise staff
    manual entry, legacy upload, and mark-received. External email stays disabled or
@@ -1040,11 +1051,11 @@ cleanup satisfied this invariant. [VERIFIED]
    history were captured 2026-07-26. The prior v1 prompt body, system prompt,
    variables, output-schema hash, and content hashes are now preserved as the
    audited monotonic rollback input; current v2 and its completed audit were also
-   captured. The stored question template proves `impact` can be
-   reactivated by its existing row ID but deliberately cannot prove the
-   `impactAreas` row-ID deactivation until that row exists after publication;
-   therefore the executable manifest/review remains pending. [BASELINE CAPTURED;
-   PROMPT ROLLBACK INPUT CAPTURED; QUESTION MANIFEST PLANNED]
+   captured. After publication, the reviewed executable 23-PATCH question
+   manifest was generated from the completed audit and fresh active/inactive
+   row IDs/ETags. It proves `impact` reactivation and `impactAreas` deactivation
+   by existing row ID without any POST. [COMPLETED 2026-07-26; EXECUTION/REHEARSAL
+   REMAINS PENDING]
 
 ### 9.2 Primary rehearsal, rollback proof, republish, then expose
 
@@ -1056,11 +1067,18 @@ cleanup satisfied this invariant. [VERIFIED]
    `codex-review-synthesis-multiselect-2026-07-26` is completed with no warnings.
    The legacy question-set version/digest/rows were unchanged.
 2. Publish the exact target question set in §1.2 through the admin full-set save.
-   Record the publication request ID needed by rollback. [PLANNED]
+   **[COMPLETED 2026-07-26]** The atomic save retained `affiliation`, created 11
+   target rows, retired 11 legacy rows, and returned normalized version
+   `347a37e820f73890`. Audit request
+   `3d0c7160-3a09-4d96-ab9f-36ebe63e0e7a` has a completed pending/final pair,
+   exact before/after sets, the expected summary, and no warnings.
 3. From independently routed requests, verify the same new
    `questionSetVersion`, exact key/type/order/options set, and a clean context,
    draft, and validation response. Any mixed version triggers immediate rollback.
-   [PLANNED]
+   Three independently routed admin reads plus a direct Dataverse read verified
+   the exact target version/set. External context, draft, and validation-route
+   verification remain part of the controlled smoke. [PARTIALLY COMPLETED
+   2026-07-26; CONTROLLED-SMOKE READERS PLANNED]
 4. Run a controlled production smoke using a dedicated internal test suggestion,
    with external email disabled or captured by the sanctioned test mode. Exercise
    the real `impactAreas` configuration and new prompt end-to-end and satisfy every
@@ -1198,6 +1216,9 @@ remain release gates and must not be inferred from code completion:
   numeric domains under new keys.
 - [x] The exact §1.2 mapping is encoded: retain only `affiliation`; retire the
   other eleven legacy keys and create all eleven numbered target keys.
+- [x] The exact §1.2 target is published in production at version
+  `347a37e820f73890`, with 12 active target rows, 11 inactive legacy rows, and a
+  completed warning-free audit pair.
 - [x] The additive answer property has a reviewed wave-15 schema package.
 - [x] The additive answer property is provisioned and read back.
 - [x] The one authoritative canonicalizer owns validation, deduplication, ordering,
@@ -1213,9 +1234,10 @@ remain release gates and must not be inferred from code completion:
   the separately preserved Tim Newhouse/St. Jude legacy test PDF were preserved.
 - [x] The prompt is published before production question-set activation.
 - [ ] Controlled production smoke and cleanup are green before external exposure.
-- [ ] Question rollback is executable from the reviewed manual manifest and
-  preserved release evidence; prompt rollback is audited; both are ordered and
-  rehearsed.
+- [x] Question rollback is executable from the reviewed 23-PATCH manual manifest
+  and preserved release evidence.
+- [ ] Question and prompt rollback are executed, ordered, and rehearsed; the
+  target prompt/set are then republished and verified.
 - [x] Corrupt JSON, tampered labels, unknown values, and duplicates are tested.
 - [x] Matrix, cards, comparisons, DOCX, PDF, courtesy copy, and synthesis have
   source-level focused coverage.
@@ -1223,7 +1245,7 @@ remain release gates and must not be inferred from code completion:
   verified in the controlled rehearsal.
 - [x] Relevant gates, tests, and build are green for the feature branch.
 - [x] Atlas, service catalog, source prompt contract, and active memory agree with
-  the implemented-vs-production-pending boundary.
+  the published-but-rehearsal/exposure-pending boundary.
 
 ## 13. Explicit non-goals
 

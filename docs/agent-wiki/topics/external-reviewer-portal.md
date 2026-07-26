@@ -104,10 +104,10 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
 - **The stage2b "submit your review" surface is now in-browser authoring, not file upload (S301, Phase 2).**
   `MaterialsView` renders `ReviewAuthoringForm` (controlled) with the staff-editable
   Dataverse question set across `string`, single-choice `picklist`, fixed-option
-  `multiselect`, and `richtext` fields. The staged target seed has 11 numbered
+  `multiselect`, and `richtext` fields. The active target seed has 11 numbered
   questions — 2 rating radios, 1 checkbox multiselect, and 8 `RichReviewEditor`
-  (tiptap) narrative answers — plus the affiliation field; production remains on
-  the prior active set until the controlled publication. The form autosaves to
+  (tiptap) narrative answers — plus the affiliation field; the exact target set
+  was published to production on 2026-07-26. The form autosaves to
   Postgres `review_drafts` via the `GET/PUT /api/external/review/[token]/draft` route
   (`ReviewDraftService`). Reviewer HTML is UNTRUSTED: the draft PUT server-sanitizes
   every rich-text answer with `lib/external/sanitize-review-html.js` (DOM-free
@@ -156,7 +156,7 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   an in-flight session or the answer is recorded against text the reviewer never saw (Codex Phase B P1-A).
   Draft load reconciles type-aware — a draft value whose shape ≠ the current field type is discarded. `lib/external/review-form-schema.js` is RETAINED as the field-shape +
   seed + helper source (`reviewParentColumnByKey` affiliation binding, rating label
-  decoders, and staged target set). All four write boundaries — portal submit,
+  decoders, and active target set). All four write boundaries — portal submit,
   staff manual entry, legacy upload, and mark-received-no-file — resolve the
   authoritative live question set before validation. (The staff
   `ReviewFormFields` upload surface that also used the static default was **removed from
@@ -171,7 +171,7 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   reload); set capped at 100; the three protected core rows
   (`affiliation`/`riskLevel`/`overallAssessment`) cannot be removed (server 400).
   Plan: `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md`.
-- **Fixed-option multiselect is implemented in source; production activation is pending (S376, 2026-07-26).**
+- **Fixed-option multiselect is implemented and its exact target configuration is active in production (S376, 2026-07-26).**
   The review-question path supports exactly `picklist` (single-choice radios),
   `multiselect` (native checkbox fieldset), `richtext`, and `string`. The browser
   sends numeric arrays only; `lib/external/review-multiselect.js` validates against
@@ -186,11 +186,14 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   exact metadata and entity-set select readback passed via
   `scripts/probe-review-answer-multiselect-field.mjs`. Compatible code was then
   promoted at `5282cee8` and is live in production deployment
-  `dpl_7sfTLrMafYPKp7mnYdrEVjs9HmW5`; the prior 12-row question set remains active.
-  The backward-compatible `review-synthesis.generate` v2 publication completed
+  `dpl_7sfTLrMafYPKp7mnYdrEVjs9HmW5`. The prior set remained active through the
+  backward-compatible `review-synthesis.generate` v2 publication, which completed
   through the audited admin route on 2026-07-26 without changing that legacy
-  set. Target-question publication, controlled rehearsal/rollback, and reviewer
-  exposure remain separate release gates. Known-fixture disposition cleared
+  set. The audited full-set publication then activated the exact target at
+  version `347a37e820f73890`, retained `affiliation`, and retired the eleven
+  prior-only rows under request `3d0c7160-3a09-4d96-ab9f-36ebe63e0e7a`.
+  Controlled rehearsal/rollback and reviewer exposure remain separate release
+  gates. Known-fixture disposition cleared
   2026-07-26 via audited alerts `361`/`362`, with both CRM contacts and an
   initially unclassified Tim Newhouse/St. Jude PDF preserved. The owner later
   identified that PDF as another test artifact from the retired reviewer-PDF

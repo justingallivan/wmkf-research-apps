@@ -1,11 +1,11 @@
 ---
 name: project-review-form-checkbox-questions
-description: Owner reworked the reviewer review form; fixed-option multiselect support, production schema expansion, compatible code deployment, known-fixture cleanup, and compatible synthesis-prompt publication are complete, while question publication, rehearsal, and exposure remain pending.
+description: Owner reworked the reviewer review form; fixed-option multiselect support, production schema expansion, compatible code deployment, known-fixture cleanup, compatible synthesis-prompt publication, and exact target-question publication are complete, while rehearsal and exposure remain pending.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-26 via production pre-activation and cleanup evidence bundles plus implementation source and focused contract tests
+  last_verified: 2026-07-26 via audited production question/prompt publication, pre-activation and cleanup evidence bundles, implementation source, and focused contract tests
 ---
 
 ## Status (2026-07-26 implementation pass)
@@ -16,8 +16,11 @@ production as `dpl_7sfTLrMafYPKp7mnYdrEVjs9HmW5`; wave 15 was applied to
 production and read back first on 2026-07-26. The backward-compatible
 `review-synthesis.generate` v2 was published through the audited admin route on
 2026-07-26 while the legacy question set remained byte-for-byte unchanged.
-Target-question publication, controlled rehearsal/rollback and reviewer exposure
-are deliberately still pending. Fixture disposition completed 2026-07-26. The read-only pre-activation
+The exact target question set was then published through the audited admin
+full-set route on 2026-07-26: 12 target rows are active at version
+`347a37e820f73890`, 11 legacy rows are inactive, and the retained `affiliation`
+row kept its identity. Controlled rehearsal/rollback and reviewer exposure are
+deliberately still pending. Fixture disposition completed 2026-07-26. The read-only pre-activation
 probe found a sent thank-you marker on the EICAR fixture, so the frozen cleanup
 contract stopped before the later deletion authority and cleanup. A follow-up
 read-only investigation traced
@@ -47,8 +50,9 @@ Closed owner decisions (do not reopen without a new one):
 - Production operations are not implied by a green code build. Applying wave 15,
   publishing the prompt or question set, exercising rollback, and opening
   reviewer exposure are separately controlled steps. Wave 15 and compatible
-  prompt publication cleared 2026-07-26; target-question publication, rollback,
-  and exposure remain controlled and pending. Fixture deletion was a separately
+  prompt publication cleared 2026-07-26; exact target-question publication also
+  cleared 2026-07-26. Rollback rehearsal and exposure remain controlled and
+  pending. Fixture deletion was a separately
   controlled step and cleared 2026-07-26.
 - Wave 15 is a **pre-deployment** gate, not only a pre-activation gate: readers
   always select `wmkf_answervalues` and writers always emit it, so production
@@ -118,8 +122,10 @@ paragraph remains historical evidence for why the full-chain change was required
 production release had to apply/read back wave 15 before deploying the compatible
 code, because its readers and writers reference `wmkf_answervalues` even while the
 old question set remains active. That gate cleared on 2026-07-26, and the compatible
-code is now deployed. The prior 12-row question set remains active; a `multiselect`
-row may be activated only through the later controlled publication/rehearsal steps.
+code is now deployed. The prior 12-row question set remained active through the
+compatible prompt publication, then the exact target set was atomically published
+on 2026-07-26. A `multiselect` row is now active; exposure remains held pending
+the controlled rehearsal/rollback steps.
 Hand-writing a `checkbox` type remains invalid; the supported type name is exactly
 `multiselect`.
 
@@ -131,10 +137,10 @@ Committed probe `scripts/probe-review-multiselect-preactivation.mjs` produced
 `a22c5029bdd7341fe81f74d53d4668b37f6f77699fea7370135cba5bd9155e30`).
 It made no production writes.
 
-- The legacy 12-row set remains active at version `119da525418d1d43`; there are
-  no inactive question rows. The encoded target validates at version
-  `347a37e820f73890` and would create 11 rows, retain `affiliation`, and
-  deactivate 11 legacy rows.
+- At the pre-activation measurement, the legacy 12-row set remained active at
+  version `119da525418d1d43` with no inactive question rows. The encoded target
+  validated at version `347a37e820f73890` and would create 11 rows, retain
+  `affiliation`, and deactivate 11 legacy rows.
 - Four isolated production-target service processes resolved the same active
   version and stopped before their first write (`set_changed` for portal/manual;
   validation for legacy upload/mark-received). This is not independently routed
@@ -153,6 +159,13 @@ It made no production writes.
   the legacy `impact` row can be reactivated by its existing immutable ID, but
   cannot supply the future `impactAreas` row ID/ETag or cutover audit until after
   publication.
+- The later audited question publication completed under request
+  `3d0c7160-3a09-4d96-ab9f-36ebe63e0e7a`: 12 exact target rows are active at
+  `347a37e820f73890`, 11 legacy rows are inactive, and the completed audit has
+  no warnings. The resulting 23-PATCH rollback manifest now includes the real
+  `impactAreas` row ID/ETag and is preserved but not executed. Evidence:
+  `outputs/review-form-multiselect/question-publication-evidence-2026-07-26.json`,
+  SHA-256 `9f5dead9ecc9989e2701f7ec6573c6313eb295a68a40b1ebc6992d3faade16cf`.
 - EICAR fixture `6ad328b4-f044-f111-88b5-000d3a306d45` is selected, accepted,
   received, report/synthesis-included, owns the three sentinel answers and test
   file, and has `wmkf_thankyousentat=2026-05-01T01:11:26Z`. The frozen §8
