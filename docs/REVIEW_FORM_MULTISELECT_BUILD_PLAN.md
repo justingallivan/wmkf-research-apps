@@ -20,11 +20,39 @@ related:
 
 # Review Form Multi-Select Questions — Build Plan
 
-**Status:** DRAFT 4 (S375, 2026-07-26). Not started.
+**Status:** ACCEPTED AND FROZEN (S375, 2026-07-26). Implementation not started.
+**Target go-live: 2026-08-15** (owner-set; the date external reviewers first see the
+new form).
 
-This draft is the executable contract for adding a fixed-option, check-all-that-apply
-question to the research review form. It supersedes draft 3. The owner decisions in
-§1 are closed; implementation must not reopen them.
+This is the executable contract for adding a fixed-option, check-all-that-apply
+question to the research review form. Draft 4 was authored by Codex, reviewed by
+Claude, and accepted: §2.3's single-canonicalizer payload contract, §3's type-gate
+inventory with the §3.6 raw-comparison closeout, and §8's simplified cleanup path
+were each verified against source rather than taken on assertion.
+
+**Owner decisions applied after that review — closed, do not reopen:**
+
+1. **Re-key the whole set** (§1.1). Draft 4's semantic-retention rule was correct in
+   principle but produced four keys pointing at differently-numbered questions
+   forever. With no stored answers, legibility wins. Only `affiliation` keeps its key.
+2. **Manual rollback procedure** (§4) rather than building a reusable restore service.
+3. **Sandbox rehearsal dropped**; the controlled production smoke is the primary
+   pre-exposure rehearsal (§7, §9).
+4. **Deletion of the test artifacts is NOT authorized** by this plan (§8). The
+   read-only consumer probe is; deletion needs a separate approval naming exact writes.
+
+**FROZEN.** Do not reconcile this document against incidental source changes while
+implementation proceeds — it cites roughly thirty files, and per-change reconciliation
+was measurably more expensive than the drift it prevented. Reconcile it once, in full,
+when implementation lands. The §0.2 recheck markers below are the last such pass.
+
+**Scope note for the 2026-08-15 date.** Must-ship: the `multiselect` type end to end,
+the `wmkf_answervalues` column, every write path in §3.4, the re-keyed set published,
+PD read-back (cards, Compare section, per-option tally), the §5 synthesis prompt
+version, and one controlled production rehearsal. Deferrable past go-live without
+blocking reviewers: the bespoke DOCX/PDF categorical sections (exports read
+`answerText`, which carries the joined labels), and rehearsing the §4 rollback
+procedure as opposed to having it written.
 
 ## 0. Evidence, boundaries, and prerequisites
 
@@ -145,39 +173,56 @@ before any external reviewer is exposed. [PLANNED]
 
 ### 1.1 Key contract
 
-Among the current structured ratings, only `impact` is semantically replaced. Its
-successor is the new `impactAreas` multiselect question. The current `risk` and
-`overallRating` keys remain in place with their existing meanings, option labels,
-and numeric domains. [PLANNED]
+**Owner decision 2026-07-26 — supersedes draft 4's semantic-retention rule.** Draft 4
+kept `risk`, `overallRating`, `q2`, `q4`, `q5`, `q6`, `q8`, and `q11` on the principle
+that a key is retired only when the answer's meaning changes. That rule is sound when
+it protects stored answers. There are none: the only answer rows are sentinel fixtures
+scheduled for removal (§0.1, §8).
+
+Its cost, however, is permanent. Under draft 4's list, `q4` held Q5, `q5` held Q6,
+`q6` held Q8, and `q8` held Q9 — four keys pointing at differently-numbered questions,
+forever, for every future reader of an answer snapshot. Weighed against a
+human-legibility preference and a zero-data window that closes at the first real
+submission, the owner chose to re-key the whole set now.
+
+**Every question key is therefore re-authored except `affiliation`**, which is the
+reviewer-identity field, is unchanged by the new form, and remains bound to a parent
+column (`reviewParentColumnByKey`). Retire: `impact`, `risk`, `overallRating`, `q2`,
+`q4`, `q5`, `q6`, `q7`, `q8`, `q9`, `q11`.
 
 After the change, these constants must resolve exactly as follows:
 
 ```js
 export const CORE_RATING_KEYS = Object.freeze([
-  'risk',
-  'overallRating',
+  'riskLevel',
+  'overallAssessment',
 ]);
 
 export const PARENT_BOUND_KEYS = Object.freeze([
   'affiliation',
-  'risk',
-  'overallRating',
+  'riskLevel',
+  'overallAssessment',
 ]);
 ```
 
 `PARENT_BOUND_KEYS` may be implemented as
 `Object.freeze(['affiliation', ...CORE_RATING_KEYS])`, but the resulting values and
-order must be exactly the array above. [PLANNED]
+order must be exactly the array above. `impactAreas` is NOT a core rating — it is a
+multiselect and must never appear in either list, or `assertRatingInvariants` will
+demand a numeric `answerValue` it cannot have. [PLANNED]
 
-The current code instead includes `impact` in `CORE_RATING_KEYS`, derives the
-parent-bound set from it, and exposes rating snapshots for all three current
-rating keys. [VERIFIED via `lib/external/review-form-schema.js:151-181`,
+The current code includes `impact` in `CORE_RATING_KEYS`, derives the parent-bound set
+from it, and exposes rating snapshots for all three current rating keys. [VERIFIED via
+`lib/external/review-form-schema.js:151-181`,
 `lib/admin/review-question-save.js:40-45`,
 `lib/dataverse/adapters/review-answer.js:60-130`, and
 `lib/external/review-answer-snapshot.js:26-38`]
 
-Do not introduce `riskLevel` or `overallAssessment`. Those draft-2 names are
-withdrawn. [PLANNED]
+Both additional hardcoded rating-key lists must be re-authored to the same two names:
+`REVIEW_RATING_KEYS` in `lib/dataverse/adapters/review-answer.js` and in
+`lib/external/review-answer-snapshot.js`, plus `RATING_KEYS`/`PROJECTION_FIELD` in
+`shared/components/workbench/ReviewsTab.js`. Draft 4's instruction to withdraw the
+names `riskLevel` and `overallAssessment` is itself withdrawn. [PLANNED]
 
 ### 1.2 Target question set
 
@@ -199,22 +244,23 @@ continued use of the same question after rewording. [VERIFIED via
 |---:|---|---|---|
 | — | `affiliation` | `string` | Required: “Title & Organization”; `maxLength: 300`; `prefillFromCrm: true`; hint: “Pre-filled from CRM if known. Edit if your affiliation has changed.” This identity field is unnumbered and has no snapshot order. |
 | 1 | `priorWork` | `richtext` | Required, `maxLength: 50000`: “Q1 — Are there existing publications, technologies, or prior work that address part of the proposed work? What distinguishes this proposal?” |
-| 2 | `q2` | `richtext` | Required, `maxLength: 50000`: “Q2 — What specific significant impacts do you foresee? Which outcomes may be useful to your work?” |
+| 2 | `foreseenImpacts` | `richtext` | Required, `maxLength: 50000`: “Q2 — What specific significant impacts do you foresee? Which outcomes may be useful to your work?” |
 | 3 | `impactAreas` | `multiselect` | Required: “Q3 — If the proposed project is successful in its entirety, it will (check all that apply)”. Options, in canonical order: `1` Provide enabling tools to the community; `2` Result in publications of disciplinary interest; `3` Result in publications of broad interest; `4` Revise textbooks. |
-| 4 | `risk` | `picklist` | Required: “Q4 — How risky is the project overall?” Hint: “The Keck Foundation is comfortable funding risky projects.” Unchanged domain: `1` Low risk (will likely work in its entirety); `2` Medium risk (parts may succeed, others may fail); `3` High risk (significant risk of failure); `4` Impossible (fatal flaw). |
-| 5 | `q4` | `richtext` | Required, `maxLength: 50000`: “Q5 — What are the risks (technical, hypothesis, or scope)?” |
-| 6 | `q5` | `richtext` | Required, `maxLength: 50000`: “Q6 — Are the proposed methods, data gathering, and analysis appropriate?” |
+| 4 | `riskLevel` | `picklist` | Required: “Q4 — How risky is the project overall?” Hint: “The Keck Foundation is comfortable funding risky projects.” Unchanged domain: `1` Low risk (will likely work in its entirety); `2` Medium risk (parts may succeed, others may fail); `3` High risk (significant risk of failure); `4` Impossible (fatal flaw). |
+| 5 | `riskDetail` | `richtext` | Required, `maxLength: 50000`: “Q5 — What are the risks (technical, hypothesis, or scope)?” |
+| 6 | `methodsAppropriate` | `richtext` | Required, `maxLength: 50000`: “Q6 — Are the proposed methods, data gathering, and analysis appropriate?” |
 | 7 | `teamCapacity` | `richtext` | Required, `maxLength: 50000`: “Q7 — Do you have concerns about the team’s capacity, including personnel, infrastructure, or budget?” |
-| 8 | `q6` | `richtext` | Required, `maxLength: 50000`: “Q8 — What questions should the Foundation raise with the principal investigator?” |
-| 9 | `q8` | `richtext` | Required, `maxLength: 50000`: “Q9 — Would this proposal be competitive in peer review at a traditional funding agency?” |
-| 10 | `overallRating` | `picklist` | Required: “Q10 — Please assign an overall rating to the proposal.” Unchanged domain: `1` Poor; `2` Fair; `3` Good; `4` Very Good; `5` Excellent. Reorder the options array to display Excellent first; array order is display order, but every option retains its existing numeric value and label (`5` Excellent through `1` Poor). Never renumber the values. |
-| 11 | `q11` | `richtext` | Optional, `maxLength: 50000`: “Q11 — Is there anything else you would like to share with the Foundation about the proposal or this review process?” |
+| 8 | `questionsForPi` | `richtext` | Required, `maxLength: 50000`: “Q8 — What questions should the Foundation raise with the principal investigator?” |
+| 9 | `traditionalFunding` | `richtext` | Required, `maxLength: 50000`: “Q9 — Would this proposal be competitive in peer review at a traditional funding agency?” |
+| 10 | `overallAssessment` | `picklist` | Required: “Q10 — Please assign an overall rating to the proposal.” Unchanged domain: `1` Poor; `2` Fair; `3` Good; `4` Very Good; `5` Excellent. Reorder the options array to display Excellent first; array order is display order, but every option retains its existing numeric value and label (`5` Excellent through `1` Poor). Never renumber the values. |
+| 11 | `additionalComments` | `richtext` | Optional, `maxLength: 50000`: “Q11 — Is there anything else you would like to share with the Foundation about the proposal or this review process?” |
 
-Only `impactAreas` is check-all-that-apply. `risk` and `overallRating` remain
+Only `impactAreas` is check-all-that-apply. `riskLevel` and `overallAssessment` remain
 single-choice questions even if the source form’s glyphs resemble checkboxes, and
 no option carries an `Other` free-text payload. [PLANNED]
 
-The numeric option values for `risk` and `overallRating` above are the current
+The numeric option values for `riskLevel` and `overallAssessment` above are carried
+unchanged from the current `risk` and `overallRating` rows; only the keys change. They are the current
 static-schema values. [VERIFIED via `lib/external/review-form-schema.js:68-82` and
 `lib/external/review-form-schema.js:126-141`]
 
@@ -227,10 +273,18 @@ those answers would not retain the same meaning. [VERIFIED current text via
 `lib/external/review-form-schema.js:76-123`, and
 `lib/external/review-form-schema.js:138-145`; target disposition is PLANNED]
 
-Retire exactly `impact`, `q7`, and `q9` through the full-set publication. Create
-exactly `priorWork`, `impactAreas`, and `teamCapacity`. Keep `affiliation`, `q2`,
-`risk`, `q4`, `q5`, `q6`, `q8`, `overallRating`, and `q11` under their existing
-immutable keys. [PLANNED]
+Retire every current key except `affiliation` through the full-set publication —
+`impact`, `risk`, `overallRating`, `q2`, `q4`, `q5`, `q6`, `q7`, `q8`, `q9`, and
+`q11` (§1.1). Create all eleven numbered keys fresh: `priorWork`, `foreseenImpacts`,
+`impactAreas`, `riskLevel`, `riskDetail`, `methodsAppropriate`, `teamCapacity`,
+`questionsForPi`, `traditionalFunding`, `overallAssessment`, `additionalComments`.
+`affiliation` alone keeps its existing immutable key, because it is the
+reviewer-identity field, is unchanged by the new form, and is the one key still bound
+to a parent column through `reviewParentColumnByKey`. [PLANNED]
+
+Two rating questions change key but not meaning: the `risk` row's options and hint
+carry onto `riskLevel`, and the `overallRating` row's five options carry onto
+`overallAssessment`, values unchanged. This is a re-key, not a re-scoring. [PLANNED]
 
 ## 2. Storage and canonical answer contract
 
@@ -351,7 +405,7 @@ Every site below is in the implementation change; none may be handled implicitly
     `canonicalizeMultiselectSelection`; the normalized answer carries its returned
     values, pairs, and text.
   - In `ratingKeysFor`, remain picklist-only; with the corrected
-    `CORE_RATING_KEYS`, it validates only `risk` and `overallRating`.
+    `CORE_RATING_KEYS`, it validates only `riskLevel` and `overallAssessment`.
   - In the answer-question filter, admit `multiselect`.
   - In `buildReviewSubmission`’s row-emission branch, emit one row using the
     canonical object and set scalar/HTML properties as specified in §2.1.
@@ -363,11 +417,11 @@ Every site below is in the implementation change; none may be handled implicitly
   - Keep `PICKLIST_FIELDS_BY_KEY` picklist-only.
   - In `validateReviewForm`, call the shared canonicalizer for `multiselect` and
     expose a normalized multiselect bucket to legacy snapshot writers.
-  - Keep `risk` and `overallRating` option domains unchanged.
+  - Carry the `risk`/`overallRating` option domains unchanged onto `riskLevel`/`overallAssessment`.
   [VERIFIED current gates via `lib/external/review-form-schema.js:179-200` and
   `lib/external/review-form-schema.js:250-299`]
 - `lib/external/review-answer-snapshot.js`
-  - Change local `REVIEW_RATING_KEYS` to `risk` and `overallRating`.
+  - Change local `REVIEW_RATING_KEYS` to `riskLevel` and `overallAssessment`.
   - Keep `buildRatingSnapshotRows` picklist-only.
   - Add `buildMultiselectSnapshotRows` that consumes only canonicalized results.
   - Extend `buildAnswerRowBody` to accept `answerValues`; legacy rows pass null.
@@ -375,8 +429,8 @@ Every site below is in the implementation change; none may be handled implicitly
   `lib/external/review-answer-snapshot.js:95-143`]
 - `lib/dataverse/adapters/review-answer.js`
   - Select, write, parse, and map `wmkf_answervalues`.
-  - Change local `REVIEW_RATING_KEYS` and `ratings` DTO shape to only `risk` and
-    `overallRating`.
+  - Change local `REVIEW_RATING_KEYS` and `ratings` DTO shape to only `riskLevel` and
+    `overallAssessment`.
   - Expose `answerValues` and `answerValuesUnreadable`.
   [VERIFIED current shape via `lib/dataverse/adapters/review-answer.js:43-60`,
   `lib/dataverse/adapters/review-answer.js:97-130`, and
@@ -456,7 +510,7 @@ request input.
   selection tallies and reviewer membership from parsed snapshots.
   [VERIFIED current numeric branch via `shared/utils/review-matrix.js:146-158`]
 - `shared/components/workbench/ReviewsTab.js`: change the hard-coded rating key
-  set and comparison ratings to `risk` and `overallRating`; render multiselect
+  set and comparison ratings to `riskLevel` and `overallAssessment`; render multiselect
   answers as categorical chips/lists in cards and a separate categorical comparison
   block, not in the numeric rating grid.
   [VERIFIED current gates via `shared/components/workbench/ReviewsTab.js:53-58`,
@@ -470,7 +524,7 @@ request input.
   `shared/utils/review-report-pdf.js`: render the new categorical sections and the
   unreadable-answer marker; do not calculate multiselect averages. [PLANNED]
 - `lib/services/review-manager/reviewers-service.js`: update rating projections to
-  return only `risk` and `overallRating`; pass through parsed multiselect answers
+  return only `riskLevel` and `overallAssessment`; pass through parsed multiselect answers
   through the answer DTO rather than adding a scalar rating. [PLANNED]
 - `lib/services/review-manager/synthesize-reviews-service.js`: select and parse
   `wmkf_answervalues`; include readable multiselect pairs as categorical evidence;
@@ -585,7 +639,7 @@ impact rating. [VERIFIED via
 Publish a new **backward-compatible** prompt version before production question-set
 activation. It must:
 
-- continue to interpret `risk` and `overallRating` as unchanged numeric ratings;
+- continue to interpret `riskLevel` and `overallAssessment` as unchanged numeric ratings;
 - treat `impactAreas` as categorical evidence using snapshot labels;
 - never average, rank, or infer magnitude from multiselect option values;
 - tolerate the old `impact` picklist during expand and rollback;
@@ -855,7 +909,7 @@ For portal submit, manual entry, legacy upload, and mark-received, prove:
 
 - the same live question set and canonicalizer are used;
 - multiselect rows are emitted once per question;
-- `risk` and `overallRating` remain the only core rating snapshots;
+- `riskLevel` and `overallAssessment` are the only core rating snapshots;
 - partial failure does not leave an answer-only commit outside the existing
   changeset boundary;
 - draft cleanup remains post-success and does not change answer durability.
@@ -873,8 +927,8 @@ Add tests for:
 - native checkbox interaction, required validation, reload, and submission;
 - admin create/edit/reorder/serialize for multiselect options;
 - rejection of duplicate option values and blank labels;
-- parent-bound enforcement with exactly `affiliation`, `risk`, and
-  `overallRating`;
+- parent-bound enforcement with exactly `affiliation`, `riskLevel`, and
+  `overallAssessment`;
 - numeric matrix averages excluding multiselect rows;
 - categorical tally behavior across historical label changes;
 - card, comparison, DOCX, PDF, courtesy copy, and synthesis rendering;
@@ -927,8 +981,8 @@ Implementation is complete only when all of the following are evidenced:
 - [ ] The §0.2 write-boundary coherence fix is deployed and every write path
   resolves authoritatively.
 - [ ] `CORE_RATING_KEYS` and `PARENT_BOUND_KEYS` resolve exactly as §1.1 states.
-- [ ] `risk` and `overallRating` retain their current keys, meanings, labels, and
-  numeric domains.
+- [ ] `riskLevel` and `overallAssessment` carry the prior ratings' meanings, labels, and
+  numeric domains under new keys.
 - [ ] The exact §1.2 mapping is enforced: retire `impact`, `q7`, and `q9`; create
   `priorWork`, `impactAreas`, and `teamCapacity`; retain every other listed key.
 - [ ] The additive answer property is provisioned and read back.
