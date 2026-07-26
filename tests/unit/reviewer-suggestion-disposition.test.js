@@ -30,6 +30,7 @@ const {
   restore,
   APPLICANT_DISPOSITION_EXCLUDED,
   APPLICANT_DISPOSITION_MAP,
+  RESPONSE_TYPE_MAP,
   REVIEW_STATUS_MAP,
 } = suggestionAdapter;
 
@@ -40,6 +41,11 @@ const PR_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const SUGGESTION_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
 const ENGAGEMENT_STAMP_RESET_PAYLOAD = {
+  wmkf_accepted: false,
+  wmkf_declined: false,
+  wmkf_responsetype: null,
+  wmkf_reviewstatus: null,
+  wmkf_externaltokenrevoked: true,
   wmkf_invited: false,
   wmkf_emailsentat: null,
   wmkf_respondremindersentat: null,
@@ -99,9 +105,13 @@ describe('disposition optionset + helpers', () => {
 
 describe('restore scope guard (Codex S285 review High)', () => {
   test('re-selects a genuinely removed row (selected=false, disposition=null), ETag-guarded', async () => {
-    DynamicsService.getRecord.mockResolvedValue({ wmkf_selected: false, wmkf_applicantdisposition: null, _etag: 'W/"42"' });
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_selected: false,
+      wmkf_applicantdisposition: null,
+      wmkf_declined: false,
+      _etag: 'W/"42"',
+    });
     await restore(SUGGESTION_ID, { actingUserSystemId: 'SYS-1' });
-    // updateLifecycle re-reads then PATCHes wmkf_selected:true.
     const patched = DynamicsService.updateRecord.mock.calls.find((c) => c[2] && 'wmkf_selected' in c[2]);
     expect(patched).toBeTruthy();
     expect(patched[2].wmkf_selected).toBe(true);
@@ -110,6 +120,32 @@ describe('restore scope guard (Codex S285 review High)', () => {
     expect(patched[2]).toMatchObject(ENGAGEMENT_STAMP_RESET_PAYLOAD);
     // TOCTOU guard: the write is conditional on the row read by the scope check.
     expect(patched[3]).toMatchObject({ ifMatch: 'W/"42"' });
+  });
+
+  test('restores an auto-archived applicant recommendation only when it actually declined', async () => {
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_selected: false,
+      wmkf_applicantdisposition: APPLICANT_DISPOSITION_MAP.recommended,
+      wmkf_declined: true,
+      wmkf_responsetype: RESPONSE_TYPE_MAP.declined,
+      wmkf_reviewstatus: REVIEW_STATUS_MAP.withdrew,
+      _etag: 'W/"43"',
+    });
+
+    await restore(SUGGESTION_ID, { actingUserSystemId: 'SYS-1' });
+
+    expect(DynamicsService.updateRecord).toHaveBeenCalledWith(
+      'wmkf_appreviewersuggestions',
+      SUGGESTION_ID,
+      expect.objectContaining({
+        wmkf_selected: true,
+        wmkf_declined: false,
+        wmkf_responsetype: null,
+        wmkf_reviewstatus: null,
+        wmkf_externaltokenrevoked: true,
+      }),
+      { actingUserSystemId: 'SYS-1', ifMatch: 'W/"43"' },
+    );
   });
 
   test('refuses to restore an applicant-recommended row (must use promotion path)', async () => {
@@ -161,6 +197,14 @@ describe('list readers carry the disposition guard', () => {
   test('findApplicantRecommendedByRequest rejects non-GUID request ids', async () => {
     await expect(findApplicantRecommendedByRequest('not-a-guid')).rejects.toThrow(/requestId must be a GUID/);
     expect(DynamicsService.queryRecords).not.toHaveBeenCalled();
+  });
+
+  test('findRemovedByRequest includes staff-removed rows and declined recommendations only', async () => {
+    await suggestionAdapter.findRemovedByRequest(REQUEST_ID);
+    const query = DynamicsService.queryRecords.mock.calls[0][1];
+    expect(query.filter).toContain('wmkf_selected eq false');
+    expect(query.filter).toContain('(wmkf_applicantdisposition eq null or wmkf_declined eq true)');
+    expect(query.filter).toContain(notExcludedFilter());
   });
 
   test('findApplicantRecommendedByRequest filters by recommended disposition without selected constraint', async () => {

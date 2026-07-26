@@ -16,6 +16,7 @@ jest.mock('../../lib/dataverse/core/context', () => ({
 }));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   applyStage2aResponse: jest.fn(async () => ({})),
+  updateLifecycle: jest.fn(async () => ({})),
   getForEtagRefresh: jest.fn(async () => ({ _etag: 'W/"2"' })),
   stampProposalFirstAccessed: jest.fn(async () => ({})),
   getForSubmitFinalityCheck: jest.fn(async () => ({ _etag: 'W/"fresh"', wmkf_reviewreceivedat: null })),
@@ -76,6 +77,7 @@ import { withDalContext } from '../../lib/dataverse/core/context';
 import {
   applyStage2aResponse,
   getForSubmitFinalityCheck,
+  updateLifecycle,
 } from '../../lib/dataverse/adapters/reviewer-suggestion';
 import { getByIdWithSelect as getSystemUserByIdWithSelect } from '../../lib/dataverse/adapters/system-user';
 import { runChangeset } from '../../lib/dataverse/core/changeset';
@@ -309,6 +311,26 @@ describe('applyReviewerResponse', () => {
       httpStatus: 412,
       body: { ok: false, reason: 'concurrent_modification' },
     });
+  });
+
+  it('repeat decline repairs a legacy row that is still selected', async () => {
+    const result = await applyReviewerResponse({
+      suggestion: baseSuggestion({
+        wmkf_declined: true,
+        wmkf_selected: true,
+        _etag: 'W/"legacy"',
+      }),
+      request,
+      reviewer,
+      body: { action: 'decline', decline: {} },
+    });
+
+    expect(updateLifecycle).toHaveBeenCalledWith(
+      expect.any(String),
+      { selected: false },
+      { ifMatch: 'W/"legacy"' },
+    );
+    expect(result).toMatchObject({ ok: true, idempotent: true });
   });
 });
 

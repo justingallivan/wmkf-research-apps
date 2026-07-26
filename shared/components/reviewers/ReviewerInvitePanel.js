@@ -578,8 +578,8 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
           {showRemoved && (
             <>
               <p className="text-xs text-gray-400 mt-1.5">
-                Candidates removed from this request. Restoring returns them to the list above; if they had
-                an invitation, that link was revoked — re-invite to send a fresh one.
+                Candidates removed from this request and reviewers who declined. Restoring starts a fresh
+                invitation.
               </p>
               <ul className="mt-2 divide-y divide-gray-100">
                 {removedCandidates.map((c) => (
@@ -587,7 +587,9 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
                     <div className="min-w-0">
                       <p className="text-sm text-gray-700 truncate">
                         {c.name || '(unnamed)'}
-                        {c.wasInvited && (
+                        {c.declined ? (
+                          <span className="ml-2 text-xs font-medium text-red-600">Declined</span>
+                        ) : c.wasInvited && (
                           <span className="ml-2 text-xs text-gray-400">(invite was revoked)</span>
                         )}
                       </p>
@@ -600,9 +602,13 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
                           onClick={() => restoreCandidate(c)}
                           disabled={restoringId === c.suggestionId}
                           className="text-xs font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50 whitespace-nowrap"
-                          title="Restore this candidate to the list above"
+                          title={c.declined
+                            ? 'Clear the prior decline and restore this reviewer for a fresh invitation'
+                            : 'Restore this candidate to the list above'}
                         >
-                          {restoringId === c.suggestionId ? 'Restoring…' : 'Restore'}
+                          {restoringId === c.suggestionId
+                            ? 'Restoring…'
+                            : c.declined ? 'Reset & restore' : 'Restore'}
                         </button>
                         <button
                           type="button"

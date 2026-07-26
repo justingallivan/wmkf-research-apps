@@ -48,6 +48,7 @@ describe('reviewer withdrawal changeset', () => {
       key: SUGGESTION_ID,
       ifMatch: 'W/"17"',
       body: {
+        wmkf_selected: false,
         wmkf_accepted: false,
         wmkf_declined: true,
         wmkf_responsetype: RESPONSE_TYPE_MAP.declined,
@@ -75,6 +76,7 @@ describe('reviewer withdrawal changeset', () => {
       key: SUGGESTION_ID,
       ifMatch: 'W/"18"',
       body: {
+        wmkf_selected: false,
         wmkf_accepted: false,
         wmkf_declined: true,
       },
@@ -106,6 +108,7 @@ describe('reviewer withdrawal changeset', () => {
       key: SUGGESTION_ID,
       ifMatch: 'W/"19"',
       body: {
+        wmkf_selected: false,
         wmkf_accepted: false,
         wmkf_declined: true,
         wmkf_responsetype: RESPONSE_TYPE_MAP.declined,
@@ -139,6 +142,7 @@ describe('reviewer withdrawal changeset', () => {
       'wmkf_appreviewersuggestions',
       SUGGESTION_ID,
       expect.objectContaining({
+        wmkf_selected: false,
         wmkf_accepted: false,
         wmkf_declined: true,
         wmkf_responsetype: RESPONSE_TYPE_MAP.declined,
@@ -147,6 +151,36 @@ describe('reviewer withdrawal changeset', () => {
         wmkf_externaltokenrevoked: true,
       }),
       { ifMatch: 'W/"20"', actingUserSystemId: 'staff-2' },
+    );
+
+    updateSpy.mockRestore();
+  });
+
+  it('re-selects a reviewer who changes a pre-materials decline back to accept', async () => {
+    const updateSpy = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    await applyStage2aResponse(
+      SUGGESTION_ID,
+      {
+        action: 'accept',
+        acks: {
+          coiVersionId: '33333333-3333-4333-8333-333333333333',
+          aiUseVersionId: '44444444-4444-4444-8444-444444444444',
+        },
+      },
+      { ifMatch: 'W/"21"' },
+    );
+
+    expect(updateSpy).toHaveBeenCalledWith(
+      'wmkf_appreviewersuggestions',
+      SUGGESTION_ID,
+      expect.objectContaining({
+        wmkf_selected: true,
+        wmkf_accepted: true,
+        wmkf_declined: false,
+        wmkf_responsetype: RESPONSE_TYPE_MAP.accepted,
+      }),
+      { ifMatch: 'W/"21"', actingUserSystemId: undefined },
     );
 
     updateSpy.mockRestore();

@@ -56,7 +56,7 @@ test('returns declined rows that carry a non-empty referral, with decliner name 
 
   const out = await getDeclineReferrals({ requestId: REQ });
 
-  expect(findByRequest).toHaveBeenCalledWith(REQ, { selectedOnly: true });
+  expect(findByRequest).toHaveBeenCalledWith(REQ, { selectedOnly: false });
   expect(out).toEqual({
     success: true,
     referrals: [

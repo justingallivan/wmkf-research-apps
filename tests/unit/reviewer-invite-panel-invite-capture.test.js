@@ -201,4 +201,26 @@ describe('ReviewerInvitePanel invitation capture rehearsal', () => {
     expect(screen.getByLabelText('Select Dr. Accepted')).toBeDisabled();
     expect(screen.getByText('1 invitable · 1 accepted')).toBeInTheDocument();
   });
+
+  test('shows archived declines below the active proposal with an explicit reset action', () => {
+    render(
+      <ReviewerInvitePanel
+        requestId="REQ-1"
+        candidates={[candidate]}
+        removedCandidates={[{
+          suggestionId: 'S-DECLINED',
+          name: 'Dr. Archived Decline',
+          affiliation: 'Example University',
+          wasInvited: true,
+          declined: true,
+          responseType: 'declined',
+        }]}
+      />,
+    );
+
+    expect(screen.getByText('Dr. Archived Decline')).toBeInTheDocument();
+    expect(screen.getByText('Declined')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reset & restore' })).toBeInTheDocument();
+    expect(screen.getByText(/reviewers who declined/i)).toBeInTheDocument();
+  });
 });

@@ -33,7 +33,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   softDelete: jest.fn(async () => {}),
   bulkUpdateByRequest: jest.fn(async () => 0),
   APPLICANT_DISPOSITION_MAP: { recommended: 100000000 },
-  RESPONSE_TYPE_BY_VALUE: { 100000001: 'accepted' },
+  RESPONSE_TYPE_BY_VALUE: { 100000000: 'accepted', 100000001: 'declined' },
 }));
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   __esModule: true,
@@ -92,7 +92,7 @@ describe('getMyCandidates', () => {
       _wmkf_request_value: REQUEST_ID,
       _wmkf_potentialreviewer_value: PERSON_ID,
       wmkf_sources: 'literature_retrieved',
-      wmkf_responsetype: 100000001,
+      wmkf_responsetype: 100000000,
     }]);
     potentialReviewerAdapter.queryReviewers.mockImplementation(async ({ select }) => (
       select.includes('wmkf_organizationname')
@@ -123,6 +123,8 @@ describe('getMyCandidates', () => {
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
       _wmkf_potentialreviewer_value: PERSON_ID,
       wmkf_invited: true,
+      wmkf_declined: true,
+      wmkf_responsetype: 100000001,
       modifiedon: '2026-06-01',
     }]);
     potentialReviewerAdapter.queryReviewers.mockImplementation(async ({ select }) => (
@@ -136,7 +138,12 @@ describe('getMyCandidates', () => {
     expect(out.totalCandidates).toBe(0);
     expect(out.proposals[0].candidates).toEqual([]);
     expect(out.proposals[0].removedCandidates).toEqual([expect.objectContaining({
-      suggestionId: SUGGESTION_ID, name: 'Dr X', wasInvited: true, removedAt: '2026-06-01',
+      suggestionId: SUGGESTION_ID,
+      name: 'Dr X',
+      wasInvited: true,
+      declined: true,
+      responseType: 'declined',
+      removedAt: '2026-06-01',
     })]);
   });
 

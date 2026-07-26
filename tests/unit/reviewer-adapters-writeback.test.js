@@ -20,6 +20,11 @@ import {
 function err412() { const e = new Error('Precondition Failed'); e.status = 412; return e; }
 
 const ENGAGEMENT_STAMP_RESET_PAYLOAD = {
+  wmkf_accepted: false,
+  wmkf_declined: false,
+  wmkf_responsetype: null,
+  wmkf_reviewstatus: null,
+  wmkf_externaltokenrevoked: true,
   wmkf_invited: false,
   wmkf_emailsentat: null,
   wmkf_respondremindersentat: null,
