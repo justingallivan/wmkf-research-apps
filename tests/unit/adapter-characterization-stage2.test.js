@@ -32,14 +32,15 @@ const GUID_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const PD_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
 // PD-scope request $select strings (Codex S329 review: pin select/top too, not
-// just filters). findAcceptedByPD adds wmkf_organizationname — a real, deliberate
+// just filters). findAcceptedByPD adds wmkf_organizationname and the
+// reviewer-return deadline — real, deliberate
 // divergence between the two request queries.
 const PD_REQUEST_SELECT =
   'akoya_requestid,akoya_requestnum,akoya_title,wmkf_meetingdate,wmkf_abstract,' +
   '_akoya_applicantid_value,_wmkf_projectleader_value,_wmkf_grantprogram_value,' +
   '_wmkf_programareaserved_value';
 const PD_ACCEPTED_REQUEST_SELECT =
-  'akoya_requestid,akoya_requestnum,akoya_title,wmkf_meetingdate,wmkf_abstract,' +
+  'akoya_requestid,akoya_requestnum,akoya_title,wmkf_meetingdate,wmkf_reviewduedate,wmkf_abstract,' +
   'wmkf_organizationname,_akoya_applicantid_value,_wmkf_projectleader_value,' +
   '_wmkf_grantprogram_value,_wmkf_programareaserved_value';
 const SUGGESTION_SELECT = selectFields('wmkf_appreviewersuggestions').join(',');
@@ -255,7 +256,11 @@ describe('reviewer-suggestion.findByPD (characterization)', () => {
 describe('reviewer-suggestion.findAcceptedByPD (characterization)', () => {
   test('golden: adds wmkf_accepted eq true to the selected+notExcluded filter', async () => {
     jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
-      records: [{ akoya_requestid: GUID_A, akoya_requestnum: 'REQ-1' }],
+      records: [{
+        akoya_requestid: GUID_A,
+        akoya_requestnum: 'REQ-1',
+        wmkf_reviewduedate: '2026-09-09',
+      }],
     });
     const q = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
       records: [{ wmkf_appreviewersuggestionid: GUID_B }],
@@ -272,6 +277,7 @@ describe('reviewer-suggestion.findAcceptedByPD (characterization)', () => {
     expect(q.mock.calls[0][1].orderby).toBe('createdon desc');
     expect(q.mock.calls[0][1].top).toBe(500);
     expect(out.suggestions).toEqual([{ wmkf_appreviewersuggestionid: GUID_B }]);
+    expect(out.requestById[GUID_A].reviewDeadline).toBe('2026-09-09');
   });
 
   test('failure/edge: no PD id → empty result, no queries', async () => {

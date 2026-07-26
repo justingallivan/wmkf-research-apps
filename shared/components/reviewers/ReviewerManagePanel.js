@@ -286,7 +286,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
   const [sentResults, setSentResults] = useState({ sent: [], failed: [], skipped: [] });
   const [error, setError] = useState(null);
   const [emailFields, setEmailFields] = useState({
-    reviewDueDate: '',
+    reviewDueDate: settings.reviewDueDate || '',
     proposalSendDate: '',
     // honorarium removed S199 — now a Dataverse ground-truth read server-side.
   });
@@ -467,7 +467,15 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
   useEffect(() => {
     try {
       const saved = localStorage.getItem(EMAIL_FIELDS_STORAGE_KEY);
-      if (saved) setEmailFields(prev => ({ ...prev, ...JSON.parse(saved) }));
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setEmailFields(prev => ({
+          ...prev,
+          ...parsed,
+          // A stale saved blank must not hide the request's campaign date.
+          reviewDueDate: parsed.reviewDueDate || prev.reviewDueDate || settings.reviewDueDate || '',
+        }));
+      }
     } catch (e) { /* ignore */ }
     try {
       const saved = localStorage.getItem(ATTACHMENTS_STORAGE_KEY);

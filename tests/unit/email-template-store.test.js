@@ -70,6 +70,16 @@ describe('email-template-store', () => {
     expect(REVIEWER_INVITATION_SEED_BODY).not.toMatch(/respond to this email/i);
   });
 
+  test('materials seed is concise and keeps the deadline, link, and signature placeholders', () => {
+    expect(REVIEWER_MATERIALS_SEED_BODY).toBe(
+      '{{greeting}},\n\n'
+      + 'Please use the link to download the proposal materials and submit your completed review by {{reviewDueDate}}.\n\n'
+      + '{{externalLink}}\n\n'
+      + '{{signature}}',
+    );
+    expect(REVIEWER_MATERIALS_SEED_BODY).not.toMatch(/Thank you for agreeing|This link is unique|questions about the review process|time and expertise/);
+  });
+
   test('mergeTemplates: per-PD override wins, admin default fills gaps, all types present', () => {
     const admin = SEED_BY_TYPE;
     const merged = mergeTemplates({ materials: { subject: 'Custom materials' } }, admin);

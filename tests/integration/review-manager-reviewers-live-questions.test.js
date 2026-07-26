@@ -120,6 +120,7 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
     akoya_title: 'Full Envelope Test Request',
     wmkf_abstract: 'An abstract.',
     wmkf_meetingdate: null,
+    wmkf_reviewduedate: '2026-09-09',
     wmkf_organizationname: 'Test University',
     _akoya_applicantid_value_formatted: 'Applicant Name',
     _wmkf_projectleader_value_formatted: 'PI Name',
@@ -186,6 +187,7 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
       grantCycleCode: null,
       cycleLabel: null,
       meetingDate: null,
+      reviewDeadline: '2026-09-09',
       reviewSynthesis: null,
       statusSummary: { review_received: 1 },
       reviewers: [{

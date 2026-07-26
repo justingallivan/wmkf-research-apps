@@ -119,7 +119,11 @@ describe('getReviewers', () => {
 
   test('proposalId scope groups accepted suggestions into the proposal DTO with liveQuestions', async () => {
     getRequestById.mockResolvedValueOnce({
-      akoya_requestid: REQ, akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
+      akoya_requestid: REQ,
+      akoya_requestnum: 'R-1001',
+      akoya_title: 'T',
+      wmkf_meetingdate: null,
+      wmkf_reviewduedate: '2026-09-09',
     });
     findByRequest.mockResolvedValueOnce([
       {
@@ -136,6 +140,7 @@ describe('getReviewers', () => {
     expect(out.success).toBe(true);
     expect(out.totalReviewers).toBe(1); // non-accepted row filtered out
     expect(out.proposals).toHaveLength(1);
+    expect(out.proposals[0].reviewDeadline).toBe('2026-09-09');
     expect(out.proposals[0].reviewers[0]).toMatchObject({
       suggestionId: IDS[0],
       reviewStatus: 'materials_sent',
@@ -144,6 +149,32 @@ describe('getReviewers', () => {
     });
     expect(out.proposals[0].statusSummary).toEqual({ materials_sent: 1 });
     expect(out.liveQuestions).toEqual([{ key: 'impact', order: 1, text: 'Impact?', type: 'picklist' }]);
+  });
+
+  test('default PD scope carries the request review deadline into the proposal DTO', async () => {
+    resolvePD.mockResolvedValueOnce({ systemuserid: 'pd-1' });
+    findAcceptedByPD.mockResolvedValueOnce({
+      requestById: {
+        [REQ]: {
+          requestId: REQ,
+          requestNumber: 'R-1001',
+          title: 'T',
+          reviewDeadline: '2026-09-09',
+          meetingCycleCode: null,
+        },
+      },
+      suggestions: [{
+        wmkf_appreviewersuggestionid: IDS[0],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-1',
+        wmkf_accepted: true,
+        wmkf_reviewstatus: 100000001,
+      }],
+    });
+
+    const out = await getReviewers({ azureEmail: 'pd@wmkf.org' });
+
+    expect(out.proposals[0].reviewDeadline).toBe('2026-09-09');
   });
 
   test('chunk boundary: 26 distinct person ids chunk both the reviewer and researcher OR-chains at 25, first call gets ids 0-24 in order, second gets id 25', async () => {
