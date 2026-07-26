@@ -50,6 +50,10 @@ mean stale; `stale` and action eligibility are computed, not stored.
 
 Lifecycle bools (each has a `*name` virtual):
 - `wmkf_selected`, `wmkf_invited`, `wmkf_accepted`, `wmkf_declined`
+- A reviewer decline atomically sets `wmkf_selected=false`; this archives the
+  engagement from active proposal lists/counts while retaining the row in the
+  Invite Reviewers panel's Removed section. A pre-materials change back to
+  accept restores `wmkf_selected=true`.
 
 Outreach timestamps:
 - `wmkf_emailsentat`, `wmkf_emailopenedat`
@@ -59,7 +63,7 @@ Outreach timestamps:
 
 Review status: `wmkf_reviewstatus` (Picklist live in production: `accepted=100000000 | materials_sent=100000001 | under_review=100000002 | review_received=100000003 | complete=100000004 | withdrew=100000005 | released=100000006`; terminal values provisioned and post-publish verified 2026-07-23).
 - `complete` (S196 claim): set by Request Workbench when PD closes out — drops the row off the PD dashboard. Paired with `wmkf_completedat` (DateTime, added 2026-05-28).
-- `withdrew` / `released` are post-accept terminal outcomes that stamp neither `wmkf_reviewreceivedat` nor `wmkf_completedat`. They are excluded from work-remaining, cannot be written through the generic reviewers PATCH, and use a fresh-read + ETag dedicated transition service. The shared values in `shared/config/reviewerStatus.js` are accepted only if the owner-gated provisioning script proves they are the next free live values and Dataverse returns the exact requested `NewOptionValue`.
+- `withdrew` / `released` are post-accept terminal outcomes that stamp neither `wmkf_reviewreceivedat` nor `wmkf_completedat`. They are excluded from work-remaining, cannot be written through the generic reviewers PATCH, and use a fresh-read + ETag dedicated transition service. `withdrew` also sets `wmkf_selected=false`; `released` leaves selection unchanged. The shared values in `shared/config/reviewerStatus.js` are accepted only if the owner-gated provisioning script proves they are the next free live values and Dataverse returns the exact requested `NewOptionValue`.
 
 Applicant disposition (S208, wave6 — deployed 2026-05-31):
 - `wmkf_applicantdisposition` (Picklist, local optionset: `Recommended=100000000 | Excluded=100000001`; **null = staff/Claude-discovered, the normal case**). Tags an applicant-sourced engagement row. **Per-request only** — lives solely on this junction, never on the global `wmkf_potentialreviewer` person, so a reviewer excluded by one applicant stays eligible for every other request. `excluded` rows are also written `wmkf_selected=false`.
