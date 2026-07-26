@@ -88,6 +88,13 @@ Result (2026-07-25): `affiliation`(string, order 0), `impact`(picklist), `q2`,
 `lib/external/review-form-schema.js`. **No divergence; the seeded schema is a valid
 baseline.**
 
+[RECHECKED after scripts/probe-live-review-questions.mjs change: the script was fixed
+mid-session — its first version mis-read the `queryRecords` return shape and then hit
+the mandatory-`$filter` rule — and the result quoted above is from the corrected run,
+not the failed ones. The fixed version pages through `queryAllRecords` with a
+`statecode eq 0 or statecode eq 1` filter, so soft-deleted question rows are visible
+too.]
+
 ## 2. Target question set (from the owner's document)
 
 Checkbox glyphs appear on Q3, Q4, and Q10, but **only Q3 is multi-select** — it is the
