@@ -27,7 +27,8 @@ readback completed 2026-07-26, followed by compatible code promotion to `main`
 (`5282cee8`) and a Ready production deployment
 (`dpl_7sfTLrMafYPKp7mnYdrEVjs9HmW5`). Publication, controlled rehearsal/rollback,
 and reviewer exposure remain pending; the known fixture disposition completed
-2026-07-26. The 2026-07-26
+2026-07-26, as did the independently routed production HTTP proof for all four
+review writers. The 2026-07-26
 read-only pre-activation evidence pass found that the EICAR fixture already has a
 sent thank-you timestamp, which is an explicit §8 stop condition. A follow-up
 provenance probe traced it to the April 30 production validation run: Dynamics
@@ -137,9 +138,20 @@ rollback template. The full JSON evidence digest is
 The four service probes each resolved the same live version in a fresh local
 process targeting production Dataverse and stopped before their first write:
 external submit and manual entry returned `409 set_changed`; legacy upload and
-mark-received returned validation failures. This verifies the service boundaries,
-but it is not the independently routed production HTTP evidence required by
-§9.1(3), so that gate remains open. [VERIFIED service-level / PLANNED HTTP-level]
+mark-received returned validation failures. The follow-up HTTP proof then routed
+the external context plus all four writers independently through production
+against approved Request #1002788 test suggestion
+`0df1e20a-8c88-f111-ab0f-6045bd018deb`. Context returned the same live version
+`119da525418d1d43`; external submit and manual entry stopped at `409 set_changed`;
+legacy upload and mark-received stopped at `400` form validation. Separate
+`x-vercel-id` values were captured for every request. The suggestion ETag and
+review-domain state digest were byte-identical before/after; it retained zero
+answers, no received timestamp or file pointer, and one pre-existing draft.
+[VERIFIED service-level and production HTTP-level via
+`outputs/review-form-multiselect/production-http-writer-evidence-2026-07-26.json`,
+SHA-256 `b6885185ab7281c53ac658c62803f831941732f69f75cbb3ee4784960a2c1b62`;
+the gitignored local artifact contains production/test identifiers but no token,
+cookie, JWT, or environment-secret value]
 
 At the time of this evidence pass, the EICAR fixture was selected, accepted,
 received, included by the workbench/report
@@ -991,8 +1003,13 @@ cleanup satisfied this invariant. [VERIFIED]
    is still active. Read paths may still serve a cached set for up to the TTL —
    that is the accepted residual in §0.2, not a defect. Four fresh-process,
    production-target service probes resolved `119da525418d1d43` and stopped
-   before any write on 2026-07-26; independently routed production **HTTP**
-   evidence remains outstanding. [SERVICE BOUNDARY VERIFIED; HTTP ROUTING PLANNED]
+   before any write on 2026-07-26. **[COMPLETED 2026-07-26]** The external
+   context and all four writer routes then reached production through distinct
+   HTTP requests and resolved the same version. External submit/manual entry
+   stopped at `409 set_changed`; legacy upload/mark-received stopped at `400`
+   validation. The approved test suggestion's ETag and complete review-domain
+   digest were unchanged before/after. [VERIFIED via the evidence artifact and
+   SHA-256 recorded in §0.1a]
 4. Execute the §8 consumer probe, obtain the separately required deletion
    approval, complete the single audited cleanup procedure, and attach its
    postconditions. The consumer probe stopped on the EICAR thank-you marker; the
@@ -1162,6 +1179,8 @@ remain release gates and must not be inferred from code completion:
 - [x] The one authoritative canonicalizer owns validation, deduplication, ordering,
   label construction, JSON, and joined text.
 - [x] Every type gate in §3 is implemented and classified.
+- [x] All four review writers have independently routed production HTTP evidence
+  against the live legacy question-set version, with unchanged review-domain state.
 - [ ] The real target multiselect configuration and versioned prompt have passed
   the primary controlled-production rehearsal and rollback rehearsal.
 - [x] Both named test artifacts passed the consumer/provenance probes, received

@@ -4,9 +4,9 @@
 historical. The compatible multiselect code and production schema expansion are
 complete and deployed; the known-fixture cleanup is also complete. The live next
 work is the remaining pre-activation sequence in
-`docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` §9: routed production writer
-evidence, prompt/question publication, controlled smoke, rollback rehearsal,
-republish, final smoke, and exposure.
+`docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` §9: prompt/question publication,
+controlled smoke, rollback rehearsal, republish, final smoke, and exposure. The
+independently routed production HTTP writer gate completed 2026-07-26.
 
 ## Session 375 Summary
 
@@ -101,13 +101,24 @@ The next session is expected to be Codex implementing against the frozen plan.
 1. **Complete the remaining pre-activation release gates.**
    Evidence: `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` records compatible code
    deployed on `main`, wave 15 read back in production, and the legacy 12-row set
-   still active. Independently routed production HTTP writer evidence, prompt and
-   question publication, rollback rehearsal, controlled smoke, and exposure remain
-   pending. **Target go-live remains 2026-08-15.**
+   still active. Prompt and question publication, rollback rehearsal, controlled
+   smoke, and exposure remain pending. **Target go-live remains 2026-08-15.**
 
 ### Recently Closed
 
-1. **§8 fixture cleanup completed 2026-07-26.**
+1. **§9.1(3) independently routed production HTTP writer evidence completed
+   2026-07-26.**
+   The external context and all four writer routes resolved the live legacy
+   question-set version `119da525418d1d43` through separate production HTTP
+   requests. External submit and manual entry stopped at `409 set_changed`;
+   legacy upload and mark-received stopped at `400` form validation. The
+   approved Request #1002788 test suggestion retained the same ETag and state
+   digest before/after, with zero answers, no received timestamp or review file,
+   and its one pre-existing draft unchanged. Evidence:
+   `outputs/review-form-multiselect/production-http-writer-evidence-2026-07-26.json`,
+   SHA-256 `b6885185ab7281c53ac658c62803f831941732f69f75cbb3ee4784960a2c1b62`.
+
+2. **§8 fixture cleanup completed 2026-07-26.**
    The owner confirmed both exact records were disposable tests and authorized
    their children/linked test artifacts with `deleteContact:false`. The first
    preflight stopped on a then-unclassified Tim Newhouse/St. Jude PDF in the EICAR

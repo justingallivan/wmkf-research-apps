@@ -748,7 +748,7 @@ async function main() {
 
   const generatedAt = new Date().toISOString();
   const report = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     reportType: 'review-form-multiselect-preactivation',
     mode: 'READ_ONLY',
     generatedAt,
@@ -763,7 +763,7 @@ async function main() {
       promptBaseline: '[VERIFIED via production Dataverse + Postgres audit reads]',
       fixtureConsumers: '[VERIFIED via production Dataverse + Postgres reads and live consumer predicates]',
       writerAuthority:
-        '[VERIFIED at production-target service boundaries; independently routed production HTTP verification remains PLANNED]',
+        '[VERIFIED at production-target service boundaries; independently routed production HTTP verification is outside this script]',
       rollback:
         '[PLANNED template only; deliberately blocked until post-publication row IDs/ETags and completed cutover audit exist]',
     },
@@ -775,7 +775,11 @@ async function main() {
     releaseGates: {
       schemaAndCompatibleCode: 'completed before this probe',
       writerServiceBoundaryNoWriteProbes: writerProbes.every((probe) => probe.noWriteStopObserved),
-      independentlyRoutedProductionHttpWriterVerification: false,
+      independentlyRoutedProductionHttpWriterVerification: {
+        evaluatedByThisScript: false,
+        evidenceBoundary:
+          'See the release plan and the separately captured production HTTP evidence; this script runs local service-boundary probes only.',
+      },
       fixtureDeletionApproved: false,
       fixtureDeletionCompleted: false,
       backwardCompatiblePromptPublished: false,
