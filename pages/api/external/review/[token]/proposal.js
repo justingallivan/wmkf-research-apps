@@ -15,7 +15,7 @@ import { verifySuggestionToken, tokenHasOp } from '../../../../../lib/external/v
 import { GraphService } from '../../../../../lib/services/graph-service';
 import { getRequestSharePointBuckets } from '../../../../../lib/utils/sharepoint-buckets';
 import { withDalContext } from '../../../../../lib/dataverse/core/context';
-import { isReviewerMaterial } from '../../../../../lib/external/reviewer-materials';
+import { isReviewerProposalFile } from '../../../../../lib/external/reviewer-materials';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 
 export default async function handler(req, res) {
@@ -87,11 +87,10 @@ export default async function handler(req, res) {
 
 /**
  * Walk the request's SharePoint buckets and check whether the (library,
- * fileId) pair appears in one of the reviewer-materials folders. Files
- * outside those folders are not downloadable through the external
- * endpoint regardless of whether the client has their fileId — defense
- * against an attacker brute-forcing or replaying a leaked id from a
- * different surface.
+ * fileId) pair is the verified request's exact reviewer proposal file.
+ * Every other file — including internal files in the same SharePoint folder
+ * — is not downloadable through the external endpoint regardless of whether
+ * the client has its fileId.
  */
 async function isFileInRequestSet(requestId, requestNumber, library, fileId) {
   const buckets = await getRequestSharePointBuckets(requestId, requestNumber);
@@ -109,7 +108,7 @@ async function isFileInRequestSet(requestId, requestNumber, library, fileId) {
       continue;
     }
     for (const f of items) {
-      if (!isReviewerMaterial(f.folder || '')) continue;
+      if (!isReviewerProposalFile(f.folder || '', f.name, requestNumber)) continue;
       if (f.id === fileId) return true;
     }
   }

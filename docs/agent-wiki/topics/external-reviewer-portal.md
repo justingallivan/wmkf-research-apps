@@ -284,13 +284,17 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
 - **Accept/decline links are durable, signed surfaces.** Changes to link
   generation or response handling need an in-flight invitation compatibility check;
   see memory `project-reviewer-accept-decline-links`.
-- **Design direction — reviewer-materials selection: folder-convention today, move to explicit attach-and-verify (decided S312, NOT yet built).**
-  Which file a reviewer receives is decided *only* by placement in the request's
-  `Reviewer_Downloads/` SharePoint folder by Connor's PowerAutomate flow (see
+- **Design direction — reviewer-materials selection: exact folder/file contract today, move to explicit attach-and-verify (decided S312, NOT yet built).**
+  The one file a reviewer receives is
+  `Reviewer Materials/Proposal_{Request#}.pdf`, built by Connor's PowerAutomate
+  flow. Both folder and request-bound filename are enforced (see
   `listReviewerMaterials` in `lib/external/reviewer-materials.js` → `getRequestSharePointBuckets` +
-  `isReviewerMaterial`; hoisted S328 out of `context.js` — the staff-side
-  `/api/review-manager/materials-preflight` empty-folder warning reuses the same
-  function/filter so the two surfaces cannot disagree). No Dataverse link entity or outbound-file pointer field
+  `isReviewerProposalFile`; the staff-side
+  `/api/review-manager/materials-preflight` missing-proposal warning reuses the same
+  function/filter so the two surfaces cannot disagree). Other files in that
+  folder are internal and remain invisible; specifically,
+  `Research Phase I Application_<timestamp>.pdf` contains more information than
+  WMKF sends reviewers and must never be exposed. No Dataverse link entity or outbound-file pointer field
   exists — the suggestion's `wmkf_reviewfilename` is the *inbound* review upload,
   `wmkf_materialssentat` is a timestamp, not a file ref. Gap: the folder-drop is
   invisible to staff (no in-app confirmation the file was staged), request-wide (no

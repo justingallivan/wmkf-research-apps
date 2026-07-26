@@ -587,13 +587,13 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
       return;
     }
 
-    // Empty reviewer-materials folder for a "materials" release: confirm the
+    // Missing exact reviewer proposal for a "materials" release: confirm the
     // PD means to send anyway before creating the (irreversible) email
     // activities. Only gates on a verified-empty count ('ok' + 0) — an
     // unverifiable check ('unavailable') must never block a real send.
     if (templateType === 'materials' && materialsPreflight.status === 'ok' && materialsPreflight.fileCount === 0) {
       const releaseAnyway = window.confirm(
-        'No reviewer materials are in the download folder for this request — reviewers who follow '
+        'The expected reviewer proposal PDF is not available for this request — reviewers who follow '
           + 'their link will find nothing to download. Release anyway?'
       );
       if (!releaseAnyway) return;
@@ -727,8 +727,8 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
 
               {templateType === 'materials' && materialsPreflight.status === 'ok' && materialsPreflight.fileCount === 0 && (
                 <div className="p-3 bg-amber-50 text-amber-800 rounded-lg text-sm">
-                  No reviewer materials are in the download folder for this request — reviewers who
-                  follow their link will find nothing to download.
+                  The expected reviewer proposal PDF is not available for this request — reviewers
+                  who follow their link will find nothing to download.
                 </div>
               )}
 

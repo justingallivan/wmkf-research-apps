@@ -93,16 +93,22 @@ const FIXTURES = [
     content: 'Files land under Reviewer_Uploads/{reviewerSubfolder}.\n',
   },
   {
-    name: 'path-reviewer-downloads-wrong-shape (positive)',
-    patternId: 'path-reviewer-downloads-wrong-shape',
+    name: 'path-reviewer-materials-old-contract (positive — old folder)',
+    patternId: 'path-reviewer-materials-old-contract',
     kind: 'positive',
-    content: 'Reviewers fetch from Reviewer_Download (singular).\n',
+    content: 'Reviewers fetch from Reviewer_Downloads/.\n',
   },
   {
-    name: 'path-reviewer-downloads-wrong-shape (negative — canonical shape)',
-    patternId: 'path-reviewer-downloads-wrong-shape',
+    name: 'path-reviewer-materials-old-contract (positive — old env allowlist)',
+    patternId: 'path-reviewer-materials-old-contract',
+    kind: 'positive',
+    content: 'Set REVIEWER_MATERIALS_FOLDERS to widen access.\n',
+  },
+  {
+    name: 'path-reviewer-materials-old-contract (negative — canonical shape)',
+    patternId: 'path-reviewer-materials-old-contract',
     kind: 'negative',
-    content: 'Reviewers fetch from Reviewer_Downloads/.\n',
+    content: 'Reviewers fetch only Reviewer Materials/Proposal_1002379.pdf.\n',
   },
 ];
 

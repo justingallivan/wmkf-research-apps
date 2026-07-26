@@ -141,12 +141,19 @@ const DRIFT_PATTERNS = [
     allow: ['check-doc-currency.js'],
   },
   {
-    id: 'path-reviewer-downloads-wrong-shape',
+    id: 'path-reviewer-materials-old-contract',
     kind: 'path-contract drift',
-    needle: /Reviewer_Download\b(?!s\/)/g,
+    needle: /\b(?:Reviewer_Downloads?|Reviewer_Materials|REVIEWER_MATERIALS_FOLDERS)\b/g,
     reason:
-      'Canonical path is `Reviewer_Downloads/`. Singular forms are stale.',
-    allow: ['check-doc-currency.js'],
+      'Canonical outbound exposure is exactly `Reviewer Materials/Proposal_{Request#}.pdf`. The old folder names and environment-configurable allowlist are stale.',
+    allow: [
+      'check-doc-currency.js',
+      // Historical implementation/design records preserve the name that was
+      // current at the time; their status banners route readers to live docs.
+      'EXTERNAL_REVIEWER_INTAKE_PLAN.md',
+      'INTAKE_PORTAL_DESIGN.md',
+      'memory-wiki-audit-2026-06-23.md',
+    ],
   },
 ];
 

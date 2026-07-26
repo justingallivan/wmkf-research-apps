@@ -1,92 +1,140 @@
 /**
- * Tests for the Reviewer_Downloads folder-policy matcher.
+ * Security contract for reviewer-visible SharePoint material.
  *
- * The match rule is security-relevant: the file-list and file-download
- * endpoints both use it as the *only* gate between SharePoint contents
- * and the external reviewer's eyes. A regression here could leak staff-
- * only briefs, applicant admin paperwork, or other reviewers' uploads.
+ * The list and download endpoints must expose exactly one request-bound file:
+ * `Reviewer Materials/Proposal_{requestNumber}.pdf`. Other files in that same
+ * folder can contain internal-only information and must remain invisible.
  *
  * @jest-environment node
  */
 
-import { isReviewerMaterial, getReviewerMaterialFolders } from '../../lib/external/reviewer-materials.js';
+import {
+  expectedReviewerProposalFilename,
+  getReviewerMaterialFolders,
+  isReviewerProposalFile,
+  listReviewerMaterials,
+} from '../../lib/external/reviewer-materials.js';
 
-describe('isReviewerMaterial', () => {
-  let originalEnv;
-  beforeEach(() => {
-    originalEnv = process.env.REVIEWER_MATERIALS_FOLDERS;
-    delete process.env.REVIEWER_MATERIALS_FOLDERS;
-  });
-  afterEach(() => {
-    if (originalEnv === undefined) delete process.env.REVIEWER_MATERIALS_FOLDERS;
-    else process.env.REVIEWER_MATERIALS_FOLDERS = originalEnv;
-  });
-
-  describe('default policy (Reviewer_Downloads)', () => {
-    test('matches the canonical folder at the request root', () => {
-      expect(isReviewerMaterial('1002379_GUID/Reviewer_Downloads')).toBe(true);
-      expect(isReviewerMaterial('1002379_GUID/Reviewer_Downloads/Project Narrative.pdf')).toBe(true);
-    });
-
-    test('matches when the folder is at any depth', () => {
-      expect(isReviewerMaterial('Reviewer_Downloads/file.pdf')).toBe(true);
-      expect(isReviewerMaterial('a/b/Reviewer_Downloads/c/d/file.pdf')).toBe(true);
-    });
-
-    test('matches case-insensitively', () => {
-      expect(isReviewerMaterial('1002379_GUID/reviewer_downloads/file.pdf')).toBe(true);
-      expect(isReviewerMaterial('1002379_GUID/REVIEWER_DOWNLOADS/file.pdf')).toBe(true);
-    });
-
-    test('rejects sibling folders that contain the substring', () => {
-      // Critical: a folder named `My_Reviewer_Downloads_v2` must not match
-      // — that's what segment anchoring is for.
-      expect(isReviewerMaterial('1002379_GUID/My_Reviewer_Downloads_v2')).toBe(false);
-      expect(isReviewerMaterial('Reviewer_Downloads_Old')).toBe(false);
-      expect(isReviewerMaterial('XReviewer_Downloads')).toBe(false);
-    });
-
-    test('rejects unrelated folders that the proposal directory holds', () => {
-      // These are real top-level files from a sample request — none of
-      // them should be visible to a reviewer.
-      expect(isReviewerMaterial('1002379_GUID')).toBe(false);
-      expect(isReviewerMaterial('1002379_GUID/Phase II')).toBe(false);
-      expect(isReviewerMaterial('1002379_GUID/Reviews/abc')).toBe(false);
-    });
-
-    test('rejects empty / null / non-string input', () => {
-      expect(isReviewerMaterial('')).toBe(false);
-      expect(isReviewerMaterial(null)).toBe(false);
-      expect(isReviewerMaterial(undefined)).toBe(false);
-      expect(isReviewerMaterial(42)).toBe(false);
-    });
+describe('reviewer proposal file policy', () => {
+  test('constructs the exact request-bound filename', () => {
+    expect(expectedReviewerProposalFilename('1002379')).toBe('Proposal_1002379.pdf');
+    expect(expectedReviewerProposalFilename(' REQ-001 ')).toBe('Proposal_REQ-001.pdf');
+    expect(expectedReviewerProposalFilename('')).toBeNull();
+    expect(expectedReviewerProposalFilename(null)).toBeNull();
   });
 
-  describe('env override (REVIEWER_MATERIALS_FOLDERS)', () => {
-    test('honors a single comma-separated alternative', () => {
-      process.env.REVIEWER_MATERIALS_FOLDERS = 'Shared_With_Reviewer';
-      expect(isReviewerMaterial('1002379_GUID/Shared_With_Reviewer/file.pdf')).toBe(true);
-      expect(isReviewerMaterial('1002379_GUID/Reviewer_Downloads/file.pdf')).toBe(false);
+  test('matches only the exact proposal file in Reviewer Materials', () => {
+    expect(isReviewerProposalFile(
+      '1002379_GUID/Reviewer Materials',
+      'Proposal_1002379.pdf',
+      '1002379',
+    )).toBe(true);
+  });
+
+  test('matches the folder case-insensitively but keeps the filename exact', () => {
+    expect(isReviewerProposalFile(
+      '1002379_GUID/reviewer materials',
+      'Proposal_1002379.pdf',
+      '1002379',
+    )).toBe(true);
+    expect(isReviewerProposalFile(
+      '1002379_GUID/Reviewer Materials',
+      'proposal_1002379.pdf',
+      '1002379',
+    )).toBe(false);
+  });
+
+  test('rejects the timestamped internal application in the same folder', () => {
+    expect(isReviewerProposalFile(
+      '1002379_GUID/Reviewer Materials',
+      'Research Phase I Application_2026-05-01T18-44-00Z.pdf',
+      '1002379',
+    )).toBe(false);
+  });
+
+  test('rejects the right filename outside the canonical folder', () => {
+    expect(isReviewerProposalFile(
+      '1002379_GUID/Reviewer_Downloads',
+      'Proposal_1002379.pdf',
+      '1002379',
+    )).toBe(false);
+    expect(isReviewerProposalFile(
+      '1002379_GUID/Phase II',
+      'Proposal_1002379.pdf',
+      '1002379',
+    )).toBe(false);
+    expect(isReviewerProposalFile(
+      '1002379_GUID/Reviewer Materials/Internal',
+      'Proposal_1002379.pdf',
+      '1002379',
+    )).toBe(false);
+  });
+
+  test('rejects a proposal file bound to a different request', () => {
+    expect(isReviewerProposalFile(
+      '1002379_GUID/Reviewer Materials',
+      'Proposal_1009999.pdf',
+      '1002379',
+    )).toBe(false);
+  });
+
+  test('rejects sibling folders that merely contain the canonical name', () => {
+    expect(isReviewerProposalFile(
+      '1002379_GUID/My Reviewer Materials Old',
+      'Proposal_1002379.pdf',
+      '1002379',
+    )).toBe(false);
+  });
+
+  test('rejects empty, null, and non-string path or filename input', () => {
+    expect(isReviewerProposalFile('', 'Proposal_1002379.pdf', '1002379')).toBe(false);
+    expect(isReviewerProposalFile(null, 'Proposal_1002379.pdf', '1002379')).toBe(false);
+    expect(isReviewerProposalFile('Reviewer Materials', null, '1002379')).toBe(false);
+    expect(isReviewerProposalFile('Reviewer Materials', 42, '1002379')).toBe(false);
+  });
+
+  test('reports the single canonical folder', () => {
+    expect(getReviewerMaterialFolders()).toEqual(['Reviewer Materials']);
+  });
+});
+
+describe('listReviewerMaterials', () => {
+  test('returns only the exact proposal while excluding internal files present in the same folder', async () => {
+    const result = await listReviewerMaterials('request-id', '1002379', {
+      getRequestSharePointBuckets: jest.fn().mockResolvedValue([
+        { library: 'akoya_request', folder: '1002379_GUID', source: 'dynamics' },
+      ]),
+      listFiles: jest.fn().mockResolvedValue([
+        {
+          id: 'proposal',
+          name: 'Proposal_1002379.pdf',
+          folder: '1002379_GUID/Reviewer Materials',
+          size: 100,
+          mimeType: 'application/pdf',
+        },
+        {
+          id: 'internal-application',
+          name: 'Research Phase I Application_2026-05-01T18-44-00Z.pdf',
+          folder: '1002379_GUID/Reviewer Materials',
+          size: 200,
+          mimeType: 'application/pdf',
+        },
+        {
+          id: 'wrong-folder',
+          name: 'Proposal_1002379.pdf',
+          folder: '1002379_GUID/Phase II',
+          size: 300,
+          mimeType: 'application/pdf',
+        },
+      ]),
     });
 
-    test('supports multiple folders during a transition window', () => {
-      process.env.REVIEWER_MATERIALS_FOLDERS = 'Reviewer_Downloads,Shared_With_Reviewer';
-      expect(isReviewerMaterial('1002379_GUID/Reviewer_Downloads/file.pdf')).toBe(true);
-      expect(isReviewerMaterial('1002379_GUID/Shared_With_Reviewer/file.pdf')).toBe(true);
-      expect(isReviewerMaterial('1002379_GUID/Phase II/file.pdf')).toBe(false);
-    });
-
-    test('falls back to default when env var is empty or whitespace-only', () => {
-      process.env.REVIEWER_MATERIALS_FOLDERS = '   ';
-      expect(getReviewerMaterialFolders()).toEqual(['Reviewer_Downloads']);
-    });
-
-    test('escapes regex metacharacters in folder names', () => {
-      // If someone puts an unfortunate name like `Reviewer.Materials` in
-      // the env var, the dot must be matched literally — not as "any char."
-      process.env.REVIEWER_MATERIALS_FOLDERS = 'Reviewer.Materials';
-      expect(isReviewerMaterial('Reviewer.Materials/file.pdf')).toBe(true);
-      expect(isReviewerMaterial('ReviewerXMaterials/file.pdf')).toBe(false);
-    });
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: 'proposal',
+        name: 'Proposal_1002379.pdf',
+        folder: '1002379_GUID/Reviewer Materials',
+      }),
+    ]);
   });
 });

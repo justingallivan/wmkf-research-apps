@@ -3,7 +3,7 @@ title: "Reviewer Materials — SharePoint Folder Convention"
 domain: reviewer-workbench
 kind: source-of-truth
 status: canonical
-summary: "Audience: Connor (PowerAutomate / file generation owner) Status: Agreed 2026-05-01. Code aligned to these names."
+summary: "Canonical outbound reviewer package: Reviewer Materials/Proposal_{Request#}.pdf; every other request file remains internal."
 canonical: true
 cataloged: 2026-07-02
 owner: product-engineering
@@ -14,143 +14,102 @@ related:
 # Reviewer Materials — SharePoint Folder Convention
 
 **Audience:** Connor (PowerAutomate / file generation owner)
-**Status:** Agreed 2026-05-01. Code aligned to these names.
+**Status:** Owner-confirmed 2026-07-26. Code aligned to this exact folder/file contract.
 **Related:** `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` (file storage architecture)
 
 ---
 
 ## What we agreed
 
-For each `akoya_request` going out for external review, two sibling
-subfolders under the request's existing SharePoint folder:
+For each `akoya_request` going out for external review, the outbound reviewer
+package is one exact PDF under the request's existing SharePoint folder:
 
 ```
 akoya_request/                                                ← existing library
   └─ 1002379_54E2B88B04B9F011BBD36045BD02B4CC/                 ← existing per-request folder
       ├─ (existing internal files — staff briefs, admin paperwork, etc.)
       ├─ Phase II/                                              ← raw GoApply submission (untouched)
-      ├─ Reviewer_Downloads/                                    ← Connor's flow populates this
-      │   ├─ Project Narrative.pdf
-      │   ├─ Bibliography.pdf
-      │   └─ ... (curated reviewer-facing files)
-      └─ Reviewer_Uploads/                                      ← reviewers' completed reviews land here
-          ├─ Patel_7f3a9c2e/                                    ← per-reviewer subfolder, created on first upload
-          │   ├─ review.pdf
-          │   └─ supplementary_notes.pdf
-          └─ vanderBerg_a1b2c3d4/
-              └─ review.docx
+      ├─ Reviewer Materials/                                    ← outbound reviewer package
+      │   ├─ Proposal_1002379.pdf                               ← the ONLY reviewer-visible file
+      │   └─ Research Phase I Application_2026-...pdf           ← internal; NEVER exposed
+      └─ (other internal files and folders)
 ```
 
-- **`Reviewer_Downloads/`** — Connor's PA flow creates this empty at
-  request creation, then drops files in as they're generated. The
-  reviewer-facing app reads only what's inside.
-- **`Reviewer_Uploads/`** — Connor's PA flow creates this empty at
-  request creation. Per-reviewer subfolders are created automatically
-  by our backend on first upload (you don't populate this folder).
+- **`Reviewer Materials/Proposal_{Request#}.pdf`** — Connor's PA flow creates
+  or replaces this compiled reviewer package. The reviewer-facing app exposes
+  only this exact request-bound filename.
 
-The reviewer-facing app reads only `Reviewer_Downloads/`. Anything else
-in the request folder — admin paperwork, staff briefs, the raw `Phase
-II/` submission — is invisible to reviewers by construction.
+Anything else in the request folder — including other files placed in
+`Reviewer Materials/`, admin paperwork, staff briefs, and raw application
+exports — is invisible to reviewers by construction.
 
 ---
 
 ## Why this design
 
-**Security by default.** A typical request folder holds 20+ files,
-several of which (staff AI summaries, governing board lists, internal
-status letters, applicant admin paperwork) should never be exposed
-externally. Allowlisting one curated subfolder makes leakage impossible
-absent staff explicitly placing the wrong file there.
+**Security by default.** A typical request folder holds 20+ files, several of
+which should never be exposed externally. Folder-only allowlisting is not
+enough because internal artifacts can coexist with the reviewer package.
+Requiring both the canonical folder and request-bound filename prevents those
+neighboring files from leaking.
 
-**Symmetric naming.** "Downloads" and "Uploads" name the direction from
-the reviewer's perspective — easy for everyone to remember.
+**One explicit outbound contract.** Staff and automation can identify the
+reviewer package without inferring visibility from a broad folder.
 
-**Decoupled from GoApply.** GoApply's submission shape can change
-without affecting what reviewers see. PowerAutomate becomes the single
-canonical place that decides "here is the reviewer package."
+**Decoupled from GoApply.** GoApply's submission shape can change without
+affecting what reviewers see. PowerAutomate produces one compiled package with
+a stable name.
 
-**Staff visibility.** Anyone browsing SharePoint can see exactly what
-was shared with reviewers and what came back — no opaque filter buried
-in code.
-
----
-
-## What goes in `Reviewer_Downloads/`
-
-For Phase II reviews, the reviewer-facing package today looks like:
-
-- Project Narrative
-- Bibliography
-- Biographical Sketches
-- Project Budget
-- Financial Narrative
-- Collaborative Arrangements
-- Graphical Abstract
-- (Optional) Proposal Abstract
-
-Most of these are already produced by GoApply into `Phase II/`. The
-flow's job is to copy (or generate fresh PDFs of) the curated subset
-into `Reviewer_Downloads/`. Subfolders inside are fine if useful — the
-reader walks recursively up to depth 3.
-
-**Explicitly do NOT include:**
-
-- `*_Staff_Version.*` — internal AI-generated staff briefs
-- Application / Proposal Cover Pages — admin forms
-- Recognition Statement, Declaration of Status Letter, Governing Board
-  List — applicant administrative paperwork
-- Phase I materials (when reviewing Phase II)
-- Other Support documents (PII risk: pending grants from non-applicants)
-
-When in doubt, exclude. Staff can always drop a file in manually after
-the fact.
+**Staff visibility.** Anyone browsing SharePoint can identify the shared file
+unambiguously: `Proposal_{Request#}.pdf`.
 
 ---
 
-## Per-reviewer subfolder format (`Reviewer_Uploads/{name}/`)
+## What reviewers receive
 
-`{sanitizedLastName}_{shortId}` — e.g. `Patel_7f3a9c2e`,
-`OBrien_a1b2c3d4`, `vanderBerg_aabb1122`.
+The only reviewer-visible file is:
 
-- `sanitizedLastName`: ASCII-folded (`José` → `Jose`), punctuation and
-  spaces stripped (`O'Brien` → `OBrien`, `van der Berg` → `vanderBerg`),
-  truncated to 30 chars
-- `shortId`: first 8 chars of the suggestion GUID (collision-proof
-  pairing)
-- If the lastname sanitizes to empty (e.g. CJK-only with no ASCII fold),
-  falls back to `{shortId}` only
+`Reviewer Materials/Proposal_{Request#}.pdf`
 
-The folder name is computed once at first upload and frozen. Replacing
-files reuses the same folder. If the reviewer's name is corrected later
-in the CRM, the SharePoint folder name does not auto-update — the
-canonical pointer lives in `wmkf_appreviewersuggestion.wmkf_reviewsharepointfolder`.
+Example for Request #1002788:
 
-**Important for any future automation that reads review uploads:**
-identify reviewers by joining through Dataverse
-(`_wmkf_potentialreviewer_value` → name, affiliation, email), never by
-parsing the folder name. Folder names are display strings.
+`Reviewer Materials/Proposal_1002788.pdf`
+
+PowerAutomate owns assembling the approved reviewer-facing content into that
+single PDF.
+
+**Explicitly never expose:**
+
+- `Research Phase I Application_<timestamp>.pdf` — this raw/internal
+  application artifact contains more information than WMKF sends reviewers.
+- Any other filename in `Reviewer Materials/`, even if it is a PDF.
+- `*_Staff_Version.*`, cover pages, governing-board lists, declarations,
+  recognition statements, Other Support documents, internal summaries, or
+  administrative paperwork.
+
+The portal enforces this server-side at both listing and download time. Merely
+placing another file beside the proposal does not make it reviewer-visible.
 
 ---
 
 ## Folder name details
 
-- **Spelling:** exactly `Reviewer_Downloads` and `Reviewer_Uploads`
-  (capital R, capital second word, single underscore). Case-insensitive
-  on the read side, but standardize on this for clarity.
+- **Outbound folder spelling:** exactly `Reviewer Materials` (one space).
+  Matching is case-insensitive on the read side because SharePoint paths are
+  case-insensitive, but automation and staff should use the canonical spelling.
+- **Outbound filename:** exactly `Proposal_{Request#}.pdf`, including
+  capitalization and extension. Filename matching is case-sensitive.
 - **Location:** directly inside `akoya_request/{requestNumber}_{requestGuid}/`.
-- **Empty `Reviewer_Downloads/`:** the reviewer-facing app shows "The
-  Foundation hasn't shared materials yet — please contact us if you
-  need them." Reviewers can still load the page, just no downloads.
+- **Missing exact proposal file:** the reviewer-facing app shows no download.
+  An unrelated PDF in the same folder does not satisfy the release preflight.
 
 ---
 
-## Multi-folder support / transition windows
+## No environment-configurable widening
 
-The reviewer app supports a comma-separated environment variable
-`REVIEWER_MATERIALS_FOLDERS` for periods where two folder names need to
-coexist (e.g., a future rename). Default: `Reviewer_Downloads`. If we
-change the convention later, the var lets us match both names during
-the transition without a deploy.
+The outbound folder and filename are code-reviewed constants, not an
+environment allowlist. Widening reviewer visibility requires a reviewed code
+change and matching tests; an environment edit cannot expose another folder.
 
 ---
 
@@ -162,37 +121,36 @@ place.
 1. **Magic link generation** — when a reviewer accepts, the app mints
    a one-time JWT and sends them a `https://[app]/external/review/{token}`
    URL, embedded into the materials email body.
-2. **File listing** — the landing page calls Microsoft Graph, walks
-   the request's SharePoint folder under the `akoya_request` library,
-   and returns only files whose path contains `/Reviewer_Downloads/`.
+2. **File listing** — the landing page calls Microsoft Graph, walks the
+   request's SharePoint buckets, and returns only
+   `Reviewer Materials/Proposal_{Request#}.pdf`.
 3. **File download** — when a reviewer clicks Download, the app
-   re-validates membership (defense against ID brute-forcing), then
+   independently re-validates the same folder + filename + request-number
+   predicate (defense against ID brute-forcing or a leaked internal file ID), then
    streams the file from SharePoint via Graph as the foundation's app
    registration. The reviewer never sees a SharePoint URL or token.
-4. **Review upload** — multipart POST. Files validated (extension,
-   magic bytes, size cap). On success, written to
-   `Reviewer_Uploads/{Patel_7f3a9c2e}/...` and the suggestion row's
-   `wmkf_reviewsharepointfolder` is set to the path. Rollback on failure.
+4. **Review submission** — the reviewer completes the in-browser form. Final
+   submit writes structured `wmkf_appreviewanswer` snapshots to Dataverse; no
+   reviewer PDF is required. Retained legacy upload infrastructure is outside
+   this outbound-materials contract.
 
 ---
 
 ## What you need to build
 
-1. **At request creation (or whenever the request enters Phase II
-   Pending):** create the two empty subfolders
-   `Reviewer_Downloads/` and `Reviewer_Uploads/` under the request's
-   SharePoint folder.
-2. **As reviewer-facing files become available:** drop them into
-   `Reviewer_Downloads/`. Curate per the include/exclude list above.
+1. **At request creation (or whenever the request enters Phase II Pending):**
+   create `Reviewer Materials/` under the request's SharePoint folder.
+2. **When the reviewer package is ready:** create or replace exactly
+   `Reviewer Materials/Proposal_{Request#}.pdf`.
+3. **Do not rename the raw timestamped application export to the canonical
+   proposal filename.** The canonical PDF must contain only the content
+   approved for external reviewers.
 
 That's it. The rest happens automatically.
 
 ---
 
-## Open questions (post-pilot)
+## Open question
 
-- Trigger point for folder creation: when the request enters "Phase II
-  Pending," or earlier?
-- Any naming you want for subfolders within `Reviewer_Downloads/` if
-  you want to organize (e.g., `Reviewer_Downloads/Proposal/`,
-  `Reviewer_Downloads/Supporting/`) — works fine on our end either way.
+- Trigger point for folder/file generation: when the request enters
+  "Phase II Pending," or another explicit release-ready state?

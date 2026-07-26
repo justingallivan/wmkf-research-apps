@@ -28,7 +28,8 @@ The system today is split between manual operation and partial automation. The c
 What is already built:
 
 - Magic-link token primitive for external reviewers, including post-submission window extension
-- Reviewer materials access (the `Reviewer_Downloads/` folder enforcement)
+- Reviewer materials access (exact
+  `Reviewer Materials/Proposal_{Request#}.pdf` enforcement)
 - Reviewer self-upload of a review file
 - A four-field structured-review schema (`affiliation`, `impact`, `risk`, `overallRating`) — defined but not surfaced in any UI
 - The Review Manager staff app, including draft-emails-with-cycle-variables capability

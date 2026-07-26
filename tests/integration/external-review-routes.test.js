@@ -261,7 +261,7 @@ describe('/api/external/review/[token]/context', () => {
     });
   });
 
-  it('only returns files from reviewer-materials folders for the verified request', async () => {
+  it('returns only the exact reviewer proposal file for the verified request', async () => {
     verifySuggestionToken.mockResolvedValue(verifiedSuggestion);
     getRequestSharePointBuckets.mockResolvedValue([
       { library: 'akoya_request', folder: 'REQ-001_request', source: 'active' },
@@ -269,15 +269,22 @@ describe('/api/external/review/[token]/context', () => {
     GraphService.listFiles.mockResolvedValue([
       {
         id: 'allowed-file',
-        name: 'proposal.pdf',
+        name: 'Proposal_REQ-001.pdf',
         size: 123,
         mimeType: 'application/pdf',
-        folder: 'REQ-001_request/Reviewer_Downloads',
+        folder: 'REQ-001_request/Reviewer Materials',
+      },
+      {
+        id: 'internal-application',
+        name: 'Research Phase I Application_2026-05-01T18-44-00Z.pdf',
+        size: 456,
+        mimeType: 'application/pdf',
+        folder: 'REQ-001_request/Reviewer Materials',
       },
       {
         id: 'blocked-file',
         name: 'internal-notes.pdf',
-        size: 456,
+        size: 789,
         mimeType: 'application/pdf',
         folder: 'REQ-001_request/Internal',
       },
@@ -573,13 +580,13 @@ describe('/api/external/review/[token]/proposal', () => {
     GraphService.listFiles.mockResolvedValue([
       {
         id: 'allowed-file',
-        name: 'proposal.pdf',
-        folder: 'REQ-001_request/Reviewer_Downloads',
+        name: 'Proposal_REQ-001.pdf',
+        folder: 'REQ-001_request/Reviewer Materials',
       },
     ]);
     GraphService.getDriveId.mockResolvedValue('drive-1');
     GraphService.downloadFile.mockResolvedValue({
-      filename: 'proposal.pdf',
+      filename: 'Proposal_REQ-001.pdf',
       mimeType: 'application/pdf',
       size: 10,
       buffer: Buffer.from('test-file'),
@@ -598,6 +605,32 @@ describe('/api/external/review/[token]/proposal', () => {
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.send).toHaveBeenCalledWith(Buffer.from('test-file'));
     expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'private, no-store');
+  });
+
+  it('rejects the timestamped internal application even when it is in Reviewer Materials', async () => {
+    verifySuggestionToken.mockResolvedValue(verifiedSuggestion);
+    getRequestSharePointBuckets.mockResolvedValue([
+      { library: 'akoya_request', folder: 'REQ-001_request', source: 'active' },
+    ]);
+    GraphService.listFiles.mockResolvedValue([
+      {
+        id: 'internal-application',
+        name: 'Research Phase I Application_2026-05-01T18-44-00Z.pdf',
+        folder: 'REQ-001_request/Reviewer Materials',
+      },
+    ]);
+
+    const req = createMockReq({
+      method: 'GET',
+      query: { token: 'good-token', fileId: 'internal-application', library: 'akoya_request' },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'file_not_in_request_set' });
+    expect(GraphService.downloadFile).not.toHaveBeenCalled();
   });
 });
 
