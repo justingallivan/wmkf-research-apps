@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-24
+last_verified: 2026-07-25
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -162,6 +162,22 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   `baseVersion` is required + each update/delete carries the row's `_etag` as `If-Match` (412 → 409
   reload); set capped at 100; the four parent-bound rows (affiliation/impact/risk/overallRating)
   can't be removed until Phase E (server 400). Plan: `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md`.
+- **The question-type system has NO checkbox / multi-select type (verified S375, 2026-07-25).**
+  The review-question path supports exactly `picklist` (rendered as **single-choice
+  radios**, `ReviewAuthoringForm.js:426`), `richtext`, and `string` — enforced at
+  `review-question-fetcher.js:29` (`SUPPORTED_TYPES`), `review-question-save.js:69`
+  (staff save path), and the admin dropdown (`ReviewQuestionsSection.js:25-26`, which
+  offers only "Rich text (narrative)" / "Rating (single choice)"). `build-review-submission.js:83-124`
+  normalizes a picklist to ONE integer, and `wmkf_appreviewanswer` stores a single
+  `wmkf_answervalue` — **there is no multi-value column**, so "check all that apply"
+  needs a storage decision, not just a renderer. Read-back is affected too:
+  `review-matrix.js:146` computes average/spread for picklist only, and the Compare
+  grid, DOCX/PDF export, and AI synthesis all derive from that matrix.
+  **HAZARD — do not add a `checkbox` row directly in Dataverse.** `getActiveQuestionSet()`
+  is fail-closed: an unrecognized `wmkf_questiontype` throws, and `context`/`draft`/`submit`
+  all 500 on it, so a hand-added row breaks **every reviewer's portal page**, not just
+  that question. The type must ship in code first. Owner ask + scope: memory
+  `project-review-form-checkbox-questions`.
 - **Prod accept triggers a live automation chain — keep automated tests mocked/fenced.**
   A reviewer accept CREATEs a honorarium `akoya_request`, which fires AkoyaGo plugins
   + classic workflows + a live Bill.com payment flow + a contact→Business-Central sync.
