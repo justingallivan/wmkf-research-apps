@@ -1,8 +1,10 @@
 /**
  * POST /api/external/review/[token]/upload
  *
- * Multipart form-data: 1..5 files plus structured form fields. Token
- * verification gives us the suggestion id; everything else (file
+ * Multipart form-data: 1..5 files plus structured form fields. Multiselects use
+ * repeated bracketed names, e.g. `impactAreas[]=1&impactAreas[]=4`; scalar and
+ * array encodings may not be mixed. Token verification gives us the suggestion
+ * id; everything else (file
  * validation, SharePoint write, Dataverse PATCH, rollback) goes through
  * the shared `writeReviewFiles` core so the staff and self-serve paths
  * can never drift.

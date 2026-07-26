@@ -184,7 +184,12 @@ export function deriveReviewMatrix(reviewers, liveQuestions) {
           tallyByPair.set(tallyKey, tally);
         }
       }
-      question.tallies = [...tallyByPair.values()];
+      // Stable across reviewer arrival order while retaining historical
+      // `(value,label)` identities. A renamed label with the same stored value
+      // remains a separate tally and receives a deterministic secondary order.
+      question.tallies = [...tallyByPair.values()].sort(
+        (a, b) => (a.value - b.value) || a.label.localeCompare(b.label),
+      );
       question.answeredCount = cells.filter(
         (cell) => !cell.answerValuesUnreadable && Array.isArray(cell.answerValues),
       ).length;

@@ -50,6 +50,14 @@ implementation landed; `[IMPLEMENTED IN SOURCE]` does not mean the corresponding
 production schema, configuration, prompt publication, rehearsal, cleanup, or
 exposure step has occurred.
 
+**PRE-DEPLOYMENT BLOCKER:** wave 15 must be applied to production and its
+`wmkf_answervalues` metadata read back before this branch is merged or promoted to
+an auto-deploying production branch. Compatible readers select the property and
+all answer writers emit it even while the old question set remains active; the
+expand is therefore a code-deployment prerequisite, not merely an activation
+prerequisite. [VERIFIED via `lib/dataverse/adapters/review-answer.js:42-52`,
+`lib/dataverse/adapters/review-answer.js:232-243`, and §9.1]
+
 **Scope for the 2026-08-15 date: all of it, fully tested.** Owner direction
 2026-07-26 — the system must be ready and rehearsed before the date, not partially
 shipped with a follow-up queue. An earlier draft of this note proposed deferring the
@@ -386,10 +394,15 @@ values, or an invalid pair, return `answerValues: null` and
 `answerValuesUnreadable: true`; do not fail the entire answer read. The DTO must
 display “Unreadable answer,” exclude the row from multiselect tallies and
 synthesis evidence, and retain enough diagnostics for staff to identify the answer
-row. [IMPLEMENTED IN SOURCE]
+row. Apply this parsing and unreadable marker only when
+`wmkf_questiontype = "multiselect"`; non-multiselect rows ignore a stray
+`wmkf_answervalues` value so categorical corruption cannot suppress a valid
+rating or narrative. [IMPLEMENTED IN SOURCE]
 
 Tallies group by stored `(value,label)` pair rather than by current question
 options. This preserves historical labels if staff later rename an option.
+Aggregate output sorts those pair identities by numeric value and then label so
+reviewer arrival order cannot change comparison or export ordering.
 [IMPLEMENTED IN SOURCE]
 
 ## 3. Complete executable type-gate inventory
@@ -961,7 +974,7 @@ At minimum, changed-surface validation includes instruction invariants, docs
 frontmatter/catalog checks, state-Atlas checks, Dataverse schema safety, service
 contracts, prompt governance, security checks for any touched route, lint, tests,
 and build. [VERIFIED 2026-07-26 via paired gates/self-tests, type check, lint,
-516 Jest suites / 6,125 tests, 7 focused Playwright scenarios, and Next.js build]
+516 Jest suites / 6,128 tests, 7 focused Playwright scenarios, and Next.js build]
 
 ## 11. Durable-surface reconciliation
 

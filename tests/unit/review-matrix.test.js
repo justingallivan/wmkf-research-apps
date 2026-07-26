@@ -213,6 +213,40 @@ describe('deriveReviewMatrix', () => {
     ]);
   });
 
+  test('multiselect tallies have deterministic value/label order independent of reviewer arrival', () => {
+    const reviewers = [
+      reviewer('r1', 'Dr. A', [
+        row('impactAreas', 3, 'multiselect', 'Impact areas?', {
+          answerValues: [{ value: 4, label: 'Textbooks' }],
+          answerText: 'Textbooks',
+        }),
+      ]),
+      reviewer('r2', 'Dr. B', [
+        row('impactAreas', 3, 'multiselect', 'Impact areas?', {
+          answerValues: [
+            { value: 2, label: 'Publications — renamed' },
+            { value: 1, label: 'Tools' },
+          ],
+          answerText: 'Publications — renamed; Tools',
+        }),
+      ]),
+      reviewer('r3', 'Dr. C', [
+        row('impactAreas', 3, 'multiselect', 'Impact areas?', {
+          answerValues: [{ value: 2, label: 'Publications' }],
+          answerText: 'Publications',
+        }),
+      ]),
+    ];
+
+    const question = deriveReviewMatrix(reviewers, null).questions[0];
+    expect(question.tallies.map(({ value, label }) => ({ value, label }))).toEqual([
+      { value: 1, label: 'Tools' },
+      { value: 2, label: 'Publications' },
+      { value: 2, label: 'Publications — renamed' },
+      { value: 4, label: 'Textbooks' },
+    ]);
+  });
+
   test('corrupt multiselect content is isolated and excluded from tallies', () => {
     const question = deriveReviewMatrix([
       reviewer('r1', 'Dr. A', [

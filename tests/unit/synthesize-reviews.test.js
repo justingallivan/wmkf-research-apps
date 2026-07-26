@@ -58,6 +58,7 @@ beforeEach(() => {
         wmkf_questiontext: 'Rate the risk.',
         wmkf_questiontype: 'picklist',
         wmkf_answervalue: 3,
+        wmkf_answervalues: '{stray corrupt json',
         wmkf_answertext: 'High risk',
         wmkf_answerhtml: '<p>High risk</p>',
       },
@@ -204,6 +205,7 @@ test('overwrite:true bypasses the already-exists gate and passes forceOverwrite 
   expect(digest).toContain('Question text: Rate the risk.');
   expect(digest).toContain('Answer value: 3');
   expect(digest).toContain('Answer text: High risk');
+  expect(digest).not.toContain('{stray corrupt json');
   expect(digest).toContain('Question key: impactAreas');
   expect(digest).toContain('Question type: multiselect');
   expect(digest).toContain('Selected categories: Tools; Broad interest');

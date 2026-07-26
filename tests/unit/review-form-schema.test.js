@@ -192,6 +192,16 @@ describe('validateReviewForm', () => {
     test('still validates present values', () => {
       expect(validateReviewForm({ riskLevel: 7 }, { partial: true }).ok).toBe(false);
       expect(validateReviewForm({ impactAreas: [999] }, { partial: true }).ok).toBe(false);
+      expect(validateReviewForm({ impactAreas: '1' }, { partial: true }).ok).toBe(false);
+    });
+
+    test('treats an empty-string multiselect as absent', () => {
+      expect(validateReviewForm({ impactAreas: '' }, { partial: true })).toEqual({
+        ok: true,
+        dataverseValues: {},
+        ratings: {},
+        multiselects: {},
+      });
     });
 
     test('routes only provided rating and multiselect values', () => {

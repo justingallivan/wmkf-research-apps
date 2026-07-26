@@ -11,7 +11,7 @@ metadata:
 ## Status (2026-07-26 implementation pass)
 
 **Plan ACCEPTED and FROZEN: `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md`. The
-backward-compatible code and additive wave-15 schema package are implemented on
+row-backward-compatible code and additive wave-15 schema package are implemented on
 `codex/review-form-multiselect`; production schema application, prompt/question
 publication, controlled rehearsal/rollback, fixture disposition, and reviewer
 exposure are deliberately still pending. Target go-live remains 2026-08-15.**
@@ -32,6 +32,10 @@ Closed owner decisions (do not reopen without a new one):
 - Production operations are not implied by a green code build. Applying wave 15,
   publishing the prompt or question set, exercising rollback, deleting fixtures,
   and opening reviewer exposure remain separately controlled steps.
+- Wave 15 is a **pre-deployment** gate, not only a pre-activation gate: readers
+  always select `wmkf_answervalues` and writers always emit it, so production
+  metadata readback must precede merging/promoting this branch to auto-deploying
+  `main`.
 
 **Do not reconcile the frozen plan against incidental source changes.** It cites 30
 source files; per-change reconciliation cost more than the drift it prevented.
@@ -86,13 +90,16 @@ admin and reviewer UIs support it, every writer uses one server canonicalizer,
 wave 15 defines `wmkf_answervalues`, and readers isolate corrupt JSON. The old
 paragraph remains historical evidence for why the full-chain change was required.
 
-## Release hazard: expand before activation
+## Release hazard: expand before deployment, then activate
 
 `getActiveQuestionSet()` is deliberately fail-closed — an unrecognized
 `wmkf_questiontype` throws, and `context`/`draft`/`submit` all 500 on that throw. A
-`multiselect` row must not be activated until the compatible code is deployed and
-wave 15 has been applied/read back. Hand-writing a `checkbox` type remains invalid;
-the supported type name is exactly `multiselect`.
+production release must apply/read back wave 15 before deploying the compatible
+code, because its readers and writers reference `wmkf_answervalues` even while the
+old question set remains active. Only after the property exists may the compatible
+code deploy; only after that deployment may a `multiselect` row be activated.
+Hand-writing a `checkbox` type remains invalid; the supported type name is exactly
+`multiselect`.
 
 ## Probed live state (2026-07-25) — do NOT re-infer this
 

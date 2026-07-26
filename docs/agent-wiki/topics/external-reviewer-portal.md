@@ -13,8 +13,11 @@ source_files:
   - pages/api/external/review/[token]/draft.js
   - pages/api/external/review/[token]/submit.js
   - lib/external/build-review-submission.js
+  - lib/external/review-multiselect.js
   - lib/external/review-question-fetcher.js
   - lib/external/review-form-schema.js
+  - lib/dataverse/adapters/review-answer.js
+  - shared/utils/review-matrix.js
   - pages/api/admin/review-questions.js
   - lib/admin/review-question-save.js
   - shared/components/admin/ReviewQuestionsSection.js
@@ -100,9 +103,11 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   honorarium before it can send confirmation/quota side effects.
 - **The stage2b "submit your review" surface is now in-browser authoring, not file upload (S301, Phase 2).**
   `MaterialsView` renders `ReviewAuthoringForm` (controlled) with the staff-editable
-  question set (seeded as the 11 questions — 3 rating radios + 8 `RichReviewEditor`
-  (tiptap) narrative answers + the affiliation field; now Dataverse-sourced, see the
-  staff-editable-questions note below) — autosaving to
+  Dataverse question set across `string`, single-choice `picklist`, fixed-option
+  `multiselect`, and `richtext` fields. The staged target seed has 11 numbered
+  questions — 2 rating radios, 1 checkbox multiselect, and 8 `RichReviewEditor`
+  (tiptap) narrative answers — plus the affiliation field; production remains on
+  the prior active set until the controlled publication. The form autosaves to
   Postgres `review_drafts` via the `GET/PUT /api/external/review/[token]/draft` route
   (`ReviewDraftService`). Reviewer HTML is UNTRUSTED: the draft PUT server-sanitizes
   every rich-text answer with `lib/external/sanitize-review-html.js` (DOM-free
@@ -112,10 +117,12 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   Phase 3):** the wired Submit button POSTs to `pages/api/external/review/[token]/submit.js`,
   which finality-prechecks (409 if `wmkf_reviewreceivedat` set), server-sanitizes + validates
   (`lib/external/build-review-submission.js`: `validateReviewSubmission` + the single producer
-  `buildReviewSubmission`), then writes ONE atomic `DynamicsService.executeChangeset`: the 11
+  `buildReviewSubmission`), then writes ONE atomic `DynamicsService.executeChangeset`: the
   `wmkf_appreviewanswer` snapshot rows upserted by the **`_wmkf_appreviewersuggestion_value=<guid>`**
   alternate-key form (NOT the bare logical name — memory `reference-dataverse-altkey-lookup-upsert-url`)
-  + the parent ratings/affiliation/receivedat PATCH guarded fail-closed by `If-Match`. Submit is
+  + the parent affiliation/receivedat PATCH guarded fail-closed by `If-Match`. The
+  snapshots are the sole structured home for the two ratings, categorical
+  selections, and narratives. Submit is
   FINAL — the form locks read-only, and both `/draft` PUT and the reviewer-token `upload.js` 409
   post-submit (P0-1). The engagement gate is the shared pure helper
   `lib/external/review-engagement-state.js::computeEngagementState`.
@@ -148,9 +155,10 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   structure: the submit snapshot persists `questionText = field.label`, so a wording edit MUST invalidate
   an in-flight session or the answer is recorded against text the reviewer never saw (Codex Phase B P1-A).
   Draft load reconciles type-aware — a draft value whose shape ≠ the current field type is discarded. `lib/external/review-form-schema.js` is RETAINED as the field-shape +
-  seed + helper source (`reviewParentColumnByKey` dual-write binding, label decoders) and the
-  dormant default param; the seeded set is byte-identical to it, so behavior is unchanged. The two
-  legacy `validateReviewForm` paths stay on the static default until Phase D. (The staff
+  seed + helper source (`reviewParentColumnByKey` affiliation binding, rating label
+  decoders, and staged target set). All four write boundaries — portal submit,
+  staff manual entry, legacy upload, and mark-received-no-file — resolve the
+  authoritative live question set before validation. (The staff
   `ReviewFormFields` upload surface that also used the static default was **removed from
   `ReviewerManagePanel` in S347** — see the staff-side removal note below; `ReviewFormFields.js`
   was then deleted (S347) as orphaned.) **Phase C (S304): superuser editor** at `/admin` →
@@ -160,28 +168,30 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   optimistic-lock (409 `set_changed`), audits to Postgres `review_question_audit` (pending→final,
   hard-abort if audit down), and calls `invalidate()`. Concurrency-hardened (Codex Phase C P1s):
   `baseVersion` is required + each update/delete carries the row's `_etag` as `If-Match` (412 → 409
-  reload); set capped at 100; the four parent-bound rows (affiliation/impact/risk/overallRating)
-  can't be removed until Phase E (server 400). Plan: `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md`.
-- **The question-type system has NO checkbox / multi-select type (verified S375, 2026-07-25).**
-  The review-question path supports exactly `picklist` (rendered as **single-choice
-  radios**, `ReviewAuthoringForm.js:426`), `richtext`, and `string` — enforced at
-  `review-question-fetcher.js:29` (`SUPPORTED_TYPES`), `review-question-save.js:69`
-  (staff save path), and the admin dropdown (`ReviewQuestionsSection.js:25-26`, which
-  offers only "Rich text (narrative)" / "Rating (single choice)"). `build-review-submission.js:83-124`
-  normalizes a picklist to ONE integer, and `wmkf_appreviewanswer` stores a single
-  `wmkf_answervalue` — **there is no multi-value column**, so "check all that apply"
-  needs a storage decision, not just a renderer. Read-back is affected too:
-  `review-matrix.js:146` computes average/spread for picklist only, and the Compare
-  grid, DOCX/PDF export, and AI synthesis all derive from that matrix.
-  **HAZARD — do not add a `checkbox` row directly in Dataverse.** `getActiveQuestionSet()`
-  is fail-closed: an unrecognized `wmkf_questiontype` throws, and `context`/`draft`/`submit`
-  all 500 on it, so a hand-added row breaks **every reviewer's portal page**, not just
-  that question. The type must ship in code first. Owner ask + scope: memory
+  reload); set capped at 100; the three protected core rows
+  (`affiliation`/`riskLevel`/`overallAssessment`) cannot be removed (server 400).
+  Plan: `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md`.
+- **Fixed-option multiselect is implemented in source; production activation is pending (S376, 2026-07-26).**
+  The review-question path supports exactly `picklist` (single-choice radios),
+  `multiselect` (native checkbox fieldset), `richtext`, and `string`. The browser
+  sends numeric arrays only; `lib/external/review-multiselect.js` validates against
+  live options, deduplicates, orders by live option order, and constructs the sole
+  stored `{value,label}` snapshot plus joined text. Every writer uses that
+  canonicalizer. Readers parse `wmkf_answervalues` defensively only for multiselect
+  rows; corrupt categorical storage marks that row unreadable without suppressing
+  another rating or narrative. Matrix/report outputs keep categorical tallies
+  separate from numeric averages and sort tally identities deterministically by
+  stored value then label.
+  **PRE-DEPLOYMENT GATE:** wave 15 must be applied to production and
+  `wmkf_answervalues` metadata read back before this branch is merged/promoted to
+  auto-deploying `main`, because readers always select the property and writers
+  always emit it even while the old question set remains active. After compatible
+  code deploys, prompt/question publication, controlled rehearsal/rollback,
+  fixture disposition, and reviewer exposure remain separate release gates.
+  Hand-writing a `checkbox` type remains invalid; the supported name is exactly
+  `multiselect`. Canonical contract:
+  `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md`; active memory:
   `project-review-form-checkbox-questions`.
-  **Build contract (S375): `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` is ACCEPTED and
-  FROZEN; implementation not started; go-live 2026-08-15, full scope.** Read its §3
-  type-gate inventory and §3.6 raw-comparison closeout before touching any `'picklist'`
-  comparison — every `snapshotKeys` allowlist still filters `picklist || richtext`.
 - **Write paths resolve the question set uncached (S375).** `getAuthoritativeQuestionSet()`
   is used by portal submit, staff manual entry, legacy upload, and mark-received-no-file,
   because the module-local cache (5-min TTL, process-local `invalidate()`) let a stale

@@ -78,6 +78,9 @@ describe('validateReviewSubmission', () => {
     expect(validateReviewSubmission(validInput({ riskLevel: null })).ok).toBe(false);
     expect(validateReviewSubmission(validInput({ overallAssessment: 6 })).ok).toBe(false);
     expect(validateReviewSubmission(validInput({ impactAreas: [] })).ok).toBe(false);
+    const emptyMultiselect = validateReviewSubmission(validInput({ impactAreas: '' }));
+    expect(emptyMultiselect.ok).toBe(false);
+    expect(emptyMultiselect.errors.join(' ')).toMatch(/Q3.*required/);
     expect(validateReviewSubmission(validInput({ affiliation: '   ' })).ok).toBe(false);
   });
 

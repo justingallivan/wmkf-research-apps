@@ -120,6 +120,31 @@ describe('review-answer.fetchAnswersBySuggestion (mirror of review-answers.js)',
     });
   });
 
+  test('ignores stray corrupt multiselect storage on a valid picklist row', async () => {
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: [{
+        _wmkf_appreviewersuggestion_value: SID_A,
+        wmkf_appreviewanswerid: 'answer-rating',
+        wmkf_questionkey: 'riskLevel',
+        wmkf_questionorder: 4,
+        wmkf_questiontype: 'picklist',
+        wmkf_answertext: 'Medium risk',
+        wmkf_answervalue: 2,
+        wmkf_answervalues: '{bad json',
+      }],
+      capped: false,
+    });
+
+    const out = await reviewAnswer.fetchAnswersBySuggestion([SID_A]);
+    expect(out[SID_A][0]).toMatchObject({
+      questionType: 'picklist',
+      answerText: 'Medium risk',
+      answerValue: 2,
+      answerValues: null,
+      answerValuesUnreadable: false,
+    });
+  });
+
   test('re-sanitizes answerHtml on read (defense in depth)', async () => {
     jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
       records: [
