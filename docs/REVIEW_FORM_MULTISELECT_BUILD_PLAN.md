@@ -28,10 +28,14 @@ readback completed 2026-07-26, followed by compatible code promotion to `main`
 (`dpl_7sfTLrMafYPKp7mnYdrEVjs9HmW5`). Publication, controlled rehearsal/rollback,
 fixture disposition, and reviewer exposure remain pending. The 2026-07-26
 read-only pre-activation evidence pass found that the EICAR fixture already has a
-sent thank-you timestamp, which is an explicit §8 stop condition; no fixture was
-deleted and cutover remains blocked pending an owner decision on that lifecycle
-history. [VERIFIED via
-`outputs/review-form-multiselect/preactivation-evidence-2026-07-26.json`]
+sent thank-you timestamp, which is an explicit §8 stop condition. A follow-up
+provenance probe traced it to the April 30 production validation run: Dynamics
+records the matching thank-you email to the fixture address within seconds of the
+marker, and the validation commit records that exact test phase. No fixture was
+deleted and cutover remains blocked pending an owner cleanup decision. [VERIFIED
+via `outputs/review-form-multiselect/preactivation-evidence-2026-07-26.json`,
+`outputs/review-form-multiselect/thankyou-provenance-2026-07-26.json`, and commit
+`ada645de`]
 **Target go-live: 2026-08-15** (owner-set; the date external reviewers first see the
 new form).
 
@@ -129,6 +133,28 @@ and has `wmkf_thankyousentat=2026-05-01T01:11:26Z`. Section 8 says to stop when 
 sent thank-you exists. The `Gallivan_test` fixture has no answers, report,
 synthesis inclusion, honorarium, or sent thank-you, but still owns the sole
 Postgres draft. Neither fixture was changed. [VERIFIED via the same evidence]
+
+The marker is now explained. The follow-up read-only provenance probe found a
+Dynamics email activity regarding request 1002379 with the matching thank-you
+subject, created at `2026-05-01T01:11:24Z`, sent at `01:11:33Z`, from
+`jgallivan@wmkeck.org` to the fixture address `justingallivan@me.com`; the marker
+at `01:11:26Z` falls inside that nine-second send window. The suggestion was
+created at `00:00:09Z`, so this was a later lifecycle update, not a value present
+at row creation. Commit `ada645de`, authored two minutes after the marker in
+Pacific time, independently records the five-phase validation against this exact
+test row, including “thank-you — email sent ... + status to complete.” The
+historical manual send path sent first and then stamped `thankYouSentAt` without a
+review-received gate. Dataverse audit history is currently readable and both the
+entity and attribute are now audit-enabled, but its 15 retained events do not
+include the original marker delta; the email activity plus point-in-time source
+and commit supply the provenance. This reclassifies the marker as a deliberate
+synthetic validation side effect, not genuine reviewer correspondence, but it
+does not waive §8's stop or authorize cleanup. The provenance evidence digest is
+`b5e3fcbde1d0e30275d310f246b38e3e05b67bae1d6d016385eeb60727d4d2d9`.
+[VERIFIED via
+`outputs/review-form-multiselect/thankyou-provenance-2026-07-26.json`,
+`git show ada645de`, and
+`git show ef233a0e:pages/api/review-manager/send-emails.js`]
 
 ### 0.2 Dependency: question-set coherence at write boundaries — SHIPPED
 
@@ -798,8 +824,13 @@ approval naming the exact writes. Cutover is blocked until the cleanup completes
 The probe found a sent thank-you marker on
 `6ad328b4-f044-f111-88b5-000d3a306d45`. Per step 2 below, processing stopped:
 no deletion approval was requested, no suggestion/answer/draft/file/contact was
-changed, and cutover remains blocked. The evidence bundle is
-`outputs/review-form-multiselect/preactivation-evidence-2026-07-26.json`.
+changed, and cutover remains blocked. The follow-up provenance investigation
+confirmed that the marker belongs to the April 30 production validation send to
+the fixture email address, not to the later EICAR upload or a genuine reviewer.
+That finding makes the owner decision better informed but does not silently
+relax the stop condition. Evidence bundles:
+`outputs/review-form-multiselect/preactivation-evidence-2026-07-26.json` and
+`outputs/review-form-multiselect/thankyou-provenance-2026-07-26.json`.
 [VERIFIED]
 
 The existing hard-removal service performs a preflight, writes a durable system
@@ -921,7 +952,9 @@ draft, or bypassing the existing removal audit is prohibited. [PLANNED]
    approval, complete the single audited cleanup procedure, and attach its
    postconditions. The consumer probe completed 2026-07-26 and found the EICAR
    fixture's sent thank-you marker, so the mandated stop fired before approval
-   or cleanup. [PROBE COMPLETED; CLEANUP BLOCKED]
+   or cleanup. The follow-up investigation traced it to the April 30 production
+   validation send to the fixture address; cleanup still requires the explicit
+   §8 owner decision. [PROBE + PROVENANCE COMPLETED; CLEANUP BLOCKED]
 5. Record the active and inactive question rows with IDs/ETags, normalized active
    version, and the completed question audit; record the current synthesis prompt
    identity/content/hash. Produce and review the §4 manual rollback dry-run manifest
@@ -1089,7 +1122,8 @@ remain release gates and must not be inferred from code completion:
 - [ ] Both named test artifacts have passed the consumer probe, received explicit
   deletion authority, and completed the one audited cleanup procedure. The
   2026-07-26 probe stopped because the EICAR fixture has a sent thank-you marker;
-  no deletion authority was requested and no cleanup ran.
+  the marker is now traced to the April 30 synthetic validation send, but no
+  deletion authority was requested and no cleanup ran.
 - [ ] The prompt is published before production question-set activation.
 - [ ] Controlled production smoke and cleanup are green before external exposure.
 - [ ] Question rollback is executable from the reviewed manual manifest and

@@ -90,32 +90,29 @@ The next session is expected to be Codex implementing against the frozen plan.
 
 ### Verified Open
 
-1. **Implement the multiselect build. NOT STARTED.**
-   Evidence: `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` header reads
-   "ACCEPTED AND FROZEN … Implementation not started"; `grep -rn "multiselect" lib
-   shared pages` returns no runtime support.
-   **Target go-live 2026-08-15, FULL scope — the owner explicitly rejected deferrals.**
-   The plan is the executable contract; §3 is a complete type-gate inventory and §3.6
-   is a 25-row raw-comparison closeout table. Suggested order: the `wmkf_answervalues`
-   schema wave and `lib/external/review-multiselect.js` canonicalizer first (every
-   write path depends on both), then fetcher/admin allowlists, then the reviewer form
-   renderer and hydration, then the four write paths, then PD read-back, exports, and
-   the versioned synthesis prompt.
+1. **Complete the remaining pre-activation release gates.**
+   Evidence: `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` records compatible code
+   deployed on `main`, wave 15 read back in production, and the legacy 12-row set
+   still active. Independently routed production HTTP writer evidence, prompt and
+   question publication, rollback rehearsal, controlled smoke, and exposure remain
+   pending. **Target go-live remains 2026-08-15.**
 
-2. **Run the §8 read-only consumer probe for the two test artifacts.**
-   Evidence: §8 specifies the exact fields; the probe has NOT been run. Owner
-   authorized the read-only probe only.
-   Targets: suggestion `6ad328b4-f044-f111-88b5-000d3a306d45` (EICAR fixture) and
-   `3c4bb952-e061-f111-a826-000d3a306da2` (`Gallivan_test` draft). Probe request,
-   person, lifecycle, reports, synthesis, and thank-you-sweep consumers.
+2. **Resolve the §8 fixture cleanup stop with an explicit owner decision.**
+   The consumer probe completed. A follow-up read-only provenance probe traced the
+   EICAR fixture's `2026-05-01T01:11:26Z` marker to the April 30 production
+   validation thank-you sent from `jgallivan@wmkeck.org` to
+   `justingallivan@me.com`; it is synthetic test correspondence, not a genuine
+   reviewer event. The frozen plan still requires approval naming both suggestion
+   IDs, their children, and `deleteContact:false` before the audited cleanup runs.
 
 ### Owner Decision Needed
 
-1. **Deletion approval for the two test artifacts — after the §8 probe.**
+1. **Deletion approval for the two test artifacts.**
    Evidence: `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` §8 — "No deletion is
    authorized by this plan."
-   The owner said "let's talk after the probe". Approval must name the exact
-   suggestion IDs, answer rows, drafts, and state `deleteContact:false`.
+   The probe and provenance follow-up are complete. Approval must name the exact
+   suggestion IDs, answer rows, drafts, linked test files, and state
+   `deleteContact:false`.
 
 ### Parked
 

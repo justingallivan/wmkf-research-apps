@@ -17,7 +17,10 @@ production and read back first on 2026-07-26. Prompt/question publication,
 controlled rehearsal/rollback, fixture disposition, and reviewer exposure are
 deliberately still pending. The read-only pre-activation probe found a sent
 thank-you marker on the EICAR fixture, so the frozen cleanup contract stopped
-before deletion authority or cleanup. Target go-live remains 2026-08-15.**
+before deletion authority or cleanup. A follow-up read-only investigation traced
+the marker to the April 30 production validation thank-you sent to the fixture
+address; it was not genuine reviewer correspondence, but the stop still requires
+an explicit owner cleanup decision. Target go-live remains 2026-08-15.**
 Read the plan for the release contract; this entry records the current boundary.
 
 Closed owner decisions (do not reopen without a new one):
@@ -135,7 +138,15 @@ It made no production writes.
   received, report/synthesis-included, owns the three sentinel answers and test
   file, and has `wmkf_thankyousentat=2026-05-01T01:11:26Z`. The frozen §8
   contract says a sent thank-you is a stop condition. No deletion approval was
-  requested and nothing was removed.
+  requested and nothing was removed. Follow-up provenance:
+  `outputs/review-form-multiselect/thankyou-provenance-2026-07-26.json` records a
+  Dynamics thank-you activity created at `01:11:24Z` and sent at `01:11:33Z`
+  from `jgallivan@wmkeck.org` to the fixture address, bracketing the marker.
+  Commit `ada645de`, authored two minutes later in Pacific time, records the
+  exact five-phase validation run and its thank-you send. The marker is therefore
+  a synthetic validation side effect, but cleanup remains blocked for explicit
+  owner approval. Evidence digest:
+  `b5e3fcbde1d0e30275d310f246b38e3e05b67bae1d6d016385eeb60727d4d2d9`.
 - `Gallivan_test` fixture `3c4bb952-e061-f111-a826-000d3a306da2` has no answer,
   report, synthesis, honorarium, or sent thank-you, but owns the sole Postgres
   draft. It remains untouched pending resolution of the EICAR stop plus explicit
