@@ -22,7 +22,11 @@ new document flows (reviewer uploads, etc.) fit into the existing pattern.
 > `wmkf_appreviewanswer` snapshots to Dataverse. The file-upload route and pointer
 > fields remain as hidden compatibility/rescue infrastructure, so old SharePoint
 > PDFs and test artifacts may still exist. A PDF's presence is not evidence of a
-> current genuine review and is not deletion authority.
+> current genuine review and is not deletion authority. Legacy upload-path rows
+> are the exception to the structured-content assumption: their rating and
+> multiselect values are in `wmkf_appreviewanswer`, but their narrative answers
+> remain only in the uploaded PDF. Deleting one of those PDFs is therefore not
+> recoverable from the structured rows.
 
 ---
 

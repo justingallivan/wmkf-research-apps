@@ -59,6 +59,17 @@ With no blocks, safety = **integrity + a durable trail**, three controls:
    and — for the opt-in contact delete — the **comprehensive** contact association
    count (portal OID `wmkf_portaloid`, BILL vendor fields, CRM activities, PI/recipient
    roles, other requests), not just reviewer rows.
+4. **Scoped SharePoint cleanup.** The commit re-lists the server-read review folder
+   before any durable mutation and records the selected and preserved drive items in
+   the audit breadcrumb. Current `attempt_<32-hex>` folders are isolated to one upload,
+   so all files in that exact folder are eligible. Legacy folder shapes delete only the
+   exact stored `wmkf_reviewfilename`; every other file is preserved. An internal
+   operator may instead pass an exact `{id,name}` allowlist (including `[]` to preserve
+   all files); id or name drift aborts before the audit and Dataverse changeset.
+   A normal route call does not become unavailable when Graph cannot resolve the
+   folder: it proceeds with the engagement removal, skips all file cleanup, and
+   records a partial warning. Exact internal allowlists still fail closed because
+   silently skipping their requested target set would violate the operator contract.
 
 ## Scope
 
@@ -70,6 +81,11 @@ ONE atomic Dataverse changeset deletes:
 Then, cross-store (Postgres, not in the changeset): `ReviewDraftService.deleteBySuggestion`
 [VERIFIED via lib/services/review-draft-service.js:90 read this session] to drop the
 autosaved draft keyed by `suggestion_id`.
+SharePoint review-file cleanup is also outside the Dataverse changeset and best-effort
+after Action A commits. Its target set is resolved before Action A under the scoped
+policy above, and the audit result records exact selected, deleted, failed, and
+preserved drive items plus the total folder listing count. A deliberate preserve-all
+result reports zero selected/deleted files rather than claiming a deletion.
 **Left intact:** the global `contact` (unless Action B), and (deferred/out-of-scope) BILL.
 
 ### Action B — optional "Also delete the contact" (opt-in)
@@ -78,19 +94,23 @@ warning above. Never automatic; second explicit opt-in.
 
 ## Cross-store ordering (the one unavoidable seam)
 
-Dataverse changeset is atomic for Dataverse rows; Postgres `review_drafts` is a
-separate store. Order: **(1) write pre-delete audit → (2) Dataverse changeset (atomic)
-→ (3) Postgres `deleteBySuggestion` → (4) update audit with result.** If step 3 fails
-after step 2 commits, that is a recoverable orphan draft — recorded in the audit row
-for cleanup, never silent. (Draft is already unreachable post-delete since token
-verification needs the suggestion.)
+Dataverse changeset is atomic for Dataverse rows; SharePoint and Postgres are separate
+stores. Order: **(1) resolve the SharePoint cleanup target set → (2) write pre-delete
+audit → (3) required Dataverse changeset (atomic) → (4) optional contact changeset →
+(5) best-effort SharePoint cleanup → (6) Postgres `deleteBySuggestion` → (7) update
+audit with exact results.** If a cross-store cleanup fails after step 3 commits, the
+orphan is recorded in the audit row, never silent. (The draft is already unreachable
+post-delete since token verification needs the suggestion.)
 
 ## Backend
 
-- New service `removeCandidateEntirely({ suggestionId, deleteContact }, ctx)` +
+- New service `removeCandidateEntirely({ suggestionId, deleteContact,
+  reviewFileDeletionAllowlist }, ctx)` +
   a preflight `describeRemoval({ suggestionId })` for the disclosure.
 - Preflight/commit **re-read the suggestion (+ parent request) server-side** and run
   under a trusted DAL context (required by `runChangeset`). Fail-closed on excluded.
+- Preflight and commit independently list the server-read SharePoint folder and derive
+  the same safe default policy. The route never accepts drive-item ids from the client.
 - Route: extend `DELETE /api/reviewer-finder/my-candidates` with `mode=hard`
   (+ `deleteContact=true`), same app-access gate as today's soft-delete
   [VERIFIED via pages/api/reviewer-finder/my-candidates.js dispatch read this session].
@@ -118,7 +138,9 @@ verification needs the suggestion.)
   honorarium-absent case; review-answer/draft-absent cases; Action B adds contact op +
   surfaces full association count; excluded fail-closed; **audit-write-fails → aborts
   before any delete**; Dataverse-changeset-fails → nothing deleted (atomic); Postgres-
-  delete-fails-after-changeset → recorded partial, not silent.
+  delete-fails-after-changeset → recorded partial, not silent; isolated-attempt versus
+  legacy-folder file targeting; exact allowlist id/name drift; empty preserve-all
+  allowlist; per-file SharePoint partial-failure attribution.
 - Route: `mode=hard`, `deleteContact`, auth gate, preflight disclosure shape, 4xx.
 - `check:api-routes` matrix note; `check:atlas`; `check:dataverse-access-layer`;
   `check:dynamics-context-boundary` (changeset needs trusted context); full suite.

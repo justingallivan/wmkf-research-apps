@@ -23,13 +23,17 @@ beforeEach(() => {
       },
       reviewSharePointFolder: 'REQ-1/Reviewer_Uploads/Jane',
       reviewFilename: 'review.pdf',
+      reviewFileCleanupPreview: {
+        deletionPolicy: 'legacy_primary_filename_only',
+        deleteFiles: [{ id: 'sp-1', name: 'review.pdf' }],
+        preserveFiles: [{ id: 'sp-2', name: 'older-review.pdf' }],
+      },
     }),
   }));
 });
 
 afterEach(() => {
   jest.restoreAllMocks();
-  delete global.fetch;
 });
 
 test('discloses submitted-review rows separately from best-effort SharePoint cleanup', async () => {
@@ -46,5 +50,41 @@ test('discloses submitted-review rows separately from best-effort SharePoint cle
   expect(screen.getByText(/SharePoint review pointer recorded for audit:/)).toHaveTextContent(
     'REQ-1/Reviewer_Uploads/Jane / review.pdf',
   );
+  expect(screen.getByText(/SharePoint cleanup preview:/)).toHaveTextContent(
+    'delete review.pdf; preserve older-review.pdf',
+  );
   expect(screen.queryByText(/^Their submitted review$/)).not.toBeInTheDocument();
+});
+
+test('keeps removal available while disclosing that Graph cleanup will be skipped', async () => {
+  global.fetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({
+      suggestionId: SUGGESTION_ID,
+      hasSubmittedReview: true,
+      answerRowCount: 1,
+      contactId: null,
+      reviewSharePointFolder: 'REQ-1/Reviewer_Uploads/Jane',
+      reviewFilename: 'review.pdf',
+      reviewFileCleanupPreview: {
+        deletionPolicy: 'skip_on_resolution_failure',
+        deleteFiles: [],
+        preserveFiles: [],
+        error: 'Graph 503',
+      },
+    }),
+  });
+
+  render(
+    <RemoveEntirelyModal
+      candidate={{ suggestionId: SUGGESTION_ID, name: 'Dr Reviewer' }}
+      onClose={jest.fn()}
+      onRemoved={jest.fn()}
+    />,
+  );
+
+  expect(await screen.findByText(/cleanup preview unavailable/)).toHaveTextContent(
+    'file cleanup will be skipped and audited',
+  );
+  expect(screen.getByRole('button', { name: 'Remove entirely' })).toBeEnabled();
 });

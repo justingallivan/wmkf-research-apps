@@ -143,6 +143,27 @@ export default function RemoveEntirelyModal({ candidate, onClose, onRemoved }) {
                     {disclosure.reviewFilename ? ` / ${disclosure.reviewFilename}` : ''}
                   </li>
                 )}
+                {disclosure.reviewFileCleanupPreview && (
+                  <li>
+                    {disclosure.reviewFileCleanupPreview.error
+                      ? 'SharePoint cleanup preview unavailable; the engagement can still be removed, but file cleanup will be skipped and audited.'
+                      : (
+                        <>
+                          SharePoint cleanup preview: delete{' '}
+                          {disclosure.reviewFileCleanupPreview.deleteFiles.length > 0
+                            ? disclosure.reviewFileCleanupPreview.deleteFiles
+                              .map((file) => file.name || file.id)
+                              .join(', ')
+                            : 'no files'}
+                          {disclosure.reviewFileCleanupPreview.preserveFiles.length > 0
+                            ? `; preserve ${disclosure.reviewFileCleanupPreview.preserveFiles
+                              .map((file) => file.name || file.id)
+                              .join(', ')}`
+                            : ''}
+                        </>
+                      )}
+                  </li>
+                )}
               </ul>
             </div>
           )}

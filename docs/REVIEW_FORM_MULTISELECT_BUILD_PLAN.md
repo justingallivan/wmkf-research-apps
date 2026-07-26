@@ -43,9 +43,12 @@ subsequently identified it as a second test artifact from the retired reviewer-P
 experiment, not a genuine review; no additional deletion was authorized. [VERIFIED
 via `outputs/review-form-multiselect/preactivation-evidence-2026-07-26.json`,
 `outputs/review-form-multiselect/thankyou-provenance-2026-07-26.json`, and commit
-`ada645de`; cleanup verified via
+`ada645de`; cleanup durably recorded in Postgres `system_alerts` 361 and 362.
+The gitignored local evidence copy is
 `outputs/review-form-multiselect/fixture-cleanup-evidence-2026-07-26.json`,
-SHA-256 `021c21fc8b2f90aee2651aab3df19f04df3d79d76d36c8385f86a999f5d6666e`]
+SHA-256 `021c21fc8b2f90aee2651aab3df19f04df3d79d76d36c8385f86a999f5d6666e`;
+it is intentionally not a fresh-clone source of truth because it contains live
+production identifiers and test email addresses.]
 **Target go-live: 2026-08-15** (owner-set; the date external reviewers first see the
 new form).
 

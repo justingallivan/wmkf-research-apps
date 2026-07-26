@@ -92,7 +92,7 @@ jest.mock('../../lib/services/graph-service', () => ({
 
 const cleanupSharePointItems = jest.fn(async () => true);
 jest.mock('../../lib/services/sharepoint-cleanup', () => ({
-  cleanupSharePointItems: (...a) => cleanupSharePointItems(...a),
+  cleanupSharePointItemsDetailed: (...a) => cleanupSharePointItems(...a),
 }));
 
 let removeCandidateEntirely;
@@ -133,7 +133,10 @@ beforeEach(() => {
   updateAlertMetadata.mockResolvedValue({});
   getDriveId.mockResolvedValue('drive-1');
   listFiles.mockResolvedValue([]);
-  cleanupSharePointItems.mockResolvedValue(true);
+  cleanupSharePointItems.mockImplementation(async (_driveId, items) => ({
+    deleted: items,
+    failed: [],
+  }));
 });
 
 describe('removeCandidateEntirely — full bundle', () => {
@@ -340,7 +343,7 @@ describe('removeCandidateEntirely — Dataverse-changeset-fails', () => {
 });
 
 describe('removeCandidateEntirely — SharePoint review-file cleanup', () => {
-  test('records folder/filename in the audit snapshot and best-effort deletes listed files after Action A', async () => {
+  test('legacy folders delete only the stored primary filename and preserve unrelated files', async () => {
     findById.mockResolvedValue(baseSuggestion({
       wmkf_reviewreceivedat: '2026-07-01',
       wmkf_reviewsharepointfolder: REVIEW_FOLDER,
@@ -357,10 +360,7 @@ describe('removeCandidateEntirely — SharePoint review-file cleanup', () => {
     expect(listFiles).toHaveBeenCalledWith('akoya_request', REVIEW_FOLDER, { recursive: false });
     expect(cleanupSharePointItems).toHaveBeenCalledWith(
       'drive-1',
-      [
-        { id: 'sp-1', name: REVIEW_FILENAME },
-        { id: 'sp-2', name: 'supplement.docx' },
-      ],
+      [{ id: 'sp-1', name: REVIEW_FILENAME }],
       'remove-candidate-review-files',
     );
     expect(out).toEqual(expect.objectContaining({
@@ -372,8 +372,13 @@ describe('removeCandidateEntirely — SharePoint review-file cleanup', () => {
       }),
       sharePointCleanupAttempted: true,
       sharePointReviewFilesDeleted: true,
-      sharePointReviewFilesDeletedCount: 2,
+      sharePointReviewFilesDeletedCount: 1,
       warnings: [],
+    }));
+    expect(out.sharePointCleanup).toEqual(expect.objectContaining({
+      deletionPolicy: 'legacy_primary_filename_only',
+      preservedCount: 1,
+      preservedFilenames: ['supplement.docx'],
     }));
 
     const auditMetadata = notify.mock.calls[0][0].metadata;
@@ -393,12 +398,44 @@ describe('removeCandidateEntirely — SharePoint review-file cleanup', () => {
       result: expect.objectContaining({
         sharePointCleanup: expect.objectContaining({
           attempted: true,
-          filesFound: 2,
+          filesFound: 1,
           deleted: true,
           error: null,
         }),
       }),
     });
+  });
+
+  test('isolated attempt folders delete every file created by that upload attempt', async () => {
+    const attemptFolder = `${REVIEW_FOLDER}/attempt_0123456789abcdef0123456789abcdef`;
+    findById.mockResolvedValue(baseSuggestion({
+      wmkf_reviewreceivedat: '2026-07-01',
+      wmkf_reviewsharepointfolder: attemptFolder,
+      wmkf_reviewfilename: REVIEW_FILENAME,
+    }));
+    listFiles.mockResolvedValue([
+      { id: 'sp-1', name: REVIEW_FILENAME },
+      { id: 'sp-2', name: 'supplement.docx' },
+    ]);
+
+    const out = await removeCandidateEntirely({
+      suggestionId: SUGGESTION_ID,
+      actingUserSystemId: ACTOR,
+    });
+
+    expect(cleanupSharePointItems).toHaveBeenCalledWith(
+      'drive-1',
+      [
+        { id: 'sp-1', name: REVIEW_FILENAME },
+        { id: 'sp-2', name: 'supplement.docx' },
+      ],
+      'remove-candidate-review-files',
+    );
+    expect(out.sharePointCleanup).toEqual(expect.objectContaining({
+      deletionPolicy: 'isolated_attempt_folder',
+      deletedCount: 2,
+      preservedCount: 0,
+    }));
   });
 
   test('an exact deletion allowlist preserves other files in the same folder', async () => {
@@ -432,6 +469,7 @@ describe('removeCandidateEntirely — SharePoint review-file cleanup', () => {
     }));
     expect(notify.mock.calls[0][0].metadata).toEqual(expect.objectContaining({
       reviewFileDeletionAllowlist: [{ id: 'sp-1', name: REVIEW_FILENAME }],
+      reviewFileDeletionPolicy: 'explicit_allowlist',
       reviewFilesPreserved: [{ id: 'sp-2', name: 'unrelated-real-review.pdf' }],
     }));
   });
@@ -454,6 +492,171 @@ describe('removeCandidateEntirely — SharePoint review-file cleanup', () => {
     expect(deleteBySuggestion).not.toHaveBeenCalled();
   });
 
+  test('allowlist rename drift aborts before the audit or Dataverse changeset', async () => {
+    findById.mockResolvedValue(baseSuggestion({
+      wmkf_reviewsharepointfolder: REVIEW_FOLDER,
+      wmkf_reviewfilename: REVIEW_FILENAME,
+    }));
+    listFiles.mockResolvedValue([{ id: 'sp-1', name: 'renamed-review.pdf' }]);
+
+    await expect(removeCandidateEntirely({
+      suggestionId: SUGGESTION_ID,
+      actingUserSystemId: ACTOR,
+      reviewFileDeletionAllowlist: [{ id: 'sp-1', name: REVIEW_FILENAME }],
+    })).rejects.toThrow(/no longer matches live SharePoint item/);
+
+    expect(notify).not.toHaveBeenCalled();
+    expect(runChangeset).not.toHaveBeenCalled();
+    expect(deleteBySuggestion).not.toHaveBeenCalled();
+  });
+
+  test('an empty allowlist explicitly preserves every file while removing the engagement', async () => {
+    findById.mockResolvedValue(baseSuggestion({
+      wmkf_reviewsharepointfolder: REVIEW_FOLDER,
+      wmkf_reviewfilename: REVIEW_FILENAME,
+    }));
+    listFiles.mockResolvedValue([
+      { id: 'sp-1', name: REVIEW_FILENAME },
+      { id: 'sp-2', name: 'legacy-review.pdf' },
+    ]);
+
+    const out = await removeCandidateEntirely({
+      suggestionId: SUGGESTION_ID,
+      actingUserSystemId: ACTOR,
+      reviewFileDeletionAllowlist: [],
+    });
+
+    expect(runChangeset).toHaveBeenCalledTimes(1);
+    expect(cleanupSharePointItems).not.toHaveBeenCalled();
+    expect(out.sharePointCleanup).toEqual(expect.objectContaining({
+      deletionPolicy: 'explicit_allowlist',
+      deleted: false,
+      deletedCount: 0,
+      selectedCount: 0,
+      folderFilesFound: 2,
+      preservedCount: 2,
+      preservedFilenames: [REVIEW_FILENAME, 'legacy-review.pdf'],
+    }));
+  });
+
+  test('a legacy folder with no stored filename preserves every file', async () => {
+    findById.mockResolvedValue(baseSuggestion({
+      wmkf_reviewsharepointfolder: REVIEW_FOLDER,
+      wmkf_reviewfilename: null,
+    }));
+    listFiles.mockResolvedValue([
+      { id: 'sp-1', name: 'older-review.pdf' },
+      { id: 'sp-2', name: 'notes.docx' },
+    ]);
+
+    const out = await removeCandidateEntirely({
+      suggestionId: SUGGESTION_ID,
+      actingUserSystemId: ACTOR,
+    });
+
+    expect(cleanupSharePointItems).not.toHaveBeenCalled();
+    expect(out.sharePointCleanup).toEqual(expect.objectContaining({
+      deletionPolicy: 'preserve_all_no_filename',
+      deleted: false,
+      selectedCount: 0,
+      folderFilesFound: 2,
+      preservedCount: 2,
+      preservedFilenames: ['older-review.pdf', 'notes.docx'],
+    }));
+  });
+
+  test('an attempt-folder near miss uses the legacy primary-filename policy', async () => {
+    const nearMissFolder = `${REVIEW_FOLDER}/attempt_0123456789abcdef0123456789abcde`;
+    findById.mockResolvedValue(baseSuggestion({
+      wmkf_reviewsharepointfolder: nearMissFolder,
+      wmkf_reviewfilename: REVIEW_FILENAME,
+    }));
+    listFiles.mockResolvedValue([
+      { id: 'sp-1', name: REVIEW_FILENAME },
+      { id: 'sp-2', name: 'must-preserve.pdf' },
+    ]);
+
+    const out = await removeCandidateEntirely({
+      suggestionId: SUGGESTION_ID,
+      actingUserSystemId: ACTOR,
+    });
+
+    expect(cleanupSharePointItems).toHaveBeenCalledWith(
+      'drive-1',
+      [{ id: 'sp-1', name: REVIEW_FILENAME }],
+      'remove-candidate-review-files',
+    );
+    expect(out.sharePointCleanup).toEqual(expect.objectContaining({
+      deletionPolicy: 'legacy_primary_filename_only',
+      preservedFilenames: ['must-preserve.pdf'],
+    }));
+  });
+
+  test('an allowlist without a live folder aborts before the audit or Dataverse changeset', async () => {
+    findById.mockResolvedValue(baseSuggestion({
+      wmkf_reviewsharepointfolder: null,
+      wmkf_reviewfilename: REVIEW_FILENAME,
+    }));
+
+    await expect(removeCandidateEntirely({
+      suggestionId: SUGGESTION_ID,
+      actingUserSystemId: ACTOR,
+      reviewFileDeletionAllowlist: [{ id: 'sp-1', name: REVIEW_FILENAME }],
+    })).rejects.toThrow(/requires a live review SharePoint folder/);
+
+    expect(notify).not.toHaveBeenCalled();
+    expect(runChangeset).not.toHaveBeenCalled();
+  });
+
+  test('normal-route Graph resolution failure skips file cleanup and is audited as partial', async () => {
+    findById.mockResolvedValue(baseSuggestion({
+      wmkf_reviewsharepointfolder: REVIEW_FOLDER,
+      wmkf_reviewfilename: REVIEW_FILENAME,
+    }));
+    getDriveId.mockRejectedValue(new Error('Graph 503'));
+
+    const out = await removeCandidateEntirely({
+      suggestionId: SUGGESTION_ID,
+      actingUserSystemId: ACTOR,
+    });
+
+    expect(runChangeset).toHaveBeenCalledTimes(1);
+    expect(cleanupSharePointItems).not.toHaveBeenCalled();
+    expect(out).toEqual(expect.objectContaining({
+      success: true,
+      partialFailure: 'sharepoint_review_file_cleanup_failed',
+      warnings: ['sharepoint_review_file_cleanup_failed'],
+      sharePointCleanup: expect.objectContaining({
+        attempted: false,
+        deletionPolicy: 'skip_on_resolution_failure',
+        error: 'sharepoint_target_resolution_failed: Graph 503',
+      }),
+    }));
+    expect(notify.mock.calls[0][0].metadata).toEqual(expect.objectContaining({
+      reviewFileTargetResolutionError: 'Graph 503',
+      reviewFilesSelectedForDeletion: null,
+    }));
+  });
+
+  test.each([
+    ['not an array', { id: 'sp-1', name: REVIEW_FILENAME }],
+    ['missing name', [{ id: 'sp-1' }]],
+    ['duplicate ids', [
+      { id: 'sp-1', name: REVIEW_FILENAME },
+      { id: 'sp-1', name: 'other.pdf' },
+    ]],
+  ])('rejects an invalid allowlist (%s) before reads or writes', async (_label, reviewFileDeletionAllowlist) => {
+    await expect(removeCandidateEntirely({
+      suggestionId: SUGGESTION_ID,
+      actingUserSystemId: ACTOR,
+      reviewFileDeletionAllowlist,
+    })).rejects.toThrow(/reviewFileDeletionAllowlist/);
+
+    expect(findById).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+    expect(runChangeset).not.toHaveBeenCalled();
+  });
+
   test('SharePoint cleanup failure is recorded as partial and does not undo Action A', async () => {
     findById.mockResolvedValue(baseSuggestion({
       wmkf_reviewreceivedat: '2026-07-01',
@@ -461,7 +664,10 @@ describe('removeCandidateEntirely — SharePoint review-file cleanup', () => {
       wmkf_reviewfilename: REVIEW_FILENAME,
     }));
     listFiles.mockResolvedValue([{ id: 'sp-1', name: REVIEW_FILENAME }]);
-    cleanupSharePointItems.mockResolvedValue(false);
+    cleanupSharePointItems.mockResolvedValue({
+      deleted: [],
+      failed: [{ id: 'sp-1', name: REVIEW_FILENAME, error: 'Graph 503' }],
+    });
 
     const out = await removeCandidateEntirely({ suggestionId: SUGGESTION_ID, actingUserSystemId: ACTOR });
 
@@ -479,6 +685,8 @@ describe('removeCandidateEntirely — SharePoint review-file cleanup', () => {
         sharePointCleanup: expect.objectContaining({
           attempted: true,
           deleted: false,
+          deletedCount: 0,
+          failedFiles: [{ id: 'sp-1', name: REVIEW_FILENAME, error: 'Graph 503' }],
           error: 'one_or_more_sharepoint_deletes_failed',
         }),
       }),
@@ -579,6 +787,10 @@ describe('describeRemoval — preflight', () => {
       wmkf_reviewfilename: REVIEW_FILENAME,
     }));
     fetchAnswersBySuggestion.mockResolvedValue({});
+    listFiles.mockResolvedValue([
+      { id: 'sp-1', name: REVIEW_FILENAME },
+      { id: 'sp-2', name: 'legacy-review.pdf' },
+    ]);
 
     const out = await describeRemoval({ suggestionId: SUGGESTION_ID });
 
@@ -592,7 +804,31 @@ describe('describeRemoval — preflight', () => {
         wmkf_reviewsharepointfolder: REVIEW_FOLDER,
         wmkf_reviewfilename: REVIEW_FILENAME,
       },
+      reviewFileCleanupPreview: {
+        deletionPolicy: 'legacy_primary_filename_only',
+        deleteFiles: [{ id: 'sp-1', name: REVIEW_FILENAME }],
+        preserveFiles: [{ id: 'sp-2', name: 'legacy-review.pdf' }],
+      },
     }));
+    expect(notify).not.toHaveBeenCalled();
+    expect(runChangeset).not.toHaveBeenCalled();
+  });
+
+  test('Graph preview failure is disclosed without blocking the read-only preflight', async () => {
+    findById.mockResolvedValue(baseSuggestion({
+      wmkf_reviewsharepointfolder: REVIEW_FOLDER,
+      wmkf_reviewfilename: REVIEW_FILENAME,
+    }));
+    getDriveId.mockRejectedValue(new Error('Graph 503'));
+
+    const out = await describeRemoval({ suggestionId: SUGGESTION_ID });
+
+    expect(out.reviewFileCleanupPreview).toEqual({
+      deletionPolicy: 'skip_on_resolution_failure',
+      deleteFiles: [],
+      preserveFiles: [],
+      error: 'Graph 503',
+    });
     expect(notify).not.toHaveBeenCalled();
     expect(runChangeset).not.toHaveBeenCalled();
   });
