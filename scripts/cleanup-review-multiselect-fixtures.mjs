@@ -75,7 +75,14 @@ const FIXTURES = Object.freeze([
     draftId: null,
     folder:
       '1002379_54E2B88B04B9F011BBD36045BD02B4CC/Reviewer_Uploads/GallivanTest_6ad328b4',
-    filenames: Object.freeze(['eicar-test-bytes.pdf']),
+    filenames: Object.freeze([
+      'eicar-test-bytes.pdf',
+      "Tim Newhouse WMKF Research Reviewer Form_St. Jude Children's Research Hospital_June 2026.pdf",
+    ]),
+    deleteFilenames: Object.freeze(['eicar-test-bytes.pdf']),
+    preserveFilenames: Object.freeze([
+      "Tim Newhouse WMKF Research Reviewer Form_St. Jude Children's Research Hospital_June 2026.pdf",
+    ]),
   }),
   Object.freeze({
     label: 'Gallivan_test fixture',
@@ -91,6 +98,8 @@ const FIXTURES = Object.freeze([
     draftId: '1',
     folder: null,
     filenames: Object.freeze([]),
+    deleteFilenames: Object.freeze([]),
+    preserveFilenames: Object.freeze([]),
   }),
 ]);
 
@@ -194,7 +203,7 @@ async function preflightFixture(fixture) {
     `${fixture.label}: review folder drift`,
   );
   invariant(
-    (suggestion.wmkf_reviewfilename || null) === (fixture.filenames[0] || null),
+    (suggestion.wmkf_reviewfilename || null) === (fixture.deleteFilenames[0] || null),
     `${fixture.label}: review filename drift`,
   );
   invariant(
@@ -279,7 +288,10 @@ async function postVerifyFixture(fixture, before) {
     person._wmkf_contact_value === fixture.contactId,
     `${fixture.label}: CRM contact link was removed or changed`,
   );
-  invariant(files.length === 0, `${fixture.label}: SharePoint review file still exists`);
+  invariant(
+    sameStrings(files.map((file) => file.name), fixture.preserveFilenames),
+    `${fixture.label}: SharePoint preservation set drift after cleanup`,
+  );
   invariant(
     request.reviewSynthesisSha256 === before.request.reviewSynthesisSha256,
     `${fixture.label}: request synthesis changed`,
@@ -328,8 +340,12 @@ function verifyOperationResult(fixture, result) {
   if (fixture.folder) {
     invariant(result.sharePointCleanupAttempted === true, `${fixture.label}: file cleanup not attempted`);
     invariant(
-      result.sharePointReviewFilesDeletedCount === fixture.filenames.length,
+      result.sharePointReviewFilesDeletedCount === fixture.deleteFilenames.length,
       `${fixture.label}: unexpected file delete count`,
+    );
+    invariant(
+      sameStrings(result.sharePointCleanup.preservedFilenames, fixture.preserveFilenames),
+      `${fixture.label}: unexpected preserved-file set`,
     );
   } else {
     invariant(
@@ -395,7 +411,8 @@ async function main() {
     evidence.before.push(await preflightFixture(fixture));
     console.log(
       `  ${fixture.label}: ${fixture.suggestionId}; answers=${fixture.answerIds.length}; ` +
-        `draft=${fixture.draftId || 'none'}; files=${fixture.filenames.join(',') || 'none'}; contact=preserve`,
+        `draft=${fixture.draftId || 'none'}; deleteFiles=${fixture.deleteFilenames.join(',') || 'none'}; ` +
+        `preserveFiles=${fixture.preserveFilenames.join(',') || 'none'}; contact=preserve`,
     );
   }
 
@@ -407,7 +424,13 @@ async function main() {
   }
 
   console.log('Executing audited removal with deleteContact=false...');
-  for (const fixture of FIXTURES) {
+  for (let index = 0; index < FIXTURES.length; index += 1) {
+    const fixture = FIXTURES[index];
+    const reviewFileDeletionAllowlist = fixture.folder
+      ? evidence.before[index].sharePointFiles
+          .filter((file) => fixture.deleteFilenames.includes(file.name))
+          .map((file) => ({ id: file.id, name: file.name }))
+      : null;
     const operation = { suggestionId: fixture.suggestionId };
     evidence.operations.push(operation);
     try {
@@ -415,6 +438,7 @@ async function main() {
         suggestionId: fixture.suggestionId,
         deleteContact: false,
         actingUserSystemId: ACTING_USER_SYSTEM_ID,
+        reviewFileDeletionAllowlist,
       });
       operation.result = result;
       verifyOperationResult(fixture, result);

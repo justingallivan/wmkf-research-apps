@@ -401,6 +401,59 @@ describe('removeCandidateEntirely — SharePoint review-file cleanup', () => {
     });
   });
 
+  test('an exact deletion allowlist preserves other files in the same folder', async () => {
+    findById.mockResolvedValue(baseSuggestion({
+      wmkf_reviewreceivedat: '2026-07-01',
+      wmkf_reviewsharepointfolder: REVIEW_FOLDER,
+      wmkf_reviewfilename: REVIEW_FILENAME,
+    }));
+    listFiles.mockResolvedValue([
+      { id: 'sp-1', name: REVIEW_FILENAME },
+      { id: 'sp-2', name: 'unrelated-real-review.pdf' },
+    ]);
+
+    const out = await removeCandidateEntirely({
+      suggestionId: SUGGESTION_ID,
+      actingUserSystemId: ACTOR,
+      reviewFileDeletionAllowlist: [{ id: 'sp-1', name: REVIEW_FILENAME }],
+    });
+
+    expect(cleanupSharePointItems).toHaveBeenCalledWith(
+      'drive-1',
+      [{ id: 'sp-1', name: REVIEW_FILENAME }],
+      'remove-candidate-review-files',
+    );
+    expect(out.sharePointCleanup).toEqual(expect.objectContaining({
+      filesFound: 1,
+      deletedCount: 1,
+      preservedCount: 1,
+      preservedFilenames: ['unrelated-real-review.pdf'],
+      error: null,
+    }));
+    expect(notify.mock.calls[0][0].metadata).toEqual(expect.objectContaining({
+      reviewFileDeletionAllowlist: [{ id: 'sp-1', name: REVIEW_FILENAME }],
+      reviewFilesPreserved: [{ id: 'sp-2', name: 'unrelated-real-review.pdf' }],
+    }));
+  });
+
+  test('allowlist drift aborts before the audit or Dataverse changeset', async () => {
+    findById.mockResolvedValue(baseSuggestion({
+      wmkf_reviewsharepointfolder: REVIEW_FOLDER,
+      wmkf_reviewfilename: REVIEW_FILENAME,
+    }));
+    listFiles.mockResolvedValue([{ id: 'sp-different', name: REVIEW_FILENAME }]);
+
+    await expect(removeCandidateEntirely({
+      suggestionId: SUGGESTION_ID,
+      actingUserSystemId: ACTOR,
+      reviewFileDeletionAllowlist: [{ id: 'sp-1', name: REVIEW_FILENAME }],
+    })).rejects.toThrow(/no longer matches live SharePoint item/);
+
+    expect(notify).not.toHaveBeenCalled();
+    expect(runChangeset).not.toHaveBeenCalled();
+    expect(deleteBySuggestion).not.toHaveBeenCalled();
+  });
+
   test('SharePoint cleanup failure is recorded as partial and does not undo Action A', async () => {
     findById.mockResolvedValue(baseSuggestion({
       wmkf_reviewreceivedat: '2026-07-01',
