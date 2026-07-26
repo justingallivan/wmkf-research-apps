@@ -231,7 +231,9 @@ async function preflightFixture(fixture) {
   );
   invariant(
     sameStrings(files.map((file) => file.name), fixture.filenames),
-    `${fixture.label}: SharePoint file allowlist drift`,
+    `${fixture.label}: SharePoint file allowlist drift; expected=${JSON.stringify(
+      fixture.filenames,
+    )} actual=${JSON.stringify(files.map((file) => file.name))}`,
   );
 
   return {
