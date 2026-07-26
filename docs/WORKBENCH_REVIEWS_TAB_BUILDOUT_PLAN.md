@@ -37,8 +37,7 @@ until then); unit tests (mocked Executor/Dataverse) are the coverage today.
 of the December-2026 cycle — no reviewer has ever submitted through it, so the
 populated Compare grid, narrative browser, and DOCX/PDF exports CANNOT be
 browser-verified against real data yet. They are covered by unit tests only.
-Verify them at the first real submission, or sooner via a staged test
-submission (token-invite on a sandbox request through the live authoring form).**
+Verify them at the first real submission.**
 
 ## Context
 

@@ -49,26 +49,53 @@ The table records a point-in-time measurement, not authorization to mutate eithe
 store. Re-run the read-only ownership/consumer probe in §8 immediately before the
 cutover decision. [PLANNED]
 
-### 0.2 Separate blocking dependency: coherent question caching
+### 0.2 Dependency: question-set coherence at write boundaries — SHIPPED
 
-Today the question fetcher keeps a module-local cache with a five-minute TTL, and
-`invalidateQuestionCache()` clears only the process that receives the call.
-[VERIFIED via `lib/external/review-question-fetcher.js:28-36`,
-`lib/external/review-question-fetcher.js:160-190`, and
-`lib/external/review-question-fetcher.js:197-200`]
+**Status: RESOLVED for the property this plan depends on (commit `afed10ec`,
+2026-07-26).** The acceptance criterion below was narrowed from draft 4's version
+by the reviewer; the reasoning is recorded so the change is auditable rather than
+silently relaxed.
 
-The cross-instance cache-coherence correction is **separate work and a hard
-dependency**. It must be deployed and verified before this plan reaches production
-expand or question-set activation. This plan does not add TTL waits, hybrid
-question sets, retry folklore, or another cache layer to compensate for the current
-split brain. [PLANNED]
+The question fetcher keeps a module-local cache with a five-minute TTL, and
+`invalidate()` clears only the process that receives the call. [VERIFIED via
+`lib/external/review-question-fetcher.js:34-36` and
+`lib/external/review-question-fetcher.js:231-234`]
 
-Dependency acceptance is exact: after one admin publication, independently routed
-requests for context, draft load, portal submit, manual entry, legacy upload, and
-mark-received must resolve the same `questionSetVersion` without waiting for the
-old TTL; invalidation must be coherent across serverless instances. The dependency
-owner must provide a repeatable multi-instance probe and its successful result.
-[PLANNED]
+Draft 4 required cross-instance coherence for **every** consumer — context, draft
+load, and the four write paths — before this plan could proceed. That criterion is
+stronger than the correctness property at stake, and meeting it would require a
+genuine distributed invalidation mechanism.
+
+The failure that actually matters is at the **write** boundary: the submitting
+instance compared the client's `setVersion` against its own possibly-stale set, so
+both sides agreed, the `set_changed` guard passed, and rows committed against a
+question set that was no longer live. A stale **read** is not equivalent — it
+renders a superseded form, and the write boundary now rejects that submission with
+`set_changed`, so the system converges.
+
+What shipped: `getAuthoritativeQuestionSet()` resolves uncached (refreshing the
+cache, preserving the fail-closed behavior and the generation guard) and is used by
+portal submit, staff manual entry, legacy review upload, and mark-received-no-file.
+[VERIFIED via `lib/external/review-question-fetcher.js:215-224`,
+`lib/services/external-review/submit-service.js:126-128`,
+`lib/services/review-manager/manual-review-entry-service.js:136-138`,
+`lib/services/review-upload.js:132-134`, and
+`lib/services/review-manager/mark-received-no-file-service.js:78-80`]
+
+The admin save path never had this exposure: it reads live rows through
+`readActiveSetWithIds()`, so its optimistic lock was already authoritative across
+instances. [VERIFIED via `lib/services/admin/review-questions-service.js:117-124`]
+
+**Accepted residual.** For up to the cache TTL after a publication, an instance may
+still render the previous form via `context` or validate a draft against it. A
+reviewer who submits from that form receives `set_changed` and reloads; the reviewer
+form flushes the in-progress draft before reloading, so answers are not lost. The
+cost is a possible wasted form-fill inside a five-minute window that the cutover
+sequence (§9) already keeps external reviewers out of. Implementation must NOT add
+TTL waits, hybrid question sets, or another cache layer to close this residual.
+
+Full read-path coherence remains available as optional future work; it is **not** a
+prerequisite for this plan.
 
 ### 0.3 Expand-first is mandatory
 
@@ -519,7 +546,9 @@ The manual rollback procedure must:
    must never POST an already-existing immutable key.
 5. Preserve the manifest, operator, source publication request ID, request/response
    evidence, and timestamps in the release record.
-6. Invalidate through the separately delivered coherent cache mechanism.
+6. Call `invalidate()` in the executing process, and rely on the write-boundary
+   authoritative resolve (§0.2) rather than on that invalidation reaching every
+   instance.
 7. Read back the active set across independently routed requests and require its
    normalized version to match the audited prior version.
 
@@ -595,7 +624,8 @@ delivery is the test objective, and post-run reconciliation. [VERIFIED via
 
 Execute this sequence with external exposure held closed:
 
-1. Complete and verify the separate coherent-cache dependency in §0.2.
+1. Confirm the write-boundary coherence fix of §0.2 is deployed (shipped
+   `afed10ec`); no further cache work is a prerequisite.
 2. Build and pass isolated automation on a release branch under the repository’s
    Tier-2 process. [PLANNED]
 3. Complete the production expand and baseline capture in §9.1. [PLANNED]
@@ -734,8 +764,10 @@ draft, or bypassing the existing removal audit is prohibited. [PLANNED]
 2. Deploy the backward-compatible code: old question rows and old answer snapshots
    must behave exactly as before; new readers tolerate null `wmkf_answervalues`.
    [PLANNED]
-3. Verify the coherent-cache dependency across independently routed production
-   requests while the old question set remains active. [PLANNED]
+3. Verify from independently routed production requests that each of the four
+   write paths resolves the live `questionSetVersion` while the old question set
+   is still active. Read paths may still serve a cached set for up to the TTL —
+   that is the accepted residual in §0.2, not a defect. [PLANNED]
 4. Execute the §8 consumer probe, obtain the separately required deletion
    approval, complete the single audited cleanup procedure, and attach its
    postconditions. [PLANNED]
@@ -837,7 +869,8 @@ Add tests for:
 - card, comparison, DOCX, PDF, courtesy copy, and synthesis rendering;
 - corrupt multiselect storage exclusion from tallies and synthesis;
 - old question-set and old-answer regressions during expand;
-- cache-coherence acceptance across independently routed requests;
+- write-boundary authority: a stale cached set must not let a superseded
+  `setVersion` pass the `set_changed` guard;
 - manual question restore manifest/execution and audited prompt rollback.
 
 ### 10.4 Gates
@@ -880,8 +913,8 @@ not rely on either claim. [VERIFIED via
 
 Implementation is complete only when all of the following are evidenced:
 
-- [ ] The separate coherent-cache dependency is deployed and its multi-instance
-  acceptance probe is green.
+- [ ] The §0.2 write-boundary coherence fix is deployed and every write path
+  resolves authoritatively.
 - [ ] `CORE_RATING_KEYS` and `PARENT_BOUND_KEYS` resolve exactly as §1.1 states.
 - [ ] `risk` and `overallRating` retain their current keys, meanings, labels, and
   numeric domains.
@@ -916,4 +949,5 @@ Implementation is complete only when all of the following are evidenced:
 - No client-supplied labels.
 - No orphaned fixture answers or drafts.
 - No deletion without the separately recorded approval required by §8.
-- No workaround for the pre-cutover cache-coherence dependency.
+- No TTL waits, hybrid question sets, or additional cache layers to close the
+  accepted read-path residual in §0.2.
