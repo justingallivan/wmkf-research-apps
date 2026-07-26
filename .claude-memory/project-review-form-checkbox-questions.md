@@ -60,6 +60,20 @@ reviewer review form. Per-layer evidence:
 `checkbox` row hand-written into `wmkf_reviewquestion` would break **every reviewer's
 portal page**, not just render one question oddly. The type must ship in code first.
 
+## Reconcile list for when a checkbox type ships
+
+The `picklist | richtext | string` list is restated in these durable surfaces — all
+CORRECT as of 2026-07-25, and all needing an update in the same pass that adds a new
+type (grepped S375):
+
+- `docs/atlas/dataverse-wmkf-reviewquestion.md:31` and `:33` — live column semantics.
+- `docs/atlas/dataverse-wmkf-appreviewanswer.md:29` — snapshot `wmkf_questiontype`.
+- `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md:89` and
+  `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md:74` — completed-epic design
+  records; classify as historical rather than silently rewriting them.
+- `docs/atlas/postgres-review-drafts.md:18` — `draft_json` shape per type, which a
+  multi-value answer changes.
+
 ## Prior art
 
 `shared/forms/phase-ii-research-2026-06/schema.js:24` documents a `bool` → checkbox
