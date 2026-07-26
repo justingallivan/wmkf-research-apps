@@ -63,6 +63,13 @@ were merged to `main`, deployed successfully, and verified on request
    - The merged feature branch was deleted locally; no remote feature branch
      existed. `main` was clean and synchronized at session close.
 
+6. **Effective invitation wording**
+   - The live organization invitation now says “Your completed review would be
+     due by {{reviewDue}}.”
+   - The sole saved reviewer-template preference has no invitation-body
+     override, so the singular organization wording is the effective text.
+   - [VERIFIED via read-only production Dataverse reads on 2026-07-26.]
+
 ### Commits
 
 - `ab2b22f4` — Fix declined reviewer invite eligibility
@@ -75,12 +82,7 @@ were merged to `main`, deployed successfully, and verified on request
 
 ### Verified Open
 
-1. **Correct the effective saved invitation wording**
-   Evidence: the real invitation rendered “Your completed reviews,” while
-   `lib/seed/email-defaults/reviewer-templates.js` already says “Your completed
-   review.” Source wording alone does not control saved admin/per-PD overrides.
-   Read the effective organization default and Justin's per-PD override, then
-   edit or reset the winning saved template.
+None.
 
 ### Owner Decision Needed
 
@@ -103,12 +105,7 @@ were merged to `main`, deployed successfully, and verified on request
 
 ### Verify Before Acting
 
-1. **Production/default-template state**
-   Evidence currently available: tracked singular wording does not prove the
-   effective saved admin/per-PD template is singular.
-   Read both live layers before editing or claiming correction.
-
-2. **Local real-email mode**
+1. **Local real-email mode**
    Evidence currently available: `.env.local` normally uses capture mode and
    may not contain a usable external signing secret.
    A future real-email rehearsal must deliberately enable send mode, use an
@@ -128,6 +125,8 @@ were merged to `main`, deployed successfully, and verified on request
 6. The reviewer invitation/acceptance/decline/staff-withdrawal production QA is
    complete; do not carry it forward as untested without new regression
    evidence.
+7. The effective invitation due-date sentence is singular in production; do
+   not reopen the wording item without new evidence of regression.
 
 ## Key Files Reference
 
