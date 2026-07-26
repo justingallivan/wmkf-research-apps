@@ -1,6 +1,6 @@
 ---
 name: project-review-form-checkbox-questions
-description: Owner reworked the reviewer review form; fixed-option multiselect support is implemented in code, while production expansion, publication, rehearsal, and exposure remain pending.
+description: Owner reworked the reviewer review form; fixed-option multiselect support and the production schema expansion are complete, while code promotion, publication, rehearsal, and exposure remain pending.
 metadata:
   type: project
   status: active
@@ -11,10 +11,11 @@ metadata:
 ## Status (2026-07-26 implementation pass)
 
 **Plan ACCEPTED and FROZEN: `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md`. The
-row-backward-compatible code and additive wave-15 schema package are implemented on
-`codex/review-form-multiselect`; production schema application, prompt/question
-publication, controlled rehearsal/rollback, fixture disposition, and reviewer
-exposure are deliberately still pending. Target go-live remains 2026-08-15.**
+row-backward-compatible code is implemented on `codex/review-form-multiselect`, and
+wave 15 was applied to production and read back on 2026-07-26. Code promotion,
+prompt/question publication, controlled rehearsal/rollback, fixture disposition,
+and reviewer exposure are deliberately still pending. Target go-live remains
+2026-08-15.**
 Read the plan for the release contract; this entry records the current boundary.
 
 Closed owner decisions (do not reopen without a new one):
@@ -35,7 +36,10 @@ Closed owner decisions (do not reopen without a new one):
 - Wave 15 is a **pre-deployment** gate, not only a pre-activation gate: readers
   always select `wmkf_answervalues` and writers always emit it, so production
   metadata readback must precede merging/promoting this branch to auto-deploying
-  `main`.
+  `main`. **Cleared 2026-07-26** via
+  `scripts/probe-review-answer-multiselect-field.mjs`: prod reports the nullable
+  custom Memo `wmkf_answervalues`, max length 150000, and the property is selectable
+  through `wmkf_appreviewanswers`.
 
 **Do not reconcile the frozen plan against incidental source changes.** It cites 30
 source files; per-change reconciliation cost more than the drift it prevented.
@@ -90,14 +94,14 @@ admin and reviewer UIs support it, every writer uses one server canonicalizer,
 wave 15 defines `wmkf_answervalues`, and readers isolate corrupt JSON. The old
 paragraph remains historical evidence for why the full-chain change was required.
 
-## Release hazard: expand before deployment, then activate
+## Release sequence: expand complete; deploy before activation
 
 `getActiveQuestionSet()` is deliberately fail-closed — an unrecognized
 `wmkf_questiontype` throws, and `context`/`draft`/`submit` all 500 on that throw. A
-production release must apply/read back wave 15 before deploying the compatible
+production release had to apply/read back wave 15 before deploying the compatible
 code, because its readers and writers reference `wmkf_answervalues` even while the
-old question set remains active. Only after the property exists may the compatible
-code deploy; only after that deployment may a `multiselect` row be activated.
+old question set remains active. That gate cleared on 2026-07-26. The compatible
+code may now deploy; only after that deployment may a `multiselect` row be activated.
 Hand-writing a `checkbox` type remains invalid; the supported type name is exactly
 `multiselect`.
 

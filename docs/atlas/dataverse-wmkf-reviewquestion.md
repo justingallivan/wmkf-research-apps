@@ -1,6 +1,6 @@
 # Atlas: `wmkf_reviewquestion` (Dataverse, WMKF config entity)
 
-**Phase status:** Original staff-editable-question epic complete through S305. The multiselect code expansion and re-authored target seed are implemented on the release branch as of 2026-07-26; production schema expansion, prompt publication, question-set publication, rehearsal, and exposure remain pending.
+**Phase status:** Original staff-editable-question epic complete through S305. The multiselect code expansion and re-authored target seed are implemented on the release branch, and the sibling `wmkf_appreviewanswer.wmkf_answervalues` production schema expansion completed 2026-07-26. Code promotion, prompt publication, question-set publication, rehearsal, and exposure remain pending.
 **Last verified:** 2026-06-29 (S303) — **CREATED in prod** via `scripts/apply-dataverse-schema.js --target=prod --wave=9-review-questions --execute` (entity + 8 attributes + alt key all `✓ created`), then **seeded** with the current 12 fields via `scripts/seed-review-questions.mjs --execute` (the alt-key index gate held at `Pending`, then ran once `Active`). **Read-back verified end-to-end:** `getActiveQuestionSet()` returns all 12 questions from live prod, ordered, with types/required/option-counts matching the static schema. **[VERIFIED via live fetch S303 + `lib/dataverse/schema/wave9-review-questions/01_wmkf_reviewquestion.json`].**
 **Live row count:** 12 (affiliation order 0 + 11 questions), as of 2026-06-29.
 **Entity set:** `wmkf_reviewquestions`

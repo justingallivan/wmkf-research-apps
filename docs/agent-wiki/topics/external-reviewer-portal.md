@@ -182,12 +182,12 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   another rating or narrative. Matrix/report outputs keep categorical tallies
   separate from numeric averages and sort tally identities deterministically by
   stored value then label.
-  **PRE-DEPLOYMENT GATE:** wave 15 must be applied to production and
-  `wmkf_answervalues` metadata read back before this branch is merged/promoted to
-  auto-deploying `main`, because readers always select the property and writers
-  always emit it even while the old question set remains active. After compatible
-  code deploys, prompt/question publication, controlled rehearsal/rollback,
-  fixture disposition, and reviewer exposure remain separate release gates.
+  **PRE-DEPLOYMENT GATE CLEARED 2026-07-26:** wave 15 is applied to production;
+  exact metadata and entity-set select readback passed via
+  `scripts/probe-review-answer-multiselect-field.mjs`. Compatible code promotion is
+  now permitted while the old question set remains active. Prompt/question
+  publication, controlled rehearsal/rollback, fixture disposition, and reviewer
+  exposure remain separate release gates.
   Hand-writing a `checkbox` type remains invalid; the supported name is exactly
   `multiselect`. Canonical contract:
   `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md`; active memory:

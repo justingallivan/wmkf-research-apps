@@ -22,7 +22,8 @@ related:
 
 **Status:** ACCEPTED AND FROZEN (S375, 2026-07-26). Backward-compatible code
 implementation and the additive wave-15 schema package are complete on
-`codex/review-form-multiselect`; production expansion, publication, controlled
+`codex/review-form-multiselect`; production expansion and exact metadata/select
+readback completed 2026-07-26. Code promotion, publication, controlled
 rehearsal/rollback, fixture disposition, and reviewer exposure remain pending.
 **Target go-live: 2026-08-15** (owner-set; the date external reviewers first see the
 new form).
@@ -50,13 +51,14 @@ implementation landed; `[IMPLEMENTED IN SOURCE]` does not mean the corresponding
 production schema, configuration, prompt publication, rehearsal, cleanup, or
 exposure step has occurred.
 
-**PRE-DEPLOYMENT BLOCKER:** wave 15 must be applied to production and its
-`wmkf_answervalues` metadata read back before this branch is merged or promoted to
-an auto-deploying production branch. Compatible readers select the property and
-all answer writers emit it even while the old question set remains active; the
-expand is therefore a code-deployment prerequisite, not merely an activation
-prerequisite. [VERIFIED via `lib/dataverse/adapters/review-answer.js:42-52`,
-`lib/dataverse/adapters/review-answer.js:232-243`, and §9.1]
+**PRE-DEPLOYMENT BLOCKER — CLEARED 2026-07-26:** wave 15 was applied to
+production and `wmkf_answervalues` read back as a nullable custom Memo with
+`MaxLength=150000`; an entity-set query also proved the property selectable.
+Compatible readers select the property and all answer writers emit it even while
+the old question set remains active, so this expand had to precede code deployment.
+[VERIFIED via `scripts/probe-review-answer-multiselect-field.mjs`, production run
+2026-07-26; implementation dependency verified via
+`lib/dataverse/adapters/review-answer.js`]
 
 **Scope for the 2026-08-15 date: all of it, fully tested.** Owner direction
 2026-07-26 — the system must be ready and rehearsed before the date, not partially
@@ -325,7 +327,8 @@ For a multiselect row:
 - `wmkf_answerhtml = null`.
 
 All legacy picklist, rich-text, and string rows write
-`wmkf_answervalues = null`. [IMPLEMENTED IN SOURCE; PRODUCTION SCHEMA EXPANSION PENDING]
+`wmkf_answervalues = null`. [IMPLEMENTED IN SOURCE; PRODUCTION SCHEMA EXPANSION
+COMPLETED 2026-07-26]
 
 Create the additive schema package at
 `lib/dataverse/schema/wave15-review-answer-multiselect/`.
@@ -333,7 +336,8 @@ Create the additive schema package at
 independent of every other figure in this plan] The package must add a Memo property
 with logical name `wmkf_answervalues` and publish it through the existing schema
 application mechanism. Update the answer adapter field list, row body, DTO, and
-Atlas entry in the same change. [IMPLEMENTED IN SOURCE; PRODUCTION SCHEMA EXPANSION PENDING]
+Atlas entry in the same change. [IMPLEMENTED IN SOURCE; PRODUCTION SCHEMA EXPANSION
+COMPLETED 2026-07-26]
 
 ### 2.2 Rejected representations
 
@@ -850,7 +854,12 @@ draft, or bypassing the existing removal audit is prohibited. [PLANNED]
 ### 9.1 Expand and prepare
 
 1. Apply the additive `wmkf_answervalues` schema to production and verify metadata
-   readback. Do not activate a multiselect question yet. [PLANNED]
+   readback. **[COMPLETED 2026-07-26]** The production probe verified
+   `LogicalName=wmkf_answervalues`, `SchemaName=wmkf_AnswerValues`,
+   `AttributeType=Memo`, `MaxLength=150000`, `RequiredLevel=None`,
+   `IsCustomAttribute=true`, and successful entity-set selection. No multiselect
+   question was activated. [VERIFIED via
+   `scripts/probe-review-answer-multiselect-field.mjs`]
 2. Deploy the backward-compatible code: old question rows and old answer snapshots
    must behave exactly as before; new readers tolerate null `wmkf_answervalues`.
    [PLANNED]
