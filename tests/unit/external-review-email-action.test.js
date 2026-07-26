@@ -2,7 +2,10 @@
  * @jest-environment jsdom
  */
 
-import { deriveEmailActionView } from '../../pages/external/review/[token]';
+import {
+  deriveEmailActionView,
+  shouldShowAcceptedWithdrawal,
+} from '../../pages/external/review/[token]';
 
 describe('reviewer email action deep links', () => {
   test('fresh invitation accept opens the existing Stage 2a accept form', () => {
@@ -44,5 +47,32 @@ describe('reviewer email action deep links', () => {
       serverView: 'stage2a',
       dismissed: true,
     })).toBeNull();
+  });
+});
+
+describe('accepted reviewer withdrawal visibility', () => {
+  test('hides withdrawal only for the token accepted during this mounted visit', () => {
+    expect(shouldShowAcceptedWithdrawal({
+      acceptedThisVisitToken: 'token-a',
+      token: 'token-a',
+    })).toBe(false);
+  });
+
+  test('shows withdrawal on initial load and when the page changes to another token', () => {
+    expect(shouldShowAcceptedWithdrawal({
+      acceptedThisVisitToken: null,
+      token: 'token-a',
+    })).toBe(true);
+    expect(shouldShowAcceptedWithdrawal({
+      acceptedThisVisitToken: 'token-a',
+      token: 'token-b',
+    })).toBe(true);
+  });
+
+  test('fails closed when no token is available', () => {
+    expect(shouldShowAcceptedWithdrawal({
+      acceptedThisVisitToken: null,
+      token: null,
+    })).toBe(false);
   });
 });

@@ -171,8 +171,15 @@ test.describe('Reviewer Stage 2a accept flow', () => {
     expect(body.address).toMatchObject({ line1: '123 Main St', city: 'Townsville', postalCode: '94000', country: 'US', phone: '+1 555 123 4567' });
     expect(body.policyAcks).toMatchObject({ 'reviewer-coi': true, 'reviewer-ai-use': true });
 
-    // Post-accept refetch returns the accepted view → Stage 2a accept button is gone.
+    // The immediate post-accept view is purely confirmatory.
     await expect(page.getByRole('button', { name: 'Accept and continue' })).toBeHidden();
+    await expect(page.getByRole('heading', { name: /confirmed as a reviewer/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'I can no longer review' })).toBeHidden();
+
+    // Returning later through the same secure link restores the quieter
+    // self-service withdrawal option.
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'I can no longer review' })).toBeVisible();
   });
 
   test('a server 422 payment_contact_required renders inline (defensive path)', async ({ page }) => {

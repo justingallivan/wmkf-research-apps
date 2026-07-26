@@ -9,6 +9,7 @@ import { useEffect, useRef } from 'react';
 export default function AcceptedConfirmationView({
   programDirector = null,
   onRequestDecline,
+  showWithdrawalOption = true,
 }) {
   const headingRef = useRef(null);
   const hasProgramDirectorContact = Boolean(
@@ -40,7 +41,9 @@ export default function AcceptedConfirmationView({
         <p>
           If something changes — calendar conflict, conflict of interest you
           spotted, anything — please let us know before materials are released.
-          You can withdraw using the button below, or reach out to your Program Director
+          {showWithdrawalOption
+            ? ' You can change your response below, or reach out to your Program Director'
+            : ' Use the secure link in your confirmation email, or reach out to your Program Director'}
           {hasProgramDirectorContact && (
             <>
               {' '}({programDirector.name},{' '}
@@ -56,12 +59,18 @@ export default function AcceptedConfirmationView({
         </p>
       </div>
 
-      {onRequestDecline && (
-        <div className="pt-2">
+      {showWithdrawalOption && onRequestDecline && (
+        <div className="pt-4 border-t border-gray-100 space-y-2">
+          <p className="text-sm font-medium text-gray-700">
+            Need to change your response?
+          </p>
+          <p className="text-xs text-gray-500">
+            If you can no longer complete the review, you can withdraw and suggest alternate reviewers.
+          </p>
           <button
             type="button"
             onClick={onRequestDecline}
-            className="text-sm font-semibold text-red-700 hover:text-red-900 underline underline-offset-2"
+            className="text-sm font-medium text-gray-600 hover:text-gray-900 underline underline-offset-2"
           >
             I can no longer review
           </button>

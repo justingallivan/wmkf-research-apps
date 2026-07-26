@@ -41,6 +41,11 @@ export default function ExternalReviewPage() {
   // invitation. Key this by token so a later client-side navigation to a different
   // invitation still honors that new link's action.
   const [dismissedEmailActionToken, setDismissedEmailActionToken] = useState(null);
+  // A successful accept transitions to the same server view used on later
+  // visits. Remember the token only for this mounted page session so the
+  // immediate success screen stays confirmatory; a reload or later visit
+  // naturally restores the self-service withdrawal option.
+  const [acceptedThisVisitToken, setAcceptedThisVisitToken] = useState(null);
 
   const fetchContext = useCallback(async () => {
     try {
@@ -116,14 +121,15 @@ export default function ExternalReviewPage() {
   // child views can await the parent state update before resetting their
   // local submit state — fixes the "button re-enables while context is
   // mid-fetch" race that Codex flagged.
-  const onResponseSubmitted = useCallback(async () => {
+  const onResponseSubmitted = useCallback(async (responseAction) => {
+    setAcceptedThisVisitToken(responseAction === 'accept' ? token : null);
     setViewOverride(null);
     if (typeof window !== 'undefined' && window.history.state?.stage2aView) {
       // Replace history state so back-button doesn't return to the override.
       window.history.replaceState({}, '');
     }
     await fetchContext();
-  }, [fetchContext]);
+  }, [fetchContext, token]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -147,6 +153,10 @@ export default function ExternalReviewPage() {
             onRequestFlipToAccept={() => pushOverrideView('stage2a')}
             onCancelOverride={cancelCurrentOverride}
             onResponseSubmitted={onResponseSubmitted}
+            showAcceptedWithdrawal={shouldShowAcceptedWithdrawal({
+              acceptedThisVisitToken,
+              token,
+            })}
           />
         )}
       </div>
@@ -166,7 +176,22 @@ export function deriveEmailActionView({ action, serverView, dismissed = false })
   return null;
 }
 
-function Dispatcher({ data, token, viewOverride, emailActionView, onRequestDecline, onRequestFlipToAccept, onCancelOverride, onResponseSubmitted }) {
+export function shouldShowAcceptedWithdrawal({ acceptedThisVisitToken, token }) {
+  if (!token) return false;
+  return acceptedThisVisitToken !== token;
+}
+
+function Dispatcher({
+  data,
+  token,
+  viewOverride,
+  emailActionView,
+  onRequestDecline,
+  onRequestFlipToAccept,
+  onCancelOverride,
+  onResponseSubmitted,
+  showAcceptedWithdrawal,
+}) {
   // Client-only views take precedence; otherwise dispatch on server-derived view.
   const view = viewOverride || emailActionView || data.engagementState?.view || 'stage2a';
 
@@ -177,7 +202,7 @@ function Dispatcher({ data, token, viewOverride, emailActionView, onRequestDecli
           token={token}
           etag={data.etag}
           onCancel={onCancelOverride}
-          onDeclined={onResponseSubmitted}
+          onDeclined={() => onResponseSubmitted('decline')}
         />
       );
 
@@ -187,7 +212,7 @@ function Dispatcher({ data, token, viewOverride, emailActionView, onRequestDecli
           data={data}
           token={token}
           onRequestDecline={onRequestDecline}
-          onAccepted={onResponseSubmitted}
+          onAccepted={() => onResponseSubmitted('accept')}
         />
       );
 
@@ -196,6 +221,7 @@ function Dispatcher({ data, token, viewOverride, emailActionView, onRequestDecli
         <AcceptedConfirmationView
           programDirector={data.programDirector}
           onRequestDecline={onRequestDecline}
+          showWithdrawalOption={showAcceptedWithdrawal}
         />
       );
 
