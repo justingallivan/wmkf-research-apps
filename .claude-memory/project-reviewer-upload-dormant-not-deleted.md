@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-upload-dormant-not-deleted
-description: Both the reviewer-portal FILE-UPLOAD path (S301) AND the staff-side "Staff upload (override)" + "Mark received (no file)" Track-Reviewers surfaces (S347) are hidden/removed-not-deleted — routes/services retained server-side for a future staff rescue tool. How to re-enable.
+description: The old reviewer-PDF experiment was replaced by structured form submission to Dataverse. Its hidden/removed UI and retained server routes/fields can leave legacy test baggage; do not treat a PDF as a current authoritative review.
 metadata:
   type: project
   status: active
   scope: external-reviewers
-  last_verified: 2026-07-22 via retained upload/mark-received routes and current MaterialsView/ReviewAuthoringForm source
+  last_verified: 2026-07-26 via owner clarification, retained upload/mark-received routes, and current MaterialsView/ReviewAuthoringForm source
 ---
 
 ## Recall Rule
@@ -24,6 +24,29 @@ deleted**:
 - **Kept server-side:** `pages/api/external/review/[token]/upload.js`,
   `lib/services/review-upload.js`, the virus-scan path, `sharepoint-cleanup.js`, and
   the `wmkf_reviewsharepointfolder` / `wmkf_reviewfilename` columns.
+
+**Authority boundary:** the current review is the form submission's structured
+`wmkf_appreviewanswer` snapshots in Dataverse, not a PDF filename or file in a
+review upload folder. The older design explicitly experimented with reviewers
+uploading a PDF of their review. Files, pointers, statuses, scripts, and retained
+routes from that experiment are legacy baggage unless a current caller and
+provenance prove otherwise.
+
+Owner clarification 2026-07-26: the Tim Newhouse/St. Jude PDF found under request
+1002379's `Reviewer_Uploads/GallivanTest_6ad328b4` folder was another **test
+artifact from that earlier PDF-upload experiment**, not a genuine submitted
+review. It was preserved during the exact EICAR cleanup because its status was
+unknown at deletion time. This later classification does not retroactively widen
+that deletion authorization.
+
+When legacy review files surface:
+
+- do not count the file as a current review or infer genuine reviewer history;
+- inspect suggestion lifecycle fields, answer snapshots, draft/audit history,
+  folder provenance, and current callers;
+- distinguish “test artifact” from “authorized to delete”—classification alone is
+  not deletion authority;
+- expect more dormant PDF-era baggage elsewhere until positively reconciled.
 
 ## Staff-side surfaces ALSO removed from the Track Reviewers panel (S347)
 

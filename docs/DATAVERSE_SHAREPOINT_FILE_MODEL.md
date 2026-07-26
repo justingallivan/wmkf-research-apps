@@ -3,7 +3,7 @@ title: Dataverse / SharePoint File Storage Model
 domain: dataverse
 kind: source-of-truth
 status: active
-summary: "How files are stored and linked in the AkoyaGO + Dynamics environment, and how new document flows (reviewer uploads, etc.) fit into the existing..."
+summary: "File storage and linking in AkoyaGO/Dynamics, including the retained reviewer-upload path; current reviews use structured Dataverse answers."
 canonical: true
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,6 +15,14 @@ related:
 
 How files are stored and linked in the AkoyaGO + Dynamics environment, and how
 new document flows (reviewer uploads, etc.) fit into the existing pattern.
+
+> **Reviewer-flow status (owner-confirmed 2026-07-26):** the reviewer-PDF
+> design was an experiment and is no longer the primary workflow. Reviewers now
+> complete the in-browser form; final submit writes structured
+> `wmkf_appreviewanswer` snapshots to Dataverse. The file-upload route and pointer
+> fields remain as hidden compatibility/rescue infrastructure, so old SharePoint
+> PDFs and test artifacts may still exist. A PDF's presence is not evidence of a
+> current genuine review and is not deletion authority.
 
 ---
 
@@ -52,9 +60,10 @@ The folder name pattern is always `{requestNumber}_{requestGuidNoHyphensUpper}`.
 
 ---
 
-## Where review uploads will land (new flow)
+## Where legacy review uploads land (retained hidden flow)
 
-Same library, same request folder, new subfolder per reviewer:
+The retained file-upload service uses the same library and request folder, with a
+subfolder per reviewer:
 
 ```
 akoya_request/
@@ -86,15 +95,19 @@ needs to find the files via Graph API.
 | **(c) Files in Vercel Blob** | Current state for reviews under the legacy upload flow | Orphaned from the canonical document graph — staff can't find them in Dynamics, no SharePoint search, no versioning |
 
 (b) is the standard Dynamics CE + SharePoint pattern, what GOapply uses, and
-what the staged review pipeline / backend automation will rely on. Sticking
-with it means proposals and reviews share one storage model and one access
-pattern.
+what the retained reviewer-file path relies on. The current structured form path
+does not create a review PDF; it persists answer snapshots in Dataverse.
 
 ---
 
 ## What this means in practice
 
-For one reviewer's submission, the data lands in two places:
+For the **current form-based review**, final submit writes
+`wmkf_appreviewanswer` child rows plus the engagement's affiliation,
+`wmkf_reviewreceivedat`, and lifecycle status in one Dataverse changeset, then
+removes the Postgres draft. No review file is required or authoritative.
+
+For a **legacy/retained file upload**, the data lands in two places:
 
 - **Dataverse** — the existing `wmkf_appreviewersuggestion` row is updated
   with token timestamps, `wmkf_reviewreceivedat`, the new
@@ -102,7 +115,7 @@ For one reviewer's submission, the data lands in two places:
   filename, kept for back-compat with existing UI), and the
   `wmkf_reviewuploadedbystaff` boolean flag.
 - **SharePoint** — 1–5 actual file blobs at the folder path above.
-- **Vercel Blob** — not used for reviews. (The legacy `wmkf_reviewbloburl`
+- **Vercel Blob** — not used for new review uploads. (The legacy `wmkf_reviewbloburl`
   fallback path was retired 2026-05-03; zero real reviews still pointed at
   Blob storage at retirement.)
 

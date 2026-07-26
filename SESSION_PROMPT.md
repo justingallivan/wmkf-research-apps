@@ -110,8 +110,11 @@ The next session is expected to be Codex implementing against the frozen plan.
 1. **§8 fixture cleanup completed 2026-07-26.**
    The owner confirmed both exact records were disposable tests and authorized
    their children/linked test artifacts with `deleteContact:false`. The first
-   preflight stopped on an unrelated Tim Newhouse/St. Jude PDF in the EICAR
-   folder; exact-item deletion preserved it. Alerts `361`/`362` completed with no
+   preflight stopped on a then-unclassified Tim Newhouse/St. Jude PDF in the EICAR
+   folder; exact-item deletion preserved it. The owner later identified that PDF
+   as another test artifact from the retired reviewer-PDF experiment. It remains
+   preserved and has not received separate deletion authorization. Alerts
+   `361`/`362` completed with no
    warnings. Both test suggestions, three sentinel answers, sole draft, and
    `eicar-test-bytes.pdf` are gone; both CRM contacts, the unrelated PDF, parent
    requests, and synthesis hashes remain. Evidence:

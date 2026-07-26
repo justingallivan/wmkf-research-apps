@@ -38,7 +38,9 @@ test artifacts and explicitly authorized their exact removal with both CRM
 contacts preserved. Audited cleanup alerts `361` and `362` completed with no
 warnings; the three sentinel answers, sole draft, and `eicar-test-bytes.pdf` are
 gone. A real-looking Tim Newhouse/St. Jude review PDF found in the same folder
-was excluded from the deletion allowlist and remains in SharePoint. [VERIFIED
+was excluded from the deletion allowlist and remains in SharePoint. The owner
+subsequently identified it as a second test artifact from the retired reviewer-PDF
+experiment, not a genuine review; no additional deletion was authorized. [VERIFIED
 via `outputs/review-form-multiselect/preactivation-evidence-2026-07-26.json`,
 `outputs/review-form-multiselect/thankyou-provenance-2026-07-26.json`, and commit
 `ada645de`; cleanup verified via
@@ -176,7 +178,9 @@ artifacts with `deleteContact:false`. The committed operator preflighted every
 Dataverse, Postgres, and SharePoint target before writing. Its first pass stopped
 when the EICAR folder contained an unexpected Tim Newhouse/St. Jude review PDF.
 The removal service was then narrowed with an exact Graph-item allowlist so the
-test file could be deleted while that unrelated PDF remained.
+named EICAR file could be deleted while the then-unclassified PDF remained. The
+owner later classified the preserved PDF as a legacy test artifact from the
+retired file-upload design.
 
 Audit alerts `361` and `362` finalized with `status=success` and no warnings. The
 two suggestions, three sentinel answer rows, sole Postgres draft, and
@@ -991,8 +995,8 @@ cleanup satisfied this invariant. [VERIFIED]
    postconditions. The consumer probe stopped on the EICAR thank-you marker; the
    provenance investigation traced it to the April 30 synthetic validation send.
    The owner then supplied the explicit §8 authority. Cleanup completed with
-   alerts `361`/`362`, no warnings, both contacts preserved, and the unrelated Tim
-   Newhouse/St. Jude PDF preserved. [COMPLETED 2026-07-26]
+   alerts `361`/`362`, no warnings, both contacts preserved, and the separately
+   preserved Tim Newhouse/St. Jude legacy test PDF untouched. [COMPLETED 2026-07-26]
 5. Record the active and inactive question rows with IDs/ETags, normalized active
    version, and the completed question audit; record the current synthesis prompt
    identity/content/hash. Produce and review the §4 manual rollback dry-run manifest
@@ -1160,7 +1164,7 @@ remain release gates and must not be inferred from code completion:
 - [x] Both named test artifacts passed the consumer/provenance probes, received
   explicit deletion authority, and completed the audited cleanup procedure on
   2026-07-26. Alerts `361`/`362` are successful with no warnings; contacts and
-  the unrelated Tim Newhouse/St. Jude PDF were preserved.
+  the separately preserved Tim Newhouse/St. Jude legacy test PDF were preserved.
 - [ ] The prompt is published before production question-set activation.
 - [ ] Controlled production smoke and cleanup are green before external exposure.
 - [ ] Question rollback is executable from the reviewed manual manifest and

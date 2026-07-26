@@ -20,6 +20,14 @@ Visual orientation for the reviewer-domain Dataverse entities and how they conne
 
 > **Authoritative source for any single entity is its atlas page** (`docs/atlas/dataverse-*.md`). This doc summarizes the connections; the atlas pages have the per-field detail.
 
+> **Current review-content authority (owner-confirmed 2026-07-26):** the live
+> reviewer workflow is the in-browser form. Final submit writes structured
+> `wmkf_appreviewanswer` child rows to Dataverse and marks the engagement
+> received. Review PDFs, `wmkf_reviewbloburl`, `wmkf_reviewfilename`, and
+> `wmkf_reviewsharepointfolder` belong to the earlier file-upload experiment and
+> retained rescue/compatibility paths. Their presence does not prove a current or
+> genuine review; legacy test files are known to remain.
+
 > **Identity-binding durability foundation (deployed, not authoritative,
 > 2026-07-13):** Wave 13 added nullable binding generation/source/anchor/time,
 > derived-generation, and per-field-lineage columns to the person, plus COI
@@ -47,7 +55,8 @@ Visual orientation for the reviewer-domain Dataverse entities and how they conne
 | `wmkf_potentialreviewer` | The **person**. Custom Foundation entity (not vendor). Global. One row per real human, dedup'd on email. Row origin tracked in `wmkf_source` — currently two main paths: (a) **Reviewer Finder** discovery (rich enrichment, full bibliometrics), (b) **Applicant-submitted** during application intake (sparse: usually just name + affiliation + email). The same person can later be enriched if Reviewer Finder picks them up, or via the Workbench "enrich recommended reviewers" action (S211). | First touch by either path. | 4,423 |
 | ~~`wmkf_appresearcher`~~ | **DROPPED S213** — the bibliometric sidecar (h-index, ORCID, citations, scholar URL) was collapsed onto `wmkf_potentialreviewer`. Those fields now live on the person; written by Reviewer Finder enrichment + the Workbench "enrich recommended reviewers" action. See "What changed" below. | — |
 | `contact` | The **CRM contact**. Where canonical identity ultimately lives. | Promoted from `wmkf_potentialreviewer` on first staff outreach. | (vendor table — many) |
-| `wmkf_appreviewersuggestion` | The **per-(reviewer, request) engagement**. Lifecycle ledger — every state, timestamp, decline reason, policy ack, review content lives here. | Reviewer Finder save-candidates creates one per (person, request). | 710 |
+| `wmkf_appreviewersuggestion` | The **per-(reviewer, request) engagement**. Lifecycle ledger for state, timestamps, decline reason, policy acknowledgments, and links. Current structured review content lives in its `wmkf_appreviewanswer` children. | Reviewer Finder save-candidates creates one per (person, request). | 710 |
+| `wmkf_appreviewanswer` | One immutable structured answer snapshot per submitted question, linked to the engagement. This is the current review-content authority for ratings, multiselect selections, and narratives. | Final form submit; alternate key is suggestion + question key. | (child rows) |
 | `akoya_request` (grant) | The **proposal being reviewed**. | Created when WMKF intakes a grant request. | 25,473+ |
 | `akoya_request` (honorarium) | The **honorarium request for the reviewer**. Same entity class as the grant, distinct row-purpose. | Created at reviewer accept time by the portal when honorarium creation is enabled; BILL onboarding remains deferred. | (subset of the same 25,473) |
 | `wmkf_policy` / `wmkf_policyversion` | Versioned policy text (COI, AI use). | Staff edits in admin UI. | 2 / 8 |
@@ -124,6 +133,7 @@ Adds the two `akoya_request` flavors (the grant being reviewed and the honorariu
 erDiagram
     POTENTIALREVIEWER ||--o| CONTACT : "promoted"
     POTENTIALREVIEWER ||--o{ APPREVIEWERSUGGESTION : "many engagements over time"
+    APPREVIEWERSUGGESTION ||--o{ APPREVIEWANSWER : "structured form answer snapshots"
 
     GRANT_REQUEST ||--o{ APPREVIEWERSUGGESTION : "one grant has many reviewer engagements"
 
@@ -156,9 +166,18 @@ erDiagram
         lookup wmkf_HonorariumRequest "→ HONORARIUM_REQUEST (S196)"
         picklist wmkf_reviewstatus
         bool wmkf_honorariumoptout
-        string wmkf_reviewbloburl "submitted review file"
+        string wmkf_reviewbloburl "legacy PDF-upload pointer"
         picklist wmkf_revieweroverallrating
         datetime wmkf_completedat "PD closeout (S196)"
+    }
+    APPREVIEWANSWER {
+        guid wmkf_appreviewanswerid PK
+        lookup wmkf_appreviewersuggestion "→ APPREVIEWERSUGGESTION"
+        string wmkf_questionkey "alternate-key component"
+        string wmkf_questiontype
+        number wmkf_answervalue "picklist only"
+        memo wmkf_answervalues "multiselect JSON snapshot"
+        memo wmkf_answerhtml "sanitized narrative snapshot"
     }
     GRANT_REQUEST {
         guid akoya_requestid PK
@@ -211,9 +230,9 @@ flowchart TD
     S2hon --> S3["Stage 3 — Materials sent"]
     S3 --> S3w["WRITES on wmkf_appreviewersuggestion:<br/>• wmkf_materialssentat<br/>• wmkf_proposalurl, wmkf_proposalpassword<br/>• wmkf_reviewstatus = materials_sent"]
 
-    S3w --> S4["Stage 4 — Reviewer works (drafts)"]
+    S3w --> S4["Stage 4 — Reviewer works in form<br/>(Postgres review_drafts scratchpad)"]
     S4 --> S5["Stage 5 — Reviewer submits review"]
-    S5 --> S5w["WRITES on wmkf_appreviewersuggestion:<br/>• wmkf_reviewreceivedat (PAYMENT-ELIGIBILITY SIGNAL)<br/>• wmkf_reviewbloburl, wmkf_reviewfilename, wmkf_reviewsharepointfolder<br/>• wmkf_revieweroverallrating, wmkf_reviewerimpact, wmkf_reviewerrisk<br/>• wmkf_reviewstatus = review_received"]
+    S5 --> S5w["ONE Dataverse changeset:<br/>• UPSERT wmkf_appreviewanswer rows (ratings, multiselect, narratives)<br/>• PATCH suggestion affiliation + wmkf_reviewreceivedat (PAYMENT-ELIGIBILITY SIGNAL)<br/>• wmkf_reviewstatus = review_received<br/>Then delete Postgres draft.<br/>Legacy PDF/file/rating parent fields are not the current content authority."]
 
     S5w --> S6["Stage 6 — PD closes out (Request Workbench, S196)"]
     S6 --> S6w["WRITES on wmkf_appreviewersuggestion:<br/>• wmkf_reviewstatus = complete<br/>• wmkf_completedat<br/><br/>Row drops off PD dashboard."]
@@ -241,8 +260,9 @@ flowchart TD
 | Has payment been sent? | `akoya_request.akoya_folio = 'PAID'` (honorarium row) | NOT `akoya_paymentsent` — empirically not a payment gate |
 | BILL vendor id for a reviewer | `contact.wmkf_billcomid` | Retained dormant field; automated BILL onboarding is tabled |
 | BILL network state | `akoya_request.wmkf_exisitngbillcomaccount` (honorarium row, sic spelling) | Retained dormant field; not the current payment path |
-| Submitted review file | `wmkf_appreviewersuggestion.wmkf_reviewbloburl` + `.wmkf_reviewfilename` + `.wmkf_reviewsharepointfolder` | |
-| Reviewer's overall rating | `wmkf_appreviewersuggestion.wmkf_revieweroverallrating` (picklist) | Companions: `wmkf_reviewerimpact`, `wmkf_reviewerrisk` |
+| Current submitted review content | `wmkf_appreviewanswer` rows linked by `_wmkf_appreviewersuggestion_value` | Structured form snapshots; use these for ratings, categorical selections, narratives, reports, and synthesis. |
+| Legacy review PDF/file | `wmkf_appreviewersuggestion.wmkf_reviewbloburl` + `.wmkf_reviewfilename` + `.wmkf_reviewsharepointfolder` | Retained compatibility/rescue fields from the retired PDF-upload experiment. A pointer/file can be test baggage; verify provenance before treating it as review history or deleting it. |
+| Current reviewer ratings | `wmkf_appreviewanswer` rows for `riskLevel` and `overallAssessment` | Parent `wmkf_revieweroverallrating` / `wmkf_reviewerimpact` / `wmkf_reviewerrisk` are legacy compatibility fields, not the structured answer authority. |
 | External access token (magic link) | `wmkf_appreviewersuggestion.wmkf_externaltokenhash` + `.wmkf_externaltokenissued` / `expires` / `revoked` | Stored as HMAC hash, never plaintext |
 | Has PD closed out the review? | `wmkf_appreviewersuggestion.wmkf_reviewstatus = complete` AND `.wmkf_completedat` set | S196-new |
 | The grant being reviewed | `wmkf_appreviewersuggestion.wmkf_request → akoya_request` (the GRANT row) | |

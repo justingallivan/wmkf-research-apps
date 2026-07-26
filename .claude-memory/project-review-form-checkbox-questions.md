@@ -24,8 +24,10 @@ address; it was not genuine reviewer correspondence, but the stop still required
 an explicit owner cleanup decision. The owner supplied that authority with
 `deleteContact:false`; alerts `361`/`362` completed with no warnings. Both test
 suggestions, the three sentinel answers, sole draft, and `eicar-test-bytes.pdf`
-are gone, while both CRM contacts and the unrelated Tim Newhouse/St. Jude PDF
-remain. Target go-live remains 2026-08-15.**
+are gone, while both CRM contacts and the separately preserved Tim Newhouse/St.
+Jude PDF remain. The owner later identified that PDF as another test artifact from
+the retired reviewer-PDF experiment, not a genuine review; it has not received a
+new deletion authorization. Target go-live remains 2026-08-15.**
 Read the plan for the release contract; this entry records the current boundary.
 
 Closed owner decisions (do not reopen without a new one):
@@ -163,7 +165,9 @@ It made no production writes.
 The owner authorized both exact fixture removals and linked test artifacts with
 `deleteContact:false`. The first exact preflight stopped on an unexpected
 Tim Newhouse/St. Jude PDF in the EICAR folder; the service/operator was narrowed
-to delete only the exact EICAR Graph item. Audited cleanup then removed the two
+to delete only the exact EICAR Graph item. The owner later classified the
+preserved PDF as a second legacy test artifact from the retired PDF-upload design.
+Audited cleanup removed the two
 suggestions, three answer rows, sole draft, and `eicar-test-bytes.pdf`. Alerts
 `361`/`362` finalized successfully with no warnings. Both potential-reviewer rows
 and CRM contact links remain, the Tim Newhouse/St. Jude PDF remains, no honorarium
