@@ -46,13 +46,16 @@ implementation proceeds — it cites roughly thirty files, and per-change reconc
 was measurably more expensive than the drift it prevented. Reconcile it once, in full,
 when implementation lands. The §0.2 recheck markers below are the last such pass.
 
-**Scope note for the 2026-08-15 date.** Must-ship: the `multiselect` type end to end,
-the `wmkf_answervalues` column, every write path in §3.4, the re-keyed set published,
-PD read-back (cards, Compare section, per-option tally), the §5 synthesis prompt
-version, and one controlled production rehearsal. Deferrable past go-live without
-blocking reviewers: the bespoke DOCX/PDF categorical sections (exports read
-`answerText`, which carries the joined labels), and rehearsing the §4 rollback
-procedure as opposed to having it written.
+**Scope for the 2026-08-15 date: all of it, fully tested.** Owner direction
+2026-07-26 — the system must be ready and rehearsed before the date, not partially
+shipped with a follow-up queue. An earlier draft of this note proposed deferring the
+DOCX/PDF categorical sections and the rollback rehearsal; that deferral was not
+requested and is withdrawn. Every section of this plan is in scope: the `multiselect`
+type end to end, the `wmkf_answervalues` column, every write path in §3.4, the
+re-keyed set published, PD read-back (cards, Compare section, per-option tally),
+the DOCX and PDF categorical sections, the §5 synthesis prompt version, the §7
+controlled production rehearsal, the §4 rollback procedure exercised rather than
+merely written, and the §10 test contract in full.
 
 ## 0. Evidence, boundaries, and prerequisites
 

@@ -69,6 +69,10 @@ export default function ReviewQuestionsSection() {
   const [rows, setRows] = useState([]);
   const [baseVersion, setBaseVersion] = useState(null);
   const [loadedSnapshot, setLoadedSnapshot] = useState('[]');
+  // Row ids the server changed since this editor last synced, plus ids the server
+  // no longer has. Populated only by a set_changed resync. `loadedSnapshot` is the
+  // record of what we synced against, so no second copy of the rows is kept.
+  const [conflicts, setConflicts] = useState(null); // { changed: Set, removed: Set, added: [] }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -100,10 +104,56 @@ export default function ReviewQuestionsSection() {
         setRows(editable);
         setBaseVersion(data.version || null);
         setLoadedSnapshot(JSON.stringify(toPayload(editable)));
+        setConflicts(null);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  /**
+   * Recover from a 409 set_changed WITHOUT discarding the operator's edits.
+   *
+   * The previous behavior blocked Save and offered only a Reload, which refetched
+   * the server's set and silently threw away everything typed since load — the one
+   * moment the work is least reproducible. Instead: refetch the server set, keep
+   * the edited rows, re-baseline the optimistic token, and report exactly which
+   * rows moved underneath so the operator can decide per row.
+   *
+   * Deliberately NOT an auto-merge. Re-saving after this overwrites the concurrent
+   * change for any row the operator keeps, which is the right default for a
+   * single-admin surface but must be visible, not implicit.
+   */
+  const resyncPreservingEdits = useCallback(async () => {
+    const res = await fetch('/api/admin/review-questions');
+    if (!res.ok) throw new Error('Could not reload the current question set');
+    const data = await res.json();
+    const serverRows = (data.questions || []).map(toEditable);
+
+    // What this editor last synced against, recovered from the snapshot rather
+    // than duplicated in state.
+    let priorPayload = [];
+    try { priorPayload = JSON.parse(loadedSnapshot) || []; } catch { priorPayload = []; }
+    const priorById = new Map(priorPayload.filter((r) => r.id).map((r) => [r.id, JSON.stringify(r)]));
+    const serverPayload = toPayload(serverRows);
+    const serverById = new Map(
+      serverPayload.filter((r) => r.id).map((r) => [r.id, JSON.stringify(r)]),
+    );
+
+    const changed = new Set();
+    for (const [id, serverJson] of serverById) {
+      const priorJson = priorById.get(id);
+      if (priorJson && priorJson !== serverJson) changed.add(id);
+    }
+    const removed = new Set([...priorById.keys()].filter((id) => !serverById.has(id)));
+    const added = serverPayload.filter((r) => r.id && !priorById.has(r.id));
+
+    setBaseVersion(data.version || null);
+    // Baseline against the SERVER's state so `dirty` means "differs from what is
+    // live", which is what Save is about to act on.
+    setLoadedSnapshot(JSON.stringify(serverPayload));
+    setConflicts({ changed, removed, added });
+    return { changed, removed, added };
+  }, [loadedSnapshot]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -146,8 +196,25 @@ export default function ReviewQuestionsSection() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 409 && data.status === 'set_changed') {
-        setStaleReload(true); // disable Save until the user reloads a fresh version
-        setMessage({ tone: 'reload', text: data.error || 'The question set changed since you loaded it. Reload to see the current version.' });
+        // Preserve the operator's edits and re-baseline instead of forcing a
+        // discarding reload. Save stays enabled: the retry is now against a
+        // current baseVersion.
+        try {
+          const { changed, removed, added } = await resyncPreservingEdits();
+          const parts = [];
+          if (changed.size) parts.push(`${changed.size} question${changed.size === 1 ? ' was' : 's were'} edited`);
+          if (removed.size) parts.push(`${removed.size} removed`);
+          if (added.length) parts.push(`${added.length} added`);
+          setMessage({
+            tone: 'conflict',
+            text: parts.length
+              ? `Someone else changed the question set while you were editing (${parts.join(', ')}). Your edits are kept below and highlighted. Review them, then save again — saving will overwrite their version of any row you keep.`
+              : 'The question set changed while you were editing. Your edits are kept below; save again to apply them.',
+          });
+        } catch (resyncError) {
+          setStaleReload(true);
+          setMessage({ tone: 'reload', text: `${resyncError.message}. Reload to see the current version — your unsaved edits will be lost.` });
+        }
         return;
       }
       if (res.status === 400 && Array.isArray(data.errors)) {
@@ -165,12 +232,21 @@ export default function ReviewQuestionsSection() {
       if (s.updated) parts.push(`${s.updated} edited`);
       if (s.reordered) parts.push(`${s.reordered} reordered`);
       if (s.deleted) parts.push(`${s.deleted} removed`);
-      setMessage({ tone: 'saved', text: data.noop || parts.length === 0 ? 'No changes to save.' : `Saved — ${parts.join(', ')}.` });
+      // A no-op is NOT a success: it means nothing was written. Giving it the same
+      // green treatment as a real save made a swallowed edit look like a completed
+      // one, so it gets its own neutral tone.
+      const noop = Boolean(data.noop) || parts.length === 0;
+      setMessage(noop
+        ? { tone: 'noop', text: 'No changes to save — nothing was written. If you expected a change here, your edit may not have registered.' }
+        : { tone: 'saved', text: `Saved — ${parts.join(', ')}.` });
       // A committed write whose audit row failed: the change is applied but
       // under-recorded — surface a persistent warning (survives the reload).
       if (data.auditWritten === false) setAuditWarning(true);
-      // Reload to pick up new ids + the fresh version (so the next save diffs correctly).
-      load();
+      // Reload to pick up new ids + the fresh version (so the next save diffs
+      // correctly). Skipped on a no-op: nothing was written, so there are no new
+      // ids and the version is unchanged — and `load()` clears `message`, which
+      // would wipe the "nothing was written" notice before it could be read.
+      if (!noop) load();
     } catch (e) {
       setMessage({ tone: 'error', text: e.message || 'Save failed.' });
     } finally {
@@ -199,12 +275,23 @@ export default function ReviewQuestionsSection() {
       {message && (
         <div className={`mb-3 px-3 py-2 rounded-lg text-sm border ${
           message.tone === 'saved' ? 'bg-green-50 text-green-800 border-green-200'
-            : message.tone === 'reload' ? 'bg-amber-50 text-amber-800 border-amber-200'
-              : 'bg-red-50 text-red-800 border-red-200'
-        }`} role="alert">
+            : message.tone === 'noop' ? 'bg-gray-50 text-gray-700 border-gray-300'
+              : message.tone === 'conflict' ? 'bg-amber-50 text-amber-900 border-amber-300'
+                : message.tone === 'reload' ? 'bg-amber-50 text-amber-800 border-amber-200'
+                  : 'bg-red-50 text-red-800 border-red-200'
+        }`} role="alert" data-testid={`rq-message-${message.tone}`}>
           {message.text}
           {message.tone === 'reload' && (
             <button onClick={load} className="ml-3 px-2 py-1 text-xs font-semibold bg-amber-900 text-white rounded">Reload</button>
+          )}
+          {message.tone === 'conflict' && (
+            <button
+              onClick={load}
+              className="ml-3 px-2 py-1 text-xs font-semibold border border-amber-700 text-amber-900 rounded"
+              title="Discard your edits and load the current server version"
+            >
+              Discard my edits
+            </button>
           )}
         </div>
       )}
@@ -230,11 +317,27 @@ export default function ReviewQuestionsSection() {
             onDragOver={onDragOver}
             onDrop={() => onDrop(index)}
             data-testid="rq-row"
-            className="rounded-lg border border-gray-200 bg-gray-50 p-3"
+            className={`rounded-lg border p-3 ${
+              conflicts && row.id && conflicts.changed.has(row.id)
+                ? 'border-amber-400 bg-amber-50'
+                : conflicts && row.id && conflicts.removed.has(row.id)
+                  ? 'border-red-300 bg-red-50'
+                  : 'border-gray-200 bg-gray-50'
+            }`}
           >
             <div className="flex items-start gap-2">
               <span className="cursor-grab select-none text-gray-400 pt-2" title="Drag to reorder" aria-label="Drag to reorder">⠿</span>
               <div className="flex-1 min-w-0 space-y-2">
+                {conflicts && row.id && conflicts.changed.has(row.id) && (
+                  <p className="text-[11px] text-amber-900" data-testid="rq-row-conflict">
+                    Someone else edited this question while you were working. Saving keeps your version and overwrites theirs.
+                  </p>
+                )}
+                {conflicts && row.id && conflicts.removed.has(row.id) && (
+                  <p className="text-[11px] text-red-800" data-testid="rq-row-removed">
+                    This question was removed on the server. Saving will recreate it under its existing key.
+                  </p>
+                )}
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-semibold text-gray-500">Q{index + 1}</span>
                   {row.id ? (

@@ -65,35 +65,59 @@ test('save POSTs the full set + baseVersion, then reloads', async () => {
   });
 });
 
-test('a 409 set_changed shows a reload prompt instead of succeeding', async () => {
+test('a 409 set_changed preserves the operator edits instead of discarding them', async () => {
   global.fetch = mockFetch({ postResponse: { ok: false, status: 409, json: async () => ({ status: 'set_changed', error: 'The question set changed since you loaded it.' }) } });
   render(<ReviewQuestionsSection />);
   await waitFor(() => expect(screen.getAllByTestId('rq-row')).toHaveLength(2));
 
-  fireEvent.change(within(screen.getAllByTestId('rq-row')[1]).getByLabelText('Question text'), { target: { value: 'changed' } });
+  const edited = within(screen.getAllByTestId('rq-row')[1]).getByLabelText('Question text');
+  fireEvent.change(edited, { target: { value: 'my unsaved wording' } });
   fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
-  await waitFor(() => expect(screen.getByText(/changed since you loaded it/i)).toBeInTheDocument());
-  expect(screen.getByRole('button', { name: /^Reload$/ })).toBeInTheDocument();
-  // Codex P2: Save is disabled until reload (re-saving a stale version just 409s again).
-  expect(screen.getByRole('button', { name: /reload to save/i })).toBeDisabled();
+  // The conflict is reported...
+  await waitFor(() => expect(screen.getByTestId('rq-message-conflict')).toBeInTheDocument());
+  // ...the typed edit is STILL THERE (the regression this guards: it used to be
+  // recoverable only by reloading, which threw it away)...
+  expect(within(screen.getAllByTestId('rq-row')[1]).getByLabelText('Question text')).toHaveValue('my unsaved wording');
+  // ...and Save is usable again, because the resync re-baselined the version.
+  expect(screen.getByRole('button', { name: /save changes/i })).not.toBeDisabled();
+  // Discarding remains available, but only as an explicit choice.
+  expect(screen.getByRole('button', { name: /discard my edits/i })).toBeInTheDocument();
 });
 
-test('clicking Reload after a 409 re-fetches and re-enables editing', async () => {
+test('a 409 resync re-fetches the live set so the retry saves against a current version', async () => {
   global.fetch = mockFetch({ postResponse: { ok: false, status: 409, json: async () => ({ status: 'set_changed', error: 'stale' }) } });
   render(<ReviewQuestionsSection />);
   await waitFor(() => expect(screen.getAllByTestId('rq-row')).toHaveLength(2));
   fireEvent.change(within(screen.getAllByTestId('rq-row')[1]).getByLabelText('Question text'), { target: { value: 'x' } });
   fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
-  await waitFor(() => expect(screen.getByRole('button', { name: /reload to save/i })).toBeInTheDocument());
 
-  fireEvent.click(screen.getByRole('button', { name: /^Reload$/ }));
-  // A fresh GET fired and the stale-reload lock cleared (button back to its normal label).
+  await waitFor(() => expect(screen.getByTestId('rq-message-conflict')).toBeInTheDocument());
+  // The resync issued its own GET — without it the retry would 409 forever.
   await waitFor(() => {
     const gets = global.fetch.mock.calls.filter(([, o]) => !o?.method);
     expect(gets.length).toBeGreaterThanOrEqual(2);
   });
-  await waitFor(() => expect(screen.queryByRole('button', { name: /reload to save/i })).not.toBeInTheDocument());
+  // The explicit discard path still reloads from the server.
+  fireEvent.click(screen.getByRole('button', { name: /discard my edits/i }));
+  await waitFor(() => {
+    const gets = global.fetch.mock.calls.filter(([, o]) => !o?.method);
+    expect(gets.length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+test('a no-op save is reported neutrally, not as a success', async () => {
+  global.fetch = mockFetch({ postResponse: { ok: true, status: 200, json: async () => ({ status: 'completed', summary: { created: 0, updated: 0, deleted: 0, reordered: 0 }, version: 'v1' }) } });
+  render(<ReviewQuestionsSection />);
+  await waitFor(() => expect(screen.getAllByTestId('rq-row')).toHaveLength(2));
+  fireEvent.change(within(screen.getAllByTestId('rq-row')[1]).getByLabelText('Question text'), { target: { value: 'edited but server saw no diff' } });
+  fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+  // Nothing was written, so it must NOT wear the success styling — that is what
+  // made a swallowed edit look like a completed one.
+  await waitFor(() => expect(screen.getByTestId('rq-message-noop')).toBeInTheDocument());
+  expect(screen.queryByTestId('rq-message-saved')).not.toBeInTheDocument();
+  expect(screen.getByTestId('rq-message-noop')).toHaveTextContent(/nothing was written/i);
 });
 
 test('a completed save with auditWritten:false surfaces a persistent audit warning', async () => {
