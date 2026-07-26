@@ -3,7 +3,7 @@ title: "Workbench Reviews Tab — Consumption Build-Out Plan"
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "All four Reviews-tab phases are built and deployed. The remaining verification boundary is the first real submitted review (or a staged test submission)."
+summary: "Reviews tab deployed; staged production verified deterministic consumers, but AI synthesis failed twice and remains a red gate."
 canonical: false
 cataloged: 2026-07-03
 owner: product-engineering
@@ -30,16 +30,18 @@ code deployed (prod deployment READY on `fc9ab2c7`), and the
 `review-synthesis.generate` prompt seeded as v1 (create-only bootstrap,
 exactly-one-current verified), then advanced through the audited admin route to
 current backward-compatible v2 on 2026-07-26. Same D26
-verification-boundary caveat as Phases 2-3: the synthesis flow cannot be
-exercised end-to-end until at least one review is submitted (the route correctly
-409s `no_submitted_reviews` until then); unit tests (mocked Executor/Dataverse)
-are the coverage today.
+verification boundary was exercised on 2026-07-26 with controlled Request
+#1002788. Submitted DTO hydration, comparison, DOCX/PDF, and courtesy-copy
+consumers passed. Two real current-v2 synthesis calls failed before writeback
+with incomplete JSON and created failed append-only AI runs; the prior request
+memo remained unchanged. Phase 4 therefore remains a red pre-exposure gate.
 
-**Verification boundary (owner context, S326): the portal is being built AHEAD
-of the December-2026 cycle — no reviewer has ever submitted through it, so the
-populated Compare grid, narrative browser, and DOCX/PDF exports CANNOT be
-browser-verified against real data yet. They are covered by unit tests only.
-Verify them at the first real submission.**
+**Verification boundary update (S376):** no genuine external reviewer has used
+the form, but the owner-authorized staged production submission proved the
+populated Compare/matrix and DOCX/PDF/courtesy outputs against canonical answer
+rows. The smoke data was atomically cleaned up. AI synthesis is the unresolved
+runtime boundary; staff-writer success paths and the post-republish final smoke
+also remain.
 
 ## Context
 
@@ -178,8 +180,8 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   `validationSchema` (`lib/utils/ai-output-schema.js`) bounds/strips the parsed
   shape before the writeback.
 - New memo column `wmkf_reviewsynthesisjson` on `akoya_request`
-  (`lib/dataverse/schema/wave11-review-synthesis/`) — APPLIED to prod 2026-07-03, was prepared/not applied to
-  any environment.
+  (`lib/dataverse/schema/wave11-review-synthesis/`) — APPLIED to prod 2026-07-03
+  and live-probed selectable.
 - Route `POST /api/review-manager/synthesize-reviews`
   (`requireAppAccess('review-manager', 'reviewers')`, requestId GUID-validated):
   409 `no_submitted_reviews` on zero submitted reviews (no LLM call); since the
@@ -197,6 +199,13 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   `synthesis` param → `synthesisSection` on the composed report, additive in
   both the DOCX and PDF renderers; `ExportMenu` passes
   `proposal.reviewSynthesis` through.
+- **Production execution result (2026-07-26):** Request #1002788 produced the
+  exact categorical digest input, but two current-v2/8000-max-token Executor
+  runs failed parsing incomplete JSON (`Unexpected end of JSON input`), with
+  failed audit ids `f5aa3712-4789-f111-ab0f-6045bd018a07` and
+  `04805a39-4789-f111-ab0f-6045bd018deb`. Neither attempt changed
+  `wmkf_reviewsynthesisjson`. Resolve or execute the multiselect plan's
+  prompt-only rollback before exposure.
 
 ## Verification per phase
 

@@ -10,6 +10,26 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Multiselect production smoke passes form pipeline, exposes synthesis defect (Session 376)
+
+**Milestone:** The first controlled production smoke of the published multiselect
+review form passed external authoring through cleanup but reproducibly failed AI
+synthesis.
+**Sessions:** 376.
+**Ship state:**
+- Request #1002788 passed materials exposure, sanitized draft reload, atomic
+  11-answer submit, categorical workbench/report/courtesy consumers, and finality.
+- No email route ran; the request synthesis and email markers were preserved.
+- Two current-v2 `review-synthesis.generate` calls failed on incomplete JSON and
+  produced failed append-only AI audit rows; the pre-exposure gate remains red.
+- A 12-operation cleanup atomically removed the smoke answers and reset the test
+  suggestion to `materials_sent`.
+**Why it matters:** the form/storage/report contract is production-proven, while
+the release remains safely closed on a real synthesis-runtime defect rather than
+being declared green from unit coverage.
+**Pointers:** `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` §7/§9; gitignored
+`outputs/review-form-multiselect/primary-smoke-evidence-2026-07-26.json`.
+
 ## July 2026 — Dataverse target/write interlock enforced in production (Session 368)
 
 **Milestone:** The deployment × target-hostname × operation interlock moved from observed warn mode

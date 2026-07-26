@@ -76,6 +76,14 @@ Both written by `execute-prompt.js` `writeRunRow()`. Migration plans touching ei
   `outputs/review-form-multiselect/prompt-publication-evidence-2026-07-26.json`
   (SHA-256
   `50b7a4974e6bcd5e7dd1135bf1edd228f300fe42de406d5951c3ca10dbdbe428`).
+- **First controlled v2 executions (2026-07-26):** two Request #1002788
+  synthesis attempts failed before writeback with
+  `Claude output not valid JSON: Unexpected end of JSON input`. Both resolved
+  the current v2 prompt (`wmkf_ai_maxtokens=8000`) and created required failed
+  audit rows `f5aa3712-4789-f111-ab0f-6045bd018a07` and
+  `04805a39-4789-f111-ab0f-6045bd018deb`; the pre-smoke request synthesis was
+  unchanged. The release gate remains red pending synthesis resolution or the
+  documented prompt-only rollback.
 - Production prompt writes occur through controlled admin publication or seed
   operations; ordinary prompt execution remains read-only on this entity.
 

@@ -192,8 +192,12 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   set. The audited full-set publication then activated the exact target at
   version `347a37e820f73890`, retained `affiliation`, and retired the eleven
   prior-only rows under request `3d0c7160-3a09-4d96-ab9f-36ebe63e0e7a`.
-  Controlled rehearsal/rollback and reviewer exposure remain separate release
-  gates. Known-fixture disposition cleared
+  The first controlled Request #1002788 portal smoke passed context, sanitized
+  draft reload, submit/readback, categorical consumers, finality, and cleanup
+  without sending email. The overall release gate remains red because two
+  current-v2 synthesis executions returned incomplete JSON. Synthesis
+  resolution, staff-writer success coverage, rollback/republish, final smoke,
+  and reviewer exposure remain separate release gates. Known-fixture disposition cleared
   2026-07-26 via audited alerts `361`/`362`, with both CRM contacts and an
   initially unclassified Tim Newhouse/St. Jude PDF preserved. The owner later
   identified that PDF as another test artifact from the retired reviewer-PDF

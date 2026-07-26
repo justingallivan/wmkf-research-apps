@@ -4,10 +4,16 @@
 historical. The compatible multiselect code and production schema expansion are
 complete and deployed; the known-fixture cleanup is also complete. The live next
 work is the remaining pre-exposure sequence in
-`docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` §9: controlled smoke, rollback
-rehearsal, republish, final smoke, and exposure. The target question publication,
-independently routed production HTTP writer gate and backward-compatible
-`review-synthesis.generate` v2 publication all completed 2026-07-26.
+`docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` §9. The first controlled Request
+#1002788 production smoke passed external draft/submit, canonical multiselect
+storage, workbench DTO/matrix, panel DOCX/PDF, courtesy DOCX, finality, and
+cleanup, but failed `review-synthesis.generate` twice with incomplete JSON.
+The original request synthesis and email markers were preserved and no email was
+sent. The immediate open gate is synthesis resolution (or the plan's prompt-only
+rollback), followed by the remaining staff-writer success rehearsal, question/
+prompt rollback proof, republish, final smoke, and exposure. The target question
+publication, independently routed production HTTP writer gate, and backward-
+compatible synthesis prompt v2 publication all completed 2026-07-26.
 
 ## Session 375 Summary
 
@@ -103,12 +109,36 @@ The next session is expected to be Codex implementing against the frozen plan.
    Evidence: `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` records compatible code
    deployed on `main`, wave 15 read back in production, and the frozen target
    12-row set active at version `347a37e820f73890`. The compatible synthesis
-   prompt is current; rollback rehearsal, controlled smoke, and exposure remain pending.
+   prompt is current, but its first production execution failed twice with
+   `Claude output not valid JSON: Unexpected end of JSON input` under v2 with
+   `wmkf_ai_maxtokens=8000`. Resolve that red gate (or execute the plan's
+   prompt-only rollback), then complete the three staff-writer success paths,
+   rollback/republish rehearsal, final smoke, and exposure.
    **Target go-live remains 2026-08-15.**
 
 ### Recently Closed
 
-1. **§9.2(2) exact target question publication completed 2026-07-26.**
+1. **Primary Request #1002788 portal smoke and cleanup completed, with synthesis
+   red, 2026-07-26.**
+   The external context exposed only `Proposal_1002788.pdf`; token regeneration
+   cleared the disposable draft; autosave stripped a script tag, dropped an
+   unknown key, and canonicalized `[3,1,3,999,'x']` to `[1,3]`; final submit
+   atomically wrote 11 answer snapshots and the parent finality fields.
+   `impactAreas` stored `answerValue=null` plus the exact two value/label pairs.
+   Workbench hydration, categorical tallies, numeric ratings, panel DOCX/PDF,
+   courtesy DOCX, and both finality locks passed. No email route ran and all email
+   markers remained unchanged. Two current-v2 synthesis calls failed before
+   writeback with incomplete JSON, producing failed append-only runs
+   `f5aa3712-4789-f111-ab0f-6045bd018a07` and
+   `04805a39-4789-f111-ab0f-6045bd018deb`; the pre-smoke request synthesis hash
+   remained `a91f05cc0a20cad72341db9d7fc5fe808ed3b28610a35dfdaca82d69beebbcba`.
+   A 12-operation atomic cleanup deleted the 11 answers and restored the test
+   suggestion to `materials_sent` with no draft, received timestamp, or
+   affiliation. Gitignored local evidence:
+   `outputs/review-form-multiselect/primary-smoke-evidence-2026-07-26.json`,
+   SHA-256 `1eb2b8b7542cdd829ed5bcc87b2a090ad4a02a14e8ebdce751001bd8eb6645da`.
+
+2. **§9.2(2) exact target question publication completed 2026-07-26.**
    The audited production admin full-set route retained `affiliation`, created
    the eleven frozen target rows, and retired the eleven legacy rows atomically.
    Production now has exactly 12 active target rows at normalized version
@@ -122,7 +152,7 @@ The next session is expected to be Codex implementing against the frozen plan.
    `outputs/review-form-multiselect/question-publication-evidence-2026-07-26.json`,
    SHA-256 `9f5dead9ecc9989e2701f7ec6573c6313eb295a68a40b1ebc6992d3faade16cf`.
 
-2. **§9.2(1) backward-compatible synthesis prompt publication completed
+3. **§9.2(1) backward-compatible synthesis prompt publication completed
    2026-07-26.**
    Production prompt `review-synthesis.generate` advanced monotonically from
    v1 `d97a4a17-6977-f111-ab0f-000d3a306da2` to current v2
@@ -135,7 +165,7 @@ The next session is expected to be Codex implementing against the frozen plan.
    `outputs/review-form-multiselect/prompt-publication-evidence-2026-07-26.json`,
    SHA-256 `50b7a4974e6bcd5e7dd1135bf1edd228f300fe42de406d5951c3ca10dbdbe428`.
 
-3. **§9.1(3) independently routed production HTTP writer evidence completed
+4. **§9.1(3) independently routed production HTTP writer evidence completed
    2026-07-26.**
    The external context and all four writer routes resolved the live legacy
    question-set version `119da525418d1d43` through separate production HTTP
@@ -147,7 +177,7 @@ The next session is expected to be Codex implementing against the frozen plan.
    `outputs/review-form-multiselect/production-http-writer-evidence-2026-07-26.json`,
    SHA-256 `b6885185ab7281c53ac658c62803f831941732f69f75cbb3ee4784960a2c1b62`.
 
-4. **§8 fixture cleanup completed 2026-07-26.**
+5. **§8 fixture cleanup completed 2026-07-26.**
    The owner confirmed both exact records were disposable tests and authorized
    their children/linked test artifacts with `deleteContact:false`. The first
    preflight stopped on a then-unclassified Tim Newhouse/St. Jude PDF in the EICAR

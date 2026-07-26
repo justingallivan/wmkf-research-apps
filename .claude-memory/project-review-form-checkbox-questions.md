@@ -1,11 +1,11 @@
 ---
 name: project-review-form-checkbox-questions
-description: Owner reworked the reviewer review form; fixed-option multiselect support, production schema expansion, compatible code deployment, known-fixture cleanup, compatible synthesis-prompt publication, and exact target-question publication are complete, while rehearsal and exposure remain pending.
+description: Owner reworked the reviewer review form; the portal/multiselect production smoke passed through cleanup, but synthesis failed twice, so synthesis resolution, remaining rehearsal, rollback proof, and exposure remain pending.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-26 via audited production question/prompt publication, pre-activation and cleanup evidence bundles, implementation source, and focused contract tests
+  last_verified: 2026-07-26 via audited production question/prompt publication, primary production smoke and cleanup evidence, implementation source, and focused contract tests
 ---
 
 ## Status (2026-07-26 implementation pass)
@@ -19,8 +19,13 @@ production and read back first on 2026-07-26. The backward-compatible
 The exact target question set was then published through the audited admin
 full-set route on 2026-07-26: 12 target rows are active at version
 `347a37e820f73890`, 11 legacy rows are inactive, and the retained `affiliation`
-row kept its identity. Controlled rehearsal/rollback and reviewer exposure are
-deliberately still pending. Fixture disposition completed 2026-07-26. The read-only pre-activation
+row kept its identity. The broader release rehearsal/rollback and reviewer
+exposure are deliberately still pending. The first controlled Request #1002788 portal smoke
+passed context, sanitized draft reload, atomic submit, canonical multiselect
+storage, workbench DTO/matrix, DOCX/PDF/courtesy consumers, finality, and atomic
+cleanup, with no email. It remained red because two current-v2 synthesis runs
+failed before writeback on incomplete JSON; the original request synthesis and
+all email markers were preserved. Fixture disposition completed 2026-07-26. The read-only pre-activation
 probe found a sent thank-you marker on the EICAR fixture, so the frozen cleanup
 contract stopped before the later deletion authority and cleanup. A follow-up
 read-only investigation traced
@@ -51,8 +56,10 @@ Closed owner decisions (do not reopen without a new one):
   publishing the prompt or question set, exercising rollback, and opening
   reviewer exposure are separately controlled steps. Wave 15 and compatible
   prompt publication cleared 2026-07-26; exact target-question publication also
-  cleared 2026-07-26. Rollback rehearsal and exposure remain controlled and
-  pending. Fixture deletion was a separately
+  cleared 2026-07-26. The first portal smoke passed its deterministic surfaces
+  and cleanup but failed synthesis twice; synthesis resolution, staff-writer
+  success coverage, rollback rehearsal, final smoke, and exposure remain
+  controlled and pending. Fixture deletion was a separately
   controlled step and cleared 2026-07-26.
 - Wave 15 is a **pre-deployment** gate, not only a pre-activation gate: readers
   always select `wmkf_answervalues` and writers always emit it, so production

@@ -321,7 +321,7 @@ DTO has no dedicated `piName` field, so `proposalAuthors` (project
 leader/applicant) stands in as the best-available PI identity.
 
 **Phase 4 BUILT (2026-07-03); prompt current in production 2026-07-26 —
-pending first-submission verification:**
+first controlled execution failed twice on incomplete JSON:**
 Executor-based AI synthesis of a proposal's submitted reviews. New Tier-1
 prompt `review-synthesis.generate` (`shared/config/prompts/review-synthesis.js`,
 initially bootstrapped as v1 and published through the audited admin path as
@@ -344,8 +344,15 @@ always-overwrite, regeneration gating is enforced at THIS route instead — 409
 review is submitted) with a Generate/Regenerate action, plain-text only (no
 `dangerouslySetInnerHTML`); `composeReviewReport` accepts an optional
 `synthesis` param rendered additively in both export formats. Same
-verification boundary as Phases 2-3: the production prompt dependency is now
-satisfied, but no real review synthesis has yet been executed for this release.
+verification boundary as Phases 2-3: Request #1002788 production-proved the
+submitted DTO, categorical matrix, and both export renderers on 2026-07-26.
+Two real v2 synthesis executions then failed before writeback with
+`Claude output not valid JSON: Unexpected end of JSON input`, producing failed
+append-only audit runs `f5aa3712-4789-f111-ab0f-6045bd018a07` and
+`04805a39-4789-f111-ab0f-6045bd018deb`. The prior request memo remained
+unchanged and the smoke answers were atomically cleaned up. This phase remains a
+red pre-exposure gate until synthesis succeeds (or the prompt-only rollback is
+executed and verified).
 Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 ## Email templates (admin org default + per-PD override)
