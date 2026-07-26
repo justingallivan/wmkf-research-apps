@@ -77,7 +77,7 @@ function buildContext({ address, honorariumOptOut = false, longBody = false, vie
     submission: { receivedAt: null, filename: null },
     prefill: {
       affiliation: 'Example University',
-      impact: null, risk: null, overallRating: null,
+      riskLevel: null, overallAssessment: null,
       firstName: 'Jane', lastName: 'Reviewer', nickname: 'Dr. Reviewer',
       title: 'Professor', email: 'jane@uni.edu', orcid: '0000-0002-1825-0097',
       honorariumOptOut,

@@ -14,8 +14,24 @@ function reviewer(suggestionId, name, answers) {
   return { suggestionId, name, answers };
 }
 
-function row(questionKey, questionOrder, questionType, questionText, { answerText = null, answerHtml = null, answerValue = null } = {}) {
-  return { questionKey, questionOrder, questionType, questionText, answerText, answerHtml, answerValue };
+function row(questionKey, questionOrder, questionType, questionText, {
+  answerText = null,
+  answerHtml = null,
+  answerValue = null,
+  answerValues = null,
+  answerValuesUnreadable = false,
+} = {}) {
+  return {
+    questionKey,
+    questionOrder,
+    questionType,
+    questionText,
+    answerText,
+    answerHtml,
+    answerValue,
+    answerValues,
+    answerValuesUnreadable,
+  };
 }
 
 describe('deriveReviewMatrix', () => {
@@ -157,5 +173,58 @@ describe('deriveReviewMatrix', () => {
     expect(matrix.reviewers).toHaveLength(2);
     const q = matrix.questions.find((x) => x.key === 'impact');
     expect(q.cells.find((c) => c.suggestionId === 'r1').state).toBe('not-asked');
+  });
+
+  test('multiselect tallies are separate from numeric rating aggregates', () => {
+    const reviewers = [
+      reviewer('r1', 'Dr. A', [
+        row('impactAreas', 3, 'multiselect', 'Impact areas?', {
+          answerValues: [{ value: 1, label: 'Tools' }, { value: 3, label: 'Broad interest' }],
+          answerText: 'Tools; Broad interest',
+        }),
+      ]),
+      reviewer('r2', 'Dr. B', [
+        row('impactAreas', 3, 'multiselect', 'Impact areas?', {
+          answerValues: [{ value: 1, label: 'Tools' }],
+          answerText: 'Tools',
+        }),
+      ]),
+    ];
+
+    const question = deriveReviewMatrix(reviewers, null).questions[0];
+    expect(question.average).toBeUndefined();
+    expect(question.answeredCount).toBe(2);
+    expect(question.tallies).toEqual([
+      {
+        value: 1,
+        label: 'Tools',
+        count: 2,
+        reviewers: [
+          { suggestionId: 'r1', name: 'Dr. A' },
+          { suggestionId: 'r2', name: 'Dr. B' },
+        ],
+      },
+      {
+        value: 3,
+        label: 'Broad interest',
+        count: 1,
+        reviewers: [{ suggestionId: 'r1', name: 'Dr. A' }],
+      },
+    ]);
+  });
+
+  test('corrupt multiselect content is isolated and excluded from tallies', () => {
+    const question = deriveReviewMatrix([
+      reviewer('r1', 'Dr. A', [
+        row('impactAreas', 3, 'multiselect', 'Impact areas?', {
+          answerText: 'Unreadable answer',
+          answerValuesUnreadable: true,
+        }),
+      ]),
+    ], null).questions[0];
+
+    expect(question.cells[0].state).toBe('unreadable');
+    expect(question.answeredCount).toBe(0);
+    expect(question.tallies).toEqual([]);
   });
 });

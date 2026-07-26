@@ -56,7 +56,7 @@ jest.mock('../../lib/external/review-question-fetcher', () => {
   };
 });
 jest.mock('../../lib/external/review-answer-snapshot', () => ({
-  readRatingsBySuggestion: jest.fn(async () => ({ impact: null, risk: null, overallRating: null })),
+  readRatingsBySuggestion: jest.fn(async () => ({ riskLevel: null, overallAssessment: null })),
 }));
 jest.mock('../../lib/services/capture-self-reported-orcid', () => ({
   captureSelfReportedReviewerOrcid: jest.fn(async () => ({})),
@@ -340,9 +340,17 @@ describe('submitReview', () => {
   const { reviewFormSchema } = jest.requireActual('../../lib/external/review-form-schema');
   const validAnswers = () => ({
     affiliation: 'Professor of Physics, Example University',
-    impact: 3, risk: 2, overallRating: 4,
-    q2: '<p>a</p>', q4: '<p>a</p>', q5: '<p>a</p>', q6: '<p>a</p>',
-    q7: '<p>a</p>', q8: '<p>a</p>', q9: '<p>a</p>', q11: '',
+    priorWork: '<p>a</p>',
+    foreseenImpacts: '<p>a</p>',
+    impactAreas: [1, 3],
+    riskLevel: 2,
+    riskDetail: '<p>a</p>',
+    methodsAppropriate: '<p>a</p>',
+    teamCapacity: '<p>a</p>',
+    questionsForPi: '<p>a</p>',
+    traditionalFunding: '<p>a</p>',
+    overallAssessment: 4,
+    additionalComments: '',
   });
   const stage2b = (over = {}) => baseSuggestion({ wmkf_accepted: true, wmkf_reviewstatus: 100000001, ...over });
 

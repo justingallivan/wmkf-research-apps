@@ -4,7 +4,8 @@
  * Postgres-backed autosave for the in-browser reviewer authoring surface
  * (docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md §5). The draft is a
  * scratchpad; the system of record for a SUBMITTED review is the Dataverse
- * wmkf_appreviewanswer snapshot (+ parent ratings), written by /submit (Phase 3).
+ * wmkf_appreviewanswer snapshot plus parent affiliation/finality metadata,
+ * written by /submit (Phase 3).
  *
  *   GET  → returns the saved draft_json so the editor rehydrates on return
  *          visits. Returns an empty draft once the review is submitted (no
@@ -76,6 +77,13 @@ function buildSanitizedDraftJson(input, fieldByKey) {
         oversized.push({ key, length: html.length, maxLength: field.maxLength });
       }
       out[key] = html;
+    } else if (field.type === 'multiselect') {
+      const submitted = new Set(
+        Array.isArray(value) ? value.filter((item) => Number.isInteger(item)) : [],
+      );
+      out[key] = (field.options || [])
+        .filter((option) => submitted.has(option.value))
+        .map((option) => option.value);
     } else {
       out[key] = value;
     }

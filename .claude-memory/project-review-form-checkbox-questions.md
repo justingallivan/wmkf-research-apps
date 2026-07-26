@@ -1,19 +1,21 @@
 ---
 name: project-review-form-checkbox-questions
-description: Owner reworked the reviewer review form to include check-all-that-apply and checkbox-plus-Other questions; the question-type system supports no checkbox type today.
+description: Owner reworked the reviewer review form; fixed-option multiselect support is implemented in code, while production expansion, publication, rehearsal, and exposure remain pending.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-25 via source read of the full question-type chain (fetcher, admin save/editor, ReviewAuthoringForm, build-review-submission, review-answer adapter, review-matrix)
+  last_verified: 2026-07-26 via implementation source and focused contract tests across fetcher, admin, authoring, four writers, adapter, matrix, reports, and synthesis
 ---
 
-## Status (S375, 2026-07-26)
+## Status (2026-07-26 implementation pass)
 
-**Plan ACCEPTED and FROZEN: `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md`. Implementation
-NOT started. Target go-live 2026-08-15, full scope — the owner explicitly rejected
-deferring any part of it.** Read the plan, not this file, for the contract; this entry
-records only what a future session would otherwise re-derive or get wrong.
+**Plan ACCEPTED and FROZEN: `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md`. The
+backward-compatible code and additive wave-15 schema package are implemented on
+`codex/review-form-multiselect`; production schema application, prompt/question
+publication, controlled rehearsal/rollback, fixture disposition, and reviewer
+exposure are deliberately still pending. Target go-live remains 2026-08-15.**
+Read the plan for the release contract; this entry records the current boundary.
 
 Closed owner decisions (do not reopen without a new one):
 - The whole question set is re-keyed; only `affiliation` keeps its key.
@@ -27,6 +29,9 @@ Closed owner decisions (do not reopen without a new one):
 - The client sends numeric values only; the server builds the pairs from live options.
 - Only Q3 is multi-select. Q4/Q10 show ☐ in Word but are single-choice. No "Other".
 - No sandbox rehearsal — the controlled production smoke replaced it.
+- Production operations are not implied by a green code build. Applying wave 15,
+  publishing the prompt or question set, exercising rollback, deleting fixtures,
+  and opening reviewer exposure remain separately controlled steps.
 
 **Do not reconcile the frozen plan against incidental source changes.** It cites 30
 source files; per-change reconciliation cost more than the drift it prevented.
@@ -39,21 +44,21 @@ prerequisite for the review form matching the owner's reworked question set, so 
 sequences ahead of the never-yet-executed live submission rehearsal in
 [[project-reviewer-reliability-data]]'s neighbor, `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
-## The ask (owner, S375, 2026-07-25)
+## Historical intake (owner, S375, 2026-07-25)
 
-The review form has been reworked to contain **checkbox questions**, specifically:
+The initial review-form document described **checkbox questions**, specifically:
 
 - **Check all that apply** — multi-select from a fixed option list, zero/one/many
   selections per question.
 - **Checkbox plus free-text "Other"** — multi-select where one option opens a text
   field, so an option can carry a text payload.
 
-The owner has the reworked form in a document and will share it; the exact question
-list, option sets, and required-ness come from that document, not from this file.
+The later frozen plan resolved that broader intake: only the fixed-option
+`impactAreas` multiselect is in scope, and no option carries an `Other` payload.
 
-## Verified state: no checkbox type exists (2026-07-25)
+## Historical pre-implementation state (verified 2026-07-25)
 
-The review-question path supports exactly three types — `picklist` (rendered as
+Before this implementation, the review-question path supported exactly three types — `picklist` (rendered as
 **single-choice radios**), `richtext`, `string`. Verified by a repo-wide
 disconfirming grep for every `type === '...'` comparison in `lib`/`pages`/`shared`:
 the other form types it surfaced (`table`, `file`, `longtext`, `rating`) belong to
@@ -61,27 +66,33 @@ the **separate** applicant/grantee form schema (`lib/utils/form-schema.js`,
 `shared/forms/phase-ii-research-2026-06/`) and the virtual review panel, not to the
 reviewer review form. Per-layer evidence:
 
-- `lib/external/review-question-fetcher.js:29` — `SUPPORTED_TYPES` allowlist.
-- `lib/admin/review-question-save.js:69` — same allowlist on the staff save path.
-- `shared/components/admin/ReviewQuestionsSection.js:25-26` — editor dropdown offers
+- `lib/external/review-question-fetcher.js` — `SUPPORTED_TYPES` allowlist.
+- `lib/admin/review-question-save.js` — same allowlist on the staff save path.
+- `shared/components/admin/ReviewQuestionsSection.js` — editor dropdown offered
   only "Rich text (narrative)" and "Rating (single choice)".
-- `shared/components/external/ReviewAuthoringForm.js:404-447` — picklist renders as
+- `shared/components/external/ReviewAuthoringForm.js` — picklist renders as
   `type="radio"`, so selections are mutually exclusive by construction.
-- `lib/external/build-review-submission.js:83-124` — picklist normalizes to ONE
+- `lib/external/build-review-submission.js` — picklist normalized to ONE
   integer; any unrecognized type produces an `unsupported field type` error.
-- `wmkf_appreviewanswer` (`lib/dataverse/adapters/review-answer.js:44-50`) — a single
+- `wmkf_appreviewanswer` (`lib/dataverse/adapters/review-answer.js`) — a single
   `wmkf_answervalue` number plus one `wmkf_answertext` / `wmkf_answerhtml`. **There is
   no multi-value column**, so multi-select needs a storage decision, not just a
   renderer.
-- `shared/utils/review-matrix.js:146` — average/spread is picklist-only; the Compare
+- `shared/utils/review-matrix.js` — average/spread is picklist-only; the Compare
   grid, DOCX/PDF export, and AI synthesis all derive from that matrix.
 
-## Hazard: do not add a checkbox row directly in Dataverse
+That gap is now closed in source: `multiselect` is an explicit fourth type, the
+admin and reviewer UIs support it, every writer uses one server canonicalizer,
+wave 15 defines `wmkf_answervalues`, and readers isolate corrupt JSON. The old
+paragraph remains historical evidence for why the full-chain change was required.
+
+## Release hazard: expand before activation
 
 `getActiveQuestionSet()` is deliberately fail-closed — an unrecognized
 `wmkf_questiontype` throws, and `context`/`draft`/`submit` all 500 on that throw. A
-`checkbox` row hand-written into `wmkf_reviewquestion` would break **every reviewer's
-portal page**, not just render one question oddly. The type must ship in code first.
+`multiselect` row must not be activated until the compatible code is deployed and
+wave 15 has been applied/read back. Hand-writing a `checkbox` type remains invalid;
+the supported type name is exactly `multiselect`.
 
 ## Probed live state (2026-07-25) — do NOT re-infer this
 
@@ -102,19 +113,18 @@ Net: no *real* reviewer data, so keys/types/columns are still freely redefinable
 that is a decision to dispose of known test artifacts, not an absence of data. Say it
 that way; the sloppy version is what the review caught.
 
-## Reconcile list for when a checkbox type ships
+## Reconciliation completed with the code implementation
 
-The `picklist | richtext | string` list is restated in these durable surfaces — all
-CORRECT as of 2026-07-25, and all needing an update in the same pass that adds a new
-type (grepped S375):
+The live durable surfaces that restated the old type list were updated with the
+implementation:
 
-- `docs/atlas/dataverse-wmkf-reviewquestion.md:31` and `:33` — live column semantics.
-- `docs/atlas/dataverse-wmkf-appreviewanswer.md:29` — snapshot `wmkf_questiontype`.
-- `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md:89` and
-  `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md:74` — completed-epic design
-  records; classify as historical rather than silently rewriting them.
-- `docs/atlas/postgres-review-drafts.md:18` — `draft_json` shape per type, which a
-  multi-value answer changes.
+- `docs/atlas/dataverse-wmkf-reviewquestion.md` — option-bearing multiselect type.
+- `docs/atlas/dataverse-wmkf-appreviewanswer.md` — multiselect snapshot column,
+  canonical JSON, and corrupt-row behavior.
+- `docs/atlas/postgres-review-drafts.md` — numeric-array draft values.
+- `docs/SERVICE_AND_UTILITY_CATALOG.md` — canonicalizer and multipart helper.
+- The completed-epic authoring plans remain historical design records and were not
+  rewritten as current contracts.
 
 ## Prior art
 

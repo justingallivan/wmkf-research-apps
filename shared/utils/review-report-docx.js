@@ -204,6 +204,34 @@ export async function generateReviewReportDocx(report) {
     ratingsChildren.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headRow, ...bodyRows] }));
   }
 
+  const categoricalChildren = [];
+  for (const section of report.categoricalSections || []) {
+    categoricalChildren.push(new Paragraph({
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 300, after: 120 },
+      children: [new TextRun({
+        text: section.retired ? `${section.text} (prior cycle)` : section.text,
+        size: 26,
+        font: FONT,
+        bold: true,
+      })],
+    }));
+    for (const answer of section.answers) {
+      const value = answer.unreadable
+        ? 'Unreadable answer'
+        : answer.state === 'not-asked'
+          ? 'Not asked'
+          : answer.labels.length > 0 ? answer.labels.join('; ') : 'No answer provided';
+      categoricalChildren.push(new Paragraph({
+        spacing: { after: 80 },
+        children: [
+          bodyRun(`${answer.reviewerName || 'Unnamed reviewer'}: `, { bold: true }),
+          bodyRun(value, answer.unreadable ? { color: '996600' } : {}),
+        ],
+      }));
+    }
+  }
+
   // --- Narrative sections ---
   function runsToTextRuns(runs) {
     // A run's text may contain an embedded "\n" from a <br>; docx needs an
@@ -300,6 +328,7 @@ export async function generateReviewReportDocx(report) {
         ...summaryChildren,
         ...synthesisChildren,
         ...ratingsChildren,
+        ...categoricalChildren,
         ...narrativeChildren,
       ],
     }],

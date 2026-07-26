@@ -13,8 +13,8 @@
  *     (`questionKey/Order/Text/Type`, `answerText/Html/Value`) already on the
  *     GET /api/review-manager/reviewers DTO. NO hardcoded question keys here,
  *     and this module never reads `lib/external/review-form-schema.js` or the
- *     legacy `reviewerImpact`/`reviewerRisk`/`reviewerOverallRating`
- *     projections — rating labels come from each row's own `answerText`.
+ *     legacy parent rating projections — rating labels come from each row's
+ *     own `answerText`.
  *  2. Ordering: questions present in the LIVE question set
  *     (`review-question-fetcher.js#getActiveQuestionSet()`) are ordered by
  *     the live set's `order`. A snapshot `questionKey` absent from the live
@@ -24,7 +24,8 @@
  *     `answers[]`. Averages/spread for a rating question are computed only
  *     across reviewers who answered THAT key. A reviewer with no row for a
  *     key renders `state: 'not-asked'` — distinct from an `'empty'` row
- *     (a row exists but carries no content) and an `'answered'` row.
+ *     (a row exists but carries no content), an `'unreadable'` multiselect row,
+ *     and an `'answered'` row.
  *
  * Duplicate `questionKey` with differing snapshot `questionText`/`questionType`
  * across reviewers (expected across cycles as staff edit question wording):
@@ -52,7 +53,7 @@
  *   reviewers: Array<{suggestionId:string, name:(string|null)}>,
  *   questions: Array<{
  *     key:string, type:(string|null), text:string, retired:boolean,
- *     cells: Array<{suggestionId:string, state:('answered'|'empty'|'not-asked'),
+ *     cells: Array<{suggestionId:string, state:('answered'|'empty'|'unreadable'|'not-asked'),
  *       answerText:(string|null), answerHtml:(string|null), answerValue:(number|null)}>,
  *     average?:(number|null), min?:(number|null), max?:(number|null),
  *     answeredCount?:number, totalReviewers?:number,
@@ -124,18 +125,25 @@ export function deriveReviewMatrix(reviewers, liveQuestions) {
           answerText: null,
           answerHtml: null,
           answerValue: null,
+          answerValues: null,
+          answerValuesUnreadable: false,
         };
       }
       const hasText = typeof row.answerText === 'string' && row.answerText.trim().length > 0;
       const hasHtml = typeof row.answerHtml === 'string' && row.answerHtml.trim().length > 0;
       const hasValue = row.answerValue !== null && row.answerValue !== undefined;
-      const state = hasText || hasHtml || hasValue ? 'answered' : 'empty';
+      const hasValues = Array.isArray(row.answerValues);
+      const state = row.answerValuesUnreadable
+        ? 'unreadable'
+        : (hasText || hasHtml || hasValue || hasValues ? 'answered' : 'empty');
       return {
         suggestionId: reviewer.suggestionId,
         state,
         answerText: row.answerText ?? null,
         answerHtml: row.answerHtml ?? null,
         answerValue: row.answerValue ?? null,
+        answerValues: Array.isArray(row.answerValues) ? row.answerValues : null,
+        answerValuesUnreadable: row.answerValuesUnreadable === true,
       };
     });
 
@@ -154,6 +162,32 @@ export function deriveReviewMatrix(reviewers, liveQuestions) {
       question.min = answeredCount > 0 ? Math.min(...values) : null;
       question.max = answeredCount > 0 ? Math.max(...values) : null;
       question.answeredCount = answeredCount;
+      question.totalReviewers = reviewerList.length;
+    } else if (type === 'multiselect') {
+      const tallyByPair = new Map();
+      for (const cell of cells) {
+        if (cell.answerValuesUnreadable || !Array.isArray(cell.answerValues)) continue;
+        const reviewer = reviewerList.find((candidate) => candidate.suggestionId === cell.suggestionId);
+        for (const pair of cell.answerValues) {
+          const tallyKey = `${pair.value}\u0000${pair.label}`;
+          const tally = tallyByPair.get(tallyKey) || {
+            value: pair.value,
+            label: pair.label,
+            count: 0,
+            reviewers: [],
+          };
+          tally.count += 1;
+          tally.reviewers.push({
+            suggestionId: cell.suggestionId,
+            name: reviewer?.name || null,
+          });
+          tallyByPair.set(tallyKey, tally);
+        }
+      }
+      question.tallies = [...tallyByPair.values()];
+      question.answeredCount = cells.filter(
+        (cell) => !cell.answerValuesUnreadable && Array.isArray(cell.answerValues),
+      ).length;
       question.totalReviewers = reviewerList.length;
     }
 

@@ -284,6 +284,7 @@ export function composeReviewReport({
     : { reviewers: [], questions: [] };
 
   const ratingQuestions = safeMatrix.questions.filter((q) => q.type === 'picklist');
+  const categoricalQuestions = safeMatrix.questions.filter((q) => q.type === 'multiselect');
   const narrativeQuestions = safeMatrix.questions.filter((q) => q.type === 'richtext');
 
   const header = {
@@ -329,6 +330,20 @@ export function composeReviewReport({
 
   const reviewerName = new Map(safeMatrix.reviewers.map((r) => [r.suggestionId, r.name || null]));
 
+  const categoricalSections = categoricalQuestions.map((q) => ({
+    key: q.key,
+    text: q.text,
+    retired: !!q.retired,
+    tallies: Array.isArray(q.tallies) ? q.tallies : [],
+    answers: q.cells.map((c) => ({
+      suggestionId: c.suggestionId,
+      reviewerName: reviewerName.get(c.suggestionId) ?? null,
+      state: c.state,
+      unreadable: c.answerValuesUnreadable === true,
+      labels: Array.isArray(c.answerValues) ? c.answerValues.map((pair) => pair.label) : [],
+    })),
+  }));
+
   const narrativeSections = narrativeQuestions.map((q) => ({
     key: q.key,
     text: q.text,
@@ -354,7 +369,14 @@ export function composeReviewReport({
     }
     : null;
 
-  return { header, summary, ratingsTable, narrativeSections, synthesisSection };
+  return {
+    header,
+    summary,
+    ratingsTable,
+    categoricalSections,
+    narrativeSections,
+    synthesisSection,
+  };
 }
 
 /**

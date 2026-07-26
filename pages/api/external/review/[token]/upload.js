@@ -14,6 +14,7 @@ import { writeReviewFiles } from '../../../../../lib/services/review-upload';
 import { respondForFailedReviewUpload } from '../../../../../lib/utils/review-upload-response';
 import { withDalContext } from '../../../../../lib/dataverse/core/context';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
+import { addReviewMultipartField } from '../../../../../lib/external/review-multipart-fields';
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 MB per file
 const MAX_FILES = 5;
@@ -85,6 +86,13 @@ export default async function handler(req, res) {
           ok: false,
           reason: 'too_many_files',
           errors: [`Max ${MAX_FILES} files per upload.`],
+        });
+      }
+      if (e.code === 'INVALID_FORM_FIELD') {
+        return res.status(400).json({
+          ok: false,
+          reason: 'validation',
+          errors: ['Review form fields are malformed.'],
         });
       }
       throw e;
@@ -183,12 +191,14 @@ function parseMultipart(req) {
     });
 
     busboy.on('field', (name, value) => {
-      // Coerce numeric picklist strings to numbers; review-form-schema also
-      // tolerates strings, but we normalize here to keep the shape clean.
-      const numeric = Number(value);
-      fields[name] = value !== '' && !Number.isNaN(numeric) && /^-?\d+$/.test(value)
-        ? numeric
-        : value;
+      if (aborted) return;
+      try {
+        addReviewMultipartField(fields, name, value);
+      } catch (error) {
+        aborted = true;
+        error.code = 'INVALID_FORM_FIELD';
+        reject(error);
+      }
     });
 
     busboy.on('error', reject);

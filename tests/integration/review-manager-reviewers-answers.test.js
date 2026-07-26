@@ -70,8 +70,8 @@ test('attaches ordered, sanitized answers[] to a submitted reviewer', async () =
   // Answer rows returned out of order, one carrying a stored XSS payload.
   DynamicsService.queryAllRecords.mockResolvedValue({
     records: [
-      { _wmkf_appreviewersuggestion_value: SUGGESTION_ID, wmkf_questionkey: 'q4', wmkf_questionorder: 4, wmkf_questiontype: 'richtext', wmkf_questiontext: 'Q4', wmkf_answerhtml: '<p>ok</p><script>alert(1)</script>', wmkf_answertext: 'ok', wmkf_answervalue: null },
-      { _wmkf_appreviewersuggestion_value: SUGGESTION_ID, wmkf_questionkey: 'impact', wmkf_questionorder: 1, wmkf_questiontype: 'picklist', wmkf_questiontext: 'Q1', wmkf_answerhtml: null, wmkf_answertext: 'broad', wmkf_answervalue: 3 },
+      { _wmkf_appreviewersuggestion_value: SUGGESTION_ID, wmkf_questionkey: 'riskDetail', wmkf_questionorder: 5, wmkf_questiontype: 'richtext', wmkf_questiontext: 'Q5', wmkf_answerhtml: '<p>ok</p><script>alert(1)</script>', wmkf_answertext: 'ok', wmkf_answervalue: null },
+      { _wmkf_appreviewersuggestion_value: SUGGESTION_ID, wmkf_questionkey: 'riskLevel', wmkf_questionorder: 4, wmkf_questiontype: 'picklist', wmkf_questiontext: 'Q4', wmkf_answerhtml: null, wmkf_answertext: 'High risk', wmkf_answervalue: 3 },
     ],
   });
 
@@ -80,13 +80,14 @@ test('attaches ordered, sanitized answers[] to a submitted reviewer', async () =
 
   expect(res.statusCode).toBe(200);
   const reviewer = res._data.proposals[0].reviewers[0];
-  expect(reviewer.answers.map((a) => a.questionOrder)).toEqual([1, 4]); // ordered
-  // Phase D: the DTO rating is sourced from the snapshot answer row (impact=3),
+  expect(reviewer.answers.map((a) => a.questionOrder)).toEqual([4, 5]); // ordered
+  // The DTO rating is sourced from the snapshot answer row,
   // NOT the parent column.
-  expect(reviewer.reviewerImpact).toBe(3);
-  const q4 = reviewer.answers.find((a) => a.questionKey === 'q4');
-  expect(q4.answerHtml).not.toMatch(/<script/i); // re-sanitized on read
-  expect(q4.answerHtml).toContain('ok');
+  expect(reviewer.reviewerRiskLevel).toBe(3);
+  expect(reviewer.reviewerOverallAssessment).toBeNull();
+  const detail = reviewer.answers.find((a) => a.questionKey === 'riskDetail');
+  expect(detail.answerHtml).not.toMatch(/<script/i); // re-sanitized on read
+  expect(detail.answerHtml).toContain('ok');
   // The keyed child read filtered by the lookup value attribute.
   const filterArg = DynamicsService.queryAllRecords.mock.calls[0][1].filter;
   expect(filterArg).toContain(`_wmkf_appreviewersuggestion_value eq ${SUGGESTION_ID}`);
@@ -102,24 +103,23 @@ test('a submitted reviewer whose child query returns nothing gets answers: []', 
   // Phase D load-bearing: the fixture's PARENT columns are set (impact=3 etc.,
   // beforeEach), but with no snapshot rows the DTO ratings are null — proving the
   // source is the snapshot, not the parent column. Fails if the migration regresses.
-  expect(reviewer.reviewerImpact).toBeNull();
-  expect(reviewer.reviewerRisk).toBeNull();
-  expect(reviewer.reviewerOverallRating).toBeNull();
+  expect(reviewer.reviewerRiskLevel).toBeNull();
+  expect(reviewer.reviewerOverallAssessment).toBeNull();
 });
 
 test('null / non-string answerHtml normalizes to empty (no sanitizer crash)', async () => {
   DynamicsService.queryAllRecords.mockResolvedValue({
     records: [
-      { _wmkf_appreviewersuggestion_value: SUGGESTION_ID, wmkf_questionkey: 'risk', wmkf_questionorder: 3, wmkf_questiontype: 'picklist', wmkf_answerhtml: null, wmkf_answertext: 'med', wmkf_answervalue: 2 },
-      { _wmkf_appreviewersuggestion_value: SUGGESTION_ID, wmkf_questionkey: 'q5', wmkf_questionorder: 5, wmkf_questiontype: 'richtext', wmkf_questiontext: 'Q5', wmkf_answerhtml: '', wmkf_answertext: '', wmkf_answervalue: null },
+      { _wmkf_appreviewersuggestion_value: SUGGESTION_ID, wmkf_questionkey: 'riskLevel', wmkf_questionorder: 4, wmkf_questiontype: 'picklist', wmkf_answerhtml: null, wmkf_answertext: 'med', wmkf_answervalue: 2 },
+      { _wmkf_appreviewersuggestion_value: SUGGESTION_ID, wmkf_questionkey: 'riskDetail', wmkf_questionorder: 5, wmkf_questiontype: 'richtext', wmkf_questiontext: 'Q5', wmkf_answerhtml: '', wmkf_answertext: '', wmkf_answervalue: null },
     ],
   });
   const { req, res } = get({ proposalId: REQUEST_ID });
   await handler(req, res);
   expect(res.statusCode).toBe(200);
   const answers = res._data.proposals[0].reviewers[0].answers;
-  expect(answers.find((a) => a.questionKey === 'risk').answerHtml).toBe('');
-  expect(answers.find((a) => a.questionKey === 'q5').answerHtml).toBe('');
+  expect(answers.find((a) => a.questionKey === 'riskLevel').answerHtml).toBe('');
+  expect(answers.find((a) => a.questionKey === 'riskDetail').answerHtml).toBe('');
 });
 
 test('child rows for an unrelated suggestion are not attached to this reviewer', async () => {

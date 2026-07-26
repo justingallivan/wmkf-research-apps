@@ -48,24 +48,37 @@ const rawPick = (id, key, order, over = {}) => ({
   ...rawRich(id, key, order), wmkf_questiontype: 'picklist',
   wmkf_options: JSON.stringify([{ value: 1, label: 'Low' }, { value: 2, label: 'High' }]), ...over,
 });
+const rawMulti = (id, key, order, over = {}) => ({
+  ...rawPick(id, key, order), wmkf_questiontype: 'multiselect', ...over,
+});
 
-// A realistic live set: the four parent-bound rows (affiliation + 3 ratings) + a narrative.
+// A compact target-shaped set: affiliation + categorical + 2 ratings + narrative.
 const baseRaw = () => [
   rawString('id-aff', 'affiliation', 0),
-  rawPick('id-imp', 'impact', 1),
-  rawPick('id-risk', 'risk', 2),
-  rawPick('id-or', 'overallRating', 3),
-  rawRich('id-q4', 'q4', 4),
+  rawMulti('id-imp', 'impactAreas', 1),
+  rawPick('id-risk', 'riskLevel', 2),
+  rawRich('id-q4', 'riskDetail', 3),
+  rawPick('id-or', 'overallAssessment', 4),
 ];
 const versionOf = (raw) => questionSetVersion(raw.map((r) => normalizeRow(r)));
 
-// The four parent-bound rows as the editor would resubmit them (ids + shapes match baseRaw).
+// The four structured rows as the editor would resubmit them (ids + shapes match baseRaw).
 const submittedFour = () => [
   { id: 'id-aff', key: 'affiliation', label: 'Question affiliation', type: 'string', required: true },
-  { id: 'id-imp', key: 'impact', label: 'Question impact', type: 'picklist', required: true, options: [{ value: 1, label: 'Low' }, { value: 2, label: 'High' }] },
-  { id: 'id-risk', key: 'risk', label: 'Question risk', type: 'picklist', required: true, options: [{ value: 1, label: 'Low' }, { value: 2, label: 'High' }] },
-  { id: 'id-or', key: 'overallRating', label: 'Question overallRating', type: 'picklist', required: true, options: [{ value: 1, label: 'Low' }, { value: 2, label: 'High' }] },
+  { id: 'id-imp', key: 'impactAreas', label: 'Question impactAreas', type: 'multiselect', required: true, options: [{ value: 1, label: 'Low' }, { value: 2, label: 'High' }] },
+  { id: 'id-risk', key: 'riskLevel', label: 'Question riskLevel', type: 'picklist', required: true, options: [{ value: 1, label: 'Low' }, { value: 2, label: 'High' }] },
+  { id: 'id-or', key: 'overallAssessment', label: 'Question overallAssessment', type: 'picklist', required: true, options: [{ value: 1, label: 'Low' }, { value: 2, label: 'High' }] },
 ];
+const fullSubmitted = () => {
+  const [affiliation, impactAreas, riskLevel, overallAssessment] = submittedFour();
+  return [
+    affiliation,
+    impactAreas,
+    riskLevel,
+    { id: 'id-q4', key: 'riskDetail', label: 'Question riskDetail', type: 'richtext', required: true },
+    overallAssessment,
+  ];
+};
 
 beforeEach(() => {
   DynamicsService.queryRecords.mockReset();
@@ -118,7 +131,9 @@ describe('envelope inventory gap fill (Stage 5 Phase A)', () => {
   it('POST golden: completed envelope pinned exactly (no extra/missing keys)', async () => {
     DynamicsService.queryRecords.mockResolvedValue({ records: baseRaw() });
     const res = mockRes();
-    const submit = [...submittedFour(), { id: 'id-q4', key: 'q4', label: 'Edited q4', type: 'richtext', required: true }];
+    const submit = fullSubmitted().map((row) => (
+      row.key === 'riskDetail' ? { ...row, label: 'Edited riskDetail' } : row
+    ));
     await handler({ method: 'POST', query: {}, body: { questions: submit, baseVersion: versionOf(baseRaw()) } }, res);
     expect(res.statusCode).toBe(200);
     expect(Object.keys(res.body).sort()).toEqual(['auditWritten', 'status', 'summary', 'version']);
@@ -147,9 +162,9 @@ describe('POST save', () => {
     DynamicsService.queryRecords.mockResolvedValue({ records: baseRaw() });
     const res = mockRes();
     const submit = [
-      ...submittedFour().map((r) => (r.key === 'impact' ? { ...r, label: 'Edited impact' } : r)), // edit impact
+      ...submittedFour().map((r) => (r.key === 'impactAreas' ? { ...r, label: 'Edited impactAreas' } : r)), // edit categorical question
       { key: 'q12', label: 'Brand new', type: 'richtext', required: false },                       // create
-      // id-q4 'q4' dropped → soft-delete
+      // id-q4 'riskDetail' dropped → soft-delete
     ];
     await handler(post(submit, versionOf(baseRaw())), res);
 
@@ -174,7 +189,7 @@ describe('POST save', () => {
 
   it('400 when a parent-bound key is removed (Codex P1-3)', async () => {
     const res = mockRes();
-    const withoutRisk = submittedFour().filter((r) => r.key !== 'risk');
+    const withoutRisk = submittedFour().filter((r) => r.key !== 'riskLevel');
     await handler(post(withoutRisk, 'any-token'), res);
     expect(res.statusCode).toBe(400);
     expect(res.body.errors.join(' ')).toMatch(/can't be removed/i);
@@ -203,7 +218,7 @@ describe('POST save', () => {
     DynamicsService.queryRecords.mockResolvedValue({ records: baseRaw() });
     DynamicsService.executeChangeset.mockRejectedValue(Object.assign(new Error('precondition failed'), { status: 412 }));
     const res = mockRes();
-    const submit = submittedFour().map((r) => (r.key === 'impact' ? { ...r, label: 'edit' } : r));
+    const submit = submittedFour().map((r) => (r.key === 'impactAreas' ? { ...r, label: 'edit' } : r));
     await handler(post(submit, versionOf(baseRaw())), res);
     expect(res.statusCode).toBe(409);
     expect(res.body.status).toBe('set_changed');
@@ -212,8 +227,8 @@ describe('POST save', () => {
   it('400 when an existing row\'s key is changed (immutability, no write)', async () => {
     DynamicsService.queryRecords.mockResolvedValue({ records: baseRaw() });
     const res = mockRes();
-    // Keep all four parents; rename the non-parent q4 row by id → immutability error.
-    const submit = [...submittedFour(), { id: 'id-q4', key: 'q4_renamed', label: 'x', type: 'richtext', required: true }];
+    // Keep the structured rows; rename the narrative row by id → immutability error.
+    const submit = [...submittedFour(), { id: 'id-q4', key: 'riskDetail_renamed', label: 'x', type: 'richtext', required: true }];
     await handler(post(submit, versionOf(baseRaw())), res);
     expect(res.statusCode).toBe(400);
     expect(res.body.errors.join(' ')).toMatch(/can't be changed/i);
@@ -234,8 +249,8 @@ describe('POST save', () => {
   it('no-op save (identical set) short-circuits without a changeset', async () => {
     DynamicsService.queryRecords.mockResolvedValue({ records: baseRaw() });
     const res = mockRes();
-    // Resubmit the live set unchanged (four parents + q4).
-    const submit = [...submittedFour(), { id: 'id-q4', key: 'q4', label: 'Question q4', type: 'richtext', required: true }];
+    // Resubmit the live set unchanged (four structured rows + narrative).
+    const submit = fullSubmitted();
     await handler(post(submit, versionOf(baseRaw())), res);
     expect(res.statusCode).toBe(200);
     expect(res.body.status).toBe('completed');

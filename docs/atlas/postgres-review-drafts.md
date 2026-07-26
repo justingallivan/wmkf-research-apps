@@ -5,7 +5,7 @@
 
 ## Source of truth
 
-**Postgres-primary, but SCRATCHPAD only.** This table holds the in-progress autosave state for the external reviewer in-browser review form — one row per review, keyed by `suggestion_id` (the `wmkf_appreviewersuggestion` GUID). It is NOT the system of record for a submitted review: on final submit, the route maps the draft into the Dataverse `wmkf_appreviewanswer` snapshot child rows + the discrete rating columns on the parent `wmkf_appreviewersuggestion`, then deletes the draft. A reviewer's authoritative, point-in-time answers live in Dataverse (see [dataverse-wmkf-appreviewanswer.md](dataverse-wmkf-appreviewanswer.md)).
+**Postgres-primary, but SCRATCHPAD only.** This table holds the in-progress autosave state for the external reviewer in-browser review form — one row per review, keyed by `suggestion_id` (the `wmkf_appreviewersuggestion` GUID). It is NOT the system of record for a submitted review: on final submit, the route maps the draft into Dataverse `wmkf_appreviewanswer` snapshot child rows, patches the parent affiliation/finality fields, then deletes the draft. A reviewer's authoritative, point-in-time answers live in Dataverse (see [dataverse-wmkf-appreviewanswer.md](dataverse-wmkf-appreviewanswer.md)).
 
 Same reasoning as `intake_drafts`: autosave fires many times per session, and Dataverse is the wrong store for high-frequency partial writes.
 
@@ -15,7 +15,7 @@ Same reasoning as `intake_drafts`: autosave fires many times per session, and Da
 |---|---|---|
 | `id` | bigint (IDENTITY PK) | |
 | `suggestion_id` | uuid NOT NULL **UNIQUE** | `wmkf_appreviewersuggestion` GUID; at most one active draft per review. The `ON CONFLICT (suggestion_id)` target for autosave upsert. |
-| `draft_json` | jsonb NOT NULL DEFAULT `'{}'` | answers keyed by `review-form-schema` `field.key`: server-sanitized HTML for richtext answers, ints for picklist ratings. |
+| `draft_json` | jsonb NOT NULL DEFAULT `'{}'` | answers keyed by `review-form-schema` `field.key`: server-sanitized HTML for richtext answers, integers for picklist ratings, and numeric arrays for multiselect selections. Draft multiselect values never contain labels or `{value,label}` pairs. |
 | `updated_at` | timestamptz NOT NULL DEFAULT now() | touched on every autosave; drives GC. |
 
 ## Read / Write paths

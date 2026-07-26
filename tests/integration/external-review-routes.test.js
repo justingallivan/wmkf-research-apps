@@ -54,7 +54,7 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 // file-listing/etag tests don't assert on ratings, so stub the read to nulls
 // (a dedicated test asserts the snapshot→prefill mapping).
 jest.mock('../../lib/external/review-answer-snapshot', () => ({
-  readRatingsBySuggestion: jest.fn(async () => ({ impact: null, risk: null, overallRating: null })),
+  readRatingsBySuggestion: jest.fn(async () => ({ riskLevel: null, overallAssessment: null })),
 }));
 jest.mock('../../lib/external/review-question-fetcher', () => {
   const { reviewFormSchema } = jest.requireActual('../../lib/external/review-form-schema');
@@ -363,12 +363,12 @@ describe('/api/external/review/[token]/context', () => {
     expect(res._data.etag).toBeNull();
   });
 
-  it('Phase D: prefill ratings come from the answer snapshot, not the suggestion row', async () => {
+  it('prefill ratings come from the answer snapshot, not the suggestion row', async () => {
     verifySuggestionToken.mockResolvedValue(verifiedSuggestion);
     getRequestSharePointBuckets.mockResolvedValue([]);
     DynamicsService.updateRecord.mockResolvedValue({});
     // The snapshot read drives the prefill ratings.
-    readRatingsBySuggestion.mockResolvedValueOnce({ impact: 4, risk: 2, overallRating: 5 });
+    readRatingsBySuggestion.mockResolvedValueOnce({ riskLevel: 2, overallAssessment: 5 });
 
     const req = createMockReq({ method: 'GET', query: { token: 'good-token' } });
     const res = createMockRes();
@@ -376,7 +376,11 @@ describe('/api/external/review/[token]/context', () => {
 
     expect(res.status).toHaveBeenCalledWith(200);
     expect(readRatingsBySuggestion).toHaveBeenCalledWith('suggestion-1');
-    expect(res._data.prefill).toMatchObject({ impact: 4, risk: 2, overallRating: 5 });
+    expect(res._data.prefill).toMatchObject({
+      affiliation: 'Reviewer Org',
+      riskLevel: 2,
+      overallAssessment: 5,
+    });
   });
 
   it('stage2a with a promoted-contact reviewer looks up the contact with the prefill select (contact.getByIdWithSelect passthrough)', async () => {

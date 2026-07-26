@@ -9,6 +9,22 @@
 const { test, expect } = require('@playwright/test');
 const { TOKEN, buildContext, mockPortal, portalUrl, QUESTION_SET_VERSION } = require('./helpers/reviewer-portal');
 
+function completeDraft() {
+  return {
+    priorWork: '<p>a</p>',
+    foreseenImpacts: '<p>a</p>',
+    impactAreas: [1, 3],
+    riskLevel: 2,
+    riskDetail: '<p>a</p>',
+    methodsAppropriate: '<p>a</p>',
+    teamCapacity: '<p>a</p>',
+    questionsForPi: '<p>a</p>',
+    traditionalFunding: '<p>a</p>',
+    overallAssessment: 4,
+    additionalComments: '',
+  };
+}
+
 test.describe('Reviewer stage2b in-browser authoring', () => {
   test('renders the rich-text form, autosaves on edit, rehydrates on reload, submit gated until complete', async ({ page }) => {
     const draftCalls = { puts: [] };
@@ -42,9 +58,9 @@ test.describe('Reviewer stage2b in-browser authoring', () => {
     // (a) No file input anywhere on the stage2b surface.
     await expect(page.locator('input[name="files"]')).toHaveCount(0);
 
-    // (b) The form renders: affiliation prefilled, rating radios, and 8 rich-text editors.
+    // (b) The form renders: affiliation, multiselect checkboxes, ratings, and rich-text editors.
     await expect(page.getByLabel('Title & Organization')).toHaveValue('Example University');
-    await expect(page.getByText('Q2 — What specific significant impacts do you foresee?')).toBeVisible();
+    await expect(page.getByText(/Q2 — What specific significant impacts do you foresee/)).toBeVisible();
     await expect(page.locator('.ProseMirror')).toHaveCount(8);
     await expect(page.getByRole('button', { name: 'Bold' }).first()).toBeVisible();
 
@@ -58,10 +74,10 @@ test.describe('Reviewer stage2b in-browser authoring', () => {
     await page.keyboard.type('This work could reshape the field.');
     await expect.poll(() => draftCalls.puts.length, { timeout: 5000 }).toBeGreaterThan(0);
     const lastPut = draftCalls.puts[draftCalls.puts.length - 1];
-    expect(lastPut.draftJson.q2).toContain('This work could reshape the field.');
+    expect(lastPut.draftJson.foreseenImpacts).toContain('This work could reshape the field.');
 
-    // Also exercise a rating radio + bold formatting (toolbar wiring).
-    await page.getByLabel('Will rewrite textbooks').check();
+    // Also exercise a multiselect checkbox + bold formatting (toolbar wiring).
+    await page.getByLabel('Revise textbooks').check();
     await q2.click();
     await page.getByRole('button', { name: 'Bold' }).first().click();
     await page.keyboard.type('bolded');
@@ -80,11 +96,7 @@ test.describe('Reviewer stage2b in-browser authoring', () => {
 
     // The draft pre-fills every required answer so the form loads complete and
     // the Submit button is enabled without typing into 8 editors.
-    const fullDraft = {
-      impact: 3, risk: 2, overallRating: 4,
-      q2: '<p>a</p>', q4: '<p>a</p>', q5: '<p>a</p>', q6: '<p>a</p>',
-      q7: '<p>a</p>', q8: '<p>a</p>', q9: '<p>a</p>',
-    };
+    const fullDraft = completeDraft();
     await page.route(`**/api/external/review/${TOKEN}/draft`, (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, draftJson: fullDraft, submitted: false }) }));
 
@@ -106,7 +118,8 @@ test.describe('Reviewer stage2b in-browser authoring', () => {
     await expect(page.getByText(/Your review is final/i)).toBeVisible();
     await expect(page.locator('.ProseMirror')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Submit review' })).toHaveCount(0);
-    expect(submitBody.answers.q2).toContain('a');
+    expect(submitBody.answers.foreseenImpacts).toContain('a');
+    expect(submitBody.answers.impactAreas).toEqual([1, 3]);
     // B2: the client echoes the context-supplied question-set version so the
     // server can detect a mid-edit staff change (set_changed).
     expect(submitBody.setVersion).toBe(QUESTION_SET_VERSION);
@@ -114,11 +127,7 @@ test.describe('Reviewer stage2b in-browser authoring', () => {
 
   test('a set_changed 409 prompts a reload (not a terminal conflict) and flushes debounce-window edits to the draft', async ({ page }) => {
     await mockPortal(page, { context: buildContext({ view: 'stage2b' }) });
-    const fullDraft = {
-      impact: 3, risk: 2, overallRating: 4,
-      q2: '<p>a</p>', q4: '<p>a</p>', q5: '<p>a</p>', q6: '<p>a</p>',
-      q7: '<p>a</p>', q8: '<p>a</p>', q9: '<p>a</p>',
-    };
+    const fullDraft = completeDraft();
     const draftPuts = [];
     await page.route(`**/api/external/review/${TOKEN}/draft`, (route) => {
       if (route.request().method() === 'PUT') {
@@ -151,43 +160,36 @@ test.describe('Reviewer stage2b in-browser authoring', () => {
     // P1-B: the in-debounce edit was flushed to the draft before the reload
     // prompt, so "your saved answers will be kept" is actually true.
     expect(draftPuts.length).toBeGreaterThan(0);
-    expect(draftPuts.some((p) => (p.draftJson?.q2 || '').includes('debounced-edit'))).toBe(true);
+    expect(draftPuts.some((p) => (p.draftJson?.foreseenImpacts || '').includes('debounced-edit'))).toBe(true);
   });
 
   test('type-aware draft reconciliation: a draft value whose shape mismatches the current field type is discarded', async ({ page }) => {
     await mockPortal(page, { context: buildContext({ view: 'stage2b' }) });
 
-    // A draft saved under a PRIOR set where q2 was a picklist (number) and
-    // impact was richtext (HTML). Against the current set (q2 richtext, impact
-    // picklist) both values are shape-mismatched and must be discarded, never
-    // fed to the wrong control. q4 is a valid richtext answer and survives.
+    // Values left by prior question types are discarded; numeric arrays are
+    // filtered to the current live multiselect domain and option order.
     const staleDraft = {
-      q2: 3,                 // number left by a former picklist → discard (richtext now)
-      impact: '<p>x</p>',    // HTML left by a former richtext → discard (picklist now)
-      q4: '<p>kept</p>',     // valid richtext → survives
+      foreseenImpacts: 3,
+      riskLevel: '<p>x</p>',
+      riskDetail: '<p>kept</p>',
+      impactAreas: [4, '1', 999, 1, 4],
     };
     await page.route(`**/api/external/review/${TOKEN}/draft`, (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, draftJson: staleDraft, submitted: false }) }));
 
     await page.goto(portalUrl(TOKEN));
 
-    // q4's valid answer hydrated; q2's mismatched number was dropped (empty).
-    await expect(page.locator('[aria-label^="Q4 —"]')).toContainText('kept');
+    await expect(page.locator('[aria-label^="Q5 —"]')).toContainText('kept');
     await expect(page.locator('[aria-label^="Q2 —"]')).not.toContainText('3');
-    // The mismatched impact value did not select any radio.
-    await expect(page.getByLabel('Little to no impact')).not.toBeChecked();
-    await expect(page.getByLabel('Will result in publications of disciplinary interest')).not.toBeChecked();
-    await expect(page.getByLabel('Will result in publications of broad interest')).not.toBeChecked();
-    await expect(page.getByLabel('Will rewrite textbooks')).not.toBeChecked();
+    await expect(page.getByLabel('Low risk (will likely work in its entirety)')).not.toBeChecked();
+    await expect(page.getByLabel('Provide enabling tools to the community')).toBeChecked();
+    await expect(page.getByLabel('Revise textbooks')).toBeChecked();
+    await expect(page.getByLabel('Result in publications of disciplinary interest')).not.toBeChecked();
   });
 
   test('a 409 from submit locks the form into a terminal conflict state (no resubmit)', async ({ page }) => {
     await mockPortal(page, { context: buildContext({ view: 'stage2b' }) });
-    const fullDraft = {
-      impact: 3, risk: 2, overallRating: 4,
-      q2: '<p>a</p>', q4: '<p>a</p>', q5: '<p>a</p>', q6: '<p>a</p>',
-      q7: '<p>a</p>', q8: '<p>a</p>', q9: '<p>a</p>',
-    };
+    const fullDraft = completeDraft();
     await page.route(`**/api/external/review/${TOKEN}/draft`, (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, draftJson: fullDraft, submitted: false }) }));
     await page.route(`**/api/external/review/${TOKEN}/submit`, (route) =>
@@ -214,7 +216,7 @@ test.describe('Reviewer stage2b in-browser authoring', () => {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ ok: true, draftJson: { q2: '<p>previously saved answer</p>' }, submitted: false }),
+          body: JSON.stringify({ ok: true, draftJson: { foreseenImpacts: '<p>previously saved answer</p>' }, submitted: false }),
         });
       }
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, draftId: 1, updatedAt: 'TS' }) });

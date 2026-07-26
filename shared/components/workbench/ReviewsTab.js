@@ -1,19 +1,16 @@
 /**
  * ReviewsTab — the Reviews tab inside the Request Workbench (tier-3).
  *
- * Read surface for submitted reviews. A submitted review is captured on the
- * `wmkf_appreviewersuggestion` row (structured Q1/Q3/Q10 ratings) plus an
- * uploaded file in SharePoint; until now nothing read it back. This renders,
- * per reviewer who has submitted, the decoded impact/risk/overall ratings, the
- * reviewer's affiliation, when the review was received, and a download link to
- * the uploaded file.
+ * Read surface for submitted reviews. Structured ratings, categorical answers,
+ * and narratives come from the `wmkf_appreviewanswer` snapshot; affiliation and
+ * receipt/file metadata come from `wmkf_appreviewersuggestion`. This renders each
+ * submitted reviewer, their answers, receipt state, and any SharePoint download.
  *
  * Reuses the existing GET `/api/review-manager/reviewers?proposalId=<guid>`,
- * which projects the rating fields AND (Phase 4) the narrative answer snapshot
- * `reviewer.answers[]` read from the `wmkf_appreviewanswer` child table. Ratings
- * decode through `labelForReviewRating` — the same schema the form wrote; the
- * narrative rich-text answers render as sanitized HTML (the route re-sanitizes
- * server-side immediately before this read, so the bytes here are trusted).
+ * which projects the snapshot-derived rating fields and `reviewer.answers[]`.
+ * Ratings decode through `labelForReviewRating` — the same schema the form wrote;
+ * rich-text answers render as sanitized HTML (the route re-sanitizes server-side
+ * immediately before this read, so the bytes here are trusted).
  *
  * Phase 2 (docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md) adds a "Compare" view
  * toggle alongside the default "Cards" rendering above — a schema-free ratings
@@ -50,11 +47,10 @@ function formatDate(iso) {
 }
 
 // Reviews tab rating order, and the projection field that holds each value.
-const RATING_KEYS = ['impact', 'risk', 'overallRating'];
+const RATING_KEYS = ['riskLevel', 'overallAssessment'];
 const PROJECTION_FIELD = {
-  impact: 'reviewerImpact',
-  risk: 'reviewerRisk',
-  overallRating: 'reviewerOverallRating',
+  riskLevel: 'reviewerRiskLevel',
+  overallAssessment: 'reviewerOverallAssessment',
 };
 
 function RatingCell({ fieldKey, value }) {
@@ -96,12 +92,12 @@ function ReviewCard({ reviewer }) {
           )}
         </div>
       </div>
-      <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-gray-100 pt-3">
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-gray-100 pt-3">
         {RATING_KEYS.map((k) => (
           <RatingCell key={k} fieldKey={k} value={reviewer[PROJECTION_FIELD[k]]} />
         ))}
       </div>
-      <NarrativeAnswers answers={reviewer.answers} />
+      <AnswerDetails answers={reviewer.answers} />
     </Card>
   );
 }
@@ -111,21 +107,33 @@ function ReviewCard({ reviewer }) {
 // order. HTML is rendered as-is because the API re-sanitizes on read (the stored
 // value was sanitized on write, and the route is the trusted server boundary
 // immediately before this render).
-function NarrativeAnswers({ answers }) {
-  const narrative = (answers || []).filter(
-    (a) => a.questionType === 'richtext' && a.answerHtml && a.answerHtml.trim().length > 0,
+function AnswerDetails({ answers }) {
+  const details = (answers || []).filter(
+    (a) => (a.questionType === 'richtext' && a.answerHtml && a.answerHtml.trim().length > 0)
+      || a.questionType === 'multiselect',
   );
-  if (narrative.length === 0) return null;
+  if (details.length === 0) return null;
   return (
     <div className="mt-4 border-t border-gray-100 pt-3 space-y-4">
-      {narrative.map((a) => (
+      {details.map((a) => (
         <div key={a.questionKey || a.questionOrder}>
           <div className="text-xs font-semibold text-gray-700">{a.questionText}</div>
-          <div
-            className="prose prose-sm max-w-none text-gray-800 mt-1"
-            // eslint-disable-next-line react/no-danger
-            dangerouslySetInnerHTML={{ __html: a.answerHtml }}
-          />
+          {a.questionType === 'richtext' ? (
+            <div
+              className="prose prose-sm max-w-none text-gray-800 mt-1"
+              dangerouslySetInnerHTML={{ __html: a.answerHtml }}
+            />
+          ) : a.answerValuesUnreadable ? (
+            <div className="text-sm text-amber-700 mt-1">Unreadable answer</div>
+          ) : (
+            <div className="flex flex-wrap gap-1.5 mt-1">
+              {(a.answerValues || []).map((pair) => (
+                <span key={`${pair.value}:${pair.label}`} className="text-xs rounded-full bg-gray-100 text-gray-700 px-2 py-1">
+                  {pair.label}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -200,6 +208,40 @@ function CompareRatingsGrid({ matrix }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function CompareCategoricalSelections({ matrix }) {
+  const questions = matrix.questions.filter((q) => q.type === 'multiselect');
+  if (questions.length === 0) return null;
+  return (
+    <div className="space-y-5">
+      {questions.map((question) => (
+        <div key={question.key}>
+          <div className="text-sm font-semibold text-gray-900">{question.text}</div>
+          <div className="mt-2 space-y-2">
+            {(question.tallies || []).map((tally) => (
+              <div key={`${tally.value}:${tally.label}`} className="rounded-lg border border-gray-100 p-3">
+                <div className="text-sm text-gray-900">
+                  {tally.label} <span className="text-gray-500">({tally.count})</span>
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {tally.reviewers.map((reviewer) => reviewer.name || 'Unnamed reviewer').join(', ')}
+                </div>
+              </div>
+            ))}
+            {question.cells.filter((cell) => cell.answerValuesUnreadable).map((cell) => {
+              const reviewer = matrix.reviewers.find((candidate) => candidate.suggestionId === cell.suggestionId);
+              return (
+                <div key={cell.suggestionId} className="text-xs text-amber-700">
+                  {reviewer?.name || 'Unnamed reviewer'}: Unreadable answer
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -343,6 +385,7 @@ function CompareView({ submitted, liveQuestions }) {
   return (
     <div className="space-y-6">
       <CompareRatingsGrid matrix={matrix} />
+      <CompareCategoricalSelections matrix={matrix} />
       <CompareNarrativeBrowser matrix={matrix} />
     </div>
   );

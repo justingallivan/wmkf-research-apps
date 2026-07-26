@@ -107,7 +107,7 @@ describe('shared guards', () => {
     });
     for (const opts of [
       { method: 'GET', query: { token: 't' } },
-      { method: 'PUT', query: { token: 't' }, body: { draftJson: { impact: 3 } } },
+      { method: 'PUT', query: { token: 't' }, body: { draftJson: { riskLevel: 3 } } },
     ]) {
       const req = createMockReq(opts);
       const res = createMockRes();
@@ -137,12 +137,12 @@ describe('shared guards', () => {
 describe('GET', () => {
   it('returns the saved draft in the authoring stage', async () => {
     verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion(), payload: DEFAULT_PAYLOAD });
-    ReviewDraftService.getBySuggestion.mockResolvedValue({ draft_json: { impact: 3 } });
+    ReviewDraftService.getBySuggestion.mockResolvedValue({ draft_json: { riskLevel: 3 } });
     const req = createMockReq({ method: 'GET', query: { token: 't' } });
     const res = createMockRes();
     await handler(req, res);
     expect(res.statusCode).toBe(200);
-    expect(res._data).toEqual({ ok: true, draftJson: { impact: 3 }, submitted: false });
+    expect(res._data).toEqual({ ok: true, draftJson: { riskLevel: 3 }, submitted: false });
   });
 
   it('returns null draft when none saved', async () => {
@@ -186,7 +186,14 @@ describe('PUT (autosave)', () => {
     const req = createMockReq({
       method: 'PUT',
       query: { token: 't' },
-      body: { draftJson: { impact: 3, affiliation: 'X University', bogusKey: 'dropme' } },
+      body: {
+        draftJson: {
+          riskLevel: 3,
+          impactAreas: [4, '1', 999, 1, 4],
+          affiliation: 'X University',
+          bogusKey: 'dropme',
+        },
+      },
     });
     const res = createMockRes();
     await handler(req, res);
@@ -195,7 +202,11 @@ describe('PUT (autosave)', () => {
     // Unknown keys dropped; known schema keys preserved.
     expect(ReviewDraftService.upsertDraftJson).toHaveBeenCalledWith({
       suggestionId: SUGGESTION_ID,
-      draftJson: { impact: 3, affiliation: 'X University' },
+      draftJson: {
+        riskLevel: 3,
+        impactAreas: [1, 4],
+        affiliation: 'X University',
+      },
     });
   });
 
@@ -205,28 +216,28 @@ describe('PUT (autosave)', () => {
     const req = createMockReq({
       method: 'PUT',
       query: { token: 't' },
-      body: { draftJson: { q2: '<p>real impact</p><img src=x onerror=alert(1)><script>steal()</script>' } },
+      body: { draftJson: { foreseenImpacts: '<p>real impact</p><img src=x onerror=alert(1)><script>steal()</script>' } },
     });
     const res = createMockRes();
     await handler(req, res);
     expect(res.statusCode).toBe(200);
     const persisted = ReviewDraftService.upsertDraftJson.mock.calls[0][0].draftJson;
-    expect(persisted.q2).toContain('<p>real impact</p>');
-    expect(persisted.q2).not.toMatch(/onerror|<img|<script|steal\(/i);
+    expect(persisted.foreseenImpacts).toContain('<p>real impact</p>');
+    expect(persisted.foreseenImpacts).not.toMatch(/onerror|<img|<script|steal\(/i);
   });
 
   it('400 answer_too_long when a richtext answer exceeds maxLength (no write)', async () => {
     verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion(), payload: DEFAULT_PAYLOAD });
-    // q2 maxLength is 50000; a plain string longer than that sanitizes to >50000 chars.
+    // foreseenImpacts maxLength is 50000.
     const huge = 'a'.repeat(50001);
     const req = createMockReq({
-      method: 'PUT', query: { token: 't' }, body: { draftJson: { q2: huge } },
+      method: 'PUT', query: { token: 't' }, body: { draftJson: { foreseenImpacts: huge } },
     });
     const res = createMockRes();
     await handler(req, res);
     expect(res.statusCode).toBe(400);
     expect(res._data).toMatchObject({ reason: 'answer_too_long' });
-    expect(res._data.fields[0]).toMatchObject({ key: 'q2', maxLength: 50000 });
+    expect(res._data.fields[0]).toMatchObject({ key: 'foreseenImpacts', maxLength: 50000 });
     expect(ReviewDraftService.upsertDraftJson).not.toHaveBeenCalled();
   });
 
@@ -237,7 +248,7 @@ describe('PUT (autosave)', () => {
       payload: DEFAULT_PAYLOAD,
     });
     const req = createMockReq({
-      method: 'PUT', query: { token: 't' }, body: { draftJson: { impact: 3 } },
+      method: 'PUT', query: { token: 't' }, body: { draftJson: { riskLevel: 3 } },
     });
     const res = createMockRes();
     await handler(req, res);
@@ -253,7 +264,7 @@ describe('PUT (autosave)', () => {
       payload: DEFAULT_PAYLOAD,
     });
     const req = createMockReq({
-      method: 'PUT', query: { token: 't' }, body: { draftJson: { impact: 3 } },
+      method: 'PUT', query: { token: 't' }, body: { draftJson: { riskLevel: 3 } },
     });
     const res = createMockRes();
     await handler(req, res);

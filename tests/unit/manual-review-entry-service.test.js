@@ -39,16 +39,16 @@ jest.mock('../../lib/dataverse/core/changeset', () => ({
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
 const QUESTIONS = [
   { key: 'affiliation', order: 0, label: 'Affiliation', type: 'string', required: true, maxLength: 500 },
-  { key: 'impact', order: 1, label: 'Impact', type: 'picklist', required: true, options: [{ value: 1, label: 'Low' }, { value: 3, label: 'High' }] },
-  { key: 'risk', order: 2, label: 'Risk', type: 'picklist', required: true, options: [{ value: 1, label: 'Low' }, { value: 2, label: 'Medium' }] },
-  { key: 'overallRating', order: 3, label: 'Overall', type: 'picklist', required: true, options: [{ value: 4, label: 'Excellent' }] },
+  { key: 'impactAreas', order: 1, label: 'Impact areas', type: 'multiselect', required: true, options: [{ value: 1, label: 'Tools' }, { value: 3, label: 'Broad interest' }] },
+  { key: 'riskLevel', order: 2, label: 'Risk', type: 'picklist', required: true, options: [{ value: 1, label: 'Low' }, { value: 2, label: 'Medium' }] },
+  { key: 'overallAssessment', order: 3, label: 'Overall', type: 'picklist', required: true, options: [{ value: 4, label: 'Excellent' }] },
   { key: 'comments', order: 4, label: 'Comments', type: 'richtext', required: true, maxLength: 5000 },
 ];
 const ANSWERS = {
   affiliation: 'Test University',
-  impact: 3,
-  risk: 2,
-  overallRating: 4,
+  impactAreas: [3, 1],
+  riskLevel: 2,
+  overallAssessment: 4,
   comments: '<p>Strong <script>alert(1)</script>proposal.</p>',
 };
 
@@ -117,7 +117,15 @@ test('full submit sanitizes, builds the canonical snapshot, and commits parent +
       }),
     }),
     children: expect.arrayContaining([
-      expect.objectContaining({ row: expect.objectContaining({ questionKey: 'impact', answerValue: 3 }) }),
+      expect.objectContaining({
+        row: expect.objectContaining({
+          questionKey: 'impactAreas',
+          answerValues: [
+            { value: 1, label: 'Tools' },
+            { value: 3, label: 'Broad interest' },
+          ],
+        }),
+      }),
       expect.objectContaining({ row: expect.objectContaining({ questionKey: 'comments', answerText: 'Strong proposal.' }) }),
     ]),
   });

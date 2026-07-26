@@ -121,7 +121,9 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`token-lifecycle.js`** — `mintAndStore` / `revoke` / `ensureToken` (idempotent) / `extendForPostSubmissionWindow` / `buildExternalUrl`.
 - **`verify-suggestion-token.js`** — Combined JWT + suggestion-row check; discriminated result with reason codes.
 - **`reviewer-materials.js`** — Enforces "files outside `Reviewer_Downloads/` are invisible to reviewers" at list + download. Case-insensitive segment matching; env override available.
-- **`review-form-schema.js`** — single source for the 12 review-form fields: affiliation + 3 ratings (impact/risk/overallRating, parent-mapped) + 8 in-browser `richtext` narrative questions (Q2/Q4–Q9/Q11, no parent column — they map to the `wmkf_appreviewanswer` snapshot). `validateReviewForm` validates only the parent-mapped fields (richtext is validated at submit); supports `{ partial: true }`.
+- **`review-form-schema.js`** — static seed/shape source for affiliation plus the staged 11-question form: 2 core picklist ratings, the `impactAreas` multiselect, and 8 rich-text narratives. Only affiliation is parent-column-bound; structured and narrative answers map to `wmkf_appreviewanswer`. `validateReviewForm` supports partial legacy upload validation and delegates multiselect normalization to the canonicalizer.
+- **`review-multiselect.js`** — authoritative pure canonicalizer for multiselect request values. Accepts numeric values only, rejects unknowns, deduplicates and orders by live options, constructs server-owned `{value,label}` pairs, and derives joined snapshot text.
+- **`review-multipart-fields.js`** — strict Busboy field accumulator for review upload routes. Preserves scalar fields and repeated `field[]` values while rejecting ambiguous mixed scalar/array encodings before review validation.
 - **`policy-fetcher.js`** — Policy-document fetcher with `bypassDynamicsRestrictions` wrapper.
 
 ---

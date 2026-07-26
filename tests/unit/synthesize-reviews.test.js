@@ -53,13 +53,36 @@ beforeEach(() => {
     records: [
       {
         _wmkf_appreviewersuggestion_value: SUGGESTION_ID,
-        wmkf_questionkey: 'impact',
-        wmkf_questionorder: 1,
-        wmkf_questiontext: 'Rate the impact.',
+        wmkf_questionkey: 'riskLevel',
+        wmkf_questionorder: 4,
+        wmkf_questiontext: 'Rate the risk.',
         wmkf_questiontype: 'picklist',
-        wmkf_answervalue: 4,
-        wmkf_answertext: 'High',
-        wmkf_answerhtml: '<p>High</p>',
+        wmkf_answervalue: 3,
+        wmkf_answertext: 'High risk',
+        wmkf_answerhtml: '<p>High risk</p>',
+      },
+      {
+        _wmkf_appreviewersuggestion_value: SUGGESTION_ID,
+        wmkf_questionkey: 'impactAreas',
+        wmkf_questionorder: 3,
+        wmkf_questiontext: 'Select impact areas.',
+        wmkf_questiontype: 'multiselect',
+        wmkf_answervalue: null,
+        wmkf_answervalues: JSON.stringify([
+          { value: 1, label: 'Tools' },
+          { value: 3, label: 'Broad interest' },
+        ]),
+        wmkf_answertext: 'Tools; Broad interest',
+      },
+      {
+        _wmkf_appreviewersuggestion_value: SUGGESTION_ID,
+        wmkf_questionkey: 'corruptAreas',
+        wmkf_questionorder: 4,
+        wmkf_questiontext: 'Corrupt selection.',
+        wmkf_questiontype: 'multiselect',
+        wmkf_answervalue: null,
+        wmkf_answervalues: '{bad json',
+        wmkf_answertext: 'Must not reach the model',
       },
       {
         _wmkf_appreviewersuggestion_value: SUGGESTION_ID,
@@ -169,17 +192,23 @@ test('overwrite:true bypasses the already-exists gate and passes forceOverwrite 
   expect(call.runSource).toBe('Vercel Interactive');
 
   expect(DynamicsService.queryAllRecords.mock.calls[0][1].select).toContain('wmkf_answervalue');
+  expect(DynamicsService.queryAllRecords.mock.calls[0][1].select).toContain('wmkf_answervalues');
 
   const digest = call.overrideVariables.reviews_digest;
   // Digest composition: reviewer name/affiliation + question metadata +
   // answerValue/answerText, no answerHtml anywhere in the payload sent to the LLM.
   expect(digest).toContain('Dr. Reviewer');
   expect(digest).toContain('Test University');
-  expect(digest).toContain('Question key: impact');
+  expect(digest).toContain('Question key: riskLevel');
   expect(digest).toContain('Question type: picklist');
-  expect(digest).toContain('Question text: Rate the impact.');
-  expect(digest).toContain('Answer value: 4');
-  expect(digest).toContain('Answer text: High');
+  expect(digest).toContain('Question text: Rate the risk.');
+  expect(digest).toContain('Answer value: 3');
+  expect(digest).toContain('Answer text: High risk');
+  expect(digest).toContain('Question key: impactAreas');
+  expect(digest).toContain('Question type: multiselect');
+  expect(digest).toContain('Selected categories: Tools; Broad interest');
+  expect(digest).not.toContain('Question key: corruptAreas');
+  expect(digest).not.toContain('Must not reach the model');
   expect(digest).toContain('Question key: strengths');
   expect(digest).toContain('Question type: richtext');
   expect(digest).toContain('Answer text: Strong methodology.');

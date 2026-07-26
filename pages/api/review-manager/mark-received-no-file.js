@@ -15,8 +15,8 @@
  *
  * Body: { suggestionId: string, structuredData?: Object }
  *   `structuredData` follows the same shape the form posts (`affiliation`,
- *   `impact`, `risk`, `overallRating`). All keys optional; whatever is
- *   present is validated against the schema and written.
+ *   `impactAreas` numeric array, `riskLevel`, `overallAssessment`). All keys
+ *   are optional; whatever is present is validated against the live schema.
  *
  * Side effects (always):
  *   - wmkf_reviewreceivedat = now()

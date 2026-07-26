@@ -41,7 +41,7 @@ Respond with ONLY a single JSON object, no markdown fences, no commentary, in ex
     "disagreements": ["short description of where reviewers diverge", ...],
     "keyConcerns": ["short description of a risk/concern/ethical issue raised", ...],
     "ratingSummaries": [
-      { "questionKey": "impact", "questionText": "<the question text as given>", "summary": "1-2 sentence summary of the score distribution and the rationale reviewers gave" }
+      { "questionKey": "riskLevel", "questionText": "<the question text as given>", "summary": "1-2 sentence summary of the score distribution and the rationale reviewers gave" }
     ],
     "overall": "2-4 sentence overall synthesis of where the reviews land and what staff/PDs should focus discussion on"
   }
@@ -50,6 +50,9 @@ Respond with ONLY a single JSON object, no markdown fences, no commentary, in ex
 Rules:
 - "consensus", "disagreements", and "keyConcerns" are arrays of short (one sentence) strings. Use an empty array, never null, when there is nothing to report for that category.
 - "ratingSummaries" has one entry per rating (picklist) question that appears in the reviews, using the question's own key/text as given in the input — do not invent question keys.
+- Treat "impactAreas" and every other multiselect answer as categorical evidence. Use its selected labels with reviewer attribution in consensus/disagreements/concerns; never average, rank, or infer magnitude from its numeric option values.
+- During expand or rollback, an older "impact" picklist may appear. Treat it as a numeric rating, while "riskLevel" and "overallAssessment" are the current numeric ratings.
+- Ignore any answer the server omits as unreadable; do not infer missing selections.
 - Keep every string plain text (no HTML, no markdown formatting).
 - Never quote a reviewer's name inside a string value — refer to reviewers only as "a reviewer" / "reviewers" / "most reviewers", since the values may be displayed without attribution context.`;
 

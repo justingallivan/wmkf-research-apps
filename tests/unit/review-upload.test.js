@@ -88,9 +88,9 @@ function validInput(overrides = {}) {
     files: [{ filename: 'review.pdf', buffer: PDF_BYTES }],
     structuredData: {
       affiliation: 'Prof X, U of Example',
-      impact: 3,
-      risk: 2,
-      overallRating: 4,
+      impactAreas: [1, 3],
+      riskLevel: 2,
+      overallAssessment: 4,
     },
     opts: { source: 'reviewer_self_token', performedBy: null },
     ...overrides,
@@ -241,7 +241,7 @@ describe('writeReviewFiles — file validation', () => {
 describe('writeReviewFiles — structured-data validation', () => {
   test('rejects missing affiliation', async () => {
     const r = await writeReviewFiles(validInput({
-      structuredData: { impact: 3, risk: 2, overallRating: 4 },
+      structuredData: { impactAreas: [1], riskLevel: 2, overallAssessment: 4 },
     }));
     expect(r.ok).toBe(false);
     expect(r.errors.some(e => /Organization/.test(e))).toBe(true);
@@ -249,7 +249,12 @@ describe('writeReviewFiles — structured-data validation', () => {
 
   test('rejects out-of-range picklist', async () => {
     const r = await writeReviewFiles(validInput({
-      structuredData: { affiliation: 'X', impact: 99, risk: 99, overallRating: 17 },
+      structuredData: {
+        affiliation: 'X',
+        impactAreas: [99],
+        riskLevel: 99,
+        overallAssessment: 17,
+      },
     }));
     expect(r.ok).toBe(false);
   });
@@ -280,18 +285,22 @@ describe('writeReviewFiles — happy paths', () => {
     expect(patch.wmkf_reviewerrisk).toBeUndefined();
     expect(patch.wmkf_revieweroverallrating).toBeUndefined();
     expect(patch.wmkf_reviewreceivedat).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-    // The changeset carries the 3 rating snapshot rows, addressed by alternate
-    // key, byte-identical to a reviewer-written row.
+    // The changeset carries the multiselect plus two rating snapshot rows,
+    // addressed by alternate key and byte-identical to reviewer-written rows.
     const [ops] = DynamicsService.executeChangeset.mock.calls[0];
     const answerOps = ops.filter((o) => /wmkf_questionkey=/.test(o.url));
     expect(answerOps).toHaveLength(3);
-    const impactOp = answerOps.find((o) => o.url.includes("wmkf_questionkey='impact'"));
+    const impactOp = answerOps.find((o) => o.url.includes("wmkf_questionkey='impactAreas'"));
     expect(impactOp.url).toContain(`_wmkf_appreviewersuggestion_value=${SUGGESTION_ID}`);
     expect(impactOp.body).toMatchObject({
-      wmkf_questionorder: 1,
-      wmkf_questiontype: 'picklist',
-      wmkf_answervalue: 3,
-      wmkf_answertext: 'Will result in publications of broad interest',
+      wmkf_questionorder: 3,
+      wmkf_questiontype: 'multiselect',
+      wmkf_answervalue: null,
+      wmkf_answervalues: JSON.stringify([
+        { value: 1, label: 'Provide enabling tools to the community' },
+        { value: 3, label: 'Result in publications of broad interest' },
+      ]),
+      wmkf_answertext: 'Provide enabling tools to the community; Result in publications of broad interest',
       wmkf_answerhtml: null,
     });
   });

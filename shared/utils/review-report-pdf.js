@@ -113,6 +113,19 @@ export async function generateReviewReportPdf(report) {
     }
   }
 
+  for (const section of report.categoricalSections || []) {
+    const label = section.retired ? `${section.text} (prior cycle)` : section.text;
+    builder.addSection(label);
+    for (const answer of section.answers) {
+      const value = answer.unreadable
+        ? 'Unreadable answer'
+        : answer.state === 'not-asked'
+          ? 'Not asked'
+          : answer.labels.length > 0 ? answer.labels.join('; ') : 'No answer provided';
+      builder.addKeyValue(answer.reviewerName || 'Unnamed reviewer', value);
+    }
+  }
+
   // --- Narrative sections ---
   for (const section of report.narrativeSections) {
     const label = section.retired ? `${section.text} (prior cycle)` : section.text;

@@ -4,8 +4,9 @@
  * Replaces the old file-upload card. Renders all review questions from the
  * STAFF-EDITABLE question set delivered by /context (`data.questions`, the
  * Dataverse `wmkf_reviewquestion` set) in order: affiliation (text), the
- * ratings (radios), and the narrative questions (RichReviewEditor). Work
- * autosaves to the Postgres draft route as the reviewer types.
+ * ratings (radios), categorical questions (checkboxes), and narrative questions
+ * (RichReviewEditor). Work autosaves to the Postgres draft route as the reviewer
+ * types.
  *
  * The set is supplied as a prop (no static import) so staff edits flow through
  * without a deploy (staff-editable-questions epic Phase B2). `data.questions`
@@ -19,8 +20,8 @@
  * draft was saved can't feed the wrong control shape (Codex P1).
  *
  * Final submit POSTs the answers + the `setVersion` it rendered to /submit,
- * which atomically writes the Dataverse answer-snapshot rows + parent ratings
- * and deletes the draft. A stale setVersion comes back 409 `set_changed` →
+ * which atomically writes the Dataverse answer-snapshot rows plus parent
+ * affiliation/finality metadata and deletes the draft. A stale setVersion comes back 409 `set_changed` →
  * reload. On success the form locks read-only. The security boundary is
  * server-side: both the draft PUT and /submit sanitize + validate every answer
  * regardless of what this client sends; the client-side completeness check only
@@ -41,6 +42,14 @@ export function buildInitialValues(fields, prefill = {}, draftJson = {}) {
       // (a number) is discarded → empty, never fed to the rich-text editor.
       const d = draftJson[field.key];
       values[field.key] = typeof d === 'string' ? d : '';
+    } else if (field.type === 'multiselect') {
+      const draftRaw = draftJson[field.key];
+      const submitted = new Set(
+        Array.isArray(draftRaw) ? draftRaw.filter((value) => Number.isInteger(value)) : [],
+      );
+      values[field.key] = (field.options || [])
+        .filter((option) => submitted.has(option.value))
+        .map((option) => option.value);
     } else if (field.type === 'picklist') {
       // Prefer a shape-valid draft value; a draft value that doesn't coerce to
       // one of THIS field's options (e.g. HTML left behind by a former richtext
@@ -86,6 +95,8 @@ export function isComplete(fields, values) {
       if (!hasText(v)) return false;
     } else if (field.type === 'picklist') {
       if (v === null || v === undefined || v === '') return false;
+    } else if (field.type === 'multiselect') {
+      if (!Array.isArray(v) || v.length === 0) return false;
     } else if (typeof v !== 'string' || v.trim().length === 0) {
       return false;
     }
@@ -393,13 +404,22 @@ export function ReviewQuestionFields({ fields, values, onChange, disabled = fals
 
 function FieldRow({ field, value, onChange, disabled = false }) {
   const id = `rf-${field.key}`;
+  const hintId = field.hint ? `${id}-hint` : undefined;
+  const selectedValues = field.type === 'multiselect'
+    ? new Set(Array.isArray(value) ? value : [])
+    : null;
+  const multiselectMissing = field.type === 'multiselect'
+    && field.required
+    && selectedValues.size === 0;
+  const multiselectErrorId = multiselectMissing ? `${id}-error` : undefined;
+  const multiselectDescriptionIds = [hintId, multiselectErrorId].filter(Boolean).join(' ') || undefined;
   return (
     <div className="space-y-2">
       <label htmlFor={id} className="block text-sm font-semibold text-gray-900">
         {field.label}
         {field.required && <span className="text-red-600 ml-1">*</span>}
       </label>
-      {field.hint && <p className="text-xs text-gray-500">{field.hint}</p>}
+      {field.hint && <p id={hintId} className="text-xs text-gray-500">{field.hint}</p>}
 
       {field.type === 'string' && (
         <input
@@ -408,13 +428,14 @@ function FieldRow({ field, value, onChange, disabled = false }) {
           maxLength={field.maxLength}
           value={value ?? ''}
           disabled={disabled}
+          aria-describedby={hintId}
           onChange={(e) => onChange(field.key, e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 disabled:bg-gray-50 disabled:text-gray-500"
         />
       )}
 
       {field.type === 'picklist' && (
-        <fieldset className="space-y-2" disabled={disabled}>
+        <fieldset className="space-y-2" disabled={disabled} aria-describedby={hintId}>
           <legend className="sr-only">{field.label}</legend>
           {field.options.map((option) => {
             const optId = `${id}-${option.value}`;
@@ -434,6 +455,51 @@ function FieldRow({ field, value, onChange, disabled = false }) {
               </div>
             );
           })}
+        </fieldset>
+      )}
+
+      {field.type === 'multiselect' && (
+        <fieldset
+          className="space-y-2"
+          disabled={disabled}
+          aria-describedby={multiselectDescriptionIds}
+          aria-invalid={multiselectMissing}
+          aria-required={field.required}
+        >
+          <legend className="sr-only">{field.label}</legend>
+          {field.options.map((option) => {
+            const optId = `${id}-${option.value}`;
+            return (
+              <div key={option.value} className="flex items-start gap-2">
+                <input
+                  id={optId}
+                  name={`${field.key}[]`}
+                  type="checkbox"
+                  value={option.value}
+                  checked={selectedValues.has(option.value)}
+                  disabled={disabled}
+                  onChange={(event) => {
+                    const nextSelected = new Set(selectedValues);
+                    if (event.target.checked) nextSelected.add(option.value);
+                    else nextSelected.delete(option.value);
+                    onChange(
+                      field.key,
+                      field.options
+                        .filter((candidate) => nextSelected.has(candidate.value))
+                        .map((candidate) => candidate.value),
+                    );
+                  }}
+                  className="mt-1"
+                />
+                <label htmlFor={optId} className="text-sm text-gray-800">{option.label}</label>
+              </div>
+            );
+          })}
+          {multiselectMissing && (
+            <p id={multiselectErrorId} className="text-xs text-red-600">
+              Choose at least one option.
+            </p>
+          )}
         </fieldset>
       )}
 

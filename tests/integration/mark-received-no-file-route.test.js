@@ -32,7 +32,10 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 }));
 jest.mock('../../lib/external/review-question-fetcher', () => {
   const { reviewFormSchema } = require('../../lib/external/review-form-schema');
-  return { getActiveQuestionSet: jest.fn(async () => reviewFormSchema.fields) };
+  return {
+    getActiveQuestionSet: jest.fn(async () => reviewFormSchema.fields),
+    getAuthoritativeQuestionSet: jest.fn(async () => reviewFormSchema.fields),
+  };
 });
 
 const SUGGESTION_ID = '11111111-1111-1111-1111-111111111111';
@@ -81,8 +84,11 @@ test('unauthenticated → short-circuits before any lookup or write', async () =
   expect(DynamicsService.executeChangeset).not.toHaveBeenCalled();
 });
 
-test('ratings present → atomic changeset with 3 rating upserts + parent PATCH; no bare updateRecord', async () => {
-  const { req, res } = post({ suggestionId: SUGGESTION_ID, structuredData: { impact: 3, risk: 2, overallRating: 5 } });
+test('structured answers present → atomic changeset with 2 ratings + multiselect + parent PATCH', async () => {
+  const { req, res } = post({
+    suggestionId: SUGGESTION_ID,
+    structuredData: { impactAreas: [1, 4], riskLevel: 2, overallAssessment: 5 },
+  });
   await handler(req, res);
   expect(res.statusCode).toBe(200);
 
@@ -93,9 +99,17 @@ test('ratings present → atomic changeset with 3 rating upserts + parent PATCH;
 
   const answerOps = ops.filter((o) => /wmkf_questionkey=/.test(o.url));
   expect(answerOps).toHaveLength(3);
-  const impactOp = answerOps.find((o) => o.url.includes("wmkf_questionkey='impact'"));
+  const impactOp = answerOps.find((o) => o.url.includes("wmkf_questionkey='impactAreas'"));
   expect(impactOp.url).toContain(`_wmkf_appreviewersuggestion_value=${SUGGESTION_ID}`);
-  expect(impactOp.body).toMatchObject({ wmkf_answervalue: 3, wmkf_questiontype: 'picklist', wmkf_questionorder: 1 });
+  expect(impactOp.body).toMatchObject({
+    wmkf_answervalue: null,
+    wmkf_questiontype: 'multiselect',
+    wmkf_questionorder: 3,
+  });
+  expect(JSON.parse(impactOp.body.wmkf_answervalues)).toEqual([
+    { value: 1, label: 'Provide enabling tools to the community' },
+    { value: 4, label: 'Revise textbooks' },
+  ]);
 
   // Parent PATCH is the LAST op and carries received-at + staff flag — but NOT
   // the rating columns (Phase E: ratings live only in the snapshot rows above).
@@ -122,19 +136,22 @@ test('informal feedback (no structuredData) → parent-only updateRecord, NO sna
 });
 
 test('partial ratings → changeset writes only the present rating rows', async () => {
-  const { req, res } = post({ suggestionId: SUGGESTION_ID, structuredData: { impact: 1 } });
+  const { req, res } = post({ suggestionId: SUGGESTION_ID, structuredData: { riskLevel: 1 } });
   await handler(req, res);
   expect(res.statusCode).toBe(200);
   const [ops] = DynamicsService.executeChangeset.mock.calls[0];
   const answerOps = ops.filter((o) => /wmkf_questionkey=/.test(o.url));
-  expect(answerOps.map((o) => o.url.match(/wmkf_questionkey='([^']+)'/)[1])).toEqual(['impact']);
+  expect(answerOps.map((o) => o.url.match(/wmkf_questionkey='([^']+)'/)[1])).toEqual(['riskLevel']);
 });
 
 test('changeset 404 → not_found', async () => {
   const err = new Error('changeset failed (404)');
   err.status = 404;
   DynamicsService.executeChangeset.mockRejectedValue(err);
-  const { req, res } = post({ suggestionId: SUGGESTION_ID, structuredData: { impact: 3, risk: 2, overallRating: 5 } });
+  const { req, res } = post({
+    suggestionId: SUGGESTION_ID,
+    structuredData: { impactAreas: [3], riskLevel: 2, overallAssessment: 5 },
+  });
   await handler(req, res);
   expect(res.statusCode).toBe(404);
   expect(res._data).toMatchObject({ ok: false, reason: 'not_found' });

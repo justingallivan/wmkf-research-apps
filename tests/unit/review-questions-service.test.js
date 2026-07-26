@@ -33,22 +33,34 @@ const rawPick = (id, key, order) => ({
   ...rawRich(id, key, order), wmkf_questiontype: 'picklist',
   wmkf_options: JSON.stringify([{ value: 1, label: 'Low' }, { value: 2, label: 'High' }]),
 });
+const rawMulti = (id, key, order) => ({
+  ...rawPick(id, key, order), wmkf_questiontype: 'multiselect',
+});
 
 const baseRaw = () => [
   rawString('id-aff', 'affiliation', 0),
-  rawPick('id-imp', 'impact', 1),
-  rawPick('id-risk', 'risk', 2),
-  rawPick('id-or', 'overallRating', 3),
-  rawRich('id-q4', 'q4', 4),
+  rawMulti('id-imp', 'impactAreas', 1),
+  rawPick('id-risk', 'riskLevel', 2),
+  rawRich('id-q4', 'riskDetail', 3),
+  rawPick('id-or', 'overallAssessment', 4),
 ];
 const versionOf = (raw) => questionSetVersion(raw.map((r) => normalizeRow(r)));
 const submittedFour = () => [
   { id: 'id-aff', key: 'affiliation', label: 'Question affiliation', type: 'string', required: true },
-  { id: 'id-imp', key: 'impact', label: 'Question impact', type: 'picklist', required: true, options: [{ value: 1, label: 'Low' }, { value: 2, label: 'High' }] },
-  { id: 'id-risk', key: 'risk', label: 'Question risk', type: 'picklist', required: true, options: [{ value: 1, label: 'Low' }, { value: 2, label: 'High' }] },
-  { id: 'id-or', key: 'overallRating', label: 'Question overallRating', type: 'picklist', required: true, options: [{ value: 1, label: 'Low' }, { value: 2, label: 'High' }] },
+  { id: 'id-imp', key: 'impactAreas', label: 'Question impactAreas', type: 'multiselect', required: true, options: [{ value: 1, label: 'Low' }, { value: 2, label: 'High' }] },
+  { id: 'id-risk', key: 'riskLevel', label: 'Question riskLevel', type: 'picklist', required: true, options: [{ value: 1, label: 'Low' }, { value: 2, label: 'High' }] },
+  { id: 'id-or', key: 'overallAssessment', label: 'Question overallAssessment', type: 'picklist', required: true, options: [{ value: 1, label: 'Low' }, { value: 2, label: 'High' }] },
 ];
-const fullSubmitted = () => [...submittedFour(), { id: 'id-q4', key: 'q4', label: 'Question q4', type: 'richtext', required: true }];
+const fullSubmitted = () => {
+  const [affiliation, impactAreas, riskLevel, overallAssessment] = submittedFour();
+  return [
+    affiliation,
+    impactAreas,
+    riskLevel,
+    { id: 'id-q4', key: 'riskDetail', label: 'Question riskDetail', type: 'richtext', required: true },
+    overallAssessment,
+  ];
+};
 
 function primeActive(records = baseRaw()) {
   queryActiveQuestions.mockResolvedValue({ records, totalCount: records.length, hasMore: false });
@@ -107,7 +119,7 @@ describe('saveQuestionSet', () => {
   it('500 audit_unavailable hard-abort: pending audit failure blocks the changeset', async () => {
     primeActive();
     sql.mockRejectedValueOnce(new Error('db down'));
-    const edited = fullSubmitted().map((r) => (r.key === 'q4' ? { ...r, label: 'Edited' } : r));
+    const edited = fullSubmitted().map((r) => (r.key === 'riskDetail' ? { ...r, label: 'Edited' } : r));
     await expect(saveQuestionSet({ questions: edited, baseVersion: versionOf(baseRaw()), profileId: 7 }))
       .rejects.toMatchObject({ httpStatus: 500, body: expect.objectContaining({ status: 'audit_unavailable' }) });
     expect(runChangeset).not.toHaveBeenCalled();
@@ -115,7 +127,7 @@ describe('saveQuestionSet', () => {
 
   it('applies edits as ONE changeset, invalidates the fetcher cache, reports auditWritten', async () => {
     primeActive();
-    const edited = fullSubmitted().map((r) => (r.key === 'q4' ? { ...r, label: 'Edited' } : r));
+    const edited = fullSubmitted().map((r) => (r.key === 'riskDetail' ? { ...r, label: 'Edited' } : r));
     const r = await saveQuestionSet({ questions: edited, baseVersion: versionOf(baseRaw()), profileId: 7 });
     expect(r.status).toBe('completed');
     expect(r.auditWritten).toBe(true);
@@ -128,7 +140,7 @@ describe('saveQuestionSet', () => {
   it('412 from the changeset → 409 set_changed (whole edit rolled back)', async () => {
     primeActive();
     runChangeset.mockRejectedValue(Object.assign(new Error('precondition'), { status: 412 }));
-    const edited = fullSubmitted().map((r) => (r.key === 'q4' ? { ...r, label: 'Edited' } : r));
+    const edited = fullSubmitted().map((r) => (r.key === 'riskDetail' ? { ...r, label: 'Edited' } : r));
     await expect(saveQuestionSet({ questions: edited, baseVersion: versionOf(baseRaw()), profileId: 7 }))
       .rejects.toMatchObject({ httpStatus: 409, body: expect.objectContaining({ status: 'set_changed' }) });
   });
@@ -136,7 +148,7 @@ describe('saveQuestionSet', () => {
   it('non-412 changeset failure → 502 failed, nothing applied', async () => {
     primeActive();
     runChangeset.mockRejectedValue(new Error('batch refused'));
-    const edited = fullSubmitted().map((r) => (r.key === 'q4' ? { ...r, label: 'Edited' } : r));
+    const edited = fullSubmitted().map((r) => (r.key === 'riskDetail' ? { ...r, label: 'Edited' } : r));
     await expect(saveQuestionSet({ questions: edited, baseVersion: versionOf(baseRaw()), profileId: 7 }))
       .rejects.toMatchObject({
         httpStatus: 502,

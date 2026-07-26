@@ -24,8 +24,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 const TYPE_OPTIONS = [
   { value: 'richtext', label: 'Rich text (narrative)' },
   { value: 'picklist', label: 'Rating (single choice)' },
+  { value: 'multiselect', label: 'Multiselect (check all that apply)' },
   { value: 'string', label: 'Short text (single line)' },
 ];
+
+const isOptionType = (type) => type === 'picklist' || type === 'multiselect';
 
 // Editable-row shape (UI). maxLength/hint kept as strings for controlled inputs;
 // the POST mapper coerces. New rows carry id:null and an editable key.
@@ -58,7 +61,7 @@ function toPayload(rows) {
     if (r.id) out.id = r.id;
     if (r.hint && r.hint.trim()) out.hint = r.hint;
     if (r.maxLength !== '' && r.maxLength !== null) out.maxLength = Number(r.maxLength);
-    if (r.type === 'picklist') {
+    if (isOptionType(r.type)) {
       out.options = r.options.map((o) => ({ value: Number(o.value), label: o.label }));
     }
     return out;
@@ -356,7 +359,14 @@ export default function ReviewQuestionsSection() {
                   <select
                     aria-label="Question type"
                     value={row.type}
-                    onChange={(e) => update(index, { type: e.target.value })}
+                    onChange={(e) => {
+                      const type = e.target.value;
+                      update(index, {
+                        type,
+                        options: isOptionType(type) ? row.options : [],
+                        maxLength: isOptionType(type) ? '' : row.maxLength,
+                      });
+                    }}
                     className="px-2 py-1 border border-gray-300 rounded text-xs"
                   >
                     {TYPE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -391,7 +401,7 @@ export default function ReviewQuestionsSection() {
                     onChange={(e) => update(index, { hint: e.target.value })}
                     className="px-2 py-1 border border-gray-300 rounded text-xs flex-1 min-w-[12rem]"
                   />
-                  {row.type !== 'picklist' && (
+                  {!isOptionType(row.type) && (
                     <label className="flex items-center gap-1 text-xs text-gray-500">
                       Max length
                       <input
@@ -406,7 +416,7 @@ export default function ReviewQuestionsSection() {
                   )}
                 </div>
 
-                {row.type === 'picklist' && (
+                {isOptionType(row.type) && (
                   <OptionsEditor
                     options={row.options}
                     onChange={(options) => update(index, { options })}
@@ -447,7 +457,7 @@ function OptionsEditor({ options, onChange }) {
 
   return (
     <div className="rounded border border-gray-200 bg-white p-2">
-      <p className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">Rating options</p>
+      <p className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">Options</p>
       <div className="space-y-1">
         {options.map((o, i) => (
           <div key={i} className="flex items-center gap-2">

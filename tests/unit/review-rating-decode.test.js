@@ -6,31 +6,31 @@
 import { labelForReviewRating, reviewRatingShortLabels } from '../../lib/external/review-form-schema';
 
 test('decodes each rating field to its written label', () => {
-  expect(labelForReviewRating('impact', 4)).toBe('Will rewrite textbooks');
-  expect(labelForReviewRating('risk', 2)).toBe('Medium risk (parts may succeed, others may fail)');
-  expect(labelForReviewRating('overallRating', 5)).toBe('Excellent');
+  expect(labelForReviewRating('riskLevel', 2)).toBe('Medium risk (parts may succeed, others may fail)');
+  expect(labelForReviewRating('overallAssessment', 5)).toBe('Excellent');
 });
 
 test('the removed "Unable to answer" sentinel (99) now decodes to null', () => {
-  expect(labelForReviewRating('impact', 99)).toBeNull();
-  expect(labelForReviewRating('overallRating', 99)).toBeNull();
+  expect(labelForReviewRating('riskLevel', 99)).toBeNull();
+  expect(labelForReviewRating('overallAssessment', 99)).toBeNull();
 });
 
 test('accepts string-numeric values (as they can arrive over the wire)', () => {
-  expect(labelForReviewRating('impact', '3')).toBe('Will result in publications of broad interest');
+  expect(labelForReviewRating('riskLevel', '3')).toBe('High risk (significant risk of failure)');
 });
 
 test('returns null for absent values (never submitted)', () => {
-  expect(labelForReviewRating('impact', null)).toBeNull();
-  expect(labelForReviewRating('impact', undefined)).toBeNull();
-  expect(labelForReviewRating('impact', '')).toBeNull();
+  expect(labelForReviewRating('riskLevel', null)).toBeNull();
+  expect(labelForReviewRating('riskLevel', undefined)).toBeNull();
+  expect(labelForReviewRating('riskLevel', '')).toBeNull();
 });
 
 test('returns null for an out-of-range value or unknown field', () => {
-  expect(labelForReviewRating('impact', 999)).toBeNull();
+  expect(labelForReviewRating('riskLevel', 999)).toBeNull();
+  expect(labelForReviewRating('impact', 4)).toBeNull();
   expect(labelForReviewRating('bogusField', 1)).toBeNull();
 });
 
-test('short labels cover the three structured ratings', () => {
-  expect(reviewRatingShortLabels).toMatchObject({ impact: 'Impact', risk: 'Risk', overallRating: 'Overall' });
+test('short labels cover exactly the two structured ratings', () => {
+  expect(reviewRatingShortLabels).toEqual({ riskLevel: 'Risk', overallAssessment: 'Overall' });
 });

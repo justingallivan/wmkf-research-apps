@@ -4,7 +4,7 @@
   "schemaName": "wmkf_AppReviewAnswer",
   "displayName": "App Review Answer",
   "displayCollectionName": "App Review Answers",
-  "description": "Point-in-time answer snapshot for an external reviewer's submitted review. One row per question per submitted review (all 11 questions, ratings included), each storing the question text exactly as asked beside the answer, so a submitted review reconstructs losslessly even after the question set changes. System of record for the narrative answers; ratings are also denormalized onto the parent wmkf_appreviewersuggestion row for native aggregation. Adding questions later = more rows, never new columns. See docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md §3a. Idempotent submit/retry is enforced by the (suggestion, questionkey) alternate key.",
+  "description": "Point-in-time answer snapshot for an external reviewer's submitted review. One row per question per submitted review (all 11 questions, ratings included), each storing the question text exactly as asked beside the answer, so a submitted review reconstructs losslessly even after the question set changes. System of record for narrative, rating, and multiselect answers. Adding questions later = more rows, never new per-question columns. See docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md §3a and the additive multiselect extension wave. Idempotent submit/retry is enforced by the (suggestion, questionkey) alternate key.",
   "ownershipType": "OrganizationOwned",
   "primaryNameAttribute": {
     "schemaName": "wmkf_Name",
@@ -18,7 +18,7 @@
       "type": "String",
       "schemaName": "wmkf_QuestionKey",
       "displayName": "Question Key",
-      "description": "Stable question id (impact, risk, overallRating, q2, q4..q11). The join back to the question across question-set changes. Never reused for a different question. Mirrors field.key in lib/external/review-form-schema.js.",
+      "description": "Stable question id. The join back to the question across question-set changes. Never reused for a different question. Mirrors field.key in lib/external/review-form-schema.js.",
       "maxLength": 100,
       "requiredLevel": "ApplicationRequired"
     },
@@ -41,7 +41,7 @@
       "type": "String",
       "schemaName": "wmkf_QuestionType",
       "displayName": "Question Type",
-      "description": "picklist | richtext | string (mirrors field.type in the schema).",
+      "description": "picklist | multiselect | richtext | string (mirrors field.type in the schema).",
       "maxLength": 50
     },
     {
@@ -62,7 +62,7 @@
       "type": "Integer",
       "schemaName": "wmkf_AnswerValue",
       "displayName": "Answer Value",
-      "description": "Picklist numeric value for rating questions (impact/risk/overallRating); null for narrative answers.",
+      "description": "Picklist numeric value for rating questions; null for narrative and multiselect answers.",
       "minValue": -2147483648,
       "maxValue": 2147483647
     }

@@ -1,0 +1,15 @@
+{
+  "name": "wmkf_appreviewanswer-multiselect",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_appreviewanswer",
+  "_comment": "Additive historical snapshot storage for runtime-configured multiselect review answers. The application stores canonical compact JSON [{value,label}] pairs; legacy answer rows leave this property null.",
+  "attributes": [
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_AnswerValues",
+      "displayName": "Answer Values",
+      "description": "Canonical compact JSON array of ordered {value,label} pairs for multiselect answers. Null for picklist, richtext, and string answers; [] represents an allowed empty multiselect selection.",
+      "maxLength": 150000
+    }
+  ]
+}

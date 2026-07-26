@@ -20,8 +20,10 @@ jest.mock('../../lib/external/review-form-schema', () => ({
   validateReviewForm: (...a) => validateReviewForm(...a),
 }));
 const buildRatingSnapshotRows = jest.fn();
+const buildMultiselectSnapshotRows = jest.fn();
 jest.mock('../../lib/external/review-answer-snapshot', () => ({
   buildRatingSnapshotRows: (...a) => buildRatingSnapshotRows(...a),
+  buildMultiselectSnapshotRows: (...a) => buildMultiselectSnapshotRows(...a),
 }));
 const patchReviewReceipt = jest.fn(async () => {});
 const getByIdWithSelect = jest.fn();
@@ -44,7 +46,8 @@ jest.mock('../../lib/dataverse/core/changeset', () => ({
 const SUG = '22222222-2222-4222-8222-222222222222';
 const ACTOR = 'su-1';
 const QUESTIONS = [
-  { key: 'impact', type: 'picklist' },
+  { key: 'riskLevel', type: 'picklist' },
+  { key: 'impactAreas', type: 'multiselect' },
   { key: 'comments', type: 'richtext' },
   { key: 'other', type: 'text' },
 ];
@@ -60,6 +63,8 @@ beforeAll(async () => {
 beforeEach(() => {
   jest.clearAllMocks();
   getActiveQuestionSet.mockResolvedValue(QUESTIONS);
+  buildRatingSnapshotRows.mockReturnValue([]);
+  buildMultiselectSnapshotRows.mockReturnValue([]);
   getByIdWithSelect.mockResolvedValue({
     wmkf_appreviewersuggestionid: SUG,
     wmkf_accepted: true,
@@ -71,7 +76,7 @@ beforeEach(() => {
 });
 
 test('0 rating rows → single patchReviewReceipt PATCH, no changeset', async () => {
-  validateReviewForm.mockReturnValueOnce({ ok: true, dataverseValues: {}, ratings: {} });
+  validateReviewForm.mockReturnValueOnce({ ok: true, dataverseValues: {}, ratings: {}, multiselects: {} });
   buildRatingSnapshotRows.mockReturnValueOnce([]);
   const out = await markReceivedNoFile({ suggestionId: SUG, structuredData: undefined, actingUserSystemId: ACTOR });
   expect(out).toEqual({ ok: true });
@@ -88,10 +93,11 @@ test('≥1 rating row → ONE atomic changeset (parent PATCH + answer upserts), 
   validateReviewForm.mockReturnValueOnce({
     ok: true,
     dataverseValues: { wmkf_affiliation: 1 },
-    ratings: { impact: 4 },
+    ratings: { riskLevel: 4 },
+    multiselects: {},
   });
-  buildRatingSnapshotRows.mockReturnValueOnce([{ key: 'impact', value: 4 }]);
-  const out = await markReceivedNoFile({ suggestionId: SUG, structuredData: { impact: 4 }, actingUserSystemId: ACTOR });
+  buildRatingSnapshotRows.mockReturnValueOnce([{ key: 'riskLevel', value: 4 }]);
+  const out = await markReceivedNoFile({ suggestionId: SUG, structuredData: { riskLevel: 4 }, actingUserSystemId: ACTOR });
   expect(out).toEqual({ ok: true });
   expect(patchReviewReceipt).not.toHaveBeenCalled();
   expect(runChangeset).toHaveBeenCalledTimes(1);
@@ -103,17 +109,17 @@ test('≥1 rating row → ONE atomic changeset (parent PATCH + answer upserts), 
     ifMatch: 'W/"receipt-1"',
   });
   expect(atomicArg.parent.body.wmkf_affiliation).toBe(1);
-  expect(atomicArg.children).toEqual([{ upsertFor: 'impact' }]);
-  // snapshotKeys = picklist/richtext keys from the live question set
+  expect(atomicArg.children).toEqual([{ upsertFor: 'riskLevel' }]);
+  // snapshotKeys = all persisted question types from the live question set
   const snapshotKeys = answerUpsertDescriptor.mock.calls[0][2];
-  expect([...snapshotKeys].sort()).toEqual(['comments', 'impact']);
+  expect([...snapshotKeys].sort()).toEqual(['comments', 'impactAreas', 'riskLevel']);
   expect(runChangeset.mock.calls[0][1]).toEqual({ actingUserSystemId: ACTOR });
 });
 
 test('form validation failure → 400 MarkReceivedNoFileError with the validator result verbatim as body', async () => {
-  const formResult = { ok: false, reason: 'validation', errors: ['impact out of range'] };
+  const formResult = { ok: false, reason: 'validation', errors: ['riskLevel out of range'] };
   validateReviewForm.mockReturnValueOnce(formResult);
-  const err = await markReceivedNoFile({ suggestionId: SUG, structuredData: { impact: 99 }, actingUserSystemId: null })
+  const err = await markReceivedNoFile({ suggestionId: SUG, structuredData: { riskLevel: 99 }, actingUserSystemId: null })
     .catch((e) => e);
   expect(err).toBeInstanceOf(MarkReceivedNoFileError);
   expect(err.httpStatus).toBe(400);
@@ -123,7 +129,7 @@ test('form validation failure → 400 MarkReceivedNoFileError with the validator
 });
 
 test('404-shaped write failure → 404 with { ok:false, reason:"not_found" } body', async () => {
-  validateReviewForm.mockReturnValueOnce({ ok: true, dataverseValues: {}, ratings: {} });
+  validateReviewForm.mockReturnValueOnce({ ok: true, dataverseValues: {}, ratings: {}, multiselects: {} });
   buildRatingSnapshotRows.mockReturnValueOnce([]);
   patchReviewReceipt.mockRejectedValueOnce(new Error('update failed with 404'));
   const err = await markReceivedNoFile({ suggestionId: SUG, structuredData: undefined, actingUserSystemId: null })
@@ -134,7 +140,7 @@ test('404-shaped write failure → 404 with { ok:false, reason:"not_found" } bod
 });
 
 test('non-404 write failure propagates untyped (shell maps to 500)', async () => {
-  validateReviewForm.mockReturnValueOnce({ ok: true, dataverseValues: {}, ratings: {} });
+  validateReviewForm.mockReturnValueOnce({ ok: true, dataverseValues: {}, ratings: {}, multiselects: {} });
   buildRatingSnapshotRows.mockReturnValueOnce([]);
   patchReviewReceipt.mockRejectedValueOnce(new Error('dataverse 503'));
   const err = await markReceivedNoFile({ suggestionId: SUG, structuredData: undefined, actingUserSystemId: null })
@@ -144,7 +150,7 @@ test('non-404 write failure propagates untyped (shell maps to 500)', async () =>
 });
 
 test.each([100000005, 100000006])('terminal status %s is rejected before any receipt write', async (status) => {
-  validateReviewForm.mockReturnValueOnce({ ok: true, dataverseValues: {}, ratings: {} });
+  validateReviewForm.mockReturnValueOnce({ ok: true, dataverseValues: {}, ratings: {}, multiselects: {} });
   buildRatingSnapshotRows.mockReturnValueOnce([]);
   getByIdWithSelect.mockResolvedValueOnce({
     wmkf_accepted: true,
@@ -160,7 +166,7 @@ test.each([100000005, 100000006])('terminal status %s is rejected before any rec
 });
 
 test('precondition failure maps to a receipt conflict', async () => {
-  validateReviewForm.mockReturnValueOnce({ ok: true, dataverseValues: {}, ratings: {} });
+  validateReviewForm.mockReturnValueOnce({ ok: true, dataverseValues: {}, ratings: {}, multiselects: {} });
   buildRatingSnapshotRows.mockReturnValueOnce([]);
   patchReviewReceipt.mockRejectedValueOnce(Object.assign(new Error('precondition failed'), { status: 412 }));
   await expect(markReceivedNoFile({ suggestionId: SUG, actingUserSystemId: ACTOR }))

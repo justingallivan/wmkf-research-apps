@@ -34,12 +34,12 @@ describe('validateSubmittedSet', () => {
     expect(validateSubmittedSet([richField('a', { required: 'yes' })]).ok).toBe(false);
   });
 
-  it('validates picklist options (≥1, integer unique values, labelled)', () => {
-    expect(validateSubmittedSet([pickField('r', { options: [] })]).ok).toBe(false);
-    expect(validateSubmittedSet([pickField('r', { options: [{ value: 1.5, label: 'x' }] })]).ok).toBe(false);
-    expect(validateSubmittedSet([pickField('r', { options: [{ value: 1, label: 'x' }, { value: 1, label: 'y' }] })]).ok).toBe(false);
-    expect(validateSubmittedSet([pickField('r', { options: [{ value: 1, label: '' }] })]).ok).toBe(false);
-    const ok = validateSubmittedSet([pickField('r')]);
+  it.each(['picklist', 'multiselect'])('validates %s options (≥1, integer unique values, labelled)', (type) => {
+    expect(validateSubmittedSet([pickField('r', { type, options: [] })]).ok).toBe(false);
+    expect(validateSubmittedSet([pickField('r', { type, options: [{ value: 1.5, label: 'x' }] })]).ok).toBe(false);
+    expect(validateSubmittedSet([pickField('r', { type, options: [{ value: 1, label: 'x' }, { value: 1, label: 'y' }] })]).ok).toBe(false);
+    expect(validateSubmittedSet([pickField('r', { type, options: [{ value: 1, label: '' }] })]).ok).toBe(false);
+    const ok = validateSubmittedSet([pickField('r', { type })]);
     expect(ok.ok).toBe(true);
     expect(ok.rows[0].options).toEqual([{ value: 1, label: 'Low' }, { value: 2, label: 'High' }]);
   });
@@ -62,12 +62,12 @@ describe('validateSubmittedSet', () => {
 });
 
 describe('missingParentBoundKeys (Codex P1-3)', () => {
-  it('lists the four required keys that are absent', () => {
-    expect(PARENT_BOUND_KEYS).toEqual(expect.arrayContaining(['affiliation', 'impact', 'risk', 'overallRating']));
-    expect(missingParentBoundKeys([richField('q2')])).toEqual(expect.arrayContaining(['affiliation', 'impact', 'risk', 'overallRating']));
+  it('lists affiliation and the two required core ratings that are absent', () => {
+    expect(PARENT_BOUND_KEYS).toEqual(['affiliation', 'riskLevel', 'overallAssessment']);
+    expect(missingParentBoundKeys([richField('priorWork')])).toEqual(PARENT_BOUND_KEYS);
     const full = PARENT_BOUND_KEYS.map((k) => ({ key: k }));
     expect(missingParentBoundKeys(full)).toEqual([]);
-    expect(missingParentBoundKeys([...full.filter((r) => r.key !== 'risk')])).toEqual(['risk']);
+    expect(missingParentBoundKeys(full.filter((row) => row.key !== 'riskLevel'))).toEqual(['riskLevel']);
   });
 });
 
@@ -96,6 +96,19 @@ describe('buildChangeset', () => {
     expect(out.operations[0].body.wmkf_questiontext).toBe('New text');
     expect(out.operations[0].body).not.toHaveProperty('wmkf_questionkey');
     expect(out.summary.updated).toBe(1);
+  });
+
+  it('serializes multiselect options into the same Dataverse option JSON column', () => {
+    const submitted = pickField('impactAreas', {
+      type: 'multiselect',
+      label: 'Impact areas',
+      options: [{ value: 4, label: 'Revise textbooks' }, { value: 1, label: 'Tools' }],
+    });
+    const out = buildChangeset([], v([submitted]));
+    expect(out.operations[0].body).toMatchObject({
+      wmkf_questiontype: 'multiselect',
+      wmkf_options: JSON.stringify(submitted.options),
+    });
   });
 
   it('REJECTS changing an existing row\'s key (immutability)', () => {

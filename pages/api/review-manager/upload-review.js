@@ -10,7 +10,8 @@
  *   - suggestionId           (string)  required
  *   - files                  (file[])  1..5
  *   - affiliation            (string)  required (review form field)
- *   - impact, risk, overallRating  (numeric strings)  required
+ *   - riskLevel, overallAssessment (numeric strings) required
+ *   - impactAreas[]          (repeated numeric strings) required multiselect
  *
  * Replaces the previous Vercel Blob path; the legacy fallback was retired
  * 2026-05-03 (zero rows still pointing at Blob storage in prod).
@@ -21,6 +22,7 @@ import { requireAppAccess } from '../../../lib/utils/auth';
 import { writeReviewFiles } from '../../../lib/services/review-upload';
 import { respondForFailedReviewUpload } from '../../../lib/utils/review-upload-response';
 import { withDalContext } from '../../../lib/dataverse/core/context';
+import { addReviewMultipartField } from '../../../lib/external/review-multipart-fields';
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_FILES = 5;
@@ -55,6 +57,13 @@ export default async function handler(req, res) {
           ok: false,
           reason: 'too_many_files',
           errors: [`Max ${MAX_FILES} files per upload.`],
+        });
+      }
+      if (e.code === 'INVALID_FORM_FIELD') {
+        return res.status(400).json({
+          ok: false,
+          reason: 'validation',
+          errors: ['Review form fields are malformed.'],
         });
       }
       throw e;
@@ -155,10 +164,14 @@ function parseMultipart(req) {
     });
 
     busboy.on('field', (name, value) => {
-      const numeric = Number(value);
-      fields[name] = value !== '' && !Number.isNaN(numeric) && /^-?\d+$/.test(value)
-        ? numeric
-        : value;
+      if (aborted) return;
+      try {
+        addReviewMultipartField(fields, name, value);
+      } catch (error) {
+        aborted = true;
+        error.code = 'INVALID_FORM_FIELD';
+        reject(error);
+      }
     });
 
     busboy.on('error', reject);

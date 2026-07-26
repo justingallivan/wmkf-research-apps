@@ -228,6 +228,38 @@ describe('composeReviewReport', () => {
     expect(answer.blocks).toEqual([]);
   });
 
+  test('multiselect questions compose categorical sections with tallies and unreadable markers', () => {
+    const reviewers = [
+      reviewer('r1', 'Dr. A', [
+        row('impactAreas', 3, 'multiselect', 'Impact areas?', {
+          answerText: 'Tools; Broad interest',
+          answerValues: [{ value: 1, label: 'Tools' }, { value: 3, label: 'Broad interest' }],
+        }),
+      ]),
+      reviewer('r2', 'Dr. B', [
+        row('impactAreas', 3, 'multiselect', 'Impact areas?', {
+          answerText: 'Unreadable answer',
+          answerValuesUnreadable: true,
+        }),
+      ]),
+    ];
+    const report = composeReviewReport({
+      matrix: deriveReviewMatrix(reviewers, null),
+      generatedAtIso: '2026-07-03T00:00:00.000Z',
+    });
+
+    expect(report.summary.ratingQuestions).toEqual([]);
+    expect(report.categoricalSections).toHaveLength(1);
+    expect(report.categoricalSections[0].tallies).toEqual([
+      { value: 1, label: 'Tools', count: 1, reviewers: [{ suggestionId: 'r1', name: 'Dr. A' }] },
+      { value: 3, label: 'Broad interest', count: 1, reviewers: [{ suggestionId: 'r1', name: 'Dr. A' }] },
+    ]);
+    expect(report.categoricalSections[0].answers).toEqual([
+      expect.objectContaining({ reviewerName: 'Dr. A', labels: ['Tools', 'Broad interest'], unreadable: false }),
+      expect.objectContaining({ reviewerName: 'Dr. B', labels: [], unreadable: true }),
+    ]);
+  });
+
   test('a malformed/unsanitized-looking answerHtml on an answered cell does not throw during composition', () => {
     const reviewers = [
       reviewer('r1', 'Dr. A', [row('comments', 1, 'richtext', 'Comments?', { answerHtml: '<p>unterminated <strong>bold' })]),

@@ -41,7 +41,7 @@
       "type": "String",
       "schemaName": "wmkf_QuestionType",
       "displayName": "Question Type",
-      "description": "picklist | richtext | string (mirrors field.type). Drives the editor control and validation.",
+      "description": "picklist | multiselect | richtext | string (mirrors field.type). Drives the editor control and validation.",
       "maxLength": 50
     },
     {

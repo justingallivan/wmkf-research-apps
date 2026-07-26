@@ -51,6 +51,7 @@ jest.mock('../../lib/external/review-question-fetcher', () => {
   const { reviewFormSchema } = jest.requireActual('../../lib/external/review-form-schema');
   return {
     getActiveQuestionSet: jest.fn(async () => reviewFormSchema.fields),
+    getAuthoritativeQuestionSet: jest.fn(async () => reviewFormSchema.fields),
     questionSetVersion: jest.fn(() => 'testver'),
   };
 });
@@ -73,17 +74,17 @@ function suggestion(overrides = {}) {
 function validAnswers(overrides = {}) {
   return {
     affiliation: 'Professor of Physics, Example University',
-    impact: 3,
-    risk: 2,
-    overallRating: 4,
-    q2: '<p>Significant impact.</p>',
-    q4: '<p>Technical risks.</p>',
-    q5: '<p>Methods appropriate.</p>',
-    q6: '<p>No issues.</p>',
-    q7: '<p>Strong team.</p>',
-    q8: '<p>Unlikely elsewhere.</p>',
-    q9: '<p>Budget reasonable.</p>',
-    q11: '',
+    priorWork: '<p>Distinct prior work.</p>',
+    foreseenImpacts: '<p>Significant impact.</p>',
+    impactAreas: [1, 3],
+    riskLevel: 2,
+    riskDetail: '<p>Technical risks.</p>',
+    methodsAppropriate: '<p>Methods appropriate.</p>',
+    teamCapacity: '<p>Strong team.</p>',
+    questionsForPi: '<p>No issues.</p>',
+    traditionalFunding: '<p>Unlikely elsewhere.</p>',
+    overallAssessment: 4,
+    additionalComments: '',
     ...overrides,
   };
 }
@@ -201,7 +202,7 @@ describe('finality + stage gates', () => {
 
 describe('validation', () => {
   it('400s with errors when a required answer is empty (and does not write)', async () => {
-    const { req, res } = post({ answers: validAnswers({ q2: '<p></p>' }) });
+    const { req, res } = post({ answers: validAnswers({ foreseenImpacts: '<p></p>' }) });
     await handler(req, res);
     expect(res.statusCode).toBe(400);
     expect(res._data.reason).toBe('validation');
@@ -210,7 +211,7 @@ describe('validation', () => {
   });
 
   it('400s a removed/out-of-range rating value', async () => {
-    const { req, res } = post({ answers: validAnswers({ impact: 99 }) });
+    const { req, res } = post({ answers: validAnswers({ riskLevel: 99 }) });
     await handler(req, res);
     expect(res.statusCode).toBe(400);
     expect(res._data.errors.join(' ')).toMatch(/invalid choice/);
@@ -272,24 +273,34 @@ describe('happy path — atomic write', () => {
     expect(parentOp.body.wmkf_reviewerimpact).toBeUndefined();
     expect(parentOp.body.wmkf_reviewerrisk).toBeUndefined();
     expect(parentOp.body.wmkf_revieweroverallrating).toBeUndefined();
-    // The 11 answer upserts still carry the ratings (impact/risk/overallRating rows).
-    const ratingAnswerOps = answerOps.filter((o) => /wmkf_questionkey='(impact|risk|overallRating)'/.test(o.url));
-    expect(ratingAnswerOps).toHaveLength(3);
+    // The snapshot carries exactly the two ratings plus the categorical answer.
+    const ratingAnswerOps = answerOps.filter((o) => /wmkf_questionkey='(riskLevel|overallAssessment)'/.test(o.url));
+    expect(ratingAnswerOps).toHaveLength(2);
+    const categoricalOp = answerOps.find((o) => o.url.includes("wmkf_questionkey='impactAreas'"));
+    expect(categoricalOp.body).toMatchObject({
+      wmkf_answervalue: null,
+      wmkf_questiontype: 'multiselect',
+      wmkf_answertext: 'Provide enabling tools to the community; Result in publications of broad interest',
+    });
+    expect(JSON.parse(categoricalOp.body.wmkf_answervalues)).toEqual([
+      { value: 1, label: 'Provide enabling tools to the community' },
+      { value: 3, label: 'Result in publications of broad interest' },
+    ]);
 
     expect(ReviewDraftService.deleteBySuggestion).toHaveBeenCalledWith(SUGGESTION_ID);
   });
 
   it('server-sanitizes rich-text answers before writing (stored-XSS boundary)', async () => {
     const { req, res } = post({
-      answers: validAnswers({ q2: '<p>ok</p><script>alert(1)</script><img src=x onerror=alert(1)>' }),
+      answers: validAnswers({ priorWork: '<p>ok</p><script>alert(1)</script><img src=x onerror=alert(1)>' }),
     });
     await handler(req, res);
     expect(res.statusCode).toBe(200);
 
     const [operations] = DynamicsService.executeChangeset.mock.calls[0];
-    const q2 = operations.find((o) => o.url.includes("wmkf_questionkey='q2'"));
-    expect(q2.body.wmkf_answerhtml).not.toMatch(/<script|onerror|<img/i);
-    expect(q2.body.wmkf_answerhtml).toContain('ok');
+    const priorWork = operations.find((o) => o.url.includes("wmkf_questionkey='priorWork'"));
+    expect(priorWork.body.wmkf_answerhtml).not.toMatch(/<script|onerror|<img/i);
+    expect(priorWork.body.wmkf_answerhtml).toContain('ok');
   });
 
   it('succeeds even if the post-commit draft delete fails (non-fatal)', async () => {

@@ -65,6 +65,32 @@ test('save POSTs the full set + baseVersion, then reloads', async () => {
   });
 });
 
+test('multiselect uses the option editor and saves numeric value/label pairs', async () => {
+  render(<ReviewQuestionsSection />);
+  await waitFor(() => expect(screen.getAllByTestId('rq-row')).toHaveLength(2));
+
+  const narrativeRow = within(screen.getAllByTestId('rq-row')[1]);
+  fireEvent.change(narrativeRow.getByLabelText('Question type'), {
+    target: { value: 'multiselect' },
+  });
+  expect(narrativeRow.queryByLabelText('Max length')).not.toBeInTheDocument();
+  fireEvent.click(narrativeRow.getByRole('button', { name: /add option/i }));
+  fireEvent.change(narrativeRow.getByLabelText('Option 1 label'), {
+    target: { value: 'First category' },
+  });
+
+  fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+  await waitFor(() => {
+    const post = global.fetch.mock.calls.find(([, options]) => options?.method === 'POST');
+    const body = JSON.parse(post[1].body);
+    expect(body.questions[1]).toMatchObject({
+      key: 'q2',
+      type: 'multiselect',
+      options: [{ value: 1, label: 'First category' }],
+    });
+  });
+});
+
 test('a 409 set_changed preserves the operator edits instead of discarding them', async () => {
   global.fetch = mockFetch({ postResponse: { ok: false, status: 409, json: async () => ({ status: 'set_changed', error: 'The question set changed since you loaded it.' }) } });
   render(<ReviewQuestionsSection />);

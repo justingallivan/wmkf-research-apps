@@ -202,6 +202,7 @@ jest.mock('../../lib/utils/file-magic', () => ({
 jest.mock('../../lib/external/review-form-schema', () => ({ validateReviewForm: mockValidateReviewForm }));
 jest.mock('../../lib/external/review-question-fetcher', () => ({
   getActiveQuestionSet: mockGetActiveQuestionSet,
+  getAuthoritativeQuestionSet: mockGetActiveQuestionSet,
 }));
 jest.mock('../../lib/external/review-answer-snapshot', () => ({
   buildRatingSnapshotRows: jest.fn(() => []),

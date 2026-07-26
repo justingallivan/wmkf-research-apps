@@ -1,119 +1,92 @@
 /**
- * validateReviewSubmission + buildReviewSubmission — the Phase 3 submit producer.
- *
- * Covers (plan §5/§9, Codex P1-N4 / P1-R3 / S301-P1):
- *   - full-form validation: required richtext emptiness-after-strip, optional Q11,
- *     rating live-domain (removed 99 + out-of-range rejected), maxLength.
- *   - the single mapping: parentPatch (affiliation + receivedat — ratings are
- *     snapshot-only post-Phase-E) and 11 ordered answer rows; rating rows carry value+label;
- *     richtext rows carry sanitized html + plain-text rendition.
- *   - producer backstops: exactly-3-ratings, rating-domain, parent/child equality,
- *     snapshot-fidelity, receivedAt required.
+ * validateReviewSubmission + buildReviewSubmission — final reviewer submit.
  */
 
-import { validateReviewSubmission, buildReviewSubmission } from '../../lib/external/build-review-submission';
+import {
+  validateReviewSubmission,
+  buildReviewSubmission,
+} from '../../lib/external/build-review-submission';
 import { reviewFormSchema } from '../../lib/external/review-form-schema';
 
 const RECEIVED_AT = '2026-06-28T12:00:00.000Z';
-
-// The question set as ReviewQuestionFetcher returns it from Dataverse: the same
-// questions, but WITHOUT the code-only `dataverseField` and with affiliation
-// carrying order 0 (the seed gives it order 0; the static schema had none). The
-// runtime path must produce output byte-identical to the static-default path.
-const RUNTIME_SET = reviewFormSchema.fields.map((f) => {
-  const { dataverseField, ...rest } = f;
-  return { ...rest, order: typeof f.order === 'number' ? f.order : 0 };
+const RUNTIME_SET = reviewFormSchema.fields.map((field) => {
+  const { dataverseField, ...rest } = field;
+  return { ...rest, order: typeof field.order === 'number' ? field.order : 0 };
 });
 
-// A complete, valid, already-sanitized submit keyed by field.key.
 function validInput(overrides = {}) {
   return {
     affiliation: '  Professor of Physics, Example University  ',
-    impact: 3,
-    risk: 2,
-    overallRating: 4,
-    q2: '<p>Significant impact on the field.</p>',
-    q4: '<p>Technical risks around instrument build.</p>',
-    q5: '<p>Methods are appropriate.</p>',
-    q6: '<p>No issues to raise.</p>',
-    q7: '<p>Strong team.</p>',
-    q8: '<p>Unlikely to be funded elsewhere.</p>',
-    q9: '<p>Budget is reasonable.</p>',
-    q11: '', // optional
+    priorWork: '<p>Existing work is narrower.</p>',
+    foreseenImpacts: '<p>Significant impact on the field.</p>',
+    impactAreas: [4, 1, 4],
+    riskLevel: 2,
+    riskDetail: '<p>Technical risks around instrument build.</p>',
+    methodsAppropriate: '<p>Methods are appropriate.</p>',
+    teamCapacity: '<p>Strong team.</p>',
+    questionsForPi: '<p>How will scale-up work?</p>',
+    traditionalFunding: '<p>Unlikely to be funded elsewhere.</p>',
+    overallAssessment: 4,
+    additionalComments: '',
     ...overrides,
   };
 }
 
 describe('validateReviewSubmission', () => {
-  test('a complete valid submit passes and normalizes types', () => {
-    const r = validateReviewSubmission(validInput());
-    expect(r.ok).toBe(true);
-    expect(r.normalized.affiliation).toBe('Professor of Physics, Example University'); // trimmed
-    expect(r.normalized.impact).toBe(3);
-    expect(r.normalized.risk).toBe(2);
-    expect(r.normalized.overallRating).toBe(4);
-    expect(r.normalized.q2).toBe('<p>Significant impact on the field.</p>');
-    expect(r.normalized.q11).toBe(''); // optional, omitted
+  test('normalizes the complete frozen question set', () => {
+    const result = validateReviewSubmission(validInput());
+    expect(result.ok).toBe(true);
+    expect(result.normalized.affiliation).toBe('Professor of Physics, Example University');
+    expect(result.normalized.riskLevel).toBe(2);
+    expect(result.normalized.overallAssessment).toBe(4);
+    expect(result.normalized.impactAreas).toEqual({
+      values: [1, 4],
+      pairs: [
+        { value: 1, label: 'Provide enabling tools to the community' },
+        { value: 4, label: 'Revise textbooks' },
+      ],
+      answerText: 'Provide enabling tools to the community; Revise textbooks',
+    });
+    expect(result.normalized.additionalComments).toBe('');
   });
 
-  test('coerces numeric-string ratings to ints', () => {
-    const r = validateReviewSubmission(validInput({ impact: '3' }));
-    expect(r.ok).toBe(true);
-    expect(r.normalized.impact).toBe(3);
+  test('coerces clean numeric-string ratings but rejects malformed values', () => {
+    expect(validateReviewSubmission(validInput({ riskLevel: '2 ' })).normalized.riskLevel).toBe(2);
+    expect(validateReviewSubmission(validInput({ riskLevel: '2abc' })).ok).toBe(false);
+    expect(validateReviewSubmission(validInput({ riskLevel: '2.5' })).ok).toBe(false);
   });
 
-  test('rejects a required richtext that is empty after tag-strip', () => {
-    const r = validateReviewSubmission(validInput({ q2: '<p></p>' }));
-    expect(r.ok).toBe(false);
-    expect(r.errors.join(' ')).toMatch(/Q2.*required/);
+  test('rejects unknown or request-labelled multiselect values', () => {
+    expect(validateReviewSubmission(validInput({ impactAreas: [99] })).ok).toBe(false);
+    expect(validateReviewSubmission(validInput({
+      impactAreas: [{ value: 1, label: 'Forged' }],
+    })).ok).toBe(false);
   });
 
-  test('rejects a required richtext that is whitespace/structural-only', () => {
-    const r = validateReviewSubmission(validInput({ q4: '<p><br></p>' }));
-    expect(r.ok).toBe(false);
-    expect(r.errors.join(' ')).toMatch(/Q4.*required/);
+  test('rejects required richtext that is structurally empty', () => {
+    const result = validateReviewSubmission(validInput({ priorWork: '<p><br></p>' }));
+    expect(result.ok).toBe(false);
+    expect(result.errors.join(' ')).toMatch(/Q1.*required/);
   });
 
-  test('allows an empty optional Q11', () => {
-    expect(validateReviewSubmission(validInput({ q11: '<p></p>' })).ok).toBe(true);
-    expect(validateReviewSubmission(validInput({ q11: undefined })).ok).toBe(true);
+  test('allows empty optional additional comments', () => {
+    expect(validateReviewSubmission(validInput({ additionalComments: '<p></p>' })).ok).toBe(true);
+    expect(validateReviewSubmission(validInput({ additionalComments: undefined })).ok).toBe(true);
   });
 
-  test('rejects a removed rating value (retired "Unable to answer"/99)', () => {
-    const r = validateReviewSubmission(validInput({ impact: 99 }));
-    expect(r.ok).toBe(false);
-    expect(r.errors.join(' ')).toMatch(/invalid choice/);
+  test('rejects invalid, missing, and out-of-domain required fields', () => {
+    expect(validateReviewSubmission(validInput({ riskLevel: null })).ok).toBe(false);
+    expect(validateReviewSubmission(validInput({ overallAssessment: 6 })).ok).toBe(false);
+    expect(validateReviewSubmission(validInput({ impactAreas: [] })).ok).toBe(false);
+    expect(validateReviewSubmission(validInput({ affiliation: '   ' })).ok).toBe(false);
   });
 
-  test('rejects a malformed numeric-string rating (no silent parseInt truncation)', () => {
-    expect(validateReviewSubmission(validInput({ impact: '3abc' })).ok).toBe(false);
-    expect(validateReviewSubmission(validInput({ impact: '3.5' })).ok).toBe(false);
-    expect(validateReviewSubmission(validInput({ risk: '2 ' })).ok).toBe(true); // trims surrounding ws
-  });
-
-  test('rejects an out-of-range rating value', () => {
-    const r = validateReviewSubmission(validInput({ overallRating: 6 })); // domain is 1..5
-    expect(r.ok).toBe(false);
-    expect(r.errors.join(' ')).toMatch(/invalid choice/);
-  });
-
-  test('rejects a missing required rating', () => {
-    const r = validateReviewSubmission(validInput({ risk: null }));
-    expect(r.ok).toBe(false);
-    expect(r.errors.join(' ')).toMatch(/Q3.*required/);
-  });
-
-  test('rejects a missing required affiliation', () => {
-    const r = validateReviewSubmission(validInput({ affiliation: '   ' }));
-    expect(r.ok).toBe(false);
-    expect(r.errors.join(' ')).toMatch(/required/);
-  });
-
-  test('enforces richtext maxLength on the sanitized html', () => {
-    const huge = `<p>${'a'.repeat(50001)}</p>`;
-    const r = validateReviewSubmission(validInput({ q2: huge }));
-    expect(r.ok).toBe(false);
-    expect(r.errors.join(' ')).toMatch(/max 50000 characters/);
+  test('enforces richtext maxLength on sanitized HTML', () => {
+    const result = validateReviewSubmission(validInput({
+      foreseenImpacts: `<p>${'a'.repeat(50001)}</p>`,
+    }));
+    expect(result.ok).toBe(false);
+    expect(result.errors.join(' ')).toMatch(/max 50000 characters/);
   });
 
   test('rejects non-object input', () => {
@@ -123,128 +96,114 @@ describe('validateReviewSubmission', () => {
   });
 });
 
-describe('buildReviewSubmission — mapping', () => {
-  function build(overrides) {
-    const v = validateReviewSubmission(validInput(overrides));
-    expect(v.ok).toBe(true);
-    return buildReviewSubmission(v.normalized, { receivedAt: RECEIVED_AT });
+describe('buildReviewSubmission', () => {
+  function build(overrides, questionSet = reviewFormSchema.fields) {
+    const validated = validateReviewSubmission(validInput(overrides), questionSet);
+    expect(validated.ok).toBe(true);
+    return buildReviewSubmission(validated.normalized, { receivedAt: RECEIVED_AT, questionSet });
   }
 
-  test('parentPatch carries affiliation + receivedat + reviewstatus ONLY (ratings are snapshot-only post-Phase-E)', () => {
-    const { parentPatch } = build();
-    expect(parentPatch).toEqual({
-      wmkf_revieweraffiliation: 'Professor of Physics, Example University',
+  test('keeps only affiliation and receipt lifecycle on the parent row', () => {
+    expect(build().parentPatch).toEqual({
       wmkf_reviewreceivedat: RECEIVED_AT,
-      // S328: submit advances the lifecycle picklist atomically so the Track
-      // Reviewers badge follows the submission (100000003 = Review Received).
       wmkf_reviewstatus: 100000003,
+      wmkf_revieweraffiliation: 'Professor of Physics, Example University',
     });
-    // The rating columns are no longer written.
-    expect(parentPatch.wmkf_reviewerimpact).toBeUndefined();
-    expect(parentPatch.wmkf_reviewerrisk).toBeUndefined();
-    expect(parentPatch.wmkf_revieweroverallrating).toBeUndefined();
   });
 
-  test('emits exactly 11 answer rows in question order', () => {
+  test('emits exactly eleven ordered answer rows using the frozen keys', () => {
     const { answerRows } = build();
     expect(answerRows).toHaveLength(11);
-    expect(answerRows.map((r) => r.questionOrder)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
-    expect(answerRows.map((r) => r.questionKey)).toEqual([
-      'impact', 'q2', 'risk', 'q4', 'q5', 'q6', 'q7', 'q8', 'q9', 'overallRating', 'q11',
+    expect(answerRows.map((row) => row.questionOrder)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    expect(answerRows.map((row) => row.questionKey)).toEqual([
+      'priorWork',
+      'foreseenImpacts',
+      'impactAreas',
+      'riskLevel',
+      'riskDetail',
+      'methodsAppropriate',
+      'teamCapacity',
+      'questionsForPi',
+      'traditionalFunding',
+      'overallAssessment',
+      'additionalComments',
     ]);
   });
 
-  test('rating rows carry value + label + null html (snapshot is the only home now)', () => {
-    const { answerRows } = build();
-    const impact = answerRows.find((r) => r.questionKey === 'impact');
-    expect(impact).toMatchObject({
-      questionType: 'picklist',
-      answerValue: 3,
+  test('stores canonical multiselect pairs, fallback text, and no numeric scalar', () => {
+    const row = build().answerRows.find((answer) => answer.questionKey === 'impactAreas');
+    expect(row).toMatchObject({
+      questionType: 'multiselect',
+      answerValue: null,
+      answerValues: [
+        { value: 1, label: 'Provide enabling tools to the community' },
+        { value: 4, label: 'Revise textbooks' },
+      ],
+      answerText: 'Provide enabling tools to the community; Revise textbooks',
       answerHtml: null,
-      answerText: 'Will result in publications of broad interest',
     });
   });
 
-  test('richtext rows carry sanitized html + a plain-text rendition + null value', () => {
+  test('stores rating labels and richtext plain-text renditions', () => {
     const { answerRows } = build();
-    const q2 = answerRows.find((r) => r.questionKey === 'q2');
-    expect(q2).toMatchObject({
-      questionType: 'richtext',
+    expect(answerRows.find((row) => row.questionKey === 'riskLevel')).toMatchObject({
+      answerValue: 2,
+      answerText: 'Medium risk (parts may succeed, others may fail)',
+      answerValues: null,
+    });
+    expect(answerRows.find((row) => row.questionKey === 'foreseenImpacts')).toMatchObject({
       answerHtml: '<p>Significant impact on the field.</p>',
       answerText: 'Significant impact on the field.',
       answerValue: null,
+      answerValues: null,
     });
   });
 
-  test('an empty optional Q11 still emits a row (complete snapshot) with empty content', () => {
-    const { answerRows } = build({ q11: '<p></p>' });
-    const q11 = answerRows.find((r) => r.questionKey === 'q11');
-    expect(q11).toMatchObject({ questionOrder: 11, answerHtml: '', answerText: '', answerValue: null });
+  test('emits an empty optional row for a complete historical snapshot', () => {
+    expect(build({ additionalComments: '<p></p>' }).answerRows.find(
+      (row) => row.questionKey === 'additionalComments',
+    )).toMatchObject({
+      questionOrder: 11,
+      answerHtml: '',
+      answerText: '',
+      answerValue: null,
+      answerValues: null,
+    });
   });
 
-  test('every row denormalizes a non-empty question text + type', () => {
-    const { answerRows } = build();
-    for (const row of answerRows) {
-      expect(typeof row.questionOrder).toBe('number');
-      expect(row.questionText.length).toBeGreaterThan(0);
-      expect(['picklist', 'richtext']).toContain(row.questionType);
-    }
-  });
-});
-
-describe('buildReviewSubmission — producer backstops', () => {
-  test('throws when receivedAt is missing', () => {
-    const v = validateReviewSubmission(validInput());
-    expect(() => buildReviewSubmission(v.normalized, {})).toThrow(/receivedAt/);
-  });
-
-  test('throws on a non-object normalized', () => {
+  test('backstops required inputs at the producer boundary', () => {
+    const { normalized } = validateReviewSubmission(validInput());
+    expect(() => buildReviewSubmission(normalized, {})).toThrow(/receivedAt/);
     expect(() => buildReviewSubmission(null, { receivedAt: RECEIVED_AT })).toThrow(/normalized object required/);
+    expect(() => buildReviewSubmission(
+      { ...normalized, impactAreas: [1] },
+      { receivedAt: RECEIVED_AT },
+    )).toThrow(/canonical multiselect/);
+    expect(() => buildReviewSubmission(
+      { ...normalized, riskLevel: 99 },
+      { receivedAt: RECEIVED_AT },
+    )).toThrow(/not in the live picklist domain/);
+    expect(() => buildReviewSubmission(
+      { ...normalized, overallAssessment: null },
+      { receivedAt: RECEIVED_AT },
+    )).toThrow(/exactly 2 core rating rows/);
   });
 
-  test('throws if a rating drifts from its parent column (constructed inconsistency)', () => {
-    const v = validateReviewSubmission(validInput());
-    // Corrupt the normalized impact AFTER validation so parent/child can disagree
-    // only if the producer failed to use a single source — simulate a producer bug
-    // by hand-building an inconsistent normalized that the validator would pass.
-    // Here we tamper to an out-of-domain value to trip the domain assert.
-    const bad = { ...v.normalized, impact: 99 };
-    expect(() => buildReviewSubmission(bad, { receivedAt: RECEIVED_AT })).toThrow(
-      /not in the live picklist domain/,
-    );
+  test('Dataverse-loaded and static question sets produce identical output', () => {
+    const staticValidated = validateReviewSubmission(validInput());
+    const runtimeValidated = validateReviewSubmission(validInput(), RUNTIME_SET);
+    expect(runtimeValidated).toEqual(staticValidated);
+    expect(buildReviewSubmission(runtimeValidated.normalized, {
+      receivedAt: RECEIVED_AT,
+      questionSet: RUNTIME_SET,
+    })).toEqual(buildReviewSubmission(staticValidated.normalized, {
+      receivedAt: RECEIVED_AT,
+    }));
   });
 
-  test('throws if a required rating is null at build time (fewer than 3 rating rows)', () => {
-    // Re-anchored on CORE_RATING_KEYS (not the parent-column map) so the producer
-    // backstop survived the Phase E column retirement (Codex P1-1).
-    const v = validateReviewSubmission(validInput());
-    const bad = { ...v.normalized, risk: null };
-    expect(() => buildReviewSubmission(bad, { receivedAt: RECEIVED_AT })).toThrow(
-      /exactly 3 core rating rows/,
-    );
-  });
-});
-
-describe('parity: Dataverse-loaded question set == static default', () => {
-  test('validateReviewSubmission produces identical normalized output', () => {
-    const input = validInput();
-    const staticR = validateReviewSubmission(input);
-    const runtimeR = validateReviewSubmission(input, RUNTIME_SET);
-    expect(runtimeR).toEqual(staticR);
-  });
-
-  test('buildReviewSubmission produces identical parentPatch + answerRows', () => {
-    const { normalized } = validateReviewSubmission(validInput());
-    const staticOut = buildReviewSubmission(normalized, { receivedAt: RECEIVED_AT });
-    const runtimeOut = buildReviewSubmission(normalized, { receivedAt: RECEIVED_AT, questionSet: RUNTIME_SET });
-    expect(runtimeOut).toEqual(staticOut);
-  });
-
-  test('the runtime set does NOT emit an affiliation snapshot row (despite order 0)', () => {
-    const { normalized } = validateReviewSubmission(validInput());
-    const { answerRows, parentPatch } = buildReviewSubmission(normalized, { receivedAt: RECEIVED_AT, questionSet: RUNTIME_SET });
-    expect(answerRows.some((r) => r.questionKey === 'affiliation')).toBe(false);
-    expect(answerRows).toHaveLength(11); // the 11 questions, affiliation excluded
-    expect(parentPatch.wmkf_revieweraffiliation).toBe('Professor of Physics, Example University');
+  test('runtime affiliation order 0 does not create an answer row', () => {
+    const output = build(undefined, RUNTIME_SET);
+    expect(output.answerRows.some((row) => row.questionKey === 'affiliation')).toBe(false);
+    expect(output.answerRows).toHaveLength(11);
   });
 });

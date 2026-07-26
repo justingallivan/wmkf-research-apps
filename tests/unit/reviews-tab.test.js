@@ -33,9 +33,8 @@ const REVIEWERS = [
     reviewReceivedAt: '2026-06-20T00:00:00Z',
     reviewSharePointFolder: 'akoya_request/123/Reviewer_Uploads/x',
     reviewFilename: 'review.pdf',
-    reviewerImpact: 4,
-    reviewerRisk: 2,
-    reviewerOverallRating: 5,
+    reviewerRiskLevel: 2,
+    reviewerOverallAssessment: 5,
   },
   // Pending — no reviewReceivedAt: must be filtered out.
   { suggestionId: 'g2', name: 'Dr. Pending', reviewStatus: 'materials_sent' },
@@ -45,9 +44,8 @@ const REVIEWERS = [
     name: 'Dr. NoFile',
     reviewReceivedAt: '2026-06-19T00:00:00Z',
     reviewUploadedByStaff: true,
-    reviewerImpact: 1,
-    reviewerRisk: null,
-    reviewerOverallRating: 99,
+    reviewerRiskLevel: null,
+    reviewerOverallAssessment: 99,
   },
 ];
 
@@ -73,10 +71,10 @@ test('renders submitted reviews with decoded ratings + download link; pending la
   expect(screen.getByText('Dr. Pending')).toBeInTheDocument();
 
   // Decoded ratings (not raw numbers).
-  expect(screen.getByText('Will rewrite textbooks')).toBeInTheDocument(); // impact 4
+  expect(screen.getByText('Medium risk (parts may succeed, others may fail)')).toBeInTheDocument();
   expect(screen.getByText('Excellent')).toBeInTheDocument(); // overall 5
-  // NoFile has risk = null and a legacy overall = 99 (the removed "Unable to
-  // answer" sentinel); both now decode to "Not provided".
+  // NoFile has risk = null and an invalid historical overall value; both
+  // decode to "Not provided".
   expect(screen.getAllByText('Not provided').length).toBeGreaterThanOrEqual(2);
 
   // Download link reuses the existing endpoint, keyed by suggestionId.
@@ -92,15 +90,15 @@ test('renders the narrative rich-text answers (Phase 4), not the picklist rows',
     suggestionId: 'g1',
     name: 'Dr. Narrative',
     reviewReceivedAt: '2026-06-20T00:00:00Z',
-    reviewerImpact: 3,
-    reviewerRisk: 2,
-    reviewerOverallRating: 4,
+    reviewerRiskLevel: 2,
+    reviewerOverallAssessment: 4,
     answers: [
-      // Picklist rows must NOT render in the narrative section (shown as cells).
-      { questionKey: 'impact', questionOrder: 1, questionType: 'picklist', answerHtml: '', answerText: 'Will result in publications of broad interest', answerValue: 3 },
-      { questionKey: 'q2', questionOrder: 2, questionType: 'richtext', questionText: 'Q2 — What specific significant impacts do you foresee?', answerHtml: '<p>This could <strong>reshape</strong> the field.</p>', answerText: '...', answerValue: null },
+      // Picklist rows render in the fixed rating cells, not the answer details.
+      { questionKey: 'riskLevel', questionOrder: 4, questionType: 'picklist', answerHtml: '', answerText: 'Medium risk (parts may succeed, others may fail)', answerValue: 2 },
+      { questionKey: 'impactAreas', questionOrder: 3, questionType: 'multiselect', questionText: 'Q3 — Impact areas', answerHtml: '', answerText: 'Tools; Broad interest', answerValue: null, answerValues: [{ value: 1, label: 'Tools' }, { value: 3, label: 'Broad interest' }] },
+      { questionKey: 'foreseenImpacts', questionOrder: 2, questionType: 'richtext', questionText: 'Q2 — What specific significant impacts do you foresee?', answerHtml: '<p>This could <strong>reshape</strong> the field.</p>', answerText: '...', answerValue: null },
       // Empty optional richtext: skipped.
-      { questionKey: 'q11', questionOrder: 11, questionType: 'richtext', questionText: 'Q11 — Anything else?', answerHtml: '', answerText: '', answerValue: null },
+      { questionKey: 'additionalComments', questionOrder: 11, questionType: 'richtext', questionText: 'Q11 — Anything else?', answerHtml: '', answerText: '', answerValue: null },
     ],
   };
   fetch.mockResolvedValue({
@@ -115,9 +113,10 @@ test('renders the narrative rich-text answers (Phase 4), not the picklist rows',
   expect(screen.getByText('reshape')).toBeInTheDocument(); // <strong> rendered
   // The empty optional question is not rendered.
   expect(screen.queryByText('Q11 — Anything else?')).not.toBeInTheDocument();
-  // The impact picklist label shows once (the rating cell) — the narrative
-  // section does NOT add a second copy of the picklist answer.
-  expect(screen.getAllByText('Will result in publications of broad interest')).toHaveLength(1);
+  expect(screen.getAllByText('Medium risk (parts may succeed, others may fail)')).toHaveLength(1);
+  expect(screen.getByText('Q3 — Impact areas')).toBeInTheDocument();
+  expect(screen.getByText('Tools')).toBeInTheDocument();
+  expect(screen.getByText('Broad interest')).toBeInTheDocument();
 });
 
 test('shows an empty state when no reviewer has submitted', async () => {

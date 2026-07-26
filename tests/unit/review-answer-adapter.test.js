@@ -23,8 +23,9 @@ const SID_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const SID_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
 const ANSWER_SELECT =
-  'wmkf_questionkey,wmkf_questionorder,wmkf_questiontext,wmkf_questiontype,' +
-  'wmkf_answerhtml,wmkf_answertext,wmkf_answervalue,_wmkf_appreviewersuggestion_value';
+  'wmkf_appreviewanswerid,wmkf_questionkey,wmkf_questionorder,wmkf_questiontext,' +
+  'wmkf_questiontype,wmkf_answerhtml,wmkf_answertext,wmkf_answervalue,' +
+  'wmkf_answervalues,_wmkf_appreviewersuggestion_value';
 
 // ─────────────────────── adapter: fetchAnswersBySuggestion ───────────────────────
 
@@ -59,6 +60,7 @@ describe('review-answer.fetchAnswersBySuggestion (mirror of review-answers.js)',
     });
     expect(out[SID_A]).toEqual([
       {
+        answerId: null,
         questionKey: 'impact',
         questionOrder: 1,
         questionText: 'Impact',
@@ -66,8 +68,56 @@ describe('review-answer.fetchAnswersBySuggestion (mirror of review-answers.js)',
         answerHtml: '',
         answerText: 'High',
         answerValue: 3,
+        answerValues: null,
+        answerValuesUnreadable: false,
       },
     ]);
+  });
+
+  test('parses canonical multiselect pairs and isolates corrupt JSON', async () => {
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: [
+        {
+          _wmkf_appreviewersuggestion_value: SID_A,
+          wmkf_appreviewanswerid: 'answer-good',
+          wmkf_questionkey: 'impactAreas',
+          wmkf_questionorder: 3,
+          wmkf_questiontype: 'multiselect',
+          wmkf_answertext: 'One; Three',
+          wmkf_answervalues: JSON.stringify([
+            { value: 1, label: 'One' },
+            { value: 3, label: 'Three' },
+          ]),
+        },
+        {
+          _wmkf_appreviewersuggestion_value: SID_A,
+          wmkf_appreviewanswerid: 'answer-bad',
+          wmkf_questionkey: 'otherAreas',
+          wmkf_questionorder: 4,
+          wmkf_questiontype: 'multiselect',
+          wmkf_answertext: 'Must not leak',
+          wmkf_answervalues: '{bad json',
+        },
+      ],
+      capped: false,
+    });
+
+    const out = await reviewAnswer.fetchAnswersBySuggestion([SID_A]);
+    expect(out[SID_A][0]).toMatchObject({
+      answerId: 'answer-good',
+      answerValues: [
+        { value: 1, label: 'One' },
+        { value: 3, label: 'Three' },
+      ],
+      answerValuesUnreadable: false,
+      answerText: 'One; Three',
+    });
+    expect(out[SID_A][1]).toMatchObject({
+      answerId: 'answer-bad',
+      answerValues: null,
+      answerValuesUnreadable: true,
+      answerText: 'Unreadable answer',
+    });
   });
 
   test('re-sanitizes answerHtml on read (defense in depth)', async () => {
@@ -128,8 +178,8 @@ describe('review-answer.readRatingsBySuggestion (mirror of review-answer-snapsho
   test('golden: queries the two rating columns filtered by suggestion, derives ratings', async () => {
     const q = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
       records: [
-        { wmkf_questionkey: 'impact', wmkf_answervalue: 3 },
-        { wmkf_questionkey: 'risk', wmkf_answervalue: 2 },
+        { wmkf_questionkey: 'riskLevel', wmkf_answervalue: 2 },
+        { wmkf_questionkey: 'overallAssessment', wmkf_answervalue: 4 },
       ],
     });
     const out = await reviewAnswer.readRatingsBySuggestion(SID_A);
@@ -137,7 +187,7 @@ describe('review-answer.readRatingsBySuggestion (mirror of review-answer-snapsho
       select: 'wmkf_questionkey,wmkf_answervalue',
       filter: `_wmkf_appreviewersuggestion_value eq ${SID_A}`,
     });
-    expect(out).toEqual({ impact: 3, risk: 2, overallRating: null });
+    expect(out).toEqual({ riskLevel: 2, overallAssessment: 4 });
   });
 
   test('GUID guard: a non-GUID suggestionId throws BEFORE any query', async () => {
@@ -149,25 +199,24 @@ describe('review-answer.readRatingsBySuggestion (mirror of review-answer-snapsho
   test('no rows → all ratings null', async () => {
     jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({ records: [] });
     expect(await reviewAnswer.readRatingsBySuggestion(SID_A)).toEqual({
-      impact: null,
-      risk: null,
-      overallRating: null,
+      riskLevel: null,
+      overallAssessment: null,
     });
   });
 });
 
 describe('review-answer.ratingsFromAnswers (pure)', () => {
-  test('picks the three canonical keys, ignores others, defaults missing to null', () => {
+  test('picks the two canonical keys, ignores others, defaults missing to null', () => {
     expect(
       reviewAnswer.ratingsFromAnswers([
-        { questionKey: 'impact', answerValue: 3 },
-        { questionKey: 'overallRating', answerValue: 4 },
+        { questionKey: 'riskLevel', answerValue: 3 },
+        { questionKey: 'overallAssessment', answerValue: 4 },
         { questionKey: 'summary', answerValue: 99 },
       ]),
-    ).toEqual({ impact: 3, risk: null, overallRating: 4 });
+    ).toEqual({ riskLevel: 3, overallAssessment: 4 });
   });
   test('non-array → all null', () => {
-    expect(reviewAnswer.ratingsFromAnswers(null)).toEqual({ impact: null, risk: null, overallRating: null });
+    expect(reviewAnswer.ratingsFromAnswers(null)).toEqual({ riskLevel: null, overallAssessment: null });
   });
 });
 
@@ -210,6 +259,7 @@ describe('review-answer alt-key upsert URL/body (mirror of review-answer-snapsho
       wmkf_answerhtml: null,
       wmkf_answertext: 'High',
       wmkf_answervalue: 3,
+      wmkf_answervalues: null,
     });
   });
 
@@ -230,6 +280,7 @@ describe('review-answer alt-key upsert URL/body (mirror of review-answer-snapsho
         wmkf_answerhtml: null,
         wmkf_answertext: 'Low',
         wmkf_answervalue: 1,
+        wmkf_answervalues: null,
       },
     });
   });
@@ -301,11 +352,11 @@ describe('changeset.buildOperations', () => {
 // ─────────────────── core: atomic parent+answers write shape ───────────────────
 
 describe('changeset atomic parent+answers (covers the external-review submit flow)', () => {
-  const snapshotKeys = new Set(['impact', 'risk', 'overallRating']);
+  const snapshotKeys = new Set(['impactAreas', 'riskLevel', 'overallAssessment']);
   const parentPatch = { wmkf_reviewreceivedat: '2026-07-04T00:00:00Z', wmkf_reviewstatus: 100000003 };
   const answerRows = [
-    { questionKey: 'impact', questionOrder: 1, questionText: 'Impact', questionType: 'picklist', answerHtml: null, answerText: 'High', answerValue: 3 },
-    { questionKey: 'risk', questionOrder: 2, questionText: 'Risk', questionType: 'picklist', answerHtml: null, answerText: 'Low', answerValue: 1 },
+    { questionKey: 'riskLevel', questionOrder: 4, questionText: 'Risk', questionType: 'picklist', answerHtml: null, answerText: 'High', answerValue: 3, answerValues: null },
+    { questionKey: 'overallAssessment', questionOrder: 10, questionText: 'Overall', questionType: 'picklist', answerHtml: null, answerText: 'Poor', answerValue: 1, answerValues: null },
   ];
 
   test('atomicParentWithChildren orders children (answer upserts) BEFORE the parent PATCH', () => {
@@ -313,8 +364,8 @@ describe('changeset atomic parent+answers (covers the external-review submit flo
     const parent = { method: 'PATCH', entitySet: 'wmkf_appreviewersuggestions', key: SID_A, body: parentPatch, ifMatch: 'W/"9"' };
     const ops = changeset.atomicParentWithChildren({ parent, children });
     expect(ops).toHaveLength(3);
-    expect(ops[0].keyPredicate).toContain("wmkf_questionkey='impact'");
-    expect(ops[1].keyPredicate).toContain("wmkf_questionkey='risk'");
+    expect(ops[0].keyPredicate).toContain("wmkf_questionkey='riskLevel'");
+    expect(ops[1].keyPredicate).toContain("wmkf_questionkey='overallAssessment'");
     expect(ops[2]).toBe(parent);
   });
 
@@ -335,8 +386,8 @@ describe('changeset atomic parent+answers (covers the external-review submit flo
     expect(exec).toHaveBeenCalledTimes(1);
     expect(exec.mock.calls[0][1]).toEqual({ actingUserSystemId: 'user-1' });
     expect(exec.mock.calls[0][0]).toEqual([
-      { method: 'PATCH', url: `wmkf_appreviewanswers(_wmkf_appreviewersuggestion_value=${SID_A},wmkf_questionkey='impact')`, body: { wmkf_questionorder: 1, wmkf_questiontext: 'Impact', wmkf_questiontype: 'picklist', wmkf_answerhtml: null, wmkf_answertext: 'High', wmkf_answervalue: 3 } },
-      { method: 'PATCH', url: `wmkf_appreviewanswers(_wmkf_appreviewersuggestion_value=${SID_A},wmkf_questionkey='risk')`, body: { wmkf_questionorder: 2, wmkf_questiontext: 'Risk', wmkf_questiontype: 'picklist', wmkf_answerhtml: null, wmkf_answertext: 'Low', wmkf_answervalue: 1 } },
+      { method: 'PATCH', url: `wmkf_appreviewanswers(_wmkf_appreviewersuggestion_value=${SID_A},wmkf_questionkey='riskLevel')`, body: { wmkf_questionorder: 4, wmkf_questiontext: 'Risk', wmkf_questiontype: 'picklist', wmkf_answerhtml: null, wmkf_answertext: 'High', wmkf_answervalue: 3, wmkf_answervalues: null } },
+      { method: 'PATCH', url: `wmkf_appreviewanswers(_wmkf_appreviewersuggestion_value=${SID_A},wmkf_questionkey='overallAssessment')`, body: { wmkf_questionorder: 10, wmkf_questiontext: 'Overall', wmkf_questiontype: 'picklist', wmkf_answerhtml: null, wmkf_answertext: 'Poor', wmkf_answervalue: 1, wmkf_answervalues: null } },
       { method: 'PATCH', url: `wmkf_appreviewersuggestions(${SID_A})`, body: parentPatch, ifMatch: 'W/"9"' },
     ]);
   });

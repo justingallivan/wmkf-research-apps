@@ -20,7 +20,10 @@ related:
 
 # Review Form Multi-Select Questions — Build Plan
 
-**Status:** ACCEPTED AND FROZEN (S375, 2026-07-26). Implementation not started.
+**Status:** ACCEPTED AND FROZEN (S375, 2026-07-26). Backward-compatible code
+implementation and the additive wave-15 schema package are complete on
+`codex/review-form-multiselect`; production expansion, publication, controlled
+rehearsal/rollback, fixture disposition, and reviewer exposure remain pending.
 **Target go-live: 2026-08-15** (owner-set; the date external reviewers first see the
 new form).
 
@@ -41,10 +44,11 @@ were each verified against source rather than taken on assertion.
 4. **Deletion of the test artifacts is NOT authorized** by this plan (§8). The
    read-only consumer probe is; deletion needs a separate approval naming exact writes.
 
-**FROZEN.** Do not reconcile this document against incidental source changes while
-implementation proceeds — it cites roughly thirty files, and per-change reconciliation
-was measurably more expensive than the drift it prevented. Reconcile it once, in full,
-when implementation lands. The §0.2 recheck markers below are the last such pass.
+**FROZEN CONTRACT, RECONCILED IMPLEMENTATION STATUS.** The normative decisions and
+release sequence remain frozen. The document was reconciled once after the code
+implementation landed; `[IMPLEMENTED IN SOURCE]` does not mean the corresponding
+production schema, configuration, prompt publication, rehearsal, cleanup, or
+exposure step has occurred.
 
 **Scope for the 2026-08-15 date: all of it, fully tested.** Owner direction
 2026-07-26 — the system must be ready and rehearsed before the date, not partially
@@ -212,10 +216,11 @@ export const PARENT_BOUND_KEYS = Object.freeze([
 `Object.freeze(['affiliation', ...CORE_RATING_KEYS])`, but the resulting values and
 order must be exactly the array above. `impactAreas` is NOT a core rating — it is a
 multiselect and must never appear in either list, or `assertRatingInvariants` will
-demand a numeric `answerValue` it cannot have. [PLANNED]
+demand a numeric `answerValue` it cannot have. [IMPLEMENTED IN SOURCE]
 
-The current code includes `impact` in `CORE_RATING_KEYS`, derives the parent-bound set
-from it, and exposes rating snapshots for all three current rating keys. [VERIFIED via
+At plan freeze, the pre-implementation code included `impact` in
+`CORE_RATING_KEYS`, derived the parent-bound set from it, and exposed rating
+snapshots for all three prior rating keys. [HISTORICAL baseline verified via
 `lib/external/review-form-schema.js:151-181`,
 `lib/admin/review-question-save.js:40-45`,
 `lib/dataverse/adapters/review-answer.js:60-130`, and
@@ -225,13 +230,13 @@ Both additional hardcoded rating-key lists must be re-authored to the same two n
 `REVIEW_RATING_KEYS` in `lib/dataverse/adapters/review-answer.js` and in
 `lib/external/review-answer-snapshot.js`, plus `RATING_KEYS`/`PROJECTION_FIELD` in
 `shared/components/workbench/ReviewsTab.js`. Draft 4's instruction to withdraw the
-names `riskLevel` and `overallAssessment` is itself withdrawn. [PLANNED]
+names `riskLevel` and `overallAssessment` is itself withdrawn. [IMPLEMENTED IN SOURCE]
 
 ### 1.2 Target question set
 
 The admin publication must reconcile to this complete ordered set. The content
 column is normative display text and must be authored verbatim; hints are omitted
-unless stated. [PLANNED]
+unless stated. [IMPLEMENTED IN SOURCE; PRODUCTION PUBLICATION PENDING]
 
 Omitted active questions are deactivated by the existing full-set save behavior.
 [VERIFIED via `lib/services/admin/review-questions-service.js:82-145`]
@@ -260,7 +265,7 @@ continued use of the same question after rewording. [VERIFIED via
 
 Only `impactAreas` is check-all-that-apply. `riskLevel` and `overallAssessment` remain
 single-choice questions even if the source form’s glyphs resemble checkboxes, and
-no option carries an `Other` free-text payload. [PLANNED]
+no option carries an `Other` free-text payload. [IMPLEMENTED IN SOURCE]
 
 The numeric option values for `riskLevel` and `overallAssessment` above are carried
 unchanged from the current `risk` and `overallRating` rows; only the keys change. They are the current
@@ -283,11 +288,13 @@ Retire every current key except `affiliation` through the full-set publication �
 `questionsForPi`, `traditionalFunding`, `overallAssessment`, `additionalComments`.
 `affiliation` alone keeps its existing immutable key, because it is the
 reviewer-identity field, is unchanged by the new form, and is the one key still bound
-to a parent column through `reviewParentColumnByKey`. [PLANNED]
+to a parent column through `reviewParentColumnByKey`. [IMPLEMENTED IN SOURCE;
+PRODUCTION PUBLICATION PENDING]
 
 Two rating questions change key but not meaning: the `risk` row's options and hint
 carry onto `riskLevel`, and the `overallRating` row's five options carry onto
-`overallAssessment`, values unchanged. This is a re-key, not a re-scoring. [PLANNED]
+`overallAssessment`, values unchanged. This is a re-key, not a re-scoring.
+[IMPLEMENTED IN SOURCE; PRODUCTION PUBLICATION PENDING]
 
 ## 2. Storage and canonical answer contract
 
@@ -310,7 +317,7 @@ For a multiselect row:
 - `wmkf_answerhtml = null`.
 
 All legacy picklist, rich-text, and string rows write
-`wmkf_answervalues = null`. [PLANNED]
+`wmkf_answervalues = null`. [IMPLEMENTED IN SOURCE; PRODUCTION SCHEMA EXPANSION PENDING]
 
 Create the additive schema package at
 `lib/dataverse/schema/wave15-review-answer-multiselect/`.
@@ -318,7 +325,7 @@ Create the additive schema package at
 independent of every other figure in this plan] The package must add a Memo property
 with logical name `wmkf_answervalues` and publish it through the existing schema
 application mechanism. Update the answer adapter field list, row body, DTO, and
-Atlas entry in the same change. [PLANNED]
+Atlas entry in the same change. [IMPLEMENTED IN SOURCE; PRODUCTION SCHEMA EXPANSION PENDING]
 
 ### 2.2 Rejected representations
 
@@ -361,7 +368,7 @@ derived joined text. Its contract is:
 The browser request therefore carries numeric values only. The server never accepts
 or trusts a client-supplied label. Both `validateReviewSubmission` and the legacy
 `validateReviewForm` path must call this helper; row emitters consume its result and
-must not reconstruct labels. [PLANNED]
+must not reconstruct labels. [IMPLEMENTED IN SOURCE]
 
 ### 2.4 Defensive reading
 
@@ -379,16 +386,17 @@ values, or an invalid pair, return `answerValues: null` and
 `answerValuesUnreadable: true`; do not fail the entire answer read. The DTO must
 display “Unreadable answer,” exclude the row from multiselect tallies and
 synthesis evidence, and retain enough diagnostics for staff to identify the answer
-row. [PLANNED]
+row. [IMPLEMENTED IN SOURCE]
 
 Tallies group by stored `(value,label)` pair rather than by current question
 options. This preserves historical labels if staff later rename an option.
-[PLANNED]
+[IMPLEMENTED IN SOURCE]
 
 ## 3. Complete executable type-gate inventory
 
-The current review-question pipeline supports `picklist`, `richtext`, and `string`
-through explicit allowlists and raw type comparisons. [VERIFIED via
+At plan freeze, the pre-implementation review-question pipeline supported
+`picklist`, `richtext`, and `string` through explicit allowlists and raw type
+comparisons. [HISTORICAL baseline verified via
 `lib/external/review-question-fetcher.js:29`,
 `lib/admin/review-question-save.js:69`, and
 `shared/components/admin/ReviewQuestionsSection.js:24-28`]
@@ -459,7 +467,7 @@ Every site below is in the implementation change; none may be handled implicitly
 
 The checkbox fieldset must expose a legend containing the question text, individual
 label associations, error text connected with `aria-describedby`, and keyboard
-operation through native checkbox semantics. [PLANNED]
+operation through native checkbox semantics. [IMPLEMENTED IN SOURCE]
 
 ### 3.3 Admin serialization and option editing
 
@@ -525,10 +533,10 @@ request input.
   `shared/utils/review-report.js:395-438`]
 - `shared/utils/review-report-docx.js` and
   `shared/utils/review-report-pdf.js`: render the new categorical sections and the
-  unreadable-answer marker; do not calculate multiselect averages. [PLANNED]
+  unreadable-answer marker; do not calculate multiselect averages. [IMPLEMENTED IN SOURCE]
 - `lib/services/review-manager/reviewers-service.js`: update rating projections to
   return only `riskLevel` and `overallAssessment`; pass through parsed multiselect answers
-  through the answer DTO rather than adding a scalar rating. [PLANNED]
+  through the answer DTO rather than adding a scalar rating. [IMPLEMENTED IN SOURCE]
 - `lib/services/review-manager/synthesize-reviews-service.js`: select and parse
   `wmkf_answervalues`; include readable multiselect pairs as categorical evidence;
   exclude unreadable rows; never place multiselect values in rating summaries.
@@ -577,7 +585,8 @@ The implementation must sweep all raw `'picklist'` comparisons under `lib/` and
 
 After implementation, rerun the same repository search. Every surviving
 picklist-only comparison must match an intentional disposition in this table and
-have a test. Any unclassified comparison is a release blocker. [PLANNED]
+have a test. Any unclassified comparison is a release blocker. [IMPLEMENTED IN SOURCE;
+POST-IMPLEMENTATION SEARCH RECONCILED]
 
 ## 4. Question-set publication and rollback mechanics
 
@@ -635,8 +644,8 @@ outside the service. [VERIFIED via
 `lib/services/review-manager/synthesize-reviews-service.js:170-215` and
 `shared/config/prompts/review-synthesis.js:4-8`]
 
-The current prompt describes numeric picklist ratings, including the current
-impact rating. [VERIFIED via
+At plan freeze, the bundled prompt described numeric picklist ratings, including
+the prior impact rating. [HISTORICAL baseline verified via
 `shared/config/prompts/review-synthesis.js:43-53`]
 
 Publish a new **backward-compatible** prompt version before production question-set
@@ -664,7 +673,7 @@ then retires the prior current row under ETag protection.
 
 The answer entity remains the historical snapshot authority. Current question
 labels may change later; reports, comparisons, courtesy copies, and synthesis use
-the stored pair labels for submitted multiselect answers. [PLANNED]
+the stored pair labels for submitted multiselect answers. [IMPLEMENTED IN SOURCE]
 
 Expected presentation:
 
@@ -695,7 +704,7 @@ Execute this sequence with external exposure held closed:
 1. Confirm the write-boundary coherence fix of §0.2 is deployed (shipped
    `afed10ec`); no further cache work is a prerequisite.
 2. Build and pass isolated automation on a release branch under the repository’s
-   Tier-2 process. [PLANNED]
+   Tier-2 process. [IMPLEMENTED AND VERIFIED LOCALLY; RELEASE PROMOTION PENDING]
 3. Complete the production expand and baseline capture in §9.1. [PLANNED]
 4. Publish the new synthesis prompt and the exact target question set from §1.2,
    including the real required `impactAreas` options. [PLANNED]
@@ -951,7 +960,8 @@ selection and ordering come from the live CI reference at implementation time.
 At minimum, changed-surface validation includes instruction invariants, docs
 frontmatter/catalog checks, state-Atlas checks, Dataverse schema safety, service
 contracts, prompt governance, security checks for any touched route, lint, tests,
-and build. [PLANNED]
+and build. [VERIFIED 2026-07-26 via paired gates/self-tests, type check, lint,
+516 Jest suites / 6,125 tests, 7 focused Playwright scenarios, and Next.js build]
 
 ## 11. Durable-surface reconciliation
 
@@ -969,7 +979,7 @@ In the implementation commit, update:
 
 The older completed-epic authoring plans are historical design records; annotate
 their staleness only if the repository’s durable-doc rule requires it rather than
-rewriting history. [PLANNED]
+rewriting history. [IMPLEMENTED IN SOURCE/DURABLE DOCS]
 
 The current active memory still describes a broader checkbox-plus-`Other` ask and
 states that the test data makes keys freely redefinable. Draft 4 deliberately does
@@ -979,19 +989,22 @@ not rely on either claim. [VERIFIED via
 
 ## 12. Completion checklist
 
-Implementation is complete only when all of the following are evidenced:
+The release is complete only when all of the following are evidenced. Checked
+source items are implemented on the feature branch; unchecked production items
+remain release gates and must not be inferred from code completion:
 
-- [ ] The §0.2 write-boundary coherence fix is deployed and every write path
+- [x] The §0.2 write-boundary coherence fix is implemented and every write path
   resolves authoritatively.
-- [ ] `CORE_RATING_KEYS` and `PARENT_BOUND_KEYS` resolve exactly as §1.1 states.
-- [ ] `riskLevel` and `overallAssessment` carry the prior ratings' meanings, labels, and
+- [x] `CORE_RATING_KEYS` and `PARENT_BOUND_KEYS` resolve exactly as §1.1 states.
+- [x] `riskLevel` and `overallAssessment` carry the prior ratings' meanings, labels, and
   numeric domains under new keys.
-- [ ] The exact §1.2 mapping is enforced: retire `impact`, `q7`, and `q9`; create
+- [x] The exact §1.2 mapping is encoded: retire `impact`, `q7`, and `q9`; create
   `priorWork`, `impactAreas`, and `teamCapacity`; retain every other listed key.
+- [x] The additive answer property has a reviewed wave-15 schema package.
 - [ ] The additive answer property is provisioned and read back.
-- [ ] The one authoritative canonicalizer owns validation, deduplication, ordering,
+- [x] The one authoritative canonicalizer owns validation, deduplication, ordering,
   label construction, JSON, and joined text.
-- [ ] Every type gate in §3 is implemented and classified.
+- [x] Every type gate in §3 is implemented and classified.
 - [ ] The real target multiselect configuration and versioned prompt have passed
   the primary controlled-production rehearsal and rollback rehearsal.
 - [ ] Both named test artifacts have passed the consumer probe, received explicit
@@ -1001,12 +1014,14 @@ Implementation is complete only when all of the following are evidenced:
 - [ ] Question rollback is executable from the reviewed manual manifest and
   preserved release evidence; prompt rollback is audited; both are ordered and
   rehearsed.
-- [ ] Corrupt JSON, tampered labels, unknown values, and duplicates are tested.
-- [ ] Matrix, cards, comparisons, DOCX, PDF, courtesy copy, synthesis, and
-  thank-you behavior are verified.
-- [ ] Relevant gates, tests, and build are green.
-- [ ] Atlas, service catalog, prompt records, and active memory agree with shipped
-  behavior.
+- [x] Corrupt JSON, tampered labels, unknown values, and duplicates are tested.
+- [x] Matrix, cards, comparisons, DOCX, PDF, courtesy copy, and synthesis have
+  source-level focused coverage.
+- [ ] Production presentation, synthesis, and unchanged thank-you behavior are
+  verified in the controlled rehearsal.
+- [x] Relevant gates, tests, and build are green for the feature branch.
+- [x] Atlas, service catalog, source prompt contract, and active memory agree with
+  the implemented-vs-production-pending boundary.
 
 ## 13. Explicit non-goals
 

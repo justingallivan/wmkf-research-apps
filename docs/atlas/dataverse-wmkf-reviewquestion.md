@@ -1,6 +1,6 @@
 # Atlas: `wmkf_reviewquestion` (Dataverse, WMKF config entity)
 
-**Phase status:** A (entity+fetcher+seed) LIVE S303 · B (reviewer consumers read the set) LIVE S303–S304 · C (superuser editor) LIVE S304 · D (rating reader+writer migration to the `wmkf_appreviewanswer` snapshot) LIVE S305 · E1 (stop the parent dual-write — ratings snapshot-only) LIVE S305 · E2 (drop `wmkf_reviewer{impact,risk,overallrating}` columns) DONE S305. **Epic complete.**
+**Phase status:** Original staff-editable-question epic complete through S305. The multiselect code expansion and re-authored target seed are implemented on the release branch as of 2026-07-26; production schema expansion, prompt publication, question-set publication, rehearsal, and exposure remain pending.
 **Last verified:** 2026-06-29 (S303) — **CREATED in prod** via `scripts/apply-dataverse-schema.js --target=prod --wave=9-review-questions --execute` (entity + 8 attributes + alt key all `✓ created`), then **seeded** with the current 12 fields via `scripts/seed-review-questions.mjs --execute` (the alt-key index gate held at `Pending`, then ran once `Active`). **Read-back verified end-to-end:** `getActiveQuestionSet()` returns all 12 questions from live prod, ordered, with types/required/option-counts matching the static schema. **[VERIFIED via live fetch S303 + `lib/dataverse/schema/wave9-review-questions/01_wmkf_reviewquestion.json`].**
 **Live row count:** 12 (affiliation order 0 + 11 questions), as of 2026-06-29.
 **Entity set:** `wmkf_reviewquestions`
@@ -25,14 +25,14 @@ Alternate key:
 - `wmkf_reviewquestion_key` on `(wmkf_questionkey)` — single-attribute key; makes the admin save / seed an idempotent upsert (PATCH to `wmkf_reviewquestions(wmkf_questionkey='<key>')`).
 
 Data:
-- `wmkf_questionkey` (String 100, ApplicationRequired) — stable, **immutable** question id (`affiliation`, `impact`, `risk`, `overallRating`, `q2`, `q4`..`q11`); the join to `wmkf_appreviewanswer.wmkf_questionkey` (also String 100). Never reused for a different question.
+- `wmkf_questionkey` (String 100, ApplicationRequired) — stable, **immutable** question id; the join to `wmkf_appreviewanswer.wmkf_questionkey` (also String 100). Production still holds the prior active keys until publication. The staged target keeps `affiliation` and creates the eleven numbered keys listed in `review-form-schema.js`. Never reuse a key for a different question.
 - `wmkf_questionorder` (Integer 0–1000) — display/snapshot position (`field.order`); affiliation = 0, questions 1–11.
 - `wmkf_questiontext` (Memo 4000) — question label/text shown to the reviewer (`field.label`); copied verbatim into each answer row at submission.
-- `wmkf_questiontype` (String 50) — `picklist` | `richtext` | `string` (mirrors `field.type`). Plain text, not a Choice (code-controlled values; simplest-first, same as the snapshot's type column).
+- `wmkf_questiontype` (String 50) — `picklist` | `multiselect` | `richtext` | `string` (mirrors `field.type`). Plain text, not a Choice (code-controlled values; simplest-first, same as the snapshot's type column).
 - `wmkf_required` (Boolean, default true; labels Required/Optional) — whether an answer is required to submit.
 - `wmkf_maxlength` (Integer 0–1000000) — char cap for richtext/string (`field.maxLength`); null → code default. Unused for picklists.
 - `wmkf_hint` (String 500) — optional helper text (`field.hint`); null when none.
-- `wmkf_options` (Memo 20000) — for picklists, a JSON array of `{ value, label }` (`field.options`); null otherwise. Options are never queried natively (only answers are, in the snapshot), so JSON is sufficient.
+- `wmkf_options` (Memo 20000) — for picklists and multiselects, a JSON array of `{ value, label }` (`field.options`); null otherwise. Options are never queried natively (only answers are, in the snapshot), so JSON is sufficient.
 
 ## Read Paths
 
@@ -40,7 +40,7 @@ Data:
 
 ## Write Paths
 
-- **Seed (Phase A):** `scripts/seed-review-questions.mjs` upserts the current schema's fields by alt key.
+- **Seed (Phase A):** `scripts/seed-review-questions.mjs` upserts `review-form-schema.js` fields by alt key. Because that static schema now holds the staged target set, do not run the seed as an incidental verification command; production activation follows the controlled full-set publication plan.
 - **Admin editor (Phase C, LIVE S304):** `pages/api/admin/review-questions.js` (superuser, `/admin` → `ReviewQuestionsSection`). POST diffs the submitted full set vs the live set **by row id** (`lib/admin/review-question-save.js`, pure + unit-tested) and applies create (POST) / update (PATCH by id) / soft-delete (PATCH `statecode:1,statuscode:2`) / reorder (order PATCH) as **one atomic `executeChangeset`** (so a partial save can't leave the set inconsistent). Enforces key-immutability by row identity, validates against the column caps + the fetcher's normalization rules, and gates on optimistic concurrency via `questionSetVersion` (409 `set_changed`). On success calls `ReviewQuestionFetcher.invalidate()`. Updates/deletes use the **row-id URL** (`wmkf_reviewquestions(<id>)`), not the alt-key form — the editor round-trips ids. **state values [VERIFIED via metadata probe S304]:** `statecode` 0=Active (defaultStatus 1) / 1=Inactive (defaultStatus 2); `statuscode` 1→Active / 2→Inactive. So the soft-delete pair `{statecode:1,statuscode:2}` is exact, and a bare POST create lands Active (statecode 0) → visible to the fetcher's `statecode eq 0` filter. The UPDATE path is also prod-proven (S304 live save 200 with per-row `If-Match`); CREATE/DELETE verbs are evidence-confirmed (payload matches the working seed 1:1, no lookups/nav-props) but not yet live-exercised.
   - **Audit:** every save writes to Postgres **`review_question_audit`** (`lib/db/migrations/022_review_question_audit.sql`) — a 'pending' row before the changeset (HARD-ABORT if the audit is unavailable) then a 'final' row with the before/after set + op summary + status; `system_alerts` on audit-write failure. Mirrors `policy_publish_audit`. Append-only; indexed on `request_id` + `created_at`.
 
@@ -49,7 +49,7 @@ Data:
 - **Created + seeded in prod S303.** `schema-apply` is creation-only/idempotent, so re-running is safe; the seed upserts by alt key (idempotent) and self-gates on `EntityKeyIndexStatus === 'Active'`.
 - **Schema will live only in prod.** The sandbox never had the reviewer schema provisioned (sibling reviewer entities 404 there; memory `project-dynamics-sandbox-state`), same as `wmkf_appreviewanswer`.
   - **Re-measured 2026-07-26** via `scripts/probe-sandbox-reviewer-schema.mjs` (read-only metadata probe): the sandbox org is alive and authenticates, but `wmkf_appreviewersuggestion`, `wmkf_appreviewanswer`, `wmkf_reviewquestion`, and `wmkf_potentialreviewer` all return 404; only `akoya_request` is present. This is absence, not drift a re-run would fix — the reviewer chain has never existed in the sandbox.
-- **`affiliation` is seeded as a question row (order 0, type `string`)** so the fetched set equals today's static set 1:1 (behavior-preserving for Phase B). Its mapping to the parent `wmkf_revieweraffiliation` column stays in code (`reviewParentColumnByKey`), not in this entity.
-- **The four core rows (`affiliation`/`impact`/`risk`/`overallRating`) can't be removed via the editor** (Codex Phase C P1-3, fixed): the save route rejects (400) any submitted set missing one of them. Post-E1 the guard list is an **explicit constant** (`PARENT_BOUND_KEYS = ['affiliation', ...CORE_RATING_KEYS]`), deliberately decoupled from `reviewParentColumnByKey` (which E1 shrank to affiliation) — the guard is **retained**, not lifted, because the 3 ratings remain the required backbone of every review (the submit producer asserts them present; affiliation is the identity field). Codex E2 P1-4.
-- **Key format** allows camelCase (`overallRating`) — `^[a-z][a-zA-Z0-9_]*$`, not the lowercase-only form first drafted in the plan.
+- **`affiliation` remains a question row (order 0, type `string`)** and stays mapped to parent `wmkf_revieweraffiliation` in code (`reviewParentColumnByKey`), not in this entity.
+- **The staged core rows (`affiliation`/`riskLevel`/`overallAssessment`) cannot be removed via the editor.** `PARENT_BOUND_KEYS = ['affiliation', ...CORE_RATING_KEYS]`, while `reviewParentColumnByKey` remains affiliation-only. `impactAreas` is categorical and deliberately absent from both rating-key lists.
+- **Key format** allows camelCase (`riskLevel`, `impactAreas`, `overallAssessment`) — `^[a-z][a-zA-Z0-9_]*$`.
 - **Out-of-band writes serve stale to reviewers for ≤5 min.** `ReviewQuestionFetcher.invalidate()` is **process-local** and fires only on the admin save success path. A direct Dataverse write outside the editor (the seed, a manual fix/revert, a Power Platform edit) does NOT invalidate any serverless instance's cache (`CACHE_TTL_MS` = 5 min), so reviewers may see the pre-edit set for up to that long. Operational caveat after any manual production intervention; not a code bug.

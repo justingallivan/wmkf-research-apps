@@ -35,6 +35,10 @@ const rowPick = (key, order, options, overrides = {}) => ({
   wmkf_options: JSON.stringify(options),
   ...overrides,
 });
+const rowMulti = (key, order, options, overrides = {}) => rowPick(key, order, options, {
+  wmkf_questiontype: 'multiselect',
+  ...overrides,
+});
 
 beforeEach(() => {
   invalidate();
@@ -60,6 +64,26 @@ it('queries active rows only, ordered by question order, and normalizes the fiel
       options: [{ value: 1, label: 'Low' }, { value: 2, label: 'High' }] },
     { key: 'q2', order: 2, label: 'Question q2?', type: 'richtext', required: true, maxLength: 50000, hint: 'be specific' },
   ]);
+});
+
+it('normalizes multiselect options with the same fail-closed option contract', async () => {
+  DynamicsService.queryRecords.mockResolvedValue({
+    records: [rowMulti('impactAreas', 3, [
+      { value: '1', label: 'Tools' },
+      { value: 4, label: 'Revise textbooks' },
+    ])],
+  });
+  expect(await getActiveQuestionSet()).toEqual([{
+    key: 'impactAreas',
+    order: 3,
+    label: 'Rate impactAreas',
+    type: 'multiselect',
+    required: true,
+    options: [
+      { value: 1, label: 'Tools' },
+      { value: 4, label: 'Revise textbooks' },
+    ],
+  }]);
 });
 
 it('accepts the camelCase live key overallRating', async () => {
@@ -138,6 +162,16 @@ describe('fail-closed', () => {
   it('throws on a picklist with no options', async () => {
     DynamicsService.queryRecords.mockResolvedValue({ records: [rowPick('impact', 1, [])] });
     await expect(getActiveQuestionSet()).rejects.toThrow(/no options/);
+  });
+
+  it('throws on duplicate multiselect option values', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({
+      records: [rowMulti('impactAreas', 3, [
+        { value: 1, label: 'Tools' },
+        { value: 1, label: 'Duplicate' },
+      ])],
+    });
+    await expect(getActiveQuestionSet()).rejects.toThrow(/duplicate option value/);
   });
 
   it('throws on a non-boolean required flag (does not degrade to optional)', async () => {
