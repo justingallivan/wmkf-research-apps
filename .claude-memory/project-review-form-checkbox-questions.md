@@ -61,6 +61,13 @@ Closed owner decisions (do not reopen without a new one):
   success coverage, rollback rehearsal, final smoke, and exposure remain
   controlled and pending. Fixture deletion was a separately
   controlled step and cleared 2026-07-26.
+- Review synthesis readiness is a separate owner decision: automatic synthesis
+  must wait until every invited reviewer has submitted, while staff may explicitly
+  run it earlier as a manual override. Existing synthesis display must not be
+  coupled to readiness or current submitted count. This is **not implemented**:
+  the current route rejects only zero submitted reviews, and the Reviews tab
+  hides the entire synthesis card at zero submissions. Declined/withdrawn
+  invitation semantics remain to be decided before automatic triggering is built.
 - Wave 15 is a **pre-deployment** gate, not only a pre-activation gate: readers
   always select `wmkf_answervalues` and writers always emit it, so production
   metadata readback must precede merging/promoting this branch to auto-deploying

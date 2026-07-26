@@ -353,6 +353,15 @@ append-only audit runs `f5aa3712-4789-f111-ab0f-6045bd018a07` and
 unchanged and the smoke answers were atomically cleaned up. This phase remains a
 red pre-exposure gate until synthesis succeeds (or the prompt-only rollback is
 executed and verified).
+
+**Owner-confirmed target lifecycle (2026-07-26; NOT YET IMPLEMENTED):**
+automatic synthesis must wait until every invited reviewer has submitted;
+staff may explicitly generate it earlier as a manual override. Stored-output
+visibility is a separate concern: an existing `wmkf_reviewsynthesisjson` value
+must remain visible even when the current submitted count is zero. Current code
+has no automatic trigger, permits the manual action after one submission, and
+hides the entire Synthesis card at zero. Declined/withdrawn invitation semantics
+must be decided before implementing the automatic all-in readiness test.
 Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 ## Email templates (admin org default + per-PD override)

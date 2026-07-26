@@ -14,6 +14,13 @@ rollback), followed by the remaining staff-writer success rehearsal, question/
 prompt rollback proof, republish, final smoke, and exposure. The target question
 publication, independently routed production HTTP writer gate, and backward-
 compatible synthesis prompt v2 publication all completed 2026-07-26.
+Owner decision recorded 2026-07-26: automatic synthesis must wait until every
+invited reviewer has submitted; staff may explicitly run it earlier; an existing
+stored synthesis must remain visible regardless of current submitted count.
+This is planned, not implemented. The current UI exposes the manual card at one
+submitted review and hides the card at zero, while the service rejects only zero.
+Declined/withdrawn invitation handling still requires an owner decision before an
+automatic readiness trigger is implemented.
 
 ## Session 375 Summary
 
@@ -114,6 +121,10 @@ The next session is expected to be Codex implementing against the frozen plan.
    `wmkf_ai_maxtokens=8000`. Resolve that red gate (or execute the plan's
    prompt-only rollback), then complete the three staff-writer success paths,
    rollback/republish rehearsal, final smoke, and exposure.
+   Also implement and verify the owner-confirmed synthesis lifecycle before
+   exposure: all-in automatic readiness, explicit staff early-run override, and
+   stored-output visibility independent of current submissions. Do not infer
+   declined/withdrawn readiness semantics.
    **Target go-live remains 2026-08-15.**
 
 ### Recently Closed

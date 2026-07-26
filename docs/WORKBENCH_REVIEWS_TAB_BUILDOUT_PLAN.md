@@ -105,6 +105,18 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
    `sendOneReminder`/`readRequiredEmailDefaults` call graph]. A manual nudge MUST
    share the sweep's exclusion/dedupe record so manual + cron cannot double-send.
    Outward-facing email = high-risk surface; the send guard is the review point.
+6. **Synthesis readiness and visibility (owner-confirmed 2026-07-26; planned,
+   not implemented).** Automatic synthesis must do nothing until every invited
+   reviewer has submitted. Staff may explicitly run synthesis earlier as a
+   deliberate manual override. Display is independent of generation readiness:
+   an existing stored synthesis must remain visible even when there are currently
+   zero submitted reviews. The present implementation does not enforce this
+   contract: it has no automatic trigger, its manual card appears once at least
+   one review is submitted, the route rejects only zero submitted reviews, and
+   the card (including already-stored output) is hidden at zero submissions.
+   Before implementing an automatic trigger, the owner must separately decide
+   how declined or withdrawn invitations affect the all-in readiness test; do not
+   silently classify either state as submitted.
 
 ## Phases (independently shippable, in order)
 
@@ -195,6 +207,13 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
 - `ReviewsTab`'s Synthesis card (renders only when ≥1 review is submitted):
   stored synthesis sections or a "Generate synthesis" / "Regenerate" action;
   plain-text rendering only (LLM output; no `dangerouslySetInnerHTML`).
+- **Known workflow/UI gap (owner decision 2026-07-26; not yet implemented):**
+  preserve the explicit staff action as the early-run override, add automatic
+  execution only after every invited reviewer has submitted, and decouple stored
+  synthesis display from readiness so a populated memo is never hidden merely
+  because the current submitted count is zero. The current ≥1 client gate and
+  zero-only service gate are implementation evidence, not the intended final
+  workflow.
 - `shared/utils/review-report.js#composeReviewReport` accepts an optional
   `synthesis` param → `synthesisSection` on the composed report, additive in
   both the DOCX and PDF renderers; `ExportMenu` passes
