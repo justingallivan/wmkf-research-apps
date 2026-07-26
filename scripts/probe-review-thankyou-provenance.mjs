@@ -140,7 +140,7 @@ async function main() {
 
   const suggestionSelect = [
     'wmkf_appreviewersuggestionid',
-    'wmkf_name',
+    'wmkf_suggestionlabel',
     'createdon',
     'modifiedon',
     '_createdby_value',
