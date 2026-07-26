@@ -138,7 +138,7 @@ const resultOf = (emitted) => emitted.find((e) => e.event === 'result')?.data;
 const draft = (id) => ({
   suggestionId: id,
   subject: 'S',
-  body: 'B https://reviews.example.org/external/review/tok-1',
+  body: 'B\nhttps://reviews.example.org/external/review/tok-1',
 });
 
 describe('send-emails-service — fail-closed templateType', () => {
@@ -155,6 +155,23 @@ describe('send-emails-service — fail-closed templateType', () => {
     expect(names(await run({ drafts: [], templateType: 'invitation' }))).toEqual(['error']);
     expect(names(await run({ drafts: [{ suggestionId: 'nope', subject: 'S', body: 'B' }], templateType: 'invitation' }))).toEqual(['error']);
     expect(findById).not.toHaveBeenCalled();
+  });
+
+  test('a flattened materials draft is refused before any recipient lookup or send', async () => {
+    const emitted = await run({
+      drafts: [{
+        suggestionId: SUG_OK,
+        subject: 'Review Materials',
+        body: 'Dear Reviewer, Please review: https://reviews.example.org/external/review/tok-1 Thank you.',
+      }],
+      templateType: 'materials',
+    });
+
+    expect(names(emitted)).toEqual(['error']);
+    expect(emitted[0].data.message)
+      .toBe('Materials email body lost its line breaks. Regenerate the preview before sending.');
+    expect(findById).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 });
 

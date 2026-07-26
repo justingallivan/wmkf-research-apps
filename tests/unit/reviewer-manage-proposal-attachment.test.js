@@ -346,7 +346,7 @@ describe('ReviewerManagePanel materials-preflight (empty SharePoint folder guard
     renderPanel({ materialsPreflight: { ok: true, fileCount: 0 } });
 
     await openReleaseModal();
-    await screen.findByText(/No reviewer materials are in the download folder/i);
+    await screen.findByText(/The expected reviewer proposal PDF is not available/i);
 
     fireEvent.click(screen.getByRole('button', { name: /preview 1 email/i }));
     const sendButton = await screen.findByRole('button', { name: /send 1 email/i });
@@ -361,7 +361,7 @@ describe('ReviewerManagePanel materials-preflight (empty SharePoint folder guard
 
     await openReleaseModal();
     await screen.findByText('Proposal document');
-    expect(screen.queryByText(/No reviewer materials are in the download folder/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/The expected reviewer proposal PDF is not available/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Couldn.t verify reviewer materials availability/i)).not.toBeInTheDocument();
 
     await previewAndSend();
@@ -373,7 +373,7 @@ describe('ReviewerManagePanel materials-preflight (empty SharePoint folder guard
 
     await openReleaseModal();
     await screen.findByText(/Couldn.t verify reviewer materials availability/i);
-    expect(screen.queryByText(/No reviewer materials are in the download folder/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/The expected reviewer proposal PDF is not available/i)).not.toBeInTheDocument();
 
     await previewAndSend();
     expect(window.confirm).not.toHaveBeenCalledWith(expect.stringMatching(/Release anyway\?/i));

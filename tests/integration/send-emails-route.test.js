@@ -205,7 +205,7 @@ async function run(body) {
 const draft = (id = SUG_1) => ({
   suggestionId: id,
   subject: 'S',
-  body: 'B https://reviews.example.org/external/review/tok-1',
+  body: 'B\nhttps://reviews.example.org/external/review/tok-1',
 });
 
 describe('send-emails — reviewer portal HTML links', () => {
@@ -312,6 +312,50 @@ describe('send-emails — reviewer portal HTML links', () => {
     expect(htmlBodySent()).not.toContain('<table role="presentation"');
     expect(htmlBodySent()).not.toContain('Start Review');
     expect(htmlBodySent()).not.toContain('Respond to Invitation');
+  });
+
+  test('materials body renders as paragraphs around the portal call-to-action', async () => {
+    SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_accepted: true }) };
+    await run({
+      drafts: [{
+        suggestionId: SUG_1,
+        subject: 'Review Materials',
+        body: [
+          'Dear Dr. Reviewer,',
+          '',
+          'Thank you for agreeing to review the proposal.',
+          '',
+          'Please use your secure reviewer link:',
+          'https://reviews.wmkeck.org/external/review/token.value',
+          '',
+          'This link is unique to you.',
+          '',
+          'Sincerely,',
+          '',
+          'Justin Gallivan',
+          '--',
+          'Justin Gallivan',
+          'Senior Program Director',
+          'W.M. Keck Foundation',
+          'Los Angeles',
+        ].join('\n'),
+      }],
+      templateType: 'materials',
+    });
+
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(htmlBodySent()).toContain(
+      '<p style="margin:0 0 16px 0;">Dear Dr. Reviewer,</p>'
+    );
+    expect(htmlBodySent()).toContain(
+      '<p style="margin:0 0 16px 0;">Please use your secure reviewer link:</p><table role="presentation"'
+    );
+    expect(htmlBodySent()).toContain(
+      '</a></p><p style="margin:0 0 16px 0;">This link is unique to you.</p>'
+    );
+    expect(htmlBodySent()).toContain(
+      '<p style="margin:0 0 16px 0;">Justin Gallivan<br>--<br>Justin Gallivan<br>Senior Program Director<br>W.M. Keck Foundation<br>Los Angeles</p>'
+    );
   });
 });
 
