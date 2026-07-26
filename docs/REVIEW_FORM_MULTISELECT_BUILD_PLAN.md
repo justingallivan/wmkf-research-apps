@@ -26,16 +26,24 @@ implementation and the additive wave-15 schema package are complete on
 readback completed 2026-07-26, followed by compatible code promotion to `main`
 (`5282cee8`) and a Ready production deployment
 (`dpl_7sfTLrMafYPKp7mnYdrEVjs9HmW5`). Publication, controlled rehearsal/rollback,
-fixture disposition, and reviewer exposure remain pending. The 2026-07-26
+and reviewer exposure remain pending; the known fixture disposition completed
+2026-07-26. The 2026-07-26
 read-only pre-activation evidence pass found that the EICAR fixture already has a
 sent thank-you timestamp, which is an explicit §8 stop condition. A follow-up
 provenance probe traced it to the April 30 production validation run: Dynamics
 records the matching thank-you email to the fixture address within seconds of the
 marker, and the validation commit records that exact test phase. No fixture was
-deleted and cutover remains blocked pending an owner cleanup decision. [VERIFIED
+deleted during that probe. The owner subsequently confirmed both records were
+test artifacts and explicitly authorized their exact removal with both CRM
+contacts preserved. Audited cleanup alerts `361` and `362` completed with no
+warnings; the three sentinel answers, sole draft, and `eicar-test-bytes.pdf` are
+gone. A real-looking Tim Newhouse/St. Jude review PDF found in the same folder
+was excluded from the deletion allowlist and remains in SharePoint. [VERIFIED
 via `outputs/review-form-multiselect/preactivation-evidence-2026-07-26.json`,
 `outputs/review-form-multiselect/thankyou-provenance-2026-07-26.json`, and commit
-`ada645de`]
+`ada645de`; cleanup verified via
+`outputs/review-form-multiselect/fixture-cleanup-evidence-2026-07-26.json`,
+SHA-256 `021c21fc8b2f90aee2651aab3df19f04df3d79d76d36c8385f86a999f5d6666e`]
 **Target go-live: 2026-08-15** (owner-set; the date external reviewers first see the
 new form).
 
@@ -55,8 +63,9 @@ were each verified against source rather than taken on assertion.
 2. **Manual rollback procedure** (§4) rather than building a reusable restore service.
 3. **Sandbox rehearsal dropped**; the controlled production smoke is the primary
    pre-exposure rehearsal (§7, §9).
-4. **Deletion of the test artifacts is NOT authorized** by this plan (§8). The
-   read-only consumer probe is; deletion needs a separate approval naming exact writes.
+4. **Deletion of the test artifacts was NOT authorized** by this plan (§8). The
+   required separate approval naming exact writes and `deleteContact:false` was
+   later supplied by the owner and executed on 2026-07-26.
 
 **FROZEN CONTRACT, RECONCILED IMPLEMENTATION STATUS.** The normative decisions and
 release sequence remain frozen. The document was reconciled once after the code
@@ -100,12 +109,12 @@ received-review suggestions, Postgres drafts, and question-set audit records.
 | `wmkf_reviewquestion` | **12 rows, all active**, byte-identical to the seeded schema. [DERIVED-FROM: `scripts/probe-live-review-questions.mjs` read-only run 2026-07-25; a direct row count, independent of every other figure in this plan] | The active configuration had not diverged from the static seed when measured. [VERIFIED via `scripts/probe-live-review-questions.mjs:23-69`] |
 | `review_question_audit` | **4 rows**, all dated 2026-06-29: **2 pending, 1 failed, 1 completed**. [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §4 read-only run 2026-07-25; a direct row count, independent of every other figure in this plan] | The measurement did not show a later successful admin publication. [VERIFIED via `scripts/probe-review-blank-slate.mjs:106-123`] |
 | `wmkf_appreviewanswer` | **3 rows** on **1 suggestion**, keys `impact`, `risk`, and `overallRating`; each has `answerValue=99` and empty `answerText`. [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §1 read-only run 2026-07-25; a direct row count, independent of every other figure in this plan] | These are sentinel answer snapshots and cannot remain when `impact` is retired. [VERIFIED via `scripts/probe-review-blank-slate.mjs:37-64`] |
-| Suggestions with `wmkf_reviewreceivedat` | **1** — `6ad328b4-f044-f111-88b5-000d3a306d45`, a staff upload named `eicar-test-bytes.pdf`. The narrow 2026-07-25 probe did not select reviewer identity fields; the 2026-07-26 preflight resolved the person as `Justin Gallivan Test` / `justingallivan@me.com`. [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §2 and `scripts/probe-review-multiselect-preactivation.mjs`] | This is the EICAR fixture suggestion named by the owner, not evidence of an empty answer store; its sent thank-you marker now blocks the planned automatic fixture-cleanup progression. [VERIFIED via `outputs/review-form-multiselect/preactivation-evidence-2026-07-26.json`] |
-| `review_drafts` | **1** — suggestion `3c4bb952-e061-f111-a826-000d3a306da2`, updated 2026-07-04, containing every current question key. [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §3 read-only run 2026-07-25; a direct row count, independent of every other figure in this plan] | This is the `Gallivan_test` draft named by the owner and must be removed through the audited suggestion-removal path, not abandoned. [VERIFIED via `scripts/probe-review-blank-slate.mjs:82-104`] |
+| Suggestions with `wmkf_reviewreceivedat` | **1** — `6ad328b4-f044-f111-88b5-000d3a306d45`, a staff upload named `eicar-test-bytes.pdf`. The narrow 2026-07-25 probe did not select reviewer identity fields; the 2026-07-26 preflight resolved the person as `Justin Gallivan Test` / `justingallivan@me.com`. [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §2 and `scripts/probe-review-multiselect-preactivation.mjs`] | Historical measurement: the sent thank-you marker stopped automatic progression, after which the owner authorized audited cleanup. The fixture was removed 2026-07-26. |
+| `review_drafts` | **1** — suggestion `3c4bb952-e061-f111-a826-000d3a306da2`, updated 2026-07-04, containing every current question key. [DERIVED-FROM: `scripts/probe-review-blank-slate.mjs` §3 read-only run 2026-07-25; a direct row count, independent of every other figure in this plan] | Historical measurement: the `Gallivan_test` draft was removed through the audited suggestion-removal path on 2026-07-26. |
 
 The table records a point-in-time measurement, not authorization to mutate either
-store. Re-run the read-only ownership/consumer probe in §8 immediately before the
-cutover decision. [COMPLETED 2026-07-26; result is a STOP, not deletion authority]
+store. The read-only ownership/consumer probe in §8 completed and stopped as
+designed; separate owner authority then permitted the exact cleanup.
 
 ### 0.1a Pre-activation evidence pass (2026-07-26)
 
@@ -127,12 +136,15 @@ mark-received returned validation failures. This verifies the service boundaries
 but it is not the independently routed production HTTP evidence required by
 §9.1(3), so that gate remains open. [VERIFIED service-level / PLANNED HTTP-level]
 
-The EICAR fixture is selected, accepted, received, included by the workbench/report
+At the time of this evidence pass, the EICAR fixture was selected, accepted,
+received, included by the workbench/report
 and synthesis predicates, owns the three sentinel answers and linked test file,
 and has `wmkf_thankyousentat=2026-05-01T01:11:26Z`. Section 8 says to stop when a
 sent thank-you exists. The `Gallivan_test` fixture has no answers, report,
 synthesis inclusion, honorarium, or sent thank-you, but still owns the sole
-Postgres draft. Neither fixture was changed. [VERIFIED via the same evidence]
+Postgres draft. Neither fixture was changed by this read-only pass. [VERIFIED via
+the same evidence; both were subsequently removed by the separately authorized
+cleanup recorded below]
 
 The marker is now explained. The follow-up read-only provenance probe found a
 Dynamics email activity regarding request 1002379 with the matching thank-you
@@ -149,12 +161,32 @@ entity and attribute are now audit-enabled, but its 15 retained events do not
 include the original marker delta; the email activity plus point-in-time source
 and commit supply the provenance. This reclassifies the marker as a deliberate
 synthetic validation side effect, not genuine reviewer correspondence, but it
-does not waive §8's stop or authorize cleanup. The provenance evidence digest is
+did not itself waive §8's stop or authorize cleanup. The provenance evidence digest is
 `b5e3fcbde1d0e30275d310f246b38e3e05b67bae1d6d016385eeb60727d4d2d9`.
 [VERIFIED via
 `outputs/review-form-multiselect/thankyou-provenance-2026-07-26.json`,
 `git show ada645de`, and
 `git show ef233a0e:pages/api/review-manager/send-emails.js`]
+
+### 0.1b Authorized fixture cleanup (2026-07-26)
+
+After reviewing the provenance, the owner confirmed both records were disposable
+tests and authorized removal of both exact suggestions and their linked test
+artifacts with `deleteContact:false`. The committed operator preflighted every
+Dataverse, Postgres, and SharePoint target before writing. Its first pass stopped
+when the EICAR folder contained an unexpected Tim Newhouse/St. Jude review PDF.
+The removal service was then narrowed with an exact Graph-item allowlist so the
+test file could be deleted while that unrelated PDF remained.
+
+Audit alerts `361` and `362` finalized with `status=success` and no warnings. The
+two suggestions, three sentinel answer rows, sole Postgres draft, and
+`eicar-test-bytes.pdf` are absent; neither contact deletion was attempted; both
+potential-reviewer rows retain their original CRM contact links; no honorarium was
+deleted; and both request synthesis hashes and `modifiedon` values are unchanged.
+The execution evidence digest is
+`021c21fc8b2f90aee2651aab3df19f04df3d79d76d36c8385f86a999f5d6666e`.
+[VERIFIED via
+`outputs/review-form-multiselect/fixture-cleanup-evidence-2026-07-26.json`]
 
 ### 0.2 Dependency: question-set coherence at write boundaries — SHIPPED
 
@@ -255,8 +287,8 @@ before any external reviewer is exposed. [PLANNED]
 **Owner decision 2026-07-26 — supersedes draft 4's semantic-retention rule.** Draft 4
 kept `risk`, `overallRating`, `q2`, `q4`, `q5`, `q6`, `q8`, and `q11` on the principle
 that a key is retired only when the answer's meaning changes. That rule is sound when
-it protects stored answers. There are none: the only answer rows are sentinel fixtures
-scheduled for removal (§0.1, §8).
+it protects stored answers. There were no genuine reviewer rows: the only answer
+rows were sentinel fixtures subsequently removed under §8.
 
 Its cost, however, is permanent. Under draft 4's list, `q4` held Q5, `q5` held Q6,
 `q6` held Q8, and `q8` held Q9 — four keys pointing at differently-numbered questions,
@@ -814,24 +846,24 @@ ASSUMED]
 No external reviewer is exposed until this exact production rehearsal, rollback,
 republish, final smoke, and cleanup sequence is green. [PLANNED]
 
-## 8. Exact audited cleanup path for the known test artifacts
+## 8. Exact audited cleanup path for the known test artifacts — COMPLETED
 
-No deletion is authorized by this plan. The owner has authorized the read-only
-consumer probe below; its report is the prerequisite for a separate, explicit
-approval naming the exact writes. Cutover is blocked until the cleanup completes.
-[READ-ONLY PROBE COMPLETED 2026-07-26; CLEANUP BLOCKED]
+No deletion was authorized by this plan. The separately required owner approval
+was supplied after the consumer and provenance probes, naming both exact
+suggestions, their children and linked test file, and `deleteContact:false`.
+Cleanup completed 2026-07-26. [COMPLETED]
 
 The probe found a sent thank-you marker on
 `6ad328b4-f044-f111-88b5-000d3a306d45`. Per step 2 below, processing stopped:
-no deletion approval was requested, no suggestion/answer/draft/file/contact was
-changed, and cutover remains blocked. The follow-up provenance investigation
+no deletion approval was requested and no suggestion/answer/draft/file/contact was
+changed; cutover was blocked at that point. The follow-up provenance investigation
 confirmed that the marker belongs to the April 30 production validation send to
 the fixture email address, not to the later EICAR upload or a genuine reviewer.
-That finding makes the owner decision better informed but does not silently
-relax the stop condition. Evidence bundles:
+That finding made the later owner decision informed without silently relaxing the
+stop condition. Pre-approval evidence bundles:
 `outputs/review-form-multiselect/preactivation-evidence-2026-07-26.json` and
 `outputs/review-form-multiselect/thankyou-provenance-2026-07-26.json`.
-[VERIFIED]
+[HISTORICAL STOP VERIFIED; LATER CLEANUP VERIFIED IN §0.1b]
 
 The existing hard-removal service performs a preflight, writes a durable system
 alert before deletion, removes answer rows and the suggestion in one Dataverse
@@ -841,7 +873,8 @@ the audit with success or warnings. [VERIFIED via
 `lib/services/reviewer-finder/remove-candidate-service.js:246-426`, and
 `pages/api/reviewer-finder/my-candidates.js:129-160`]
 
-Use this **single audited procedure**, once for each exact suggestion ID:
+The following **single audited procedure** was used once for each exact
+suggestion ID:
 
 1. Run a read-only preflight for
    `6ad328b4-f044-f111-88b5-000d3a306d45` and
@@ -881,8 +914,11 @@ Use this **single audited procedure**, once for each exact suggestion ID:
 3. Obtain explicit owner approval for hard removal of both exact suggestion IDs,
    their answer rows, their Postgres drafts, and linked test review objects.
    Approval must also state `deleteContact:false`.
-4. Under the existing superuser/app guard, call
-   `DELETE /api/reviewer-finder/my-candidates` for each artifact with:
+4. Under the same service contract as the existing superuser/app route, call the
+   audited hard-removal service for each artifact with `deleteContact:false`.
+   The committed production operator used an exact Graph-item deletion allowlist
+   after preflight found an unrelated PDF in the EICAR folder; the normal route
+   payload remains:
 
    ```json
    {
@@ -910,7 +946,8 @@ Use this **single audited procedure**, once for each exact suggestion ID:
    review object; neither artifact eligible for a thank-you; any unchanged synthesis
    memo is explicitly recorded as potentially stale and regenerable; and both
    durable removal audits finalized without unresolved warnings. Attach before/after
-   evidence and the owner approval to the cutover record. [PLANNED]
+   evidence and the owner approval to the cutover record. [COMPLETED 2026-07-26;
+   evidence digest in §0.1b]
 
 The synthesis inclusion filter requires selected, accepted suggestions with a
 received-review timestamp, while the thank-you sweep evaluates a received review
@@ -921,7 +958,8 @@ must therefore be probed explicitly rather than inferred from filenames.
 `lib/services/reviewer-thankyou-sweep.js:150-185`]
 
 Leaving either artifact orphaned, deleting only the answer rows, deleting only the
-draft, or bypassing the existing removal audit is prohibited. [PLANNED]
+draft, or bypassing the existing removal audit was prohibited; the completed
+cleanup satisfied this invariant. [VERIFIED]
 
 ## 9. Production expand, activation, exposure, and rollback
 
@@ -950,11 +988,11 @@ draft, or bypassing the existing removal audit is prohibited. [PLANNED]
    evidence remains outstanding. [SERVICE BOUNDARY VERIFIED; HTTP ROUTING PLANNED]
 4. Execute the §8 consumer probe, obtain the separately required deletion
    approval, complete the single audited cleanup procedure, and attach its
-   postconditions. The consumer probe completed 2026-07-26 and found the EICAR
-   fixture's sent thank-you marker, so the mandated stop fired before approval
-   or cleanup. The follow-up investigation traced it to the April 30 production
-   validation send to the fixture address; cleanup still requires the explicit
-   §8 owner decision. [PROBE + PROVENANCE COMPLETED; CLEANUP BLOCKED]
+   postconditions. The consumer probe stopped on the EICAR thank-you marker; the
+   provenance investigation traced it to the April 30 synthetic validation send.
+   The owner then supplied the explicit §8 authority. Cleanup completed with
+   alerts `361`/`362`, no warnings, both contacts preserved, and the unrelated Tim
+   Newhouse/St. Jude PDF preserved. [COMPLETED 2026-07-26]
 5. Record the active and inactive question rows with IDs/ETags, normalized active
    version, and the completed question audit; record the current synthesis prompt
    identity/content/hash. Produce and review the §4 manual rollback dry-run manifest
@@ -1119,11 +1157,10 @@ remain release gates and must not be inferred from code completion:
 - [x] Every type gate in §3 is implemented and classified.
 - [ ] The real target multiselect configuration and versioned prompt have passed
   the primary controlled-production rehearsal and rollback rehearsal.
-- [ ] Both named test artifacts have passed the consumer probe, received explicit
-  deletion authority, and completed the one audited cleanup procedure. The
-  2026-07-26 probe stopped because the EICAR fixture has a sent thank-you marker;
-  the marker is now traced to the April 30 synthetic validation send, but no
-  deletion authority was requested and no cleanup ran.
+- [x] Both named test artifacts passed the consumer/provenance probes, received
+  explicit deletion authority, and completed the audited cleanup procedure on
+  2026-07-26. Alerts `361`/`362` are successful with no warnings; contacts and
+  the unrelated Tim Newhouse/St. Jude PDF were preserved.
 - [ ] The prompt is published before production question-set activation.
 - [ ] Controlled production smoke and cleanup are green before external exposure.
 - [ ] Question rollback is executable from the reviewed manual manifest and

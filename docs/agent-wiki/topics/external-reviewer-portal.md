@@ -187,8 +187,10 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   `scripts/probe-review-answer-multiselect-field.mjs`. Compatible code was then
   promoted at `5282cee8` and is live in production deployment
   `dpl_7sfTLrMafYPKp7mnYdrEVjs9HmW5`; the prior 12-row question set remains active.
-  Prompt/question publication, controlled rehearsal/rollback, fixture disposition,
-  and reviewer exposure remain separate release gates.
+  Prompt/question publication, controlled rehearsal/rollback, and reviewer
+  exposure remain separate release gates. Known-fixture disposition cleared
+  2026-07-26 via audited alerts `361`/`362`, with both CRM contacts and an
+  unrelated Tim Newhouse/St. Jude PDF preserved.
   Hand-writing a `checkbox` type remains invalid; the supported name is exactly
   `multiselect`. Canonical contract:
   `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md`; active memory:

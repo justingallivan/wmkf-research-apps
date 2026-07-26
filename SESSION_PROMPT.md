@@ -1,4 +1,12 @@
-# Session 376 Prompt: Implement the review-form multiselect build
+# Session 376 Prompt: Finish the review-form multiselect release
+
+**Current status (2026-07-26):** the original implementation brief below is
+historical. The compatible multiselect code and production schema expansion are
+complete and deployed; the known-fixture cleanup is also complete. The live next
+work is the remaining pre-activation sequence in
+`docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` §9: routed production writer
+evidence, prompt/question publication, controlled smoke, rollback rehearsal,
+republish, final smoke, and exposure.
 
 ## Session 375 Summary
 
@@ -97,22 +105,18 @@ The next session is expected to be Codex implementing against the frozen plan.
    question publication, rollback rehearsal, controlled smoke, and exposure remain
    pending. **Target go-live remains 2026-08-15.**
 
-2. **Resolve the §8 fixture cleanup stop with an explicit owner decision.**
-   The consumer probe completed. A follow-up read-only provenance probe traced the
-   EICAR fixture's `2026-05-01T01:11:26Z` marker to the April 30 production
-   validation thank-you sent from `jgallivan@wmkeck.org` to
-   `justingallivan@me.com`; it is synthetic test correspondence, not a genuine
-   reviewer event. The frozen plan still requires approval naming both suggestion
-   IDs, their children, and `deleteContact:false` before the audited cleanup runs.
+### Recently Closed
 
-### Owner Decision Needed
-
-1. **Deletion approval for the two test artifacts.**
-   Evidence: `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` §8 — "No deletion is
-   authorized by this plan."
-   The probe and provenance follow-up are complete. Approval must name the exact
-   suggestion IDs, answer rows, drafts, linked test files, and state
-   `deleteContact:false`.
+1. **§8 fixture cleanup completed 2026-07-26.**
+   The owner confirmed both exact records were disposable tests and authorized
+   their children/linked test artifacts with `deleteContact:false`. The first
+   preflight stopped on an unrelated Tim Newhouse/St. Jude PDF in the EICAR
+   folder; exact-item deletion preserved it. Alerts `361`/`362` completed with no
+   warnings. Both test suggestions, three sentinel answers, sole draft, and
+   `eicar-test-bytes.pdf` are gone; both CRM contacts, the unrelated PDF, parent
+   requests, and synthesis hashes remain. Evidence:
+   `outputs/review-form-multiselect/fixture-cleanup-evidence-2026-07-26.json`,
+   SHA-256 `021c21fc8b2f90aee2651aab3df19f04df3d79d76d36c8385f86a999f5d6666e`.
 
 ### Parked
 
@@ -134,11 +138,11 @@ The next session is expected to be Codex implementing against the frozen plan.
    lands." It cites 30 source files; per-change reconciliation cost more than the drift
    it prevented. The §0.2 recheck markers were the last such pass.
 
-2. **`snapshotKeys` allowlists still filter `picklist || richtext` everywhere.**
-   Evidence: `submit-service.js:130-132`, `manual-review-entry-service.js:164-168`,
-   `review-upload.js`, `mark-received-no-file-service.js`. The S375 resolver swap
-   changed only WHEN each path learns about a publication — it did not reduce any
-   §3.4 work. Do not mistake it for progress on the type work.
+2. **The multiselect writer allowlists are complete; do not re-infer the historical
+   `picklist || richtext` gap.**
+   Portal submit, manual entry, legacy upload, and mark-received now admit
+   `multiselect` snapshot keys and use the shared canonical producer. Verify
+   source/tests before changing this contract.
 
 ### Do Not Reopen Without New Decision
 
