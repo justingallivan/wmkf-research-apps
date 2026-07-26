@@ -105,8 +105,8 @@ and runs inside `bypassDynamicsRestrictions`.
 
 ## 6. Key facts & constraints (probed ground truth — trust these, they cost time to find)
 
-- **Local-dev hits PROD Dataverse.** There is no isolated test store (a stale sandbox
-  exists but lacks the reviewer schema — see memory `project-dynamics-sandbox-state`). So
+- **Local-dev hits PROD Dataverse.** There is no isolated test store (a reachable sandbox
+  exists but never had the reviewer schema provisioned — see memory `project-dynamics-sandbox-state`). So
   e2e data is real prod data; keep it minimal + clean up.
 - **`EXTERNAL_LINK_SECRET` can be a local throwaway.** The token is minted (setup script,
   reads `.env.local`) AND verified (dev server, reads `.env.local`) by the **same local

@@ -176,8 +176,9 @@ writes from those deployment classes remain denied at the shared boundary.
 ### Mode C — Dataverse sandbox
 
 **[CURRENT — documented 2026-06-02; RE-PROBED 2026-07-26]** A reachable Dataverse
-sandbox exists, but the recorded state is schema-stale for reviewer Workbench use:
-core reviewer entities were absent and policy-version seed rows were missing.
+sandbox exists, but the recorded state shows the reviewer schema was never provisioned
+there for Workbench use: core reviewer entities were absent and policy-version seed
+rows were missing.
 `DYNAMICS_SANDBOX_URL` is used by selected adapters and scripts; the general
 application runtime reads `DYNAMICS_URL`.
 

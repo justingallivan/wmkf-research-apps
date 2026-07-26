@@ -63,7 +63,7 @@ The change that drives everything: **a synchronous, always-present, build-time a
 
 ### 2a. New Dataverse entity `wmkf_reviewquestion` (system of record for the question SET)
 
-Schema-as-code, new wave (`lib/dataverse/schema/wave9-review-questions/`), prod dry-run → execute (sandbox is schema-stale per `project-dynamics-sandbox-state`). One row **per current question**:
+Schema-as-code, new wave (`lib/dataverse/schema/wave9-review-questions/`), prod dry-run → execute (the reviewer schema, including this entity's sibling `wmkf_appreviewersuggestion`, was never provisioned in the sandbox — per `project-dynamics-sandbox-state`). One row **per current question**:
 
 | Column | Type | Holds |
 |---|---|---|
