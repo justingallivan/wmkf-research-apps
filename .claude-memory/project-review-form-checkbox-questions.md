@@ -60,6 +60,25 @@ reviewer review form. Per-layer evidence:
 `checkbox` row hand-written into `wmkf_reviewquestion` would break **every reviewer's
 portal page**, not just render one question oddly. The type must ship in code first.
 
+## Probed live state (2026-07-25) — do NOT re-infer this
+
+A Codex adversarial review refuted the first plan's "blank slate" claim, which had been
+inferred from a doc note saying no reviewer had submitted through the *portal*. Probed
+via `scripts/probe-live-review-questions.mjs` and `scripts/probe-review-blank-slate.mjs`:
+
+- The live `wmkf_reviewquestion` set is **byte-identical to the seeded schema**. The
+  owner believed they edited it on 2026-07-25; neither the set nor
+  `review_question_audit` shows any change after 2026-06-29. The edits never reached
+  Dataverse — most likely an admin save that hit the `missingParentBoundKeys` 400.
+- `wmkf_appreviewanswer` is **NOT empty**: sentinel rows (`answerValue=99`, empty text)
+  on one synthetic fixture whose review file is `eicar-test-bytes.pdf` (virus-scan test
+  data, not a review).
+- `review_drafts` holds a draft belonging to reviewer lastname `Gallivan_test`.
+
+Net: no *real* reviewer data, so keys/types/columns are still freely redefinable — but
+that is a decision to dispose of known test artifacts, not an absence of data. Say it
+that way; the sloppy version is what the review caught.
+
 ## Reconcile list for when a checkbox type ships
 
 The `picklist | richtext | string` list is restated in these durable surfaces — all
