@@ -23,8 +23,10 @@ related:
 **Status:** ACCEPTED AND FROZEN (S375, 2026-07-26). Backward-compatible code
 implementation and the additive wave-15 schema package are complete on
 `codex/review-form-multiselect`; production expansion and exact metadata/select
-readback completed 2026-07-26. Code promotion, publication, controlled
-rehearsal/rollback, fixture disposition, and reviewer exposure remain pending.
+readback completed 2026-07-26, followed by compatible code promotion to `main`
+(`5282cee8`) and a Ready production deployment
+(`dpl_7sfTLrMafYPKp7mnYdrEVjs9HmW5`). Publication, controlled rehearsal/rollback,
+fixture disposition, and reviewer exposure remain pending.
 **Target go-live: 2026-08-15** (owner-set; the date external reviewers first see the
 new form).
 
@@ -862,7 +864,11 @@ draft, or bypassing the existing removal audit is prohibited. [PLANNED]
    `scripts/probe-review-answer-multiselect-field.mjs`]
 2. Deploy the backward-compatible code: old question rows and old answer snapshots
    must behave exactly as before; new readers tolerate null `wmkf_answervalues`.
-   [PLANNED]
+   **[COMPLETED 2026-07-26]** Commit `5282cee8` was fast-forwarded to `main`;
+   Vercel production deployment `dpl_7sfTLrMafYPKp7mnYdrEVjs9HmW5` reached Ready,
+   the sign-in surface returned 200, the external review context route rejected a
+   malformed token fail-closed, and the read-only production question probe
+   confirmed the prior 12-row set remained active.
 3. Verify from independently routed production requests that each of the four
    write paths resolves the live `questionSetVersion` while the old question set
    is still active. Read paths may still serve a cached set for up to the TTL —

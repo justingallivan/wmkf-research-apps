@@ -1,6 +1,6 @@
 ---
 name: project-review-form-checkbox-questions
-description: Owner reworked the reviewer review form; fixed-option multiselect support and the production schema expansion are complete, while code promotion, publication, rehearsal, and exposure remain pending.
+description: Owner reworked the reviewer review form; fixed-option multiselect support, production schema expansion, and compatible code deployment are complete, while publication, rehearsal, and exposure remain pending.
 metadata:
   type: project
   status: active
@@ -11,11 +11,11 @@ metadata:
 ## Status (2026-07-26 implementation pass)
 
 **Plan ACCEPTED and FROZEN: `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md`. The
-row-backward-compatible code is implemented on `codex/review-form-multiselect`, and
-wave 15 was applied to production and read back on 2026-07-26. Code promotion,
-prompt/question publication, controlled rehearsal/rollback, fixture disposition,
-and reviewer exposure are deliberately still pending. Target go-live remains
-2026-08-15.**
+row-backward-compatible code was promoted to `main` at `5282cee8` and deployed to
+production as `dpl_7sfTLrMafYPKp7mnYdrEVjs9HmW5`; wave 15 was applied to
+production and read back first on 2026-07-26. Prompt/question publication,
+controlled rehearsal/rollback, fixture disposition, and reviewer exposure are
+deliberately still pending. Target go-live remains 2026-08-15.**
 Read the plan for the release contract; this entry records the current boundary.
 
 Closed owner decisions (do not reopen without a new one):
@@ -100,8 +100,9 @@ paragraph remains historical evidence for why the full-chain change was required
 `wmkf_questiontype` throws, and `context`/`draft`/`submit` all 500 on that throw. A
 production release had to apply/read back wave 15 before deploying the compatible
 code, because its readers and writers reference `wmkf_answervalues` even while the
-old question set remains active. That gate cleared on 2026-07-26. The compatible
-code may now deploy; only after that deployment may a `multiselect` row be activated.
+old question set remains active. That gate cleared on 2026-07-26, and the compatible
+code is now deployed. The prior 12-row question set remains active; a `multiselect`
+row may be activated only through the later controlled publication/rehearsal steps.
 Hand-writing a `checkbox` type remains invalid; the supported type name is exactly
 `multiselect`.
 

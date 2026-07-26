@@ -184,10 +184,11 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   stored value then label.
   **PRE-DEPLOYMENT GATE CLEARED 2026-07-26:** wave 15 is applied to production;
   exact metadata and entity-set select readback passed via
-  `scripts/probe-review-answer-multiselect-field.mjs`. Compatible code promotion is
-  now permitted while the old question set remains active. Prompt/question
-  publication, controlled rehearsal/rollback, fixture disposition, and reviewer
-  exposure remain separate release gates.
+  `scripts/probe-review-answer-multiselect-field.mjs`. Compatible code was then
+  promoted at `5282cee8` and is live in production deployment
+  `dpl_7sfTLrMafYPKp7mnYdrEVjs9HmW5`; the prior 12-row question set remains active.
+  Prompt/question publication, controlled rehearsal/rollback, fixture disposition,
+  and reviewer exposure remain separate release gates.
   Hand-writing a `checkbox` type remains invalid; the supported name is exactly
   `multiselect`. Canonical contract:
   `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md`; active memory:
