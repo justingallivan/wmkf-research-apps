@@ -34,15 +34,22 @@ const FIELDS = [
 ];
 
 async function main() {
-  const rows = await bypassDynamicsRestrictions(
+  // queryRecords returns { records, count, totalCount, hasMore } — NOT a raw
+  // OData envelope (lib/services/dynamics/read-ops.js:92-101).
+  const { records: list, totalCount, hasMore } = await bypassDynamicsRestrictions(
     { reason: 'read-only review-question set probe (scripts/probe-live-review-questions.mjs)' },
-    () => DynamicsService.queryRecords(ENTITY_SET, {
+    // A $filter is mandatory (unfiltered full-table dumps are refused). This one
+    // matches every row in either state, so active AND soft-deleted questions are
+    // both visible — a retired row still matters when planning key reuse.
+    () => DynamicsService.queryAllRecords(ENTITY_SET, {
       select: FIELDS.join(','),
+      filter: 'statecode eq 0 or statecode eq 1',
       orderby: 'wmkf_questionorder asc',
     }),
   );
 
-  const list = rows?.value || rows || [];
+  if (hasMore) console.log('WARNING: more rows exist than were returned.');
+  if (totalCount != null) console.log(`totalCount reported by Dataverse: ${totalCount}`);
   console.log(`\nLIVE question rows: ${list.length}\n${'='.repeat(70)}`);
 
   for (const r of list) {
