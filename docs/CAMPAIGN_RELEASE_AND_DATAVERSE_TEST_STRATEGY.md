@@ -175,11 +175,19 @@ writes from those deployment classes remain denied at the shared boundary.
 
 ### Mode C — Dataverse sandbox
 
-**[CURRENT — documented 2026-06-02; re-probe required]** A reachable Dataverse
+**[CURRENT — documented 2026-06-02; RE-PROBED 2026-07-26]** A reachable Dataverse
 sandbox exists, but the recorded state is schema-stale for reviewer Workbench use:
 core reviewer entities were absent and policy-version seed rows were missing.
 `DYNAMICS_SANDBOX_URL` is used by selected adapters and scripts; the general
 application runtime reads `DYNAMICS_URL`.
+
+The 2026-07-26 re-probe (`scripts/probe-sandbox-reviewer-schema.mjs`, read-only
+metadata) confirms this is still true and is absence rather than drift: the org
+authenticates and `akoya_request` is present, while `wmkf_appreviewersuggestion`,
+`wmkf_appreviewanswer`, `wmkf_reviewquestion`, and `wmkf_potentialreviewer` each
+return 404. `DYNAMICS_SANDBOX_URL` was also unset in the local environment at that
+time. Any plan proposing a sandbox rehearsal of the reviewer flow therefore depends
+on the full campaign gate below, not on a provisioning step.
 
 **[CAMPAIGN GATE]** Before calling the sandbox a reviewer test environment:
 
