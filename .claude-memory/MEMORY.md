@@ -57,6 +57,7 @@
 - Prompt legacy audit (RESOLVED S344 — apps sunset, peer-review wired, dead gens removed): project-prompt-legacy-audit-followup.md; ../docs/PROMPT_LEGACY_AUDIT.md
 - BILL / honoraria / payment semantics (BILL API TABLED by owner 2026-07-12, possibly permanently — address-based onboarding via existing systems instead): ../docs/agent-wiki/topics/finance-honoraria.md; project-honorarium-payment-landscape.md
 - Auth / admin / access / security / private Blob / file download: ../docs/agent-wiki/topics/security-auth.md
+- App-access grants and Q9 raw-client migration/warn-soak posture: project-app-access-control.md; ../docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md
 - Integrity screener / Retraction Watch / PubPeer / News: ../docs/agent-wiki/topics/integrity-screener.md
 - Dev environment / secrets / Vercel deploy / local build: ../docs/agent-wiki/topics/dev-environment.md; ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
 - Vercel plugin disabled for context cost (S377) — what it provides and how to re-enable before deploy debugging: project-vercel-plugin-disabled-restore.md

@@ -146,7 +146,7 @@ and a subsidiary `UNKNOWN` or `PLANNED` boundary.
 | `PLANNED` | 3 | The PA prompt Executor, workflow-chaining DAG, and review-synthesis readiness policy are unbuilt options/targets. The broad paid reviewer-contact scout was owner-closed as not currently justified after the 2026-07-27 live measurement. |
 | `ASSUMED` | 0 | No assumption is used as current truth. |
 | `STALE-CONFLICT` | 0 final | Independent review found conflicts during integration; each is listed and closed below rather than hidden by the final zero. |
-| `UNKNOWN` | 1 | Remaining external-platform/live-environment facts require their named probes. The PA prompt pipeline was resolved by the 2026-07-27 production metadata probe. |
+| `UNKNOWN` | 1 | One umbrella live-external-state contract remains probe-bounded. It includes the unreadable active Q9 deployment snapshot and the broader current platform facts listed below; Q9's project configuration and decision-relevant Stage 2 result are resolved. |
 
 ### Contract-reconcile matrix
 
@@ -161,7 +161,7 @@ and a subsidiary `UNKNOWN` or `PLANNED` boundary.
 | Grantee/honorarium | Guarded routes/services | Dataverse request/contact entities plus documented Postgres operational state | Workbench/portal/finance flows | `PARTIAL`; honorarium link population and grantee reminder/waiver configuration were probed 2026-07-27. All three package rows are Drafted, and the probe found no evidence of successful live reminder delivery. |
 | Review synthesis | Staff synthesis route after at least one submitted review | `akoya_request.wmkf_reviewsynthesisjson` | Reviews tab and DOCX/PDF exports | `PARTIAL`; no auto trigger; participation semantics were owner-confirmed 2026-07-27 but remain unimplemented |
 | DAL/context migration | Post-auth entry points establish trusted context; services use entity adapters | Dataverse through the 19 registered adapters; boundary gates enforce exceptions | Route/service consumers | `VERIFIED`; DAL, bypass-strip, and notification push-up plans are completed history |
-| Q9 preferences/app access | Preference service uses the DynamicsService adapter; app-access service still uses raw client transport | Dataverse preference and app-access entities | Auth/profile/app-access consumers | `PARTIAL`; preference migration shipped, app-access transport migration deferred, production warn/soak state `UNKNOWN` |
+| Q9 preferences/app access | Preference service uses the DynamicsService adapter; app-access service still uses raw client transport | Dataverse preference and app-access entities | Auth/profile/app-access consumers | `PARTIAL`; preference migration shipped and app-access remains deferred. Current Preview/Production project config omits `DATAVERSE_DAL_UNIVERSAL`; the active deployment snapshot is unreadable and no qualifying warn-soak receipt exists, so Stage 2 is not satisfied. |
 | Intake membership | Applicant landing/submit call membership service | Dataverse `wmkf_portalmembership` | Applicant eligibility and submit guard | `PARTIAL`; applicant reads shipped, intake-admin approval app/page/routes unbuilt |
 | Intake budget | Submit freezes flat budget lines; drain writes child rows | Postgres draft/job state → Dataverse `wmkf_proposalbudgetline` | Intake workflow | `PARTIAL`; applicant UI, nested model, parent aggregates/persons, and terminal transition unbuilt |
 | Historical memory incidents | N/A — dated decision/incident evidence | Tracked memory leaf | Future agent recall | `VERIFIED` as historical only; fresh incidents require re-verification |
@@ -246,6 +246,12 @@ These are deliberately not converted into “current” facts:
   or environment values, GitHub plan capabilities, tenant operation,
   Dataverse/SharePoint privileges, and live schema metadata until their named
   read-only probes run.
+
+For Q9 specifically, the decision-relevant result is no longer unknown:
+current Vercel project configuration does not preserve warn mode, and no
+qualifying clean soak is established. The already-built production
+deployment's embedded value remains unreadable from deployment metadata, but
+that cannot satisfy Stage 2 without a dated exercise receipt.
 
 ### Follow-up resolution: Power Automate prompt pipeline
 
@@ -383,6 +389,39 @@ to the tracked-seed hash
 `6bc31823750af6477e3764505c568b9c92db84358b84f58eeb020fe92c8d6dfa`.
 No cron was invoked and no email was sent.
 
+### Follow-up resolution: Q9 universal-DAL rollout posture
+
+The Q9 live-state slice was narrowed on 2026-07-27 with current source,
+Vercel project environment metadata, active-deployment metadata, and bounded
+runtime-log queries:
+
+- `DATAVERSE_DAL_UNIVERSAL` is absent from the current Preview and Production
+  project configuration; source resolves unset to `off`;
+- `DATAVERSE_DAL_ENFORCEMENT=on` remains present in Production;
+- the active production deployment is READY at commit `c2b57d0`, but the
+  deployment metadata does not expose its embedded universal-guard value;
+- retained-log queries found no `[dal-universal]` or app-access error lines,
+  but the requested 30-day window exceeded retention and an empty query is not
+  clean-soak evidence without proof that the deployment ran in `warn`; and
+- no dated receipt proves the required fresh sign-in and representative
+  app-access exercise.
+
+The actionable conclusion is therefore fixed: Q9 Stage 2 is **not satisfied**,
+and Stage 4 must remain deferred. Closing it requires an owner-selected
+observation window followed by an explicit `warn` setting, redeploy, Preview
+exercise, Production promotion, representative traffic, and clean log receipt.
+No environment variable, deployment, or application state was changed by this
+probe.
+
+### Q9 follow-up independent census
+
+A separate adversarial review checked six Q9 file-and-claim pairs: the active
+plan, this audit, the app-access memory leaf, the memory router, the Dataverse
+wiki topic, and the session handoff. All six were `AGREE`; none were stale,
+historical, or unrelated. The review specifically confirmed the
+project-configuration versus active-deployment boundary, the Stage 2
+conclusion, and the current 503/no-empty-cache auth semantics.
+
 ### Grantee follow-up independent census
 
 A separate adversarial census reviewed 31 grantee reminder/waiver
@@ -396,7 +435,9 @@ stale probe verdict. Each was corrected before commit.
 
 Across the original and follow-up censuses, the final additive result is 79
 material file/claim pairs: 52 `AGREE`, 25 `HISTORICAL`, 2 `UNRELATED`, and 0
-`STALE`. These are claim-pair reviews, not 79 unique files.
+`STALE`. Including the later six-pair Q9 follow-up, the cumulative result is
+85 pairs: 58 `AGREE`, 25 `HISTORICAL`, 2 `UNRELATED`, and 0 `STALE`. These are
+claim-pair reviews, not unique-file counts.
 
 ### Mechanical memory result
 
@@ -417,9 +458,9 @@ claim review and explicit unknowns above, not on the checker alone.
 
 ## Final verification and verdict
 
-The independent adversarial review found no unresolved material documentation
-or memory-hygiene finding. The original and grantee follow-up censuses together
-covered 79 material claim/file pairs: 52 `AGREE`, 25 `HISTORICAL`, 2
+The independent adversarial reviews found no unresolved material documentation
+or memory-hygiene finding. The original, grantee, and Q9 follow-up censuses
+together covered 85 material claim/file pairs: 58 `AGREE`, 25 `HISTORICAL`, 2
 `UNRELATED`, and 0 `STALE`.
 
 The root-run verification battery completed sequentially:
@@ -439,10 +480,10 @@ The root-run verification battery completed sequentially:
 domain, there is no known live stale claim or unresolved contradiction.
 Historical numeric references that remain are confined to clearly dated
 historical material rather than current implementation guidance. The original
-sweep used read-only probes; the later grantee follow-up included the one
-owner-authorized, guarded reminder-body settings write documented above. The
-production Power Automate and honorarium-link read-only probes resolved those
-slices. The items still listed in “Explicit remaining unknowns and owner
-decisions” remain intentionally open pending their named read-only probes or
-owner decisions. The grantee settings write did not invoke the cron or send
-email.
+sweep and Q9 follow-up used read-only probes; the grantee follow-up included
+the one owner-authorized, guarded reminder-body settings write documented
+above. The production Power Automate and honorarium-link read-only probes
+resolved those slices. The items still listed in “Explicit remaining unknowns
+and owner decisions” remain intentionally open pending their named read-only
+probes or owner decisions. The grantee settings write did not invoke the cron
+or send email; the Q9 follow-up changed no environment or deployment state.

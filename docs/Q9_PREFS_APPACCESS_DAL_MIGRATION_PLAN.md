@@ -30,9 +30,15 @@ DynamicsService. Stage 4 remains deferred: app access still calls
 `lib/dataverse/client.js` directly for `wmkf_appuserappaccesses`, and no
 app-access adapter or bounded unfiltered admin-list primitive exists.
 
-The active remaining work is Stage 4 plus Stage 5 closeout. Production warn
-posture and the required Stage-4 soak window are **UNKNOWN** in this
-source-only reconciliation and must be re-probed before execution.
+The active remaining work is Stage 4 plus Stage 5 closeout. The 2026-07-27
+Vercel probe found no `DATAVERSE_DAL_UNIVERSAL` entry in the current Preview
+or Production project configuration, so a new deployment would resolve the
+guard to its source default, `off`. Vercel's deployment metadata does not
+expose the already-built production deployment's embedded value, and the
+retained logs do not prove a prior clean warn-mode exercise. Operationally,
+Stage 2 is therefore **NOT SATISFIED**: do not begin Stage 4 until an explicit
+Preview → Production `warn` rollout completes the exercise and observation
+window below.
 
 ## Historical decision and planning record
 
@@ -89,7 +95,7 @@ section above and live source govern Stage 4 execution.
 | Write enforcement is ON in ALL environments: `DATAVERSE_DAL_ENFORCEMENT=on` explicit in prod (S330 flip); unset defaults to on outside production | `lib/services/dynamics-context.js:124-130` (`isDalEnforcementOn`) |
 | **Reads are stricter than writes**: `checkRestriction` throws `'Restrictions not initialized — cannot execute query'` **unconditionally** (no flag) when no ALS context is set; called by every read (`:294,:344,:400,:448,:492,:541,:596,:666`) | `lib/services/dynamics-service.js:183-197` |
 | Consequence: swapping a READ (`listAppKeysForUser`, `getUserPreferences`, `findRow`) onto DynamicsService before its caller establishes context throws in EVERY environment, flags irrelevant. This is the whole reason Q9's default was "leave them." | derived from the above, [VERIFIED] |
-| The throw is then CAUGHT by the services' own try/catch → **silent degradation, not a 500**: `listAppKeysForUser` returns `[]` → every user sees "Access Not Available"; prefs read as empty. Harder to notice than a crash — warn-mode observation before swap is therefore mandatory, not optional. | prefs/app-access catch blocks cited in 1.1 |
+| The throw is caught by the service. Current auth callers pass `{ throwOnError: true }`, so `requireAppAccess` returns a retryable 503 and does **not** cache an empty grant set; display-only callers retain the graceful `[]` fallback. A missed context can therefore interrupt every non-superuser app-gated request even though it no longer creates a two-minute silent lockout. Warn-mode observation before the swap remains mandatory. | `lib/services/dataverse-app-access-service.js:listAppKeysForUser`; `lib/utils/auth.js:requireAppAccess` |
 | `withDalContext(scopeLabel, fn)` = thin DAL-labeled wrapper over `bypassDynamicsRestrictions`; performs no auth; sanctioned for post-auth entry points; "always allowed" by the context-boundary gate | `lib/dataverse/core/context.js:46-54`; `scripts/check-dynamics-context-boundary.js:45,:111-112` |
 | Interim guard (`assertDataverseAccess`, `DATAVERSE_DAL_UNIVERSAL` off/warn/on, default off) uses the SAME ALS-presence predicate (`getDynamicsContext()`), so a caller wrapped for warn-mode is correctly wrapped for DynamicsService — no rework | `lib/services/dynamics-context.js:226-243` |
 
@@ -217,9 +223,11 @@ Dataverse services. The migration swaps the two services' *internals*; no route 
 - **OQ-1 — CLOSED (2026-07-06/S339).** `DYNAMICS_SANDBOX_URL` is unset in all Vercel runtime
   environments `[VERIFIED via vercel env ls: only DYNAMICS_URL across Dev/Preview/Prod]`. No org
   repoint risk; the swap is URL-neutral; no data copy needed. Nothing blocks Stage 3 on this axis.
-- **OQ-2:** Warn-mode observation window length before each swap stage (recommendation: ≥3
-  weekdays of prod traffic including at least one fresh staff sign-in; the S330 enforcement flip
-  used a runtime-log-scan protocol — reuse it).
+- **OQ-2 — OWNER DECISION REQUIRED:** Warn-mode observation window length before the
+  app-access swap. Recommendation: ≥3 weekdays of production traffic including
+  at least one fresh staff sign-in; the S330 enforcement flip used a
+  runtime-log-scan protocol — reuse it. The 2026-07-27 probe did not find
+  retained evidence that this window already occurred.
 - **OQ-3:** After both entities migrate, the only remaining `client.js` write surfaces are
   `wmkf_appsystemsettings` (Wave 3) + `wmkf_appgrantcycles` (Wave 6) + identity-map reads. Flip
   `DATAVERSE_DAL_UNIVERSAL` to `warn`→`on` for that tail on the same schedule, or leave until
@@ -301,7 +309,13 @@ Hard orderings, stated per entry point:
 2. Baseline: full jest suite green (4945 baseline), all four gates + self-tests green, census
    report snapshot (`node scripts/check-dataverse-access-layer.js --report`) saved to scratchpad
    for before/after diffing.
-3. Confirm prod still runs `DATAVERSE_DAL_ENFORCEMENT=on` and `DATAVERSE_DAL_UNIVERSAL` unset.
+3. **RE-PROBED 2026-07-27:** current Production project configuration contains
+   `DATAVERSE_DAL_ENFORCEMENT=on`; current Preview and Production project
+   configuration contain no `DATAVERSE_DAL_UNIVERSAL` entry. Source therefore
+   resolves a new deployment to `off`. The active production deployment's
+   embedded value is not exposed by Vercel deployment metadata, so establish
+   the runtime posture deliberately with the Stage 2 env change and redeploy
+   rather than inferring it from the project setting.
 
 ### Stage 1 — Context wraps (DONE)
 Each commit: wrap + a `*-dal-context` test proving the call now executes inside ALS context
@@ -362,7 +376,17 @@ Each commit: wrap + a `*-dal-context` test proving the call now executes inside 
 Gates for Stage 1: `check:dynamics-context-boundary` (+ self-test), full jest suite. No census
 change expected (transport untouched).
 
-### Stage 2 — Warn-mode observation (CURRENT STATUS UNKNOWN)
+### Stage 2 — Warn-mode observation (NOT SATISFIED)
+
+**[VERIFIED 2026-07-27 via Vercel project env metadata, active-deployment
+metadata, and bounded runtime-log queries]** The current Preview and Production
+project configuration omit `DATAVERSE_DAL_UNIVERSAL`; source defaults an unset
+value to `off`. The active production deployment snapshot does not expose the
+embedded value. Queries over the retained log window found no
+`[dal-universal]` or app-access error lines, but that is not clean-soak evidence
+when the flag is not known to have been `warn`, and the requested 30-day window
+exceeded available retention. No qualifying exercise receipt was found.
+
 Set `DATAVERSE_DAL_UNIVERSAL=warn` in preview, exercise: fresh sign-in (new profile), prefs
 save/load, admin grant/revoke, prompt-override save, **a reviewer-finder `analyze` AND `discover`
 run BY A USER WHO HAS A SAVED PROMPT OVERRIDE** (exercises the 1h path — confirms
@@ -449,7 +473,8 @@ Extra rigor for the hot path:
 - Deploy prod at a low-traffic moment; watch logs live; the 2-min app-access cache
   (`auth.js:266-271`) means a regression surfaces within minutes, not instantly — scan for
   `[dataverse-app-access] listAppKeysForUser error` specifically, and treat ANY occurrence as
-  rollback trigger (it means every affected user is being denied all apps).
+  rollback trigger (current auth returns retryable 503 and does not cache the failed lookup, but
+  every affected non-superuser app-gated request is interrupted until the lookup succeeds).
 - Rollback = single-commit revert of the swap commit (Stage-1 wraps stay — they are correct for
   both transports; the interim client.js path has no context requirement).
 
@@ -490,7 +515,7 @@ adapter attribution with zero new violations.
 
 | Risk | Mechanism | Mitigation |
 |---|---|---|
-| **Auth-path silent lockout** (highest) | post-swap missing context → `checkRestriction` throw → caught → `[]` → every user "Access Not Available"; NOT a 500, so no error-rate alarm | Stage-1 wrap of `requireAppAccess` lands first and is warn-observed (Stage 2) against the SAME ALS predicate DynamicsService uses; app-access swapped LAST (Stage 4) after prefs proves the pattern; explicit log-scan trigger on `[dataverse-app-access]` error lines; single-commit revert |
+| **Auth-path broad 503 interruption** (highest) | post-swap missing context → `checkRestriction` throw → service rethrows for the auth caller → `requireAppAccess` returns retryable 503 without caching an empty grant set; display-only callers still degrade to `[]` | Stage-1 wrap of `requireAppAccess` lands first and is warn-observed (Stage 2) against the SAME ALS predicate DynamicsService uses; app-access swapped LAST (Stage 4) after prefs proves the pattern; explicit log-scan trigger on `[dataverse-app-access]` error lines; single-commit revert |
 | ~~Sandbox-URL repoint~~ **RESOLVED** | services' `SANDBOX \|\| URL` fallback vs DynamicsService's `DYNAMICS_URL` | **CLOSED S339: no `DYNAMICS_SANDBOX_URL` in any Vercel env `[VERIFIED via vercel env ls]` → fallback is dead code, swap URL-neutral.** Delete the dead fallback during each swap |
 | Ownership-binding regression | different create path | bind keys pass through `createRecord` body verbatim (`dynamics-service.js:758-763` [VERIFIED]); characterization asserts body bytes; never pass `actingUserSystemId` |
 | **List reads truncate/throw through `queryRecords`** (Codex re-review P1, CONFIRMED) | `queryRecords` caps `$top≤100`, defaults 25, throws on unfiltered>25 (`dynamics-service.js:398-407`); per-user prefs list has no `$top`, admin `listAll` is unfiltered `$top=5000` | per-user lists use filtered `queryAllRecords`; `listAll` gets a new bounded admin primitive (OQ-5 RESOLVED → option a, Stage 4 step 0); char-tests with >25 prefs / bulk grants |
@@ -536,9 +561,13 @@ asserts that the named checkpoint status remains current.
    the **reviewer-prompt-resolver override read (1h — Codex P1, confirmed bare)** — one commit per
    file, each with a dal-context/`overrideUsed` test; add warn-mode read probes to the five read
    functions; verify the 6 email-signature transitive paths.
-3. Flip `DATAVERSE_DAL_UNIVERSAL=warn` (preview→prod) and hold until logs are clean, because
-   post-swap a context gap is a SILENT access denial (caught → falsy), not a crash. Exercise a
-   prompt-override user's analyze+discover (the 1h path) in the warn window.
+3. After the owner selects OQ-2's window, explicitly set
+   `DATAVERSE_DAL_UNIVERSAL=warn` and redeploy Preview → Production. Hold until
+   the exercise and logs are clean; the 2026-07-27 project configuration omits
+   the flag and does not satisfy this stage. Post-swap, a context gap returns a
+   retryable 503 on the auth path (without caching an empty grant set), while
+   display-only callers may still degrade to `[]`. Exercise a prompt-override
+   user's analyze+discover (the 1h path) in the warn window.
 4. **Convert/retire the 5 live R8 scripts** to `enterDynamicsBypassForScript` per entity BEFORE
    its swap (Stage 2.5 — Codex P2), else they silently degrade / mis-report post-swap.
 5. Migrate PREFS first (off the auth hot path; bounded blast radius): characterization tests →
@@ -602,6 +631,19 @@ asserts that the named checkpoint status remains current.
   `listByOwner`, and closed OQ-4 by moving the guarded-swap pin to the adapter. Ownership boundary:
   `lib/services/dynamics-service.js`, `tests/unit/dynamics-service-count.test.js`, the app-access
   transport swap, and the Stage 4 admin-list primitive were intentionally left untouched.
+- **2026-07-27 — live posture re-probe: Stage 2 not satisfied.** Current
+  Vercel project env metadata contains no `DATAVERSE_DAL_UNIVERSAL` entry for
+  Preview or Production; source defaults unset to `off`.
+  `DATAVERSE_DAL_ENFORCEMENT=on` remains present in Production. The active
+  production deployment is READY at commit `c2b57d0`, but deployment metadata
+  does not reveal its embedded universal-guard value. Bounded runtime queries
+  found no `[dal-universal]` or app-access error lines; because the flag was not
+  established as `warn` and the wider requested window exceeded retention,
+  those empty results are not a clean-soak receipt. Current source also
+  supersedes the historical silent-lockout description: the auth caller
+  requests `throwOnError`, returns a retryable 503 on lookup failure, and does
+  not cache an empty grant set. Stage 4 remains deferred pending the OQ-2 owner
+  decision and a deliberate Preview → Production warn exercise.
 
 Historical S339 sequencing note: no decomposition checkpoint was then a
 prerequisite; commits were not to be interleaved.
