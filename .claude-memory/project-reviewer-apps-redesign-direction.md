@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: Reviewer Finder + Reviewer Manager are slated to be replaced by a unified Request Workbench (per-request, holistic) + standalone Reviewer Pool. Holistic frame locked S195; build sequence = reviewer-lifecycle slice first (= Workbench v1). Reviewer-tab structure: DECIDED S206 as 4-tab; built as 5 sub-tabs (Candidates added S211); now COLLAPSED to 3 sub-tabs (Find · Invite Reviewers · Track Reviewers, S280). Workbench Phases 0–3 (reviewer-lifecycle slice) all SHIPPED; Proposal (S258, expert-link enrichment S260), Overview + Status (Group A, S260), and Awardee/grantee-deliverables also shipped — 6 live tabs (incl. Reviews); the other 4 request-lifecycle tabs are still placeholders (scoped in docs/REQUEST_WORKBENCH_BUILD_PLAN.md §"Remaining lifecycle tabs — scope (S260)").
+description: The unified Request Workbench is live with six implemented tabs and four placeholders; current truth and forward sequencing are owned by the 2026-07-26 audit and near-term execution plan, while this entry preserves the redesign chronology.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-06-26 via source (live tabs: Reviewers w/ 3 sub-tabs [Find · Invite Reviewers · Track Reviewers, ReviewersTab.js:41-43], Proposal w/ Field Primer, Overview + Status [Group A, S260], Reviews, Awardee/grantee-deliverables; 4 top-level tabs still placeholders — see body)
+  last_verified: 2026-07-26 via source, live metadata/prompt probes, and Workbench truth audit
 ---
 
 ## Recall Rule
@@ -23,7 +23,25 @@ Do not:
 - Re-flag `akoya_requeststatus` values as "unverified," or advance status early for D26 (use the manual request-number allowlist instead — advancing status fires PA triggers prematurely).
 - Treat "Completed" as paying anyone or firing a trigger (option a: record-keeping only, no drop-off).
 
-Ground truth: `docs/REQUEST_WORKBENCH_BUILD_PLAN.md`, `docs/REQUEST_WORKBENCH_SCOPING.md`, `docs/mockups/lifecycle-ui-mockup.html`, `shared/config/d26Allowlist.js`, `docs/DATAVERSE_POWER_TOOLS_DESIGN.md`, `scripts/probe-akoya-status-predicate.js`; many related entries linked at file end.
+Ground truth: `pages/workbench/[requestId].js`,
+`docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md`,
+`docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`, and the per-surface source/Atlas
+contracts. `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` and
+`docs/REQUEST_WORKBENCH_SCOPING.md` are historical chronology/rationale.
+
+## Current source-backed state (2026-07-26)
+
+- Ten top-level tabs; six live (Overview, Proposal, Reviewers, Reviews, Status, Awardee)
+  and four placeholders (Initial Writeup, Pre Site Visit Writeup, Site Visit, Final Writeup).
+- Reviews is built; its synthesis producer/persistence/consumer path exists, but the
+  production structured-output smoke is still red and automatic all-in triggering is not built.
+- Awardee includes the distinct live `/external/grantee/[token]` portal and
+  `wmkf_granteedeliverable` persistence. GAL-trigger automation remains separate/unknown.
+- The proposed writeup URL fields and `writeup.*` prompt rows are absent; the June writeup
+  design is historical input, not implementation truth.
+- Reviewer Pool remains planned and optional, not a shipped Workbench-v1 deliverable.
+
+## Historical decision chronology
 
 S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer Pool). **S195 reframed it twice**, ending at a holistic Request Workbench backed by a backend automation tier. Build deferred until S208 — goal before code was a scoping doc Connor / Sarah can react to.
 
@@ -33,7 +51,9 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 - **Per-request shell** (`eeb5da3`): `/workbench/[requestId].js` shell (tab strip + placeholder panels) so dashboard rows resolve. *(At this commit all panels were stubs; the Reviewers panel was made live by Phases 2–3 below, the Proposal tab later (S258), Overview + Status in Group A (S260), Reviews, and Awardee/grantee-deliverables later; the other 4 tabs remain placeholders.)*
 - **Phase 2 — SHIPPED S209 (`64f694f`):** real Manage panel `shared/components/reviewers/ReviewerManagePanel.js`, shared by Review Manager + Workbench; `ReviewersTab.js` wires the Reviewers tab (Invite/Track/Completed + state-aware landing).
 - **Phase 3 — SHIPPED S210 (`79a2840`) + S211 (`bd95087`):** `ReviewerFindPanel.js` (auto-load proposal, in-panel `analyze→discover→enrich→save` search at full standalone parity), applicant-reviewer ingestion (`/api/workbench/applicant-reviewers.js`, recommended→candidates / excluded→per-request soft-block), and the new **Candidates** saved-roster sub-tab (`CandidatesPanel.js` + real invitations). Manual reviewer add SHIPPED S236 (`/api/workbench/manual-reviewer.js`). At S210–S211 the live Reviewers tab had **5** sub-tabs (Find · Candidates · Invite · Track · Completed), not the 4 of the S206 design; it was later **collapsed to 3 (Find · Invite Reviewers · Track Reviewers, S280, commit `4d45b4c8`)**. Authoritative phase status: `docs/REQUEST_WORKBENCH_BUILD_PLAN.md`.
-- **Still pending (operational, NOT code — verify, don't assume):** grant the `reviewers` app to the pilot PDs via `/admin`, and browser-smoke `/workbench`. No source artifact proves these are done; treat as open until checked live.
+- **Historical operational note:** the original pilot grant/browser-smoke checkpoint is
+  superseded by subsequent production Workbench use. Current smoke status is tracked in
+  `docs/CURRENT_WORK_QUEUE.md`; do not revive this old checkpoint.
 
 **S260 (2026-06-15) — Group A tabs + triage-field plan + app-retirement started:**
 - **Group A SHIPPED (`f47d1f09`, `66f33b8c`):** the **Overview** (per-request command center) + **Status**
@@ -41,7 +61,8 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
   Overview's reviewer-stage strip uses a NEW lighter endpoint `/api/workbench/reviewer-rollup` (shared
   `lib/services/reviewer-rollup.js` — `deriveWorkRemaining` moved there; the `status-enum-parity` gate now
   reads it from there). **4 placeholder lifecycle tabs remain** (Initial/Pre-Site-Visit/Final Writeup,
-  Site Visit) — scoped in `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` §"Remaining lifecycle tabs".
+  Site Visit). The current contract and order are in
+  `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`; the old S260 scope is historical.
 - **Triage-field BUILT + DEPLOYED (S261, `ecdcaed2`/`42823593`):** `docs/WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md` (v4, 3 Codex rounds).
   A new `wmkf_triagestatus` picklist (Advancing/Set aside/null) on **core `akoya_request`** is LIVE in prod with the
   D26 backfill applied (35 Advancing + 170 Set aside, 205 rows). It is DESIGNED to retire the manual `d26Allowlist.js`,

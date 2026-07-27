@@ -6,7 +6,7 @@ status: canonical
 summary: Canonical priority queue separating current commitments, evidence windows, optional work, external dependencies, and parked programs.
 canonical: true
 cataloged: 2026-07-22
-last_verified: 2026-07-24
+last_verified: 2026-07-26
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -16,6 +16,8 @@ related:
   - docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md
   - docs/REVIEWER_IDENTITY_CONTACT_PLAN.md
   - docs/REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md
+  - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
+  - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
 ---
 
 # Current Work Queue
@@ -32,12 +34,18 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Reviewer reliability evidence design | Structured staff review entry and post-accept terminal statuses (`withdrew` vs `released`) are live in production. The next allowed step is a read-only probe of whether Dynamics email activities can serve as durable, ordered materials-dispatch evidence. Completed-review payability remains a separate feature; keep pre-accept reset separate from both terminal status and post-accept financial annotation. | Owner-reviewed evidence design before any schema or metric build. |
-| 2 | Reviewer campaign evidence window | Keep the legacy resolver authoritative during the upcoming run. Record W2 shadow disagreements, wrong/missed identity outcomes, email confirmation, staff corrections, invitations, and review completion. | Post-run evidence review; no automatic cutover. |
-| 3 | Optional reviewer UX triage | Select only improvements supported by observed staff friction. Current candidates: campaign-settings discoverability/defaults, review-output formatting, and global reviewer notes/flags or a Reviewer Pool. | Separate owner choice for each item; absence from this selection means no build. |
+| 1 | Production review-synthesis smoke | Use Request `1002788` and a deliberate staff-triggered Generate/Regenerate action. Verify valid structured output, Dataverse persistence, reload visibility, overwrite behavior, and clean logs. Do not add automatic triggering during the smoke. | All smoke criteria in `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` pass, or a bounded diagnosis is recorded with no partial write. |
+| 2 | Reviews/synthesis contract closure | Fix the incomplete-JSON reliability gate; define the participating-invitation set; implement automatic all-in readiness, explicit manual early-run, stored-output visibility, and observable regeneration. | Owner-approved state machine plus tested producer → persistence → consumer contract. |
+| 3 | Remaining lifecycle design freeze | Calendar the fixed deadlines and define the full contract for Pre Site Visit Writeup, Site Visit, Final Writeup, and Initial Writeup. Existing June assumptions are inputs, not decisions. | Each tab has approved user, inputs, producer, persistence, consumer, access, recovery, and deadline. |
+| 4 | First deadline-bound writeup slice | Default candidate is Pre Site Visit Writeup, but only after the calendar and input/artifact contracts are approved. | One request produces a durable, editable Word artifact and visible Workbench state through a production smoke. |
 
 ## Completed in this execution
 
+- Evidence-first sweep correction and Workbench truth audit: the sweep now derives truth before
+  searching prose, supports domain audits, requires producer→persistence→consumer evidence, and
+  records supported/falsified claims. The scalar fact gate now derives Workbench tab counts and
+  cannot be bypassed with Markdown-bold/code-wrapped numbers. The 2026-07-26 audit retired the
+  stale forward roadmap and established the current six-live/four-placeholder state.
 - Documentation ground-truth reconciliation: merged to `main` on 2026-07-22; this queue is the
   priority authority and the documentation gates were green.
 - Dataverse target/write interlock: positive warn-mode production observation, explicit owner
@@ -74,8 +82,9 @@ These are valid directions but are not current app-team delivery commitments:
 
 - Power Automate Executor parity and status-driven backend automation — Connor-owned and dependent
   on grant-cycle sequencing.
-- Group B writeup spine and related dashboard automation — blocked on the documented Dataverse and
-  Power Automate inputs.
+- Power Automate-backed writeup automation remains dependency-bound. The former Group B document
+  is historical; the app-side writeup contract must be redesigned from current fields, prompts,
+  inputs, and deadlines before any build.
 - Proposal-context extraction and staged-pipeline evolution — later-cycle work, not part of the
   current reviewer campaign.
 

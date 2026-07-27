@@ -6,7 +6,7 @@ status: active
 summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-07-23
+last_verified: 2026-07-26
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -18,7 +18,7 @@ related:
 
 # Where We're Headed
 
-**Last verified: 2026-07-22.** This document owns long-term direction and principles. The
+**Last verified: 2026-07-26.** This document owns long-term direction and principles. The
 ordered, current delivery agenda lives in `docs/CURRENT_WORK_QUEUE.md`; this document is not a
 backlog.
 
@@ -123,14 +123,15 @@ Now we have read access to Dynamics and SharePoint, and leadership buy-in to use
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
 
-1. ship the terminal post-accept reviewer status (`withdrew` vs `released`) independently; design
-   deadline evidence separately around durable, ordered materials dispatches; keep completed-review
-   payability as another independent feature;
-2. use the upcoming reviewer campaign as an evidence window while the legacy resolver remains authoritative;
-3. select optional reviewer UX work only from demonstrated staff friction.
+1. run the parked production review-synthesis smoke and close its structured-output reliability gate;
+2. finish the synthesis lifecycle contract, including all-in readiness, manual early-run, and stored-output visibility;
+3. freeze the user/input/storage/access/deadline contract for the four remaining Workbench lifecycle tabs;
+4. build the first deadline-bound writeup slice, provisionally Pre Site Visit Writeup.
 
-The documentation reconciliation and Dataverse target/write interlock enforcement stages completed
-2026-07-22; see `docs/CURRENT_WORK_QUEUE.md` for the evidence and remaining order.
+The 2026-07-26 evidence-first audit found six live Workbench tabs and four placeholders,
+retired the contradictory forward roadmap, and separated shipped behavior from proposed
+writeup fields/prompts. See `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md`
+and `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
 
 Power Automate automation, the applicant-intake product, automated BILL onboarding, and broader
 reviewer cleanup have separate dependency or owner gates. They are not implied next steps.

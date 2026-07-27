@@ -1,23 +1,35 @@
 ---
-title: "Group B — Writeup Spine: Design Proposal"
+title: "Group B — Writeup Spine: historical design proposal"
 domain: architecture
 kind: spec
-status: active
-summary: "Audience: Justin + Connor Status: Design — not yet built; pending Connor's input on Dataverse schema and PA flow Date: 2026-06-16."
+status: historical
+summary: "Historical June 2026 writeup-spine proposal; proposed fields, prompts, D26 pilot timing, and input flow were not implemented as written."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
 related:
+  - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
+  - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
   - scripts/probe-graph-write-access.mjs
   - shared/config/prompts/phase-i-writeup.js
   - shared/config/prompts/proposal-summarizer.js
   - pages/api/workbench/resolve-request.js
 ---
 
-# Group B — Writeup Spine: Design Proposal
+# Group B — Writeup Spine: historical design proposal
+
+> **Current routing (2026-07-26):** Preserve this document as the June design record,
+> not as an implementation-ready plan. Production probes found both proposed
+> `wmkf_ai_*writeupurl` fields absent, and the live prompt store has neither
+> `writeup.initial` nor `writeup.pre-site-visit`. The Pre Site Visit flow below also
+> omits the returned-review/synthesis input its stated purpose requires. Existing
+> `akoya_sitevisitdate` and `akoya_sitevisitnotes` fields invalidate the adjacent
+> assumption that Site Visit necessarily needs new schema. Use
+> `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md` for evidence and
+> `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` for current sequencing.
 
 **Audience:** Justin + Connor  
-**Status:** Design — not yet built; pending Connor's input on Dataverse schema and PA flow  
+**Status at drafting:** Design — not yet built; pending Connor's input on Dataverse schema and PA flow  
 **Date:** 2026-06-16
 
 ---

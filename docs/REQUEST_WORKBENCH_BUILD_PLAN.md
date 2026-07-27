@@ -1,22 +1,28 @@
 ---
-title: "Request Workbench (D26 reviewer dashboard) — build plan"
+title: "Request Workbench (D26 reviewer dashboard) — historical build record"
 domain: architecture
 kind: plan
-status: active
-summary: "- Build the full Workbench, not just the allowlist unblock."
+status: historical
+summary: "Historical implementation chronology for the D26 reviewer dashboard and early Workbench build; no longer owns forward lifecycle scope."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
 related:
   - docs/REQUEST_WORKBENCH_SCOPING.md
+  - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
+  - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
   - docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md
   - pages/api/reviewer-finder/my-proposals.js
   - docs/AUDIT_S154_MEMORY.md
 ---
 
-# Request Workbench (D26 reviewer dashboard) — build plan
+# Request Workbench (D26 reviewer dashboard) — historical build record
 
-> **Status:** Living implementation roadmap, drafted 2026-05-31 (Session 207). Major Reviewer, Proposal, and Status work has shipped; this document retains their implementation record and scopes the remaining lifecycle tabs. It complements the historical scoping doc `docs/REQUEST_WORKBENCH_SCOPING.md` (the *what/why*) with the *how* — file paths, signatures, phasing. Live-state claims are marked verified where probed.
+> **Current routing (2026-07-26):** This is the historical implementation chronology
+> for the D26 reviewer-dashboard build. It no longer owns current Workbench status or
+> forward scope. Use `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md` for the
+> evidence-backed state assessment and `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`
+> for current sequencing.
 >
 > **v2 (2026-05-31): Codex review round 1 folded in.** Accepted: expanded junction-reader audit (§Phase 0.7), allowlist `scope=my` + string-quoting fix (§Phase 1), race-safe upsert + exclude-resolution + conflict rules (§Phase 3), `summaryBlobUrl` removal blast-radius (§Find-mod 6), grant-assignment step (§Phase 1), `wmkf_selected=false` for excluded rows, `wrongApp` test fix. **Pushed back (already in-plan, reviewer missed): the API-route-matrix rows + Atlas-page update are in §"CI gates + doc updates"; `wmkf_completedat` is adapter-wiring-only (not a deploy).**
 >
@@ -146,61 +152,26 @@ Codex reviewed the Phase 0 diff and flagged that the excluded-row guard, while c
 - Staff post-acceptance direct writes (`mark-received-no-file`, `lib/services/review-upload.js`) bypass the adapter — route them through it or add an inline disposition reject. (Unreachable while excluded rows never reach acceptance, but close the gap when ingestion lands.)
 - `generate-emails` legacy `.eml` mark-as-sent loop writes by id directly — moot once the legacy path is retired (Find-mod 6), otherwise add the reject.
 
-## Deferred (not this round)
+## Historical deferred scope — superseded
 
-Retire legacy `reviewer-finder`/`review-manager` keys + delete old pages; real functionality for the **6** remaining placeholder tabs (every tab except the live **Reviewers**, **Proposal** [S258], **Overview**, and **Status** [Overview+Status = Group A, shipped S260] — i.e. Initial Writeup/Reviews/Pre Site Visit Writeup/Site Visit/Final Writeup/Awardee; **scoped in §"Remaining lifecycle tabs — scope (S260)" below**); backup/co-PD management rights; Reviewer Pool; the planned person-level `wmkf_reviewerstate` field; a structured *reason* field for excludes; the analyze-side `summaryPages`/`summaryBlobUrl` strip (Find-mod 6 — the Workbench no longer passes it, but the shared `analyze.js` still references it). (The in-panel search / `NewSearchTab` relocation SHIPPED S210 — no longer deferred.)
+The S260 forward-scope section that previously followed this heading is retired. It was
+not merely old sequencing: it contradicted current code by describing Reviews as unbuilt,
+Awardee as future work, six tabs as placeholders, and Site Visit as necessarily requiring
+new Dataverse storage.
 
-## Remaining lifecycle tabs — scope (drafted S260)
+As verified on 2026-07-26:
 
-> **Status:** Forward scope for the still-placeholder Workbench tabs. Drafted 2026-06-15 (S260) from `docs/REQUEST_WORKBENCH_SCOPING.md` (§3.2 writeups, §3.4 Status, §3.6 Awardee, §3.7 dossier, Appendix automation-tiers) + the live shell. The *what/why* per tab lives in the scoping doc; this is the *how/when/size*. **Sizes are relative (S/M/L), not estimates.** Proposal shipped S258 (Field Primer + documents + AI content; expert profile-link enrichment S260) and is the template for the re-home pattern below.
->
-> **UPDATE (S260): Group A SHIPPED — `Status` + `Overview` v1 are now live**, and the shell defaults to Overview. So **6** placeholder tabs remain (Initial Writeup, Pre Site Visit Writeup, Final Writeup, Reviews, Site Visit, Awardee). Live tabs are now Reviewers, Proposal, Overview, Status. *(Later update, verified vs `pages/workbench/[requestId].js` TABS + render branches 2026-06-26: Awardee + Reviews also shipped → **4** placeholders remain — Initial Writeup, Pre Site Visit Writeup, Site Visit, Final Writeup — and **6** live: Overview, Proposal, Reviewers, Reviews, Status, Awardee.)* See the per-tab table + build order below for what shipped.
+- live tabs are Overview, Proposal, Reviewers, Reviews, Status, and Awardee;
+- placeholders are Initial Writeup, Pre Site Visit Writeup, Site Visit, and Final Writeup;
+- review synthesis has a real producer/persistence/consumer path but remains behind a red
+  production reliability gate;
+- Awardee/grantee deliverables has a distinct, live external portal and child-entity model;
+- production already has `akoya_sitevisitdate` and `akoya_sitevisitnotes`;
+- the proposed writeup URL fields and `writeup.*` prompt rows do not exist.
 
-**The cheap part is built; the cost is per-tab substance.** Reviewers was hard because it was net-new infrastructure (discovery, identity, invite/track). By contrast the scoping doc's central principle is that **most remaining tabs RE-HOME an existing app, pre-loaded with the proposal.** The shell already does the expensive plumbing once: `resolve-request` returns a rich `context` a tab *can* read — `requestStatus`, `meetingDate`, `proposalInfo`, PD/institution, `aiContent.{fitRationale,summary,dataExtract,fieldPrimer}` [verified `pages/api/workbench/resolve-request.js`] — and adding a tab = a component + one branch in the shell conditional (exactly how Proposal was added). (As of S260, the **Overview / Proposal / Reviewers / Status** branches consume `ctx`; the other 6 render a placeholder card.) So cost concentrates in **a few cross-cutting primitives, not a per-tab rebuild.**
-
-**Two corrections from the Codex review of this plan (S260), reflected below:**
-- **The re-home apps are flat, UPLOAD-BASED pages today** (`pages/phase-i-writeup.js`, `pages/phase-ii-writeup.js`, `pages/peer-review-summarizer.js` — *files*, not directories). Each re-home therefore needs a **request-preload adapter** (proposal/reviews loaded from the request, not a file upload) — the same upload→requestId shim Proposal already built. This is a real, repeated cost, not a free re-home.
-- **"Re-home an existing app" is the scoping doc's generalization, not a universal.** The genuine net-new / new-input exceptions: **Overview** (composed), **Site Visit** (new notes capture), **Final Writeup** (needs a site-visit-findings input the Phase II engine lacks), and the **Reviewer Pool** sibling (tier-1, not a tab). Flagged inline.
-
-### Per-tab scope
-
-| Tab | Purpose (scoping §) | Re-home / data source | Automation tier (Appendix) | Size | Main dependency |
-|---|---|---|---|---|---|
-| **Overview** ⭐net-new — ✅ **v1 SHIPPED S260** | Per-request "command center" — *where is this request, what do I do next* (§3.2/§3.7) | `OverviewTab.js`: `ctx` snapshot + AI-artifact presence + reviewer-stage strip via `reviewers.js` + shared `reviewer-modes` helpers | composed | **S→M** | v1 done (ctx + reviewer rollup); the smart "next step" still wants `isActionableForPD` (**open**, §6); writeup/review state lands with those tabs |
-| **Status** — ✅ **SHIPPED S260** | Read-only reflection of `akoya_requeststatus` (§3.4) | `StatusTab.js`: `ctx.requestStatus` + server-derived `statusClass` (reuses canonical `classifyStatus`/`STATUS_CLASS`); parity-gated `CLASS_META` badge | display-only | **S** | done — living taxonomy (unmapped ⇒ UNCLASSIFIED, shown raw) |
-| **Initial Writeup** | Phase I writeup, early (§3.2) | Re-home `phase-i-writeup.js` (upload-based → needs request-preload adapter) | auto-draft, PD refines | **M** | Writeup primitive (embed-vs-in-app) + preload adapter |
-| **Pre Site Visit Writeup** | Folds returned reviews into the writeup (§3.2) | Re-home `phase-ii-writeup.js` (upload-based → needs request-preload adapter) | auto-draft | **M** | same writeup primitive + preload adapter |
-| **Final Writeup** | Folds site-visit findings in (§3.2) | `phase-ii-writeup.js` engine **+ a NEW site-visit-findings input the engine lacks today** (not a clean re-home — Codex S260) | auto-draft | **M→L** | writeup primitive **+ Site Visit tab as its findings source** (build after Site Visit) |
-| **Reviews** | Read returned reviews + summary | Re-home `peer-review-summarizer.js` **+ a NEW returned-review reader** — submitted reviews live behind reviewer rows / `download-review`, NOT file uploads (Codex S260) | fully-auto summary | **M** | returned-review reader (reviewer-row → summarizer feed) |
-| **Site Visit** | Human-only notes capture | New, minimal (notes + persistence) | human-only | **S→M** | new Dataverse notes field/entity |
-| **Awardee** | Post-award: foundation-abstract approve, artwork upload, release form (§3.6) | Reuse the `lib/external` **crypto core only**; token-lifecycle/verifier/materials/upload are reviewer-suggestion-specific (`wmkf_appreviewersuggestions`, reviewer folders) → **must be generalized first** (Codex S260) | mixed | **L** | generalize `lib/external` + new Dataverse doc-routing schema; **explicitly future/out-of-scope** |
-
-### Cross-cutting primitives (build once, reused)
-- ✅ Shell + context loader + tab routing (Phase 2)
-- ⬜ **Request-preload adapter** (upload→requestId) for every re-homed upload-based app — Proposal established the pattern; Initial/Pre-Site-Visit/Final/Reviews all need it
-- ⬜ **Writeup embed/re-home primitive** — unblocks Initial / Pre-Site-Visit / Final together (**DECIDED S262: embed SharePoint co-authoring** — SharePoint holds Word doc, Dataverse holds URL pointer, Open in Word preserves co-authoring; see `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md`)
-- ⬜ **Returned-review reader** — feed submitted reviews (reviewer rows / `download-review`) into the summarizer (Reviews tab); the summarizer is upload-based today
-- ✅ **Status value→class map** consumer (living taxonomy) — Status tab reuses canonical `classifyStatus`/`STATUS_CLASS`; `STATUS_CLASS ⇔ CLASS_META` is now a `check:status-enum-parity` invariant (S260)
-- ⬜ **`lib/external` generalization** — today it is reviewer-suggestion-specific (token-lifecycle/verifier/materials/upload); only the crypto core is reusable. Awardee (external instance #2) needs the suggestion-specific bits factored out first (§3.6)
-- ⬜ **Access model beyond `reviewers`** — the whole `/workbench/[requestId]` page is currently gated on the `reviewers` grant (`[requestId].js`). The **dossier read-projection** (team-open read, §3.7) and the **writeup-collaborator set** (PDs + CSO + President, broader than `reviewers`, §3.2/§6) both require per-tab access that doesn't exist yet — **open**
-
-### Recommended build order (leverage × dependency)
-1. **Group A — ✅ SHIPPED S260 — coherence wins from data already loaded (no new infra):** `Status` (read-only) + `Overview` v1. Overview v1 was scoped to what has a live source today: `ctx` + the reviewer-stage strip (via `reviewers.js` + shared `reviewer-modes`). Writeup/review state has **no source yet** (the dashboard rollup is reviewer-only), so those Overview signals land later as those tabs are built. The default now lands on **Overview** (`[requestId].js` `activeTab`); dashboard rows still deep-link `?tab=reviewers`. **Still open:** the smart "next step" line is a light heuristic, not the deferred `isActionableForPD` rule set.
-2. **Group B — writeup spine (decisions resolved S262 — unblocks two tabs now, the third later):** embed-vs-in-app RESOLVED (embed SharePoint co-authoring); access set RESOLVED (`reviewers` grant) → build the writeup primitive + preload adapter once → `Initial` / `Pre-Site-Visit`. **`Final` waits for Group D** — it needs Site Visit findings as input (see table), so it can't land with the other two.
-3. **Group C — reviews reading:** `Reviews` (re-home `peer-review-summarizer` + the **returned-review reader** primitive). The **dossier read-projection** (§3.7) is adjacent but **needs the access-model work** (the page is `reviewers`-gated today) — it is NOT free from this group alone.
-4. **Group D — human-only + post-award:** `Site Visit` (notes) → then `Final Writeup` (now that Site Visit findings exist) → then `Awardee` last (generalize `lib/external` + new schema; already fenced as future).
-
-> **Sibling, not a tab — Reviewer Pool.** Scoping (§3.5/§7) puts the request-agnostic **Reviewer Pool** in D26 scope but it is still **pending** and has no `appRegistry` entry yet. It is a tier-1 surface, not one of these lifecycle tabs, but it is a real outstanding workbench-vision deliverable — tracked here so it isn't lost between this section and the Deferred list.
-
-### Open decisions / blockers (need Justin/Connor before the dependent group)
-- **Overview actionability** (`isActionableForPD`, §6 open) — the summary half is buildable now; the smart "next action" half waits on this.
-- **Writeup: embed-SharePoint vs in-app + the writeup-collaborator access set** — **RESOLVED (S262).** SharePoint holds Word doc; Dataverse holds URL pointer (`wmkf_ai_initialwriteupurl`, `wmkf_ai_presitevisitwriteupurl`). Open in Word preserves co-authoring. Access: everyone with `reviewers` grant. See `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md`.
-- **Site-visit notes storage** — new Dataverse field/entity (small schema).
-- **Awardee** — doc-routing schema + (J27) Connor's phase trigger; keep deferred. `[[project-awardee-onboarding]]`.
-
-### Caveats
-- **The automation tier is out of scope** (§7) — so v1 of each content tab is *PD-triggered generate* (like Proposal / Field Primer today), not event-driven materialization. This matches the live Proposal tab and is fine for v1.
-- The **writeup-collaborator access model** was the one genuinely-unsettled piece — **RESOLVED S262:** everyone with the `reviewers` grant. No access-model expansion needed for Group B.
+The source-backed evidence matrix is
+`docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md`. Current product decisions and
+build order are in `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
 
 ## CI gates + doc updates
 

@@ -7,7 +7,8 @@
  * content + Field Primer, S258/S260), Reviews (read-back of submitted reviews —
  * decoded Q1/Q3/Q10 ratings + file download), and — Group A, S260 — Overview
  * (per-request command center) + Status (read-only akoya_requeststatus
- * reflection). The other 5 tabs are placeholders for the rest of the request
+ * reflection), and Awardee (grantee-deliverables workflow). The other 4 tabs
+ * are placeholders for the rest of the request
  * lifecycle. The default landing is Overview. Tab + sub-tab selection is
  * query-string driven (?tab=reviewers&sub=track) for deep-links.
  */
@@ -29,8 +30,8 @@ import StatusTab from '../../shared/components/workbench/StatusTab';
 import AwardeeTab from '../../shared/components/workbench/AwardeeTab';
 import { computeCanManage } from '../../shared/components/reviewers/reviewer-modes';
 
-// Live tabs: Overview, Proposal, Reviewers (Phases 2–3), Status; the other 6 are
-// placeholders for the full request lifecycle. Order matches the build plan's tab strip.
+// Live tabs: Overview, Proposal, Reviewers, Reviews, Status, Awardee. The other
+// 4 are placeholders for the full request lifecycle.
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'proposal', label: 'Proposal' },

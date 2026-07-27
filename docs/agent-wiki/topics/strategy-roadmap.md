@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-23
+last_verified: 2026-07-26
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -10,11 +10,13 @@ source_files:
   - DEVELOPMENT_LOG.md
   - SESSION_PROMPT.md
   - docs/GROUP_B_WRITEUP_SPINE_DESIGN.md
+  - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
+  - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
 canonical_docs:
   - docs/CURRENT_WORK_QUEUE.md
   - docs/SYSTEM_MODEL.md
   - DEVELOPMENT_LOG.md
-  - docs/GROUP_B_WRITEUP_SPINE_DESIGN.md
+  - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
 watch_paths:
   - docs/CURRENT_WORK_QUEUE.md
   - docs/SYSTEM_MODEL.md
@@ -40,15 +42,18 @@ document inventory, and individual implementation plans do not establish priorit
 ## Durable Memory
 
 - Current priorities: `docs/CURRENT_WORK_QUEUE.md`.
-- Current reviewer reliability boundary: terminal post-accept status is the active slice; deadline
-  evidence and completed-review payability are separate designs. See
-  `docs/REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md`.
+- Current Workbench truth and contradictions:
+  `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md`.
+- Current near-term sequence: production synthesis smoke → synthesis lifecycle/reliability →
+  remaining-tab design freeze → first deadline-bound writeup slice. See
+  `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel: `project-virtual-review-panel`.
 - Roadmap snapshots: `project-app-roadmap-2026-04-25`, `project-phase-i-summary-app-winddown`.
 - Phasing/cycle scoping: `project-grant-phasing-evolution`, `feedback-cycle-vs-executor-scope`, `feedback-concepts-vs-phase-i`.
 - J27 document-capture & Proposal-tab evolution (doc→Dataverse-table direction; D26 filename-match is interim; near-term planning): `project-j27-doc-capture-evolution`.
-- Group B writeup spine (SharePoint holds Word doc, Dataverse holds URL pointer; D26 Pre-Site-Visit is pilot; executive dashboard; design blocked pending Connor inputs): `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md`.
+- Historical Group B writeup proposal: `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md`. Its proposed
+  URL fields and `writeup.*` prompt rows are not live, and its D26 pilot timing is obsolete.
 - Planned review/proposal work: `project-staged-review-pipeline`, `project-proposal-context-extraction`.
 - Planned automation/reports/post-award/AI: `project-backend-automation`, `project-interim-report-automation`, `project-awardee-onboarding`, `project-new-ai-capabilities`.
 - IRS verify-EIN: `project-irs-exempt-verification`.

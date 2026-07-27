@@ -9,20 +9,24 @@ cataloged: 2026-07-02
 owner: product-engineering
 related:
   - docs/mockups/lifecycle-ui-mockup.html
-  - docs/REQUEST_WORKBENCH_BUILD_PLAN.md
+  - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
+  - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
   - lib/external
   - pages/api/reviewer-finder/my-proposals.js
 ---
 
 # Request Workbench & Cycle Dashboards — Scoping
 
-> **Current routing:** Historical discussion and rationale record. Use `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` and current Workbench source for implementation status and new scope.
+> **Current routing (2026-07-26):** Historical discussion and rationale record. Use
+> `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md` for source-backed status and
+> `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` for current scope. The former build
+> plan is now historical implementation chronology.
 
 **Per-PD navigation model for the grant lifecycle: the D26 patch and the J27 build.**
 
 > **Status at drafting:** Draft for discussion (Connor / Sarah). Drafted 2026-05-31 (Session 206) from the clickable mockup at `docs/mockups/lifecycle-ui-mockup.html` and a working session with Justin. Captures the period's decisions, proposals, and open dependencies.
 >
-> **BUILD UPDATE (2026-06-11, verified against source; refreshed 2026-06-23):** the D26 reviewer dashboard has since SHIPPED — `/workbench` (tier-2) + `/workbench/[requestId]` (tier-3) with the **Reviewers tab live** (Workbench Phases 0–3). The Reviewers tab shipped with **5** sub-tabs (Find · Candidates · Invite · Track · Completed) but was later **collapsed to 3 (Find · Invite Reviewers · Track Reviewers, S280, commit `4d45b4c8`)** — the 4-tab design below is the S206 rationale, not the current structure; see `docs/REQUEST_WORKBENCH_BUILD_PLAN.md`. Proposal, Overview/Status, Reviews, and Awardee/grantee-deliverables have also shipped, so **4** request-lifecycle tabs remain placeholders; forward scope is in `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` §"Remaining lifecycle tabs — scope (S260)". Note also that §3.2's "each tab is an existing capability re-homed" is a generalization — Overview, Site Visit, and the Reviewer Pool sibling are net-new exceptions; see that build-plan section. This scoping doc remains the *design rationale* (the what/why); for authoritative phase-by-phase build status see `docs/REQUEST_WORKBENCH_BUILD_PLAN.md`. Schema groundwork called out at drafting time is deployed: `wmkf_appreviewersuggestion.wmkf_completedat` (PD-closeout timestamp; wave5, prod 2026-05-28). See §3.4 / §6.
+> **BUILD UPDATE (2026-06-11, refreshed 2026-07-26):** the D26 reviewer dashboard shipped as `/workbench` (tier 2) + `/workbench/[requestId]` (tier 3). The Reviewers tab shipped with five sub-tabs and later collapsed to three (Find · Invite Reviewers · Track Reviewers, S280). Proposal, Overview, Status, Reviews, and Awardee/grantee deliverables also shipped; four lifecycle tabs remain placeholders. This document preserves the original design rationale, including superseded assumptions. Use `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md` for current evidence and `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` for forward scope. The former build plan is historical implementation chronology.
 >
 > **How to read this:** §1–§5 are for everyone. §6 (dependencies) is where Connor's items live. §7–§8 are scope fences and technical detail you can skim. Where a claim depends on live Dynamics/Dataverse state it is marked `[verified]` or `[open]`.
 
