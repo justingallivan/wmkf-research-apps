@@ -34,6 +34,11 @@ At audit time, items 1-3 were mechanical and safe; items 4-5's `.env.example` ad
 
 **Outcome 2026-07-03:** items 1-3 were applied mechanically. Items 4-5 and 7 were later owner-approved and applied with triage rather than a blanket env dump: BILL runtime credentials/HMACs and option-set values are now documented in `docs/CREDENTIALS_RUNBOOK.md`; local toggles/placeholders for reviewer page-email recovery, intake drain tuning, and BILL disabled-mode setup are in `.env.example`; `CLAUDE.md` now lists `modules/`, `outputs/`, and `_archived/`. `MOCK_MODE` was not promoted to a supported env contract because `docs/DEAD_CODE_DELETION_MANIFEST.md` marks it as computed with no live readers.
 
+**Superseded 2026-07-26 (S377):** item 7 is moot — the `## Project Shape` tree was removed
+from `CLAUDE.md` entirely (along with the `## Development` command block) as content a
+session can derive from `ls` and `package.json`. Do not re-apply item 7's diff below; the
+section it patches no longer exists. Items 1-6 are unaffected.
+
 ```diff
 --- a/README.md
 +++ b/README.md

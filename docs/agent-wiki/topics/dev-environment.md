@@ -52,6 +52,22 @@ Claude config sync, and environment-specific operating notes.
 
 ## Operating Notes
 
+- **npm-global and Homebrew share `/opt/homebrew` — the path never identifies the
+  installer (S377).** npm's global prefix on this machine is `/opt/homebrew`, so
+  npm-installed CLIs land in `/opt/homebrew/bin` beside Homebrew's and `which` cannot
+  tell them apart. Before telling the owner how to update a tool, resolve it:
+  `readlink /opt/homebrew/bin/<tool>` → `../lib/node_modules/…` means npm
+  (`npm i -g <pkg>`), `../Cellar/…` means brew (`brew upgrade <formula>`); a tool in
+  `/usr/bin` is macOS-shipped and belongs to neither. Confirm with
+  `npm -g ls --depth=0` / `brew list --versions <tool>`, which name the package rather
+  than merely containing the binary. As of 2026-07-26: `vercel`, `codegraph`, `codex`,
+  and `gemini` are npm; `rtk`, `gh`, and `node`/`npm` are brew
+  [VERIFIED 2026-07-26 via `readlink` on each binary, cross-checked against
+  `npm -g ls --depth=0` and `brew list --versions`; re-run those three to refresh].
+  Hazard this guards:
+  S377 asserted "Homebrew-installed" for `vercel` from the path prefix and recorded it
+  as `[VERIFIED]`, contradicting Codex, which had been correctly saying npm. Policy
+  memory: `feedback-cite-ground-truth`, `project-vercel-plugin-disabled-restore`.
 - **Session automation is branch-aware (S356).** `/start` checks
   `git rev-parse --abbrev-ref HEAD` before any pull (never `git pull origin main`
   from a feature branch), and `/stop` verifies the branch at Step 1, re-verifies
