@@ -3,7 +3,7 @@ title: "Workflow Chaining & Token Efficiency (Design Principle)"
 domain: prompt-executor
 kind: spec
 status: active
-summary: "Chaining fields and Executor persistence are live; the end-to-end Power Automate DAG remains target architecture and externally unverified."
+summary: "Chaining fields and Vercel Executor persistence are live; the end-to-end Power Automate DAG remains unbuilt target architecture."
 canonical: true
 cataloged: 2026-07-02
 owner: product-engineering
@@ -28,11 +28,14 @@ tracked/deployed schema; prompt rows can declare
 `wmkf_ai_promptoutputschema`; and the Executor can parse structured output and
 coalesce declared targets onto the request write.
 
-The end-to-end lifecycle DAG below remains **TARGET ARCHITECTURE**. Repository
-source does not prove that a Power Automate ingest flow currently populates all
-six fields or that compliance, reviewer matching, portfolio analytics, and PD
-assignment consume them as chained inputs. Current PA flow/row state is
-**UNKNOWN** without a dated external probe.
+The end-to-end lifecycle DAG below remains **TARGET ARCHITECTURE**. A read-only
+production probe on 2026-07-27 scanned all 114 cloud-flow definitions visible
+to the Dataverse application user; none referenced any `wmkf_ai_*` field/table,
+the Executor routes, Claude/Anthropic, or the WMKF Vercel app. The current
+production PA ingest/chaining DAG is therefore **NOT DEPLOYED in the visible
+flow metadata**. No current PA producer populates all six fields as this design
+describes, and the proposed downstream compliance, reviewer-matching,
+portfolio, and PD-assignment consumers remain unbuilt.
 
 > Companion to `PROMPT_STORAGE_DESIGN.md`. Storage is about *where prompts live*. This doc is about *how workflows use them* — specifically, how to pass data between steps without re-uploading the source document to Claude on every call.
 
@@ -169,12 +172,13 @@ The original blockers classify as follows:
    A generalized automatic `{source:"..."}` input resolver is not established
    by this document and should not be assumed.
 
-3. **PA flow complexity — UNKNOWN externally.** Each PA ingest flow still needs
-   equivalent parse, validation, coalesced write, and retry behavior; repository
-   source cannot verify its deployed implementation.
+3. **PA flow complexity — PLANNED/UNBUILT.** The 2026-07-27 production probe
+   found no prompt-Executor flow. Any future PA ingest flow still needs
+   equivalent parse, validation, coalesced write, and retry behavior.
 
-4. **Validation parity — PARTIAL.** Vercel Executor structured parsing/output
-   checks are live. PA-side validation/retry parity remains unverified.
+4. **Validation parity — VERCEL SHIPPED / PA UNBUILT.** Vercel Executor
+   structured parsing/output checks are live. There is no deployed PA side
+   against which to claim validation/retry parity.
 
 ## Honest caveats
 

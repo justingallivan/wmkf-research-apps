@@ -217,11 +217,11 @@ related:
 | [MODEL_PREFLIP_REPLAY_RUNBOOK.md](MODEL_PREFLIP_REPLAY_RUNBOOK.md) | runbook | active |  | Use this before changing reviewer-affecting Claude model routing, including advancing the reviewer-finder tier fallback or removing a concrete pin. | 2026-07-02 |
 | [PEER_REVIEW_EXECUTOR_MIGRATION_PLAN.md](PEER_REVIEW_EXECUTOR_MIGRATION_PLAN.md) | plan | historical |  | Historical record of the completed peer-review-summarizer Executor migration and A7 fail-closed hardening. | 2026-07-08 |
 | [PROMPT_CACHING_PLAN.md](PROMPT_CACHING_PLAN.md) | draft | historical |  | Historical April 2026 prompt-caching experiments and early plan. Superseded for current remediation status by PROMPT_CACHING_AUDIT.md. | 2026-07-02 |
-| [PROMPT_STORAGE_DESIGN.md](PROMPT_STORAGE_DESIGN.md) | plan | active |  | Current prompt-storage boundary: live current rows, Executor fetch, admin publication, and audit; broader authoring and PA execution remain unbuilt or unknown. | 2026-07-02 |
+| [PROMPT_STORAGE_DESIGN.md](PROMPT_STORAGE_DESIGN.md) | plan | active |  | Current prompt-storage boundary: live current rows, Vercel Executor fetch, admin publication, and audit; broader authoring and PA execution remain unbuilt. | 2026-07-02 |
 | [STAGED_PIPELINE_IMPLEMENTATION_PLAN.md](STAGED_PIPELINE_IMPLEMENTATION_PLAN.md) | plan | active |  | 1. Fit Screener — Standalone Stage 1 tool. Upload a proposal, get pass/flag/decline-recommend result. Single Haiku call, fast and cheap. Useful... | 2026-07-02 |
 | [STAGED_REVIEW_PIPELINE.md](STAGED_REVIEW_PIPELINE.md) | history | active |  | Proposals flow through stages sequentially. Staff review is required before any proposal is declined at Stage 1. Stages 2 and 3 produce inputs for... | 2026-07-02 |
 | [VIRTUAL_REVIEW_PANEL.md](VIRTUAL_REVIEW_PANEL.md) | spec | active | yes | Thin design / operations reference for the Virtual Review Panel app. Created S191 to receive content extracted from CLAUDE.md so the table-row... | 2026-07-02 |
-| [WORKFLOW_CHAINING_DESIGN.md](WORKFLOW_CHAINING_DESIGN.md) | spec | active | yes | Chaining fields and Executor persistence are live; the end-to-end Power Automate DAG remains target architecture and externally unverified. | 2026-07-02 |
+| [WORKFLOW_CHAINING_DESIGN.md](WORKFLOW_CHAINING_DESIGN.md) | spec | active | yes | Chaining fields and Vercel Executor persistence are live; the end-to-end Power Automate DAG remains unbuilt target architecture. | 2026-07-02 |
 
 ## prompts
 

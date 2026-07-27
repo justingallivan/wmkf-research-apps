@@ -6,7 +6,7 @@ status: canonical
 summary: Canonical priority queue separating current commitments, evidence windows, optional work, external dependencies, and parked programs.
 canonical: true
 cataloged: 2026-07-22
-last_verified: 2026-07-26
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -101,7 +101,9 @@ The reviewer redesign is an active **measured program**, not authorization for c
 These are valid directions but are not current app-team delivery commitments:
 
 - Power Automate Executor parity and status-driven backend automation — Connor-owned and dependent
-  on grant-cycle sequencing.
+  on grant-cycle sequencing. The 2026-07-27 production metadata probe found no
+  deployed prompt-Executor flow among the 114 visible cloud-flow definitions;
+  this is planned external work, not an active production pipeline.
 - Power Automate-backed writeup automation remains dependency-bound. The former Group B document
   is historical; the app-side writeup contract must be redesigned from current fields, prompts,
   inputs, and deadlines before any build.

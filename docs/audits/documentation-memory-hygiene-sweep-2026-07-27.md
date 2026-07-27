@@ -143,10 +143,10 @@ and a subsidiary `UNKNOWN` or `PLANNED` boundary.
 |---|---:|---|
 | `VERIFIED` | 6 | Current reviewer-table state; adapter/service ownership; acceptance/enforcement/propagation; shipped contact-lead slices; completed DAL/context migration; historical memory incidents as historical evidence. |
 | `PARTIAL` | 7 | Prompt storage/Executor, workflow chaining, grantee/honorarium, synthesis, Q9, intake-admin, and budget each have a verified shipped boundary plus unbuilt or unprobed portions. |
-| `PLANNED` | 1 | Broad paid reviewer-contact scouting is an unbuilt option pending owner decisions. |
+| `PLANNED` | 3 | Broad paid reviewer-contact scouting plus the PA prompt Executor and workflow-chaining DAG are unbuilt options/targets. |
 | `ASSUMED` | 0 | No assumption is used as current truth. |
 | `STALE-CONFLICT` | 0 final | Independent review found conflicts during integration; each is listed and closed below rather than hidden by the final zero. |
-| `UNKNOWN` | 2 | Current Power Automate operation and current external-platform/live-environment facts require named probes. |
+| `UNKNOWN` | 1 | Remaining external-platform/live-environment facts require their named probes. The PA prompt pipeline was resolved by the 2026-07-27 production metadata probe. |
 
 ### Contract-reconcile matrix
 
@@ -156,8 +156,8 @@ and a subsidiary `UNKNOWN` or `PLANNED` boundary.
 | Grant-request access | Domain services | `grant-request` adapter over Dataverse `akoya_request` | Reviewer, Workbench, Grant Reporting, Phase I, Expertise, and Grantee services | `VERIFIED` |
 | Reviewer acceptance | External respond service stages acceptance and a durable job | Dataverse suggestion is lifecycle authority; Postgres `reviewer_acceptance_jobs` is side-effect progress | Acceptance drain performs contact/honorarium/email/quota work | `VERIFIED` |
 | Contact leads | Contact enrichment emits quarantined leads; manage-only promotion selects one | Bounded `reviewer_find_roster` representation plus canonical Dataverse person/suggestion on promotion | Reviewer Finder audit expander and invitation confirmation gate | `VERIFIED` for shipped slices; paid broad scout `PLANNED` |
-| Prompt publication/execution | Admin publication route and repository seed paths | Dataverse `wmkf_ai_prompt`; append-only Postgres publication audit; `wmkf_ai_run` execution audit is fallible | Vercel Executor callers | `PARTIAL`; universal editor/resolver and PA parity unbuilt or unknown |
-| Workflow chaining | Vercel Executor parses declared output and attempts target writes | Declared `akoya_request.wmkf_ai_*` fields; per-output write results must be checked | Downstream PA consumers | `PARTIAL`; downstream PA DAG `UNKNOWN` |
+| Prompt publication/execution | Admin publication route and repository seed paths | Dataverse `wmkf_ai_prompt`; append-only Postgres publication audit; `wmkf_ai_run` execution audit is fallible | Vercel Executor callers | `PARTIAL`; universal editor/resolver unbuilt; production PA prompt Executor absent from the 2026-07-27 visible flow metadata |
+| Workflow chaining | Vercel Executor parses declared output and attempts target writes | Declared `akoya_request.wmkf_ai_*` fields; per-output write results must be checked | Downstream PA consumers | `PARTIAL`; downstream PA DAG is planned/unbuilt, not an unknown current pipeline |
 | Grantee/honorarium | Guarded routes/services | Dataverse request/contact entities plus documented Postgres operational state | Workbench/portal/finance flows | `PARTIAL`; current row/config populations require probes |
 | Review synthesis | Staff synthesis route after at least one submitted review | `akoya_request.wmkf_reviewsynthesisjson` | Reviews tab and DOCX/PDF exports | `PARTIAL`; no auto trigger and participation set is undecided |
 | DAL/context migration | Post-auth entry points establish trusted context; services use entity adapters | Dataverse through the 19 registered adapters; boundary gates enforce exceptions | Route/service consumers | `VERIFIED`; DAL, bypass-strip, and notification push-up plans are completed history |
@@ -165,7 +165,7 @@ and a subsidiary `UNKNOWN` or `PLANNED` boundary.
 | Intake membership | Applicant landing/submit call membership service | Dataverse `wmkf_portalmembership` | Applicant eligibility and submit guard | `PARTIAL`; applicant reads shipped, intake-admin approval app/page/routes unbuilt |
 | Intake budget | Submit freezes flat budget lines; drain writes child rows | Postgres draft/job state → Dataverse `wmkf_proposalbudgetline` | Intake workflow | `PARTIAL`; applicant UI, nested model, parent aggregates/persons, and terminal transition unbuilt |
 | Historical memory incidents | N/A — dated decision/incident evidence | Tracked memory leaf | Future agent recall | `VERIFIED` as historical only; fresh incidents require re-verification |
-| Live external state | N/A until a read-only probe runs | Vercel, Power Platform, GitHub, tenant, Dataverse/SharePoint live state | Operational decisions | `UNKNOWN`, never inferred from repository source |
+| Live external state | N/A until a read-only probe runs | Vercel, Power Platform, GitHub, tenant, Dataverse/SharePoint live state | Operational decisions | `UNKNOWN`, never inferred from repository source; the production PA prompt-pipeline slice was probed and resolved on 2026-07-27 |
 
 ### Structural fixes
 
@@ -240,8 +240,6 @@ the repository.
 
 These are deliberately not converted into “current” facts:
 
-- Power Automate prompt execution, trigger posture, retry behavior, and the
-  end-to-end workflow-chaining DAG require a dated Power Platform probe.
 - Current production row populations, including honorarium proposal-link
   population, require a new read-only row probe.
 - Review-synthesis participation semantics remain an owner decision. The target
@@ -255,6 +253,30 @@ These are deliberately not converted into “current” facts:
   or environment values, GitHub plan capabilities, tenant operation,
   Dataverse/SharePoint privileges, and live schema metadata until their named
   read-only probes run.
+
+### Follow-up resolution: Power Automate prompt pipeline
+
+The first listed unknown was resolved on 2026-07-27 with
+`scripts/probe-power-automate-prompt-executor.js`:
+
+- all 114 production cloud-flow definitions visible to the Dataverse
+  application user had `clientdata`, and all 114 definitions parsed as JSON;
+- no definition referenced any `wmkf_ai_*` field/table, the Executor routes,
+  Claude/Anthropic, or the WMKF Vercel app;
+- the three broad-keyword matches were deprecated GOapply flows containing the
+  generic phrase “Phase I,” not AI prompt flows; and
+- the live `wmkf_ai_run` ledger had 353 rows. Its 303
+  PowerAutomate-labeled historical rows lacked a current-prompt lookup and
+  ended on 2026-05-06, whereas Vercel-labeled runs continued through
+  2026-07-26.
+
+This falsifies the prior “unknown current PA pipeline” framing within the
+probe's production visibility boundary. The Power Automate prompt Executor,
+trigger/retry behavior, and chaining DAG are planned/unbuilt; they are not a
+deployed production pipeline in the visible metadata. A sandbox pass could not
+run because `DYNAMICS_SANDBOX_URL` is not present in `.env.local`; that does
+not weaken the production conclusion but leaves sandbox-only experimentation
+outside this claim.
 
 ### Mechanical memory result
 
@@ -296,6 +318,7 @@ The root-run verification battery completed sequentially:
 domain, there is no known live stale claim or unresolved contradiction.
 Historical numeric references that remain are confined to clearly dated
 historical material rather than current implementation guidance. No live
-external write or state-changing probe was performed; the items in “Explicit
-remaining unknowns and owner decisions” remain intentionally open pending their
-named read-only probes or owner decisions.
+external write or state-changing probe was performed. The production
+Power Automate read-only probe resolved that slice; the items still listed in
+“Explicit remaining unknowns and owner decisions” remain intentionally open
+pending their named read-only probes or owner decisions.

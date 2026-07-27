@@ -4,7 +4,7 @@ description: Leadership-driven initiative to move from manual user-initiated pro
 type: project
 status: active
 scope: strategy
-last_verified: 2026-07-27 via owner strategy record, docs/EXECUTOR_CONTRACT.md, and current execute-prompt/logAiRun source; external deployment details remain date-bounded
+last_verified: 2026-07-27 via owner strategy record, current Executor source, and production Power Automate metadata probe
 ---
 
 ## Recall Rule
@@ -24,9 +24,12 @@ Ground truth: `docs/EXECUTOR_CONTRACT.md`, [[project-dynamics-ai-writeback]]; PR
 
 [VERIFIED 2026-07-27 via `lib/services/execute-prompt.js` and
 `lib/services/dynamics-service.js`]: the shared execution and AI-run write seams
-exist. PowerAutomate triggering and broader direct writeback remain product
-direction; the dated field-deployment claims below require the named read-only
-schema probes before operational use.
+exist. [VERIFIED 2026-07-27 via
+`scripts/probe-power-automate-prompt-executor.js`]: no production cloud-flow
+definition visible to the Dataverse application user implements the prompt
+Executor or chaining DAG. PowerAutomate triggering remains product direction,
+not deployed current behavior; the dated field-deployment claims below require
+their named read-only schema probes before operational use.
 
 Leadership wants key processing tasks automated on the backend — no manual uploads. Two tiers:
 

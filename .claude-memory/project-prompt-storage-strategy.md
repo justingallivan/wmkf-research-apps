@@ -1,11 +1,11 @@
 ---
 name: Prompt Storage + Executor Contract
-description: Current Vercel Executor boundary plus the historical Path B / Power Automate target; external PA operation requires a fresh probe.
+description: Current Vercel Executor boundary plus the historical Path B / Power Automate target; the production PA prompt pipeline was absent in the 2026-07-27 metadata probe.
 type: project
 originSessionId: d898b20a-8b1d-4a13-ad0e-878f4f62e71d
 status: active
 scope: prompt
-last_verified: 2026-07-27 via current Executor/docs reconciliation; live Dataverse counts remain a dated 2026-07-12 snapshot
+last_verified: 2026-07-27 via current Executor source and production Power Automate/AI-run read-only probe
 ---
 
 ## Recall Rule
@@ -29,10 +29,13 @@ Phase I summarize-v2 route/service. The prompt schema was probed live
 ## Current boundary
 
 The Vercel prompt store, publication path, and single-prompt Executor are
-shipped. The current existence, parity, prompt inventory, and trigger posture
-of Power Automate flows are `UNKNOWN` until a dated Power Platform probe runs.
-Universal prompt visibility/editability, the generalized prompt resolver, and
-the historical Phase 1/2 chain extensions below must not be inferred as built.
+shipped. The 2026-07-27 production probe scanned all 114 visible, parseable
+cloud-flow definitions and found no reference to any `wmkf_ai_*` field/table,
+the Executor routes, Claude/Anthropic, or the WMKF Vercel app. The PA prompt
+Executor and chaining DAG are not deployed in visible production flow
+metadata. Universal prompt visibility/editability, the generalized prompt
+resolver, and the historical Phase 1/2 chain extensions below must not be
+inferred as built.
 
 Session 109 (2026-04-24) reconciled six design docs + Wave 1 reality + Connor's built-out Dynamics schema into a single staged plan. **Authoritative refs:**
 - `docs/EXECUTOR_CONTRACT.md` — shared spec both PA + Vercel build against
@@ -63,14 +66,18 @@ Session 109 (2026-04-24) reconciled six design docs + Wave 1 reality + Connor's 
 **Phase 0 — SHIPPED (historical, kept for context):**
 - Connor added `wmkf_ai_systemprompt` Memo + Lookup `wmkf_ai_prompt` on `wmkf_ai_run` (verified live).
 - `phase-i.summary` prompt row authored; `lib/services/execute-prompt.js` is the canonical Executor implementation; `pages/api/phase-i-dynamics/summarize-v2.js` imports it.
-- `wmkf_ai_prompts` has 17 rows live; `wmkf_ai_runs` has 351 rows (verified live 2026-07-12; was 11/329 at the 2026-05-14 audit and unchanged through S209 2026-06-01, then grew — so Executor runs have occurred since).
-- Repository source does not establish PA flow state. Generalized context
-  blocks and cross-prompt cache alignment remain unbuilt unless a current
-  implementation/probe proves otherwise.
+- `wmkf_ai_runs` had 353 rows on 2026-07-27. The 303
+  PowerAutomate-labeled historical rows had no current-prompt lookup and ended
+  on 2026-05-06; Vercel-labeled runs continued through 2026-07-26. The
+  `PowerAutomate Auto` option is also used by the current Vercel
+  title-generation cron, so the label alone is not caller proof.
+- The production flow-definition probe found no PA prompt Executor.
+  Generalized context blocks and cross-prompt cache alignment remain unbuilt.
 
 **Historical Phase 1 target:** Connor would build a PA `ExecutePrompt` child
 flow plus first parent flow over the same prompt rows, add `prior_output`, and
-use an echo-prompt oracle for parity. Current PA implementation is `UNKNOWN`.
+use an echo-prompt oracle for parity. No such production flow was present in
+the 2026-07-27 visible metadata.
 
 **Historical Phase 2 target:** context blocks plus parallel-consumer chains,
 including a `shared.full_application` block, `placement: system`, and

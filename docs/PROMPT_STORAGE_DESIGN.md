@@ -3,7 +3,7 @@ title: "Prompt Storage — Current Boundary and Historical Design"
 domain: prompt-executor
 kind: plan
 status: active
-summary: "Current prompt-storage boundary: live current rows, Executor fetch, admin publication, and audit; broader authoring and PA execution remain unbuilt or unknown."
+summary: "Current prompt-storage boundary: live current rows, Vercel Executor fetch, admin publication, and audit; broader authoring and PA execution remain unbuilt."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -38,12 +38,23 @@ related:
   user-facing prompt override surface; and
 - the proposed broad migration of every app prompt into Dataverse.
 
-The Power Automate Executor and automated flows are external state. Their
-current existence, parity, prompt inventory, and trigger posture are
-**UNKNOWN** without a dated Power Platform probe. The repository proves only
-the Vercel-side implementation. `docs/EXECUTOR_CONTRACT.md` is the current
-Vercel execution contract; the body below is retained as historical rationale
-and unfinished target architecture.
+**Production Power Automate boundary (verified 2026-07-27):** the read-only
+`scripts/probe-power-automate-prompt-executor.js` probe scanned all 114 cloud
+flow definitions visible to the production Dataverse application user. All 114
+had parseable `clientdata`; none referenced any `wmkf_ai_*` field/table, the
+Executor routes, Claude/Anthropic, or the WMKF Vercel app.
+The three broad-keyword matches were deprecated GOapply flows containing only
+the generic phrase “Phase I.” The production run ledger had 353 rows; its 303
+PowerAutomate-labeled historical rows had no current-prompt lookup and ended on
+2026-05-06, while Vercel-labeled Executor runs continued through 2026-07-26.
+
+Therefore the Power Automate Executor, its trigger/retry behavior, and the
+automated chaining DAG are **not deployed in the visible production flow
+metadata**. They remain unfinished target architecture, not unknown current
+behavior. Connection health and run history for a future PA implementation
+will require a new probe after a flow is actually deployed.
+`docs/EXECUTOR_CONTRACT.md` is the current Vercel execution contract; the body
+below is retained as historical rationale and unfinished target architecture.
 
 **Status:** Design conversation started 2026-04-14 (Session 99), extended in Sessions 100–103. Session 103 (2026-04-17) shipped a **working prototype** via the Phase I Dynamics test endpoint — see "Session 103 prototype findings" below. Session 109 (2026-04-24) reconciled this design with Connor's built-out schema and produced a phased delivery plan.
 **Owner:** Justin Gallivan
@@ -225,8 +236,8 @@ The run log already exists (Connor's side). Three additions for override and pro
 ## Historical target: Power Automate composition responsibilities
 
 The design assigned the following responsibilities to Power Automate under
-full composition. Whether current flows implement them remains externally
-`UNKNOWN` without the dated probe named in the current boundary above.
+full composition. The 2026-07-27 production probe found no prompt-Executor flow
+implementing them, so each remains unbuilt target behavior.
 
 - **PDF/DOCX text extraction** — `lib/utils/file-loader.js` on the Vercel side. PA has its own PDF preprocessing capability, so both callers can handle extraction independently — no cross-boundary helper needed.
 - **Anthropic retry / backoff on 529s and rate limits.** PA has built-in retry but it's coarse; needs per-flow configuration.
@@ -361,7 +372,8 @@ The token-efficiency principle (#7 above) has its own design doc — see
 `WORKFLOW_CHAINING_DESIGN.md`. Current Vercel Executor support includes
 `wmkf_ai_promptoutputschema`; a generalized automatic
 `wmkf_ai_promptvariables[].source` resolver and the Power Automate DAG are not
-established as shipped. The historical intersection proposed:
+shipped. The 2026-07-27 production probe found no corresponding PA flow. The
+historical intersection proposed:
 
 - `wmkf_ai_prompt.wmkf_ai_promptoutputschema` (Memo, JSON) declares what structured fields a prompt produces and where they persist in Dynamics
 - `wmkf_ai_prompt.wmkf_ai_promptvariables` entries can include `{source: "akoya_request.wmkf_keywords"}` to express "this slot is filled by an upstream prompt's output, not a runtime input"
@@ -371,7 +383,7 @@ The companion doc covers worked examples, prerequisite Dynamics fields on `akoya
 
 ## Historical questions and current disposition
 
-### 1. Template variable format — RESOLVED (Next.js side; PA side still pending)
+### 1. Template variable format — RESOLVED on Vercel; PA implementation unbuilt
 
 Prompts are templates with runtime slots (proposal text, grant context, file contents, etc.). What substitution syntax do we use?
 
@@ -379,15 +391,22 @@ Prompts are templates with runtime slots (proposal text, grant context, file con
 
 **Empirical verification (Session 103, 2026-04-17):** The Phase I prototype (`lib/services/prompt-resolver.js`) stored `{{proposal_text}}`, `{{summary_length}}`, `{{summary_length_suffix}}`, and `{{audience_description}}` in a Dataverse Memo field (`wmkf_ai_rawoutput` on a scratch `wmkf_ai_run` row), read them via OData, and successfully interpolated at runtime. **Dataverse does not interpret `{{` in Memo field values** — content is returned as literal strings. The Next.js-side `{{var}}` syntax works.
 
-What's still untested: the PA side. When PA reads the same Memo field via Dataverse connector and passes the body through a `replace()` action, does it handle `{{` cleanly? Likely fine (PA's `replace()` is delimiter-agnostic), but a concrete PA flow needs to confirm. The original Connor test (create a PA flow that reads a Memo containing `{{name}}` and echoes it) is still on his list.
-
-**Follow-through:** once the PA-side check passes, remove this Q from the doc entirely.
+The PA-side substitution path is not merely untested: the 2026-07-27
+production metadata probe found no deployed prompt-Executor flow. A future
+implementation must still verify that reading a Memo and applying PA
+`replace()` preserves literal `{{name}}` delimiters before parity can be
+claimed.
 
 ### 2. v1 scope — RESOLVED
 
 **v1 is three prompt rows:** `phase-i-writeup`, `phase-ii-writeup`, `compliance-field-set-c`.
 
-Rationale: these are the only prompts with a PA driver (the original motivation for moving out of `.js`). Phase I/II writeup rows are dual-caller — read by both PA auto-draft and Next.js interactive refinement. Compliance Field Set C is Pattern A backend-only. Batch Phase I/II Summaries share their prompts with the single-writeup apps (backend loops over the per-proposal prompt), so the batch apps contribute no new prompt rows.
+Historical rationale: these were the three prompts selected for the proposed PA
+driver. No production PA prompt driver was present in the 2026-07-27 probe.
+Phase I/II writeup rows and Compliance Field Set C therefore remain target
+dual-caller/backend cases rather than current PA consumers. Batch Phase I/II
+Summaries were intended to share the corresponding per-proposal prompt, so the
+target inventory did not add separate prompt rows for them.
 
 See "App patterns and inventory" above for the full classification. Everything Pattern B, Pattern C, deprecated, or Q&A sub-prompt is explicitly v2+.
 

@@ -21,7 +21,7 @@ the remaining work is Connor-owned PowerAutomate composition/operation plus the 
 needed for backend-first automation. This plan retains the earlier architecture discussion as
 historical context.
 **Created:** Session 90, 2026-03-28
-**Last Updated:** Session 94, 2026-04-08
+**Last Updated:** 2026-07-27 production Power Automate metadata probe
 **Stakeholders:** Justin (prompt development, Vercel app), Connor (PowerAutomate flows, Dynamics admin)
 
 ## Context
@@ -74,7 +74,7 @@ See `docs/GRANT_CYCLE_LIFECYCLE.md` for the full proposal lifecycle with stage-b
 >
 > Also in Session 103: a **proposal context extraction plan** (`docs/PROPOSAL_CONTEXT_EXTRACTION_PLAN.md`) that extends the workflow-chaining idea for the upcoming single-phase cycle. Proposes ~15 structured fields the initial pass should extract so deep-dive calls (reviewer matching, panel review, compliance) read ~1.5K tokens of curated context instead of the full ~7K-token proposal. Compounds with expensive models and multi-LLM panel work. Not blocking v1; factored in when planning single-phase cycle Dynamics fields.
 
-## Target architecture (Power Automate state externally unverified)
+## Target architecture (Power Automate prompt pipeline not deployed)
 
 ### Automated AI Tasks (PowerAutomate → Claude API → Dynamics)
 
@@ -85,9 +85,12 @@ The intended Power Automate flows handle automated backend processing:
 4. Write results back to Dynamics fields
 
 Under the chosen target architecture, the Vercel app is **not in the loop** for
-those automated tasks. The repository does not prove that the corresponding PA
-flows, triggers, retries, or prompt-parity behavior are currently deployed.
-Their live state is **UNKNOWN** pending a dated Power Platform probe.
+those automated tasks. A read-only production probe on 2026-07-27 scanned all
+114 cloud-flow definitions visible to the Dataverse application user. None
+referenced any `wmkf_ai_*` field/table, the Executor routes, Claude/Anthropic,
+or the WMKF Vercel app. The corresponding PA prompt flows,
+triggers, retries, and prompt-parity behavior are therefore **not deployed in
+the visible production flow metadata**; Phase 4 below remains planned work.
 
 > **Decision (2026-04-16, Session 102):** Full PA composition confirmed. PA owns the entire Claude call lifecycle for automated backend jobs — no Vercel dependency at runtime. This matches the original architecture above. Rationale: easier to debug PA-native flows, and backend automation is mission-critical. PA handles PDF extraction natively (confirmed 2026-04-15). Retry, `cache_control`, and JSON validation will be implemented in PA flows. See `PROMPT_STORAGE_DESIGN.md` for full decision record.
 
