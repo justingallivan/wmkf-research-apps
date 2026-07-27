@@ -112,15 +112,15 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
    quarantine, reconciliation-generator redesign, line-reference validation,
    and full-body reclassification of the explicitly named mixed plans.
 
-5. **Keep Q9 app-access Stage 4 deferred until its warn-mode prerequisite is
-   deliberately completed.**
+5. **Proceed with Q9 app-access Stage 4 from the deterministic acceptance
+   baseline.**
    Evidence: `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md` and
-   `docs/audits/documentation-memory-hygiene-sweep-2026-07-27.md`.
-   The 2026-07-27 read-only probe found no `DATAVERSE_DAL_UNIVERSAL` entry in
-   current Preview or Production project configuration, no qualifying soak
-   receipt, and no deployment-metadata view of the active deployment's
-   embedded value. The decision-relevant result is fixed: Stage 2 is not
-   satisfied. Do not migrate the raw-client app-access transport yet.
+   `docs/audits/q9-app-access-stage2-acceptance-2026-07-27.md`.
+   The owner replaced the low-signal passive warn soak with
+   `DATAVERSE_DAL_UNIVERSAL=on` contract acceptance across each app-access
+   entry-point class plus a read-only live inventory. All 27 focused assertions
+   passed. Stage 2 is satisfied; Stage 4 is ready to execute. Preserve its
+   authenticated Preview smoke and production log watch at release time.
 
 ### Owner Decision Needed
 
@@ -142,11 +142,6 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
    Provide the fixed dates and minimum outcomes for the remaining Workbench
    lifecycle. Synthesis participation semantics are closed in
    `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
-
-5. **Q9 warn observation window.**
-   Choose the production warn-mode observation window before authorizing the
-   environment change and Preview → Production exercise. The plan recommends
-   at least three weekdays including one fresh staff sign-in.
 
 ### Parked
 
@@ -211,7 +206,7 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
 | `docs/APPLICATION_STATE_ATLAS.md` | Data-layer routing and ownership |
 | `scripts/README.md` | Blocked legacy operational script guidance |
 | `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` | Current product execution sequence |
-| `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md` | Deferred app-access DAL migration and unsatisfied warn-mode prerequisite |
+| `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md` | App-access DAL Stage 4, now unblocked by deterministic context acceptance |
 
 ## Testing
 

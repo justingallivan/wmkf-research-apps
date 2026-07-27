@@ -7,7 +7,7 @@ metadata:
   originSessionId: 17893605-3207-451d-8190-118bbacd8141
   status: active
   scope: auth
-  last_verified: 2026-07-27 via shared/config/appRegistry.js, shared/context/AppAccessContext.js, lib/utils/auth.js, Q9 source, and Vercel metadata
+  last_verified: 2026-07-27 via app-access source/tests, read-only live inventory, Q9 plan, and Vercel metadata
 ---
 
 ## Recall Rule
@@ -52,6 +52,9 @@ Do not:
   `requireAppAccess` wraps the Dataverse lookup in `withDalContext`, requests
   `throwOnError`, returns a retryable 503, and does not cache an empty grant
   set. Display-only reads retain their graceful `[]` fallback.
+- The admin API uses a strict all-grants read. Grant/revoke responses report
+  only identifiers actually completed; a transport error returns non-2xx with
+  any completed prefix instead of claiming every requested key succeeded.
 - `shared/context/AppAccessContext.js` fetches `/api/app-access` and exposes
   `hasAccess(appKey)` / `isSuperuser` to the UI.
 - `reviewers` is the shipped Workbench grant. Legacy reviewer grant strings
@@ -60,12 +63,17 @@ Do not:
 ## Q9 rollout boundary
 
 The 2026-07-27 Vercel probe found no `DATAVERSE_DAL_UNIVERSAL` entry in the
-current Preview or Production project configuration and no qualifying
-warn-soak receipt. The already-built production deployment's embedded value
-was not exposed by deployment metadata. Decision-relevant result: Stage 2 is
-not satisfied, so the app-access transport swap remains deferred pending an
-owner-selected observation window and an explicit Preview → Production
-`warn` rollout.
+current Preview or Production project configuration. The owner accepted that
+posture and replaced the low-signal passive soak with deterministic
+`DATAVERSE_DAL_UNIVERSAL=on` acceptance. Seven focused suites / 27 tests cover
+the ordinary-user lookup, admin list/grant/revoke, fresh-profile default
+grants, and partial-failure UI refresh; all passed. A read-only live inventory
+found 10 active profiles: two
+superusers, six mapped ordinary users with three to five grants, and two
+unmapped read-only profiles. No grant, environment variable, deployment, or
+saved session changed. Stage 2 is satisfied and Stage 4 is ready to execute;
+retain the normal authenticated Preview smoke and production log watch at
+release.
 
 Ground truth: `shared/config/appRegistry.js`,
 `shared/context/AppAccessContext.js`, `lib/utils/auth.js`,

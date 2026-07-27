@@ -146,7 +146,7 @@ and a subsidiary `UNKNOWN` or `PLANNED` boundary.
 | `PLANNED` | 3 | The PA prompt Executor, workflow-chaining DAG, and review-synthesis readiness policy are unbuilt options/targets. The broad paid reviewer-contact scout was owner-closed as not currently justified after the 2026-07-27 live measurement. |
 | `ASSUMED` | 0 | No assumption is used as current truth. |
 | `STALE-CONFLICT` | 0 final | Independent review found conflicts during integration; each is listed and closed below rather than hidden by the final zero. |
-| `UNKNOWN` | 1 | One umbrella live-external-state contract remains probe-bounded. It includes the unreadable active Q9 deployment snapshot and the broader current platform facts listed below; Q9's project configuration and decision-relevant Stage 2 result are resolved. |
+| `UNKNOWN` | 1 | One umbrella live-external-state contract remains probe-bounded for the broader current platform facts listed below. Q9's project configuration and Stage 2 acceptance are resolved. |
 
 ### Contract-reconcile matrix
 
@@ -161,7 +161,7 @@ and a subsidiary `UNKNOWN` or `PLANNED` boundary.
 | Grantee/honorarium | Guarded routes/services | Dataverse request/contact entities plus documented Postgres operational state | Workbench/portal/finance flows | `PARTIAL`; honorarium link population and grantee reminder/waiver configuration were probed 2026-07-27. All three package rows are Drafted, and the probe found no evidence of successful live reminder delivery. |
 | Review synthesis | Staff synthesis route after at least one submitted review | `akoya_request.wmkf_reviewsynthesisjson` | Reviews tab and DOCX/PDF exports | `PARTIAL`; no auto trigger; participation semantics were owner-confirmed 2026-07-27 but remain unimplemented |
 | DAL/context migration | Post-auth entry points establish trusted context; services use entity adapters | Dataverse through the 19 registered adapters; boundary gates enforce exceptions | Route/service consumers | `VERIFIED`; DAL, bypass-strip, and notification push-up plans are completed history |
-| Q9 preferences/app access | Preference service uses the DynamicsService adapter; app-access service still uses raw client transport | Dataverse preference and app-access entities | Auth/profile/app-access consumers | `PARTIAL`; preference migration shipped and app-access remains deferred. Current Preview/Production project config omits `DATAVERSE_DAL_UNIVERSAL`; the active deployment snapshot is unreadable and no qualifying warn-soak receipt exists, so Stage 2 is not satisfied. |
+| Q9 preferences/app access | Preference service uses the DynamicsService adapter; app-access service still uses raw client transport | Dataverse preference and app-access entities | Auth/profile/app-access consumers | `PARTIAL`; preference migration shipped. The owner replaced passive warn observation with deterministic `on`-mode context acceptance plus a read-only live inventory; Stage 2 is satisfied and Stage 4 is ready to execute. |
 | Intake membership | Applicant landing/submit call membership service | Dataverse `wmkf_portalmembership` | Applicant eligibility and submit guard | `PARTIAL`; applicant reads shipped, intake-admin approval app/page/routes unbuilt |
 | Intake budget | Submit freezes flat budget lines; drain writes child rows | Postgres draft/job state → Dataverse `wmkf_proposalbudgetline` | Intake workflow | `PARTIAL`; applicant UI, nested model, parent aggregates/persons, and terminal transition unbuilt |
 | Historical memory incidents | N/A — dated decision/incident evidence | Tracked memory leaf | Future agent recall | `VERIFIED` as historical only; fresh incidents require re-verification |
@@ -247,11 +247,11 @@ These are deliberately not converted into “current” facts:
   Dataverse/SharePoint privileges, and live schema metadata until their named
   read-only probes run.
 
-For Q9 specifically, the decision-relevant result is no longer unknown:
-current Vercel project configuration does not preserve warn mode, and no
-qualifying clean soak is established. The already-built production
-deployment's embedded value remains unreadable from deployment metadata, but
-that cannot satisfy Stage 2 without a dated exercise receipt.
+For Q9 specifically, the current Vercel project configuration still omits the
+universal guard. The owner explicitly accepted that observability posture and
+replaced the low-signal passive soak with deterministic `on`-mode context
+acceptance. The unreadable embedded value is therefore no longer
+decision-relevant to Stage 2.
 
 ### Follow-up resolution: Power Automate prompt pipeline
 
@@ -406,14 +406,39 @@ runtime-log queries:
 - no dated receipt proves the required fresh sign-in and representative
   app-access exercise.
 
-The actionable conclusion is therefore fixed: Q9 Stage 2 is **not satisfied**,
-and Stage 4 must remain deferred. Closing it requires an owner-selected
-observation window followed by an explicit `warn` setting, redeploy, Preview
-exercise, Production promotion, representative traffic, and clean log receipt.
-No environment variable, deployment, or application state was changed by this
-probe.
+At this point in the same-day sequence, the actionable conclusion was that Q9
+Stage 2 was not satisfied. That conclusion is historical and was superseded
+later on 2026-07-27 by the owner-approved deterministic acceptance recorded
+below. No environment variable, deployment, or application state was changed
+by this probe.
 
-### Q9 follow-up independent census
+### Follow-up resolution: Q9 deterministic Stage 2 acceptance
+
+The owner determined that a passive production soak would provide little
+signal because the population is small and access changes are rare. Stage 2
+was therefore closed with a deterministic acceptance contract:
+
+- read-only Postgres and production Dataverse inventory found 10 active
+  profiles: two superusers, six mapped ordinary users holding three to five
+  grants each, and two unmapped read-only profiles;
+- no dedicated mapped test account was found, and no reusable ordinary-user
+  session was available to this run, so no real staff account was silently
+  selected for mutation;
+- seven focused suites ran `DATAVERSE_DAL_UNIVERSAL=on` over the ordinary-user
+  auth lookup, admin list/grant/revoke, fresh-profile default grants, read
+  probes, guard semantics, and partial-failure UI refresh; all 27 tests passed;
+- the admin API was made fail-loud for all-grants read failures and now reports
+  the actually completed prefix on partial grant/revoke failure rather than
+  claiming the whole request succeeded; and
+- the Dataverse access, context-boundary, route-lifecycle-auth,
+  route-service-boundary, and API-route gates plus their self-tests passed.
+
+No live grant, environment variable, deployment, or saved auth state changed.
+The real ordinary-user OAuth path remains an optional Stage 4 release smoke,
+not a prerequisite for starting the transport migration. Durable receipt:
+`docs/audits/q9-app-access-stage2-acceptance-2026-07-27.md`.
+
+### Initial Q9 follow-up independent census
 
 A separate adversarial review checked six Q9 file-and-claim pairs: the active
 plan, this audit, the app-access memory leaf, the memory router, the Dataverse
@@ -421,6 +446,18 @@ wiki topic, and the session handoff. All six were `AGREE`; none were stale,
 historical, or unrelated. The review specifically confirmed the
 project-configuration versus active-deployment boundary, the Stage 2
 conclusion, and the current 503/no-empty-cache auth semantics.
+
+### Q9 acceptance adversarial review
+
+The deterministic acceptance received a separate implementation-and-contract
+review. It initially found incomplete canonical refresh handling, raw
+transport-error exposure, a stale current-plan restatement, an erased success
+message, imprecise evidence wording, and an editable stale snapshot when the
+canonical refresh itself failed. All were corrected. The final re-review
+confirmed that failed canonical reloads lock every mutation control until
+Retry succeeds, the service and route preserve honest partial-success
+semantics, and no P1/P2 issue remains. This was a code-and-contract review, not
+an additional claim-pair census, so it does not alter the counts below.
 
 ### Grantee follow-up independent census
 

@@ -141,18 +141,23 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   name); the app registration sees exactly two instances via Global Discovery;
   `.api.crm.dynamics.com` host forms are deliberately unregistered (fail
   closed).
-- **Q9 app-access transport remains deferred (verified 2026-07-27).**
+- **Q9 app-access transport is ready for Stage 4 (verified 2026-07-27).**
   Preferences use the 19th DynamicsService adapter, while
   `lib/services/dataverse-app-access-service.js` still uses
   `lib/dataverse/client.js` for `wmkf_appuserappaccesses`. Current Vercel
   Preview and Production project configuration omit
-  `DATAVERSE_DAL_UNIVERSAL`, which source defaults to `off`; the active
-  deployment metadata does not expose its embedded value, and no qualifying
-  warn-mode exercise receipt was found. Treat Q9 Stage 2 as not satisfied and
-  keep Stage 4 deferred until the owner selects the observation window and a
-  deliberate Preview → Production `warn` rollout passes. Current auth behavior
-  is fail-closed but retryable: `requireAppAccess` returns 503 on grant-lookup
-  failure and does not cache an empty grant set. See
+  `DATAVERSE_DAL_UNIVERSAL`, which source defaults to `off`. The owner accepted
+  that observability posture and replaced the passive soak with deterministic
+  `on`-mode acceptance across the ordinary-user auth lookup, admin
+  list/grant/revoke, fresh-profile default grant, and partial-failure UI
+  refresh. All 27 focused assertions
+  passed; the read-only live inventory found six mapped ordinary users with
+  three to five grants each. Current auth behavior is fail-closed but
+  retryable: `requireAppAccess` returns 503 on grant-lookup failure and does not
+  cache an empty grant set. Admin grant-list failures are also fail-loud, and
+  partial writes report only completed identifiers. Stage 2 is satisfied;
+  retain the normal authenticated Preview smoke and production log watch when
+  Stage 4 is released. See
   `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md`.
 - OData null filters do not behave like SQL.
 - The sandbox is not drop-in prod parity.
