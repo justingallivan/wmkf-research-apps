@@ -54,15 +54,15 @@ The canonical reference for the live state of the application's data layer.
 | Entity | Rows | Status | Page |
 |---|---:|---|---|
 | `wmkf_appresearcher` | — | **DROPPED S213** — bibliometric sidecar collapsed into `wmkf_potentialreviewers` (17 fields folded onto the person); see `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md` | (page removed) |
-| `wmkf_appreviewersuggestion` | 710 | active lifecycle ledger | [dataverse-wmkf-appreviewersuggestion.md](atlas/dataverse-wmkf-appreviewersuggestion.md) |
-| `wmkf_potentialreviewers` (vendor + ext.) | 4,423 | per-person scratch+history; **now also carries the bibliometric fields** (affiliation/h-index/citations/scholar/orcid/etc.) folded in from the dropped sidecar (S213) | [dataverse-wmkf-potentialreviewers.md](atlas/dataverse-wmkf-potentialreviewers.md) |
+| `wmkf_appreviewersuggestion` | 724 | active lifecycle ledger | [dataverse-wmkf-appreviewersuggestion.md](atlas/dataverse-wmkf-appreviewersuggestion.md) |
+| `wmkf_potentialreviewers` (vendor + ext.) | 4,427 | per-person scratch+history; **now also carries the bibliometric fields** (affiliation/h-index/citations/scholar/orcid/etc.) folded in from the dropped sidecar (S213) | [dataverse-wmkf-potentialreviewers.md](atlas/dataverse-wmkf-potentialreviewers.md) |
 | `wmkf_apppublication` | — | **DROPPED S213** (was 0 rows, no callers) — went down with the appresearcher collapse | (page section removed) |
 | `wmkf_appgrantcycle` | 10 | Dataverse-primary post-W3 (2026-05-12); full 11-attr schema deployed; consumed by reviewer-finder/grant-cycles + review-manager render/send-emails + maintenance-service blob-cleanup | same page |
 | `wmkf_appproposalsearch` | 0 | DEPLOYED (S185), entity set is the unconventional `wmkf_appproposalsearchs`; verified S188 audit re-sweep 2026-05-25 | same page |
 | `wmkf_app_z_publication_author` | n/a | NOT DEPLOYED | same page |
 | `wmkf_apprequestperson` | 5,561 | active junction (S139); awaiting Connor PA dual-write | [dataverse-wmkf-apprequestperson.md](atlas/dataverse-wmkf-apprequestperson.md) |
 | `wmkf_appreviewanswer` | — | **[CREATED prod S301; R/W LIVE S302]** point-in-time answer-snapshot child of `wmkf_appreviewersuggestion` (one row per question per submitted review). WRITE: `/api/external/review/[token]/submit` upserts the rows by alternate key in one atomic changeset (Phase 3). READ: `/api/review-manager/reviewers` GET, keyed child read by `_wmkf_appreviewersuggestion_value`, rendered in `ReviewsTab` (Phase 4) | [dataverse-wmkf-appreviewanswer.md](atlas/dataverse-wmkf-appreviewanswer.md) |
-| `wmkf_reviewquestion` | 12 | **[Phase A S303 — CREATED + seeded in prod; read-back verified]** staff-editable review-form question set (one row per question), system of record for *which* questions the form asks. READ: `lib/external/review-question-fetcher.js` (cached, fail-closed) — built + unit-tested + live-verified, but **no production route consumes it until Phase B** (static `reviewFormSchema.fields` is still the live source). WRITE: seed `scripts/seed-review-questions.mjs`; admin editor is Phase C. Snapshot (`wmkf_appreviewanswer`) preserves history so the set edits live | [dataverse-wmkf-reviewquestion.md](atlas/dataverse-wmkf-reviewquestion.md) |
+| `wmkf_reviewquestion` | 23 total (12 active, 11 inactive) | **[LIVE through S305; production re-probed 2026-07-26]** staff-editable review-form question set, system of record for *which* questions the form asks. READ: `lib/external/review-question-fetcher.js` (cached, fail-closed) supplies the live reviewer context/draft/submit flow. WRITE: controlled seed plus the live superuser editor (`/admin` → Review Questions), which atomically creates, updates, reorders, or soft-deletes rows and records `review_question_audit`. Snapshot (`wmkf_appreviewanswer`) preserves history so the set edits live. | [dataverse-wmkf-reviewquestion.md](atlas/dataverse-wmkf-reviewquestion.md) |
 
 ### Vendor entities (master records)
 
@@ -178,7 +178,7 @@ Useful summary of how Postgres ↔ Dataverse currently join (or will join post-c
 | Entity | Schema-as-code | Live deployment | Has data |
 |---|---|---|---|
 | `wmkf_appresearcher` | — | **DROPPED S213** (collapsed into `wmkf_potentialreviewers`) | — |
-| `wmkf_appreviewersuggestion` | extension manifest | ✅ 52 attrs | ✅ 710 rows |
+| `wmkf_appreviewersuggestion` | extension manifest | ✅ 52 attrs | ✅ 724 rows |
 | `wmkf_apppublication` | — | **DROPPED S213** | — |
 | `wmkf_appgrantcycle` | ✅ 8 attrs | ✅ 10 attrs (different gap from Postgres) | ✅ 10 rows (2026-05-14 audit) |
 | `wmkf_appproposalsearch` | ✅ | ✅ (entity set `wmkf_appproposalsearchs`, NOT `-es`) | empty |
