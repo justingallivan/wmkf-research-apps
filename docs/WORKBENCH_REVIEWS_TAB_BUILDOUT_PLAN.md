@@ -6,7 +6,7 @@ status: active
 summary: "Reviews tab deployed; staged production verified deterministic consumers, but AI synthesis failed twice and remains a red gate."
 canonical: false
 cataloged: 2026-07-03
-last_verified: 2026-07-26
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -115,20 +115,36 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
    `sendOneReminder`, and `email-defaults.readRequiredEmailDefaults`]. A manual nudge MUST
    share the sweep's exclusion/dedupe record so manual + cron cannot double-send.
    Outward-facing email = high-risk surface; the send guard is the review point.
-6. **Synthesis readiness and visibility (owner-confirmed 2026-07-26; planned,
-   not implemented).** The target is automatic synthesis only when all reviews
-   are in. Staff may explicitly run synthesis earlier as a deliberate manual
-   override. Display is independent of generation readiness:
+6. **Synthesis readiness and visibility (owner-confirmed 2026-07-26 and
+   participation semantics confirmed 2026-07-27; planned, not implemented).**
+   The target is automatic synthesis only when all participating invitations
+   are resolved, with at least one submitted review. Staff may explicitly run
+   synthesis earlier as a deliberate manual override after at least one
+   submission. Display is independent of generation readiness:
    an existing stored synthesis must remain visible even when there are currently
    zero submitted reviews. The present implementation does not enforce this
    contract: it has no automatic trigger, its manual card appears once at least
    one review is submitted, the route rejects only zero submitted reviews, and
    the card (including already-stored output) is hidden at zero submissions.
-   Before implementing an automatic trigger, the owner must define which
-   invitation states participate in the all-in test. Declined,
-   withdrawn/released, revoked, duplicate, and exception-state semantics remain
-   undecided; do not silently equate “all reviews are in” with every invitation
-   having a submitted review.
+   The readiness population is every selected, not-applicant-excluded suggestion
+   that has entered the invitation/engagement lifecycle (`wmkf_invited=true` or
+   `wmkf_accepted=true`). A row resolves with review content when
+   `wmkf_reviewreceivedat` is set. It resolves without review content when it has
+   an explicit non-review outcome (declined, no-response,
+   `withdrawn_sufficient`, withdrew, or released), or when its current external
+   token is revoked or expired. A live-token participant without a receipt
+   remains blocking, including a not-yet-accepted invitee. Unselected,
+   applicant-excluded, and explicitly merged/removed duplicate rows do not
+   participate; an unresolved duplicate still in the readiness population
+   blocks. Missing/malformed token dates and unknown lifecycle states block
+   fail-closed. Minting a replacement token clears revocation and writes a future
+   expiry [VERIFIED via `token-lifecycle.mintAndStore` →
+   `reviewer-suggestion.setExternalToken`]. It reactivates readiness only when
+   revoked/expired token state was that otherwise-participating, nonterminal
+   row's sole resolved-without-review condition; it does not reselect a removed
+   row or undo decline/withdraw/release. A synthesis generated before a genuine
+   reactivation remains visible but is not current until the population resolves
+   and synthesis runs again.
 
 ## Phases (independently shippable, in order)
 
@@ -220,14 +236,16 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
 - `ReviewsTab`'s Synthesis card (renders only when ≥1 review is submitted):
   stored synthesis sections or a "Generate synthesis" / "Regenerate" action;
   plain-text rendering only (LLM output; no `dangerouslySetInnerHTML`).
-- **Known workflow/UI gap (owner decision 2026-07-26; not yet implemented):**
+- **Known workflow/UI gap (owner decisions 2026-07-26 and 2026-07-27; not yet
+  implemented):**
   preserve the explicit staff action as the early-run override, add automatic
   execution only after all reviews are in, and decouple stored synthesis display
   from readiness so a populated memo is never hidden merely because the current
   submitted count is zero. The current ≥1 client gate and zero-only service gate
-  are implementation evidence, not the intended final workflow. Participation
-  semantics for declined, withdrawn/released, revoked, duplicate, and
-  exception-state invitations remain an owner decision.
+  are implementation evidence, not the intended final workflow. Implement the
+  participation state machine in governing decision 6, including revoked/expired
+  tokens as resolved-without-review and replacement-token minting as
+  reactivation only for otherwise-participating, nonterminal rows.
 - `shared/utils/review-report.js#composeReviewReport` accepts an optional
   `synthesis` param → `synthesisSection` on the composed report, additive in
   both the DOCX and PDF renderers; `ExportMenu` passes

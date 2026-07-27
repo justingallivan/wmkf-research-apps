@@ -26,7 +26,8 @@ related:
 > `docs/EXTERNAL_REVIEWER_INTAKE_PLAN.md` for the external-reviewer flow, and
 > `docs/CURRENT_WORK_QUEUE.md` for remaining work. In particular, automatic
 > synthesis readiness is not implemented: the target is “all reviews are in,”
-> while participating invitation states remain undecided.
+> and the participating-invitation state machine was owner-confirmed on
+> 2026-07-27 in `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 ## Historical status snapshot (2026-05-08)
 

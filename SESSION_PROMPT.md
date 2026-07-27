@@ -97,11 +97,13 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
    enforcement remains enabled. Use `/contract-reconcile` before changing the
    response because `RequireAuth`, `Layout`, and the home page consume it.
 
-3. **Continue the deadline and lifecycle design discussion.**
+3. **Continue the deadline and lifecycle implementation discussion.**
    Evidence: `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` Calendar Gate
    and Decision Log.
    Obtain each fixed date, audience, and minimum required artifact/action before
-   converting the relative sequence into calendar commitments.
+   converting the relative sequence into calendar commitments. Synthesis
+   participation semantics were owner-confirmed on 2026-07-27; use the plan's
+   resolved state machine rather than reopening that decision.
 
 4. **Plan the next reconciliation slice without claiming the repository clean.**
    Evidence:
@@ -126,14 +128,15 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
    counts and statuses, prompt/question rows, external reviewer usage, BILL,
    Blob, and external automation state.
 
-4. **Synthesis participation semantics and fixed deadlines.**
-   Decide which invitation terminal states participate in “all reviews are in,”
-   plus the fixed dates and minimum outcomes for the remaining Workbench
-   lifecycle.
+4. **Fixed deadlines.**
+   Provide the fixed dates and minimum outcomes for the remaining Workbench
+   lifecycle. Synthesis participation semantics are closed in
+   `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
 
 ### Parked
 
-1. **Automatic synthesis triggering until readiness semantics are approved.**
+1. **Automatic synthesis triggering until the production synthesis red gate is
+   closed and the approved readiness state machine is implemented and tested.**
 
 2. **Implementation of the four placeholder tabs until the design/calendar
    gate is complete.**

@@ -6,7 +6,7 @@ status: canonical
 summary: "Evidence-backed critical path for stabilizing review synthesis and designing the remaining Workbench lifecycle before implementation."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-07-26
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -80,8 +80,24 @@ memo write.
 - Manual staff override: allow an early run with explicit confirmation.
 - Stored-output visibility: show an existing synthesis independently of current readiness.
 - Regeneration: always deliberate and auditable.
-- Decide the participation set for declined, withdrew, released, revoked, duplicate, and
-  cancelled rows before coding the automatic trigger.
+- Participation population (owner-confirmed 2026-07-27): selected,
+  not-applicant-excluded rows that have entered invitation/engagement
+  (`wmkf_invited=true` or `wmkf_accepted=true`).
+- Resolved with content: `wmkf_reviewreceivedat` is set. Resolved without
+  content: declined, no-response, `withdrawn_sufficient`, withdrew, released,
+  or the current token is revoked/expired.
+- Blocking: any other participant with no receipt, including a live-token
+  not-yet-accepted invitee; malformed/unknown state fails closed.
+- Removed/excluded/merged-away rows do not participate. An unresolved duplicate
+  that still satisfies the population rule blocks.
+- Require at least one submitted review before either automatic generation or
+  the existing staff override.
+- Replacement-token minting clears revocation and assigns a future expiry. It
+  reopens readiness only when token state was the otherwise-participating,
+  nonterminal row's sole resolved-without-content condition; it does not undo
+  removal or a terminal outcome. Keep an older synthesis visible but treat it as
+  not current until synthesis runs again after genuine reactivation and
+  resolution.
 
 Exit: one documented state machine, one tested readiness calculation, one automatic trigger
 path, and one manual override path.
@@ -177,9 +193,7 @@ For every slice:
 The next planning conversation needs:
 
 1. fixed deadlines and minimum outcomes;
-2. review-synthesis participation semantics;
-3. Pre Site Visit inputs;
-4. writeup file/pointer/version contract;
-5. Site Visit field sufficiency;
-6. leadership/editor access timing.
-
+2. Pre Site Visit inputs;
+3. writeup file/pointer/version contract;
+4. Site Visit field sufficiency;
+5. leadership/editor access timing.

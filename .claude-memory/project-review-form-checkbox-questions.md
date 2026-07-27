@@ -54,13 +54,15 @@ email. It remained red because two current-v2 synthesis attempts failed on
 incomplete JSON before writeback; the original synthesis and all email markers
 were preserved.
 
-[PLANNED / HELD] Resolve synthesis, prove the staff-writer success path, rehearse
-rollback, run the final smoke, then make a separate reviewer-exposure decision.
-Automatic synthesis readiness is also unimplemented: owner intent is "all
-invited reviews are in," with explicit staff override. The participation set is
-`UNKNOWN`: declined, withdrew, released, and revoked invitations have not been
-decided as included, excluded, or terminal for readiness. Current source rejects
-only zero submitted reviews, and the UI hides the synthesis card at zero.
+[PLANNED / HELD] Fix synthesis, prove staff write, rehearse rollback/smoke, then
+decide exposure. [OWNER-CONFIRMED 2026-07-27] Automatic readiness covers
+selected, non-excluded invited/accepted rows and requires ≥1 receipt. Receipt
+resolves with content; decline/no-response/withdrawn-sufficient/withdrew/
+released or current revoked/expired token resolves without. Others block
+fail-closed (including live-token non-acceptance, unresolved duplicates, invalid
+state); re-minting reactivates only a participating nonterminal row whose token
+was its sole resolution. Unbuilt: no auto trigger; service/card remain
+zero-gated; staff keeps the explicit ≥1-receipt override.
 
 ## Frozen owner decisions
 

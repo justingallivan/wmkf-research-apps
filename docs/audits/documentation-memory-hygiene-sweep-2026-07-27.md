@@ -159,7 +159,7 @@ and a subsidiary `UNKNOWN` or `PLANNED` boundary.
 | Prompt publication/execution | Admin publication route and repository seed paths | Dataverse `wmkf_ai_prompt`; append-only Postgres publication audit; `wmkf_ai_run` execution audit is fallible | Vercel Executor callers | `PARTIAL`; universal editor/resolver unbuilt; production PA prompt Executor absent from the 2026-07-27 visible flow metadata |
 | Workflow chaining | Vercel Executor parses declared output and attempts target writes | Declared `akoya_request.wmkf_ai_*` fields; per-output write results must be checked | Downstream PA consumers | `PARTIAL`; downstream PA DAG is planned/unbuilt, not an unknown current pipeline |
 | Grantee/honorarium | Guarded routes/services | Dataverse request/contact entities plus documented Postgres operational state | Workbench/portal/finance flows | `PARTIAL`; honorarium link population probed 2026-07-27, while grantee and broader mutable row/config populations still require probes |
-| Review synthesis | Staff synthesis route after at least one submitted review | `akoya_request.wmkf_reviewsynthesisjson` | Reviews tab and DOCX/PDF exports | `PARTIAL`; no auto trigger and participation set is undecided |
+| Review synthesis | Staff synthesis route after at least one submitted review | `akoya_request.wmkf_reviewsynthesisjson` | Reviews tab and DOCX/PDF exports | `PARTIAL`; no auto trigger; participation semantics were owner-confirmed 2026-07-27 but remain unimplemented |
 | DAL/context migration | Post-auth entry points establish trusted context; services use entity adapters | Dataverse through the 19 registered adapters; boundary gates enforce exceptions | Route/service consumers | `VERIFIED`; DAL, bypass-strip, and notification push-up plans are completed history |
 | Q9 preferences/app access | Preference service uses the DynamicsService adapter; app-access service still uses raw client transport | Dataverse preference and app-access entities | Auth/profile/app-access consumers | `PARTIAL`; preference migration shipped, app-access transport migration deferred, production warn/soak state `UNKNOWN` |
 | Intake membership | Applicant landing/submit call membership service | Dataverse `wmkf_portalmembership` | Applicant eligibility and submit guard | `PARTIAL`; applicant reads shipped, intake-admin approval app/page/routes unbuilt |
@@ -243,9 +243,6 @@ These are deliberately not converted into “current” facts:
 - Broader current production row populations still require purpose-built
   read-only probes. The honorarium proposal-link population named in the
   original sweep was resolved by the dated follow-up below.
-- Review-synthesis participation semantics remain an owner decision. The target
-  is “all reviews are in,” but declined, withdrawn/released, revoked, duplicate,
-  and exception-state participation is not defined.
 - Broad paid reviewer-contact scouting remains unbuilt; its value, eligibility
   floor, budget, and enablement policy remain owner decisions.
 - Remaining grantee reminder-policy operations and current policy-row/body state
@@ -304,6 +301,35 @@ were never promised a direct proposal lookup and remain intentionally outside
 the portal-cohort guarantee.
 The probe contains no Dataverse write: OAuth token acquisition is the only POST
 and every tenant data request is GET.
+
+### Follow-up resolution: review-synthesis participation semantics
+
+The owner closed the readiness-policy unknown on 2026-07-27:
+
+- the population is every selected, not-applicant-excluded suggestion that has
+  entered invitation/engagement (`wmkf_invited=true` or
+  `wmkf_accepted=true`);
+- `wmkf_reviewreceivedat` resolves a participant with review content;
+- declined, no-response, `withdrawn_sufficient`, withdrew, released, and a
+  currently revoked or expired external token resolve a participant without
+  review content;
+- every other participant without a receipt blocks, including live-token
+  not-yet-accepted invitees, unresolved duplicates, and malformed/unknown
+  states;
+- unselected, applicant-excluded, and explicitly merged/removed duplicates are
+  outside the population; and
+- at least one submitted review is required. Staff retains the explicit
+  early-run action after one submission.
+
+Current source proves that token verification rejects revoked and expired rows,
+while replacement-token minting clears revocation and assigns a future expiry.
+Regeneration therefore reopens readiness only when token state was the
+otherwise-participating, nonterminal row's sole resolved-without-review
+condition; it does not reselect a removed row or undo decline/withdraw/release.
+A prior synthesis remains visible but is not current until the population
+resolves and synthesis runs again after a genuine reactivation. The policy is
+`PLANNED`, not built: there is still no automatic trigger/readiness helper, and
+the current Synthesis card remains hidden at zero submissions.
 
 ### Mechanical memory result
 

@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-26
+last_verified: 2026-07-27
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -33,6 +33,9 @@ source_files:
   - lib/services/reviewer-candidate-export.js
   - lib/services/reviewer-campaign-timeline.js
   - lib/services/review-manager/terminal-transition-service.js
+  - lib/external/token-lifecycle.js
+  - lib/external/reviewer-token-ttl.js
+  - lib/external/verify-suggestion-token.js
   - lib/services/review-receipt-guard.js
   - lib/services/reviewer-roster-store.js
   - lib/services/contact-enrichment-service.js
@@ -354,16 +357,24 @@ unchanged and the smoke answers were atomically cleaned up. This phase remains a
 red pre-exposure gate until synthesis succeeds (or the prompt-only rollback is
 executed and verified).
 
-**Owner-confirmed target lifecycle (2026-07-26; NOT YET IMPLEMENTED):**
-automatic synthesis is intended only after all invited reviews are in, while
-staff may explicitly generate it earlier as a manual override. The exact
-readiness rule remains **UNKNOWN** until the owner decides how declined,
-withdrew, released, and revoked invitations participate; do not equate “all
-reviews are in” with every invited person submitting. Stored-output visibility
-is a separate concern: an existing `wmkf_reviewsynthesisjson` value must remain
-visible even when the current submitted count is zero. Current code has no
-automatic trigger, permits the manual action after one submission, and hides
-the entire Synthesis card at zero. Plan doc:
+**Owner-confirmed target lifecycle (2026-07-26; participation semantics closed
+2026-07-27; NOT YET IMPLEMENTED):** automatic synthesis is intended only after
+all participating invitations resolve and at least one review is submitted;
+staff may explicitly generate it earlier after one submission. Participants are
+selected, not-applicant-excluded rows that entered invitation/engagement
+(`wmkf_invited=true` or `wmkf_accepted=true`). A receipt resolves with review
+content. Declined, no-response, `withdrawn_sufficient`, withdrew, released, and
+a currently revoked or expired token resolve without content. Every other
+participant without a receipt blocks, including live-token invitees who have
+not accepted, unresolved duplicates, and malformed/unknown lifecycle or token
+state. Unselected, applicant-excluded, and explicitly merged/removed duplicates
+do not participate. `mintAndStore` clears revocation and writes a future expiry,
+but regeneration reopens readiness only when token state was the
+otherwise-participating, nonterminal row's sole resolution; it does not reselect
+a removed row or undo decline/withdraw/release. An existing synthesis remains
+visible but is not current until synthesis runs again after genuine reactivation
+and resolution. Current code has no automatic trigger, permits the manual action
+after one submission, and hides the entire Synthesis card at zero. Plan doc:
 `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 ## Email templates (admin org default + per-PD override)
