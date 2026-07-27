@@ -51,8 +51,8 @@ function makeDeps({ keeperRow, loserRow, loserSug = [], keeperSug = [], slots = 
   };
 }
 
-const bareKeeper = { wmkf_potentialreviewersid: KEEPER, wmkf_name: 'Joshua Rabinowitz', wmkf_emailaddress: 'joshr@princeton.edu' };
-const bareLoser = { wmkf_potentialreviewersid: LOSER, wmkf_name: 'Joshua Ravinowitz', wmkf_emailaddress: null };
+const bareKeeper = { wmkf_potentialreviewersid: KEEPER, wmkf_name: 'Avery Quinn', wmkf_emailaddress: 'avery.quinn@example.org' };
+const bareLoser = { wmkf_potentialreviewersid: LOSER, wmkf_name: 'Avery Quill', wmkf_emailaddress: null };
 
 describe('planMerge — validation', () => {
   test('rejects non-GUID ids and identical ids', async () => {
@@ -120,11 +120,11 @@ describe('planMerge — block predicate (fail-closed)', () => {
   });
 });
 
-describe('planMerge — the Rabinowitz shape (both pre-engagement, no collision)', () => {
+describe('planMerge — near-name duplicate shape (both pre-engagement, no collision)', () => {
   test('not blocked; loser suggestion is a repoint; field diff computed', async () => {
     const deps = makeDeps({
-      keeperRow: { ...bareKeeper, wmkf_primaryaffiliation: 'Princeton' },
-      loserRow: { ...bareLoser, wmkf_primaryaffiliation: 'Ludwig Princeton Branch' },
+      keeperRow: { ...bareKeeper, wmkf_primaryaffiliation: 'Example University' },
+      loserRow: { ...bareLoser, wmkf_primaryaffiliation: 'Example Research Branch' },
       loserSug: [{ wmkf_appreviewersuggestionid: SUG_L, _wmkf_request_value: REQ1, wmkf_selected: true, _etag: 'W/"1"' }],
       keeperSug: [],
     });
@@ -171,13 +171,13 @@ describe('executeMerge', () => {
 
   test('chosen loser field is written to the keeper (affiliation → both adapters)', async () => {
     const deps = makeDeps({
-      keeperRow: { ...bareKeeper, wmkf_primaryaffiliation: 'Princeton' },
-      loserRow: { ...bareLoser, wmkf_primaryaffiliation: 'Ludwig Princeton Branch' },
+      keeperRow: { ...bareKeeper, wmkf_primaryaffiliation: 'Example University' },
+      loserRow: { ...bareLoser, wmkf_primaryaffiliation: 'Example Research Branch' },
       loserSug: [],
     });
     await executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: { affiliation: 'loser' } }, deps);
-    expect(deps.potentialReviewer.update).toHaveBeenCalledWith(KEEPER, { affiliation: 'Ludwig Princeton Branch' }, expect.any(Object));
-    expect(deps.researcher.updateById).toHaveBeenCalledWith(KEEPER, expect.objectContaining({ affiliation: 'Ludwig Princeton Branch' }), expect.any(Object));
+    expect(deps.potentialReviewer.update).toHaveBeenCalledWith(KEEPER, { affiliation: 'Example Research Branch' }, expect.any(Object));
+    expect(deps.researcher.updateById).toHaveBeenCalledWith(KEEPER, expect.objectContaining({ affiliation: 'Example Research Branch' }), expect.any(Object));
   });
 
   test('collision row is conditional-deleted (ifMatch), not repointed', async () => {
@@ -240,8 +240,8 @@ describe('executeMerge', () => {
   test('email move: clears loser email, sets keeper, stamps manual provenance — in that order', async () => {
     const calls = [];
     const deps = makeDeps({
-      keeperRow: { ...bareKeeper, wmkf_emailaddress: 'old@princeton.edu' },
-      loserRow: { ...bareLoser, wmkf_emailaddress: 'joshr@princeton.edu' },
+      keeperRow: { ...bareKeeper, wmkf_emailaddress: 'old@example.org' },
+      loserRow: { ...bareLoser, wmkf_emailaddress: 'avery.quinn@example.org' },
       loserSug: [],
     });
     deps.potentialReviewer.clearEmail = jest.fn(async () => { calls.push('clearLoser'); });
@@ -256,8 +256,8 @@ describe('executeMerge', () => {
 
   test('step 6 keeper email update failure stays a 500 email-move failure', async () => {
     const deps = makeDeps({
-      keeperRow: { ...bareKeeper, wmkf_emailaddress: 'old@princeton.edu' },
-      loserRow: { ...bareLoser, wmkf_emailaddress: 'joshr@princeton.edu' },
+      keeperRow: { ...bareKeeper, wmkf_emailaddress: 'old@example.org' },
+      loserRow: { ...bareLoser, wmkf_emailaddress: 'avery.quinn@example.org' },
       loserSug: [],
     });
     deps.potentialReviewer.update = jest.fn(async (id, u) => {
@@ -322,8 +322,8 @@ describe('executeMerge — applicant-slot repoint (v1 block lifted)', () => {
   test('slot repoint runs BEFORE the email move and the loser deactivate', async () => {
     const order = [];
     const deps = makeDeps({
-      keeperRow: { ...bareKeeper, wmkf_emailaddress: 'old@princeton.edu' },
-      loserRow: { ...bareLoser, wmkf_emailaddress: 'joshr@princeton.edu' },
+      keeperRow: { ...bareKeeper, wmkf_emailaddress: 'old@example.org' },
+      loserRow: { ...bareLoser, wmkf_emailaddress: 'avery.quinn@example.org' },
       loserSug: [],
       slots: [slotRow(REQ1, { 2: LOSER })],
     });
@@ -442,7 +442,7 @@ describe('executeMerge — empty-loser overwrite guard (Codex S289 ITEM-3)', () 
   // real value — even though the field "differs" (keeper-has / loser-empty).
   test('email: empty loser email is NOT moved over the keeper (no clearEmail, no null set)', async () => {
     const deps = makeDeps({
-      keeperRow: { ...bareKeeper, wmkf_emailaddress: 'keeper@princeton.edu' },
+      keeperRow: { ...bareKeeper, wmkf_emailaddress: 'keeper@example.org' },
       loserRow: { ...bareLoser, wmkf_emailaddress: null },
       loserSug: [],
     });
@@ -455,7 +455,7 @@ describe('executeMerge — empty-loser overwrite guard (Codex S289 ITEM-3)', () 
 
   test('affiliation: empty loser value does not overwrite the keeper', async () => {
     const deps = makeDeps({
-      keeperRow: { ...bareKeeper, wmkf_primaryaffiliation: 'Princeton' },
+      keeperRow: { ...bareKeeper, wmkf_primaryaffiliation: 'Example University' },
       loserRow: { ...bareLoser, wmkf_primaryaffiliation: null },
       loserSug: [],
     });
@@ -466,7 +466,7 @@ describe('executeMerge — empty-loser overwrite guard (Codex S289 ITEM-3)', () 
 
   test('whitespace-only loser value is treated as empty (name)', async () => {
     const deps = makeDeps({
-      keeperRow: { ...bareKeeper, wmkf_name: 'Joshua Rabinowitz' },
+      keeperRow: { ...bareKeeper, wmkf_name: 'Avery Quinn' },
       loserRow: { ...bareLoser, wmkf_name: '   ' },
       loserSug: [],
     });

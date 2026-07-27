@@ -2,10 +2,9 @@
  * Unit tests for ContactParser.isNameConsistentEmail — the grounding guard that
  * rejects hallucinated / wrong-person emails from the Tier-3 (Claude web search)
  * and Tier-4 (SerpAPI) contact-enrichment lookups before they can be used to
- * send a reviewer invitation. Regression cases come from the S220 bug where the
- * Workbench "Enrich recommended" flow attached `justin@gmail.com` to a
- * 0-publication fake reviewer and `SarahRose888@boisestate.edu` to a different
- * same-named person.
+ * send a reviewer invitation. Regression shapes come from the S220 bug where
+ * the Workbench "Enrich recommended" flow attached a given-name-only address
+ * to a fake reviewer and an unrelated address to a different same-named person.
  */
 
 const { ContactParser } = require('../../lib/utils/contact-parser');
@@ -13,11 +12,11 @@ const { ContactParser } = require('../../lib/utils/contact-parser');
 describe('ContactParser.isNameConsistentEmail', () => {
   describe('rejects fabricated / wrong-person emails (the S220 bug)', () => {
     test.each([
-      ['justin@gmail.com', 'Justin Test3'],                 // fabricated, surname absent
-      ['justin@gmail.com', 'Justin Test4'],
-      ['SarahRose888@boisestate.edu', 'Justin_test Gallivan'], // different same-search person
-      ['someone.else@stanford.edu', 'Li-Huei Tsai'],
-      ['labmanager@mit.edu', 'Michael Greenberg'],
+      ['alex@example.org', 'Alex Test3'],                   // fabricated, surname absent
+      ['alex@example.org', 'Alex Test4'],
+      ['other.person@example.org', 'Alex_test Mercer'],     // different same-search person
+      ['someone.else@example.org', 'Amara Ann Khan'],
+      ['labmanager@example.org', 'Ava Mercer'],
     ])('rejects %s for "%s"', (email, name) => {
       expect(ContactParser.isNameConsistentEmail(email, name)).toBe(false);
     });
@@ -25,12 +24,12 @@ describe('ContactParser.isNameConsistentEmail', () => {
 
   describe('accepts name-consistent emails', () => {
     test.each([
-      ['jgallivan@queensu.ca', 'Justin Gallivan'],          // first-initial + surname
-      ['justin.gallivan@mit.edu', 'Dr. Justin Gallivan'],   // first.surname
-      ['justingallivan@me.com', 'Justin Gallivan'],         // firstsurname, free webmail OK when surname present
-      ['gallivanj@uw.edu', 'Justin Gallivan'],              // surname + first-initial
-      ['lhtsai@mit.edu', 'Li-Huei Tsai'],                   // multi-initial + surname
-      ['madabhushi@utsouthwestern.edu', 'Ram Madabhushi'],  // bare surname
+      ['amercer@example.org', 'Ava Mercer'],                // first-initial + surname
+      ['ava.mercer@example.org', 'Dr. Ava Mercer'],         // first.surname
+      ['avamercer@example.org', 'Ava Mercer'],              // firstsurname, free webmail OK when surname present
+      ['mercera@example.org', 'Ava Mercer'],                // surname + first-initial
+      ['aakhan@example.org', 'Amara Ann Khan'],             // multi-initial + surname
+      ['mercer@example.org', 'Ava Mercer'],                 // bare surname
     ])('accepts %s for "%s"', (email, name) => {
       expect(ContactParser.isNameConsistentEmail(email, name)).toBe(true);
     });
@@ -38,53 +37,53 @@ describe('ContactParser.isNameConsistentEmail', () => {
 
   describe('surname-first and compound surnames (Codex S220 false-negative fixes)', () => {
     test.each([
-      ['wzhang@stanford.edu', 'Zhang Wei'],                 // surname-first order: initial(Wei) + surname(Zhang)
-      ['mgarcia@unam.mx', 'Maria Garcia Marquez'],          // compound surname, first component
-      ['marquez@unam.mx', 'Maria Garcia Marquez'],          // compound surname, last component (bare)
-      ['lzhang@mit.edu', 'Li Zhang'],
+      ['mvega@example.org', 'Vega Mira'],                   // surname-first order: initial(Mira) + surname(Vega)
+      ['agarcia@example.org', 'Ariana Garcia Marquez'],     // compound surname, first component
+      ['marquez@example.org', 'Ariana Garcia Marquez'],     // compound surname, last component (bare)
+      ['npatel@example.org', 'Noor Patel'],
     ])('accepts %s for "%s"', (email, name) => {
       expect(ContactParser.isNameConsistentEmail(email, name)).toBe(true);
     });
 
     test('a lone given-name address is still rejected (does not regress #1)', () => {
-      expect(ContactParser.isNameConsistentEmail('justin@gmail.com', 'Justin Test3')).toBe(false);
-      expect(ContactParser.isNameConsistentEmail('maria@unam.mx', 'Maria Garcia Marquez')).toBe(false);
+      expect(ContactParser.isNameConsistentEmail('alex@example.org', 'Alex Test3')).toBe(false);
+      expect(ContactParser.isNameConsistentEmail('ariana@example.org', 'Ariana Garcia Marquez')).toBe(false);
     });
   });
 
   describe('suffix / credential tokens and accents (Codex S221 false-negative fixes)', () => {
     test.each([
-      ['gallivan@queensu.ca', 'Justin Gallivan Jr'],        // generational suffix not the surname
-      ['gallivan@queensu.ca', 'Justin Gallivan Ph.D.'],     // credential not the surname
-      ['gallivan@queensu.ca', 'Justin Gallivan III'],       // roman-numeral suffix
-      ['jgallivan@queensu.ca', 'Justin Gallivan MD'],       // initial+surname survives suffix strip
-      ['jose.nunez@unam.mx', 'José Núñez'],                  // accented surname normalizes to ASCII
-      ['jnunez@unam.mx', 'José Núñez'],                      // accented initial+surname
+      ['mercer@example.org', 'Ava Mercer Jr'],              // generational suffix not the surname
+      ['mercer@example.org', 'Ava Mercer Ph.D.'],           // credential not the surname
+      ['mercer@example.org', 'Ava Mercer III'],             // roman-numeral suffix
+      ['amercer@example.org', 'Ava Mercer MD'],             // initial+surname survives suffix strip
+      ['ana.nunez@example.org', 'Ana Núñez'],               // accented surname normalizes to ASCII
+      ['anunez@example.org', 'Ana Núñez'],                  // accented initial+surname
     ])('accepts %s for "%s"', (email, name) => {
       expect(ContactParser.isNameConsistentEmail(email, name)).toBe(true);
     });
 
     test('a name made only of suffix tokens yields no surname → false', () => {
-      expect(ContactParser.isNameConsistentEmail('jr@x.edu', 'Jr')).toBe(false);
+      expect(ContactParser.isNameConsistentEmail('jr@example.org', 'Jr')).toBe(false);
     });
 
     test('suffix stripping must NOT collapse a 2-token name to a lone given name (Codex S221 false-accept)', () => {
-      // "John MD" has no real surname once MD is stripped — a lone given-name
-      // address must stay rejected, exactly as "Justin Test3" is.
-      expect(ContactParser.isNameConsistentEmail('john@x.edu', 'John MD')).toBe(false);
-      expect(ContactParser.isNameConsistentEmail('john@x.edu', 'John Jr')).toBe(false);
+      // "Alex MD" has no real surname once MD is stripped — a lone given-name
+      // address must stay rejected, exactly as "Alex Test3" is.
+      expect(ContactParser.isNameConsistentEmail('alex@example.org', 'Alex MD')).toBe(false);
+      expect(ContactParser.isNameConsistentEmail('alex@example.org', 'Alex Jr')).toBe(false);
       // …but a real surname alongside the credential still works.
-      expect(ContactParser.isNameConsistentEmail('smith@x.edu', 'John Smith MD')).toBe(true);
+      expect(ContactParser.isNameConsistentEmail('mercer@example.org', 'Ava Mercer MD')).toBe(true);
     });
   });
 
   describe('defensive inputs', () => {
     test('null / empty / malformed return false', () => {
-      expect(ContactParser.isNameConsistentEmail(null, 'Justin Gallivan')).toBe(false);
-      expect(ContactParser.isNameConsistentEmail('jgallivan@x.edu', null)).toBe(false);
-      expect(ContactParser.isNameConsistentEmail('', 'Justin Gallivan')).toBe(false);
-      expect(ContactParser.isNameConsistentEmail('not-an-email', 'Justin Gallivan')).toBe(false);
-      expect(ContactParser.isNameConsistentEmail('@nolocal.edu', 'Justin Gallivan')).toBe(false);
+      expect(ContactParser.isNameConsistentEmail(null, 'Ava Mercer')).toBe(false);
+      expect(ContactParser.isNameConsistentEmail('amercer@example.org', null)).toBe(false);
+      expect(ContactParser.isNameConsistentEmail('', 'Ava Mercer')).toBe(false);
+      expect(ContactParser.isNameConsistentEmail('not-an-email', 'Ava Mercer')).toBe(false);
+      expect(ContactParser.isNameConsistentEmail('@example.org', 'Ava Mercer')).toBe(false);
     });
   });
 });

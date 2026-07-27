@@ -6,27 +6,54 @@
  *   write   — no Dataverse record owns the email → PATCH it onto the suggestion's
  *             person record (guarded: person email empty + no other owner).
  *   repoint — a sibling record owns the email → repoint the suggestion to that
- *             keeper (like the Walsh fix), guarded against unique-key collision.
+ *             keeper, guarded against unique-key collision.
+ *
+ * Cases contain operational PII and therefore live outside the repository.
+ * Pass --cases-file=/absolute/path/to/cases.json. Example entry:
+ *   { "name": "Avery Quinn", "reqNum": "1000000",
+ *     "email": "avery.quinn@example.org", "source": "claude_search",
+ *     "op": "write" }
+ *
  * Dry-run by default; pass --execute to write.
  */
 import fs from 'fs'; import path from 'path'; import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const EXECUTE = process.argv.includes('--execute');
+const norm = (s) => String(s || '').toLowerCase().replace(/^(dr\.?|prof\.?|professor)\s+/i, '').replace(/[^a-z\s]/g, '').replace(/\s+/g, ' ').trim();
+
+const casesFileArg = process.argv.find((arg) => arg.startsWith('--cases-file='));
+if (!casesFileArg || !casesFileArg.slice('--cases-file='.length).trim()) {
+  console.error('Usage: node scripts/fix-roster-email-recovery.mjs --cases-file=/absolute/path/to/cases.json [--execute]');
+  process.exit(1);
+}
+const casesFileInput = casesFileArg.slice('--cases-file='.length);
+if (!path.isAbsolute(casesFileInput)) {
+  throw new Error('Cases file must use an absolute path outside the repository');
+}
+const casesFile = path.resolve(casesFileInput);
+const repoRoot = path.resolve(__dirname, '..');
+const relativeToRepo = path.relative(repoRoot, casesFile);
+if (relativeToRepo === '' || (!relativeToRepo.startsWith('..') && !path.isAbsolute(relativeToRepo))) {
+  throw new Error('Cases file must live outside the repository');
+}
+const CASES = JSON.parse(fs.readFileSync(casesFile, 'utf8'));
+if (!Array.isArray(CASES) || CASES.length === 0) {
+  throw new Error('Cases file must contain a non-empty JSON array');
+}
+for (const [index, c] of CASES.entries()) {
+  if (!c || !c.name || !c.reqNum || !c.email || !['write', 'repoint'].includes(c.op)) {
+    throw new Error(`Invalid case at index ${index}: name, reqNum, email, and op=write|repoint are required`);
+  }
+  if (c.op === 'write' && !c.source) {
+    throw new Error(`Invalid write case at index ${index}: source is required`);
+  }
+}
+
 const envPath = path.join(__dirname, '..', '.env.local');
 if (fs.existsSync(envPath)) for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
   const m = line.match(/^([A-Z0-9_]+)=(.*)$/); if (!m) continue; let [, k, v] = m;
   v = v.trim().replace(/^"(.*)"$/, '$1'); if (!process.env[k]) process.env[k] = v;
 }
-const EXECUTE = process.argv.includes('--execute');
-const norm = (s) => String(s || '').toLowerCase().replace(/^(dr\.?|prof\.?|professor)\s+/i, '').replace(/[^a-z\s]/g, '').replace(/\s+/g, ' ').trim();
-
-// Cases derived from probe-roster-has-dataverse-empty + owner check. Pollina skipped (junk munge).
-const CASES = [
-  { name: 'Nitin Phadnis',     reqNum: '1002860', email: 'phadnis@biology.utah.edu', source: 'claude_search', op: 'write' },
-  { name: 'Michael Crair',     reqNum: '1002835', email: 'michael.crair@yale.edu',   source: 'claude_search', op: 'write' },
-  { name: 'Carla J. Shatz',    reqNum: '1003034', email: 'cshatz@stanford.edu',       op: 'repoint' },
-  { name: 'Tsampikos Kottos',  reqNum: '1002926', email: 'tkottos@wesleyan.edu',      op: 'repoint' },
-  { name: 'Harmit Malik',      reqNum: '1002860', email: 'hsmalik@fredhutch.org',     op: 'repoint' },
-];
 
 async function getToken() {
   const r = await fetch(`https://login.microsoftonline.com/${process.env.DYNAMICS_TENANT_ID}/oauth2/v2.0/token`, {

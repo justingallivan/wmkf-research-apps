@@ -3,11 +3,36 @@
  */
 import {
   canonicalize,
+  parseArgs,
   runtimeConfigDiff,
   sha256Canonical,
 } from '../../scripts/probe-reviewer-holistic-runtime-config.mjs';
 
 describe('reviewer holistic runtime-config probe helpers', () => {
+  test('probe requires external proposal input before any production reads', () => {
+    expect(() => parseArgs(['--target=prod'])).toThrow('--proposal-evaluation-file');
+    expect(() => parseArgs([
+      '--target=prod',
+      '--proposal-evaluation-file=/secure/proposals.json',
+      '--check-manifest',
+    ])).toThrow('--manifest-file');
+    expect(parseArgs([
+      '--target=prod',
+      '--proposal-evaluation-file=/secure/proposals.json',
+      '--check-manifest',
+      '--manifest-file=/secure/manifest.json',
+    ])).toEqual({
+      target: 'prod',
+      checkManifest: true,
+      proposalEvaluationPath: '/secure/proposals.json',
+      manifestPath: '/secure/manifest.json',
+    });
+    expect(() => parseArgs([
+      '--target=prod',
+      `--proposal-evaluation-file=${process.cwd()}/tests/fixtures/reviewer-holistic-proposal-evaluation.synthetic.json`,
+    ])).toThrow('outside the repository');
+  });
+
   test('canonical hashing is stable across object-key order', () => {
     expect(canonicalize({ z: 1, a: { d: 4, b: 2 } })).toEqual({ a: { b: 2, d: 4 }, z: 1 });
     expect(sha256Canonical({ z: 1, a: 2 })).toBe(sha256Canonical({ a: 2, z: 1 }));

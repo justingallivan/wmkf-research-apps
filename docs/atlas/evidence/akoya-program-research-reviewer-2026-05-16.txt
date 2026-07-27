@@ -1,38 +1,31 @@
-Verify akoya_program="Research Reviewer" — 2026-05-17T02:22:53.081Z (read-only)
+REDACTED AGGREGATE EVIDENCE
+Probe date: 2026-05-16 (read-only production verification)
+Subject: akoya_program = "Research Reviewer"
 
-akoya_program entity: set=akoya_programs  id=akoya_programid  name=akoya_program
+Purpose
+-------
+Test whether the "Research Reviewer" program represented a grant-program
+bucket or a distinct population of individual honorarium requests.
 
-══ The program record itself ══
-  id=7e744a42-37eb-f011-8543-6045bd02b4cc
-  name="Research Reviewer"  state=Active
-  program record createdon = 2026-01-06T19:38:26Z   modifiedon = 2026-01-06T19:44:40Z
+Aggregate observations
+----------------------
+- Matching request rows: 87.
+- Creation span: early January through early March 2026.
+- Rows created before 2024: 0.
+- Rows carrying a positive grant amount: 0.
+- Type distribution: 87 Individual.
+- Status distribution: 87 Pending.
 
-══ akoya_request rows with akoya_program="Research Reviewer": 87 ══
-  createdon span : 2026-01-06T21:06:48Z  …  2026-03-10T20:00:09Z
-  pre-2024 rows  : 0   2024+ rows: 87
-  → user hypothesis "all post-2024": CONFIRMED (0 pre-2024)
-  with grant>0   : 0  (a real *grant program* would mostly carry awards; ~0 ⇒ not a grant bucket)
-  by wmkf_type   :
-     87  Individual
-  by status      :
-     87  Pending
+Conclusion
+----------
+The observed population was entirely post-2024, individual, pending, and
+non-grant-bearing. That supports treating "Research Reviewer" as the
+honorarium-request program discriminator rather than as a grant bucket.
 
-══ Spot-check sample (first 8 + last 8 by createdon) ══
-#1002668  created=2026-01-06T21:06:48Z  Pending          grant=null  type=Individual  — :: 
-#1002696  created=2026-02-12T00:44:48Z  Pending          grant=null  type=Individual  — :: 
-#1002697  created=2026-02-12T00:53:22Z  Pending          grant=null  type=Individual  — :: 
-#1002698  created=2026-02-12T00:55:28Z  Pending          grant=null  type=Individual  — :: 
-#1002699  created=2026-02-12T01:04:15Z  Pending          grant=null  type=Individual  — :: 
-#1002700  created=2026-02-12T01:15:00Z  Pending          grant=null  type=Individual  — :: 
-#1002701  created=2026-02-12T01:20:33Z  Pending          grant=null  type=Individual  — :: 
-#1002702  created=2026-02-12T01:30:50Z  Pending          grant=null  type=Individual  — :: 
-#1002774  created=2026-02-20T06:25:47Z  Pending          grant=null  type=Individual  — :: 
-#1002775  created=2026-02-24T17:13:32Z  Pending          grant=null  type=Individual  — :: 
-#1002776  created=2026-02-25T08:46:08Z  Pending          grant=null  type=Individual  — :: 
-#1002777  created=2026-02-26T19:36:35Z  Pending          grant=null  type=Individual  — :: 
-#1002778  created=2026-02-27T15:48:02Z  Pending          grant=null  type=Individual  — :: 
-#1002785  created=2026-03-03T20:59:52Z  Pending          grant=null  type=Individual  — :: 
-#1002786  created=2026-03-05T02:20:18Z  Pending          grant=null  type=Individual  — :: 
-#1002789  created=2026-03-10T20:00:09Z  Pending          grant=null  type=Individual  — :: 
-
-Done (read-only verification — akoya_program=Research Reviewer).
+Redaction boundary
+------------------
+The original probe output included the program-record GUID, request numbers,
+per-row timestamps, and a first/last sample. Those production identifiers are
+not needed to support the conclusion and are intentionally excluded from the
+tracked evidence. Re-run the read-only production probe when current counts or
+row-level substantiation are required.

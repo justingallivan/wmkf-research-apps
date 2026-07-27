@@ -1,6 +1,6 @@
 # Wave 1 Prod Cutover — Second (smaller) privilege ask
 
-**For:** Connor
+**For:** production administrator
 **Date:** 2026-04-24
 **Time needed:** ~1–3 min, either path
 
@@ -19,7 +19,7 @@ After you assigned System Customizer, I reran the schema apply and it completed 
 
 Then I ran the role script. It also mostly succeeded:
 
-- Role `WMKF Research Review App Suite - Staff` created (id `462451f6-0b40-f111-88b5-000d3a306d45`) ✓
+- Role `WMKF Research Review App Suite - Staff` created ✓
 - 18 privileges applied via `AddPrivilegesRole` ✓
 - Role added to `wmkfResearchReviewAppSuite` solution ✓
 
@@ -74,16 +74,12 @@ Role to assign: **`WMKF Research Review App Suite - Staff`**
 
 Users to assign it to:
 
-| # | User | Email |
-|---|---|---|
-| 1 | Justin Gallivan | jgallivan@wmkeck.org |
-| 2 | Kevin Moses | kmoses@wmkeck.org |
-| 3 | Jean Kim | jkim@wmkeck.org |
-| 4 | Beth Pruitt | bpruitt@wmkeck.org |
-| 5 | Connor Noda (you) | cnoda@wmkeck.org |
-| 6 | Sarah Hibler | shibler@wmkeck.org |
-| 7 | Allison Keller | akeller@wmkeck.org |
-| 8 | **The app user** — `# WMK: Research Review App Suite` | App ID `d2e73696-537a-483b-bb63-4a4de6aa5d45` |
+- the 7 current staff accounts supplied through an access-controlled roster;
+  and
+- the `# WMK: Research Review App Suite` application user.
+
+The staff roster, email addresses, and application identifier are intentionally
+not retained in this public historical document.
 
 The 8th is important — without the app user being assigned the role, the data-sync step can't create preference rows on behalf of each user, because the preference table is User-owned and the caller needs `prvReadwmkf_AppUserPreference` at Basic depth to even create a row whose owner is set.
 
@@ -101,7 +97,7 @@ For each staff user (#1–7):
 For the app user (#8):
 
 1. Same environment, but left nav → **… More → Users + permissions → Application users**.
-2. Find **`# WMK: Research Review App Suite`** (App ID `d2e73696-537a-483b-bb63-4a4de6aa5d45`).
+2. Find **`# WMK: Research Review App Suite`** by its current registered application identity.
 3. Top nav → **Manage Roles**.
 4. Check **WMKF Research Review App Suite - Staff**. (Leave the other roles checked.)
 5. **Save**.

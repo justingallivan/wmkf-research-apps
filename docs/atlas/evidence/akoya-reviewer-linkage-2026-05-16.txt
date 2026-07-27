@@ -1,118 +1,53 @@
-Reviewer linkage probe — 2026-05-17T02:26:55.461Z (read-only)
+# Akoya reviewer linkage probe — redacted evidence summary
 
-Sampling 5 of the 87 Research Reviewer requests (full field dump)
+Original probe time: 2026-05-17T02:26:55.461Z
+Probe mode: read-only
+Original evidence commit: 09e81fdb (2026-05-16)
+Current-tree redaction: 2026-07-27
 
-══ #1002668  (created 2026-01-06T21:06:48Z) ══
-  LOOKUPS:
-    akoya_goapplyapplication  →  [akoya_akoyaapply]  = 001020
-    akoya_goapplyphase  →  [akoya_phase]  = 001076
-    akoya_goapplysettings  →  [akoya_goapplysettings]  = 1000
-    akoya_goapplysubmitter  →  [akoya_akoyaapplycontact]  = ctnoda@outlook.com
-    akoya_primarycontactid  →  [contact]  = Connor Noda
-    akoya_programid  →  [akoya_program]  = Research Reviewer
-    createdby  →  [systemuser]  = # BCO akoyaGO Integration
-    modifiedby  →  [systemuser]  = # BCO akoyaGO Integration
-    ownerid  →  [systemuser]  = # BCO akoyaGO Integration
-    owningbusinessunit  →  [businessunit]  = wmkf
-    owninguser  →  [systemuser]  = 0b877e9d-3283-ee11-8179-000d3a341e8f
-    transactioncurrencyid  →  [transactioncurrency]  = US Dollar
-    wmkf_grantprogram  →  [wmkf_grantprogram]  = Honorarium
-    wmkf_type  →  [wmkf_type]  = Individual
-  SCALARS (67): akoya_requesttype=100000001 (Scholarship) · akoya_recommendedamount_base=250 ($250.00) · versionnumber=81044396 (81,044,396) · wmkf_conceptcallparticipantflag=false (No) · wmkf_california=false (No) · akoya_nextpaymentdue_state=1 (1) · wmkf_billcomstreet1=704 31st street · wmkf_organizationisgovernmententity=false (No) · statuscode=1 (Active) · statecode=0 (Active) · wmkf_meetingdate=2026-06-04 (6/4/2026) · wmkf_billcomcity=Manhattan Beach · akoya_paid_base=0 ($0.00) · akoya_request_base=250 ($250.00) · wmkf_galreadyforreview=false (No) · akoya_nextrequirementdue_state=1 (1) · wmkf_usingpayee=false (No) · akoya_grantrecommendercertification=false (No) · wmkf_invitedamount_base=250 ($250.00) · wmkf_phaseiicheckincomplete=100000000 (No) · wmkf_request_type=682090001 (Individual) · wmkf_groupexempt=false (No) · createdon=2026-01-06T21:06:48Z (1/6/2026 9:06 PM) · wmkf_phistaffversioncompleteflag=false (No) · wmkf_typeforrollup=Individual · timezoneruleversionnumber=0 (0) · akoya_recommendedamount=250 ($250.00) · akoya_submitdatetime=2026-01-06T21:06:57Z (1/6/2026 9:06 PM) · wmkf_granteemeetseligibilityflag=false (No) · akoya_anonymous=false (No) · akoya_paid=0 ($0.00) · wmkf_vendorverified=100000001 (No) · wmkf_billcomstate=CA · wmkf_pcgoverifycomplete=100000000 (No) · wmkf_firsttimegranteeflag=false (No) · wmkf_creditcardpayment=false (No) · wmkf_caftb=false (No) · wmkf_authorizationtoremitpaymentflag=false (No) · akoya_reviewcomplete=false (No) · wmkf_invitedamount=250 ($250.00) · wmkf_awardbasedonsubmissionflag=false (No) · wmkf_readyforreview=false (No) · modifiedon=2026-05-02T01:36:52Z (5/2/2026 1:36 AM) · akoya_submitdate=2026-01-06T21:06:57Z (1/6/2026) · akoya_requestnum=1002668 · wmkf_billcomzipcode=90266 · akoya_paid_state=1 (1) · wmkf_numberofpayments_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM) · exchangerate=1 (1.0000000000) · akoya_balanced=false (No) · akoya_requestsource=100000001 (GOapply) · akoya_request=250 ($250.00) · akoya_nextpaymentdue_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM) · wmkf_organizationnameonbillcomaccount=Connor Noda · akoya_fiscalyear=June 2026 · wmkf_numberofpayments_state=1 (1) · wmkf_numberofpayments=0 (0) · akoya_nextrequirementdue_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM) · akoya_requestid=2b989c9b-43eb-f011-8544-0022480aba6d · akoya_requeststatus=Pending · akoya_submissionaccepted=false (No) · wmkf_paymentnetworkidpni=5 · wmkf_emailaddressonbillcomaccount=ctnoda@outlook.com · wmkf_rationalesummarycompleted=false (No) · wmkf_numberofyearsoffunding=100000000 (1) · wmkf_calculatedtime=2026-05-17T02:26:57Z (5/17/2026 2:26 AM) · akoya_paid_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM)
+## Scope and aggregate result
 
-══ #1002696  (created 2026-02-12T00:44:48Z) ══
-  LOOKUPS:
-    akoya_goapplyapplication  →  [akoya_akoyaapply]  = 001020
-    akoya_goapplyphase  →  [akoya_phase]  = 001076
-    akoya_goapplysettings  →  [akoya_goapplysettings]  = 1000
-    akoya_goapplysubmitter  →  [akoya_akoyaapplycontact]  = shibler+1000@wmkeck.org
-    akoya_primarycontactid  →  [contact]  = Adrienne Hibler
-    akoya_programid  →  [akoya_program]  = Research Reviewer
-    createdby  →  [systemuser]  = # BCO akoyaGO Integration
-    modifiedby  →  [systemuser]  = # BCO akoyaGO Integration
-    ownerid  →  [systemuser]  = # BCO akoyaGO Integration
-    owningbusinessunit  →  [businessunit]  = wmkf
-    owninguser  →  [systemuser]  = 0b877e9d-3283-ee11-8179-000d3a341e8f
-    transactioncurrencyid  →  [transactioncurrency]  = US Dollar
-    wmkf_grantprogram  →  [wmkf_grantprogram]  = Honorarium
-    wmkf_type  →  [wmkf_type]  = Individual
-  SCALARS (60): akoya_requesttype=100000001 (Scholarship) · akoya_recommendedamount_base=250 ($250.00) · versionnumber=81044227 (81,044,227) · wmkf_conceptcallparticipantflag=false (No) · wmkf_california=false (No) · akoya_nextpaymentdue_state=1 (1) · wmkf_organizationisgovernmententity=false (No) · statuscode=1 (Active) · statecode=0 (Active) · wmkf_meetingdate=2026-06-04 (6/4/2026) · akoya_paid_base=0 ($0.00) · akoya_request_base=250 ($250.00) · wmkf_galreadyforreview=false (No) · akoya_nextrequirementdue_state=1 (1) · wmkf_usingpayee=false (No) · akoya_grantrecommendercertification=false (No) · wmkf_invitedamount_base=250 ($250.00) · wmkf_phaseiicheckincomplete=100000000 (No) · wmkf_request_type=682090001 (Individual) · wmkf_groupexempt=false (No) · createdon=2026-02-12T00:44:48Z (2/12/2026 12:44 AM) · wmkf_phistaffversioncompleteflag=false (No) · wmkf_typeforrollup=Individual · timezoneruleversionnumber=0 (0) · akoya_recommendedamount=250 ($250.00) · akoya_submitdatetime=2026-02-12T00:44:57Z (2/12/2026 12:44 AM) · wmkf_granteemeetseligibilityflag=false (No) · akoya_anonymous=false (No) · akoya_paid=0 ($0.00) · wmkf_vendorverified=100000001 (No) · wmkf_pcgoverifycomplete=100000000 (No) · wmkf_firsttimegranteeflag=false (No) · wmkf_creditcardpayment=false (No) · wmkf_caftb=false (No) · wmkf_authorizationtoremitpaymentflag=false (No) · akoya_reviewcomplete=false (No) · wmkf_invitedamount=250 ($250.00) · wmkf_awardbasedonsubmissionflag=false (No) · wmkf_readyforreview=false (No) · modifiedon=2026-05-02T01:36:35Z (5/2/2026 1:36 AM) · akoya_submitdate=2026-02-12T00:44:57Z (2/12/2026) · akoya_requestnum=1002696 · akoya_paid_state=1 (1) · wmkf_numberofpayments_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM) · exchangerate=1 (1.0000000000) · akoya_balanced=false (No) · akoya_requestsource=100000001 (GOapply) · akoya_request=250 ($250.00) · akoya_nextpaymentdue_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM) · akoya_fiscalyear=June 2026 · wmkf_numberofpayments_state=1 (1) · wmkf_numberofpayments=0 (0) · akoya_nextrequirementdue_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM) · akoya_requestid=fb593e02-ac07-f111-8406-000d3a352e68 · akoya_requeststatus=Pending · akoya_submissionaccepted=false (No) · wmkf_rationalesummarycompleted=false (No) · wmkf_numberofyearsoffunding=100000000 (1) · wmkf_calculatedtime=2026-05-17T02:26:57Z (5/17/2026 2:26 AM) · akoya_paid_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM)
+- Sampled honorarium/reviewer requests: 5 of an 87-request cohort.
+- Distinct Dataverse contacts resolved from the 5 requests: 5.
+- Contact state: 3 active and 2 inactive.
+- Parent-account linkage: 0 of 5 contacts had a parent account.
+- All 5 requests had both a GoApply-submitter relationship and a
+  primary-contact relationship.
+- One sampled request also had populated Bill.com address, organization, and
+  payment-network fields; it was the staff/test-like row in the sample.
 
-══ #1002697  (created 2026-02-12T00:53:22Z) ══
-  LOOKUPS:
-    akoya_goapplyapplication  →  [akoya_akoyaapply]  = 001020
-    akoya_goapplyphase  →  [akoya_phase]  = 001076
-    akoya_goapplysettings  →  [akoya_goapplysettings]  = 1000
-    akoya_goapplysubmitter  →  [akoya_akoyaapplycontact]  = andrew.adamatzky@uwe.ac.uk
-    akoya_primarycontactid  →  [contact]  = Andrew Adamatzky
-    akoya_programid  →  [akoya_program]  = Research Reviewer
-    createdby  →  [systemuser]  = # BCO akoyaGO Integration
-    modifiedby  →  [systemuser]  = # BCO akoyaGO Integration
-    ownerid  →  [systemuser]  = # BCO akoyaGO Integration
-    owningbusinessunit  →  [businessunit]  = wmkf
-    owninguser  →  [systemuser]  = 0b877e9d-3283-ee11-8179-000d3a341e8f
-    transactioncurrencyid  →  [transactioncurrency]  = US Dollar
-    wmkf_grantprogram  →  [wmkf_grantprogram]  = Honorarium
-    wmkf_type  →  [wmkf_type]  = Individual
-  SCALARS (60): akoya_requesttype=100000001 (Scholarship) · akoya_recommendedamount_base=250 ($250.00) · versionnumber=81044231 (81,044,231) · wmkf_conceptcallparticipantflag=false (No) · wmkf_california=false (No) · akoya_nextpaymentdue_state=1 (1) · wmkf_organizationisgovernmententity=false (No) · statuscode=1 (Active) · statecode=0 (Active) · wmkf_meetingdate=2026-06-04 (6/4/2026) · akoya_paid_base=0 ($0.00) · akoya_request_base=250 ($250.00) · wmkf_galreadyforreview=false (No) · akoya_nextrequirementdue_state=1 (1) · wmkf_usingpayee=false (No) · akoya_grantrecommendercertification=false (No) · wmkf_invitedamount_base=250 ($250.00) · wmkf_phaseiicheckincomplete=100000000 (No) · wmkf_request_type=682090001 (Individual) · wmkf_groupexempt=false (No) · createdon=2026-02-12T00:53:22Z (2/12/2026 12:53 AM) · wmkf_phistaffversioncompleteflag=false (No) · wmkf_typeforrollup=Individual · timezoneruleversionnumber=0 (0) · akoya_recommendedamount=250 ($250.00) · akoya_submitdatetime=2026-02-12T00:53:25Z (2/12/2026 12:53 AM) · wmkf_granteemeetseligibilityflag=false (No) · akoya_anonymous=false (No) · akoya_paid=0 ($0.00) · wmkf_vendorverified=100000001 (No) · wmkf_pcgoverifycomplete=100000000 (No) · wmkf_firsttimegranteeflag=false (No) · wmkf_creditcardpayment=false (No) · wmkf_caftb=false (No) · wmkf_authorizationtoremitpaymentflag=false (No) · akoya_reviewcomplete=false (No) · wmkf_invitedamount=250 ($250.00) · wmkf_awardbasedonsubmissionflag=false (No) · wmkf_readyforreview=false (No) · modifiedon=2026-05-02T01:36:36Z (5/2/2026 1:36 AM) · akoya_submitdate=2026-02-12T00:53:25Z (2/12/2026) · akoya_requestnum=1002697 · akoya_paid_state=1 (1) · wmkf_numberofpayments_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM) · exchangerate=1 (1.0000000000) · akoya_balanced=false (No) · akoya_requestsource=100000001 (GOapply) · akoya_request=250 ($250.00) · akoya_nextpaymentdue_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM) · akoya_fiscalyear=June 2026 · wmkf_numberofpayments_state=1 (1) · wmkf_numberofpayments=0 (0) · akoya_nextrequirementdue_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM) · akoya_requestid=1ff50b35-ad07-f111-8406-000d3a352e68 · akoya_requeststatus=Pending · akoya_submissionaccepted=false (No) · wmkf_rationalesummarycompleted=false (No) · wmkf_numberofyearsoffunding=100000000 (1) · wmkf_calculatedtime=2026-05-17T02:26:57Z (5/17/2026 2:26 AM) · akoya_paid_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM)
+## Useful linkage fields retained
 
-══ #1002698  (created 2026-02-12T00:55:28Z) ══
-  LOOKUPS:
-    akoya_goapplyapplication  →  [akoya_akoyaapply]  = 001020
-    akoya_goapplyphase  →  [akoya_phase]  = 001076
-    akoya_goapplysettings  →  [akoya_goapplysettings]  = 1000
-    akoya_goapplysubmitter  →  [akoya_akoyaapplycontact]  = Khaw.KooiYeong@monash.edu
-    akoya_primarycontactid  →  [contact]  = Kooi Yeong
-    akoya_programid  →  [akoya_program]  = Research Reviewer
-    createdby  →  [systemuser]  = # BCO akoyaGO Integration
-    modifiedby  →  [systemuser]  = # BCO akoyaGO Integration
-    ownerid  →  [systemuser]  = # BCO akoyaGO Integration
-    owningbusinessunit  →  [businessunit]  = wmkf
-    owninguser  →  [systemuser]  = 0b877e9d-3283-ee11-8179-000d3a341e8f
-    transactioncurrencyid  →  [transactioncurrency]  = US Dollar
-    wmkf_grantprogram  →  [wmkf_grantprogram]  = Honorarium
-    wmkf_type  →  [wmkf_type]  = Individual
-  SCALARS (60): akoya_requesttype=100000001 (Scholarship) · akoya_recommendedamount_base=250 ($250.00) · versionnumber=81043972 (81,043,972) · wmkf_conceptcallparticipantflag=false (No) · wmkf_california=false (No) · akoya_nextpaymentdue_state=1 (1) · wmkf_organizationisgovernmententity=false (No) · statuscode=1 (Active) · statecode=0 (Active) · wmkf_meetingdate=2026-06-04 (6/4/2026) · akoya_paid_base=0 ($0.00) · akoya_request_base=250 ($250.00) · wmkf_galreadyforreview=false (No) · akoya_nextrequirementdue_state=1 (1) · wmkf_usingpayee=false (No) · akoya_grantrecommendercertification=false (No) · wmkf_invitedamount_base=250 ($250.00) · wmkf_phaseiicheckincomplete=100000000 (No) · wmkf_request_type=682090001 (Individual) · wmkf_groupexempt=false (No) · createdon=2026-02-12T00:55:28Z (2/12/2026 12:55 AM) · wmkf_phistaffversioncompleteflag=false (No) · wmkf_typeforrollup=Individual · timezoneruleversionnumber=0 (0) · akoya_recommendedamount=250 ($250.00) · akoya_submitdatetime=2026-02-12T00:55:36Z (2/12/2026 12:55 AM) · wmkf_granteemeetseligibilityflag=false (No) · akoya_anonymous=false (No) · akoya_paid=0 ($0.00) · wmkf_vendorverified=100000001 (No) · wmkf_pcgoverifycomplete=100000000 (No) · wmkf_firsttimegranteeflag=false (No) · wmkf_creditcardpayment=false (No) · wmkf_caftb=false (No) · wmkf_authorizationtoremitpaymentflag=false (No) · akoya_reviewcomplete=false (No) · wmkf_invitedamount=250 ($250.00) · wmkf_awardbasedonsubmissionflag=false (No) · wmkf_readyforreview=false (No) · modifiedon=2026-05-02T01:36:11Z (5/2/2026 1:36 AM) · akoya_submitdate=2026-02-12T00:55:36Z (2/12/2026) · akoya_requestnum=1002698 · akoya_paid_state=1 (1) · wmkf_numberofpayments_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM) · exchangerate=1 (1.0000000000) · akoya_balanced=false (No) · akoya_requestsource=100000001 (GOapply) · akoya_request=250 ($250.00) · akoya_nextpaymentdue_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM) · akoya_fiscalyear=June 2026 · wmkf_numberofpayments_state=1 (1) · wmkf_numberofpayments=0 (0) · akoya_nextrequirementdue_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM) · akoya_requestid=36996d80-ad07-f111-8406-000d3a352682 · akoya_requeststatus=Pending · akoya_submissionaccepted=false (No) · wmkf_rationalesummarycompleted=false (No) · wmkf_numberofyearsoffunding=100000000 (1) · wmkf_calculatedtime=2026-05-17T02:26:57Z (5/17/2026 2:26 AM) · akoya_paid_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM)
+The probe established that the reviewer person can be followed through these
+request relationships:
 
-══ #1002699  (created 2026-02-12T01:04:15Z) ══
-  LOOKUPS:
-    akoya_goapplyapplication  →  [akoya_akoyaapply]  = 001020
-    akoya_goapplyphase  →  [akoya_phase]  = 001076
-    akoya_goapplysettings  →  [akoya_goapplysettings]  = 1000
-    akoya_goapplysubmitter  →  [akoya_akoyaapplycontact]  = ben.sheldon@biology.ox.ac.uk
-    akoya_primarycontactid  →  [contact]  = Benjamin Conrad Sheldon
-    akoya_programid  →  [akoya_program]  = Research Reviewer
-    createdby  →  [systemuser]  = # BCO akoyaGO Integration
-    modifiedby  →  [systemuser]  = # BCO akoyaGO Integration
-    ownerid  →  [systemuser]  = # BCO akoyaGO Integration
-    owningbusinessunit  →  [businessunit]  = wmkf
-    owninguser  →  [systemuser]  = 0b877e9d-3283-ee11-8179-000d3a341e8f
-    transactioncurrencyid  →  [transactioncurrency]  = US Dollar
-    wmkf_grantprogram  →  [wmkf_grantprogram]  = Honorarium
-    wmkf_type  →  [wmkf_type]  = Individual
-  SCALARS (60): akoya_requesttype=100000001 (Scholarship) · akoya_recommendedamount_base=250 ($250.00) · versionnumber=81044235 (81,044,235) · wmkf_conceptcallparticipantflag=false (No) · wmkf_california=false (No) · akoya_nextpaymentdue_state=1 (1) · wmkf_organizationisgovernmententity=false (No) · statuscode=1 (Active) · statecode=0 (Active) · wmkf_meetingdate=2026-06-04 (6/4/2026) · akoya_paid_base=0 ($0.00) · akoya_request_base=250 ($250.00) · wmkf_galreadyforreview=false (No) · akoya_nextrequirementdue_state=1 (1) · wmkf_usingpayee=false (No) · akoya_grantrecommendercertification=false (No) · wmkf_invitedamount_base=250 ($250.00) · wmkf_phaseiicheckincomplete=100000000 (No) · wmkf_request_type=682090001 (Individual) · wmkf_groupexempt=false (No) · createdon=2026-02-12T01:04:15Z (2/12/2026 1:04 AM) · wmkf_phistaffversioncompleteflag=false (No) · wmkf_typeforrollup=Individual · timezoneruleversionnumber=0 (0) · akoya_recommendedamount=250 ($250.00) · akoya_submitdatetime=2026-02-12T01:04:17Z (2/12/2026 1:04 AM) · wmkf_granteemeetseligibilityflag=false (No) · akoya_anonymous=false (No) · akoya_paid=0 ($0.00) · wmkf_vendorverified=100000001 (No) · wmkf_pcgoverifycomplete=100000000 (No) · wmkf_firsttimegranteeflag=false (No) · wmkf_creditcardpayment=false (No) · wmkf_caftb=false (No) · wmkf_authorizationtoremitpaymentflag=false (No) · akoya_reviewcomplete=false (No) · wmkf_invitedamount=250 ($250.00) · wmkf_awardbasedonsubmissionflag=false (No) · wmkf_readyforreview=false (No) · modifiedon=2026-05-02T01:36:37Z (5/2/2026 1:36 AM) · akoya_submitdate=2026-02-12T01:04:17Z (2/12/2026) · akoya_requestnum=1002699 · akoya_paid_state=1 (1) · wmkf_numberofpayments_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM) · exchangerate=1 (1.0000000000) · akoya_balanced=false (No) · akoya_requestsource=100000001 (GOapply) · akoya_request=250 ($250.00) · akoya_nextpaymentdue_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM) · akoya_fiscalyear=June 2026 · wmkf_numberofpayments_state=1 (1) · wmkf_numberofpayments=0 (0) · akoya_nextrequirementdue_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM) · akoya_requestid=18ee76bd-ae07-f111-8406-000d3a352e68 · akoya_requeststatus=Pending · akoya_submissionaccepted=false (No) · wmkf_rationalesummarycompleted=false (No) · wmkf_numberofyearsoffunding=100000000 (1) · wmkf_calculatedtime=2026-05-17T02:26:57Z (5/17/2026 2:26 AM) · akoya_paid_date=2026-05-17T01:47:57Z (5/17/2026 1:47 AM)
+- `_akoya_goapplyapplication_value`
+- `_akoya_goapplyphase_value`
+- `_akoya_goapplysettings_value`
+- `_akoya_goapplysubmitter_value`
+- `_akoya_primarycontactid_value`
+- program and owner lookups
 
-══ Contact-targeted lookups found: akoya_primarycontactid ══
-Resolving 5 distinct contact id(s) to see how reviewers are modelled in `contact`:
+The original request dump also included request-state, honorarium, payee, and
+Bill.com field groups. Those values are not needed to preserve the linkage
+conclusion.
 
-  contact 91cc59ad-6786-ef11-ac21-000d3a344c0f
-    fullname=Connor Noda  email=ctnoda@outlook.com  jobtitle=Program Coordinator or something
-    state=Inactive  status=Inactive  created=2024-10-09T17:55:40Z  parentAccount=—
-  contact b0f275de-c106-f111-8406-000d3a352682
-    fullname=Adrienne Hibler  email=shibler+1000@wmkeck.org  jobtitle=title
-    state=Inactive  status=Inactive  created=2026-02-10T20:48:40Z  parentAccount=—
-  contact ac19483b-ad07-f111-8406-000d3a352682
-    fullname=Andrew Adamatzky  email=andrew.adamatzky@uwe.ac.uk  jobtitle=Professor
-    state=Active  status=Active  created=2026-02-12T00:53:25Z  parentAccount=—
-  contact fa331f89-ad07-f111-8406-000d3a352e68
-    fullname=Kooi Yeong  email=khaw.kooiyeong@monash.edu  jobtitle=Dr
-    state=Active  status=Active  created=2026-02-12T00:55:37Z  parentAccount=—
-  contact bbcac4bc-ae07-f111-8406-000d3a352c8a
-    fullname=Benjamin Conrad Sheldon  email=ben.sheldon@biology.ox.ac.uk  jobtitle=Dr
-    state=Active  status=Active  created=2026-02-12T01:04:17Z  parentAccount=—
+## Conclusion
 
-INTERPRETATION: if the reviewer person resolves to a real `contact` (email/jobtitle/parent-org),
-then Reviewer Manager → Dataverse should key on `contact`, not a new entity, and reconcile
-against the existing Reviewer Finder pool (Postgres `researchers`) + program-director-resolver.
+The reviewer person already resolves to a Dataverse `contact`. Review-manager
+to Dataverse integration should therefore key person linkage on the existing
+contact rather than introduce a second person entity. That contact identity
+still needs reconciliation with the reviewer pool, Postgres researcher
+records, and the program-director resolver.
 
-Done (read-only reviewer-linkage probe).
+## Redaction and reproducibility boundary
+
+The original sample contained person names, email addresses, request/contact
+identifiers, mailing addresses, and payment-network identifiers. Those values
+have been removed from the current tree. No hashes or stable aliases derived
+from them are retained.
+
+Exact row-level reproduction requires rerunning the controlled read-only
+Dataverse probe under an authorized data-access context. Future tracked
+evidence should record aggregate linkage states and field names, not raw
+person-level values.

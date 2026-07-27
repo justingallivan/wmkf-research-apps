@@ -36,7 +36,10 @@ DFT email exchange 2026-05-26 — locked context for the `VIRUS_SCAN_ENABLED` ro
 **DFT does NOT need per-detection notifications.** Our scan happens in app memory before any SharePoint write. On detection we reject and discard bytes — nothing to quarantine, nothing for DFT to investigate, nothing in any system they administer. DFT's original ask for their support email as detection notification target was framed against an MDO/Safe-Attachments quarantine model that doesn't apply here. Future cadence: aggregate stats once a cycle, not per-event.
 
 **Internal notification design — locked S190.** Per-detection: write a `system_alerts` row AND send an email. Recipients are the **union** of:
-1. The `'virus-detection'` category configured in `/admin → Alert Recipients` (stored in `wmkf_appsystemsettings.alertRecipientsByCategory`). Set to `alerts@wmkeck.org` for production. **Admin must configure this in the dashboard before detection alerts will email anyone.**
+1. The `'virus-detection'` category configured in `/admin → Alert Recipients`
+   (stored in `wmkf_appsystemsettings.alertRecipientsByCategory`). **Admin must
+   configure the current production recipient in the dashboard before
+   detection alerts will email anyone; the address does not belong in memory.**
 2. `explicitRecipients` per-event: the PD on the related `akoya_request` when resolvable. Reviewer path: PD resolved via suggestion → request → wmkf_programdirector → systemuser.internalemailaddress. Intake path: PD-of-request is N/A (drafts are pre-submission, request_id is null) so explicitRecipients is empty there.
 
 `NotificationService.sendAdminEmail` was changed S190 from "explicit-bypasses-category" semantics to "explicit-unions-with-category" so this design works. See [[memory-store-propagation]] for how this lives across sessions.

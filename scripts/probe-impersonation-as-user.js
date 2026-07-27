@@ -1,13 +1,23 @@
 #!/usr/bin/env node
 // Variant of probe-impersonation-resmoke.js that takes a target staff
 // systemuserid (or email) as CLI arg. Used to repeat the smoke as a
-// narrower-role staff user (e.g. cnoda@wmkeck.org), surfacing any
+// narrower-role staff user, surfacing any
 // table-level 403s the rollout doc anticipated.
 //
-//   node scripts/probe-impersonation-as-user.js cnoda@wmkeck.org
+//   node scripts/probe-impersonation-as-user.js staff.user@example.org \
+//     --request=<test-request-number>
 
 const fs = require('fs');
 const path = require('path');
+
+const CLI_ARGS = process.argv.slice(2);
+const TARGET_USER = CLI_ARGS.find((arg) => !arg.startsWith('--'));
+const requestArg = CLI_ARGS.find((arg) => arg.startsWith('--request='));
+const REQUEST_NUMBER = requestArg?.slice('--request='.length);
+if (!TARGET_USER || !REQUEST_NUMBER) {
+  console.error('Usage: node scripts/probe-impersonation-as-user.js <email|systemuserid> --request=<test-request-number>');
+  process.exit(1);
+}
 
 const envPath = path.join(__dirname, '..', '.env.local');
 if (fs.existsSync(envPath)) {
@@ -20,7 +30,6 @@ if (fs.existsSync(envPath)) {
   }
 }
 
-const REQUEST_NUMBER = '1002379';
 const TASK_TYPE_PHASE_I = 682090000;
 const STATUS_COMPLETED = 682090000;
 
@@ -88,16 +97,10 @@ async function listRoles(systemuserid) {
 }
 
 async function main() {
-  const target = process.argv[2];
-  if (!target) {
-    console.error('Usage: node scripts/probe-impersonation-as-user.js <email|systemuserid>');
-    process.exit(1);
-  }
-
-  console.log(`=== Impersonation smoke as ${target} ===\n`);
+  console.log(`=== Impersonation smoke as ${TARGET_USER} ===\n`);
 
   console.log('Step 0a: Resolve target user');
-  const user = await resolveUser(target);
+  const user = await resolveUser(TARGET_USER);
   const targetId = user.systemuserid;
   console.log(`  ✓ ${user.fullname} <${user.internalemailaddress}> ${targetId}`);
 

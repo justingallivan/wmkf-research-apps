@@ -18,7 +18,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -46,14 +46,20 @@ import {
 } from './probe-reviewer-holistic-runtime-config.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const MANIFEST_PATH = join(ROOT, 'docs/audits/reviewer-holistic-evaluation-manifest-v1.json');
-const EVALUATION_PATH = join(ROOT, 'docs/audits/reviewer-holistic-proposal-evaluation-v1.json');
-const COHORT_PATH = join(ROOT, 'docs/audits/reviewer-holistic-proposal-cohort-proposal-v1.json');
 const OUTPUT_DIR = join(ROOT, 'outputs/reviewer-holistic-m1');
 const EXECUTION_PATH = join(OUTPUT_DIR, 'execution-v1.json');
 const SCORING_PATH = join(OUTPUT_DIR, 'scoring-package-v1.json');
 const UNBLINDING_PATH = join(OUTPUT_DIR, 'unblinding-map-v1.json');
 const LOCK_PATH = join(OUTPUT_DIR, 'execution-v1.lock');
+
+function resolveExternalInput(value, flag) {
+  const candidate = resolve(value);
+  const root = resolve(ROOT);
+  if (candidate === root || candidate.startsWith(`${root}${sep}`)) {
+    throw new Error(`${flag} must resolve outside the repository`);
+  }
+  return candidate;
+}
 
 const COMMON_RUNTIME_FILES = [
   'lib/services/claude-reviewer-service.js',
@@ -107,6 +113,9 @@ export function parseArgs(argv) {
     maxRuns: 60,
     retryFailed: false,
     help: false,
+    manifestPath: null,
+    proposalEvaluationPath: null,
+    cohortPath: null,
   };
   let explicitMode = null;
   for (const arg of argv) {
@@ -123,6 +132,18 @@ export function parseArgs(argv) {
       out.maxRuns = value;
     } else if (arg === '--retry-failed') {
       out.retryFailed = true;
+    } else if (arg.startsWith('--manifest-file=')) {
+      const value = arg.slice('--manifest-file='.length);
+      if (!value) throw new Error('--manifest-file=<path> requires a non-empty path');
+      out.manifestPath = resolveExternalInput(value, '--manifest-file');
+    } else if (arg.startsWith('--proposal-evaluation-file=')) {
+      const value = arg.slice('--proposal-evaluation-file='.length);
+      if (!value) throw new Error('--proposal-evaluation-file=<path> requires a non-empty path');
+      out.proposalEvaluationPath = resolveExternalInput(value, '--proposal-evaluation-file');
+    } else if (arg.startsWith('--cohort-file=')) {
+      const value = arg.slice('--cohort-file='.length);
+      if (!value) throw new Error('--cohort-file=<path> requires a non-empty path');
+      out.cohortPath = resolveExternalInput(value, '--cohort-file');
     } else if (arg === '--help' || arg === '-h') {
       out.help = true;
     } else {
@@ -135,6 +156,11 @@ export function parseArgs(argv) {
   if (out.mode === 'preflight' && (out.confirmPaidRuns || out.retryFailed || out.maxRuns !== 60)) {
     throw new Error('paid-run, retry, and max-run flags are valid only with --execute');
   }
+  if (!out.help && !out.manifestPath) throw new Error('--manifest-file=<path> is required');
+  if (!out.help && !out.proposalEvaluationPath) {
+    throw new Error('--proposal-evaluation-file=<path> is required');
+  }
+  if (!out.help && !out.cohortPath) throw new Error('--cohort-file=<path> is required');
   return out;
 }
 
@@ -242,7 +268,7 @@ function acquireLock() {
 }
 
 async function loadFrozenInputs({ manifest, proposalEvaluation, cohort, plan }) {
-  const observed = await observeRuntimeConfig({ target: 'prod' });
+  const observed = await observeRuntimeConfig({ target: 'prod', proposalEvaluation });
   const diffs = runtimeConfigDiff(manifest.runtimeConfig, observed.runtimeConfig);
   if (diffs.length > 0) throw new Error(`live runtime drift: ${JSON.stringify(diffs)}`);
 
@@ -295,8 +321,8 @@ async function loadFrozenInputs({ manifest, proposalEvaluation, cohort, plan }) 
   return { inputByProposal, observed };
 }
 
-async function postflightRuntime(manifest) {
-  const observed = await observeRuntimeConfig({ target: 'prod' });
+async function postflightRuntime(manifest, proposalEvaluation) {
+  const observed = await observeRuntimeConfig({ target: 'prod', proposalEvaluation });
   const diffs = runtimeConfigDiff(manifest.runtimeConfig, observed.runtimeConfig);
   if (diffs.length > 0) throw new Error(`postflight runtime drift: ${JSON.stringify(diffs)}`);
   return observed;
@@ -305,15 +331,15 @@ async function postflightRuntime(manifest) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
-    console.log('Usage: node scripts/run-reviewer-holistic-m1.mjs [--preflight | --execute --confirm-paid-runs=60] [--max-runs=N] [--retry-failed]');
+    console.log('Usage: node scripts/run-reviewer-holistic-m1.mjs --manifest-file=<path> --proposal-evaluation-file=<path> --cohort-file=<path> [--preflight | --execute --confirm-paid-runs=60] [--max-runs=N] [--retry-failed]');
     return;
   }
+  const manifest = readJson(args.manifestPath);
+  const proposalEvaluation = readJson(args.proposalEvaluationPath);
+  const cohort = readJson(args.cohortPath);
+  const plan = buildReviewerHolisticRunPlan({ manifest, proposalEvaluation });
   loadEnvFile(join(ROOT, '.env.local'));
   loadEnvFile(join(ROOT, '.env.m1.local'));
-  const manifest = readJson(MANIFEST_PATH);
-  const proposalEvaluation = readJson(EVALUATION_PATH);
-  const cohort = readJson(COHORT_PATH);
-  const plan = buildReviewerHolisticRunPlan({ manifest, proposalEvaluation });
   assertSourceAttribution(manifest);
   if (!process.env.CLAUDE_API_KEY) throw new Error('CLAUDE_API_KEY is required');
   if (!process.env.REVIEWER_HOLISTIC_M1_RANDOMIZATION_SEED) throw new Error('REVIEWER_HOLISTIC_M1_RANDOMIZATION_SEED is required');
@@ -383,7 +409,7 @@ async function main() {
     console.log(`Execution checkpoint: ${JSON.stringify(summary)}`);
     if (artifact.status === 'complete') {
       try {
-        const after = await postflightRuntime(manifest);
+        const after = await postflightRuntime(manifest, proposalEvaluation);
         artifact.runtimeChecks.after = {
           checkedAt: new Date().toISOString(),
           runtimeConfig: after.runtimeConfig,

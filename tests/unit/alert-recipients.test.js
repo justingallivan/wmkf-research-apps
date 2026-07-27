@@ -32,7 +32,7 @@ function mockRoster(emails) {
 
 describe('isValidEmail', () => {
   test.each([
-    'a@b.co', 'first.last@example.com', 'a+b@c.io',
+    'alpha@example.org', 'first.last@example.com', 'a+b@example.net',
   ])('accepts %s', (e) => expect(AlertRecipients.isValidEmail(e)).toBe(true));
 
   test.each([
@@ -40,7 +40,7 @@ describe('isValidEmail', () => {
   ])('rejects %s', (e) => expect(AlertRecipients.isValidEmail(e)).toBe(false));
 
   test('rejects emails over 254 chars', () => {
-    const long = 'a'.repeat(250) + '@b.co';
+    const long = 'a'.repeat(250) + '@example.org';
     expect(AlertRecipients.isValidEmail(long)).toBe(false);
   });
 });
@@ -48,25 +48,25 @@ describe('isValidEmail', () => {
 describe('normalizeConfig', () => {
   test('trims, lowercases, dedupes', () => {
     const out = AlertRecipients.normalizeConfig({
-      spend: [' A@B.CO ', 'a@b.co', 'c@d.io'],
+      spend: [' ALPHA@EXAMPLE.ORG ', 'alpha@example.org', 'charlie@example.net'],
     });
-    expect(out).toEqual({ spend: ['a@b.co', 'c@d.io'] });
+    expect(out).toEqual({ spend: ['alpha@example.org', 'charlie@example.net'] });
   });
 
   test('drops invalid emails silently (read-path defense)', () => {
     const out = AlertRecipients.normalizeConfig({
-      ops: ['valid@x.co', 'not-an-email', 'also@y.io'],
+      ops: ['valid@example.org', 'not-an-email', 'also@example.net'],
     });
-    expect(out).toEqual({ ops: ['valid@x.co', 'also@y.io'] });
+    expect(out).toEqual({ ops: ['valid@example.org', 'also@example.net'] });
   });
 
   test('drops empty categories', () => {
     const out = AlertRecipients.normalizeConfig({
-      spend: ['a@b.co'],
+      spend: ['alpha@example.org'],
       ops: [],
       bad: ['not-an-email'],
     });
-    expect(out).toEqual({ spend: ['a@b.co'] });
+    expect(out).toEqual({ spend: ['alpha@example.org'] });
   });
 
   test('returns {} for null/non-object', () => {
@@ -78,41 +78,41 @@ describe('normalizeConfig', () => {
 
 describe('resolveRecipients — lookup rule', () => {
   test('category hit returns that bucket', async () => {
-    mockConfig({ spend: ['finance@wmkeck.org'], default: ['ops@wmkeck.org'] });
+    mockConfig({ spend: ['finance@example.org'], default: ['ops@example.org'] });
     const r = await AlertRecipients.resolveRecipients('spend');
-    expect(r.recipients).toEqual(['finance@wmkeck.org']);
+    expect(r.recipients).toEqual(['finance@example.org']);
     expect(r.source).toBe('category');
     expect(r.category).toBe('spend');
   });
 
   test('unknown category falls back to default', async () => {
-    mockConfig({ default: ['ops@wmkeck.org'] });
+    mockConfig({ default: ['ops@example.org'] });
     const r = await AlertRecipients.resolveRecipients('does-not-exist');
-    expect(r.recipients).toEqual(['ops@wmkeck.org']);
+    expect(r.recipients).toEqual(['ops@example.org']);
     expect(r.source).toBe('default');
   });
 
   test('empty category list falls back to default', async () => {
-    mockConfig({ default: ['ops@wmkeck.org'] });
+    mockConfig({ default: ['ops@example.org'] });
     // empty arrays are normalized away, so this exercises the same path
     const r = await AlertRecipients.resolveRecipients('spend');
-    expect(r.recipients).toEqual(['ops@wmkeck.org']);
+    expect(r.recipients).toEqual(['ops@example.org']);
     expect(r.source).toBe('default');
   });
 
   test('no config, no default → superuser roster', async () => {
     mockConfig({});
-    mockRoster(['admin@wmkeck.org']);
+    mockRoster(['admin@example.org']);
     const r = await AlertRecipients.resolveRecipients('intake');
-    expect(r.recipients).toEqual(['admin@wmkeck.org']);
+    expect(r.recipients).toEqual(['admin@example.org']);
     expect(r.source).toBe('roster');
   });
 
   test('null category targets default bucket', async () => {
-    mockConfig({ default: ['ops@wmkeck.org'] });
+    mockConfig({ default: ['ops@example.org'] });
     const r = await AlertRecipients.resolveRecipients(null);
     expect(r.source).toBe('default');
-    expect(r.recipients).toEqual(['ops@wmkeck.org']);
+    expect(r.recipients).toEqual(['ops@example.org']);
   });
 
   test('returns empty + source=none when nothing resolves', async () => {
@@ -125,26 +125,26 @@ describe('resolveRecipients — lookup rule', () => {
 
   test('roster filters invalid + bad-shape emails', async () => {
     DataverseSettings.getSetting.mockResolvedValue(null);
-    mockRoster(['good@wmkeck.org', null, 'broken', '  another@wmkeck.org  ']);
+    mockRoster(['good@example.org', null, 'broken', '  another@example.org  ']);
     const r = await AlertRecipients.resolveRecipients('spend');
     expect(r.source).toBe('roster');
-    expect(r.recipients).toEqual(['good@wmkeck.org', 'another@wmkeck.org']);
+    expect(r.recipients).toEqual(['good@example.org', 'another@example.org']);
   });
 
   test('configOverride skips Dataverse read', async () => {
     const r = await AlertRecipients.resolveRecipients('spend', {
-      configOverride: { spend: ['x@y.co'] },
+      configOverride: { spend: ['override@example.org'] },
     });
     expect(DataverseSettings.getSetting).not.toHaveBeenCalled();
-    expect(r.recipients).toEqual(['x@y.co']);
+    expect(r.recipients).toEqual(['override@example.org']);
   });
 
   test('corrupt JSON in setting → falls through to roster', async () => {
     DataverseSettings.getSetting.mockResolvedValue('not-json{');
-    mockRoster(['admin@wmkeck.org']);
+    mockRoster(['admin@example.org']);
     const r = await AlertRecipients.resolveRecipients('spend');
     expect(r.source).toBe('roster');
-    expect(r.recipients).toEqual(['admin@wmkeck.org']);
+    expect(r.recipients).toEqual(['admin@example.org']);
   });
 });
 
@@ -161,7 +161,7 @@ describe('writeConfig — validation', () => {
   });
 
   test('rejects bad email — loud (write-path)', async () => {
-    const r = await AlertRecipients.writeConfig({ spend: ['ok@x.co', 'broken'] });
+    const r = await AlertRecipients.writeConfig({ spend: ['ok@example.org', 'broken'] });
     expect(r.ok).toBe(false);
     expect(r.errors.some((e) => e.includes('broken'))).toBe(true);
   });
@@ -170,7 +170,7 @@ describe('writeConfig — validation', () => {
     const r = await AlertRecipients.writeConfig({
       spend: ['not-an-email'],
       ops: ['also-bad'],
-      'BAD CATEGORY': ['ok@x.co'],
+      'BAD CATEGORY': ['ok@example.org'],
       bad_shape: 'not-an-array',
     });
     expect(r.ok).toBe(false);
@@ -183,7 +183,7 @@ describe('writeConfig — validation', () => {
 
   test('rejects category names with weird characters', async () => {
     for (const bad of ['has space', 'UPPER', 'has.dot', '__proto__', 'with/slash', '']) {
-      const r = await AlertRecipients.writeConfig({ [bad]: ['ok@x.co'] });
+      const r = await AlertRecipients.writeConfig({ [bad]: ['ok@example.org'] });
       expect(r.ok).toBe(false);
     }
   });
@@ -191,14 +191,14 @@ describe('writeConfig — validation', () => {
   test('accepts lowercase + digits + hyphen + underscore category names', async () => {
     DataverseSettings.setSetting.mockResolvedValue(true);
     const r = await AlertRecipients.writeConfig({
-      'staff-onboarding': ['a@b.co'],
-      'cat_1': ['c@d.io'],
+      'staff-onboarding': ['alpha@example.org'],
+      'cat_1': ['charlie@example.net'],
     });
     expect(r.ok).toBe(true);
   });
 
   test('rejects non-array value', async () => {
-    const r = await AlertRecipients.writeConfig({ spend: 'a@b.co' });
+    const r = await AlertRecipients.writeConfig({ spend: 'alpha@example.org' });
     expect(r.ok).toBe(false);
     expect(r.errors[0]).toMatch(/must be an array/);
   });
@@ -206,23 +206,23 @@ describe('writeConfig — validation', () => {
   test('writes normalized config on success', async () => {
     DataverseSettings.setSetting.mockResolvedValue(true);
     const r = await AlertRecipients.writeConfig({
-      spend: [' A@B.CO ', 'a@b.co'],
+      spend: [' ALPHA@EXAMPLE.ORG ', 'alpha@example.org'],
       ops: [],
     });
     expect(r.ok).toBe(true);
     const [, value] = DataverseSettings.setSetting.mock.calls[0];
-    expect(JSON.parse(value)).toEqual({ spend: ['a@b.co'] });
+    expect(JSON.parse(value)).toEqual({ spend: ['alpha@example.org'] });
   });
 
   test('passes profileId through', async () => {
     DataverseSettings.setSetting.mockResolvedValue(true);
-    await AlertRecipients.writeConfig({ spend: ['a@b.co'] }, 42);
+    await AlertRecipients.writeConfig({ spend: ['alpha@example.org'] }, 42);
     expect(DataverseSettings.setSetting.mock.calls[0][2]).toBe(42);
   });
 
   test('returns failure when Dataverse write fails', async () => {
     DataverseSettings.setSetting.mockResolvedValue(false);
-    const r = await AlertRecipients.writeConfig({ spend: ['a@b.co'] });
+    const r = await AlertRecipients.writeConfig({ spend: ['alpha@example.org'] });
     expect(r.ok).toBe(false);
     expect(r.errors).toContain('Dataverse write failed');
   });

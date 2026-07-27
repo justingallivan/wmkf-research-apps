@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
  * READ-ONLY probe: are there duplicate wmkf_potentialreviewers rows on the
- * email that's tripping the 412 entity-key error from Edit Candidate save?
+ * email that's tripping a 412 entity-key error from Edit Candidate save?
  *
- * Default email = chrischang@princeton.edu (the row from the bug report,
- * id 538989a9-f044-f111-88b4-000d3a306da2). Override with --email=foo@bar.
+ * The target is required to keep operational PII out of source control:
+ *   node scripts/probe-potentialreviewer-email-dups.js --email=reviewer@example.org
  *
  * Output: every row matching the email (with id, name, org, createdon,
  * modifiedon) so we can tell whether (a) it's a single self-collision
@@ -30,7 +30,11 @@ const args = Object.fromEntries(process.argv.slice(2).map((a) => {
   const m = a.match(/^--([^=]+)=(.*)$/);
   return m ? [m[1], m[2]] : [a, true];
 }));
-const EMAIL = args.email || 'chrischang@princeton.edu';
+const EMAIL = args.email;
+if (!EMAIL) {
+  console.error('Usage: node scripts/probe-potentialreviewer-email-dups.js --email=reviewer@example.org');
+  process.exit(1);
+}
 
 async function getToken() {
   const r = await fetch(`https://login.microsoftonline.com/${process.env.DYNAMICS_TENANT_ID}/oauth2/v2.0/token`, {
@@ -88,6 +92,6 @@ async function get(token, urlPath) {
     console.log('Fix at adapter layer: skip writing fields whose value equals the existing row.');
   } else {
     console.log(`⚠️  ${rows.length} rows share this email. The alternate key is being violated by REAL duplicate data.`);
-    console.log('   Connor / data steward needs to consolidate before any update on this email will succeed.');
+    console.log('   A data steward needs to consolidate the rows before an update on this email will succeed.');
   }
 })().catch((e) => { console.error(e); process.exit(1); });

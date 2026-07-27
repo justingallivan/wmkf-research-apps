@@ -1,80 +1,42 @@
-Token acquired.
-Probe date: 2026-05-17 (dated evidence)
+REDACTED AGGREGATE EVIDENCE
+Probe date: 2026-05-17 (read-only production verification)
+Subject: principal-investigator fields versus request primary contact
 
-══ 1. fill per era ══
-  (total 25561 · migrated 22573 · native 2988)
-  wmkf_researchleader      overall    384 (2%)  mig 0%  nat 13%
-  wmkf_projectleader       overall   4488 (18%)  mig 16%  nat 32%
-  wmkf_copi1               overall    561 (2%)  mig 0%  nat 19%
-  akoya_primarycontactid   overall  18078 (71%)  mig 70%  nat 77%
+Population
+----------
+- Total requests: 25,561.
+- Migrated: 22,573.
+- Native: 2,988.
 
-══ 2. wmkf_researchleader fill by program (process-is-program-scoped) ══
-    159  (no program)
-    121  Medical Research
-    104  Science and Engineering Research
+Field fill observations
+-----------------------
+| Field | Overall | Migrated | Native |
+|---|---:|---:|---:|
+| `wmkf_researchleader` | 384 (2%) | 0% | 13% |
+| `wmkf_projectleader` | 4,488 (18%) | 16% | 32% |
+| `wmkf_copi1` | 561 (2%) | 0% | 19% |
+| `akoya_primarycontactid` | 18,078 (71%) | 70% | 77% |
 
-══ 3. University of Southern California — native, PI fields vs primary contact ══
-  #1000834 "Grant to University of Southern California "
-     researchLeader=—  · projectLeader=—  · primaryContact=—
-  #1001044 "Grant to University of Southern California "
-     researchLeader=—  · projectLeader=—  · primaryContact=Hossein Pourmand
-  #1001394 "Grant to University of Southern California "
-     researchLeader=—  · projectLeader=—  · primaryContact=Hossein Pourmand
-  #1001952 "Grant to University of Southern California "
-     researchLeader=—  · projectLeader=Ishwar Puri  · primaryContact=Hossein Pourmand
-  #1002445 "Grant to University of Southern California "
-     researchLeader=—  · projectLeader=—  · primaryContact=Hossein Pourmand
-  #1002404 "Grant to University of Southern California "
-     researchLeader=—  · projectLeader=—  · primaryContact=Hossein Pourmand
-  #1002405 "Grant to University of Southern California "
-     researchLeader=—  · projectLeader=—  · primaryContact=Hossein Pourmand
-  #997407 ""
-     researchLeader=—  · projectLeader=—  · primaryContact=—
-  #997345 ""
-     researchLeader=—  · projectLeader=—  · primaryContact=—
-  #997384 ""
-     researchLeader=—  · projectLeader=—  · primaryContact=—
-  #997268 ""
-     researchLeader=—  · projectLeader=—  · primaryContact=—
-  #997264 ""
-     researchLeader=—  · projectLeader=—  · primaryContact=—
-  #1002926 "Coherence from Chaos: Entropy-Driven Emergence"
-     researchLeader=Ishwar Puri  · projectLeader=Mercedeh Khajavikhan  · primaryContact=Hossein Pourmand
-  #1002903 "Multiplexed Ultrasound Decoding for Gene Progr"
-     researchLeader=Ishwar Puri  · projectLeader=Peter Yingxiao Wang  · primaryContact=Hossein Pourmand
+The 384 populated `wmkf_researchleader` rows were confined to three program
+groupings: no program (159), Medical Research (121), and Science and
+Engineering Research (104).
 
-══ 3. California Institute of Technology — native, PI fields vs primary contact ══
-  #1002811 "Grant to California Institute of Technology "
-     researchLeader=—  · projectLeader=—  · primaryContact=Nelly Khidekel
-  #1000702 "Grant to California Institute of Technology "
-     researchLeader=—  · projectLeader=—  · primaryContact=—
-  #1000886 "Grant to California Institute of Technology "
-     researchLeader=—  · projectLeader=—  · primaryContact=Nelly Khidekel
-  #1001674 "Grant to California Institute of Technology "
-     researchLeader=—  · projectLeader=—  · primaryContact=Nelly Khidekel
-  #1001020 "Grant to California Institute of Technology "
-     researchLeader=—  · projectLeader=—  · primaryContact=Nelly Khidekel
-  #1001021 "Grant to California Institute of Technology "
-     researchLeader=—  · projectLeader=—  · primaryContact=Nelly Khidekel
-  #1001423 "Grant to California Institute of Technology "
-     researchLeader=—  · projectLeader=—  · primaryContact=Nelly Khidekel
-  #1000736 "Grant to California Institute of Technology "
-     researchLeader=—  · projectLeader=—  · primaryContact=—
-  #1000737 "Grant to California Institute of Technology "
-     researchLeader=—  · projectLeader=—  · primaryContact=—
-  #1001939 "Grant to California Institute of Technology "
-     researchLeader=—  · projectLeader=Jennifer Jackson  · primaryContact=Nelly Khidekel
-  #1001585 "The Fragment Generation Hypothesis to Explain "
-     researchLeader=—  · projectLeader=David Prober  · primaryContact=Nelly Khidekel
-  #1001647 "Massively scalable connectomics through image-"
-     researchLeader=—  · projectLeader=Long Cai  · primaryContact=Nelly Khidekel
-  #1002307 "Grant to California Institute of Technology "
-     researchLeader=—  · projectLeader=—  · primaryContact=Nelly Khidekel
-  #1002022 "Grant to California Institute of Technology "
-     researchLeader=—  · projectLeader=—  · primaryContact=Nelly Khidekel
+Institutional spot-check
+------------------------
+Two native-request institutional cohorts were inspected. In both, the request
+primary contact frequently remained the same recurring institutional liaison
+while project/research leaders varied with the proposed work. That separation
+supports modeling the principal investigator independently from
+`akoya_primarycontactid`.
 
-Read: researchLeader/projectLeader VARYING with the title while
-primaryContact stays the recurring liaison ⇒ PI IS modeled separately
-⇒ candidate NEW default column (reopens Unknown-1).
+Conclusion
+----------
+`wmkf_researchleader` and `wmkf_projectleader` are candidate PI fields;
+`akoya_primarycontactid` is not a safe default PI field because it commonly
+represents an institutional liaison.
 
-Done (read-only PI-field probe).
+Redaction boundary
+------------------
+The original output contained request numbers, proposal titles, institution
+names, and people. Those row-level production values are intentionally
+excluded. Re-run the dated read-only probe for row-level substantiation.

@@ -42,20 +42,19 @@ Both classes pre-date the current `save-candidates.js` writer contract, which en
 
 **Engagement check (verifying "no engagement beyond selected"):** the SELECT used to surface the table below pulled `selected, invited, accepted, declined, email_sent_at, response_type`. For all 8 rows, ONLY `selected=true` was set; every other engagement column was null. The rows are abandoned discovery-flow saves — researcher was clicked but never invited.
 
-Justin's call: **manual recovery is technically possible but not worth the risk/effort for 8 historical, never-invited rows.** Accept loss, document each, do not block W4 on a recovery pass. If a future audit decides any of these warrants recovery, the Postgres data stays read-only for 14+ days post-cutover per the plan's safety window.
+Project-owner decision: **manual recovery is technically possible but not worth the risk/effort for 8 historical, never-invited rows.** Accept loss, retain only the aggregate evidence below, and do not block W4 on a recovery pass. If a future audit decides any of these warrants recovery, the protected operational backup—not this public repository—remains the appropriate evidence source.
 
-## Per-row dispositions
+## Aggregate dispositions
 
-| PG id | request_number | cycle | email | name | engagement | disposition |
-|---|---|---|---|---|---|---|
-| 532 | 1002181 | J26 | NULL | Majid Basharat | selected only | accept-loss (no email; cannot upsert potentialreviewer) |
-| 561 | 1002305 | J26 | NULL | Marian Kupczynski | selected only | accept-loss (no email) |
-| 611 | 1002185 | J26 | NULL | Kuan-Lin Chen | selected only | accept-loss (no email) |
-| 801 | 1002365 | J26 | NULL | Dr. Karine Gibbs | selected only | accept-loss (no email) |
-| 915 | NULL | J26 | ccoley@mit.edu | Dr. Connor Coley | selected only | accept-loss (no request anchor; row pre-dates request_number column) |
-| 916 | NULL | J26 | gisbert.schneider@pharma.ethz.ch | Gisbert Schneider | selected only | accept-loss (no request anchor) |
-| 918 | NULL | J26 | aube-office@medchemlett.acs.org | Werngard Czechtizky | selected only | accept-loss (no request anchor) |
-| 921 | NULL | J26 | glorius@uni-muenster.de | Frank Glorius | selected only | accept-loss (no request anchor) |
+| Missing anchor | Count | Engagement | Disposition |
+|---|---:|---|---|
+| Reviewer email | 4 | selected only; never invited | accept-loss (cannot safely upsert a potential reviewer) |
+| Request number | 4 | selected only; never invited | accept-loss (cannot safely anchor the suggestion to a request) |
+
+The original production-derived row identifiers, request numbers, names, and
+email addresses are intentionally excluded from the tracked document. This
+aggregate is sufficient to explain and reproduce the migration disposition;
+any row-level follow-up must use access-controlled operational evidence.
 
 ## Operational implication for W4
 

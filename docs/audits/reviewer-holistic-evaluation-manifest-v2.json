@@ -1,87 +1,31 @@
 {
   "schemaVersion": 1,
-  "status": "frozen",
-  "freezePoint": "after_shared_c0_containment",
-  "createdAt": "2026-07-16T15:30:48.000Z",
-  "baseline": {
-    "origin": "origin/main",
-    "commit": "50140eb62dd8f3c04f6d3ab5e131d96711f804d7",
-    "runtimeBehavior": "legacy-default"
+  "status": "redacted_public_receipt",
+  "artifactType": "reviewer_holistic_evaluation_manifest_v2",
+  "redaction": {
+    "performedAt": "2026-07-27",
+    "reason": "The operational manifest binds production proposal, document, prompt, and runtime identifiers and is not suitable for a public repository.",
+    "operationalInput": "An explicit external manifest JSON file is required by every planner, validator, probe, and executor path that consumes this contract.",
+    "sensitiveFieldsRetained": false
   },
-  "redesign": {
-    "startingCommit": "50140eb62dd8f3c04f6d3ab5e131d96711f804d7",
-    "implementationCommit": "166800a3142179db642af3beefd67b8dcc381173",
-    "pipelineVersion": "reviewer-holistic-applicant-neighborhood-seeds-v1"
-  },
-  "execution": {
-    "implementationCommit": "e8796ce535954f5d8678f58b94abea1b9ceea66c",
-    "scriptVersion": "reviewer-holistic-m1-executor-v3",
-    "artifactVersion": "reviewer-holistic-m1-execution-v1"
-  },
-  "identityBenchmark": {
-    "fixtureVersion": "reviewer-identity-v2",
-    "minimumCases": 40,
-    "hazardMinimum": 20,
-    "cleanPositiveMinimum": 20,
-    "labelingPolicy": "single_reviewer_blinded"
-  },
-  "proposalEvaluation": {
-    "proposalIds": [
-      "ce2a0046-d826-f011-8c4e-6045bd0510d4",
-      "631eb17c-7a24-f011-8c4d-6045bd003e28",
-      "e4115ab9-4e24-f011-8c4e-6045bd0510d4",
-      "cb6845e3-9798-ef11-8a6a-00224803a64e",
-      "0e241e8d-9698-ef11-8a6a-000d3a383a3f",
-      "85b1fb9b-9498-ef11-8a6a-000d3a344c0f",
-      "d36a659e-5998-ef11-8a6a-00224803a64e",
-      "29ae3261-f207-ef11-9f89-000d3a32c1ae",
-      "cc417741-1407-ef11-9f89-00224805fbb2",
-      "6375f4c2-a401-ef11-a1fd-000d3a3621c7"
-    ],
-    "documentHashes": {
-      "ce2a0046-d826-f011-8c4e-6045bd0510d4": "4f8f2443f7de3176d1c2ef84bdeb8e5af1d632abd89783489a43812c9336bbd9",
-      "631eb17c-7a24-f011-8c4d-6045bd003e28": "7021235c6e41695efa1573f9894b87f6d7b6036847bc780dae5ba979bb71b877",
-      "e4115ab9-4e24-f011-8c4e-6045bd0510d4": "7374af688fe6fa13aaf9b6cc28309fa3c77c9c0d8f788cdf1f1d9f48ead030c4",
-      "cb6845e3-9798-ef11-8a6a-00224803a64e": "527d4757e232a98ae2127d78356e758c4c299b13bf19a7d57fbb0b0de52b807e",
-      "0e241e8d-9698-ef11-8a6a-000d3a383a3f": "fe29ae3d3f29823b3383f0fb7c2d670905296b0ca159d9919d34e42b12858e1d",
-      "85b1fb9b-9498-ef11-8a6a-000d3a344c0f": "170e5a5c065dadae5f4f379beb8deb146df0f3dba6b72930b79d0411a050339b",
-      "d36a659e-5998-ef11-8a6a-00224803a64e": "1c83868e08d3788ccdb92a4df7d1edb2a1fc46a6433f9175ee54380b8ebb1e95",
-      "29ae3261-f207-ef11-9f89-000d3a32c1ae": "d3ab56ca752e8f83c8bd4ce54d80a5d0ba427c087f3e00bcea01fe054ebee190",
-      "cc417741-1407-ef11-9f89-00224805fbb2": "eda910b6faa17b3f7df4e472a4acc3fc92f36aea42a6bc319ded8f85557af6b0",
-      "6375f4c2-a401-ef11-a1fd-000d3a3621c7": "73cc610028d7af644539e9e3ddb45804f85274680f108e708898eafcf817e724"
-    },
+  "method": {
+    "freezePoint": "after_shared_c0_containment",
+    "proposalCount": 10,
     "replicatesPerArm": 3,
-    "selectionPolicy": "held_out_stratified_thin_and_full_signal"
+    "plannedRunCount": 60,
+    "identityBenchmarkMinimumCases": 40,
+    "identityHazardMinimum": 20,
+    "identityCleanPositiveMinimum": 20,
+    "identityFixtureRevision": 2
   },
-  "runtimeConfig": {
-    "promptRowId": "07beab8a-887a-f111-ab0f-000d3a3065b8",
-    "promptVersion": "2",
-    "promptPayloadHash": "f64340a312d55052db16d9cfed111b74ba729316e3a05196e71f5f698dbece48",
-    "modelIds": [
-      "claude-opus-4-8"
-    ],
-    "modelOverridesHash": "32dd3df797669df443016c5596fb00b84883982004fe959bbca88cae4c88be9c",
-    "reviewerCount": 15,
-    "temperature": 0.3,
-    "exclusionsHash": "6fa4d5dec35c955ccb6c6c74dfc66de08883da5680e1d18a9e847406bde30e97"
-  },
-  "rubric": {
-    "version": "reviewer-holistic-v1",
-    "identityHardGates": {
-      "hazardFalseBindingsMax": 0,
-      "unsafeActionsMax": 0,
-      "correctionIntegrityRequired": 1,
-      "cleanPositiveAbstentionIncreaseMaxCases": 1
-    },
-    "proposalPilotGates": {
-      "wrongPersonIncreaseMax": 0,
-      "lossesMax": 2,
-      "winsMin": 4,
-      "winMarginMin": 2,
-      "eligibleShortlistNonInferior": true
-    }
-  },
-  "adjudicator": null,
-  "artifactSchemaVersion": 1,
-  "evaluationScriptVersion": "reviewer-holistic-m1-run-plan-v2"
+  "gates": {
+    "runtimeConfigurationPinned": true,
+    "sourceAttributionPinned": true,
+    "documentIntegrityPinned": true,
+    "identityFalseBindingsMaximum": 0,
+    "unsafeActionsMaximum": 0,
+    "proposalLossesMaximum": 2,
+    "proposalWinsMinimum": 4,
+    "proposalWinMarginMinimum": 2
+  }
 }

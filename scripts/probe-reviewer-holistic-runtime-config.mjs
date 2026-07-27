@@ -9,16 +9,29 @@
  *
  * Usage:
  *   node --import ./scripts/lib/use-extensionless.mjs \
- *     scripts/probe-reviewer-holistic-runtime-config.mjs --target=prod
+ *     scripts/probe-reviewer-holistic-runtime-config.mjs --target=prod \
+ *     --proposal-evaluation-file=/secure/path/proposal-evaluation.json
  *   node --import ./scripts/lib/use-extensionless.mjs \
- *     scripts/probe-reviewer-holistic-runtime-config.mjs --target=prod --check-manifest
+ *     scripts/probe-reviewer-holistic-runtime-config.mjs --target=prod --check-manifest \
+ *     --proposal-evaluation-file=/secure/path/proposal-evaluation.json \
+ *     --manifest-file=/secure/path/manifest.json
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
+import { resolve, sep } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
+const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
+
+function resolveExternalInput(value, flag) {
+  const candidate = resolve(value);
+  if (candidate === ROOT || candidate.startsWith(`${ROOT}${sep}`)) {
+    throw new Error(`${flag} must resolve outside the repository`);
+  }
+  return candidate;
+}
 
 export function canonicalize(value) {
   if (Array.isArray(value)) return value.map(canonicalize);
@@ -59,21 +72,60 @@ function loadEnvLocal() {
   } catch { /* environment may already be exported */ }
 }
 
-function parseArgs(argv) {
-  const targetArg = argv.find((arg) => arg.startsWith('--target='));
-  return {
-    target: targetArg?.slice('--target='.length) || null,
-    checkManifest: argv.includes('--check-manifest'),
+export function parseArgs(argv) {
+  const out = {
+    target: null,
+    checkManifest: false,
+    proposalEvaluationPath: null,
+    manifestPath: null,
   };
+  for (const arg of argv) {
+    if (arg.startsWith('--target=')) {
+      out.target = arg.slice('--target='.length);
+    } else if (arg === '--check-manifest') {
+      out.checkManifest = true;
+    } else if (arg.startsWith('--proposal-evaluation-file=')) {
+      const value = arg.slice('--proposal-evaluation-file='.length);
+      if (!value) throw new Error('--proposal-evaluation-file=<path> requires a non-empty path');
+      out.proposalEvaluationPath = resolveExternalInput(value, '--proposal-evaluation-file');
+    } else if (arg.startsWith('--manifest-file=')) {
+      const value = arg.slice('--manifest-file='.length);
+      if (!value) throw new Error('--manifest-file=<path> requires a non-empty path');
+      out.manifestPath = resolveExternalInput(value, '--manifest-file');
+    } else {
+      throw new Error(`unknown argument: ${arg}`);
+    }
+  }
+  if (!out.proposalEvaluationPath) {
+    throw new Error('--proposal-evaluation-file=<path> is required before production reads');
+  }
+  if (out.checkManifest && !out.manifestPath) {
+    throw new Error('--manifest-file=<path> is required with --check-manifest');
+  }
+  if (!out.checkManifest && out.manifestPath) {
+    throw new Error('--manifest-file is valid only with --check-manifest');
+  }
+  return out;
 }
 
 function isCliEntrypoint() {
   return import.meta.url === pathToFileURL(process.argv[1] || '').href;
 }
 
-export async function observeRuntimeConfig({ target }) {
+export async function observeRuntimeConfig({ target, proposalEvaluation, proposalEvaluationPath }) {
   if (target !== 'prod') {
     throw new Error('Explicit --target=prod is required for the frozen production cohort');
+  }
+  const evaluation = proposalEvaluation || (
+    proposalEvaluationPath
+      ? JSON.parse(readFileSync(proposalEvaluationPath, 'utf8'))
+      : null
+  );
+  if (!evaluation) {
+    throw new Error('An explicit proposal evaluation is required before production reads');
+  }
+  if (evaluation.status !== 'frozen' || evaluation.proposals?.length !== 10) {
+    throw new Error('The M1.2 proposal evaluation must be frozen with exactly ten proposals');
   }
 
   loadEnvLocal();
@@ -114,14 +166,6 @@ export async function observeRuntimeConfig({ target }) {
   }
 
   enterDynamicsBypassForScript('probe-reviewer-holistic-runtime-config');
-  const evaluation = JSON.parse(readFileSync(
-    new URL('../docs/audits/reviewer-holistic-proposal-evaluation-v1.json', import.meta.url),
-    'utf8',
-  ));
-  if (evaluation.status !== 'frozen' || evaluation.proposals?.length !== 10) {
-    throw new Error('The M1.2 proposal evaluation must be frozen with exactly ten proposals');
-  }
-
   const prompt = await fetchCurrentPrompt('reviewer-finder.analyze');
   const settingsResult = await DynamicsService.queryRecords('wmkf_appsystemsettings', {
     select: 'wmkf_settingkey,wmkf_settingvalue',
@@ -204,10 +248,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const observed = await observeRuntimeConfig(args);
   if (args.checkManifest) {
-    const manifest = JSON.parse(readFileSync(
-      new URL('../docs/audits/reviewer-holistic-evaluation-manifest-v1.json', import.meta.url),
-      'utf8',
-    ));
+    const manifest = JSON.parse(readFileSync(args.manifestPath, 'utf8'));
     const diffs = runtimeConfigDiff(manifest.runtimeConfig, observed.runtimeConfig);
     if (diffs.length > 0) {
       console.error(JSON.stringify({ status: 'drift', diffs, observed }, null, 2));

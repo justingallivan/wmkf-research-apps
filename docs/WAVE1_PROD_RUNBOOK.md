@@ -1,5 +1,5 @@
 ---
-title: "Wave 1 Production Cutover — Runbook for Connor (HISTORICAL — applied 2026-04-24)"
+title: "Wave 1 Production Cutover — Historical Runbook (applied 2026-04-24)"
 domain: security-auth
 kind: runbook
 status: active
@@ -14,7 +14,7 @@ related:
   - scripts/apply-security-role.js
 ---
 
-# Wave 1 Production Cutover — Runbook for Connor (HISTORICAL — applied 2026-04-24)
+# Wave 1 Production Cutover — Historical Runbook (applied 2026-04-24)
 
 **Status:** ✅ Cutover applied 2026-04-24. Flag flip 2026-05-03. Postgres tables dropped 2026-05-12 via `lib/db/migrations/007_drop_wave1_tables.sql`. This runbook is the historical record of the cutover-day commands; verification queries against the dropped Postgres tables will fail. Do not run as a live procedure.
 
@@ -22,15 +22,16 @@ related:
 
 ## Where we are
 
-Wave 1 of the Postgres → Dataverse migration has been applied end-to-end in **sandbox** (`orgd9e66399`) and verified at every layer:
+Wave 1 of the Postgres → Dataverse migration was applied end-to-end in the
+sandbox environment and verified at every layer:
 
 | Layer | Status | Proof |
 |---|---|---|
 | Schema (3 tables + systemuser extensions) | ✓ live | `scripts/apply-dataverse-schema.js` + `scripts/smoke-test-wave1.js` |
 | Security role + privilege matrix | ✓ live | `scripts/apply-security-role.js` + role is in solution `wmkfResearchReviewAppSuite` |
 | Role assigned to all 7 real staff users | ✓ | same script, `--assign=<emails>` |
-| User-level isolation on encrypted preferences | ✓ | `scripts/test-role-isolation-wave1.js` — 11/11 symmetric asserts (Justin + Kevin, both non-admin) |
-| Data migrated (Postgres → Dataverse) | ✓ | `scripts/sync-wave1-postgres-to-dataverse.js` — 149 rows, Tom→Beth remap, Test User dropped |
+| User-level isolation on encrypted preferences | ✓ | `scripts/test-role-isolation-wave1.js` — 11/11 symmetric assertions using two non-admin accounts |
+| Data migrated (Postgres → Dataverse) | ✓ | `scripts/sync-wave1-postgres-to-dataverse.js` — 149 rows, one departed-user ownership remap, test account dropped |
 | Byte-level data fidelity Postgres ↔ Dataverse | ✓ | `scripts/verify-wave1-read-path.js` — 66/66 asserts across all users |
 | Application-level prefs service works against Dataverse | ✓ | `scripts/test-dataverse-prefs-service.js` — 16/16 asserts (CRUD + encryption + masking + bulk + skip) |
 
@@ -38,7 +39,7 @@ Nothing in prod has been touched. The app is still running off Postgres.
 
 ---
 
-## Why this needs you
+## Why this required an administrator
 
 Our Azure app user in prod (`WMK: Research Review App Suite`) has read-only access — `akoyaGO Read Only access` + `WMKF AI Tools` + `WMKF Custom Entities`. It can't create tables, roles, or solutions in prod.
 
@@ -126,11 +127,16 @@ node scripts/sync-wave1-postgres-to-dataverse.js --target=prod --execute
 - 84 app-access rows
 - 45 system settings
 
-**Identity bridge:** matches on `azure_email` → `systemuser.internalemailaddress`. Tom Rieker's rows route to Beth Pruitt (he left; she took over). All 7 real users resolve cleanly (Justin, Kevin, Jean, Beth, you, Sarah, Allison).
+**Identity bridge:** matches on `azure_email` →
+`systemuser.internalemailaddress`. One departed user's rows were reassigned to
+the current owner. All 7 staff accounts resolved cleanly.
 
 **Idempotent.** Pre-queries each row by natural key; skips existing.
 
-**Prerequisites:** this step needs all 7 users to have the staff role assigned for ownership on the preferences table. Run the role script first with `--assign=jgallivan@wmkeck.org,kmoses@wmkeck.org,jkim@wmkeck.org,bpruitt@wmkeck.org,cnoda@wmkeck.org,shibler@wmkeck.org,akeller@wmkeck.org` — same flag that worked in sandbox.
+**Prerequisites:** this step needs all 7 users to have the staff role assigned
+for ownership on the preferences table. Supply the current roster through the
+role script's `--assign=<comma-separated emails>` argument; do not store that
+roster in the repository.
 
 **Rollback:** Postgres is untouched. To roll back Dataverse, just delete the three tables (or the solution).
 
@@ -158,7 +164,7 @@ Nothing in that sequence needs your help unless something breaks.
 
 ---
 
-## Two open questions for you
+## Two open questions for the administrator
 
 Low priority — whenever you have a minute:
 
@@ -171,4 +177,4 @@ Low priority — whenever you have a minute:
 
 Three scripts, each dry-run-able, each idempotent, each with a one-action rollback. The scripts log before they write and print exactly what failed if something does.
 
-If something looks wrong, stop and grab Justin. Reverting is cheap.
+If something looks wrong, stop and contact the project owner. Reverting is cheap.

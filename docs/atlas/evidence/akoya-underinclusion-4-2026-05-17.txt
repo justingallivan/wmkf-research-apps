@@ -1,57 +1,41 @@
-Token acquired.
-Probe date: 2026-05-17 (dated evidence)
+REDACTED AGGREGATE EVIDENCE
+Probe date: 2026-05-17 (read-only production verification)
+Subject: payee, applicant, primary-contact, and applicant-address coverage
 
-  akoya_payee: type=Lookup label="Payee"
-  akoya_primarycontactid: type=Lookup label="Primary Contact"
-  akoya_purpose: type=Memo label="Purpose"
+Field metadata
+--------------
+- `akoya_payee`: Lookup ("Payee").
+- `akoya_primarycontactid`: Lookup ("Primary Contact").
+- `akoya_purpose`: Memo ("Purpose").
 
-══ akoya_payee — fill rate ══
-  overall  2844/25561  (11%)
-  migrated 218/22573  (1%)
-  native   2626/2988  (88%)
+Fill observations
+-----------------
+| Field | Overall | Migrated | Native |
+|---|---:|---:|---:|
+| `akoya_payee` | 2,844/25,561 (11%) | 218/22,573 (1%) | 2,626/2,988 (88%) |
+| `akoya_primarycontactid` | 18,078/25,561 (71%) | 15,766/22,573 (70%) | 2,312/2,988 (77%) |
 
-══ akoya_primarycontactid — fill rate ══
-  overall  18078/25561  (71%)
-  migrated 15766/22573  (70%)
-  native   2312/2988  (77%)
+In a 14-row newest-native sample, payee and applicant account matched in 13
+rows and differed in one. Primary contact was often populated but represented
+a person role distinct from the organizational payee/applicant.
 
-══ payee vs applicant vs primary-contact — newest-native sample (divergence check) ══
-  #1003096  payee(account)="Pacific Council on International Policy"  applicant="Pacific Council on International Policy"  contact="—"  [payee==applicant]
-  #1003095  payee(account)="Npower Inc"  applicant="Npower Inc"  contact="Jimmy Ancheta-Tilley"  [payee==applicant]
-  #1003094  payee(account)="Climb Hire Inc."  applicant="Climb Hire Inc."  contact="Sorbriqué Grant"  [payee==applicant]
-  #1003093  payee(account)="Aspire Public Schools"  applicant="Aspire Public Schools"  contact="Wil Flores"  [payee==applicant]
-  #1003092  payee(account)="T H I N K Together"  applicant="T H I N K Together"  contact="Lawrence Gustafson"  [payee==applicant]
-  #1003091  payee(account)="Neighborhood Legal Services of Los Angeles County"  applicant="Neighborhood Legal Services of Los Angeles County"  contact="Erin Higashi"  [payee==applicant]
-  #1003090  payee(account)="Coalition for Humane Immigrant Rights"  applicant="Coalition for Humane Immigrant Rights"  contact="Julio Martinez"  [payee==applicant]
-  #1003089  payee(account)="Alliance For Community Empowerment"  applicant="Alliance For Community Empowerment"  contact="Ashley Burgin"  [payee==applicant]
-  #1003088  payee(account)="American Institute of Mathematics"  applicant="American Institute of Mathematics"  contact="David Crombecque"  [payee==applicant]
-  #1003087  payee(account)="Lundquist Institute for Biomedical Innovation at Harbor-Ucla Medical"  applicant="Lundquist Institute for Biomedical Innovation at Harbor-Ucla Medical"  contact="Megan Lewicki"  [payee==applicant]
-  #1003086  payee(account)="Core Community Organized Relief Effort"  applicant="Core Community Organized Relief Effort"  contact="Tiffany Tse"  [payee==applicant]
-  #1003085  payee(account)="Access Services Incorporated"  applicant="Access Services Incorporated"  contact="Matthew Avancena"  [payee==applicant]
-  #1003084  payee(account)="Connie Rice Institute for Urban Peace"  applicant="Connie Rice Institute for Urban Peace"  contact="Mia McNeil"  [payee==applicant]
-  #1003083  payee(account)="University of Georgia Research Foundation, Inc."  applicant="University Of Georgia"  contact="Catherine Cuppett"  [DIVERGES]
+Applicant-account address coverage
+----------------------------------
+Among 25,473 requests with an applicant account:
 
-══ applicant-org address (account joined on akoya_applicantid) ══
-  address1_city              25382/25473 of requests-with-applicant (100%)
-  address1_stateorprovince   25381/25473 of requests-with-applicant (100%)
+- `address1_city`: 25,382 populated.
+- `address1_stateorprovince`: 25,381 populated.
 
-  top applicant-org states by request count:
-     12235  CA
-      1467  NY
-      1176  MA
-      1088  TX
-       706  PA
-       602  DC
-       492  OR
-       485  IL
-       418  CO
-       405  WA
-       374  OH
-       353  VA
-       312  MD
-       292  GA
+Conclusion
+----------
+Payee is strongly native-era scoped and usually agrees with applicant account
+in the inspected sample, while primary contact has different semantics.
+Applicant-account city/state are broadly populated, but whether they belong in
+a default analytical projection depends on the use case.
 
-Read: DEFAULT only if distinct + analyst-meaningful + era-robust;
-else opt-in (flagged sparse/era-scoped) or prune.
-
-Done (read-only under-inclusion-4 adjudication probe).
+Redaction boundary
+------------------
+The original sample contained request numbers, organization and contact names,
+and a state-frequency table. Those row-level and location-linked production
+values are intentionally excluded. Re-run the read-only production probe when
+current row-level substantiation is authorized.

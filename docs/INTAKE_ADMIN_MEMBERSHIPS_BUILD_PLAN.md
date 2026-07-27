@@ -54,11 +54,11 @@ In scope:
 
 Not in scope:
 - Applicant-side claim UX (separate slice; the cross-slice contract it must honor lives in § 9).
-- Submitted-requests admin, opportunity status (post-Sarah-inventory slices).
+- Submitted-requests admin and opportunity status (post-field-inventory slices).
 - `wmkf_portalmembership` entity creation in Dataverse — this historical
   slice-0 prerequisite is now complete; the admin build would consume the
   deployed entity and Atlas-recorded metadata.
-- Email notifications on approve/reject — PA-trigger, Connor's plate.
+- Email notifications on approve/reject — owned by the workflow administrator.
 
 **Historical sequencing rationale:** the design originally put this slice
 before applicant UX so staff could act on pending rows. That sequence was not
@@ -145,7 +145,10 @@ Do **not** hard-code bind keys in this plan until slice 0 lands them; reference 
 }
 ```
 
-**Not in `DEFAULT_APP_GRANTS`.** Granted manually via `/admin`. Pilot grants: Justin + one Foundation staff TBD. Sarah opt-in for visibility.
+**Not in `DEFAULT_APP_GRANTS`.** Granted manually via `/admin`. The pilot uses
+two staff accounts from the access-controlled roster, with an optional third
+visibility-only grant. Named account-to-app mappings do not belong in this
+public design.
 
 ---
 
@@ -329,11 +332,11 @@ Response shape:
     {
       "id": "guid",
       "etag": "W/\"123456\"",
-      "contact": { "id": "guid", "name": "Erika Espinosa-Ortiz", "email": "..." },
-      "account": { "id": "guid", "name": "Utah State University" },
+      "contact": { "id": "guid", "name": "Example Applicant", "email": "applicant@example.org" },
+      "account": { "id": "guid", "name": "Example University" },
       "role": "submitter",
       "approvalStatus": "requested",
-      "requestedBy": { "id": "guid", "name": "Erika Espinosa-Ortiz" },
+      "requestedBy": { "id": "guid", "name": "Example Applicant" },
       "requestedAt": "2026-05-12T14:22:00Z",
       "priorDecision": null
     }
@@ -419,7 +422,7 @@ Single page at `pages/apply/admin/memberships.js`. Wrapped in `RequireAppAccess`
 │                                                        │
 │  ┌─ Table ─────────────────────────────────────────┐   │
 │  │ Applicant │ Institution │ Role │ Requested │ … │   │
-│  │ Erika E-O │ Utah State  │ Sub. │ 2026-…    │   │   │
+│  │ Example A │ Example U.  │ Sub. │ 2026-…    │   │   │
 │  │   ▸ Previously rejected 2026-05-01: "..."     │   │
 │  │   [Approve]   [Reject…]                        │   │
 │  └────────────────────────────────────────────────┘   │
@@ -509,10 +512,10 @@ When the staff member subsequently approves or rejects the re-applied row, the a
 ## 10. Out of scope (followups)
 
 - Bulk approve/reject — pilot scale doesn't justify.
-- Email notifications — PA-trigger, Connor.
+- Email notifications — owned by the workflow administrator.
 - Revocation flow (`approved → revoked`) — separate slice.
 - Audit log UI — `intake_audit` queryable from Postgres directly.
-- Submitted-requests admin view — blocked on Sarah's field inventory.
+- Submitted-requests admin view — blocked on the field inventory.
 - Field rename `_wmkf_approvedby_value` → `decidedby` — Phase 1+ schema review.
 - `updateRecord` `{ returnRepresentation: true }` — single-round-trip alternative to post-write refetch; tracked as nice-to-have.
 

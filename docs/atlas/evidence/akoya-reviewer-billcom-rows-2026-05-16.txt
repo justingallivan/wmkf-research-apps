@@ -1,49 +1,44 @@
-Research Reviewer rows WITH bill.com detail — 2026-05-17T02:41:37.750Z (read-only)
+# Akoya reviewer Bill.com field probe — redacted evidence summary
 
-Cohort 87; rows with ANY bill.com field populated: 8
+Original probe time: 2026-05-17T02:41:37.750Z
+Probe mode: read-only
+Original evidence commit: 4103af79 (2026-05-16)
+Current-tree redaction: 2026-07-27
 
-#1002668  created=2026-01-06T21:06:48Z  status=Pending  paid=0  ⟵ looks STAFF/TEST
-   contact=Connor Noda   goapplySubmitter=ctnoda@outlook.com
-   billcom: name="Connor Noda"  email="ctnoda@outlook.com"  704 31st street  Manhattan Beach CA 90266
-   paymentnetworkidpni=5  usingpayee=No  vendorverified=No
+## Scope
 
-#1002709  created=2026-02-12T06:15:55Z  status=Pending  paid=0  
-   contact=Nicola Allen   goapplySubmitter=nallen@salk.edu
-   billcom: name="Nicola Allen"  email="nallen@salk.edu"  3692 brant st  san diego ca 92103 usa
-   paymentnetworkidpni=0236841370255587  usingpayee=No  vendorverified=No
+- Honorarium/reviewer cohort: 87 requests.
+- Requests with at least one Bill.com-related field populated: 8.
+- Of those 8, 1 was classified as staff/test by the original probe and 7 were
+  external-reviewer rows.
 
-#1002712  created=2026-02-12T13:44:07Z  status=Pending  paid=0  
-   contact=Bradley Hyman   goapplySubmitter=bhyman@mgh.harvard.edu
-   billcom: name="bradley hyman"  email="bhyman@mgh.harvard.edu"  5 Reinach Place PO Box 460 Madison NH 03849 United States
-   paymentnetworkidpni=0252714352317974  usingpayee=No  vendorverified=No
+## Aggregate result
 
-#1002717  created=2026-02-12T15:04:00Z  status=Pending  paid=0  
-   contact=Erik Musiek   goapplySubmitter=musieke@neuro.wustl.edu
-   billcom: name="Erik Musiek"  email="musieke@wustl.edu"  7401 Byron Pl  Clayton MO 63105 USA
-   paymentnetworkidpni=0106584858653412  usingpayee=No  vendorverified=No
+- All 8 populated rows had `akoya_requeststatus = Pending`.
+- All 8 populated rows had `akoya_paid = 0`.
+- The populated rows clustered near the earliest creation dates in the cohort.
+  This supports the original interpretation that the Bill.com-populated rows
+  were setup/test-era records, but the date clustering alone does not prove
+  that every row was synthetic.
 
-#1002719  created=2026-02-12T15:29:11Z  status=Pending  paid=0  
-   contact=Kirill Martemyanov   goapplySubmitter=kmartemyanov@miami.edu
-   billcom: name="Kirill Martemyanov"  email="kxm1992@miami.edu"  1164 Egret cir S  Jupiter FL 33458 US
-   paymentnetworkidpni=N/A  usingpayee=No  vendorverified=No
+The probe inspected these useful field groups:
 
-#1002723  created=2026-02-12T18:26:37Z  status=Pending  paid=0  
-   contact=Thomas Cech   goapplySubmitter=CechT@hhmi.org
-   billcom: name="Thomas Cech"  email="cecht@hhmi.org"  1545 Rockmont Cir  Boulder CO 80305 USA
-   paymentnetworkidpni=0161999447362329  usingpayee=No  vendorverified=No
+- Request state: `akoya_requestnum`, `createdon`,
+  `akoya_requeststatus`, `akoya_paid`.
+- Reviewer linkage: primary-contact and GoApply-submitter relationships.
+- Bill.com/payee data:
+  `wmkf_organizationnameonbillcomaccount`,
+  `wmkf_paymentnetworkidpni`, `wmkf_usingpayee`, and the Bill.com
+  email/address fields.
 
-#1002733  created=2026-02-13T09:25:54Z  status=Pending  paid=0  
-   contact=Simon Mead   goapplySubmitter=s.mead@ucl.ac.uk
-   billcom: name="Simon Mead"  email="s.mead@prion.ucl.ac.uk"  the tack room  leighton buzzard bucks lu7 9df uk
-   paymentnetworkidpni=u164216946333850  usingpayee=No  vendorverified=No
+## Redaction and reproducibility boundary
 
-#1002772  created=2026-02-19T21:14:44Z  status=Pending  paid=0  
-   contact=David Weitz   goapplySubmitter=weitz@seas.harvard.edu
-   billcom: name="David Weitz"  email="weitz@seas.harvard.edu"  213 Green Road  Bolton MA 01740 USA
-   paymentnetworkidpni=0259321813926830  usingpayee=No  vendorverified=No
+The original row-level dump contained request identifiers, person names,
+email addresses, mailing addresses, and payment-network identifiers. Those
+values have been removed from the current tree. No hashes or opaque
+derivatives of those values are retained here.
 
-cohort createdon span : 2026-01-06T21:06:48Z … 2026-03-10T20:00:09Z
-populated-set span    : 2026-01-06T21:06:48Z … 2026-02-19T21:14:44Z
-  (if the populated set clusters at the cohort's earliest dates ⇒ supports "these are the setup/test rows")
-
-Done (read-only — bill.com-populated reviewer rows for spot-check).
+The aggregate counts, field names, probe timestamp, and original interpretation
+remain reproducible. Exact row-level verification requires rerunning the
+controlled read-only Dataverse probe under an authorized data-access context;
+the raw values should not be copied into tracked documentation.

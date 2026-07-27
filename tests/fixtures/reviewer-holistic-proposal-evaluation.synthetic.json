@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "status": "frozen",
+  "evaluationVersion": "reviewer-proposal-head-to-head-v1",
+  "selectionPolicy": "held_out_stratified_thin_and_full_signal",
+  "replicatesPerArm": 3,
+  "scorer": "synthetic-scorer",
+  "randomizationSeedHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "frozenAt": "2000-01-02T00:00:00.000Z",
+  "proposals": [
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000001",
+      "blindProposalId": "RPE-0000000001",
+      "programArea": "Synthetic Area A",
+      "signalLevel": "thin",
+      "documentHash": "0101010101010101010101010101010101010101010101010101010101010101",
+      "usedForTuning": false,
+      "runs": { "baseline": [], "redesign": [] },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    },
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000002",
+      "blindProposalId": "RPE-0000000002",
+      "programArea": "Synthetic Area B",
+      "signalLevel": "full",
+      "documentHash": "0202020202020202020202020202020202020202020202020202020202020202",
+      "usedForTuning": false,
+      "runs": { "baseline": [], "redesign": [] },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    },
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000003",
+      "blindProposalId": "RPE-0000000003",
+      "programArea": "Synthetic Area A",
+      "signalLevel": "thin",
+      "documentHash": "0303030303030303030303030303030303030303030303030303030303030303",
+      "usedForTuning": false,
+      "runs": { "baseline": [], "redesign": [] },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    },
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000004",
+      "blindProposalId": "RPE-0000000004",
+      "programArea": "Synthetic Area B",
+      "signalLevel": "full",
+      "documentHash": "0404040404040404040404040404040404040404040404040404040404040404",
+      "usedForTuning": false,
+      "runs": { "baseline": [], "redesign": [] },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    },
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000005",
+      "blindProposalId": "RPE-0000000005",
+      "programArea": "Synthetic Area A",
+      "signalLevel": "thin",
+      "documentHash": "0505050505050505050505050505050505050505050505050505050505050505",
+      "usedForTuning": false,
+      "runs": { "baseline": [], "redesign": [] },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    },
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000006",
+      "blindProposalId": "RPE-0000000006",
+      "programArea": "Synthetic Area B",
+      "signalLevel": "full",
+      "documentHash": "0606060606060606060606060606060606060606060606060606060606060606",
+      "usedForTuning": false,
+      "runs": { "baseline": [], "redesign": [] },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    },
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000007",
+      "blindProposalId": "RPE-0000000007",
+      "programArea": "Synthetic Area A",
+      "signalLevel": "thin",
+      "documentHash": "0707070707070707070707070707070707070707070707070707070707070707",
+      "usedForTuning": false,
+      "runs": { "baseline": [], "redesign": [] },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    },
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000008",
+      "blindProposalId": "RPE-0000000008",
+      "programArea": "Synthetic Area B",
+      "signalLevel": "full",
+      "documentHash": "0808080808080808080808080808080808080808080808080808080808080808",
+      "usedForTuning": false,
+      "runs": { "baseline": [], "redesign": [] },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    },
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000009",
+      "blindProposalId": "RPE-0000000009",
+      "programArea": "Synthetic Area A",
+      "signalLevel": "thin",
+      "documentHash": "0909090909090909090909090909090909090909090909090909090909090909",
+      "usedForTuning": false,
+      "runs": { "baseline": [], "redesign": [] },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    },
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000010",
+      "blindProposalId": "RPE-0000000010",
+      "programArea": "Synthetic Area B",
+      "signalLevel": "full",
+      "documentHash": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "usedForTuning": false,
+      "runs": { "baseline": [], "redesign": [] },
+      "candidateArmMembership": [],
+      "candidateScores": []
+    }
+  ]
+}

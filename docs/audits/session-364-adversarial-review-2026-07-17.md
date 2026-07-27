@@ -13,6 +13,14 @@
   defects. Two MEDIUM process/coverage findings (F1, F2) should be fixed before
   the next evaluation cycle. Nothing here invalidates recorded results.
 
+> **Current privacy follow-up (2026-07-27):** this remains a historical review
+> of the named commit. The four production proposal cohort/evaluation/manifest
+> files referenced below are no longer tracked operational inputs; their public
+> paths now contain aggregate receipts. Current planner, runner, probe, and
+> validators require explicit external files, and public tests use synthetic
+> fixtures. Present-tense statements below describe the reviewed 2026-07-17
+> tree unless a follow-up note says otherwise.
+
 ## 1. Claims verified (all reproduced empirically)
 
 ### 1.1 Identity benchmark v2 `[VERIFIED via data]`
@@ -44,8 +52,9 @@
   `scripts/lib/reviewer-holistic-m1.js`,
   `scripts/validate-reviewer-holistic-m1-assets.js`, and one line of
   `tests/unit/reviewer-holistic-evaluation-manifest.test.js`.
-- Tracked `docs/audits/reviewer-holistic-proposal-evaluation-v1.json` still has
-  0 runs / 0 scores / 0 armMembership — "unchanged and unscored" is accurate.
+- At the reviewed commit,
+  `docs/audits/reviewer-holistic-proposal-evaluation-v1.json` had 0 runs / 0
+  scores / 0 armMembership — "unchanged and unscored" was accurate.
   The 60 completed runs live only in local `outputs/…/execution-v1.json`
   (60/60 `completed`).
 
@@ -93,7 +102,8 @@
 
 ### F1. MEDIUM — "Frozen" manifest mutated in place; freeze is asserted, not enforced
 
-`docs/audits/reviewer-holistic-evaluation-manifest-v1.json` carries
+At the reviewed commit,
+`docs/audits/reviewer-holistic-evaluation-manifest-v1.json` carried
 `status: "frozen"`, yet `e94e8f78` edited `identityBenchmark.fixtureVersion`
 v1→v2 **and updated the guarding unit-test literal in the same commit**
 (`tests/unit/reviewer-holistic-evaluation-manifest.test.js:58`). The test pins
@@ -109,6 +119,11 @@ Mitigations already in place: the edit is outside the fingerprinted region
 amendment/history entry (or a `manifest-v2`) instead of rewriting the frozen
 file; or explicitly document that `identityBenchmark` sits outside the
 manifest's freeze scope (and why the fingerprint excludes it).
+
+**Follow-up 2026-07-27:** operational manifests are external, versioned inputs;
+the tracked path is an aggregate receipt. The validator requires an explicit
+manifest file, so an in-repository test literal can no longer redefine the
+operational freeze.
 
 ### F2. MEDIUM — Standing gate no longer validates the active fixture
 
@@ -129,6 +144,10 @@ empirically: the default run validates v1 and never opens v2.
 `fixtureVersion` (fail closed if the file is missing), or validate both v1 and
 v2 in the default run; add a consistency check that the manifest fixtureVersion
 corresponds to an existing frozen benchmark.
+
+**Follow-up 2026-07-27:** closed for the current CLI contract. There is no
+implicit operational manifest default; the supplied external manifest selects
+the identity fixture, and missing or mismatched inputs fail closed.
 
 ### F3. LOW — evaluationVersion conflation risk
 

@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 /**
  * READ-ONLY audit: how widespread are duplicate wmkf_potentialreviewers rows
- * sharing an email? Triggered by the Edit Candidate 412 bug — one Christopher
- * Chang turned out to have a 2025 row (chrischang@princeton.edu, Princeton)
- * and a 2026 re-discovery row (lp9904@princeton.edu, Berkeley), with the
- * current suggestion pointed at the wrong row.
+ * sharing an email? Triggered by an Edit Candidate 412 bug where one reviewer
+ * had both a prior-cycle row and a re-discovery row, with the current
+ * suggestion pointed at the wrong row.
  *
  * Strategy: pull all active wmkf_potentialreviewers with non-null email,
  * group by normalized email (lowercase + trim), report any group with >1.
  * For each dup group, also count selected suggestions per row so we can see
  * which row(s) are "load-bearing" (referenced by a live suggestion).
  *
- * Pure GET; no writes. Reports counts only, no PII beyond names already
- * visible to staff in Reviewer Finder.
+ * Pure GET; no writes. The bounded sample includes operational names, email
+ * addresses, organizations, and record ids. Treat stdout as access-controlled
+ * transient evidence; do not commit it to the repository.
  */
 
 const fs = require('fs');
@@ -87,7 +87,7 @@ async function getAll(token, entitySet, query) {
   console.log(`Email keys with >1 row: ${dupGroups.length}\n`);
 
   if (dupGroups.length === 0) {
-    console.log('No duplicate groups by email. The Chris Chang case may be unique.');
+    console.log('No duplicate groups by email. The original incident may be unique.');
     return;
   }
 

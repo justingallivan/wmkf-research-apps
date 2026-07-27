@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "status": "frozen",
+  "freezePoint": "after_shared_c0_containment",
+  "createdAt": "2000-01-02T00:00:00.000Z",
+  "baseline": {
+    "origin": "origin/main",
+    "commit": "1111111111111111111111111111111111111111",
+    "runtimeBehavior": "legacy-default"
+  },
+  "redesign": {
+    "startingCommit": "1111111111111111111111111111111111111111",
+    "implementationCommit": "2222222222222222222222222222222222222222",
+    "pipelineVersion": "reviewer-holistic-applicant-neighborhood-seeds-v1"
+  },
+  "execution": {
+    "implementationCommit": "3333333333333333333333333333333333333333",
+    "scriptVersion": "reviewer-holistic-m1-executor-v3",
+    "artifactVersion": "reviewer-holistic-m1-execution-v1"
+  },
+  "identityBenchmark": {
+    "fixtureVersion": "reviewer-identity-v2",
+    "minimumCases": 40,
+    "hazardMinimum": 20,
+    "cleanPositiveMinimum": 20,
+    "labelingPolicy": "single_reviewer_blinded"
+  },
+  "proposalEvaluation": {
+    "proposalIds": [
+      "00000000-0000-4000-8000-000000000001",
+      "00000000-0000-4000-8000-000000000002",
+      "00000000-0000-4000-8000-000000000003",
+      "00000000-0000-4000-8000-000000000004",
+      "00000000-0000-4000-8000-000000000005",
+      "00000000-0000-4000-8000-000000000006",
+      "00000000-0000-4000-8000-000000000007",
+      "00000000-0000-4000-8000-000000000008",
+      "00000000-0000-4000-8000-000000000009",
+      "00000000-0000-4000-8000-000000000010"
+    ],
+    "documentHashes": {
+      "00000000-0000-4000-8000-000000000001": "0101010101010101010101010101010101010101010101010101010101010101",
+      "00000000-0000-4000-8000-000000000002": "0202020202020202020202020202020202020202020202020202020202020202",
+      "00000000-0000-4000-8000-000000000003": "0303030303030303030303030303030303030303030303030303030303030303",
+      "00000000-0000-4000-8000-000000000004": "0404040404040404040404040404040404040404040404040404040404040404",
+      "00000000-0000-4000-8000-000000000005": "0505050505050505050505050505050505050505050505050505050505050505",
+      "00000000-0000-4000-8000-000000000006": "0606060606060606060606060606060606060606060606060606060606060606",
+      "00000000-0000-4000-8000-000000000007": "0707070707070707070707070707070707070707070707070707070707070707",
+      "00000000-0000-4000-8000-000000000008": "0808080808080808080808080808080808080808080808080808080808080808",
+      "00000000-0000-4000-8000-000000000009": "0909090909090909090909090909090909090909090909090909090909090909",
+      "00000000-0000-4000-8000-000000000010": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"
+    },
+    "replicatesPerArm": 3,
+    "selectionPolicy": "held_out_stratified_thin_and_full_signal"
+  },
+  "runtimeConfig": {
+    "promptRowId": "00000000-0000-4000-8000-000000000100",
+    "promptVersion": "1",
+    "promptPayloadHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "modelIds": ["synthetic/model"],
+    "modelOverridesHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "reviewerCount": 15,
+    "temperature": 0.3,
+    "exclusionsHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "rubric": {
+    "version": "reviewer-holistic-v1",
+    "identityHardGates": {
+      "hazardFalseBindingsMax": 0,
+      "unsafeActionsMax": 0,
+      "correctionIntegrityRequired": 1,
+      "cleanPositiveAbstentionIncreaseMaxCases": 1
+    },
+    "proposalPilotGates": {
+      "wrongPersonIncreaseMax": 0,
+      "lossesMax": 2,
+      "winsMin": 4,
+      "winMarginMin": 2,
+      "eligibleShortlistNonInferior": true
+    }
+  },
+  "adjudicator": null,
+  "artifactSchemaVersion": 1,
+  "evaluationScriptVersion": "reviewer-holistic-m1-run-plan-v2"
+}

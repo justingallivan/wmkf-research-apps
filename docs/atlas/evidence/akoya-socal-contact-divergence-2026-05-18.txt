@@ -1,101 +1,28 @@
-Token acquired. Run 2026-05-18T16:30:42.373Z (read-only).
-SoCal wmkf_grantprogram = 8cf9c61d-a7cb-ee11-9079-000d3a341fd9
+REDACTED AGGREGATE EVIDENCE
+Probe date: 2026-05-18 (read-only production verification)
+Subject: request-primary-contact versus organization-primary-contact divergence
 
-SoCal 2025 (meeting date in 2025) requests: 268
-  of those, both-contacts present: 228; DIVERGENT (req ≠ org): 71
+Population and result
+---------------------
+- 2025-cycle requests in the scoped grant program: 268.
+- Rows with both contact lookups populated: 228.
+- Rows where request and organization primary contacts differed: 71.
+- Divergence rate among rows with both contacts: approximately 31%.
 
-══ 15 example divergent SoCal-2025 applications (web-lookup ready) ══
+A 15-row sample was inspected to confirm that the difference was substantive,
+not a formatting or lookup-annotation artifact. The sample also showed that
+organization leader/CEO, organization primary contact, and request primary
+contact are separate roles and may coincide or diverge independently.
 
-  #1001112  (meeting 2025-06-12)  Venice Family Clinic
-     Request Primary Contact : Naomi Neuman
-     Org Primary Contact     : Jenny O'Brian
-     Organization Leader/CEO : Mitesh Popat
-     [req PC 74ef7238-86ab-ef11-b8e8-6045bd00230d · org PC 791dba4e-cc8f-ee11-8179-000d3a341e8f]
+Conclusion
+----------
+The request-level primary contact cannot be substituted with the applicant
+organization's primary contact. Consumers must select the role that matches
+their workflow rather than treating either lookup as a universal person.
 
-  #1000879  (meeting 2025-06-12)  Educate Advancing Early Childhood Education Parenting And Literacy
-     Request Primary Contact : Elisa Coburn
-     Org Primary Contact     : Laurie Petersen
-     Organization Leader/CEO : Elisa Coburn
-     [req PC 90a76d34-4395-ef11-8a6a-0022480aa879 · org PC 5ec33eb8-cd8f-ee11-8179-000d3a341fd9]
-
-  #1001080  (meeting 2025-06-12)  Together California Inc.
-     Request Primary Contact : Alexandria Levitt
-     Org Primary Contact     : Tim McCormick
-     Organization Leader/CEO : Tim McCormick
-     [req PC 5ff5e8fe-fafc-ee11-a1ff-000d3a341325 · org PC 31312d45-fffc-ee11-a1ff-000d3a340055]
-
-  #1001097  (meeting 2025-06-12)  Alliance College-Ready Public Schools Foundation
-     Request Primary Contact : Catherine Suitor
-     Org Primary Contact     : Kristen Laskaris
-     Organization Leader/CEO : Catherine Suitor
-     [req PC a8395ab3-ce8f-ee11-8179-000d3a310f67 · org PC 8a3e62c0-b581-ef11-ac21-000d3a383a3f]
-
-  #1001115  (meeting 2025-06-12)  Harbor Community Clinic, Inc.
-     Request Primary Contact : Nathalia Jimenez
-     Org Primary Contact     : Tamra King
-     Organization Leader/CEO : Tamra King
-     [req PC d17eda11-8dcc-ef11-b8e8-6045bd00230d · org PC 3ff15239-ce8f-ee11-8179-000d3a310f67]
-
-  #1001142  (meeting 2025-06-12)  Rancho San Antonio Boys Home, Inc.
-     Request Primary Contact : Rosalie Brown
-     Org Primary Contact     : Rosalie Brown
-     Organization Leader/CEO : Aubree Sweeney
-     [req PC 17f3ddd3-0cad-ef11-b8e8-6045bd00230d · org PC 34dedd0a-8e48-f011-877a-6045bd02b4cc]
-
-  #1001016  (meeting 2025-06-12)  Life Steps Foundation Inc.
-     Request Primary Contact : Doug Rimerman
-     Org Primary Contact     : Doug Rimerman
-     Organization Leader/CEO : Susan Chang
-     [req PC 108fe23c-df9a-ef11-8a6a-000d3a344c0f · org PC b2e01750-84a3-ef11-8a6a-00224803a64e]
-
-  #1001069  (meeting 2025-06-12)  The Whole Child-Mental Health & Housing Services
-     Request Primary Contact : Julia Scalise
-     Org Primary Contact     : Brittany Evans
-     Organization Leader/CEO : Constanza Pachon
-     [req PC f632f88c-ce8f-ee11-8179-000d3a310f67 · org PC a0b1c879-31b9-f011-bbd2-000d3a30a1aa]
-
-  #1001093  (meeting 2025-06-12)  Community Partners
-     Request Primary Contact : Jessica Meaney
-     Org Primary Contact     : Nancy Villarreal
-     Organization Leader/CEO : Alicia Lara
-     [req PC 37cadfa4-caa2-ef11-8a6a-000d3a344c0f · org PC 120792a5-f8b0-f011-bbd3-6045bd0510d4]
-
-  #1001094  (meeting 2025-06-12)  Aspire Public Schools
-     Request Primary Contact : Mari Bennett
-     Org Primary Contact     : Wil Flores
-     Organization Leader/CEO : Chris Carr
-     [req PC 7469b60c-12a2-ef11-8a6a-000d3a344c0f · org PC 9eb47efb-c945-f111-88b4-000d3a306da2]
-
-  #1001294  (meeting 2025-06-12)  American National Red Cross
-     Request Primary Contact : Valerie Loduem
-     Org Primary Contact     : Berit Anderson
-     Organization Leader/CEO : ∅
-     [req PC ec264fe1-27b7-ef11-b8e8-6045bd034fed · org PC 873ec602-de3f-f011-b4cb-6045bd0510d4]
-
-  #1001306  (meeting 2025-06-12)  Shelter Partnership Inc.
-     Request Primary Contact : Anthony Parker
-     Org Primary Contact     : Kaylin Finley
-     Organization Leader/CEO : ∅
-     [req PC 5ee1c203-29ca-ef11-b8e9-000d3a344c0f · org PC 2abb447c-f776-f011-b4cb-6045bd02b4cc]
-
-  #1000831  (meeting 2025-06-12)  Santa Monica Mountains Fund
-     Request Primary Contact : Deanna Armbruster
-     Org Primary Contact     : Deanna Armbruster
-     Organization Leader/CEO : Deanna Armbruster
-     [req PC d900b917-678d-ef11-ac21-0022480aa879 · org PC 3c3ccecf-648d-ef11-ac21-000d3a344c0f]
-
-  #1001118  (meeting 2025-06-12)  Linc Housing Corporation
-     Request Primary Contact : Ian Nevarez
-     Org Primary Contact     : Cynthia Gellis
-     Organization Leader/CEO : Ian Nevarez
-     [req PC 29cccdf9-cd8f-ee11-8179-000d3a341e8f · org PC c98c9c21-a5fb-f011-8406-000d3a352682]
-
-  #1001141  (meeting 2025-06-12)  Regents of the University of California at Los Angeles
-     Request Primary Contact : Stellar Kim
-     Org Primary Contact     : Stellar Kim
-     Organization Leader/CEO : Julio Frenk
-     [req PC dc2401d4-cc8f-ee11-8179-000d3a310f67 · org PC fc742075-08da-f011-8544-6045bd0510d4]
-
-  …(+56 more divergent; full list in this run's filter if needed)
-
-Done (read-only SoCal-2025 contact-divergence examples).
+Redaction boundary
+------------------
+The original output contained the grant-program GUID and row-level request
+numbers, meeting dates, organizations, contact/leader names, and contact
+GUIDs. Those production-derived values are intentionally excluded. Re-run the
+read-only probe for any authorized row-level investigation.
