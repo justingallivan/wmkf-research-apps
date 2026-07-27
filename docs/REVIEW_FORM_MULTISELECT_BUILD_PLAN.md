@@ -38,8 +38,16 @@ cleanup. It did **not** pass synthesis: two independent
 `f5aa3712-4789-f111-ab0f-6045bd018a07` and
 `04805a39-4789-f111-ab0f-6045bd018deb`. The pre-smoke request synthesis and all
 email markers remained unchanged; no email was sent. The pre-exposure gate is
-therefore red. Successful staff-writer rehearsal, synthesis resolution, the
-rollback/republish proof, final smoke, and reviewer exposure remain pending.
+therefore red. The owner-authorized 2026-07-27 follow-up then
+production-proved the structured staff Manual Review Entry writer, but its
+first and only regeneration reproduced the same incomplete-JSON defect as HTTP
+500 and failed append-only AI run
+`be61f383-f289-f111-ab0f-70a8a59cded0`. The original 1,709-character
+synthesis memo retained its exact hash and modified timestamp. Cleanup deleted
+exactly the 11 staged answers and restored the four parent fields; no draft or
+unrelated email/material/reminder/thank-you change remained. The two legacy
+staff-writer success rehearsals, synthesis resolution, rollback/republish
+proof, final smoke, and reviewer exposure remain pending.
 The known fixture
 disposition completed 2026-07-26, as did the independently routed production
 HTTP proof for all four review writers. The 2026-07-26
@@ -892,7 +900,11 @@ Execute this sequence with external exposure held closed:
    storage, DTO/matrix, DOCX/PDF, courtesy-copy, finality, and cleanup portions.
    It stopped red after two synthesis runs returned incomplete JSON; the three
    staff-writer success paths were not exercised because this smoke had one
-   submitted test suggestion. [PARTIALLY COMPLETED; SYNTHESIS FAILED 2026-07-26]
+   submitted test suggestion. On 2026-07-27, a bounded follow-up exercised the
+   structured Manual Review Entry path successfully and restored it exactly,
+   while its single regeneration produced the third current-v2 incomplete-JSON
+   failure. Legacy upload and mark-received success rehearsals remain.
+   [PARTIALLY COMPLETED; SYNTHESIS FAILED 2026-07-26 AND 2026-07-27]
 6. Execute the documented question rollback procedure in §4 and the audited prompt
    rollback in §5. Verify the exact prior question set and prior prompt, then
    republish the new prompt and target set and verify them again. [PLANNED]
@@ -1115,8 +1127,11 @@ cleanup satisfied this invariant. [VERIFIED]
    `Claude output not valid JSON: Unexpected end of JSON input`; both used current
    prompt v2 with `wmkf_ai_maxtokens=8000`, the original request synthesis hash
    remained unchanged, and cleanup restored the suggestion to `materials_sent`
-   with zero answers/drafts. Staff manual-entry, legacy-upload, and mark-received
-   success coverage also remains. [FAILED/PARTIALLY COMPLETED 2026-07-26]
+   with zero answers/drafts. Staff Manual Review Entry success was subsequently
+   proved on 2026-07-27, followed by a third incomplete-JSON failure and exact
+   restoration to zero answers/no draft with unchanged email/material/reminder/
+   thank-you state. Legacy upload and mark-received success coverage remains.
+   [FAILED/PARTIALLY COMPLETED 2026-07-26; MANUAL ENTRY FOLLOW-UP 2026-07-27]
 5. While external exposure remains closed, execute the §4 manual rollback
    changeset, require exact prior-version readback, and publish the recorded prior
    prompt as a new audited version. Then republish the new prompt and exact target

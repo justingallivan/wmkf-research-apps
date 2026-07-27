@@ -1,11 +1,11 @@
 # Atlas: `wmkf_ai_run` + `wmkf_ai_prompt` (Dataverse)
 
-**Last verified:** 2026-07-26 for the `review-synthesis.generate` publication
-record; 2026-07-12 for the broader entity inventory via
+**Last verified:** 2026-07-27 for the `review-synthesis.generate` execution
+record; 2026-07-26 for publication; 2026-07-12 for the broader entity inventory via
 `scripts/reconcile-memory-claims.js`
 **Source spec:** `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` (canonical; v2 archived)
 
-## `wmkf_ai_run` (351 rows)
+## `wmkf_ai_run` (mutable row count; probe before quoting)
 
 **Source of truth:** Dataverse-only. Append-only audit ledger for every AI invocation against a grant request.
 
@@ -76,13 +76,20 @@ Both written by `execute-prompt.js` `writeRunRow()`. Migration plans touching ei
   `outputs/review-form-multiselect/prompt-publication-evidence-2026-07-26.json`
   (SHA-256
   `50b7a4974e6bcd5e7dd1135bf1edd228f300fe42de406d5951c3ca10dbdbe428`).
-- **First controlled v2 executions (2026-07-26):** two Request #1002788
-  synthesis attempts failed before writeback with
-  `Claude output not valid JSON: Unexpected end of JSON input`. Both resolved
-  the current v2 prompt (`wmkf_ai_maxtokens=8000`) and created required failed
-  audit rows `f5aa3712-4789-f111-ab0f-6045bd018a07` and
-  `04805a39-4789-f111-ab0f-6045bd018deb`; the pre-smoke request synthesis was
-  unchanged. The release gate remains red pending synthesis resolution or the
+- **Controlled v2 executions (2026-07-26 and 2026-07-27):** three Request
+  #1002788 synthesis attempts failed before writeback with
+  `Claude output not valid JSON: Unexpected end of JSON input`. All resolved
+  the current v2 prompt (`wmkf_ai_maxtokens=8000`); the first two required
+  failed audit rows are `f5aa3712-4789-f111-ab0f-6045bd018a07` and
+  `04805a39-4789-f111-ab0f-6045bd018deb`. The 2026-07-27 bounded follow-up
+  created failed run `be61f383-f289-f111-ab0f-70a8a59cded0`
+  (`2026-27-07-1355`) with `claude-sonnet-5`, prompt version 2,
+  `wmkf_ai_runsource=682090003` (Vercel Interactive), both request and prompt
+  lookups, and a redacted 2,825-character `reviews_digest` override. The API
+  returned HTTP 500; the request synthesis memo remained byte-for-byte at its
+  pre-smoke 1,709-character value and prior modified timestamp. The synthetic
+  review was fully restored while this append-only audit row intentionally
+  remained. The release gate remains red pending synthesis resolution or the
   documented prompt-only rollback.
 - Production prompt writes occur through controlled admin publication or seed
   operations; ordinary prompt execution remains read-only on this entity.

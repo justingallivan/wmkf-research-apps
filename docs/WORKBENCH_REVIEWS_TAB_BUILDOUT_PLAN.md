@@ -3,7 +3,7 @@ title: "Workbench Reviews Tab — Consumption Build-Out Plan"
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Reviews tab deployed; staged production verified deterministic consumers, but AI synthesis failed twice and remains a red gate."
+summary: "Reviews tab deployed; production verified deterministic consumers and staff entry, but three controlled current-v2 synthesis runs failed."
 canonical: false
 cataloged: 2026-07-03
 last_verified: 2026-07-27
@@ -35,16 +35,17 @@ exactly-one-current verified), then advanced through the audited admin route to
 current backward-compatible v2 on 2026-07-26. Same D26
 verification boundary was exercised on 2026-07-26 with controlled Request
 #1002788. Submitted DTO hydration, comparison, DOCX/PDF, and courtesy-copy
-consumers passed. Two real current-v2 synthesis calls failed before writeback
-with incomplete JSON and created failed append-only AI runs; the prior request
-memo remained unchanged. Phase 4 therefore remains a red pre-exposure gate.
+consumers passed. A third controlled current-v2 synthesis call on 2026-07-27
+again failed before writeback with incomplete JSON and created a failed
+append-only AI run; the prior request memo remained unchanged across all three
+attempts. Phase 4 therefore remains a red pre-exposure gate.
 
 **Verification boundary update (S376):** no genuine external reviewer has used
 the form, but the owner-authorized staged production submission proved the
 populated Compare/matrix and DOCX/PDF/courtesy outputs against canonical answer
-rows. The smoke data was atomically cleaned up. AI synthesis is the unresolved
-runtime boundary; staff-writer success paths and the post-republish final smoke
-also remain.
+rows. The smoke data was atomically cleaned up. The 2026-07-27 follow-up also
+proved the staff Manual Review Entry producer and exact restoration path. AI
+synthesis is the unresolved runtime boundary; a post-fix final smoke remains.
 
 ## Context
 
@@ -250,13 +251,22 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   `synthesis` param → `synthesisSection` on the composed report, additive in
   both the DOCX and PDF renderers; `ExportMenu` passes
   `proposal.reviewSynthesis` through.
-- **Production execution result (2026-07-26):** Request #1002788 produced the
-  exact categorical digest input, but two current-v2/8000-max-token Executor
-  runs failed parsing incomplete JSON (`Unexpected end of JSON input`), with
-  failed audit ids `f5aa3712-4789-f111-ab0f-6045bd018a07` and
-  `04805a39-4789-f111-ab0f-6045bd018deb`. Neither attempt changed
-  `wmkf_reviewsynthesisjson`. Resolve or execute the multiselect plan's
-  prompt-only rollback before exposure.
+- **Production execution results (2026-07-26 and 2026-07-27):** Request
+  #1002788 produced the exact categorical digest input, but three controlled
+  current-v2/8000-max-token Executor runs failed parsing incomplete JSON
+  (`Unexpected end of JSON input`). The first two failed audit ids are
+  `f5aa3712-4789-f111-ab0f-6045bd018a07` and
+  `04805a39-4789-f111-ab0f-6045bd018deb`. The 2026-07-27 bounded follow-up
+  failed as HTTP 500 with audit id
+  `be61f383-f289-f111-ab0f-70a8a59cded0`, concrete model
+  `claude-sonnet-5`, prompt v2, source `Vercel Interactive`, and redacted
+  `reviews_digest`. No attempt changed `wmkf_reviewsynthesisjson`; the latest
+  run preserved the exact 1,709-character baseline memo and its prior modified
+  timestamp. Its 11 synthetic answers and four staged parent fields were fully
+  restored, with no draft or unrelated email/material/reminder/thank-you
+  change. Resolve the structured-output reliability defect (or execute and
+  verify the documented prompt-only rollback) before exposure or another
+  production regeneration.
 
 ## Verification per phase
 

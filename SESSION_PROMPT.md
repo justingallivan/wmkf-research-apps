@@ -1,6 +1,49 @@
-# Session 378 Prompt: Production synthesis smoke and audited follow-through
+# Session 379 Prompt: Review-synthesis reliability and lifecycle closure
 
-## Session 377 Summary
+## Session 378 Summary
+
+Session 378 executed the owner-authorized production review-synthesis smoke on
+Request `1002788`, stopped after the first regeneration failure, restored the
+reversible synthetic review, and reconciled the changed durable facts.
+
+### What Was Completed
+
+1. **Production smoke executed as a bounded failure**
+   - A controlled review was entered through the signed-in staff Manual Review
+     Entry path, creating exactly 11 answer rows and changing only receipt,
+     status, affiliation, and staff-upload fields.
+   - The first and only Regenerate attempt returned HTTP 500.
+   - Vercel and Dataverse recorded
+     `Claude output not valid JSON: Unexpected end of JSON input`.
+   - Failed AI run `be61f383-f289-f111-ab0f-70a8a59cded0`
+     (`2026-27-07-1355`) used `claude-sonnet-5`,
+     `review-synthesis.generate` v2, and Vercel Interactive source; its review
+     input override is redacted.
+
+2. **No partial synthesis write**
+   - `wmkf_reviewsynthesisjson` remained exactly 1,709 characters with SHA-256
+     `a91f05cc0a20cad72341db9d7fc5fe808ed3b28610a35dfdaca82d69beebbcba`.
+   - The request `modifiedOn` remained `2026-07-24T18:43:25Z`.
+   - This is the third controlled current-v2 incomplete-JSON failure; it is not
+     evidence that the successful v1 memo is invalid.
+
+3. **Synthetic state fully restored**
+   - Deleted exactly the 11 staged answer IDs.
+   - Restored the four suggestion fields to their exact baseline.
+   - Verified zero answers, no draft, unchanged target non-staging fields,
+     unchanged sibling fields, and unchanged email/material/reminder/thank-you
+     markers.
+   - The append-only failed AI audit row intentionally remains.
+   - A signed-in production reload again showed zero submitted and two
+     outstanding reviews.
+
+4. **Queue and durable documentation reconciled**
+   - The production-smoke item closed through its documented bounded-diagnosis
+     alternative.
+   - The next task is synthesis structured-output reliability and the approved
+     lifecycle contract—not another blind regeneration.
+
+## Prior Session 377 Summary
 
 Session 377 completed a repository-wide material-claim audit against current
 source, tests, migrations, configuration, and dated probe evidence. It repaired
@@ -79,16 +122,17 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
 
 ### Verified Open
 
-1. **FIRST: run the deliberate production review-synthesis smoke on Request
-   `1002788`.**
+1. **FIRST: diagnose and fix review-synthesis structured-output reliability.**
    Evidence: `docs/CURRENT_WORK_QUEUE.md`,
    `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`, and
    `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
-   Use the staff-triggered Generate/Regenerate action. Verify complete
-   schema-valid output, `wmkf_reviewsynthesisjson` persistence, reload
-   visibility, deliberate overwrite, useful logs, and absence of unrelated
-   reviewer/email/materials writes. If it fails, stop at a bounded diagnosis;
-   do not add automatic triggering.
+   Three controlled current-v2 production calls have now failed before
+   writeback with truncated/incomplete JSON. Trace the model response and parser
+   contract, decide whether the smallest reliable fix is prompt/output settings,
+   structured generation, bounded retry/repair, or a combination, and add
+   malformed/truncated-output plus write-on-success-only tests. Do not run
+   another blind production regeneration before the change is reviewed and
+   tested.
 
 2. **Resolve or explicitly defer the P1 auth-status policy divergence.**
    Evidence: `pages/api/auth/status.js`, `lib/utils/auth-policy.js`, and the
@@ -148,8 +192,9 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
 
 ### Parked
 
-1. **Automatic synthesis triggering until the production synthesis red gate is
-   closed and the approved readiness state machine is implemented and tested.**
+1. **Automatic synthesis triggering and another production regeneration until
+   the synthesis reliability defect is fixed, reviewed, and tested and the
+   approved readiness state machine is implemented.**
 
 2. **Implementation of the four placeholder tabs until the design/calendar
    gate is complete.**

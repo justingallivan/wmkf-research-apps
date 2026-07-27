@@ -1,6 +1,6 @@
 ---
 name: project-review-form-checkbox-questions
-description: Current release boundary for the reviewer-form multiselect change: compatible code/schema/questions are live, the primary portal smoke passed, synthesis remains red, and reviewer exposure is held.
+description: Multiselect release boundary: code/config and staff entry are live; synthesis failed three current-v2 runs; exposure is held.
 metadata:
   type: project
   status: active
@@ -47,14 +47,14 @@ back before deployment. The audited admin route published backward-compatible
 - retained `affiliation` row identity preserved; and
 - real rollback row IDs/ETags captured in the unexecuted rollback manifest.
 
-[VERIFIED] Request `1002788` portal smoke passed context,
-sanitized draft reload, atomic submit, canonical multiselect storage, Workbench
-DTO/matrix, DOCX/PDF/courtesy consumers, finality, and atomic cleanup without
-email. It remained red because two current-v2 synthesis attempts failed on
-incomplete JSON before writeback; the original synthesis and all email markers
-were preserved.
+[VERIFIED] Request `1002788` passed the portal, canonical storage,
+Workbench/export/courtesy consumers, finality, and cleanup without email.
+Three current-v2 synthesis runs failed on incomplete JSON before writeback.
+The 2026-07-27 follow-up proved Manual Review Entry and exact restoration:
+memo hash/timestamp and outreach markers stayed unchanged; zero answers/draft
+remained. Failed run `be61f383-f289-f111-ab0f-70a8a59cded0` is append-only.
 
-[PLANNED / HELD] Fix synthesis, prove staff write, rehearse rollback/smoke, then
+[PLANNED / HELD] Fix synthesis, rehearse rollback, run a post-fix smoke, then
 decide exposure. [OWNER-CONFIRMED 2026-07-27] Automatic readiness covers
 selected, non-excluded invited/accepted rows and requires ≥1 receipt. Receipt
 resolves with content; decline/no-response/withdrawn-sufficient/withdrew/
@@ -81,13 +81,11 @@ zero-gated; staff keeps the explicit ≥1-receipt override.
 
 ## Fixture and cleanup boundary
 
-[VERIFIED] The EICAR thank-you marker was traced to the April 30 synthetic
-validation, not genuine reviewer correspondence. Exact owner-approved cleanup
-with `deleteContact:false` removed both test suggestions, three sentinel
-answers, the sole draft, and `eicar-test-bytes.pdf`; alerts `361`/`362` completed
-without warnings. Both contacts and the separately preserved Tim Newhouse/St.
-Jude PDF remain. The owner later classified that PDF as a test artifact, but no
-new deletion authority exists. Do not carry deletion forward.
+[VERIFIED] The EICAR thank-you marker came from the April 30 synthetic
+validation. Owner-approved `deleteContact:false` cleanup removed both test
+suggestions, three sentinel answers, the sole draft, and `eicar-test-bytes.pdf`;
+alerts `361`/`362` were clean. Contacts and the separately preserved Tim
+Newhouse/St. Jude test PDF remain; no new deletion authority exists.
 
 ## Evidence index
 
@@ -97,6 +95,5 @@ Under `outputs/review-form-multiselect/`: `question-publication-evidence-2026-07
 `thankyou-provenance-2026-07-26.json`, and
 `fixture-cleanup-evidence-2026-07-26.json`.
 
-Historical pre-implementation type census, the complete 23-PATCH rollback
-contract, and all release sequencing rationale remain in the frozen plan and
-evidence artifacts. Do not expand this routed memory back into a build diary.
+Historical census, the 23-PATCH rollback contract, and sequencing rationale
+remain in the frozen plan. Do not expand this routed memory into a build diary.

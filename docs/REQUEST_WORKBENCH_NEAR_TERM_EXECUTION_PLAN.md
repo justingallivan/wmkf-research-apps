@@ -39,33 +39,42 @@ provides:
 
 Until then, “Week 1/2/3” are relative execution windows, not delivery promises.
 
-## Immediate next task — parked at this session boundary
+## Production review-synthesis smoke — completed as a bounded failure
 
-### Production review-synthesis smoke
+On 2026-07-27, the owner-authorized staff-triggered production smoke ran against
+Request `1002788`. A reversible synthetic review was entered through the normal
+staff Manual Review Entry path and verified before regeneration.
 
-Use Request `1002788` and a deliberate staff-triggered Generate/Regenerate action.
-This is an authorized test and must not be interpreted as authorization for an automatic
-one-review trigger.
+The first and only regeneration attempt failed cleanly:
 
-Pass criteria:
+- `POST /api/review-manager/synthesize-reviews` returned HTTP 500;
+- Vercel and Dataverse recorded
+  `Claude output not valid JSON: Unexpected end of JSON input`;
+- failed AI run `be61f383-f289-f111-ab0f-70a8a59cded0`
+  (`2026-27-07-1355`) resolved `review-synthesis.generate` v2
+  (`7423049a-3f89-f111-ab0f-7ced8d3d15a6`) with
+  `claude-sonnet-5`, source `Vercel Interactive`, and a redacted
+  `reviews_digest` override;
+- the request memo was never partially written: it remained 1,709 characters,
+  SHA-256
+  `a91f05cc0a20cad72341db9d7fc5fe808ed3b28610a35dfdaca82d69beebbcba`,
+  with `modifiedOn=2026-07-24T18:43:25Z`; and
+- the synthetic review was fully restored: zero staged answers, no draft, the
+  four staged suggestion fields back to baseline, and all other target/sibling
+  fields—including email, reminder, materials, and thank-you markers—unchanged.
+  The append-only failed AI audit row intentionally remains.
 
-1. the endpoint returns a complete object matching the synthesis schema;
-2. `wmkf_reviewsynthesisjson` is written on the intended request;
-3. a reload renders the persisted synthesis card;
-4. regenerate deliberately overwrites the same request memo without creating a second
-   durable artifact;
-5. logs identify the model, prompt version, request, and failure/success state without
-   exposing review content;
-6. no reviewer email, materials dispatch, review-answer mutation, or unrelated Dataverse
-   write occurs.
-
-If it fails, stop at diagnosis. Do not proceed to automatic triggering.
+This satisfies the queue's bounded-diagnosis completion alternative, not the
+success criteria. The next task is reliability diagnosis/fix. Do not attempt a
+second blind regeneration, expose the multiselect form, or implement automatic
+triggering until that gate is closed.
 
 ## Week 1 — close the current Reviews contract
 
 ### 1. Make synthesis generation reliable
 
-- Reproduce and diagnose the incomplete-JSON failure.
+- Use the three controlled current-v2 failures, including the 2026-07-27 run
+  above, to diagnose the incomplete/truncated-JSON failure.
 - Decide whether the fix belongs in the prompt, model/output settings, structured parsing,
   bounded retry/repair, or a combination.
 - Preserve the shared Executor contract and audit trail.
