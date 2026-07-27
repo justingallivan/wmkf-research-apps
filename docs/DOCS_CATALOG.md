@@ -24,7 +24,7 @@ related:
 |---|---|---|---|---|---|
 | [AGENT_COLLABORATION_PLAN.md](AGENT_COLLABORATION_PLAN.md) | plan | active |  | Active operating contract for coordinating Justin, Claude, and Codex across branches, worktrees, reviews, and handoffs. | 2026-07-02 |
 | [AGENT_HARNESS_STYLE_GUIDE.md](AGENT_HARNESS_STYLE_GUIDE.md) | spec | active |  | This guide keeps agent-facing instructions precise, confident, and low-noise. | 2026-07-02 |
-| [AGENT_INSTRUCTION_AUDIT_S322.md](AGENT_INSTRUCTION_AUDIT_S322.md) | audit | active |  | Audit of CLAUDE.md, AGENTS.md, and .claude/rules/ for size, duplication, unread content, broken imports, and lint restatement. Findings + outcomes. |  |
+| [AGENT_INSTRUCTION_AUDIT_S322.md](AGENT_INSTRUCTION_AUDIT_S322.md) | audit | historical |  | Historical S322 instruction audit; the approved consolidation shipped and the rejected path-glob change remains closed. | 2026-07-26 |
 | [AGENT_SELF_VERIFICATION_ENFORCEMENT.md](AGENT_SELF_VERIFICATION_ENFORCEMENT.md) | spec | active |  | Narrow blockers and fingerprinted review receipts enforce evidence where advisory reminders repeatedly failed. | 2026-07-18 |
 | [CLAUDE_COVERAGE_LESSONS.md](CLAUDE_COVERAGE_LESSONS.md) | plan | historical |  | Created: 2026-05-07 (S137) after a Codex stress-test cycle where each round caught a slightly different syntactic pattern the previous round... | 2026-07-02 |
 | [CLAUDE_INSTRUCTION_AUTHORITY.md](CLAUDE_INSTRUCTION_AUTHORITY.md) | source-of-truth | canonical | yes | Status: Active Last verified: 2026-06-05 Purpose: Identify the authoritative definition and enforcement mirror for must-follow agent instructions. | 2026-07-02 |
@@ -32,7 +32,7 @@ related:
 | [CLAUDE_REMEDIATION_PLAN.md](CLAUDE_REMEDIATION_PLAN.md) | source-of-truth | canonical | yes | Audience: future-Claude (and current-Claude when this drifts). Justin can read it, but it is written for the agent to consult before data-layer,... | 2026-07-02 |
 | [CLAUDE_SKILL_REMEDIATION_PLAN.md](CLAUDE_SKILL_REMEDIATION_PLAN.md) | plan | historical |  | Historical rationale for whole-flow skill remediation; the core contract-reconcile deliverable shipped. | 2026-07-02 |
 | [CODEX_REVIEW_PROMPT_hook-self-review.md](CODEX_REVIEW_PROMPT_hook-self-review.md) | draft | draft |  | ✅ COMPLETED (S259, 2026-06-15). This review was run, relayed verbatim, and acted on. | 2026-07-02 |
-| [HARNESS_INSTRUCTION_AUDIT_S322.md](HARNESS_INSTRUCTION_AUDIT_S322.md) | audit | active |  | Classification of all 16 hooks, 6 skills, and settings wiring as still-needed / redundant / harmful, with a ranked removal list and risk notes. No deletions. |  |
+| [HARNESS_INSTRUCTION_AUDIT_S322.md](HARNESS_INSTRUCTION_AUDIT_S322.md) | audit | historical |  | Historical S322 harness audit; approved hook and skill changes shipped, while the remaining removal was explicitly rejected. | 2026-07-26 |
 
 ## architecture
 
@@ -65,7 +65,7 @@ related:
 | [REQUEST_WORKBENCH_SCOPING.md](REQUEST_WORKBENCH_SCOPING.md) | plan | historical |  | Historical 2026-05 scoping record for the per-PD Workbench navigation model. | 2026-07-02 |
 | [REVIEW_FORM_MULTISELECT_BUILD_PLAN.md](REVIEW_FORM_MULTISELECT_BUILD_PLAN.md) | plan | active |  | Add multiselect end to end and publish the owner's reworked review question set, with rollback rehearsal before reviewer exposure. | 2026-07-25 |
 | [ROUTE_SERVICE_CONSOLIDATION_PLAN.md](ROUTE_SERVICE_CONSOLIDATION_PLAN.md) | plan | active | yes | COMPLETE (S331): route-to-service boundary census fell from 49 to 0; check:route-service-boundary is permanent law. | 2026-07-04 |
-| [STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md](STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md) | plan | active |  | Today [VERIFIED via source, S303] lib/external/review-form-schema.js exports a hardcoded reviewFormSchema.fields array, statically imported by 8... | 2026-07-02 |
+| [STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md](STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md) | plan | historical |  | Completed S305 implementation record for the staff-editable Dataverse review-question set and answer-snapshot rating migration. | 2026-07-02 |
 | [STRATEGY.md](STRATEGY.md) | plan | active |  | Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md. | 2026-07-02 |
 | [SYSTEM_MODEL.md](SYSTEM_MODEL.md) | source-of-truth | canonical | yes | The model has one organizing principle, two orthogonal axes, and a small set of layers. Get those and the rest follows. | 2026-07-02 |
 | [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md) | spec | historical |  | _Concept Evaluator was retired 2026-04-25 (Session 110) — page/API/prompt archived to /_archived. Removed from this suite list; retained only as... | 2026-07-02 |
@@ -103,7 +103,7 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [CANONICAL_COUNTS.md](CANONICAL_COUNTS.md) | source-of-truth | canonical | yes | Generated source of truth for code-derived scalar counts used by documentation gates. | 2026-07-02 |
-| [CI_GATES_REFERENCE.md](CI_GATES_REFERENCE.md) | runbook | canonical | yes | Mechanics, exemption rules, and operating contracts for the project's CI gates. CLAUDE.md keeps the rule (\"red gates are P0\") and the gate-name... | 2026-07-02 |
+| [CI_GATES_REFERENCE.md](CI_GATES_REFERENCE.md) | runbook | canonical | yes | Mechanics, enforcement locations, exemption rules, and operating contracts for repository checks and their self-tests. | 2026-07-02 |
 | [DOCS_STALENESS_AUDIT_2026-06-28.md](DOCS_STALENESS_AUDIT_2026-06-28.md) | audit | historical |  | - For ARCHIVE items with inbound references, prefer adding or tightening a top-of-file Status: historical banner in place unless Justin also wants... | 2026-07-02 |
 | [HOME_MAC_MEMORY_SYNC_FIX.md](HOME_MAC_MEMORY_SYNC_FIX.md) | history | historical |  | Written 2026-05-14. One-time procedure to move the project into iCloud Drive so it syncs automatically between Macs, including .env.local and... | 2026-07-02 |
 | [PARALLEL_AGENT_WORKTREE_RUNBOOK.md](PARALLEL_AGENT_WORKTREE_RUNBOOK.md) | runbook | active |  | - Yellow: same feature, different layers → implementer/reviewer split. | 2026-07-02 |
@@ -209,8 +209,8 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [AI_DATA_FLOW_MATRIX.md](AI_DATA_FLOW_MATRIX.md) | audit | active |  | It complements docs/API_ROUTE_SECURITY_MATRIX.md: that document answers \"who can call this route,\" while this one answers \"what the code sends or... | 2026-07-02 |
-| [AI_PROMPTS_DETAILED.md](AI_PROMPTS_DETAILED.md) | source-of-truth | canonical | yes | This document contains the actual text of every prompt we send to Claude, with code removed and dynamic placeholders described in plain English.... | 2026-07-02 |
-| [AI_PROMPTS_OVERVIEW.md](AI_PROMPTS_OVERVIEW.md) | spec | active |  | Every app sends Claude specific instructions — a \"prompt\" — that tells it exactly what to produce, in what format, and under what rules. This... | 2026-07-02 |
+| [AI_PROMPTS_DETAILED.md](AI_PROMPTS_DETAILED.md) | spec | historical |  | Historical prompt-text snapshot; incomplete for the current app registry and not a source of live prompt truth. | 2026-07-02 |
+| [AI_PROMPTS_OVERVIEW.md](AI_PROMPTS_OVERVIEW.md) | spec | historical |  | Historical plain-language prompt overview; incomplete for the current app registry and not a source of prompt truth. | 2026-07-02 |
 | [EXECUTOR_CONTRACT.md](EXECUTOR_CONTRACT.md) | source-of-truth | canonical | yes | The Executor is the function invoker. The prompt row is the function definition. Chains and triggers are the Flow's job, not the Executor's. | 2026-07-02 |
 | [EXECUTOR_EXTENSIONS_PLAN.md](EXECUTOR_EXTENSIONS_PLAN.md) | plan | active |  | Status: Design sketch (Session 110, 2026-04-25). Not yet implemented. | 2026-07-02 |
 | [MODEL_CHANGE_STRATEGY.md](MODEL_CHANGE_STRATEGY.md) | plan | active |  | Active policy: model registry, validation, request shaping, retry, canary, and replay shipped; future model changes still use this runbook. | 2026-07-02 |
@@ -234,7 +234,7 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [DEAD_CODE_DELETION_MANIFEST.md](DEAD_CODE_DELETION_MANIFEST.md) | audit | active |  | SAFE dead-code bucket applied 2026-07-03; owner-confirmation deletion candidates remain parked for explicit approval. |  |
-| [DOCS_DRIFT_AUDIT_S322.md](DOCS_DRIFT_AUDIT_S322.md) | audit | active |  | Fresh code-first comparison of README, CLAUDE.md, and docs/ claims against actual behavior. Drift table with evidence plus a proposed docs patch. No edits. |  |
+| [DOCS_DRIFT_AUDIT_S322.md](DOCS_DRIFT_AUDIT_S322.md) | audit | historical |  | Historical S322 docs-vs-code audit; approved fixes were applied in 2026-07 and current truth lives in source and canonical docs. | 2026-07-26 |
 
 ## review-manager
 

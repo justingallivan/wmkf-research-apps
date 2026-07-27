@@ -213,28 +213,40 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   instance agree with a stale client `setVersion` and commit rows against a retired
   question set. Reads stay cached deliberately — a stale render self-corrects when the
   write boundary returns `set_changed`.
-- **Prod accept triggers a live automation chain — keep automated tests mocked/fenced.**
-  A reviewer accept CREATEs a honorarium `akoya_request`, which fires AkoyaGo plugins
-  + classic workflows + a live Bill.com payment flow + a contact→Business-Central sync.
-  **MOCK the data layer** for automated tests; a real-prod accept is a human-supervised
-  one-off gated on the Power-Automate owner (Connor) confirming the honorarium/payment
-  flows won't act. Read-only probe: `scripts/probe-dataverse-automation.js`. Full
-  detail: memory `project-reviewer-accept-prod-automation`.
-- **Accept now writes reviewer self-reported identity onto the linked CRM contact (2026-06-27).**
-  On accept, `respond.js` syncs corrected first/last/title/nickname → `contacts.firstname/lastname/
-  jobtitle/nickname` (OVERWRITE, reviewer-self-report-wins, silent; `lib/services/sync-reviewer-name-title-to-contact.js`,
-  fail-closed `trusted:true`), and raises staff alerts (NO write) when the accept email differs from
-  `contacts.emailaddress1` (`reviewer_contact_email_mismatch`; `lib/services/alert-reviewer-email-mismatch.js`)
-  or the reported affiliation differs from the contact's institution (`reviewer_contact_affiliation_mismatch`;
+- **Prod accept can trigger external automation — keep automated tests mocked/fenced.**
+  A reviewer accept may create an honorarium `akoya_request`, which can activate
+  AkoyaGo plugins/classic workflows and contact→Business-Central automation.
+  The in-repo BILL onboarding path is currently deferred/configuration-gated;
+  current Power Automate/plugin behavior is external state and must be re-probed
+  rather than described as a live BILL payment flow. **MOCK the data layer** for
+  automated tests; any real-prod accept is a human-supervised one-off gated on
+  the automation owner confirming what will act. Read-only probe:
+  `scripts/probe-dataverse-automation.js`. Full detail: memory
+  `project-reviewer-accept-prod-automation`.
+- **Accept durably queues reviewer identity/contact follow-up (2026-06-27; drain flow current).**
+  The response service validates and commits the acceptance event, then queues
+  follow-up work. `reviewer-acceptance-drain.js` performs the board-identity
+  capture and syncs corrected first/last/title/nickname →
+  `contacts.firstname/lastname/jobtitle/nickname` (OVERWRITE,
+  reviewer-self-report-wins, silent;
+  `lib/services/sync-reviewer-name-title-to-contact.js`, fail-closed
+  `trusted:true`). The drain also raises staff alerts (NO write) when the accept
+  email differs from `contacts.emailaddress1`
+  (`reviewer_contact_email_mismatch`;
+  `lib/services/alert-reviewer-email-mismatch.js`) or the reported affiliation
+  differs from the contact's institution
+  (`reviewer_contact_affiliation_mismatch`;
   `lib/services/alert-reviewer-affiliation-mismatch.js`).
   These contact writes feed the same Business-Central sync as above — mock the data layer in tests.
 - **Board-writeup identity is REQUIRED at accept (S308).** The Stage 2a accept form collects three
   required fields — academic rank, primary department, main institution (`BoardIdentityCard` in
   `Stage2aView`) — sent as a dedicated `boardIdentity` payload object (NOT `contactEdits`, which is
-  engagement-scoped + allowlisted). `respond.js` re-validates them on the fresh-accept (`!isAcceptRepeat`)
-  path: trimmed-non-empty, else 400 `board_identity_required` + `fields`. On success they're captured to
-  the PERSON record (`wmkf_academicrank`/`wmkf_primarydepartment`/`wmkf_maininstitution`) via
-  `lib/services/capture-self-reported-reviewer-identity.js` — non-fatal post-commit (ORCID-twin pattern)
+  engagement-scoped + allowlisted). The response service re-validates them on the
+  fresh-accept (`!isAcceptRepeat`) path: trimmed-non-empty, else 400
+  `board_identity_required` + `fields`. On success the acceptance drain captures
+  them to the PERSON record
+  (`wmkf_academicrank`/`wmkf_primarydepartment`/`wmkf_maininstitution`) via
+  `lib/services/capture-self-reported-reviewer-identity.js` — durable post-commit follow-up
   BUT with no suggestion-row fallback, so a failure fires a `board_identity_capture_failed` admin alert,
   and the workbench edit (`CandidateEditModal`) ships alongside so staff can repair. Prefill seeds
   department/institution from the person's enrichment fields (`wmkf_department`/`wmkf_primaryaffiliation`);
@@ -257,10 +269,10 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   end by design (owner-stated S326). Any staff-UI browser drive/E2E/manual check
   (workbench, admin) must use `https://applications.wmkeck.org`. Four S326
   browser-drive attempts were lost misreading this as a session problem. Detail:
-  `.claude-memory/project-branded-domains.md`. Also S326: zero reviews have ever
-  been submitted through the portal (built ahead of the D26 cycle), so populated
-  review-consumption UI needs a staged submission — the S308 token procedure
-  below is the recipe.
+  `.claude-memory/project-branded-domains.md`. No genuine external reviewer
+  submission has been recorded in the current evidence set. One owner-authorized
+  staged production portal submission passed on 2026-07-26 and was cleaned up, so
+  “zero submissions ever” is false; genuine usage remains a live-state probe.
 - **Smoke-testing the prod accept form (S308 procedure).** To get a working
   magic link for a test reviewer WITHOUT sending an email: hit `POST /api/review-manager/
   regenerate-token { suggestionId }` from an authenticated STAFF session — it mints the

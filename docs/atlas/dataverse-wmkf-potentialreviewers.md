@@ -108,16 +108,32 @@ Methods:
 | ~~Dataverse `wmkf_appresearcher`~~ | **DROPPED S213** — bibliometric snapshots folded onto this entity (see Key fields) |
 | Vendor `akoya_requests.wmkf_potentialreviewer1..5` | Legacy per-proposal slots (not the canonical link — those are in `wmkf_appreviewersuggestion`) |
 
-## "Engaged" semantics + one-shot post-pilot drop (locked S136; cleanup-cron approach replaced)
+## Blocked cleanup proposal
 
-Per the migration plan, this table is treated as **scratch + history** rather than canonical-person. A `wmkf_potentialreviewer` row becomes "engaged" (= history) when ANY of the 8 signals on its linked `wmkf_appreviewersuggestion` are populated (see that page). The earlier cleanup-cron plan was replaced (Codex-reviewed) with a **one-shot post-pilot DELETE script** matching the Wave 1 precedent: drops un-engaged rows where `wmkf_meetingdate < today - 30 days` (the `wmkf_appresearcher` sidecar that this once cascaded onto was dropped S213 — bibliometrics are now columns on this row). No cron exists or is planned. Permanent reviewer identity ultimately lives in `contact` via promotion (`wmkf_contact` lookup).
+The S136 plan treated this entity as scratch/history and proposed a one-shot
+post-pilot delete of “unengaged” people. That proposal is a **stale conflict and
+is blocked pending an owner retention decision**. Current Finder save, identity
+reuse, enrichment, board-writeup, and contact-link flows treat
+`wmkf_potentialreviewers` as the canonical reusable reviewer-person store. The
+caller audit proves the inherited bulk-delete proposal is unsafe to run as
+written; it does not establish a permanent retention policy. No inherited
+cleanup plan may delete rows from this entity without a new caller audit,
+relationship probe, and owner-approved retention policy.
 
 ## Migration disposition (live source of truth for reviewer identity)
 
-Already the live source of truth for reviewer identity. Dataverse `wmkf_potentialreviewers` currently has 4,427 rows, including vendor-historical and post-cutover writes; pre-cutover bulk import from Postgres `researchers` was replaced with an engagement-history approach (don't bulk-migrate). One-shot post-pilot drop (per the section above) is the cleanup vehicle.
+Already the live source of truth for reviewer identity. Dataverse
+`wmkf_potentialreviewers` had 4,427 rows at the 2026-07-26 probe, including
+historical and post-cutover writes. The old engagement-based bulk-delete proposal
+is blocked in its current form; any future retention work requires an owner
+decision and must preserve current person reuse and relationship semantics.
 
 ## Open questions / gotchas
 
 - Dataverse `wmkf_potentialreviewers` currently has 4,427 rows, much larger than the dropped Postgres `researchers` 331-row historical pool. Per the migration plan: don't import researchers in bulk — engagement-history approach replaces the bulk-import pattern.
-- `wmkf_contact` lookup population unknown — should probe how many rows have a non-null contact link before any drop operation runs.
-- The "per-proposal slot vs. per-person canonical" distinction is contextual: the *table* is per-person (email is the dedupe key, `upsertByEmail` is idempotent), but `akoya_request.wmkf_potentialreviewer1..5` lookups treat individual rows as **per-proposal slot fills**. Both framings are correct; the one-shot post-pilot DELETE acts on per-person rows that have no per-proposal engagement (the earlier cleanup-cron design was replaced — see "Engaged semantics" section above).
+- `wmkf_contact` lookup population is a mutable live-state question; re-probe it
+  before contact-promotion or retention work.
+- The table is per-person (email is the dedupe key and `upsertByEmail` is
+  idempotent). Native `akoya_request.wmkf_potentialreviewer1..5` lookups are a
+  separate per-request representation; whether every modern assignment co-writes
+  those slots is currently **UNKNOWN** and must not be assumed.

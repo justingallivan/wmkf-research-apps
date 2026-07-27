@@ -6,6 +6,7 @@ status: canonical
 summary: "*Quick reference for managing environment variables, rotating secrets, and diagnosing auth failures.*."
 canonical: true
 cataloged: 2026-07-02
+last_verified: 2026-07-26
 owner: product-engineering
 related:
   - lib/utils/auth.js
@@ -20,12 +21,15 @@ related:
 
 ## What Expires
 
-Only two credentials expire automatically. Everything else is stable until manually rotated.
+Three configured client secrets have vendor expiration dates. Other tracked
+secrets and API keys are stable until manually rotated unless their provider
+changes that policy.
 
 | Credential | Expires | Where to Check |
 |------------|---------|----------------|
 | `AZURE_AD_CLIENT_SECRET` | Yes — 6mo, 1yr, or 2yr from creation | Azure Portal → App registrations → *Keck Research Tools* → Certificates & secrets |
 | `DYNAMICS_CLIENT_SECRET` | Yes — same schedule | Azure Portal → App registrations → *Dynamics CRM* app → Certificates & secrets |
+| `EXTERNAL_AZURE_AD_CLIENT_SECRET` | Yes — tenant policy/creation schedule | External Entra tenant → App registrations → Certificates & secrets |
 
 **Set a calendar reminder 2 weeks before each expiration date.**
 
@@ -292,7 +296,11 @@ Both stores are private — direct browser fetches against their Blob URLs retur
 
 ## Virus scanning (`VIRUS_SCAN_ENABLED` + `CLOUDMERSIVE_API_KEY`)
 
-App-side malware scanning for user-uploaded files. Today: reviewer uploads (both external-token and staff session paths) via `lib/services/review-upload.js`. Future: intake-portal attach endpoint.
+App-side malware scanning for user-uploaded files. Current guarded paths include
+reviewer uploads (external-token and staff session paths) through
+`lib/services/review-upload.js` and intake draft attachment processing through
+`pages/api/intake/draft/attach.js`. Strict intake validation accepts only an
+attachment whose recorded scan result is `clean`.
 
 **Default off.** Operators opt in by setting `VIRUS_SCAN_ENABLED=true` (and providing `CLOUDMERSIVE_API_KEY`). When on, the contract is fail-closed: a scanner outage or misconfiguration blocks uploads. This is intentional — the opt-in flag means the operator has explicitly accepted the scanner as a gatekeeper; partial degradation would defeat the point.
 
@@ -410,6 +418,7 @@ Canonical list lives in `lib/utils/tracked-secrets.js` — both `pages/api/cron/
 | `irs_verify_secret` | IRS Verify Secret (PowerAutomate shared) | hmac | No expiry. Rotate on PA-flow rebuild or compromise |
 | `bill_webhook_secret` | BILL Webhook Secret (HMAC for /api/webhooks/bill) | hmac | Per-subscription `securityKey` from BILL. Rotate via `POST /v3/subscriptions/{id}/security-key` |
 | `claude_api_key` | Anthropic Claude API Key | vendor | No vendor expiry, but rotate on compromise or staff offboarding |
+| `openalex_api_key` | OpenAlex API Key | vendor | Authenticated request credential; rotate on compromise and update every runtime environment |
 | `cloudmersive_api_key` | Cloudmersive API Key (virus scan; gated by VIRUS_SCAN_ENABLED) | vendor | Pilot uses free tier (800 scans/mo); rotate on compromise |
 | `perplexity_api_key` | Perplexity API Key (VRP sonar claim-verification + reviewer web discovery) | vendor | No vendor expiry, but rotate on compromise or staff offboarding. Live in prod 2026-06-05; one key, two surfaces (set `VRP_ALLOWED_PROVIDERS` to gate VRP exposure). |
 | `blob_read_write_token` | Vercel Blob RW Token (shared store) | blob | Vercel-issued; no expiry; rotate via Vercel dashboard if compromised |

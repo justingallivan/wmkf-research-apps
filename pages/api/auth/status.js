@@ -1,9 +1,9 @@
 /**
  * API Route: /api/auth/status
  *
- * Returns whether authentication is enabled. Used by `RequireAuth` and the
- * sign-in page bootstrap to decide whether to redirect unauthenticated
- * visitors before any session cookie exists.
+ * Returns the client-bootstrap view of whether authentication is configured.
+ * Used by `RequireAuth` and the sign-in page bootstrap to decide whether to
+ * redirect unauthenticated visitors before any session cookie exists.
  *
  * **Intentionally public.** The response shape MUST stay `{ enabled: boolean }`
  * — never grow this endpoint to expose tenant IDs, client IDs, configured
@@ -12,14 +12,16 @@
  * safe to expose pre-auth. If you need richer config on the client, gate it
  * behind a session.
  *
- * Authentication is enabled when ALL of these conditions are met:
+ * This endpoint reports enabled when ALL of these conditions are met:
  * 1. AUTH_REQUIRED=true (kill switch - set to false to disable auth)
  * 2. Azure AD credentials are configured (CLIENT_ID, CLIENT_SECRET, TENANT_ID)
  *
- * Kill Switch Usage:
- * - If locked out, go to Vercel Dashboard → Environment Variables
- * - Set AUTH_REQUIRED=false and redeploy
- * - This disables auth without changing code
+ * IMPORTANT: this predicate is not the server enforcement policy. In any
+ * runtime where NODE_ENV=production (including Vercel Preview and Production),
+ * `isAuthRequired()` fails closed unless EMERGENCY_AUTH_BYPASS=true. Therefore
+ * this endpoint can report `enabled:false` while the server still enforces
+ * authentication. See docs/AUTHENTICATION_SETUP.md. The divergence is a known
+ * P1 and must not be described as a working single-variable kill switch.
  */
 
 export default function handler(req, res) {
@@ -29,7 +31,7 @@ export default function handler(req, res) {
     process.env.AZURE_AD_TENANT_ID
   );
 
-  // Kill switch: AUTH_REQUIRED must be explicitly set to 'true'
+  // Client-bootstrap configuration flag; not the fail-closed server policy.
   const authRequired = process.env.AUTH_REQUIRED === 'true';
 
   const enabled = authRequired && hasCredentials;

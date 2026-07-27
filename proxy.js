@@ -11,7 +11,10 @@
  * Next.js automatically applies the nonce to framework scripts during SSR
  * when it detects 'nonce-{value}' in the CSP header.
  *
- * Respects AUTH_REQUIRED kill switch — when disabled, all requests pass through.
+ * Respects the shared auth policy. `AUTH_REQUIRED=false` bypasses auth only when
+ * `NODE_ENV !== 'production'`; production-mode runtimes (including Vercel
+ * Preview and Production) additionally require
+ * `EMERGENCY_AUTH_BYPASS=true`.
  * NextAuth's own routes (/api/auth/*) are excluded so the login flow works.
  *
  * Uses withAuth from next-auth/middleware (uses jose instead of Node.js crypto).

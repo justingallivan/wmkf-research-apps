@@ -6,6 +6,7 @@ status: canonical
 summary: "The Executor is the function invoker. The prompt row is the function definition. Chains and triggers are the Flow's job, not the Executor's."
 canonical: true
 cataloged: 2026-07-02
+last_verified: 2026-07-26
 owner: product-engineering
 related:
   - lib/services/execute-prompt.js
@@ -72,6 +73,8 @@ The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-onl
 | `overrideVariables` | object | no | Per-invocation variable overrides. Keys must match names declared in `wmkf_ai_promptvariables`. Used for user-session overrides (Vercel) and test harness runs. |
 | `runSource` | enum | yes | One of the `wmkf_ai_runsource` picklist values (e.g., `PowerAutomate Auto`, `Vercel Interactive`, `Vercel User`, `Vercel Test`). Caller supplies. |
 | `forceOverwrite` | bool | no | Default `false`. When `true`, output guards (see *Output guards*) are bypassed and the Executor writes regardless of whether targets are populated. Caller's choice — not a Dynamics-row setting. |
+| `actingUserSystemId` | GUID | no | Dataverse system-user identity used to attribute supported writes. Callers must derive it from authenticated/server context, never request input. |
+| `assertSystemIncludes` | string \| string[] | no | Fail-closed assertion that each required substring survived composition in the actual system prompt. Used when a mutable prompt row must retain a security-critical block. |
 
 **Deferred (Phase 1+):** `overridePromptBody: { system?: string, body?: string }` — body-level override for per-session prompt editing (PROMPT_STORAGE_DESIGN §17). Not needed for May 1.
 
@@ -80,21 +83,28 @@ The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-onl
 | Name | Type | Purpose |
 |---|---|---|
 | `parsed` | object \| null | Output object matching `wmkf_ai_promptoutputschema`. `null` when `blocked = true`. Downstream chain steps consume this. |
-| `runId` | GUID | `wmkf_ai_run.wmkf_ai_runid` for the logged Execution. |
+| `runId` | GUID \| null | `wmkf_ai_run.wmkf_ai_runid` when audit-row creation succeeds. A thrown failure can carry `runId = null` if writing the failure row also fails. |
 | `cacheHit` | bool | Derived from Claude response's `usage.cache_read_input_tokens > 0`. For observability. |
 | `blocked` | bool | `true` when at least one guarded target was already populated and `forceOverwrite` was false. Claude was not called; no targets written. |
 | `conflicts` | array | When `blocked`, one entry per guarded target that triggered the block: `{ output, table, field, existingContent, existingLength, modifiedOn }`. Caller (typically Vercel) uses this to render a confirm-overwrite UI. |
 | `writeResults` | object \| null | When not blocked: `{ allOk, results: [{ output, ok, field?, jsonPath?, reason?, error? }] }`. `null` when blocked. |
-| `usage` | object \| null | Verbatim Anthropic `usage` object (`input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`). `null` when blocked. |
-| `meta` | object \| null | `{ promptName, promptVersion, promptId, modelUsed, systemChars, bodyChars }`. `null` when blocked. Useful for observability/UI display. |
+| `usage` | object \| absent | Verbatim Anthropic `usage` object (`input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`). The key is omitted from the blocked return. |
+| `meta` | object \| absent | `{ promptName, promptVersion, promptId, modelUsed, systemChars, bodyChars, aiPayloadBoundaries, rawOutputRetention }`. The key is omitted from the blocked return. Useful for observability/UI display. |
 
 ### Errors
 
-The Vercel Executor throws on: prompt not found, variable resolution failure, Claude API error,
-output parse failure, or target write failure. A future PA implementation must represent the same
-failures while still writing the required failed run row.
+The Vercel Executor throws on prompt-not-found, variable-resolution, composed
+system assertion, Claude API, output-parse/validation, and other contract-level
+failures. Individual target persistence failures are returned in
+`writeResults` with `allOk=false`; the run is logged as `Needs Review` and the
+parsed result is still returned so the caller can handle partial persistence
+explicitly.
 
-**Invariant:** a `wmkf_ai_run` row is **always** written — even on failure — with `wmkf_ai_status = Failed` and `wmkf_ai_notes = <error summary>`. This preserves audit completeness.
+**Audit attempt invariant:** the Executor attempts a `wmkf_ai_run` row for
+blocked, completed/needs-review, and thrown-failure outcomes. Audit persistence
+can itself fail; that secondary failure is logged server-side and a thrown error
+then carries `runId = null`. Do not describe the audit trail as mathematically
+complete when Dataverse logging is unavailable.
 
 ---
 
@@ -109,9 +119,9 @@ failures while still writing the required failed run row.
 | 5 | Compose Claude payload | Compose action: system + user blocks; `cache_control: {type:"ephemeral"}` at declared prefix boundary | `buildClaudeRequest(prompt, variables)` |
 | 6 | Call Claude | HTTP action → Anthropic API | `callClaude()` → `LLMClient.complete()` (2026-06-11; canonical transport — `safeFetch` SSRF allowlist, abortable timeout, 429/529 retry, API-key redaction). The `cache_control` system array passes through `LLMClient` verbatim; its normalized response is re-shaped back to the raw Anthropic shape (`content[0].text`, snake_case `usage`, `model`) for steps 7 + 9. No `appName` is passed — avoids double-counting `api_usage_log` against the driver route's own `logUsage`. |
 | 7 | Parse output | Parse JSON on Claude response `content[0].text` using `wmkf_ai_promptoutputschema.jsonSchema` (or treat as raw text when `parseMode = "raw"`) | Same |
-| 8 | Persist outputs | Coalesce all `akoya_request` outputs into **one** PATCH with `If-Match: <etag>` from step 4. Direct field writes (no `jsonPath`) merge into the payload as `{ field: value }`. `jsonPath` outputs grouped by field: GET the current memo, apply each `$.path` write in declaration order (later writes win on key collisions), serialize back, add the merged JSON to the same payload. Two direct outputs writing the same field (no `jsonPath`) throws at preflight as a schema error. Success or failure is uniform across all contributors: a 412 marks every eligible output as `concurrent_edit`. | Same coalesced PATCH |
-| 9 | Log Execution | Create `wmkf_ai_run`: Lookup to prompt row, `wmkf_ai_promptversion`, `wmkf_ai_runsource`, `wmkf_ai_status`, `wmkf_ai_model`, `wmkf_ai_rawoutput` according to `rawOutputRetention`, token/cache counts in `wmkf_ai_notes`, `wmkf_ai_request` Lookup | Same |
-| 10 | Return | Return `{ parsed, runId, cacheHit, blocked: false }` | `return { parsed, runId, cacheHit, blocked: false }` |
+| 8 | Persist outputs | Coalesce all `akoya_request` outputs into **one** PATCH with `If-Match: <etag>` from step 4. Direct field writes (no `jsonPath`) merge into the payload as `{ field: value }`. `jsonPath` outputs grouped by field: GET the current memo, apply each `$.path` write in declaration order (later writes win on key collisions), serialize back, add the merged JSON to the same payload. Two direct outputs writing the same field (no `jsonPath`) throws at preflight as a schema error. Success or failure is uniform across all contributors: a 412 marks every eligible output as `concurrent_edit`. Persistence errors become structured `writeResults`, not necessarily thrown errors. | Same coalesced PATCH and structured result |
+| 9 | Log Execution | Attempt to create `wmkf_ai_run`: Lookup to prompt row, `wmkf_ai_promptversion`, `wmkf_ai_runsource`, `wmkf_ai_status`, `wmkf_ai_model`, `wmkf_ai_rawoutput` according to `rawOutputRetention`, token/cache counts in `wmkf_ai_notes`, `wmkf_ai_request` Lookup | Same; logging failure is fail-visible and can leave `runId=null` on a thrown path |
+| 10 | Return | Return parsed output, audit id, cache/guard state, structured write results, usage, and metadata | `return { parsed, runId, cacheHit, blocked, conflicts, writeResults, usage, meta }` |
 
 ---
 
@@ -297,7 +307,10 @@ invocation to reuse the document prefix. `context_block` remains deferred.
 
 ## Logging contract
 
-Every Execution writes one `wmkf_ai_run` row with, at minimum:
+Every execution path attempts one `wmkf_ai_run` row with, at minimum, the
+following fields. A Dataverse failure can prevent that row from being created;
+callers and operators must treat `runId=null` as an audit failure, not as proof
+that no execution occurred.
 
 | Field | Value |
 |---|---|

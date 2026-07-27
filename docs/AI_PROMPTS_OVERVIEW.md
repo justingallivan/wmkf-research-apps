@@ -2,26 +2,38 @@
 title: How We Use AI Across Our Apps
 domain: prompt-executor
 kind: spec
-status: active
-summary: "Every app sends Claude specific instructions — a \"prompt\" — that tells it exactly what to produce, in what format, and under what rules. This..."
+status: historical
+summary: "Historical plain-language prompt overview; incomplete for the current app registry and not a source of prompt truth."
 canonical: false
 cataloged: 2026-07-02
+last_verified: 2026-07-26
 owner: product-engineering
 ---
 
 # How We Use AI Across Our Apps
 
-Every app sends Claude specific instructions — a "prompt" — that tells it exactly what to produce, in what format, and under what rules. This document describes what each app asks the AI to do in plain language.
+> **STALE INVENTORY — do not use as a current prompt or app catalogue.** The
+> current system mixes Dataverse prompt rows, bundled prompts, route/service-local
+> instructions, deterministic tools, and multiple providers. Several PDF-upload
+> apps below were sunset in S344, while current apps and Executor consumers are
+> omitted. Use source, live prompt rows, `shared/config/appRegistry.js`, and
+> `docs/EXECUTOR_CONTRACT.md` for current behavior.
 
-## Shared Rules Across All Apps
+AI-backed surfaces send task-specific instructions to one or more providers.
+This page preserves a plain-language historical overview; it does not enumerate
+every active app or prompt.
 
-- **Neutral tone is enforced everywhere.** Words like "groundbreaking," "revolutionary," "paradigm-shifting," and "outstanding" are banned.
-- **Investigator names are underlined** and academic titles are always lowercase.
-- **No fabrication.** Claude must work only from the documents or data provided.
+## Common rules in several historical prompt families
+
+- Neutral/non-effusive tone and no-fabrication instructions appear in several
+  proposal/reviewer prompt families, but they are not universal enforcement
+  rules across every provider and surface.
+- Investigator-name underlining and title casing are output-format rules for
+  specific writeup prompts, not global AI policy.
 
 ---
 
-## Phase II Writeup / Batch Phase II Summaries
+## Phase II Writeup / Batch Phase II Summaries _(sunset S344; historical)_
 
 Reads a full Phase II research proposal and produces a **two-part writeup**:
 
@@ -33,7 +45,7 @@ Reads a full Phase II research proposal and produces a **two-part writeup**:
 
 ---
 
-## Batch Phase I Summaries
+## Batch Phase I Summaries _(sunset S344; historical)_
 
 Analyzes a Phase I proposal and produces a summary plus **four evaluative bullets**:
 
@@ -44,7 +56,7 @@ Analyzes a Phase I proposal and produces a summary plus **four evaluative bullet
 
 ---
 
-## Phase I Writeup
+## Phase I Writeup _(sunset S344; historical)_
 
 Produces a **one-page standardized writeup** with: institution name, an italicized "To..." project title, a Summary paragraph, and exactly four Rationale bullets (Significance, Research Plan with numbered aims, Team Expertise, Foundation Opportunity). The word "paradigm" is forbidden.
 
@@ -143,7 +155,7 @@ A **conversational CRM assistant** — staff ask questions in plain English (e.g
 
 ---
 
-## Prompt-to-App Reference
+## Historical prompt-to-app reference
 
 | App | Prompt(s) Used |
 |-----|---------------|

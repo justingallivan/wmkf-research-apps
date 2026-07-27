@@ -3,10 +3,11 @@
 ## Session 376 Summary
 
 Session 376 finished the controlled multiselect production rehearsal, recorded the
-owner's review-synthesis lifecycle rule, corrected the `/sweep` workflow so it actually
-tests durable claims against source/live state, performed an evidence-first Request
-Workbench audit, and replaced the contradictory forward roadmap with a near-term
-execution plan.
+owner's review-synthesis lifecycle rule, corrected the `/sweep` workflow, performed
+a bounded evidence-first Request Workbench pass, and replaced the contradictory
+forward roadmap with a near-term execution plan. The 2026-07-26 repository-wide
+material-claim audit later found additional Workbench/Reviewer contradictions,
+so the S376 pass must not be cited as a complete domain audit.
 
 The production review-synthesis smoke is intentionally the first task next session.
 After that, continue the product discussion and calendar the plan using Justin's fixed
@@ -46,7 +47,7 @@ dates and minimum required outcome at each date.
    - The self-test independently derives Workbench counts and includes the exact bolded
      stale-placeholder regression.
 
-5. **Deep Request Workbench truth audit completed**
+5. **Bounded Request Workbench truth pass completed**
    - Six live tabs: Overview, Proposal, Reviewers, Reviews, Status, Awardee.
    - Four placeholders: Initial Writeup, Pre Site Visit Writeup, Site Visit,
      Final Writeup.

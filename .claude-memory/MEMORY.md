@@ -17,7 +17,7 @@
 
 ## Always-Read Guardrails
 - Carryover / bulk actions: feedback-verify-before-destructive-carryover.md; feedback-list-and-confirm-before-bulk-deletes.md; feedback-verify-additive-carryover-not-just-destructive.md
-- Red gates / test claims: feedback-red-gates-are-p0.md; feedback-green-requires-full-test-suite.md; project-bill-com-integration-tests-known-red.md; feedback-new-gate-fixtures-trip-scanner-gates.md
+- Red gates / test claims: feedback-red-gates-are-p0.md; feedback-green-requires-full-test-suite.md; feedback-new-gate-fixtures-trip-scanner-gates.md
 - Scope or behavior claims: feedback-falsify-not-confirm.md; feedback-behavior-claims-cite-the-producer.md; feedback-verify-write-paths-against-live-service.md; feedback-plan-contracts-read-the-extremes.md
 - Durable docs/memory fixes: feedback-reconcile-dont-append-docs.md; feedback-apply-reconcile-to-fix-work.md; feedback-rename-code-not-just-docs.md; feedback-timebox-metawork.md; reference-staleness-ack-single-line.md
 - External/platform/literal claims: feedback-verify-external-platform-claims.md; feedback-cite-ground-truth.md; feedback-no-fabricated-placeholder-values.md

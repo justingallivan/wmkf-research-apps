@@ -6,6 +6,7 @@ status: active
 summary: "Active policy: model registry, validation, request shaping, retry, canary, and replay shipped; future model changes still use this runbook."
 canonical: false
 cataloged: 2026-07-02
+last_verified: 2026-07-26
 owner: product-engineering
 related:
   - lib/services/llm-client.js
@@ -17,10 +18,15 @@ related:
 # Model-Change Strategy
 
 **Status: Active policy/runbook.** The core safeguards have shipped: capability/pricing
-registry and CI validation, reviewed admin overrides, capability-aware request shaping,
+registry and static validation, reviewed admin overrides, capability-aware request shaping,
 deprecated-parameter retry, discovery canary, Admin Models status, and replay artifacts.
 This document remains active because each future model change still needs its review,
 validation, rollout, and replay procedure.
+
+**Enforcement boundary (verified 2026-07-26):** `check:model-registry` and its
+self-test are registered package checks and part of the `/start` battery, but
+`.github/workflows/test.yml` does not currently run them. Do not call the static
+gate “CI-enforced” until that workflow changes.
 
 Authority note: this is a design doc. Live behavior is governed by source —
 `lib/services/llm-client.js`, `lib/services/model-capabilities.js`,
@@ -47,11 +53,13 @@ and no pre-deploy tripwire:
 - before S288, a second LLM transport, `lib/services/multi-llm-service.js`
   `_callClaude`, built its own body and passed `temperature` unconditionally —
   bypassing the gate entirely;
-- "Anthropic shipped a new model / deprecated a param" had **no checklist and no CI
-  gate**, so it failed at *runtime* (a 400 in front of users), the one failure mode the
+- "Anthropic shipped a new model / deprecated a param" had **no checklist or static
+  registry gate**, so it failed at *runtime* (a 400 in front of users), the one failure mode the
   reviewer/Workbench rollout cannot afford.
 
-**Guiding principle: model drift must fail LOUD in CI, never silently in prod.**
+**Guiding principle:** model drift must fail loud in a required pre-deploy gate,
+never silently in production. Moving the registered gate into GitHub CI remains
+an enforcement improvement, not shipped state.
 
 ## §1 — Interim hardening already shipped (S286)
 
@@ -126,7 +134,7 @@ deployment configuration and still rely on the pre-deploy registry/pricing check
    answers request-shaping and response-semantics questions (`supportsTemperature`,
    `supportsEffort`, `thinkingMode`, `maxOutputTokens`, `refusalSemantics`,
    retention class, future flags), keyed by concrete model id/prefix with a
-   `reviewedAt`/`source` per entry. Unknown ids **fail loud in CI** where statically
+   `reviewedAt`/`source` per entry. Unknown ids **fail loud in the static gate** where statically
    configured, and **fail closed in prod** for optional params (omit non-required
    params until reviewed). Hybrid: use `/v1/models` for existence / release ordering /
    max-token limits; keep request-param compatibility and response semantics in the
@@ -151,10 +159,11 @@ deployment configuration and still rely on the pre-deploy registry/pricing check
    auto-persist registry changes. This catches the next uncatalogued deprecation
    gracefully where the gate (which only knows *current* drift) cannot.
 
-5. **CI gate — the keystone.** `check:model-registry` plus its self-test now follows
-   the existing `check:*` pattern. v1 is offline/static (no Anthropic creds): it scans
+5. **Static gate — the keystone.** `check:model-registry` plus its self-test follows
+   the existing `check:*` pattern. It is offline/static (no Anthropic creds): it scans
    `BASE_CONFIG.APP_MODELS`, `TIER_FALLBACK_IDS`, pricing keys, and the capability
-   registry. Runtime/publish/write validation now covers prompt rows and Dataverse
+   registry. It is required by this runbook and `/start`, but is not currently wired
+   into GitHub CI. Runtime/publish/write validation covers prompt rows and Dataverse
    admin model overrides; env overrides remain a deploy-time preflight because they
    are not written through an app route. The weekly `pricing-canary` cron now compares
    live `/v1/models` against `LAST_CAPABILITY_REVIEWED_AT` and the pricing registry as
@@ -181,7 +190,7 @@ deployment configuration and still rely on the pre-deploy registry/pricing check
 | 2a (done S287) | Wire `LLMClient._buildBody` + 529 rebuild through capabilities; normalize refusal metadata. | M | Med |
 | 2b (done S288) | Fix `lib/services/multi-llm-service.js` Claude request shaping and refusal metadata. | M | Med |
 | 2c (done S288) | Route `lib/services/execute-prompt.js` prompt-row model/temperature handling through the same capability helper. | M | Med |
-| 3a (done S287) | Add `check:model-registry` + self-test for static config/fallback/pricing/capability parity. | M | Low |
+| 3a (done S287) | Add the registered `check:model-registry` + self-test for static config/fallback/pricing/capability parity. GitHub CI wiring remains separate. | M | Low |
 | 3b (done 2026-06-25) | Executor runtime rejects unreviewed prompt-row ids; admin model override writes reject unreviewed concrete Claude ids before Dataverse persistence; prompt publish rejects cloning an unreviewed concrete Claude id. Env overrides are documented as deploy-time preflight values, not route-validated writes. | M | Med |
 | 4 (done 2026-06-25) | Resolver returns `{ resolvedId, capabilities }` through `resolveModelWithCapabilities()` so callers cannot accidentally split resolution from capability lookup. | M | Med |
 | 5 (done 2026-06-25) | Extend the pricing-canary cron to alert when `/v1/models` has a newer same-family id than the registry review date and is not specifically covered by capability + pricing registries, before runtime use. | M | Med |

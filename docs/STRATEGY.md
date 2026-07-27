@@ -76,7 +76,12 @@ This is not a plan to replace AkoyaGO. There is significant business logic in Po
 
 The app suite started as a bottom-up effort to accelerate individual workflows. Without programmatic access to documents or CRM data, file upload was the only starting point — and the apps had to extract data from proposals that already existed as ground truth in Dataverse. That was a historical contingency.
 
-Now we have read access to Dynamics and SharePoint, and leadership buy-in to use AI for automation. The next phase inverts the flow: instead of users uploading files and triggering processing, **backend triggers will initiate the same API calls** based on proposal status changes. Users will still use the app suite's interfaces — Review Manager, Reviewer Finder, etc. — but the data arrives automatically.
+Now we have read access to Dynamics and SharePoint, and leadership buy-in to use
+AI for automation. The target direction inverts the flow: backend triggers may
+initiate selected processing from proposal status changes. Staff currently use
+the consolidated Request Workbench for reviewer finding/management; broader
+Power Automate orchestration remains dependency-bound and must not be described
+as shipped.
 
 ---
 
@@ -113,9 +118,9 @@ Now we have read access to Dynamics and SharePoint, and leadership buy-in to use
 | Dynamics request linking | `request_number` on reviewer/proposal tables; reviewer-finder cutover to Dataverse-native `wmkf_apprequestperson` junction (S139) | Done |
 | User feedback logging | Thumbs up/down + auto-detection on Dynamics Explorer | Working |
 | Operational monitoring | Health checks, log analysis, maintenance cron, alerts, secret-expiration tracking, spend monitoring | Working |
-| AI audit trail | `wmkf_ai_run` child entity (DEPLOYED) — every AI write logged with model + prompt version + status + raw output | Working |
-| Backend prompt store | `wmkf_ai_prompt` Dataverse table — staff-readable prompts; `prompt-resolver` with bundled fallback | Working |
-| Executor contract | `lib/services/execute-prompt.js` — Vercel side ready; PA side build by Connor in progress | Vercel done |
+| Executor AI audit trail | `wmkf_ai_run` child entity — Executor-backed calls attempt append-only model/prompt/status logging; direct LLM paths such as VRP, Integrity, and Dynamics Explorer use other persistence/telemetry | Working for Executor consumers |
+| Backend prompt store | `wmkf_ai_prompt` Dataverse table — current rows are read directly by the Executor; bundled prompts and direct-service prompts also exist outside this store | Working, not universal |
+| Executor contract | `lib/services/execute-prompt.js` — Vercel implementation is live; Power Automate progress is external/dependency-bound and requires owner confirmation | Vercel done; PA unverified |
 <!-- [STALE-ACCEPTED: lib/services/execute-prompt.js — S344 added the additive, backward-compatible assertSystemIncludes option; the "Vercel done" Executor-contract status here is unchanged.] -->
 
 

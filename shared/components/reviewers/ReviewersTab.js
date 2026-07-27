@@ -55,12 +55,10 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
   const [declineReferrals, setDeclineReferrals] = useState([]);
-  // ReviewersTab is NOT keyed by requestId (the workbench page reuses the
-  // instance across request navigations — the [requestId].js key is on
-  // AwardeeTab, not this tab), so an in-flight fetch from the prior request
-  // could paint its data onto the new one. All three loaders below capture the
-  // request they fired for and guard every post-await write against the request
-  // that is current NOW.
+  // The parent currently keys ReviewersTab by requestId, which remounts it across
+  // request navigations. Keep the in-flight guards below as defense in depth:
+  // they also prevent a late response from painting stale data if the parent
+  // keying contract changes or a request is reloaded in place.
   const currentRequestIdRef = useRef(requestId);
   currentRequestIdRef.current = requestId;
   // Per-referral inline action state for the Track Reviewers decline-referral

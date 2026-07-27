@@ -1,17 +1,26 @@
 ---
 title: "AI Prompts — Detailed Reference"
 domain: prompt-executor
-kind: source-of-truth
-status: canonical
-summary: "This document contains the actual text of every prompt we send to Claude, with code removed and dynamic placeholders described in plain English...."
-canonical: true
+kind: spec
+status: historical
+summary: "Historical prompt-text snapshot; incomplete for the current app registry and not a source of live prompt truth."
+canonical: false
 cataloged: 2026-07-02
+last_verified: 2026-07-26
 owner: product-engineering
 ---
 
 # AI Prompts — Detailed Reference
 
-This document contains the actual text of every prompt we send to Claude, with code removed and dynamic placeholders described in plain English. Each section shows what we ask Claude to do and the rules it must follow.
+> **HISTORICAL, INCOMPLETE SNAPSHOT — not a source of live prompt truth.**
+> This page omits active prompt families, includes retired applications, embeds
+> mutable counts, and does not reflect all Dataverse rows, route/service-local
+> instructions, providers, or Executor consumers. Use current source and live
+> prompt rows for behavior; use `docs/EXECUTOR_CONTRACT.md` for the Executor
+> contract.
+
+The sections below preserve selected prompt text and historical explanations.
+They do not enumerate every prompt currently sent to an AI provider.
 
 ---
 

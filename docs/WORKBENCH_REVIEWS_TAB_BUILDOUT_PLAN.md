@@ -6,6 +6,7 @@ status: active
 summary: "Reviews tab deployed; staged production verified deterministic consumers, but AI synthesis failed twice and remains a red gate."
 canonical: false
 cataloged: 2026-07-03
+last_verified: 2026-07-26
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -47,6 +48,12 @@ also remain.
 
 ## Context
 
+> The first two paragraphs below describe the pre-build S326 baseline. They are
+> retained as implementation history, not current Workbench behavior. Phases
+> 1–3 now provide Outstanding tracking, comparison/matrix, and DOCX/PDF export.
+> The current gap is the Phase-4 synthesis lifecycle/readiness behavior described
+> in decision 6 and Phase 4.
+
 The reviewer-facing submission pipeline is COMPLETE and LIVE (see
 `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md` and
 `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md`, both marked complete):
@@ -60,10 +67,9 @@ atomic Dataverse changeset — parent `wmkf_appreviewersuggestion`
 `answerValue`, `answerText` (= picklist option label at submit time), `answerHtml`
 [VERIFIED via lib/external/build-review-submission.js:142-198].
 
-The staff-facing consumption side is the gap: `shared/components/workbench/ReviewsTab.js`
-is a read-only card list (ratings, narrative answers, SharePoint download) with the
-panel-prep roll-up explicitly deferred [VERIFIED via ReviewsTab.js:18 comment and
-component body]. This plan builds it out.
+At the S326 starting point, the staff-facing consumption side was a read-only
+card list. That gap is now closed: `ReviewsTab` includes Outstanding tracking,
+comparison, a categorical matrix, manual review entry, and DOCX/PDF export.
 
 Primary consumers: BOTH program staff pre-panel (compilation/export) and PDs
 monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S326).

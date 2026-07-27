@@ -41,11 +41,14 @@ sequence.
 
 ## Completed in this execution
 
-- Evidence-first sweep correction and Workbench truth audit: the sweep now derives truth before
+- Evidence-first sweep correction and bounded Workbench truth pass: the sweep now derives truth before
   searching prose, supports domain audits, requires producer→persistence→consumer evidence, and
   records supported/falsified claims. The scalar fact gate now derives Workbench tab counts and
-  cannot be bypassed with Markdown-bold/code-wrapped numbers. The 2026-07-26 audit retired the
-  stale forward roadmap and established the current six-live/four-placeholder state.
+  cannot be bypassed with Markdown-bold/code-wrapped numbers. That pass retired the stale forward
+  roadmap and established the six-live/four-placeholder state, but it did not fully reconcile the
+  Reviewer/Reviews corpus; the 2026-07-26 [repository-wide material-claim
+  audit](audits/AUDIT_FULL_DOCUMENTATION_TRUTH_2026-07-26.md) records the
+  remaining contradictions and probe requirements.
 - Documentation ground-truth reconciliation: merged to `main` on 2026-07-22; this queue is the
   priority authority and the documentation gates were green.
 - Dataverse target/write interlock: positive warn-mode production observation, explicit owner

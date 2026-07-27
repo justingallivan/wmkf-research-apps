@@ -202,7 +202,7 @@ export const APP_LIFECYCLE_REGISTRY = {
     archivedTo: '_archived/pages/phase-ii-writeup-legacy.js',
     pagePath: '/phase-ii-writeup-legacy',
     notes:
-      'Archived S291 (2026-06-26). Direct-URL legacy variant of the active phase-ii-writeup app; not in nav and confirmed not in active use by the owner. Page + its API (/api/process-legacy) + prompt (proposal-summarizer-legacy) moved to _archived/. No dedicated grant key — the legacy page reused the active phase-ii-writeup grant, so existing grants are unaffected.',
+      'Archived S291 (2026-06-26). Direct-URL legacy variant of phase-ii-writeup, which later became a sunset candidate in S344; not in nav and confirmed not in active use by the owner. Page + its API (/api/process-legacy) + prompt (proposal-summarizer-legacy) moved to _archived/. No dedicated grant key — the legacy page reused the phase-ii-writeup grant, so existing grants are unaffected.',
     lastVerified: '2026-06-26',
   },
   'phase-i-dynamics': {

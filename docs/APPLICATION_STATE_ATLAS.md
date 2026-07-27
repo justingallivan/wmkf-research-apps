@@ -48,6 +48,7 @@ The canonical reference for the live state of the application's data layer.
 | `grant_cycles` | 13 | drain-only post-W3 (2026-05-12); Dataverse `wmkf_appgrantcycle` is source of truth (10 rows). NOT dropped (separate domain, still draining). | [postgres-grant-cycles.md](atlas/postgres-grant-cycles.md) |
 | ~~`proposal_searches`~~ | — | **DROPPED 2026-06-04 (S219)** via migration 018 (was empty, `extract-summary` endpoint retired) | [postgres-other-reviewer-tables.md](atlas/postgres-other-reviewer-tables.md) |
 | `search_cache` | 0 | **KEPT — live cache** (0 rows but `DatabaseService.checkCache`/`cacheSearch` in pubmed/biorxiv/arxiv/chemrxiv + `/api/cron/maintenance` cleanup are live callers). Excluded from the S219 drop. | [postgres-other-reviewer-tables.md](atlas/postgres-other-reviewer-tables.md) |
+| `reviewer_find_roster` | probe required | **ACTIVE operational roster cache/source for Workbench Find**; written and read through `reviewer-roster-store.js`, not a migration drain | [postgres-reviewer-find-roster.md](atlas/postgres-reviewer-find-roster.md) |
 
 ### Reviewer-finder domain (Dataverse)
 
@@ -55,7 +56,7 @@ The canonical reference for the live state of the application's data layer.
 |---|---:|---|---|
 | `wmkf_appresearcher` | — | **DROPPED S213** — bibliometric sidecar collapsed into `wmkf_potentialreviewers` (17 fields folded onto the person); see `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md` | (page removed) |
 | `wmkf_appreviewersuggestion` | 724 | active lifecycle ledger | [dataverse-wmkf-appreviewersuggestion.md](atlas/dataverse-wmkf-appreviewersuggestion.md) |
-| `wmkf_potentialreviewers` (vendor + ext.) | 4,427 | per-person scratch+history; **now also carries the bibliometric fields** (affiliation/h-index/citations/scholar/orcid/etc.) folded in from the dropped sidecar (S213) | [dataverse-wmkf-potentialreviewers.md](atlas/dataverse-wmkf-potentialreviewers.md) |
+| `wmkf_potentialreviewers` (custom WMKF entity) | 4,427 | canonical reusable reviewer-person record; also carries the bibliometric fields (affiliation/h-index/citations/scholar/orcid/etc.) folded in from the dropped sidecar (S213) | [dataverse-wmkf-potentialreviewers.md](atlas/dataverse-wmkf-potentialreviewers.md) |
 | `wmkf_apppublication` | — | **DROPPED S213** (was 0 rows, no callers) — went down with the appresearcher collapse | (page section removed) |
 | `wmkf_appgrantcycle` | 10 | Dataverse-primary post-W3 (2026-05-12); full 11-attr schema deployed; consumed by reviewer-finder/grant-cycles + review-manager render/send-emails + maintenance-service blob-cleanup | same page |
 | `wmkf_appproposalsearch` | 0 | DEPLOYED (S185), entity set is the unconventional `wmkf_appproposalsearchs`; verified S188 audit re-sweep 2026-05-25 | same page |
@@ -106,14 +107,21 @@ Promote any of these to a per-entity page if app code starts writing to it.
 
 ## Adapter inventory (`lib/dataverse/adapters/`)
 
-| File | Entity set | Methods | Callers |
-|---|---|---|---|
-| `researcher.js` | `wmkf_potentialreviewerses` (was `wmkf_appresearchers`) | `getByPotentialReviewer`, `upsertByPotentialReviewer`, `updateById` | S213: repointed to write bibliometrics onto the person (sidecar dropped); `save-candidates`/`my-candidates`/`workbench/enrich-recommended`/`contact-enrichment-service` |
-| `potential-reviewer.js` | `wmkf_potentialreviewerses` | `getByEmail`, `getById`, `upsertByEmail`, `update`, `setContactLink` | `pages/api/reviewer-finder/{save-candidates,my-candidates}.js`, `pages/api/review-manager/send-emails.js` |
-| `reviewer-suggestion.js` | `wmkf_appreviewersuggestions` | `findByPotentialReviewerAndRequest`, `findByRequest`, `findApplicantRecommendedByRequest`, `findByPD`, `findAcceptedByPD`, `upsert`, `ensureApplicantRecommended`, `updateLifecycle`, `softDelete`, `bulkUpdateByRequest`, `findById` | `pages/api/reviewer-finder/{save-candidates,my-candidates}.js`, `pages/api/review-manager/{render-emails,send-emails,reviewers}.js`, `pages/api/workbench/{applicant-reviewers,enrich-recommended,promote-applicant-reviewer}.js` |
-| `contact.js` | `contacts` | `findByEmail`, `findOrCreateByEmail` | `pages/api/review-manager/send-emails.js` |
+**[VERIFIED 2026-07-26 via directory inventory]** The adapter layer contains
+19 files:
 
-No adapter exists yet for: `wmkf_appgrantcycle`, `wmkf_appproposalsearch`, `akoya_request` (accessed direct via `DynamicsService`). (`wmkf_apppublication` was dropped S213.)
+`account.js`, `ai-prompt.js`, `ai-run.js`, `app-request-person.js`,
+`contact.js`, `grant-cycle.js`, `grant-request.js`,
+`grantee-deliverable.js`, `membership.js`, `policy.js`,
+`potential-reviewer.js`, `proposal-budget-line.js`, `researcher.js`,
+`review-answer.js`, `review-question.js`, `reviewer-suggestion.js`,
+`sharepoint-document-location.js`, `system-user.js`, and
+`user-preference.js`.
+
+The earlier four-adapter inventory and statement that grant cycles and
+`akoya_request` had no adapters were superseded by the DAL migration. Read the
+named adapter and its callers before changing a contract; this Atlas deliberately
+does not duplicate every method signature.
 
 ## Service-layer inventory (`lib/services/`)
 
@@ -121,7 +129,7 @@ The high-leverage services for data-layer work — full source remains authorita
 
 | Service | Postgres tables touched | Dataverse access | Notes |
 |---|---|---|---|
-| `database-service.js` | `search_cache`, `user_profiles`, `api_usage_log`, etc. — researcher/publication/suggestion methods gutted W5 (commit `0c58da4`) | none | central Postgres gateway for the surviving tables; Wave 1 user_preferences branch is dead code (table dropped 2026-05-12) |
+| `database-service.js` | `search_cache`, `user_profiles`, `api_usage_log`, etc. — researcher/publication/suggestion methods gutted W5 (commit `0c58da4`) | none | central Postgres gateway for the surviving tables; the Wave 1 `user_preferences` branch was removed after the table dropped |
 | `discovery-service.js` | — (Postgres-researchers cache check removed in W5 commit `c0c5b5b`) | `wmkf_potentialreviewer` (indirect via picker flow) | previously called `DatabaseService.findResearcher` for the verification cache; PubMed verification is now unconditional |
 | `deduplication-service.js` | — (Postgres-researchers lookup removed in W5 commit `c0c5b5b`) | none | previously called `DatabaseService.findResearcher` to attach `existing?.id`; merged candidates are now transient with no PG id |
 | `contact-enrichment-service.js` | — (Postgres-researchers writer removed in W5 commit `c0c5b5b`) | `wmkf_potentialreviewer` (read+upsert identity + bibliometrics, S213) via adapter chain | enrichment writeback targets the person: `potentialReviewerAdapter.upsertByEmail` (identity) + `researcherAdapter.upsertByPotentialReviewer` (bibliometrics, now person-targeting post-collapse), gated on potentialreviewer-row existence |
@@ -130,8 +138,8 @@ The high-leverage services for data-layer work — full source remains authorita
 | `dynamics-identity-service.js` | `user_profiles` (read) | `systemusers` (read) | impersonation contract (`MSCRMCallerID`) |
 | `dataverse-identity-map.js` | `user_profiles` | `systemusers` | bridge resolver |
 | `program-director-resolver.js` | none | `systemusers` (read) | email → `systemuserid` |
-| `app-access-service.js` / `dataverse-app-access-service.js` | (Wave 1 retired) | `wmkf_appuserappaccesses` | Postgres table dropped 2026-05-12; dispatcher's PG branch is dead code |
-| `settings-service.js` / `dataverse-settings-service.js` | (Wave 1 retired) | `wmkf_appsystemsettings` | Postgres table dropped 2026-05-12; dispatcher's PG branch is dead code |
+| `app-access-service.js` / `dataverse-app-access-service.js` | none (Wave 1 Postgres table retired) | `wmkf_appuserappaccesses` | unsupported Postgres configuration fails loudly; the old PG branch has been removed |
+| `settings-service.js` / `dataverse-settings-service.js` | none (Wave 1 Postgres table retired) | `wmkf_appsystemsettings` | unsupported Postgres configuration fails loudly; the old PG branch has been removed |
 | `dataverse-prefs-service.js` | — | `wmkf_appuserpreferences` | Postgres `user_preferences` dropped 2026-05-12 |
 | `prompt-resolver.js` | none | **`wmkf_ai_run` scratch row** (read, 5-min cache) — NOT `wmkf_ai_prompt` (Session 103 holdover; will swap when v3 path matures) | falls back to bundled `.js` modules unless `PROMPT_RESOLVER_STRICT=true` |
 | `execute-prompt.js` | none — calls Claude through `llm-client.js` and rejects unreviewed concrete prompt-row Claude ids before execution | `wmkf_ai_prompts` (read in `fetchCurrentPrompt()`), `akoya_requests` (read once up-front for the skip-if-populated guard in `preflightGuards()`; **coalesced write to the prompt's declared `target.field` via `persistOutputs()` → `DynamicsService.updateRecord`**), `wmkf_ai_runs` (write audit in `writeRunRow()` with FKs to prompt + request) | Executor contract; **dynamically writes to `akoya_request` flat fields** (e.g. `wmkf_ai_summary`) — the Executor is the canonical writer for prompts that declare a target |
@@ -153,7 +161,7 @@ The high-leverage services for data-layer work — full source remains authorita
 
 ## Endpoint inventory
 
-For per-endpoint persistence info, see **`docs/API_ROUTE_SECURITY_MATRIX.md`** — the security matrix is CI-gated, so it is the canonical endpoint list. The Atlas defers to it rather than duplicating a count or route table. ~~**Atlas v1 gap:** the matrix doesn't yet annotate "writes Postgres `<table>` / Dataverse `<entity>`."~~ **Closed S141 (2026-05-08):** the matrix has a Persistence column for every registered route (PG = Postgres, DV = Dataverse). The current code-derived route-file count is [149](CANONICAL_COUNTS.md#api-route-file-count).
+For per-endpoint persistence info, see **`docs/API_ROUTE_SECURITY_MATRIX.md`**. The matrix has a registered structural check and is the canonical endpoint list; that check is run manually and by selected hooks/session workflows, but is not presently part of `.github/workflows/test.yml`. The Atlas defers to it rather than duplicating a count or route table. ~~**Atlas v1 gap:** the matrix doesn't yet annotate "writes Postgres `<table>` / Dataverse `<entity>`."~~ **Closed S141 (2026-05-08):** the matrix has a Persistence column for every registered route (PG = Postgres, DV = Dataverse). The current code-derived route-file count is [149](CANONICAL_COUNTS.md#api-route-file-count).
 
 For the reviewer-finder + review-manager subset, the per-entity pages above already enumerate read/write endpoints.
 

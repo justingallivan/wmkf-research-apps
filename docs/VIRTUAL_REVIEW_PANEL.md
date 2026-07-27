@@ -37,7 +37,8 @@ Orchestrated by `PanelReviewService` in `lib/services/panel-review-service.js`; 
 4. **(Optional) Stage 0d — Perplexity synthesis.** Runs only when Perplexity is configured AND allowed by `VRP_ALLOWED_PROVIDERS`; synthesizes field landscape from claims + collated results.
 5. **(Optional) Stage 1 — Claim verification.** Each selected provider checks claims against literature.
 6. **Stage 2 — Structured review.** Each selected provider returns the WMKF reviewer form (affiliation / impact / risk / overall rating + narrative).
-7. **(Optional) Devil's Advocate pass.** Each selected provider re-reviews with the adversarial system prompt.
+7. **(Optional) Devil's Advocate pass.** One provider is selected at random from
+   the resolved panel to perform the adversarial re-review.
 8. **Synthesis.** Claude only; produces panel summary with consensus, disagreements, open questions.
 
 Two stages intentionally do NOT receive raw proposal text: search collation (Stage 0c) operates on `claimData` + search results, and synthesis operates on parsed reviewer outputs. Both invariants are pinned by tests so a refactor that piped raw proposal text in would fail loudly. See `docs/AI_DATA_FLOW_MATRIX.md` § "Virtual Review Panel" for the full payload-boundary spec.

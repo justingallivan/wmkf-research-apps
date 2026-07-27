@@ -16,34 +16,28 @@ node scripts/apply-migrations.js     # existing environment
 
 ## Database Cleanup
 
+> **BLOCKED legacy surface:** migration 018 dropped the reviewer-finder
+> Postgres tables. Several cleanup/reset scripts below still reference those
+> tables and have not been reconciled to the current schema. Do not run them
+> against a current environment until they are quarantined or repaired after an
+> owner-approved scope review.
+
 | Script | Description |
 |--------|-------------|
-| `cleanup-database.js` | Remove researchers missing email OR website (keeps high-quality entries) |
-| `clear-all-database.js` | Delete ALL data from all tables for a fresh start |
-| `cleanup-duplicate-cycles.js` | Remove duplicate grant cycles |
-
-```bash
-node scripts/cleanup-database.js      # Clean up incomplete entries
-node scripts/clear-all-database.js    # Full reset (destructive!)
-```
+| `cleanup-database.js` | **BLOCKED legacy script**; references retired reviewer-finder state. |
+| `clear-all-database.js` | **BLOCKED and destructive**; contains statements against dropped tables. |
+| `cleanup-duplicate-cycles.js` | **BLOCKED pending schema/caller reconciliation.** |
 
 ## User Profile Management
 
 | Script | Description |
 |--------|-------------|
-| `export-proposals-for-migration.js` | Export proposals to CSV for user profile assignment |
-| `import-user-assignments.js` | Import user profile assignments from CSV |
+| `export-proposals-for-migration.js` | Legacy export for the retired reviewer-finder Postgres assignment flow. |
+| `import-user-assignments.js` | **BLOCKED legacy script**; writes retired reviewer-finder Postgres tables. |
 | `manage-preferences.js` | View and delete user API key preferences |
 | `test-profiles.js` | Test profile/preference database operations |
 
 ```bash
-# Export proposals for user assignment
-node scripts/export-proposals-for-migration.js
-
-# Import user assignments from CSV (dry-run first)
-node scripts/import-user-assignments.js --file proposals-for-migration.csv --dry-run
-node scripts/import-user-assignments.js --file proposals-for-migration.csv
-
 # View/delete API key preferences
 node scripts/manage-preferences.js --list
 node scripts/manage-preferences.js --delete-all-keys
@@ -54,15 +48,7 @@ node scripts/manage-preferences.js --delete-keys --profile 2
 
 | Script | Description |
 |--------|-------------|
-| `assign-orphan-records.js` | Assign legacy NULL `user_profile_id` rows in `reviewer_suggestions` and `proposal_searches` to a specified user profile |
-
-```bash
-# Preview orphan records (no changes)
-node scripts/assign-orphan-records.js --profile-id 1 --dry-run
-
-# Execute assignment
-node scripts/assign-orphan-records.js --profile-id 1
-```
+| `assign-orphan-records.js` | **DO NOT RUN:** targets `reviewer_suggestions` and `proposal_searches`, both dropped by migration 018. |
 
 ## Security
 

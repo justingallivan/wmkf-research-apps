@@ -92,13 +92,20 @@ Structured review fields (S130 schema additions):
 
 Stage 2a slice 1 additions (S143, deployed 2026-05-09):
 
-Engagement-scope contact corrections (written by reviewer at Stage 2a; never propagated to `wmkf_potentialreviewers` or `contact` — promotion is staff-controlled, deferred):
+Engagement-scope contact corrections (written by reviewer at Stage 2a; downstream
+propagation is field-specific, not all-or-nothing):
 - `wmkf_reviewerfirstname` (String, max 100)
 - `wmkf_reviewerlastname` (String, max 100)
 - `wmkf_reviewernickname` (String, max 100)
 - `wmkf_reviewertitle` (String, max 200)
 - `wmkf_revieweremail` (String, max 200) — engagement-scope correspondence email; replaces prior plan's "write to `contact.emailaddress2/3`" routing
 - `wmkf_reviewerorcid` (String, max 50)
+
+The acceptance follow-up flow synchronizes reviewer-confirmed name, nickname,
+and title to the linked contact through
+`sync-reviewer-name-title-to-contact.js`; ORCID and board identity use their own
+capture paths. Email and affiliation differences remain engagement-scoped and
+drive mismatch/operations handling rather than silently overwriting the contact.
 
 Decline structured capture:
 - `wmkf_declinereasonpicklist` (Picklist: `too-busy=100000000 | conflict-of-interest=100000001 | outside-expertise=100000002 | bad-timing=100000003 | other=100000004`)
@@ -182,7 +189,9 @@ Write (verified 2026-05-07; +Phase 3 ingestion S210):
 
 ## Cross-system
 
-Postgres `reviewer_suggestions` (337 rows) is parity at ~97.6% per S136 probe (`scripts/backfill-reviewer-suggestions-parity.js`). Cutover plan retires the Postgres table and switches all readers/writers to this entity.
+Postgres `reviewer_suggestions` had 337 rows at the historical S136 parity
+probe. Migration `018_drop_reviewer_finder_postgres_tables.sql` dropped that
+table on 2026-06-04; this Dataverse entity is the sole live suggestion ledger.
 
 ## Schema additions — DEPLOYED 2026-05-09 (S143 Stage 2a slice 1)
 
@@ -200,4 +209,11 @@ Postgres `reviewer_suggestions` (337 rows) is parity at ~97.6% per S136 probe (`
 
 ## Migration disposition (post-W3-W6 cutover 2026-05-12)
 
-**Cutover complete.** This entity is the live source of truth for reviewer suggestions; Postgres `reviewer_suggestions` is drain-only with no live application readers/writers. The 4 historical orphan rows in Postgres (missing `request_number`) remain in the drain snapshot and will be handled at the post-pilot one-shot drop. ~~Review Manager `grant_cycles` Postgres dependency~~ **RESOLVED (verified 2026-05-18, S164):** Review Manager reads grant cycles from Dataverse via `lib/services/grant-cycles-dataverse`; no Postgres `grant_cycles` dependency remains in `pages/api/review-manager/*`. See `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` for the migration log.
+**Cutover complete.** This entity is the live source of truth for reviewer
+suggestions; Postgres `reviewer_suggestions` was dropped on 2026-06-04, so old
+drain/orphan cleanup instructions are historical only. ~~Review Manager
+`grant_cycles` Postgres dependency~~ **RESOLVED (verified 2026-05-18, S164):**
+Review Manager reads grant cycles from Dataverse via
+`lib/services/grant-cycles-dataverse`; no Postgres `grant_cycles` dependency
+remains in `pages/api/review-manager/*`. See
+`docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` for the migration log.

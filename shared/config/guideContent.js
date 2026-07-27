@@ -58,11 +58,11 @@ export const GUIDE_SECTIONS = [
     sections: [
       {
         heading: 'Overview',
-        content: `Screen grant applicants for research integrity concerns by searching Retraction Watch (63,000+ retracted papers), PubPeer (post-publication peer review), and Google News (media coverage of misconduct).`,
+        content: `Screen grant applicants for research integrity concerns by searching the locally loaded Retraction Watch records, PubPeer (post-publication peer review), and Google News (media coverage of misconduct).`,
       },
       {
         heading: 'Running a Screening',
-        content: `Enter applicant names (one per line), then click Screen Applicants. Results stream in as each source is checked. Each applicant gets a results card with match counts, confidence levels, and an AI summary.`,
+        content: `Enter applicant names (one per line), then click Screen Applicants. Results stream in as each source is checked. Each applicant gets a results card with match counts, confidence values, and source-specific details; PubPeer and news may include AI-written source summaries.`,
       },
       {
         heading: 'Understanding Confidence Levels',
@@ -70,11 +70,11 @@ export const GUIDE_SECTIONS = [
       },
       {
         heading: 'Dismissing False Positives',
-        content: `Click Dismiss on matches that are clearly not the same person. Provide a brief reason. Dismissed matches won't appear in future screenings for that applicant.`,
+        content: `The current Dismiss button is a placeholder: it does not yet save a durable dismissal or suppress the match in a later screening. Record adjudication outside the screener until that workflow is completed.`,
       },
       {
         heading: 'History & Export',
-        content: `Previous screenings are saved in the History tab. Click Export to download results including all matches, confidence levels, AI summaries, and dismissal records.`,
+        content: `The current page has no History tab, although authenticated history APIs exist. PDF, JSON, and Markdown exports cover the current run, including matches, confidence values, and available PubPeer/news summaries; they do not include dismissal records.`,
       },
       {
         heading: 'Important Caveats',
@@ -103,7 +103,7 @@ export const GUIDE_SECTIONS = [
       },
       {
         heading: 'Multi-Turn Conversations',
-        content: `The chat maintains context across messages. Ask "Show me requests from 2024", then follow up with "Which of those are from California?" — the AI remembers previous results and can refine them.`,
+        content: `The chat sends up to three recent user/assistant exchanges (six messages) as context. Follow-ups can refine recent results, but older turns fall outside that active window.`,
       },
       {
         heading: 'Exporting Data',

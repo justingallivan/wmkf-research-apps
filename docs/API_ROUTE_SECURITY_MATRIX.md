@@ -16,7 +16,7 @@ related:
 
 # API Route Security Matrix
 
-Last updated: 2026-07-24
+Last updated: 2026-07-26
 
 > **Route→Service consolidation (Stage 7, 2026-07-05):** the business logic of
 > the `pages/api` routes now lives in per-domain `lib/services/<domain>/`
@@ -48,7 +48,7 @@ The matrix focuses on authorization, data ownership, and persistence (what each 
 | Authenticated | Any signed-in user may call it. Use only for low-sensitivity shared utilities. | `requireAuth` |
 | Profile | Signed-in user must have a linked active profile. User-owned data must be scoped to that profile. | `requireAuthWithProfile` |
 | App | Signed-in user must have access to the named app. User-owned data must still be scoped where applicable. | `requireAppAccess(req, res, appKey)` |
-| Superuser | Linked profile plus `dynamics_user_roles.role = 'superuser'`. | `requireAuthWithProfile` plus role check |
+| Superuser | Linked profile plus `dynamics_user_roles.role = 'superuser'`. | `requireSuperuser` |
 | Cron | Vercel scheduled/background endpoint. | `verifyCronSecret` |
 | External token | Public magic-link route scoped by the token payload and server-side token verification. | `verifySuggestionToken` |
 | Applicant session | NextAuth session minted by the `entra-external` provider (separate Entra External ID tenant). Carries `contactOid` + `contactEmail`. Routes scope writes to data the contact owns, and may additionally gate on `wmkf_portalmembership` role/state. | `getServerSession` + `session.user.userType === 'applicant'` (+ optional role/membership check) |

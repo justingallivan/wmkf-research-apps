@@ -1,38 +1,31 @@
 ---
 name: project-bill-com-integration-tests-known-red
-description: tests/unit/bill.test.js and tests/unit/discovery-verification-status.test.js are EXPECTED-RED (~29 failures, ReferenceError-class) from an unfinished bill.com integration — known/accepted, fires nightly on Vercel, NOT a regression to chase and NOT a check:* gate. Any full-suite failure OUTSIDE these two suites is real. Expect these to stay red indefinitely: the BILL API integration was TABLED by the owner 2026-07-12 (possibly permanently), so the integration will not be finished on any near timeline.
+description: Closed historical exception. The two suites once recorded as expected-red are now green; do not suppress future failures in either suite.
 metadata:
   type: project
-  status: active
+  status: closed
   scope: global
-  last_verified: S272 (2026-06-20) — owner confirmed: unfinished bill.com integration, fires nightly on Vercel
+  last_verified: 2026-07-26 — exact suites passed, 78/78 tests
 ---
 
-## Recall Rule
+## Closed finding
 
-Read when `npm test` (full suite) shows failures, or when triaging the nightly
-Vercel test run, before flagging/chasing/blocking on them.
+This file preserves the reason an old test exception existed. It is no longer an
+always-read guardrail and must not be used to dismiss a current failure.
 
-## The fact (owner, S272)
+## Current fact
 
-- **`tests/unit/bill.test.js`** (BILL/honoraria vendor + network) and
-  **`tests/unit/discovery-verification-status.test.js`** are **expected-red**: ~29
-  failures, `ReferenceError`-class, caused by an **unfinished bill.com integration**.
-  The owner is aware; it fires every night on Vercel. It is annoying but accepted —
-  **do not investigate, bisect, or "fix" it** as if it were a fresh regression.
-- These are **unit-test** failures, NOT `check:*` CI gates. The P0 gate rule
-  ([[feedback-red-gates-are-p0]]) is about `check:*` gates, which are independent and
-  should be green — do not conflate the two.
-- **Expected-red set:** exactly these two suites. **Any full-suite failure outside
-  `bill.test.js` / `discovery-verification-status.test.js` is real** and must be
-  treated as such — don't let the known noise mask a genuine new break.
+- On 2026-07-26, the exact two suites named by the former exception passed:
+  **2/2 suites and 78/78 tests**.
+- There is now **no expected-red exemption** for
+  `tests/unit/bill.test.js` or
+  `tests/unit/discovery-verification-status.test.js`.
+- Any future failure in either suite is a current regression signal and receives
+  normal investigation.
 
-**Why:** S272 burned repeated cycles re-confirming and re-dismissing this red as
-"pre-existing, unrelated" because nothing recorded that it's a known, accepted state
-— the dismissal-without-memory loop. **How to apply:** when the full suite is red,
-diff the failing suites against this expected set; if it's only these two, note
-"expected-red (bill.com integration, see project-bill-com-integration-tests-known-red)"
-and move on; otherwise the delta is the real signal. Revisit/retire this memory if
-the bill.com integration is finished (the suites should then go green).
+The historical exception was valid for the S272 point-in-time state, but retaining
+it after the suites recovered created a more dangerous failure mode: a real
+regression could be mislabeled as accepted noise.
+
 Related: [[feedback-green-requires-full-test-suite]], [[feedback-red-gates-are-p0]],
 [[../docs/agent-wiki/topics/finance-honoraria]].

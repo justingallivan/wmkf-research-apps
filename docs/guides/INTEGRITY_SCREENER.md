@@ -10,7 +10,7 @@ The Integrity Screener searches for retractions, corrections, and integrity-rela
 
 | Source | What It Searches | Coverage |
 |--------|-----------------|----------|
-| **Retraction Watch** | Database of 63,000+ retracted papers | Comprehensive retraction records with reasons |
+| **Retraction Watch** | Locally loaded Retraction Watch records | Retraction records and reasons present in the current database |
 | **PubPeer** | Post-publication peer review comments | Community-flagged concerns about published papers |
 | **News Search** | Google News via SerpAPI | Media coverage of research misconduct |
 
@@ -34,7 +34,7 @@ Each applicant gets a results card showing:
 
 - **Match count** per source (Retraction Watch, PubPeer, News)
 - **Confidence level** — how closely the match aligns with the applicant's name
-- **AI Summary** — Claude analyzes all findings and provides a plain-language assessment
+- **Source summaries** — PubPeer and news searches can include AI-written summaries for that source
 - **Individual matches** — expandable details for each hit
 
 #### Understanding Confidence Levels
@@ -43,25 +43,26 @@ Each applicant gets a results card showing:
 - **Medium** — Partial name match or common name with some supporting context
 - **Low** — Weak match that may be a different person with the same name
 
-### 4. Dismiss False Positives
+### 4. Record False Positives
 
-If a match is clearly not the same person:
-- Click **Dismiss** on the specific match
-- Provide a brief reason (e.g., "Different institution, different field")
-- Dismissed matches won't appear in future screenings for this applicant
+The current results page displays a **Dismiss** action, but that UI is not yet
+connected to durable dismissal storage or future-screen suppression. Treat it as
+a placeholder and record adjudication outside the screener until the workflow is
+completed.
 
 ## Screening History
 
-Previous screenings are saved and accessible from the **History** tab:
-- View past screening results without re-running searches
-- See which applicants were screened and when
-- Dismissed matches remain recorded with their dismissal reasons
+Completed screenings can be saved by the service, and authenticated history APIs
+exist, but the current page does **not** provide a History tab. Do not rely on the
+application UI to retrieve earlier runs.
 
 ## Exporting Results
 
 - Click **Export** to download screening results
-- The export includes all matches, confidence levels, and AI summaries
-- Dismissed matches are clearly marked
+- PDF, JSON, and Markdown exports include the current run's matches, confidence
+  values, and available PubPeer/news summaries
+- Dismissal records are not included because the current dismissal UI is not
+  persistently wired
 
 ## Important Caveats
 

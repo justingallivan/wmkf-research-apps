@@ -321,13 +321,14 @@ function detectPossibleFailure(text) {
 // ─── Conversation management ───
 
 /**
- * Trim conversation history to last 3 exchanges (6 messages) to control tokens.
+ * Bound conversation history to six messages. When trimming is required, two
+ * synthetic context notices plus the four most recent real messages are sent.
  * The most recent user message is always kept.
  */
 function trimConversation(messages) {
   const cleaned = messages.map(m => ({ role: m.role, content: m.content }));
   if (cleaned.length <= 6) return cleaned;
-  // Keep a summary hint + last 6 messages
+  // Keep a two-message summary hint + the last four real messages.
   return [
     { role: 'user', content: '[Earlier conversation context was trimmed to save tokens]' },
     { role: 'assistant', content: 'Understood, I\'ll work with the recent context.' },

@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-13
+last_verified: 2026-07-26
 stale_after_days: 90
 owner: integrity-screener
 source_files:
@@ -40,6 +40,17 @@ applicant against several signals and surfaces a per-applicant `hasConcerns` fla
 Sources 2 + 3 are both gated behind one `effectiveSerpKey` today (`integrity-service.js`); the UI/export
 consume a `sources.pubpeer` shape (`hasConcerns`, `summary`, `resultCount`, `searchUrl`, …) rendered in
 `pages/integrity-screener.js`.
+
+## Current UI boundaries
+
+- The screen service saves completed runs when it receives a user profile ID, and
+  authenticated history and dismissal API primitives exist.
+- The current page has no History tab and does not call the history API.
+- The current Dismiss handler is explicitly a placeholder: it logs and alerts but
+  does not call the dismissal API. `screenApplicants` also does not read prior
+  dismissals, so future-screen suppression is not implemented.
+- PDF, JSON, and Markdown exports cover the current run and its source-specific
+  summaries; they do not contain durable dismissal records.
 
 ## Durable Memory
 

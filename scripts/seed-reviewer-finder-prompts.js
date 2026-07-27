@@ -40,8 +40,9 @@
  * Phase 0 design choices (mirroring `phase-i.summary`)
  * ──────────────────────────────────────────────────────────────────────────
  * - parseMode: "raw" — Claude emits delimited text, not JSON. Single output
- *   `response_text` with `target.kind: "none"` (route persists separately to
- *   Postgres, eventually Dataverse Wave 2).
+ *   `response_text` with `target.kind: "none"`. Live routes post-parse the
+ *   response in `ClaudeReviewerService`; explicit candidate saves persist
+ *   separately through the canonical Dataverse reviewer-person/suggestion path.
  * - All variables `placement: "user"` (Phase 0 constraint). System prompt is
  *   intentionally empty: legacy code sends a single user message with no
  *   system block, so we preserve that exactly to avoid behavioral drift.
@@ -154,8 +155,9 @@ const analyzeRow = {
       {
         name: 'response_text',
         type: 'string',
-        // Route post-parses via parseAnalysisResponse and persists to Postgres
-        // (proposal_searches / reviewer_suggestions). No Dynamics writeback.
+        // Live routes post-parse via parseAnalysisResponse. target.kind:none
+        // means this prompt row declares no Executor writeback; explicit
+        // candidate saves use the canonical Dataverse persistence path.
         target: { kind: 'none' },
       },
     ],
@@ -212,7 +214,7 @@ const scoreRow = {
   notes:
     'Phase 0 seed (Session 111). Per-batch (10 candidates) relevance scoring. ' +
     'Source of truth: shared/config/prompts/reviewer-finder-dynamics.js. ' +
-    'Live routes still use legacy createDiscoveredReasoningPrompt until route refactor.',
+    'Live reviewer service resolves the Dataverse row and composes the score prompt.',
 };
 
 const rowsToProcess = [analyzeRow, scoreRow].filter((r) => {

@@ -6,6 +6,7 @@ status: canonical
 summary: "If you're touching a service or utility, read its header before this catalog. If a header is sparse or stale, fix it in the same commit as your..."
 canonical: true
 cataloged: 2026-07-02
+last_verified: 2026-07-26
 owner: product-engineering
 related:
   - lib/services/
@@ -29,10 +30,12 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`llm-client.js`** — Canonical Anthropic API wrapper (`complete()` + `stream()`). SSRF allowlist, abortable timeouts, 429/529 retry, single fallback-model swap, usage logging, API-key redaction. **Use this — not ad-hoc `fetch`** for new Anthropic API calls.
 - **`model-capabilities.js`** — Reviewed Anthropic model capability registry for request shaping (`temperature`, `output_config.effort`) and response semantics (refusals, retention class, max tokens). Unknown runtime ids fail closed for optional params; configured ids are guarded by `check:model-registry`.
 - **`model-review-validation.js`** — Shared write-time validator for tier keys and concrete Claude model ids. Admin model overrides and prompt publishes use it to reject unreviewed concrete Claude ids unless both capability and pricing entries exist.
-- **`execute-prompt.js`** — Live prompt-execution Executor implementing `docs/EXECUTOR_CONTRACT.md`. Reads current prompt rows from Dataverse entity set `wmkf_ai_prompts`, rejects unreviewed concrete Claude model ids before execution, and writes audit rows to `wmkf_ai_runs`. Used in production by `/api/phase-i-dynamics/summarize-v2`.
+- **`execute-prompt.js`** — Live prompt-execution Executor implementing `docs/EXECUTOR_CONTRACT.md`. Reads current prompt rows from Dataverse entity set `wmkf_ai_prompts`, rejects unreviewed concrete Claude model ids before execution, and attempts append-only audit rows in `wmkf_ai_runs`. Production consumers include Phase-I Dynamics summary, grantee title/abstract, field primer, peer-review summary, and review synthesis flows; inspect current callers before changing the contract.
 - **`prompt-resolver.js`** — Legacy Session 103 holdover. Reads prompts from a scratch row on `wmkf_ai_runs`, 5-min cache, `{{var}}` interpolation, bundled `.js` fallback. `PROMPT_RESOLVER_STRICT=true` disables fallback. Currently used only by scripts; no live API route depends on it.
 - **`model-resolver.js`** / **`model-override-loader.js`** — Per-app model overrides for `baseConfig.js`. Resolver computes effective model per app at call time and exposes `resolveModelWithCapabilities()` for coupled concrete-id + reviewed-capability lookup; loader caches DB-backed overrides.
-- **`claude-reviewer-service.js`** — Legacy Claude wrapper with retry/fallback (new code uses `llm-client.js`).
+- **`claude-reviewer-service.js`** — Live, legacy-named Reviewer
+  Finder/Workbench orchestration service. It now delegates provider calls through
+  `llm-client.js`; do not treat it as dead code.
 
 ### Dynamics / Dataverse
 
@@ -48,7 +51,10 @@ If you're touching a service or utility, read its header before this catalog. If
 
 - **`settings-service.js`** / **`dataverse-settings-service.js`** — Dataverse `wmkf_appsystemsettings`. Legacy Postgres `system_settings` was dropped 2026-05-12 (Migrates / Replaced); dispatch retained as fail-loud opt-out.
 - **`app-access-service.js`** / **`dataverse-app-access-service.js`** — Dataverse `wmkf_appuserappaccesses`. Legacy Postgres `user_app_access` was dropped 2026-05-12 (Migrates / Replaced).
-- **`dataverse-prefs-service.js`** — Dataverse `wmkf_appuserpreferences` adapter. Postgres `user_preferences` was dropped 2026-05-12 (Migrates / Replaced). See header KNOWN HAZARD re: dead Postgres branches in `database-service.js`.
+- **`dataverse-prefs-service.js`** — Dataverse `wmkf_appuserpreferences`
+  adapter. Postgres `user_preferences` was dropped 2026-05-12 and its old
+  database-service branch was removed; unsupported Postgres configuration fails
+  loudly.
 - **`email-signature.js`** — Unified per-user email-signature resolver. Reads the `email_signature` preference from Dataverse user preferences, falls back to legacy reviewer sender info, resolves request-scoped grantee signatures from the assigned Dataverse PD via `dataverse-identity-map`, and appends a Foundation-ending signature block for grantee invite/reminder mail.
 
 ### Storage / persistence
@@ -106,7 +112,10 @@ If you're touching a service or utility, read its header before this catalog. If
 
 - **`feedback-service.js`** — `dynamics_feedback` thumbs + auto-detected failures.
 - **`alert-service.js`** — `system_alerts` rows; health/maintenance/secret/log alerts; dedupe.
-- **`notification-service.js`** — System-alert row + category-routed email; explicit-recipients union (S190); HTML-escaped body; Dynamics email transport wrapped in `bypassDynamicsRestrictions` (S191).
+- **`notification-service.js`** — System-alert row + category-routed email;
+  explicit-recipients union and HTML-escaped body. Callers must establish the
+  trusted ambient Dataverse context; the service no longer creates a hidden
+  bypass around its Dynamics email transport.
 - **`maintenance-service.js`** — Cleanup operations; audit trail; Dataverse-configured retention.
 
 ### Other
@@ -142,7 +151,7 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ### Auth / cron
 
-- **`auth-policy.js`** — proxy-bundle-safe `isAuthRequired()` shared between `proxy.js` (Node.js runtime in Next 16) and `lib/utils/auth.js`. Reads only `process.env`, no Node-only / `@vercel/postgres` / `next-auth` imports. **Production fails closed** unless `EMERGENCY_AUTH_BYPASS=true`. Misconfig warnings memoized once per process.
+- **`auth-policy.js`** — proxy-bundle-safe `isAuthRequired()` shared between `proxy.js` (Node.js runtime in Next 16) and `lib/utils/auth.js`. Reads only `process.env`, no Node-only / `@vercel/postgres` / `next-auth` imports. **`NODE_ENV=production` fails closed** unless `EMERGENCY_AUTH_BYPASS=true`; the predicate is not a Vercel environment-name check and applies to production-mode Preview and Production runtimes. Misconfig warnings memoized once per process.
 - **`cron-auth.js`** — Vercel cron `CRON_SECRET` verification (Bearer header). Dev-mode bypass.
 
 ### Health / files

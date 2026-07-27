@@ -2,10 +2,11 @@
 title: "Staff-Editable Review Questions — Build Plan"
 domain: architecture
 kind: plan
-status: active
-summary: "Today [VERIFIED via source, S303] lib/external/review-form-schema.js exports a hardcoded reviewFormSchema.fields array, statically imported by 8..."
+status: historical
+summary: "Completed S305 implementation record for the staff-editable Dataverse review-question set and answer-snapshot rating migration."
 canonical: false
 cataloged: 2026-07-02
+last_verified: 2026-07-26
 owner: product-engineering
 related:
   - pages/api/admin/review-questions.js
@@ -15,7 +16,12 @@ related:
 
 # Staff-Editable Review Questions — Build Plan
 
-**Status:** IN PROGRESS — scoped + Codex-reviewed S303 (2026-06-29) from `REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md` §0 #6 (the deferred staff-editable-questions phase, now eligible because the authoring flow shipped). **Phase A COMPLETE + LIVE IN PROD S303** — entity created + seeded (12 rows), `getActiveQuestionSet()` read-back verified end-to-end against prod; Codex-reviewed, P1/P2 fixes folded in (commits `f06316bb`, `d6b4d69c`). **Phase B COMPLETE** — B1 server (S303: submit/draft/context routes + `build-review-submission` read `getActiveQuestionSet()`) and B2 client (S304: `ReviewAuthoringForm` renders from the `context` set, type-aware draft reconciliation, `setVersion` echo + `set_changed` reload, real-build E2E green). The live reviewer authoring flow now renders end-to-end from the Dataverse `wmkf_reviewquestion` set (behavior-identical — seeded set == static schema). **Phase C COMPLETE (S304)** — superuser editor (`/admin` → `ReviewQuestionsSection` → `pages/api/admin/review-questions.js`): atomic-changeset save, pure diff module, Postgres audit (migration 022 **applied to prod S304**), key-immutability, optimistic-lock, drag-reorder; unit/integration/RTL green. **Phases D–E not started.** Codex design-review findings folded in (see §11); the Phase-A P0 (missing `primaryNameAttribute`) is resolved in §2. Owner decisions captured below (S303). **Phase B Codex-reviewed S304** (no P0; two P1s — version-hash audit gap + set_changed draft flush — fixed + regression-tested, §11).
+**Status:** **COMPLETE (S305).** Phases A–E shipped: the 12-row
+Dataverse-backed question set and cached/authoritative fetch paths, reviewer
+rendering, superuser editor and audit, snapshot-based rating readers/writers,
+and retirement of the three parent rating columns. The remaining sections are
+the implementation record; statements labeled “Today” describe the S303
+starting point unless explicitly updated.
 
 **Codex correction (S303):** the parent-rating-column reader fan-out was re-verified by literal-column grep. `virtual-review-panel.js` and `dataverse-export/preview.js` do **NOT** read `wmkf_reviewer{impact,risk,overallrating}` (they matched an unrelated "average/aggregate" term search in the initial scoping pass) — they are removed from the §6 reader list. `ReviewerManagePanel.js:977-979` (a DTO consumer) was missed and is added. Net: the retirement fan-out is smaller and has no LLM-prompt/export dependency.
 
@@ -34,7 +40,9 @@ related:
 
 ## 1. The architectural spine
 
-**Today** [VERIFIED via source, S303] `lib/external/review-form-schema.js` exports a hardcoded `reviewFormSchema.fields` array, **statically imported** by 8 consumers:
+**S303 starting point (historical):** `lib/external/review-form-schema.js`
+exported a hardcoded `reviewFormSchema.fields` array, statically imported by
+eight consumers:
 
 | Consumer | Uses |
 |---|---|
@@ -49,11 +57,16 @@ related:
 
 *(That table is the S303 starting point. **Since Phase B (S303 B1 server + S304 B2 client):** `draft.js`, `submit.js`, and `context.js` read the fetched set; `build-review-submission.js` takes it as a param (the live routes pass it — the imported `reviewFormSchema.fields` survives only as the dormant default they override); `ReviewAuthoringForm.js` renders from the `context`-supplied set with **no static import**. Still static as the live question source: `ReviewFormFields.js`'s default `fields` prop (its only caller `ReviewerManagePanel` stays static) and the two legacy `validateReviewForm` paths — deferred to Phase C/D per §5. `ReviewsTab.js` imports only retained label helpers (`labelForReviewRating`, `reviewRatingShortLabels`), not the question array.)*
 
-The change that drives everything: **a synchronous, always-present, build-time array becomes a runtime-loaded, possibly-empty (Dataverse-down), async-fetched set.** Three consequences:
+The implemented change replaced that synchronous, always-present build-time
+array with a runtime-loaded, fail-closed Dataverse set. The historical design
+identified three consequences:
 
 - **Server consumers** (draft/submit/context/build-review-submission/upload validator) must `await` the question set and thread it through, instead of importing it.
 - **Client consumers** (`ReviewFormFields`, `ReviewAuthoringForm`, `ReviewsTab`) can't fetch async at import time — the question set must flow to the client **through `context.js`** as data. (This **reverses the Phase-2 decision** that removed `formSchema` from the `context.js` response because both renderers imported it statically — see authoring plan §8 Phase 2.)
-- **Fail-closed when Dataverse is unreachable**, exactly like `PolicyFetcher` (no bundled fallback): a reviewer cannot author against an unknown question set; render an error, never a broken/empty form. The current 11 questions are migrated into the entity as the **seed** (one-time), so steady-state always has a set.
+- **Fail-closed when Dataverse is unreachable**, exactly like `PolicyFetcher`
+  (no bundled fallback): a reviewer cannot author against an unknown question
+  set; render an error, never a broken/empty form. The seed/current set contains
+  12 questions.
 
 `review-form-schema.js` is **retained** as: (a) the normalized field *shape* contract + the seed definition, and (b) the pure helpers (`labelForReviewRating` etc.) re-pointed to operate on the fetched set. It stops being the system of record for *which* questions exist.
 
@@ -88,7 +101,10 @@ Schema-as-code, new wave (`lib/dataverse/schema/wave9-review-questions/`), prod 
 
 ### 2b. `wmkf_appreviewanswer` (system of record for ANSWERS) — unchanged
 
-Already holds all 11 questions including ratings (`wmkf_answervalue` for picklists). **No schema change needed** — decision #4 (ratings → snapshot) is already structurally supported. The snapshot is what makes "live edit" safe.
+Already held the complete seeded question set, including ratings
+(`wmkf_answervalue` for picklists). **No schema change was needed** — decision
+#4 (ratings → snapshot) was already structurally supported. The snapshot is what
+makes live edits safe.
 
 ### 2c. Postgres `review_drafts` — unchanged
 
@@ -173,7 +189,9 @@ Retiring them is **not** a single delete. Stage it:
 - **6d-E1. Stop writing the parent columns. ✅ DONE (S305).** All 3 writers stopped PATCHing `wmkf_reviewer{impact,risk,overallrating}`; ratings are snapshot-only. `reviewParentColumnByKey` reduced to affiliation; the producer count/domain backstop re-anchored on explicit `CORE_RATING_KEYS`; `validateReviewForm` returns a separate `ratings` bucket (strict integer parse); the admin removal guard (`PARENT_BOUND_KEYS`) decoupled from the parent map so it survived the shrink; the one-shot backfill is frozen. Codex design-reviewed (P1×4 + P2×1 folded). No code writes the columns anymore (grep-verified).
 - **6d-E2. Drop the parent columns. ✅ DONE (S305).** The 3 attrs were retired from schema-as-code first (removed from `lib/dataverse/schema/wave2-existing/wmkf_appreviewersuggestion-extensions.json` so the create-only applier can't resurrect them — Codex E2 P0-1), then dropped from the Dataverse `wmkf_appreviewersuggestion` entity via `scripts/drop-reviewer-rating-columns.mjs --execute` (dedicated metadata-delete; idempotent, 404-safe). Verified gone (re-run reports all 3 already-dropped). Dropped during a multi-week zero-review window (no in-flight submission to disrupt) after E1 was the sole live prod bundle. **Forward constraint: never redeploy pre-E1 code** — it would PATCH the now-missing columns (P0-2). The Postgres engagement/drop predicate was already moot (migration 018 dropped `reviewer_suggestions` 2026-06-04 — P2-2).
 
-Until 6d, the parent/child rating-equality invariant in `buildReviewSubmission` still holds for the canonical 3 and is the safety net during dual-write.
+During the migration, the parent/child rating-equality invariant in
+`buildReviewSubmission` protected the canonical three ratings. Phase E removed
+that dual-write and the parent columns.
 
 ---
 

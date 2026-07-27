@@ -6,6 +6,7 @@ status: active
 summary: "This guide explains how to configure Azure AD (Microsoft Entra ID) authentication to restrict app access to your organization only."
 canonical: false
 cataloged: 2026-07-02
+last_verified: 2026-07-26
 owner: product-engineering
 related:
   - lib/utils/auth.js
@@ -21,8 +22,8 @@ This guide explains how to configure Azure AD (Microsoft Entra ID) authenticatio
 ## Overview
 
 The app uses Microsoft Entra ID (Azure AD) for single sign-on (SSO). When enabled:
-- A **server-side proxy gate** (`proxy.js`, Next 16 `proxy` file convention + `next-auth/middleware`) validates the session JWT before any HTML/JS is served — unauthenticated users are redirected before the app code is reachable.
-- All API endpoints additionally enforce auth via `lib/utils/auth.js` (`requireAuth`, `requireAuthWithProfile`, `requireAppAccess`, `requireSuperuser`).
+- A **server-side proxy gate** (`proxy.js`, Next 16 `proxy` file convention + `next-auth/middleware`) validates session JWTs for matched application routes before protected pages are served. Static/image assets, NextAuth, cron, IRS, and narrowly matched HMAC endpoints are excluded and enforce their own boundary contracts.
+- Staff API endpoints normally use guards from `lib/utils/auth.js` (`requireAuth`, `requireAuthWithProfile`, `requireAppAccess`, `requireSuperuser`). Applicant, external-token, cron, IRS, BILL webhook/HMAC, NextAuth, and intentionally public metadata routes use their dedicated guards instead.
 - Client-side guards (`RequireAuth`, `RequireAppAccess`) provide UX-level defense-in-depth.
 
 This is a three-layer defense-in-depth model — middleware → API auth → client guards. See CLAUDE.md "Authentication Architecture" for the full description.
@@ -38,7 +39,7 @@ Sessions self-identify via `session.user.userType: 'staff' | 'applicant'`; middl
 
 ### Kill switch
 
-A **kill switch** (`AUTH_REQUIRED` environment variable) allows you to disable authentication without code changes if something goes wrong. **In production, the kill switch fails closed** — you must also set `EMERGENCY_AUTH_BYPASS=true` to disable auth in a production environment. This guards against accidentally shipping `AUTH_REQUIRED=false` to prod. See `lib/utils/auth-policy.js`.
+A **kill switch** (`AUTH_REQUIRED` environment variable) allows you to disable authentication without code changes if something goes wrong. **Whenever `NODE_ENV=production`, the kill switch fails closed** — you must also set `EMERGENCY_AUTH_BYPASS=true`. This predicate applies to production-mode Vercel Preview and Production runtimes; it is not a check of the Vercel environment name. This guards against accidentally shipping `AUTH_REQUIRED=false` to a deployed build. See `lib/utils/auth-policy.js`.
 
 ---
 
@@ -173,18 +174,17 @@ The `AUTH_REQUIRED` environment variable acts as a kill switch. If you get locke
 ### Disabling Authentication (Emergency Access)
 
 1. Go to Vercel Dashboard → Project → **Settings** → **Environment Variables**
-2. Find `AUTH_REQUIRED`
-3. Change value from `true` to `false`
-4. Click **Save**
-5. Go to **Deployments** → Redeploy the latest deployment
-6. Wait ~30 seconds for deployment to complete
-7. Access the app without authentication
+2. Set `AUTH_REQUIRED=false`.
+3. If `NODE_ENV=production`—including Vercel Preview and Production runtimes—also set `EMERGENCY_AUTH_BYPASS=true`. `AUTH_REQUIRED=false` alone intentionally fails closed in production mode.
+4. Click **Save**, then go to **Deployments** and redeploy the latest deployment.
+5. Verify the expected critical server alert and confirm emergency access.
 
 ### Re-enabling Authentication
 
 1. Fix any issues with Azure AD configuration
 2. Change `AUTH_REQUIRED` back to `true`
-3. Redeploy
+3. Remove `EMERGENCY_AUTH_BYPASS` (or set it to `false`)
+4. Redeploy and verify authenticated access
 
 ---
 
@@ -248,9 +248,10 @@ This allows you to develop without setting up Azure credentials locally.
 
 **Fix:** Use the kill switch:
 1. Set `AUTH_REQUIRED=false` in Vercel
-2. Redeploy
-3. Debug the issue
-4. Re-enable when fixed
+2. When `NODE_ENV=production`—including Vercel Preview and Production—also set `EMERGENCY_AUTH_BYPASS=true`
+3. Redeploy and verify the critical alert
+4. Debug the issue
+5. Restore `AUTH_REQUIRED=true`, remove the emergency bypass, and redeploy
 
 ---
 
@@ -298,7 +299,7 @@ View sign-in logs in Azure Portal:
 | File | Purpose |
 |------|---------|
 | `proxy.js` | Server-side auth gate (Next 16 `proxy` convention, `withAuth`/`jose`) + CSP nonce generation |
-| `lib/utils/auth-policy.js` | proxy-bundle-safe `isAuthRequired()` (shared by `proxy.js` Node.js runtime + `lib/utils/auth.js`) — production fails closed unless `EMERGENCY_AUTH_BYPASS=true` |
+| `lib/utils/auth-policy.js` | proxy-bundle-safe `isAuthRequired()` (shared by `proxy.js` Node.js runtime + `lib/utils/auth.js`) — `NODE_ENV=production` fails closed unless `EMERGENCY_AUTH_BYPASS=true` |
 | `lib/utils/auth.js` | Server-side auth helpers (`requireAuth`, `requireAuthWithProfile`, `requireAppAccess`, `requireSuperuser`) — app grants cached 2-min in-memory; `is_active` + superuser role read fresh each request (never cached) |
 | `pages/api/auth/[...nextauth].js` | NextAuth dual-provider configuration (`azure-ad` + `entra-external`) |
 | `pages/api/auth/status.js` | Auth status endpoint (checks kill switch) |

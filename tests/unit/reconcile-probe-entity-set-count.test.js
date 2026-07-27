@@ -189,7 +189,7 @@ describe('reconciliation report semantics', () => {
 
     expect(claim).toMatchObject({
       entity: 'wmkf_appreviewersuggestion',
-      atlas_claim: 710,
+      atlas_claim: 724,
       source_file: 'docs/atlas/dataverse-wmkf-appreviewersuggestion.md',
     });
   });

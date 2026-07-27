@@ -2,11 +2,18 @@
 title: Agent Instruction File Audit (S322)
 domain: agent-harness
 kind: audit
-status: active
-summary: Audit of CLAUDE.md, AGENTS.md, and .claude/rules/ for size, duplication, unread content, broken imports, and lint restatement. Findings + outcomes.
+status: historical
+summary: Historical S322 instruction audit; the approved consolidation shipped and the rejected path-glob change remains closed.
+canonical: false
+last_verified: 2026-07-26
 ---
 
 # Agent Instruction File Audit — Session 322 (2026-07-03)
+
+> **Historical snapshot.** The approved F1 edits shipped; F2 was rejected and remains
+> closed. Counts, line numbers, and the application protocol below describe the S322
+> repository and are not current operating authority. Use `CLAUDE.md`,
+> `docs/CLAUDE_INSTRUCTION_AUTHORITY.md`, and the live instruction gates.
 
 Audit-only report; no instruction file was modified during the original audit. Subsequent owner decisions are recorded as outcome notes below. Every original claim below is grounded in a tool result from the S322 session, quoted with file:line. Evidence anchor: commit `16185334`. A future LLM applying any remaining recommendation must follow the **Application protocol** at the end.
 

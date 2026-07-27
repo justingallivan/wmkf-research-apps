@@ -2,11 +2,18 @@
 title: Docs-vs-Code Drift Audit (S322)
 domain: repo-hygiene
 kind: audit
-status: active
-summary: Fresh code-first comparison of README, CLAUDE.md, and docs/ claims against actual behavior. Drift table with evidence plus a proposed docs patch. No edits.
+status: historical
+summary: Historical S322 docs-vs-code audit; approved fixes were applied in 2026-07 and current truth lives in source and canonical docs.
+canonical: false
+last_verified: 2026-07-26
 ---
 
 # Docs-vs-Code Drift Audit — Session 322 (2026-07-03)
+
+> **Historical snapshot.** The approved outcomes recorded below were applied in July
+> 2026. The proposed diffs and application protocol are retained as evidence and must
+> not be treated as current instructions. Re-derive current truth from source and the
+> canonical docs before acting.
 
 Audit-only; nothing was changed. Method: three code-first read-only scans (setup/commands, env vars both directions, architecture/layout) that derived ground truth from source before reading the doc claims, plus main-session re-verification of every load-bearing mismatch. Evidence anchor: commit `1ccb837a`.
 

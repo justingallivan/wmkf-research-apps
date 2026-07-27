@@ -5,9 +5,8 @@
  *   - peer-review-summarizer.analyze
  *   - peer-review-summarizer.questions
  *
- * Migrates the two live Claude prompts in `pages/api/process-peer-reviews.js`
- * into Dynamics-resident storage. Live route still uses the legacy generators
- * in `shared/config/prompts/peer-reviewer.js` until the post-cycle route refactor.
+ * Seeds the Dynamics-resident rows used by the live peer-review summarizer
+ * Executor path. The route no longer uses the legacy prompt generators.
  *
  * Usage:
  *   node scripts/seed-peer-review-summarizer-prompts.js --dry-run
@@ -125,7 +124,7 @@ const analyzeRow = {
   notes:
     'Phase 0 seed (Session 111). Combined SUMMARY + QUESTIONS pass. ' +
     'Source of truth: shared/config/prompts/peer-reviewer-dynamics.js. ' +
-    'Live route still uses createPeerReviewAnalysisPrompt until route refactor.',
+    'Live route executes this prompt through executePrompt.',
 };
 
 const questionsRow = {

@@ -17,7 +17,7 @@ related:
 
 # WMKF System Model
 
-**Status:** Canonical conceptual model, refreshed 2026-07-22 against source. This is the
+**Status:** Canonical conceptual model, refreshed 2026-07-26 against source. This is the
 **architecture/decomposition** layer — the *why* and *how it fits together*. The live app registry is
 `shared/config/appRegistry.js`; code-derived counts live in `docs/CANONICAL_COUNTS.md`; the
 system-of-record matrix is `docs/APPLICATION_STATE_ATLAS.md` plus `docs/atlas/`; strategic direction
@@ -67,8 +67,10 @@ them):
   "Storage tiers + two interaction modes" below.
 - **drain** — moving data *out of* Postgres toward Dataverse (the system of record). Two related
   senses: (1) **drain-only** describes a Postgres table that is no longer authoritative — its rows
-  were migrated to Dataverse and the table is kept only as historical/staging (e.g., the reviewer
-  tables, `grant_cycles`); (2) the **submission drain** (`/api/cron/drain-submissions`) is the cron
+  were migrated to Dataverse and the table is kept only as historical/staging
+  (for example `grant_cycles`; the retired reviewer identity/suggestion tables
+  were dropped, while other reviewer Postgres tables remain active operational
+  stores); (2) the **submission drain** (`/api/cron/drain-submissions`) is the cron
   that advances queued intake `submission_jobs` one state at a time and lands them in Dataverse.
 - **slice-0** — the foundational schema increment for the intake-portal pilot: the first set of
   Dataverse schema changes (such as institution membership, roster rollup, and the request-person
@@ -243,7 +245,7 @@ machinery even applies):
 | Shape | fixed prompt → defined output | open-ended chat / agent loop |
 | "Prompt" | canonical, shared, Dataverse, cached, audited | whatever the user types — no canonical prompt |
 | Output | Dataverse field / SharePoint doc (org memory) | ephemeral — in-app transcript / export / download |
-| Examples | proposal summary, Phase I writeup, integrity screen | "consult LLM on this proposal"; NL CRM chat; Phase II "ask questions" |
+| Examples | Executor-backed proposal summary, grantee abstract/title, field primer, review synthesis | Integrity Screener; Virtual Review Panel; "consult LLM on this proposal"; NL CRM chat |
 | Governed by | Executor contract, prompt migration, dual-caller | context assembly + ephemerality only |
 
 **"Consult LLM" (Mode 2 exemplar + de-risking first slice — target-state):** in the Workbench the
@@ -325,10 +327,16 @@ payment automation), **compliance/security** (records, audit, access), **grants 
 
 ---
 
-## The simplifying realizations this model is built on
+## Target-state simplifying realizations
 
-1. **An app = (a prompt in Dataverse) × (a thin adapter).** App surfaces → *N prompts + a few adapter
-   shapes* (Workbench tab · PA trigger · ad hoc standalone).
+These are decomposition heuristics, not a claim that every current application
+already has this shape. Several live surfaces still use bundled or
+service-local prompts, direct LLM paths, Postgres operational state, or
+multi-step agent/panel orchestration.
+
+1. **A shareable declarative task tends toward (a prompt in Dataverse) × (a thin
+   adapter).** App surfaces → *N prompts + a few adapter shapes* (Workbench tab ·
+   PA trigger · ad hoc standalone).
 2. **The workflow and the surface are one initiative** (reviewer lifecycle = Workbench v1), with the
    **state machine as backbone**.
 3. **Backend automation is a dependency, not a capability**, and runs mostly off-platform (PA),

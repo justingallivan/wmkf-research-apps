@@ -6,6 +6,7 @@ status: active
 summary: "Plus, when a potential reviewer is first invited:."
 canonical: false
 cataloged: 2026-07-02
+last_verified: 2026-07-26
 owner: product-engineering
 related:
   - docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md
@@ -78,8 +79,22 @@ The split exists so the same person can have an unbounded number of suggestion r
 - The **slots** are AkoyaGO's native pattern — what staff sees on the request form.
 - The **suggestion rows** are the system-of-record for the full lifecycle, including everyone who was *considered* (selected=false) plus declines plus reminder counts.
 
-When a reviewer is "assigned" to a proposal, they appear in both: a slot lookup on the request, and a `selected=true` suggestion row.
+Modern assignment is authoritative in the `selected=true` suggestion row.
+Whether every current runtime path also maintains the five native request slots
+is **UNKNOWN**; do not depend on that co-write without a source/Power Automate/live
+probe. The slots remain a legacy applicant-input representation used by Workbench
+ingestion.
 
-## Same model across Postgres (now drain-only) and Dataverse (live source of truth, post-W6 2026-05-12)
+## Postgres operational state versus Dataverse authority
 
-The legacy Postgres schema (`researchers`, `reviewer_suggestions`, plus a flatter person concept) maps onto the same two-table shape. Wave 2 adapters are live in `/api/reviewer-finder/save-candidates` (writes to Dataverse `wmkf_potentialreviewer` and `wmkf_appreviewersuggestion`; bibliometrics are on the person after S213). `/my-candidates` is **Dataverse-backed** (W3-W6 / S164) — reads suggestions via `suggestionAdapter.findByPD()` and resolves grant-cycle data through `grant-cycles-dataverse`. The remaining Postgres reviewer tables are drain-only post-W6; per-row reconciliation status lives in `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`.
+The legacy Postgres person/suggestion tables (`researchers`,
+`researcher_keywords`, `publications`, `proposal_searches`, and
+`reviewer_suggestions`) were dropped by migration 018. Wave 2 adapters write the
+canonical Dataverse person and suggestion entities, and `/my-candidates` is
+Dataverse-backed.
+
+Reviewer-domain Postgres is not blanket “drain-only.” Active operational tables
+include `reviewer_find_roster` (Workbench Find roster), `review_drafts`
+(autosave scratchpad), `reviewer_acceptance_jobs` (post-accept side-effect
+queue), and `reviewer_identity_shadow_log` (resolver observability). Their
+per-table Atlas pages define ownership and lifecycle.

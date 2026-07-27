@@ -2,11 +2,18 @@
 title: Harness Instruction Audit — hooks, skills, guardrails (S322)
 domain: agent-harness
 kind: audit
-status: active
-summary: Classification of all 16 hooks, 6 skills, and settings wiring as still-needed / redundant / harmful, with a ranked removal list and risk notes. No deletions.
+status: historical
+summary: Historical S322 harness audit; approved hook and skill changes shipped, while the remaining removal was explicitly rejected.
+canonical: false
+last_verified: 2026-07-26
 ---
 
 # Harness Instruction Audit — Session 322 (2026-07-03)
+
+> **Historical snapshot.** The approved changes in the Outcome section shipped on
+> 2026-07-03, and the remaining removal was explicitly rejected. Inventory counts,
+> line numbers, ranked removals, and the closing application protocol describe S322
+> only. Use the live hooks, skills, settings, and instruction gates for current truth.
 
 Audit-only; nothing was deleted or modified. Companion to `docs/AGENT_INSTRUCTION_AUDIT_S322.md` (which covers `CLAUDE.md`, `AGENTS.md`, and `.claude/rules/` — not re-audited here). Every claim is grounded in an S322 tool result.
 

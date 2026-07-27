@@ -3,9 +3,10 @@ title: CI Gates Reference
 domain: docs-governance
 kind: runbook
 status: canonical
-summary: "Mechanics, exemption rules, and operating contracts for the project's CI gates. CLAUDE.md keeps the rule (\"red gates are P0\") and the gate-name..."
+summary: Mechanics, enforcement locations, exemption rules, and operating contracts for repository checks and their self-tests.
 canonical: true
 cataloged: 2026-07-02
+last_verified: 2026-07-26
 owner: product-engineering
 related:
   - docs/atlas/
@@ -16,11 +17,31 @@ related:
 
 # CI Gates Reference
 
-Mechanics, exemption rules, and operating contracts for the project's CI gates. CLAUDE.md keeps the rule ("red gates are P0") and the gate-name list; this doc holds the per-gate detail.
+Mechanics, exemption rules, and operating contracts for repository checks. A
+`check:*` package script is not automatically a GitHub CI check: enforcement can
+live in GitHub Actions, a blocking commit hook, the changed-surface session-stop
+hook, `/start`, or a manual release procedure.
+
+## Enforcement locations
+
+| Location | Current contract |
+|---|---|
+| GitHub Actions | `.github/workflows/test.yml` is authoritative. It runs lint; API-route, Atlas, doc-currency, docs-catalog, migration-manifest, agent-invariant, instruction-architecture, memory-router, doc-symbol, build-claim, model-warming, DAL/OData/context/route-service/route-lifecycle, secret, scaffolding, harness, and type checks; most listed gate self-tests; build; and `test:ci`. |
+| Blocking commit hooks | `check:docs-catalog` runs for catalog-relevant staged/command paths. `check:status-enum-parity` and `check:trust-boundary-guid` run on every recognized `git commit`. These hooks fail open on hook-internal errors, so `/start` remains their backstop. |
+| Session-stop changed-surface hook | `check:api-routes`, `check:atlas`, `check:migrations-manifest`, `check:prompt-injection-tagging`, `check:agent-wiki`, and `check:fact-consistency` are selected by changed paths. `CLAUDE_STOP_GATE_MODE` defaults to `advisory`; only an explicit `block` value makes failures blocking. |
+| Session start / manual | `.claude/skills/start/SKILL.md` owns the broader startup battery. Advisory checks such as `check:memory-drift:no-write` and `check:memory-health` do not become blocking merely because they have package scripts. |
+
+Do not describe a check as “in CI,” “blocking,” or “session-stop enforced” from
+its name alone. Verify the applicable workflow or hook. The repository policy
+still requires relevant red gates to be resolved before completion even when a
+particular enforcement layer is advisory.
 
 ## P0 gates
 
-A red gate in this set on `main` blocks new commits to the affected surface. Established 2026-05-08 after a two-session gap where a `wmkf_apprequestpersons` Atlas miss from S139 sat unfixed because each subsequent session classified it as out-of-scope.
+A red gate in this set blocks completion on the affected surface as repository
+policy. Automation varies by the enforcement table above. Established 2026-05-08
+after a two-session gap where a `wmkf_apprequestpersons` Atlas miss from S139 sat
+unfixed because each subsequent session classified it as out-of-scope.
 
 | Gate | What it scans | What it blocks |
 |---|---|---|
@@ -291,6 +312,42 @@ Scans `git ls-files` text content (current tree only, not history) and skips `pa
 - Allowlist: `scripts/check-secret-scan-allowlist.js`; entries must be file/line or substring-narrow and carry a reason comment. The current allowlist is empty.
 - Self-test: `npm run check:secret-scan:self-test` writes temporary fixtures, proves a real-looking secret is flagged, proves fake/test-marked values pass, and asserts the live baseline is clean.
 
+### `check:route-lifecycle-auth` — lifecycle auth claims match routes
+
+Compares every `ROUTE_NAMESPACE_LIFECYCLE` entry in
+`shared/config/appRegistry.js` with the actual `requireAppAccess(...)` keys in
+the resolved route files. It fails closed on missing handlers, unparseable
+guards, a missing `guardAppKeys`, a supposedly uniform namespace whose keys
+differ, or a `guardAppKeys: null` namespace that is not actually heterogeneous.
+GitHub CI runs the gate and `check:route-lifecycle-auth:self-test`.
+
+### `check:prompt-injection-tagging` — A7 registry coverage
+
+Checks the registered untrusted-input LLM surfaces for the required
+`wrapUntrustedContent` and `buildUntrustedContentPreamble` controls, including
+multimodal and per-builder exceptions declared in the registry. The gate and
+self-test are in the `/start` battery; the changed-surface session hook runs the
+gate for prompt paths in advisory mode by default. They are **not currently in
+`.github/workflows/test.yml`**.
+
+### `check:scaffolding-tokens` — leaked tool-call markup
+
+Scans tracked text files for bare-line tool scaffolding tags outside fenced code
+blocks. GitHub CI runs both the gate and
+`check:scaffolding-tokens:self-test`.
+
+### Repository and instruction integrity checks
+
+- `check:migrations-manifest` verifies that the sorted manifest exactly matches
+  `lib/db/migrations/*.sql`; GitHub CI also checks the build did not regenerate
+  an uncommitted manifest.
+- `check:agent-invariants:ci` verifies the tracked `AGENTS.md` symlink in CI.
+  Local `check:agent-invariants` additionally checks `.agents/skills` and the
+  Claude memory-store symlink.
+- `check:instruction-architecture` verifies required rules/hook wiring,
+  instruction size/shape, protected-path behavior, and the fresh-install
+  database guard.
+
 ## Coverage tool self-tests (binding contract)
 
 When modifying any `scripts/check-*.js` gate (or building a new one), the matching self-test must pass:
@@ -304,7 +361,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:prompt-storage-mentions` | `check:prompt-storage-mentions:self-test` |
 | `check:doc-symbol-refs` | `check:doc-symbol-refs:self-test` — positive (dangling), negative (existing/annotated/marker/glob/ellipsis/relative/URL/gitignored), and live-baseline-clean fixtures. |
 | `check:build-claim-freshness` | `check:build-claim-freshness:self-test` — positive (pending construction on an existing path: before/after/colon/to-be-created), negative (pending on absent path, plain ref, done-marker, "now lives at", bare-planned label, multi-path, ignore-marker, gitignored), and live-baseline-clean fixtures. |
-| `check:canonical-pointers` | `check:canonical-pointers-self-test` |
+| `check:canonical-pointers` | `check:canonical-pointers:self-test` |
 | `check:model-registry` | `check:model-registry:self-test` |
 | `check:agent-wiki` | `check:agent-wiki:self-test` |
 | `check:harness-framing` | `check:harness-framing:self-test` |
@@ -312,7 +369,10 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:trust-boundary-guid` | `check:trust-boundary-guid:self-test` |
 | `check:dataverse-access-layer` | `check:dataverse-access-layer:self-test` — law-mode greens plus red fixtures for entity calls, unresolved aliases/changesets, unknown methods, exported/re-exported aliases, method extraction/binding, client pass-through, computed methods, inline source expressions, and dynamic import. |
 | `check:route-service-boundary` | `check:route-service-boundary:self-test` — law-mode red fixtures (direct/alias/wrapper-reexport incl. import-then-export + CJS binding re-export/dynamic-import/inline-require adapter imports, dynamics-service import, root-level route, non-literal-source hard-fails), each asserting a named law failure with no baseline, + greens (clean shell, service-only route, own-function-exporting service, exempt dirs, green-only tree exits 0). |
+| `check:route-lifecycle-auth` | `check:route-lifecycle-auth:self-test` |
 | `check:secret-scan` | `check:secret-scan:self-test` |
+| `check:scaffolding-tokens` | `check:scaffolding-tokens:self-test` |
+| `check:prompt-injection-tagging` | `check:prompt-injection-tagging:self-test` |
 
 **When external review catches a structural pattern an existing gate missed, the order is mandatory:**
 
@@ -325,9 +385,14 @@ Skip step 1 and you'll forget the lesson; skip step 2 and the gate can regress s
 
 ## Fixture-path race hazard
 
-Several self-tests write synthetic fixtures into paths that the main gate also scans (e.g., `check:atlas:self-test` writes into `lib/services/atlas_selftest_tmp/`, which `check:atlas` scans). Running the pair concurrently causes the main gate to false-fail on the synthetic fixtures and race the self-test's cleanup.
+Several self-tests write synthetic fixtures into paths that multiple
+documentation gates scan (e.g., `docs/` or `docs/agent-wiki/`). Running only
+each gate/self-test pair sequentially is insufficient if different pairs run in
+parallel: one pair can read or delete another pair's fixtures. This was
+reproduced during the 2026-07-26 full documentation audit.
 
-**Always run a gate and its self-test sequentially:**
+**Run the entire fixture-writing gate battery serially. Within it, run each gate
+before its self-test:**
 - `check:atlas` then `check:atlas:self-test` (never in parallel)
 - `check:fact-consistency` then `check:fact-consistency:self-test` (same hazard)
 - `check:canonical-pointers` then `check:canonical-pointers:self-test` (same hazard)

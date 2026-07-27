@@ -4,7 +4,10 @@ Query your Dynamics 365 CRM data using natural language. No need to write OData 
 
 ## Overview
 
-Dynamics Explorer is an AI-powered chatbot that translates your questions into CRM queries, executes them, and presents the results in a readable format. It understands the CRM schema and can search across all indexed tables.
+Dynamics Explorer is an AI-powered chatbot that translates your questions into
+CRM queries, executes them, and presents the results in a readable format. It
+uses live schema metadata, but only exposes entities and fields allowed by the
+server-side restriction policy.
 
 ## Getting Started
 
@@ -54,13 +57,17 @@ Results are displayed as formatted tables or summaries depending on the query ty
 
 ## Multi-Turn Conversations
 
-The chat maintains context across messages, so you can:
+The chat sends at most six messages with each request. Histories of six or
+fewer messages are sent unchanged. When a longer history is trimmed, two
+synthetic context notices plus the four most recent real messages—normally two
+user/assistant exchanges—are sent, so you can:
 
 1. Ask "Show me requests from 2024"
 2. Follow up with "Which of those are from California?"
 3. Then "Show me the details for the third one"
 
-The AI remembers previous results and can refine or drill into them.
+Within that bounded window, the AI can use recent results to refine or drill
+into them. Older turns are not part of the active model context.
 
 ## Exporting Data
 
@@ -78,7 +85,9 @@ The AI remembers previous results and can refine or drill into them.
 
 ## Limitations
 
-- Results are limited by CRM query size limits (typically 5,000 records per query)
+- List/export retrieval is capped (up to 5,000 rows for supported export paths);
+  count requests use a distinct-count query and are not estimates based on that
+  retrieval cap
 - Some tables or fields may be restricted based on your role
 - Complex aggregations (averages, percentiles) may require multiple queries
 - The AI may occasionally misinterpret ambiguous queries — rephrase if results seem off
