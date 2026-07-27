@@ -39,6 +39,23 @@ sequence.
 | 3 | Remaining lifecycle design freeze | Calendar the fixed deadlines and define the full contract for Pre Site Visit Writeup, Site Visit, Final Writeup, and Initial Writeup. Existing June assumptions are inputs, not decisions. | Each tab has approved user, inputs, producer, persistence, consumer, access, recovery, and deadline. |
 | 4 | First deadline-bound writeup slice | Default candidate is Pre Site Visit Writeup, but only after the calendar and input/artifact contracts are approved. | One request produces a durable, editable Word artifact and visible Workbench state through a production smoke. |
 
+## Audit follow-ups — verified open, not silently prioritized
+
+- **Auth-status policy divergence (P1):** `/api/auth/status` reports
+  `AUTH_REQUIRED && credentials`, while server enforcement uses the fail-closed
+  `isAuthRequired()` policy. In a production-mode runtime the public endpoint can
+  return `enabled:false` while the server enforces authentication. A deliberate
+  product/security decision must choose whether the endpoint reports enforcement
+  state or remains a configuration hint; do not change it incidentally.
+- **Retired-table operational scripts:** 25 non-archive scripts mention the
+  dropped `reviewer_suggestions` table. `scripts/README.md` now blocks the
+  copy-pasteable commands, but code quarantine/removal requires an owner-approved
+  scope and caller review.
+- **Live-state reconciliation:** environment posture, mutable row counts, external
+  automation, and genuine external-reviewer use remain probe-required. The
+  repository-wide material-claim audit is partial reconciliation, not a clean
+  bill of health.
+
 ## Completed in this execution
 
 - Evidence-first sweep correction and bounded Workbench truth pass: the sweep now derives truth before
