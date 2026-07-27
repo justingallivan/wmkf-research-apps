@@ -1,30 +1,34 @@
 ---
 name: project-grantee-deliverable-email-voice
-description: Grantee deliverable emails (abstract-review invite + reminder) are sent from the NAMED Program Director in an established PD voice — not a generic "The W. M. Keck Foundation" sign-off. Canonical structure provided by Justin (S271).
+description: Current grantee invite/reminder email voice and live reminder template; both send from the named Program Director.
 metadata:
   type: project
   status: active
   scope: global
-  last_verified: S271 via owner-provided example email
+  last_verified: 2026-07-27 via source trace, production settings probe, and owner-authorized body update
 ---
 
 ## Recall Rule
 
 Read this when drafting/defaulting the grantee-deliverables invitation or reminder
-email copy (`email.grantee_invite.*`, AwardeeTab fill behavior, chunk-6 reminder body) or
+email copy (`email.grantee_invite.*`, AwardeeTab fill behavior, or
+`email.grantee_reminder.*`) or
 the publish-image waiver wording.
 
 ## The facts (owner, S271)
 
-- **From the Program Director, by name.** The email is signed by the named PD with
-  title (e.g. "Justin Gallivan / Senior Program Director / W. M. Keck Foundation"),
-  NOT "The W. M. Keck Foundation". The send already goes from the PD mailbox
-  (build plan chunk 3c); the BODY/signature must match. PD identity is available as
-  `ctx.programDirectorId` (resolve-request) — auto-populate the signature where
-  possible; otherwise leave a clear placeholder for staff to fill.
-- **Salutation:** "Dear Professor [Name]:" (the owner's example used "Professor",
-  not "Dr.").
-- **Canonical structure** (from the owner's real PD email, S271):
+- **Owner voice requirement:** the emails should read as coming from the named
+  Program Director, not a generic Foundation sender. The invite uses the
+  authenticated staff sender. The reminder requires the request's assigned PD
+  systemuser, name, and email and sends with `noFallback:true`; if those cannot
+  be resolved, it skips rather than sending from the service principal.
+- **Signature fallback is narrower than the ideal example.** A saved signature
+  may contain the PD's title. Without one, `resolveSignatureForRequest` produces
+  the PD name plus `W. M. Keck Foundation`; if request/PD resolution fails, the
+  body fallback can be Foundation-only. Source does not synthesize a title.
+  Never accept sender identity from the grantee/client.
+- **Invite salutation/structure (owner example, S271):** the original example used
+  "Dear Professor [Name]:" (not "Dr.") and this sequence:
   1. Congratulations on the recent W. M. Keck Foundation grant.
   2. "We plan to post an abstract on the Foundation's website describing your award
      entitled '[title]'."
@@ -41,8 +45,10 @@ the publish-image waiver wording.
      publications and other scientific work related to this award, such as
      presentations and posters."
   6. "Please do not hesitate to contact me if you need additional information."
-  7. "Thank you," + PD name + title.
-- **Deadline model answers part of chunk-6 cadence:** there IS a hard deadline
+  7. The owner example ended with "Thank you," + PD name + title. The shipped
+     invite default later removed that body closing to avoid colliding with the
+     PD's saved Outlook signature; do not restore it to the invite by analogy.
+- **Deadline model:** there IS a hard deadline
   (COB a named date) and **non-response = implied consent to post the draft**.
 - **Approved abstract-provenance line (owner edit S271):** "The draft abstract is
   based on information you provided in your proposal, lightly edited to conform to
@@ -51,6 +57,23 @@ the publish-image waiver wording.
 - **Image format/caption/release paragraphs are REMOVED from the email** — the
   portal interface now collects the image, caption+credit, and the publish
   permission (the waiver checkbox IS the release form).
+
+## Current shipped reminder (verified 2026-07-27)
+
+The automatic reminder is built and deployed. It runs daily, selects packages
+still `Invited` at day 12, and uses invite-date + 14 days as the COB deadline.
+It sends from the assigned PD to the PI and Cc's the liaison.
+
+The live `email.grantee_reminder.subject/body` rows match
+`lib/seed/email-defaults/grantee-reminder.js`. Current wording uses
+`Dear Professor {{granteeName}},` (comma), a concise follow-up, the secure link,
+the day-14 deadline/implied-concurrence sentence, the no-action-needed sentence,
+the contact invitation, and `Thank you,` before `{{signature}}`. The owner
+authorized restoring `Thank you,` on 2026-07-27. Do not copy the longer invite
+sequence into the reminder unless the owner requests a reminder-copy change.
+
+At verification time, all three production package rows were `Drafted`; the
+probe found zero eligible rows and no evidence of successful live delivery.
 
 **Why:** stakeholder/grantee emails in the Foundation's real voice are personal,
 PD-signed, and deadline-driven; a generic Foundation sign-off and portal mechanics

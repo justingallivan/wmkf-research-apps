@@ -158,15 +158,15 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [GRANTEE_WAIVER_VERSIONING_PLAN.md](GRANTEE_WAIVER_VERSIONING_PLAN.md) | plan | draft |  | Version the grantee publication waiver like the reviewer COI/AI-use policies: a grantee-waiver slot, admin editing, and an acked-version lookup. |  |
+| [GRANTEE_WAIVER_VERSIONING_PLAN.md](GRANTEE_WAIVER_VERSIONING_PLAN.md) | plan | historical |  | Historical design and rollout record for the shipped, versioned grantee publication waiver. |  |
 
 ## grantee-portal
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md](GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md) | plan | active |  | - The 14-day-to-respond / remind-at-day-12 cadence needs an anchor: when was the invite sent? Nothing records that today. | 2026-07-02 |
+| [GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md](GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md) | plan | historical |  | Historical record for the shipped child-package cutover and day-12 reminder; current behavior lives in GRANTEE_PORTAL_SPEC and the Atlas. | 2026-07-02 |
 | [GRANTEE_INVITE_BODY_CUSTOM_PLAN.md](GRANTEE_INVITE_BODY_CUSTOM_PLAN.md) | plan | historical |  | Historical record of the completed per-PD grantee-invite-body preference and Awardee-tab edit affordance. | 2026-07-02 |
-| [GRANTEE_PORTAL_BUILD_PLAN.md](GRANTEE_PORTAL_BUILD_PLAN.md) | plan | active |  | As-built implementation chronology for the grantee deliverables portal; current field ownership and consent behavior defer to GRANTEE_PORTAL_SPEC and the Atlas. | 2026-07-02 |
+| [GRANTEE_PORTAL_BUILD_PLAN.md](GRANTEE_PORTAL_BUILD_PLAN.md) | plan | historical |  | Historical implementation chronology for the grantee deliverables portal; current behavior is defined by GRANTEE_PORTAL_SPEC, the Atlas, and source. | 2026-07-02 |
 | [GRANTEE_PORTAL_SPEC.md](GRANTEE_PORTAL_SPEC.md) | spec | active | yes | As-built grantee deliverables contract: abstract text on akoya_request; package state, image, caption, and waiver evidence on the child row. | 2026-07-02 |
 
 ## intake-portal

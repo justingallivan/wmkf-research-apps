@@ -158,7 +158,7 @@ and a subsidiary `UNKNOWN` or `PLANNED` boundary.
 | Contact leads | Contact enrichment emits quarantined leads; manage-only promotion selects one | Bounded `reviewer_find_roster` representation plus canonical Dataverse person/suggestion on promotion | Reviewer Finder audit expander and invitation confirmation gate | `VERIFIED` for shipped slices; paid broad scout parked as not currently justified by owner decision after live measurement |
 | Prompt publication/execution | Admin publication route and repository seed paths | Dataverse `wmkf_ai_prompt`; append-only Postgres publication audit; `wmkf_ai_run` execution audit is fallible | Vercel Executor callers | `PARTIAL`; universal editor/resolver unbuilt; production PA prompt Executor absent from the 2026-07-27 visible flow metadata |
 | Workflow chaining | Vercel Executor parses declared output and attempts target writes | Declared `akoya_request.wmkf_ai_*` fields; per-output write results must be checked | Downstream PA consumers | `PARTIAL`; downstream PA DAG is planned/unbuilt, not an unknown current pipeline |
-| Grantee/honorarium | Guarded routes/services | Dataverse request/contact entities plus documented Postgres operational state | Workbench/portal/finance flows | `PARTIAL`; honorarium link population probed 2026-07-27, while grantee and broader mutable row/config populations still require probes |
+| Grantee/honorarium | Guarded routes/services | Dataverse request/contact entities plus documented Postgres operational state | Workbench/portal/finance flows | `PARTIAL`; honorarium link population and grantee reminder/waiver configuration were probed 2026-07-27. All three package rows are Drafted, and the probe found no evidence of successful live reminder delivery. |
 | Review synthesis | Staff synthesis route after at least one submitted review | `akoya_request.wmkf_reviewsynthesisjson` | Reviews tab and DOCX/PDF exports | `PARTIAL`; no auto trigger; participation semantics were owner-confirmed 2026-07-27 but remain unimplemented |
 | DAL/context migration | Post-auth entry points establish trusted context; services use entity adapters | Dataverse through the 19 registered adapters; boundary gates enforce exceptions | Route/service consumers | `VERIFIED`; DAL, bypass-strip, and notification push-up plans are completed history |
 | Q9 preferences/app access | Preference service uses the DynamicsService adapter; app-access service still uses raw client transport | Dataverse preference and app-access entities | Auth/profile/app-access consumers | `PARTIAL`; preference migration shipped, app-access transport migration deferred, production warn/soak state `UNKNOWN` |
@@ -218,13 +218,13 @@ and a subsidiary `UNKNOWN` or `PLANNED` boundary.
   product as parked drafts with their shipped foundations separated from their
   unbuilt products.
 
-### Focused independent restatement census
+### Original focused independent restatement census
 
 Units are material file/claim pairs, not raw matching lines. Duplicate textual
 hits in one file for the same claim collapse to one pair; a file participating
 in two distinct claim families counts twice. This is a focused independent
-census of 48 whole-read/source-checked pairs, not every textual occurrence in
-the repository.
+census of 48 whole-read/source-checked pairs before the later grantee follow-up,
+not every textual occurrence in the repository.
 
 | Claim family | Pairs | `AGREE` | `STALE` | `HISTORICAL` | `UNRELATED` |
 |---|---:|---:|---:|---:|---:|
@@ -240,11 +240,8 @@ the repository.
 
 These are deliberately not converted into “current” facts:
 
-- Broader current production row populations still require purpose-built
-  read-only probes. The honorarium proposal-link population named in the
-  original sweep was resolved by the dated follow-up below.
-- Remaining grantee reminder-policy operations and current policy-row/body state
-  require external verification.
+- Broader current production row populations outside the specifically probed
+  honorarium and grantee slices still require purpose-built read-only probes.
 - Several memory leaves intentionally retain `UNKNOWN` for current Vercel flags
   or environment values, GitHub plan capabilities, tenant operation,
   Dataverse/SharePoint privileges, and live schema metadata until their named
@@ -354,6 +351,53 @@ failures. Any reopened proposal must re-decide the materiality threshold,
 identity eligibility, hard cap, latency budget, and leads-only safety invariant
 before implementation.
 
+### Follow-up resolution: grantee reminder and waiver state
+
+The grantee slice of the mutable-row/config unknown was resolved on 2026-07-27
+with `scripts/probe-grantee-reminder-state.mjs`,
+`scripts/probe-grantee-waiver-slot.mjs`, source/CodeGraph tracing, and a bounded
+deployed-configuration check:
+
+- production contains three deliverable rows, all `Drafted`;
+- there are zero day-12 eligible rows, zero past-day-14 rows, zero
+  `Reminder Sent` rows with or without `wmkf_remindeddate`, and zero malformed
+  status/date combinations;
+- the reminder subject/body settings each have exactly one row, all Mustache
+  tokens render, and the live values match the tracked seed;
+- the deployed production configuration registers the reminder cron daily at
+  08:00 UTC, but no eligible live row has exercised delivery and the bounded
+  runtime-log query returned no execution receipt;
+- the active waiver is version `2026-07-09`, exact-match to the tracked
+  295-character body, SHA-256
+  `941c44a3529aa81130df51fa186263edd5230e1e364bde2e7676cf77639b9659`.
+
+The owner then authorized one guarded production settings update: restore
+`Thank you,` immediately before `{{signature}}` in the reminder body. The
+one-purpose script required the exact prior hash and Dataverse ETag, touched
+only the single expected body row, and verified the post-write value. The
+retained script now also requires `--execute` and a hostname from the tracked
+production Dataverse registry. The body
+changed from SHA-256
+`4779ac3bbfd42f4453592e105468c3d10f5babd5dd144485218fc3a4a62226ce`
+to the tracked-seed hash
+`6bc31823750af6477e3764505c568b9c92db84358b84f58eeb020fe92c8d6dfa`.
+No cron was invoked and no email was sent.
+
+### Grantee follow-up independent census
+
+A separate adversarial census reviewed 31 grantee reminder/waiver
+file-and-claim pairs: 16 initially `AGREE`, 9 `STALE`, 4 `HISTORICAL`, and 2
+`UNRELATED`. The nine stale pairs were the package/build/spec documents, audit,
+email-voice memory, waiver plan, generated catalogue, form header, and memory
+router. A second pass found five residual issues: one leftover open-decision
+sentence, an overstated signature guarantee, an incomplete final census, a
+retained updater without explicit execution/production-target guards, and a
+stale probe verdict. Each was corrected before commit.
+
+Across the original and follow-up censuses, the final additive result is 79
+material file/claim pairs: 52 `AGREE`, 25 `HISTORICAL`, 2 `UNRELATED`, and 0
+`STALE`. These are claim-pair reviews, not 79 unique files.
+
 ### Mechanical memory result
 
 `check:memory-health -- --json` now reports:
@@ -374,8 +418,9 @@ claim review and explicit unknowns above, not on the checker alone.
 ## Final verification and verdict
 
 The independent adversarial review found no unresolved material documentation
-or memory-hygiene finding. Its focused census covered 48 material claim/file
-pairs: 27 `AGREE`, 21 `HISTORICAL`, 0 `STALE`, and 0 `UNRELATED`.
+or memory-hygiene finding. The original and grantee follow-up censuses together
+covered 79 material claim/file pairs: 52 `AGREE`, 25 `HISTORICAL`, 2
+`UNRELATED`, and 0 `STALE`.
 
 The root-run verification battery completed sequentially:
 
@@ -393,8 +438,11 @@ The root-run verification battery completed sequentially:
 **Verdict: `RECONCILED WITH EXPLICIT UNKNOWNS`.** Within the declared sweep
 domain, there is no known live stale claim or unresolved contradiction.
 Historical numeric references that remain are confined to clearly dated
-historical material rather than current implementation guidance. No live
-external write or state-changing probe was performed. The production Power
-Automate and honorarium-link read-only probes resolved those slices; the items
-still listed in “Explicit remaining unknowns and owner decisions” remain
-intentionally open pending their named read-only probes or owner decisions.
+historical material rather than current implementation guidance. The original
+sweep used read-only probes; the later grantee follow-up included the one
+owner-authorized, guarded reminder-body settings write documented above. The
+production Power Automate and honorarium-link read-only probes resolved those
+slices. The items still listed in “Explicit remaining unknowns and owner
+decisions” remain intentionally open pending their named read-only probes or
+owner decisions. The grantee settings write did not invoke the cron or send
+email.

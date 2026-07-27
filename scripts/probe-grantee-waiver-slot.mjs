@@ -15,6 +15,7 @@
  */
 
 import fs from 'fs';
+import { createHash } from 'crypto';
 const env = fs.readFileSync('.env.local', 'utf8');
 for (const line of env.split('\n')) {
   const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
@@ -40,11 +41,16 @@ const { getActivePolicy, invalidate } = await import('../lib/external/policy-fet
   console.log(`  parent:        ${policy.parentDisplayName} (${policy.parentId})`);
   console.log(`  activeVersion: ${policy.versionLabel} (${policy.activeVersionId})`);
   console.log(`  title:         ${policy.title}`);
+  console.log(`  effectiveDate: ${policy.effectiveDate || '(none)'}`);
   console.log(`  body chars:    ${(policy.body || '').length}`);
   if (!policy.activeVersionId || !(policy.body || '').trim()) {
     console.error('✗ resolved but missing active version id or body — misconfigured.');
     process.exit(1);
   }
-  console.log('\nVERDICT: OK — safe to deploy the fail-closed grantee waiver portal code.');
+  console.log(`  body sha256:   ${createHash('sha256').update(policy.body).digest('hex')}`);
+  console.log('\n--- active policy body ---');
+  console.log(policy.body);
+  console.log('--- end active policy body ---');
+  console.log('\nVERDICT: OK — active grantee waiver resolver is healthy.');
   process.exit(0);
 })().catch((e) => { console.error('probe error:', e?.message || e); process.exit(2); });

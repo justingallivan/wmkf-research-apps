@@ -63,7 +63,7 @@
 - Strategy / current queue / system model / roadmap / phasing / Virtual Review Panel: ../docs/CURRENT_WORK_QUEUE.md; ../docs/agent-wiki/topics/strategy-roadmap.md
 - Proposal docs / phasing / Phase I-II: project-j27-doc-capture-evolution.md; project-grant-phasing-evolution.md; project-phaseistatus-decision-lifecycle.md
 - Grantee and email templates: project-grantee-deliverable-email-voice.md; project-email-template-token-syntax.md
-- Grantee publication waiver (versioned, staff-editable in admin Policies; SHIPPED S350; ack modal S351): project-grantee-waiver-versioning.md; ../docs/GRANTEE_WAIVER_VERSIONING_PLAN.md
+- Grantee publication waiver (versioned, staff-editable in admin Policies; SHIPPED S350; ack modal S351): project-grantee-waiver-versioning.md; ../docs/GRANTEE_PORTAL_SPEC.md; ../docs/atlas/dataverse-wmkf-granteedeliverable.md
 - Reviewer ack provenance parity (MINOR follow-up S351 — reviewer COI/AI-use acks lack body-hash + bind version at-submit, not render): project-reviewer-ack-provenance-parity-followup.md
 - Reviewer institution → CRM linking / affiliation-mismatch alert / institution typeahead (PARKED S354 — pending Connor+Sarah account cleanup; ROR/OpenAlex canonical spine): project-reviewer-affiliation-institution-linking.md
 - Deferred cleanup / dead-code session: project-deferred-code-cleanup.md

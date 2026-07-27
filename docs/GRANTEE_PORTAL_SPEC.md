@@ -108,7 +108,12 @@ Per grantee, exactly:
    either row rolls back the whole changeset). SharePoint is outside the changeset: on a non-412
    failure the writer re-reads the deliverable before deleting the upload, so it never deletes an
    image a committed row references (`lib/services/grantee-upload.js`). Virus-scan the image on intake.
-6. **Cadence:** once per cycle, with an optional reminder for non-responders.
+6. **Cadence:** a daily cron selects packages still in `Invited` whose first
+   `wmkf_inviteddate` is at least 12 days old. It sends one reminder from the
+   assigned Program Director to the PI, Cc'ing the liaison, with a day-14 COB
+   deadline. The service conditionally claims the package as `Reminder Sent`
+   before email delivery so the next run cannot select it again; after a
+   successful send it stamps `wmkf_remindeddate`.
 
 ## Reuse — shared primitives vs parallel grantee variant
 
@@ -259,7 +264,7 @@ edited title is **staff-owned/display-only, NOT PI-editable** — so output (a) 
 (including the title) display-only above the editable body, with no title write-back path. See the
 build-plan chunk-8 "BUILT" blocks for modules, the canonical owner template, and route paths.
 
-## Remaining product/operations decisions
+## Current production boundary (verified 2026-07-27)
 
 The implementation questions about prompt wiring, storage fields, image
 validation, and waiver evidence are closed by the as-built contract above:
@@ -271,10 +276,29 @@ validation, and waiver evidence are closed by the as-built contract above:
   server-side; and
 - field/schema literals are recorded in the two canonical Atlas pages.
 
-Reminder cadence/deadline policy remains owner-configured operational scope.
-Current production row/status distribution and the current policy-row body are
-**UNKNOWN** without a dated live probe; source code and this spec do not prove
-those mutable facts.
+The reminder policy is implemented, deployed, and no longer an open product
+decision. The deployed Vercel configuration registers
+`/api/cron/grantee-deliverable-reminders` at `0 8 * * *` (08:00 UTC). The
+route accepts only a valid cron secret, and the service implements the day-12
+selection/day-14 deadline and once-only claim described above.
+
+A dated production probe found three `wmkf_granteedeliverable` rows, all in
+`Drafted`: zero day-12-eligible rows, zero past-day-14 rows, zero claimed
+`Reminder Sent` rows with a missing final timestamp, and zero exact-subject
+reminder email activities. This proves the current workload is empty; it does
+not prove a successful live cron delivery. No execution receipt was available
+from the bounded Vercel runtime-log query.
+
+The production `email.grantee_reminder.subject` and `.body` settings each have
+exactly one row and match `lib/seed/email-defaults/grantee-reminder.js`. On
+2026-07-27 the owner authorized restoring `Thank you,` before the Program
+Director signature; the guarded update changed only that setting row and the
+post-write probe rendered all tokens without leftovers.
+
+The separate `grantee-waiver` policy slot is also live and resolvable. Its
+active version is `2026-07-09`, and its exact body matches the tracked seed in
+`scripts/seed-grantee-waiver-policy.mjs`. See
+`docs/GRANTEE_WAIVER_VERSIONING_PLAN.md` for the historical rollout record.
 
 ## Pointers
 
