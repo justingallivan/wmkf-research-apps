@@ -3,7 +3,7 @@ title: "Workbench Reviews Tab — Consumption Build-Out Plan"
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Reviews tab deployed; production verified deterministic consumers and staff entry, but three controlled current-v2 synthesis runs failed."
+summary: "Reviews tab deployed; deterministic consumers verified; local synthesis reliability fix awaits governed publication/deployment and post-fix smoke."
 canonical: false
 cataloged: 2026-07-03
 last_verified: 2026-07-27
@@ -45,7 +45,9 @@ the form, but the owner-authorized staged production submission proved the
 populated Compare/matrix and DOCX/PDF/courtesy outputs against canonical answer
 rows. The smoke data was atomically cleaned up. The 2026-07-27 follow-up also
 proved the staff Manual Review Entry producer and exact restoration path. AI
-synthesis is the unresolved runtime boundary; a post-fix final smoke remains.
+synthesis remains the unresolved production runtime boundary. A local
+terminal-response/native-schema/bounded-retry fix passed focused tests on
+2026-07-27; governed prompt publication, deployment, and a post-fix smoke remain.
 
 ## Context
 
@@ -217,7 +219,8 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   All-override; the untrusted variable is `reviews_digest` — reviewer
   `answerText` (never `answerHtml`) composed server-side into a plain digest —
   declared `untrusted: true` so the Executor wraps it + injects the A7
-  preamble. Output: strict JSON, single output `synthesis` →
+  preamble. Output: strict JSON with prompt-level
+  `generationMode:'native-json-schema'`, single output `synthesis` →
   `akoya_request.wmkf_reviewsynthesisjson`, `guard: 'always-overwrite'`; a
   `validationSchema` (`lib/utils/ai-output-schema.js`) bounds/strips the parsed
   shape before the writeback.
@@ -264,9 +267,12 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   run preserved the exact 1,709-character baseline memo and its prior modified
   timestamp. Its 11 synthetic answers and four staged parent fields were fully
   restored, with no draft or unrelated email/material/reminder/thank-you
-  change. Resolve the structured-output reliability defect (or execute and
-  verify the documented prompt-only rollback) before exposure or another
-  production regeneration.
+  change. The local fix now requires `end_turn` before persistence, preserves
+  stop/token/hash diagnostics, uses capability-gated native JSON schema, and
+  retries only a typed `max_tokens` termination once with a bounded larger
+  budget. This is not yet a production-live claim: publish the governed prompt
+  version, deploy the independently reviewed code, and run one controlled
+  post-fix smoke before exposure.
 
 ## Verification per phase
 

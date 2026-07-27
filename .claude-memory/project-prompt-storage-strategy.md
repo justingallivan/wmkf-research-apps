@@ -5,7 +5,7 @@ type: project
 originSessionId: d898b20a-8b1d-4a13-ad0e-878f4f62e71d
 status: active
 scope: prompt
-last_verified: 2026-07-27 via current Executor source and production Power Automate/AI-run read-only probe
+last_verified: 2026-07-27 via current Executor source/tests and production Power Automate/AI-run read-only probe
 ---
 
 ## Recall Rule
@@ -20,6 +20,9 @@ Do:
 Do not:
 - Re-litigate the Session-109 locked decisions (Path B, two chain shapes, declarative vars/outputs, cache-boundary marker).
 - Treat the Executor as multi-turn / agent-loop / SSE-streaming / retry-engine / chain-orchestrator / Batch API — it is none of these.
+- Infer native structured output from `parseMode:"json"` alone. It is an
+  explicit prompt-level `generationMode:"native-json-schema"` opt-in and must
+  pass the resolved model-capability gate.
 
 Ground truth: `docs/EXECUTOR_CONTRACT.md`, `docs/PROMPT_STORAGE_DESIGN.md`,
 `docs/WORKFLOW_CHAINING_DESIGN.md`, `lib/services/execute-prompt.js`, and the
@@ -53,7 +56,9 @@ Session 109 (2026-04-24) reconciled six design docs + Wave 1 reality + Connor's 
 - **Table name is `wmkf_ai_prompt`** (Connor built it) — *not* `wmkf_prompt_template` as PROMPT_STORAGE_DESIGN originally proposed. <!-- prompt-storage:ignore reason=rename-callout --> Field names on it: `wmkf_ai_promptname`, `wmkf_ai_promptbody`, `wmkf_ai_promptvariables`, `wmkf_ai_promptoutputschema`, `wmkf_ai_promptstatus`, `wmkf_ai_iscurrent`, `wmkf_promptversion`, `wmkf_ai_rollbackfrom`, etc. See EXECUTOR_CONTRACT.md for full field list.
 - **Two chain shapes, both first-class:** sequential (output → input, via `prior_output` source kind, Phase 1) and parallel-consumer (shared input block, via `context_block` source kind, Phase 2)
 - **Variables are declarative** with `source.kind` enum: `dynamics`, `sharepoint`, `override` (Phase 0); `prior_output` (Phase 1); `context_block` (Phase 2)
-- **Outputs are declarative** with `target.kind` enum: `akoya_request`, `wmkf_ai_run`, `none`
+- **Outputs are declarative** with the live `target.kind` enum:
+  `akoya_request`, `none`. The Executor writes its own `wmkf_ai_run` audit row;
+  prompt outputs cannot target that table.
 - **Caching requires byte-identical prefixes across callers** — explicit `<<<CACHE_BOUNDARY>>>` marker; cacheable vars before, variable tail after
 - **Naming convention:** `<domain>.<purpose>` e.g. `phase-i.summary`, `phase-i.compliance`, `shared.full_application`
 - **Context blocks are tagged prompt rows** (new `Context` picklist value on `wmkf_ai_promptstatus`, Phase 2) — not a separate table
@@ -93,5 +98,9 @@ cross-prompt cache alignment. This is not current built-state guidance.
 - Not multi-turn / not agent-loops (Dynamics Explorer stays separate)
 - Not streaming SSE (today's streaming routes stay outside the contract)
 - Not a retry engine (caller decides retry)
+- Requires a provider-complete `end_turn` before any output persistence; callers
+  may re-invoke typed failures. Review synthesis currently retries exactly once
+  only for `claude_output_truncated`, leaving one AI-run audit attempt per
+  semantic invocation.
 - Not a chain orchestrator (the Flow orchestrates; Executor runs one prompt per invocation)
 - Not Anthropic Batch API (that's `wmkf_batch_run`, retrospective analyses)

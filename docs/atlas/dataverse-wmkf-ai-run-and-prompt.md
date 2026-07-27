@@ -1,6 +1,7 @@
 # Atlas: `wmkf_ai_run` + `wmkf_ai_prompt` (Dataverse)
 
-**Last verified:** 2026-07-27 for the `review-synthesis.generate` execution
+**Last verified:** 2026-07-27 for the local Executor/review-synthesis reliability
+contract and the latest `review-synthesis.generate` production execution
 record; 2026-07-26 for publication; 2026-07-12 for the broader entity inventory via
 `scripts/reconcile-memory-claims.js`
 **Source spec:** `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` (canonical; v2 archived)
@@ -89,8 +90,20 @@ Both written by `execute-prompt.js` `writeRunRow()`. Migration plans touching ei
   returned HTTP 500; the request synthesis memo remained byte-for-byte at its
   pre-smoke 1,709-character value and prior modified timestamp. The synthetic
   review was fully restored while this append-only audit row intentionally
-  remained. The release gate remains red pending synthesis resolution or the
-  documented prompt-only rollback.
+  remained.
+- **Local reliability change (2026-07-27; not yet a live prompt/deployment
+  claim):** the Executor now preserves complete joined response text and stop
+  metadata, rejects every non-`end_turn` result before persistence, and applies
+  failure-output retention inside the audit diagnostic envelope.
+  `review-synthesis.generate` is configured to opt into capability-gated
+  Anthropic native JSON-schema output, and its service performs at most one
+  semantic retry only for the typed `max_tokens` termination, with a bounded
+  larger budget. Each invocation independently attempts its own append-only
+  `wmkf_ai_run` row; a successful second attempt records
+  `semanticAttempt=2` and `retryOf=<first run GUID>` in notes when the first
+  audit write returned an id. The release gate remains red until the governed
+  prompt version is published, the code is deployed, and a controlled post-fix
+  smoke succeeds or fails cleanly with no write.
 - Production prompt writes occur through controlled admin publication or seed
   operations; ordinary prompt execution remains read-only on this entity.
 

@@ -1,5 +1,24 @@
 # Session 379 Prompt: Review-synthesis reliability and lifecycle closure
 
+## Session 379 In-Progress Summary
+
+The local review-synthesis reliability change is implemented and focused
+verification is green. `executePrompt` now preserves the normalized full text
+and stop metadata, requires `stopReason=end_turn` before either raw or JSON
+output can reach persistence, retains policy-compliant failure diagnostics, and
+capability-gates prompt-level Anthropic native JSON schema. The synthesis prompt
+uses a strict schema, and `synthesizeReviews` retries one confirmed
+`claude_output_truncated` invocation once with a bounded doubled budget. Because
+the retry is caller-owned, both semantic model invocations independently attempt
+their own append-only `wmkf_ai_run` row.
+
+Verification so far: 102 focused/surrounding Executor and synthesis tests
+passed; `check:model-registry` and its six-case self-test passed. Independent
+post-implementation review found no P0 and identified fail-open mode validation,
+retry-cap, audit-link, complement-test, and stale-doc issues; those local issues
+were corrected; the bounded follow-up returned READY. Commit, governed prompt
+publication/deployment, and the controlled post-fix production smoke remain.
+
 ## Session 378 Summary
 
 Session 378 executed the owner-authorized production review-synthesis smoke on
@@ -122,17 +141,17 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
 
 ### Verified Open
 
-1. **FIRST: diagnose and fix review-synthesis structured-output reliability.**
+1. **FIRST: finish review-synthesis structured-output reliability promotion.**
    Evidence: `docs/CURRENT_WORK_QUEUE.md`,
    `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`, and
    `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
-   Three controlled current-v2 production calls have now failed before
-   writeback with truncated/incomplete JSON. Trace the model response and parser
-   contract, decide whether the smallest reliable fix is prompt/output settings,
-   structured generation, bounded retry/repair, or a combination, and add
-   malformed/truncated-output plus write-on-success-only tests. Do not run
-   another blind production regeneration before the change is reviewed and
-   tested.
+   Three controlled current-v2 production calls failed before writeback with
+   incomplete JSON. The local fix and focused tests are complete: native JSON
+   schema is prompt-opt-in/capability-gated, nonterminal responses fail before
+   persistence, and only confirmed `max_tokens` gets one caller-owned bounded
+   retry. Independent follow-up review is READY and the gates are green. Commit,
+   publish the governed prompt version, deploy deliberately, then run one
+   controlled post-fix smoke.
 
 2. **Resolve or explicitly defer the P1 auth-status policy divergence.**
    Evidence: `pages/api/auth/status.js`, `lib/utils/auth-policy.js`, and the

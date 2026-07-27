@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-24
+last_verified: 2026-07-27
 stale_after_days: 90
 owner: ai-platform
 source_files:
@@ -61,6 +61,16 @@ reviewer-finder prompt migration.
   param for models that reject it (Opus 4.8 — the API 400s with "`temperature` is
   deprecated for this model"); `modelSupportsTemperature()` gates it. When adding an
   app on a reasoning-tier model, confirm whether `temperature` is accepted.
+- **Response completeness + structured output (2026-07-27):** the Executor
+  preserves `LLMClient`'s joined text and stop metadata, then requires
+  `stopReason=end_turn` before raw/JSON parsing or persistence. A syntactically
+  valid `max_tokens` prefix is still rejected. Native Anthropic JSON schema is
+  explicit per prompt (`generationMode:native-json-schema`), requires a declared
+  `jsonSchema`, and fails closed unless the resolved concrete model has
+  `supportsStructuredOutput:true`. Local `validationSchema` remains the
+  post-parse write boundary. The Executor does not semantically retry; review
+  synthesis is the current caller-owned exception, re-invoking once only for
+  typed `claude_output_truncated`, with a separate AI-run audit attempt.
 
 ## Durable Memory
 

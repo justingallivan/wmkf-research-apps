@@ -324,7 +324,8 @@ DTO has no dedicated `piName` field, so `proposalAuthors` (project
 leader/applicant) stands in as the best-available PI identity.
 
 **Phase 4 BUILT (2026-07-03); prompt current in production 2026-07-26 —
-three controlled current-v2 executions failed on incomplete JSON:**
+three controlled current-v2 executions failed on incomplete JSON; local
+reliability fix awaits promotion:**
 Executor-based AI synthesis of a proposal's submitted reviews. New Tier-1
 prompt `review-synthesis.generate` (`shared/config/prompts/review-synthesis.js`,
 initially bootstrapped as v1 and published through the audited admin path as
@@ -332,8 +333,9 @@ backward-compatible current v2
 `7423049a-3f89-f111-ab0f-7ced8d3d15a6` on 2026-07-26); all-override, single untrusted variable
 `reviews_digest` (reviewer `answerText`, never `answerHtml`, composed
 server-side into a plain digest) so the Executor wraps it + injects the A7
-preamble. Output is strict JSON (single output `synthesis`, `validationSchema`
-bounds/strips the parsed shape) written to a new memo column
+preamble. Output is strict JSON (prompt-level
+`generationMode:native-json-schema`, single output `synthesis`;
+`validationSchema` bounds/strips the parsed shape) written to a new memo column
 `akoya_request.wmkf_reviewsynthesisjson` with `guard: 'always-overwrite'` —
 schema-as-code APPLIED TO PROD 2026-07-03 (column live-probed) from
 `lib/dataverse/schema/wave11-review-synthesis/`. `POST
@@ -359,8 +361,13 @@ and a redacted override. The prior request memo remained byte-for-byte
 unchanged. The 11 synthetic answers and four staged suggestion fields were
 fully restored, with no draft or unrelated email/material/reminder/thank-you
 change; the failed AI run remains append-only. The same smoke also proved the
-staff Manual Review Entry path. This phase remains a red pre-exposure gate until
-synthesis succeeds (or the prompt-only rollback is executed and verified).
+staff Manual Review Entry path. The local 2026-07-27 change preserves joined
+response text/stop metadata, requires `end_turn` before persistence, uses
+capability-gated native JSON schema, and retries one typed `max_tokens`
+termination once with a bounded larger budget. Each semantic attempt retains
+its own AI-run audit attempt. This is not a production-live claim; the phase
+remains a red pre-exposure gate until governed prompt publication/deployment
+and one controlled post-fix smoke. Independent follow-up review returned READY.
 
 **Owner-confirmed target lifecycle (2026-07-26; participation semantics closed
 2026-07-27; NOT YET IMPLEMENTED):** automatic synthesis is intended only after

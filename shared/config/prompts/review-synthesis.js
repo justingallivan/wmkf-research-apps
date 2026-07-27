@@ -94,6 +94,10 @@ export const PROMPT_VARIABLES = {
  * persistence — an injected extra key is dropped, not written back to Dynamics.
  */
 export const PROMPT_OUTPUT_SCHEMA = {
+  // Explicit prompt-level opt-in. The Executor must never enable provider
+  // structured output for every parseMode=json prompt: older prompt rows may
+  // carry partial schemas intended only for the Executor's required-key check.
+  generationMode: 'native-json-schema',
   outputs: [
     {
       name: 'synthesis',
@@ -106,9 +110,12 @@ export const PROMPT_OUTPUT_SCHEMA = {
   jsonSchema: {
     type: 'object',
     required: ['synthesis'],
+    additionalProperties: false,
     properties: {
       synthesis: {
         type: 'object',
+        required: ['consensus', 'disagreements', 'keyConcerns', 'ratingSummaries', 'overall'],
+        additionalProperties: false,
         properties: {
           consensus: { type: 'array', items: { type: 'string' } },
           disagreements: { type: 'array', items: { type: 'string' } },
@@ -117,6 +124,8 @@ export const PROMPT_OUTPUT_SCHEMA = {
             type: 'array',
             items: {
               type: 'object',
+              required: ['questionKey', 'questionText', 'summary'],
+              additionalProperties: false,
               properties: {
                 questionKey: { type: 'string' },
                 questionText: { type: 'string' },

@@ -34,7 +34,7 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Reviews/synthesis contract closure | Diagnose and fix the three reproduced current-v2 incomplete-JSON failures; then implement the already-approved participating-invitation state machine, automatic all-in readiness, explicit manual early-run, stored-output visibility, and observable regeneration. Do not run another blind production regeneration before the reliability change is reviewed and tested. | Repeated controlled runs produce valid persisted synthesis or a clean no-write failure; owner-approved state machine plus tested producer → persistence → consumer contract. |
+| 1 | Reviews/synthesis contract closure | The local reliability fix is implemented, independently reviewed READY, and focused tests are green: prompt-level native JSON schema, terminal stop-reason enforcement, retained failure diagnostics, and one bounded `max_tokens` retry. Commit it, complete governed prompt publication/deployment, and run one controlled post-fix smoke; then implement the approved participating-invitation state machine, automatic all-in readiness, explicit manual early-run, stored-output visibility, and observable regeneration. | Controlled post-fix run produces valid persisted synthesis or a typed clean no-write failure; owner-approved state machine plus tested producer → persistence → consumer contract. |
 | 2 | Remaining lifecycle design freeze | Calendar the fixed deadlines and define the full contract for Pre Site Visit Writeup, Site Visit, Final Writeup, and Initial Writeup. Existing June assumptions are inputs, not decisions. | Each tab has approved user, inputs, producer, persistence, consumer, access, recovery, and deadline. |
 | 3 | First deadline-bound writeup slice | Default candidate is Pre Site Visit Writeup, but only after the calendar and input/artifact contracts are approved. | One request produces a durable, editable Word artifact and visible Workbench state through a production smoke. |
 
@@ -57,6 +57,16 @@ sequence.
 
 ## Completed in this execution
 
+- Local review-synthesis reliability implementation: the Executor now parses
+  complete normalized text, requires `end_turn` before persistence, preserves
+  safe stop/token/hash diagnostics on failure, and capability-gates native JSON
+  schema. Review synthesis retries only a confirmed `max_tokens` result once,
+  at a bounded larger budget; each invocation remains separately audited.
+  Focused and surrounding Executor/service suites passed 102 tests, and the
+  model-registry gate plus self-test passed. This is not yet a production-live
+  claim; prompt publication, deployment, and the controlled post-fix smoke
+  remain. Independent follow-up review returned READY after the requested local
+  changes.
 - Production review-synthesis smoke: the owner-authorized Request `1002788`
   smoke ran once on 2026-07-27 after a reversible staff Manual Review Entry.
   It reproduced the current-v2 incomplete-JSON failure as HTTP 500 and failed
