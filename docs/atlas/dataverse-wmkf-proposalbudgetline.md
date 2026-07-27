@@ -1,7 +1,7 @@
 # Atlas: `wmkf_proposalbudgetline` (Dataverse, WMKF child entity)
 
-**Last verified:** 2026-05-22 (S178) — **DEPLOYED to prod Dataverse.** Slice-0 entity, created via `apply-dataverse-schema.js --wave=4 --execute`.
-**Live row count:** 0 (entity created, no rows yet — drain/portal code not built)
+**Last verified:** schema deployment and entity-set metadata 2026-05-22 (S178); current application paths re-verified from source 2026-07-27.
+**Live row count:** **UNKNOWN** — no post-implementation live row-count probe was run in this reconciliation. The historical 2026-05-22 pre-build probe observed 0 rows and must not be treated as current.
 **Entity set:** `wmkf_proposalbudgetlines` (confirmed live, HTTP 200, 2026-05-22)
 **Schema spec:** `lib/dataverse/schema/wave4/wmkf_proposalbudgetline.json`
 **Naming:** LOCKED as `wmkf_proposalbudgetline` (Justin decision 2026-05-18, S163 — `wmkf_budgetline` alternative dropped; was flagged for Connor naming review, now closed).
@@ -9,7 +9,9 @@
 
 ## Source of truth
 
-**Per-year, per-category budget rows for an intake-portal proposal.** Child of `akoya_request` (parental, cascade delete). Drained from the applicant intake portal at submit; the status-gated PA recompute (Item 6 A+B hybrid) keeps the `akoya_request` aggregates in sync on post-submit edits. Authoritative spec: `docs/BUDGET_FORM_SPEC.md` v3 + `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` 2026-05-14 entry.
+**Per-year, per-category budget rows for an intake-portal proposal.** Child of `akoya_request` (parental, cascade delete). The current submit route freezes validated flat `draft_json.budget_lines` rows with pre-generated child GUIDs into `submission_jobs.payload.children.budget_lines`; the current drain materializes those rows in this entity through `lib/dataverse/adapters/proposal-budget-line.js`.
+
+That shipped child-row write is only part of the planned intake flow. After creating the budget rows, the current drain advances the job to `dynamics_patched` and parks it there. Person children, parent aggregate patches, status transition, and the remaining terminal stages are not built. The planned status-gated PA recompute is also not evidence that parent aggregates are currently synchronized. Authoritative shape/spec context: `docs/BUDGET_FORM_SPEC.md` v3 + `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` 2026-05-14 entry.
 
 **Cost-share lives here too** (no separate `wmkf_proposalcostshare` entity — withdrawn). The forever-filter cost: WMKF-spend aggregate queries MUST filter `wmkf_category NOT IN (100000007, 100000008, 100000009)`; the cost-share aggregate (`akoya_request.wmkf_totalothersources`) uses the inverse `IN` set.
 
@@ -36,13 +38,16 @@ Data:
 
 ## Read paths
 
-- **(Future)** PA cover-doc builder — reads rows grouped by year + category to populate a Word template (drives whether `wmkf_name` synthesis is consumed or PA assembles its own strings — open Connor item).
-- **(Future)** Aggregate consumers — sum `wmkf_amount` with the WMKF-spend / cost-share category filter for `akoya_request` / `akoya_expenses` / `wmkf_totalothersources`.
+No current application read path was found in the 2026-07-27 source trace.
+
+- **Unbuilt / proposed:** PA cover-doc builder — would read rows grouped by year + category to populate a Word template.
+- **Unbuilt / proposed:** Aggregate consumers — would sum `wmkf_amount` with the WMKF-spend / cost-share category filter for `akoya_request` / `akoya_expenses` / `wmkf_totalothersources`.
 
 ## Write paths
 
-- **(Future)** Intake drain at submit — creates 5–30 child rows in one pass, then PATCHes parent aggregates (`docs/BUDGET_FORM_SPEC.md` § "Idempotency + drain step ordering").
-- **(Future)** Connor's status-gated PA recompute flow — recomputes parent aggregates post-submit over **active children only**; child Update incl. `statecode`→Inactive deactivation, **No Delete trigger** (Connor S162 ruling, 2026-05-18; defunct children are deactivated, not deleted). **P1-Update is CLOSED — verdict FAIL** (Connor maker-portal run 2026-05-20): the as-written trigger-level Filter-rows mechanism does not evaluate at runtime. Per the gate design a FAIL routes the *recompute mechanism* to a fallback with **zero schema rework** — it did NOT block the schema deploy (slice-0 deployed S178). The mechanism is now **Option A′** (flow-body conditional: trigger has no Filter rows, flow body fetches parent `wmkf_phaseiistatus` and short-circuits) — A′ PASSED Steps 7′+9′ on proxy. P4 (real-schema re-verify of A′ on `wmkf_proposalbudgetline`) is post-deploy and gates PA-flow-live only. Authoritative live status: **`docs/INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md`**.
+- **Shipped, partial intake drain:** `pages/api/intake/submit.js` validates flat budget rows and freezes one pre-generated GUID per child in the queued payload. `lib/services/cron/drain-submissions-service.js` `handleFilesMoved` re-validates each row, builds the Dataverse payload, and calls `proposalBudgetLineAdapter.create`. Written GUIDs are checkpointed in `submission_jobs.dynamics_patches.budget_lines` for retry safety.
+- **Current stopping point:** after budget-line creation, the job advances to `dynamics_patched`; the dispatcher deliberately parks that build-pending state. Parent aggregate patches, person children, status transition, and completion are unbuilt.
+- **Unbuilt / proposed:** status-gated PA recompute over active children. Historical design and maker-portal experiments are tracked in `docs/INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md`; they do not establish a live production write path.
 
 ## Cross-system
 
@@ -54,7 +59,7 @@ Data:
 
 ## Migration disposition
 
-Net-new entity (slice 0). No backfill — all population is forward-only via the intake drain + PA recompute. No legacy data.
+Net-new entity (slice 0). No backfill and no legacy data. Current forward population is through the shipped budget-line portion of the intake drain; the broader drain and PA recompute remain incomplete as described above.
 
 ## Open questions / gotchas
 

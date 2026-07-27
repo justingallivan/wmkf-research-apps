@@ -6,10 +6,17 @@ metadata:
   node_type: memory
   type: reference
   originSessionId: 29a6b837-b641-4706-996e-0d56eb5d5029
+  last_verified: 2026-07-27 via .claude/hooks/lib/document-guards.js:338-344
 ---
 
+## Recall Rule
+
+When adding a staleness acknowledgment, keep the source path and marker on one
+physical line, then run the current `hasStalenessAck` implementation against it;
+do not assume the historical parser contract is unchanged.
+
 The session-lifecycle stop hook's `hasStalenessAck`
-(`.claude/hooks/lib/document-guards.js:225-231`, verified S355) clears a
+(`.claude/hooks/lib/document-guards.js:338-344`, verified 2026-07-27) clears a
 same-session doc-staleness warning only when a single physical line of the doc
 contains BOTH the changed source path AND the pattern
 `[RECHECKED after ... change:` (or `[STALE-ACCEPTED:`). A line-wrapped marker

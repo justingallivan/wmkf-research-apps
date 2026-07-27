@@ -7,7 +7,7 @@ metadata:
   originSessionId: 1e1dfc4f-ebfe-49c2-965d-23d90c70e16f
   status: active
   scope: dataverse
-  last_verified: 2026-05-14 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-27 as a historical owner schema-design principle from the 2026-05-14 review
 ---
 
 ## Recall Rule
@@ -23,6 +23,10 @@ Do not:
 - Optimize for normalization purity at the expense of non-technical staff having to learn a proliferation of obscure tables.
 
 Ground truth: historical-only (principle set by Justin, 2026-05-14 Connor schema-review, `docs/archive/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md` Item 1; catalog `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`). Aligns with [[project-dynamics-as-prompt-ground-truth]].
+
+[VERIFIED historically via the 2026-05-14 owner decision recorded in the cited
+schema-review document.] Entity and field examples below explain that decision;
+they are not a current schema inventory.
 
 When weighing "new child entity" vs "expand an enum / add a discriminator on an existing entity", default to the latter unless the semantic cost is irrecoverable. Non-technical staff browsing Dataverse should not have to learn a proliferation of obscure tables to understand a proposal's data.
 

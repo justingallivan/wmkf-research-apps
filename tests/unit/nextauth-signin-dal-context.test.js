@@ -22,6 +22,7 @@ const { sql } = require('@vercel/postgres');
 const { grantApps } = require('../../lib/services/app-access-service');
 const { reconcileProfile } = require('../../lib/services/dynamics-identity-service');
 const { hasTrustedDalContext } = require('../../lib/dataverse/core/context');
+const { assertDataverseAccess } = require('../../lib/services/dynamics-context');
 const { authOptions } = require('../../pages/api/auth/[...nextauth].js');
 
 function taggedRows(rows) {
@@ -30,7 +31,14 @@ function taggedRows(rows) {
 }
 
 describe('nextauth signIn DAL context (S333 characterization, sites 31-32)', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.DATAVERSE_DAL_UNIVERSAL = 'on';
+  });
+
+  afterEach(() => {
+    delete process.env.DATAVERSE_DAL_UNIVERSAL;
+  });
 
   test('negative control: no trusted context exists before the callback', () => {
     expect(hasTrustedDalContext()).toBe(false);
@@ -39,6 +47,7 @@ describe('nextauth signIn DAL context (S333 characterization, sites 31-32)', () 
   test('new-profile branch: reconcileProfile runs inside a trusted context', async () => {
     const seen = { grantInside: null, reconcileInside: null };
     grantApps.mockImplementation(async () => {
+      assertDataverseAccess('app-access:write');
       seen.grantInside = hasTrustedDalContext();
     });
     reconcileProfile.mockImplementation(async () => {
@@ -70,6 +79,7 @@ describe('nextauth signIn DAL context (S333 characterization, sites 31-32)', () 
   test('unlinked-profile branch: reconcileProfile runs inside a trusted context', async () => {
     const seen = { grantInside: null, reconcileInside: null };
     grantApps.mockImplementation(async () => {
+      assertDataverseAccess('app-access:write');
       seen.grantInside = hasTrustedDalContext();
     });
     reconcileProfile.mockImplementation(async () => {

@@ -5,7 +5,7 @@ type: project
 originSessionId: 295c55b4-a2bb-431a-984e-49c1e47ea565
 status: active
 scope: prompt
-last_verified: 2026-04-17 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 via current deferred plan and AI-field/writeback source; token estimates remain planning assumptions
 ---
 
 ## Recall Rule
@@ -20,6 +20,11 @@ Do not:
 - Build this yet — deferred until the single-phase cycle is imminent or a concrete deep-dive workflow first needs the extracted context.
 
 Ground truth: `docs/PROPOSAL_CONTEXT_EXTRACTION_PLAN.md` (field categories A/B/C, downstream economics, open design decisions); this is the capture shape for the deferred `wmkf_ai_dataextract`.
+
+[VERIFIED 2026-07-27 as deferred design, not current data flow]:
+`lib/services/dynamics-service.js` contains the AI-run/write helpers, but no
+implemented shared extraction producer→persistence→consumer chain establishes
+this proposal-context surface. Token figures below are planning estimates.
 
 Pre-extraction strategy for the single-phase grant cycle (2 cycles from 2026-04-17). In that cycle, proposals get one initial Claude pass; staff select some for deeper touch; deeper touch uses the SAME document with no new information from the submitter.
 

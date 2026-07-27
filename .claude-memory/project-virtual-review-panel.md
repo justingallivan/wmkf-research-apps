@@ -4,7 +4,7 @@ description: Multi-LLM review panel app — Claude, GPT, Gemini, Perplexity inde
 type: project
 status: active
 scope: reviewer
-last_verified: S209 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 via panel route/service, provider gate, migration 003, and current VRP doc
 ---
 
 ## Recall Rule
@@ -54,10 +54,19 @@ New app (Session 91) that creates a virtual review panel using 3-4 LLMs to indep
 - `panel_review_items` — one row per LLM per stage
 - (The "V24" label in the original S91 note was wrong — the real file is `lib/db/migrations/003_virtual_review_panel.sql`; no `024`/`V24` exists. Fixed S209.)
 
-### Status (S91 baseline; iterated since — S209)
-- Infrastructure built and live; the S91 "not yet tested end-to-end" line is stale (`pages/virtual-review-panel.js` actively iterated through late-May 2026).
+### Source status and dated runtime evidence
+- Infrastructure remains built in current source. The S91 "not yet tested
+  end-to-end" line was refuted by late-May 2026 iteration/evidence; current
+  deployment and usage require a fresh operational check.
 - Provider gating now hardened: `VRP_ALLOWED_PROVIDERS` allowlist intersected with configured keys, production fails closed if unset, must include `claude` (`lib/utils/vrp-providers.js`); see `docs/VIRTUAL_REVIEW_PANEL.md`.
 - Prompts remain iterative; Stage 2 based on the actual WMKF Research Reviewer Form.
 
-### `PERPLEXITY_API_KEY` now LIVE in prod (S227) — VRP coupling to settle when VRP is next worked on
-`PERPLEXITY_API_KEY` went permanently live in prod 2026-06-05 for reviewer-finder web discovery (Track C — [[reviewer-finder-next-topics]] §3). Because `MultiLLMService.getAvailableProviders()` reports any keyed provider, the now-always-present key makes `perplexity` a *configured* VRP provider everywhere. **Prod is still fail-closed** while `VRP_ALLOWED_PROVIDERS` is unset (`vrp-providers.js:24` → `[]`), so nothing changed yet — BUT if/when the allowlist is set it must deliberately decide whether to include `perplexity` (otherwise proposal text routes to Perplexity in VRP). **In dev/test the allowlist-unset path returns ALL keyed providers (`vrp-providers.js:23-25`), so Perplexity is already exposed to VRP locally** unless those envs set `VRP_ALLOWED_PROVIDERS`. Not a priority — settle it during the next VRP work, not every reviewer session.
+### Provider-key deployment snapshot (2026-06-05/S227)
+
+At that snapshot, `PERPLEXITY_API_KEY` was present in production and
+`VRP_ALLOWED_PROVIDERS` was unset. Current source remains fail-closed in
+production when the allowlist is unset; dev/test returns all keyed providers.
+Current environment values are `UNKNOWN` and require a read-only Vercel env
+check. During the next VRP change, deliberately decide whether Perplexity may
+receive proposal text rather than inheriting behavior from whichever keys happen
+to be configured.

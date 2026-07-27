@@ -8,6 +8,25 @@ metadata:
   originSessionId: 51fa87ad-4c64-4fca-9f37-7ee9dd40ea02
 ---
 
+## Recall Rule
+
+Read this when: adding server-side HTML/Markdown sanitization, introducing a DOM
+library into a server bundle, or changing `app-markdown.js` consumers.
+
+Do:
+- Use a statically imported DOM-free server sanitizer (`sanitize-html`) and keep
+  its allowlist aligned with the browser renderer.
+- Verify the relevant production function trace, not only local dev/build.
+
+Do not:
+- Use DOMPurify plus `jsdom` on a server route.
+- Rewrite the remaining client-only `app-markdown.js` branch unless it gains an
+  SSR/API consumer.
+
+Ground truth: `shared/utils/policy-markdown-server.js`,
+`shared/utils/grantee-markdown.js`, and the S284 production incident retained
+below.
+
 **Symptom (S284):** `POST /api/admin/policies` 500'd in prod with `Cannot find
 module 'jsdom'` → after forcing it into the trace, `ERR_REQUIRE_ESM` on
 `@exodus/bytes` (via `html-encoding-sniffer@6`). Local `next dev`/`next build`

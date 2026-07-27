@@ -2,10 +2,11 @@
 title: "WMKF Research Phase II — Budget Form: UI/UX & Data Spec"
 domain: intake-portal
 kind: spec
-status: active
-summary: A single dropdown at the top of the form. Its value controls which year columns are revealed throughout the rest of the form.
+status: draft
+summary: "Parked budget-form design: Dataverse schema and a flat budget-line submit/drain foundation exist, but the applicant UI and full workflow remain unbuilt."
 canonical: false
 cataloged: 2026-07-02
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN.md
@@ -16,15 +17,42 @@ related:
 
 # WMKF Research Phase II — Budget Form: UI/UX & Data Spec
 
-**Status:** v3 draft (2026-05-14, S149 — schema review w/ Connor). v2 had Other Sources as a separate `wmkf_proposalcostshare` entity; v3 **re-overturns that** — cost-share lives back in `wmkf_proposalbudgetline` via three new `wmkf_category` enum values (`WaivedIndirect`, `WaivedTuition`, `OtherCostShare`). Driver: human-legibility schema principle (memory `feedback_human_legibility_schema_principle`) — non-technical staff browse Dataverse, fewer obscure tables wins, accept the forever-filter cost on aggregate queries. v3 also (a) replaces the proposed `wmkf_totalwmkfrequested` / `wmkf_projectyears` / `wmkf_totalprojectcost` fields with existing `akoya_request` (Money) / `wmkf_numberofyearsoffunding` (Picklist 1–5) / `akoya_expenses` (Money) — verified via live Dataverse probe — and (b) extends `wmkf_apprequestperson` (S139 junction, 5,561 rows) instead of creating a new `wmkf_proposalroster` entity. v2-era references to `wmkf_proposalcostshare` and `wmkf_proposalroster` in this doc are superseded; the v3 sections below are authoritative. Companion build plan: `docs/INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN.md` (different slice — membership approval).
+## Current state
 
-> **Item 6 — drain-vs-PA write conflict — UNRESOLVED.** Codex review 2026-05-14 surfaced that the v2 plan (drain PATCHes parent aggregates + Connor's PA flow recomputes on every child write) violates the `INTAKE_PORTAL_DESIGN.md` § "Power Automate boundary" invariant "they never write the same field." Tracked as a separate decision; do NOT deploy the schema slice until Item 6 lands. Three viable redesigns (drain-only writes at submit + PA filters on a submitted flag; PA-only writes always + drain writes children only; rollup fields if AkoyaGO write paths to `akoya_request`/`akoya_expenses` can be audited as dormant). All v3 sections below are correct against whichever Item 6 redesign lands, except § "Aggregate fields on `akoya_request`" which describes the **target** field set (consumer of whichever writer wins).
+**[VERIFIED 2026-07-27 via source and
+`docs/atlas/dataverse-wmkf-proposalbudgetline.md`]** The budget product is
+parked. Its Dataverse entity and category contract are deployed. The intake
+submit route accepts already-flat `draft_json.budget_lines`, pre-generates
+child GUIDs, and freezes them into `submission_jobs`; the drain validates and
+writes those child rows through the proposal-budget-line adapter with
+retry markers. It then parks at `dynamics_patched` because person children,
+parent aggregate updates, and the later status transition are still
+build-pending.
+
+No applicant budget-form page or component tree described below exists.
+The nested `draft_json.budget` model, UI validation, unrolling logic, aggregate
+writer, and complete terminal workflow remain **PLANNED**, not built.
+
+## Design record
+
+**Design status:** v3 draft (2026-05-14, S149 — schema review w/ Connor). v2 had Other Sources as a separate `wmkf_proposalcostshare` entity; v3 **re-overturns that** — cost-share lives back in `wmkf_proposalbudgetline` via three new `wmkf_category` enum values (`WaivedIndirect`, `WaivedTuition`, `OtherCostShare`). Driver: human-legibility schema principle (memory `feedback_human_legibility_schema_principle`) — non-technical staff browse Dataverse, fewer obscure tables wins, accept the forever-filter cost on aggregate queries. v3 also (a) replaces the proposed `wmkf_totalwmkfrequested` / `wmkf_projectyears` / `wmkf_totalprojectcost` fields with existing `akoya_request` (Money) / `wmkf_numberofyearsoffunding` (Picklist 1–5) / `akoya_expenses` (Money) — verified via live Dataverse probe — and (b) extends `wmkf_apprequestperson` (S139 junction, 5,561 rows) instead of creating a new `wmkf_proposalroster` entity. v2-era references to `wmkf_proposalcostshare` and `wmkf_proposalroster` in this doc are superseded; the v3 sections below are authoritative. Companion build plan: `docs/INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN.md` (different slice — membership approval).
+
+> **Historical Item 6 finding; current implementation gap.** Codex review
+> 2026-05-14 found that the v2 proposal let both the drain and Connor's PA
+> flow write the same parent aggregate fields. The schema later deployed, but
+> current source still does not implement the drain-side parent aggregate
+> writer. Re-probe the authoritative PA/reconcile status and choose one writer
+> before resuming the complete budget workflow. The aggregate section below
+> remains target design, not built-state evidence.
 
 ---
 
 ## Overview
 
-A multi-section budget form for grant applicants. Built as a single page (or wizard step) within the existing app suite. Drafts persist to Postgres `intake_drafts.draft_json`; externalized to Dataverse asynchronously via the `submission_jobs` drain cron on submit. The form replaces a free-form Excel spreadsheet that applicants were filling out incorrectly.
+Target design for a multi-section budget form for grant applicants, as a
+single page or wizard step within the app suite. The current intake
+infrastructure persists drafts to Postgres and can externalize pre-unrolled
+budget lines asynchronously, but the form described here is not built.
 
 ---
 
@@ -250,7 +278,11 @@ The budget form is a planned section of the applicant intake form. *(It was scop
 
 ### Editing layer — Postgres `intake_drafts.draft_json`
 
-While the applicant edits, budget data lives as a sub-object inside the existing `intake_drafts.draft_json` JSONB column. No separate FK, no per-budget status field. The intake draft row IS the in-progress budget. Browser autosaves debounced to `/api/intake/draft` (30s of inactivity or field blur).
+**Target design (not current payload shape):** while the applicant edits,
+budget data would live as a sub-object inside `intake_drafts.draft_json`.
+Current source accepts a pre-unrolled flat `draft_json.budget_lines` array;
+there is no applicant form producing the nested object below. No separate FK
+or per-budget status field is planned.
 
 Proposed JSONB shape:
 
@@ -321,7 +353,16 @@ Calls go through `IntakeAuditService.log({ actorOid, actorType, action, targetEn
 
 ### Externalized layer — Dataverse (on submit, via drain cron)
 
-When the submit endpoint queues a `submission_jobs` row, the drain cron's `dynamics_patched` step walks `payload.budget` and writes to Dataverse: child rows under **one entity (`wmkf_proposalbudgetline`)** — WMKF spend lines + cost-share lines distinguished by `wmkf_category` per the v3 unified-table decision — plus three field updates on the parent `akoya_request` (year count reuses an existing populated field).
+**Current foundation:** when submit queues a `submission_jobs` row, it reads
+the already-flat `draft_json.budget_lines` array, validates it, pre-generates
+child GUIDs, and stores the rows under `payload.children.budget_lines`. The
+drain writes those child rows to `wmkf_proposalbudgetline` and records each
+written GUID in `dynamics_patches.budget_lines`.
+
+**Planned extension:** the form would produce the nested budget model below,
+unroll it into child rows, and add the parent `akoya_request` aggregate/year
+writes. Those parent writes and the terminal status transition are not
+implemented; current jobs park after reaching `dynamics_patched`.
 
 **Drain attribution.** Async drain writes are not user-initiated, so `MSCRMCallerID` doesn't impersonate the applicant. Two options were considered:
 
@@ -367,7 +408,7 @@ Pre-committed catalog shape from `INTAKE_PORTAL_SCHEMA_CHANGES.md` line 22 + thr
 | `wmkf_name` | Text(160) | catalog | Synthesized: `Y{year} — {category}: {description}` |
 | `_wmkf_request_value` | Lookup → `akoya_request` | catalog | Parental, cascade delete. Bound via nav-property `@odata.bind` on write — exact bind key (likely `wmkf_Request@odata.bind`) recorded at slice 0 deploy |
 | `wmkf_year` | Whole Number (1–10) | catalog | Forward-compatible across program lengths; pilot writes 1/2/3 |
-| `wmkf_category` | Choice | catalog + v3 expansion | Numeric option-set values per `lib/services/dynamics-service.js:930` convention. Values (v3 — 10 total, `Tuition` added S178): WMKF-spend categories — `Personnel / Equipment / Supplies / Travel / Other Direct / Tuition / Indirect`; cost-share categories — `WaivedIndirect / WaivedTuition / OtherCostShare`. **WMKF-spend aggregate queries MUST filter `wmkf_category NOT IN (WaivedIndirect, WaivedTuition, OtherCostShare)`** — this is the forever-filter cost of the v3 unified-table decision. Numeric mapping table recorded in Atlas at slice 0 |
+| `wmkf_category` | Choice | catalog + v3 expansion | Numeric option-set values are defined by the proposal-budget-line schema/adapter and recorded in `docs/atlas/dataverse-wmkf-proposalbudgetline.md`. Values (v3 — 10 total, `Tuition` added S178): WMKF-spend categories — `Personnel / Equipment / Supplies / Travel / Other Direct / Tuition / Indirect`; cost-share categories — `WaivedIndirect / WaivedTuition / OtherCostShare`. **WMKF-spend aggregate queries MUST filter `wmkf_category NOT IN (WaivedIndirect, WaivedTuition, OtherCostShare)`** — this is the forever-filter cost of the v3 unified-table decision. |
 | `wmkf_description` | Text(500) | catalog | Line-item description. For fixed rows: the static label ("Principal Investigators", "Consumable Supplies"). For dynamic rows: applicant-entered text |
 | `wmkf_amount` | Money (USD) | catalog | Single value per row (this row IS one year) |
 | `wmkf_lineorder` | Whole Number | catalog | Display order within `(request, year, category)` |
@@ -524,13 +565,13 @@ Schema deploy (a separate slice) ships under the existing delegated authority, s
 
 The existing `docs/atlas/dataverse-wmkf-apprequestperson.md` is amended in slice 0 to record the three new nullable fields (`wmkf_effortpct`, `wmkf_biosketchurl`, `wmkf_lineorder`) and the five-value `wmkf_role` enum.
 
-## Portal-wide infrastructure gaps surfaced by v2 (not budget-scope)
+## Historical infrastructure findings and current gaps
 
 These are not blocking for the budget form's user-facing slice but **block production-grade externalization** and are tracked at the intake-portal level rather than this spec:
 
-1. **`$batch` support in `dynamics-service.js`.** Currently absent; the drain falls back to sequential calls with progress markers. Cross-cutting because every async-drain consumer (budget, roster, attachments) wants atomic multi-write semantics.
-2. **`submission_jobs` table not in migration `005_intake_portal.sql`.** Verified 2026-05-14 — migrations 005 created `intake_drafts` + `intake_audit` but NOT `submission_jobs`. The drain has no queue to drain from. **Prerequisite to slice 0** — add migration `009_submission_jobs.sql` before the schema slice deploys.
-3. **Item 6 — drain-vs-PA write conflict on aggregate fields.** 2026-05-14 sketch (PA flow recomputes on every child write) violates the `INTAKE_PORTAL_DESIGN.md` § "Power Automate boundary" invariant. Three viable redesigns; resolution deferred. **Blocks schema slice deploy.**
+1. **`$batch` support in `dynamics-service.js`.** The historical design assumed it was absent; current child-row drain deliberately uses sequential creates plus durable progress markers. Re-probe transport capabilities before treating `$batch` as an open prerequisite.
+2. **`submission_jobs` — historical gap CLOSED.** Migration 009 and the live submit/drain queue now exist. The 2026-05-14 absence was a planning-time finding, not current state.
+3. **Item 6 aggregate-writer contract.** The schema deployed, but the parent aggregate writer is still absent from the current drain. The authoritative PA/reconcile posture must be re-probed before this product is resumed.
 4. **AkoyaGO inline child-row edit hardening.** Inline edits on `wmkf_proposalbudgetline` were Connor's 2026-05-14 driver for asking the system to be "tolerant of inline edits"; the actual answer is whichever Item 6 redesign lands.
 
 Recommend logging these in `docs/INTAKE_PORTAL_DESIGN.md` § "Open questions / open work" so they're tracked at the right scope.

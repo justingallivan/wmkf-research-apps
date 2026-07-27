@@ -77,6 +77,117 @@ test('success: digest reaches the Executor; returns synthesis payload', async ()
   expect(call.actingUserSystemId).toBe(ACTOR);
 });
 
+test('confirmed max_tokens truncation retries once with a larger bounded budget', async () => {
+  const firstRunId = '33333333-3333-4333-8333-333333333333';
+  const truncated = Object.assign(new Error('truncated'), {
+    code: 'claude_output_truncated',
+    maxTokens: 8000,
+    runId: firstRunId,
+  });
+  executePrompt
+    .mockRejectedValueOnce(truncated)
+    .mockResolvedValueOnce({
+      runId: 'run-2',
+      blocked: false,
+      parsed: { synthesis: { summary: 'recovered' } },
+      writeResults: { results: [{ output: 'synthesis', ok: true }] },
+      meta: { retryOfRunId: firstRunId },
+    });
+
+  const out = await synthesizeReviews({
+    requestId: REQ,
+    overwrite: false,
+    actingUserSystemId: ACTOR,
+  });
+
+  expect(out.runId).toBe('run-2');
+  expect(out.retryOfRunId).toBe(firstRunId);
+  expect(executePrompt).toHaveBeenCalledTimes(2);
+  expect(executePrompt.mock.calls[0][0].maxTokensOverride).toBeUndefined();
+  expect(executePrompt.mock.calls[1][0].maxTokensOverride).toBe(16000);
+  expect(executePrompt.mock.calls[1][0].semanticAttempt).toBe(2);
+  expect(executePrompt.mock.calls[1][0].retryOfRunId).toBe(firstRunId);
+  expect(executePrompt.mock.calls[1][0].overrideVariables)
+    .toEqual(executePrompt.mock.calls[0][0].overrideVariables);
+});
+
+test('retry budget increases to the 32000 cap, then truncation at/above the cap is terminal', async () => {
+  const at16000 = Object.assign(new Error('truncated'), {
+    code: 'claude_output_truncated',
+    maxTokens: 16000,
+    runId: null,
+  });
+  executePrompt
+    .mockRejectedValueOnce(at16000)
+    .mockResolvedValueOnce({
+      runId: 'run-2',
+      blocked: false,
+      parsed: { synthesis: { summary: 'recovered' } },
+      writeResults: { results: [{ output: 'synthesis', ok: true }] },
+    });
+  await synthesizeReviews({ requestId: REQ, overwrite: false, actingUserSystemId: ACTOR });
+  expect(executePrompt).toHaveBeenCalledTimes(2);
+  expect(executePrompt.mock.calls[1][0]).toMatchObject({
+    maxTokensOverride: 32000,
+    semanticAttempt: 2,
+    retryOfRunId: null,
+  });
+
+  for (const maxTokens of [32000, 40000]) {
+    executePrompt.mockClear();
+    const truncated = Object.assign(new Error('truncated'), {
+      code: 'claude_output_truncated',
+      maxTokens,
+      runId: 'failed-run',
+    });
+    executePrompt.mockRejectedValueOnce(truncated);
+    const error = await synthesizeReviews({
+      requestId: REQ,
+      overwrite: false,
+      actingUserSystemId: ACTOR,
+    }).catch((err) => err);
+    expect(error).toBe(truncated);
+    expect(executePrompt).toHaveBeenCalledTimes(1);
+  }
+});
+
+test('a second max_tokens truncation is terminal; no third semantic attempt', async () => {
+  const truncated = (runId, maxTokens) => Object.assign(new Error('truncated'), {
+    code: 'claude_output_truncated',
+    maxTokens,
+    runId,
+  });
+  executePrompt
+    .mockRejectedValueOnce(truncated('failed-run-1', 8000))
+    .mockRejectedValueOnce(truncated('failed-run-2', 16000));
+
+  const error = await synthesizeReviews({
+    requestId: REQ,
+    overwrite: false,
+    actingUserSystemId: ACTOR,
+  }).catch((err) => err);
+
+  expect(error.runId).toBe('failed-run-2');
+  expect(executePrompt).toHaveBeenCalledTimes(2);
+});
+
+test('ordinary malformed JSON and schema failures do not retry', async () => {
+  for (const code of ['claude_output_invalid_json', null]) {
+    executePrompt.mockClear();
+    const error = Object.assign(new Error('not recoverable'), code ? { code } : {});
+    executePrompt.mockRejectedValueOnce(error);
+
+    const received = await synthesizeReviews({
+      requestId: REQ,
+      overwrite: false,
+      actingUserSystemId: ACTOR,
+    }).catch((err) => err);
+
+    expect(received).toBe(error);
+    expect(executePrompt).toHaveBeenCalledTimes(1);
+  }
+});
+
 test('zero submitted reviews → 409 no_submitted_reviews WITHOUT calling the LLM', async () => {
   findByRequest.mockResolvedValueOnce([submittedSuggestion({ wmkf_accepted: false })]);
   const err = await synthesizeReviews({ requestId: REQ, overwrite: false, actingUserSystemId: null }).catch((e) => e);

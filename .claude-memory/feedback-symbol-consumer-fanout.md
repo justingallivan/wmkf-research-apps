@@ -6,7 +6,14 @@ metadata:
   type: feedback
   status: active
   originSessionId: c178a6d6-706e-47bb-9580-d248197210b1
+  last_verified: 2026-07-27 as historical S257/S334 defects; current fan-out must be re-derived from source and CodeGraph
 ---
+
+## Recall Rule
+
+For a changed persisted field, enum, or status, trace the raw symbol through every
+read surface as well as the write path. Cross-check CodeGraph with text search,
+then verify reverse maps, projections, filters, buckets, and fall-through defaults.
 
 Twice (S257, reviewer "hold step" plan) I verified the WRITE path of a new Dataverse
 picklist value (`held=100000004`) + column (`wmkf_heldat`) and called the surface covered —
@@ -40,26 +47,10 @@ field name first, then the mapping helpers) and prove:
 - **State machines span all terminals** — a sibling column or side-channel writer (cron/webhook/
   bulk) can set "done" bypassing the main guard; check every terminal-signalling column.
 
-**A literal content-grep caller census has THREE silent blind spots — close it with `grep -a` +
-CodeGraph, never grep alone (S334, NotificationService.notify site-33 push-up).** A plan claimed a
-"closed 22-caller census" built from `grep -rln "NotificationService.notify("`. It was wrong three
-times over, each a different hole a plain grep cannot see:
-1. **Binary-flagged files** — `pages/api/cron/pricing-refresh.js` contains a non-UTF8 byte, so `grep`
-   treats the whole file as binary and suppresses content matches (it still appears in `grep -l`, which
-   is how the miss hid). Fix: `grep -a` (force text). This is subtle because `-l` listed it while `-n`
-   showed nothing.
-2. **Local-variable / `.call` aliasing** — `maintenance-service.js` did
-   `const notify = NotificationService.notify; notify.call(NotificationService, {...})`, so the literal
-   `NotificationService.notify(` token never appears.
-3. **Dynamic `import()` edges** — `instrumentation.js`'s cold-start `register()` reaches callers via
-   `await import('./lib/utils/migration-drift')`, an edge no call-site grep follows.
-The reliable close: re-derive the set with `grep -a` (union the alias forms) AND a **CodeGraph caller
-query** (`codegraph_explore` for callers of the symbol) — CodeGraph resolves the alias and dynamic-import
-hops grep structurally can't, and CLAUDE.md says reach for it BEFORE grep for "locate callers" exactly
-for this reason. Cross-check both against each other; converging counts from independent methods is the
-proof, one grep variant is not. (Caveat: CodeGraph can also emit a spurious neighborhood edge — an
-apparent `handler → notify` into `drain-submissions-service.js` that had no real `notify` call — so
-verify any NEW file it surfaces at source before trusting it.)
+**Caller census needs two independent methods (S334).** Literal grep missed a
+binary-flagged file, a local-variable/`.call` alias, and a dynamic `import()` edge.
+Use `grep -a` across literal and alias forms plus a CodeGraph caller query, then
+verify newly surfaced edges at source; neither method alone proves closure.
 
 This is now audit #7 ("Symbol-consumer fan-out") in [[contract-reconcile]] — the blocking check.
 Related: [[feedback-idempotency-name-the-mechanism]], [[feedback-falsify-not-confirm]],

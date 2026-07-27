@@ -4,7 +4,7 @@ description: Any task that drops/removes/retires/archives infrastructure carried
 type: feedback
 status: active
 scope: global
-last_verified: 2026-05-12 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 as a historical carryover failure; every current removal still requires fresh caller verification
 ---
 
 ## Recall Rule
@@ -29,7 +29,7 @@ Ground truth: historical-only (lesson, not live state); CLAUDE.md "Carryover Hyg
 3. If anything looks live, **stop and report back to the user** before touching anything. Do not proceed because the carryover said to.
 4. If the verification confirms the thing is truly dead, proceed and update the relevant memory entry to reflect the live check.
 
-**Why:** On 2026-05-03 the audit found that "drop dormant Postgres reviewer tables" was sitting in the Session 126 pivot list as a green-lit option. The tables were not dormant at that time — they had 20+ live UPDATE sites in `database-service.js` and `pages/api/reviewer-finder/researchers.js`, plus active reads in `extract-summary.js`, `generate-emails.js`, `grant-cycles.js`, and `my-proposals.js`. Acting on the carryover would have broken the live Reviewer Finder app's browse/email/grant-cycle flows. *(Historical: those tables have since been migrated to Dataverse in W3-W6 (2026-05-12) and are now drain-only; the carryover-verification discipline this feedback enforces remains the same.)* <!-- drain-table:ignore reason=historical-feedback --> <!-- doc-symbol-refs:ignore reason=historical-feedback -->
+**Why:** On 2026-05-03 the audit found that "drop dormant Postgres reviewer tables" was sitting in the Session 126 pivot list as a green-lit option. The tables were not dormant at that time — they had 20+ live UPDATE sites in `database-service.js` and `pages/api/reviewer-finder/researchers.js`, plus active reads in `extract-summary.js`, `generate-emails.js`, `grant-cycles.js`, and `my-proposals.js`. Acting on the carryover would have broken the live Reviewer Finder app's browse/email/grant-cycle flows. The 2026-05-12 follow-up recorded those tables as migrated and drain-only; that is historical context, not proof of their current state. <!-- drain-table:ignore reason=historical-feedback --> <!-- doc-symbol-refs:ignore reason=historical-feedback -->
 
 The failure pattern is propagation: a belief gets written into memory, the belief inherits into SESSION_PROMPT.md "next steps", several sessions inherit it forward without re-verification, and eventually a session executes the task because the carryover said to. The audit broke this chain. Without it, the chain completes.
 

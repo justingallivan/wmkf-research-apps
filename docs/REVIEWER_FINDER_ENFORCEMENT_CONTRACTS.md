@@ -58,7 +58,8 @@ server save gate.
   || verificationStatus==='unresolved'`, OR when the provenance kind is barred/unknown AND the
   row has NO positive identity. A positively-resolved row (confirmed/probable/verified) is
   ALWAYS selectable even with a barred kind.
-- **Server (`save-candidates.js:56-67`, `isUnresolvedIdentity`).** HARD-REJECTS only the
+- **Server (`lib/services/reviewer-finder/save-candidates-service.js`,
+  `isUnresolvedIdentity`).** HARD-REJECTS only the
   EXPLICIT-unresolved triple (`needsIdentification`/`identityStatus`/`verificationStatus`),
   per-row. It deliberately does NOT gate on the full `provenanceGroupOf` — a barred/unknown-kind
   row with no top-level identity is legitimately saved here from other paths (a contact-enriched
@@ -66,8 +67,9 @@ server save gate.
   Gating the server on `provenanceGroupOf` would wrongly reject those.
 
 **Enforcement points.** `lib/utils/reviewer-provenance.js` (`provenanceGroupOf`) ·
-`pages/api/reviewer-finder/save-candidates.js:56-67` (`isUnresolvedIdentity`) ·
-`save-candidates.js:130-138` (per-row skip) · `save-candidates.js:305-316` (batch 422).
+`lib/services/reviewer-finder/save-candidates-service.js`
+(`isUnresolvedIdentity` and `saveCandidates`, including the per-row rejection
+and batch 422 result).
 
 **Why.** The clients hide ungrounded rows, but the standalone Reviewer Finder and any
 bypassed/direct caller can still POST them, so the field-level gate alone is insufficient —
@@ -91,11 +93,12 @@ selectable for identity review. BUT until its identity is confirmed/probable, th
 ORCID, Scholar, bibliometrics, department, expertise). A selectable-but-unverified row therefore
 cannot carry a wrong-person email — it could be a namesake of the named person.
 
-**Enforcement points.** `pages/api/reviewer-finder/save-candidates.js:79-82`
-(`contactBlockedForUnresolvedExempt`) gates the force-null applied at `save-candidates.js:172-191`
-and `:235` (ORCID/Scholar/metrics also nulled via `blockByIdentity`). The exemption itself is
+**Enforcement points.**
+`lib/services/reviewer-finder/save-candidates-service.js`
+(`contactBlockedForUnresolvedExempt` and `saveCandidates`) gates the force-null
+application, including ORCID/OpenAlex/metrics through `blockByIdentity`. The exemption itself is
 `isIdentityReviewExemptProvenance(...)` checked BEFORE the unresolved gate in `isUnresolvedIdentity`
-(`:63`). System-discovered (`literature_retrieved`, incl. Slice-E deferred Track-B) stays
+. System-discovered (`literature_retrieved`, incl. Slice-E deferred Track-B) stays
 hard-blocked. The card shows an amber "⚠ Verify identity — no contact saved until confirmed" pill.
 
 **Why.** Anchor-or-abstain at the persistence boundary, turned from assumption into enforced
@@ -151,8 +154,9 @@ never a client-claimed identity), runs in a Dynamics bypass under the time budge
   namesake).
 - A mis-entered ORCID is caught by a forename/surname name guard (`forenamesContradict`) → abstain.
 
-**Enforcement points.** `lib/services/proposal-pi-identity.js:125+` (`resolveProposalPI`) ·
-`lib/services/reviewer-identity-evidence.js:316-321` (`forenamesContradict` — full-forename
+**Enforcement points.** `lib/services/proposal-pi-identity.js`
+(`resolveProposalPI`) · `lib/services/reviewer-identity-evidence.js`
+(`forenamesContradict` — full-forename
 contradiction only; returns false if either name is initial-only).
 
 ---
@@ -236,8 +240,10 @@ toggle. It writes the `tierResults.openalex_author` DTO that the resolver re-pro
   free Scholar **search** link (`buildGoogleScholarUrl(name, affiliation)`) remains. Any doc that
   says "Google Scholar profile links" is drifted.
 
-**Enforcement points.** `lib/services/contact-enrichment-service.js:676-790`
-(`_attachOpenAlexMetrics`). Deeper rationale + call-site inventory:
+**Enforcement points.** `lib/services/contact-enrichment-service.js`
+(`_attachOpenAlexMetrics`, delegated to
+`lib/services/contact-enrichment/openalex-metrics.js`). Deeper rationale +
+call-site inventory:
 `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md` (design owner, status COMPLETE).
 
 ---
@@ -272,16 +278,17 @@ Dataverse and the send gate do not consume the detailed proof: invitation author
 the binary persisted `institution_page` source and is recomputed server-side.
 
 **Related verified-domain guard (S321 contests; 2026-07-18 policy makes contests research-only).**
-`_validateEmailAgainstVerifiedDomain` (`contact-enrichment-service.js:419`) now validates against
-**two domain sets** built in `_finalize` by `_buildInstitutionDomainEvidence` (`:255`):
+`_validateEmailAgainstVerifiedDomain` in
+`lib/services/contact-enrichment-service.js` now validates against **two domain
+sets** built in `_finalize` by `_buildInstitutionDomainEvidence`:
 *anchored* (identity-proven, ID-resolved: `verifiedInstitutionDomain` + ORCID
 disambiguated-organization RORs → `OpenAlexService.getInstitution`, only on a confirmed/probable
 identity) and *plausible* (anchored + name-resolved via `OpenAlexService.searchInstitutions`,
 lane-routing only). An anchored match confirms persistence; a SEARCH-sourced contradiction is
-re-stamped `emailSource='search_contested'` (`_markEmailContested`, `:303`) — kept as a visible
+re-stamped `emailSource='search_contested'` (`_markEmailContested`) — kept as a visible
 research lead but never invitation-sendable per Contract 3 — instead of nulled into a rejected
 lead. A `name_mismatch`-rejected email whose domain is plausible is likewise retained as
-contested in `_finalize` (`_readjudicateNameMismatchRejectedEmail`, `:312`).
+contested in `_finalize` (`_readjudicateNameMismatchRejectedEmail`).
 ORCID/PubMed/affiliation emails still outrank the heuristic. The opt-in fetch tier above is
 SSRF-bound to the **anchored** set only (fallback: the single `verifiedInstitutionDomain` when
 the anchored set is empty — today's bound). Design + review history:
@@ -318,8 +325,8 @@ uninformative.
 - Requires EXACTLY ONE work-grounded candidate (else abstain).
 - On abort during probing, never promotes on partial evidence (returns null — keep safe abstain).
 
-**Enforcement points.** `lib/services/reviewer-identity-evidence.js:212-271` (`rescueByWorkGrounding`,
-exported `:568`). **Audit:** `tests/unit/reviewer-identity-evidence.test.js`
+**Enforcement points.** `lib/services/reviewer-identity-evidence.js`
+(`rescueByWorkGrounding`). **Audit:** `tests/unit/reviewer-identity-evidence.test.js`
 (`describe('work-grounding rescue')`). Safety posture memory:
 `project-reviewer-verify-fail-dangerous`, `project-openalex-merge-use-orcid-works`.
 
@@ -329,11 +336,11 @@ exported `:568`). **Audit:** `tests/unit/reviewer-identity-evidence.test.js`
 
 | # | Contract | Primary enforcement point |
 |---|----------|---------------------------|
-| 1 | Slice-E client/server asymmetry | `save-candidates.js:56-67,305-316` + `reviewer-provenance.js` (`provenanceGroupOf`) |
-| 2 | PI-named/cited/referred exemption + force-null | `save-candidates.js:79-82,172-191` (kinds: `reviewer-provenance.js` `isIdentityReviewExemptProvenance`) |
-| 3 | Invite-confidence allowlist | `reviewer-invite.js:70-88` + `send-emails.js:292-294` |
-| 4 | Structured-PI fail-open/augment-only | `proposal-pi-identity.js:125+` + `reviewer-identity-evidence.js:316-321` |
-| 5 | S240 institution COI default hard drop + flagged exception | `save-candidates.js:116,150-160` + `discover.js`/`DiscoveryService` `partitionConflicts` + `reviewer-roster-store.js` `recordCoiDropped` |
-| 6 | OpenAlex bibliometrics/verified-domain | `contact-enrichment-service.js:676-790` |
+| 1 | Slice-E client/server asymmetry | `save-candidates-service.js` (`isUnresolvedIdentity`, `saveCandidates`) + `reviewer-provenance.js` (`provenanceGroupOf`) |
+| 2 | PI-named/cited/referred exemption + force-null | `save-candidates-service.js` (`contactBlockedForUnresolvedExempt`, `saveCandidates`; kinds: `reviewer-provenance.js` `isIdentityReviewExemptProvenance`) |
+| 3 | Invite-confidence allowlist | `reviewer-invite.js` (`emailConfidence`) + `send-emails-service.js` |
+| 4 | Structured-PI fail-open/augment-only | `proposal-pi-identity.js` (`resolveProposalPI`) + `reviewer-identity-evidence.js` (`forenamesContradict`) |
+| 5 | S240 institution COI default hard drop + flagged exception | `save-candidates-service.js` + `discover.js`/`DiscoveryService` (`partitionConflicts`) + `reviewer-roster-store.js` (`recordCoiDropped`) |
+| 6 | OpenAlex bibliometrics/verified-domain | `contact-enrichment-service.js` (`_attachOpenAlexMetrics`, `_validateEmailAgainstVerifiedDomain`) |
 | 7 | Faculty-page guarded fetch + ranked mailbox ownership | `safe-fetch.js` + `contact-enrichment/page-email.js` + roster/UI evidence projection |
-| 8 | Work-grounding rescue | `reviewer-identity-evidence.js:212-271` |
+| 8 | Work-grounding rescue | `reviewer-identity-evidence.js` (`rescueByWorkGrounding`) |

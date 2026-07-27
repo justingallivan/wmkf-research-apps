@@ -6,7 +6,7 @@ status: canonical
 summary: "The Executor is the function invoker. The prompt row is the function definition. Chains and triggers are the Flow's job, not the Executor's."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-07-26
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - lib/services/execute-prompt.js
@@ -22,7 +22,7 @@ related:
 and multiple live grantee, field-primer, and review services). A Power Automate implementation is a deferred target, not a
 second current implementation. The original "May 1 2026 cycle target" framing is historical.
 **Created:** 2026-04-24 (Session 109, reconciliation pass)
-**Last status update:** 2026-05-25 (S188, B6-F2 readiness-audit drift refresh)
+**Last status update:** 2026-07-27 (review-synthesis response-completeness and native-schema reliability)
 **Owners:** Justin (Vercel implementation — shipped); Connor would own any future Power Automate implementation
 **Related docs:** `docs/PROMPT_STORAGE_DESIGN.md`, `docs/BACKEND_AUTOMATION_PLAN.md`, `docs/WORKFLOW_CHAINING_DESIGN.md`, `docs/GRANT_CYCLE_LIFECYCLE.md`
 
@@ -75,6 +75,9 @@ The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-onl
 | `forceOverwrite` | bool | no | Default `false`. When `true`, output guards (see *Output guards*) are bypassed and the Executor writes regardless of whether targets are populated. Caller's choice — not a Dynamics-row setting. |
 | `actingUserSystemId` | GUID | no | Dataverse system-user identity used to attribute supported writes. Callers must derive it from authenticated/server context, never request input. |
 | `assertSystemIncludes` | string \| string[] | no | Fail-closed assertion that each required substring survived composition in the actual system prompt. Used when a mutable prompt row must retain a security-critical block. |
+| `maxTokensOverride` | positive integer | no | Server-owned, per-invocation output-budget override. Must not exceed the resolved model's reviewed `maxOutputTokens`. Used by the review-synthesis caller for its one bounded `max_tokens` recovery attempt; never accept it from client input. |
+| `semanticAttempt` | positive integer | no | Default `1`. Server-owned audit metadata for caller-level semantic retries. |
+| `retryOfRunId` | GUID | no | Prior failed `wmkf_ai_run` id when the caller re-invokes. Included in notes for deterministic audit pairing; null is allowed when the prior audit write failed. |
 
 **Deferred (Phase 1+):** `overridePromptBody: { system?: string, body?: string }` — body-level override for per-session prompt editing (PROMPT_STORAGE_DESIGN §17). Not needed for May 1.
 
@@ -89,7 +92,7 @@ The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-onl
 | `conflicts` | array | When `blocked`, one entry per guarded target that triggered the block: `{ output, table, field, existingContent, existingLength, modifiedOn }`. Caller (typically Vercel) uses this to render a confirm-overwrite UI. |
 | `writeResults` | object \| null | When not blocked: `{ allOk, results: [{ output, ok, field?, jsonPath?, reason?, error? }] }`. `null` when blocked. |
 | `usage` | object \| absent | Verbatim Anthropic `usage` object (`input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`). The key is omitted from the blocked return. |
-| `meta` | object \| absent | `{ promptName, promptVersion, promptId, modelUsed, systemChars, bodyChars, aiPayloadBoundaries, rawOutputRetention }`. The key is omitted from the blocked return. Useful for observability/UI display. |
+| `meta` | object \| absent | `{ promptName, promptVersion, promptId, modelUsed, systemChars, bodyChars, aiPayloadBoundaries, rawOutputRetention, semanticAttempt, retryOfRunId }`. The key is omitted from the blocked return. Useful for observability/UI display and caller-level retry linkage. |
 
 ### Errors
 
@@ -99,6 +102,15 @@ failures. Individual target persistence failures are returned in
 `writeResults` with `allOk=false`; the run is logged as `Needs Review` and the
 parsed result is still returned so the caller can handle partial persistence
 explicitly.
+
+The normalized provider response must end with `stopReason="end_turn"` before
+raw or JSON output can reach persistence. `max_tokens`,
+`model_context_window_exceeded`, `refusal`, missing, and unreviewed stop reasons
+fail closed even if the returned text happens to be syntactically valid JSON.
+Typed output errors include `code`, `stopReason`, and `maxTokens`; the current
+codes are `claude_output_truncated`, `claude_context_window_exceeded`,
+`claude_output_refused`, `claude_output_incomplete`, and
+`claude_output_invalid_json`.
 
 **Audit attempt invariant:** the Executor attempts a `wmkf_ai_run` row for
 blocked, completed/needs-review, and thrown-failure outcomes. Audit persistence
@@ -117,8 +129,8 @@ complete when Dataverse logging is unavailable.
 | 3 | Resolve variable values | Apply-to-each + Switch on `source.kind` | Loop + switch; source kinds handled by dedicated resolvers |
 | 4 | **Preflight output guards** | For each output with `guard != "always-overwrite"`, GET target field. If populated AND `forceOverwrite = false` → write `wmkf_ai_run` with status `Needs Review`, return `{ blocked: true, conflicts, runId }`. Capture `@odata.etag` per target for step 8's `If-Match`. | Same. Skip steps 5–8 on block. |
 | 5 | Compose Claude payload | Compose action: system + user blocks; `cache_control: {type:"ephemeral"}` at declared prefix boundary | `buildClaudeRequest(prompt, variables)` |
-| 6 | Call Claude | HTTP action → Anthropic API | `callClaude()` → `LLMClient.complete()` (2026-06-11; canonical transport — `safeFetch` SSRF allowlist, abortable timeout, 429/529 retry, API-key redaction). The `cache_control` system array passes through `LLMClient` verbatim; its normalized response is re-shaped back to the raw Anthropic shape (`content[0].text`, snake_case `usage`, `model`) for steps 7 + 9. No `appName` is passed — avoids double-counting `api_usage_log` against the driver route's own `logUsage`. |
-| 7 | Parse output | Parse JSON on Claude response `content[0].text` using `wmkf_ai_promptoutputschema.jsonSchema` (or treat as raw text when `parseMode = "raw"`) | Same |
+| 6 | Call Claude | HTTP action → Anthropic API | `callClaude()` → `LLMClient.complete()` (2026-06-11; canonical transport — `safeFetch` SSRF allowlist, abortable timeout, 429/529 retry, API-key redaction). The `cache_control` system array passes through verbatim. The Executor preserves normalized joined `text`, `stopReason`, `stopDetails`, refusal state, model, usage, and the applied token budget. A prompt with `generationMode:"native-json-schema"` passes `jsonSchema` as Anthropic `output_config.format` only when the concrete model is explicitly reviewed for structured output. No `appName` is passed — avoids double-counting `api_usage_log` against the driver route's own `logUsage`. |
+| 7 | Validate termination + parse output | Require a clean terminal response, then parse the complete joined text using `wmkf_ai_promptoutputschema.jsonSchema` (or treat as raw text when `parseMode = "raw"`) | Requires `stopReason="end_turn"` before parsing/persistence. Joins every text content block. Applies required-key checks and then the optional local `validationSchema`. |
 | 8 | Persist outputs | Coalesce all `akoya_request` outputs into **one** PATCH with `If-Match: <etag>` from step 4. Direct field writes (no `jsonPath`) merge into the payload as `{ field: value }`. `jsonPath` outputs grouped by field: GET the current memo, apply each `$.path` write in declaration order (later writes win on key collisions), serialize back, add the merged JSON to the same payload. Two direct outputs writing the same field (no `jsonPath`) throws at preflight as a schema error. Success or failure is uniform across all contributors: a 412 marks every eligible output as `concurrent_edit`. Persistence errors become structured `writeResults`, not necessarily thrown errors. | Same coalesced PATCH and structured result |
 | 9 | Log Execution | Attempt to create `wmkf_ai_run`: Lookup to prompt row, `wmkf_ai_promptversion`, `wmkf_ai_runsource`, `wmkf_ai_status`, `wmkf_ai_model`, `wmkf_ai_rawoutput` according to `rawOutputRetention`, token/cache counts in `wmkf_ai_notes`, `wmkf_ai_request` Lookup | Same; logging failure is fail-visible and can leave `runId=null` on a thrown path |
 | 10 | Return | Return parsed output, audit id, cache/guard state, structured write results, usage, and metadata | `return { parsed, runId, cacheHit, blocked, conflicts, writeResults, usage, meta }` |
@@ -218,6 +230,7 @@ Callers no longer need to apply their own substring before passing values via `o
 
 ```json
 {
+  "generationMode": "native-json-schema",
   "outputs": [
     {
       "name": "summary",
@@ -243,6 +256,16 @@ Callers no longer need to apply their own substring before passing values via `o
 }
 ```
 
+**`generationMode` (output schema, prompt-level opt-in):**
+`"native-json-schema"` sends the declared `jsonSchema` through Anthropic's
+native structured-output grammar. It requires `parseMode:"json"`, a real
+`jsonSchema`, and `supportsStructuredOutput:true` on the resolved concrete
+model. It is deliberately not inferred from `parseMode:"json"` because older
+prompt rows may carry partial schemas intended only for the Executor's local
+required-key check. Absence means ordinary generation; any unknown non-null
+value fails closed before the Messages API call. Provider structured output
+supplements—never replaces—the termination check and local `validationSchema`.
+
 **Target kinds (Phase 0):**
 
 | Kind | Meaning |
@@ -263,7 +286,7 @@ Each output may declare a `guard` policy that the Executor applies in step 4 (pr
 
 **Phase 1+ deferred guards:** `append` (concatenate to existing value with separator), `version-on-conflict` (write to `field_v2` etc.), `error-on-conflict` (fail with 409 instead of returning `blocked`).
 
-**`parseMode` (output schema, Phase 0):** `"json"` (default — Claude must return parseable JSON matching `jsonSchema`) or `"raw"` (the entire `content[0].text` becomes the value of the single declared output; `jsonSchema` ignored). Multi-output prompts must use `"json"`.
+**`parseMode` (output schema, Phase 0):** `"json"` (default — Claude must return parseable JSON matching `jsonSchema`) or `"raw"` (the complete joined text becomes the value of the single declared output; `jsonSchema` ignored). Multi-output prompts must use `"json"`.
 
 **`validationSchema` (output schema, added 2026-05-22 — A7 step 3):** an optional declarative schema, in the `validateAiJson` node format (`lib/utils/ai-output-schema.js` — `{ "type": "object", "fields": { … } }`, plus `array` / `record` / scalar nodes; fully JSON-serialisable). When present and `parseMode = "json"`, the Executor validates the parsed model output against it in step 7, **after** the `jsonSchema.required` check and **before** step 8 persistence. Undeclared keys are dropped and types/lengths are bounded, so a prompt-injected model cannot smuggle an extra field through to an `akoya_request` writeback. A validation failure throws (logged as a `failed` run row). Prompts that omit `validationSchema` are unchanged — the field is purely additive. `raw` parseMode never reaches this check. `jsonSchema` (presence/required-key assertion) and `validationSchema` (post-parse shape enforcement) are independent and may both be declared.
 
@@ -275,7 +298,7 @@ Each output may declare a `guard` policy that the Executor applies in step 4 (pr
 | `hash` | Content-free metadata: `{retention:"hash", originalChars, sha256}`. Use when the model output is already persisted to a target field such as `akoya_request.wmkf_ai_summary`. |
 | `none` | Content-free metadata: `{retention:"none", originalChars}`. Use when even hash correlation is unnecessary. |
 
-`phase-i.summary` uses `"hash"` because the summary itself is already written to `akoya_request.wmkf_ai_summary`; the run row only needs correlation metadata.
+`phase-i.summary` uses `"hash"` because the summary itself is already written to `akoya_request.wmkf_ai_summary`; the run row only needs correlation metadata. Thrown failures after a provider response retain the same policy inside a diagnostic envelope with stop reason, token budget, usage, and retained/hash-only output metadata.
 
 ---
 
@@ -322,9 +345,9 @@ that no execution occurred.
 | `wmkf_ai_tasktype` | Derived from the prompt row (future — after `tasktype` lands on `wmkf_ai_prompt`) |
 | `wmkf_ai_status` | `Completed` / `Failed` / `Needs Review` (the last is also used for blocked runs — see *Notes for caller authors*) |
 | `wmkf_ai_model` | The model ID actually used |
-| `wmkf_ai_rawoutput` | Claude response according to `rawOutputRetention` (`full`, `hash`, or `none`) |
+| `wmkf_ai_rawoutput` | Completed Claude response according to `rawOutputRetention` (`full`, `hash`, or `none`), or a thrown-failure diagnostic envelope whose nested response output applies the same retention policy |
 | `wmkf_ai_request` | Lookup to `akoya_request` (if applicable) |
-| `wmkf_ai_notes` | Input/output token counts + cache hit counts + any error summary |
+| `wmkf_ai_notes` | Input/output token counts + cache hit counts + any error summary; includes `semanticAttempt` and, for a linked caller retry, `retryOf=<prior run GUID>` |
 | `createdon` | Built-in Dataverse creation timestamp for the run row. Do not write vestigial `wmkf_ai_rundatetime`. |
 
 ---
@@ -363,7 +386,10 @@ A prompt row with `guard: "always-overwrite"` on every output ignores `forceOver
 
 - **Does not orchestrate chains.** The caller (parent PA flow or Vercel API route) decides which prompts run in what order. Executor runs exactly one prompt per invocation.
 - **Does not branch on output.** Business-logic conditions ("if compliance failed, notify staff") live in the caller's Flow.
-- **Does not retry.** Caller decides retry policy. Executor returns failure; caller decides whether to re-invoke.
+- **Does not semantically retry.** Caller decides retry policy. Executor returns a
+  typed failure; the review-synthesis service is the current example that
+  re-invokes once only for `claude_output_truncated`. Transport-level 429/529
+  retries remain inside `LLMClient` and are not semantic prompt attempts.
 - **Does not handle arbitrary code.** Preprocessing, source kinds, and target kinds are closed enums.
   A new case requires a new enum value in the live Executor and, if PA is later implemented, its
   conformance implementation — not an "exec arbitrary script" escape hatch.

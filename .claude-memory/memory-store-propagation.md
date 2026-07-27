@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: dev-env
-  last_verified: S175 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-27 via /start readlink check for the current repo path
 ---
 
 ## Recall Rule
@@ -22,6 +22,10 @@ Do not:
 - Assume moving the repo into iCloud makes memory propagate (the harness store lives under `~/.claude`, outside the repo).
 
 Ground truth: `.claude-memory/`; `~/.claude/projects/<slug>/memory` symlink. Supersedes: `memory-propagation-icloud-misfix`, `project_memory_two_stores_propagation`. Related: [[env-broken-git-autogc]].
+
+[VERIFIED on 2026-07-27 via `/start`'s `readlink` checks for the current repo
+path.] This proves the current machine/path only; repeat after a move or on
+another machine.
 
 **There is ONE canonical memory store: `.claude-memory/` in the repo, git-tracked.**
 Everything durable lives there, propagates between Macs via normal `git push`/`pull`,

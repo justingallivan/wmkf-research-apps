@@ -8,29 +8,46 @@
 
 Covers three Postgres tables in the reviewer-finder domain that don't warrant individual pages: `researcher_keywords` (DROPPED 2026-06-04), `proposal_searches` (DROPPED 2026-06-04), `search_cache` (KEPT — live cache). (`playing_with_neon` was a Neon-console tutorial scratch table dropped 2026-05-25 via migration 014; section retained below as a historical record.)
 
-## `researcher_keywords` (1,028 rows)
+## Historical `researcher_keywords` snapshot (1,028 rows)
 
-**Source of truth:** Postgres-only.
+**Disposition:** dropped by migration 018. The following schema and row count
+describe the final pre-drop snapshot, not a current Postgres source of truth.
 
-Schema: `id`, `researcher_id` (FK CASCADE), `keyword`, `relevance_score` (0-1), `source` (`publications | profile | manual`), `created_at`. UNIQUE `(researcher_id, keyword, source)`.
+Historical schema: `id`, `researcher_id` (FK CASCADE), `keyword`,
+`relevance_score` (0-1), `source`
+(`publications | profile | manual`), `created_at`. UNIQUE
+`(researcher_id, keyword, source)`.
 
-**Read/write paths:** Live application readers/writers retired. `pages/api/reviewer-finder/researchers.js` deleted 2026-05-12 in W6 step 1; `lib/services/database-service.js` keyword methods gutted in W5 step 2 (commit `0c58da4`). Remaining touches: `scripts/backfill-postgres-to-dataverse.js`, `scripts/clear-all-database.js` (admin scripts).
+**Historical read/write closeout:** application readers and writers retired
+before the drop. Retained backfill or cleanup scripts are migration
+archaeology, not current table callers.
 
-**Cross-system:** Migrates to `wmkf_potentialreviewer.wmkf_keywords` as a single Memo field (comma-joined; S213: this was `wmkf_appresearcher.wmkf_keywords` before the sidecar collapsed onto the person). The 1:N → 1:1 collapse is intentional — the current Postgres design over-models keyword provenance.
+**Historical cross-system mapping:** keywords migrated to
+`wmkf_potentialreviewer.wmkf_keywords` as a single Memo field after the S213
+sidecar collapse. Current authority is the Dataverse person record.
 
-## `proposal_searches` (0 rows)
+## Historical `proposal_searches` snapshot (0 rows)
 
-**Source of truth:** dead. Writer is dead code (per S136 audit + plan).
+**Disposition:** dropped by migration 018. It had no rows and was not a source
+of truth at drop time.
 
-Schema: 20 columns including `proposal_title`, `proposal_hash`, `claude_suggestions` (jsonb), `search_queries` (jsonb), `summary_blob_url`, `request_number`, `user_profile_id`. UNIQUE on `proposal_hash` (implicit via writer).
+Historical schema: 20 columns including `proposal_title`, `proposal_hash`,
+`claude_suggestions` (jsonb), `search_queries` (jsonb), `summary_blob_url`,
+`request_number`, `user_profile_id`. UNIQUE on `proposal_hash` (implicit via
+the retired writer).
 
-**Read/write paths:** No live application readers/writers. `pages/api/reviewer-finder/extract-summary.js` was retired entirely 2026-05-12 (W5 step 5); `lib/services/maintenance-service.js` dropped the `proposal_searches` blob scan in W5 step 6. Remaining touches: `scripts/{clear-all-database,assign-orphan-records,import-user-assignments}.js` (admin scripts).
+**Historical read/write closeout:** no application reader or writer remained
+before the drop. Retained admin scripts are not current callers.
 
-**JOIN retired 2026-05-12 (W3 cutover):** Previously `pages/api/reviewer-finder/grant-cycles.js` did `LEFT JOIN proposal_searches`. That route is now Dataverse-only (verified 2026-05-14 — header says "W3 cutover (2026-05-12) — Dataverse-only"; no `proposal_searches` reference in source). The JOIN site is gone. `proposal_searches` Postgres table has no remaining application-code readers — drop is unblocked.
+**JOIN retired 2026-05-12 (W3 cutover):** the former grant-cycle join was
+removed before migration 018. The table drop is complete, not merely
+unblocked.
 
 **Dataverse counterpart:** `wmkf_appproposalsearch` schema-as-code exists at `lib/dataverse/schema/wave2/wmkf_app_proposal_search.json`. Live state (S188 audit re-sweep 2026-05-25): **DEPLOYED, 0 rows**. Entity-set name is the unconventional `wmkf_appproposalsearchs` (no `e` before `s` — Dataverse auto-pluralized with `+s` rather than `-ches`). Earlier "NOT deployed" framing (2026-05-07) was a string-mismatch against the wrong entity-set name; same trap the audit script hit and S188 fixed.
 
-**Migration disposition:** Drop the Postgres table during cleanup. The Dataverse counterpart is already deployed (S185, 0 rows) and sits empty awaiting a future feature need — no migration of data required since both sides are empty.
+**Migration disposition:** complete. Migration 018 dropped the Postgres table;
+no cleanup action remains. The separately deployed Dataverse counterpart had
+0 rows at the dated S188 probe.
 
 ## `search_cache` (0 rows)
 
@@ -38,11 +55,17 @@ Schema: 20 columns including `proposal_title`, `proposal_hash`, `claude_suggesti
 
 Schema: `id`, `source`, `query_hash` (sha256), `query_text`, `results` (jsonb), `result_count`, `created_at`, `expires_at`. UNIQUE `(source, query_hash)`. Index on `expires_at` for `cleanup_expired_cache()` plpgsql function.
 
-**Read/write paths:** `lib/services/database-service.js`, `scripts/clear-all-database.js`, `scripts/cleanup-database.js`.
+**Current read/write paths:** `DatabaseService.checkCache` and
+`DatabaseService.cacheSearch` are called by the PubMed, bioRxiv, arXiv, and
+ChemRxiv services when caching is enabled. `MaintenanceService.cleanupExpiredCache`
+is called by `/api/cron/maintenance`.
 
-**Live state:** 0 rows. Cache is either disabled or never enabled. The `cleanup_expired_cache()` function exists in `schema.sql` but no cron job calls it.
+**Last observed state:** 0 rows at the 2026-05-07 probe. That snapshot does not
+mean the cache is disabled. Current source retains optional cache reads/writes
+and a maintenance-cron cleanup path.
 
-**Migration disposition:** Drop. Pure ephemeral cache; reconstitute via Dataverse cache-table or in-process LRU if needed.
+**Migration disposition:** keep. Migration 018 deliberately excluded
+`search_cache` because it has live callers. There is no approved drop action.
 
 ## `playing_with_neon` — DROPPED 2026-05-25
 

@@ -7,7 +7,7 @@ metadata:
   originSessionId: 17893605-3207-451d-8190-118bbacd8141
   status: active
   scope: dev-env
-  last_verified: 2026-05-12 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-27 via package.json and key-only local .env.local inspection
 ---
 
 ## Recall Rule
@@ -23,6 +23,12 @@ Do not:
 - Assume a separate local/test Dataverse store — local dev points at PROD Dataverse (`https://wmkf.crm.dynamics.com`); the sandbox is not drop-in usable (see [[project-dynamics-sandbox-state]]).
 
 Ground truth: `.env.local`, `package.json` scripts; cross-refs [[project-dynamics-sandbox-state]]. Config values may drift — verify against the live `.env.local` rather than this memory.
+
+[VERIFIED 2026-07-27 via key-only `.env.local` inspection and `package.json`]:
+`AUTH_REQUIRED=true`, `NEXTAUTH_URL=http://localhost:3000`,
+`DYNAMICS_URL=https://wmkf.crm.dynamics.com`, and the two named Wave-1 backend
+flags are absent. Re-check these non-secret values each session that depends on
+them.
 
 - Dev server: `npm run dev` on port 3000
 - Auth required in the current local `.env.local` (`AUTH_REQUIRED=true`)

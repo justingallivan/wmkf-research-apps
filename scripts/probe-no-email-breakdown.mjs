@@ -7,7 +7,8 @@
  *
  * Authoritative "can't invite" = Dataverse person.wmkf_emailaddress empty.
  * Classification = the Postgres reviewer_find_roster candidate blob's enrichment
- * flags (emailPersistAllowed / contactStatus) matched by request + name.
+ * flags (emailPersistAllowed / contactStatus) and quarantined contactLeads,
+ * matched by request + name.
  * Only POST is the OAuth token; every Dataverse call is a GET; Postgres is read-only.
  */
 import fs from 'fs'; import path from 'path'; import { fileURLToPath } from 'url';
@@ -85,6 +86,7 @@ async function getAll(token, urlPath) {
         epa: (c.emailPersistAllowed ?? enr.emailPersistAllowed),
         contactStatus: (c.contactStatus || enr.contactStatus || null),
         rosterEmail: c.email || enr.email || null,
+        contactLeads: Array.isArray(enr.contactLeads) ? enr.contactLeads : [],
       };
     }
   }
@@ -96,7 +98,13 @@ async function getAll(token, urlPath) {
     if (r.isApplicant) { applicant++; continue; }
     if (!rr) { unmatched++; continue; }
     if (rr.rosterEmail) { staleRosterHasEmail++; continue; } // roster found an email; Dataverse empty (staleness/other)
-    if (rr.epa === false) { findCompleted++; findCompletedList.push(`${r.name}${r.affHasEmail ? ' [aff-has-email!]' : ''}`); }
+    if (rr.epa === false) {
+      findCompleted++;
+      findCompletedList.push({
+        name: `${r.name}${r.affHasEmail ? ' [aff-has-email!]' : ''}`,
+        leads: rr.contactLeads,
+      });
+    }
     else { findBlank++; } // flags undefined/blank → enrichment never attached
   }
 
@@ -111,5 +119,15 @@ async function getAll(token, urlPath) {
   console.log(`  roster HAS email but Dataverse empty (stale/other)  : ${staleRosterHasEmail}`);
   console.log(`  no roster match (can't classify)                    : ${unmatched}`);
   console.log(`\nCause #2 reviewers (enrichment completed, no email surfaced):`);
-  for (const n of findCompletedList) console.log('  -', n);
+  for (const entry of findCompletedList) {
+    const leadSummary = entry.leads.length
+      ? entry.leads.map((lead) => {
+        const kind = lead.type || 'unknown';
+        const confidence = lead.confidence || 'unknown';
+        const reason = lead.rejectedReason ? `:${lead.rejectedReason}` : '';
+        return `${kind}/${confidence}${reason}`;
+      }).join(', ')
+      : 'none';
+    console.log(`  - ${entry.name}: ${entry.leads.length} lead(s) [${leadSummary}]`);
+  }
 })().catch((e) => { console.error('PROBE ERROR:', e.message); process.exit(1); });

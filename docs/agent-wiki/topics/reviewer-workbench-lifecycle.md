@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-26
+last_verified: 2026-07-27
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -33,6 +33,9 @@ source_files:
   - lib/services/reviewer-candidate-export.js
   - lib/services/reviewer-campaign-timeline.js
   - lib/services/review-manager/terminal-transition-service.js
+  - lib/external/token-lifecycle.js
+  - lib/external/reviewer-token-ttl.js
+  - lib/external/verify-suggestion-token.js
   - lib/services/review-receipt-guard.js
   - lib/services/reviewer-roster-store.js
   - lib/services/contact-enrichment-service.js
@@ -321,7 +324,8 @@ DTO has no dedicated `piName` field, so `proposalAuthors` (project
 leader/applicant) stands in as the best-available PI identity.
 
 **Phase 4 BUILT (2026-07-03); prompt current in production 2026-07-26 —
-first controlled execution failed twice on incomplete JSON:**
+three controlled current-v2 executions failed on incomplete JSON; local
+reliability fix awaits promotion:**
 Executor-based AI synthesis of a proposal's submitted reviews. New Tier-1
 prompt `review-synthesis.generate` (`shared/config/prompts/review-synthesis.js`,
 initially bootstrapped as v1 and published through the audited admin path as
@@ -329,8 +333,9 @@ backward-compatible current v2
 `7423049a-3f89-f111-ab0f-7ced8d3d15a6` on 2026-07-26); all-override, single untrusted variable
 `reviews_digest` (reviewer `answerText`, never `answerHtml`, composed
 server-side into a plain digest) so the Executor wraps it + injects the A7
-preamble. Output is strict JSON (single output `synthesis`, `validationSchema`
-bounds/strips the parsed shape) written to a new memo column
+preamble. Output is strict JSON (prompt-level
+`generationMode:native-json-schema`, single output `synthesis`;
+`validationSchema` bounds/strips the parsed shape) written to a new memo column
 `akoya_request.wmkf_reviewsynthesisjson` with `guard: 'always-overwrite'` —
 schema-as-code APPLIED TO PROD 2026-07-03 (column live-probed) from
 `lib/dataverse/schema/wave11-review-synthesis/`. `POST
@@ -346,23 +351,43 @@ review is submitted) with a Generate/Regenerate action, plain-text only (no
 `synthesis` param rendered additively in both export formats. Same
 verification boundary as Phases 2-3: Request #1002788 production-proved the
 submitted DTO, categorical matrix, and both export renderers on 2026-07-26.
-Two real v2 synthesis executions then failed before writeback with
+Three real v2 synthesis executions failed before writeback with
 `Claude output not valid JSON: Unexpected end of JSON input`, producing failed
 append-only audit runs `f5aa3712-4789-f111-ab0f-6045bd018a07` and
-`04805a39-4789-f111-ab0f-6045bd018deb`. The prior request memo remained
-unchanged and the smoke answers were atomically cleaned up. This phase remains a
-red pre-exposure gate until synthesis succeeds (or the prompt-only rollback is
-executed and verified).
+`04805a39-4789-f111-ab0f-6045bd018deb` on 2026-07-26, then
+`be61f383-f289-f111-ab0f-70a8a59cded0` on 2026-07-27. The latest attempt
+returned HTTP 500 with `claude-sonnet-5`, prompt v2, Vercel Interactive source,
+and a redacted override. The prior request memo remained byte-for-byte
+unchanged. The 11 synthetic answers and four staged suggestion fields were
+fully restored, with no draft or unrelated email/material/reminder/thank-you
+change; the failed AI run remains append-only. The same smoke also proved the
+staff Manual Review Entry path. The local 2026-07-27 change preserves joined
+response text/stop metadata, requires `end_turn` before persistence, uses
+capability-gated native JSON schema, and retries one typed `max_tokens`
+termination once with a bounded larger budget. Each semantic attempt retains
+its own AI-run audit attempt. This is not a production-live claim; the phase
+remains a red pre-exposure gate until governed prompt publication/deployment
+and one controlled post-fix smoke. Independent follow-up review returned READY.
 
-**Owner-confirmed target lifecycle (2026-07-26; NOT YET IMPLEMENTED):**
-automatic synthesis must wait until every invited reviewer has submitted;
-staff may explicitly generate it earlier as a manual override. Stored-output
-visibility is a separate concern: an existing `wmkf_reviewsynthesisjson` value
-must remain visible even when the current submitted count is zero. Current code
-has no automatic trigger, permits the manual action after one submission, and
-hides the entire Synthesis card at zero. Declined/withdrawn invitation semantics
-must be decided before implementing the automatic all-in readiness test.
-Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
+**Owner-confirmed target lifecycle (2026-07-26; participation semantics closed
+2026-07-27; NOT YET IMPLEMENTED):** automatic synthesis is intended only after
+all participating invitations resolve and at least one review is submitted;
+staff may explicitly generate it earlier after one submission. Participants are
+selected, not-applicant-excluded rows that entered invitation/engagement
+(`wmkf_invited=true` or `wmkf_accepted=true`). A receipt resolves with review
+content. Declined, no-response, `withdrawn_sufficient`, withdrew, released, and
+a currently revoked or expired token resolve without content. Every other
+participant without a receipt blocks, including live-token invitees who have
+not accepted, unresolved duplicates, and malformed/unknown lifecycle or token
+state. Unselected, applicant-excluded, and explicitly merged/removed duplicates
+do not participate. `mintAndStore` clears revocation and writes a future expiry,
+but regeneration reopens readiness only when token state was the
+otherwise-participating, nonterminal row's sole resolution; it does not reselect
+a removed row or undo decline/withdraw/release. An existing synthesis remains
+visible but is not current until synthesis runs again after genuine reactivation
+and resolution. Current code has no automatic trigger, permits the manual action
+after one submission, and hides the entire Synthesis card at zero. Plan doc:
+`docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 ## Email templates (admin org default + per-PD override)
 
@@ -494,8 +519,10 @@ Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
   ("… Boston Children's Hospital. christopher.walsh@childrens.harvard.edu.") used to be saved
   with the email ORPHANED inside `wmkf_primaryaffiliation` and an EMPTY `wmkf_emailaddress`
   ("no email — can't invite" on the Invite Reviewers tab), because enrichment's own Tier-0
-  extraction (`contact-enrichment-service.js:439-450`) never ran to completion.
-  `save-candidates.js` now re-applies that extraction as a last step: if no email was captured
+  extraction (`contact-enrichment/tiers.js` `applyTier0`, using
+  `ContactParser.extractPrimaryEmail`) never ran to completion.
+  `reviewer-finder/save-candidates-service.js` re-applies that extraction as a
+  last step: if no email was captured
   and the affiliation being persisted contains one (`ContactParser.extractPrimaryEmail`), it is
   stored as `emailSource='affiliation'` — a grounded, name-adjacent address that enrichment
   trusts unconditionally (Tier 0 returns before domain validation, so it is immune to the

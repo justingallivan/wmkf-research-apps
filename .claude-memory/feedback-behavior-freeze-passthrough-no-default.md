@@ -7,6 +7,12 @@ metadata:
   status: active
 ---
 
+## Recall Rule
+
+During behavior-freeze extraction, keep a pass-through parameter for a
+runtime-mutable static free of defaults. Verify the facade supplies it and census
+other importers before claiming byte-equivalent behavior.
+
 When extracting a method out of a class as a behavior-freeze (pure code motion), and the method
 read a runtime-mutable static via `this.CONST`, the facade wrapper passes `this.CONST` into the
 extracted function as a parameter (the C1 pass-through). **That parameter must NOT carry a default

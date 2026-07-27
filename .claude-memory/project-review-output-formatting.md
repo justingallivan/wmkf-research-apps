@@ -5,8 +5,27 @@ status: active
 metadata:
   node_type: memory
   type: project
+  last_verified: 2026-07-27 via review-report composition and ReviewsTab consumers; formatting work remains planned
   originSessionId: 7db29a2d-b16d-490a-80f0-7e4fa4c04f0a
 ---
+
+## Recall Rule
+
+Read this when: changing a reviewer courtesy-copy attachment or the staff
+DOCX/PDF review export.
+
+Do:
+- Keep `composeReviewReport` as the shared semantic composition seam.
+- Apply separate reviewer-facing and staff-facing presentation styles over the
+  same answer snapshot.
+
+Do not:
+- Fork answer interpretation between courtesy and staff exports.
+- Treat the requested formatting pass as already implemented.
+
+Ground truth: owner note S328 and current composition/consumers in
+`shared/utils/review-report.js` and
+`shared/components/workbench/ReviewsTab.js`. Formatting remains `[PLANNED]`.
 
 Owner note (S328, 2026-07-04), captured while architecting the review
 thank-you sweep with courtesy-copy attachment:

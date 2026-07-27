@@ -1,6 +1,68 @@
-# Session 378 Prompt: Production synthesis smoke and audited follow-through
+# Session 379 Prompt: Review-synthesis reliability and lifecycle closure
 
-## Session 377 Summary
+## Session 379 In-Progress Summary
+
+The local review-synthesis reliability change is implemented and focused
+verification is green. `executePrompt` now preserves the normalized full text
+and stop metadata, requires `stopReason=end_turn` before either raw or JSON
+output can reach persistence, retains policy-compliant failure diagnostics, and
+capability-gates prompt-level Anthropic native JSON schema. The synthesis prompt
+uses a strict schema, and `synthesizeReviews` retries one confirmed
+`claude_output_truncated` invocation once with a bounded doubled budget. Because
+the retry is caller-owned, both semantic model invocations independently attempt
+their own append-only `wmkf_ai_run` row.
+
+Verification so far: 102 focused/surrounding Executor and synthesis tests
+passed; `check:model-registry` and its six-case self-test passed. Independent
+post-implementation review found no P0 and identified fail-open mode validation,
+retry-cap, audit-link, complement-test, and stale-doc issues; those local issues
+were corrected; the bounded follow-up returned READY. Commit, governed prompt
+publication/deployment, and the controlled post-fix production smoke remain.
+
+## Session 378 Summary
+
+Session 378 executed the owner-authorized production review-synthesis smoke on
+Request `1002788`, stopped after the first regeneration failure, restored the
+reversible synthetic review, and reconciled the changed durable facts.
+
+### What Was Completed
+
+1. **Production smoke executed as a bounded failure**
+   - A controlled review was entered through the signed-in staff Manual Review
+     Entry path, creating exactly 11 answer rows and changing only receipt,
+     status, affiliation, and staff-upload fields.
+   - The first and only Regenerate attempt returned HTTP 500.
+   - Vercel and Dataverse recorded
+     `Claude output not valid JSON: Unexpected end of JSON input`.
+   - Failed AI run `be61f383-f289-f111-ab0f-70a8a59cded0`
+     (`2026-27-07-1355`) used `claude-sonnet-5`,
+     `review-synthesis.generate` v2, and Vercel Interactive source; its review
+     input override is redacted.
+
+2. **No partial synthesis write**
+   - `wmkf_reviewsynthesisjson` remained exactly 1,709 characters with SHA-256
+     `a91f05cc0a20cad72341db9d7fc5fe808ed3b28610a35dfdaca82d69beebbcba`.
+   - The request `modifiedOn` remained `2026-07-24T18:43:25Z`.
+   - This is the third controlled current-v2 incomplete-JSON failure; it is not
+     evidence that the successful v1 memo is invalid.
+
+3. **Synthetic state fully restored**
+   - Deleted exactly the 11 staged answer IDs.
+   - Restored the four suggestion fields to their exact baseline.
+   - Verified zero answers, no draft, unchanged target non-staging fields,
+     unchanged sibling fields, and unchanged email/material/reminder/thank-you
+     markers.
+   - The append-only failed AI audit row intentionally remains.
+   - A signed-in production reload again showed zero submitted and two
+     outstanding reviews.
+
+4. **Queue and durable documentation reconciled**
+   - The production-smoke item closed through its documented bounded-diagnosis
+     alternative.
+   - The next task is synthesis structured-output reliability and the approved
+     lifecycle contract—not another blind regeneration.
+
+## Prior Session 377 Summary
 
 Session 377 completed a repository-wide material-claim audit against current
 source, tests, migrations, configuration, and dated probe evidence. It repaired
@@ -43,8 +105,8 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
      exhaustive source of prompt truth.
 
 3. **Operational hazards surfaced without destructive action**
-   - Twenty-five non-archive scripts mention dropped
-     `reviewer_suggestions`; some contain direct mutations.
+   - Twenty-five non-archive scripts mention the dropped `reviewer_suggestions`
+     table; some contain direct mutations.
    - `scripts/README.md` no longer provides copy-pasteable commands for those
      retired-table flows and marks them blocked.
    - Script quarantine/removal was not performed because it changes operational
@@ -79,16 +141,17 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
 
 ### Verified Open
 
-1. **FIRST: run the deliberate production review-synthesis smoke on Request
-   `1002788`.**
+1. **FIRST: finish review-synthesis structured-output reliability promotion.**
    Evidence: `docs/CURRENT_WORK_QUEUE.md`,
    `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`, and
    `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
-   Use the staff-triggered Generate/Regenerate action. Verify complete
-   schema-valid output, `wmkf_reviewsynthesisjson` persistence, reload
-   visibility, deliberate overwrite, useful logs, and absence of unrelated
-   reviewer/email/materials writes. If it fails, stop at a bounded diagnosis;
-   do not add automatic triggering.
+   Three controlled current-v2 production calls failed before writeback with
+   incomplete JSON. The local fix and focused tests are complete: native JSON
+   schema is prompt-opt-in/capability-gated, nonterminal responses fail before
+   persistence, and only confirmed `max_tokens` gets one caller-owned bounded
+   retry. Independent follow-up review is READY and the gates are green. Commit,
+   publish the governed prompt version, deploy deliberately, then run one
+   controlled post-fix smoke.
 
 2. **Resolve or explicitly defer the P1 auth-status policy divergence.**
    Evidence: `pages/api/auth/status.js`, `lib/utils/auth-policy.js`, and the
@@ -97,11 +160,13 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
    enforcement remains enabled. Use `/contract-reconcile` before changing the
    response because `RequireAuth`, `Layout`, and the home page consume it.
 
-3. **Continue the deadline and lifecycle design discussion.**
+3. **Continue the deadline and lifecycle implementation discussion.**
    Evidence: `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` Calendar Gate
    and Decision Log.
    Obtain each fixed date, audience, and minimum required artifact/action before
-   converting the relative sequence into calendar commitments.
+   converting the relative sequence into calendar commitments. Synthesis
+   participation semantics were owner-confirmed on 2026-07-27; use the plan's
+   resolved state machine rather than reopening that decision.
 
 4. **Plan the next reconciliation slice without claiming the repository clean.**
    Evidence:
@@ -109,6 +174,19 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
    Highest-value candidates are read-only live probes, retired-table script
    quarantine, reconciliation-generator redesign, line-reference validation,
    and full-body reclassification of the explicitly named mixed plans.
+
+5. **Proceed with Q9 app-access Stage 4 from the deterministic acceptance
+   baseline.**
+   Evidence: `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md` and
+   `docs/audits/q9-app-access-stage2-acceptance-2026-07-27.md`.
+   The owner replaced the low-signal passive warn soak with
+   `DATAVERSE_DAL_UNIVERSAL=on` contract acceptance across each app-access
+   entry-point class plus a read-only live inventory. All 33 focused assertions
+   passed. Stage 2 is satisfied; Stage 4 is ready to execute. Preserve its
+   required deliberately designated ordinary-user Preview smoke, reversible
+   grant/revoke restoration check, authenticated reviewer-finder
+   `analyze`/`discover` check with a known prompt override, and production log
+   watch at release time.
 
 ### Owner Decision Needed
 
@@ -126,14 +204,16 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
    counts and statuses, prompt/question rows, external reviewer usage, BILL,
    Blob, and external automation state.
 
-4. **Synthesis participation semantics and fixed deadlines.**
-   Decide which invitation terminal states participate in “all reviews are in,”
-   plus the fixed dates and minimum outcomes for the remaining Workbench
-   lifecycle.
+4. **Fixed deadlines.**
+   Provide the fixed dates and minimum outcomes for the remaining Workbench
+   lifecycle. Synthesis participation semantics are closed in
+   `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
 
 ### Parked
 
-1. **Automatic synthesis triggering until readiness semantics are approved.**
+1. **Automatic synthesis triggering and another production regeneration until
+   the synthesis reliability defect is fixed, reviewed, and tested and the
+   approved readiness state machine is implemented.**
 
 2. **Implementation of the four placeholder tabs until the design/calendar
    gate is complete.**
@@ -193,6 +273,7 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
 | `docs/APPLICATION_STATE_ATLAS.md` | Data-layer routing and ownership |
 | `scripts/README.md` | Blocked legacy operational script guidance |
 | `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` | Current product execution sequence |
+| `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md` | App-access DAL Stage 4, now unblocked by deterministic context acceptance |
 
 ## Testing
 

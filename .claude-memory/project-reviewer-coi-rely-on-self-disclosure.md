@@ -14,6 +14,9 @@ Read before any reviewer-finder COI work that DROPS, FLAGS, or SURFACES a confli
 co-author COI, the model `POTENTIAL_CONCERNS` advisory, or "should we warn the PD about X."
 
 ## The principle (Justin, S240)
+[VERIFIED 2026-07-27 via owner decisions and current COI/save enforcement in
+`lib/services/reviewer-finder/save-candidates-service.js` plus reviewer
+candidate-card consumers.]
 - **Hard-act only on self-evident POLICY conflicts** the PD does not need to verify: proposal authors
   (PI + co-Is) and corroborated **CURRENT** same-institution. These stay hard drops (foundation policy
   — also the S238 exception in [[project-reviewer-recall-over-precision]]).

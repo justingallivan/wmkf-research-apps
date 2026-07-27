@@ -11,7 +11,7 @@ metadata:
   modified: 2026-07-27T01:03:36.342Z
 ---
 
-## Recall Trigger
+## Recall Rule
 
 Read this when preparing to assert a scope or quantity claim: only, all, none,
 every, never, always, "the rest", "N of M", or "source of truth" — especially

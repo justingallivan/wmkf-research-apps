@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-26
+last_verified: 2026-07-27
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -134,14 +134,18 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   file-upload path: memory `project-reviewer-upload-dormant-not-deleted`.
   **The whole epic (Phases 0–5) is COMPLETE (S302).**
   Full plan: `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md`.
-- **Staff-side upload + "mark received" surfaces removed from the Track Reviewers panel (S347).**
+- **Staff-side upload + "mark received" surfaces removed from the Track Reviewers panel (S347); structured manual entry now lives on the Reviews tab.**
   `ReviewerManagePanel`'s ⋮ menu no longer offers **"Staff upload (override)"** (file upload →
   `/api/review-manager/upload-review`, was `UploadReviewModal` + `ReviewFormFields`) or **"Mark
   received (no file)"** (`/api/review-manager/mark-received-no-file`). These were PDF-email-era
   holdovers — a modern review is structured `wmkf_appreviewanswer` data via `/submit`, not a file,
   and `ReviewFormFields` only renders picklist/string (no rich-text). **Routes + services are
-  RETAINED unchanged** for a planned dedicated staff "manual review rescue" tool that must mirror
-  the full `ReviewAuthoringForm` (incl. rich-text). The legacy `ReviewFormFields.js` renderer
+  RETAINED unchanged** as legacy partial writers. The dedicated structured
+  rescue is now `ManualReviewEntryForm` →
+  `/api/review-manager/manual-review-entry` on the Workbench Reviews tab; it
+  mirrors the full live question set, including rich text, and its success path
+  was production-proved on 2026-07-27 before exact synthetic restoration. The
+  legacy `ReviewFormFields.js` renderer
   (string+picklist only, no rich-text) was orphaned by this removal and **deleted (S347)**.
   Memory `project-reviewer-upload-dormant-not-deleted`.
 - **The review question SET is staff-editable (Dataverse `wmkf_reviewquestion`), not hardcoded — Phases A+B+C LIVE (S303–S304).**
@@ -194,10 +198,15 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   prior-only rows under request `3d0c7160-3a09-4d96-ab9f-36ebe63e0e7a`.
   The first controlled Request #1002788 portal smoke passed context, sanitized
   draft reload, submit/readback, categorical consumers, finality, and cleanup
-  without sending email. The overall release gate remains red because two
-  current-v2 synthesis executions returned incomplete JSON. Synthesis
-  resolution, staff-writer success coverage, rollback/republish, final smoke,
-  and reviewer exposure remain separate release gates. Known-fixture disposition cleared
+  without sending email. A 2026-07-27 follow-up proved the staff Manual Review
+  Entry writer, then a third current-v2 synthesis execution returned HTTP 500
+  with incomplete JSON (failed AI run
+  `be61f383-f289-f111-ab0f-70a8a59cded0`). The original request memo and all
+  email/material/reminder/thank-you markers remained unchanged; the 11 staged
+  answers, draft, and four parent fields were fully restored. Synthesis
+  resolution, the two legacy staff-writer success rehearsals,
+  rollback/republish, final smoke, and reviewer exposure remain separate
+  release gates. Known-fixture disposition cleared
   2026-07-26 via audited alerts `361`/`362`, with both CRM contacts and an
   initially unclassified Tim Newhouse/St. Jude PDF preserved. The owner later
   identified that PDF as another test artifact from the retired reviewer-PDF

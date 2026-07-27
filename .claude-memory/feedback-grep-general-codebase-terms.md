@@ -4,7 +4,7 @@ description: "Does the codebase have X?" requires grepping general-purpose terms
 type: feedback
 status: active
 scope: global
-last_verified: S182 (2026-05-23) via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 as a historical S182 search failure and operating lesson
 ---
 
 ## Recall Rule
@@ -20,6 +20,10 @@ Do not:
 - Grep article/attacker-specific terminology ("white-on-white", "OCR", "canary") and treat one empty grep as proof of absence — that built a parallel weaker A7 system (S182, reverted).
 
 Ground truth: historical-only (S182 burn). Same shape as CLAUDE.md "before claiming 'X has no Y', grep for Y" — in spirit, not just letter. See [[project-a7-prompt-injection-hardening]].
+
+[VERIFIED historically via the S182 revert and owner feedback.] The specific
+infrastructure examples below are incident evidence, not a current inventory;
+derive current coverage from source, gates, docs, and history.
 
 When a user asks a question that requires checking the codebase for existing infrastructure ("does our system handle X?", "should we add Y?", "what defenses do we have against Z?"), the search has to use **general-purpose terms** the prior implementer would plausibly have used — not the specific terminology of whatever prompted the question.
 

@@ -6,7 +6,18 @@ metadata:
   type: reference
   status: active
   originSessionId: 8ca2ceaf-bb48-4bb1-8208-f8bccc762ba8
+  last_verified: 2026-07-27 via ~/.claude git metadata, tracked files, settings.json, sync-config.sh, and statusline.sh
 ---
+
+## Recall Rule
+
+Read this only when diagnosing cross-machine Claude configuration. Verify the
+current `~/.claude` remote, tracked-file allowlist, hooks, and symlinks before
+acting; this entry records the intended setup, not proof of current machine state.
+
+[VERIFIED on 2026-07-27 via `git -C ~/.claude remote -v`, branch and
+`ls-files`, plus direct reads of `settings.json`, `sync-config.sh`, and
+`statusline.sh` for the behaviors below.]
 
 `~/.claude` is version-controlled and synced between Justin's home and office Macs via a private GitHub repo (`justingallivan/claude-config`, branch `main`).
 

@@ -1,11 +1,11 @@
 ---
 name: Grant request vs honorarium request nomenclature
-description: Both grant proposals AND reviewer honoraria are stored as akoya_request rows in Dataverse — easy to confuse. Use precise terms; honorarium rows have a shipped reviewer-suggestion provenance link.
+description: Both grant proposals AND reviewer honoraria are stored as akoya_request rows in Dataverse — easy to confuse. Use precise terms; portal-created honoraria have both a direct proposal lookup and a reviewer-suggestion provenance link.
 metadata:
   type: project
   status: active
   scope: bill
-  last_verified: 2026-06-27 — re-probed live (#1002764 person vs #1002794/#1002238 institutions)
+  last_verified: 2026-07-27 — discriminators retained; portal linkage re-probed with the GET-only honorarium-link census
 ---
 
 ## Recall Rule
@@ -15,10 +15,16 @@ Read this when: writing or discussing anything involving `akoya_request` rows wh
 Do:
 - Say "grant request" or "honorarium request" — never "request" alone.
 - When filtering `akoya_request`, state which type and use the program-lookup discriminator (`akoya_program`/`wmkf_grantprogram`/`wmkf_type`/`wmkf_request_type`), not heuristics like the $250 amount.
-- Prefer the shipped reviewer-suggestion provenance link for portal-created honoraria; for older/backfilled honoraria without that link, reconstruct via the reviewer's contact (`_akoya_primarycontactid_value`) + matching grant cycle (`wmkf_meetingdate`).
+- For portal-created honoraria, use the direct `wmkf_reviewedproposal` lookup for
+  the parent grant request and the suggestion's `wmkf_HonorariumRequest` lookup
+  for the exact reviewer-engagement provenance.
+- For older GoApply honoraria without either link, reconstruct via the reviewer's
+  contact (`_akoya_primarycontactid_value`) + matching grant cycle
+  (`wmkf_meetingdate`).
 
 Do not:
-- Assume an honorarium row has a parent-grant lookup — there is none by default.
+- Assume every historical honorarium has a parent-grant lookup. The custom
+  lookup is populated by the portal create path, not retroactively by default.
 
 Ground truth: live discriminators as of 2026-05-25 in body; [[project-bill-honorarium-integration]]; [[akoya-payment-field-semantics]]. Grant↔reviewer assignment denormalized on the grant request (`wmkf_potentialreviewer1..5`, `wmkf_reviewer1`).
 
@@ -39,7 +45,10 @@ Concrete example: Utah State submitted **grant request** #1002238. Amy Gladfelte
 
 This payee-type split is the crux for any "mimic the grant→BILL payment flow for honoraria" work — the vendor record and BILL id live on the `account` for orgs, not the contact: see [[akoya-payment-field-semantics]].
 
-**Critical: old/backfilled rows may have no data link between them.** Honorarium request #1002764 had ZERO lookup fields pointing back to grant request #1002238. For those rows, reconstruct "this honorarium was paid for reviewing which grant?" via:
+**Critical: old/GoApply rows may have no data link between them.** Honorarium
+request #1002764 had ZERO lookup fields pointing back to grant request #1002238.
+For those rows, reconstruct "this honorarium was paid for reviewing which grant?"
+via:
 - Honorarium row's `_akoya_primarycontactid_value` → the reviewer's contact (Amy)
 - Find grant requests where any of `wmkf_potentialreviewer1..5` slot-lookups point to that contact, in the same cycle (`wmkf_meetingdate`)
 - Probably one match per cycle
@@ -48,9 +57,21 @@ The grant↔reviewer assignment is denormalized on the grant request itself: 5 n
 
 **Why:** Last cycle (2026-06-04 meeting) was the first time honoraria were tracked in Akoya. Of 85 reviewer-honoraria for that meeting, 77 were paid via Excel and Steph is back-filling for bookkeeping; only 8 have any BILL fields populated.
 
+**Current portal cohort (GET-only production census 2026-07-27):** all 40
+portal-era honoraria had the direct `wmkf_reviewedproposal` lookup and the
+suggestion-junction link; all 40 proposal identities agreed. The 87
+GoApply-origin honoraria remain outside this guarantee. Re-run
+`scripts/probe-honorarium-link-population.js` before quoting a later count.
+
 **How to apply:**
 - In design docs, tickets, emails, conversation: use "grant request" or "honorarium request" — never "request" alone.
 - When filtering/querying `akoya_request`, ALWAYS state which type the filter is for, and prefer the program-lookup discriminator over heuristics (e.g., $250 amount).
-- Don't assume an honorarium has a parent-grant pointer — there isn't one in the data. Reverse-lookup via contact + cycle is the reconstruction.
-- See [[project-bill-honorarium-integration]] for the integration that now populates provenance via `wmkf_HonorariumRequest` on `wmkf_appreviewersuggestion` (bind `wmkf_HonorariumRequest@odata.bind`, read `_wmkf_honorariumrequest_value`), not the abandoned proposed `wmkf_honorariumforrequest` name.
+- For portal-created rows, read the direct parent-grant pointer as
+  `_wmkf_reviewedproposal_value`; use contact + cycle reconstruction only for
+  older unlinked rows.
+- See [[project-bill-honorarium-integration]] for the integration that populates
+  engagement provenance via `wmkf_HonorariumRequest` on
+  `wmkf_appreviewersuggestion` (bind `wmkf_HonorariumRequest@odata.bind`, read
+  `_wmkf_honorariumrequest_value`) and the direct honorarium→proposal lookup via
+  `wmkf_ReviewedProposal` (read `_wmkf_reviewedproposal_value`).
 - See [[akoya-payment-field-semantics]] for related field-gating audit findings.

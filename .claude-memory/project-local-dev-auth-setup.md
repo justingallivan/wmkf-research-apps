@@ -4,7 +4,27 @@ description: Local `npm run dev` needs three separate things to behave like real
 metadata:
   type: project
   status: active
+  last_verified: 2026-07-27 via auth source and key-only local .env.local inspection
 ---
+
+## Recall Rule
+
+Read this when: localhost appears signed in as the wrong person, Azure sign-in
+loops, or reviewer invite minting reports `missing_secure_link`.
+
+Do:
+- Check presence/configuration of the Azure/NextAuth variables,
+  `AUTH_REQUIRED=true`, and `EXTERNAL_LINK_SECRET`, then restart the dev server.
+- Inspect only key presence for secrets; never print secret values.
+
+Do not:
+- Debug browser cookies before checking the auth kill switch.
+- Reuse a production signing secret for local-only testing.
+
+Ground truth: `lib/utils/auth-policy.js`, `shared/components/ProfileSelector.js`,
+and `lib/services/external-token.js`. [VERIFIED 2026-07-27 via source plus a
+key-only local `.env.local` check: `AUTH_REQUIRED=true` and
+`NEXTAUTH_URL=http://localhost:3000`.]
 
 S346 lost most of a session to what looked like three unrelated bugs (a "wrong
 user" logged in with no sign-out button, then a `missing_secure_link` invite

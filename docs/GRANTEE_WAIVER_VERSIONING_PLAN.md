@@ -2,8 +2,8 @@
 title: "Grantee Publication Waiver Versioning Plan"
 domain: grantee-deliverables
 kind: plan
-status: draft
-summary: "Version the grantee publication waiver like the reviewer COI/AI-use policies: a grantee-waiver slot, admin editing, and an acked-version lookup."
+status: historical
+summary: "Historical design and rollout record for the shipped, versioned grantee publication waiver."
 owner: product-engineering
 related:
   - docs/GRANTEE_PORTAL_SPEC.md
@@ -15,6 +15,22 @@ related:
 ---
 
 # Grantee Publication Waiver Versioning Plan
+
+## Current boundary — SHIPPED AND LIVE
+
+The code, schema, policy slot, admin editing, signed render-token binding, and
+atomic consent write are deployed. A production probe on 2026-07-27 resolved one
+active `grantee-waiver` version:
+
+- version label `2026-07-09`;
+- effective at `2026-07-09T19:29:04Z`;
+- exact body length 295;
+- SHA-256 `941c44a3529aa81130df51fa186263edd5230e1e364bde2e7676cf77639b9659`;
+- exact match to the tracked seed/body constant.
+
+The remainder of this document is the historical design and adversarial-review
+record. Current behavior is defined by `docs/GRANTEE_PORTAL_SPEC.md`, the
+`wmkf_granteedeliverable` Atlas page, and source.
 
 ## Implementation status — IMPLEMENTED IN CODE 2026-07-09 (S350)
 
@@ -33,12 +49,11 @@ green (5224). The proposed artifacts below now EXIST and match this plan
 (prod `wmkf.crm.dynamics.com`); `seed-grantee-waiver-policy.mjs` seeded the `grantee-waiver`
 slot + initial version; `probe-grantee-waiver-slot.mjs` passed (VERDICT: OK). The
 fail-closed dependency (§5) is now satisfied in prod — the portal edit view resolves
-the waiver and records the acknowledged version. Only the production code deploy of
-`main` remains (if not already auto-deployed).
+the waiver and records the acknowledged version. The production deployment is complete.
 
 ## Goal
 
-Today the grantee publication-consent waiver is a hardcoded frontend constant
+At the time this plan was written, the grantee publication-consent waiver was a hardcoded frontend constant
 (`WAIVER_LABEL` in `shared/components/external/GranteeDeliverableForm.js:21`),
 rendered as a client-side submit gate and **never persisted** — a deliberate
 decision documented in `docs/GRANTEE_PORTAL_SPEC.md:48-54,141-142` ("No consent

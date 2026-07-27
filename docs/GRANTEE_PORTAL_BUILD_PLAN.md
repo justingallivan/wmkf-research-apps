@@ -2,8 +2,8 @@
 title: "Grantee Deliverables Portal — Build Plan"
 domain: grantee-portal
 kind: plan
-status: active
-summary: "As-built implementation chronology for the grantee deliverables portal; current field ownership and consent behavior defer to GRANTEE_PORTAL_SPEC and the Atlas."
+status: historical
+summary: "Historical implementation chronology for the grantee deliverables portal; current behavior is defined by GRANTEE_PORTAL_SPEC, the Atlas, and source."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -16,7 +16,7 @@ related:
 
 # Grantee Deliverables Portal — Build Plan
 
-Status: **IMPLEMENTED CHRONOLOGY — limited follow-ups remain.** Current behavior is defined by
+Status: **HISTORICAL IMPLEMENTATION CHRONOLOGY.** Current behavior is defined by
 `docs/GRANTEE_PORTAL_SPEC.md`, the two grantee Atlas pages, and source. The original S268 flat
 five-field request design below was superseded: only `wmkf_abstractformatted` and
 `wmkf_abstractapproved` remain on `akoya_request`; lifecycle, image, caption, dates, and waiver
@@ -44,7 +44,7 @@ build a **parallel grantee variant** of the lifecycle, pages, submit route, uplo
 | 3d | **Awardee-tab UI** ✅ | `AwardeeTab` wired into the workbench tab dispatch — generate → confirm recipients → preview → send | 3, 3b, 3c |
 | 4 | **Grantee portal UI** ✅ | edit abstract (in-portal text), upload image, caption, publish-image waiver submit-gate (`GranteeDeliverableForm`) | 1 |
 | 5 | **Submit route** ✅ | `POST .../submit`: atomic SharePoint image upload + ETag-conditional Dataverse PATCH (`wmkf_abstractapproved`, caption, image ref, status→Submitted) + rollback; image magic-byte (`validateGranteeImage`) + virus scan; `grantee-upload` service | 1, 4 |
-| 6 | **Status/lifecycle + reminders** | status transitions on the Awardee tab, optional reminder send | 3, 5 |
+| 6 | **Status/lifecycle + reminders** ✅ | status transitions, first-invite timestamp, and automatic day-12 reminder with a day-14 deadline | 3, 5 |
 | 7 | **Edited-title generator (S269)** ✅ | Sonnet prompt (`grantee-title.generate`, title+abstract) + cron-poll on `wmkf_phaseistatus=Invited` → writes the EXISTING `wmkf_wmkfprojectdescription` when empty (research-only, idempotent; no new schema). Prompt/service/seed/A7 BUILT; prompt seeded to prod v1 (S269); cron **deployed + registered in the Vercel cron registry (S270)** | Executor contract |
 | 8 | **Document assembly + export (S269 design; S270–271 build)** | server-side template (structured header + edited title + body/caption) → portal preview · website HTML · cycle-level export. **Foundation + outputs (b) website HTML & (c) cycle export BUILT (S270); (a) portal preview BUILT (S271, title display-only)** | 7, 5 |
 
@@ -618,7 +618,7 @@ fetchCoPIs, role=Co-PI 100000001]`
   Closing the gap (signed proxy route that streams the private image vs. manual CMS upload) is **Connor's
   call as the website builder** — he owns how images get published. Left open pending his approach; no
   build this session.
-- Chunk 6: reminder cadence/deadline. Waiver wording is now staff-managed through the versioned
+- Chunk 6: reminder cadence/deadline. Waiver wording is staff-managed through the versioned
   `grantee-waiver` policy slot; the code persists the exact acknowledged version.
   - **Invitation email default — LANDED (S271).** the grantee-invite default copy (admin-editable settings
     store, seeded from `lib/seed/email-defaults/grantee-invite.js`, fetched via
@@ -629,10 +629,13 @@ fetchCoPIs, role=Co-PI 100000001]`
     (`shared/config/granteeInviteEmail.js`, wired at `AwardeeTab.js:209`) fills `[Name]` (PI surname),
     `[title]` (award title), and `COB [date]` (computed today+14) into the body; the PD signature is
     appended server-side (`resolveSignatureForRequest` + `appendSignatureBlock`), never a body
-    placeholder. Full design + hazards: `docs/GRANTEE_INVITE_BODY_CUSTOM_PLAN.md`. Only the
-    cadence/signature-policy decisions below remain open. Voice + structure: `project-grantee-deliverable-email-voice`.
-  - **Still open:** reminder cadence (count/timing/recipients, auto-cron vs. manual "Send reminder" button).
-    The reminder send is NOT built pending cadence.
+    placeholder. Full design + hazards: `docs/GRANTEE_INVITE_BODY_CUSTOM_PLAN.md`. Voice + current
+    fallback behavior: `project-grantee-deliverable-email-voice`.
+  - **Reminder automation — BUILT + DEPLOYED.** The daily cron selects packages still `Invited`
+    12 days after the first invite, sends one reminder from the assigned PD to the PI with the
+    liaison Cc'd, and uses a day-14 COB deadline. It claims the row before sending and finalizes
+    `wmkf_remindeddate` after delivery. On 2026-07-27 all three production package rows were still
+    `Drafted`; the probe found zero eligible/stuck rows and no evidence of successful live delivery.
 - Optional **auto-on-award cron** (PA-free) — a `pages/api/cron/*` route on the awardee eligibility
   filter (`granteeResearchPrograms.js`) that pre-generates **abstracts** for newly-`Active` research
   awardees; idempotent. (Distinct from the chunk-7 title cron, which fires earlier on the `Invited`

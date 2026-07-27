@@ -5,7 +5,7 @@ type: project
 originSessionId: 05e61454-b0c9-4b62-a30f-89e979b3157b
 status: active
 scope: intake
-last_verified: unknown via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 via owner scope/park decisions and current intake design/source boundaries
 ---
 
 > **BUILD PARKED (2026-07-08, S348):** the intake-portal build is on the back burner
@@ -28,6 +28,12 @@ Do not:
 
 Ground truth: `docs/INTAKE_PORTAL_DESIGN.md` (still skewed to the larger target), [[project-system-model]].
 
+[VERIFIED 2026-07-27 as owner-approved scope and park decision, not deployed
+state]: source currently provides partial intake foundations under `pages/apply`
+and `lib/services/intake-*`; any entity/field provision claim must be checked
+against `docs/APPLICATION_STATE_ATLAS.md` plus a read-only Dataverse metadata
+probe before revival.
+
 The new applicant intake portal targets full GOapply replacement long-term
 (target "a"), but every pilot decision should be sized like the external
 reviewer intake portal: skinny, focused, leverages existing infra.
@@ -48,10 +54,11 @@ now-superseded June 2026 Phase II Research pilot — see [[project-system-model]
   Reviewer pipeline consumes structured fields + attachments fine.
 - Admin UI: shrink to the minimum (collaborator approval, list of submitted
   requests). Opportunity/phase config can be code/seed data for pilot.
-- Schema: prefer fields on existing entities over new tables. Pilot adds
-  fields to `contact` and `akoya_request`, plus one new entity
-  `wmkf_portalmembership` (no underscore in deployed name). The four-table
-  model in the original planning doc is for Phase 1+ expansion, not pilot.
+- Planned schema posture: prefer fields on existing entities over new tables.
+  The pilot design uses `contact`, `akoya_request`, and
+  `wmkf_portalmembership`; verify current metadata through the Atlas plus a
+  read-only probe before revival. The original four-table model is Phase 1+
+  expansion, not pilot scope.
 
 Strategic doc: `docs/INTAKE_PORTAL_DESIGN.md` (still skewed toward the larger
 target — pilot section needs to be tightened to reflect this skinny scope).

@@ -4,14 +4,15 @@
  * Rendered in the `view === 'edit'` branch of pages/external/grantee/[token].js.
  * The grantee reviews/edits the AI-formatted abstract, uploads a graphical image
  * + caption, and acknowledges the publication-consent waiver. Per the design
- * (docs/GRANTEE_PORTAL_SPEC.md): the waiver is a CLIENT-SIDE SUBMIT GATE — the
- * checkbox enables the submit button and is NEVER sent/persisted; a submitted
- * package IS the consent record.
+ * (docs/GRANTEE_PORTAL_SPEC.md): the acknowledgment is a CLIENT-SIDE SUBMIT
+ * GATE, while a signed waiver render token binds the exact displayed policy
+ * version/body hash to the request. The server verifies that token and persists
+ * the version lookup, acknowledgment time, and body hash with the package.
  *
- * Submit contract (implemented by chunk 5 — the submit route is not built yet):
+ * Submit contract (implemented):
  *   POST /api/external/grantee/{token}/submit  (multipart/form-data)
  *     editedAbstract: string   caption: string   image: File (optional if one is
- *     already on file). Returns { ok: true } on success.
+ *     already on file) plus waiverToken. Returns { ok: true } on success.
  */
 
 import { useState } from 'react';
@@ -21,9 +22,8 @@ import PolicyAckModal from './PolicyAckModal';
 // the versioned `grantee-waiver` policy (shown in the acknowledgment modal from
 // `waiverPolicy.body`); this constant is only a last-resort fallback if the
 // policy body is somehow absent (the context route fails closed, so on the edit
-// view it normally isn't). The waiver remains a CLIENT-SIDE submit gate — the
-// acknowledgment is never sent; the server records the acknowledged version
-// (bound in `waiverToken`).
+// view it normally isn't). The waiver remains a CLIENT-SIDE submit gate; the
+// signed `waiverToken` is sent and the server records its bound version/body hash.
 const WAIVER_LABEL =
   "By submitting, I give the W. M. Keck Foundation permission to publish the abstract, project title, my name and institution, and the image and caption I provide here in materials announcing this award, in print and online. I further confirm that I have the right to share the image I've uploaded.";
 

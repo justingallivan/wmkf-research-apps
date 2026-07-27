@@ -5,10 +5,35 @@ metadata:
   node_type: memory
   type: project
   status: active
+  last_verified: 2026-07-27 via current security workflow; GitHub plan/licensing facts remain bounded to 2026-07-03/04
   originSessionId: 6fc5f954-97c9-44ce-9593-d2aa5dce023e
 ---
 
-Repo `justingallivan/wmkf-research-apps` is PRIVATE on a personal (non-org) account. Going private (done ~2026-06 for a security scare that turned out to be a spam bot) did NOT break Dependabot (still opening PRs, free on private) or Actions minutes (2,000/mo free, not currently capped). It broke exactly one check: **CodeQL**.
+## Recall Rule
+
+Read this when: changing security CI, CodeQL/Semgrep coverage, or required checks
+for the private GitHub repository.
+
+Do:
+- Treat the CodeQL/license and branch-protection statements as dated external
+  platform evidence and verify GitHub's current plan capabilities before paying
+  for or redesigning CI.
+- Keep the custom token audit blocking; triage advisory Semgrep findings before
+  promoting packs to blocking.
+
+Do not:
+- Re-add CodeQL solely by fixing checkout permissions; the 2026-07-04 license
+  check was a separate blocker.
+- Assume the advisory rule count or GitHub plan matrix is current.
+
+Ground truth: `.github/workflows/security-scan.yml` and dated GitHub checks from
+2026-07-03/04. Current external capabilities require an official GitHub
+plan/security-feature check.
+
+**External-platform snapshot, 2026-07-03/04:** the repository was private on a
+personal account; Dependabot and available Actions minutes still operated, while
+CodeQL failed. Current plan capabilities, quotas, and repository visibility must
+be rechecked through GitHub before relying on this snapshot.
 
 Two reasons CodeQL failed on the private repo, both verified 2026-07-03/04:
 1. `codeql.yml` had a `permissions:` block listing only `security-events: write`, so `contents` defaulted to `none` → checkout got a 404 on the now-private repo (public repos clone without that scope). `security-scan.yml` passes because it declares `contents: read`.

@@ -6,7 +6,7 @@ status: canonical
 summary: "Evidence-backed critical path for stabilizing review synthesis and designing the remaining Workbench lifecycle before implementation."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-07-26
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -39,33 +39,42 @@ provides:
 
 Until then, “Week 1/2/3” are relative execution windows, not delivery promises.
 
-## Immediate next task — parked at this session boundary
+## Production review-synthesis smoke — completed as a bounded failure
 
-### Production review-synthesis smoke
+On 2026-07-27, the owner-authorized staff-triggered production smoke ran against
+Request `1002788`. A reversible synthetic review was entered through the normal
+staff Manual Review Entry path and verified before regeneration.
 
-Use Request `1002788` and a deliberate staff-triggered Generate/Regenerate action.
-This is an authorized test and must not be interpreted as authorization for an automatic
-one-review trigger.
+The first and only regeneration attempt failed cleanly:
 
-Pass criteria:
+- `POST /api/review-manager/synthesize-reviews` returned HTTP 500;
+- Vercel and Dataverse recorded
+  `Claude output not valid JSON: Unexpected end of JSON input`;
+- failed AI run `be61f383-f289-f111-ab0f-70a8a59cded0`
+  (`2026-27-07-1355`) resolved `review-synthesis.generate` v2
+  (`7423049a-3f89-f111-ab0f-7ced8d3d15a6`) with
+  `claude-sonnet-5`, source `Vercel Interactive`, and a redacted
+  `reviews_digest` override;
+- the request memo was never partially written: it remained 1,709 characters,
+  SHA-256
+  `a91f05cc0a20cad72341db9d7fc5fe808ed3b28610a35dfdaca82d69beebbcba`,
+  with `modifiedOn=2026-07-24T18:43:25Z`; and
+- the synthetic review was fully restored: zero staged answers, no draft, the
+  four staged suggestion fields back to baseline, and all other target/sibling
+  fields—including email, reminder, materials, and thank-you markers—unchanged.
+  The append-only failed AI audit row intentionally remains.
 
-1. the endpoint returns a complete object matching the synthesis schema;
-2. `wmkf_reviewsynthesisjson` is written on the intended request;
-3. a reload renders the persisted synthesis card;
-4. regenerate deliberately overwrites the same request memo without creating a second
-   durable artifact;
-5. logs identify the model, prompt version, request, and failure/success state without
-   exposing review content;
-6. no reviewer email, materials dispatch, review-answer mutation, or unrelated Dataverse
-   write occurs.
-
-If it fails, stop at diagnosis. Do not proceed to automatic triggering.
+This satisfies the queue's bounded-diagnosis completion alternative, not the
+success criteria. The next task is reliability diagnosis/fix. Do not attempt a
+second blind regeneration, expose the multiselect form, or implement automatic
+triggering until that gate is closed.
 
 ## Week 1 — close the current Reviews contract
 
 ### 1. Make synthesis generation reliable
 
-- Reproduce and diagnose the incomplete-JSON failure.
+- Use the three controlled current-v2 failures, including the 2026-07-27 run
+  above, to diagnose the incomplete/truncated-JSON failure.
 - Decide whether the fix belongs in the prompt, model/output settings, structured parsing,
   bounded retry/repair, or a combination.
 - Preserve the shared Executor contract and audit trail.
@@ -80,8 +89,24 @@ memo write.
 - Manual staff override: allow an early run with explicit confirmation.
 - Stored-output visibility: show an existing synthesis independently of current readiness.
 - Regeneration: always deliberate and auditable.
-- Decide the participation set for declined, withdrew, released, revoked, duplicate, and
-  cancelled rows before coding the automatic trigger.
+- Participation population (owner-confirmed 2026-07-27): selected,
+  not-applicant-excluded rows that have entered invitation/engagement
+  (`wmkf_invited=true` or `wmkf_accepted=true`).
+- Resolved with content: `wmkf_reviewreceivedat` is set. Resolved without
+  content: declined, no-response, `withdrawn_sufficient`, withdrew, released,
+  or the current token is revoked/expired.
+- Blocking: any other participant with no receipt, including a live-token
+  not-yet-accepted invitee; malformed/unknown state fails closed.
+- Removed/excluded/merged-away rows do not participate. An unresolved duplicate
+  that still satisfies the population rule blocks.
+- Require at least one submitted review before either automatic generation or
+  the existing staff override.
+- Replacement-token minting clears revocation and assigns a future expiry. It
+  reopens readiness only when token state was the otherwise-participating,
+  nonterminal row's sole resolved-without-content condition; it does not undo
+  removal or a terminal outcome. Keep an older synthesis visible but treat it as
+  not current until synthesis runs again after genuine reactivation and
+  resolution.
 
 Exit: one documented state machine, one tested readiness calculation, one automatic trigger
 path, and one manual override path.
@@ -177,9 +202,7 @@ For every slice:
 The next planning conversation needs:
 
 1. fixed deadlines and minimum outcomes;
-2. review-synthesis participation semantics;
-3. Pre Site Visit inputs;
-4. writeup file/pointer/version contract;
-5. Site Visit field sufficiency;
-6. leadership/editor access timing.
-
+2. Pre Site Visit inputs;
+3. writeup file/pointer/version contract;
+4. Site Visit field sufficiency;
+5. leadership/editor access timing.

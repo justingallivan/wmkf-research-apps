@@ -6,7 +6,14 @@ metadata:
   type: feedback
   status: active
   originSessionId: c178a6d6-706e-47bb-9580-d248197210b1
+  last_verified: 2026-07-27 as a historical S257 defect pattern; current mechanisms require source evidence
 ---
+
+## Recall Rule
+
+Before calling a path idempotent, cite the enforcing early return, conditional
+write, uniqueness constraint, or generation guard at source. Without a mechanism,
+label the property `[ASSUMED]` or retract it.
 
 In the S257 reviewer "hold step" plan I wrote "idempotent repeat hold = no re-stamp" as an
 assertion. Codex traced it: `applyStage2aResponse` writes `now = new Date().toISOString()`

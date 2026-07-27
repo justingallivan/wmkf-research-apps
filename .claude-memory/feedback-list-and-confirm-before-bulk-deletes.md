@@ -5,7 +5,7 @@ metadata:
   type: feedback
   status: active
   scope: global
-  last_verified: S193 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-27 as a historical S193 authorization failure; owner clarified artifact context on 2026-07-26
 ---
 
 ## Recall Rule
@@ -21,6 +21,10 @@ Do not:
 - Expand a narrow directive into a broader "clean up everything test-ish nearby" scope.
 
 Ground truth: historical-only (lesson, not live state). Related: [[feedback-verify-before-destructive-carryover]].
+
+[VERIFIED historically via the S193 deletion/recovery incident and the owner's
+2026-07-26 artifact clarification.] The lesson concerns authorization at decision
+time; it does not classify any current file or row.
 
 When the user asks to clean up "the test file" or "the artifact" or names a single thing, do NOT assume that everything else in the same folder/scope is also cleanup-eligible. List the contents, surface them by name, ask which to delete.
 

@@ -16,7 +16,7 @@ related:
 
 # AI Data Flow Matrix
 
-Last updated: 2026-06-11
+Last updated: 2026-07-27
 
 ## Purpose
 
@@ -102,11 +102,30 @@ Recommended next step: keep provider policy changes explicit in config and tests
 
 ### P2 - Legacy/direct Anthropic fetch paths bypass the canonical wrapper
 
-`health-checker` and the old module demo still use direct `fetch` calls. `ClaudeReviewerService` and `ContactEnrichmentService.claudeWebSearch` previously did as well, but have since been migrated to `LLMClient` (contact enrichment as of the A7 follow-up — `lib/services/contact-enrichment-service.js:1082` routes through `LLMClient`, preserving the `web_search` tool via `complete()`'s `tools` passthrough). Some remaining paths are low sensitivity, but the direct-fetch pattern bypasses `LLMClient`'s timeout, safeFetch, retry, and redaction behavior.
+`health-checker` and the old module demo still use direct `fetch` calls.
+`ClaudeReviewerService` and `ContactEnrichmentService.claudeWebSearch`
+previously did as well, but have since been migrated to `LLMClient`. Contact
+enrichment now delegates through
+`lib/services/contact-enrichment/search-tiers.js`, preserving the `web_search`
+tool through `LLMClient.complete()`. Some remaining paths are low sensitivity,
+but the direct-fetch pattern bypasses `LLMClient`'s timeout, safeFetch, retry,
+and redaction behavior.
 
 Recommended next step: migrate remaining production Claude callers to `LLMClient` or `safeFetch` as appropriate. Prioritize paths where the wrapper adds meaningful timeout, redaction, retry, or allowlist behavior.
 
-**Status (2026-06-11): mostly addressed.** `ClaudeReviewerService` uses `LLMClient` for reviewer-finder analysis and discovered-candidate reasoning (content-bearing debug logs gated behind `DEBUG_REVIEWER_FINDER`), and `ContactEnrichmentService.claudeWebSearch` now routes through `LLMClient` as well (A7 follow-up, `contact-enrichment-service.js:1082`), wrapping the candidate identity string as untrusted external content (`dataClass: EXTERNAL_API_TEXT`, 2k cap) before the call. The remaining direct-fetch paths are `health-checker` (low — static "Hello", acceptable) and the `modules/expertise_matching` demo (confirm production-reachability or archive). The residual data risk for contact enrichment is unchanged: candidate name + institution still leave the app via Claude web search.
+**Status (reconciled 2026-07-27): mostly addressed.**
+`ClaudeReviewerService` uses `LLMClient` for reviewer-finder analysis and
+discovered-candidate reasoning (content-bearing debug logs are gated behind
+`DEBUG_REVIEWER_FINDER`), and
+`ContactEnrichmentService.claudeWebSearch` routes through `LLMClient`, wrapping
+the candidate identity string as untrusted external content
+(`dataClass: EXTERNAL_API_TEXT`, 2k cap) before the call. The remaining
+production direct-fetch path in this finding is `health-checker` (low — static
+“Hello,” acceptable). `modules/expertise_matching` also uses a direct browser
+fetch, but source/caller inspection found no production caller; it is an
+isolated reference/demo rather than part of the production Expertise Finder.
+The residual data risk for contact enrichment is unchanged: candidate name +
+institution still leave the app via Claude web search.
 
 ### P2 - AI-run logs persist generated outputs with large limits
 
@@ -153,7 +172,7 @@ Recommended next step: use this as the model for "redact before external AI, red
 | `lib/services/claude-reviewer-service.js` | Anthropic Claude | Reviewer-finder prompts containing bounded proposal text, reviewer criteria, notes/exclusions | Proposal text capped at 100,000 chars by `ai-payload-boundary`; `LLMClient` retry/fallback behavior | Usage metadata through `LLMClient` | Called behind reviewer-finder app access; `LLMClient` transport with `safeFetch`, timeout, retry, redacted errors; explicit AI payload boundary metadata | High | Direct `fetch` migration and proposal-text boundary are complete for the reviewer-finder analysis path. |
 | `lib/services/contact-enrichment-service.js` | Anthropic Claude web search | Candidate name and institution | Minimal prompt, one web search | Contact enrichment result | `LLMClient` transport (timeout/safeFetch/retry/redaction); untrusted-content wrapping of candidate identity; server-side credentials | Medium | Migrated to `LLMClient` (`:1082`; `web_search` tool preserved via `complete()` passthrough). Residual risk: candidate name/institution still sent to Claude/web search. |
 | `lib/services/multi-llm-service.js` | Anthropic/OpenAI/Gemini/Perplexity | Arbitrary caller prompt, often proposal review prompts | Large max-token default; Claude request body shaped by reviewed model capabilities | Usage metadata; Claude refusal metadata | `safeFetch`; provider env keys; `model-capabilities.js` for Anthropic request compatibility | High | Exposure depends entirely on caller. Needs caller-level matrix references. |
-| `modules/expertise_matching/src/reviewer_matcher.jsx` | Anthropic Claude | Browser-side prompt for local/module reviewer matching | Demo/module code path, not main API | Unknown | Direct browser/component fetch | Medium | Confirm whether this module is production-reachable. If not, archive or document as non-production. |
+| `modules/expertise_matching/src/reviewer_matcher.jsx` | Anthropic Claude | Browser-side prompt for the isolated module demo | Non-production reference/demo; no app/API caller found | Unknown within the standalone demo | Direct browser/component fetch | Low for the production app; medium if someone runs the demo | Do not cite this module as the production Expertise Finder. The production page/API uses `shared/config/prompts/expertise-finder.js`. Archive separately only with owner approval. |
 
 ## Recommended Hardening Sequence
 
@@ -177,7 +196,10 @@ Recommended next step: use this as the model for "redact before external AI, red
 
 4. **Remaining direct Anthropic fetch paths**
    - ✅ `ContactEnrichmentService.claudeWebSearch` migrated to `LLMClient` (A7 follow-up).
-   - 🟡 Review `health-checker` (low — static health ping) and the `modules/expertise_matching` demo (confirm production-reachability or archive).
+   - 🟡 Review `health-checker` (low — static health ping).
+   - ✅ Source/caller inspection classifies `modules/expertise_matching` as an
+     isolated non-production reference/demo; it is not the production Expertise
+     Finder.
    - Migrate remaining production paths to `LLMClient` or `safeFetch` where the wrapper adds meaningful protection.
 
 5. **Payload-boundary governance**

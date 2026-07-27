@@ -2,8 +2,8 @@
 title: "Plan: Grantee Deliverable Package table + automatic reminders (S271)"
 domain: grantee-portal
 kind: plan
-status: active
-summary: "- The 14-day-to-respond / remind-at-day-12 cadence needs an anchor: when was the invite sent? Nothing records that today."
+status: historical
+summary: "Historical record for the shipped child-package cutover and day-12 reminder; current behavior lives in GRANTEE_PORTAL_SPEC and the Atlas."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -16,19 +16,20 @@ related:
 
 # Plan: Grantee Deliverable Package table + automatic reminders (S271)
 
-> **Status: IMPLEMENTED (Codex `1f3ba1cb`) + schema applied to PROD (S271).** Codex pre-impl review
+> **Status: HISTORICAL — IMPLEMENTED, DEPLOYED, AND LIVE.** Codex pre-impl review
 > folded; sender-mailbox RESOLVED (Path A, PD impersonation; prod flag verified). The new table is live
 > (9/9 EXACT) and the SP write privilege is verified by smoke test — **no role grant needed** (Codex #7
-> closed). Remaining before go-live: deploy the code + the manual deletion of the 3 orphaned
-> `akoya_request` fields (see "Deploy progress" below). Owner chose **Option 1** (move the deliverable
+> closed). The optional manual deletion of the three retired `akoya_request` fields remains deferred
+> and requires a fresh caller/data probe plus explicit owner/admin approval; it is not a go-live
+> dependency. Owner chose **Option 1** (move the deliverable
 > package off `akoya_request` into its own
 > related table) over adding more one-off date columns to the top-level request. This plan covers that
 > migration plus the 14-day / day-12 automatic reminder it unblocks.
 
-## Why (owner intent, S271)
+## Why (historical owner intent, S271)
 
-- The 14-day-to-respond / remind-at-day-12 cadence needs an anchor: **when was the invite sent?**
-  Nothing records that today.
+- The 14-day-to-respond / remind-at-day-12 cadence needed an anchor: **when was the invite sent?**
+  Before this migration, nothing recorded that event.
 - Owner did not want to keep bolting one-off lifecycle dates onto the top-level `akoya_request`.
   Decision: give the deliverable **package its own related table** (a distinct lifecycle — the
   "different lifecycle/shape" exception to the fewer-tables principle in
@@ -123,7 +124,26 @@ Future lifecycle dates (submitted / reviewed / completed) land here too — not 
    parity (status now on the new entity). Run `check:atlas`, `check:api-routes`, `check:status-enum-parity`,
    `check:trust-boundary-guid`, `check:fact-consistency` + self-tests.
 
-## Deploy progress (S271)
+## Current boundary (verified 2026-07-27)
+
+- The child table, helper cutover, invite timestamp, reminder service, cron route,
+  and Vercel schedule are deployed. The deployed schedule is daily at 08:00 UTC.
+- Production contains three package rows, all `Drafted`; therefore there were
+  zero day-12 eligible rows, zero past-day-14 rows, zero stuck pre-send claims,
+  and zero exact-subject reminder email activities. This verifies current state,
+  not successful live delivery; the probe found no evidence that the live send
+  path has completed successfully.
+- The production reminder subject/body each have exactly one settings row and
+  match the tracked seed. On 2026-07-27 the owner authorized restoring
+  `Thank you,` before `{{signature}}`; the guarded write changed the body from
+  SHA-256 `4779ac3bbfd42f4453592e105468c3d10f5babd5dd144485218fc3a4a62226ce`
+  to `6bc31823750af6477e3764505c568b9c92db84358b84f58eeb020fe92c8d6dfa`.
+- A `Reminder Sent` row with no `wmkf_remindeddate` remains an intentionally
+  ambiguous operational state: the pre-send claim may have succeeded while the
+  email or final timestamp failed. It must be investigated, not automatically
+  retried.
+
+## Deploy progress (historical, S271)
 
 - ✅ **Schema applied to PROD** (`apply-dataverse-schema.js --target=prod --wave=3-grantee-deliverable-table --execute`).
   Preflight (after a fix — its relationship probe needed the `OneToManyRelationshipMetadata` type cast)
@@ -139,9 +159,11 @@ Future lifecycle dates (submitted / reviewed / completed) land here too — not 
 - ✅ Prod `DYNAMICS_IMPERSONATION_ENABLED=true` (verified). The cron's `noFallback` email send impersonates
   the PD; that needs the PD able to send an email activity (the same capability the manual invite uses) —
   otherwise the cron skip+reports the row. Not a custom-table privilege.
-- ⏳ **Remaining manual step:** after the deployed code runs clean, delete the 3 now-orphaned fields from
+- ⏳ **Deferred manual cleanup:** after a fresh caller/data verification and explicit owner/admin approval,
+  delete the 3 now-orphaned fields from
   `akoya_request` (`wmkf_granteedeliverablestatus`, `wmkf_granteeimagefileref`, `wmkf_granteeimagecaption`)
-  in Dataverse (schema-apply is creation-only; manual; safe — 0 rows ever held data).
+  in Dataverse. `schema-apply` is creation-only, and the historical S271 probe
+  found zero values; repeat the caller/data probe before any deletion.
 
 ## Cutover order
 

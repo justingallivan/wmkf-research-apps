@@ -1,6 +1,6 @@
 ---
 name: feedback-codex-build-gate-turbopack-sandbox
-description: When delegating build verification to Codex in WMKF_Apps, include the Turbopack-sandbox build-gate instruction — a Next 16/Turbopack panic with "Operation not permitted" (process/port bind) is an execution-environment failure, NOT an app build failure; escalate outside the sandbox, never delete .next/kill broad processes on a stale lock.
+description: S272 observed a sandbox-specific Turbopack "Operation not permitted" build failure; match the signature and re-verify the current environment before classifying a new failure.
 metadata:
   type: feedback
   status: active
@@ -10,31 +10,25 @@ metadata:
 
 ## Recall Rule
 
-Read before delegating any task to Codex (codex:codex-rescue / `codex exec`) whose
-acceptance includes `npm run build`, or when composing the Codex invocation. Paste the
-build-gate block below into the delegation prompt.
+Read before delegating a task whose acceptance includes `npm run build`.
 
-**Why:** WMKF_Apps uses **Next 16 / Turbopack**. Codex's sandbox cannot bind a local
-worker port, so `npm run build` panics with `Operation not permitted` while creating a
-process or binding a port. This is an environment failure, not a real build break — but
-left unguided, Codex (a) treats it as an app failure, (b) hangs polling the wedged
-build, and worst (c) reaches for destructive cleanup (delete `.next`, kill broad
-process patterns) on a stale "Another next build process is already running" lock.
-Observed S272: Codex's build hung for minutes and it never emitted its final report; I
-had to run the build myself to verify. Verified clean via Webpack/outside the sandbox.
+[VERIFIED historically via the S272 build output.] In that run, the canonical
+build failed inside the then-current sandbox with a Turbopack panic containing
+`Operation not permitted` while creating a process or binding a worker port. A
+Webpack build outside that sandbox passed. This establishes one recognizable
+historical environment signature; it does not establish that every current Codex
+sandbox has the same limitation.
 
 ## Build-gate instruction to include (paste into the Codex delegation)
 
-> For verification, run scoped tests/lint in the Codex sandbox first. For `npm run
-> build`, be aware this repo uses Next 16/Turbopack and Codex sandboxing can fail with
-> a Turbopack panic containing `Operation not permitted` while creating a process or
-> binding a local worker port. Treat that as an execution-environment failure, not an
-> app build failure.
+> Run the canonical build first. If it fails with the S272 signature — a Turbopack
+> panic containing `Operation not permitted` while creating a process or binding a
+> worker port — classify the first result as environment-suspect, not automatically
+> as an application defect.
 >
-> If `npm run build` fails with that sandbox/port-binding signature, immediately retry
-> the same command through your escalation/approval mechanism so it runs outside the
-> sandbox. If escalation is unavailable, you may run `npx next build --webpack`, but
-> report it as a fallback build signal, not the canonical Turbopack build.
+> Re-run the same command through the current approved mechanism outside the failing
+> environment. If that is unavailable, a Webpack build is only a fallback signal,
+> not proof that the canonical build passes.
 >
 > If Next reports "Another next build process is already running" after an interrupted
 > attempt, check for a live `next build` / `npm run build` process FIRST. Do not delete
@@ -43,14 +37,12 @@ had to run the build myself to verify. Verified clean via Webpack/outside the sa
 
 ## How to apply
 
-- **If I control the Codex invocation**, prefer:
-  `codex exec --ask-for-approval on-request --sandbox workspace-write ...`
-  (lets Codex escalate the build out of the sandbox on request).
-- **Either way**, paste the build-gate block above into the task prompt.
-- **As the reviewer:** if Codex reports a build failure, check the signature before
-  trusting it — a Turbopack `Operation not permitted` / port-bind panic is the sandbox,
-  not the app. Run `npm run build` myself (I am not under the same sandbox) to get the
-  canonical signal, as I did in S272.
+- Use the current tool's documented escalation/approval mechanism; the exact S272
+  invocation syntax is not retained as current guidance.
+- Match the full failure signature before applying this fallback. A different
+  Turbopack failure remains an application/build finding until investigated.
+- Verify process state before any stale-lock cleanup and obtain approval before
+  deleting build artifacts or terminating processes.
 
 Related: [[project-codex-design-pre-impl-iteration]], [[project-codex-recurring-review]],
 [[feedback-commit-before-delegating-to-worktree-agent]], [[feedback-share-codex-verbatim]].

@@ -8,6 +8,11 @@ metadata:
   originSessionId: b7556be6-1734-49d3-a0e8-1a8029fd0df3
 ---
 
+## Recall Rule
+
+Present status, options, and stopping points without inferring the user's available
+time or using time pressure as the reason for a recommendation.
+
 Never tell the user when they are (or might be) out of time, or frame
 recommendations around their time pressure — even if they earlier said "I have a
 few minutes." Phrases to avoid: "you're out of time", "since you're short on

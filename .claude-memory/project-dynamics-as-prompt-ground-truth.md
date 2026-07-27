@@ -5,7 +5,7 @@ type: project
 originSessionId: e2e4c03f-8046-4d90-a1fd-93c1bb8256d1
 status: active
 scope: prompt
-last_verified: 2026-04-25 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 via owner decision, docs/EXECUTOR_CONTRACT.md, and current prompt-resolution source
 ---
 
 ## Recall Rule

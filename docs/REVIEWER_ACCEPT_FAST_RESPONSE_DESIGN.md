@@ -2,8 +2,8 @@
 title: "Reviewer Accept Fast Response Design"
 domain: reviewer-workbench
 kind: spec
-status: active
-summary: "SHIPPED as the reviewer_acceptance_jobs queue + drain: reviewer Stage 2a accept returns fast, post-accept side effects run durably."
+status: historical
+summary: "Completed design record for the shipped reviewer_acceptance_jobs queue and durable acceptance drain."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -50,11 +50,11 @@ original proposal and what landed:
 
 This is an implementation spec for Claude. It is intentionally conservative: make the reviewer-facing accept path fast, but do not lose data that currently exists only in the Stage 2a POST body.
 
-## Problem
+## Historical problem
 
 Reviewer Stage 2a accept can remain in the submitting state for roughly 20 seconds before the modal goes away. The accept intent is not the only work in that wait.
 
-Current browser flow:
+The pre-implementation browser flow was:
 
 ```text
 Stage2aView submits POST /api/external/review/{token}/respond
@@ -66,9 +66,11 @@ ExternalReviewPage refetches /context
 the accepted-pre-materials view renders
 ```
 
-The user-visible wait is therefore the accept PATCH plus the post-accept tail plus a second context read.
+That historical user-visible wait included the accept PATCH, the post-accept
+tail, and a second context read. The shipped route/service split described in
+the status section removes the post-accept tail from the request.
 
-## Verified Current State
+## Pre-implementation evidence (historical)
 
 - [VERIFIED via `shared/components/external/Stage2aView.js:238-260`] The client POSTs `action: 'accept'`, `contactEdits`, `honorariumOptOut`, optional `address`, `boardIdentity`, and `policyAcks` to `/respond`.
 - [VERIFIED via `shared/components/external/Stage2aView.js:303-308`] After `/respond` succeeds, the client awaits `onAccepted()` before the Stage 2a component unblocks or unmounts.
@@ -86,7 +88,11 @@ The user-visible wait is therefore the accept PATCH plus the post-accept tail pl
 - [VERIFIED via `lib/services/dynamics-service.js:1698-1714`] Dataverse fetches have a 30 second timeout, not an app-level queue or sleep.
 - [VERIFIED via `lib/bill/onboard-reviewer-service.js:54-60` and `lib/bill/onboard-reviewer-service.js:430-445`] The BILL request-side patch helper has a small explicit retry backoff, but BILL onboarding is not wired for this current use case.
 
-Conclusion: the likely latency source is serial awaited post-commit work plus the follow-up `/context` read, not a deliberate Dataverse write throttle around the accept intent.
+The implementation used this evidence to attribute the historical latency to
+serial awaited post-commit work plus the follow-up `/context` read, rather than
+to a deliberate Dataverse write throttle around the accept intent. The line
+citations in this historical evidence list predate the route-to-service
+extraction and are not current navigation anchors.
 
 ## Data-Loss Analysis
 
@@ -104,7 +110,7 @@ Not safe to drop:
 - `contactEdits` details needed by downstream contact sync or mismatch checks if they are not already persisted on the suggestion row.
 - Follow-up workflow obligations: acceptance confirmation email, quota check/PD notification, and mismatch alerts. These are not user-entered data loss, but missed side effects still need retry and staff visibility.
 
-## Recommended Design
+## Historical recommended design and shipped disposition
 
 Create a durable post-accept follow-up queue, modeled after the intake `submission_jobs` pattern rather than an in-memory promise.
 
@@ -234,7 +240,7 @@ Move these out of the blocking reviewer response path:
 | `/context` remains authoritative on refresh | Manual/browser test: refreshing after accept still renders accepted state from Dataverse |
 | BILL remains disabled/deferred unless existing env gates enable it | Unit test with current env posture confirms no BILL vendor/network calls |
 
-## Tests
+## Historical implementation test plan
 
 Add or update tests at the lowest useful layer:
 
@@ -255,7 +261,7 @@ Add or update tests at the lowest useful layer:
    - accept flow posts the right payload and the accept button/modal disappears promptly after the mocked `/respond` response.
    - refresh after accept still derives accepted state from `/context`.
 
-## Gates
+## Historical implementation gates
 
 Because this adds durable Postgres state and a route/cron or worker, Claude must run the relevant gates for changed surfaces:
 
@@ -267,7 +273,7 @@ Because this adds durable Postgres state and a route/cron or worker, Claude must
 
 Run each gate and its self-test sequentially when applicable, per `docs/CI_GATES_REFERENCE.md`.
 
-## Build Notes For Claude
+## Historical build notes
 
 - Start with a read-first buildability gate. Confirm whether an existing queue abstraction can be reused before adding a new table.
 - Do not trust plan prose as proof of built behavior; cite source lines before editing.
@@ -279,9 +285,15 @@ Run each gate and its self-test sequentially when applicable, per `docs/CI_GATES
 - If changing durable state, reconcile `docs/APPLICATION_STATE_ATLAS.md` and the matching `docs/atlas/` page.
 - Keep reviewer-facing copy simple: the reviewer should see that their acceptance is confirmed, not internal sync progress.
 
-## Open Questions
+## Historical questions and shipped answers
 
-1. Should `address` and `boardIdentity` also be persisted on the suggestion row as a permanent audit snapshot, or is the follow-up job payload enough until completion?
-2. Should acceptance confirmation email get a Dataverse marker to enforce exactly-once sending across retries, or should the follow-up job's completed step be the only marker?
-3. Should quota notification remain in the same follow-up job or run in a separate quota-specific worker?
-4. What is the acceptable follow-up delay before staff should see an alert: first failure, retry exhaustion, or age-based SLA?
+The build resolved the implementation questions as follows:
+
+1. Request-only values are frozen in the acceptance-job payload; they were not
+   added as a permanent snapshot on the suggestion row.
+2. The drain's durable per-step completion state is the retry boundary for the
+   acceptance confirmation work.
+3. Quota notification remains in the acceptance drain's post-accept work.
+4. Retry scheduling and terminal failure visibility live on
+   `reviewer_acceptance_jobs`; no separate product SLA was adopted in this
+   design.

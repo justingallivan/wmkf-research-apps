@@ -3,9 +3,10 @@ title: Reviewer Contact Leads / Scout Layer Spec
 domain: reviewer-workbench
 kind: spec
 status: active
-summary: "Drafted: 2026-06-18 Scope: Reviewer Finder contact recall and staff workflow. This is a product/architecture spec, not an implementation record."
+summary: "Shipped contact-leads contract: quarantined leads, staff promotion, bounded roster persistence; broad paid scouting is parked as unjustified."
 canonical: false
 cataloged: 2026-07-02
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - lib/services/discovery-service.js
@@ -16,9 +17,23 @@ related:
 
 # Reviewer Contact Leads / Scout Layer Spec
 
-Status: **PROPOSED DRAFT for Justin + Claude review**  
-Drafted: 2026-06-18  
-Scope: Reviewer Finder contact recall and staff workflow. This is a product/architecture spec, not an implementation record.
+Status: **PARTIALLY SHIPPED; current contract**
+Drafted: 2026-06-18; reconciled: 2026-07-27
+Scope: Reviewer Finder contact recall and staff workflow.
+
+## Current implementation boundary
+
+Slices 1, 2a, 3, 4, and 5 are shipped. They measure contact outcomes, surface
+already-fetched but rejected contact data in a quarantined `contactLeads[]`
+shape, render those leads separately, allow a manage-only manual promotion,
+and persist a compact bounded form in `reviewer_find_roster`. Promoted contact
+remains low-confidence and must pass the existing invitation confirmation
+gate.
+
+Slice 2b, the broad paid lead-only scout, is **PARKED / NOT CURRENTLY
+JUSTIFIED** by the 2026-07-27 owner decision and live read-only measurement
+below. It is not an active implementation target. Nothing in the shipped
+slices performs those additional paid searches.
 
 ## 1. Problem
 
@@ -28,24 +43,55 @@ Current live behavior separates invite-safe contact data poorly from staff-usefu
 
 - `[VERIFIED via lib/services/discovery-service.js:43-52]` Track-B retrieval-originated candidate discovery is archived off with `TRACK_B_ENABLED = false`, so current runs depend heavily on Claude-named Track-A suggestions.
 - `[VERIFIED via shared/config/prompts/reviewer-finder.js:8-14]` Stage-1 database search-query generation was removed after Track B was archived, leaving `searchQueries` as stable empty shape for existing consumers.
-- `[VERIFIED via lib/services/contact-enrichment-service.js:483-495]` contact enrichment computes an identity/institution anchor and marks unanchored candidates as `contactStatus: 'unresolved'`.
-- `[VERIFIED via lib/services/contact-enrichment-service.js:484-487]` the current contact-search gate is **institution OR ORCID**, not full identity confirmation: `hasIdentityAnchor = !!effectiveInstitution || this._hasOrcidAnchor(...)`.
-- `[VERIFIED via lib/services/contact-enrichment-service.js:91-101]` `effectiveInstitution` comes from ORCID affiliation, `candidate.affiliation`, `candidate.institution`, or `candidate.primaryAffiliation`; it does not directly read `suggestedInstitution`.
-- `[VERIFIED via lib/services/contact-enrichment-service.js:501-572]` Claude web search runs only when `hasIdentityAnchor` is true; otherwise it is skipped.
-- `[VERIFIED via lib/services/contact-enrichment-service.js:579-650]` SerpAPI Google search likewise only searches for missing email when `hasIdentityAnchor` is true.
-- `[VERIFIED via lib/services/contact-enrichment-service.js:123-141]` the unanchored abstain path clears email, website, faculty page, metrics, affiliation candidates, and all related persist flags.
-- `[VERIFIED via lib/services/contact-enrichment-service.js:513-517 and lib/services/contact-enrichment-service.js:593-597]` anchor-contradicting Claude/Serp results are already preserved in `tierResults` with `rejectedReason: 'identity_anchor_contradiction'`.
-- `[VERIFIED via lib/services/contact-enrichment-service.js:606-613]` a name-inconsistent SerpAPI email is nulled in place after `tierResults.serp_search = serpResult`, so recovering that discarded email requires a capture hook before mutation.
-- `[VERIFIED via lib/services/contact-enrichment-service.js:545-551]` Claude can report `emailRejectedReason: 'name_mismatch'`, but the code does not mutate `claudeResult.email` in the analogous way.
-- `[VERIFIED via pages/api/reviewer-finder/save-candidates.js:56-67]` unresolved system-discovered identities are hard-rejected at save.
-- `[VERIFIED via pages/api/reviewer-finder/save-candidates.js:79-82 and pages/api/reviewer-finder/save-candidates.js:169-187]` unresolved exempt rows can save as name rows, but contact and identity-derived fields are force-nulled or field-gated before persistence.
-- `[VERIFIED via shared/components/reviewers/ReviewerInvitePanel.js:67,275-287]` the saved-candidates UI already has a manual recovery pattern: when no email exists but a page exists, it shows "find on faculty page ->".
+- `[VERIFIED via ContactEnrichmentService orchestration and
+  contact-enrichment/identity-anchor.js]` contact enrichment computes an
+  identity/institution anchor and marks unanchored candidates as
+  `contactStatus: 'unresolved'`.
+- `[VERIFIED via ContactEnrichmentService._effectiveInstitution,
+  ContactEnrichmentService._hasOrcidAnchor, and their
+  contact-enrichment/identity-anchor.js delegates]` the contact-search gate is
+  **institution OR ORCID**, not full identity confirmation.
+- `[VERIFIED via contact-enrichment/identity-anchor.js effectiveInstitution]`
+  effective institution uses ORCID affiliation, `candidate.affiliation`,
+  `candidate.institution`, or `candidate.primaryAffiliation`; it does not
+  directly read `suggestedInstitution`.
+- `[VERIFIED via lib/services/contact-enrichment/tiers.js orchestration]`
+  Claude web search runs only with an identity anchor; otherwise it is skipped.
+- `[VERIFIED via lib/services/contact-enrichment/tiers.js orchestration]`
+  SerpAPI Google search likewise searches for missing email only with an
+  identity anchor.
+- `[VERIFIED via contact-enrichment/identity-anchor.js
+  markUnanchoredAbstain]` the unanchored abstain path clears email, website,
+  faculty page, metrics, affiliation candidates, and related persist flags.
+- `[VERIFIED via lib/services/contact-enrichment/tiers.js]`
+  anchor-contradicting Claude/Serp results are preserved in `tierResults` with
+  `rejectedReason: 'identity_anchor_contradiction'`.
+- `[VERIFIED via lib/services/contact-enrichment/tiers.js]` a
+  name-inconsistent SerpAPI email is nulled after its result is captured, so
+  lead recovery must occur before mutation.
+- `[VERIFIED via lib/services/contact-enrichment/tiers.js]` Claude can report
+  `emailRejectedReason: 'name_mismatch'` without the analogous email mutation.
+- `[VERIFIED via lib/services/reviewer-finder/save-candidates-service.js
+  isUnresolvedIdentity/saveCandidates]` unresolved system-discovered
+  identities are hard-rejected at save.
+- `[VERIFIED via lib/services/reviewer-finder/save-candidates-service.js
+  contactBlockedForUnresolvedExempt/saveCandidates]` unresolved exempt rows can
+  save as name rows, but contact and identity-derived fields are force-nulled
+  or field-gated before persistence.
+- `[VERIFIED via shared/components/reviewers/ReviewerInvitePanel.js
+  candidateContactPageUrl and its saved-candidate render consumer]` the
+  saved-candidates UI already has a manual recovery pattern: when no email
+  exists but a page exists, it shows "find on faculty page ->".
 
 That behavior is right for automated persistence and invitations. It is too strict for a staff workbench whose practical goal is: "give me enough context to find and evaluate possible reviewers."
 
 ## 2. Product Goal
 
-Add a **contact scout layer** that searches aggressively for contact/context leads, while keeping automatic persistence and invitation gates strict.
+The shipped **contact scout layer** recovers contact/context leads from data
+the existing enrichment tiers already fetched, while keeping automatic
+persistence and invitation gates strict. It does not add broad paid searches.
+The more aggressive query design is retained only as a parked option in
+Section 5.
 
 The tool should behave like this:
 
@@ -166,11 +212,15 @@ Evidence flags must be mechanically derived and explainable:
 
 When the evidence comes only from a search snippet and not a fetched/official page, cap confidence at `medium`.
 
-## 5. Search Strategy
+## 5. Parked broad-scout design guardrails
 
-Lead discovery may use broader queries than persistence because its output is quarantined.
+There is no current implementation target for the query plan in this section.
+If a future measured or staff-reported trigger reopens the broad scout, lead
+discovery may use broader queries than persistence only because its output
+remains quarantined.
 
-For each candidate, build a small bounded query plan from available context:
+In that reopened design, build a small bounded query plan from available
+context:
 
 - Name only: `"Full Name" email`
 - Name + institution: `"Full Name" "Institution" email`
@@ -188,9 +238,9 @@ Inputs should come from:
 - proposal keywords / expertise areas
 - known verified institution domain when available
 
-Bound the search budget:
+Any reopened implementation must bound the search budget:
 
-- First implementation: maximum 3-5 queries per candidate.
+- Start with a maximum of 3-5 queries per candidate.
 - Only run for candidates visible to staff and missing verified email or missing useful website.
 - Prefer official-domain queries when `verifiedInstitutionDomain` is known.
 - Do not add new queries for candidates that already have a high-confidence persisted email unless staff explicitly asks to scout.
@@ -266,13 +316,32 @@ Acceptance:
 
 ### Slice 2b: Broad Lead-Only Scout
 
-Add new broad searches only after Slice 1 shows this is worth the paid latency/cost.
+**Status: PARKED / NOT CURRENTLY JUSTIFIED (owner-confirmed 2026-07-27).**
+
+The read-only `scripts/probe-no-email-breakdown.mjs` measurement, including its
+matching Postgres read over `reviewer_find_roster`, covered all 511 selected
+reviewer suggestions in the 365-day window:
+
+- 11/511 (2.2%) lacked an email;
+- four had completed FIND enrichment without an email;
+- all four already had one to three quarantined `contactLeads[]`; three had a
+  low-confidence page lead, while one had only rejected,
+  verified-domain-contradicting leads; and
+- of the other seven, one had a roster email not reflected in Dataverse and
+  six had no roster match, so they are not evidence that additional broad
+  search fan-out would recover contact.
+
+This does not justify additional paid calls and latency now. Do not implement,
+fund, or default-enable a broad scout on the current evidence. The rules below
+are retained only as safety requirements if a future measurement reopens the
+option, not as a current delivery plan.
 
 Rules:
 
 - Default per-candidate query budget starts at 3.
 - Enforce a per-run cap.
-- If Slice 1 justifies building this, default it on for staff within the hard cap instead of hiding it behind an opt-in toggle.
+- If a future audit reopens and justifies this option, decide operational
+  enablement explicitly while preserving the hard cap.
 - Run only for candidates visible to staff and missing verified email or missing useful page.
 - Broad scout output must not set `email`, `website`, `facultyPageUrl`, or any `*_PersistAllowed` flag.
 - Broad scout results may populate only `contactLeads[]`.
@@ -399,26 +468,36 @@ These must remain true:
 - Do not treat topic overlap as identity proof.
 - Do not add a Dataverse schema change in the first slice unless review decides durable leads are required immediately.
 
-## 9. Open Questions for Review
+## 9. Resolved decisions and parked option
 
-1. Should lead-only search run for unresolved identities, or only for identities that are at least `probable` / human-grounded?
-2. Should likely namesake leads be hidden entirely by default, or shown under an audit expander?
-3. What is the compact roster DTO for `contactLeads[]`, and what payload size cap should it enforce?
-4. What is the maximum acceptable per-candidate lead-search budget?
-5. Should "Use this email" require opening the source URL first, or is the existing edit/save confirmation enough?
-6. Should broad lead-only scout run for unresolved identities, or only for name-grounded unresolved identities with OpenAlex/PubMed/ORCID evidence?
+Resolved by the shipped slices:
 
-## 10. Suggested First Implementation
+- weak/rejected leads are available behind an audit expander rather than
+  silently discarded;
+- compact roster persistence is capped at eight leads and excludes raw
+  provider payloads;
+- “Use this email/page” does not require opening the source first, but it is
+  manage-only and retains low-confidence invitation confirmation;
+- the existing-discard/faculty-page path is default-on and adds no network
+  calls.
 
-Start with the smallest product-correct order:
+The broad paid scout is closed as not currently justified. While it is parked,
+there is no eligibility, budget, or operational-enablement decision to make.
+Reconsider it only if either:
 
-1. Add Slice 1 measurement/audit, including `namesake_ambiguous`.
-2. Add `contactLeads[]` to `contactEnrichment`.
-3. Implement Slice 2a: capture already-discarded Claude/Serp results, add the Serp pre-null hook, and surface existing faculty/profile pages as leads.
-4. Persist compact leads in the Find roster cache.
-5. Render high/medium leads in the candidate card, with weak/rejected leads collapsed.
-6. Wire "Use this email" into the existing manual edit flow.
-7. Add tests that manual promotion remains low-confidence for first-contact invitation unless separately verified.
-8. Use Slice 1 results to decide whether to build Slice 2b broad paid scout.
+1. a future full-cycle contact audit finds a material population of
+   completed-enrichment candidates with neither a sendable email nor a useful
+   lead; or
+2. staff reports recurring failures to recover contact through the shipped
+   page/lead and manual-edit workflow.
 
-This restores staff utility while preserving the safety gates that prevent wrong-person invitations.
+If either trigger occurs, remeasure the affected cohort and explicitly decide
+the materiality threshold, identity eligibility, per-run cap, latency budget,
+and leads-only invariant before code changes.
+
+## 10. Current next step
+
+Do not build Slice 2b on the current evidence, and do not rebuild the already
+shipped slices. Continue using the shipped outcome audit, quarantined leads,
+manual promotion/editing, and low-confidence invitation confirmation. Reopen
+the broad scout only on one of the measured or staff-reported triggers above.

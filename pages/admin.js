@@ -1516,7 +1516,7 @@ function RoleManagementSection() {
 }
 
 // --- Section D: App Access Management ---
-function AppAccessSection() {
+export function AppAccessSection() {
   const [serverGrants, setServerGrants] = useState(null); // truth from API
   const [localGrants, setLocalGrants] = useState({});      // editable working copy: { userId: Set(appKeys) }
   const [allApps, setAllApps] = useState([]);
@@ -1524,6 +1524,7 @@ function AppAccessSection() {
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+  const [snapshotStale, setSnapshotStale] = useState(false);
 
   // Build the server-state map and local working copy
   const applyServerData = (data) => {
@@ -1536,22 +1537,33 @@ function AppAccessSection() {
     setLocalGrants(local);
   };
 
-  const fetchGrants = () => {
-    fetch('/api/app-access?all=true')
-      .then(r => {
-        if (r.status === 403 || r.status === 401) {
-          setIsSuperuser(false);
-          return null;
-        }
-        return r.json();
-      })
-      .then(data => {
-        if (!data) return;
-        setIsSuperuser(true);
-        applyServerData(data);
-      })
-      .catch(() => setIsSuperuser(false))
-      .finally(() => setLoading(false));
+  const fetchGrants = async () => {
+    try {
+      const res = await fetch('/api/app-access?all=true');
+      if (res.status === 403 || res.status === 401) {
+        setIsSuperuser(false);
+        setSnapshotStale(true);
+        return 'unauthorized';
+      }
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Unable to load app access grants');
+      }
+      setIsSuperuser(true);
+      setSnapshotStale(false);
+      setMessage(null);
+      applyServerData(data);
+      return 'ok';
+    } catch (error) {
+      // The admin page is already superuser-only. Keep this section visible so
+      // a transport failure cannot masquerade as "no users/no grants."
+      setIsSuperuser(true);
+      setSnapshotStale(true);
+      setMessage({ type: 'error', text: error.message });
+      return 'error';
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Mount-only initial load; fetchGrants reads no reactive state (setters only).
@@ -1562,7 +1574,13 @@ function AppAccessSection() {
     return <div className="text-gray-500 text-sm">Loading...</div>;
   }
 
-  if (!isSuperuser) return null;
+  if (!isSuperuser) {
+    return message ? (
+      <div className="mb-4 px-3 py-2 rounded-lg text-sm bg-red-50 text-red-800 border border-red-200">
+        {message.text}
+      </div>
+    ) : null;
+  }
 
   const visibleAppSet = new Set(allApps);
   const visibleOnlySet = (keys) => new Set([...keys].filter(k => visibleAppSet.has(k)));
@@ -1642,10 +1660,28 @@ function AppAccessSection() {
       const parts = [];
       if (totalGrants) parts.push(`${totalGrants} granted`);
       if (totalRevokes) parts.push(`${totalRevokes} revoked`);
-      setMessage({ type: 'success', text: `Saved: ${parts.join(', ')}` });
-      fetchGrants(); // refresh from server
+      const refreshed = await fetchGrants();
+      setMessage(refreshed === 'ok'
+        ? { type: 'success', text: `Saved: ${parts.join(', ')}` }
+        : {
+            type: 'error',
+            text: refreshed === 'unauthorized'
+              ? 'Changes were saved, but your admin session expired before the grant snapshot could be reloaded. Sign in again to verify the current grants.'
+              : 'Changes were saved, but the current grant snapshot could not be reloaded. Refresh before editing again.',
+          });
     } catch (err) {
-      setMessage({ type: 'error', text: err.message });
+      // A batch may have completed a prefix before the API returned non-2xx.
+      // Always replace both server and local state from the canonical snapshot
+      // before allowing Discard or another edit.
+      const refreshed = await fetchGrants();
+      setMessage({
+        type: 'error',
+        text: refreshed === 'ok'
+          ? `${err.message}. Current grants were reloaded.`
+          : refreshed === 'unauthorized'
+            ? `${err.message}. Your admin session expired before current grants could be reloaded; sign in again to verify them.`
+            : `${err.message}. Current grants could not be reloaded; refresh before editing again.`,
+      });
     } finally {
       setSaving(false);
     }
@@ -1665,15 +1701,26 @@ function AppAccessSection() {
   // integrity but auth/app-access lookups exclude inactive profiles.
   const removeUser = async (userId, userName) => {
     if (!confirm(`Remove ${userName || `user ${userId}`}? They will lose login and app access. The profile row is preserved for audit history.`)) return;
+    setSaving(true);
     setMessage(null);
     try {
       const res = await fetch(`/api/admin/users?id=${userId}`, { method: 'DELETE' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Remove failed');
-      setMessage({ type: 'success', text: `Removed ${data.name || userName || userId}` });
-      fetchGrants();
+      const removedName = data.name || userName || userId;
+      const refreshed = await fetchGrants();
+      setMessage(refreshed === 'ok'
+        ? { type: 'success', text: `Removed ${removedName}` }
+        : {
+            type: 'error',
+            text: refreshed === 'unauthorized'
+              ? `Removed ${removedName}, but your admin session expired before the grant snapshot could be reloaded. Sign in again to verify the current grants.`
+              : `Removed ${removedName}, but the current grant snapshot could not be reloaded. Refresh before editing again.`,
+          });
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1691,6 +1738,7 @@ function AppAccessSection() {
           {hasChanges && (
             <button
               onClick={discardChanges}
+              disabled={snapshotStale || saving}
               className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
               Discard
@@ -1698,7 +1746,7 @@ function AppAccessSection() {
           )}
           <button
             onClick={saveAll}
-            disabled={!hasChanges || saving}
+            disabled={!hasChanges || saving || snapshotStale}
             className="px-4 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {saving ? 'Saving...' : hasChanges ? `Save Changes` : 'No Changes'}
@@ -1711,6 +1759,15 @@ function AppAccessSection() {
           message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
         }`}>
           {message.text}
+          {snapshotStale && (
+            <button
+              type="button"
+              onClick={fetchGrants}
+              className="ml-2 underline font-medium"
+            >
+              Retry grant reload
+            </button>
+          )}
         </div>
       )}
 
@@ -1753,6 +1810,7 @@ function AppAccessSection() {
                           <input
                             type="checkbox"
                             checked={checked}
+                            disabled={snapshotStale || saving}
                             onChange={() => toggle(uid, appKey)}
                             className={`rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer ${changed ? 'ring-2 ring-amber-400' : ''}`}
                           />
@@ -1763,6 +1821,7 @@ function AppAccessSection() {
                       <input
                         type="checkbox"
                         checked={allChecked}
+                        disabled={snapshotStale || saving}
                         onChange={() => toggleAll(uid)}
                         className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                         title={allChecked ? 'Deselect all' : 'Select all'}
@@ -1771,8 +1830,9 @@ function AppAccessSection() {
                     <td className="py-2 px-2 text-center">
                       <button
                         onClick={() => removeUser(uid, grant.user_name)}
+                        disabled={snapshotStale || saving}
                         title="Soft-archive this user (sets is_active=false). The row is preserved for audit history."
-                        className="text-xs text-red-600 hover:text-red-800"
+                        className="text-xs text-red-600 hover:text-red-800 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         Remove
                       </button>
@@ -1783,9 +1843,9 @@ function AppAccessSection() {
             </tbody>
           </table>
         </div>
-      ) : (
+      ) : serverGrants !== null && !snapshotStale ? (
         <p className="text-gray-500 text-sm">No users found.</p>
-      )}
+      ) : null}
 
       {hasChanges && (
         <p className="text-xs text-amber-600 mt-3">

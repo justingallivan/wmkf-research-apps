@@ -6,7 +6,7 @@ status: active
 summary: "Evidence-first repository-wide material-claim audit and partial reconciliation of current documentation, memory, source comments, gates, and selected live-state assertions against the codebase."
 canonical: false
 cataloged: 2026-07-26
-last_verified: 2026-07-26
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/APPLICATION_STATE_ATLAS.md
@@ -204,8 +204,13 @@ historical/current rewrite before its frontmatter changes.
   red.
 - Contact correction propagation is field-specific: name/nickname/title sync,
   separate ORCID/board capture, and alert-only email/affiliation handling.
-- Awardee/grantee and honorarium code paths exist; current production record
+- Awardee/grantee code paths exist; their current production record
   distribution/configuration remains probe-required.
+- Honorarium linkage is now live-probed: 40/40 portal-era honoraria have both
+  the suggestion junction and direct proposal lookup, with 40/40 agreement and
+  no orphans/mismatches. The 87 historical GoApply-origin rows remain outside
+  the portal-link guarantee. `[VERIFIED via
+  scripts/probe-honorarium-link-population.js, production GETs, 2026-07-27]`
 
 ### Corrected
 
@@ -328,8 +333,9 @@ Do not upgrade these to verified until probed:
 - Live Postgres migration/table inventory and row/status distributions for
   drafts, roster, acceptance jobs, integrity, expertise, and panel tables.
 - Live Dataverse entity/attribute/count spot checks, question-set hash/version,
-  prompt inventory, AI-run counts, honorarium linkage, reviewer native-slot
-  co-write, and grantee deliverable statuses.
+  prompt inventory, reviewer native-slot co-write, and grantee deliverable
+  statuses. AI-run counts and honorarium linkage now have separate dated probes;
+  re-run those probes before quoting future populations.
 - SharePoint/Graph permissions and document-library paths.
 - Blob access modes.
 - BILL webhook/subscription state.

@@ -5,7 +5,7 @@ type: project
 originSessionId: 05e61454-b0c9-4b62-a30f-89e979b3157b
 status: active
 scope: intake
-last_verified: unknown via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 via owner design principle and current forms-as-code schema/map source
 ---
 
 ## Recall Rule
@@ -21,6 +21,11 @@ Do not:
 - Push structured content into narrative free-text fields or XLSX/PDF uploads — every downstream AI tool then re-extracts it (latency, cost, error risk).
 
 Ground truth: historical-only (lesson/design principle, not live state); compounds with [[project-strategy-direction]]. Sarah + Connor own the per-phase field wishlists.
+
+[VERIFIED 2026-07-27 as a design principle, not production behavior]:
+`shared/forms/phase-ii-research-2026-06/schema.js` and
+`shared/forms/phase-ii-research-2026-06/map-to-dynamics.js` are prior art only;
+future form/entity choices still require owner approval and Atlas reconciliation.
 
 The new applicant intake portal is a strategic opportunity to capture
 machine-legible structured data instead of stuffing everything into narrative

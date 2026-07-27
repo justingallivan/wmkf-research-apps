@@ -23,7 +23,18 @@ Do not:
 
 Ground truth: Dataverse `wmkf_appreviewersuggestion` (backfilled from the Postgres `reviewer_suggestions` table, which was DROPPED 2026-06-04 via migration 018 after backfill), `wmkf_potentialreviewer1..5` slot fallback.
 
-**Reality:** Reviewer lifecycle counts shown in `/reviewer-finder` (invited / accepted / declined) come from **Dataverse `wmkf_appreviewersuggestion`** (post-W3-W6 cutover 2026-05-12) — backfilled from the historical Postgres `reviewer_suggestions` table where data existed. That data only starts being populated when staff used the tool to save candidates — which began in **J26** for the Foundation, and not all staff used it that cycle either. The data-quality caveat below is unchanged by the storage migration; it's about adoption history, not where the rows live now.
+[VERIFIED 2026-07-27 via
+`lib/db/migrations/018_drop_reviewer_finder_postgres_tables.sql`,
+`docs/atlas/dataverse-wmkf-appreviewersuggestion.md`, and current proposal
+reader fallback source]. The adoption-history caveat is organizational evidence;
+cycle reliability must be re-measured before analytics use.
+
+**Reality:** Current Workbench counts and retained legacy readers source
+invited/accepted/declined state from **Dataverse
+`wmkf_appreviewersuggestion`**. The W3–W6 cutover backfilled historical
+Postgres data where it existed. That data begins when staff used the tool to
+save candidates (J26, with mixed adoption), so the caveat is about adoption
+history, not current storage.
 
 **What this means:**
 - **Pre-J26 proposals** (J25, J24, …) have no rows from the tool — picker falls back to slot population from `wmkf_potentialreviewer1..5`. Shows "5 invited" honestly but no accept/decline breakdown.

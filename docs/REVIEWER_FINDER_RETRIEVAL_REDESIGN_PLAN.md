@@ -112,8 +112,9 @@ matters: **gate on exact identity first; disambiguate among real matches second.
 - `[VERIFIED]` **Verify path fails dangerous.** `generateNameVariants` emits an
   initial variant ("A Laederach"); PubMed `[Author]` is order-insensitive
   ("A Laederach" == "Laederach A"); `namesMatch` matches "a laederach" ==
-  "alain laederach" via a first-initial rule (`discovery-service.js:1102`,
-  reproduced). A fabricated **"Dr. Alfred Laederach" VERIFIED** against the real
+  "alain laederach" via the first-initial rule now isolated in
+  `lib/services/discovery/name-matching.js` (`generateNameVariants`,
+  `namesMatch`; reproduced). A fabricated **"Dr. Alfred Laederach" VERIFIED** against the real
   Alain Laederach's 8 papers + UNC affiliation, `confidence 100%`,
   `institutionMismatch=false`. The institution-mismatch guard misses because only
   the forename was wrong.
@@ -300,7 +301,8 @@ The redesign therefore **extends** these, it does not replace them.
   to `claude_verified` vs `database`
   (`lib/services/reviewer-roster-store.js:23-27`); save maps source to
   `claude/pubmed/arxiv/biorxiv/unknown`
-  (`pages/api/reviewer-finder/save-candidates.js:79-84`); the Workbench UI splits
+  (`lib/services/reviewer-finder/save-candidates-service.js`,
+  `saveCandidates`); the Workbench UI splits
   sections by `isClaudeSuggestion || source === 'claude_suggestion'`
   (`shared/components/reviewers/ReviewerSearchSection.js:78-83,787-788`). The
   S232 updated all four contracts together (Codex-built, reviewed): `/discover` emits the
@@ -581,9 +583,9 @@ big redesign):
    PubMed-verify; route suggestions to `unverified[]` / identity-review with
    `verificationStatus:'unresolved'` (provenance `barred_parametric` unless
    proposal-named / applicant-suggested). Gate the post-verify PubMed coauthor-COI
-   pass (`discover.js:250` → `discovery-service.js:1498`) on the same contract.
+   pass (`discover.js` → `DiscoveryService.verifyClaudeSuggestions`) on the same contract.
    Also apply this to the applicant-recommended verify path
-   (`pages/api/workbench/enrich-recommended.js:203-208`), which currently calls
+   (`lib/services/workbench/enrich-recommended-service.js`), which currently calls
    `DiscoveryService.verifyClaudeSuggestions` against PubMed unconditionally, for
    non-biomedical proposals.
    **UX / effort (Codex):** small-to-medium, multi-layer. The "Needs identity
@@ -600,8 +602,8 @@ big redesign):
    title/snippet before attaching (mirror the email name-consistency guard).
    `john-fazakerley` vs `Robert Sang` is rejected on the slug alone. Scope includes
    the SAVE/PERSIST boundary: wrong websites can survive in saved payloads unless a
-   save-time/roster-time website sanitization guard is added at
-   `pages/api/reviewer-finder/save-candidates.js:75,151`.
+   save-time/roster-time website sanitization guard is added in
+   `lib/services/reviewer-finder/save-candidates-service.js`.
 9. **Preserve the proposal-named source.** Map parsed `SOURCE: Mentioned in proposal`
    → `source:'proposal_named'` / `provenance.kind = proposal_named` **before** Track
    A, so the anchor survives (do not overwrite to `claude_suggestion`). Proposal-
@@ -1217,7 +1219,7 @@ CORRECTION bullet below.)
   (route-level `markInstitutionCOI`, "flag, don't filter" `discover.js:225`); Track-A coauthor
   COI (above); forename/institution/expertise mismatch — only the **forename gate** demotes
   verified→`unverified[]` (still surfaced), institution/expertise are soft flags; Track-A `<3`
-  pubs → `unverified[]` (`discovery-service.js:695-707`, UI read-only). Ranking is **sort-only**
+  pubs → `unverified[]` (`DiscoveryService.verifyClaudeSuggestions`, UI read-only). Ranking is **sort-only**
   (`relevance-score.js:95-99`); `filterByHIndex`/`filterByMinimumQualifications` is **dead code**
   (no live caller). **My earlier "flag-not-drop everywhere else" was wrong** — it described the
   Track-A route path and missed the Track-B service-path drops above.
@@ -1231,7 +1233,8 @@ CORRECTION bullet below.)
   purely parametric** (Codex correction): the analyze prompt explicitly asks for
   proposal-mentioned names + reference authors *before* known experts
   (`reviewer-finder.js:81-85`) and `normalizeSuggestionSource` preserves
-  `SOURCE: Mentioned in proposal` → `proposal_named` (`discovery-service.js:741-759`). The
+  `SOURCE: Mentioned in proposal` → `proposal_named`
+  (`lib/services/discovery-service.js`, provenance mapping). The
   parametric-invention concern is scoped to the "known experts" portion, not the whole pool.
 
 **Shippable fixes, independent of the big redesign:**
@@ -1312,8 +1315,11 @@ built **from this run's keyword-search hits**, not the author's corpus.
 that emits metadata + reviewer names + PART-3 `searchQueries` together → ~3 queries per source,
 each **3–6 words**, "methods/organisms/phenomena/systems", no author names → each query fetches
 the **top 50** recent papers (`searchPubMed`, 5-yr `pdat` filter) → each paper mints **one**
-candidate from a **single author position** (PubMed/arXiv = last author `discovery-service.js:1149-1164,1210`;
-bioRxiv/chemRxiv = corresponding/first `:1278,1341`) with `publications: [that one paper]` →
+candidate from a **single author position** (the legacy PubMed/arXiv
+literature-selection path took the last author, while bioRxiv/chemRxiv took
+the corresponding/first author; current orchestration is split between
+`lib/services/discovery-service.js` and `lib/services/discovery/`) with
+`publications: [that one paper]` →
 dedup merges by author (`deduplication-service.js:192,228`, no preprint/DOI dedup at the merge).
 
 **The funnel math (the operator's point, S238).** ~3 queries × top-50 × single-author-position

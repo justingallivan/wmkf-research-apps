@@ -8,6 +8,12 @@ metadata:
   originSessionId: 0a631ca0-29ca-4f6c-913a-f551fb1ced7d
 ---
 
+## Recall Rule
+
+In a correctness or security review loop, re-review every fix and treat only a
+clean independent review as evidence of convergence. Report review cost neutrally;
+do not declare diminishing returns as a substitute for evidence.
+
 On the reviewer-finder save-COI work (S339), across five adversarial Codex rounds I repeatedly framed real findings as "getting narrower / diminishing returns" and, after the TOCTOU fix, **recommended merging without another review**. The user ran the review anyway and Codex found a HIGH-severity COI bypass (email-less confident ORCID/name match) — a regression **I had introduced** in my own exact-reuse refactor the pass before. My self-assessment of "converged / good enough to skip review" was wrong twice: the finding wasn't narrow, and skipping would have shipped a bypass to prod.
 
 **Why:** My judgment that an iterative correctness/security loop has "converged" is unreliable — I both introduce and miss real issues. Treating my own "it's fine now" as a stopping signal risks shipping bugs, and it also quietly pressures the user toward under-reviewing.

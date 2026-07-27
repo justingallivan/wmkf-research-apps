@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-13
+last_verified: 2026-07-27
 stale_after_days: 60
 owner: dynamics-platform
 source_files:
@@ -11,6 +11,8 @@ source_files:
   - lib/services/dynamics-odata-validator.js
   - lib/services/dynamics-identity-service.js
   - lib/services/dynamics-explorer-taxonomy.js
+  - lib/services/dataverse-app-access-service.js
+  - lib/utils/auth.js
   - lib/dataverse/client.js
   - lib/dataverse/schema-apply.js
   - pages/dynamics-explorer.js
@@ -19,6 +21,7 @@ canonical_docs:
   - docs/atlas/
   - docs/DYNAMICS_SCHEMA_ANNOTATION.md
   - docs/DATAVERSE_POWER_TOOLS_DESIGN.md
+  - docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md
 watch_paths:
   - lib/services/dynamics-service.js
   - lib/services/dynamics/**
@@ -26,6 +29,8 @@ watch_paths:
   - lib/services/dynamics-odata-validator.js
   - lib/services/dynamics-identity-service.js
   - lib/services/dynamics-explorer-taxonomy.js
+  - lib/services/dataverse-app-access-service.js
+  - lib/utils/auth.js
   - lib/dataverse/**
   - pages/dynamics-explorer.js
   - pages/api/dynamics-explorer/**
@@ -33,6 +38,7 @@ update_triggers:
   - Dataverse / Dynamics schema, probe, or OData query changes
   - Dynamics Explorer or Power Tools surface changes
   - Dynamics identity reconciliation / impersonation changes
+  - Q9 app-access transport or DATAVERSE_DAL_UNIVERSAL posture changes
 ---
 
 # Dataverse & Dynamics
@@ -135,6 +141,26 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   name); the app registration sees exactly two instances via Global Discovery;
   `.api.crm.dynamics.com` host forms are deliberately unregistered (fail
   closed).
+- **Q9 app-access transport is ready for Stage 4 (verified 2026-07-27).**
+  Preferences use the 19th DynamicsService adapter, while
+  `lib/services/dataverse-app-access-service.js` still uses
+  `lib/dataverse/client.js` for `wmkf_appuserappaccesses`. Current Vercel
+  Preview and Production project configuration omit
+  `DATAVERSE_DAL_UNIVERSAL`, which source defaults to `off`. The owner accepted
+  that observability posture and replaced the passive soak with deterministic
+  `on`-mode acceptance across the ordinary-user auth lookup, admin
+  list/grant/revoke, fresh-profile default grant, and partial-failure UI
+  refresh. All 33 focused assertions
+  passed; the read-only live inventory found six mapped ordinary users with
+  three to five grants each. Current auth behavior is fail-closed but
+  retryable: `requireAppAccess` returns 503 on grant-lookup failure and does not
+  cache an empty grant set. Admin grant-list failures are also fail-loud, and
+  partial writes report only completed identifiers. Stage 2 is satisfied;
+  Stage 4 requires a deliberately designated ordinary-user Preview smoke,
+  reversible grant/revoke restoration check, authenticated reviewer-finder
+  `analyze`/`discover` check with a known prompt override, and production log
+  watch before release. See
+  `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md`.
 - OData null filters do not behave like SQL.
 - The sandbox is not drop-in prod parity.
 - Do not rebuild Explorer behavior when the Power Tools surface should be reused.

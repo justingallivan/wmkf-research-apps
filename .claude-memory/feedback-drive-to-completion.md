@@ -10,7 +10,7 @@ metadata:
   last_verified: S174 via memory-content (not re-probed 2026-06-04)
 ---
 
-## Recall Trigger
+## Recall Rule
 
 Read this when executing a multi-part initiative the user asked to finish or
 complete.

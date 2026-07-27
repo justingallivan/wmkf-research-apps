@@ -5,7 +5,7 @@ type: project
 originSessionId: 8d412c2f-d6c6-4080-a43c-79e0e04e9653
 status: active
 scope: dynamics
-last_verified: 2026-06-04 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 via docs/atlas/dataverse-akoya-request.md and current request-reader source; sample 1002379 remains dated evidence
 ---
 
 ## Recall Rule

@@ -6,7 +6,7 @@ status: active
 summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-07-26
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -18,7 +18,7 @@ related:
 
 # Where We're Headed
 
-**Last verified: 2026-07-26.** This document owns long-term direction and principles. The
+**Last verified: 2026-07-27.** This document owns long-term direction and principles. The
 ordered, current delivery agenda lives in `docs/CURRENT_WORK_QUEUE.md`; this document is not a
 backlog.
 
@@ -128,10 +128,15 @@ as shipped.
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
 
-1. run the parked production review-synthesis smoke and close its structured-output reliability gate;
+1. diagnose and fix the review-synthesis structured-output reliability gate,
+   now reproduced in three controlled current-v2 production executions;
 2. finish the synthesis lifecycle contract, including all-in readiness, manual early-run, and stored-output visibility;
 3. freeze the user/input/storage/access/deadline contract for the four remaining Workbench lifecycle tabs;
 4. build the first deadline-bound writeup slice, provisionally Pre Site Visit Writeup.
+
+The owner-authorized 2026-07-27 Request `1002788` smoke closed as a bounded
+failure with no partial memo write; its reversible synthetic review was fully
+restored. Another blind regeneration is not the next step.
 
 The 2026-07-26 evidence-first audit found six live Workbench tabs and four placeholders,
 retired the contradictory forward roadmap, and separated shipped behavior from proposed

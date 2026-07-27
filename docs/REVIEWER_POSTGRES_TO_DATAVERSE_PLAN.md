@@ -26,13 +26,19 @@ related:
 
 **Created:** 2026-05-06 (Session 136)
 **Last revision:** 2026-05-25 (S188) — stale W3-W5 forward-tense language reconciled across §"Endpoint rewrite scope", §"Dependency-ordered queue", and the W3-W7 schedule table. Whole-doc one-pass sweep, not site-by-site patches.
-**Status:** **Active build, late shipping.** Schema deployed (`wmkf_potentialreviewer` extended with the S213 bibliometric fields, `wmkf_appreviewersuggestion`, `wmkf_apprequestperson`, `wmkf_appgrantcycle`; the former `wmkf_appresearcher` sidecar was dropped S213). `save-candidates` / `my-candidates` / `load-proposal` / `contact-history` live in prod. W3 grant-cycle cutover, W4 reviewer-suggestion data alignment, and the full W5 reader-cutover wave (generate-emails, my-proposals, extract-summary retirement, maintenance blob-scanner) all shipped. W6 step 1 — `researchers.js` retirement + Database tab UI removal — shipped 2026-05-12. W6 step 2 — the drain-only Postgres table drop (`researchers`, `researcher_keywords`, `publications`, `proposal_searches`, + `reviewer_suggestions`) — **DONE EARLY 2026-06-04 (S219)** via tracked migration `018_drop_reviewer_finder_postgres_tables.sql` (ahead of the ≥2026-07-01 trigger; `search_cache` kept; memory `[[project-w6-table-drop-closed]]` CLOSED). Remaining: match-on-discovery wiring + UI (post-pilot); `add-candidate-manual` (post-pilot). The Dataverse-suggestion restore double-booking was RESOLVED S164 → distinct filenames (see the `restore-reviewer-suggestion-cleanup-backup.js` row in the "Spec'd vs. built" table). See "Spec'd vs. built" table below for the line-by-line state.
+**Status:** **Historical completed migration record.** W3–W6 reader cutover
+shipped, and migration 018 dropped the historical Postgres `researchers`,
+`researcher_keywords`, `publications`, `proposal_searches`, and
+`reviewer_suggestions` tables on 2026-06-04. `search_cache` was deliberately
+kept because it has live callers. Postgres `grant_cycles` remains a separate
+drain-only snapshot while Dataverse `wmkf_appgrantcycle` is authoritative.
+Enhancement ideas in this record are not a current work queue.
 **Priority:** Top (historical) — was the gate for the intake portal pilot; the reviewer migration shipped W3–W6 2026-05-12, and that pilot is superseded (the live direction is a single Phase I intake for the next cycle — see `docs/SYSTEM_MODEL.md`).
 **Target environment:** Prod (Dataverse Wave 2 schema is live)
 
 ## Read this first: ground truth lives in the Atlas
 
-For live state of any entity/table this plan touches, the canonical reference is the **Application State Atlas** (`docs/APPLICATION_STATE_ATLAS.md` + per-entity pages under `docs/atlas/`). Verified 2026-05-07 via `scripts/audit-postgres-state.js` + `scripts/audit-dataverse-state.js`. When this plan and an Atlas page disagree, the Atlas is authoritative — this plan describes the *target* state and the migration *steps*; the Atlas describes *current* state.
+For live state of any entity/table this plan touches, the canonical reference is the **Application State Atlas** (`docs/APPLICATION_STATE_ATLAS.md` + per-entity pages under `docs/atlas/`). Verified 2026-05-07 via `scripts/audit-postgres-state.js` + `scripts/audit-dataverse-state.js`. When this plan and an Atlas page disagree, the Atlas is authoritative — this plan describes the historical target and executed migration sequence; the Atlas describes current state.
 
 ## Spec'd vs. built (verified 2026-05-07)
 
@@ -63,7 +69,11 @@ Refreshed 2026-05-12. Several artifacts have shipped since the plan was locked; 
 
 Every application file holding a live Postgres read/write against a Wave 2 drain table. **This is the actual scope of "cutover" work** — not just the two endpoints originally cited (`render-emails.js` / `send-emails.js`).
 
-> **Status banner (2026-05-19, S167 ground-truth verification):** Independent code grep (Codex-verified) confirms **zero live SQL** against `researchers`, `publications`, `researcher_keywords`, `reviewer_suggestions`, `grant_cycles`, `proposal_searches` anywhere under `pages/api/`, `lib/services/`, `lib/dataverse/`, or `shared/`. The cutover is complete at the application runtime layer. Every row below is historical; the "shipped" annotations are now baked into the source files themselves (see file headers). Only `scripts/*` admin tools still SQL these tables.
+> **Historical endpoint inventory.** The application cutover reached zero live
+> runtime SQL against all six legacy names. Migration 018 subsequently dropped
+> five of the tables; retained scripts that still contain their SQL are
+> archaeology, not current callers. `grant_cycles` alone remains as a
+> drain-only Postgres snapshot.
 
 | File | Drain tables touched (pre-cutover) | Status | Notes |
 |---|---|---|---|
@@ -104,11 +114,18 @@ To prevent scope creep — destructive carryover items that name "drop Postgres 
 
 **Rule**: any decommission script in this migration explicitly enumerates the Postgres tables it drops; never wildcards. See "Pre-drop grep gates" under Rollback Strategy.
 
-## Where the migration actually stands today
+## Historical pre-cutover state snapshot
 
-> **HISTORICAL — supersede with the spec-vs-built table (line 13) + ground-truth banner (line 42) for current state.** The W3-W6 cutovers shipped 2026-05-12 (W3 grant cycles; W4 reviewer-suggestion alignment; W5 reader cutover incl. `generate-emails.js` / `my-proposals.js` / `extract-summary.js` retirement / `maintenance-service.js` blob-scanner / `database-service.js` gut; W6 step 1 `researchers.js` retirement). Body of this section was written pre-cutover; the "Migrate", "rewriting endpoints", "Review Manager is mostly Dataverse but partially Postgres" framings are the planning state, not the live state. Drop-pending tail items still real: post-pilot one-shot Postgres table drop, restore script, match-on-discovery, add-candidate-manual.
+> **HISTORICAL BASELINE — not current state.** The body of this section was
+> written before cutover. The five-table Postgres drop is complete via
+> migration 018; the spec'd drain-table restore script was never built and was
+> superseded by the executed migration path. `grant_cycles` remains a separate
+> drain-only domain. Use the Atlas for current ownership. Enhancement sketches
+> below are not automatically active work.
 
-**Already in Dataverse (live)** — reviewer-person extension + lifecycle entity (historically three custom entities + extensions before S213):
+**Already present in Dataverse at the historical baseline** — reviewer-person
+extension and lifecycle entity (historically three custom entities plus
+extensions before S213):
 
 - `wmkf_potentialreviewer` — global per-person identity (by email). One person across N proposals = ONE row. Source: pre-existing entity, extended per `lib/dataverse/schema/wave2-existing/wmkf_potentialreviewers-extensions.json`.
 - ~~`wmkf_appresearcher`~~ — **DROPPED S213**; its bibliometric fields now live directly on `wmkf_potentialreviewer`.
@@ -117,7 +134,8 @@ To prevent scope creep — destructive carryover items that name "drop Postgres 
 - Endpoints fully on Dataverse: `save-candidates.js`, `my-candidates.js`, `load-proposal.js`
 - **Review Manager is mostly Dataverse but partially Postgres**: `reviewers.js` reads/writes Dataverse for the per-proposal lifecycle, but `render-emails.js` and `send-emails.js` both call `loadCycleConfigs()` which reads Postgres `grant_cycles`. (Surfaced by grep gate 2026-05-06; was incorrectly described as "fully Dataverse" in earlier revisions of this plan.)
 
-**Pre-existing schema-as-code (mixed deployment status — verify per-file before consuming):**
+**Historical schema-as-code inventory (mixed deployment status at the
+baseline):**
 
 The `lib/dataverse/schema/wave2/` directory held six schema-as-code files written in an earlier session that designed the original Wave 2 entities. **S213 update — only three remain deployed:** `wmkf_appgrantcycle`, `wmkf_appreviewersuggestion`, and `wmkf_appproposalsearch` (S185; entity-set `wmkf_appproposalsearchs`, empty). The other three — **`wmkf_appresearcher`, `wmkf_apppublication`, and `wmkf_apppublicationauthor` — were DROPPED S213** (the sidecar collapsed onto `wmkf_potentialreviewers`; the two publication entities were empty and went down with it; their schema-as-code files were deleted). See `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md`. Historically all six encoded the **1:1 sidecar model** (not the pool model the Wave 1 design doc text implied):
 
@@ -132,20 +150,20 @@ The `lib/dataverse/schema/wave2/` directory held six schema-as-code files writte
 
 The migration question is therefore **"do we deploy what's already designed, or modify the designs first?"**, not "what should we design?" Most of the Wave 2 design work happened months ago.
 
-**Postgres data still load-bearing:**
+**Historical Postgres disposition at the pre-drop baseline:**
 
 | Table | Rows (verified 2026-05-12) | Disposition |
 |---|---|---|
 | `publications` | 0 | **Retired** (deploy decision: skip). Writer is dead and reader `DatabaseService.getRecentPublications` (line 313) has **zero external callers** (verified 2026-05-07 via repo-wide grep — Codex R3 #7 resolved). The Dataverse counterparts `wmkf_apppublication` and the junction `wmkf_apppublicationauthor` were both deployed empty (0 rows) and **DROPPED S213** in the appresearcher collapse (`docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md`). Reviewer Finder discovery already rescrapes per-search; no need for a cached table. |
-| `proposal_searches` | 0 | **Drain (no app readers remain).** `pages/api/reviewer-finder/extract-summary.js` retired W5 (2026-05-12) per row 49 above + `docs/atlas/postgres-other-reviewer-tables.md:25`. The W3 grant-cycles JOIN dropped at the same cutover. Remaining touches are admin scripts only. The Dataverse counterpart `wmkf_appproposalsearch` IS deployed (S185, 0 rows, entity-set `wmkf_appproposalsearchs`) and sits empty awaiting a future feature need. Postgres table drop unblocked. |
-| `researchers` | 331 | **Drain.** Don't migrate. `researchers.js` admin UI retired 2026-05-12 (W6 step 1); no live application readers/writers remain. The post-pilot one-shot DELETE/table-drop path handles cleanup after the staleness probe passes (≥2026-07-01), matching the W6 row below. |
-| `researcher_keywords` | 1,028 | **Drain.** Coverage moves to `wmkf_potentialreviewers.wmkf_keywords` for new rows (S213: folded onto the person; the `wmkf_appresearcher` sidecar was dropped). Live readers/writers gone with `researchers.js` retirement (W6 step 1). |
-| `reviewer_suggestions` | 337 | **Backfill spec needed** — see "Reviewer suggestions backfill" section below. Naive "active-cycle migrate, closed-cycle discard" is not enough. |
-| `grant_cycles` | 13 | **Migrate** to net-new `wmkf_appgrantcycle`. Field-by-field mapping in "Grant cycle field mapping" section below — Postgres has more fields than the original §1 spec captured. |
+| `proposal_searches` | 0 | **Historical snapshot; dropped by migration 018.** |
+| `researchers` | 331 | **Historical snapshot; dropped by migration 018.** Current person authority is Dataverse. |
+| `researcher_keywords` | 1,028 | **Historical snapshot; dropped by migration 018.** Current keyword authority is on the Dataverse person. |
+| `reviewer_suggestions` | 337 | **Historical snapshot; dropped by migration 018 after cutover/reconciliation.** Current lifecycle authority is Dataverse. |
+| `grant_cycles` | 13 | **Still present as a drain-only Postgres snapshot.** Dataverse `wmkf_appgrantcycle` is authoritative. |
 
-Total live data is ~1,700 rows. The "migration" is mostly **letting Postgres data drain** as J26 closes, plus rewriting the few endpoints that still talk to Postgres.
+These were the historical pre-drop counts, not current live Postgres totals.
 
-### Verified live state (2026-05-06, `scripts/audit-postgres-state.js`)
+### Historical live-state snapshot (2026-05-06, `scripts/audit-postgres-state.js`)
 
 Per-column population probed against live Neon Postgres. Highlights driving plan decisions:
 
@@ -216,7 +234,11 @@ Rationale: Reviewer Finder surfaces ~25 candidates per proposal. Selected review
 
 ### Post-pilot one-shot cleanup
 
-Cleanup runs as a one-shot script, not as a scheduled cron. **Note (reconciled 2026-07-01):** this section describes the *Dataverse* unengaged-`wmkf_appreviewersuggestion` row cleanup — a separate concern from the *Postgres* drain-only table drop, which is already DONE (2026-06-04, S219, migration 018; see the Post-pilot schedule row). The old "≥2026-07-01 drain-only table drop gate" this used to wait on has passed; whether the Dataverse suggestion-row cleanup below is still wanted is tracked separately (see the MOOT note in `docs/atlas/postgres-reviewer-suggestions.md`).
+**Historical, unapproved cleanup design.** This section concerns a possible
+Dataverse unengaged-suggestion cleanup, not the completed Postgres table drop.
+It is not a current instruction and must not be executed without a fresh owner
+decision and current contract review. The Postgres drop completed through
+migration 018; no restore-script prerequisite remains for it.
 
 **Logic** (corrected 2026-05-07: drops suggestion rows, not potentialreviewer rows):
 
@@ -276,9 +298,12 @@ The reviewer-history surface for a contact is `wmkf_appreviewersuggestion` rows 
   - Late/on-time flag = `wmkf_reviewreceivedat` vs. cycle's `wmkf_reviewreturndeadline`.
   - Response latency hours = `wmkf_emailsentat` vs. `wmkf_ResponseReceivedAt`.
 
-## New work in scope
+## Historical proposed work
 
-> **§1 below is HISTORICAL — SHIPPED W3 2026-05-12.** The schema patch (`wmkf_ShortCode`, `wmkf_ProgramName`, `wmkf_CustomFields`), the preference-shape migration (Postgres integer ID → `wmkf_shortcode`), the alt-keys, and all three-file endpoint rewrites (`grant-cycles.js`, `render-emails.js`, `send-emails.js`) all shipped at W3 cutover. Sections §2–§6 below ("Match-on-discovery", "Contact form view", "Add candidate by hand", "wmkf_apprequestperson junction", "Reviewer-portal field audit") remain in-scope as planned post-pilot or in-cycle work.
+> This whole section is historical design. §1 shipped at W3. Sections §2–§6
+> record proposed or subsequently completed work but are not a current scope
+> declaration; current product work must be routed through the active queue and
+> current architecture docs.
 
 ### 1. `wmkf_appgrantcycle` entity — preflight, patch schema-as-code, then deploy (HISTORICAL — SHIPPED W3)
 
@@ -345,7 +370,7 @@ The full field mapping below names every Postgres column. Postgres columns marke
 
 Naming follows live convention `wmkf_app<name>` (no underscore — matches existing live entities, **not** the Wave 1 doc's proposed `wmkf_app_<name>`).
 
-### 2. Match-on-discovery + history badges
+### 2. Historical proposal: match-on-discovery + history badges
 
 The most visible payoff of the migration. Surfaces "have we worked with this person before" at the moment a PD is choosing candidates.
 
@@ -370,7 +395,7 @@ For each candidate with email or ORCID:
 
 Click any badge → modal with the full history list.
 
-### 3. Contact form "Reviewer history" view
+### 3. Historical proposal: contact-form reviewer history
 
 A "Reviewer history" subgrid (or tab) on the standard `contact` form. Lists `wmkf_appreviewersuggestion` rows linked to this contact via the slot's `wmkf_contact`. Columns: cycle code (derived from request's `wmkf_meetingdate`), request number (clickable), response type, materials sent date, review submission date, overall rating (when populated). Read-only.
 
@@ -380,7 +405,7 @@ Same data as the picker-side history modal (§2), surfaced from the contact side
 
 Optionally (later, not in pilot scope): derived summary fields on contact, recomputed on a cron — `wmkf_lastreviewedcycle`, `wmkf_avgresponsetimehours`, `wmkf_declinecount`. Nice-to-haves.
 
-### 4. "Add candidate by hand" (net-new, replaces retired Database tab)
+### 4. Historical proposal: add candidate by hand
 
 Today the Reviewer Finder Database tab has a "Create researcher" button that adds a row to the legacy Postgres `researchers` pool. Justin's actual usage was **adding reviewers PDs already knew about**, not browsing the pool. Under the 1:1 model the seed-the-pool target goes away, so this becomes a net-new feature attached to a specific proposal.
 
@@ -398,7 +423,7 @@ Today the Reviewer Finder Database tab has a "Create researcher" button that add
 
 **Endpoint**: `POST /api/reviewer-finder/add-candidate-manual`. Same auth as `save-candidates.js` (`requireAppAccess('reviewer-finder')`). Single-candidate variant of the existing flow; ~half-day implementation.
 
-### 5. `wmkf_apprequestperson` junction (PI + co-PI history)
+### 5. Completed historical build: `wmkf_apprequestperson` junction
 
 Net-new junction table to support the PI/co-PI history badge. Locked S136 2026-05-06 — Connor's preference for junctions + cleaner long-term shape.
 
@@ -435,7 +460,7 @@ Alt key: `(wmkf_request, wmkf_contact, wmkf_role)`.
 - **`_wmkf_projectleader_value` (PI lookup) stays live** — used by other flows unrelated to reviewers; PA flows dual-write (projectleader field + junction `pi` row). Only the **co-PI slots** (`_wmkf_copi1..5_value`) become obsolete read-only legacy data once backfill + PA flows are live.
 - Backfill script remains Justin/Claude's job.
 
-### 6. Reviewer-portal field audit
+### 6. Historical reviewer-portal field audit
 
 Confirm `wmkf_appreviewersuggestion` (where reviewer-portal data lives — see "Reviewer-portal data lives on `wmkf_appreviewersuggestion`" section above) has columns for everything the portal will capture. Net-new fields locked S136: `wmkf_DeclineReason`, `wmkf_ResponseReceivedAt`. Late/on-time and response-latency derive from existing timestamps. Connor coordination only on whether anything else surfaces during portal build that isn't in the extensions JSON.
 
@@ -575,46 +600,64 @@ Audit: are there other 100-char (or other) caps elsewhere in the adapter set? Ru
 
 > **HISTORICAL — all rewrites in this section shipped W3 + W5 (2026-05-12).** See "Drain-target endpoint inventory" (line 38) and "Spec'd vs. built" (line 13) for the current per-file shipped status. The dispositions below ("Read from X; write Y", "Rewrite all sites", "Retire entirely") describe the intent at planning time; the post-shipping state lives in the inventory table at top.
 
-| Endpoint | Today | Migration work |
+| Endpoint | Planning-time baseline | Historical proposed disposition |
 |---|---|---|
-| `pages/api/reviewer-finder/discover.js` | Cache lookup via `DatabaseService.findResearcher` (Postgres `researchers`) | Replace cache lookup with match-on-discovery against `contact`. Drop Postgres dependency. |
+| `pages/api/reviewer-finder/discover.js` | Cache lookup via `DatabaseService.findResearcher` (Postgres `researchers`) | Proposed replacing the cache lookup with contact-based match-on-discovery. |
 | ~~`pages/api/reviewer-finder/researchers.js`~~ | Admin pool CRUD over `researchers` / `researcher_keywords` / `publications` | **RETIRED 2026-05-12** in W6 step 1 (was locked S136 2026-05-06). Endpoint deleted; Database tab UI removed. Will be replaced post-pilot by net-new "Add candidate by hand" feature. |
-| `pages/api/reviewer-finder/generate-emails.js` | Reads `reviewer_suggestions`, writes `email_sent_at` | Read from `wmkf_appreviewersuggestion`; write `wmkf_emailsentat` on `wmkf_appreviewersuggestion`. |
+| `pages/api/reviewer-finder/generate-emails.js` | Read `reviewer_suggestions`, wrote `email_sent_at` | Proposed Dataverse reads/writes; the cutover later shipped. |
 | `pages/api/reviewer-finder/extract-summary.js` | Reads `proposal_searches` as IDOR guard (broken — table empty); writes `reviewer_suggestions` | **RETIRED W5 (2026-05-12).** Endpoint removed; UI caller in `pages/reviewer-finder.js` updated. Original disposition (locked S136): retire entirely rather than rewrite. |
 | `pages/api/reviewer-finder/grant-cycles.js` | Direct `sql\`\`` against `grant_cycles` (5+ sites) **plus** `proposal_searches` and `reviewer_suggestions` reads | **SHIPPED W3 cutover (2026-05-12).** All sites rewritten against `wmkf_appgrantcycle` (alt-key by short_code). Scope shipped: (a) per-cycle proposal counts via `akoya_request` filtered on `akoya_fiscalyear`; (b) per-cycle candidate counts via `wmkf_appreviewersuggestion` filtered on `wmkf_grantcyclecode`; (c) unassigned candidate count via null-`wmkf_grantcyclecode` filter; (d) duplicate-check by alt-key collision; (e) soft-delete via PATCH `wmkf_isactive=false`. |
 | **`pages/api/review-manager/render-emails.js`** | `loadCycleConfigs()` reads `grant_cycles.{short_code, name, program_name, review_deadline, custom_fields}` | **SHIPPED W3 (2026-05-12).** `loadCycleConfigs()` reads `wmkf_appgrantcycle` via `lib/services/grant-cycles-dataverse`. Was missed in earlier scoping which described Review Manager as fully Dataverse-only. |
 | **`pages/api/review-manager/send-emails.js`** (scope addition) | `loadCycleConfigs()` reads `grant_cycles.{short_code, review_template_blob_url, additional_attachments}` | Same rewrite. |
-| `pages/api/reviewer-finder/my-proposals.js` | Mixed Postgres + Dataverse | Pick Dataverse; remove Postgres path. |
+| `pages/api/reviewer-finder/my-proposals.js` | Mixed Postgres + Dataverse | Proposed Dataverse-only routing; the cutover later shipped. |
 
 **Endpoints already built (S139):**
 
 - `pages/api/reviewer-finder/contact-history.js` — **single-contact lookup**. GET query: `?contactId=<guid>`. Returns: `{ reviewerHistory: [...], piHistory: [...] }`. UNION-with-projectleader read strategy. Used by the picker UI to populate badges (consumer wiring is still to build). Earlier drafts of this plan described a batched POST shape — that was never built; batch shape is a post-pilot enhancement (see §"Match-on-discovery + history badges" for the eventual 25-candidate batching need). Codex S147 pre-W4 review Q5 caught the drift 2026-05-12.
 
-**Net-new endpoints still to build:**
+**Historical endpoint proposal:**
 
-- `pages/api/reviewer-finder/add-candidate-manual.js` — net-new "add candidate by hand" feature, replaces retired Database tab. Writes to `wmkf_potentialreviewer` (identity + bibliometrics on the person, post-S213) and `wmkf_appreviewersuggestion` via existing adapters.
+- `pages/api/reviewer-finder/add-candidate-manual.js` was the proposed
+  "add candidate by hand" replacement for the retired Database tab. This
+  historical path is not a current build instruction.
 
-**Service-layer rewrites:**
+**Historical service-layer plan:**
 
-- `lib/services/database-service.js` — researcher/publication/keyword paths gutted; suggestion paths point at `wmkf_appreviewersuggestion`.
-- `lib/services/discovery-service.js` — calls `DatabaseService.findResearcher` (1 of 3 callers, verified via Atlas). Replace with match-on-discovery against `contact`.
-- `lib/services/deduplication-service.js` — calls `DatabaseService.findResearcher` (2 of 3 callers). Reads candidates from Dataverse instead of Postgres; logic unchanged.
+- `lib/services/database-service.js` — reviewer-domain Postgres methods were
+  removed during cutover.
+- `lib/services/discovery-service.js` — the historical plan proposed replacing
+  its `DatabaseService.findResearcher` dependency with contact-based history.
+- `lib/services/deduplication-service.js` — the historical plan proposed
+  removing its Postgres researcher lookup while preserving deduplication logic.
 - `lib/services/contact-enrichment-service.js` — **MIGRATED W5 (writeback shipped 2026-05-??).** Writes identity through `potentialReviewerAdapter.upsertByEmail` and bibliometrics through `researcherAdapter.upsertByPotentialReviewer`; post-S213 the researcher adapter targets the person entity set `wmkf_potentialreviewerses`, not a sidecar. The original Postgres-writer scope ("rewrite the writer to upsert against Dataverse") is complete.
-- New: `lib/services/contact-history-service.js` — encapsulates the match-on-discovery + history aggregation.
+- `lib/services/contact-history-service.js` was the proposed aggregation
+  helper; this historical bullet does not declare its current build status.
 
 **No change:** `pubmed-service.js`, `arxiv-service.js`, `biorxiv-service.js`, `chemrxiv-service.js`, `orcid-service.js`, `serp-contact-service.js`, `claude-reviewer-service.js`. External-DB clients don't care where we persist.
 
-## UI changes (`pages/reviewer-finder.js`)
+## Historical proposed UI changes
 
-31 fetch sites. HTTP contracts mostly unchanged so most call sites don't move. New work:
+The migration-era design counted 31 fetch sites and proposed the following
+follow-on work. These bullets are historical proposals, not a current task
+queue:
 
-- **Candidate card** — render history badges. New props: `contactId`, `reviewerHistory`, `piHistory`. Bulk-fetch via `/api/reviewer-finder/contact-history` after discovery returns.
-- **History modal component** — clickable badge → modal listing each event with request number link, cycle code, response type / decision, date. Color-code recency.
-- **ID format sweep** — Postgres researcher IDs were `INTEGER`; Dataverse equivalents are GUIDs. Audit anywhere a researcher ID is used as a React key, compared with `===`, or coerced via `parseInt`.
+- **Historical proposal — candidate card:** render history badges using
+  `contactId`, `reviewerHistory`, and `piHistory`, with a bulk history fetch.
+- **Historical proposal — history modal:** open a detailed event list from a
+  history badge.
+- **Historical proposal — ID-format sweep:** audit UI assumptions that
+  Postgres researcher IDs were integers when Dataverse equivalents are GUIDs.
+
+Current implementation status for these three UI ideas was not re-established
+in this documentation reconciliation; scope them against current source before
+reviving any item.
 
 ## Dependency order
 
-> **HISTORICAL — items 1–11 below all shipped 2026-05-12 (W3 + W4 + W5 + W6 step 1).** The numbered queue describes the original ordering. Tail items still pending: the post-pilot one-shot Postgres table drop + restore script (W6 step 2, deferred per §"Post-pilot one-shot cleanup" at line 191 and the post-pilot row of the schedule below; one-shot script, NOT a cron — earlier framings that called this a cron were wrong) and match-on-discovery / add-candidate-manual / contact-form-subgrid (slip-eligible enhancements, deferred to post-pilot). See "Spec'd vs. built" table at top for current per-deliverable state.
+> **HISTORICAL EXECUTION ORDER.** The numbered queue is not a current task
+> list. The five-table Postgres drop completed through migration 018; its
+> spec'd restore script was never built and is superseded. Enhancement ideas
+> require separate current scoping.
 
 Hard constraints (each blocks the step after it):
 
@@ -630,12 +673,14 @@ Hard constraints (each blocks the step after it):
 8. **`my-proposals.js` lifecycle counts** (`pages/api/reviewer-finder/my-proposals.js:153`). Cutover after step 6 verifies.
 9. **`maintenance-service.js` blob orphan scanner.** **SHIPPED W5 (2026-05-12).** `cleanupBlobs()` reads Dataverse `wmkf_appgrantcycle.wmkf_reviewtemplateurl` and `wmkf_appreviewersuggestion` blob URLs (per row 54 of "Spec'd vs. built"). Original Postgres reads (`proposal_searches`, `grant_cycles`, `reviewer_suggestions`) are gone; `proposal_searches.full_proposal_blob_url` intentionally omitted (table empty).
 10. **`lib/services/database-service.js` researcher/publication/keyword methods.** Either gut (if no remaining callers) or rewrite to delegate to Dataverse adapters. Codex 5 — heavy consumer. Reachable from `discovery-service.js`, `deduplication-service.js`, `contact-enrichment-service.js`.
-11. **Cleanup predicate + backup contract.** Historical queue item later changed from cron to one-shot DELETE; keep the engaged predicate and backup-on-delete requirement, but execute through the post-pilot table-drop path.
+11. **Historical cleanup proposal.** This did not become the Postgres drop
+    mechanism; migration 018 superseded it.
 12. **Match-on-discovery service + discovery-service.js wiring.** Read-only; ships anytime after step 7.
 13. **`WAVE2_BACKEND_*` decision for W4+ drain targets.** W3 is locked as Option B (see §"W3 cutover method"). For each W4+ table, decide A vs B at the start of its window, not as a blanket call.
 14. **Cutover (W4+ drain targets).** Service layer flips per-table. Method depends on step 13 decision.
-15. **Cleanup real-mode.** Historical queue item later changed from cron to one-shot DELETE. Earliest 14 days post-cutover. **`scripts/restore-reviewer-suggestion-cleanup-backup.js` must exist before this step.**
-16. **Decommission.** Drop Postgres tables after 14+ days clean.
+15. **Historical cleanup real-mode proposal.** Not current work.
+16. **Decommission — completed.** Migration 018 dropped the five historical
+    reviewer-domain tables on 2026-06-04.
 
 **Post-pilot enhancements (descoped from critical path):**
 - History badges UI in Reviewer Finder (additive UX; ships after the data layer is clean).
@@ -687,21 +732,28 @@ The previous framing of this section conflated two separate read paths. Correcte
 - **PI history** comes from `_wmkf_projectleader_value` on `akoya_request` (lead PI) **UNION** the `wmkf_apprequestperson` junction (PI + co-PIs). Both stay live as steady-state per §"Junction read strategy"; nothing retires post-pilot.
 - **Reviewer history** comes from `wmkf_appreviewersuggestion` rows linked to a contact. The projectleader fallback **does not rescue** missing reviewer-suggestion rows — these are distinct data paths.
 
-**The actual data-loss risk:** if any Postgres `reviewer_suggestions` row fails to backfill to Dataverse before the Postgres table is dropped, that row's reviewer-history content (decline reason, response timestamp, ack state, etc.) is **permanently lost**. The projectleader path won't recover it because that path serves PI history, not reviewer history.
+**Historical risk that was gated before migration 018:** a Postgres
+`reviewer_suggestions` row omitted from the Dataverse backfill would have lost
+reviewer-history content at drop time. The following mitigations describe the
+completed migration gate, not current actions.
 
 **Mitigations the plan requires:**
 1. **Triage the 8-row Postgres-only delta** (parity script output) before running `scripts/backfill-reviewer-suggestions-to-dataverse.js` in commit mode. For each anomaly, decide: genuine missed sync (must backfill) vs. legitimate Postgres-only artifact (e.g., proposal not yet in Dataverse; safe to discard).
 2. **Run `scripts/reconcile-reviewer-migration.js`** after backfill commits and again immediately before any Postgres table drop. Cutover blocks until parity is 0-row drift on active-cycle data.
 3. **Postgres tables stay read-only, not dropped, for 14+ days post-cutover.** If divergence surfaces in that window, the original rows are still available for inspection.
 
-### Per step, mostly reversible until cutover
+### Historical reversibility model
 
 1. Schema creation: delete table from solution; no prod impact.
 2. Match-on-discovery + history: read-only; turn off via feature flag (`REVIEWER_FINDER_HISTORY_BADGES=false`) — no data implications.
-3. Cleanup one-shot: dry-run mode logs what it would delete without acting. At real-mode time, pre-delete export to blob with 30-day retention provides manual restore path. **Restore script** (`scripts/restore-reviewer-suggestion-cleanup-backup.js`): reads the JSON blob, re-CREATEs the `wmkf_appreviewersuggestion` rows via `reviewerSuggestionAdapter.upsert`. Re-runnable via the adapter's find-then-update/create (sequential single-instance reruns safe; NOT concurrent-safe; NOT a true Dataverse alternate-key PATCH). (Slots and sidecars are never deleted by the one-shot cleanup — only suggestion rows — so the restore path is suggestion-only too.) Half-day to write; **must exist before first real-mode run.**
+3. Historical Dataverse-cleanup proposal: dry-run, pre-delete export, and
+   `scripts/restore-reviewer-suggestion-cleanup-backup.js` were the designed
+   safeguards. This cleanup is unapproved current work; any future execution
+   requires fresh scoping rather than following this checklist.
 4. Endpoint rewrites: see Option A vs B above; rollback path differs depending on which.
-5. Cutover: Postgres tables set read-only but not dropped. If cutover regresses, re-enable Postgres path, investigate.
-6. Decommission: only after 14 days clean. Final blob backup.
+5. Cutover: the planning model kept Postgres read-only temporarily.
+6. Decommission: completed through migration 018 after the executed safety
+   checks and backup.
 
 ### Partial-write recovery (only applies under Option A — flag flips)
 
@@ -718,7 +770,12 @@ If a flag flip happens, Dataverse takes a few writes, then we discover a problem
 
 **Acceptance**: don't re-flip until repair script's parity report shows zero drift. If repair fails (Postgres write rejects, etc.), the Dataverse rows stay; flag stays Postgres; manual triage required before retry.
 
-### Pre-drop grep gates (per CLAUDE.md carryover hygiene)
+### Historical pre-drop grep gates
+
+These checks document the evidence required before the completed migration 018
+drop. They are not a pending checklist. The first five table-drop rows below
+were satisfied before migration 018 ran. `grant_cycles` is a separate
+drain-only domain with no approved drop action in this plan.
 
 Before any destructive step, an explicit `rg` check must show zero live callers:
 
@@ -726,14 +783,17 @@ Before any destructive step, an explicit `rg` check must show zero live callers:
 |---|---|---|
 | Drop `pages/api/reviewer-finder/researchers.js` | `rg "/api/reviewer-finder/researchers"` across `pages/`, `lib/`, `scripts/`, `tests/` | Zero matches |
 | Drop Database tab from `pages/reviewer-finder.js` | `rg "fetch.*reviewer-finder/researchers"` in same scope | Zero matches |
-| Drop Postgres `researchers` table | `rg "FROM researchers\b\|INTO researchers\b\|UPDATE researchers\b"` in `lib/`, `pages/`, `scripts/` | Zero matches |
-| Drop Postgres `researcher_keywords` table | `rg "researcher_keywords"` in same scope | Zero matches |
-| Drop Postgres `publications` table | `rg "FROM publications\b\|INTO publications\b\|UPDATE publications\b"` in same scope | Zero matches (verified 2026-05-06: writer is dead) |
-| Drop Postgres `proposal_searches` table | `rg "proposal_searches"` in same scope | Zero matches outside ad-hoc scripts |
-| Drop Postgres `reviewer_suggestions` table | `rg "FROM reviewer_suggestions\b\|INTO reviewer_suggestions\b\|UPDATE reviewer_suggestions\b"` in same scope | Zero matches |
-| Drop Postgres `grant_cycles` table | `rg "FROM grant_cycles\b\|INTO grant_cycles\b\|UPDATE grant_cycles\b"` in same scope | Zero matches |
+| Historical completed drop: Postgres `researchers` | `rg "FROM researchers\b\|INTO researchers\b\|UPDATE researchers\b"` in `lib/`, `pages/`, `scripts/` | Zero matches |
+| Historical completed drop: Postgres `researcher_keywords` | `rg "researcher_keywords"` in same scope | Zero matches |
+| Historical completed drop: Postgres `publications` | `rg "FROM publications\b\|INTO publications\b\|UPDATE publications\b"` in same scope | Zero matches |
+| Historical completed drop: Postgres `proposal_searches` | `rg "proposal_searches"` in same scope | Zero runtime matches |
+| Historical completed drop: Postgres `reviewer_suggestions` | `rg "FROM reviewer_suggestions\b\|INTO reviewer_suggestions\b\|UPDATE reviewer_suggestions\b"` in same scope | Zero matches |
+| Historical proposal to drop Postgres `grant_cycles` | `rg "FROM grant_cycles\b\|INTO grant_cycles\b\|UPDATE grant_cycles\b"` in same scope | Not executed here; `grant_cycles` remains a separate drain-only snapshot |
 
-Each gate runs **immediately before** the destructive command, not at planning time. Output captured in the migration log. If any gate finds a live caller (added since cutover, missed in the rewrite), **stop and re-investigate** — do not proceed with `--force` or equivalent.
+For the completed five-table drop, each gate ran immediately before the
+destructive migration and its evidence was captured in the migration record.
+Any future `grant_cycles` disposition requires a fresh destructive-carryover
+review; this historical checklist grants no authority to drop it.
 
 ### Rollback triggers (when to flip back)
 
@@ -784,7 +844,9 @@ Pre-cutover and post-cutover, run a reconciliation script (`scripts/reconcile-re
 
 ## Dataverse readiness checklist
 
-> **HISTORICAL — all items below shipped or were verified at W3-W6 cutover 2026-05-12.** Pilot-launch readiness items (post-pilot one-shot cleanup real-mode, etc.) live in the W6/post-pilot rows of the schedule table below; everything else here is closed.
+> **HISTORICAL — all migration readiness items below are closed or superseded.**
+> The Postgres five-table drop completed via migration 018. No drain-table
+> restore script or one-shot drop remains pending.
 
 Every item below must have a check + date + owner before the relevant cutover step depends on it. Dates aligned to the refreshed W3–W7 schedule below.
 
@@ -831,7 +893,10 @@ Every item below must have a check + date + owner before the relevant cutover st
 
 ### Updated forward schedule
 
-> **HISTORICAL — W3–W6 (step 1) all SHIPPED 2026-05-12 ahead of original cadence.** W3 grant-cycles + W4 reviewer-suggestion alignment + W5 reader cutover + W6 step 1 (researchers.js retirement) landed together. The "NOT slip-eligible" gate list below was the planning gate list; most of those gates passed at cutover. One gate item is still pending: `scripts/restore-postgres-drain-table-backup.js` must be written before the post-pilot one-shot table drop runs (the drop itself is tracked in the Post-pilot row of the schedule table, not as a slip-eligible-gate). Pilot launch (W7) also remains forward work — mid-June 2026 Phase II Research cycle.
+> **HISTORICAL SCHEDULE.** W3–W6 shipped, and the five-table drop later
+> completed through migration 018. The spec'd
+> `scripts/restore-postgres-drain-table-backup.js` was never built because the
+> executed migration path superseded it. No drop gate remains pending.
 
 Slip-eligible items (history badges UI, add-candidate-manual, match-on-discovery wiring, contact form subgrid) are explicitly moved to a "Post-pilot enhancements" block below the table so they don't crowd critical-path weeks. The Postgres drain-only table drop was originally scheduled post-pilot but shipped early (DONE 2026-06-04, S219, migration 018). Each week below carries one major theme plus its safety prerequisites.
 
@@ -842,7 +907,7 @@ Slip-eligible items (history badges UI, add-candidate-manual, match-on-discovery
 | W5 (originally 2026-05-26 → 2026-06-02; **SHIPPED 2026-05-12**) | **Reviewer-suggestion reader cutover + service-layer cleanup.** Theme: every Postgres `reviewer_suggestions` read goes to Dataverse. | **SHIPPED 2026-05-12 (full wave landed early).** `pages/api/reviewer-finder/generate-emails.js` rewritten to use `lib/dataverse/adapters/reviewer-suggestion`; `my-proposals.js` rewritten to use the suggestion adapter via Dynamics; `extract-summary.js` retired entirely (caller in `pages/reviewer-finder.js` updated); `lib/services/maintenance-service.js` blob orphan scanner rewritten to read Dataverse; `lib/services/database-service.js` researcher + publication + suggestion methods gutted. `pages/api/reviewer-finder/researchers.js` Postgres reads were intentionally left as out-of-W5-scope and addressed under W6 step 1 below. |
 | W6 (2026-06-02 → 2026-06-09) | **`researchers.js` retirement.** Theme: heaviest Postgres consumer goes away. | **Step 1 (SHIPPED 2026-05-12, commit `27931b9`):** retired `pages/api/reviewer-finder/researchers.js` — API removal + Database-tab UI removal + test/doc cleanup; grep gates pass (zero matches in `pages/`, `lib/`, `scripts/`, `shared/`, `tests/`). Drain-only tables now: `researchers`, `researcher_keywords`, `publications`, `proposal_searches`. **Step 2 (drain-only cleanup) — DONE EARLY 2026-06-04 (S219), NOT deferred to post-pilot.** Originally deferred 2026-05-12; then executed ahead of the trigger at Justin's direction via tracked migration `018_drop_reviewer_finder_postgres_tables.sql` (backup `scripts/w6-drop-backup.js` → Blob `cleanup-backup/2026-06-04/`, restore `scripts/w6-drop-restore.js`). Scope expanded to 5 tables (added `reviewer_suggestions` after a live FK probe); `search_cache` kept. See the Post-pilot row below and memory `[[project-w6-table-drop-closed]]` (CLOSED). |
 | W7 (2026-06-09 → 2026-06-16) | **Pilot launch.** Theme: ship. | Pilot launch (mid-June Phase II Research cycle). Dataverse readiness checklist 100% complete before launch. (No cleanup delete in the pilot — see W6 note above.) |
-| Post-pilot (2026-06-16 onward) | **Enhancements + decommission.** Theme: visible polish + safe drops. | History badges UI in Reviewer Finder. `add-candidate-manual.js` endpoint + UI. Match-on-discovery service (`lib/services/contact-history-service.js`) + `discovery-service.js` wiring. Contact form "Reviewer history" subgrid (Connor). **W6-step-2 drain-only table drop — DONE EARLY 2026-06-04 (S219), ahead of the ≥2026-07-01 trigger.** The 4 drain-only tables (`researchers`, `researcher_keywords`, `publications`, `proposal_searches`) **plus `reviewer_suggestions`** (scope expanded once a live FK probe showed `reviewer_suggestions.researcher_id → researchers`) were DROPPED via tracked migration `lib/db/migrations/018_drop_reviewer_finder_postgres_tables.sql` — NOT the spec'd one-shot `scripts/drain-only-table-drop.js`. `search_cache` was kept (live callers). Pre-drop backups → local JSONL + Vercel Blob `cleanup-backup/2026-06-04/` via `scripts/w6-drop-backup.js`; restore = `scripts/w6-drop-restore.js` or Neon PITR (7-day). Atlas pages reconciled (`docs/atlas/postgres-researchers.md`, `postgres-reviewer-suggestions.md`). Memory `[[project-w6-table-drop-closed]]` is CLOSED. The spec'd `scripts/restore-postgres-drain-table-backup.js` was never built — superseded by the migration-018 path. **No pending action; do not re-fire this as a P0 item.** |
+| Post-pilot (2026-06-16 onward) | **Historical enhancement/decommission window.** | The W6-step-2 five-table drop completed early on 2026-06-04 through migration 018. `search_cache` was kept because of live callers; `grant_cycles` remained a separate drain-only domain. The pre-drop JSONL/Blob archive and recovery tools are historical evidence. The spec'd `scripts/restore-postgres-drain-table-backup.js` was never built because the migration-018 path superseded it. **No pending drop action.** |
 
 **Slip-eligible** (already moved to "Post-pilot enhancements" row above — these will not gate the mid-June pilot):
 - History badges + match-on-discovery wiring (additive UX)
@@ -860,7 +925,8 @@ Slip-eligible items (history badges UI, add-candidate-manual, match-on-discovery
 - `maintenance-service.js` blob-scanner rewrite
 - `database-service.js` researcher/publication/suggestion methods gutted-or-rewritten
 - `WAVE2_BACKEND_*` Option A vs B decision (made by end of W3)
-- Restore script written + tested before any one-shot cleanup real-mode run
+- ~~Drain-table restore script prerequisite~~ **SUPERSEDED** by the executed
+  migration-018 backup/recovery path; no pending build.
 - Dataverse readiness checklist 100% complete before pilot launch
 
 ## Related

@@ -5,7 +5,7 @@ type: project
 originSessionId: 9ea67012-f70f-47e6-ba56-ded9f73601c4
 status: active
 scope: reviewer
-last_verified: 2026-05-03 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 via lib/external source, upload service, proxy allowlist, and current token-lifecycle callers; external deployment remains date-bounded
 ---
 
 ## Recall Rule
@@ -24,9 +24,14 @@ Ground truth: `lib/external/*`, `proxy.js` (`/external/*` allowlist), `/api/revi
 
 Two related problems that share the same underlying architectural question: how do we hand foundation-controlled documents to external reviewers (who don't have AzureAD accounts) and accept their uploads back?
 
-**Problem A — Proposal URLs in emails throw "expired link" errors.** The links we send to reviewers point at SharePoint share URLs (or similar). Reviewers without authenticated access to the akoyaGO site can't open them — and even when authenticated paths exist, the links seem to expire. Justin's read: the deeper issue is that reviewer access must be non-authenticated for that fragment of the SharePoint drive, which the akoyaGO site policy may not currently support.
+**Historical Problem A (pre-2026-05-03) — proposal URLs in emails threw
+"expired link" errors.** Direct SharePoint links did not provide a reliable
+external-reviewer boundary; this motivated the backend-mediated token flow.
 
-**Problem B — Review uploads originally landed in Vercel Blob, not SharePoint.** Pre-2026-05-03, `/api/review-manager/upload-review` wrote to `reviews/{requestId}/{suggestionId}_{filename}` in Vercel Blob. The SharePoint write path was wired in alongside the external-reviewer landing rollout: uploads now land under `akoya_request/{requestFolder}/Reviewer_Uploads/{reviewerSubfolder}` and the Vercel Blob path was retired 2026-05-03 via commit `2277d23` (see Status block below).
+**Historical Problem B — review uploads originally landed in Vercel Blob, not
+SharePoint.** Pre-2026-05-03, `/api/review-manager/upload-review` wrote there;
+the dated rollout evidence records the later SharePoint path and Blob-path
+retirement.
 
 **Why these are one problem:** both A and B are about the same boundary — foundation files exposed to external parties.
 
@@ -34,7 +39,17 @@ Two related problems that share the same underlying architectural question: how 
 
 Connor (2026-05-01) is open to eventually replacing GOapply (the Bromelkamp applicant portal) and bringing applicant intake in-house too. Strategy: build reviewer-side first (smaller N, async, email fallback exists), then extend the same primitive to applicants if it proves out.
 
-**Status (2026-05-03): SHIPPED.** Token utility, proxy (Next 16 `proxy.js` convention; was `middleware.js`) allowlist for `/external/*`, tokenized proposal download endpoint, tokenized upload endpoint with SharePoint write + Dataverse writeback, and per-recipient token minting in Review Manager email render are all live. Vercel Blob review download path was retired 2026-05-03 (commit `2277d23`). Token expiry is event-driven. **Per-recipient mint since reviewer-engagement Phase 2 (S275):** `render-emails` keys expiry on accepted status via `computeReviewerTokenExpiry` (`lib/external/reviewer-token-ttl.js`) — accepted → review-due + 90d, invitee/non-responder → review-due + 2d cap, no sane future `wmkf_reviewduedate` → now + 90d fallback; `regenerate-token`/`ensureToken` keep the flat 90-day default. 7-day post-submission modify window via `extendForPostSubmissionWindow`. Upload is gated on `wmkf_reviewstatus >= materials_sent` for the self-token path (an accepted-pre-materials reviewer gets 403 `materials_not_sent`).
+**Source status verified 2026-07-27; deployment evidence dated.** Current source
+contains the token utility, `/external/*` proxy allowlist, tokenized proposal
+download/upload, SharePoint writeback, and per-recipient minting. Production
+promotion and Vercel Blob retirement were observed on 2026-05-03
+(`2277d23`); re-probe deployment state if operationally material. Current source
+keys expiry on accepted status via `computeReviewerTokenExpiry`
+(`lib/external/reviewer-token-ttl.js`): accepted → review-due + 90d,
+invitee/non-responder → review-due + 2d cap, no sane future due date → 90d
+fallback. `regenerate-token`/`ensureToken` retain the flat 90-day default;
+`extendForPostSubmissionWindow` supplies the seven-day modify window; upload
+requires `wmkf_reviewstatus >= materials_sent`.
 
 **How to apply:**
 - Don't rebuild any of the above. Reuse the `lib/external/*` primitives (`token-lifecycle`, `verify-suggestion-token`, `reviewer-materials`, `review-form-schema`) for new external-facing flows.

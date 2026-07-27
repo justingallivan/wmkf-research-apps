@@ -4,7 +4,7 @@ description: Grantee publication waiver is VERSIONED (SHIPPED S350) — staff ed
 metadata:
   type: project
 status: active
-last_verified: 2026-07-22 via grantee context/submit services, policy admin service, schema wave, and Atlas
+last_verified: 2026-07-27 via source, Atlas, and production waiver-slot probe
 ---
 
 ## Recall Rule
@@ -27,6 +27,11 @@ slot is in `VISIBLE_SLOT_CODES` (`lib/services/admin/policies-service.js`).
 in-place body edit). Added by schema wave `wave12-grantee-waiver-consent`,
 **applied to prod 2026-07-09**; `grantee-waiver` slot seeded + active.
 
+**Live policy verification (2026-07-27):** active version `2026-07-09`,
+effective `2026-07-09T19:29:04Z`, 295-character body, SHA-256
+`941c44a3529aa81130df51fa186263edd5230e1e364bde2e7676cf77639b9659`;
+the exact body matches `scripts/seed-grantee-waiver-policy.mjs`.
+
 **Records "what the grantee saw", not active-at-submit:** context mints a signed
 render token (`mintWaiverRenderToken`, `lib/services/external-token.js`) binding
 version+bodyHash; submit verifies it (`verifyWaiverRenderToken`), confirms it was
@@ -39,5 +44,8 @@ minted for this request, GUID-validates, then the atomic changeset in
 the Dataverse schema+seed MUST be provisioned before the code deploys — run
 `scripts/probe-grantee-waiver-slot.mjs` as the gate. Reverses the old
 GRANTEE_PORTAL_SPEC "no consent fields persisted" decision. Plan + 3 adversarial
-Codex passes: `docs/GRANTEE_WAIVER_VERSIONING_PLAN.md`. See
+Codex passes are preserved in the historical
+`docs/GRANTEE_WAIVER_VERSIONING_PLAN.md`. Current contract:
+`docs/GRANTEE_PORTAL_SPEC.md` and
+`docs/atlas/dataverse-wmkf-granteedeliverable.md`. See
 [[feedback-verify-before-destructive-carryover]] (additive twin: provision before deploy).

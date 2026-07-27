@@ -6,7 +6,7 @@ status: canonical
 summary: Mechanics, enforcement locations, exemption rules, and operating contracts for repository checks and their self-tests.
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-07-26
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/atlas/
@@ -208,7 +208,16 @@ The exact COMPLEMENT of `check:doc-symbol-refs`: a live `.claude-memory/**` + `d
 
 ### `check:drain-table-mentions` — stale "data lives in PG" claims (S167)
 
-Reviewer-domain Postgres tables (`researchers`, `publications`, `researcher_keywords`, `reviewer_suggestions`, `grant_cycles`, `proposal_searches`) are drain-only post-W3-W6 cutover (2026-05-12); live source of truth is Dataverse (`wmkf_potentialreviewer` — which since the S213 collapse carries the bibliometric fields directly; the `wmkf_appresearcher` sidecar was dropped — `wmkf_appreviewersuggestion`, `wmkf_appgrantcycle`).
+The registry covers six legacy reviewer-domain Postgres names. Five historical
+tables were **dropped** by migration 018 on 2026-06-04:
+historical/dropped `researchers`, historical/dropped `publications`,
+historical/dropped `researcher_keywords`, historical/dropped
+`reviewer_suggestions`, and historical/dropped `proposal_searches`.
+Only `grant_cycles` remains as a drain-only Postgres snapshot after the W3
+cutover. Current reviewer person, bibliometric, engagement, and grant-cycle
+authority is Dataverse (`wmkf_potentialreviewer`, which carries the
+bibliometric fields after the S213 sidecar collapse;
+`wmkf_appreviewersuggestion`; and `wmkf_appgrantcycle`).
 
 **Detection (7-shape, per Codex review):**
 1. Backticked identifier (` `X` `)
@@ -266,11 +275,11 @@ AST gate (`@babel/parser`). Every `pages/api/**` route that reaches a `getModelF
 
 ### `check:model-registry` — Anthropic model capability/pricing parity (S287)
 
-Offline/static gate for future Anthropic model changes. Scans `shared/config/baseConfig.js` (`APP_MODELS` + Claude defaults), `lib/services/model-resolver.js` (`TIER_FALLBACK_IDS`), `lib/services/model-capabilities.js` (`MODEL_CAPABILITIES`), and `lib/utils/model-pricing.js` (`MODEL_PRICING`) without importing app modules or touching Anthropic. Tier keys (`opus`/`sonnet`/`haiku`) are allowed in config; concrete Claude ids reachable from static config or tier fallback ids must match both a reviewed capability entry and a pricing entry. Capability entries must carry required request/response metadata (`supportsTemperature`, `supportsEffort`, `thinkingMode`, max tokens, refusal semantics, retention class, `reviewedAt`, `source`).
+Offline/static gate for future Anthropic model changes. Scans `shared/config/baseConfig.js` (`APP_MODELS` + Claude defaults), `lib/services/model-resolver.js` (`TIER_FALLBACK_IDS`), `lib/services/model-capabilities.js` (`MODEL_CAPABILITIES`), and `lib/utils/model-pricing.js` (`MODEL_PRICING`) without importing app modules or touching Anthropic. Tier keys (`opus`/`sonnet`/`haiku`) are allowed in config; concrete Claude ids reachable from static config or tier fallback ids must match both a reviewed capability entry and a pricing entry. Capability entries must carry required request/response metadata (`supportsTemperature`, `supportsEffort`, `supportsStructuredOutput`, `thinkingMode`, max tokens, refusal semantics, retention class, `reviewedAt`, `source`).
 
 - Blocks static model drift before runtime: a new concrete id in base config or tier fallback cannot ship until both request-shaping capabilities and pricing are reviewed.
 - Deliberate boundary: v1 is still an offline/static gate and does not inspect live Dataverse rows or env values. Runtime/write-time guards now cover prompt execution, admin prompt publish, and admin model override writes; env overrides remain a pre-deploy checklist item in `docs/CREDENTIALS_RUNBOOK.md` / `docs/MODEL_CHANGE_STRATEGY.md`.
-- Self-test: `scripts/check-model-registry-self-test.js` (clean fixture + missing capability + missing pricing + tier-fallback drift + malformed capability metadata).
+- Self-test: `scripts/check-model-registry-self-test.js` (six cases: clean fixture, missing capability, missing pricing, tier-fallback drift, missing review date, and missing structured-output review).
 
 ### `check:agent-wiki` — agent retrieval-layer structure
 

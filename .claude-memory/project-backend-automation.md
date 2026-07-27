@@ -4,7 +4,7 @@ description: Leadership-driven initiative to move from manual user-initiated pro
 type: project
 status: active
 scope: strategy
-last_verified: unknown via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 via owner strategy record, current Executor source, and production Power Automate metadata probe
 ---
 
 ## Recall Rule
@@ -22,6 +22,15 @@ Do not:
 
 Ground truth: `docs/EXECUTOR_CONTRACT.md`, [[project-dynamics-ai-writeback]]; PROMPT_STORAGE_DESIGN (Pattern A dual-caller).
 
+[VERIFIED 2026-07-27 via `lib/services/execute-prompt.js` and
+`lib/services/dynamics-service.js`]: the shared execution and AI-run write seams
+exist. [VERIFIED 2026-07-27 via
+`scripts/probe-power-automate-prompt-executor.js`]: no production cloud-flow
+definition visible to the Dataverse application user implements the prompt
+Executor or chaining DAG. PowerAutomate triggering remains product direction,
+not deployed current behavior; the dated field-deployment claims below require
+their named read-only schema probes before operational use.
+
 Leadership wants key processing tasks automated on the backend — no manual uploads. Two tiers:
 
 **Tier 1 (Fully Automatic):** PowerAutomate triggers on Dynamics status changes (e.g., proposal submitted) → calls our API → results written back to Dynamics fields. Example: Phase II proposal arrives → auto-generate summary.
@@ -30,7 +39,12 @@ Leadership wants key processing tasks automated on the backend — no manual upl
 
 **Write-back strategy:** PowerAutomate handles CRM writes initially (it already has full Dynamics access). Direct API writes from our app later when IT grants write permissions on app registration.
 
-**New custom fields needed on `akoya_request`:** v3 spec names (`wmkf_ai_summary`, `wmkf_ai_dataextract` — formerly `wmkf_ai_structured_data` in v2; renamed per Connor 2026-04-14). Run timestamps + model + version moved to the `wmkf_ai_run` child table (`createdon`, `wmkf_ai_model`, `wmkf_ai_promptversion`). All deployed. See `project-dynamics-ai-writeback.md` for canonical v3 field list.
+**2026 design/deployment record:** the v3 spec names are `wmkf_ai_summary` and
+`wmkf_ai_dataextract` (formerly `wmkf_ai_structured_data` in v2). Run timestamps,
+model, and version moved to the `wmkf_ai_run` child table (`createdon`,
+`wmkf_ai_model`, `wmkf_ai_promptversion`). These were reported deployed through
+the 2026-05-07/S209 probes; current metadata requires the read-only probes named
+in [[project-dynamics-ai-writeback]].
 
 **Configurable prompts:** Prompts should be editable by admins via the dashboard (DB-backed with versioning), not requiring code deploys. Both automatic and manual flows use the same prompt system.
 

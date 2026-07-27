@@ -8,10 +8,20 @@ metadata:
   last_verified: 2026-06-13 (S256) — the session this lesson came from
 ---
 
+## Recall Rule
+
+When preparing proactive startup or next-step summaries, omit parked or
+externally gated items unless their recorded un-park condition has demonstrably
+fired or the user asks about them.
+
 When a carryover item is flagged **parked / externally gated / do NOT proactively
 resurface**, do not echo it into any output I generate unprompted — including the
 `/start` summary's "Potential Next Steps" list. Surface it only when the user asks
 about it, or when its recorded un-park trigger demonstrably fires.
+
+[VERIFIED historically via S256 owner feedback.] Any named parked item below is
+an example from that incident, not a current-status claim; consult its current
+memory or plan before acting.
 
 **Why:** the whole point of the flag is that the item stays invisible until the
 user (not the agent) recalls it. On 2026-06-13 (S256) I listed "PubPeer migration —
@@ -22,9 +32,9 @@ explanation, is what's prohibited.
 
 **How to apply:** when summarizing next steps from SESSION_PROMPT.md, filter out any
 entry tagged parked / do-not-resurface. If acknowledging that parked work exists is
-useful, state only that there are N parked-and-gated items, not their content. The
-matching un-park trigger lives with the item (e.g. PubPeer = a sanctioned-API reply);
-act only when that trigger is real. Don't carry such items *under* a "Potential Next
+useful, state only that there are N parked-and-gated items, not their content. In
+the S256 PubPeer example, the recorded trigger was a sanctioned-API reply; current
+triggers must be read from the item's current durable record. Don't carry such items *under* a "Potential Next
 Steps" heading in SESSION_PROMPT.md either — that structure guarantees the next
 `/start` re-surfaces them. See [[project-serpapi-capability-erosion]] and the
 integrity-screener wiki topic for the PubPeer case.

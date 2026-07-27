@@ -58,11 +58,18 @@ async function handleGet(req, res, profileId, isSuperuser) {
       return res.status(403).json({ error: 'Superuser access required' });
     }
 
-    const grants = await listAllGrantsForAdmin();
-    return res.json({
-      grants,
-      allApps: ALL_APP_KEYS,
-    });
+    try {
+      const grants = await listAllGrantsForAdmin({ throwOnError: true });
+      return res.json({
+        grants,
+        allApps: ALL_APP_KEYS,
+      });
+    } catch (error) {
+      console.error('[app-access] failed to load admin grant snapshot:', error.message);
+      return res.status(502).json({
+        error: 'Unable to load app access grants',
+      });
+    }
   }
 
   // Regular user: return their own grants
@@ -89,10 +96,16 @@ async function handlePost(req, res, profileId, isSuperuser) {
     return res.status(400).json({ error: `Invalid app keys: ${invalid.join(', ')}` });
   }
 
-  await grantApps(userProfileId, apps, profileId);
-
+  const result = await grantApps(userProfileId, apps, profileId);
   clearAppAccessCache(userProfileId);
-  return res.json({ success: true, granted: apps });
+  if (result.error) {
+    console.error('[app-access] grant operation failed:', result.error);
+    return res.status(502).json({
+      error: 'Unable to grant all requested app access',
+      granted: result.granted,
+    });
+  }
+  return res.json({ success: true, granted: result.granted });
 }
 
 async function handleDelete(req, res, profileId, isSuperuser) {
@@ -106,8 +119,14 @@ async function handleDelete(req, res, profileId, isSuperuser) {
     return res.status(400).json({ error: 'userProfileId and apps[] are required' });
   }
 
-  await revokeApps(userProfileId, apps);
-
+  const result = await revokeApps(userProfileId, apps);
   clearAppAccessCache(userProfileId);
-  return res.json({ success: true, revoked: apps });
+  if (result.error) {
+    console.error('[app-access] revoke operation failed:', result.error);
+    return res.status(502).json({
+      error: 'Unable to revoke all requested app access',
+      revoked: result.revoked,
+    });
+  }
+  return res.json({ success: true, revoked: result.revoked });
 }

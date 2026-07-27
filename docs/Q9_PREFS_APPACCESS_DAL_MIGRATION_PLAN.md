@@ -6,6 +6,7 @@ status: active
 summary: "Staged migration of prefs + app-access off client.js into DynamicsService adapters (DAL-plan Stage 9 Q9). Wrap-before-swap; prefs first, app-access last."
 canonical: false
 cataloged: 2026-07-06
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md
@@ -18,16 +19,50 @@ related:
 
 # Q9 Migration Plan — prefs + app-access onto the DAL (adapters → DynamicsService)
 
-**Status:** IMPLEMENTATION STARTED — Stages 1, 2.5, and 3 completed on
-`codex/q9-prefs-appaccess`; Stage 4 app-access transport migration is deferred. Authored
-2026-07-06 (Fable) against live `main` (@478d0d20); Claude-reviewed + pillar claims verified
+## Current state
+
+**[VERIFIED 2026-07-27 via
+`lib/dataverse/adapters/user-preference.js`,
+`lib/services/dataverse-prefs-service.js`, and
+`lib/services/dataverse-app-access-service.js`]** Stages 1, 2.5, and 3 are
+complete. User preferences now use the 19th entity adapter and
+DynamicsService. Stage 4 is ready to execute: app access still calls
+`lib/dataverse/client.js` directly for `wmkf_appuserappaccesses`, and no
+app-access adapter or bounded unfiltered admin-list primitive exists.
+
+The active remaining work is Stage 4 plus Stage 5 closeout. Stage 2 is
+**SATISFIED by owner-approved deterministic acceptance** as of 2026-07-27.
+Because the access population is small (six mapped ordinary users, each with
+three to five grants) and the owner expects changes to be rare, the proposed
+passive production traffic soak was replaced with enforcement-mode contract tests over
+each app-access entry-point class at the guard seam plus a read-only live
+inventory. The focused acceptance ran with
+`DATAVERSE_DAL_UNIVERSAL=on`, which is stronger than `warn`: any missing
+trusted context would throw rather than merely log. All 33 focused assertions
+passed. No staff grant, Vercel environment variable, or deployment changed.
+
+The current Preview and Production project configuration still omits
+`DATAVERSE_DAL_UNIVERSAL`, so new deployments resolve it to `off`. That fact is
+now an explicitly accepted observability posture, not a Stage 4 blocker. A
+real signed-in ordinary-user OAuth smoke is a **required Stage 4
+Preview-to-Production release gate**, but it is not a prerequisite for
+beginning the transport work. Receipt:
+`docs/audits/q9-app-access-stage2-acceptance-2026-07-27.md`.
+
+## Historical decision and planning record
+
+**Status at the last implementation pass:** Stages 1, 2.5, and 3 completed on
+`codex/q9-prefs-appaccess`; Stage 4 app-access transport migration was deferred. Authored
+2026-07-06 (Fable) against `main` (@478d0d20); Claude-reviewed + pillar claims verified
 against source (S339); promoted to durable doc.
 **Owner decision:** Q9 (DAL plan Stage 9, `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md:446-448`) is now
 **MIGRATE** — move `wmkf_appuserpreferences` and `wmkf_appuserappaccesses` off the unguarded
 `lib/dataverse/client.js` transport into adapters routed through `DynamicsService`, overriding the
 plan's "leave them" default.
 
-Every claim below was re-probed against the live tree this session unless marked `[UNVERIFIED]`.
+Sections 1–3 preserve the S339 baseline and execution design. They are not a
+claim that every dated count or line number is current; the current-state
+section above and live source govern Stage 4 execution.
 
 > **[STALE-ACCEPTED: lib/services/dynamics-service.js — line numbers only].** This plan's
 > `dynamics-service.js` citations (e.g. `queryRecords :398-407`, `queryAllRecords :590`,
@@ -42,7 +77,7 @@ Every claim below was re-probed against the live tree this session unless marked
 
 ---
 
-## 1. Preconditions / probes (verified state)
+## 1. Historical preconditions / probes (S339 baseline)
 
 ### 1.1 The two services at plan baseline
 
@@ -69,7 +104,7 @@ Every claim below was re-probed against the live tree this session unless marked
 | Write enforcement is ON in ALL environments: `DATAVERSE_DAL_ENFORCEMENT=on` explicit in prod (S330 flip); unset defaults to on outside production | `lib/services/dynamics-context.js:124-130` (`isDalEnforcementOn`) |
 | **Reads are stricter than writes**: `checkRestriction` throws `'Restrictions not initialized — cannot execute query'` **unconditionally** (no flag) when no ALS context is set; called by every read (`:294,:344,:400,:448,:492,:541,:596,:666`) | `lib/services/dynamics-service.js:183-197` |
 | Consequence: swapping a READ (`listAppKeysForUser`, `getUserPreferences`, `findRow`) onto DynamicsService before its caller establishes context throws in EVERY environment, flags irrelevant. This is the whole reason Q9's default was "leave them." | derived from the above, [VERIFIED] |
-| The throw is then CAUGHT by the services' own try/catch → **silent degradation, not a 500**: `listAppKeysForUser` returns `[]` → every user sees "Access Not Available"; prefs read as empty. Harder to notice than a crash — warn-mode observation before swap is therefore mandatory, not optional. | prefs/app-access catch blocks cited in 1.1 |
+| The throw is caught by the service. Current auth callers pass `{ throwOnError: true }`, so `requireAppAccess` returns a retryable 503 and does **not** cache an empty grant set; display-only callers retain the graceful `[]` fallback. A missed context can therefore interrupt every non-superuser app-gated request even though it no longer creates a two-minute silent lockout. Stage 2 deterministically accepted the context roots with the guard set to `on`; Stage 4 must still run the required signed-in ordinary-user Preview smoke before Production. | `lib/services/dataverse-app-access-service.js:listAppKeysForUser`; `lib/utils/auth.js:requireAppAccess` |
 | `withDalContext(scopeLabel, fn)` = thin DAL-labeled wrapper over `bypassDynamicsRestrictions`; performs no auth; sanctioned for post-auth entry points; "always allowed" by the context-boundary gate | `lib/dataverse/core/context.js:46-54`; `scripts/check-dynamics-context-boundary.js:45,:111-112` |
 | Interim guard (`assertDataverseAccess`, `DATAVERSE_DAL_UNIVERSAL` off/warn/on, default off) uses the SAME ALS-presence predicate (`getDynamicsContext()`), so a caller wrapped for warn-mode is correctly wrapped for DynamicsService — no rework | `lib/services/dynamics-context.js:226-243` |
 
@@ -159,14 +194,13 @@ Dataverse services. The migration swaps the two services' *internals*; no route 
 5. **Failure-mode contract — try/catch boundaries stay in the services.** Adapters follow house
    style ("restriction-context posture is CALLER-OWNED", throw structured `buildServiceError`
    errors — `adapters/policy.js:15-20`, `dynamics-service.js:765-768`). The two services keep
-   their exact public API and their log+return-falsy catch blocks; only the code inside the try
-   changes from `client.*` to adapter calls. Caller-visible behavior (including the
-   `{granted:[], error: message}` shapes) is unchanged. Note the error *message text* inside
-   logs changes (structured service errors vs `find pref failed: <status>`); that is log-only
-   and acceptable — no route caller branches on message text [VERIFIED via
-   `pages/api/user-preferences.js:89,:102,:135` (`const success =` truthy checks),
-   `pages/api/reviewer-finder/prompt-override.js:105` (`const ok =`),
-   `pages/api/app-access.js:88,:105` (return value not captured)].
+   their public API and log+fallback catch boundaries; only the code inside the try changes from
+   `client.*` to adapter calls. Preserve the current app-access acceptance contract:
+   strict admin reads rethrow, grant/revoke errors retain the completed prefix, and the admin
+   route returns non-2xx with only those completed identifiers. Error-message text remains
+   server-side and is log-only. Preference callers retain their existing truthy/falsy behavior
+   [VERIFIED via `pages/api/user-preferences.js` and
+   `pages/api/reviewer-finder/prompt-override.js`].
 
 6. **`setUserPreferences` loops over `setUserPreference`** (prefs `:127-131`) — per-key writes,
    no changeset. Keep the loop (behavior freeze; partial-success semantics identical).
@@ -189,21 +223,33 @@ Dataverse services. The migration swaps the two services' *internals*; no route 
   (rewrites per 1.4.4), `dal-universal-guard.test.js` (flag semantics — unchanged),
   `dal-enforcement.test.js` (must stay green every stage), `nextauth-signin-dal-context.test.js`
   (extend for the grantDefaultApps wrap), `app-access-context.test.js` (jsdom UI guard — exercises
-  the fetch contract, unaffected but run). Full-suite baseline: 4945 passing (S338).
-- Suites + gates named in `SESSION_PROMPT.md:113-121` run at every stage boundary.
+  the fetch contract, unaffected but run). Historical S338 full-suite baseline:
+  4,945 passing; the Stage 2 acceptance boundary later passed 519 suites /
+  6,159 tests.
+- The S339 session prompt carried the then-current suite list. Its old line
+  anchor is historical; the current per-stage gate table in §4 governs Stage 4
+  execution.
 
 ### 1.6 Open questions for the owner
 
 - **OQ-1 — CLOSED (2026-07-06/S339).** `DYNAMICS_SANDBOX_URL` is unset in all Vercel runtime
   environments `[VERIFIED via vercel env ls: only DYNAMICS_URL across Dev/Preview/Prod]`. No org
   repoint risk; the swap is URL-neutral; no data copy needed. Nothing blocks Stage 3 on this axis.
-- **OQ-2:** Warn-mode observation window length before each swap stage (recommendation: ≥3
-  weekdays of prod traffic including at least one fresh staff sign-in; the S330 enforcement flip
-  used a runtime-log-scan protocol — reuse it).
+- **OQ-2 — CLOSED BY OWNER (2026-07-27):** Replace the passive warn-mode
+  observation window with deterministic enforcement-mode acceptance. The
+  small population and expected rarity of changes make representative organic
+  traffic unlikely.
+  Focused tests run the real guard in `on` mode across the ordinary-user auth
+  lookup, admin list/grant/revoke, and fresh-profile default-grant entry
+  points. A read-only production inventory confirms the bounded population.
+  A real OAuth smoke remains a required Stage 4 release gate, not a pre-build
+  soak.
 - **OQ-3:** After both entities migrate, the only remaining `client.js` write surfaces are
   `wmkf_appsystemsettings` (Wave 3) + `wmkf_appgrantcycles` (Wave 6) + identity-map reads. Flip
   `DATAVERSE_DAL_UNIVERSAL` to `warn`→`on` for that tail on the same schedule, or leave until
-  those waves land? (This plan only *requires* `warn`.)
+  those waves land? The accepted current posture remains unset/`off`; Stage 4
+  does not implicitly change this flag. Any future flag change is a separate
+  owner-approved release action.
 - **OQ-4 — CLOSED by Q9 Stage 3 implementation:** Pin-test rewrite consent per 1.4.4 (S331 ruling
   artifact). The prefs pin moved from service-local `findRow(mockClient, ...)` to adapter-level
   `findByOwnerAndKey(...)`, with the test now asserting `TypeError` plus zero
@@ -239,8 +285,7 @@ Stage 1  Context wraps (Q4 + all entry points)   │
   1h  reviewer-prompt-resolver override wrap    ◄─┴── CONFIRMED bare (Codex P1); +overrideUsed test
         │
         ▼
-Stage 2  DATAVERSE_DAL_UNIVERSAL=warn in preview→prod; observe clean window (OQ-2)
-        │   (exercise incl. a prompt-override user's analyze+discover run — the 1h path)
+Stage 2  deterministic DATAVERSE_DAL_UNIVERSAL=on acceptance + live inventory (DONE)
         ▼
 Stage 2.5  Script bypass conversion (5 live R8 scripts → enterDynamicsBypassForScript / retire)
         │   per entity, BEFORE its swap (Codex P2)
@@ -281,9 +326,16 @@ Hard orderings, stated per entry point:
 2. Baseline: full jest suite green (4945 baseline), all four gates + self-tests green, census
    report snapshot (`node scripts/check-dataverse-access-layer.js --report`) saved to scratchpad
    for before/after diffing.
-3. Confirm prod still runs `DATAVERSE_DAL_ENFORCEMENT=on` and `DATAVERSE_DAL_UNIVERSAL` unset.
+3. **RE-PROBED 2026-07-27:** current Production project configuration contains
+   `DATAVERSE_DAL_ENFORCEMENT=on`; current Preview and Production project
+   configuration contain no `DATAVERSE_DAL_UNIVERSAL` entry. Source therefore
+   resolves a new deployment to `off`. The active production deployment's
+   embedded value is not exposed by Vercel deployment metadata. No Stage 2
+   environment change or redeploy is required: the owner accepted unset/`off`.
+   Any future universal-guard flag change is a separate owner-approved release
+   action.
 
-### Stage 1 — Context wraps (one commit per file; no transport change; zero behavior change with flag off)
+### Stage 1 — Context wraps (DONE)
 Each commit: wrap + a `*-dal-context` test proving the call now executes inside ALS context
 (mirror `tests/unit/nextauth-signin-dal-context.test.js`'s shape) + `check:dynamics-context-boundary`.
 
@@ -335,24 +387,51 @@ Each commit: wrap + a `*-dal-context` test proving the call now executes inside 
   the wrap into the two routes (leaves the service unsafe for any future caller). **Test:** extend
   the resolver's suite to assert `overrideUsed: true` (and the stale-override branch) still resolve
   AFTER the prefs transport swap — i.e. mock DynamicsService with an ALS check that throws when
-  unwrapped, proving the wrap is load-bearing. Also add reviewer-finder `analyze`/`discover` to the
-  Stage 2 warn-mode exercise list (below). This commit lands in Stage 1 (inert with the flag off,
-  correct under both transports).
+  unwrapped, proving the wrap is load-bearing. The planned Stage 2
+  `analyze`/`discover` warn exercise did not occur before the prefs swap; retain
+  that coverage as an overdue authenticated Preview check in Stage 4 rather
+  than claiming it was observed. This commit landed in Stage 1 (inert with the
+  flag off, correct under both transports).
 
 Gates for Stage 1: `check:dynamics-context-boundary` (+ self-test), full jest suite. No census
 change expected (transport untouched).
 
-### Stage 2 — Warn-mode observation (no code)
-Set `DATAVERSE_DAL_UNIVERSAL=warn` in preview, exercise: fresh sign-in (new profile), prefs
-save/load, admin grant/revoke, prompt-override save, **a reviewer-finder `analyze` AND `discover`
-run BY A USER WHO HAS A SAVED PROMPT OVERRIDE** (exercises the 1h path — confirms
-`overrideUsed:true` and no `[dal-universal]`/`Restrictions not initialized` line), one review-email
-render (signature path), cron tick. Then prod, observe OQ-2 window. **Exit criterion: zero
-`[dal-universal]` lines.** Any line = a missed path; fix its wrap (return to Stage 1) before
-proceeding. Leave the flag at `warn` through Stages 3–4 (it keeps observing the not-yet-migrated
-entity while the first one migrates).
+### Stage 2 — Deterministic context acceptance (SATISFIED 2026-07-27)
 
-### Stage 2.5 — Script bypass conversion (BEFORE any transport swap; S339, Codex P2)
+The initial live-state probe established that Preview and Production project
+configuration omit `DATAVERSE_DAL_UNIVERSAL`; unset resolves to `off`, and no
+historical clean-soak receipt exists. That finding remains true but no longer
+defines acceptance.
+
+The owner chose deterministic acceptance because there are only six mapped
+ordinary users and grant changes are expected to be rare. The 2026-07-27
+acceptance:
+
+1. ran the app-access guard as `on`, not `warn`, across `requireAppAccess`,
+   `/api/app-access` admin list/grant/revoke, and new-profile default grants;
+2. proved every guarded call executes inside trusted DAL context and the
+   context does not leak after the call;
+3. added fail-loud admin-list behavior and honest partial-success reporting so
+   a later reversible smoke cannot mistake an error for an empty snapshot or
+   full success;
+4. verified the live read-only population as 10 active profiles: two
+   superusers, six mapped ordinary users with three to five grants, and two
+   unmapped read-only profiles; and
+5. changed no live grants, environment variables, deployments, or sessions.
+
+Original Stage 2 result: **7 suites, 27 tests, 27 passed**. The Dataverse access,
+context-boundary, route-lifecycle-auth, route-service-boundary, and API-route
+gates plus their self-tests also passed. Receipt:
+`docs/audits/q9-app-access-stage2-acceptance-2026-07-27.md`.
+
+Residual boundary: no dedicated mapped test account was found, and no reusable
+ordinary-user session was available to this run. A superuser session cannot
+exercise the ordinary lookup because superusers bypass it. Stage 4 **must**
+perform the authenticated Preview smoke with a deliberately designated
+ordinary user before Production, but that release check does not block
+implementation.
+
+### Stage 2.5 — Script bypass conversion (DONE; S339, Codex P2)
 The 5 live scripts in 1.3 R8 read/write these services with NO trusted context and work ONLY
 because client.js is unguarded today. Post-swap they silently degrade (missing context → caught →
 falsy), and `cleanup-concept-evaluator-grants.js` would falsely report "nothing to clean." Before
@@ -362,7 +441,7 @@ entity about to move: add an `enterDynamicsBypassForScript` bootstrap (Q3 shared
 `scripts/archive/backfill-app-access.js` is not run — leave in place, note only. Checklist item in
 each swap stage; do not defer to Stage 5.
 
-### Stage 3 — Prefs wave (order: characterize → adapter → swap → gates → deploy → verify)
+### Stage 3 — Prefs wave (DONE)
 1. **Characterization tests first** (must pass against CURRENT code): mock
    `lib/dataverse/client.js` (`createClient`/`getAccessToken`) and pin, for all 7 functions:
    exact request paths (`/wmkf_appuserpreferences?$filter=…&$select=…&$top=1` byte-for-byte),
@@ -401,7 +480,7 @@ each swap stage; do not defer to Stage 5.
    email-signature render; log-scan for `Restrictions not initialized` / `no trusted Dataverse
    context` / `[dataverse-prefs]` errors.
 
-### Stage 4 — App-access wave (only after Stage 3 has soaked in prod; OQ-2 window)
+### Stage 4 — App-access wave (READY TO EXECUTE)
 Same six steps for `dataverse-app-access-service.js` → `lib/dataverse/adapters/app-access.js`
 (register `'wmkf_appuserappaccesses'`; mirrors for `findByUserAndApp`, `listByUser`, `listAll`,
 `create` (bind keys preserved), `remove`). Postgres `user_profiles` read and identity-map calls
@@ -424,12 +503,25 @@ dynamics-service.js:398-407,:590-593]`) — two distinct cases:**
   tested. Coordinate the DynamicsService addition with the decomposition (§6).
 
 Extra rigor for the hot path:
-- Preview E2E BEFORE prod: fresh sign-in (new profile → default grants → landing page), plus an
-  existing user hitting an app route with a cold cache.
+- **Required Preview release gate with a deliberately designated ordinary
+  non-superuser:** fresh sign-in (new profile → default grants → landing
+  page), plus an existing user hitting an app-gated route with a cold cache.
+  A superuser session is not a substitute.
+- **Required reversible grant mutation:** record the designated user's
+  canonical starting grants, perform one real grant and revoke round trip
+  through the admin UI, verify the expected app-route allow/deny result and
+  two-minute cache invalidation, then restore and re-read the exact starting
+  state. Stop on any non-2xx or ambiguous partial result; use the returned
+  completed prefix and canonical reload before restoration.
+- **Required overdue prefs regression check:** run reviewer-finder
+  `analyze` and `discover` in Preview for a deliberately designated user with
+  a known prompt override and verify `overrideUsed:true`. This replaces the
+  historical Stage 2 warn exercise that never occurred.
 - Deploy prod at a low-traffic moment; watch logs live; the 2-min app-access cache
   (`auth.js:266-271`) means a regression surfaces within minutes, not instantly — scan for
   `[dataverse-app-access] listAppKeysForUser error` specifically, and treat ANY occurrence as
-  rollback trigger (it means every affected user is being denied all apps).
+  rollback trigger (current auth returns retryable 503 and does not cache the failed lookup, but
+  every affected non-superuser app-gated request is interrupted until the lookup succeeds).
 - Rollback = single-commit revert of the swap commit (Stage-1 wraps stay — they are correct for
   both transports; the interim client.js path has no context requirement).
 
@@ -443,17 +535,20 @@ Extra rigor for the hot path:
   (`:184-192` names the two services as the guarded client.js write sites — now stale);
   `database-service.js`/`app-access-service.js` header comments; CREDENTIALS_RUNBOOK untouched.
 - OQ-3 decision on `DATAVERSE_DAL_UNIVERSAL` posture for the remaining client.js tail
-  (settings + grant-cycles + identity-map). This migration leaves the flag at `warn`.
+  (settings + grant-cycles + identity-map). The accepted current posture is
+  unset/`off`; this migration does not change the flag unless OQ-3 is
+  separately resolved and approved.
 
 ---
 
 ## 4. Gates per stage (summary)
 
-| Stage | Gates (sequential with their self-tests, never parallel) | Jest |
-|---|---|---|
-| 1 | `check:dynamics-context-boundary` (+ self-test) | new `*-dal-context` tests; `dal-universal-guard`; full suite |
-| 3, 4 | `check:dataverse-access-layer` (+ self-test), `check:route-service-boundary` (+ self-test), `check:dynamics-context-boundary` (+ self-test) | characterization suites (pre- and post-swap), rewritten guarded-swap pins, `dal-enforcement`, `dynamics-service-count`*, full suite |
-| 5 | all four + `npm run check:agent-invariants` if instruction files touched | full suite |
+| Stage | Gates (sequential with their self-tests, never parallel) | Jest | Required live verification |
+|---|---|---|---|
+| 1 | `check:dynamics-context-boundary` (+ self-test) | new `*-dal-context` tests; `dal-universal-guard`; full suite | Historical stage; complete |
+| 3 | `check:dataverse-access-layer` (+ self-test), `check:route-service-boundary` (+ self-test), `check:dynamics-context-boundary` (+ self-test) | characterization suites (pre- and post-swap), rewritten guarded-swap pins, `dal-enforcement`, `dynamics-service-count`*, full suite | Historical prefs release checks; complete |
+| 4 | Same automated gates as Stage 3 | App-access characterization and DAL-context suites; guarded-swap pin; `dal-enforcement`; `dynamics-service-count`*; full suite | Deliberately designated ordinary-user Preview sign-in and cold-cache route; exact-state reversible grant/revoke; authenticated analyze/discover with a known prompt override; low-traffic Production deploy and live log watch |
+| 5 | all four + `npm run check:agent-invariants` if instruction files touched | full suite | Confirm the Stage 4 release receipt and exact grant restoration before closeout |
 
 *`tests/unit/dynamics-service-count.test.js` (decomposition covering suite) may pin
 DynamicsService method counts/callers — if it counts call sites, the new adapter calls may move
@@ -470,22 +565,27 @@ adapter attribution with zero new violations.
 
 | Risk | Mechanism | Mitigation |
 |---|---|---|
-| **Auth-path silent lockout** (highest) | post-swap missing context → `checkRestriction` throw → caught → `[]` → every user "Access Not Available"; NOT a 500, so no error-rate alarm | Stage-1 wrap of `requireAppAccess` lands first and is warn-observed (Stage 2) against the SAME ALS predicate DynamicsService uses; app-access swapped LAST (Stage 4) after prefs proves the pattern; explicit log-scan trigger on `[dataverse-app-access]` error lines; single-commit revert |
+| **Auth-path broad 503 interruption** (highest) | post-swap missing context → `checkRestriction` throw → service rethrows for the auth caller → `requireAppAccess` returns retryable 503 without caching an empty grant set; display-only callers still degrade to `[]` | Stage-1 wrap of `requireAppAccess` was deterministically accepted with the guard set to `on` against the SAME ALS predicate DynamicsService uses; app-access swaps LAST (Stage 4) after prefs; the required ordinary-user Preview gate, explicit `[dataverse-app-access]` log trigger, and single-commit revert cover the live release boundary |
 | ~~Sandbox-URL repoint~~ **RESOLVED** | services' `SANDBOX \|\| URL` fallback vs DynamicsService's `DYNAMICS_URL` | **CLOSED S339: no `DYNAMICS_SANDBOX_URL` in any Vercel env `[VERIFIED via vercel env ls]` → fallback is dead code, swap URL-neutral.** Delete the dead fallback during each swap |
 | Ownership-binding regression | different create path | bind keys pass through `createRecord` body verbatim (`dynamics-service.js:758-763` [VERIFIED]); characterization asserts body bytes; never pass `actingUserSystemId` |
 | **List reads truncate/throw through `queryRecords`** (Codex re-review P1, CONFIRMED) | `queryRecords` caps `$top≤100`, defaults 25, throws on unfiltered>25 (`dynamics-service.js:398-407`); per-user prefs list has no `$top`, admin `listAll` is unfiltered `$top=5000` | per-user lists use filtered `queryAllRecords`; `listAll` gets a new bounded admin primitive (OQ-5 RESOLVED → option a, Stage 4 step 0); char-tests with >25 prefs / bulk grants |
-| **Prompt-override silently stops applying** (Codex P1, CONFIRMED) | `reviewer-prompt-resolver` override read is bare → post-swap throws → caught → `null` → `overrideUsed:false`, no error | **1h** wraps the read at the service layer + an `overrideUsed:true`-survives-swap test; analyze/discover added to the Stage-2 warn exercise |
-| Missed read path (email-signature transitive callers, crons) | reads throw unconditionally | Stage 1g per-site verification with recorded verdicts; Stage-2 warn logs from the 1f read probes catch anything the static trace missed |
+| **Prompt-override silently stops applying** (Codex P1, CONFIRMED) | `reviewer-prompt-resolver` override read is bare → post-swap throws → caught → `null` → `overrideUsed:false`, no error | **1h** wraps the read at the service layer + an `overrideUsed:true`-survives-swap test; the previously planned warn exercise did not run, so Stage 4's required Preview gate includes authenticated analyze/discover with a known override |
+| Missed read path (email-signature transitive callers, crons) | reads throw unconditionally | Stage 1g per-site verification with recorded verdicts plus deterministic context tests; the passive warn-log net did not run, so required Stage 4 Preview smokes and Production log watch own the remaining live-release risk |
 | Pin-test erosion (S331 ruling) | `findRow` signature change | behavior-level pin re-established at adapter level (TypeError + zero transport calls); owner flagged (OQ-4) |
-| Prod throw via warn→on mis-sequencing | write asserts sit OUTSIDE try blocks | this plan never flips `DATAVERSE_DAL_UNIVERSAL=on`; it stays `warn` (observability) and real enforcement arrives via the transport swap, whose throws land INSIDE the service try/catch preserving falsy contracts |
+| Universal guard enabled unexpectedly in production | write asserts sit OUTSIDE try blocks | project configuration currently omits the flag; Stage 2 acceptance uses `on` only in tests. Any future deployed flag change is a separate release action. Real enforcement arrives through the transport swap, whose throws land INSIDE the service try/catch preserving falsy contracts |
 | Scripts break/lie post-swap (Codex P2, CONFIRMED) | 5 live scripts have no script bypass; cleanup script would falsely report "nothing to clean" | **Stage 2.5** converts/retires each per entity BEFORE its swap (Q3 pattern); full R8 census rebuilt repo-wide |
 
 **Rollback story per stage:** Stage 1 wraps are inert without the flag and correct under both
 transports — never rolled back. Stage 3/4 swaps are each ONE commit touching one service + one
 new adapter + registry line + tests; revert restores client.js transport instantly with no env
-change needed (client.js path has no context requirement; `warn` flag tolerates it).
+change needed (client.js path has no context requirement; the universal guard
+remains unset/`off` unless separately approved).
 
-## 6. Interaction with the DynamicsService decomposition
+## 6. Historical interaction with the DynamicsService decomposition
+
+The sequencing statements below describe the S339 planning context. Re-probe
+the current decomposition state before Stage 4; this document no longer
+asserts that the named checkpoint status remains current.
 
 - The keystone `dynamics/http.js` Dataverse-fetch guard is strictly post-Checkpoint-F (DAL plan
   `:414-417,:426-428`); this migration neither waits for it nor conflicts with it — DAL plan
@@ -512,18 +612,25 @@ change needed (client.js path has no context requirement; `warn` flag tolerates 
    the **reviewer-prompt-resolver override read (1h — Codex P1, confirmed bare)** — one commit per
    file, each with a dal-context/`overrideUsed` test; add warn-mode read probes to the five read
    functions; verify the 6 email-signature transitive paths.
-3. Flip `DATAVERSE_DAL_UNIVERSAL=warn` (preview→prod) and hold until logs are clean, because
-   post-swap a context gap is a SILENT access denial (caught → falsy), not a crash. Exercise a
-   prompt-override user's analyze+discover (the 1h path) in the warn window.
+3. ~~Run a passive warn window.~~ **CLOSED 2026-07-27:** the owner replaced it
+   with deterministic `on`-mode acceptance over each app-access entry-point
+   class at the guard seam
+   plus a read-only live inventory. The current project configuration still
+   omits the flag; that is accepted. Complete the required Stage 4
+   authenticated ordinary-user Preview gate and production log watch at
+   release time.
 4. **Convert/retire the 5 live R8 scripts** to `enterDynamicsBypassForScript` per entity BEFORE
    its swap (Stage 2.5 — Codex P2), else they silently degrade / mis-report post-swap.
 5. Migrate PREFS first (off the auth hot path; bounded blast radius): characterization tests →
    `adapters/user-preference.js` + registry entry → swap service internals keeping API,
    try/catch falsy contract, encryption, and the S331 non-string pin (moved to adapter level).
-6. Soak, then migrate APP-ACCESS the same way, with preview sign-in E2E and live log watch;
-   rollback is a one-commit revert per wave (wraps are transport-agnostic and stay).
+6. Migrate APP-ACCESS the same way, then complete the required designated-user
+   Preview sign-in, cold-cache, reversible grant/revoke, and prompt-override
+   checks plus the live Production log watch; rollback is a one-commit revert
+   per wave (wraps are transport-agnostic and stay).
 7. Close out: confirm R8 scripts converted, census re-snapshot, durable-docs sweep (DAL plan Q9 +
-   Stage 9 text, wiki, dynamics-context.js header), leave `warn` standing for the client.js tail.
+   Stage 9 text, wiki, dynamics-context.js header); retain unset/`off` for the
+   client.js tail unless OQ-3 is separately resolved and approved.
 
 ---
 
@@ -578,5 +685,49 @@ change needed (client.js path has no context requirement; `warn` flag tolerates 
   `listByOwner`, and closed OQ-4 by moving the guarded-swap pin to the adapter. Ownership boundary:
   `lib/services/dynamics-service.js`, `tests/unit/dynamics-service-count.test.js`, the app-access
   transport swap, and the Stage 4 admin-list primitive were intentionally left untouched.
+- **2026-07-27 — live posture re-probe: Stage 2 not satisfied.** Current
+  Vercel project env metadata contains no `DATAVERSE_DAL_UNIVERSAL` entry for
+  Preview or Production; source defaults unset to `off`.
+  `DATAVERSE_DAL_ENFORCEMENT=on` remains present in Production. The active
+  production deployment is READY at commit `c2b57d0`, but deployment metadata
+  does not reveal its embedded universal-guard value. Bounded runtime queries
+  found no `[dal-universal]` or app-access error lines; because the flag was not
+  established as `warn` and the wider requested window exceeded retention,
+  those empty results are not a clean-soak receipt. Current source also
+  supersedes the historical silent-lockout description: the auth caller
+  requests `throwOnError`, returns a retryable 503 on lookup failure, and does
+  not cache an empty grant set. Stage 4 remains deferred pending the OQ-2 owner
+  decision and a deliberate Preview → Production warn exercise.
+- **2026-07-27 — owner replaced the passive soak; Stage 2 satisfied.** The
+  access population is bounded at the point-in-time inventory, and the owner
+  expects changes to be rare: 10 active profiles, including two superusers, six
+  mapped ordinary users with three to five grants, and two unmapped read-only
+  profiles. A focused acceptance ran
+  `DATAVERSE_DAL_UNIVERSAL=on` across the ordinary auth lookup, admin
+  list/grant/revoke, new-profile default grants, and the admin partial-failure
+  refresh path; 7 suites / 27 tests
+  passed. The admin API was also made fail-loud for grant-list failures and
+  honest about partial grant/revoke completion, closing the false-success risk
+  before any future live mutation smoke. No staff grant, environment variable,
+  deployment, or saved auth session changed. The earlier same-day
+  “not satisfied” entry above is retained as the historical probe result and
+  superseded by this owner decision and acceptance receipt:
+  `docs/audits/q9-app-access-stage2-acceptance-2026-07-27.md`.
+- **2026-07-27 — Claude post-acceptance review; one UI finding plus rollout
+  drift corrected.** Claude verified that avoiding a real staff mutation in
+  Stage 2 was justified, but required the live ordinary-user exercise to remain
+  a Stage 4 release gate. The review found that successful user removal could
+  lose its confirmation during canonical reload and that an initial load
+  failure could also render “No users found.” The admin panel now awaits the
+  removal reload, explicitly distinguishes “removed, reload failed,” and
+  renders the empty state only from a successful non-stale snapshot. Three
+  regressions increased the focused acceptance to 7 suites / 33 tests; the
+  follow-up production build and full 519-suite / 6,165-test run passed. The
+  same reconciliation removed current guidance that still required a Stage 2
+  warn deployment, retained unset/`off` as the accepted flag posture, and
+  made the designated ordinary-user Preview smoke, reversible grant/revoke
+  restoration, overdue prompt-override check, and Production log watch
+  required Stage 4 gates.
 
-No decomposition checkpoint is a prerequisite; only avoid interleaving commits with it.
+Historical S339 sequencing note: no decomposition checkpoint was then a
+prerequisite; commits were not to be interleaved.

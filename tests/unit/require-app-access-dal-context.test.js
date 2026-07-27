@@ -20,6 +20,7 @@ import { sql } from '@vercel/postgres';
 import { getServerSession } from 'next-auth/next';
 import { listAppKeysForUser } from '../../lib/services/app-access-service';
 import { hasTrustedDalContext } from '../../lib/dataverse/core/context';
+import { assertDataverseAccess } from '../../lib/services/dynamics-context';
 import { clearAppAccessCache, requireAppAccess } from '../../lib/utils/auth';
 
 function mockRes() {
@@ -38,6 +39,7 @@ beforeEach(() => {
   process.env.AZURE_AD_CLIENT_ID = 'test-client-id';
   process.env.AZURE_AD_CLIENT_SECRET = 'test-client-secret';
   process.env.AZURE_AD_TENANT_ID = 'test-tenant-id';
+  process.env.DATAVERSE_DAL_UNIVERSAL = 'on';
   getServerSession.mockResolvedValue({ user: { profileId: 42 } });
   sql
     .mockResolvedValueOnce({ rows: [{ is_active: true }] })
@@ -49,11 +51,13 @@ afterEach(() => {
   delete process.env.AZURE_AD_CLIENT_ID;
   delete process.env.AZURE_AD_CLIENT_SECRET;
   delete process.env.AZURE_AD_TENANT_ID;
+  delete process.env.DATAVERSE_DAL_UNIVERSAL;
 });
 
 test('requireAppAccess wraps listAppKeysForUser in trusted DAL context', async () => {
   const seen = { inside: null };
   listAppKeysForUser.mockImplementation(async () => {
+    assertDataverseAccess('app-access:read');
     seen.inside = hasTrustedDalContext();
     return ['dynamics-explorer'];
   });

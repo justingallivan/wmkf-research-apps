@@ -42,6 +42,7 @@ global.fetch = jest.fn(async (url, init) => {
 // DynamicsService mock — we capture updateRecord calls and program
 // getRecord per-test for jsonPath merges.
 const updateCalls = [];
+const auditCalls = [];
 let getRecordImpl = async () => null;
 let updateImpl = async () => ({});
 let promptRow = null;
@@ -50,7 +51,10 @@ jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
     queryRecords: jest.fn(async () => ({ records: [promptRow] })),
     getRecord: jest.fn(async (...args) => getRecordImpl(...args)),
-    createRecord: jest.fn(async () => 'audit-row-id'),
+    createRecord: jest.fn(async (entitySet, payload) => {
+      auditCalls.push({ entitySet, payload });
+      return 'audit-row-id';
+    }),
     updateRecord: jest.fn(async (entitySet, id, payload, opts) => {
       updateCalls.push({ entitySet, id, payload, opts });
       return updateImpl(entitySet, id, payload, opts);
@@ -61,6 +65,7 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 beforeEach(() => {
   fetchedBodies.length = 0;
   updateCalls.length = 0;
+  auditCalls.length = 0;
   claudeResponse = null;
   promptRow = null;
   getRecordImpl = DEFAULT_GET_RECORD;
@@ -71,6 +76,7 @@ beforeEach(() => {
 afterAll(() => { global.fetch = originalFetch; });
 
 import { executePrompt } from '../../lib/services/execute-prompt';
+import { PROMPT_OUTPUT_SCHEMA as REVIEW_SYNTHESIS_OUTPUT_SCHEMA } from '../../shared/config/prompts/review-synthesis';
 
 function buildPromptRow(outputs) {
   return {
@@ -310,5 +316,214 @@ describe('parseClaudeOutput — validationSchema (A7 step 3)', () => {
   test('no validationSchema → parsed passes through unchanged (backward compat)', async () => {
     const result = await runWithSchema(undefined, { summary: 'S', extra: 'kept' });
     expect(result.parsed).toEqual({ summary: 'S', extra: 'kept' });
+  });
+});
+
+describe('Executor response-completeness + native structured output', () => {
+  const outputs = [
+    {
+      name: 'summary',
+      type: 'string',
+      target: { kind: 'akoya_request', field: 'wmkf_ai_summary' },
+      guard: 'always-overwrite',
+    },
+  ];
+
+  async function runWithResponse(response, outputSchema = null) {
+    promptRow = buildPromptRow(outputs);
+    if (outputSchema) {
+      promptRow.wmkf_ai_promptoutputschema = JSON.stringify(outputSchema);
+    }
+    claudeResponse = response;
+    getRecordImpl = async (entitySet, id) =>
+      (entitySet === 'akoya_requests' && id === REQUEST_ROW.akoya_requestid)
+        ? REQUEST_ROW
+        : null;
+    return executePrompt({
+      promptName: promptRow.wmkf_ai_promptname,
+      requestId: REQUEST_ROW.akoya_requestid,
+      runSource: 'Vercel Test',
+      overrideVariables: { x: 'value' },
+    });
+  }
+
+  test('joins every text block before parsing and writes only after end_turn', async () => {
+    const result = await runWithResponse({
+      content: [
+        { type: 'text', text: '{"sum' },
+        { type: 'text', text: 'mary":"complete"}' },
+      ],
+      usage: { input_tokens: 50, output_tokens: 20 },
+      model: 'claude-test',
+      stop_reason: 'end_turn',
+    });
+
+    expect(result.parsed).toEqual({ summary: 'complete' });
+    expect(updateCalls.filter((c) => c.entitySet === 'akoya_requests')).toHaveLength(1);
+  });
+
+  test('max_tokens fails closed even when the returned prefix is syntactically valid JSON', async () => {
+    const error = await runWithResponse({
+      content: [{ type: 'text', text: '{"summary":"looks complete"}' }],
+      usage: { input_tokens: 50, output_tokens: 1024 },
+      model: 'claude-test',
+      stop_reason: 'max_tokens',
+    }).catch((err) => err);
+
+    expect(error.code).toBe('claude_output_truncated');
+    expect(error.maxTokens).toBe(1024);
+    expect(updateCalls.filter((c) => c.entitySet === 'akoya_requests')).toHaveLength(0);
+    const failedAudit = auditCalls.find((c) => c.entitySet === 'wmkf_ai_runs');
+    expect(failedAudit.payload.wmkf_ai_status).toBe(682090001);
+    const retained = JSON.parse(failedAudit.payload.wmkf_ai_rawoutput);
+    expect(retained.response.stopReason).toBe('max_tokens');
+    expect(retained.response.output).toMatchObject({
+      retention: 'hash',
+      originalChars: 28,
+    });
+  });
+
+  test.each([
+    ['refusal', 'refusal', 'claude_output_refused', '{"summary":"complete"}'],
+    ['missing stop reason', undefined, 'claude_output_incomplete', '{"summary":"complete"}'],
+    ['context-window exhaustion', 'model_context_window_exceeded', 'claude_context_window_exceeded', '{"summary":"complete"}'],
+    ['unexpected tool stop', 'tool_use', 'claude_output_incomplete', '{"summary":"complete"}'],
+    ['ordinary malformed JSON', 'end_turn', 'claude_output_invalid_json', '{"summary":'],
+  ])('%s fails before request persistence', async (_label, stopReason, code, text) => {
+    const error = await runWithResponse({
+      content: [{ type: 'text', text }],
+      usage: { input_tokens: 50, output_tokens: 20 },
+      model: 'claude-test',
+      ...(stopReason === undefined ? {} : { stop_reason: stopReason }),
+    }).catch((err) => err);
+
+    expect(error.code).toBe(code);
+    expect(updateCalls.filter((c) => c.entitySet === 'akoya_requests')).toHaveLength(0);
+    expect(auditCalls.filter((c) => c.entitySet === 'wmkf_ai_runs')).toHaveLength(1);
+  });
+
+  test('ordinary JSON prompts do not implicitly opt into provider structured output', async () => {
+    await runWithResponse({
+      content: [{ type: 'text', text: '{"summary":"complete"}' }],
+      usage: { input_tokens: 50, output_tokens: 20 },
+      model: 'claude-test',
+      stop_reason: 'end_turn',
+    });
+
+    const messageBody = fetchedBodies
+      .map((entry) => JSON.parse(entry.body || '{}'))
+      .find((body) => Array.isArray(body.messages));
+    expect(messageBody.output_config).toBeUndefined();
+  });
+
+  test('unknown generationMode fails closed before the Messages API call', async () => {
+    const outputSchema = {
+      ...REVIEW_SYNTHESIS_OUTPUT_SCHEMA,
+      generationMode: 'native-json-scheam',
+    };
+    const error = await runWithResponse({
+      content: [{ type: 'text', text: '{"summary":"unused"}' }],
+      usage: {},
+      stop_reason: 'end_turn',
+    }, outputSchema).catch((err) => err);
+
+    expect(error.message).toMatch(/unsupported generationMode/);
+    const messageBodies = fetchedBodies
+      .map((entry) => JSON.parse(entry.body || '{}'))
+      .filter((body) => Array.isArray(body.messages));
+    expect(messageBodies).toHaveLength(0);
+    expect(updateCalls.filter((c) => c.entitySet === 'akoya_requests')).toHaveLength(0);
+  });
+
+  test('structured output fails closed for a reviewed model that does not support it', async () => {
+    promptRow = buildPromptRow(outputs);
+    promptRow.wmkf_ai_model = 'claude-sonnet-4';
+    promptRow.wmkf_ai_promptoutputschema = JSON.stringify(REVIEW_SYNTHESIS_OUTPUT_SCHEMA);
+    claudeResponse = {
+      content: [{ type: 'text', text: '{"summary":"unused"}' }],
+      usage: {},
+      stop_reason: 'end_turn',
+    };
+    getRecordImpl = async (entitySet, id) =>
+      (entitySet === 'akoya_requests' && id === REQUEST_ROW.akoya_requestid)
+        ? REQUEST_ROW
+        : null;
+
+    const error = await executePrompt({
+      promptName: promptRow.wmkf_ai_promptname,
+      requestId: REQUEST_ROW.akoya_requestid,
+      runSource: 'Vercel Test',
+      overrideVariables: { x: 'value' },
+    }).catch((err) => err);
+
+    expect(error.message).toMatch(/not reviewed for native structured output/);
+    const messageBodies = fetchedBodies
+      .map((entry) => JSON.parse(entry.body || '{}'))
+      .filter((body) => Array.isArray(body.messages));
+    expect(messageBodies).toHaveLength(0);
+  });
+
+  test.each([
+    ['none', { retention: 'none', originalChars: 28 }],
+    ['full', '{"summary":"looks complete"}'],
+  ])('failure audit applies rawOutputRetention=%s', async (rawOutputRetention, expectedOutput) => {
+    const baseSchema = JSON.parse(promptRow?.wmkf_ai_promptoutputschema || JSON.stringify({
+      outputs,
+      parseMode: 'json',
+    }));
+    const error = await runWithResponse({
+      content: [{ type: 'text', text: '{"summary":"looks complete"}' }],
+      usage: { input_tokens: 50, output_tokens: 1024 },
+      model: 'claude-test',
+      stop_reason: 'max_tokens',
+      stop_details: { type: 'max_tokens' },
+    }, {
+      ...baseSchema,
+      outputs,
+      parseMode: 'json',
+      rawOutputRetention,
+    }).catch((err) => err);
+
+    expect(error.code).toBe('claude_output_truncated');
+    const failedAudit = auditCalls.find((c) => c.entitySet === 'wmkf_ai_runs');
+    const retained = JSON.parse(failedAudit.payload.wmkf_ai_rawoutput);
+    expect(retained.response.output).toEqual(expectedOutput);
+    // Retention governs generated output content. Provider termination metadata
+    // remains content-free diagnostic state under every mode.
+    expect(retained.response.stopDetails).toEqual({ type: 'max_tokens' });
+  });
+
+  test('review synthesis opt-in sends Anthropic native JSON-schema output_config', async () => {
+    const synthesis = {
+      synthesis: {
+        consensus: [],
+        disagreements: [],
+        keyConcerns: [],
+        ratingSummaries: [],
+        overall: 'Complete.',
+      },
+    };
+    const result = await runWithResponse({
+      content: [{ type: 'text', text: JSON.stringify(synthesis) }],
+      usage: { input_tokens: 50, output_tokens: 20 },
+      model: 'claude-test',
+      stop_reason: 'end_turn',
+    }, REVIEW_SYNTHESIS_OUTPUT_SCHEMA);
+
+    const messageBody = fetchedBodies
+      .map((entry) => JSON.parse(entry.body || '{}'))
+      .find((body) => Array.isArray(body.messages));
+    expect(messageBody.output_config).toEqual({
+      format: {
+        type: 'json_schema',
+        schema: REVIEW_SYNTHESIS_OUTPUT_SCHEMA.jsonSchema,
+      },
+    });
+    expect(result.parsed).toEqual(synthesis);
+    expect(result.meta).toMatchObject({
+      semanticAttempt: 1,
+      retryOfRunId: null,
+    });
+    expect(updateCalls.filter((c) => c.entitySet === 'akoya_requests')).toHaveLength(1);
   });
 });

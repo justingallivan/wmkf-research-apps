@@ -99,7 +99,7 @@ const recordData = {
   // seedPromptRow (create-only + version-preserving force) — not here.
   wmkf_ai_notes:
     'AI synthesis of a proposal\'s submitted peer reviews (workbench Reviews tab Phase 4). All-override ' +
-    '(reviews_digest, untrusted), parseMode json with validationSchema, output target ' +
+    '(reviews_digest, untrusted), parseMode json with native JSON-schema generation + validationSchema, output target ' +
     'akoya_request.wmkf_reviewsynthesisjson (guard always-overwrite — the caller route gates regeneration). ' +
     'Source: shared/config/prompts/review-synthesis.js.',
 };

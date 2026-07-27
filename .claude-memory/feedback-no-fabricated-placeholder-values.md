@@ -10,6 +10,11 @@ metadata:
   originSessionId: 48076d95-6a2c-4203-a24b-df71abb5d833
 ---
 
+## Recall Rule
+
+Treat every external-facing email, URL, ID, and account literal as untrusted until
+verified. Prefer an unset configuration value over a plausible fabricated default.
+
 When code (especially Codex-generated code) contains an external-facing identifier
 — a contact email, callback URL, account/tenant ID, "from" address, sample data —
 **do not assume it is real.** It is often an invented placeholder. In S232 the

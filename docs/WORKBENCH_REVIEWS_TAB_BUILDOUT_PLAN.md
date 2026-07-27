@@ -3,10 +3,10 @@ title: "Workbench Reviews Tab — Consumption Build-Out Plan"
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Reviews tab deployed; staged production verified deterministic consumers, but AI synthesis failed twice and remains a red gate."
+summary: "Reviews tab deployed; deterministic consumers verified; local synthesis reliability fix awaits governed publication/deployment and post-fix smoke."
 canonical: false
 cataloged: 2026-07-03
-last_verified: 2026-07-26
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -35,16 +35,19 @@ exactly-one-current verified), then advanced through the audited admin route to
 current backward-compatible v2 on 2026-07-26. Same D26
 verification boundary was exercised on 2026-07-26 with controlled Request
 #1002788. Submitted DTO hydration, comparison, DOCX/PDF, and courtesy-copy
-consumers passed. Two real current-v2 synthesis calls failed before writeback
-with incomplete JSON and created failed append-only AI runs; the prior request
-memo remained unchanged. Phase 4 therefore remains a red pre-exposure gate.
+consumers passed. A third controlled current-v2 synthesis call on 2026-07-27
+again failed before writeback with incomplete JSON and created a failed
+append-only AI run; the prior request memo remained unchanged across all three
+attempts. Phase 4 therefore remains a red pre-exposure gate.
 
 **Verification boundary update (S376):** no genuine external reviewer has used
 the form, but the owner-authorized staged production submission proved the
 populated Compare/matrix and DOCX/PDF/courtesy outputs against canonical answer
-rows. The smoke data was atomically cleaned up. AI synthesis is the unresolved
-runtime boundary; staff-writer success paths and the post-republish final smoke
-also remain.
+rows. The smoke data was atomically cleaned up. The 2026-07-27 follow-up also
+proved the staff Manual Review Entry producer and exact restoration path. AI
+synthesis remains the unresolved production runtime boundary. A local
+terminal-response/native-schema/bounded-retry fix passed focused tests on
+2026-07-27; governed prompt publication, deployment, and a post-fix smoke remain.
 
 ## Context
 
@@ -58,14 +61,16 @@ The reviewer-facing submission pipeline is COMPLETE and LIVE (see
 `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md` and
 `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md`, both marked complete):
 reviewers author in-browser against the Dataverse-sourced question set
-(`wmkf_reviewquestion` [VERIFIED via lib/external/review-question-fetcher.js:29-48]),
+(`wmkf_reviewquestion` [VERIFIED via
+`review-question-fetcher.fetchActiveReviewQuestions`]),
 drafts autosave to Postgres `review_drafts.draft_json`
-[VERIFIED via lib/services/review-draft-service.js:70-75], and submit writes an
+[VERIFIED via `lib/services/review-draft-service.js` draft upsert], and submit writes an
 atomic Dataverse changeset — parent `wmkf_appreviewersuggestion`
 (`wmkf_reviewreceivedat`, affiliation) plus one self-describing
 `wmkf_appreviewanswer` snapshot row per question: `questionKey/Order/Text/Type`,
 `answerValue`, `answerText` (= picklist option label at submit time), `answerHtml`
-[VERIFIED via lib/external/build-review-submission.js:142-198].
+[VERIFIED via `lib/external/build-review-submission.js`
+`buildReviewSubmission`].
 
 At the S326 starting point, the staff-facing consumption side was a read-only
 card list. That gap is now closed: `ReviewsTab` includes Outstanding tracking,
@@ -79,14 +84,14 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
 1. **Schema-free rendering.** New UI derives everything from the answer snapshot
    rows — rating columns = picklist-type answers, narrative sections = richtext-type
    answers, labels from the row's own `answerText`. NO hardcoded question keys in
-   new code. Rationale: questions are staff-editable, but the current tab hardcodes
-   `RATING_KEYS = ['impact','risk','overallRating']`
-   [VERIFIED via shared/components/workbench/ReviewsTab.js:34], projects only those
-   three keys in `ratingsFromAnswers()`
-   [VERIFIED via lib/external/review-answer-snapshot.js:40-49], and decodes labels
-   through the static schema [VERIFIED via ReviewsTab.js:23 import of
-   review-form-schema] — a staff-added rating question would silently not render.
-   Legacy projections stay for existing consumers; new code does not read them.
+   new code. Rationale: questions are staff-editable. Before the matrix build, the
+   tab depended on a fixed rating projection. The remaining legacy single-card
+   projection now uses the two canonical snapshot keys
+   `RATING_KEYS = ['riskLevel', 'overallAssessment']`
+   [VERIFIED via `ReviewsTab.RATING_KEYS` and
+   `review-answer-snapshot.REVIEW_RATING_KEYS`]; it is not the matrix contract.
+   A staff-added rating question would still be invisible to that legacy
+   projection, so the schema-free matrix derives its columns from answer rows.
 2. **Ordering.** Default view orders questions by the LIVE admin-panel question set
    (`lib/external/review-question-fetcher.js`). Snapshot keys absent from the live
    set (prior-cycle questions) append after in snapshot `questionOrder`, marked
@@ -96,35 +101,53 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
    answered it; unasked renders as "not asked", distinct from missing.
 4. **Export renders client-side; content stays in Dataverse for Power Automate.**
    File generation reuses the existing client-side utils — `.docx` via the `docx`
-   package [VERIFIED via shared/utils/word-export.js:4-54], PDF via `pdf-lib`
-   [VERIFIED via shared/utils/pdf-export.js:5-54]; no server code imports either
+   package [VERIFIED via `shared/utils/word-export.js`], PDF via `pdf-lib`
+   [VERIFIED via `shared/utils/pdf-export.js`]; no server code imports either
    util (disconfirming grep over pages/api/ and lib/ returned nothing, S326).
    The Power Automate option is preserved by DATA, not by a server route: raw
    answers are already in Dataverse, and Phase 4 synthesis persists to an
    `akoya_request` output column via the Executor
-   [VERIFIED via lib/services/execute-prompt.js:15-16,233,318 — target.kind
-   'akoya_request' with skip-if-populated guard]. Phase 3's report composition must
+   [VERIFIED via `lib/services/execute-prompt.js` target resolution,
+   preflight guards, and `persistOutputs`]. Phase 3's report composition must
    be a PURE shared module (no DOM/browser APIs) so a server route or
    Dataverse-persisted roll-up can wrap it later. Do NOT build a roll-up column or
    server export route until a PA flow exists to consume it (owner decision, S326).
 5. **Reminder nudges reuse the existing sweep machinery.** Review-due reminders
    already run via `sweepReviewDueReminders`
-   [VERIFIED via lib/services/reviewer-reminder-sweep.js:166 and its
-   `sendOneReminder`/`readRequiredEmailDefaults` call graph]. A manual nudge MUST
+   [VERIFIED via `reviewer-reminder-sweep.sweepReviewDueReminders`,
+   `sendOneReminder`, and `email-defaults.readRequiredEmailDefaults`]. A manual nudge MUST
    share the sweep's exclusion/dedupe record so manual + cron cannot double-send.
    Outward-facing email = high-risk surface; the send guard is the review point.
-6. **Synthesis readiness and visibility (owner-confirmed 2026-07-26; planned,
-   not implemented).** Automatic synthesis must do nothing until every invited
-   reviewer has submitted. Staff may explicitly run synthesis earlier as a
-   deliberate manual override. Display is independent of generation readiness:
+6. **Synthesis readiness and visibility (owner-confirmed 2026-07-26 and
+   participation semantics confirmed 2026-07-27; planned, not implemented).**
+   The target is automatic synthesis only when all participating invitations
+   are resolved, with at least one submitted review. Staff may explicitly run
+   synthesis earlier as a deliberate manual override after at least one
+   submission. Display is independent of generation readiness:
    an existing stored synthesis must remain visible even when there are currently
    zero submitted reviews. The present implementation does not enforce this
    contract: it has no automatic trigger, its manual card appears once at least
    one review is submitted, the route rejects only zero submitted reviews, and
    the card (including already-stored output) is hidden at zero submissions.
-   Before implementing an automatic trigger, the owner must separately decide
-   how declined or withdrawn invitations affect the all-in readiness test; do not
-   silently classify either state as submitted.
+   The readiness population is every selected, not-applicant-excluded suggestion
+   that has entered the invitation/engagement lifecycle (`wmkf_invited=true` or
+   `wmkf_accepted=true`). A row resolves with review content when
+   `wmkf_reviewreceivedat` is set. It resolves without review content when it has
+   an explicit non-review outcome (declined, no-response,
+   `withdrawn_sufficient`, withdrew, or released), or when its current external
+   token is revoked or expired. A live-token participant without a receipt
+   remains blocking, including a not-yet-accepted invitee. Unselected,
+   applicant-excluded, and explicitly merged/removed duplicate rows do not
+   participate; an unresolved duplicate still in the readiness population
+   blocks. Missing/malformed token dates and unknown lifecycle states block
+   fail-closed. Minting a replacement token clears revocation and writes a future
+   expiry [VERIFIED via `token-lifecycle.mintAndStore` →
+   `reviewer-suggestion.setExternalToken`]. It reactivates readiness only when
+   revoked/expired token state was that otherwise-participating, nonterminal
+   row's sole resolved-without-review condition; it does not reselect a removed
+   row or undo decline/withdraw/release. A synthesis generated before a genuine
+   reactivation remains visible but is not current until the population resolves
+   and synthesis runs again.
 
 ## Phases (independently shippable, in order)
 
@@ -132,7 +155,7 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
 - Extend `/api/review-manager/reviewers` DTO with per-reviewer submission status,
   days since materials sent, and last-reminder timestamp — source is
   `wmkf_remindersentat` + `wmkf_remindercount` on the suggestion
-  [VERIFIED via lib/services/reviewer-reminder-sweep.js:174-188,254-255; the cron
+  [VERIFIED via `reviewer-reminder-sweep.sweepReviewDueReminders`; the cron
   is fire-once (filters `wmkf_remindersentat eq null`)].
 - Manual-nudge semantics: stamps the SAME marker + increments `wmkf_remindercount`
   (so cron and manual can never double-send — shared-marker mechanism), but manual
@@ -140,8 +163,8 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   the staffer sees prior nudges before sending again.
 - ReviewsTab: "Outstanding" section above submitted cards; per-reviewer
   "Send reminder now" action posting to a new guarded route
-  (`requireAppAccess(..., 'review-manager', ...)` per existing pattern
-  [VERIFIED via pages/api/review-manager/download-review.js:44]; add security-matrix
+  (`requireAppAccess(..., 'review-manager', ...)` per the guarded
+  `pages/api/review-manager/download-review.js` route; add security-matrix
   + route-lifecycle entries).
 - Manual send goes through the sweep's send + dedupe path.
 
@@ -160,7 +183,7 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   ratings table (same rows/columns as the Compare grid), per-richtext-question
   narrative sections (all reviewers' answers, matrix order, `retired` flag
   carried through). The sanitizer's allowlist
-  [VERIFIED via lib/external/sanitize-review-html.js:31-38] is simple
+  [VERIFIED via `sanitize-review-html` allowlist] is simple
   structural/inline tags only (p, br, strong/b, em/i, ul/ol/li, h2/h3,
   blockquote, a — no tables/images/spans/divs), so the naive tag-mapping
   approach anticipated above was sufficient; no deep-review escalation was
@@ -181,7 +204,8 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
 - Proposal identity on the export uses whatever `proposals[0]` already
   carries on the `/api/review-manager/reviewers` DTO — `requestNumber`,
   `proposalTitle`, `proposalInstitution`, `proposalAuthors`
-  [VERIFIED via pages/api/review-manager/reviewers.js:200-209]. The DTO has no
+  [VERIFIED via `lib/services/review-manager/reviewers-service.js` proposal DTO
+  assembly]. The DTO has no
   dedicated `piName` field; `proposalAuthors` (project leader/applicant)
   stands in as the best-available PI identity rather than extending the
   route.
@@ -195,7 +219,8 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   All-override; the untrusted variable is `reviews_digest` — reviewer
   `answerText` (never `answerHtml`) composed server-side into a plain digest —
   declared `untrusted: true` so the Executor wraps it + injects the A7
-  preamble. Output: strict JSON, single output `synthesis` →
+  preamble. Output: strict JSON with prompt-level
+  `generationMode:'native-json-schema'`, single output `synthesis` →
   `akoya_request.wmkf_reviewsynthesisjson`, `guard: 'always-overwrite'`; a
   `validationSchema` (`lib/utils/ai-output-schema.js`) bounds/strips the parsed
   shape before the writeback.
@@ -215,24 +240,39 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
 - `ReviewsTab`'s Synthesis card (renders only when ≥1 review is submitted):
   stored synthesis sections or a "Generate synthesis" / "Regenerate" action;
   plain-text rendering only (LLM output; no `dangerouslySetInnerHTML`).
-- **Known workflow/UI gap (owner decision 2026-07-26; not yet implemented):**
+- **Known workflow/UI gap (owner decisions 2026-07-26 and 2026-07-27; not yet
+  implemented):**
   preserve the explicit staff action as the early-run override, add automatic
-  execution only after every invited reviewer has submitted, and decouple stored
-  synthesis display from readiness so a populated memo is never hidden merely
-  because the current submitted count is zero. The current ≥1 client gate and
-  zero-only service gate are implementation evidence, not the intended final
-  workflow.
+  execution only after all reviews are in, and decouple stored synthesis display
+  from readiness so a populated memo is never hidden merely because the current
+  submitted count is zero. The current ≥1 client gate and zero-only service gate
+  are implementation evidence, not the intended final workflow. Implement the
+  participation state machine in governing decision 6, including revoked/expired
+  tokens as resolved-without-review and replacement-token minting as
+  reactivation only for otherwise-participating, nonterminal rows.
 - `shared/utils/review-report.js#composeReviewReport` accepts an optional
   `synthesis` param → `synthesisSection` on the composed report, additive in
   both the DOCX and PDF renderers; `ExportMenu` passes
   `proposal.reviewSynthesis` through.
-- **Production execution result (2026-07-26):** Request #1002788 produced the
-  exact categorical digest input, but two current-v2/8000-max-token Executor
-  runs failed parsing incomplete JSON (`Unexpected end of JSON input`), with
-  failed audit ids `f5aa3712-4789-f111-ab0f-6045bd018a07` and
-  `04805a39-4789-f111-ab0f-6045bd018deb`. Neither attempt changed
-  `wmkf_reviewsynthesisjson`. Resolve or execute the multiselect plan's
-  prompt-only rollback before exposure.
+- **Production execution results (2026-07-26 and 2026-07-27):** Request
+  #1002788 produced the exact categorical digest input, but three controlled
+  current-v2/8000-max-token Executor runs failed parsing incomplete JSON
+  (`Unexpected end of JSON input`). The first two failed audit ids are
+  `f5aa3712-4789-f111-ab0f-6045bd018a07` and
+  `04805a39-4789-f111-ab0f-6045bd018deb`. The 2026-07-27 bounded follow-up
+  failed as HTTP 500 with audit id
+  `be61f383-f289-f111-ab0f-70a8a59cded0`, concrete model
+  `claude-sonnet-5`, prompt v2, source `Vercel Interactive`, and redacted
+  `reviews_digest`. No attempt changed `wmkf_reviewsynthesisjson`; the latest
+  run preserved the exact 1,709-character baseline memo and its prior modified
+  timestamp. Its 11 synthetic answers and four staged parent fields were fully
+  restored, with no draft or unrelated email/material/reminder/thank-you
+  change. The local fix now requires `end_turn` before persistence, preserves
+  stop/token/hash diagnostics, uses capability-gated native JSON schema, and
+  retries only a typed `max_tokens` termination once with a bounded larger
+  budget. This is not yet a production-live claim: publish the governed prompt
+  version, deploy the independently reviewed code, and run one controlled
+  post-fix smoke before exposure.
 
 ## Verification per phase
 

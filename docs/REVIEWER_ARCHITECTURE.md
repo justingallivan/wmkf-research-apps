@@ -87,11 +87,12 @@ ingestion.
 
 ## Postgres operational state versus Dataverse authority
 
-The legacy Postgres person/suggestion tables (`researchers`,
-`researcher_keywords`, `publications`, `proposal_searches`, and
-`reviewer_suggestions`) were dropped by migration 018. Wave 2 adapters write the
-canonical Dataverse person and suggestion entities, and `/my-candidates` is
-Dataverse-backed.
+The legacy Postgres person/suggestion tables were dropped by migration 018.
+The historical table names `researchers`, `researcher_keywords`, `publications`,
+and `proposal_searches` are not current stores. The historical table
+`reviewer_suggestions` is a legacy, non-current store. Wave 2 adapters
+write the canonical Dataverse person and suggestion entities, and
+`/my-candidates` is Dataverse-backed.
 
 Reviewer-domain Postgres is not blanket “drain-only.” Active operational tables
 include `reviewer_find_roster` (Workbench Find roster), `review_drafts`

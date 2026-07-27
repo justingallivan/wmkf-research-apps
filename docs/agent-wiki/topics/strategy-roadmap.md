@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-26
+last_verified: 2026-07-27
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -44,8 +44,11 @@ document inventory, and individual implementation plans do not establish priorit
 - Current priorities: `docs/CURRENT_WORK_QUEUE.md`.
 - Current Workbench truth and contradictions:
   `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md`.
-- Current near-term sequence: production synthesis smoke → synthesis lifecycle/reliability →
-  remaining-tab design freeze → first deadline-bound writeup slice. See
+- Current near-term sequence: synthesis structured-output reliability and
+  lifecycle closure → remaining-tab design freeze → first deadline-bound
+  writeup slice. The 2026-07-27 Request `1002788` production smoke closed by
+  its bounded-failure alternative with no partial memo write and full synthetic
+  review restoration; do not schedule another blind regeneration. See
   `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel: `project-virtual-review-panel`.

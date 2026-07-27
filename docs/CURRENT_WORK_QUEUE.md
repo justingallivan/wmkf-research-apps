@@ -6,7 +6,7 @@ status: canonical
 summary: Canonical priority queue separating current commitments, evidence windows, optional work, external dependencies, and parked programs.
 canonical: true
 cataloged: 2026-07-22
-last_verified: 2026-07-26
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -34,10 +34,9 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Production review-synthesis smoke | Use Request `1002788` and a deliberate staff-triggered Generate/Regenerate action. Verify valid structured output, Dataverse persistence, reload visibility, overwrite behavior, and clean logs. Do not add automatic triggering during the smoke. | All smoke criteria in `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` pass, or a bounded diagnosis is recorded with no partial write. |
-| 2 | Reviews/synthesis contract closure | Fix the incomplete-JSON reliability gate; define the participating-invitation set; implement automatic all-in readiness, explicit manual early-run, stored-output visibility, and observable regeneration. | Owner-approved state machine plus tested producer → persistence → consumer contract. |
-| 3 | Remaining lifecycle design freeze | Calendar the fixed deadlines and define the full contract for Pre Site Visit Writeup, Site Visit, Final Writeup, and Initial Writeup. Existing June assumptions are inputs, not decisions. | Each tab has approved user, inputs, producer, persistence, consumer, access, recovery, and deadline. |
-| 4 | First deadline-bound writeup slice | Default candidate is Pre Site Visit Writeup, but only after the calendar and input/artifact contracts are approved. | One request produces a durable, editable Word artifact and visible Workbench state through a production smoke. |
+| 1 | Reviews/synthesis contract closure | The local reliability fix is implemented, independently reviewed READY, and focused tests are green: prompt-level native JSON schema, terminal stop-reason enforcement, retained failure diagnostics, and one bounded `max_tokens` retry. Commit it, complete governed prompt publication/deployment, and run one controlled post-fix smoke; then implement the approved participating-invitation state machine, automatic all-in readiness, explicit manual early-run, stored-output visibility, and observable regeneration. | Controlled post-fix run produces valid persisted synthesis or a typed clean no-write failure; owner-approved state machine plus tested producer → persistence → consumer contract. |
+| 2 | Remaining lifecycle design freeze | Calendar the fixed deadlines and define the full contract for Pre Site Visit Writeup, Site Visit, Final Writeup, and Initial Writeup. Existing June assumptions are inputs, not decisions. | Each tab has approved user, inputs, producer, persistence, consumer, access, recovery, and deadline. |
+| 3 | First deadline-bound writeup slice | Default candidate is Pre Site Visit Writeup, but only after the calendar and input/artifact contracts are approved. | One request produces a durable, editable Word artifact and visible Workbench state through a production smoke. |
 
 ## Audit follow-ups — verified open, not silently prioritized
 
@@ -58,6 +57,27 @@ sequence.
 
 ## Completed in this execution
 
+- Local review-synthesis reliability implementation: the Executor now parses
+  complete normalized text, requires `end_turn` before persistence, preserves
+  safe stop/token/hash diagnostics on failure, and capability-gates native JSON
+  schema. Review synthesis retries only a confirmed `max_tokens` result once,
+  at a bounded larger budget; each invocation remains separately audited.
+  Focused and surrounding Executor/service suites passed 102 tests, and the
+  model-registry gate plus self-test passed. This is not yet a production-live
+  claim; prompt publication, deployment, and the controlled post-fix smoke
+  remain. Independent follow-up review returned READY after the requested local
+  changes.
+- Production review-synthesis smoke: the owner-authorized Request `1002788`
+  smoke ran once on 2026-07-27 after a reversible staff Manual Review Entry.
+  It reproduced the current-v2 incomplete-JSON failure as HTTP 500 and failed
+  AI run `be61f383-f289-f111-ab0f-70a8a59cded0`. The original 1,709-character
+  memo retained SHA-256 `a91f05cc0a20cad72341db9d7fc5fe808ed3b28610a35dfdaca82d69beebbcba`
+  and its prior modified timestamp; no partial synthesis write occurred. The
+  11 synthetic answers and four staged parent fields were atomically restored,
+  with no draft and no changes to other target/sibling email, reminder,
+  materials, or thank-you state. The append-only failed audit row remains.
+  This closes the smoke item by its bounded-diagnosis alternative and advances
+  the queue to synthesis reliability.
 - Evidence-first sweep correction and bounded Workbench truth pass: the sweep now derives truth before
   searching prose, supports domain audits, requires producer→persistence→consumer evidence, and
   records supported/falsified claims. The scalar fact gate now derives Workbench tab counts and
@@ -101,7 +121,9 @@ The reviewer redesign is an active **measured program**, not authorization for c
 These are valid directions but are not current app-team delivery commitments:
 
 - Power Automate Executor parity and status-driven backend automation — Connor-owned and dependent
-  on grant-cycle sequencing.
+  on grant-cycle sequencing. The 2026-07-27 production metadata probe found no
+  deployed prompt-Executor flow among the 114 visible cloud-flow definitions;
+  this is planned external work, not an active production pipeline.
 - Power Automate-backed writeup automation remains dependency-bound. The former Group B document
   is historical; the app-side writeup contract must be redesigned from current fields, prompts,
   inputs, and deadlines before any build.

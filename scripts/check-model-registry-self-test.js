@@ -57,6 +57,7 @@ function cap(family, supportsTemperature, supportsEffort) {
     family: '${family}',
     supportsTemperature: ${supportsTemperature},
     supportsEffort: ${supportsEffort},
+    supportsStructuredOutput: true,
     thinkingMode: 'none',
     maxInputTokens: 200000,
     maxOutputTokens: 64000,
@@ -119,6 +120,7 @@ function main() {
         family: 'opus',
         supportsTemperature: false,
         supportsEffort: true,
+        supportsStructuredOutput: true,
         thinkingMode: 'adaptive',
         maxInputTokens: 1000000,
         maxOutputTokens: 128000,
@@ -130,7 +132,27 @@ function main() {
     }),
     /missing required field "reviewedAt"/,
   );
-  console.log('model-registry self-test OK - 5/5 cases.');
+  expectFail(
+    'capability entry missing structured-output review fails',
+    fixture({
+      badCapability: `{
+        provider: 'anthropic',
+        family: 'opus',
+        supportsTemperature: false,
+        supportsEffort: true,
+        thinkingMode: 'adaptive',
+        maxInputTokens: 1000000,
+        maxOutputTokens: 128000,
+        refusalSemantics: 'standard_stop_reason',
+        requiresRefusalHandling: false,
+        dataRetentionClass: 'standard',
+        reviewedAt: '2026-06-25',
+        source: 'https://example.test/opus',
+      }`,
+    }),
+    /missing required field "supportsStructuredOutput"/,
+  );
+  console.log('model-registry self-test OK - 6/6 cases.');
 }
 
 main();

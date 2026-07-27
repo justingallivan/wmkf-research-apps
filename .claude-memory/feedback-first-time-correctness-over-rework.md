@@ -6,6 +6,12 @@ metadata:
   status: active
 ---
 
+## Recall Rule
+
+At starts, commits, and handoffs, prefer the verification path that prevents
+rework: run the applicable gates, source checks, and self-review even when the
+faster path would probably work.
+
 When working with Justin, prioritize **first-time correctness** over a fast-now /
 fix-later cadence. He would rather pay upfront cost than spend time tracking down
 and correcting errors afterward. Additional overhead on **starts, stops, and

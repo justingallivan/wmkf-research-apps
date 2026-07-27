@@ -32,6 +32,7 @@ test('declares exactly the one override variable', () => {
 
 test('output schema targets akoya_request.wmkf_reviewsynthesisjson with guard always-overwrite', () => {
   expect(PROMPT_OUTPUT_SCHEMA.parseMode).toBe('json');
+  expect(PROMPT_OUTPUT_SCHEMA.generationMode).toBe('native-json-schema');
   expect(PROMPT_OUTPUT_SCHEMA.outputs).toHaveLength(1);
   expect(PROMPT_OUTPUT_SCHEMA.outputs[0]).toMatchObject({
     name: 'synthesis',
@@ -39,6 +40,15 @@ test('output schema targets akoya_request.wmkf_reviewsynthesisjson with guard al
     guard: 'always-overwrite',
   });
   expect(PROMPT_OUTPUT_SCHEMA.jsonSchema.required).toEqual(['synthesis']);
+  expect(PROMPT_OUTPUT_SCHEMA.jsonSchema.additionalProperties).toBe(false);
+  expect(PROMPT_OUTPUT_SCHEMA.jsonSchema.properties.synthesis.required).toEqual([
+    'consensus', 'disagreements', 'keyConcerns', 'ratingSummaries', 'overall',
+  ]);
+  expect(PROMPT_OUTPUT_SCHEMA.jsonSchema.properties.synthesis.additionalProperties).toBe(false);
+  const ratingItem = PROMPT_OUTPUT_SCHEMA.jsonSchema
+    .properties.synthesis.properties.ratingSummaries.items;
+  expect(ratingItem.additionalProperties).toBe(false);
+  expect(ratingItem.required).toEqual(['questionKey', 'questionText', 'summary']);
 });
 
 test('validationSchema accepts a well-formed model response and drops injected extra keys', () => {

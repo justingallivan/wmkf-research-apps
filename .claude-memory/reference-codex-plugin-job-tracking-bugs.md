@@ -1,12 +1,18 @@
 ---
 name: reference-codex-plugin-job-tracking-bugs
-description: "Confirmed codex plugin (v1.0.4/1.0.5) bugs — background reaping kills jobs, state.json races drop/zombify job records, console invisibility is upstream; operating rules to avoid them"
+description: "Historical codex plugin v1.0.4/1.0.5 job-tracking failures; re-check the installed version before applying these mitigations"
 metadata: 
   node_type: memory
   type: reference
-  status: active
+  status: stale
   originSessionId: c18124b6-2252-442d-b924-73ea740f86cf
 ---
+
+## Recall Rule
+
+When plugin-launched Codex job tracking misbehaves, prefer a synchronous fresh
+run and verify actual process/job state directly. Re-check the installed plugin
+version before assuming these 1.0.4/1.0.5 defects still apply.
 
 Researched 2026-07-04 (S330) after repeated lost/zombie Codex jobs. Confirmed causes, all present in plugin 1.0.5 (upgrading does not help):
 

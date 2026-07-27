@@ -7,7 +7,7 @@ scope: workflow
 last_verified: S285 (2026-06-24)
 ---
 
-## Recall Trigger
+## Recall Rule
 
 Read before declaring a slice done, committing code, or delegating a review
 through Codex, `/code-review`, contract-reconcile, or another reviewer.

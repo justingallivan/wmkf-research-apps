@@ -2,7 +2,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-05-07 via `scripts/audit-dataverse-state.js`; discriminator/era distributions 2026-05-15 via `scripts/probe-akoya-request-discriminators.js`
+**Last verified:** live shape 2026-05-07 via `scripts/audit-dataverse-state.js`; discriminator/era distributions 2026-05-15 via `scripts/probe-akoya-request-discriminators.js`; application routing 2026-07-27 via source and caller inspection
 **Live row count:** **~25,561** (FetchXML aggregate, 2026-05-15). ⚠️ OData `/$count` returns **5,000** — Dataverse caps `$count` at 5,000; the "5,000" figure is the cap, not the total. Use FetchXML aggregate / RetrieveTotalRecordCount for the true count.
 **Entity set:** `akoya_requests`
 
@@ -12,13 +12,17 @@
 
 **Master grant-request record.** AkoyaGO-vendor-owned core fields + WMKF-added `wmkf_*` extension fields. The lifecycle pivot for proposals — Reviewer Finder, Review Manager, Phase I/II Summaries, Grant Reporting all read here.
 
-**No dedicated adapter** — accessed directly via `DynamicsService.queryRecords` / `DynamicsService.getRecord` / `DynamicsService.updateRecord` from many endpoints and services.
+**Application adapter:** `lib/dataverse/adapters/grant-request.js`. Domain routes call
+services, and those services use the grant-request adapter for normal request reads
+and writes. `DynamicsService` remains the underlying transport; Dynamics Explorer
+uses its generic query surface rather than the domain adapter.
 
 ## Key fields (live, sample-probed 2026-05-07)
 
 Identity / status:
 - `akoya_requestid` (PK)
-- `akoya_requestnum` (e.g. `1002787`) — natural join key, used by Postgres `reviewer_suggestions.request_number`
+- `akoya_requestnum` (e.g. `1002787`) — natural join key; the dropped historical
+  Postgres `reviewer_suggestions.request_number` column used it before the Dataverse cutover
 - `akoya_title`
 - `akoya_requeststatus` (String — `Concept Pending | Phase I Pending | Phase II Pending | Approved | Closed | Phase I Declined | ...`; there is **no live `Accepted`** value — an earlier draft listed one in error. Full live distribution + the decided-state class map are below.)
 - `akoya_requesttype` (Picklist), `wmkf_request_type` (Picklist)
@@ -122,24 +126,37 @@ Sample row had **364 total fields** (vendor + WMKF + standard Dataverse audit fi
 
 ## Read paths (high-traffic)
 
-- `lib/services/dynamics-service.js` (canonical client, all reads route here)
-- `pages/api/dynamics-explorer/*` — natural-language query
-- `pages/api/grant-reporting/*` — final-report extraction + writeback
-- `pages/api/phase-i-dynamics/summarize.js` — Phase I summary writeback
-- `pages/api/review-manager/*` — reviewer lifecycle
-- `pages/api/reviewer-finder/{load-proposal,my-candidates,save-candidates}.js` — `load-proposal.js` `getRecord('akoya_requests', requestId, { select: 'akoya_requestid,akoya_requestnum' })` to resolve request number for the SharePoint proposal lookup that follows
-- `pages/api/grant-reporting/lookup-grant.js` — request lookup for Grant Reporting (`reviewer-finder/lookup-grant.js` does not exist; the original Atlas citation was wrong)
-- `pages/api/reviewer-finder/my-proposals.js` — `DynamicsService.queryAllRecords('akoya_requests', ...)` to list Phase-II-Pending proposals for the picker; cycle and PD filters applied
-- `pages/api/expertise-finder/*`
+- `lib/dataverse/adapters/grant-request.js` — domain adapter over the canonical
+  `lib/services/dynamics-service.js` transport
+- Reviewer Finder services including `load-proposal-service.js`,
+  `my-proposals-service.js`, and `my-candidates-service.js`
+- Review Manager services for reviewer state, synthesis, and email delivery
+- Workbench services for dashboard, request resolution, and triage
+- Grant Reporting, Phase I, Expertise Finder, and Grantee Deliverables services
+- `pages/api/dynamics-explorer/*` — natural-language queries use the generic
+  Dynamics client intentionally
 - (NOT `pages/api/integrity-screener/*`, NOT `pages/api/virtual-review-panel.js` — both read no Dataverse. `integrity-service.js` imports only Postgres `sql`; `virtual-review-panel.js` is a single file (not a directory) that's PDF-upload-driven and Postgres-backed via `PanelReviewService`.)
 - `lib/dataverse/adapters/reviewer-suggestion.js` `findByPD` — joins requests by lead PD
 
-## Write paths (verified 2026-05-07)
+## Write paths
 
-- `pages/api/phase-i-dynamics/summarize.js` — writes ONLY `wmkf_ai_summary` with pre-flight overwrite guard. The endpoint header comment defers `wmkf_ai_dataextract` (structured JSON) to "a later pass" — do not assume it writes structured fields.
-- `lib/services/execute-prompt.js` (`persistOutputs()` → `DynamicsService.updateRecord`) — Executor contract writer. **Dynamically writes to whichever `akoya_request` field the prompt's `target.field` declares.** Used by `pages/api/phase-i-dynamics/summarize-v2.js`. Same skip-if-populated overwrite-guard pattern (`preflightGuards()`). This is the canonical AI writeback path going forward; phase-i-dynamics/summarize.js is the legacy direct path.
+- `lib/services/phase-i-dynamics/summarize-service.js` — writes ONLY
+  `wmkf_ai_summary` through `grantRequestAdapter.updateById`, with a pre-flight
+  overwrite guard. The legacy route contract still defers structured extraction;
+  do not assume this path writes `wmkf_ai_dataextract`.
+- `lib/services/execute-prompt.js` (`persistOutputs()` →
+  `grantRequestAdapter.updateById`) — Executor contract writer. **Dynamically
+  writes to whichever `akoya_request` field the prompt's `target.field`
+  declares.** Used by the Phase I summarize-v2 route. Same skip-if-populated
+  overwrite-guard pattern (`preflightGuards()`).
 - (Dynamics Explorer does NOT write — its 11 tools are read-only: search, get_entity, get_related, describe_table, query_records, count_records, aggregate, find_reports_due, list_documents, search_documents, export_csv. The `dynamics_restrictions` table exists but no write-tools are wired in.)
-- `pages/api/workbench/triage.js` (S261) — writes ONLY `wmkf_triagestatus` (one-field `updateRecord` with caller `MSCRMCallerID`), behind a hard manage gate (superuser or lead PD). `scripts/backfill-d26-triage.mjs` also writes `wmkf_triagestatus` in bulk (one-time D26 backfill, restriction-bypassed). **[LIVE — field deployed + backfilled + read by the dashboard (§3, S261); see Key fields. Called from the UI by the dashboard's per-row triage-flip control (canManage-gated cosmetically; this route is the authoritative gate).]**
+- `lib/services/workbench/triage-service.js` — writes ONLY
+  `wmkf_triagestatus` through `grantRequestAdapter.updateById`, with the acting
+  caller supplied after the route's hard manage gate (superuser or lead PD).
+  `scripts/backfill-d26-triage.mjs` also writes `wmkf_triagestatus` in bulk
+  (one-time D26 backfill, restriction-bypassed). **[LIVE — field deployed +
+  backfilled + read by the dashboard (§3, S261); see Key fields. The route
+  remains the authoritative authorization gate.]**
 
 > **Codex R7 corrections (2026-05-07):**
 > - `pages/api/grant-reporting/extract.js` historically wrote only the `wmkf_ai_run` audit log row (the line 526 comment *"wmkf_ai_run row is therefore the ONLY durable copy of"* extracted data reflects that prior state). Field Set B fields were DEPLOYED on `akoya_request` 2026-05-07 (22 fields, see `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`); wiring `grant-reporting/extract.js` to write the flat fields is a follow-up.
@@ -159,8 +176,8 @@ All user-driven writes use `MSCRMCallerID` (impersonation contract per `docs/DYN
 
 | Postgres | Dataverse | Notes |
 |---|---|---|
-| `reviewer_suggestions.request_number` | `akoya_request.akoya_requestnum` | natural join key |
-| `proposal_searches.request_number` | same | (table empty) |
+| historical `reviewer_suggestions.request_number` (table dropped by migration 018) | `akoya_request.akoya_requestnum` | former natural join key |
+| historical `proposal_searches.request_number` (table dropped by migration 018) | same | former join; table was empty |
 | `grant_cycles.short_code` | derives from `akoya_request.wmkf_meetingdate` via `cycle-code.js` | not stored on request |
 
 ## Polymorphism & era distribution (live-probed 2026-05-15)

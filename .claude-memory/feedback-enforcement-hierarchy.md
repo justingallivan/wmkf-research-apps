@@ -8,7 +8,7 @@ metadata:
   last_verified: S291 via incident (process-legacy ownerAppKey) + Codex review
 ---
 
-## Recall Trigger
+## Recall Rule
 
 Read this when proposing or building a safeguard against a class of mistake: a
 gate, hook, reminder, review step, or "be careful to X" rule.
@@ -27,6 +27,11 @@ Apply the enforcement hierarchy, strongest first:
 For any safeguard, ask whether it depends on the same actor it constrains. If it
 does, classify it as friction and either move it up the hierarchy or label the
 remaining claim `[ASSUMED]`.
+
+[VERIFIED via `scripts/check-route-lifecycle-auth.js` and
+`scripts/check-scaffolding-tokens.js` as current examples.] The hierarchy itself
+is an engineering rule; each proposed enforcement still needs its own source and
+self-test evidence.
 
 ## Evidence Required
 

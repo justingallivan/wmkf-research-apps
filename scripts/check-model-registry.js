@@ -22,6 +22,7 @@ const REQUIRED_CAPABILITY_FIELDS = [
   'family',
   'supportsTemperature',
   'supportsEffort',
+  'supportsStructuredOutput',
   'thinkingMode',
   'maxInputTokens',
   'maxOutputTokens',
@@ -158,7 +159,12 @@ function validateCapabilityEntries(capabilities) {
         errors.push(`MODEL_CAPABILITIES["${key}"] missing required field "${field}"`);
       }
     }
-    for (const field of ['supportsTemperature', 'supportsEffort', 'requiresRefusalHandling']) {
+    for (const field of [
+      'supportsTemperature',
+      'supportsEffort',
+      'supportsStructuredOutput',
+      'requiresRefusalHandling',
+    ]) {
       if (typeof caps[field] !== 'boolean') {
         errors.push(`MODEL_CAPABILITIES["${key}"].${field} must be boolean`);
       }

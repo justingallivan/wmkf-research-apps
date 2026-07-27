@@ -1,7 +1,7 @@
 # Atlas: `wmkf_portalmembership` (Dataverse, WMKF pilot entity)
 
-**Last verified:** 2026-05-22 (S178) — **DEPLOYED to prod Dataverse.** Slice-0 entity, created via `apply-dataverse-schema.js --wave=4 --execute`.
-**Live row count:** 0 (entity created, no rows yet — drain/portal code not built)
+**Last verified:** schema deployment and entity-set metadata 2026-05-22 (S178); current application paths re-verified from source 2026-07-27.
+**Live row count:** **UNKNOWN** — no post-implementation live row-count probe was run in this reconciliation. The historical 2026-05-22 pre-build probe observed 0 rows and must not be treated as current.
 **Entity set:** `wmkf_portalmemberships` (confirmed live, HTTP 200, 2026-05-22)
 **Schema spec:** `lib/dataverse/schema/wave4/wmkf_portalmembership.json`
 **Naming:** logical name `wmkf_portalmembership` — no internal underscores, matching the sibling `wmkf_app*` convention. An earlier draft used `wmkf_portal_membership`; renamed to the no-underscore form pre-deploy (S178).
@@ -9,7 +9,7 @@
 
 ## Source of truth
 
-**The one new intake-portal pilot entity: a contact ↔ account (institution) join with self-service request + staff approval state.** Shape locked at `docs/INTAKE_PORTAL_DESIGN.md:98-117`. Only the *entity* is slice 0; the staff approve/reject **admin UI is a separate downstream slice** (`docs/INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN.md`).
+**The intake-portal contact ↔ account (institution) authorization join.** The entity is deployed and its approved+active rows are read through `lib/services/membership-service.js` and `lib/dataverse/adapters/membership.js`. Current callers enforce any-role access on draft autosave and attachment operations, and Submitter-role access on final submit. The applicant landing page remains an identity-only smoke page; institution selection and membership listing are not wired there. Staff approve/reject routes and UI are also unbuilt/parked (`docs/INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN.md`).
 
 One row per `(contact, account)` pair regardless of approval state (alt key) — re-applying after rejection **updates** the existing row, never duplicates. Pending vs. revoked vs. rejected are distinct states `statecode` alone cannot express; `wmkf_approvalstatus` carries the distinction, `wmkf_priordecisionstatus` snapshots the prior terminal state across a re-application.
 
@@ -40,13 +40,17 @@ Alternate key:
 
 ## Read paths
 
-- **(Future, separate slice)** `/api/apply/admin/memberships*` GET — staff approval queue (waiting-on-approval vs. cut-off), reads `wmkf_approvalstatus` + `wmkf_priordecisionstatus` for `priorDecision.status`.
-- **(Future)** Applicant-side submit-authority check — `akoya_request._wmkf_account_value` must equal an `account` for which the authenticated `contact` has an **approved + active** `wmkf_portalmembership`.
+- **Shipped:** `MembershipService.getLiveMembershipsForContact` queries approved + active rows for a Dataverse contact.
+- **Shipped guards:** `hasLiveMembership` protects draft autosave plus attachment token/finalization paths for either Submitter or Contributor membership; `hasSubmitterRole` protects `/api/intake/submit` for the selected account.
+- **Unbuilt / proposed:** `/apply` institution selection/listing. The current `pages/apply/index.js` renders authenticated identity only and has no membership-service caller.
+- **Unbuilt / proposed, separate slice:** `/api/apply/admin/memberships*` GET and the staff approval queue.
 
 ## Write paths
 
-- **(Future, separate slice)** Admin approve/reject — sets `wmkf_approvalstatus`, `wmkf_ApprovedBy@odata.bind`, `wmkf_approvedat`, `wmkf_rejectionreason`.
-- **(Future)** Applicant-side institution-claim upsert (cross-slice contract, build plan §9) — upsert on the `(contact, account)` alt key; on re-application copy current `wmkf_approvalstatus` → `wmkf_priordecisionstatus` before setting `Requested`.
+No current application writer was found in the 2026-07-27 source trace.
+
+- **Unbuilt / proposed, separate slice:** Admin approve/reject — would set `wmkf_approvalstatus`, `wmkf_ApprovedBy@odata.bind`, `wmkf_approvedat`, and `wmkf_rejectionreason`.
+- **Unbuilt / proposed:** Applicant-side institution-claim upsert — would upsert on the `(contact, account)` alternate key and preserve a prior terminal decision before setting `Requested`.
 
 ## Cross-system
 
@@ -59,7 +63,7 @@ Alternate key:
 
 ## Migration disposition
 
-Net-new pilot entity (slice 0). No backfill — forward-only via the applicant claim flow + staff admin slice. No legacy data.
+Net-new pilot entity (slice 0). No backfill and no legacy data. The read/authorization path is shipped; the applicant claim writer and staff admin control plane remain unbuilt.
 
 ## Open questions / gotchas
 
@@ -67,4 +71,4 @@ Net-new pilot entity (slice 0). No backfill — forward-only via the applicant c
 - **Naming normalized to the no-underscore form (S178).** Logical name is `wmkf_portalmembership` (not `wmkf_portal_membership`), matching the sibling `wmkf_app*` convention. The earlier underscore form was renamed pre-deploy; the admin build plan and design docs were updated in the same pass.
 - **`@odata.bind` keys CONFIRMED from live metadata (2026-05-22):** `wmkf_Contact` / `wmkf_Account` / `wmkf_RequestedBy` / `wmkf_ApprovedBy` — all PascalCase. The admin + applicant slices depend on them; lowercase keys produce `0x80048d19`.
 - **`wmkf_priordecisionstatus` is nullable by design** — no "none" option value; absence is the fourth state. Don't add a 4th option to make queries simpler.
-- **Connor shape review before `--execute`** — this is the one entity that gets design review (`project_dataverse_creator_privileges`, summary-after model).
+- **Historical pre-deploy gate:** Connor shape review was required before `--execute`; the entity was subsequently deployed in S178. It is not a current action item.

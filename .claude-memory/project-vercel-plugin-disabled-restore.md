@@ -1,6 +1,6 @@
 ---
 name: project-vercel-plugin-disabled-restore
-description: Vercel plugin is disabled to save context — what it provides and exactly how to turn it back on when deploy debugging needs it
+description: The Vercel plugin was disabled at the 2026-07-26 inspection to save context; re-check current settings before using these restore instructions.
 metadata: 
   node_type: memory
   type: project
@@ -11,9 +11,26 @@ metadata:
   modified: 2026-07-27T00:57:00.767Z
 ---
 
-The `vercel@claude-plugins-official` plugin is **disabled** in `~/.claude/settings.json`
-(set 2026-07-26, Session 377 `/doctor`). It is **not uninstalled** — it stays cached at
-`~/.claude/plugins/cache/claude-plugins-official/vercel/` and re-enables instantly.
+## Recall Rule
+
+Read this when: deciding whether to re-enable the Vercel plugin or determining
+how a globally installed CLI is managed on this machine.
+
+Do:
+- Re-check the current plugin setting before claiming it is disabled.
+- Use `readlink` plus both package-manager inventories to identify an installer.
+- Start a new session after re-enabling a plugin.
+
+Do not:
+- Infer npm vs Homebrew ownership from `/opt/homebrew/bin` alone.
+- Treat the cached plugin or CLI version recorded below as timeless.
+
+Ground truth: dated 2026-07-26 settings/transcript/toolchain inspection. Current
+machine state requires the same read-only checks before action.
+
+**Machine snapshot, 2026-07-26:** `vercel@claude-plugins-official` was disabled
+in `~/.claude/settings.json` but remained cached (not uninstalled). Re-check
+current plugin settings and cache presence before applying the restore steps.
 
 **Restore it (no re-authentication, takes seconds):**
 

@@ -1,33 +1,84 @@
 ---
 name: project-app-access-control
-description: "App-level access control architecture — Dataverse table, appRegistry as source of truth, React context, default grants, and API enforcement"
-metadata: 
+description: "App-level access control architecture — Dataverse grants, appRegistry source of truth, React context, default grants, API enforcement, and Q9 transport posture"
+metadata:
   node_type: memory
   type: project
   originSessionId: 17893605-3207-451d-8190-118bbacd8141
   status: active
   scope: auth
-  last_verified: S211 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-27 via app-access source/tests, read-only live inventory, Q9 plan, and Vercel metadata
 ---
 
 ## Recall Rule
 
-Read this when: adding or wiring app-level access control — a new app, a new app-specific API route, default grants, or the React access context.
+Read this when: adding an app, gating an app-specific route, changing default
+grants, working on the React access context, or resuming the Q9 app-access DAL
+migration.
 
 Do:
-- Treat `shared/config/appRegistry.js` as the single source of truth for app definitions and `DEFAULT_APP_GRANTS`.
-- Enforce app-specific routes with `requireAppAccess(req, res, ...appKeys)`; grants live in Dataverse `wmkf_appuserappaccesses`.
-- Use `AppAccessContext.js` (`hasAccess(appKey)` / `isSuperuser`) for client-side gating.
+
+- Treat `shared/config/appRegistry.js` as the source of truth for app
+  definitions and `DEFAULT_APP_GRANTS`.
+- Enforce app-specific routes with
+  `requireAppAccess(req, res, ...appKeys)`; grants live in Dataverse
+  `wmkf_appuserappaccesses`.
+- Use `AppAccessContext.js` (`hasAccess(appKey)` / `isSuperuser`) for
+  client-side gating.
+- Regenerate current app and endpoint counts from
+  `docs/CANONICAL_COUNTS.md`; do not preserve a hand-maintained count history
+  here.
 
 Do not:
-- Read app access from Postgres `user_app_access` — it was retired 2026-05-12 (Wave 1 closeout).
-- Assume the two legacy reviewer grants no longer matter — `reviewer-finder` and `review-manager` were retired from `appRegistry.js`, but the API routes still accept those legacy grant strings variadically with `reviewers` as deferred cleanup.
 
-Ground truth: `shared/config/appRegistry.js`, `shared/context/AppAccessContext.js`, `lib/utils/auth.js` (`requireAppAccess`), Dataverse `wmkf_appuserappaccesses`; counts regenerated from live code via `docs/CANONICAL_COUNTS.md`. See [[project-reviewer-apps-redesign-direction]].
+- Read app access from Postgres `user_app_access`; it was retired 2026-05-12.
+- Remove the legacy `reviewer-finder` / `review-manager` route-gate strings
+  just because those apps left `appRegistry.js`. Current routes still accept
+  those grants variadically with `reviewers`.
+- Treat Q9 as complete. Preferences use a DynamicsService adapter, but
+  `dataverse-app-access-service.js` still uses the raw Dataverse client.
 
-- **Dataverse `wmkf_appuserappaccesses`** — per-user app grants; Postgres `user_app_access` retired 2026-05-12 (Wave 1 closeout)
-- **`shared/config/appRegistry.js`** — single source of truth for all [12](../docs/CANONICAL_COUNTS.md#app-definition-count) app definitions (keys, names, icons, categories, descriptions); used by Layout nav, home page, admin dashboard, and access control
-- **`shared/context/AppAccessContext.js`** — React context; fetches `/api/app-access` on mount, exposes `hasAccess(appKey)` and `isSuperuser`
-- New users get only `dynamics-explorer` by default (configured in `DEFAULT_APP_GRANTS` in `appRegistry.js`)
-- **API-level enforcement active** — `requireAppAccess(req, res, ...appKeys)` on [87](../docs/CANONICAL_COUNTS.md#requireappaccess-endpoint-count) app endpoints (was ~48 at S154 2026-05-14, then 52 until test-email→requireSuperuser at S198, then 53 until `/api/workbench/applicant-reviewers` at S210, then 54 until `/api/workbench/enrich-recommended` at S211, then 55 until `/api/reviewer-finder/prompt-override` at S222, then 56 until `/api/workbench/reviewer-roster` at S224, then 57 until `/api/reviewer-finder/web-suggestions` at S227 (which made it 58); that route was REMOVED S230 (web-discovery abandoned) → back to 57; S236 `/api/workbench/manual-reviewer` makes it 58 again, then `/api/workbench/orcid-lookup` makes it 59; S237 `/api/workbench/reviewer-lookup` (manual-add cross-store dedup) makes it 60; S243 2026-06-11 `/api/reviewer-finder/cycle-material` (Phase-1 private download proxy) makes it 61; S248 2026-06-12 `/api/field-primer/generate` (standalone staff field overview) makes it 62; S258 `/api/workbench/proposal-documents` makes it 63, then `/api/workbench/download-proposal-document` (Proposal-tab Phase I doc list + scoped download proxy) makes it 64; S260 `/api/workbench/reviewer-rollup` (per-request Overview reviewer-stage rollup) makes it 65; S261 `/api/workbench/triage` (hard-gated triage-status write) makes it 66; S264 `/api/workbench/promote-applicant-reviewer` (explicit applicant promotion) makes it 67, then `/api/workbench/export-candidates` (Find-tab Excel export) makes it 68; S268 `/api/workbench/grantee-deliverables/generate` (grantee abstract generation) makes it 69, then `/api/workbench/grantee-deliverables/recipients` (PI+liaison resolve) makes it 70, then `/api/workbench/grantee-deliverables/send-invite` (grantee invite send) makes it 71, then `/api/workbench/grantee-deliverables/awardees` (cycle awardee list) makes it 72; S270 `/api/workbench/grantee-deliverables/website-html` (chunk-8 single-award HTML) makes it 73, then `/api/workbench/grantee-deliverables/cycle-export` (chunk-8 combined-cycle HTML export) makes it 74; S271 `/api/workbench/grantee-deliverables/preview-invite` (render-only invite preview, no send) makes it 75; S275 `/api/review-manager/campaign-config` (reviewer-engagement Phase-1 per-request campaign config) makes it 76, then `/api/review-manager/withdraw-sufficient` (Phase-4 PD selective decline) makes it 77; S278 `/api/workbench/grantee-deliverables/abstract` (PD review/edit/save of the publishable abstract) makes it 78; S289 `/api/reviewer-finder/merge-candidates` (reviewer duplicate merge — plan/confirm) makes it 79; S291 2026-06-26 archived `/api/process-legacy` (legacy Phase II writeup surface) → back to 78; S326 2026-07-03 `/api/review-manager/send-review-reminder` (workbench Reviews tab Phase 1 — staff "Send reminder now" manual review-due nudge) makes it 79 again; `/api/review-manager/synthesize-reviews` (workbench Reviews tab Phase 4 — AI synthesis of submitted reviews) makes it 80; S328 `/api/review-manager/release-settings` GET (materials/release email attach-proposal-email setting — its PUT is `requireSuperuser`, not counted here) makes it 81; S328 `/api/review-manager/materials-preflight` (reviewer-visible SharePoint download-folder guard — warns the PD before a materials release when the portal-visible folder is empty) makes it 82; 2026-07-06 `/api/review-manager/campaign-timeline-defaults` GET (current-cycle reviewer invitation timeline defaults; PUT is `requireSuperuser`) makes it 83; 2026-07-07 `/api/review-manager/update-abstract` (PD fixes a hard-wrapped proposal abstract of record from the invite flow) makes it 84; S349 2026-07-08 `/api/workbench/decline-referrals` (staff-side reader for reviewer decline-referrals) makes it 85; 2026-07-22 `/api/review-manager/manual-review-entry` (complete structured staff rescue) makes it 86; `/api/review-manager/terminal-transition` makes it 87; the pointer target is regenerated from live code)
-- **`reviewers` grant SHIPPED (S208), legacy registry entries retired S261** — `appRegistry.js` now exposes only the `reviewers` Workbench grant for this workflow; the reviewer-finder/review-manager API routes still accept legacy keys *variadically* (`requireAppAccess(req,res,'<old-key>','reviewers')`, e.g. `reviewer-finder/my-proposals.js:38`, `review-manager/reviewers.js:95`) so old Dataverse grants remain harmless during deferred cleanup. The standalone pages were removed; do not remove the legacy route-gate strings until the API cleanup is explicitly planned.
+## Current contract
+
+- The registry currently defines
+  [12](../docs/CANONICAL_COUNTS.md#app-definition-count) apps. New users get
+  only `dynamics-explorer` by default.
+- API enforcement currently covers
+  [87](../docs/CANONICAL_COUNTS.md#requireappaccess-endpoint-count)
+  app-specific endpoints.
+- `requireAppAccess` checks active status and superuser role fresh on every
+  request. It caches ordinary app grants for two minutes.
+- Grant lookup failures fail closed without poisoning that cache:
+  `requireAppAccess` wraps the Dataverse lookup in `withDalContext`, requests
+  `throwOnError`, returns a retryable 503, and does not cache an empty grant
+  set. Display-only reads retain their graceful `[]` fallback.
+- The admin API uses a strict all-grants read. Grant/revoke responses report
+  only identifiers actually completed; a transport error returns non-2xx with
+  any completed prefix instead of claiming every requested key succeeded.
+- `shared/context/AppAccessContext.js` fetches `/api/app-access` and exposes
+  `hasAccess(appKey)` / `isSuperuser` to the UI.
+- `reviewers` is the shipped Workbench grant. Legacy reviewer grant strings
+  remain accepted by selected API routes as deferred cleanup.
+
+## Q9 rollout boundary
+
+The 2026-07-27 Vercel probe found no `DATAVERSE_DAL_UNIVERSAL` entry in the
+current Preview or Production project configuration. The owner accepted that
+posture and replaced the low-signal passive soak with deterministic
+`DATAVERSE_DAL_UNIVERSAL=on` acceptance. Seven focused suites / 33 tests cover
+the ordinary-user lookup, admin list/grant/revoke, fresh-profile default
+grants, and partial-failure UI refresh; all passed. A read-only live inventory
+found 10 active profiles: two
+superusers, six mapped ordinary users with three to five grants, and two
+unmapped read-only profiles. No grant, environment variable, deployment, or
+saved session changed. Stage 2 is satisfied and Stage 4 is ready to execute;
+require a deliberately designated ordinary-user Preview smoke, reversible
+grant/revoke restoration check, authenticated reviewer-finder
+`analyze`/`discover` check with a known prompt override, and production log
+watch at release.
+
+Ground truth: `shared/config/appRegistry.js`,
+`shared/context/AppAccessContext.js`, `lib/utils/auth.js`,
+`lib/services/dataverse-app-access-service.js`, Dataverse
+`wmkf_appuserappaccesses`, and
+`docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md`.

@@ -38,8 +38,8 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [BYPASS_STRIP_PLAN.md](BYPASS_STRIP_PLAN.md) | plan | active | yes | Converted 52 bypass scopes to withDalContext; bypass-shape law built; Stage 4 tightening executed for 10/11 sites (site 33 deferred). S333. |  |
-| [CHUNK_CONSOLIDATION_PLAN.md](CHUNK_CONSOLIDATION_PLAN.md) | plan | active | yes | Consolidate array-chunking loops onto lib/utils/chunk.js: 17 mechanical swaps, 4 index-using left with comment, 1 sibling leave. Stages 0-2 complete. | 2026-07-05 |
+| [BYPASS_STRIP_PLAN.md](BYPASS_STRIP_PLAN.md) | plan | historical |  | Historical record of the completed bypass strip and trust-model tightening; the deferred notification site later closed in its follow-on plan. | 2026-07-27 |
+| [CHUNK_CONSOLIDATION_PLAN.md](CHUNK_CONSOLIDATION_PLAN.md) | plan | historical | yes | Completed record: lib/utils/chunk.js shipped, 17 sites migrated, five intentional loops documented, and the optional gate declined. | 2026-07-05 |
 | [CLOSEABLE_CLASS_INVARIANT_MAP.md](CLOSEABLE_CLASS_INVARIANT_MAP.md) | plan | active |  | Security/correctness classes on the enforcement ladder, the tested move that lifts each, and a ranked queue. Headline: in plain JS, rung 1 is rarely reachable. |  |
 | [CONTACT_ENRICHMENT_SERVICE_DECOMPOSITION_PLAN.md](CONTACT_ENRICHMENT_SERVICE_DECOMPOSITION_PLAN.md) | plan | active | yes | DONE (S337): split ContactEnrichmentService into 13 modules behind a 549-L facade; all 10 stages executed, with some reviews pending. |  |
 | [CURRENT_WORK_QUEUE.md](CURRENT_WORK_QUEUE.md) | source-of-truth | canonical | yes | Canonical priority queue separating current commitments, evidence windows, optional work, external dependencies, and parked programs. | 2026-07-22 |
@@ -56,7 +56,7 @@ related:
 | [INVARIANT_MAP_ORCHESTRATION_BRIEF.md](INVARIANT_MAP_ORCHESTRATION_BRIEF.md) | plan | historical |  | Historical orchestration brief that produced the Closeable-Class Invariant Map. |  |
 | [NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md](NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md) | source-of-truth | canonical | yes | History left three *different* kinds of legacy naming, and they look alike until you trace callers:. | 2026-07-02 |
 | [NOMENCLATURE_GLOSSARY.md](NOMENCLATURE_GLOSSARY.md) | source-of-truth | canonical | yes | Strategy and classification framework: docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md. | 2026-07-02 |
-| [NOTIFICATION_TRUST_MODEL_PLAN.md](NOTIFICATION_TRUST_MODEL_PLAN.md) | plan | draft | yes | Push withDalContext establishment for notify()'s email branch up to real entry points across its caller fan-out (site 33, deferred from Stage 4). |  |
+| [NOTIFICATION_TRUST_MODEL_PLAN.md](NOTIFICATION_TRUST_MODEL_PLAN.md) | plan | historical |  | Historical record of the completed NotificationService context push-up and removal of its shared internal trusted-context wrapper. | 2026-07-27 |
 | [ODATA_ESCAPE_CONSOLIDATION_PLAN.md](ODATA_ESCAPE_CONSOLIDATION_PLAN.md) | plan | active | yes | Consolidate hand-rolled OData escaping onto odata.escape; 8 mechanical + 2 guarded swaps + 2 divergent sites per owner ruling. Executed S331. | 2026-07-05 |
 | [PDF_EXPORT.md](PDF_EXPORT.md) | history | active |  | This document describes the PDF export system and how to add it to other apps in the suite. | 2026-07-02 |
 | [PDF_INPUT_FOR_BACKEND.md](PDF_INPUT_FOR_BACKEND.md) | history | historical |  | 2. PDF prompt-caching cuts subsequent calls by 90% and is verified working. The staged 3-pass pipeline drops from $0.39 → $0.20 per proposal and... | 2026-07-02 |
@@ -77,7 +77,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [DATA_ACCESS_LAYER_MIGRATION_PLAN.md](DATA_ACCESS_LAYER_MIGRATION_PLAN.md) | plan | active |  | Ratchet-gated migration of raw/aliased DynamicsService callers into per-entity adapters; ends fail-closed. Approved S328; amended after S329 Codex review. | 2026-07-04 |
+| [DATA_ACCESS_LAYER_MIGRATION_PLAN.md](DATA_ACCESS_LAYER_MIGRATION_PLAN.md) | plan | historical |  | Historical execution record for the completed DAL migration; current follow-on work is tracked in the Q9 prefs/app-access plan. | 2026-07-04 |
 | [Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md](Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md) | plan | active |  | Staged migration of prefs + app-access off client.js into DynamicsService adapters (DAL-plan Stage 9 Q9). Wrap-before-swap; prefs first, app-access last. | 2026-07-06 |
 
 ## dataverse
@@ -141,7 +141,7 @@ related:
 | [BILL_HONORARIUM_INTEGRATION_DESIGN.md](BILL_HONORARIUM_INTEGRATION_DESIGN.md) | spec | historical |  | Historical reviewer BILL onboarding design; automated BILL integration was tabled by the owner on 2026-07-12. | 2026-07-02 |
 | [BILL_integration_handoff.md](BILL_integration_handoff.md) | history | historical |  | Historical BILL.com integration handoff; automated BILL integration was tabled by the owner on 2026-07-12. | 2026-07-02 |
 | [BILL_LIB_DESIGN.md](BILL_LIB_DESIGN.md) | spec | historical |  | Historical BILL API wrapper design retained as implementation history; automated BILL integration was tabled on 2026-07-12. | 2026-07-02 |
-| [HONORARIUM_PORTAL_CREATION_STRATEGY.md](HONORARIUM_PORTAL_CREATION_STRATEGY.md) | plan | active |  | No-BILL honorarium creation LIVE in Production 2026-07-02 (BILL deferred); self-lookup + backfill hardening done; capture-only backfill unneeded. | 2026-07-02 |
+| [HONORARIUM_PORTAL_CREATION_STRATEGY.md](HONORARIUM_PORTAL_CREATION_STRATEGY.md) | plan | active |  | No-BILL honorarium creation is live; a 2026-07-27 census confirms all 40 portal-era rows have matching proposal and suggestion links. | 2026-07-02 |
 
 ## general
 
@@ -158,23 +158,23 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [GRANTEE_WAIVER_VERSIONING_PLAN.md](GRANTEE_WAIVER_VERSIONING_PLAN.md) | plan | draft |  | Version the grantee publication waiver like the reviewer COI/AI-use policies: a grantee-waiver slot, admin editing, and an acked-version lookup. |  |
+| [GRANTEE_WAIVER_VERSIONING_PLAN.md](GRANTEE_WAIVER_VERSIONING_PLAN.md) | plan | historical |  | Historical design and rollout record for the shipped, versioned grantee publication waiver. |  |
 
 ## grantee-portal
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md](GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md) | plan | active |  | - The 14-day-to-respond / remind-at-day-12 cadence needs an anchor: when was the invite sent? Nothing records that today. | 2026-07-02 |
+| [GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md](GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md) | plan | historical |  | Historical record for the shipped child-package cutover and day-12 reminder; current behavior lives in GRANTEE_PORTAL_SPEC and the Atlas. | 2026-07-02 |
 | [GRANTEE_INVITE_BODY_CUSTOM_PLAN.md](GRANTEE_INVITE_BODY_CUSTOM_PLAN.md) | plan | historical |  | Historical record of the completed per-PD grantee-invite-body preference and Awardee-tab edit affordance. | 2026-07-02 |
-| [GRANTEE_PORTAL_BUILD_PLAN.md](GRANTEE_PORTAL_BUILD_PLAN.md) | plan | active |  | As-built implementation chronology for the grantee deliverables portal; current field ownership and consent behavior defer to GRANTEE_PORTAL_SPEC and the Atlas. | 2026-07-02 |
+| [GRANTEE_PORTAL_BUILD_PLAN.md](GRANTEE_PORTAL_BUILD_PLAN.md) | plan | historical |  | Historical implementation chronology for the grantee deliverables portal; current behavior is defined by GRANTEE_PORTAL_SPEC, the Atlas, and source. | 2026-07-02 |
 | [GRANTEE_PORTAL_SPEC.md](GRANTEE_PORTAL_SPEC.md) | spec | active | yes | As-built grantee deliverables contract: abstract text on akoya_request; package state, image, caption, and waiver evidence on the child row. | 2026-07-02 |
 
 ## intake-portal
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [BUDGET_FORM_SPEC.md](BUDGET_FORM_SPEC.md) | spec | active |  | A single dropdown at the top of the form. Its value controls which year columns are revealed throughout the rest of the form. | 2026-07-02 |
-| [INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN.md](INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN.md) | plan | active |  | Predecessor: docs/INTAKE_PORTAL_DESIGN.md (schema + Option A decision near line 557, captured 2026-05-13). | 2026-07-02 |
+| [BUDGET_FORM_SPEC.md](BUDGET_FORM_SPEC.md) | spec | draft |  | Parked budget-form design: Dataverse schema and a flat budget-line submit/drain foundation exist, but the applicant UI and full workflow remain unbuilt. | 2026-07-02 |
+| [INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN.md](INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN.md) | plan | draft |  | Parked design for staff membership approval; schema and applicant-side membership reads exist, but the intake-admin app, page, and routes are unbuilt. | 2026-07-02 |
 | [INTAKE_ATTACH_BUILD_SCOPING.md](INTAKE_ATTACH_BUILD_SCOPING.md) | plan | historical |  | Historical build scoping for the intake attachment flow, now implemented. | 2026-07-02 |
 | [INTAKE_ATTACH_CHUNK3_DESIGN.md](INTAKE_ATTACH_CHUNK3_DESIGN.md) | spec | active |  | The pending-entry JSON object stored in pending_attachments[] is fixed by /upload-token:. | 2026-07-02 |
 | [INTAKE_ATTACH_CHUNK4_DESIGN.md](INTAKE_ATTACH_CHUNK4_DESIGN.md) | spec | active |  | Adds the FIRST endpoint of the three-call dance. The browser PUT (step 2) and /attach (step 3) come in chunk 5. | 2026-07-02 |
@@ -217,11 +217,11 @@ related:
 | [MODEL_PREFLIP_REPLAY_RUNBOOK.md](MODEL_PREFLIP_REPLAY_RUNBOOK.md) | runbook | active |  | Use this before changing reviewer-affecting Claude model routing, including advancing the reviewer-finder tier fallback or removing a concrete pin. | 2026-07-02 |
 | [PEER_REVIEW_EXECUTOR_MIGRATION_PLAN.md](PEER_REVIEW_EXECUTOR_MIGRATION_PLAN.md) | plan | historical |  | Historical record of the completed peer-review-summarizer Executor migration and A7 fail-closed hardening. | 2026-07-08 |
 | [PROMPT_CACHING_PLAN.md](PROMPT_CACHING_PLAN.md) | draft | historical |  | Historical April 2026 prompt-caching experiments and early plan. Superseded for current remediation status by PROMPT_CACHING_AUDIT.md. | 2026-07-02 |
-| [PROMPT_STORAGE_DESIGN.md](PROMPT_STORAGE_DESIGN.md) | draft | draft |  | - Session 110 (2026-04-25): body of this doc rewritten in place to use the live field names. References below now match wmkf_ai_* directly; no... | 2026-07-02 |
+| [PROMPT_STORAGE_DESIGN.md](PROMPT_STORAGE_DESIGN.md) | plan | active |  | Current prompt-storage boundary: live current rows, Vercel Executor fetch, admin publication, and audit; broader authoring and PA execution remain unbuilt. | 2026-07-02 |
 | [STAGED_PIPELINE_IMPLEMENTATION_PLAN.md](STAGED_PIPELINE_IMPLEMENTATION_PLAN.md) | plan | active |  | 1. Fit Screener — Standalone Stage 1 tool. Upload a proposal, get pass/flag/decline-recommend result. Single Haiku call, fast and cheap. Useful... | 2026-07-02 |
 | [STAGED_REVIEW_PIPELINE.md](STAGED_REVIEW_PIPELINE.md) | history | active |  | Proposals flow through stages sequentially. Staff review is required before any proposal is declined at Stage 1. Stages 2 and 3 produce inputs for... | 2026-07-02 |
 | [VIRTUAL_REVIEW_PANEL.md](VIRTUAL_REVIEW_PANEL.md) | spec | active | yes | Thin design / operations reference for the Virtual Review Panel app. Created S191 to receive content extracted from CLAUDE.md so the table-row... | 2026-07-02 |
-| [WORKFLOW_CHAINING_DESIGN.md](WORKFLOW_CHAINING_DESIGN.md) | spec | active | yes | Status: Design principle — extracted from Session 100 discussion of prompt storage migration. | 2026-07-02 |
+| [WORKFLOW_CHAINING_DESIGN.md](WORKFLOW_CHAINING_DESIGN.md) | spec | active | yes | Chaining fields and Vercel Executor persistence are live; the end-to-end Power Automate DAG remains unbuilt target architecture. | 2026-07-02 |
 
 ## prompts
 
@@ -254,10 +254,10 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [REVIEWER_BINDING_SMOKE_CODEX_HANDOFF.md](REVIEWER_BINDING_SMOKE_CODEX_HANDOFF.md) | audit | active |  | Reviewer-binding smoke: PR #60 merged and the owner-authorized production run passed with verified cleanup; completed queue job 25 is retained. | 2026-07-13 |
-| [REVIEWER_FINDER_COI_CHUNK2_DESIGN.md](REVIEWER_FINDER_COI_CHUNK2_DESIGN.md) | spec | active |  | Author: Claude (S240, 2026-06-10). Builds on Chunk 1 (shipped, b19b3b9). | 2026-07-02 |
+| [REVIEWER_FINDER_COI_CHUNK2_DESIGN.md](REVIEWER_FINDER_COI_CHUNK2_DESIGN.md) | spec | historical |  | Historical design for shipped institution-COI and advisory-retirement work; current enforcement is documented separately. | 2026-07-02 |
 | [REVIEWER_FINDER_D26_PIPELINE_FLOWCHART.md](REVIEWER_FINDER_D26_PIPELINE_FLOWCHART.md) | spec | active |  | Legend — 🟩 green = exists/shipped · 🟨 amber = needs building/fixing · 🟪 purple = open policy decision · ⬛ gray/dashed-X = off / abandoned /... | 2026-07-02 |
 | [REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md](REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md) | source-of-truth | canonical | yes | Status: MAINTAINED current-state reference (owns the live behavioral guarantees below). | 2026-07-02 |
-| [REVIEWER_FINDER_FUTURE_ARCHITECTURE.md](REVIEWER_FINDER_FUTURE_ARCHITECTURE.md) | spec | active |  | Status: Design sketch (Session 110, 2026-04-25). Not yet implemented. | 2026-07-02 |
+| [REVIEWER_FINDER_FUTURE_ARCHITECTURE.md](REVIEWER_FINDER_FUTURE_ARCHITECTURE.md) | spec | historical |  | Historical Session 110 design sketch; current reviewer architecture and migration state are documented in the linked canonical pages. | 2026-07-02 |
 | [REVIEWER_FINDER_ORIGINATION_EXPERIMENT_2026-06-12.md](REVIEWER_FINDER_ORIGINATION_EXPERIMENT_2026-06-12.md) | history | active |  | docs/REVIEWER_FINDER_ORIGINATION_PLAN.md §4, for the D26 Phase-I cohort and the *minimal* grounded arm only (see §3 Scope). | 2026-07-02 |
 | [REVIEWER_FINDER_ORIGINATION_PLAN.md](REVIEWER_FINDER_ORIGINATION_PLAN.md) | plan | historical |  | Completed S246 origination experiment; retained as historical decision evidence. | 2026-07-02 |
 | [REVIEWER_FINDER_PI_IDENTITY_WIREIN_PLAN.md](REVIEWER_FINDER_PI_IDENTITY_WIREIN_PLAN.md) | plan | historical |  | Shipped structured-ORCID PI identity wire-in; retained as the historical build plan. | 2026-07-02 |
@@ -301,15 +301,15 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md](REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md) | spec | active |  | SHIPPED as the reviewer_acceptance_jobs queue + drain: reviewer Stage 2a accept returns fast, post-accept side effects run durably. | 2026-07-02 |
+| [REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md](REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md) | spec | historical |  | Completed design record for the shipped reviewer_acceptance_jobs queue and durable acceptance drain. | 2026-07-02 |
 | [REVIEWER_ANALYZE_CONTRACT_SPEC.md](REVIEWER_ANALYZE_CONTRACT_SPEC.md) | source-of-truth | canonical | yes | REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md §4.4/§5/§7. Labels: [VERIFIED] (read from source this session), [PROPOSED], [OPEN] (decide with reviewer). | 2026-07-02 |
 | [REVIEWER_ARCHITECTURE.md](REVIEWER_ARCHITECTURE.md) | spec | active |  | Plus, when a potential reviewer is first invited:. | 2026-07-02 |
 | [REVIEWER_BILL_HARDENING_FINDINGS.md](REVIEWER_BILL_HARDENING_FINDINGS.md) | audit | historical |  | - contactEdits validation (was P3): respond.js now bounds each field's length + checks email shape, returning a clean 400 instead of a Dataverse 500. | 2026-07-02 |
 | [REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md](REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md) | audit | historical |  | These are all targeted flows, not a general sync of reviewer-corrected name/email/affiliation back to CRM contact. | 2026-07-02 |
 | [REVIEWER_CONTACT_INVITE_FEATURES_AND_PROD_TESTS.md](REVIEWER_CONTACT_INVITE_FEATURES_AND_PROD_TESTS.md) | history | active |  | Date: 2026-06-08 Sessions covered: S234 (contact-enrichment anchoring) and S235 (Slices E, G, F). | 2026-07-02 |
 | [REVIEWER_CONTACT_INVITE_FOLLOWON_PLAN.md](REVIEWER_CONTACT_INVITE_FOLLOWON_PLAN.md) | plan | historical |  | Completed/deferred follow-on slices retained as a historical reviewer-contact plan. | 2026-07-02 |
-| [REVIEWER_CONTACT_LEADS_REVIEW.md](REVIEWER_CONTACT_LEADS_REVIEW.md) | audit | active |  | [VERIFIED via lib/services/contact-enrichment-service.js:487] hasIdentityAnchor = !!effectiveInstitution \|\| this._hasOrcidAnchor(...) — i.e. the... | 2026-07-02 |
-| [REVIEWER_CONTACT_LEADS_SPEC.md](REVIEWER_CONTACT_LEADS_SPEC.md) | spec | active |  | Drafted: 2026-06-18 Scope: Reviewer Finder contact recall and staff workflow. This is a product/architecture spec, not an implementation record. | 2026-07-02 |
+| [REVIEWER_CONTACT_LEADS_REVIEW.md](REVIEWER_CONTACT_LEADS_REVIEW.md) | audit | historical |  | Point-in-time pre-implementation review whose accepted changes were incorporated into REVIEWER_CONTACT_LEADS_SPEC.md. | 2026-07-02 |
+| [REVIEWER_CONTACT_LEADS_SPEC.md](REVIEWER_CONTACT_LEADS_SPEC.md) | spec | active |  | Shipped contact-leads contract: quarantined leads, staff promotion, bounded roster persistence; broad paid scouting is parked as unjustified. | 2026-07-02 |
 | [REVIEWER_CONTACT_LINKER_DESIGN.md](REVIEWER_CONTACT_LINKER_DESIGN.md) | spec | active |  | 1. wmkf_potentialreviewers ↔ wmkf_potentialreviewers — duplicate reviewer rows (the misspelled-duplicate bug). Being fixed now... | 2026-07-02 |
 | [REVIEWER_DATA_MODEL.md](REVIEWER_DATA_MODEL.md) | source-of-truth | canonical | yes | Visual orientation for the reviewer-domain Dataverse entities and how they connect. Use this when you're not sure which entity holds which piece... | 2026-07-02 |
 | [REVIEWER_E2E_REHEARSAL_RUNBOOK.md](REVIEWER_E2E_REHEARSAL_RUNBOOK.md) | runbook | active |  | Safe reviewer invitation and return rehearsal through browser mocks, capture-mode controlled writes, or an allowlisted live smoke. | 2026-07-02 |
@@ -321,7 +321,7 @@ related:
 | [REVIEWER_HOLD_STEP_BUILD_PLAN.md](REVIEWER_HOLD_STEP_BUILD_PLAN.md) | plan | historical |  | ## ⚠️ RETIRED (S279) — this plan describes a feature that has been REMOVED. | 2026-07-02 |
 | [REVIEWER_INTERACTION_DESIGN.md](REVIEWER_INTERACTION_DESIGN.md) | spec | active |  | Audience for downstream artifacts: Program Directors. Management is not the primary audience. | 2026-07-02 |
 | [REVIEWER_INVITE_CONFIDENCE_DESIGN.md](REVIEWER_INVITE_CONFIDENCE_DESIGN.md) | spec | active |  | State labels: [VERIFIED] = read in source this session; [ASSUMED] = inference. | 2026-07-02 |
-| [REVIEWER_LIFECYCLE_PROPOSAL.md](REVIEWER_LIFECYCLE_PROPOSAL.md) | source-of-truth | canonical | yes | Originally written as a forward-looking proposal; large parts have shipped. Quick reality check:. | 2026-07-02 |
+| [REVIEWER_LIFECYCLE_PROPOSAL.md](REVIEWER_LIFECYCLE_PROPOSAL.md) | plan | historical |  | Historical staff-facing proposal retained for product rationale; current implementation and remaining work are documented in the linked Workbench plans. | 2026-07-02 |
 | [REVIEWER_MANUAL_ADD_DEDUP_DESIGN.md](REVIEWER_MANUAL_ADD_DEDUP_DESIGN.md) | spec | active |  | Original status: PROPOSED (S237), rev3 — second Codex pre-impl pass folded (NF1–NF3). | 2026-07-02 |
 | [REVIEWER_MANUAL_ADD_DESIGN.md](REVIEWER_MANUAL_ADD_DESIGN.md) | spec | active |  | Status: Phase 1 durable manual add shipped 2026-06-09. Manual enrichment and web-suggestion integration remain deferred. Live-state claims are... | 2026-07-02 |
 | [REVIEWER_MATERIALS_FOLDER_SPEC.md](REVIEWER_MATERIALS_FOLDER_SPEC.md) | source-of-truth | canonical | yes | Canonical outbound reviewer package: Reviewer Materials/Proposal_{Request#}.pdf; every other request file remains internal. | 2026-07-02 |
@@ -335,7 +335,7 @@ related:
 | [REVIEWER_STAGE2A_IDENTITY_CAPTURE_BUILD_PLAN.md](REVIEWER_STAGE2A_IDENTITY_CAPTURE_BUILD_PLAN.md) | plan | historical |  | Completed board-writeup identity capture; retained as the historical build plan. | 2026-07-02 |
 | [REVIEWER_TIMEOUT_BUDGET_PLAN.md](REVIEWER_TIMEOUT_BUDGET_PLAN.md) | plan | historical |  | Shipped reviewer search time-budget implementation and follow-up fixes; retained as historical record. | 2026-07-02 |
 | [REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md](REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md) | plan | active |  | Planning only. No feature code, migrations, API routes, or schema files were created for this pass. | 2026-07-02 |
-| [WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md](WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md) | plan | active |  | Reviews tab deployed; staged production verified deterministic consumers, but AI synthesis failed twice and remains a red gate. | 2026-07-03 |
+| [WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md](WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md) | plan | active |  | Reviews tab deployed; deterministic consumers verified; local synthesis reliability fix awaits governed publication/deployment and post-fix smoke. | 2026-07-03 |
 
 ## reviewers
 
