@@ -201,6 +201,71 @@ function deriveRequireAppAccessEndpointCount() {
   return count;
 }
 
+function deriveWorkbenchTabState() {
+  const rel = 'pages/workbench/[requestId].js';
+  const ast = parseJavaScript(rel, readText(rel));
+  let tabsArray = null;
+
+  for (const node of ast.program.body) {
+    if (node.type !== 'VariableDeclaration') continue;
+    for (const d of node.declarations) {
+      if (d.id?.type === 'Identifier' && d.id.name === 'TABS') tabsArray = d.init;
+    }
+  }
+
+  if (!tabsArray) failConfig(`${rel} does not declare TABS`);
+  if (tabsArray.type !== 'ArrayExpression') failConfig(`${rel} TABS is not an array literal`);
+
+  const tabKeys = tabsArray.elements.map((entry, index) => {
+    if (!entry || entry.type !== 'ObjectExpression') {
+      failConfig(`${rel} TABS entry ${index} is not an object literal`);
+    }
+    const keyProp = entry.properties.find((prop) => (
+      prop?.type === 'ObjectProperty'
+      && !prop.computed
+      && prop.key?.type === 'Identifier'
+      && prop.key.name === 'key'
+    ));
+    if (!keyProp?.value || keyProp.value.type !== 'StringLiteral' || !keyProp.value.value) {
+      failConfig(`${rel} TABS entry ${index} has a non-string/empty key`);
+    }
+    return keyProp.value.value;
+  });
+
+  const dupes = tabKeys.filter((key, index) => tabKeys.indexOf(key) !== index);
+  if (dupes.length > 0) failConfig(`${rel} TABS has duplicate keys: ${[...new Set(dupes)].join(', ')}`);
+
+  // A literal `activeTab === '<key>'` branch is the shell's implementation
+  // dispatch contract. The nav's selected-state comparison is dynamic
+  // (`activeTab === t.key`) and therefore cannot make a placeholder look live.
+  const dispatchedKeys = new Set();
+  walk(ast, (node) => {
+    if (node.type !== 'BinaryExpression' || node.operator !== '===') return;
+    const pairs = [
+      [node.left, node.right],
+      [node.right, node.left],
+    ];
+    for (const [identifier, literal] of pairs) {
+      if (
+        identifier?.type === 'Identifier'
+        && identifier.name === 'activeTab'
+        && literal?.type === 'StringLiteral'
+        && tabKeys.includes(literal.value)
+      ) {
+        dispatchedKeys.add(literal.value);
+      }
+    }
+  });
+
+  if (dispatchedKeys.size === 0) failConfig(`${rel} has no literal activeTab dispatch branches`);
+  const placeholderKeys = tabKeys.filter((key) => !dispatchedKeys.has(key));
+  return {
+    total: tabKeys.length,
+    live: dispatchedKeys.size,
+    placeholders: placeholderKeys.length,
+  };
+}
+
 function matchFrom(regex) {
   return (line) => {
     regex.lastIndex = 0;
@@ -344,6 +409,86 @@ const CANONICAL_FACTS = [
       '2026-05-19 route audit',
       '84 reviewer-route plans',
       '84 routing rules',
+    ],
+  },
+  {
+    id: 'workbench-tab-count',
+    describe: 'Request Workbench top-level tabs',
+    derivePath: '`pages/workbench/[requestId].js` → `TABS.length`',
+    derive: () => deriveWorkbenchTabState().total,
+    patterns: [
+      {
+        name: 'Workbench tabs',
+        find: matchFrom(/\b(\d+)\s+(?:top-level\s+)?Workbench tabs?\b/gi),
+      },
+    ],
+    knownMissFixtures: [
+      '10 Workbench tabs',
+      '10 top-level Workbench tabs',
+    ],
+    knownNonMatches: [
+      '3 Workbench sub-tabs',
+      '4 request-lifecycle tabs are still placeholders',
+      '10 browser tabs',
+      'S10 Workbench tab',
+    ],
+  },
+  {
+    id: 'workbench-placeholder-tab-count',
+    describe: 'Request Workbench placeholder tabs',
+    derivePath: '`pages/workbench/[requestId].js` → `TABS` keys without a literal `activeTab === <key>` implementation branch',
+    derive: () => deriveWorkbenchTabState().placeholders,
+    patterns: [
+      {
+        name: 'placeholder tabs',
+        find: matchFrom(/\b(\d+)\s+(?:remaining\s+)?(?:request-lifecycle\s+|lifecycle\s+)?placeholder tabs?\b/gi),
+      },
+      {
+        name: 'tabs remain placeholders',
+        find: matchFrom(/\b(\d+)\s+(?:request-lifecycle\s+|lifecycle\s+)?tabs? (?:remain|are still) placeholders\b/gi),
+      },
+      {
+        name: 'other tabs remain placeholders',
+        find: matchFrom(/\b(?:the\s+)?other\s+(\d+)\s+(?:request-lifecycle\s+|lifecycle\s+)?tabs? remain placeholders\b/gi),
+      },
+    ],
+    knownMissFixtures: [
+      '4 placeholder tabs',
+      '**4** remaining placeholder tabs',
+      '4 remaining lifecycle placeholder tabs',
+      '4 request-lifecycle tabs remain placeholders',
+      '4 request-lifecycle tabs are still placeholders',
+      'the other 4 tabs remain placeholders',
+    ],
+    knownNonMatches: [
+      '4 tabs remain live',
+      '4 placeholder rows',
+      'S4 placeholder tab',
+    ],
+  },
+  {
+    id: 'workbench-live-tab-count',
+    describe: 'implemented Request Workbench top-level tabs',
+    derivePath: '`pages/workbench/[requestId].js` → distinct literal `activeTab === <TABS key>` implementation branches',
+    derive: () => deriveWorkbenchTabState().live,
+    patterns: [
+      {
+        name: 'live Workbench tabs',
+        find: matchFrom(/\b(\d+)\s+live Workbench tabs?\b/gi),
+      },
+      {
+        name: 'live tabs',
+        find: matchFrom(/\b(\d+)\s+live tabs?\b/gi),
+      },
+    ],
+    knownMissFixtures: [
+      '6 live Workbench tabs',
+      '6 live tabs',
+    ],
+    knownNonMatches: [
+      '6 live routes',
+      'S6 live tab',
+      '6 tabs remain placeholders',
     ],
   },
 ];

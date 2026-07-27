@@ -1,96 +1,242 @@
 ---
 name: sweep
-description: Whole-repo reconcile sweep for fact-level doc or memory changes. Verifies that every live restatement of a changed fact agrees before completion is claimed.
-allowed-tools: Read, Edit, Bash(grep:*, rg:*, git diff:*, git log:*)
+description: Evidence-first whole-repo truth audit and reconciliation for code, live external state, docs, memory, wiki, and instructions. Use after a fact changes, when implementation status is disputed, when documentation may have drifted, or before relying on a roadmap/current-state claim. Establishes truth from authoritative sources before reconciling every live restatement; also detects semantic omissions and mixed historical/current guidance.
+allowed-tools: Read, Edit, Bash(codegraph:*, grep:*, rg:*, git diff:*, git log:*, git status:*, npm run check:*, node scripts/*)
 ---
 
-# /sweep — Whole-Repo Doc Reconcile
+# /sweep — Evidence-First Truth Audit and Reconciliation
 
-**When invoked:** a fact-level doc or memory change needs repo-wide reconciliation before completion is claimed.
+## Purpose
 
-**Purpose:** prove that every live restatement of the changed fact agrees across the repo.
+Prove or falsify a material claim from authoritative evidence, then reconcile every live
+restatement and consumer of that claim across the repository.
 
-**Blocking semantics:** the originating fact-level change is complete only after every step below has run and the report shows zero remaining live stale restatements.
+Do not treat a plan, memory entry, prior sweep assertion, or newer annotation beside older
+text as proof. Source, live-state probes, persisted schema, and enforced runtime behavior
+outrank prose.
 
-Maintainer rationale lives in `RATIONALE.md`; normal execution should use the procedure below.
+## Modes
 
----
+Choose one explicitly:
 
-## Step 1: State the claim
+- **Mode A — Changed fact:** one known fact changed and all restatements must be reconciled.
+- **Mode B — Domain truth audit:** implementation state or product behavior is uncertain;
+  build an evidence-backed inventory, falsify unsupported claims, and reconcile the durable
+  surfaces for that domain.
 
-Write the claim being reconciled, in one sentence. Format:
+If the user asks whether documentation matches code, whether a roadmap is current, what
+actually exists, or for a deep audit, use Mode B. Do not reduce it to one convenient grep
+claim.
 
-> Claim: `<fact / state>` is now reconciled across the repo, originally fixed at `<file>:<line>`.
+## Blocking rules
 
-If the claim cannot be articulated cleanly, reduce it to a single fact statement first.
+Do not say `reconciled`, `current`, `verified`, `complete`, or `sweep passed` unless:
 
-## Step 2: Identify the search terms
+1. authoritative truth was established independently of the prose being checked;
+2. source → persistence → consumer was traced where the claim describes behavior;
+3. all in-scope durable surfaces were searched and classified;
+4. semantic contradictions and omissions were checked, not only matching strings;
+5. every live stale statement was structurally corrected;
+6. the same searches and relevant gates were rerun; and
+7. the report records the evidence and zero remaining live stale claims.
 
-List 3-5 grep terms that would surface restatements of the claim. Include:
-- The literal fact value (e.g., the table name, the entity-set name, the model name)
-- Likely paraphrases / older names (e.g., the wrong plural, the deprecated alias)
-- Adjacent qualifying words (e.g., "deployed", "shipped", "NOT", "retired", "future work")
+If any step is incomplete, report `AUDIT INCOMPLETE` or `CLAIM NOT RECONCILED`.
 
-Example for a B2-F6-shaped claim ("wmkf_appproposalsearch is deployed"):
-- `wmkf_appproposalsearch`, `wmkf_appproposalsearches`, `wmkf_appproposalsearchs`
-- `NOT DEPLOYED`, `not deployed`, `to deploy`
-- `proposal_searches` (the Postgres counterpart that may carry related staleness)
+## Step 0 — Define scope and claims
 
-## Step 3: Run the sweep
+Write:
 
-For each term, run `rg -n` (or `grep -rn`) against `docs/`, `lib/`, `pages/`, `scripts/`, `shared/`, and the relevant subset of `.claude-memory/`. Capture every hit. Read each hit before classifying it.
-
-Default scope: live docs + code. Archive docs (`docs/archive/`) and auto-generated outputs (`docs/security-audit/*.json`) excluded unless the user opts in.
-
-## Step 4: Triage each hit
-
-For every hit, classify into exactly one of:
-
-| Classification | Action |
-|---|---|
-| **AGREE** — line already reflects the post-fix state | Leave it |
-| **STALE** — line still reflects the pre-fix state | Edit it (or, if structural, batch into a section-level fix) |
-| **HISTORICAL** — line is a dated audit doc / changelog entry where the pre-fix state is the historical record | Leave it; note in the sweep report |
-| **UNRELATED** — false positive (grep term collided with a different context) | Note in the sweep report |
-
-Use exactly these four buckets. If a hit does not fit cleanly, read more context until it does.
-
-## Step 5: Check for structural-vs-tactical
-
-If STALE-bucket hits exceed ~5 lines OR cluster in one section, use a structural fix (banner, section-level rewrite, doc supersession) rather than scattered per-line edits. After two tactical passes on the same shape, stop and propose a structural fix instead.
-
-## Step 6: Fix the STALE hits
-
-Apply edits. After applying, re-grep the same terms. Report any remaining STALE hits explicitly.
-
-## Step 7: Report
-
-Single concise report:
-
-```
-Sweep complete for claim: <claim>
-Terms searched: <list>
-Hits: N total → AGREE N1 / STALE N2 / HISTORICAL N3 / UNRELATED N4
-STALE addressed: N2 line edits OR <structural-fix description>
-Remaining STALE after fix pass: 0  ← MUST be 0 to declare done
-
-Memory entries that should have fired pre-claim (and didn't):
-- [[feedback-reconcile-dont-append-docs]] — primary
-- [[<other relevant entries>]] — secondary
+```text
+Mode:
+Domain/change surface:
+Claims to verify or falsify:
+Authoritative sources expected:
+Durable surfaces in scope:
+Excluded surfaces and reason:
 ```
 
-If "Remaining STALE after fix pass" is non-zero, the claim is NOT done. Go back to step 6.
+For Mode B, start with a claim inventory rather than one sentence. Include at least:
 
-## Step 8: Record relevant prior guidance
+- what exists;
+- what is live, partial, planned, retired, or blocked;
+- who/what writes the state;
+- where it persists;
+- who/what consumes it;
+- dependencies and recommended next steps asserted by current plans.
 
-Note which memory entries or rules were relevant to this sweep.
+## Step 1 — Establish truth before searching prose
 
-Keep this to one concise sentence. Per `feedback-no-performative-contrition`, the report should stay focused on the fix and evidence.
+For every material claim, find the strongest applicable evidence:
 
----
+1. **Runtime/source:** use CodeGraph before grep/read; trace entry point → service/helper →
+   persistence → response → consumer. Read every relevant branch, not only imports or names.
+2. **Live external state:** use a read-only probe for Dataverse schema/rows, Postgres schema,
+   Blob/SharePoint state, prompt rows, deployment configuration, or other external facts.
+   A checked-in schema snapshot is supporting evidence, not a substitute when live state is
+   safely probeable.
+3. **Tests/gates:** identify what behavior they prove and what they do not cover. A green
+   bounded gate is not evidence for claims outside its registry or scan roots.
+4. **Product intent:** use explicit current owner decisions. Label older plans and memories
+   as evidence of past intent, never as proof of current behavior.
 
-## What this skill is NOT
+Use these labels in the evidence matrix:
 
-- It is NOT a substitute for proactive reconciliation during normal doc work.
-- It is NOT a guarantee. If my grep terms (step 2) miss the spot where staleness lives, the sweep won't catch it. The skill is only as good as the term-selection step.
-- It is NOT scoped to documentation only. The same shape applies to code (e.g., a constant renamed in one place but referenced by string in another).
+- **VERIFIED** — directly supported by cited source or probe.
+- **PARTIAL** — some required contract hops exist; name the missing hops.
+- **PLANNED** — intended but not built/provisioned.
+- **ASSUMED** — plausible but not yet proven.
+- **STALE/CONFLICT** — contradicted by stronger evidence or another current instruction.
+- **UNKNOWN** — evidence is unavailable; identify the required probe or decision.
+
+Absence requires evidence too: search likely symbols, routes, fields, and callers before
+claiming something does not exist.
+
+## Step 2 — Build the contract/evidence matrix
+
+For each claim, record:
+
+| Claim | Producer/entry point | Persistence/source of truth | Consumer | Strongest evidence | Status |
+|---|---|---|---|---|---|
+
+Mark a hop `N/A` explicitly. If the claim is a count or list, derive it from the authoritative
+registry/source rather than hand-counting prose.
+
+For a planned feature, distinguish independently:
+
+- product purpose decided;
+- input contract decided;
+- persistence/schema provisioned;
+- prompt/configuration provisioned;
+- implementation present;
+- consumer/UI present;
+- tests and operational verification present.
+
+Do not collapse “a design document exists” into “planned and ready.”
+
+## Step 3 — Search every durable restatement
+
+Create search terms only after Step 1 exposes real symbols, old names, statuses, and likely
+contradictions. Search at least:
+
+- `docs/**` excluding clearly archived/generated evidence;
+- `.claude-memory/**`;
+- `docs/agent-wiki/**`;
+- `CLAUDE.md`, `AGENTS.md`, `SESSION_PROMPT.md`, and relevant rules/skills;
+- `pages/**`, `shared/**`, `lib/**`, `scripts/**`, `modules/**`, and tests;
+- registries, schemas, migrations, prompts, route matrices, Atlas pages, and service catalogs
+  implicated by the claim.
+
+Use literal symbols plus semantic qualifiers and opposites:
+
+- current and former names;
+- `live`, `shipped`, `built`, `partial`, `planned`, `future`, `deferred`, `blocked`,
+  `placeholder`, `retired`, `not built`;
+- counts and list members;
+- persistence field/entity names;
+- asserted dependencies and recommendations.
+
+Read the whole target durable file before classifying or editing it. Read surrounding source
+and callers/consumers before using a code hit as evidence.
+
+## Step 4 — Run the semantic contradiction pass
+
+Grep cannot detect all drift. Compare the evidence matrix against prose for:
+
+- a purpose that names inputs the described data flow never supplies;
+- a shipped component still listed as a future dependency or build step;
+- a field/entity said to be required when an existing source may already serve it;
+- an architecture described as decided when its schema/prompt/config is unprovisioned;
+- “open” and “resolved” decisions coexisting in current guidance;
+- a current summary appended above a stale table, dependency list, or recommended order;
+- counts corrected in one paragraph while named members remain wrong elsewhere;
+- a producer documented without its actual consumer, or a consumer with no real producer;
+- tests/gates cited beyond their registered facts or scan scope.
+
+Record semantic omissions as findings even when no matching stale sentence exists.
+
+## Step 5 — Classify every hit
+
+Use exactly:
+
+| Classification | Meaning | Action |
+|---|---|---|
+| **AGREE** | Reflects authoritative current truth | Leave |
+| **STALE** | Contradicted, unsupported, or misleading as current guidance | Fix |
+| **HISTORICAL** | Preserves a dated state inside an explicit historical boundary | Leave and cite boundary |
+| **UNRELATED** | Search collision | Note |
+
+`HISTORICAL` is allowed only when the file or section is visibly marked historical and is not
+also presented as a current roadmap, dependency, recommendation, source of truth, or next
+step. “As of S###” inside a living section may explain old text but does not neutralize
+contradictory current instructions below it.
+
+If a line mixes current and stale assertions, classify it `STALE`.
+
+## Step 6 — Fix structurally
+
+When stale hits cluster in a file or section, rewrite the section around current truth. Do not:
+
+- append another update banner beside contradictory text;
+- fix only the count while leaving the named list/table/order stale;
+- preserve a shipped phase as a current recommendation;
+- use a historical label to avoid repairing a document that still claims current authority.
+
+Move implementation history into a clearly historical section/document when it remains useful.
+Keep one visible current-state summary and one forward plan.
+
+After editing a durable fact, sweep every restatement in the same pass.
+
+## Step 7 — Re-run and falsify
+
+Re-run:
+
+1. the same term searches;
+2. symbol/caller/consumer searches;
+3. live probes used to establish external state;
+4. relevant gate followed by its self-test, sequentially; and
+5. `git diff` to inspect the entire reconciliation.
+
+For each conclusion, name one disconfirming check and its result. Example: “To falsify
+‘field absent,’ queried live attribute metadata by logical name; received 404.”
+
+Green gates do not close the audit unless their documented registry and scan roots cover the
+claims in the matrix.
+
+## Step 8 — Report and retain evidence
+
+Report:
+
+```text
+Sweep mode:
+Domain/claim:
+Authoritative evidence:
+Claims: N → VERIFIED n / PARTIAL n / PLANNED n / ASSUMED n /
+             STALE-CONFLICT n / UNKNOWN n
+Restatement hits: N → AGREE n / STALE n / HISTORICAL n / UNRELATED n
+Structural fixes:
+Semantic omissions found:
+Gates/probes run and bounded scope:
+Remaining live STALE: 0
+Remaining UNKNOWN/ASSUMED:
+Verdict: RECONCILED | CLAIM NOT RECONCILED | AUDIT INCOMPLETE
+```
+
+For a substantial Mode B audit, persist the evidence matrix and report in the repository’s
+appropriate durable audit/planning surface so a later session can inspect what was actually
+verified. A conversation claim that “a sweep was run” without the report or a linked durable
+artifact is not auditable evidence.
+
+## Relationship to other workflows
+
+- Use `/contract-reconcile` for detailed caller → persistence → consumer safety analysis; this
+  skill owns repo-wide truth and durable-restatement reconciliation.
+- Use relevant Atlas, route-security, migration, and CI workflows when their surfaces enter the
+  matrix.
+- Historical records may remain historical, but current operating guidance must not require a
+  reader to mentally subtract superseded paragraphs.
+
+## Limits
+
+This process can prove only the claims and surfaces listed in its report. It is not a guarantee
+that every sentence in the repository is true. Missing probes, excluded surfaces, and unresolved
+owner decisions must remain visible as `UNKNOWN` or `ASSUMED`.

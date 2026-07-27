@@ -158,6 +158,97 @@ function independentLiveEndpointCount() {
   return independentEndpointCountInFiles(walkJs(path.join(repoRoot, 'pages/api')));
 }
 
+function stripCommentsPreservingStrings(src) {
+  let out = '';
+  let i = 0;
+  let state = 'code';
+  let quote = null;
+  while (i < src.length) {
+    const c = src[i];
+    const n = src[i + 1];
+    if (state === 'code') {
+      if (c === '/' && n === '/') {
+        state = 'line';
+        out += '  ';
+        i += 2;
+      } else if (c === '/' && n === '*') {
+        state = 'block';
+        out += '  ';
+        i += 2;
+      } else if (c === '"' || c === "'" || c === '`') {
+        state = 'string';
+        quote = c;
+        out += c;
+        i += 1;
+      } else {
+        out += c;
+        i += 1;
+      }
+    } else if (state === 'line') {
+      if (c === '\n') {
+        state = 'code';
+        out += '\n';
+      } else {
+        out += ' ';
+      }
+      i += 1;
+    } else if (state === 'block') {
+      if (c === '*' && n === '/') {
+        state = 'code';
+        out += '  ';
+        i += 2;
+      } else {
+        out += c === '\n' ? '\n' : ' ';
+        i += 1;
+      }
+    } else if (state === 'string') {
+      out += c;
+      if (c === '\\') {
+        out += n || '';
+        i += 2;
+      } else if (c === quote) {
+        state = 'code';
+        quote = null;
+        i += 1;
+      } else {
+        i += 1;
+      }
+    }
+  }
+  return out;
+}
+
+function independentWorkbenchCountsFromSource(src) {
+  const clean = stripCommentsPreservingStrings(src);
+  const declaration = clean.match(/\b(?:const|let|var)\s+TABS\s*=\s*\[([\s\S]*?)\]\s*;/);
+  if (!declaration) throw new Error('independent Workbench scanner: TABS array not found');
+  const keys = [];
+  const keyRe = /\bkey\s*:\s*(['"])([^'"]+)\1/g;
+  let keyMatch;
+  while ((keyMatch = keyRe.exec(declaration[1])) !== null) keys.push(keyMatch[2]);
+  if (keys.length === 0) throw new Error('independent Workbench scanner: zero tab keys found');
+  if (new Set(keys).size !== keys.length) throw new Error('independent Workbench scanner: duplicate tab key');
+
+  const dispatched = new Set();
+  const branchRe = /\bactiveTab\s*===\s*(['"])([^'"]+)\1|(['"])([^'"]+)\3\s*===\s*activeTab/g;
+  let branchMatch;
+  while ((branchMatch = branchRe.exec(clean)) !== null) {
+    const key = branchMatch[2] || branchMatch[4];
+    if (keys.includes(key)) dispatched.add(key);
+  }
+  return {
+    total: keys.length,
+    live: dispatched.size,
+    placeholders: keys.length - dispatched.size,
+  };
+}
+
+function independentLiveWorkbenchCounts() {
+  return independentWorkbenchCountsFromSource(
+    fs.readFileSync(path.join(repoRoot, 'pages', 'workbench', '[requestId].js'), 'utf8'),
+  );
+}
+
 function assertSyntheticIndependentScanners() {
   fs.mkdirSync(syntheticDir, { recursive: true });
   const registryFixture = `
@@ -188,17 +279,36 @@ function assertSyntheticIndependentScanners() {
   for (const [name, body] of Object.entries(apiFixtures)) fs.writeFileSync(path.join(apiDir, name), body);
   const endpointCount = independentEndpointCountInFiles(walkJs(apiDir));
   if (endpointCount !== 1) throw new Error(`independent endpoint scanner synthetic expected 1, got ${endpointCount}`);
+
+  const workbenchFixture = `
+    const TABS = [
+      { key: 'one', label: 'One' },
+      { key: 'two', label: 'Two' },
+      // { key: 'commented', label: 'Commented' },
+      { key: 'three', label: 'Three' },
+    ];
+    if (activeTab === 'one') renderOne();
+    if ('two' === activeTab) renderTwo();
+    // if (activeTab === 'three') renderThree();
+    if (activeTab === tab.key) renderDynamic();
+  `;
+  const workbenchCounts = independentWorkbenchCountsFromSource(workbenchFixture);
+  if (workbenchCounts.total !== 3 || workbenchCounts.live !== 2 || workbenchCounts.placeholders !== 1) {
+    throw new Error(`independent Workbench scanner synthetic mismatch: ${JSON.stringify(workbenchCounts)}`);
+  }
 }
 
 function buildProseFixtures() {
   const apps = independentLiveAppCount();
   const eps = independentLiveEndpointCount();
+  const workbench = independentLiveWorkbenchCounts();
   const wrongAppsA = apps + 1000;
   const wrongAppsB = apps + 1001;
   const wrongAppsC = apps + 1002;
   const wrongEpsA = eps + 1000;
   const wrongEpsB = eps + 1001;
   const wrongEpsC = eps + 1002;
+  const wrongPlaceholderCount = workbench.placeholders + 1000;
   return [
     {
       name: 'known miss: web-based tools phrasing is flagged',
@@ -313,6 +423,27 @@ function buildProseFixtures() {
       token: String(wrongEpsA),
     },
     {
+      name: 'bold-wrapped stale value is flagged',
+      file: 'pos_bold_stale.md',
+      body: `Stale claim: **${wrongAppsA}** app definitions remain.`,
+      expectFlagged: true,
+      token: String(wrongAppsA),
+    },
+    {
+      name: 'bold-wrapped stale Workbench placeholder count is flagged',
+      file: 'pos_bold_workbench_placeholder.md',
+      body: `Stale claim: **${wrongPlaceholderCount}** remaining placeholder tabs.`,
+      expectFlagged: true,
+      token: String(wrongPlaceholderCount),
+    },
+    {
+      name: 'code-wrapped stale value is flagged',
+      file: 'pos_code_stale.md',
+      body: `Stale claim: \`${wrongEpsA}\` app endpoints remain.`,
+      expectFlagged: true,
+      token: String(wrongEpsA),
+    },
+    {
       name: 'marker exemption applies to pointer-wrapped stale value',
       file: 'neg_pointer_marker.md',
       body: `Historically there were [${wrongAppsB}](docs/CANONICAL_COUNTS.md#app-definition-count) app definitions. <!-- fact-consistency:ignore fact=app-definition-count as-of=2026-05-19 -->`,
@@ -372,14 +503,31 @@ function assertProseFixtures() {
 function assertProductionDerives() {
   const expectedApps = independentLiveAppCount();
   const expectedEps = independentLiveEndpointCount();
+  const expectedWorkbench = independentLiveWorkbenchCounts();
   const { status, output } = runGate();
   if (status !== 0) throw new Error(`gate must be clean before derive cross-check:\n${output}`);
-  const m = output.match(/app-definition-count=(\d+), requireappaccess-endpoint-count=(\d+)/);
+  const m = output.match(
+    /app-definition-count=(\d+), requireappaccess-endpoint-count=(\d+), api-route-file-count=\d+, workbench-tab-count=(\d+), workbench-placeholder-tab-count=(\d+), workbench-live-tab-count=(\d+)/,
+  );
   if (!m) throw new Error(`could not parse gate summary:\n${output}`);
   const gotApps = Number(m[1]);
   const gotEps = Number(m[2]);
+  const gotWorkbench = {
+    total: Number(m[3]),
+    placeholders: Number(m[4]),
+    live: Number(m[5]),
+  };
   if (gotApps !== expectedApps) throw new Error(`app derive mismatch: gate=${gotApps}, independent=${expectedApps}`);
   if (gotEps !== expectedEps) throw new Error(`endpoint derive mismatch: gate=${gotEps}, independent=${expectedEps}`);
+  if (
+    gotWorkbench.total !== expectedWorkbench.total
+    || gotWorkbench.live !== expectedWorkbench.live
+    || gotWorkbench.placeholders !== expectedWorkbench.placeholders
+  ) {
+    throw new Error(
+      `Workbench derive mismatch: gate=${JSON.stringify(gotWorkbench)}, independent=${JSON.stringify(expectedWorkbench)}`,
+    );
+  }
 }
 
 function main() {

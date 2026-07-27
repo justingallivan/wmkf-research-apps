@@ -41,3 +41,21 @@ are machine-verified — `N` against the derive, the anchor against this registr
 - **Live value:** 149
 - **Description:** pages/api route files (matches check:api-routes walker)
 - **Derive:** `pages/api/**/*.js` → count of route files (same predicate `scripts/check-api-route-security-matrix.js` uses)
+
+## workbench-tab-count
+
+- **Live value:** 10
+- **Description:** Request Workbench top-level tabs
+- **Derive:** `pages/workbench/[requestId].js` → `TABS.length`
+
+## workbench-placeholder-tab-count
+
+- **Live value:** 4
+- **Description:** Request Workbench placeholder tabs
+- **Derive:** `pages/workbench/[requestId].js` → `TABS` keys without a literal `activeTab === <key>` implementation branch
+
+## workbench-live-tab-count
+
+- **Live value:** 6
+- **Description:** implemented Request Workbench top-level tabs
+- **Derive:** `pages/workbench/[requestId].js` → distinct literal `activeTab === <TABS key>` implementation branches

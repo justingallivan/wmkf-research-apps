@@ -115,27 +115,26 @@ function isExempt(line, factId) {
   return markers.some((attrs) => attrs.fact === factId && markerHasRequiredContext(attrs));
 }
 
-// Pointer-form unwrap: the keep-number-plus-link normalization pattern wraps
-// each gated literal as `[N](docs/CANONICAL_COUNTS.md#fact-id)`. Without
-// unwrapping, the `\d+` would be followed by `]` instead of whitespace and
-// every number-plus-context regex would silently miss the pointer form,
-// turning the conversion into a gate bypass. We rewrite `[N](url)` → `N` on
-// a copy of the line before pattern matching; the original line is still
-// used for violation reporting so the user sees the actual pointer text.
-// Empty URL `[N]()` is intentionally still unwrapped — a stale value wrapped
-// that way should still be flagged.
+// Markdown wrappers must not turn into fact-gate bypasses. Normalize the
+// common keep-number-plus-link form and numeric bold/code emphasis before
+// pattern matching; the original line is still used for violation reporting.
+// Empty URL `[N]()` is intentionally still unwrapped.
 function normalizeForMatching(line) {
-  return line.replace(/\[(\d+)\]\([^)]*\)/g, '$1');
+  return line
+    .replace(/\[(\d+)\]\([^)]*\)/g, '$1')
+    .replace(/\*\*(\d+)\*\*/g, '$1')
+    .replace(/__(\d+)__/g, '$1')
+    .replace(/`(\d+)`/g, '$1');
 }
 
 function assertPatternFixtures(facts) {
   for (const fact of facts) {
     for (const sample of fact.knownMissFixtures || []) {
-      const matched = fact.patterns.some((pattern) => pattern.find(sample).length > 0);
+      const matched = fact.patterns.some((pattern) => pattern.find(normalizeForMatching(sample)).length > 0);
       if (!matched) failConfig(`known miss fixture for ${fact.id} is not matched: ${sample}`);
     }
     for (const sample of fact.knownNonMatches || []) {
-      const matched = fact.patterns.some((pattern) => pattern.find(sample).length > 0);
+      const matched = fact.patterns.some((pattern) => pattern.find(normalizeForMatching(sample)).length > 0);
       if (matched) failConfig(`known non-match fixture for ${fact.id} is matched: ${sample}`);
     }
   }
