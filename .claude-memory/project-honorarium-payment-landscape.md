@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: bill
-  last_verified: 2026-07-22 via finance-honoraria wiki, no-BILL strategy, and current honorarium source; numeric payment probes remain 2026-06-27/28
+  last_verified: 2026-07-27 via GET-only honorarium-link census, finance-honoraria wiki, no-BILL strategy, and current honorarium source; numeric payment probes remain 2026-06-27/28
 ---
 
 ## Recall Rule
@@ -32,6 +32,11 @@ the portal can receive an app-created reviewer-honorarium `akoya_request` throug
 - `BILL_ONBOARDING_DEFERRED=true` prevents the BILL tail;
 - the request binds the reviewer contact and parent proposal, and the suggestion
   junction holds the deterministic honorarium marker.
+
+The GET-only production linkage census on 2026-07-27 found 40 portal-era
+honoraria: all 40 had the direct `wmkf_reviewedproposal` link, all 40 had the
+suggestion-junction marker, and all 40 proposal identities agreed. Re-run
+`scripts/probe-honorarium-link-population.js` before quoting a later population.
 
 The earlier capture-only posture is the safety/off mode, not the current Production
 target. Detailed configuration and rollout evidence live in

@@ -158,7 +158,7 @@ and a subsidiary `UNKNOWN` or `PLANNED` boundary.
 | Contact leads | Contact enrichment emits quarantined leads; manage-only promotion selects one | Bounded `reviewer_find_roster` representation plus canonical Dataverse person/suggestion on promotion | Reviewer Finder audit expander and invitation confirmation gate | `VERIFIED` for shipped slices; paid broad scout `PLANNED` |
 | Prompt publication/execution | Admin publication route and repository seed paths | Dataverse `wmkf_ai_prompt`; append-only Postgres publication audit; `wmkf_ai_run` execution audit is fallible | Vercel Executor callers | `PARTIAL`; universal editor/resolver unbuilt; production PA prompt Executor absent from the 2026-07-27 visible flow metadata |
 | Workflow chaining | Vercel Executor parses declared output and attempts target writes | Declared `akoya_request.wmkf_ai_*` fields; per-output write results must be checked | Downstream PA consumers | `PARTIAL`; downstream PA DAG is planned/unbuilt, not an unknown current pipeline |
-| Grantee/honorarium | Guarded routes/services | Dataverse request/contact entities plus documented Postgres operational state | Workbench/portal/finance flows | `PARTIAL`; current row/config populations require probes |
+| Grantee/honorarium | Guarded routes/services | Dataverse request/contact entities plus documented Postgres operational state | Workbench/portal/finance flows | `PARTIAL`; honorarium link population probed 2026-07-27, while grantee and broader mutable row/config populations still require probes |
 | Review synthesis | Staff synthesis route after at least one submitted review | `akoya_request.wmkf_reviewsynthesisjson` | Reviews tab and DOCX/PDF exports | `PARTIAL`; no auto trigger and participation set is undecided |
 | DAL/context migration | Post-auth entry points establish trusted context; services use entity adapters | Dataverse through the 19 registered adapters; boundary gates enforce exceptions | Route/service consumers | `VERIFIED`; DAL, bypass-strip, and notification push-up plans are completed history |
 | Q9 preferences/app access | Preference service uses the DynamicsService adapter; app-access service still uses raw client transport | Dataverse preference and app-access entities | Auth/profile/app-access consumers | `PARTIAL`; preference migration shipped, app-access transport migration deferred, production warn/soak state `UNKNOWN` |
@@ -240,8 +240,9 @@ the repository.
 
 These are deliberately not converted into “current” facts:
 
-- Current production row populations, including honorarium proposal-link
-  population, require a new read-only row probe.
+- Broader current production row populations still require purpose-built
+  read-only probes. The honorarium proposal-link population named in the
+  original sweep was resolved by the dated follow-up below.
 - Review-synthesis participation semantics remain an owner decision. The target
   is “all reviews are in,” but declined, withdrawn/released, revoked, duplicate,
   and exception-state participation is not defined.
@@ -277,6 +278,32 @@ deployed production pipeline in the visible metadata. A sandbox pass could not
 run because `DYNAMICS_SANDBOX_URL` is not present in `.env.local`; that does
 not weaken the production conclusion but leaves sandbox-only experimentation
 outside this claim.
+
+### Follow-up resolution: honorarium proposal-link population
+
+The honorarium slice of the mutable-row unknown was resolved on 2026-07-27
+with `scripts/probe-honorarium-link-population.js`:
+
+- the production Research Reviewer / Honorarium / Individual composite contains
+  127 honorarium requests: 87 historical GoApply-origin rows and 40 portal-era
+  rows created since the 2026-07-02 go-live;
+- all 40/40 portal-era honoraria carry the direct
+  `akoya_request.wmkf_reviewedproposal` lookup;
+- all 40 are referenced by
+  `wmkf_appreviewersuggestion.wmkf_HonorariumRequest`;
+- all 40 direct proposal lookups agree with the proposal lookup on their
+  suggestion junction; and
+- there are zero portal-era orphan honoraria, missing direct links, or
+  mismatched proposal links.
+
+One accepted, non-opt-out suggestion in the launch-date query has no honorarium
+junction. A targeted GET confirmed it is the known `Justin_test Gallivan`
+launch-day fixture, accepted at 2026-07-02 13:34 UTC and already classified by
+the capture-only sweep, not an unserved real reviewer. Historical GoApply rows
+were never promised a direct proposal lookup and remain intentionally outside
+the portal-cohort guarantee.
+The probe contains no Dataverse write: OAuth token acquisition is the only POST
+and every tenant data request is GET.
 
 ### Mechanical memory result
 
@@ -318,7 +345,7 @@ The root-run verification battery completed sequentially:
 domain, there is no known live stale claim or unresolved contradiction.
 Historical numeric references that remain are confined to clearly dated
 historical material rather than current implementation guidance. No live
-external write or state-changing probe was performed. The production
-Power Automate read-only probe resolved that slice; the items still listed in
-“Explicit remaining unknowns and owner decisions” remain intentionally open
-pending their named read-only probes or owner decisions.
+external write or state-changing probe was performed. The production Power
+Automate and honorarium-link read-only probes resolved those slices; the items
+still listed in “Explicit remaining unknowns and owner decisions” remain
+intentionally open pending their named read-only probes or owner decisions.

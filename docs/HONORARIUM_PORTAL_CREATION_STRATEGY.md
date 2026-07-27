@@ -3,9 +3,10 @@ title: "Honorarium Portal-Creation Strategy (no-BILL cycle)"
 domain: finance-honoraria
 kind: plan
 status: active
-summary: "No-BILL honorarium creation LIVE in Production 2026-07-02 (BILL deferred); self-lookup + backfill hardening done; capture-only backfill unneeded."
+summary: "No-BILL honorarium creation is live; a 2026-07-27 census confirms all 40 portal-era rows have matching proposal and suggestion links."
 canonical: false
 cataloged: 2026-07-02
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - lib/bill/honorarium-onboard-orchestrator.js
@@ -290,9 +291,22 @@ relationship. `[VERIFIED via entity metadata 2026-07-01]`
   /akoya_requests(<proposalId>)`, guarded on `request.akoya_requestid`
   (`lib/bill/honorarium-onboard-orchestrator.js`). So app-created honoraria populate
   the FK and feed Connor's AkoyaGO dashboard. We do NOT surface it in our own app UI
-  (documented in the finance-honoraria wiki). The bind is metadata-verified and the
-  no-BILL create path is live; current production linkage population is **UNKNOWN**
-  without a new dated row probe. The field lives in the Default Solution — Connor can add the component to
+  (documented in the finance-honoraria wiki). `[VERIFIED via read-only production
+  census 2026-07-27]`: all **40/40** portal-era honorarium rows (created since the
+  2026-07-02 go-live) carry the direct proposal lookup; all 40 also have a
+  `wmkf_appreviewersuggestion.wmkf_HonorariumRequest` junction, and the proposal
+  reached through each junction agrees with the honorarium's direct lookup.
+  There were no orphan portal-era honoraria, missing direct links, or mismatched
+  proposal links. The repeatable GET-only census is
+  `scripts/probe-honorarium-link-population.js`.
+
+  One accepted, non-opt-out suggestion in the launch-date window has no honorarium
+  junction: `Justin_test Gallivan`, accepted at 2026-07-02 13:34 UTC. It is the
+  known launch-day test fixture already classified by the capture-only sweep,
+  not an unserved real reviewer. Historical GoApply-origin rows remain intentionally
+  unlinked to proposals (87 rows in the same census); no historical backfill is
+  implied by the portal-cohort result. The field lives in the Default Solution —
+  Connor can add the component to
   `wmkfResearchReviewAppSuite` if his ALM wants it bundled (non-destructive).
 - **Option C — proposal-referencing title (immediate, no schema change).** The
   create body now overrides `akoya_title` (a plain writable string, §3b) at create
@@ -325,7 +339,9 @@ Add rows here as further Dataverse schema changes arise this cycle.
   `docs/agent-wiki/topics/finance-honoraria.md`.
 - Live probes (read-only + one authorized sentinel create/delete), prod
   `wmkf.crm.dynamics.com`, 2026-07-01. Probe scripts were one-off (session
-  scratchpad); re-derive from this doc's GUIDs if needed.
+  scratchpad); re-derive from this doc's GUIDs if needed. Current linkage
+  populations are separately reproducible with the GET-only
+  `scripts/probe-honorarium-link-population.js` (last run 2026-07-27).
 - Reference record: Amy Gladfelter honorarium `#1002764`
   (`akoya_requestid 357386c5-040d-f111-8406-000d3a352e68`), cohort = 87
   `akoya_program = Research Reviewer` rows.

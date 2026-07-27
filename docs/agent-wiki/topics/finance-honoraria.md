@@ -1,12 +1,14 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-12
+last_verified: 2026-07-27
 stale_after_days: 90
 owner: finance-ops
 source_files:
   - pages/api/review-manager/send-emails.js
   - pages/api/external/review/[token]/respond.js
+  - lib/bill/honorarium-onboard-orchestrator.js
+  - scripts/probe-honorarium-link-population.js
 canonical_docs:
   - docs/APPLICATION_STATE_ATLAS.md
   - docs/atlas/
@@ -45,8 +47,8 @@ not deleted (`BILL_ENABLED` unset in every Vercel environment — verified
 `project-honorarium-payment-landscape` memory. The 2026-07-01 posture below
 remains the live mechanical state.
 
-**Current plan (2026-07-01 decision):** full BILL.com onboarding remains deferred,
-but the portal is now the planned sole creator of reviewer honorarium
+**Current posture (2026-07-01 decision; live 2026-07-02):** full BILL.com onboarding
+remains deferred, but the portal is the sole creator of reviewer honorarium
 `akoya_request` rows for reviewers who come through it. Use
 `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` as the current source of truth for
 the no-BILL cycle. **This posture WENT LIVE in Production 2026-07-02** (GUIDs set,
@@ -136,16 +138,23 @@ is `wmkf`). Authoritative names read back from the relationship metadata:
 
 The create body in `lib/bill/honorarium-onboard-orchestrator.js` binds it
 (`'wmkf_ReviewedProposal@odata.bind': /akoya_requests(<proposalId>)`, guarded on
-`request.akoya_requestid`). The bind is metadata-verified; it is first exercised by a
-live create at go-live (pipeline still deferred). Our app populates the FK but does
-NOT surface the field in its own UI. Connor surfaces it in an AkoyaGO dashboard and
+`request.akoya_requestid`). Our app populates the FK but does NOT surface the field
+in its own UI. Connor surfaces it in an AkoyaGO dashboard and
 may add the component to `wmkfResearchReviewAppSuite`. The proposal is also still
 conveyed by the honorarium title (Option C) and derivable via the
 `wmkf_appreviewersuggestion` junction (`wmkf_HonorariumRequest` + `wmkf_Request`).
 Detail: `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` §8/§9.
 
+`[VERIFIED via GET-only production census 2026-07-27]`: 40/40 portal-era
+honoraria carry the direct proposal lookup, all 40 are referenced by a suggestion
+junction, and every direct lookup agrees with the proposal on that junction.
+There are no orphan portal-era honoraria or mismatches. The 87 historical
+GoApply-origin honoraria remain outside this portal-link guarantee. Re-run
+`node scripts/probe-honorarium-link-population.js` before quoting a later count.
+
 ## Standard Probe
 
 ```bash
 rg -n "honorarium|Bill|BILL|payment|bank|akoya_request" lib pages docs tests
+node scripts/probe-honorarium-link-population.js
 ```

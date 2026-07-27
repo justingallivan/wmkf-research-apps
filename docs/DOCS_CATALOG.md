@@ -141,7 +141,7 @@ related:
 | [BILL_HONORARIUM_INTEGRATION_DESIGN.md](BILL_HONORARIUM_INTEGRATION_DESIGN.md) | spec | historical |  | Historical reviewer BILL onboarding design; automated BILL integration was tabled by the owner on 2026-07-12. | 2026-07-02 |
 | [BILL_integration_handoff.md](BILL_integration_handoff.md) | history | historical |  | Historical BILL.com integration handoff; automated BILL integration was tabled by the owner on 2026-07-12. | 2026-07-02 |
 | [BILL_LIB_DESIGN.md](BILL_LIB_DESIGN.md) | spec | historical |  | Historical BILL API wrapper design retained as implementation history; automated BILL integration was tabled on 2026-07-12. | 2026-07-02 |
-| [HONORARIUM_PORTAL_CREATION_STRATEGY.md](HONORARIUM_PORTAL_CREATION_STRATEGY.md) | plan | active |  | No-BILL honorarium creation LIVE in Production 2026-07-02 (BILL deferred); self-lookup + backfill hardening done; capture-only backfill unneeded. | 2026-07-02 |
+| [HONORARIUM_PORTAL_CREATION_STRATEGY.md](HONORARIUM_PORTAL_CREATION_STRATEGY.md) | plan | active |  | No-BILL honorarium creation is live; a 2026-07-27 census confirms all 40 portal-era rows have matching proposal and suggestion links. | 2026-07-02 |
 
 ## general
 

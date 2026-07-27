@@ -49,7 +49,12 @@ Two distinct concepts both stored in the `akoya_request` table — easy to confu
 | **Grant request** | A proposal from a university asking for funding | `akoya_program ≠ "Research Reviewer"` |
 | **Honorarium request** | A payment record for an individual who reviewed a grant request | `akoya_program = "Research Reviewer"` AND `wmkf_grantprogram = "Honorarium"` AND `wmkf_type = "Individual"` AND `wmkf_request_type = "Individual"` |
 
-Example: Utah State submitted **grant request** #1002238. Amy Gladfelter agreed to review it and was issued **honorarium request** #1002764 for $250. The two are separate `akoya_request` rows. **Today they have no data link between them**; Q5 below proposes a small schema add that preserves the linkage going forward.
+Example: Utah State submitted **grant request** #1002238. Amy Gladfelter agreed
+to review it and was issued **honorarium request** #1002764 for $250. The two are
+separate `akoya_request` rows. **At this design's 2026-05-25 evidence date they
+had no data link between them**; Q5 below records the first schema add. The
+current portal path now writes both the suggestion junction and the later
+`wmkf_reviewedproposal` direct lookup; see the superseding strategy.
 
 ---
 
@@ -246,9 +251,12 @@ Defensive recommendation: leave both null so a future workflow change doesn't ac
 
 ---
 
-### Q5. Add `wmkf_honorariumforrequest` lookup on `akoya_request` to capture honorarium↔grant provenance?
+### Q5. Historical proposal: add honorarium↔grant provenance
 
-Today Amy's honorarium #1002764 has zero data link back to grant #1002238 (the Utah State proposal she reviewed). Our portal **knows** which grant the reviewer is reviewing (it's on the suggestion row the token resolves to), so we can populate this at create time — but only if the field exists.
+At the 2026-05-25 probe, Amy's honorarium #1002764 had zero data link back to
+grant #1002238 (the Utah State proposal she reviewed). Our portal **knows** which
+grant the reviewer is reviewing (it's on the suggestion row the token resolves
+to), so the design proposed preserving that provenance at create time.
 
 Proposed new optional Lookup field (per Connor 2026-05-26, refined):
 - Name: `wmkf_HonorariumRequest`
