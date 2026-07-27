@@ -63,33 +63,7 @@ Mutable catalogues do not belong in this root file. Inspect their authoritative 
 
 ## Development
 
-```bash
-npm install
-npm run dev
-npm run lint
-npm test
-npm run build
-node scripts/apply-migrations.js
-```
-
 Run `npm run check:agent-invariants` after instruction, skill, or symlink work. Do not place the repository or `.git` in a cloud-synced folder.
-
-## Project Shape
-
-```text
-pages/             Next.js pages and API routes
-shared/            Shared components, config, prompts, and utilities
-lib/               Services, Dataverse adapters, database, and core utilities
-scripts/           Setup, probes, gates, and operational utilities
-docs/              Canonical architecture, plans, runbooks, Atlas, and guides
-modules/           Self-contained sub-projects with their own local instructions
-outputs/           Generated reports, decks, and analysis artifacts
-_archived/         Retired apps/pages moved out of the live tree
-.claude/rules/      Path-scoped conventions
-.claude/skills/     Multi-step workflows shared with Codex through .agents/skills
-.claude-memory/     Rationale, preferences, history, and task router
-tests/              Unit and integration tests
-```
 
 <!-- Do NOT run `rtk init` in this repo: it overwrites the condensed block below
      with a ~139-line reference, pushing this file past the 200-line
