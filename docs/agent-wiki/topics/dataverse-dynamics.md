@@ -150,14 +150,16 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   that observability posture and replaced the passive soak with deterministic
   `on`-mode acceptance across the ordinary-user auth lookup, admin
   list/grant/revoke, fresh-profile default grant, and partial-failure UI
-  refresh. All 27 focused assertions
+  refresh. All 33 focused assertions
   passed; the read-only live inventory found six mapped ordinary users with
   three to five grants each. Current auth behavior is fail-closed but
   retryable: `requireAppAccess` returns 503 on grant-lookup failure and does not
   cache an empty grant set. Admin grant-list failures are also fail-loud, and
   partial writes report only completed identifiers. Stage 2 is satisfied;
-  retain the normal authenticated Preview smoke and production log watch when
-  Stage 4 is released. See
+  Stage 4 requires a deliberately designated ordinary-user Preview smoke,
+  reversible grant/revoke restoration check, authenticated reviewer-finder
+  `analyze`/`discover` check with a known prompt override, and production log
+  watch before release. See
   `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md`.
 - OData null filters do not behave like SQL.
 - The sandbox is not drop-in prod parity.

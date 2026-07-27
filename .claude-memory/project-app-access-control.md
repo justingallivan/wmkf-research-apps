@@ -65,15 +65,17 @@ Do not:
 The 2026-07-27 Vercel probe found no `DATAVERSE_DAL_UNIVERSAL` entry in the
 current Preview or Production project configuration. The owner accepted that
 posture and replaced the low-signal passive soak with deterministic
-`DATAVERSE_DAL_UNIVERSAL=on` acceptance. Seven focused suites / 27 tests cover
+`DATAVERSE_DAL_UNIVERSAL=on` acceptance. Seven focused suites / 33 tests cover
 the ordinary-user lookup, admin list/grant/revoke, fresh-profile default
 grants, and partial-failure UI refresh; all passed. A read-only live inventory
 found 10 active profiles: two
 superusers, six mapped ordinary users with three to five grants, and two
 unmapped read-only profiles. No grant, environment variable, deployment, or
 saved session changed. Stage 2 is satisfied and Stage 4 is ready to execute;
-retain the normal authenticated Preview smoke and production log watch at
-release.
+require a deliberately designated ordinary-user Preview smoke, reversible
+grant/revoke restoration check, authenticated reviewer-finder
+`analyze`/`discover` check with a known prompt override, and production log
+watch at release.
 
 Ground truth: `shared/config/appRegistry.js`,
 `shared/context/AppAccessContext.js`, `lib/utils/auth.js`,

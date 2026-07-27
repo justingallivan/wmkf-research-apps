@@ -118,9 +118,12 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
    `docs/audits/q9-app-access-stage2-acceptance-2026-07-27.md`.
    The owner replaced the low-signal passive warn soak with
    `DATAVERSE_DAL_UNIVERSAL=on` contract acceptance across each app-access
-   entry-point class plus a read-only live inventory. All 27 focused assertions
+   entry-point class plus a read-only live inventory. All 33 focused assertions
    passed. Stage 2 is satisfied; Stage 4 is ready to execute. Preserve its
-   authenticated Preview smoke and production log watch at release time.
+   required deliberately designated ordinary-user Preview smoke, reversible
+   grant/revoke restoration check, authenticated reviewer-finder
+   `analyze`/`discover` check with a known prompt override, and production log
+   watch at release time.
 
 ### Owner Decision Needed
 

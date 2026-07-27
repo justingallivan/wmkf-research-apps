@@ -426,7 +426,8 @@ was therefore closed with a deterministic acceptance contract:
   selected for mutation;
 - seven focused suites ran `DATAVERSE_DAL_UNIVERSAL=on` over the ordinary-user
   auth lookup, admin list/grant/revoke, fresh-profile default grants, read
-  probes, guard semantics, and partial-failure UI refresh; all 27 tests passed;
+  probes, guard semantics, and partial-failure UI refresh; all 27 original
+  Stage 2 tests passed;
 - the admin API was made fail-loud for all-grants read failures and now reports
   the actually completed prefix on partial grant/revoke failure rather than
   claiming the whole request succeeded; and
@@ -434,8 +435,9 @@ was therefore closed with a deterministic acceptance contract:
   route-service-boundary, and API-route gates plus their self-tests passed.
 
 No live grant, environment variable, deployment, or saved auth state changed.
-The real ordinary-user OAuth path remains an optional Stage 4 release smoke,
-not a prerequisite for starting the transport migration. Durable receipt:
+The real ordinary-user OAuth path is a required Stage 4 release gate, not a
+prerequisite for starting the transport migration. It requires a deliberately
+designated ordinary user plus reversible grant/revoke restoration. Durable receipt:
 `docs/audits/q9-app-access-stage2-acceptance-2026-07-27.md`.
 
 ### Initial Q9 follow-up independent census
@@ -449,15 +451,21 @@ conclusion, and the current 503/no-empty-cache auth semantics.
 
 ### Q9 acceptance adversarial review
 
-The deterministic acceptance received a separate implementation-and-contract
-review. It initially found incomplete canonical refresh handling, raw
+The deterministic acceptance received separate implementation-and-contract
+reviews. The first found incomplete canonical refresh handling, raw
 transport-error exposure, a stale current-plan restatement, an erased success
 message, imprecise evidence wording, and an editable stale snapshot when the
-canonical refresh itself failed. All were corrected. The final re-review
-confirmed that failed canonical reloads lock every mutation control until
-Retry succeeds, the service and route preserve honest partial-success
-semantics, and no P1/P2 issue remains. This was a code-and-contract review, not
-an additional claim-pair census, so it does not alter the counts below.
+canonical refresh itself failed. Those were corrected. A later Claude review
+found that successful user removal could still lose its confirmation during
+reload and that an initial grant-load failure could also render “No users
+found.” Both were corrected: removal now awaits reload and reports the
+completed removal even when reload fails, while the empty state requires a
+successful non-stale snapshot. Follow-up authorization-loss and in-flight
+mutation cases increased the focused suite to 33 tests. The same review
+reconciled the plan’s residual
+warn/soak language and made the designated ordinary-user Stage 4 smoke a
+required release gate. This was a code-and-contract review, not an additional
+claim-pair census, so it does not alter the counts below.
 
 ### Grantee follow-up independent census
 

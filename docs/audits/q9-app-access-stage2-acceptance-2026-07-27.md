@@ -3,7 +3,7 @@ title: Q9 App-Access Stage 2 Acceptance — 2026-07-27
 domain: data-layer
 kind: audit
 status: active
-summary: "Deterministic enforcement-mode acceptance replacing the low-signal Q9 app-access production soak."
+summary: "Deterministic enforcement-mode acceptance replacing the proposed low-signal Q9 app-access production soak."
 canonical: false
 cataloged: 2026-07-27
 last_verified: 2026-07-27
@@ -60,7 +60,7 @@ a temporary permission mutation.
 
 ## Programmatic acceptance
 
-The focused run used:
+The original Stage 2 focused run used:
 
 ```text
 DATAVERSE_DAL_UNIVERSAL=on
@@ -68,6 +68,9 @@ DATAVERSE_DAL_UNIVERSAL=on
 27 tests
 27 passed
 ```
+
+After the Claude-review follow-ups, the same seven-suite acceptance set passes
+33/33 tests.
 
 Suites:
 
@@ -103,6 +106,10 @@ The current source now:
 - locks a snapshot whose canonical refetch fails and exposes an explicit Retry
   action; mutation controls remain disabled until that retry loads canonical
   grants; and
+- preserves a completed user-removal result across the canonical reload,
+  including an explicit “removed, but reload failed” state; and
+- renders “No users found” only after a successful, non-stale empty snapshot,
+  never after an initial transport failure;
 - clears the affected user's two-minute access cache after every attempted
   mutation, including partial failure.
 
@@ -121,11 +128,20 @@ The following ran sequentially and passed with their self-tests:
 
 Changed-file ESLint reported 0 errors and 10
 `react-hooks/set-state-in-effect` warnings in the existing monolithic admin
-page.
+page. The follow-up UI correction was re-linted with the same result: 0 errors
+and the same 10 warnings.
 
 The production build passed. The full Jest run passed **519 suites / 6,159
-tests**. An independent adversarial re-review found no remaining P1/P2 issue
-after the stale-snapshot lock and Retry regression were added.
+tests** at the original acceptance boundary. An independent adversarial
+re-review cleared the original findings after the stale-snapshot lock and
+Retry regression were added. A later Claude review found two related admin
+feedback defects—the removal result could be erased by its reload, and an
+initial load failure could also render “No users found”—which were corrected
+with the focused acceptance increasing to 33 tests. The follow-up production
+build passed, and the full Jest run passed **519 suites / 6,165 tests**.
+Claude's final read-only re-review found no P0–P2 regression; its two remaining
+P3 documentation omissions were corrected in this receipt and the Stage 4
+summary surfaces.
 
 ## Mutation and deployment boundary
 
@@ -133,7 +149,10 @@ No staff grant, Vercel environment variable, deployment, or saved browser
 session changed during this acceptance. The existing production deployment
 remained the baseline.
 
-A real ordinary-user OAuth smoke is still useful at Stage 4's normal release
-boundary. It requires a deliberately designated ordinary user because
-superusers bypass the grant lookup. It is a release verification, not a
+A real ordinary-user OAuth smoke is a **required Stage 4 release gate**. It
+requires a deliberately designated ordinary user because superusers bypass
+the grant lookup. The gate includes the authenticated cold-cache path and a
+reversible grant/revoke round trip with exact restoration of the starting
+grants, plus the overdue authenticated reviewer-finder `analyze`/`discover`
+check with a known prompt override. It is release verification, not a
 pre-build observation window.

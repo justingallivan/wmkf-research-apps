@@ -1542,7 +1542,8 @@ export function AppAccessSection() {
       const res = await fetch('/api/app-access?all=true');
       if (res.status === 403 || res.status === 401) {
         setIsSuperuser(false);
-        return false;
+        setSnapshotStale(true);
+        return 'unauthorized';
       }
       const data = await res.json();
       if (!res.ok) {
@@ -1552,14 +1553,14 @@ export function AppAccessSection() {
       setSnapshotStale(false);
       setMessage(null);
       applyServerData(data);
-      return true;
+      return 'ok';
     } catch (error) {
       // The admin page is already superuser-only. Keep this section visible so
       // a transport failure cannot masquerade as "no users/no grants."
       setIsSuperuser(true);
       setSnapshotStale(true);
       setMessage({ type: 'error', text: error.message });
-      return false;
+      return 'error';
     } finally {
       setLoading(false);
     }
@@ -1573,7 +1574,13 @@ export function AppAccessSection() {
     return <div className="text-gray-500 text-sm">Loading...</div>;
   }
 
-  if (!isSuperuser) return null;
+  if (!isSuperuser) {
+    return message ? (
+      <div className="mb-4 px-3 py-2 rounded-lg text-sm bg-red-50 text-red-800 border border-red-200">
+        {message.text}
+      </div>
+    ) : null;
+  }
 
   const visibleAppSet = new Set(allApps);
   const visibleOnlySet = (keys) => new Set([...keys].filter(k => visibleAppSet.has(k)));
@@ -1654,11 +1661,13 @@ export function AppAccessSection() {
       if (totalGrants) parts.push(`${totalGrants} granted`);
       if (totalRevokes) parts.push(`${totalRevokes} revoked`);
       const refreshed = await fetchGrants();
-      setMessage(refreshed
+      setMessage(refreshed === 'ok'
         ? { type: 'success', text: `Saved: ${parts.join(', ')}` }
         : {
             type: 'error',
-            text: `Changes were saved, but the current grant snapshot could not be reloaded. Refresh before editing again.`,
+            text: refreshed === 'unauthorized'
+              ? 'Changes were saved, but your admin session expired before the grant snapshot could be reloaded. Sign in again to verify the current grants.'
+              : 'Changes were saved, but the current grant snapshot could not be reloaded. Refresh before editing again.',
           });
     } catch (err) {
       // A batch may have completed a prefix before the API returned non-2xx.
@@ -1667,9 +1676,11 @@ export function AppAccessSection() {
       const refreshed = await fetchGrants();
       setMessage({
         type: 'error',
-        text: refreshed
+        text: refreshed === 'ok'
           ? `${err.message}. Current grants were reloaded.`
-          : `${err.message}. Current grants could not be reloaded; refresh before editing again.`,
+          : refreshed === 'unauthorized'
+            ? `${err.message}. Your admin session expired before current grants could be reloaded; sign in again to verify them.`
+            : `${err.message}. Current grants could not be reloaded; refresh before editing again.`,
       });
     } finally {
       setSaving(false);
@@ -1690,15 +1701,26 @@ export function AppAccessSection() {
   // integrity but auth/app-access lookups exclude inactive profiles.
   const removeUser = async (userId, userName) => {
     if (!confirm(`Remove ${userName || `user ${userId}`}? They will lose login and app access. The profile row is preserved for audit history.`)) return;
+    setSaving(true);
     setMessage(null);
     try {
       const res = await fetch(`/api/admin/users?id=${userId}`, { method: 'DELETE' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Remove failed');
-      setMessage({ type: 'success', text: `Removed ${data.name || userName || userId}` });
-      fetchGrants();
+      const removedName = data.name || userName || userId;
+      const refreshed = await fetchGrants();
+      setMessage(refreshed === 'ok'
+        ? { type: 'success', text: `Removed ${removedName}` }
+        : {
+            type: 'error',
+            text: refreshed === 'unauthorized'
+              ? `Removed ${removedName}, but your admin session expired before the grant snapshot could be reloaded. Sign in again to verify the current grants.`
+              : `Removed ${removedName}, but the current grant snapshot could not be reloaded. Refresh before editing again.`,
+          });
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1821,9 +1843,9 @@ export function AppAccessSection() {
             </tbody>
           </table>
         </div>
-      ) : (
+      ) : serverGrants !== null && !snapshotStale ? (
         <p className="text-gray-500 text-sm">No users found.</p>
-      )}
+      ) : null}
 
       {hasChanges && (
         <p className="text-xs text-amber-600 mt-3">
