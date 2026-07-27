@@ -4,7 +4,7 @@ description: Two new capabilities planned — compliance screening against Found
 type: project
 status: active
 scope: strategy
-last_verified: S209 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 via Expertise Finder page/route source, production-call-path search, and source-absence check for compliance screening
 ---
 
 ## Recall Rule
@@ -12,14 +12,22 @@ last_verified: S209 via memory-content (not re-probed 2026-06-04)
 Read this when: scoping the Compliance Screening capability, or someone asks about staff/consultant/board proposal matching.
 
 Do:
-- Treat Staff-Proposal Matching as SHIPPED with a UI as Expertise Finder (`pages/api/expertise-finder/{match,batch-match,roster,history}.js` + `expertise-finder.js`; rules in `modules/expertise_matching/CLAUDE.md`).
+- Treat Staff-Proposal Matching as SHIPPED with a UI as Expertise Finder
+  (`pages/api/expertise-finder/{match,batch-match,roster,history}.js` +
+  `expertise-finder.js`; production prompt rules in
+  `shared/config/prompts/expertise-finder.js`).
 - Build Compliance Screening (still unbuilt) via batch eval against historical Phase I proposals → iterate prompts → deploy as PA triggers; full PDFs but text-only extraction for cost at scale.
 
 Do not:
 - Rebuild matching or assume it has "no UI" — that original framing was overtaken (S209).
 - Apply the "no-UI, batch-only, PA-deploy" framing to matching; it applies only to the still-unbuilt compliance piece.
+- Treat `modules/expertise_matching` as the production implementation; it is an
+  isolated reference/demo with no production caller.
 
-Ground truth: `pages/api/expertise-finder/*.js`, `expertise-finder.js`, `modules/expertise_matching/CLAUDE.md`; compliance-screen code confirmed absent (`git grep`/`find` return nothing, S209).
+Ground truth: `pages/api/expertise-finder/*.js`, `expertise-finder.js`, and
+`shared/config/prompts/expertise-finder.js`; production-call-path search found
+no caller from the app/API into `modules/expertise_matching`. Compliance-screen
+code was confirmed absent by the S209 source search.
 
 Two new AI capabilities to develop via batch evaluation → production deployment:
 
@@ -29,7 +37,12 @@ Two new AI capabilities to develop via batch evaluation → production deploymen
 - AI evaluates proposals against criteria, flags non-fits with reasoning
 - Full PDFs required (not just abstracts), but text-only extraction (strip images) for cost at scale
 
-**2. Staff-Proposal Matching** (three tiers) — **SHIPPED as Expertise Finder (S209 update)**: `pages/api/expertise-finder/{match,batch-match,roster,history}.js` + `expertise-finder.js` page (a real web UI, contra the "no UI" note below); rules in `modules/expertise_matching/CLAUDE.md`. Staff/consultant/board tiers all covered.
+**2. Staff-Proposal Matching** (three tiers) — **SHIPPED as Expertise Finder
+(S209 update)**: `pages/api/expertise-finder/{match,batch-match,roster,history}.js`
++ `expertise-finder.js` page (a real web UI, contra the "no UI" note below);
+production rules live in `shared/config/prompts/expertise-finder.js`.
+`modules/expertise_matching` remains a non-production reference/demo. The
+staff/consultant/board tiers are all covered.
 - **Staff lead:** Coarse matching (~16 staff, by program area)
 - **Consultant flag:** Domain expertise, flag when specialist input would help
 - **Board member expertise:** Identify board members with relevant knowledge

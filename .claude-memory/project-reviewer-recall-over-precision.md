@@ -16,6 +16,9 @@ drop this candidate" work. The durable record is the canonical design doc
 the intent/routing layer.
 
 ## The reframe (why it exists)
+[VERIFIED 2026-07-27 as owner research interpretation and product design;
+current enforcement examples live in
+`lib/services/discovery-service.js` and COI/save services.]
 A 10-year retrospective (Justin/foundation) found **essentially no correlation between
 reviewer ratings and funded-project success**. It is selection-biased (funded-only →
 restriction-of-range), so the honest read is: **review functions as a FLOOR/GATE**
@@ -36,9 +39,10 @@ NOT over-read into "reviewer quality doesn't matter" — the selection bias forb
 - **COI = surface-not-gate**, except the permanent *policy* conflicts (proposal-authors,
   corroborated/current same-institution — default hard drop per foundation policy, with the
   approved Contract 5 Phase C read-only exception for a single low-trust match contradicted
-  by current-affiliation evidence). Reviewers
-  over-recuse, so system over-exclusion is the expensive error. Grade by detection
-  precision: hard-flag obvious/high-precision COI, soft-flag inferred/borderline.
+  by current-affiliation evidence). Reviewers over-recuse, so system
+  over-exclusion is the expensive error. Keep factual co-author evidence, but do
+  not surface PD-unverifiable inferred/relationship flags; rely on reviewer
+  self-disclosure. See [[project-reviewer-coi-rely-on-self-disclosure]].
 
 ## How to apply (shipped S238 — examples of the principle)
 - Track-B `<3`-pub candidates → surfaced as a warning, not silently dropped (dedup can

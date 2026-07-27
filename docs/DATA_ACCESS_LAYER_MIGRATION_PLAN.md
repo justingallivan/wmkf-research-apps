@@ -1,11 +1,12 @@
 ---
-title: "Dataverse Data-Access Layer — Staged Migration Plan"
+title: "Dataverse Data-Access Layer — Historical Migration Record"
 domain: data-layer
 kind: plan
-status: active
-summary: "Ratchet-gated migration of raw/aliased DynamicsService callers into per-entity adapters; ends fail-closed. Approved S328; amended after S329 Codex review."
+status: historical
+summary: "Historical execution record for the completed DAL migration; current follow-on work is tracked in the Q9 prefs/app-access plan."
 canonical: false
 cataloged: 2026-07-04
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/CLAUDE_REMEDIATION_PLAN.md
@@ -15,7 +16,24 @@ related:
   - docs/CI_GATES_REFERENCE.md
 ---
 
-# Dataverse Data-Access Layer — Staged Migration Plan
+# Dataverse Data-Access Layer — Historical Migration Record
+
+## Current state
+
+**[VERIFIED 2026-07-27 via `lib/dataverse/adapters/` inventory and the
+registered DAL/context law gates]** Stages 0–8 are complete. The adapter layer
+contains **19** entity adapters, the raw-access allowlist is gone, and
+`check:dataverse-access-layer` enforces the permanent application boundary.
+The later `bypassDynamicsRestrictions` strip and NotificationService
+trust-model follow-on also closed; their execution records are
+`docs/BYPASS_STRIP_PLAN.md` and `docs/NOTIFICATION_TRUST_MODEL_PLAN.md`.
+
+This file is retained as dated migration history, not as an active stage
+checklist. The remaining app-access transport migration is independently
+active in `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md`; do not infer its
+completion from the completed stages recorded here.
+
+## Historical plan and execution record
 
 **Approved by owner (S328, 2026-07-04):** scope = every route/service/cron goes
 through per-entity adapters, EXCEPT the entity-generic power tools
@@ -24,21 +42,17 @@ restriction context folds INTO the layer as a deliberate late stage;
 delivery = ratchet + gate (freeze new raw usage immediately, convert
 opportunistically + occasional dedicated sessions).
 
-**Execution status: ALL STAGES 0–8 COMPLETE (S329, 2026-07-04).** Census
+**Execution status at closeout: ALL STAGES 0–8 COMPLETE (S329, 2026-07-04).** Census
 probe, law gate (allowlist deleted), core toolkit, 18 adapters, all
 conversion waves, restriction fold-in. Final census: 12 identities / 11
 files, all non-entity-transport. The PROD `DATAVERSE_DAL_ENFORCEMENT` flip is
 CLOSED (2026-07-04/S330 — explicit `=on` in Vercel production, redeployed; see
-stage log). One item remains OPEN outside the staged plan: the mechanical
-strip of the legacy `bypassDynamicsRestrictions` importer files (census when
-scoping: `git grep -l "import.*bypassDynamicsRestrictions" -- lib pages
-scripts` — 81 on 2026-07-04, count moves with conversions; functionally
-correct as-is — the legacy wrapper IS a trusted context; owner decision
-2026-07-04: strip ends with trust-model tightening). The doc stays
-`status: active` until the strip closes — deliberately NOT flipped to
-superseded despite the Stage 8 text, to avoid declaring false completion.
+stage log). At that point the mechanical strip of legacy
+`bypassDynamicsRestrictions` importer files remained a follow-on; it later
+closed under the two historical plans linked in the current-state section
+above.
 
-## Why (baseline evidence)
+## Historical baseline evidence
 
 All literal counts `[VERIFIED 2026-07-04 via session greps; units noted per
 claim; the complement (adapters/transport/exempt tools) was excluded from each

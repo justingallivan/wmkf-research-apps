@@ -1,22 +1,34 @@
 ---
-title: "Reviewer Lifecycle Automation — Proposal for Staff Review"
+title: "Reviewer Lifecycle Automation — Historical Staff Proposal"
 domain: reviewer-workbench
-kind: source-of-truth
-status: canonical
-summary: "Originally written as a forward-looking proposal; large parts have shipped. Quick reality check:."
-canonical: true
+kind: plan
+status: historical
+summary: "Historical staff-facing proposal retained for product rationale; current implementation and remaining work are documented in the linked Workbench plans."
+canonical: false
 cataloged: 2026-07-02
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/EXTERNAL_REVIEWER_INTAKE_PLAN.md
+  - docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md
+  - docs/CURRENT_WORK_QUEUE.md
   - lib/services/review-upload.js
   - docs/atlas/dataverse-akoya-request.md
   - docs/atlas/dataverse-wmkf-appreviewersuggestion.md
 ---
 
-# Reviewer Lifecycle Automation — Proposal for Staff Review
+# Reviewer Lifecycle Automation — Historical Staff Proposal
 
-## Status (as of 2026-05-08)
+> **Historical product proposal.** This document preserves the staff-facing
+> workflow vision and its 2026-05-08 status snapshot. It is not a current
+> implementation contract or source of truth. Use
+> `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md` for the Reviews-tab boundary,
+> `docs/EXTERNAL_REVIEWER_INTAKE_PLAN.md` for the external-reviewer flow, and
+> `docs/CURRENT_WORK_QUEUE.md` for remaining work. In particular, automatic
+> synthesis readiness is not implemented: the target is “all reviews are in,”
+> while participating invitation states remain undecided.
+
+## Historical status snapshot (2026-05-08)
 
 Originally written as a forward-looking proposal; large parts have shipped. Quick reality check:
 

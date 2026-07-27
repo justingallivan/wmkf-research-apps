@@ -5,7 +5,7 @@ metadata:
   type: feedback
   status: active
   scope: auth
-  last_verified: S204 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-27 via shared/context/ProfileContext.js guards; incident and smoke evidence remain historical S203-S204
 ---
 
 ## Recall Rule

@@ -8,7 +8,7 @@ metadata:
   last_verified: 2026-07-03 (S322) — mechanical delivery moved from the dedicated PreToolUse hook to the durable-docs path rule (hook retired as duplicate)
 ---
 
-## Recall Trigger
+## Recall Rule
 
 Read this when updating a long-lived design/state doc, Atlas page,
 SESSION_PROMPT, or memory entry with a new decision, finding, status, or

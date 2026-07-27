@@ -1,9 +1,9 @@
 ---
-title: "Prompt Storage Design (In Progress)"
+title: "Prompt Storage — Current Boundary and Historical Design"
 domain: prompt-executor
-kind: draft
-status: draft
-summary: "- Session 110 (2026-04-25): body of this doc rewritten in place to use the live field names. References below now match wmkf_ai_* directly; no..."
+kind: plan
+status: active
+summary: "Current prompt-storage boundary: live current rows, Executor fetch, admin publication, and audit; broader authoring and PA execution remain unbuilt or unknown."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -14,7 +14,36 @@ related:
   - docs/WORKFLOW_CHAINING_DESIGN.md
 ---
 
-# Prompt Storage Design (In Progress)
+# Prompt Storage — Current Boundary and Historical Design
+
+## Current implementation boundary (reconciled 2026-07-27)
+
+**Shipped in source:**
+
+- versioned prompt rows in Dataverse `wmkf_ai_prompts`;
+- fail-loud current-row resolution through `lib/services/prompt-store.js` and
+  `lib/dataverse/adapters/ai-prompt.js`;
+- live Executor consumption through `lib/services/execute-prompt.js`;
+- superuser prompt inventory/history and direct versioned publication through
+  `pages/api/admin/prompts/`;
+- append-only Postgres publication audit; and
+- repository seed paths for bootstrap/recovery.
+
+**Not built as described by the historical design below:**
+
+- editable draft rows and a draft state machine;
+- lint-gated or test-run-gated publication;
+- a diff-first editor and one-click rollback workflow;
+- a universal `/api/prompts/[app-key]/current` abstraction or universal
+  user-facing prompt override surface; and
+- the proposed broad migration of every app prompt into Dataverse.
+
+The Power Automate Executor and automated flows are external state. Their
+current existence, parity, prompt inventory, and trigger posture are
+**UNKNOWN** without a dated Power Platform probe. The repository proves only
+the Vercel-side implementation. `docs/EXECUTOR_CONTRACT.md` is the current
+Vercel execution contract; the body below is retained as historical rationale
+and unfinished target architecture.
 
 **Status:** Design conversation started 2026-04-14 (Session 99), extended in Sessions 100–103. Session 103 (2026-04-17) shipped a **working prototype** via the Phase I Dynamics test endpoint — see "Session 103 prototype findings" below. Session 109 (2026-04-24) reconciled this design with Connor's built-out schema and produced a phased delivery plan.
 **Owner:** Justin Gallivan
@@ -29,11 +58,14 @@ related:
 >
 > **Phased delivery (set Session 109, Phase 0 shipped Vercel-side Session 110):** Phase 0 = shared Dynamics core + Vercel Executor by 2026-05-01 ✅ (shipped on Vercel; PA-side Phase 1 still pending). Phase 1 = PowerAutomate executor post-cycle. Phase 2 = context blocks + cross-prompt cache alignment.
 
-> This doc is a live working draft. It exists so a browser Claude Code session can pick up the conceptual work visually (Mermaid diagrams, state machines, flow comparisons). Once decisions settle, it becomes the implementation spec.
+> The sections below preserve the original working design. Statements about
+> drafts, editor safety tiers, universal visibility/overrides, rollback, and PA
+> composition are target-state unless the current boundary above says they
+> shipped.
 
 ---
 
-## Guiding principles
+## Historical design principles
 
 Extracted from the Session 99–100 design conversations. These are the load-bearing ideas — if a feature or implementation choice conflicts with one of these, that's a signal to stop and reconsider.
 
@@ -58,7 +90,7 @@ We need prompts to live somewhere that:
 4. **Can be edited by privileged users** without a code deploy
 5. **Has immutable version history** so `wmkf_ai_run.wmkf_ai_promptversion` continues to mean exactly what it says six months from now
 
-## Decisions already locked in
+## Historical decisions and targets
 
 These came out of the design conversation in Session 99. Listed here so a fresh agent session doesn't re-litigate them:
 
@@ -72,7 +104,11 @@ These came out of the design conversation in Session 99. Listed here so a fresh 
    - Superusers only: create drafts, edit drafts, publish drafts, retire published versions
 7. **Git-seed stays committed.** Canonical bootstrap copies live in the repo for disaster recovery and new-environment setup. Dynamics is source of truth; git is backup.
 8. **Dynamics ≠ AkoyaGO.** Storing prompts in `wmkf_ai_prompt` is consistent with "minimize reliance on AkoyaGO" — Dynamics is the underlying platform, which we're already committed to.
-9. **App patterns define which prompts need Dynamics storage.** Four migration-relevant patterns exist across the current app suite (see "App patterns and inventory" below). Only Pattern A and dual-caller prompts require Dynamics storage — Pattern B and C prompts have no PA driver and can stay in `.js` indefinitely.
+9. **App patterns define which prompts need Dynamics storage.** The design
+   identified four migration-relevant patterns across the then-current app
+   suite (see “Historical target patterns and inventory” below). It proposed
+   Dynamics storage for Pattern A and dual-caller prompts while leaving Pattern
+   B and C prompts in `.js`.
 10. **Retirements.** Concept Evaluator is deprecated (concepts workflow being retired). Batch Phase I Summaries and Batch Phase II Summaries Vercel UIs retire once the backend can loop over the underlying per-proposal prompt — the batch apps only existed because programmatic Dynamics access didn't yet, and they share their prompts with the single-writeup apps. Multi-Perspective Evaluator is a development playground, explicitly out of migration scope.
 11. **Phase I/II writeup apps become dual-caller.** Backend PA auto-drafts on status change and writes to `akoya_request.wmkf_ai_summary`. The Vercel app becomes an interactive refinement surface (Q&A against the draft, optional writeback to the same field). Both PA and Next.js read the same prompt row.
 12. **v1 scope is three prompt rows.** `phase-i-writeup`, `phase-ii-writeup`, `compliance-field-set-c`. Everything else (Pattern B/C prompts, Q&A prompts, shared fragments, non-dev editor UI) is v2+.
@@ -87,16 +123,18 @@ These came out of the design conversation in Session 99. Listed here so a fresh 
 21. **Ingest-once principle.** For Pattern A workflows, the first Claude call reads the full proposal and produces structured outputs covering everything downstream steps need. Downstream calls consume those outputs from Dynamics fields. Phase I writeup becomes the canonical "ingest" prompt — not just "write a summary" but "extract the prose summary AND keywords AND methodologies AND risk flags AND team info in one call."
 22. **Infrastructure composes across features.** The prompt resolver + execute-with-body endpoint + `wmkf_ai_run` logging serves: PA workflows, user overrides, superuser test runs, "promote override to draft," and dashboard previews. Building these primitives once unlocks all of them.
 
-## App patterns and inventory
+## Historical target patterns and inventory
 
-Four migration-relevant patterns across the current app suite:
+The design classified the then-current app suite into four target patterns.
+These definitions explain the original architecture; the table below is not a
+current application inventory.
 
 - **Pattern A — Backend-primary, Vercel-as-reader.** PA/Dynamics runs the analysis on a trigger (typically a status change). Output lives in Dynamics fields. The Vercel app is a styled reader: it queries Dynamics and displays results, with no Claude call on the Vercel side.
 - **Pattern B — Vercel-primary, Dynamics-as-source.** User triggers from Vercel. The app pulls structured context from Dynamics rather than asking the user to provide it or re-extract it from a PDF. Claude runs in Next.js. Output is a downloadable artifact (Word doc, `.eml`, markdown, PDF) — not persisted back to Dynamics.
 - **Pattern C — Vercel-primary, user-uploaded input.** User uploads documents not stored in Dynamics (external reviews, arbitrary papers, receipts). Input is genuinely unstructured, so defensive extraction in the prompt is still warranted. Claude runs in Next.js. Output is a downloadable artifact.
 - **Dual-caller (Pattern A + Vercel interactive).** One prompt row is read by both PA (auto-draft on trigger) and Next.js (user interactive refinement). Both write `wmkf_ai_run` rows with the same `wmkf_ai_promptversion` value — provenance is visible in the audit log ("auto-drafted by PA on Monday, refined by user via Q&A on Tuesday, saved over v1"). An interactive session should pin the prompt version it started with so a mid-session republish doesn't cause drift between the draft and subsequent Q&A turns.
 
-### Inventory (post-migration state)
+### Target inventory (not an as-built inventory)
 
 | App | Pattern | Dynamics prompt row? | Notes |
 |---|---|---|---|
@@ -120,13 +158,15 @@ Four migration-relevant patterns across the current app suite:
 | Dynamics Explorer | Pattern B (chat) | Probably not — ephemeral system prompts | — |
 | Phase I/II writeup Q&A | Next.js-only | Deferred to v2 | No PA driver |
 
-### Anatomy of a current Vercel prompt
+### Historical target decomposition of a Vercel prompt
 
-Using `shared/config/prompts/phase-i-writeup.js` as the worked example. A Claude call in the current codebase is built in six layers; three of them move to Dynamics, three stay in caller code.
+The original design used `shared/config/prompts/phase-i-writeup.js` as a worked
+example and proposed moving selected layers to Dataverse. This table records
+that target disposition; it does not describe every current Vercel caller.
 
-| Layer | Moves to `wmkf_ai_prompt`? | Notes |
+| Layer | Proposed move to `wmkf_ai_prompt`? | Historical target note |
 |---|---|---|
-| Model selection (`getModelForApp`) | Yes — `wmkf_model` | Current fallback chain (DB override → env var → `baseConfig.js`) is superseded by reading Dynamics |
+| Model selection (`getModelForApp`) | Yes — `wmkf_model` | The design proposed Dataverse model selection for migrated prompt rows; it did not supersede model resolution for all code-backed prompts. |
 | Request parameters (max_tokens, temperature) | Yes — `wmkf_maxtokens`, `wmkf_temperature` | — |
 | Static template body | Yes — `wmkf_ai_promptbody` | The ~70% analytical core |
 | Variable slot declarations | Yes — `wmkf_ai_promptvariables` (JSON) | Named slots, descriptions, types |
@@ -135,9 +175,9 @@ Using `shared/config/prompts/phase-i-writeup.js` as the worked example. A Claude
 | HTTP envelope (`fetch` call, headers) | No — caller code | PA or Next.js |
 | Response handling + `wmkf_ai_run` logging | No — caller code | Whoever makes the Anthropic call writes the run row |
 
-### Current vs. target prompt shape
+### Historical decomposition and target prompt shape
 
-Phase I Writeup today, decomposed:
+At design time, Phase I Writeup was decomposed as follows:
 
 - **~70% shared analytical core** — role framing, output structure, section rules (Summary = 150-200 words, 4 rationale bullets, etc.), tone/forbidden words, formatting, output example. Carries across PA and Next.js identically.
 - **~20% defensive extraction** — "You MUST extract the COMPLETE institution name," validation rules, error examples (Arizona vs. Arizona State, MIT vs. Massachusetts Institute of Technology), PI identification instructions. **Mostly disappears in the target state** because structured callers pass `institution`, `pi_name`, etc. as known variables.
@@ -145,11 +185,11 @@ Phase I Writeup today, decomposed:
 
 The target prompt row in Dynamics ≈ analytical core + structured-variable slots. The migrated Vercel dual-caller path adapts by sourcing those variables from Dynamics lookups instead of PDF extraction.
 
-## Schema sketch (draft)
+## Historical schema sketch
 
 Not final — naming and memo caps need to line up with Dataverse conventions and Connor's review.
 
-### `wmkf_ai_prompt` (new table)
+### `wmkf_ai_prompt` (subsequently provisioned; design-time sketch)
 
 | Column | Type | Notes |
 |---|---|---|
@@ -182,9 +222,11 @@ The run log already exists (Connor's side). Three additions for override and pro
 | `wmkf_ai_promptoverridden` | Bool | Denormalized flag for fast filtering ("show me all runs that used overrides"). **Live** (`execute-prompt.js` `writeRunRow()`). |
 | `wmkf_ai_runsource` | Choice | Picklist value mapped from `RUN_SOURCE` (e.g., `Vercel User`, `Vercel Interactive`, `PowerAutomate Auto`). Distinguishes PA auto-drafts from user overrides from superuser test-runs, used for cost attribution and eval filtering. **Live** (`execute-prompt.js` `writeRunRow()`). |
 
-## What PowerAutomate inherits by composing Claude calls itself
+## Historical target: Power Automate composition responsibilities
 
-Today these live in Next.js services. Once PA composes, PA owns them (or delegates back via a helper endpoint):
+The design assigned the following responsibilities to Power Automate under
+full composition. Whether current flows implement them remains externally
+`UNKNOWN` without the dated probe named in the current boundary above.
 
 - **PDF/DOCX text extraction** — `lib/utils/file-loader.js` on the Vercel side. PA has its own PDF preprocessing capability, so both callers can handle extraction independently — no cross-boundary helper needed.
 - **Anthropic retry / backoff on 529s and rate limits.** PA has built-in retry but it's coarse; needs per-flow configuration.
@@ -194,13 +236,16 @@ Today these live in Next.js services. Once PA composes, PA owns them (or delegat
 
 With PDF extraction solved natively in PA, the remaining items (retry, caching, token counting) will need to be implemented in PA flows. **Full composition was chosen** (2026-04-16, Session 102) — PA owns the entire Claude call lifecycle with no Vercel dependency for automated backend jobs. Rationale: easier for Connor to debug PA-native flows, and backend automation is mission-critical so removing the Vercel dependency is worth the PA-side complexity.
 
-## User-facing prompt features
+## Historical unbuilt target: user-facing prompt features
 
-Two related features that fall out of the "transparency by default" principle. They share infrastructure and should be designed together.
+The original design proposed the following related features. They remain
+unbuilt unless the current implementation boundary above explicitly says
+otherwise.
 
-### Visibility (universal, read-only)
+### Target visibility (universal, read-only; unbuilt)
 
-Every Vercel app that calls Claude shows the prompt it's about to use in a panel that's collapsed by default and expandable by any authenticated user.
+**Target behavior:** every Vercel app that calls Claude would show the prompt
+in a panel collapsed by default and expandable by any authenticated user.
 
 - The panel renders the resolved current prompt for the app, fetched at page load via `/api/prompts/[app-key]/current`.
 - Two display modes via toggle:
@@ -208,9 +253,10 @@ Every Vercel app that calls Claude shows the prompt it's about to use in a panel
   - **Rendered** — shows substituted values. Reveals exactly what Claude will see. More verbose but useful for debugging.
 - **Pattern A readers** (no Claude call on Vercel — pure display of a PA-generated draft) show the *historical* prompt that produced the displayed output, looked up via the `wmkf_ai_promptversion` on the run row. Read-only by construction.
 
-### Editability (universal, per-session)
+### Target editability (universal, per-session; unbuilt)
 
-When the panel is expanded, any user can edit the body and run with their override.
+**Target behavior:** when the panel is expanded, a user could edit the body and
+run with a session-only override.
 
 - The override exists only for the current run. The next page load reverts to the published default. (No persistent personal libraries in v1.)
 - Submission sends `{prompt_body_override, input_variables}` to the existing API endpoint. The endpoint runs Claude with the override instead of fetching from Dynamics.
@@ -218,9 +264,10 @@ When the panel is expanded, any user can edit the body and run with their overri
 - A "Restore default" button is always present.
 - A future "Promote to draft" button (deferred to v2) packages an override into a new `wmkf_ai_prompt` draft row for superuser publish review. Gives users a path from "I tweaked this and it's better" to "this should become canonical."
 
-### The prompt resolver abstraction
+### Target prompt resolver abstraction (unbuilt)
 
-Every Vercel API route that calls Claude already does prompt assembly. The resolver standardizes where the body comes from:
+The proposed resolver would have standardized prompt assembly across apps. The
+universal routes below were not built:
 
 ```
 GET  /api/prompts/[app-key]/current
@@ -243,17 +290,19 @@ Why this matters:
 - Superuser test-runs (next section) are the same call with `run_source: "vercel-test-run"`.
 - "Promote to draft" is a separate write, not a new execution path.
 
-### Side effects worth naming
+### Target-design side effects
 
 - **Prompt caching breaks for overrides.** Anthropic's `cache_control` works on stable prefixes; any user edit before the marker invalidates the cache. Fine for an experimenting user — they accept the cost — but worth knowing for accounting.
 - **Override content is user-supplied text in the system prompt.** A hostile user could attempt prompt injection against themselves. It's their session, their risk; not a blocker, but the editor should not allow saving/persisting overrides without the dual review path.
 - **Pattern A readers expose historical prompts.** Looking up `wmkf_ai_promptversion` and rendering the body of a `retired` row is supported by the schema. The reader UI just needs to know to follow that path instead of asking for `is_current = true`.
 
-## Editor safety: lint, test-run, rollback
+## Historical unbuilt target: editor safety
 
-The draft/publish flow (decision #5) is the first safety tier. Three more, in increasing build cost:
+The design proposed draft/publish as the first safety tier and three additional
+tiers. The lint/test-run/rollback workflow below is not the shipped admin
+publication flow.
 
-### Tier 2: Pre-publish structural lint (cheap)
+### Proposed Tier 2: Pre-publish structural lint
 
 Server-side check on a draft row before the publish button is enabled. Writes `wmkf_preflight_passed_at` on success.
 
@@ -265,7 +314,7 @@ Server-side check on a draft row before the publish button is enabled. Writes `w
 
 Half a day of work. Catches the dumb mistakes.
 
-### Tier 3: Pre-publish test-run (the key addition)
+### Proposed Tier 3: Pre-publish test-run
 
 Superuser runs the draft against a known input and inspects the output. Writes `wmkf_last_test_run_at` on completion.
 
@@ -278,7 +327,7 @@ Reuses the prompt resolver and execute-prompt infrastructure from the user-overr
 
 The publish button is gated on `wmkf_preflight_passed_at IS NOT NULL` AND `wmkf_last_test_run_at IS NOT NULL` for the current `wmkf_promptversion`.
 
-### Tier 4: Fast rollback (mechanical, append-only)
+### Proposed Tier 4: Fast rollback
 
 If a published version is bad, restore the previous body in one click without breaking the append-only invariant.
 
@@ -293,7 +342,7 @@ Mechanics:
 
 A `wmkf_approved_by` (Lookup, nullable) field is sketched but unused in v1. The lint + test-run + small user pool combination is sufficient. Add the gating logic when team size or stakes change.
 
-### Editor UI shape this implies
+### Proposed editor UI
 
 The "first non-Justin editor" question (Q3 below) crystallizes into a specific build:
 
@@ -308,7 +357,11 @@ Probably 2–3 days of build for a competent React engineer. Materially more tha
 
 ## Workflow chaining and structured outputs
 
-The token-efficiency principle (#7 above) has its own design doc — see `WORKFLOW_CHAINING_DESIGN.md`. The intersection with this doc is two columns and one design assumption:
+The token-efficiency principle (#7 above) has its own design doc — see
+`WORKFLOW_CHAINING_DESIGN.md`. Current Vercel Executor support includes
+`wmkf_ai_promptoutputschema`; a generalized automatic
+`wmkf_ai_promptvariables[].source` resolver and the Power Automate DAG are not
+established as shipped. The historical intersection proposed:
 
 - `wmkf_ai_prompt.wmkf_ai_promptoutputschema` (Memo, JSON) declares what structured fields a prompt produces and where they persist in Dynamics
 - `wmkf_ai_prompt.wmkf_ai_promptvariables` entries can include `{source: "akoya_request.wmkf_keywords"}` to express "this slot is filled by an upstream prompt's output, not a runtime input"
@@ -316,7 +369,7 @@ The token-efficiency principle (#7 above) has its own design doc — see `WORKFL
 
 The companion doc covers worked examples, prerequisite Dynamics fields on `akoya_request` (Connor's domain), the three token-reduction techniques, and honest caveats about when chaining doesn't work.
 
-## Four open questions
+## Historical questions and current disposition
 
 ### 1. Template variable format — RESOLVED (Next.js side; PA side still pending)
 
@@ -338,7 +391,7 @@ Rationale: these are the only prompts with a PA driver (the original motivation 
 
 See "App patterns and inventory" above for the full classification. Everything Pattern B, Pattern C, deprecated, or Q&A sub-prompt is explicitly v2+.
 
-### 3. First non-Justin editor
+### 3. First non-Justin editor — target remains unbuilt
 
 The "Editor safety" section above now spec's the build: lint panel + test-run panel + diff panel + gated publish + rollback button. That's the **full editor**, ~2-3 days for a competent React engineer.
 
@@ -364,7 +417,7 @@ Tentatively chose full composition in Session 99. Session 100 additions noted hy
 
 ---
 
-## What to sketch
+## Historical follow-on sketches
 
 Diagrams that would help the human think:
 
@@ -378,7 +431,7 @@ Diagrams that would help the human think:
 
 ---
 
-## Sketches (in progress)
+## Historical sketches
 
 Priorities 1 and 2 from the list above. Priorities 3 (worked-example data flow) and 4 (dashboard wireframe) still pending.
 
@@ -508,21 +561,26 @@ Files shipped:
 2. **For small system prompts, `cache_control` is a no-op.** The system/user split should be justified on other grounds for such apps: editor-safety (the split isolates editable rules from machinery), mix-and-match (one system message can serve several user templates), and the measured tighter-output effect. Caching ROI for small prompts is noise.
 3. **Image handling creates two distinct cost profiles.** A user-side PDF with figures can be 2–3× larger in tokens than a PA-backend text-stripped equivalent. Caching becomes much more valuable on the user-side. The prototype was done on a .docx (text-only); we don't yet have measurements for the vision-input path. Flagged in the caching plan.
 
-### What the prototype is NOT ready for
+### What the 2026-04-17 prototype was not ready for
 
-- Still uses `wmkf_ai_run` as squat space. **Needs `wmkf_ai_prompt` to ship.**
+- At the time it used `wmkf_ai_run` as squat space and needed
+  `wmkf_ai_prompt`; the real prompt table and Executor later shipped.
 - No versioning (scratch row has one current state, no history).
 - No lint/test-run/publish gating — direct overwrites.
-- Error behavior is "throw loudly" — the production resolver needs a `.js` fallback on Dynamics outage.
-- `promptVersion` in the audit row still references the `.js` constant `PHASE_I_PROMPT_VERSION` because there's no Dynamics version to reference. Fixed when the real table ships.
+- Error behavior was “throw loudly.” The proposed `.js` fallback was not
+  adopted by the current Executor, which intentionally fails on a missing
+  current prompt row.
+- `promptVersion` in that prototype audit row referenced the `.js` constant
+  `PHASE_I_PROMPT_VERSION`; the real prompt-row path later replaced the scratch
+  design.
 
-### UI surface
+### Historical prototype UI surface
 
 The `/phase-i-dynamics` test page has a "Use Dynamics-stored prompt (v2)" checkbox. Checked = v2 endpoint (Dynamics fetch + split + cache_control); unchecked = original monolithic v1. A debug panel on v2 results shows: prompt source, fetch latency, system-block size, user-message size, input tokens, cache create/read tokens. This is the minimal visibility surface — decision #16 (universal prompt panel in every app) is the generalization.
 
 ---
 
-## Out of scope for this design doc
+## Historical design exclusions
 
 - **Formal prompt eval / A-B testing.** The pre-publish test-run (Tier 3 above) gives an informed-human-eyeball check on a single pinned input. Statistical/historical-replay batch evaluation is covered separately in the broader batch evaluation tooling work.
 - **Prompt library / shared fragments** (e.g. common grant-context preamble). Decision #15 + the structured-input target state mostly dissolves the duplication problem; revisit only if a real cross-prompt fragment emerges.

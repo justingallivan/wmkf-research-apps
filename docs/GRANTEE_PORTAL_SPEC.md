@@ -88,7 +88,7 @@ Per grantee, exactly:
   enforced by its alternate request key. This is the shipped replacement for the original inline
   status/image/caption fields.
 
-## Flow (intended)
+## Flow (as built)
 
 1. **Trigger:** staff opens a grant's **Awardee tab** and starts the grantee-deliverables workflow.
 2. **Draft:** Claude generates a style-guide abstract from `wmkf_abstract` via the Executor/prompt
@@ -259,13 +259,22 @@ edited title is **staff-owned/display-only, NOT PI-editable** — so output (a) 
 (including the title) display-only above the editable body, with no title write-back path. See the
 build-plan chunk-8 "BUILT" blocks for modules, the canonical owner template, and route paths.
 
-## Open items (resolve during implementation)
+## Remaining product/operations decisions
 
-- Exact abstract-generation **prompt/template** and Executor wiring (Q1 partially open).
-- Exact **publish-image checkbox wording** (the UI label shown by the submit button).
-- Image **accepted formats/size**.
-- **Reminder cadence/deadline** specifics (count, window, who's notified).
-- Final **schemaName literals** (underscore caveat in D1).
+The implementation questions about prompt wiring, storage fields, image
+validation, and waiver evidence are closed by the as-built contract above:
+
+- abstract generation uses the live grantee-abstract prompt/Executor path;
+- waiver wording comes from the versioned `grantee-waiver` policy slot rather
+  than hard-coded checkbox copy;
+- accepted images are JPEG, PNG, or WEBP up to 10 MB, enforced client- and
+  server-side; and
+- field/schema literals are recorded in the two canonical Atlas pages.
+
+Reminder cadence/deadline policy remains owner-configured operational scope.
+Current production row/status distribution and the current policy-row body are
+**UNKNOWN** without a dated live probe; source code and this spec do not prove
+those mutable facts.
 
 ## Pointers
 

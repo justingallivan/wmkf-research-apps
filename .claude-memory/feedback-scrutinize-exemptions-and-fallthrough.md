@@ -8,6 +8,12 @@ metadata:
   originSessionId: c178a6d6-706e-47bb-9580-d248197210b1
 ---
 
+## Recall Rule
+
+For every new branch, gate, or exemption, enumerate the complement and enforce the
+exception's precondition server-side. Build negative tests with the excluded input
+present so they prove exclusion rather than fixture absence.
+
 S257 (reviewer hold step, chunk 6): Codex caught two fail-open HIGHs I'd shipped and
 self-reviewed past:
 1. `finalize` was EXEMPTED from the first-contact confidence gate on the assumption "it

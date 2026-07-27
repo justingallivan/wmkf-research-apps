@@ -6,6 +6,7 @@ status: active
 summary: "Staged migration of prefs + app-access off client.js into DynamicsService adapters (DAL-plan Stage 9 Q9). Wrap-before-swap; prefs first, app-access last."
 canonical: false
 cataloged: 2026-07-06
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md
@@ -18,16 +19,35 @@ related:
 
 # Q9 Migration Plan — prefs + app-access onto the DAL (adapters → DynamicsService)
 
-**Status:** IMPLEMENTATION STARTED — Stages 1, 2.5, and 3 completed on
-`codex/q9-prefs-appaccess`; Stage 4 app-access transport migration is deferred. Authored
-2026-07-06 (Fable) against live `main` (@478d0d20); Claude-reviewed + pillar claims verified
+## Current state
+
+**[VERIFIED 2026-07-27 via
+`lib/dataverse/adapters/user-preference.js`,
+`lib/services/dataverse-prefs-service.js`, and
+`lib/services/dataverse-app-access-service.js`]** Stages 1, 2.5, and 3 are
+complete. User preferences now use the 19th entity adapter and
+DynamicsService. Stage 4 remains deferred: app access still calls
+`lib/dataverse/client.js` directly for `wmkf_appuserappaccesses`, and no
+app-access adapter or bounded unfiltered admin-list primitive exists.
+
+The active remaining work is Stage 4 plus Stage 5 closeout. Production warn
+posture and the required Stage-4 soak window are **UNKNOWN** in this
+source-only reconciliation and must be re-probed before execution.
+
+## Historical decision and planning record
+
+**Status at the last implementation pass:** Stages 1, 2.5, and 3 completed on
+`codex/q9-prefs-appaccess`; Stage 4 app-access transport migration was deferred. Authored
+2026-07-06 (Fable) against `main` (@478d0d20); Claude-reviewed + pillar claims verified
 against source (S339); promoted to durable doc.
 **Owner decision:** Q9 (DAL plan Stage 9, `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md:446-448`) is now
 **MIGRATE** — move `wmkf_appuserpreferences` and `wmkf_appuserappaccesses` off the unguarded
 `lib/dataverse/client.js` transport into adapters routed through `DynamicsService`, overriding the
 plan's "leave them" default.
 
-Every claim below was re-probed against the live tree this session unless marked `[UNVERIFIED]`.
+Sections 1–3 preserve the S339 baseline and execution design. They are not a
+claim that every dated count or line number is current; the current-state
+section above and live source govern Stage 4 execution.
 
 > **[STALE-ACCEPTED: lib/services/dynamics-service.js — line numbers only].** This plan's
 > `dynamics-service.js` citations (e.g. `queryRecords :398-407`, `queryAllRecords :590`,
@@ -42,7 +62,7 @@ Every claim below was re-probed against the live tree this session unless marked
 
 ---
 
-## 1. Preconditions / probes (verified state)
+## 1. Historical preconditions / probes (S339 baseline)
 
 ### 1.1 The two services at plan baseline
 
@@ -283,7 +303,7 @@ Hard orderings, stated per entry point:
    for before/after diffing.
 3. Confirm prod still runs `DATAVERSE_DAL_ENFORCEMENT=on` and `DATAVERSE_DAL_UNIVERSAL` unset.
 
-### Stage 1 — Context wraps (one commit per file; no transport change; zero behavior change with flag off)
+### Stage 1 — Context wraps (DONE)
 Each commit: wrap + a `*-dal-context` test proving the call now executes inside ALS context
 (mirror `tests/unit/nextauth-signin-dal-context.test.js`'s shape) + `check:dynamics-context-boundary`.
 
@@ -342,7 +362,7 @@ Each commit: wrap + a `*-dal-context` test proving the call now executes inside 
 Gates for Stage 1: `check:dynamics-context-boundary` (+ self-test), full jest suite. No census
 change expected (transport untouched).
 
-### Stage 2 — Warn-mode observation (no code)
+### Stage 2 — Warn-mode observation (CURRENT STATUS UNKNOWN)
 Set `DATAVERSE_DAL_UNIVERSAL=warn` in preview, exercise: fresh sign-in (new profile), prefs
 save/load, admin grant/revoke, prompt-override save, **a reviewer-finder `analyze` AND `discover`
 run BY A USER WHO HAS A SAVED PROMPT OVERRIDE** (exercises the 1h path — confirms
@@ -352,7 +372,7 @@ render (signature path), cron tick. Then prod, observe OQ-2 window. **Exit crite
 proceeding. Leave the flag at `warn` through Stages 3–4 (it keeps observing the not-yet-migrated
 entity while the first one migrates).
 
-### Stage 2.5 — Script bypass conversion (BEFORE any transport swap; S339, Codex P2)
+### Stage 2.5 — Script bypass conversion (DONE; S339, Codex P2)
 The 5 live scripts in 1.3 R8 read/write these services with NO trusted context and work ONLY
 because client.js is unguarded today. Post-swap they silently degrade (missing context → caught →
 falsy), and `cleanup-concept-evaluator-grants.js` would falsely report "nothing to clean." Before
@@ -362,7 +382,7 @@ entity about to move: add an `enterDynamicsBypassForScript` bootstrap (Q3 shared
 `scripts/archive/backfill-app-access.js` is not run — leave in place, note only. Checklist item in
 each swap stage; do not defer to Stage 5.
 
-### Stage 3 — Prefs wave (order: characterize → adapter → swap → gates → deploy → verify)
+### Stage 3 — Prefs wave (DONE)
 1. **Characterization tests first** (must pass against CURRENT code): mock
    `lib/dataverse/client.js` (`createClient`/`getAccessToken`) and pin, for all 7 functions:
    exact request paths (`/wmkf_appuserpreferences?$filter=…&$select=…&$top=1` byte-for-byte),
@@ -401,7 +421,7 @@ each swap stage; do not defer to Stage 5.
    email-signature render; log-scan for `Restrictions not initialized` / `no trusted Dataverse
    context` / `[dataverse-prefs]` errors.
 
-### Stage 4 — App-access wave (only after Stage 3 has soaked in prod; OQ-2 window)
+### Stage 4 — App-access wave (ACTIVE BUT DEFERRED)
 Same six steps for `dataverse-app-access-service.js` → `lib/dataverse/adapters/app-access.js`
 (register `'wmkf_appuserappaccesses'`; mirrors for `findByUserAndApp`, `listByUser`, `listAll`,
 `create` (bind keys preserved), `remove`). Postgres `user_profiles` read and identity-map calls
@@ -485,7 +505,11 @@ transports — never rolled back. Stage 3/4 swaps are each ONE commit touching o
 new adapter + registry line + tests; revert restores client.js transport instantly with no env
 change needed (client.js path has no context requirement; `warn` flag tolerates it).
 
-## 6. Interaction with the DynamicsService decomposition
+## 6. Historical interaction with the DynamicsService decomposition
+
+The sequencing statements below describe the S339 planning context. Re-probe
+the current decomposition state before Stage 4; this document no longer
+asserts that the named checkpoint status remains current.
 
 - The keystone `dynamics/http.js` Dataverse-fetch guard is strictly post-Checkpoint-F (DAL plan
   `:414-417,:426-428`); this migration neither waits for it nor conflicts with it — DAL plan
@@ -579,4 +603,5 @@ change needed (client.js path has no context requirement; `warn` flag tolerates 
   `lib/services/dynamics-service.js`, `tests/unit/dynamics-service-count.test.js`, the app-access
   transport swap, and the Stage 4 admin-list primitive were intentionally left untouched.
 
-No decomposition checkpoint is a prerequisite; only avoid interleaving commits with it.
+Historical S339 sequencing note: no decomposition checkpoint was then a
+prerequisite; commits were not to be interleaved.

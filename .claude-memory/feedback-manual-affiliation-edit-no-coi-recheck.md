@@ -10,7 +10,7 @@ metadata:
   originSessionId: a647b42e-0a37-4ef2-8e1d-ee1f87fb8990
 ---
 
-## Rule
+## Recall Rule
 
 When working on the reviewer on-card manual contact edit (`ReviewerSearchSection.setManualContact`
 + `CandidateEditModal` local mode) or any future affiliation-edit affordance, do NOT gate or

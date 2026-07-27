@@ -5,7 +5,7 @@ type: feedback
 originSessionId: 0e402398-f829-45ec-a781-e624832c86e6
 status: active
 scope: docs
-last_verified: S209 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 via CLAUDE.md and .claude/skills/start/SKILL.md
 ---
 
 ## Recall Rule
@@ -21,6 +21,10 @@ Do not:
 - Reach for `ALLOWED_UNDOCUMENTED_*` without written justification (last resort, not default).
 
 Ground truth: CLAUDE.md "Ground-truth requirement" / "Red gates are P0 blockers"; `docs/CLAUDE_REMEDIATION_PLAN.md`; `/start` skill Step 2.
+
+[VERIFIED via the current `CLAUDE.md` Universal Operating Rules and
+`.claude/skills/start/SKILL.md` Step 2.] The old entity incident below is
+historical rationale, not a statement about today's Atlas coverage.
 
 A red `npm run check:atlas`, `:atlas:self-test`, or `:api-routes` gate on `main` means the ground-truth rubric (CLAUDE.md "Ground-truth requirement" + `docs/CLAUDE_REMEDIATION_PLAN.md`) is being violated *right now*. Treat it as a P0 blocker for any commits to data-layer surfaces (`pages/api/**`, `lib/dataverse/**`, `lib/db/**`, services, atlas docs).
 

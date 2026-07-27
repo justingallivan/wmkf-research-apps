@@ -5,7 +5,7 @@ type: project
 originSessionId: S157
 status: active
 scope: dataverse
-last_verified: S157 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 via owner decision and docs/DATAVERSE_POWER_TOOLS_DESIGN.md
 ---
 
 ## Recall Rule

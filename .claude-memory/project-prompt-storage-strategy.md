@@ -1,11 +1,11 @@
 ---
-name: Prompt Storage + Executor Contract (Phase 0 in flight for May 1 2026)
-description: Phased Vercel-first → PA-later plan; shared Dynamics core via wmkf_ai_prompt; Executor contract at docs/EXECUTOR_CONTRACT.md; Path B chosen (declarative wrappers, generic executors in both callers)
+name: Prompt Storage + Executor Contract
+description: Current Vercel Executor boundary plus the historical Path B / Power Automate target; external PA operation requires a fresh probe.
 type: project
 originSessionId: d898b20a-8b1d-4a13-ad0e-878f4f62e71d
 status: active
 scope: prompt
-last_verified: 2026-06-04 via live Dataverse probe (wmkf_ai_prompts count=11)
+last_verified: 2026-07-27 via current Executor/docs reconciliation; live Dataverse counts remain a dated 2026-07-12 snapshot
 ---
 
 ## Recall Rule
@@ -21,11 +21,23 @@ Do not:
 - Re-litigate the Session-109 locked decisions (Path B, two chain shapes, declarative vars/outputs, cache-boundary marker).
 - Treat the Executor as multi-turn / agent-loop / SSE-streaming / retry-engine / chain-orchestrator / Batch API — it is none of these.
 
-Ground truth: `docs/EXECUTOR_CONTRACT.md`, `docs/PROMPT_STORAGE_DESIGN.md`, `docs/WORKFLOW_CHAINING_DESIGN.md`, `lib/services/execute-prompt.js`, `pages/api/phase-i-dynamics/summarize-v2.js`; wmkf_ai_prompt schema probed live 2026-04-24, row counts re-probed S209 2026-06-01.
+Ground truth: `docs/EXECUTOR_CONTRACT.md`, `docs/PROMPT_STORAGE_DESIGN.md`,
+`docs/WORKFLOW_CHAINING_DESIGN.md`, `lib/services/execute-prompt.js`, and the
+Phase I summarize-v2 route/service. The prompt schema was probed live
+2026-04-24; the most recent retained row-count snapshot is 2026-07-12.
+
+## Current boundary
+
+The Vercel prompt store, publication path, and single-prompt Executor are
+shipped. The current existence, parity, prompt inventory, and trigger posture
+of Power Automate flows are `UNKNOWN` until a dated Power Platform probe runs.
+Universal prompt visibility/editability, the generalized prompt resolver, and
+the historical Phase 1/2 chain extensions below must not be inferred as built.
 
 Session 109 (2026-04-24) reconciled six design docs + Wave 1 reality + Connor's built-out Dynamics schema into a single staged plan. **Authoritative refs:**
 - `docs/EXECUTOR_CONTRACT.md` — shared spec both PA + Vercel build against
-- `docs/PROMPT_STORAGE_DESIGN.md` — original design; field names now need renaming (see Ground truth below)
+- `docs/PROMPT_STORAGE_DESIGN.md` — reconciled current boundary plus historical
+  design; its field names now match the shipped schema
 - `docs/WORKFLOW_CHAINING_DESIGN.md` — chaining principle; `wmkf_ai_promptoutputschema` column already exists
 - Plan file: `/Users/gallivan/.claude/plans/ok-claude-connor-is-precious-dove.md`
 
@@ -52,11 +64,17 @@ Session 109 (2026-04-24) reconciled six design docs + Wave 1 reality + Connor's 
 - Connor added `wmkf_ai_systemprompt` Memo + Lookup `wmkf_ai_prompt` on `wmkf_ai_run` (verified live).
 - `phase-i.summary` prompt row authored; `lib/services/execute-prompt.js` is the canonical Executor implementation; `pages/api/phase-i-dynamics/summarize-v2.js` imports it.
 - `wmkf_ai_prompts` has 17 rows live; `wmkf_ai_runs` has 351 rows (verified live 2026-07-12; was 11/329 at the 2026-05-14 audit and unchanged through S209 2026-06-01, then grew — so Executor runs have occurred since).
-- No PA flows yet, no context blocks yet, no cross-prompt cache alignment yet — those are Phase 1/2.
+- Repository source does not establish PA flow state. Generalized context
+  blocks and cross-prompt cache alignment remain unbuilt unless a current
+  implementation/probe proves otherwise.
 
-**Phase 1 — post-cycle:** Connor builds PA `ExecutePrompt` child flow + first parent flow. Same prompt rows. `prior_output` source kind. Echo-prompt test oracle verifies byte-identical output from both callers.
+**Historical Phase 1 target:** Connor would build a PA `ExecutePrompt` child
+flow plus first parent flow over the same prompt rows, add `prior_output`, and
+use an echo-prompt oracle for parity. Current PA implementation is `UNKNOWN`.
 
-**Phase 2:** context blocks + parallel-consumer chains. `shared.full_application` block referenced by `phase-i.summary` + `phase-i.compliance`. `placement: system` attribute. Cross-prompt cache alignment.
+**Historical Phase 2 target:** context blocks plus parallel-consumer chains,
+including a `shared.full_application` block, `placement: system`, and
+cross-prompt cache alignment. This is not current built-state guidance.
 
 ### Retired from prior plan
 - Old name `wmkf_prompt_template` — Connor built table as `wmkf_ai_prompt` (renamed); PROMPT_STORAGE_DESIGN updated globally S167. <!-- prompt-storage:ignore reason=rename-history -->

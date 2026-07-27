@@ -19,6 +19,19 @@ the shipped mitigation only makes an identical rerun cache-eligible. R5 remains 
 measure prefix size and repeat-within-TTL use before changing `composeScorePrompt` or
 `process-phase-i-writeup`.
 
-**Recall Rule:** Do not add a one-off cache marker because a call repeats. First prove a
-byte-identical cacheable prefix at the real execution point, the active model's applicable
-floor, and repeat-within-TTL use; then verify realized reads through usage telemetry.
+## Recall Rule
+
+Read this when: changing prompt-cache boundaries or proposing cache work after a
+repeated LLM call.
+
+Do:
+- Prove a byte-identical prefix at the real execution point, the active model's
+  applicable cache floor, and repeat-within-TTL use.
+- Verify realized cache reads through usage telemetry.
+
+Do not:
+- Add a one-off cache marker merely because a call repeats.
+
+Ground truth: `docs/PROMPT_CACHING_AUDIT.md` and
+`lib/services/execute-prompt.js`; R4/R5 remain conditional work, not shipped
+behavior.

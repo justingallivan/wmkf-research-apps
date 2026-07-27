@@ -6,7 +6,14 @@ metadata:
   status: active
   type: feedback
   originSessionId: 29a6b837-b641-4706-996e-0d56eb5d5029
+  last_verified: 2026-07-27 as historical owner feedback from S355
 ---
+
+## Recall Rule
+
+Before delegating review of enforcement, parsing, policy, or guard code, run an
+author-side adversarial pass over the real producer grammar, exception paths,
+sibling guards, and fall-through cases; give the reviewer the resulting evidence.
 
 Owner feedback (S355, 2026-07-11), after four Codex adversarial rounds on the
 Dataverse interlock found eight fail-open-by-omission defects — several of

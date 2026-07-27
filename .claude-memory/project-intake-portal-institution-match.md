@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: intake
-  last_verified: S168 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-27 via owner park decision and current account-search primitives; matching UX remains planned
 ---
 
 > **BUILD PARKED (2026-07-08, S348):** the intake-portal build (incl. this institution
@@ -29,6 +29,11 @@ Do not:
 - Rely on Connor's GOverify gate for dedup (it validates tax status only).
 
 Ground truth: Dataverse `accounts` (Search API enabled per [[project-dynamics-explorer-details]]), [[project-intake-portal-skinny-scope]], [[project-machine-legible-form-capture]].
+
+[VERIFIED 2026-07-27 as parked product intent]: the current account-search
+primitives exist in `lib/dataverse/adapters/account.js`, but this intake
+typeahead/dedup flow is not built. Before revival, verify the applicant
+confirm-step risk model and query the live account metadata/read paths.
 
 When the intake portal lets an applicant request a new account / submit a proposal, the institution selection must be **match-an-existing-account-first, create-only-as-last-resort**. A free-text "Institution" box will pollute the `account` table with near-duplicates (typos like "Stafnord", abbreviation drift "Stanford U." / "Stanford University" / "The Board of Trustees of the Leland Stanford Junior University", punctuation/casing variants).
 

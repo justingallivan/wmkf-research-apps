@@ -5,7 +5,7 @@ type: project
 originSessionId: 5fc8fbcf-cfc0-4f4b-a4d6-5abf1de8d42e
 status: active
 scope: auth
-last_verified: S129 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 via NextAuth/proxy/_app source and intake design; tenant configuration and sign-in smoke remain bounded to S129
 ---
 
 ## Recall Rule
@@ -23,7 +23,10 @@ Do not:
 
 Ground truth: `docs/INTAKE_PORTAL_DESIGN.md`, `docs/archive/IT_ENTRA_EXTERNAL_TENANT_REQUEST_2026-05-04.md`, commit `68e4c59`; tenant `04a1406b-3878-4286-bd17-b8c8118886f7`.
 
-External ID auth foundation for the applicant intake portal is live in code as of Session 129. Applicants can OTP-sign-in and the app sees their stable Object ID — that's the bridge for `contact.wmkf_portal_oid` once intake writes start.
+The External ID auth foundation remains present in current source. The
+applicant OTP round-trip and stable Object-ID behavior were verified in Session
+129; current tenant/user-flow operation requires a fresh read-only configuration
+check and sign-in smoke before release reliance.
 
 **Tenant facts:**
 - Tenant ID: `04a1406b-3878-4286-bd17-b8c8118886f7`

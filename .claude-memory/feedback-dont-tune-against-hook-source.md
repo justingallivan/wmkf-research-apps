@@ -8,6 +8,12 @@ metadata:
   originSessionId: fdb785fa-fa6a-4e1d-8c19-fabfad8a1890
 ---
 
+## Recall Rule
+
+When a hook blocks an action, diagnose the substantive invariant once, make at
+most one evidence-based correction, then stop and ask if it still blocks. Never
+iterate wording against the matcher as an oracle.
+
 Reading a hook's source once to understand WHY it blocked something is fine — that's normal debugging.
 But looping (reword → re-run the hook's own matcher function as a test oracle → reword again) crosses
 into optimizing against the checker instead of the actual goal. The auto-mode classifier blocked this

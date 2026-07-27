@@ -3,7 +3,7 @@ title: "Workflow Chaining & Token Efficiency (Design Principle)"
 domain: prompt-executor
 kind: spec
 status: active
-summary: "Status: Design principle — extracted from Session 100 discussion of prompt storage migration."
+summary: "Chaining fields and Executor persistence are live; the end-to-end Power Automate DAG remains target architecture and externally unverified."
 canonical: true
 cataloged: 2026-07-02
 owner: product-engineering
@@ -15,9 +15,24 @@ related:
 
 # Workflow Chaining & Token Efficiency (Design Principle)
 
-**Status:** Design principle — extracted from Session 100 discussion of prompt storage migration.
+**Status:** Active design principle with a mixed implementation boundary.
 **Owner:** Justin Gallivan
 **Related docs:** `docs/PROMPT_STORAGE_DESIGN.md`, `docs/BACKEND_AUTOMATION_PLAN.md`, `docs/GRANT_CYCLE_LIFECYCLE.md`
+
+## Current implementation boundary (reconciled 2026-07-27)
+
+The Vercel-side foundation is shipped: the six `akoya_request` fields
+`wmkf_ai_keywords`, `wmkf_ai_methodologies`, `wmkf_ai_riskflags`,
+`wmkf_ai_teaminfo`, `wmkf_ai_budgetsummary`, and `wmkf_ai_timeline` are in the
+tracked/deployed schema; prompt rows can declare
+`wmkf_ai_promptoutputschema`; and the Executor can parse structured output and
+coalesce declared targets onto the request write.
+
+The end-to-end lifecycle DAG below remains **TARGET ARCHITECTURE**. Repository
+source does not prove that a Power Automate ingest flow currently populates all
+six fields or that compliance, reviewer matching, portfolio analytics, and PD
+assignment consume them as chained inputs. Current PA flow/row state is
+**UNKNOWN** without a dated external probe.
 
 > Companion to `PROMPT_STORAGE_DESIGN.md`. Storage is about *where prompts live*. This doc is about *how workflows use them* — specifically, how to pass data between steps without re-uploading the source document to Claude on every call.
 
@@ -68,7 +83,7 @@ Mark the stable prefix of a prompt with `cache_control`; Anthropic caches it and
 
 **The structural fix, and the one we should design the backend around.** First expensive call persists structured outputs to Dynamics fields. Every downstream step reads those fields, not the proposal text.
 
-## Worked example: Phase I proposal lifecycle
+## Target worked example: Phase I proposal lifecycle
 
 ```mermaid
 graph TD
@@ -109,17 +124,17 @@ Today's Vercel prompts return unstructured markdown. Target-state Pattern A prom
   },
   "keywords": {
     "type": "string[]",
-    "target": "akoya_request.wmkf_keywords",
+    "target": "akoya_request.wmkf_ai_keywords",
     "description": "5-10 keywords characterizing the research area"
   },
   "methodologies": {
     "type": "string[]",
-    "target": "akoya_request.wmkf_methodologies",
+    "target": "akoya_request.wmkf_ai_methodologies",
     "description": "Key experimental approaches and techniques"
   },
   "risk_flags": {
     "type": "string[]",
-    "target": "akoya_request.wmkf_risk_flags",
+    "target": "akoya_request.wmkf_ai_riskflags",
     "description": "Compliance or feasibility concerns for downstream screening"
   }
 }
@@ -133,35 +148,33 @@ A downstream prompt's `wmkf_ai_promptvariables` can reference upstream prompt ou
 // wmkf_ai_prompt.wmkf_ai_promptvariables for compliance-field-set-c
 {
   "summary": {"source": "akoya_request.wmkf_ai_summary"},
-  "keywords": {"source": "akoya_request.wmkf_keywords"},
-  "risk_flags": {"source": "akoya_request.wmkf_risk_flags"},
-  "team_info": {"source": "akoya_request.wmkf_team_info"}
+  "keywords": {"source": "akoya_request.wmkf_ai_keywords"},
+  "risk_flags": {"source": "akoya_request.wmkf_ai_riskflags"},
+  "team_info": {"source": "akoya_request.wmkf_ai_teaminfo"}
 }
 ```
 
 Compliance doesn't re-read the proposal. It reads the structured outputs the ingest step produced.
 
-## Prerequisites for shipping chained workflows
+## Historical prerequisites and current disposition
 
-Blockers that aren't in current v1 as scoped in `PROMPT_STORAGE_DESIGN.md`:
+The original blockers classify as follows:
 
-1. **Dynamics schema additions** for intermediate fields on `akoya_request` (or a child table):
-   - `wmkf_keywords` (Memo, likely JSON-array-as-text)
-   - `wmkf_methodologies` (Memo)
-   - `wmkf_risk_flags` (Memo)
-   - `wmkf_team_info` (Memo, JSON)
-   - `wmkf_budget_summary` (Text)
-   - `wmkf_timeline` (Text)
-   - Final field list depends on what downstream steps actually need.
-   - **Connor's domain.** Should be scoped and sequenced alongside `wmkf_ai_prompt` creation.
+1. **Dynamics schema additions — SHIPPED.** The deployed logical names are the
+   six `wmkf_ai_*` fields listed in the current boundary above, not the
+   underscore-heavy draft names in the original sketch.
 
-2. **Prompt schema additions** in `wmkf_ai_prompt` (tracked in `PROMPT_STORAGE_DESIGN.md`):
-   - `wmkf_ai_promptoutputschema` (Memo, JSON) — declared outputs
-   - Optional: extend `wmkf_ai_promptvariables` entries to include `{source: "..."}` for chained inputs
+2. **Prompt output declaration — SHIPPED on Vercel.**
+   `wmkf_ai_promptoutputschema` is provisioned and consumed by the Executor.
+   A generalized automatic `{source:"..."}` input resolver is not established
+   by this document and should not be assumed.
 
-3. **PA flow complexity.** Each ingest flow needs to parse JSON output and PATCH multiple Dynamics fields, not just one. More flow steps than "write `rawOutput` to a single field." Error handling for malformed JSON needs a retry policy.
+3. **PA flow complexity — UNKNOWN externally.** Each PA ingest flow still needs
+   equivalent parse, validation, coalesced write, and retry behavior; repository
+   source cannot verify its deployed implementation.
 
-4. **JSON schema validation.** Either PA or Next.js (hybrid) validates Claude's JSON against `wmkf_ai_promptoutputschema` and retries on failure. Hybrid composition makes this easy — `claude-reviewer-service.js` can grow a JSON-retry loop. Full PA composition makes this painful.
+4. **Validation parity — PARTIAL.** Vercel Executor structured parsing/output
+   checks are live. PA-side validation/retry parity remains unverified.
 
 ## Honest caveats
 

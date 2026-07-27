@@ -6,7 +6,14 @@ metadata:
   type: feedback
   status: active
   originSessionId: abec04f6-7e77-489e-b52b-e14e75677c96
+  last_verified: 2026-07-27 as a historical S304 production incident; current write contracts require a live probe or metadata evidence
 ---
+
+## Recall Rule
+
+Before declaring a new Dataverse write path live, verify its wire payload through
+a real reversible write or current metadata plus parity with a known-working
+payload; mocked service-boundary tests are insufficient.
 
 A new Dataverse write path is not "done" because the unit/integration tests are
 green — if those tests mock the service boundary, they validate your *intent*,

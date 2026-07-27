@@ -8,6 +8,27 @@ metadata:
   originSessionId: d94dfa1d-10af-49d9-89dc-949fad29bfe0
 ---
 
+## Recall Rule
+
+Read this when: changing Campaign settings, reminder defaults, or any invite/send
+flow that consumes per-request campaign configuration.
+
+Do:
+- Treat prominence and carry-forward behavior as owner-reported product problems.
+- Trace `CampaignConfigModal` through the campaign-config service and each real
+  send consumer before choosing a UI-only or persistence change.
+
+Do not:
+- Assert that settings are currently re-confirmed by every flow without source
+  verification.
+- Conflate this follow-up with the separate Reviews-tab buildout.
+
+Ground truth: owner note S326; current producer/consumer source is
+`shared/components/reviewers/CampaignConfigModal.js` and
+`lib/services/review-manager/campaign-config-service.js`. The observed UX
+failure remains `UNKNOWN`; reproduce it in a signed-in request flow before
+implementation.
+
 Owner note (S326, 2026-07-03): revisit the reviewer **Campaign settings** surface
 (Reviewers tab → `CampaignConfigModal` → `/api/review-manager/campaign-config`,
 backing columns on `akoya_request`: enable toggles + lead days + respond offset +

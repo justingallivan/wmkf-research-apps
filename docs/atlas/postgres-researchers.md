@@ -2,17 +2,28 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-> **DROPPED 2026-06-04 (S219)** via `lib/db/migrations/018_drop_reviewer_finder_postgres_tables.sql`. The table no longer exists in Postgres. Reviewer person identity + bibliometrics live in Dataverse `wmkf_potentialreviewer`.
-> The dropped Postgres `researchers` snapshot had 331 rows backed up to local JSONL + Vercel Blob `cleanup-backup/2026-06-04/researchers.jsonl`; restore via `scripts/w6-drop-restore.js` or Neon PITR (7-day). Page retained as historical record.
+> **DROPPED 2026-06-04 (S219)** via
+> `lib/db/migrations/018_drop_reviewer_finder_postgres_tables.sql`. The table
+> no longer exists in Postgres. Reviewer person identity and bibliometrics live
+> in Dataverse `wmkf_potentialreviewer`. The 331-row pre-drop snapshot was
+> archived to local JSONL and Vercel Blob at
+> `cleanup-backup/2026-06-04/researchers.jsonl`; that backup and the
+> then-current restore tooling are historical recovery evidence, not current
+> operating guidance.
 
 **Last verified:** 2026-05-07 via `scripts/audit-postgres-state.js`. **Drain-status re-verified 2026-05-19 (S167)** via code grep + Codex independent verification.
 **Final row count before drop:** 331 (drain-only; no live application readers or writers post-W6 cutover 2026-05-12)
 
 ## Source of truth
 
-**Drain-only post-W6 cutover (2026-05-12).** The canonical identity for reviewer candidates is Dataverse `wmkf_potentialreviewers`, which **also carries the bibliometric fields** (S213: the `wmkf_appresearcher` sidecar was collapsed onto the person and dropped — historical `wmkf_appresearcher` references below predate that). The Postgres `researchers` table is retained as a historical snapshot pending the post-pilot drop (≥2026-07-01; requires `scripts/restore-postgres-drain-table-backup.js` to be built first — not yet built). Zero application code under `pages/api/`, `lib/services/`, `lib/dataverse/`, or `shared/` reads or writes this table; only `scripts/*` admin/migration tools touch it. The Database tab admin UI and `pages/api/reviewer-finder/researchers.js` endpoint that previously read this pool were retired W6 step 1.
+The canonical reviewer identity is Dataverse `wmkf_potentialreviewer`, which
+also carries the bibliometric fields after the S213
+`wmkf_appresearcher`-sidecar collapse. The historical Postgres `researchers`
+table was dropped by migration 018; no current application or script path
+should treat it as an available store. The former Database-tab UI and
+`pages/api/reviewer-finder/researchers.js` reader were retired before the drop.
 
-## Schema (live, from `information_schema`)
+## Historical schema at drop
 
 | Column | Type | Notes |
 |---|---|---|
@@ -44,16 +55,22 @@
 
 Indexes: `normalized_name`, `email`, `last_updated`, `(email IS NOT NULL)`, `contact_enriched_at`, `orcid` (M002). (See `lib/db/schema.sql` + `lib/db/migrations/002_contact_enrichment.sql`.)
 
-> **Verified active readers/writers of the M002 columns:** `pages/api/reviewer-finder/researchers.js` (retired W6 step 1 2026-05-12) and `lib/services/contact-enrichment-service.js` (enrichment pipeline migrated to Dataverse adapter chain in W5).
+> **Historical M002 callers:** the retired
+> `pages/api/reviewer-finder/researchers.js` route and the pre-cutover
+> contact-enrichment path. Current enrichment persists through the Dataverse
+> adapter chain.
 
-## Live state notes
+## Final pre-drop snapshot
 
-- 331 rows; 99% have an email; **bibliometric fields (h-index, i10, citations) are 0% populated** — the writer that fills them never landed or got removed.
+- The table had 331 rows; 99% had an email; bibliometric fields (h-index, i10,
+  citations) were 0% populated.
 - Parity probe (`scripts/backfill-reviewer-suggestions-parity.js`) historically treated this pool as the source for `wmkf_appresearcher` row creation. **S213: the `wmkf_appresearcher` sidecar (339 rows at drop) was collapsed onto `wmkf_potentialreviewers` and dropped** — the bibliometric fields now live on the person. The pre-drop counts below (334 → 339) are historical.
 
-## Read paths
+## Historical read paths
 
-**W6 update (2026-05-12):** the last live reader (`pages/api/reviewer-finder/researchers.js` admin UI) has been retired. No live application code reads this table. Remaining readers are admin scripts only.
+**W6 closeout (2026-05-12):** the last application reader was retired before
+the table was dropped. The admin scripts listed below are historical pre-drop
+tools, not current table readers.
 
 - `scripts/audit-postgres-state.js`, `scripts/clear-all-database.js`, `scripts/cleanup-database.js` — admin scripts
 
@@ -63,9 +80,10 @@ Pre-W5/W6 callers (now removed, kept for archaeology):
 - `lib/services/contact-enrichment-service.js` — replaced with Dataverse adapter chain
 - `pages/api/reviewer-finder/researchers.js` — deleted W6 step 1
 
-## Write paths
+## Historical write paths
 
-**W6 update:** no live application writers remain. Table is now drain-only (no inserts/updates from production code). Admin scripts retain DELETE for cleanup.
+No application writer remained at the W6 closeout. The cleanup scripts listed
+below predate migration 018 and must not be read as current DELETE guidance.
 
 - `scripts/clear-all-database.js`, `scripts/cleanup-database.js` — DELETE only
 
@@ -74,20 +92,25 @@ Pre-W5/W6 writers (now removed):
 - `DatabaseService.createOrUpdateResearcher` — gutted in commit `0c58da4` (W5 step 2)
 - `pages/api/reviewer-finder/researchers.js` — deleted W6 step 1
 
-## Cross-system linkages
+## Historical cross-system mapping
 
 | Direction | Mapping | Status |
 |---|---|---|
-| Postgres `researchers.id` → Dataverse `wmkf_potentialreviewers` | by email match | live (per-proposal saves promote on demand) |
-| Postgres `researchers.h_index/i10/total_citations` → `wmkf_potentialreviewers.wmkf_hindex/...` | via adapter `lib/dataverse/adapters/researcher.js` | adapter exists; bibliometric fields are 0% populated in Postgres so the migration carries no metric values. **S213: the adapter now writes these onto the person (`wmkf_potentialreviewerses`), not the dropped `wmkf_appresearcher` sidecar.** |
+| Historical Postgres `researchers.id` → Dataverse `wmkf_potentialreviewer` | pre-cutover email match | migration-era mapping; the Postgres source is dropped |
+| Historical Postgres bibliometrics → Dataverse `wmkf_potentialreviewer.wmkf_hindex/...` | migration-era adapter mapping | the final Postgres snapshot had no populated metric values; current writes target the Dataverse person |
 
 **Historical (pre-S213):** `wmkf_appresearchers` had 334 → 339 rows (a few more than Postgres `researchers`). Likely cause: per-proposal promotion via `save-candidates` created Dataverse rows for people who never made it into the Postgres pool (e.g., candidates added directly from the picker without enrichment). That sidecar entity is now dropped; bibliometrics live on `wmkf_potentialreviewers`.
 
-## Migration disposition
+## Completed migration disposition
 
-Per `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`: identity → `wmkf_potentialreviewers`; bibliometric snapshot → also `wmkf_potentialreviewers` (S213: folded onto the person; the `wmkf_appresearcher` sidecar that originally held these was dropped — see `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md`). Browse/edit UI rewrites endpoints to query Dataverse directly. Postgres `researchers` retired post-cutover.
+Identity and bibliometric authority moved to the Dataverse person record; the
+intermediate `wmkf_appresearcher` sidecar and the historical Postgres
+`researchers` table were both dropped. There is no pending Postgres retirement
+or cleanup action.
 
-## Open questions / gotchas
+## Historical gotchas
 
 - ~~Three callers of `DatabaseService.findResearcher` (not just discovery's cache lookup). Migration plan must cover all three.~~ **RESOLVED (verified 2026-05-18, S164):** grep of `lib/`/`pages/`/`scripts/` finds zero live callers of `findResearcher`/`createOrUpdateResearcher` — all 4 matches are archaeology comments describing removed pre-W5 behavior. The migration covered them; nothing outstanding.
-- The 0%-populated bibliometric fields raise the question of whether they were ever live; treat the migration as **not** carrying metric data forward unless we re-scrape.
+- The 0%-populated bibliometric fields mean the migration did not carry metric
+  values from this table. Any current bibliometric refresh must use the
+  Dataverse person contract and current source pipeline, not this snapshot.

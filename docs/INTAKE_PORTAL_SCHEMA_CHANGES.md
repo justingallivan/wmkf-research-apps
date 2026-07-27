@@ -403,7 +403,12 @@ Atlas: `docs/atlas/dataverse-wmkf-policy-and-policy-version.md`.
 
 ### New fields on `wmkf_appreviewersuggestion`
 
-Engagement-scope contact corrections (write target for Stage 2a self-confirmations; never propagated to `wmkf_potentialreviewers` or `contact`):
+Engagement-scope contact corrections are captured first on the suggestion row.
+The acceptance drain then applies field-specific downstream behavior: confirmed
+name/nickname/title values may sync to the linked CRM contact, self-reported
+ORCID follows its guarded capture path, and email/affiliation disagreements
+raise alerts rather than silently overwriting canonical person/contact data.
+These are not a blanket no-propagation or blanket-propagation contract:
 `wmkf_reviewerfirstname`, `wmkf_reviewerlastname`, `wmkf_reviewernickname`, `wmkf_reviewertitle`, `wmkf_revieweremail`, `wmkf_reviewerorcid`.
 
 Decline structured capture:
@@ -432,4 +437,3 @@ Enabled `IsAuditEnabled = true` on `wmkf_appreviewersuggestion` via `scripts/ena
 - Replace the COI placeholder body with finalized staff-approved text (create new `wmkf_policyversion` row, flip `wmkf_activeversion`).
 - Configure Dataverse security role to restrict delete privilege on `wmkf_policy` / `wmkf_policyversion` to admin role (per immutability rules §4a in build plan).
 - Remaining slice-1 work: extend `/api/external/review/[token]/context` payload, build `/respond` endpoint, page composition rewrite (state-driven view dispatch on existing route).
-

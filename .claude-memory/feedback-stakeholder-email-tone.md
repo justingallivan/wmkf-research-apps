@@ -5,7 +5,7 @@ metadata:
   type: feedback
   status: active
   scope: global
-  last_verified: S183 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-27 as a historical S183 owner communication preference
 ---
 
 ## Recall Rule
@@ -22,6 +22,10 @@ Do not:
 - Assume code paths/table names help unless they are the literal answer-target the recipient must act on.
 
 Ground truth: historical-only (lesson, not live state).
+
+[VERIFIED historically via S183 owner feedback.] The recipient profiles below
+are writing heuristics from that episode, not claims about current roles or
+technical responsibilities.
 
 Drafts of emails to non-engineers regularly fall into codebase-shape jargon
 that doesn't help the reader. S183: the Connor Q1-Q4 draft used phrases
@@ -46,8 +50,7 @@ recipient can use. The writer feels more rigorous; the reader feels lost.
 - Code paths and table names are fine when they're the *answer-target*
   (Connor needs to know which field to set) but not as framing for *why*
   the question matters.
-- Connor: moderate PA experience, no codebase context — write flow specs
-  at middle detail, write motivation at zero detail.
-- Sarah: form-design lens, no system context — frame everything in
-  applicant-experience terms.
-- DFT: IT-ops lens, no app context — frame in M365 admin-console terms.
+- In the S183 examples, Connor drafts used middle-detail flow specifications,
+  Sarah drafts used an applicant-experience frame, and DFT drafts used an
+  M365-admin frame. Reconfirm the recipient's current role and context instead
+  of treating those examples as permanent profiles.

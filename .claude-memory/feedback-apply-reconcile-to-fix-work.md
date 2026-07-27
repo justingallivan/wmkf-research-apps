@@ -8,7 +8,7 @@ metadata:
   last_verified: S196 via memory-content (not re-probed 2026-06-04)
 ---
 
-## Recall Trigger
+## Recall Rule
 
 Read this when folding code-review, Codex, or audit findings into a plan, doc,
 memory, or partly-correct artifact.

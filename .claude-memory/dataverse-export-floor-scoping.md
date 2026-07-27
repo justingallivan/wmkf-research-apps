@@ -7,36 +7,54 @@ metadata:
   originSessionId: 8050fbb7-13c6-444b-b802-c9bc7a61a3ce
   status: active
   scope: dataverse
-  last_verified: 2026-05-26 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-27 citation audit against the dated 2026-05-18 probe evidence; current populations require a fresh probe
 ---
 
 ## Recall Rule
 
-Read this when: scoping or building Dataverse Bulk Export (Track B) filter axes, the AI on-ramp grounding artifact, or any AI-driven export-column mapping.
+Read this when scoping the deferred natural-language on-ramp or adding
+person/contact filter axes to Dataverse Bulk Export.
 
 Do:
-- Treat the NL AI on-ramp as the headline goal; the builder UI is the confirmation/inspection surface.
-- Make the field-dictionary grounding artifact PER-PROGRAM, not entity-global; "led by X" is a per-program disjunction (Research→`wmkf_projectleader`+junction; SoCal→primary contact/`wmkf_ceo`; Discretionary→`wmkf_donorname` internal director).
-- Force the request-vs-org choice for "primary contact" (request `akoya_request.akoya_primarycontactid` vs org `account.primarycontactid` vs `wmkf_ceo` diverge ~32% in SoCal).
+- Preserve the built deterministic `QuerySpec` → preview → confirmed run seam; a
+  future NL layer may propose a spec but must render it for human confirmation.
+- Build person-role grounding per program, not entity-wide.
+- Force an explicit request-contact vs organization-contact vs CEO choice.
 - Label `wmkf_donorname` as "Directed by (discretionary sponsor)" — internal directed-giving, NOT an external philanthropic donor.
 
 Do not:
-- Treat the filter floor as 1:1 with the trusted export-column contract — it's the bulk-selective subset (Denial reason = export column, dropped as filter axis).
-- Ship a generic single-field "PI" axis (silently misses non-research leads = plausible-wrong export).
-- Match/filter by contact GUID as if it were a person (duplicate contact rows fragment one human).
+- Treat the trusted export-column contract as identical to the filter-axis set.
+- Ship one generic "PI" field across programs.
+- Equate contact GUID with human identity; duplicate contact rows can represent
+  the same person.
 
-Ground truth: `docs/.../DESIGN.md` (§10 AI on-ramp, §167 grounding artifact); probes `probe-akoya-person-role-by-program.js`, `probe-akoya-socal-contacts.js`, `probe-akoya-socal-contact-divergence.js` (+ 2026-05-18 evidence files). Related: [[akoya-temporal-axis-encodings]].
+## Current and Historical Boundaries
 
-The user's headline vision for Dataverse Bulk Export (Track B) is the **NL AI on-ramp** (a Dynamics-Explorer-style prompt that emits a hardened QuerySpec into the existing stable `/preview`→`/run` confirm seam). The builder UI is the *confirmation/inspection surface*, not the primary input. The deferred "AI on-ramp" in the build plan §10 is therefore the user's core goal, not a nice-to-have. S162 working session = scoping the compilable axis "floor" that gates how much the AI can honestly promise.
+[VERIFIED 2026-07-27 via
+`docs/DATAVERSE_POWER_TOOLS_TRACK_B_BUILD_PLAN.md:41-61,198,256-259`]
+The deterministic compiler, preview/run confirmation seam, and expert builder
+are built; the natural-language on-ramp remains deferred. The current user guide
+therefore describes a structured builder, not a chatbot
+(`docs/guides/DATAVERSE_BULK_EXPORT.md`).
 
-**Why:** the QuerySpec→FetchXML seam was deliberately kept stable + Codex-reviewed so the AI could emit into it additively; the gating risk is not bad FetchXML (compiler fails loud on unknown axis) but a *plausible-wrong export* from the AI mapping a user's words to the wrong physical field.
+The semantic findings below are **dated 2026-05-18 probe snapshots**, not claims
+about today's population percentages:
 
-**How to apply:**
-- The filter **floor ≠ the trusted export-column contract 1:1.** It is the *bulk-selective subset*. A field can be a legitimate export *column* without being a filter *axis* if people only read it on records they found another way (per-record lookup), not slice the whole corpus by it. Canonical example: **Denial reason** stays an export column (era-split handled in the disclosure engine) but is **dropped as a filter axis** (user decision S162 — per-proposal lookup, multi-located, not a bulk ask).
-- Tiering must consider **interpretation risk under unsupervised AI selection**, not just engineering cost. Some axes (PI; denial reason = era-split + doc-resident) must be "AI may propose only with a mandatory caveat the human clears," not autonomously selectable.
-- **PI is the canonical per-program-vocabulary-mismatch hazard (S162, user-flagged).** "PI" is *research* vocabulary; `wmkf_projectleader` is ~0% outside research. The deeper failure is not the empty field — it is that other programs may have a PI-equivalent role under a **different name/field, or none**. SoCal specifically: its lead-person-equivalent is **UNKNOWN/unprobed** (SoCal has an established field-forking pattern — its own decline field `wmkf_socalreasonsfordecline2` — so a SoCal-specific person-role field is plausible but unverified). Consequence: a "PI"-labeled single-field filter (or an AI mapping "led by"→`wmkf_projectleader`) **silently misses every non-research lead** — a plausible-wrong export. This proves the field-dictionary grounding artifact must be **per-program, not entity-global**, and is the strongest concrete instance of the grounding-gap risk class. **RESOLVED empirically S162** (`scripts/probe-akoya-person-role-by-program.js`, evidence `docs/atlas/evidence/akoya-person-role-by-program-2026-05-18.txt`): each program records its lead-person differently — **Research** → `wmkf_projectleader` (PI, 61% native at coarse `wmkf_grantprogram=Research`) + `wmkf_apprequestperson` junction (co-PIs); **SoCal** → NO project leader (3%), its lead = **Primary Contact `akoya_primarycontactid` 89% / `wmkf_ceo` 88%** (org liaison/exec, NOT a scientific PI); **Discretionary** → no grantee lead at all (~15-18%), the "who" is the internal director in `wmkf_donorname`. So a faithful "led by X" filter is a **per-program disjunction**, NOT a Tier-2 single lookup. Generic "PI" axis = proven plausible-wrong trap. v1 options: (a) ship a research-scoped, explicitly-labeled-research-only "Project Leader" axis; (b) defer all lead-person axis behind the per-program composite + disclosure UX. NOT a generic "PI" axis. Junction schema (Issue-3, definitive): `wmkf_request`(Lookup)·`wmkf_contact`(Lookup)·`wmkf_role`(Picklist), 5,561 rows — any-PI-role is buildable but the junction is itself research-roster infra (≪25,561), does not solve cross-program. ⚠️ Artifact-1 `DESIGN.md:196` PI "98%/90%" is a *fine `akoya_programid`* cut; coarse process-family is 61% native — segmentation-sensitive, reconcile before treating as AI-grounding ground truth (atlas note / Connor flag candidate).
-- 🔴 **"Primary contact" is a FAN-OUT, not one field (S162, probe `scripts/probe-akoya-socal-contacts.js`, evidence `akoya-socal-contacts-2026-05-18.txt`; Rosetta-anchored on #1001159).** Label→field, verified: "Request Primary Contact" = `akoya_request.akoya_primarycontactid`; "Org Primary Contact" = `account.primarycontactid` (on the applicant account — a Tier-2 account-link, NOT on the request); "Organization Leader / President/CEO" = `akoya_request.wmkf_ceo`. For native SoCal (500 of ~681): both-present 84.2%; of-both SAME person only **67.9%**, **32.1% diverge**. They are NOT interchangeable — the axis must FORCE the request-vs-org choice; an AI mapping "the contact" to either silently is a plausible-wrong-export. ⚠️ **GUID-divergence OVERSTATES person-divergence — duplicate contact records (S162, `scripts/probe-akoya-socal-contact-divergence.js`, SoCal-2025):** of 71/228 GUID-divergent, a real fraction is the SAME human as two distinct `contact` rows (e.g. Rosalie Brown / Doug Rimerman / Deanna Armbruster / Stellar Kim — identical name, different GUID). So any contact-lookup axis (PI, primary contact, CEO) fragments a single person across records; filtering/matching by contact GUID ≠ matching by person. This is Issue-2 (person-dedup) confirmed live and a direct AI footgun (name-match vs GUID-match diverge). True person-divergence rate is lower than the ~31% raw GUID rate — quantifying it needs a name-normalized pass (not yet run). Corrects an earlier over-simple claim that Primary Contact was a single "safe cross-program-robust" axis — population robustness holds but the request/org fan-out + 32% SoCal divergence does not. Both variants are effectively Tier 2 (contact/account links). SoCal's de-facto lead person = Org/Request Primary Contact + `wmkf_ceo` (org exec), never a PI.
-- Refined v1 floor candidates (S162): Tier 1 cheap scalars = Request # (`akoya_requestnum`), Title (`akoya_title` contains), Meeting date (`wmkf_meetingdate`), Phase I status (`wmkf_phaseistatus`). Tier 3 = Grant cycle (canonical temporal-cohort axis, absorbs fiscal year — see [[akoya-temporal-axis-encodings]]). Tier 2 (lookup link-entity, real per-axis cost, the actual cut line) = Program director (`wmkf_programdirector`/`2`→systemusers), PI (`wmkf_projectleader`→contacts, caveated), Primary contact (`akoya_primarycontactid`→contacts), Payee (`akoya_payee`→accounts), Donor (`wmkf_donorname` → **Lookup, Targets=[`wmkf_donors`]** — confirmed **Tier 2**, probed S162 `scripts/probe-akoya-meetingdate-by-type.js`). 🔴 **Disambiguation hazard / NOT external philanthropic donor:** on discretionary requests `wmkf_donorname` = the WMKF **board member or staffer who DIRECTED the discretionary/directed gift** (user-attested S162; samples Thomas E. Everhart = board, Niloo Hassas = staff). Labeling this axis "Donor" — or mapping the word "donor" → this field in an AI grounding map — actively misleads (reads as external funder; means internal directed-giving sponsor). Axis name should be e.g. "Directed by (discretionary sponsor)"; the AI grounding entry MUST encode the distinction or it produces a plausible-wrong export. Canonical instance of the field-dictionary disambiguation-gap risk class. Keep Donor a **fast-follow, not v1-three**; before build, probe `wmkf_donors` entity shape + population (bounded staff/board ⇒ dropdown vs. large ⇒ typeahead).
-- The other gating prerequisite (not floor): the field-dictionary grounding artifact is the explicitly-incomplete piece (`DESIGN.md:167`). The Set D doc-label collision that previously co-located here was resolved 2026-05-26 (Connor walkthrough — fit-assessment fields relabeled to Set E; canonical Set D = PD Assignment only); no longer load-bearing for the AI build.
+- `docs/atlas/evidence/akoya-person-role-by-program-2026-05-18.txt`:
+  Research uses `wmkf_projectleader` plus the request-person junction; SoCal
+  primarily uses request contact / `wmkf_ceo`; Discretionary does not share the
+  same grantee-lead model.
+- `docs/atlas/evidence/akoya-socal-contacts-2026-05-18.txt`:
+  request primary contact, account primary contact, and `wmkf_ceo` are distinct
+  concepts and sometimes diverged in the sampled records.
+- `docs/atlas/evidence/akoya-socal-contact-divergence-2026-05-18.txt`:
+  GUID divergence can overstate person divergence because duplicate contact rows
+  may represent one human.
+
+Before implementing a future AI grounding dictionary or reporting fresh
+percentages, rerun the corresponding scripts:
+`scripts/probe-akoya-person-role-by-program.js`,
+`scripts/probe-akoya-socal-contacts.js`, and
+`scripts/probe-akoya-socal-contact-divergence.js`.
 
 Related: [[akoya-temporal-axis-encodings]]

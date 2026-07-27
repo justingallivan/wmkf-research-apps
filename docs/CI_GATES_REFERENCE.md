@@ -208,7 +208,16 @@ The exact COMPLEMENT of `check:doc-symbol-refs`: a live `.claude-memory/**` + `d
 
 ### `check:drain-table-mentions` — stale "data lives in PG" claims (S167)
 
-Reviewer-domain Postgres tables (`researchers`, `publications`, `researcher_keywords`, `reviewer_suggestions`, `grant_cycles`, `proposal_searches`) are drain-only post-W3-W6 cutover (2026-05-12); live source of truth is Dataverse (`wmkf_potentialreviewer` — which since the S213 collapse carries the bibliometric fields directly; the `wmkf_appresearcher` sidecar was dropped — `wmkf_appreviewersuggestion`, `wmkf_appgrantcycle`).
+The registry covers six legacy reviewer-domain Postgres names. Five historical
+tables were **dropped** by migration 018 on 2026-06-04:
+historical/dropped `researchers`, historical/dropped `publications`,
+historical/dropped `researcher_keywords`, historical/dropped
+`reviewer_suggestions`, and historical/dropped `proposal_searches`.
+Only `grant_cycles` remains as a drain-only Postgres snapshot after the W3
+cutover. Current reviewer person, bibliometric, engagement, and grant-cycle
+authority is Dataverse (`wmkf_potentialreviewer`, which carries the
+bibliometric fields after the S213 sidecar collapse;
+`wmkf_appreviewersuggestion`; and `wmkf_appgrantcycle`).
 
 **Detection (7-shape, per Codex review):**
 1. Backticked identifier (` `X` `)

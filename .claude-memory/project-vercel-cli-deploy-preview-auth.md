@@ -6,6 +6,25 @@ metadata:
   status: active
 ---
 
+## Recall Rule
+
+Read this when: deploying from `main`, monitoring a Vercel deployment, or testing
+an authenticated preview.
+
+Do:
+- Treat push-to-`main` auto-deploy as the owner-confirmed production path.
+- Monitor a known deployment with `vercel inspect`; use localhost for
+  auth-gated smoke unless a preview redirect has been verified.
+
+Do not:
+- Run `vercel --prod` merely to duplicate a `main` push.
+- Rely on the old preview-URL/Azure-wildcard claim.
+
+Ground truth: owner correction S350 and `docs/AUTHENTICATION_SETUP.md`.
+Non-main preview URL compatibility remains `UNKNOWN`; push a harmless test
+branch and compare its actual callback URL with the registered Azure redirects
+before relying on it.
+
 **CORRECTED 2026-07-09 (S350), owner-stated:** pushing to `main` **DOES** trigger a
 production Vercel deploy — git-integration is active and "deploys to main on push as
 it always does." The prior claim in this file ("no GitHub git-integration; pushing a

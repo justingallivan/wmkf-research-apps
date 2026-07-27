@@ -21,6 +21,10 @@ eroded (capability loss + free alternatives); that cost-justification + migratio
 lives in [[project-serpapi-capability-erosion]].
 
 ## The fact (user-stated, S234)
+[VERIFIED only as dated owner/account evidence from 2026-06-28; current plan,
+usage, and latency require a read-only SerpAPI account/telemetry probe before a
+cost or capacity decision. Current enrichment orchestration is in
+`lib/services/contact-enrichment-service.js`.]
 The SerpAPI plan allows **~5,000 calls/month** (Developer, since 2026-06-28; was 15k) — still ample
 (actual usage ~hundreds/cycle). Early enrichment design was shaped by
 cost-minimization (contact search skipped if a free tier already found an email; single-shot per

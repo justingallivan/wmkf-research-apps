@@ -13,6 +13,9 @@ metadata:
 Read this before EVERY `git commit`, `git checkout`, or any action that assumes
 "I am on branch X" in WMKF_Apps.
 
+[VERIFIED historically via the S280 branch-drift incident and owner decision.]
+The current branch must still be checked immediately before each git action.
+
 ## The fact (Justin, S280)
 
 This repo is worked by Claude AND a separate **Codex app session** (Justin sees the

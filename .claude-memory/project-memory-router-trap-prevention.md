@@ -6,6 +6,24 @@ metadata:
   status: active
 ---
 
+## Recall Rule
+
+Read this when: editing `.claude-memory/MEMORY.md`, adding a routed memory, or
+debugging memory-router budget failures.
+
+Do:
+- Keep router lines terse and move domain detail to a leaf memory or agent-wiki
+  topic.
+- Run `check:memory-router` and its self-test after routing changes.
+
+Do not:
+- Treat the write-time hook as complete coverage; harness writes can bypass it.
+- Grow the router with historical narrative.
+
+Ground truth: `.claude/hooks/memory-router-guard.js`,
+`scripts/check-memory-router.js`, and
+`docs/CLAUDE_MEMORY_REORGANIZATION_PLAN.md`.
+
 The memory router (`.claude-memory/MEMORY.md`) is auto-loaded every session and has a
 hard size budget. It crept back over budget in under a week after the reorg because
 enforcement was **warn-only and at session start** — the session that bloated it never

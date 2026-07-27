@@ -5,7 +5,7 @@ type: project
 originSessionId: 09e7e972-ba80-4cd8-88a7-6fa9bffc5036
 status: active
 scope: dynamics
-last_verified: S209 (2026-06-01) via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 via v3 spec, DynamicsService.logAiRun/updateIfEmpty source, and retained dated probes; live schema/privileges require the named probes
 ---
 
 ## Recall Rule
@@ -49,19 +49,23 @@ Ground truth: `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md`, `DynamicsService.logAiRun
 
 Note: "compliance" task label was renamed to **Check-in** in v3.
 
-## Known quirks (will change soon)
+## Dated schema quirks (re-probe before relying on them)
 
 - `wmkf__ai_summary` (double underscore) exists on `akoya_request` alongside the real `wmkf_ai_summary` — cruft, Connor will delete. **Still present as of S209 (2026-06-01) — not yet deleted; akoya_request now carries 39 `wmkf_ai_*` attributes total, field sets A–D all confirmed deployed.** Do not target it.
 - `wmkf_ai_rundatetime` exists on `wmkf_ai_run` but is vestigial — use built-in `createdon` instead. Do not write to `wmkf_ai_rundatetime`.
 - **`wmkf_ai_rawoutput` cap is 1,000,000 chars** (Connor raised it from the 2000-char default on 2026-04-14). `DynamicsService.logAiRun` still truncates with a `…[truncated N chars]` marker as a safety valve, but real Grant Reporting payloads (5-15k) are nowhere near the cap. `wmkf_ai_notes` is still on the 2000-char default — keep notes short.
 
-## Implementation status
+## Deployment snapshot (last probed through 2026-06-01/S209)
+
+The following is retained dated deployment evidence, not a substitute for a
+current schema/privilege probe:
 
 - Field Set A (Proposal Summary): **DEPLOYED**.
 - Field Set B (Grant Report): **DEPLOYED 2026-05-07** — 22 fields on `akoya_request` (8 counts, 7 multi-line text, 6 publication fields, 1 choice). See `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` for the field list and `wmkf_ai_tasktype = 682090001` (Report) for runs writing these.
 - Field Set C (Compliance): **DEPLOYED**.
 - Field Set D (PD Assignment): **DEPLOYED** — writes to existing `wmkf_programdirector` lookup.
-- `wmkf_ai_run` child table: **DEPLOYED + live in production**.
+- `wmkf_ai_run` child table: **deployed and observed in production at that
+  snapshot**.
 - Workflow-chaining fields (`wmkf_ai_keywords`, `wmkf_ai_methodologies`, `wmkf_ai_riskflags`, `wmkf_ai_teaminfo`, `wmkf_ai_budgetsummary`, `wmkf_ai_timeline`): **DEPLOYED 2026-05-07** alongside Set B.
 
 ## Test scripts

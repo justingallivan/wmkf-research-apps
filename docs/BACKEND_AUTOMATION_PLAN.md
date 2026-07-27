@@ -26,7 +26,7 @@ historical context.
 
 ## Context
 
-This project started as a personal workflow automation tool and has grown into a multi-user platform. Leadership wants key processing tasks (especially proposal summarization and compliance screening) to happen automatically when documents arrive in Dynamics/Dataverse — no manual uploads, no button clicks. Other tasks (reviewer finding, review management) remain human-initiated but should write results back to Dynamics. **All results ultimately live in Dynamics as the source of truth.**
+This project started as a personal workflow automation tool and has grown into a multi-user platform. Leadership wants key processing tasks (especially proposal summarization and compliance screening) to happen automatically when documents arrive in Dynamics/Dataverse — no manual uploads, no button clicks. Other tasks (reviewer finding, review management) remain human-initiated and write their authoritative reviewer state to Dataverse. This is a target for grant-processing outputs, not a universal persistence rule: Integrity Screener, Virtual Review Panel, operational queues, drafts, and observability retain documented Postgres ownership.
 
 See `docs/GRANT_CYCLE_LIFECYCLE.md` for the full proposal lifecycle with stage-by-stage detail.
 
@@ -42,7 +42,17 @@ See `docs/GRANT_CYCLE_LIFECYCLE.md` for the full proposal lifecycle with stage-b
 > **Update — Session 110, 2026-04-25:** Phase 0 of the prompt-storage + Executor architecture is **shipped on the Vercel side**. Concrete state:
 >
 > 1. **`wmkf_ai_prompt` table is live** in Dynamics with a real seed row (`phase-i.summary`, GUID `d4201d8e-3840-f111-88b5-000d3a3065b8`). Seed script at `scripts/seed-phase-i-summary-prompt.js` is idempotent and round-trips cleanly. Field names finalized: `wmkf_ai_systemprompt`, `wmkf_ai_promptbody`, `wmkf_ai_promptvariables`, `wmkf_ai_promptoutputschema`, plus the new `wmkf_ai_Prompt` Lookup on `wmkf_ai_run` for provenance.
-> 2. **`executePrompt()` Executor service** lives at `lib/services/execute-prompt.js`. Implements the 10-step contract in `docs/EXECUTOR_CONTRACT.md` including the new step-4 output guards (`skip-if-populated` / `always-overwrite` + `forceOverwrite` input). Always writes a `wmkf_ai_run` row — even on failure or block — with both Lookups populated. Phase 0 source kinds: `dynamics`, `sharepoint`, `override`. Phase 0 target kinds: `akoya_request` (with optional `$.foo` jsonPath), `none`. Phase 0 parseModes: `raw`, `json`.
+> 2. **`executePrompt()` Executor service** lives at
+> `lib/services/execute-prompt.js` and implements the 10-step contract in
+> `docs/EXECUTOR_CONTRACT.md`, including output guards
+> (`skip-if-populated` / `always-overwrite` + `forceOverwrite`). It attempts an
+> audit row for blocked, completed/needs-review, and thrown-failure outcomes,
+> but audit persistence is fallible and a failure path can carry
+> `runId = null`. Structured target writes also report per-output results and
+> can return `allOk = false`; callers must not equate model completion with
+> durable write success. Phase 0 source kinds were `dynamics`, `sharepoint`,
+> and `override`; target kinds were `akoya_request` (with optional `$.foo`
+> jsonPath) and `none`; parse modes were `raw` and `json`.
 > 3. **Reference call site refactored** — `pages/api/phase-i-dynamics/summarize-v2.js` shrank from 292 → 145 lines and now does only Vercel-specific concerns (auth, rate limit, file load from `fileRef`, 409 shaping, per-user usage logging). UI compatibility preserved.
 > 4. **Strategic shift on user-facing intake apps** — see `memory/project_phase_i_summary_app_winddown.md`. Phase I summary as a user-facing task is winding down post-May-2026 cycle; future intake prompts (compliance, fit-assessment, keywords) should be designed **backend-first** (PA-triggered) rather than as new Vercel routes. User-driven apps that tie into Dynamics (reviewer finder, Phase II tools, Expertise Finder, Grant Reporting, Review Manager) stay in active development.
 >
@@ -64,17 +74,20 @@ See `docs/GRANT_CYCLE_LIFECYCLE.md` for the full proposal lifecycle with stage-b
 >
 > Also in Session 103: a **proposal context extraction plan** (`docs/PROPOSAL_CONTEXT_EXTRACTION_PLAN.md`) that extends the workflow-chaining idea for the upcoming single-phase cycle. Proposes ~15 structured fields the initial pass should extract so deep-dive calls (reviewer matching, panel review, compliance) read ~1.5K tokens of curated context instead of the full ~7K-token proposal. Compounds with expensive models and multi-LLM panel work. Not blocking v1; factored in when planning single-phase cycle Dynamics fields.
 
-## Architecture
+## Target architecture (Power Automate state externally unverified)
 
 ### Automated AI Tasks (PowerAutomate → Claude API → Dynamics)
 
-PowerAutomate flows handle all automated processing:
+The intended Power Automate flows handle automated backend processing:
 1. Detect status change or document arrival in Dynamics
 2. Fetch proposal PDFs from SharePoint
 3. Call Claude API directly (HTTP connector with API key)
 4. Write results back to Dynamics fields
 
-Our Vercel app is **not in the loop** for automated tasks. This keeps the architecture simple — PowerAutomate already has full Dynamics + SharePoint access and can call Claude's API directly.
+Under the chosen target architecture, the Vercel app is **not in the loop** for
+those automated tasks. The repository does not prove that the corresponding PA
+flows, triggers, retries, or prompt-parity behavior are currently deployed.
+Their live state is **UNKNOWN** pending a dated Power Platform probe.
 
 > **Decision (2026-04-16, Session 102):** Full PA composition confirmed. PA owns the entire Claude call lifecycle for automated backend jobs — no Vercel dependency at runtime. This matches the original architecture above. Rationale: easier to debug PA-native flows, and backend automation is mission-critical. PA handles PDF extraction natively (confirmed 2026-04-15). Retry, `cache_control`, and JSON validation will be implemented in PA flows. See `PROMPT_STORAGE_DESIGN.md` for full decision record.
 
@@ -203,19 +216,27 @@ A Vercel app page + API endpoint that:
 
 ## Phase 3: Data Migration to Dynamics
 
-**Goal:** Move all operational data from Vercel Postgres to Dynamics so Dynamics is the single source of truth.
+**Historical goal:** evaluate movement of selected operational data from
+Postgres to Dataverse. This is not a mandate to migrate Postgres-owned
+application/operational stores whose current Atlas pages keep them there.
 
-> **Status banner (2026-05-19):** Reviewer-domain tables in the table below — `researchers`, `publications`, `reviewer_suggestions`, `proposal_searches`, `grant_cycles` — were migrated in W3–W6 (2026-05-12) and are now **drain-only** in Postgres; live state is in Dataverse (`wmkf_potentialreviewer` — carrying the bibliometric fields since the S213 collapse dropped the `wmkf_appresearcher` sidecar — `wmkf_appreviewersuggestion`, `wmkf_appgrantcycle`). See `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` for the migration log. The remaining rows below (`integrity_screenings`, `screening_dismissals`, `panel_reviews`, `expertise_roster`, `expertise_matches`) are still Postgres-only and not yet scoped for migration.
+> **Current boundary:** the historical reviewer-domain Postgres tables named
+> below were migrated in W3–W6. Migration 018 dropped the person, publication,
+> proposal-search, and suggestion tables; it explicitly retained
+> `grant_cycles`, which remains drain-only while Dataverse
+> `wmkf_appgrantcycle` is authoritative. The remaining operational tables below
+> are still Postgres-owned; migration of those stores is not scheduled merely
+> because this historical phase proposed it.
 
 ### Tables to migrate
 
 | Table | Records | Purpose | Cutover status |
 |-------|---------|---------|----------------|
-| `researchers` | Expert profiles | Shared pool of reviewer candidates | drain-only post-W6 (2026-05-12); Dataverse `wmkf_potentialreviewer` is source of truth (S213: bibliometrics folded onto the person; the `wmkf_appresearcher` sidecar was dropped) |
-| `publications` | Linked to researchers | Publication history | drain-only; writer dead |
-| `reviewer_suggestions` | Per-user per-proposal | "My Candidates" saved reviewers | drain-only post-W3-W6; Dataverse `wmkf_appreviewersuggestion` is source of truth |
-| `proposal_searches` | Per-user | Proposal analysis results | drain-only; `extract-summary` endpoint retired |
-| `grant_cycles` | Shared | Grant cycle definitions | drain-only post-W3 (2026-05-12); Dataverse `wmkf_appgrantcycle` is source of truth |
+| historical `researchers` | Expert profiles | Shared pool of reviewer candidates | dropped by migration 018; Dataverse `wmkf_potentialreviewer` is source of truth (S213: bibliometrics folded onto the person; the `wmkf_appresearcher` sidecar was dropped) |
+| historical `publications` | Linked to researchers | Publication history | dropped by migration 018 |
+| historical `reviewer_suggestions` | Per-user per-proposal | "My Candidates" saved reviewers | dropped by migration 018; Dataverse `wmkf_appreviewersuggestion` is source of truth |
+| historical `proposal_searches` | Per-user | Proposal analysis results | dropped by migration 018; `extract-summary` endpoint retired |
+| `grant_cycles` | Shared | Grant cycle definitions | drain-only post-W3; explicitly kept by migration 018; Dataverse `wmkf_appgrantcycle` is source of truth |
 | `integrity_screenings` | Per-user | Screening history | Postgres-only (not yet migrated) |
 | `screening_dismissals` | Per-user | False positive dismissals | Postgres-only (not yet migrated) |
 | `panel_reviews` | Per-user | Virtual review panel results | Postgres-only (not yet migrated) |
@@ -239,7 +260,13 @@ System/infrastructure data that has no Dynamics equivalent:
 
 ### Migration strategy
 
-**SHIPPED for reviewer domain in W3-W6 (2026-05-12):** the reviewer-domain Postgres tables are now drain-only and Dataverse is the source of truth (see status banner at top of "Tables to migrate" section and `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`). The chosen approach was a cut-over per-endpoint with W3 (grant cycles), W4 (suggestion data alignment), W5 (reader migration), W6 (Database tab / researchers.js retirement). Postgres drop is post-pilot (≥2026-07-01).
+**SHIPPED for reviewer-domain application paths:** W3–W6 cut over the
+endpoints, and migration 018 later dropped the historical person,
+publication, proposal-search, and suggestion tables. Dataverse is the current
+person/suggestion/grant-cycle source of truth. Postgres `grant_cycles` remains drain-only;
+its destructive retirement still requires
+the separately documented carryover checks in
+`docs/atlas/postgres-grant-cycles.md`.
 
 For the remaining Postgres-only tables (integrity, panel, expertise), the same per-table cut-over pattern applies when scheduled.
 

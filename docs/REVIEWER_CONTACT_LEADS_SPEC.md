@@ -3,7 +3,7 @@ title: Reviewer Contact Leads / Scout Layer Spec
 domain: reviewer-workbench
 kind: spec
 status: active
-summary: "Drafted: 2026-06-18 Scope: Reviewer Finder contact recall and staff workflow. This is a product/architecture spec, not an implementation record."
+summary: "Current contact-leads contract: quarantined leads, staff promotion, and bounded roster persistence shipped; broad paid scouting remains unbuilt."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -16,9 +16,22 @@ related:
 
 # Reviewer Contact Leads / Scout Layer Spec
 
-Status: **PROPOSED DRAFT for Justin + Claude review**  
-Drafted: 2026-06-18  
-Scope: Reviewer Finder contact recall and staff workflow. This is a product/architecture spec, not an implementation record.
+Status: **PARTIALLY SHIPPED; current contract**
+Drafted: 2026-06-18; reconciled: 2026-07-27
+Scope: Reviewer Finder contact recall and staff workflow.
+
+## Current implementation boundary
+
+Slices 1, 2a, 3, 4, and 5 are shipped. They measure contact outcomes, surface
+already-fetched but rejected contact data in a quarantined `contactLeads[]`
+shape, render those leads separately, allow a manage-only manual promotion,
+and persist a compact bounded form in `reviewer_find_roster`. Promoted contact
+remains low-confidence and must pass the existing invitation confirmation
+gate.
+
+Slice 2b, the broad paid lead-only scout, is **PLANNED/UNBUILT**. Its value,
+budget, eligibility floor, and operational enablement remain owner decisions.
+Nothing in the shipped slices performs those additional paid searches.
 
 ## 1. Problem
 
@@ -28,18 +41,45 @@ Current live behavior separates invite-safe contact data poorly from staff-usefu
 
 - `[VERIFIED via lib/services/discovery-service.js:43-52]` Track-B retrieval-originated candidate discovery is archived off with `TRACK_B_ENABLED = false`, so current runs depend heavily on Claude-named Track-A suggestions.
 - `[VERIFIED via shared/config/prompts/reviewer-finder.js:8-14]` Stage-1 database search-query generation was removed after Track B was archived, leaving `searchQueries` as stable empty shape for existing consumers.
-- `[VERIFIED via lib/services/contact-enrichment-service.js:483-495]` contact enrichment computes an identity/institution anchor and marks unanchored candidates as `contactStatus: 'unresolved'`.
-- `[VERIFIED via lib/services/contact-enrichment-service.js:484-487]` the current contact-search gate is **institution OR ORCID**, not full identity confirmation: `hasIdentityAnchor = !!effectiveInstitution || this._hasOrcidAnchor(...)`.
-- `[VERIFIED via lib/services/contact-enrichment-service.js:91-101]` `effectiveInstitution` comes from ORCID affiliation, `candidate.affiliation`, `candidate.institution`, or `candidate.primaryAffiliation`; it does not directly read `suggestedInstitution`.
-- `[VERIFIED via lib/services/contact-enrichment-service.js:501-572]` Claude web search runs only when `hasIdentityAnchor` is true; otherwise it is skipped.
-- `[VERIFIED via lib/services/contact-enrichment-service.js:579-650]` SerpAPI Google search likewise only searches for missing email when `hasIdentityAnchor` is true.
-- `[VERIFIED via lib/services/contact-enrichment-service.js:123-141]` the unanchored abstain path clears email, website, faculty page, metrics, affiliation candidates, and all related persist flags.
-- `[VERIFIED via lib/services/contact-enrichment-service.js:513-517 and lib/services/contact-enrichment-service.js:593-597]` anchor-contradicting Claude/Serp results are already preserved in `tierResults` with `rejectedReason: 'identity_anchor_contradiction'`.
-- `[VERIFIED via lib/services/contact-enrichment-service.js:606-613]` a name-inconsistent SerpAPI email is nulled in place after `tierResults.serp_search = serpResult`, so recovering that discarded email requires a capture hook before mutation.
-- `[VERIFIED via lib/services/contact-enrichment-service.js:545-551]` Claude can report `emailRejectedReason: 'name_mismatch'`, but the code does not mutate `claudeResult.email` in the analogous way.
-- `[VERIFIED via pages/api/reviewer-finder/save-candidates.js:56-67]` unresolved system-discovered identities are hard-rejected at save.
-- `[VERIFIED via pages/api/reviewer-finder/save-candidates.js:79-82 and pages/api/reviewer-finder/save-candidates.js:169-187]` unresolved exempt rows can save as name rows, but contact and identity-derived fields are force-nulled or field-gated before persistence.
-- `[VERIFIED via shared/components/reviewers/ReviewerInvitePanel.js:67,275-287]` the saved-candidates UI already has a manual recovery pattern: when no email exists but a page exists, it shows "find on faculty page ->".
+- `[VERIFIED via ContactEnrichmentService orchestration and
+  contact-enrichment/identity-anchor.js]` contact enrichment computes an
+  identity/institution anchor and marks unanchored candidates as
+  `contactStatus: 'unresolved'`.
+- `[VERIFIED via ContactEnrichmentService._effectiveInstitution,
+  ContactEnrichmentService._hasOrcidAnchor, and their
+  contact-enrichment/identity-anchor.js delegates]` the contact-search gate is
+  **institution OR ORCID**, not full identity confirmation.
+- `[VERIFIED via contact-enrichment/identity-anchor.js effectiveInstitution]`
+  effective institution uses ORCID affiliation, `candidate.affiliation`,
+  `candidate.institution`, or `candidate.primaryAffiliation`; it does not
+  directly read `suggestedInstitution`.
+- `[VERIFIED via lib/services/contact-enrichment/tiers.js orchestration]`
+  Claude web search runs only with an identity anchor; otherwise it is skipped.
+- `[VERIFIED via lib/services/contact-enrichment/tiers.js orchestration]`
+  SerpAPI Google search likewise searches for missing email only with an
+  identity anchor.
+- `[VERIFIED via contact-enrichment/identity-anchor.js
+  markUnanchoredAbstain]` the unanchored abstain path clears email, website,
+  faculty page, metrics, affiliation candidates, and related persist flags.
+- `[VERIFIED via lib/services/contact-enrichment/tiers.js]`
+  anchor-contradicting Claude/Serp results are preserved in `tierResults` with
+  `rejectedReason: 'identity_anchor_contradiction'`.
+- `[VERIFIED via lib/services/contact-enrichment/tiers.js]` a
+  name-inconsistent SerpAPI email is nulled after its result is captured, so
+  lead recovery must occur before mutation.
+- `[VERIFIED via lib/services/contact-enrichment/tiers.js]` Claude can report
+  `emailRejectedReason: 'name_mismatch'` without the analogous email mutation.
+- `[VERIFIED via lib/services/reviewer-finder/save-candidates-service.js
+  isUnresolvedIdentity/saveCandidates]` unresolved system-discovered
+  identities are hard-rejected at save.
+- `[VERIFIED via lib/services/reviewer-finder/save-candidates-service.js
+  contactBlockedForUnresolvedExempt/saveCandidates]` unresolved exempt rows can
+  save as name rows, but contact and identity-derived fields are force-nulled
+  or field-gated before persistence.
+- `[VERIFIED via shared/components/reviewers/ReviewerInvitePanel.js
+  candidateContactPageUrl and its saved-candidate render consumer]` the
+  saved-candidates UI already has a manual recovery pattern: when no email
+  exists but a page exists, it shows "find on faculty page ->".
 
 That behavior is right for automated persistence and invitations. It is too strict for a staff workbench whose practical goal is: "give me enough context to find and evaluate possible reviewers."
 
@@ -399,26 +439,28 @@ These must remain true:
 - Do not treat topic overlap as identity proof.
 - Do not add a Dataverse schema change in the first slice unless review decides durable leads are required immediately.
 
-## 9. Open Questions for Review
+## 9. Resolved and open decisions
 
-1. Should lead-only search run for unresolved identities, or only for identities that are at least `probable` / human-grounded?
-2. Should likely namesake leads be hidden entirely by default, or shown under an audit expander?
-3. What is the compact roster DTO for `contactLeads[]`, and what payload size cap should it enforce?
-4. What is the maximum acceptable per-candidate lead-search budget?
-5. Should "Use this email" require opening the source URL first, or is the existing edit/save confirmation enough?
-6. Should broad lead-only scout run for unresolved identities, or only for name-grounded unresolved identities with OpenAlex/PubMed/ORCID evidence?
+Resolved by the shipped slices:
 
-## 10. Suggested First Implementation
+- weak/rejected leads are available behind an audit expander rather than
+  silently discarded;
+- compact roster persistence is capped at eight leads and excludes raw
+  provider payloads;
+- “Use this email/page” does not require opening the source first, but it is
+  manage-only and retains low-confidence invitation confirmation;
+- the existing-discard/faculty-page path is default-on and adds no network
+  calls.
 
-Start with the smallest product-correct order:
+Still open for the unbuilt broad paid scout:
 
-1. Add Slice 1 measurement/audit, including `namesake_ambiguous`.
-2. Add `contactLeads[]` to `contactEnrichment`.
-3. Implement Slice 2a: capture already-discarded Claude/Serp results, add the Serp pre-null hook, and surface existing faculty/profile pages as leads.
-4. Persist compact leads in the Find roster cache.
-5. Render high/medium leads in the candidate card, with weak/rejected leads collapsed.
-6. Wire "Use this email" into the existing manual edit flow.
-7. Add tests that manual promotion remains low-confidence for first-contact invitation unless separately verified.
-8. Use Slice 1 results to decide whether to build Slice 2b broad paid scout.
+1. Whether a new paid scout is justified by measured missing-contact outcomes.
+2. The exact eligibility floor for unresolved identities.
+3. The hard per-run budget and operational enablement policy.
 
-This restores staff utility while preserving the safety gates that prevent wrong-person invitations.
+## 10. Current next step
+
+Do not rebuild the already shipped slices. If product owners want Slice 2b,
+first review the current contact-audit distribution, choose the eligibility
+floor and hard budget, and verify that broad-search results remain confined to
+`contactLeads[]`. Until those decisions are made, Slice 2b remains unbuilt.

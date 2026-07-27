@@ -10,6 +10,24 @@ metadata:
   originSessionId: 8ce5311e-9446-4cb1-a64e-1c170772c7b1
 ---
 
+## Recall Rule
+
+Read this when: changing admin-setting recovery, Dataverse auditing, or
+`wmkf_appsystemsetting`.
+
+Do:
+- Preserve this as parked owner/IT work until Connor decides audit scope and
+  retention.
+- Re-run `scripts/probe-appsystemsetting-audit.mjs` before relying on the 2026-06-27
+  live-state snapshot.
+
+Do not:
+- Infer current table-audit enablement from the column flag.
+- Treat audit history as a replacement for bootstrap seeds.
+
+Ground truth: dated GET-only probe `scripts/probe-appsystemsetting-audit.mjs`;
+write behavior in `lib/services/dataverse-settings-service.js`.
+
 **Parked (2026-06-27), owner input needed: Connor.** Enable Dataverse
 table-level auditing on the admin settings table so accidentally-blanked admin
 values (email defaults, honorarium amount, model overrides, secret-expiry) are

@@ -13,6 +13,7 @@ metadata:
 Read before relying on an OpenAlex AUTHOR record's works or metrics for a named person — especially common names, especially to build "this person's corpus."
 
 ## The hazard (verified)
+[VERIFIED via the 2026-06-10 read-only ORCID/OpenAlex probe retained in S239.]
 ORCID gives EXACT identity, but OpenAlex's author record for that ORCID can be a MERGE of multiple same-name people. S239: PI Wen Li's correct ORCID (`0000-0002-3721-4008`, Wayne State attosecond physicist) resolved in OpenAlex to author `A5060668110` = a Yantai University ORGANIC-CHEMISTRY cluster, 311 works, none his. This is OpenAlex name-clustering noise in the MERGE direction; the Frebel case was the SPLIT direction (a stub record `works_count` 6 vs the canonical 323). Both are name-search artifacts — NOT a reason to distrust OpenAlex wholesale (the redesign-plan §2.3 "OpenAlex disqualified" claim was CORRECTED S239; OpenAlex is fine as a recall/seed source).
 
 ## The fix

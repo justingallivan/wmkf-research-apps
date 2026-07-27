@@ -7,7 +7,7 @@ metadata:
   originSessionId: 1e1dfc4f-ebfe-49c2-965d-23d90c70e16f
   status: active
   scope: global
-  last_verified: S149 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-27 as a historical S149 verification failure; platform claims require current official sources
 ---
 
 ## Recall Rule

@@ -2,8 +2,8 @@
 title: "Review — Reviewer Contact Leads / Scout Layer Spec"
 domain: reviewer-workbench
 kind: audit
-status: active
-summary: "[VERIFIED via lib/services/contact-enrichment-service.js:487] hasIdentityAnchor = !!effectiveInstitution || this._hasOrcidAnchor(...) — i.e. the..."
+status: historical
+summary: "Point-in-time pre-implementation review whose accepted changes were incorporated into REVIEWER_CONTACT_LEADS_SPEC.md."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -14,9 +14,15 @@ related:
 
 # Review — Reviewer Contact Leads / Scout Layer Spec
 
+> **Historical review record.** This memo records the 2026-06-18 review that
+> shaped the implementation order. It is not current operating guidance.
+> Current shipped/remaining scope is maintained in
+> `docs/REVIEWER_CONTACT_LEADS_SPEC.md`.
+
 Reviewer: Claude (Opus 4.8)
 Date: 2026-06-18
-Reviews: `docs/REVIEWER_CONTACT_LEADS_SPEC.md` (PROPOSED DRAFT)
+Reviews: `docs/REVIEWER_CONTACT_LEADS_SPEC.md` (current contract; proposed at
+the time of this historical review)
 Purpose: Pre-implementation alignment. This memo is written **for Codex** — please confirm,
 refute, or sharpen each point against the live code, then return a GO / GO-WITH-CHANGES / NO-GO
 on the spec **as reordered below**. The goal is to agree the slice order and the safety gates

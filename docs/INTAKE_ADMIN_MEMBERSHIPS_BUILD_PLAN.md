@@ -2,10 +2,11 @@
 title: "Intake Admin — Membership Approval Build Plan"
 domain: intake-portal
 kind: plan
-status: active
-summary: "Predecessor: docs/INTAKE_PORTAL_DESIGN.md (schema + Option A decision near line 557, captured 2026-05-13)."
+status: draft
+summary: "Parked design for staff membership approval; schema and applicant-side membership reads exist, but the intake-admin app, page, and routes are unbuilt."
 canonical: false
 cataloged: 2026-07-02
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/INTAKE_PORTAL_DESIGN.md
@@ -16,7 +17,23 @@ related:
 
 # Intake Admin — Membership Approval Build Plan
 
-**Status:** Draft v4 (2026-05-13). Revised against three Codex review passes (`INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN_CODEX_REVIEW.md` + `_V2.md` + `_V3.md`). v4 closes the last 2 MOD + 2 LOW + 1 NIT findings: prior-decision persisted as a Dataverse field (no inference), §9 disposition table promoted to entry point, `noFallback` threading specified end-to-end, status codes split (403 for unmapped staff, 503 for env misconfig), and `getRecord` named consistently. Ready to build once `wmkf_portalmembership` exists in Dataverse (slice 0).
+## Current state
+
+**[VERIFIED 2026-07-27 via the app registry, page/route inventory, source, and
+`docs/atlas/dataverse-wmkf-portalmembership.md`]** This product slice is
+parked and unbuilt. The `wmkf_portalmembership` schema prerequisite is
+deployed, and applicant-side live-membership reads use
+`lib/services/membership-service.js` through the membership adapter. The
+`intake-admin` app key, `/apply/admin/memberships` page, and
+`/api/apply/admin/memberships*` routes do not exist.
+
+The remainder is a reviewed design record, not authorization to implement.
+Re-probe helper signatures, route counts, and live schema before a future
+build.
+
+## Design record
+
+**Design status:** Draft v4 (2026-05-13). Revised against three Codex review passes (`INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN_CODEX_REVIEW.md` + `_V2.md` + `_V3.md`). v4 closes the last 2 MOD + 2 LOW + 1 NIT findings: prior-decision persisted as a Dataverse field (no inference), §9 disposition table promoted to entry point, `noFallback` threading specified end-to-end, status codes split (403 for unmapped staff, 503 for env misconfig), and `getRecord` named consistently.
 
 **Predecessor:** `docs/INTAKE_PORTAL_DESIGN.md` (schema + Option A decision near line 557, captured 2026-05-13).
 
@@ -38,16 +55,24 @@ In scope:
 Not in scope:
 - Applicant-side claim UX (separate slice; the cross-slice contract it must honor lives in § 9).
 - Submitted-requests admin, opportunity status (post-Sarah-inventory slices).
-- `wmkf_portalmembership` entity creation in Dataverse — hard prerequisite (slice 0), not optional. The admin slice cannot exercise real GET/approve/reject without entity, alternate key, navigation-property names, and choice values existing.
+- `wmkf_portalmembership` entity creation in Dataverse — this historical
+  slice-0 prerequisite is now complete; the admin build would consume the
+  deployed entity and Atlas-recorded metadata.
 - Email notifications on approve/reject — PA-trigger, Connor's plate.
 
-**Why this slice first:** the applicant entry path depends on staff acting on pending rows. Building admin before applicant UX also validates the row-state machine (`requested` → `approved`/`rejected`/`revoked`) before any user-facing flow writes rows.
+**Historical sequencing rationale:** the design originally put this slice
+before applicant UX so staff could act on pending rows. That sequence was not
+executed; current applicant-side membership reads exist while the admin slice
+remains parked.
 
 ---
 
 ## 2. Schema (no new fields — entity must exist)
 
-This slice assumes `wmkf_portalmembership` already exists in Dataverse with the shape locked at `INTAKE_PORTAL_DESIGN.md` line 100. Deploy follows the gotcha checklist at `project_dataverse_schema_deploy_gotchas.md`.
+The `wmkf_portalmembership` entity is deployed in Dataverse with the shape
+recorded in `docs/atlas/dataverse-wmkf-portalmembership.md`. Exact live
+metadata was last verified there on 2026-05-22; a future build must re-probe
+it rather than treating this design's old line references as current.
 
 ### Slice-0 addition: `wmkf_priordecisionstatus`
 
@@ -421,7 +446,7 @@ CI gates fold into the slices that introduce them — no deferred "gate" slices.
 
 | # | Slice | CI gate landing same commit | Risk |
 |---|---|---|---|
-| 0 | **Pre-req — `wmkf_portalmembership` entity creation** in Dataverse, including the v4-added `wmkf_priordecisionstatus` choice field (values: `null` / `'rejected'` / `'revoked'` / `'approved'`). Connor design-reviews shape. Catalog in `INTAKE_PORTAL_SCHEMA_CHANGES.md` + new Atlas page `docs/atlas/dataverse-wmkf-portalmembership.md` (records bind keys, semantic contract, alt-key, choice values for both `wmkf_approvalstatus` and `wmkf_priordecisionstatus`). Update `MEMORY.md` note. | `check:atlas` | Low |
+| 0 | **COMPLETE (S178, 2026-05-22)** — `wmkf_portalmembership` entity creation in Dataverse, including `wmkf_priordecisionstatus`; authoritative shape and bind keys are in `docs/atlas/dataverse-wmkf-portalmembership.md`. | `check:atlas` | Low |
 | 1 | App key + middleware carve-out (exact-or-slash) + skeleton `/apply/admin/memberships` page (empty state). No API yet. | none | Low |
 | 2 | `GET /api/apply/admin/memberships` + table render. Verifies `queryRecords` shape, `$expand`, etag projection. Includes `priorDecision` inference for re-applied rows. | `check:api-routes` row added | Low |
 | 3 | `dynamics-service` `updateRecord` `{ noFallback }` extension. `POST /approve` endpoint + UI button. End-to-end with `If-Match`, 412→409, 503 impersonation gate, 403 impersonation-rejected, audit log. | `check:api-routes` row added | Medium |
@@ -495,7 +520,11 @@ When the staff member subsequently approves or rejects the re-applied row, the a
 
 ## 11. Open questions
 
-None as of v4 (2026-05-13). All HIGH/MODERATE/LOW Codex findings from three review passes are folded in. Live helper signatures verified at:
+Design questions were closed in v4, but product scheduling/owner authorization
+remains open because this slice is parked. All HIGH/MODERATE/LOW Codex
+findings from three review passes were folded into the historical design.
+Helper signatures cited below were verified in 2026 and must be re-probed
+before implementation:
 
 - `lib/services/intake-audit-service.js:32`
 - `lib/services/dataverse-identity-map.js:70`

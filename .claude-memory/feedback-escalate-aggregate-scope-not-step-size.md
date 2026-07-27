@@ -8,6 +8,12 @@ metadata:
   originSessionId: 0a631ca0-29ca-4f6c-913a-f551fb1ced7d
 ---
 
+## Recall Rule
+
+Track cumulative detour cost against the original objective. After roughly
+two-to-three review/fix cycles on unplanned work, surface the aggregate scope and
+ask whether to continue, stop, or hand off.
+
 Owner pushback (S339): "You said this was a small task. What's up?" — after the reviewer-finder
 save-COI work ran ~6 adversarial-review cycles plus a structural reframe, each step I honestly
 called "small / the tail," never owning that the **sum** had become a major unplanned effort.

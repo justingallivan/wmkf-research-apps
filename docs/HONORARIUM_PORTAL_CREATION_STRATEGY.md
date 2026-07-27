@@ -36,7 +36,7 @@ date noted · `[DECISION]` = settled by Justin/Connor · `[OPEN]` = needs Connor
   `[DECISION]`
 - Mechanism = the post-accept pipeline `ensureHonorariumOnboarding()`
   (`lib/bill/honorarium-onboard-orchestrator.js`), run at Stage 2a accept, with
-  the **BILL tail deferred**. As of commit `cd82c405`, the create-body draft is
+  the **BILL tail deferred**. As of commit `cd82c405`, the create body is
   implemented and unit-tested behind config gates; it creates the `akoya_request`
   only after `HONORARIUM_ONBOARDING_DEFERRED` is unset and all discriminator GUIDs
   are configured. It does **not** attempt payment while `BILL_ONBOARDING_DEFERRED`
@@ -89,10 +89,10 @@ both (verified 404, and confirmed absent in AkoyaGO by Connor/Justin).
 
 ### 3a. Fields we MUST set (auto-default is absent or wrong)
 
-Implementation status: the config-gated draft create body in
-`lib/bill/honorarium-onboard-orchestrator.js` now sets these fields except the new
-proposal self-lookup, which waits on Connor's schema change in §8/§9. `[VERIFIED
-via source 2026-07-01]`
+Implementation status: the config-gated create body in
+`lib/bill/honorarium-onboard-orchestrator.js` sets these fields, including the
+proposal self-lookup completed in §8/§9. `[VERIFIED via source; schema deployment
+evidence dated 2026-07-02]`
 
 | Field | Value | Note |
 |---|---|---|
@@ -100,17 +100,17 @@ via source 2026-07-01]`
 | `wmkf_GrantProgram@odata.bind` | Honorarium | |
 | `wmkf_Type@odata.bind` | Individual | |
 | `akoya_primarycontactid@odata.bind` | reviewer contact | **see nav-casing fix §4** |
-| `transactioncurrencyid@odata.bind` | Optional explicit US Dollar bind (`0bc77bca-2c7b-ee11-8179-00224802aaea`) | drives the `*_base` amounts + `exchangerate`; draft code binds only when `HONORARIUM_CURRENCY_ID` is configured, otherwise Dataverse applies org default currency |
-| `akoya_request` | admin amount | draft now sets; minimal create leaves absent |
-| `wmkf_invitedamount` | admin amount | draft now sets; cohort carries same value |
+| `transactioncurrencyid@odata.bind` | Optional explicit US Dollar bind (`0bc77bca-2c7b-ee11-8179-00224802aaea`) | drives the `*_base` amounts + `exchangerate`; code binds only when `HONORARIUM_CURRENCY_ID` is configured, otherwise Dataverse applies org default currency |
+| `akoya_request` | admin amount | implementation sets; minimal create leaves absent |
+| `wmkf_invitedamount` | admin amount | implementation sets; cohort carries same value |
 | `akoya_recommendedamount` | admin amount | already set before S314; still set |
 | `wmkf_request_type` | `682090001` (Individual) | already set before S314; does **not** auto-default |
-| `akoya_requesttype` | `100000001` (Scholarship) | draft now sets; bare create auto-defaults to WRONG value `100000000` |
-| `wmkf_meetingdate` | parent proposal's meeting date | draft sets when parent date exists; guard/alert when missing |
-| `akoya_fiscalyear` | derived — see §5 | draft now derives; minimal create does **not** auto-derive |
-| `wmkf_respondreminderenabled` | `false` | draft now forces off; bare create auto-defaults `true` (GoApply rows are off) |
-| `wmkf_reviewduereminderenabled` | `false` | draft now forces off; bare create auto-defaults `true` |
-| _proposal-linkage lookup_ (new — see §8) | parent proposal (`request.akoya_requestid`) | **needs schema change**; TODO remains in code until Connor adds the relationship and we verify nav-property casing |
+| `akoya_requesttype` | `100000001` (Scholarship) | implementation sets; bare create auto-defaults to WRONG value `100000000` |
+| `wmkf_meetingdate` | parent proposal's meeting date | implementation sets when parent date exists; guard/alert when missing |
+| `akoya_fiscalyear` | derived — see §5 | implementation derives; minimal create does **not** auto-derive |
+| `wmkf_respondreminderenabled` | `false` | implementation forces off; bare create auto-defaults `true` (GoApply rows are off) |
+| `wmkf_reviewduereminderenabled` | `false` | implementation forces off; bare create auto-defaults `true` |
+| `wmkf_ReviewedProposal@odata.bind` (see §8) | parent proposal (`request.akoya_requestid`) | Shipped self-lookup; navigation-property casing was metadata-verified before wiring |
 
 Amounts: stamp all **three** amount fields from the single admin-panel amount
 (`getHonorariumAmount()`); the cohort carries the same value on all three —
@@ -127,7 +127,7 @@ probe 2026-07-01]`
 - `statecode/statuscode` (Active), `akoya_paid` (0), `wmkf_typeforrollup`
   (Individual), `akoya_requestnum` (auto-number), all `*_base` amounts,
   `exchangerate` → auto. `[VERIFIED]`
-- `akoya_title` → auto-generates as `"Grant to <contact>"`. The draft create body
+- `akoya_title` → auto-generates as `"Grant to <contact>"`. The create body
   now **overrides** it with a proposal-referencing title at create (Option C, §8)
   — plain writable string, no schema change. `[VERIFIED via source]`
 
@@ -165,12 +165,12 @@ relationship — it is **not** populated from a copy of the contact's data.
 
 ---
 
-## 4. Nav-property casing bug fixed in the draft create body
+## 4. Nav-property casing bug fixed before go-live
 
 The pre-S314 create body used `akoya_ProgramId` and `akoya_PrimaryContactId`.
 Dataverse **rejects** that casing with a `400` ("undeclared property … only has
 property annotations"). The real single-valued navigation properties are
-lowercase, and the draft implementation now uses them:
+lowercase, and the live implementation uses them:
 
 - `akoya_ProgramId@odata.bind` → **`akoya_programid@odata.bind`**
 - `akoya_PrimaryContactId@odata.bind` → **`akoya_primarycontactid@odata.bind`**
@@ -178,7 +178,7 @@ lowercase, and the draft implementation now uses them:
 
 This was never caught earlier because the path has been deferred in prod and its
 unit tests inject a fake `dynamics`. It would have failed the first real create;
-commit `cd82c405` fixes the draft body and adds assertions for the lowercase bind
+commit `cd82c405` fixed the create body and added assertions for the lowercase bind
 names. `[VERIFIED via prod 400 → corrected create succeeded 2026-07-01 + source]`
 
 ---
@@ -286,15 +286,15 @@ relationship. `[VERIFIED via entity metadata 2026-07-01]`
   - relationship schema name: `wmkf_akoya_request_reviewedproposal`; cascade
     `Delete = RemoveLink` (referential — deleting a proposal only clears the link).
 
-  The create body now binds it: `'wmkf_ReviewedProposal@odata.bind':
+  The create body binds it: `'wmkf_ReviewedProposal@odata.bind':
   /akoya_requests(<proposalId>)`, guarded on `request.akoya_requestid`
   (`lib/bill/honorarium-onboard-orchestrator.js`). So app-created honoraria populate
   the FK and feed Connor's AkoyaGO dashboard. We do NOT surface it in our own app UI
-  (documented in the finance-honoraria wiki). The bind is metadata-verified; it is
-  first exercised by a live create at go-live (pipeline still deferred). The field
-  lives in the Default Solution — Connor can add the component to
+  (documented in the finance-honoraria wiki). The bind is metadata-verified and the
+  no-BILL create path is live; current production linkage population is **UNKNOWN**
+  without a new dated row probe. The field lives in the Default Solution — Connor can add the component to
   `wmkfResearchReviewAppSuite` if his ALM wants it bundled (non-destructive).
-- **Option C — proposal-referencing title (immediate, no schema change).** The draft
+- **Option C — proposal-referencing title (immediate, no schema change).** The
   create body now overrides `akoya_title` (a plain writable string, §3b) at create
   with `"Reviewer honorarium — <proposal title> (#num)"`, capped to the column
   length. Human-visible on the record now, even before A lands; not

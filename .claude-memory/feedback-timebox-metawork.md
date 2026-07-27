@@ -24,6 +24,10 @@ Do not:
 
 Ground truth: this file; `CLAUDE.md` "Scope discipline — time-box meta-work". Related: [[feedback-reconcile-dont-append-docs]], [[feedback-drive-to-completion]], [[feedback-thoroughness-default]].
 
+[VERIFIED historically via S219 owner feedback and currently codified in
+`CLAUDE.md` Universal Operating Rule 3.] The table-drop episode below is
+historical rationale, not current infrastructure status.
+
 **Why:** S219 spent ~6 hours on cleanup (a table drop → ORCID backfill → a full doc/memory reconciliation → three Codex verification rounds → a start-gate fix) with **zero feature progress on the actual project**. Each step was individually reasonable, but no one time-boxed the whole and no check-in happened, so a "let's clean it up now" turned into the user's entire day. The user said so directly. The tension with [[feedback-drive-to-completion]] / [[feedback-thoroughness-default]] is real but resolvable: drive sub-tasks to completion, but the SCOPE of meta-work itself is the user's call — give them the checkpoint to make it.
 
 **How to apply:** (1) When meta-work starts, set a rough budget out loud (time or commit count). (2) At the budget, summarize state + remaining cost and ask whether to continue. (3) If a verification loop keeps finding small residuals, that's a signal to either change approach (read whole files, not lines — [[feedback-reconcile-dont-append-docs]]) or stop and accept "good enough," not to keep looping. (4) Distinguish "must-fix now" (a red gate, a prod-write hazard) from "tidy-nice-to-have" (a stale memory line) — the former justifies interrupting project work, the latter can be batched or deferred.

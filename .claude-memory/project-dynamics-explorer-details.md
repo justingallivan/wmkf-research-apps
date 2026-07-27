@@ -7,7 +7,7 @@ metadata:
   originSessionId: 17893605-3207-451d-8190-118bbacd8141
   status: active
   scope: dynamics
-  last_verified: unknown via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-27 via dynamics-service searchRecords and Dynamics Explorer route/prompt source; index metrics remain dated
 ---
 
 ## Recall Rule
@@ -25,7 +25,9 @@ Ground truth: `pages/api/dynamics-explorer/chat.js` (agentic tool-use orchestrat
 
 ## Dataverse Search API
 
-Enabled on the CRM instance (77K+ docs, 154MB index).
+Historical observation: Search was enabled when originally probed, with 77K+
+documents and a 154 MB index. Re-probe current enablement/metrics before they
+are load-bearing; source only proves how the app calls the API.
 
 - **Endpoint:** `{DYNAMICS_URL}/api/search/v1.0/query`
 - Searches all indexed text fields across tables simultaneously

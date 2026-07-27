@@ -9,6 +9,11 @@ metadata:
   scope: testing
 ---
 
+## Recall Rule
+
+Call only the executed subset green. Reserve “the test suite is green” for a
+successful full `npm test`/Jest run, and report its suite/test totals.
+
 Do not declare tests "green" (or a slice done) on the strength of targeted CI
 gates or a subset `jest <path>` run. The full suite (`npm test` / `npx jest`) is
 the only thing that proves it.

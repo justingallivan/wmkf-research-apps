@@ -5,7 +5,7 @@ type: project
 originSessionId: 0c2648c3-78b0-4258-ad88-9960b3a3d864
 status: active
 scope: dynamics
-last_verified: S209 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 via docs/atlas/dataverse-akoya-request.md and current proposal-reader/slot consumers; observed lifecycle counts remain dated
 ---
 
 ## Recall Rule
@@ -22,7 +22,10 @@ Do not:
 - Conflate `wmkf_phaseiistatus` (often null) with `akoya_requeststatus`.
 - Repeat the retracted claims that the slots "do NOT exist" or that "no live code reads them" — both were corrected (2026-05-15 / S209).
 
-Ground truth: `pages/api/reviewer-finder/my-proposals.js`, `pages/api/dynamics-explorer/chat.js`, `docs/atlas/dataverse-akoya-request.md`, [[project-d26-reviewer-inputs-probe]].
+Ground truth: `lib/services/reviewer-finder/my-proposals-service.js`,
+`pages/api/dynamics-explorer/chat.js` `handleReviewerRequests`,
+`docs/atlas/dataverse-akoya-request.md`,
+[[project-d26-reviewer-inputs-probe]].
 
 Confirmed on 2026-05-01 by querying production Dataverse on the day Phase I opened for the D26 cycle.
 
@@ -35,12 +38,27 @@ Confirmed on 2026-05-01 by querying production Dataverse on the day Phase I open
 4. (Later, post-funding/decline states exist but weren't surveyed today.)
 
 **Why this matters:**
-- `pages/api/reviewer-finder/my-proposals.js` filters to `akoya_requeststatus = 'Phase II Pending'` in default `?status=actionable` mode. New cycle submissions don't appear in the picker until staff advance them — months after the cycle opens.
+- `lib/services/reviewer-finder/my-proposals-service.js` filters to
+  `akoya_requeststatus = 'Phase II Pending'` in default `?status=actionable`
+  mode. New cycle submissions don't appear in the picker until staff advance
+  them — months after the cycle opens.
 - D26 picker was empty on 2026-05-01 because all 378 D26 rows were `Phase I Pending` (75) / `Concept Pending` (25) of the first 100 — zero `Phase II Pending`. That's the desired state, not a bug.
 
 **`wmkf_phaseiistatus IS NULL` correlates with "no Phase II review work yet"** — confirmed across all sampled D26 rows.
 
-**`wmkf_potentialreviewer1..5` DO exist on `akoya_request`** (corrected 2026-05-15 — the original "do NOT exist" claim was false). Verified four ways: `docs/atlas/dataverse-akoya-request.md:40` lists them; a live `audit-dataverse-state.js` sample row (2026-05-14) shows all 5 `_wmkf_potentialreviewer{1..5}_value` populated; `project-akoya-request-pd-fields.md` and `project-reviewer-count-invariant.md` both document them. They are legacy lookup slots → `wmkf_potentialreviewers`. **Live code DOES read them** (corrected S209 — the prior "no live code reads them" claim is now false): `pages/api/reviewer-finder/my-proposals.js:143-147` selects all five (`reviewerSlotsFilled` display/count at :180-181), and `pages/api/dynamics-explorer/chat.js` selects them at :859/:1462 and uses them as **load-bearing query logic** in `handleReviewerRequests` (:1578, reverse lookup). The richer per-(person,request) reviewer state still lives in `wmkf_appreviewersuggestion`, but the slots are no longer write-only/unread. **Relevant to the Workbench Phase 3 ingestion premise** — see [[project-d26-reviewer-inputs-probe]] / [[project-intake-portal-reviewer-capture]].
+**`wmkf_potentialreviewer1..5` DO exist on `akoya_request`** (corrected
+2026-05-15 — the original “do NOT exist” claim was false). The Akoya request
+Atlas lists them; a dated 2026-05-14 Dataverse sample showed all five populated;
+and the related project memories document them. They are legacy lookup slots to
+`wmkf_potentialreviewers`. **Live code reads them:** the Reviewer Finder
+`my-proposals-service.js` selects all five and derives
+`reviewerSlotsFilled`, while Dynamics Explorer
+`handleReviewerRequests` builds its reverse lookup across the five slots. The
+richer per-(person,request) reviewer state still lives in
+`wmkf_appreviewersuggestion`, but the slots are not write-only/unread.
+**Relevant to the Workbench Phase 3 ingestion premise** — see
+[[project-d26-reviewer-inputs-probe]] /
+[[project-intake-portal-reviewer-capture]].
 
 **How to apply:**
 - When debugging "the picker is empty for cycle X," first check `akoya_requeststatus` distribution for that cycle's meeting date — empty is expected until Phase I review selects proposals to advance.

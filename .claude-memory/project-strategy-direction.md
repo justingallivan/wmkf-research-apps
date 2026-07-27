@@ -4,7 +4,7 @@ description: Key strategic decisions from Session 86 — AkoyaGO posture, Dynami
 type: project
 status: active
 scope: strategy
-last_verified: 2026-05-14 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 via owner/Connor direction and docs/STRATEGY.md; future trigger/freshness items remain planned
 ---
 
 ## Recall Rule
@@ -21,6 +21,12 @@ Do not:
 - Treat researcher/reviewer data as merely app-operational — it belongs in the CRM.
 
 Ground truth: `docs/STRATEGY.md`.
+
+[VERIFIED 2026-07-27 as owner/Connor strategy, not a blanket live-state
+assertion]: current data ownership must still be resolved from
+`docs/APPLICATION_STATE_ATLAS.md` and the relevant `docs/atlas/` page. Backend
+triggers and freshness metadata remain planned unless a concrete source path is
+cited.
 
 Strategy document revised with input from Connor (Foundation colleague, knows AkoyaGO/Dynamics best). Key decisions:
 

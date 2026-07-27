@@ -355,14 +355,16 @@ red pre-exposure gate until synthesis succeeds (or the prompt-only rollback is
 executed and verified).
 
 **Owner-confirmed target lifecycle (2026-07-26; NOT YET IMPLEMENTED):**
-automatic synthesis must wait until every invited reviewer has submitted;
-staff may explicitly generate it earlier as a manual override. Stored-output
-visibility is a separate concern: an existing `wmkf_reviewsynthesisjson` value
-must remain visible even when the current submitted count is zero. Current code
-has no automatic trigger, permits the manual action after one submission, and
-hides the entire Synthesis card at zero. Declined/withdrawn invitation semantics
-must be decided before implementing the automatic all-in readiness test.
-Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
+automatic synthesis is intended only after all invited reviews are in, while
+staff may explicitly generate it earlier as a manual override. The exact
+readiness rule remains **UNKNOWN** until the owner decides how declined,
+withdrew, released, and revoked invitations participate; do not equate “all
+reviews are in” with every invited person submitting. Stored-output visibility
+is a separate concern: an existing `wmkf_reviewsynthesisjson` value must remain
+visible even when the current submitted count is zero. Current code has no
+automatic trigger, permits the manual action after one submission, and hides
+the entire Synthesis card at zero. Plan doc:
+`docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 ## Email templates (admin org default + per-PD override)
 
@@ -494,8 +496,10 @@ Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
   ("… Boston Children's Hospital. christopher.walsh@childrens.harvard.edu.") used to be saved
   with the email ORPHANED inside `wmkf_primaryaffiliation` and an EMPTY `wmkf_emailaddress`
   ("no email — can't invite" on the Invite Reviewers tab), because enrichment's own Tier-0
-  extraction (`contact-enrichment-service.js:439-450`) never ran to completion.
-  `save-candidates.js` now re-applies that extraction as a last step: if no email was captured
+  extraction (`contact-enrichment/tiers.js` `applyTier0`, using
+  `ContactParser.extractPrimaryEmail`) never ran to completion.
+  `reviewer-finder/save-candidates-service.js` re-applies that extraction as a
+  last step: if no email was captured
   and the affiliation being persisted contains one (`ContactParser.extractPrimaryEmail`), it is
   stored as `emailSource='affiliation'` — a grounded, name-adjacent address that enrichment
   trusts unconditionally (Tier 0 returns before domain validation, so it is immune to the

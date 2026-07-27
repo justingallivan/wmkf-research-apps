@@ -43,8 +43,8 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
      exhaustive source of prompt truth.
 
 3. **Operational hazards surfaced without destructive action**
-   - Twenty-five non-archive scripts mention dropped
-     `reviewer_suggestions`; some contain direct mutations.
+   - Twenty-five non-archive scripts mention the dropped `reviewer_suggestions`
+     table; some contain direct mutations.
    - `scripts/README.md` no longer provides copy-pasteable commands for those
      retired-table flows and marks them blocked.
    - Script quarantine/removal was not performed because it changes operational

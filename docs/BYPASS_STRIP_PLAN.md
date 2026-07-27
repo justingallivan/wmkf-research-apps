@@ -2,9 +2,10 @@
 title: bypassDynamicsRestrictions Strip Plan
 domain: architecture
 kind: plan
-status: active
-summary: "Converted 52 bypass scopes to withDalContext; bypass-shape law built; Stage 4 tightening executed for 10/11 sites (site 33 deferred). S333."
-canonical: true
+status: historical
+summary: "Historical record of the completed bypass strip and trust-model tightening; the deferred notification site later closed in its follow-on plan."
+canonical: false
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md
@@ -16,9 +17,22 @@ related:
 
 # bypassDynamicsRestrictions Strip Plan
 
-**Execution status: STAGES 0–4 COMPLETE (S333, 2026-07-05).** Frontmatter
-`status` moved to the live enum value `active` (the docs-catalog enum has no "completed" value,
-mirroring the `CHUNK`/`GATE_SCRIPT`/`ODATA` precedent). All 52 functional bypass scopes converted
+## Current state
+
+**[VERIFIED 2026-07-27 via the live reference sweep and
+`check:dynamics-context-boundary`]** The application strip is complete.
+`pages/`, `lib/`, `shared/`, and `modules/` contain no functional
+`bypassDynamicsRestrictions` import or call outside the sanctioned wrapper
+and definition. The AST law remains the current enforcement boundary. Scripts
+retain sanctioned script-only context mechanisms and historical mentions.
+
+Stages 0–4 below are a dated execution record. The one site intentionally
+deferred at this plan's closeout—NotificationService site 33—was subsequently
+completed and reviewed in `docs/NOTIFICATION_TRUST_MODEL_PLAN.md`.
+
+## Historical execution record
+
+**Execution status at S333: STAGES 0–4 COMPLETE (2026-07-05).** All 52 functional bypass scopes converted
 to `withDalContext` (Stages 1–2); the import-boundary law (Stage 3,
 `scripts/check-dynamics-context-boundary.js`) built per owner decision (build now, AST gate shape) —
 one round of Codex adversarial review found one P1 (rule 2 evadable via an aliased/namespace-form
@@ -39,13 +53,13 @@ session with the `[VERIFIED via file:line]` citations shown. Per-site facts sour
 carry `[census sweep N]`; treat the per-site table as the census of record, to be re-derived per file at
 execution (Self-checking method).
 
-**Objective.** Trusted Dataverse context must be established **only** via `withDalContext(scopeLabel, fn)`
+**Historical objective.** Trusted Dataverse context was to be established **only** via `withDalContext(scopeLabel, fn)`
 (`lib/dataverse/core/context.js:46`) at post-auth entry points, plus the sanctioned script-only variant
-`enterDynamicsBypassForScript` (`lib/services/dynamics-context.js:176`). Today **50 literal direct
-`bypassDynamicsRestrictions(...)` call sites** remain in `pages/`+`lib/` (32 pages / 18 lib), plus **2
+`enterDynamicsBypassForScript` (`lib/services/dynamics-context.js:176`). At the plan baseline, **50 literal direct
+`bypassDynamicsRestrictions(...)` call sites** remained in `pages/`+`lib/` (32 pages / 18 lib), plus **2
 aliased default-parameter scopes** in the alert services (review round 1 finding 1) — **52 functional
 bypass scopes / 40 files** total. This plan
-converts each to `withDalContext` **in place, byte-identical**, then installs an import-boundary law so
+converted each to `withDalContext` **in place, byte-identical**, then installed an import-boundary law so
 that after the strip **only `lib/dataverse/core/context.js` may import `bypassDynamicsRestrictions`** from
 the ALS module (the `withDalContext` wrapper is the one sanctioned importer). `withDalContext` is a thin,
 DAL-labeled wrapper — `withDalContext(scopeLabel, fn)` is literally `return bypassDynamicsRestrictions(scopeLabel, fn)`
@@ -75,7 +89,7 @@ are the Stage 3 import-law shape and the trust-model tightening, both OWNER DECI
 
 ---
 
-## Baseline (probed, not assumed)
+## Historical baseline (probed, not assumed)
 
 Counts re-derived this session from the disconfirming grep, **comment lines, the `withDalContext` wrapper
 at `core/context.js:53`, and the `bypassDynamicsRestrictions` export/definition excluded** — these
@@ -306,7 +320,7 @@ never touched and never trip the law.
 
 ---
 
-## Architecture decisions (pre-made — executors do not relitigate)
+## Historical architecture decisions
 
 1. **Behavior-identity swap.** Every (a) and (b) swap replaces only the **callee name** and the **import
    source**; the label string and the `fn` are byte-identical, the scope is unchanged. Do not reflow,
@@ -339,7 +353,7 @@ never touched and never trip the law.
    green with `check:dataverse-access-layer` (+ self-test), `check:route-service-boundary` (+ self-test),
    and the targeted suite.
 
-## Non-goals
+## Historical non-goals
 
 Changing any label, scope, restriction set, or fn body; widening/narrowing any trusted-context boundary;
 **removing** any nested-redundant wrapper (Stage 4 tightening); pushing lib-established context up to its
@@ -349,7 +363,7 @@ concept or a second notion of trust.
 
 ---
 
-## Self-checking method
+## Historical verification protocol
 
 **Pre-stage re-probe.** Before each stage, re-run the disconfirming census greps (Stage Log) — the lib and
 pages `bypassDynamicsRestrictions(` call sweeps, the **ALL-references alias sweep** (every
@@ -401,7 +415,7 @@ tests prove trusted context at the inner op. High findings block.
 
 ---
 
-## Stages
+## Historical stages
 
 ### Stage 0 — Characterization harness (no production behavior change)
 

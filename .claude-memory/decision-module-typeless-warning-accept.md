@@ -7,7 +7,7 @@ metadata:
   originSessionId: 5782a015-a329-4b5a-8ea7-6a44489bae62
   status: active
   scope: dev-env
-  last_verified: S164 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-27 as a historical S164 owner decision; live script counts are not operational guidance
 ---
 
 ## Recall Rule
@@ -15,16 +15,21 @@ metadata:
 Read this when: a session proposes "fix the `MODULE_TYPELESS_PACKAGE_JSON` warning" emitted by ESM `scripts/*.js` files.
 
 Do:
-- Answer E (accept as-is) — the warning is cosmetic, one-time per-process, zero runtime impact.
+- Preserve the S164 Option E decision unless the owner explicitly reopens it.
 - Only if genuinely warranted, use Option F (gradual CJS conversion of a script already being edited: `require()` + async `main()`, keeps the `.js` path).
 
 Do not:
-- Do a broad Option D `.js`→`.mjs` rename (breaks `scripts/acceptance-w4.js` filename-spawning; would have blinded the Atlas P0 gate before its S164 fix).
+- Treat S164's script inventory or runtime characterization as freshly verified.
+- Do a broad Option D `.js`→`.mjs` rename without a current caller and scanner
+  census.
 - Re-investigate from scratch — this was Codex-reviewed S164.
 
 Ground truth: historical-only (decision, not live state). Atlas-scanner fix recorded as pattern E in `docs/CLAUDE_COVERAGE_LESSONS.md`. Related: [[reviewer-identity-fragmentation]].
 
-**Decision:** the `MODULE_TYPELESS_PACKAGE_JSON` reparse warning emitted by ESM `scripts/*.js` files is **ACCEPTED as-is (Option E)**. Root cause: root `package.json` has no `"type"`, so Node tries CJS first, fails, reparses as ESM (cosmetic, one-time per-process, zero runtime impact). Exact inventory is drift-prone; current top-level `scripts/*.js` inventory is 61 ESM / 182 CJS out of 243, and recursive `scripts/**/*.js` is 61 ESM / 191 CJS out of 252.
+**Decision:** the `MODULE_TYPELESS_PACKAGE_JSON` reparse warning emitted by ESM
+`scripts/*.js` files was **accepted as-is (Option E)** in S164. The exact counts
+recorded then (61 top-level ESM scripts; 61 recursive) are a historical snapshot,
+not a current inventory. Recount from source if quantity matters.
 
 **Why D (rename the 37 `.js`→`.mjs`) was rejected** — Codex S164 review surfaced two concrete costs that outweigh a cosmetic warning:
 1. The Atlas P0 gate (`scripts/check-application-state-atlas.js`) scanned `.js` only — a `.mjs` rename would have silently dropped entity-coverage detection. **This blind spot was independently FIXED S164** (CLAUDE_COVERAGE_LESSONS.md pattern E + `check:atlas:self-test` `.mjs` fixture + gate widened to `.js|.mjs|.cjs`, committed together per the coverage-lessons protocol). The fix stands regardless of the warning decision.

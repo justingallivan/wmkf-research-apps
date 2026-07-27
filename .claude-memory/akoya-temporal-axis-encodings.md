@@ -7,7 +7,7 @@ metadata:
   originSessionId: 8050fbb7-13c6-444b-b802-c9bc7a61a3ce
   status: active
   scope: dataverse
-  last_verified: S162 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-27 via lib/utils/cycle-code.js; population figures remain dated 2026-05-18 probe snapshots
 ---
 
 ## Recall Rule

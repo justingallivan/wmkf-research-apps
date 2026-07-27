@@ -1,11 +1,11 @@
 ---
-name: Interim grant report auto-evaluation (unblocked; ready to build)
-description: Future backend automation to evaluate yearly interim grant reports and write results back to a Dynamics field. Dynamics write access unblocked + verified 2026-04-14; building remains on the future-work list, not a blocker.
+name: Interim grant report auto-evaluation
+description: Planned automation for yearly interim-report evaluation; source plumbing exists, while the target field, prompt examples, current privileges, and build remain unverified prerequisites.
 type: project
 originSessionId: 855d17dc-8935-4bc6-88a5-cb73f4cb1b2d
 status: active
 scope: dynamics
-last_verified: 2026-05-07 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 via grant-reporting extraction and SharePoint-bucket source; target field and automation remain planned
 ---
 
 ## Recall Rule
@@ -17,7 +17,8 @@ Do:
 - First confirm with Connor which `akoya_request` field holds the staff evaluation (or whether a new `wmkf_ai_interim_evaluation` field is needed); get real past examples before writing the prompt.
 
 Do not:
-- Treat Dynamics or SharePoint write access as a blocker — both were granted + verified (Dynamics 2026-04-14, SharePoint end-to-end 2026-05-01).
+- Reopen the architecture solely because write access was previously granted;
+  re-probe current Dynamics/SharePoint privileges as an operational preflight.
 - Build a final-narrative-completeness prompt; interim eval is year-over-year progress, a thinner `compareProposalToReport`.
 
 Ground truth: `pages/api/grant-reporting/extract.js`, `lib/utils/sharepoint-buckets.js`, `compareProposalToReport` helper; Field Set B fields deployed 2026-05-07.
@@ -35,7 +36,10 @@ This is a natural fit for the same backend-automation pattern we're using for ot
 
 **Why:** Same motivation as the rest of the backend-automation work — staff time on routine evaluations, consistent format, source-of-truth in Dynamics. Interim reports are higher-volume than final reports (one per year per active grant), so the automation payoff is meaningful.
 
-**How to apply:** Build whenever it's prioritized. Dynamics write access was granted + verified 2026-04-14; SharePoint write was granted 2026-04-15 and verified end-to-end 2026-05-01. Neither is a blocker anymore. Steps:
+**How to apply:** Build when prioritized. Dynamics write access was verified on
+2026-04-14 and SharePoint write on 2026-05-01; those dated results establish
+feasibility, not current authorization. Re-run the relevant read-only privilege
+checks before implementation or smoke. Steps:
 
 1. Identify (with Connor) which `akoya_request` field holds the staff evaluation today, or whether a new `wmkf_ai_interim_evaluation` field is needed. (Field Set B fields were deployed 2026-05-07; check if there's already a suitable target.)
 2. Build the prompt to mirror what staff actually write — get a few real examples from past evaluations first.

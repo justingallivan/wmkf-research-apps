@@ -6,7 +6,14 @@ metadata:
   type: feedback
   status: active
   originSessionId: c18124b6-2252-442d-b924-73ea740f86cf
+  last_verified: 2026-07-27 as historical S330 plan-review findings
 ---
+
+## Recall Rule
+
+When authoring a multi-file plan, derive denominators from one current probe, read
+the largest and oddest members, reconcile same-session docs, and test the proposed
+conversion operation rather than only its endpoints.
 
 Four guards for staged-plan authoring, from the S330 Route→Service P0 round-1 verdict (1 live-state error + 7 required changes, all coverage misses — Codex's advantage was reading the files, not deeper reasoning).
 

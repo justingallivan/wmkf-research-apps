@@ -7,7 +7,7 @@ metadata:
   originSessionId: 17893605-3207-451d-8190-118bbacd8141
   status: active
   scope: auth
-  last_verified: S211 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-27 via shared/config/appRegistry.js, shared/context/AppAccessContext.js, lib/utils/auth.js, and canonical-count pointer
 ---
 
 ## Recall Rule

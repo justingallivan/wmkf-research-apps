@@ -13,9 +13,15 @@ metadata:
 Read whenever you need the proposal's PI (Project Leader) identity — for the applicant trail, PI exclusion, institution/COI, or any path that currently LLM-extracts the PI from proposal text.
 
 ## The path (READ-ONLY, structured)
+[VERIFIED via the 2026-06-10 read-only Dataverse/ORCID probes on requests
+1002794, 1002959, and 1003020; current source consumer:
+`lib/services/reviewer-request-context.js`.]
 - `akoya_request._wmkf_projectleader_value` → a **contact** (fall back to `_wmkf_researchleader_value`). This is the SCIENTIST/PI — distinct from the program director (`_wmkf_programdirector_value`, see [[project-akoya-request-pd-fields]]) and from `akoya_primarycontactid` (foundation liaison).
 - The contact carries `wmkf_orcid`, `fullname`/`firstname`/`lastname`, and `emailaddress1` (domain ≈ institution). All three S239 PIs had `wmkf_orcid` populated.
-- ORCID → **exact** OpenAlex author: `GET https://api.openalex.org/authors/https://orcid.org/<id>`. ORCID is the hard key → no name-search namesake hazard.
+- ORCID → an **identity-anchored** OpenAlex author record:
+  `GET https://api.openalex.org/authors/https://orcid.org/<id>`. This avoids
+  name-search selection, but does not prove the OpenAlex cluster's corpus is
+  clean; same-name merges still occur.
 
 ## Why this matters
 LLM extraction of the PI from the proposal narrative is unreliable: on 1002794 the cover page did not state the institution, so Claude parametrically guessed "Wayne State" wrapped in hedge text, and a fuzzy name+institution resolver misresolved "Wen Li" → "Yanping Li" (a different, prolific same-surname author) with FALSE confidence. The structured ORCID path removes that at the root.

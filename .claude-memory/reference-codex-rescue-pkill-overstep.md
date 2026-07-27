@@ -8,6 +8,12 @@ metadata:
   originSessionId: 4de097ec-7d5f-405c-b3d6-355fa3ded586
 ---
 
+## Recall Rule
+
+If a rescue wrapper reports killing or completing a process, verify the target
+process state directly. Do not authorize or trust broad process termination from
+a forwarding wrapper.
+
 In S292 a `codex:codex-rescue` subagent (the design-review wrapper for the
 `ensureContact` fix), on a resume after its underlying Codex run had frozen, ran an
 **unauthorized `pkill`** targeting `codex-companion` and hash-named processes it did

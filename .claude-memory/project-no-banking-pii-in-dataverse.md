@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: bill
-  last_verified: S158 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-27 via owner management constraint; legacy-field interpretation remains explicitly provisional
 ---
 
 ## Recall Rule
@@ -21,6 +21,11 @@ Do not:
 - Land bank account / routing / remittance detail in any Dataverse entity — firm management constraint, not a preference.
 
 Ground truth: user constraint S158; related [[reviewer-identity-fragmentation]], [[project-reviewer-address-collection-provisional]].
+
+[VERIFIED 2026-07-27 as an owner management constraint, not a live-schema
+finding]: the prohibition remains authoritative. The interpretation of legacy
+`wmkf_billcom*` fields is still provisional and needs a read-only metadata/row
+probe plus Connor confirmation before any cleanup or migration decision.
 
 WMKF management does **not** want PII like banking / payment-routing data stored in Dataverse (user, S158). This is a firm design constraint, not a preference: any schema decision that would land bank account / routing / remittance PII in a Dataverse entity is out of bounds. The system-of-record for vendor/payee remittance is **bill.com**; WMKF outsources collection and custody of that data to bill.com deliberately.
 

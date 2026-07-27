@@ -8,7 +8,7 @@ metadata:
   last_verified: unknown via memory-content (not re-probed 2026-06-04)
 ---
 
-## Recall Trigger
+## Recall Rule
 
 Read this when the user, Codex, or another reviewer catches an error and the
 next response should correct course.

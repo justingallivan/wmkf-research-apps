@@ -6,7 +6,14 @@ metadata:
   type: feedback
   status: active
   originSessionId: c513ecfd-f41e-4862-b3e3-65c7dd7d7a3e
+  last_verified: 2026-07-27 via scripts/check-application-state-atlas.js scan roots and synthetic allowlist
 ---
+
+## Recall Rule
+
+After adding or editing a scanner gate or synthetic fixture, run the full
+`check:*` suite before push. If another scanner correctly sees the fixture, use a
+documented fixture allowlist rather than weakening the negative test.
 
 S329: Stage 0's self-test fixture used the synthetic entity name
 `should_not_count` inside `scripts/check-dataverse-access-layer-self-test.js`.

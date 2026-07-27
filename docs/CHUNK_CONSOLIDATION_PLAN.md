@@ -2,8 +2,8 @@
 title: Array-Chunk Consolidation Plan
 domain: architecture
 kind: plan
-status: active
-summary: "Consolidate array-chunking loops onto lib/utils/chunk.js: 17 mechanical swaps, 4 index-using left with comment, 1 sibling leave. Stages 0-2 complete."
+status: historical
+summary: "Completed record: lib/utils/chunk.js shipped, 17 sites migrated, five intentional loops documented, and the optional gate declined."
 canonical: true
 cataloged: 2026-07-05
 owner: product-engineering
@@ -16,11 +16,10 @@ related:
 
 # Array-Chunk Consolidation Plan
 
-**Execution status: STAGES 0-2 COMPLETE (2026-07-05).** The docs-catalog frontmatter `status` enum
-has no "completed" value; per the `ODATA_ESCAPE_CONSOLIDATION_PLAN` precedent this body line records
-completion and frontmatter moved from `draft` to the live enum value `active`. Stage 3 (the optional
-chunk-loop lint/gate law) was declined by owner decision (S332) and remains unbuilt. See the Stage Log for
-probes/counts.
+**Execution status: STAGES 0-2 COMPLETE (2026-07-05).** The completed
+implementation plan is retained as historical evidence. Stage 3 (the optional
+chunk-loop lint/gate law) was declined by owner decision (S332) and remains
+unbuilt. See the Stage Log for probes/counts.
 
 Staleness rechecks — the file mentions below changed BECAUSE this plan was executed (commits
 `a8cc2a9a..6b99ae0f`); each site now matches its Classification ruling:
@@ -37,12 +36,14 @@ Staleness rechecks — the file mentions below changed BECAUSE this plan was exe
 [RECHECKED after lib/services/pubmed-service.js change: B1 index-using comment only, commit 6b99ae0f]
 [RECHECKED after lib/services/claude-reviewer-service.js change: B2 index-using comment only, commit 6b99ae0f]
 
-**Objective.** Many files hand-roll the same array-chunking idiom —
+**Historical objective.** Many files hand-rolled the same array-chunking idiom —
 `for (let i = 0; i < arr.length; i += N) { const chunk = arr.slice(i, i + N); … }` — to bound
-OData OR-chain URL length, cap concurrency, or page an external API. This is copy-pasted drift: the
-same three-line scaffold appears at 20+ sites with only the collection, the size constant, and the
-body differing. This plan consolidates the **scaffold** onto one canonical helper,
-`chunk(array, size)` in `lib/utils/chunk.js` (new file), leaving every loop **body** byte-identical.
+OData OR-chain URL length, cap concurrency, or page an external API. This was
+copy-pasted drift: the same three-line scaffold appeared at 20+ sites with only
+the collection, the size constant, and the body differing. Stages 0–2
+consolidated the **scaffold** onto the canonical helper
+`chunk(array, size)` in `lib/utils/chunk.js`, leaving every loop **body**
+byte-identical.
 `lib/utils/` is the established home for single-purpose helpers (`guid.js`, `date-ymd.js`,
 `name-normalization.js`, `orcid-normalize.js`) `[VERIFIED via ls lib/utils/ this session]`. This is a
 motion refactor, not a redesign: same batches, same size, same order, same downstream calls.
@@ -50,10 +51,10 @@ motion refactor, not a redesign: same batches, same size, same order, same downs
 **No name collision.** At drafting time `lib/utils/chunk.js` did not exist
 `[VERIFIED via ls lib/utils/chunk.js → "No such file or directory", at drafting]`.
 [RECHECKED after lib/utils/chunk.js change: Stage 0 execution has now created the helper per The-canonical-semantics (771 bytes, ls this session); the executing agent appends its Stage Log entry at close]
-Nothing under
-`lib/`/`pages/`/`shared/`/`modules/` exports a `chunk` helper today; the 20+ occurrences of the token
-`chunk` are all **local loop-slice variables**, not an importable helper `[VERIFIED via the
-disconfirming grep in the Stage Log]`.
+At drafting time, nothing under
+`lib/`/`pages/`/`shared/`/`modules/` exported a `chunk` helper; the 20+
+occurrences of the token `chunk` were local loop-slice variables. Stage 0 then
+created the helper; the Stage Log is the authoritative execution record.
 
 **Executor profile.** Written to be executed by a cheaper model (Sonnet-class) with no prior context,
 following this document plus each stage's checklist. Every judgment is pre-made here; anything not
@@ -67,7 +68,7 @@ DECISION.
 
 | Fact | Value | Evidence |
 |---|---|---|
-| Canonical helper | `chunk(array, size)` in `lib/utils/chunk.js` — **to be created in Stage 0** | file does not yet exist `[VERIFIED via ls, this session]` |
+| Canonical helper | `chunk(array, size)` in `lib/utils/chunk.js` — **created in Stage 0** | completion evidence is recorded in the Stage Log |
 | Total `for (let i = 0; i < X.length; i += …)` scaffolds under `lib/ pages/ shared/ modules/` | **23** | `[VERIFIED via grep -rnE "for \(let i = 0; i < [A-Za-z_.]+\.length; i \+= " lib/ pages/ shared/ modules/ --include=*.js \| wc -l = 23]` |
 | — of those, `i += 1` plain-iteration loops (NOT chunk sites) | **2** | `role-apply.js:76` (`ops.length; i += 1`), `discovery-service.js:1015` (`candidates.length; i += 1`) — no `slice`, step 1 `[VERIFIED via grep this session]` |
 | Chunk scaffolds whose counter is NOT named `i` (missed by the grep above; found by review round 1) | **1** — `discovery-service.js:2269` (`batchStart += BATCH_SIZE`) | `[VERIFIED via Read :2265-2305 this session]` — the census grep must ALSO run the any-identifier variant `grep -rnE "for \(let [A-Za-z_]+ = 0; [A-Za-z_]+ < [A-Za-z_.]+\.length; [A-Za-z_]+ \+= " …` |
@@ -104,7 +105,7 @@ DECISION.
 
 ---
 
-## The canonical semantics (pin before touching anything)
+## Canonical semantics shipped by Stage 0
 
 `lib/utils/chunk.js` will export (ESM — matching every other `lib/utils/` single-purpose helper):
 
@@ -282,7 +283,7 @@ A gate and its self-test run **sequentially, never in parallel**. A red gate is 
 
 ---
 
-## Stages
+## Historical execution stages
 
 ### Stage 0 — Helper + edge-case unit test + characterization pins (no production behavior change)
 

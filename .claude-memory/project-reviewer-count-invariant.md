@@ -5,7 +5,7 @@ type: project
 originSessionId: 8d412c2f-d6c6-4080-a43c-79e0e04e9653
 status: active
 scope: reviewer
-last_verified: unknown via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-27 via owner staffing requirement, akoya-request Atlas, and reviewer lifecycle source
 ---
 
 ## Recall Rule
@@ -21,13 +21,23 @@ Do not:
 
 Ground truth: `akoya_request.wmkf_potentialreviewer1..5` (Connor's slot pattern), `wmkf_appreviewersuggestion` (Wave 2 ledger).
 
+[VERIFIED 2026-07-27 via owner staffing requirement,
+`docs/atlas/dataverse-akoya-request.md`, and current reviewer-suggestion
+services]: three confirmations is the product goal; five lookup slots are not
+proof of acceptance.
+
 **Goal:** 3 confirmed reviewers per proposal. That is the number we need to actually receive reviews from.
 
 **Why 5 slots on `akoya_request`:** `wmkf_potentialreviewer1` through `wmkf_potentialreviewer5` are 5 lookup slots because we typically invite more than 3 — some reviewers decline, so we over-invite to land 3 acceptances. The slots are *invitations*, not confirmations.
 
 **How to apply:**
 - Don't render "5/5 slots filled" — implies the proposal is fully staffed when it might be at 0 acceptances. Use "{n} invited" instead.
-- The Wave 2 lifecycle ledger (`wmkf_appreviewersuggestion`) is where accept/decline state actually lives — eventually the UI should pull confirmed-acceptances count from there, not infer from slot population.
+- The lifecycle ledger (`wmkf_appreviewersuggestion`) is where accept/decline
+  state lives. The current Workbench dashboard/Overview already renders its
+  accepted count against `reviewers.needed`
+  (`lib/services/workbench/dashboard-service.js`, `pages/workbench.js`,
+  `shared/components/workbench/OverviewTab.js`); preserve that source.
 - Goal-state for "this proposal is good" = 3 acceptances logged in the ledger, not "all 5 slots populated."
 
-**Future tweak:** the 5-slot model on `akoya_request` may itself become legacy as the lifecycle ledger takes over. For now both coexist — the slots are Connor's pre-existing pattern, the ledger is our Wave 2 addition.
+The five-slot model and lifecycle ledger still coexist. Treat the slots as
+legacy invitation compatibility, not the Workbench acceptance source.

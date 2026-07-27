@@ -10,6 +10,24 @@ metadata:
   originSessionId: c238c19b-e78c-4f94-9e8d-c7f1432af984
 ---
 
+## Recall Rule
+
+Read this when: changing reviewer COI/AI-use acknowledgments or comparing their
+provenance to the grantee waiver.
+
+Do:
+- Preserve the current distinction: reviewer acknowledgments bind active policy
+  versions at submit; the grantee waiver binds version plus body hash at render.
+- If implementing parity, trace render-token mint → respond verification →
+  Dataverse fields before calling it complete.
+
+Do not:
+- Claim reviewer acknowledgments currently prove the exact rendered body.
+- Add schema fields without migration/Atlas/consumer reconciliation.
+
+Ground truth: `lib/services/external-review/respond-service.js` and
+`lib/services/grantee-upload.js`; follow-up remains `[PLANNED]`.
+
 MINOR follow-up (owner-approved priority, S351): make the reviewer COI/AI-use
 acknowledgments match the grantee waiver's stronger provenance model.
 

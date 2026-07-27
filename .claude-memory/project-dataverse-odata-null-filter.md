@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: dataverse
-  last_verified: S208 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-27 via lib/dataverse/adapters/reviewer-suggestion.js and current OData query helpers
 ---
 
 ## Recall Rule

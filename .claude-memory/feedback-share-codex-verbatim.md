@@ -8,7 +8,7 @@ metadata:
   last_verified: S221 (2026-06-04) — PostToolUse hook added
 ---
 
-## Recall Trigger
+## Recall Rule
 
 Read this when an `Agent(codex:codex-rescue)`, `/codex:rescue`, Codex review,
 rescue, or diagnostic tool result returns — every round-trip. This explicitly

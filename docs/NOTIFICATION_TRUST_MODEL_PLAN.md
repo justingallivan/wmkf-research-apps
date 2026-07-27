@@ -1,10 +1,11 @@
 ---
-title: NotificationService Trust-Model Push-Up Plan
+title: NotificationService Trust-Model Push-Up — Historical Execution Record
 domain: architecture
 kind: plan
-status: draft
-summary: "Push withDalContext establishment for notify()'s email branch up to real entry points across its caller fan-out (site 33, deferred from Stage 4)."
-canonical: true
+status: historical
+summary: "Historical record of the completed NotificationService context push-up and removal of its shared internal trusted-context wrapper."
+canonical: false
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/BYPASS_STRIP_PLAN.md
@@ -13,13 +14,26 @@ related:
   - docs/CI_GATES_REFERENCE.md
 ---
 
-# NotificationService Trust-Model Push-Up Plan
+# NotificationService Trust-Model Push-Up — Historical Execution Record
 
-**Execution status: STAGES 1 AND 2 EXECUTED, REVIEWED, AND COMMITTED; STAGE 3 IN PROGRESS
+## Current state
+
+**[VERIFIED 2026-07-27 via
+`lib/services/notification-service.js:171-182`]** The follow-on is complete.
+`sendAdminEmail()` no longer establishes its own `withDalContext`; it assumes
+ambient trusted context and the Dynamics email transport fails closed if a
+caller omits it. The entry-point push-ups and handler-driven regression tests
+recorded below remain the safety case.
+
+This file is historical evidence, not an active plan.
+
+## Historical plan and execution record
+
+**Execution status: STAGES 0–3 EXECUTED, REVIEWED, AND COMMITTED
 (2026-07-05).** Census re-closed at 23 (three-way verified, `02d3cd9`); Stage 0 passed; Stage 1's 9
 single-hop push-ups landed (`23cff83`) and Stage 2's 1 push-up + coverage landed (`1b69d4f`), both under
-fresh-context Codex review. **Stage 3 COMPLETE: the shared internal `withDalContext('notification-email')`
-wrapper was REMOVED from `sendAdminEmail` (`notification-service.js:171`); site 33 is fully closed.** All
+fresh-context Codex review. Stage 3 removed the shared internal `withDalContext('notification-email')`
+wrapper from `sendAdminEmail` (`notification-service.js:171`); site 33 was fully closed. All
 10 already-covered characterization tests are handler-driven and mutation-proven; 2 stale tests
 (`notification-service-dal-context`, `intake-routes-dynamics-context`) were realigned to the new
 "assumes ambient context" contract; full suite 428/4770 green incl. the real-DynamicsService no-context
@@ -31,16 +45,17 @@ text explicitly deferred this site: its DAL-touching branch sits inside a shared
 most of whose callers never reach it, and safely auditing that full fan-out was out of scope for that
 session. This plan is that audit.
 
-## Objective
+## Historical objective
 
 `lib/services/notification-service.js`'s `NotificationService.notify(...)` conditionally calls
 `sendAdminEmail(...)` → `DynamicsService.createAndSendEmail(...)`, a Dataverse **write** gated by
-`assertTrustedDalContext` under `DATAVERSE_DAL_ENFORCEMENT` (on in all environments). `notify()`'s own
+`assertTrustedDalContext` under `DATAVERSE_DAL_ENFORCEMENT`. At the plan
+baseline, `notify()`'s own
 `withDalContext('notification-email', ...)` wrap (installed and byte-preserved through
-`BYPASS_STRIP_PLAN.md` Stages 1-3) currently makes this safe from *any* caller, in *any* context state.
+`BYPASS_STRIP_PLAN.md` Stages 1-3) made this safe from *any* caller, in *any* context state.
 The Stage 4 doctrine ("services assume a trusted DAL context already exists; establishment stays at
-the route" — Route→Service Decision 3) says this wrap belongs at each real entry point instead. This
-plan traces every real entry point that can reach the email branch and, where safe, relocates the
+the route" — Route→Service Decision 3) said this wrap belonged at each real entry point instead. This
+plan traced every real entry point that could reach the email branch and, where safe, relocated the
 wrap — following the exact same acceptance bar Stage 4 used: **every real caller traced (not assumed),
 byte-preserved label, characterization proving trusted context, fresh-context review, gates green.**
 
@@ -52,13 +67,14 @@ never reach the email branch (the branch requires `severity: 'error'|'critical'`
 own further fan-out that this session did not trace** (see #10, #11 in the Classification table). A
 push-up here is not a single relocation; it is, in the worst case, a **multi-hop trace** from
 `notify()` up through one or more intermediate shared utilities to the real route/cron entry point.
-**Recommendation embedded in this plan: push up only the single-hop REACHES sites; leave multi-hop
-sites (#10, #11) as a separately-scoped follow-on, not bundled into this plan's Stage 1.** See
+**Historical recommendation:** push up only the single-hop REACHES sites and
+leave multi-hop sites (#10, #11) for a separately scoped follow-on. Both were
+ultimately completed in the later stages recorded below. See
 Decision 3.
 
 ---
 
-## Baseline (probed this session, not assumed)
+## Historical baseline (probed during execution)
 
 | Fact | Value | Evidence |
 |---|---|---|
@@ -121,7 +137,7 @@ the Classification heading).
 
 ---
 
-## Decisions (draft — for review, not yet owner-approved)
+## Historical draft decisions
 
 1. **Only single-hop REACHES sites are in this plan's Stage 1 scope.** That is #9, #14, #17, #18, #19,
    #20, #21 (7 sites) plus #12, #13, and #22, all three already confirmed covered by their callers'
@@ -149,7 +165,7 @@ the Classification heading).
    more code than before is acceptable per the `cleanupBlobs` precedent; narrowing or stranding a call
    is not).
 
-## Non-goals
+## Historical non-goals
 
 Touching #10/#11's deeper fan-out in this plan; any change to `notify()`'s email-vs-no-email branching
 logic; any change to `sendAdminEmail`'s recipient resolution; changing `instrumentation.js`'s
@@ -158,7 +174,7 @@ into an uncaught one).
 
 ---
 
-## Self-checking method
+## Historical verification protocol
 
 Same as `BYPASS_STRIP_PLAN.md`: **pre-stage re-probe** (re-run the caller-count and severity/emailAdmins
 census before executing, since this doc's census could drift — and re-probe with `grep -a` AND a
@@ -174,7 +190,7 @@ closed, exactly as Stage 3/4 both required.
 
 ---
 
-## Stages
+## Historical stages
 
 ### Stage 0 — Pre-execution verification (before touching any code)
 

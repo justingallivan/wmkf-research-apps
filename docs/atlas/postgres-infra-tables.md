@@ -9,25 +9,37 @@ Compact summary for the Postgres tables outside the reviewer-finder domain. Prom
 ### `user_profiles` (9 rows)
 **Source of truth:** Postgres.
 **Schema:** identity bridge (`azure_id`, `azure_email`, `dynamics_systemuser_id`, `is_active`, role).
-**Read sites:** 16 (NextAuth callbacks, `requireAuth*` helpers, admin dashboard, identity reconciliation, many app endpoints).
-**Write sites:** 3 (NextAuth signin upsert, admin grant/revoke, identity reconciliation script).
+**Read paths:** NextAuth callbacks, `requireAuth*` helpers, the admin dashboard,
+identity reconciliation, and authenticated application services. The exact
+caller count is intentionally not frozen in this mutable catalogue.
+**Write paths:** NextAuth signin upsert, admin grant/revoke, and identity
+reconciliation.
 **Cross-system:** `dynamics_systemuser_id` joins to Dataverse `systemusers.systemuserid`. See `lib/services/dataverse-identity-map.js`.
 **Migration:** Wave 1 dispatch flag `WAVE1_BACKEND_*` exists but identity stays Postgres for now.
 
 ### `user_app_access` — RETIRED 2026-05-12 (was Postgres / now Dataverse-only)
 **Source of truth:** **Dataverse `wmkf_appuserappaccesses`**. Postgres table dropped via migration `007_drop_wave1_tables.sql` on 2026-05-12 after 9 days of empirically zero prod writes since the 2026-05-03 flag flip.
-**Live adapter:** `lib/services/dataverse-app-access-service.js`. The dispatcher `lib/services/app-access-service.js` retains a Postgres branch as dead code (will be removed in a follow-up cleanup).
+**Live adapter:** `lib/services/dataverse-app-access-service.js`.
+`lib/services/app-access-service.js` routes unconditionally to Dataverse; the
+former Postgres branch is removed and `WAVE1_BACKEND_APP_ACCESS=postgres` fails
+loud at module load.
 **Schema:** `(user_profile_id, app_key)` unique grant rows.
 **Recovery:** Neon PITR window 7 days; restore prod branch to ~2026-05-12T01:25Z if needed.
 
 ### `user_preferences` — RETIRED 2026-05-12 (was Postgres / now Dataverse-only)
 **Source of truth:** **Dataverse `wmkf_appuserpreferences`**. Postgres table dropped via migration `007_drop_wave1_tables.sql` on 2026-05-12.
-**Live adapter:** `lib/services/dataverse-prefs-service.js`. The dispatcher `lib/services/database-service.js` retains a Postgres branch as dead code.
+**Live adapter:** `lib/services/dataverse-prefs-service.js`.
+`lib/services/database-service.js` routes preference methods unconditionally
+to Dataverse; the former Postgres preference branch is removed and
+`WAVE1_BACKEND_PREFS=postgres` fails loud at module load.
 **Encryption:** values AES-256-GCM when `is_encrypted = true`.
 
 ### `system_settings` — RETIRED 2026-05-12 (was Postgres / now Dataverse-only)
 **Source of truth:** **Dataverse `wmkf_appsystemsettings`**. Postgres table dropped via migration `007_drop_wave1_tables.sql` on 2026-05-12. Final reconciliation on 2026-05-11 synced 10 tier-keyed `model_override:*` rows from S145 dev writes (PG→DV); counts matched (45/45) before the drop.
-**Live adapter:** `lib/services/dataverse-settings-service.js`. The dispatcher `lib/services/settings-service.js` retains a Postgres branch as dead code.
+**Live adapter:** `lib/services/dataverse-settings-service.js`.
+`lib/services/settings-service.js` routes unconditionally to Dataverse; the
+former Postgres branch is removed and `WAVE1_BACKEND_SETTINGS=postgres` fails
+loud at module load.
 **Schema:** generic key-value (model overrides, feature flags, etc.).
 
 ## Dynamics Explorer state
@@ -48,7 +60,11 @@ RBAC scaffolding for the explorer write tools. Restrictions table is empty; a 27
 
 ### `expertise_roster` (38 rows), `expertise_matches` (344 rows)
 **Source of truth:** Postgres.
-Internal staff/consultant/board roster + per-proposal match history. See `modules/expertise_matching/CLAUDE.md`.
+Internal staff/consultant/board roster + per-proposal match history. Production
+consumers are `pages/api/expertise-finder/{match,batch-match,roster,history}.js`;
+production prompt rules live in
+`shared/config/prompts/expertise-finder.js`. The isolated
+`modules/expertise_matching` reference/demo has no production caller.
 
 ## Integrity Screener
 
@@ -76,7 +92,7 @@ Multi-LLM review history. `panel_review_items` holds per-LLM responses.
 **Source of truth:** Postgres. V030 migration / `009_submission_jobs.sql` (S150, 2026-05-14) → `011_submission_jobs_states.sql` (S179, 2026-05-22; drain plan v7 P0).
 One row per applicant submit click (idempotency-keyed). `/api/intake/submit` INSERTs (`ON CONFLICT (idempotency_key) DO UPDATE SET attempts = submission_jobs.attempts -- no-op, lets RETURNING fire`) and returns immediately with `{jobId, requestId, status}`; on collision against a `failed`/`cancelled` row the endpoint returns 409 `previous_submission_terminal` instead. `/api/cron/drain-submissions` advances each row through the v7 state machine one step per tick: `queued → scanning → request_created → files_moved → dynamics_patched → status_flipped → completed` (terminal `failed` / `cancelled`). The single-phase pivot inserts `request_created` (drain CREATES a new `akoya_request` with the client-supplied GUID rather than attaching to an existing one); `akoya_requestnum` is captured server-side for the SharePoint folder name. Two-phase claim via `locked_until` (lease deadline) + `lease_token` UUID (stable per-claim identifier, untouched by lease renewal) protects parallel-worker correctness. `payload` is the frozen validated-draft snapshot — drain never re-reads `intake_drafts`. See `docs/INTAKE_PORTAL_DRAIN_PLAN.md` (v7) for the full state machine, error taxonomy, and recovery semantics.
 
-### `reviewer_acceptance_jobs` (new)
+### `reviewer_acceptance_jobs`
 **Source of truth:** Postgres-only follow-up ledger. `024_reviewer_acceptance_jobs.sql`.
 One row per reviewer acceptance timestamp (`UNIQUE (suggestion_id, accepted_at)`). `/api/external/review/[token]/respond` stages the row before a fresh Dataverse accept PATCH and returns after the PATCH commits; repeat accepts reuse/requeue the same logical job. Payload schema v2 stores the portal token encrypted (never plaintext) so the asynchronous acceptance email can include a secure `?action=decline` withdrawal link. `/api/cron/drain-reviewer-acceptances` claims ready rows with `FOR UPDATE SKIP LOCKED` + `lease_token`, re-reads `wmkf_appreviewersuggestion`, and runs the formerly-inline accept tail: honorarium/contact capture, self-reported ORCID, board identity, contact name/title sync, mismatch alerts, acceptance confirmation email, and quota notification. Every lease-guarded step/cancel/complete/failure update must return a row; a stale-token no-op is classified as lease loss rather than completion or retry. On self-withdrawal, unlocked active jobs are cancelled; a leased worker remains retryable, re-checks Dataverse after honorarium creation, and removes any late-created linked honorarium before stopping. Drain telemetry records claimed ids plus per-outcome ids, and deployed-smoke attribution consumes only `completedJobIds`. Dataverse `wmkf_appreviewersuggestion` remains the authoritative accepted/declined state; this table records side-effect progress, retry scheduling, terminal deterministic failures, and completion. Stale `accept_pending` rows are cancelled if the Dataverse accept never landed.
 
