@@ -3,9 +3,10 @@ title: Reviewer Contact Leads / Scout Layer Spec
 domain: reviewer-workbench
 kind: spec
 status: active
-summary: "Current contact-leads contract: quarantined leads, staff promotion, and bounded roster persistence shipped; broad paid scouting remains unbuilt."
+summary: "Shipped contact-leads contract: quarantined leads, staff promotion, bounded roster persistence; broad paid scouting is parked as unjustified."
 canonical: false
 cataloged: 2026-07-02
+last_verified: 2026-07-27
 owner: product-engineering
 related:
   - lib/services/discovery-service.js
@@ -29,9 +30,10 @@ and persist a compact bounded form in `reviewer_find_roster`. Promoted contact
 remains low-confidence and must pass the existing invitation confirmation
 gate.
 
-Slice 2b, the broad paid lead-only scout, is **PLANNED/UNBUILT**. Its value,
-budget, eligibility floor, and operational enablement remain owner decisions.
-Nothing in the shipped slices performs those additional paid searches.
+Slice 2b, the broad paid lead-only scout, is **PARKED / NOT CURRENTLY
+JUSTIFIED** by the 2026-07-27 owner decision and live read-only measurement
+below. It is not an active implementation target. Nothing in the shipped
+slices performs those additional paid searches.
 
 ## 1. Problem
 
@@ -85,7 +87,11 @@ That behavior is right for automated persistence and invitations. It is too stri
 
 ## 2. Product Goal
 
-Add a **contact scout layer** that searches aggressively for contact/context leads, while keeping automatic persistence and invitation gates strict.
+The shipped **contact scout layer** recovers contact/context leads from data
+the existing enrichment tiers already fetched, while keeping automatic
+persistence and invitation gates strict. It does not add broad paid searches.
+The more aggressive query design is retained only as a parked option in
+Section 5.
 
 The tool should behave like this:
 
@@ -206,11 +212,15 @@ Evidence flags must be mechanically derived and explainable:
 
 When the evidence comes only from a search snippet and not a fetched/official page, cap confidence at `medium`.
 
-## 5. Search Strategy
+## 5. Parked broad-scout design guardrails
 
-Lead discovery may use broader queries than persistence because its output is quarantined.
+There is no current implementation target for the query plan in this section.
+If a future measured or staff-reported trigger reopens the broad scout, lead
+discovery may use broader queries than persistence only because its output
+remains quarantined.
 
-For each candidate, build a small bounded query plan from available context:
+In that reopened design, build a small bounded query plan from available
+context:
 
 - Name only: `"Full Name" email`
 - Name + institution: `"Full Name" "Institution" email`
@@ -228,9 +238,9 @@ Inputs should come from:
 - proposal keywords / expertise areas
 - known verified institution domain when available
 
-Bound the search budget:
+Any reopened implementation must bound the search budget:
 
-- First implementation: maximum 3-5 queries per candidate.
+- Start with a maximum of 3-5 queries per candidate.
 - Only run for candidates visible to staff and missing verified email or missing useful website.
 - Prefer official-domain queries when `verifiedInstitutionDomain` is known.
 - Do not add new queries for candidates that already have a high-confidence persisted email unless staff explicitly asks to scout.
@@ -306,13 +316,32 @@ Acceptance:
 
 ### Slice 2b: Broad Lead-Only Scout
 
-Add new broad searches only after Slice 1 shows this is worth the paid latency/cost.
+**Status: PARKED / NOT CURRENTLY JUSTIFIED (owner-confirmed 2026-07-27).**
+
+The read-only `scripts/probe-no-email-breakdown.mjs` measurement, including its
+matching Postgres read over `reviewer_find_roster`, covered all 511 selected
+reviewer suggestions in the 365-day window:
+
+- 11/511 (2.2%) lacked an email;
+- four had completed FIND enrichment without an email;
+- all four already had one to three quarantined `contactLeads[]`; three had a
+  low-confidence page lead, while one had only rejected,
+  verified-domain-contradicting leads; and
+- of the other seven, one had a roster email not reflected in Dataverse and
+  six had no roster match, so they are not evidence that additional broad
+  search fan-out would recover contact.
+
+This does not justify additional paid calls and latency now. Do not implement,
+fund, or default-enable a broad scout on the current evidence. The rules below
+are retained only as safety requirements if a future measurement reopens the
+option, not as a current delivery plan.
 
 Rules:
 
 - Default per-candidate query budget starts at 3.
 - Enforce a per-run cap.
-- If Slice 1 justifies building this, default it on for staff within the hard cap instead of hiding it behind an opt-in toggle.
+- If a future audit reopens and justifies this option, decide operational
+  enablement explicitly while preserving the hard cap.
 - Run only for candidates visible to staff and missing verified email or missing useful page.
 - Broad scout output must not set `email`, `website`, `facultyPageUrl`, or any `*_PersistAllowed` flag.
 - Broad scout results may populate only `contactLeads[]`.
@@ -439,7 +468,7 @@ These must remain true:
 - Do not treat topic overlap as identity proof.
 - Do not add a Dataverse schema change in the first slice unless review decides durable leads are required immediately.
 
-## 9. Resolved and open decisions
+## 9. Resolved decisions and parked option
 
 Resolved by the shipped slices:
 
@@ -452,15 +481,23 @@ Resolved by the shipped slices:
 - the existing-discard/faculty-page path is default-on and adds no network
   calls.
 
-Still open for the unbuilt broad paid scout:
+The broad paid scout is closed as not currently justified. While it is parked,
+there is no eligibility, budget, or operational-enablement decision to make.
+Reconsider it only if either:
 
-1. Whether a new paid scout is justified by measured missing-contact outcomes.
-2. The exact eligibility floor for unresolved identities.
-3. The hard per-run budget and operational enablement policy.
+1. a future full-cycle contact audit finds a material population of
+   completed-enrichment candidates with neither a sendable email nor a useful
+   lead; or
+2. staff reports recurring failures to recover contact through the shipped
+   page/lead and manual-edit workflow.
+
+If either trigger occurs, remeasure the affected cohort and explicitly decide
+the materiality threshold, identity eligibility, per-run cap, latency budget,
+and leads-only invariant before code changes.
 
 ## 10. Current next step
 
-Do not rebuild the already shipped slices. If product owners want Slice 2b,
-first review the current contact-audit distribution, choose the eligibility
-floor and hard budget, and verify that broad-search results remain confined to
-`contactLeads[]`. Until those decisions are made, Slice 2b remains unbuilt.
+Do not build Slice 2b on the current evidence, and do not rebuild the already
+shipped slices. Continue using the shipped outcome audit, quarantined leads,
+manual promotion/editing, and low-confidence invitation confirmation. Reopen
+the broad scout only on one of the measured or staff-reported triggers above.

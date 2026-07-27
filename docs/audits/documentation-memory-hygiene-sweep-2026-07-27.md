@@ -143,7 +143,7 @@ and a subsidiary `UNKNOWN` or `PLANNED` boundary.
 |---|---:|---|
 | `VERIFIED` | 6 | Current reviewer-table state; adapter/service ownership; acceptance/enforcement/propagation; shipped contact-lead slices; completed DAL/context migration; historical memory incidents as historical evidence. |
 | `PARTIAL` | 7 | Prompt storage/Executor, workflow chaining, grantee/honorarium, synthesis, Q9, intake-admin, and budget each have a verified shipped boundary plus unbuilt or unprobed portions. |
-| `PLANNED` | 3 | Broad paid reviewer-contact scouting plus the PA prompt Executor and workflow-chaining DAG are unbuilt options/targets. |
+| `PLANNED` | 3 | The PA prompt Executor, workflow-chaining DAG, and review-synthesis readiness policy are unbuilt options/targets. The broad paid reviewer-contact scout was owner-closed as not currently justified after the 2026-07-27 live measurement. |
 | `ASSUMED` | 0 | No assumption is used as current truth. |
 | `STALE-CONFLICT` | 0 final | Independent review found conflicts during integration; each is listed and closed below rather than hidden by the final zero. |
 | `UNKNOWN` | 1 | Remaining external-platform/live-environment facts require their named probes. The PA prompt pipeline was resolved by the 2026-07-27 production metadata probe. |
@@ -155,7 +155,7 @@ and a subsidiary `UNKNOWN` or `PLANNED` boundary.
 | Reviewer-domain retirement | Migration 018 drops five legacy tables; W3 cutover retains Postgres `grant_cycles` as drain-only | Migration SQL + Postgres/Dataverse Atlas | Current adapters and routes have no reader/writer for the five dropped tables; grant-cycle app reads use Dataverse | `VERIFIED` |
 | Grant-request access | Domain services | `grant-request` adapter over Dataverse `akoya_request` | Reviewer, Workbench, Grant Reporting, Phase I, Expertise, and Grantee services | `VERIFIED` |
 | Reviewer acceptance | External respond service stages acceptance and a durable job | Dataverse suggestion is lifecycle authority; Postgres `reviewer_acceptance_jobs` is side-effect progress | Acceptance drain performs contact/honorarium/email/quota work | `VERIFIED` |
-| Contact leads | Contact enrichment emits quarantined leads; manage-only promotion selects one | Bounded `reviewer_find_roster` representation plus canonical Dataverse person/suggestion on promotion | Reviewer Finder audit expander and invitation confirmation gate | `VERIFIED` for shipped slices; paid broad scout `PLANNED` |
+| Contact leads | Contact enrichment emits quarantined leads; manage-only promotion selects one | Bounded `reviewer_find_roster` representation plus canonical Dataverse person/suggestion on promotion | Reviewer Finder audit expander and invitation confirmation gate | `VERIFIED` for shipped slices; paid broad scout parked as not currently justified by owner decision after live measurement |
 | Prompt publication/execution | Admin publication route and repository seed paths | Dataverse `wmkf_ai_prompt`; append-only Postgres publication audit; `wmkf_ai_run` execution audit is fallible | Vercel Executor callers | `PARTIAL`; universal editor/resolver unbuilt; production PA prompt Executor absent from the 2026-07-27 visible flow metadata |
 | Workflow chaining | Vercel Executor parses declared output and attempts target writes | Declared `akoya_request.wmkf_ai_*` fields; per-output write results must be checked | Downstream PA consumers | `PARTIAL`; downstream PA DAG is planned/unbuilt, not an unknown current pipeline |
 | Grantee/honorarium | Guarded routes/services | Dataverse request/contact entities plus documented Postgres operational state | Workbench/portal/finance flows | `PARTIAL`; honorarium link population probed 2026-07-27, while grantee and broader mutable row/config populations still require probes |
@@ -243,8 +243,6 @@ These are deliberately not converted into “current” facts:
 - Broader current production row populations still require purpose-built
   read-only probes. The honorarium proposal-link population named in the
   original sweep was resolved by the dated follow-up below.
-- Broad paid reviewer-contact scouting remains unbuilt; its value, eligibility
-  floor, budget, and enablement policy remain owner decisions.
 - Remaining grantee reminder-policy operations and current policy-row/body state
   require external verification.
 - Several memory leaves intentionally retain `UNKNOWN` for current Vercel flags
@@ -330,6 +328,31 @@ A prior synthesis remains visible but is not current until the population
 resolves and synthesis runs again after a genuine reactivation. The policy is
 `PLANNED`, not built: there is still no automatic trigger/readiness helper, and
 the current Synthesis card remains hidden at zero submissions.
+
+### Follow-up resolution: broad paid reviewer-contact scout
+
+The owner closed the broad-scout decision on 2026-07-27 after a read-only
+production measurement with `scripts/probe-no-email-breakdown.mjs`, including
+its matching Postgres read over `reviewer_find_roster`:
+
+- all 511 selected reviewer suggestions in the 365-day window were covered;
+- 11/511 (2.2%) lacked an email, and four had completed FIND enrichment
+  without one;
+- all four completed-enrichment cases already had one to three quarantined
+  contact leads; three had a low-confidence page lead, while one had only
+  rejected verified-domain-contradicting leads; and
+- the other seven consisted of one roster/Dataverse stale-email case and six
+  rows with no roster match, which does not establish that broader paid search
+  would recover contact.
+
+The additional paid calls and latency are therefore not currently justified.
+Slice 2b is parked, not an active `PLANNED` item; its former eligibility,
+budget, and enablement questions are not open decisions while parked. Reopen
+only if a future full-cycle audit finds a material cohort with neither
+sendable email nor a useful lead, or staff reports recurring manual-recovery
+failures. Any reopened proposal must re-decide the materiality threshold,
+identity eligibility, hard cap, latency budget, and leads-only safety invariant
+before implementation.
 
 ### Mechanical memory result
 

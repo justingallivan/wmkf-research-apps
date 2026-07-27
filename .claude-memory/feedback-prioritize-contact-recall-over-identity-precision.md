@@ -7,7 +7,7 @@ metadata:
   originSessionId: 404d25f7-fbe1-4ecd-9f37-ec8651198ec4
   status: active
   scope: code
-  last_verified: 2026-06-18 via session-feedback
+  last_verified: 2026-07-27 via source, live contact-gap probe, and owner decision
 ---
 
 ## Recall Rule
@@ -24,14 +24,20 @@ unconfirmed identity force-nulls email at `_markUnanchoredAbstain` and at the en
 `unconfirmedMatch` path). Tightening safety = less recall.
 
 **How to apply:**
-- Default to fixing RECALL (find/show the contact) over PRECISION (confirm the identity) when the user's
-  complaint is missing-but-findable contact data.
-- The agreed architecture: decouple them — a quarantined `contactLeads[]` layer that searches
-  aggressively for staff breadcrumbs but never feeds the safe `email`/`website`/persist/invite fields.
-  Design + Codex GO-WITH-CHANGES: [[../docs/REVIEWER_CONTACT_LEADS_SPEC.md]] + `REVIEWER_CONTACT_LEADS_REVIEW.md`.
-  Build order starts with Slice 1 (MEASURE the real missing-email buckets) before building.
-- Identity-precision fixes (e.g. the OpenAlex affiliation-history widening, Codex GO-WITH-CHANGES) are
-  real but should be PARKED behind the recall work — they only move a few candidates and don't address
-  the headline pain.
+- When staff reports missing-but-findable contact data, inspect the shipped
+  contact-audit buckets and quarantined `contactLeads[]` before proposing more
+  identity-precision work or more paid search.
+- The shipped architecture decouples recall from persistence by surfacing
+  already-fetched weak/rejected emails and pages as quarantined staff
+  breadcrumbs. It never feeds those leads into the safe
+  `email`/`website`/persist/invite fields. See
+  [[../docs/REVIEWER_CONTACT_LEADS_SPEC.md]].
+- The broader paid scout is **parked, not planned**. A 2026-07-27 live probe
+  found only 11/511 selected suggestions without email; all four
+  completed-enrichment cases already had quarantined leads. Reopen only if a
+  future full-cycle audit finds a material cohort with neither sendable email
+  nor a useful lead, or staff reports recurring manual-recovery failures.
+- Prioritize recall or identity precision from the measured failure mode; do
+  not assume either class of work is categorically next.
 - Cardinal safety invariant still holds: leads stay quarantined; a wrong-person email must never reach
   an auto-invite. Related: [[project-reviewer-verify-fail-dangerous]].
