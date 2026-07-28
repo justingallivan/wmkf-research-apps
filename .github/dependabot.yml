@@ -26,8 +26,11 @@ updates:
         versions: [">=4"]
       - dependency-name: "pdf-parse"
         versions: [">=2"]
-      - dependency-name: "multer"
-        versions: [">=2"]
+      # 2.17.6 requires Node >=22.12 and its ESM parser chain breaks the current
+      # Jest dependency-loading path. Keep the working release until both the
+      # CI runtime and Jest loading path are compatible.
+      - dependency-name: "sanitize-html"
+        versions: ["2.17.6"]
     groups:
       minor-and-patch:
         update-types:
