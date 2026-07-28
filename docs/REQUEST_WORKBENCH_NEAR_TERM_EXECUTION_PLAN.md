@@ -3,7 +3,7 @@ title: "Request Workbench — near-term execution plan"
 domain: architecture
 kind: plan
 status: canonical
-summary: "Review synthesis lifecycle is deployed with automation disabled; signed-in verification and bounded enablement smoke precede further Workbench work."
+summary: "Review synthesis lifecycle is production-proved with automation enabled; the next sequence is the remaining Workbench lifecycle design freeze."
 canonical: true
 cataloged: 2026-07-26
 last_verified: 2026-07-28
@@ -94,7 +94,7 @@ Completed: v3 is the sole current governed prompt, and the first controlled
 post-fix run persisted valid synthesis with a completed, prompt-linked audit
 row. The three v2 no-write failures remain append-only historical evidence.
 
-### 2. Implement the owner-approved lifecycle — deployed with automation disabled 2026-07-28
+### 2. Implement the owner-approved lifecycle — deployed and enabled 2026-07-28
 
 - Generation readiness: automatic only when every participating invitation is complete.
 - Manual staff override: allow an early run with explicit confirmation.
@@ -127,12 +127,19 @@ manual early-confirmation path, durable Postgres job/currentness ledger, and
 feature-gated automatic drain are implemented with focused tests. Stored output
 is visible independently of submitted count and is labeled Current/Stale from a
 matching completed fingerprint. Merge `70956477` reached READY production
-deployment `dpl_2tgAYjUXFFx4nQo7FgE2Z3TBMqP9`; production migration 028 is live,
-the ledger remained empty after deployment, and the authenticated cron probe
-returned `automation_disabled`. Signed-in manual/read-only verification and
-later bounded enablement smoke remain.
+deployment `dpl_2tgAYjUXFFx4nQo7FgE2Z3TBMqP9`; production migration 028 is live.
+Signed-in manual/read-only verification then passed, Production automation was
+enabled, and the controlled Request `1002788` automatic smoke completed in one
+claim: job `2`, maintenance run `27723`, and prompt-v3 AI run
+`1b882cf6-bf8a-f111-ab0f-7ced8d3d15a6` completed. Exact cleanup removed the 11
+temporary answers, restored the four parent fields, left no draft, and returned
+the global census to zero eligible requests; the retained memo correctly became
+Stale after cleanup. PR #98 fixed the run-source defect found by the first
+pre-LLM attempt, and PR #99 fixed stale-claim cancellation before content
+loading. Final deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready; a
+post-deploy authenticated drain returned zero eligible/enqueued/claimed/failed.
 
-### 3. Finish Reviews observability — deployed with automation disabled 2026-07-28
+### 3. Finish Reviews observability — deployed and automation enabled 2026-07-28
 
 - Surface last-generated time and generation state.
 - Keep generation errors visible and actionable without hiding returned reviews.
@@ -140,7 +147,8 @@ later bounded enablement smoke remain.
 
 Production result: the DTO/UI expose readiness, queued/running/failed state,
 last/current completion time, sanitized failure detail, and Current/Stale status
-without hiding returned reviews. Signed-in verification remains.
+without hiding returned reviews. Signed-in verification passed before enablement
+and again after cleanup, with the retained synthesis visible and correctly Stale.
 
 ## Week 1–2 — lifecycle design freeze
 

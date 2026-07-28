@@ -163,8 +163,8 @@ As verified on 2026-07-26:
 
 - live tabs are Overview, Proposal, Reviewers, Reviews, Status, and Awardee;
 - placeholders are Initial Writeup, Pre Site Visit Writeup, Site Visit, and Final Writeup;
-- review synthesis has a real producer/persistence/consumer path but remains behind a red
-  production reliability gate;
+- review synthesis has a production-proved producer/persistence/consumer path,
+  exact currentness ledger, and enabled bounded automatic drain;
 - Awardee/grantee deliverables has a distinct, live external portal and child-entity model;
 - production already has `akoya_sitevisitdate` and `akoya_sitevisitnotes`;
 - the proposed writeup URL fields and `writeup.*` prompt rows do not exist.

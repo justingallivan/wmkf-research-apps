@@ -1,14 +1,14 @@
-# Session 384 Prompt: Release review-synthesis lifecycle safely
+# Session 385 Prompt: Continue the Workbench product sequence
 
-## Session 383 Summary
+## Session 384 Summary
 
-Session 383 closed the auth-status divergence and routine dependency update,
-reconciled the post-synthesis operational evidence, then implemented the
-owner-approved review-synthesis lifecycle on a deliberate Tier feature branch.
-The lifecycle implementation is fully tested, merged through PR #96 as
-`70956477`, and production-deployed in Vercel deployment
-`dpl_2tgAYjUXFFx4nQo7FgE2Z3TBMqP9`. Migration 028 is applied to production
-Postgres, its ledger remains empty, and automation remains disabled.
+Session 384 completed the owner-approved review-synthesis lifecycle rollout.
+The lifecycle implementation merged through PR #96, signed-in Workbench
+verification passed, migration 028 is live, the production automation flag is
+enabled, and a controlled automatic smoke completed end to end. Two defects
+found by the smoke were fixed through PRs #98 and #99. Final production
+deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
+`applications.wmkeck.org`.
 
 ### What Was Completed
 
@@ -76,6 +76,30 @@ Postgres, its ledger remains empty, and automation remains disabled.
      catalog, canonical facts, doc-symbol references, doc currency, and all
      required self-tests passed.
 
+4. **Automatic lifecycle production rollout**
+   - Signed-in read-only verification on Request `1002788` proved the stored
+     synthesis remains visible and correctly reports Stale with no submitted
+     reviews.
+   - `REVIEW_SYNTHESIS_AUTOMATION_ENABLED=true` was added to Production and the
+     current production artifact was rebuilt before any review was staged.
+   - The first controlled attempt exposed unsupported Executor run source
+     `Vercel Cron` before any LLM call or synthesis write. Cleanup removed all
+     11 staged answer rows and restored four parent fields. PR #98
+     (`53266764`) changed automatic runs to the existing Dataverse
+     `PowerAutomate Auto` option.
+   - The rerun completed in one claim: job `2`, maintenance run `27723`, and AI
+     run `1b882cf6-bf8a-f111-ab0f-7ced8d3d15a6` all completed; prompt v3 ended
+     with `end_turn`; the synthesis memo was written.
+   - Cleanup again removed exactly the 11 staged answers, restored Materials
+     Sent / Stanford / no receipt / not staff-uploaded, left no draft, and
+     returned the live census to 157 participant rows, 25 requests, zero
+     eligible. The UI correctly returned to Stale while retaining the memo.
+   - The sweep found that a claimed fingerprint whose review disappeared
+     retried instead of cancelling. PR #99 (`a8f22d1a`) now revalidates
+     lifecycle readiness before content loading. The final deployment is
+     `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1`; a post-deploy bounded drain returned
+     zero eligible/enqueued/claimed/failed with automation still enabled.
+
 ### Commits
 
 - `12981732` — Align auth status with enforcement policy (#95)
@@ -85,30 +109,20 @@ Postgres, its ledger remains empty, and automation remains disabled.
 - `f3037cc5` — Verify alert mailbox server-side sync
 - `e33374cf` — Implement review synthesis lifecycle
 - `70956477` — Implement review synthesis lifecycle (#96)
+- `53266764` — Fix automatic synthesis run source (#98)
+- `a8f22d1a` — Cancel synthesis jobs when readiness disappears (#99)
 
 ## Next Items
 
 ### Verified Open
 
-1. **Verify and complete the review-synthesis lifecycle rollout deliberately.**
+1. **Review-synthesis lifecycle rollout — completed 2026-07-28.**
    Evidence: `70956477`;
    `docs/audits/AUDIT_REVIEW_SYNTHESIS_LIFECYCLE_2026-07-28.md`;
    `docs/CURRENT_WORK_QUEUE.md`.
-   Required order:
-   1. ~~review/push/open the feature PR and obtain green Preview checks;~~
-      complete in draft PR #96;
-   2. ~~apply migration 028 to the existing database with
-      `node scripts/apply-migrations.js`;~~ complete and live-verified;
-   3. ~~merge/deploy while `REVIEW_SYNTHESIS_AUTOMATION_ENABLED` remains
-      unset;~~ complete in production deployment
-      `dpl_2tgAYjUXFFx4nQo7FgE2Z3TBMqP9`, with authenticated disabled-path probe
-      and zero-row ledger verification;
-   4. perform signed-in manual/read-only Workbench verification and inspect the
-      ledger/currentness projection;
-   5. enable the exact `true` flag deliberately and redeploy;
-   6. run one bounded automatic smoke and inspect the job row, AI-run,
-      Dataverse memo, maintenance run, and logs before marking the lifecycle
-      live.
+   The ordered migration, disabled deployment, signed-in verification, flag
+   enablement, bounded automatic smoke, cleanup, defect fixes, and post-deploy
+   zero-eligible probe are complete. Production automation remains enabled.
 
 2. **Continue the Workbench product sequence after synthesis release.**
    Evidence: `docs/CURRENT_WORK_QUEUE.md`;
@@ -148,13 +162,11 @@ Postgres, its ledger remains empty, and automation remains disabled.
 
 ### Verify Before Acting
 
-1. **Production has the deployed lifecycle code and an empty
-   `review_synthesis_jobs` table; automation remains disabled.** The next
-   boundary is signed-in manual/read-only Workbench verification before any
-   enablement.
-2. **Do not enable automation with the first deployment.** Any value other than
-   exact `true` is intentionally inert so historical requests are not
-   backfilled unexpectedly.
+1. **Production review-synthesis automation is enabled and proved.** The
+   controlled smoke completed job `2` in one claim; cleanup returned zero
+   eligible requests; the final bounded probe was clean.
+2. **Preserve the exact rollout gate.** Any value other than exact `true`
+   remains intentionally inert; Production is deliberately set to `true`.
 3. Re-read the live governed `review-synthesis.generate` row before any prompt
    publication. Governed v3 was the verified sole-current production baseline
    on 2026-07-28.
@@ -169,7 +181,7 @@ Postgres, its ledger remains empty, and automation remains disabled.
 1. The auth-status divergence fixed in PR #95.
 2. Routine dependency PR #94 and the completed 49-alert security rollup.
 3. The production-proven synthesis terminal-response/native-schema reliability
-   fix and governed-v3 smoke; the open work is lifecycle release only.
+   fix, governed-v3 smoke, and automatic lifecycle rollout.
 4. A drafts-folder reviewer-email workflow; edit-before-send remains the
    accepted behavior.
 
