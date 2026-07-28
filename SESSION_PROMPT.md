@@ -44,9 +44,18 @@ forks, and four linked local worktrees. Two worktrees contain untracked files.
 
 The targeted simulation selected 694 non-current historical blobs across 65
 audited paths plus three history-only commit-message contacts. It removed all
-selected objects/values, preserved the current public `main` tree exactly, and
-passed object-integrity checks. All 91 PR head refs changed, so a real rewrite
-requires GitHub Support cleanup and full old-clone invalidation.
+selected objects/values, preserved the then-current public `main` tree exactly,
+and passed object-integrity checks. All 91 PR head refs changed, so a real
+rewrite requires GitHub Support cleanup and full old-clone invalidation.
+
+A later semantic review reopened the current-tree privacy prerequisite:
+`modules/expertise_matching` is a non-production reference/demo that
+duplicates the protected 38-person production roster and retains person-linked
+cycle assignment/usage findings. The production app, authenticated API, and
+database remain live and are not removal targets. The owner must decide
+whether to privately archive and remove the retired duplicate or retain a
+sanitized public design/findings record. The earlier dry-run counts validate
+mechanics but are not a complete final removal specification.
 
 No external or destructive action is yet authorized. Use
 `docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md` for the execution invariants,
@@ -309,7 +318,7 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
 | `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md` | App-access DAL Stage 4, now unblocked by deterministic context acceptance |
 | `docs/audits/local-operational-data-retention-audit-2026-07-27.md` | Local retention findings, preservation boundary, and completed source-disposal status |
 | `docs/audits/local-operational-source-disposal-receipt-2026-07-27.md` | Privacy-safe aggregate receipt for the completed 139-file disposal |
-| `docs/audits/public-repository-pii-history-audit-2026-07-27.md` | Current-tree privacy remediation and unresolved reachable-history findings |
+| `docs/audits/public-repository-pii-history-audit-2026-07-27.md` | Current-tree privacy findings, including the unresolved retired expertise-matching duplicate, and reachable-history findings |
 
 ## Testing
 
