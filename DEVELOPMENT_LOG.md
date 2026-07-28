@@ -10,6 +10,25 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Dependabot security backlog eliminated (Session 382)
+
+**Milestone:** The public repository's 49-alert dependency-security backlog was
+consolidated into one reviewed release and reduced to zero open alerts.
+**Sessions:** 382.
+**Ship state:**
+- PR #93 updated or removed all 13 affected package families, added focused
+  compatibility tests, and preserved a bounded legacy brace-expansion API while
+  delegating the modern API to patched upstream 5.0.8.
+- Node 20/npm 10, Jest, Playwright, builds, lint, types, Trivy, Semgrep,
+  Gitleaks, Vercel Preview, and independent reviews passed.
+- Merge `c325afd5` deployed Ready as `dpl_4LBja725wdLHsATtLhLVZkCMSso3`;
+  post-merge CI passed and GitHub reported zero open Dependabot alerts.
+**Why it matters:** the security backlog is closed without breaking older
+minimatch consumers, and the repository now has regression coverage for the
+highest-risk forced dependency boundaries.
+**Pointers:** `SESSION_PROMPT.md`; `package.json`;
+`vendor/brace-expansion-compat/`; PR #93; merge `c325afd5`.
+
 ## July 2026 — Reviewer email release contracts and live copy shipped (Session 381)
 
 **Milestone:** Reviewer release emails gained staff review-before-send with

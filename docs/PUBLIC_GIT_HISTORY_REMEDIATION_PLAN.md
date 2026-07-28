@@ -6,7 +6,7 @@ status: active
 summary: "Owner-gated plan for removing the audited personal and confidential data from public Git history without changing the approved current main tree."
 canonical: false
 cataloged: 2026-07-27
-last_verified: 2026-07-27
+last_verified: 2026-07-28
 owner: product-engineering
 related:
   - docs/audits/public-repository-pii-history-audit-2026-07-27.md
@@ -75,6 +75,13 @@ The open pull requests are eight same-repository dependency updates and one
 older feature PR. The repository has no direct collaborator other than the
 owner, but old local worktrees can still reintroduce rewritten history if they
 push or merge after cleanup.
+
+**Current-delta note (2026-07-28):** the table and branch classification above
+remain the dated preflight baseline, not a current execution census. PRs
+#83–#91 (excluding nonexistent #88) were closed as superseded, security rollup
+#93 merged, and Dependabot then opened routine update PR #94. Read-only
+re-enumeration found two open PRs (#62 and #94). Every ref, PR, worktree, and
+artifact count still requires a fresh freeze-time probe.
 
 The active retention branch is diverged from fetched public `main`. It contains
 the completed local-retention work plus this remediation planning and must be
@@ -220,7 +227,9 @@ itself.
    record. Do not alter the protected production roster or its app/API.
 3. Reconcile the retention branch with current public `main`.
 4. Integrate every wanted branch before the freeze.
-5. Close the nine open PRs. Dependency PRs may be regenerated after cleanup.
+5. Re-enumerate and close or reconcile every freeze-time open PR. The original
+   nine-PR count is a dated baseline; as of 2026-07-28 the open set was #62 and
+   routine dependency PR #94. Dependency PRs may be regenerated after cleanup.
 6. Decide whether to retain rewritten remote feature branches or delete them
    after private backup. Pruning non-`main` branches reduces recontamination
    and unnecessary Vercel preview activity.
@@ -323,7 +332,9 @@ Before Phase 4, record explicit decisions for:
 3. whether to make the repository private during remediation;
 4. which, if any, non-`main` remote branches and the lightweight backup tag
    should survive in rewritten form;
-5. approval to close the nine open PRs and delete the 1,942 Actions artifacts;
+5. approval to close every freeze-time open PR and delete the freshly
+   re-enumerated Actions-artifact set (the original 9 / 1,942 counts are dated
+   baselines);
 6. approval to invalidate and replace every pre-rewrite local worktree;
 7. approval to force-push the frozen rewritten refs and accept a production
    redeployment; and
