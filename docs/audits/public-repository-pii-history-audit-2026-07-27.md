@@ -3,7 +3,7 @@ title: Public Repository PII and History Audit — 2026-07-27
 domain: security-privacy
 kind: audit
 status: active
-summary: "Redacted current-tree and reachable-history audit of personal data, operational identifiers, credentials, and ignored local evidence after confirming that the GitHub repository is public."
+summary: "Baseline public-repository privacy audit plus a current-tree remediation follow-up; reachable history and ignored local retention remain unresolved."
 canonical: false
 cataloged: 2026-07-27
 last_verified: 2026-07-27
@@ -73,12 +73,19 @@ history.
 
 **Verdict: `CLAIM NOT RECONCILED`.**
 
-The audit is complete, but the privacy condition is not reconciled. The public
-tracked tree contains production-derived reviewer contact and payment-context
-evidence, identifiable reviewer-research evaluation material, staff access
-topology, and confidential proposal metadata. Reachable public history retains
-additional personal contact values that are no longer present in the current
-tree. A much larger personal-data corpus also exists in ignored local outputs.
+The baseline audit is complete, but the overall privacy condition is not
+reconciled. The original tracked-tree findings have now been remediated on the
+current branch: audited raw evidence was replaced with aggregate receipts,
+operational identities were externalized, test identities were replaced with
+reserved fixtures, named access mappings were removed, genuine contact
+addresses were removed from current memory, and the production proposal
+evaluation bundle was externalized behind explicit file inputs.
+
+This follow-up does not rewrite reachable public history or dispose of ignored
+local evidence. Earlier revisions still retain personal contact and
+operational values, and a much larger personal-data corpus still exists in
+ignored local outputs. Those two classes keep the verdict at
+`CLAIM NOT RECONCILED`.
 
 No probable live credential was identified in reachable Git history. The
 primary problem is durable personal and confidential data retention, not an
@@ -88,12 +95,30 @@ API-key or password leak.
 
 | Claim | Evidence | Classification |
 |---|---|---|
-| The current public tree is PII-free. | Production-derived reviewer contact/payment evidence, identifiable evaluation evidence, access rosters, and proposal metadata remain tracked. | `STALE-CONFLICT` |
+| The current public tree is PII-free. | The baseline contained production-derived reviewer contact/payment evidence, identifiable evaluation evidence, access rosters, and proposal metadata. The audited high-risk surfaces are resolved in the follow-up, but an absolute whole-tree semantic absence claim remains beyond the bounded classifiers. | Baseline: `STALE-CONFLICT`; follow-up: audited surfaces resolved, absolute claim `UNKNOWN` |
 | Current-file deletion alone would close the exposure. | Deleted and earlier revisions containing personal contact values remain in reachable history. | `STALE-CONFLICT` |
 | Reachable history contains a probable live credential. | Three secret-shaped hits were deterministic scanner/test fixtures; independent assignment and credential-URL checks found no candidate. | `FALSIFIED` |
 | Current tracked archives conceal obvious secrets or high-risk identifiers. | Archive/XML/string inspection found none in the reviewed PPTX, ZIP, DOCX history, or PNG strings. | `FALSIFIED` within the stated binary limits |
 | Ignored output is adequately protected by `.gitignore`. | Ignored exports contain a large personal-data corpus without a documented retention/access-control contract. | `STALE-CONFLICT` |
 | The current secret gate is a privacy gate. | It passed while tracked production-derived personal data remained present. | `FALSIFIED` |
+
+## Current-tree remediation follow-up
+
+**Scope:** non-history changes only. No ignored output was deleted, no
+credential was rotated, no repository visibility changed, and no Git object
+or ref was rewritten.
+
+| Invariant | Current-tree action | Verification |
+|---|---|---|
+| Tracked reviewer/payment evidence contains no person-level rows. | Replaced the three reviewer/payment files, five representative Atlas row dumps, and the W4 per-row anomaly table with dated aggregate receipts. | Whole-file review plus focused zero-count scans for contact addresses, UUIDs, and production request-number shapes. |
+| Reviewer-evaluation evidence retains method without identifiable subjects. | Replaced the contact-strategy audit's named subjects with aggregate method/results. | Focused PII/identifier scan and document review. |
+| Operational scripts contain no embedded production identity targets. | Required explicit user, request, email, or external cases-file inputs; write-capable repair remains dry-run by default and refuses a cases file inside the repository. | Syntax checks and fail-loud missing-input probes. |
+| Test behavior is preserved without real identities. | Replaced audited identities with fictional names and reserved-domain addresses. | Eight focused suites: 147 tests passed. |
+| Access documentation does not publish a person-to-privilege roster. | Replaced the Wave 1 rosters and intake pilot mappings with access-controlled roster/role references and synthetic UI examples. | Targeted name/address/GUID scan of the audited access documents. |
+| Current memory contains no genuine contact address from the audited corpus. | Removed operational contacts, a personal test recipient, an applicant test account, and named reviewer-contact examples. Preserved OData forms such as `@odata.bind`, which are code syntax rather than addresses. | Genuine-address classifier returned zero current `.claude-memory` matches after excluding OData annotations. |
+| Production proposal inputs are not retained in tracked evaluation assets. | Replaced four production proposal JSON assets with aggregate public receipts; operational planner/runner/validators require explicit external files, while tests use internally consistent synthetic fixtures. | Focused evaluator tests, syntax checks, and production-identifier scan. |
+| Deliberate public support content remains intentional and bounded. | Retained the additional-access/help contact only in `shared/components/WelcomeModal.js` and `pages/guide.js`. | Scoped current-tree scan and owner-context review. |
+| History and ignored-local boundaries remain explicit. | No history or local-retention mutation was performed. | Reachable-history and ignored-corpus baseline in this audit remains the governing evidence. |
 
 ## Findings
 
@@ -116,7 +141,12 @@ The files entered history in commits `4103af79`, `09e81fdb`, and `75b98284`.
 Payment-network identifiers are treated as confidential even though no bank
 account or routing number was detected.
 
-**Status:** unresolved current-tree and history exposure.
+**Follow-up:** the current versions are aggregate-only receipts and contain no
+person-level contact, address, payment identifier, request number, or record
+GUID.
+
+**Status:** current-tree component resolved; reachable-history component
+unresolved.
 
 ### P1 — identifiable reviewer-research evaluation evidence
 
@@ -129,7 +159,12 @@ credential. Its retention beside assessment and matching evidence creates a
 separate privacy and reputational risk. The file entered history in commit
 `83f162f8`.
 
-**Status:** unresolved current-tree and history exposure.
+**Follow-up:** the current version retains the evaluation method, aggregate
+measurements, provenance boundary, and conclusions without named subjects,
+contact details, person URLs, or reversible identity aliases.
+
+**Status:** current-tree component resolved; reachable-history component
+unresolved.
 
 ### P1 local-only — ignored operational evidence
 
@@ -173,7 +208,14 @@ request numbers, titles, program areas, document keys/hashes, and evaluation
 results. This is principally confidential proposal/business information, with
 possible person-level linkability from titles and research context.
 
-**Status:** contextual review and redaction required.
+**Follow-up:** the five representative raw Atlas files listed above are now
+aggregate evidence receipts. The four mutually referential production
+proposal assets are now aggregate public receipts; operational execution
+requires explicit external files and contract tests use synthetic fixtures.
+
+**Status:** audited current-tree surfaces resolved. This does not prove that
+every semantically identifying value in every tracked document has been
+classified.
 
 ### P2 — staff identities and access topology
 
@@ -190,8 +232,13 @@ These are work identities, not private consumer profiles. The mapping of named
 people to applications and privilege levels is nevertheless sensitive
 operational information in a public repository.
 
-**Status:** unresolved; replace with controlled mappings or opaque stable
-labels where named identity is not essential.
+**Follow-up:** the Wave 1 current and archived rosters now point to an
+access-controlled roster rather than naming staff. The intake-admin design
+uses role labels and synthetic applicant examples. The Q9 DAL migration plan
+contains generic permission architecture, not a person-to-access mapping, and
+was retained.
+
+**Status:** audited current-tree roster mappings resolved.
 
 ### P2 — real-looking identities in code and fixtures
 
@@ -217,7 +264,12 @@ corpus and comparison rules are defined in the reproducibility appendix below.
 Real identities are unnecessary for most test contracts and should use
 reserved-domain fixtures.
 
-**Status:** unresolved fixture and operational-script hygiene.
+**Follow-up:** audited operational targets now arrive through explicit CLI or
+external-file inputs, and the audited unit-test identities use reserved
+domains. The two user-facing help surfaces retain their deliberate public
+contact as a bounded exception.
+
+**Status:** audited current-tree fixture and script-literal findings resolved.
 
 ### P2 — reachable history retains deleted personal data
 
@@ -260,8 +312,13 @@ The current `SESSION_PROMPT.md` is comparatively clean, but earlier reachable
 revisions contain history-only contact values. This distinction is important:
 current memory hygiene does not prove historical removal.
 
-**Status:** current memory needs contextual redaction; session history remains
-part of any authorized history-remediation scope.
+**Follow-up:** current memory's genuine contact-address count is zero after
+contextual redaction. Remaining email-regex hits there are OData
+navigation/annotation syntax, not contacts. Earlier session/memory revisions
+were not rewritten.
+
+**Status:** current-memory component resolved; session/history component
+remains part of any authorized history-remediation scope.
 
 ## Credential, high-risk identifier, and binary results
 
@@ -493,11 +550,11 @@ It did not query live Dataverse, Postgres, SharePoint, search providers, or
 email systems. Counts across paths cannot be summed as unique people because
 the same value may recur.
 
-The reported 12-file current distribution and 10 history-only path/revision
-distribution are therefore bounded to this curated local corpus. The current
-path-only manifest is:
+The reported baseline 12-file current distribution and 10 history-only
+path/revision distribution are therefore bounded to this curated local corpus.
+The baseline current path-only manifest is:
 
-| Current tracked path | Distinct matches |
+| Baseline current tracked path | Distinct matches |
 |---|---:|
 | `scripts/probe-potentialreviewer-email-dups-audit.js` | 2 |
 | `docs/atlas/evidence/akoya-reviewer-linkage-2026-05-16.txt` | 1 |
@@ -530,24 +587,25 @@ The history-only path/revision manifest is:
 These counts must not be used as a complete inventory of all possible
 live-source identities.
 
-## Remediation sequence requiring owner decisions
+## Remediation sequence and remaining owner decisions
 
-### Immediate, non-history remediation
+### Immediate, non-history remediation — follow-up status
 
-1. Replace the three raw reviewer/payment evidence files with redacted
-   aggregates that retain counts, hashes, field names, and conclusions but no
-   person-level rows.
-2. Redact identifiable contacts from the reviewer contact-strategy audit while
-   retaining method and aggregate evaluation results.
-3. Review all current Atlas evidence and proposal cohort artifacts for the
-   minimum information necessary to preserve their conclusions.
-4. Replace named access rosters with opaque labels or controlled mappings.
-5. Replace real staff identities in tests with reserved-domain fixtures; move
-   operational smoke targets to controlled configuration.
-6. Inventory ignored operational exports, restrict access, and adopt an
-   explicit retention/disposal rule.
-7. Ask the security/data owner to classify the payment-network identifiers and
-   decide whether notification or replacement is required.
+1. **Completed in current tree:** replace raw reviewer/payment evidence with
+   aggregate receipts containing no person-level rows.
+2. **Completed in current tree:** remove identifiable subjects from the
+   reviewer contact-strategy audit while retaining method and aggregate
+   results.
+3. **Completed for audited surfaces:** replace representative Atlas row dumps
+   with aggregates and externalize the production proposal-evaluation bundle.
+4. **Completed for audited surfaces:** replace named access rosters with
+   controlled-roster references and role labels.
+5. **Completed for audited surfaces:** use reserved-domain fixtures and
+   explicit operational inputs rather than embedded identities.
+6. **Still open; no deletion authorized:** inventory owners must approve and
+   enforce an access/retention/disposal rule for ignored operational exports.
+7. **Still an owner decision:** classify whether the historically exposed
+   payment-network identifiers require notification or replacement.
 
 ### Public-history decision
 
@@ -579,12 +637,15 @@ should:
 - flag street/phone shapes, raw person-level exports, payment-network fields,
   and access-roster mappings;
 - require reserved domains in tests by default; and
-- encourage future probes to persist redacted counts, hashes, field names, and
-  opaque identifiers rather than raw rows.
+- encourage future probes to persist redacted counts, field names, and random
+  opaque identifiers rather than raw rows. Unsalted hashes of low-entropy PII,
+  including contact addresses, must not be retained because dictionary
+  comparison can reverse them; cryptographic hashes remain appropriate only
+  for high-entropy artifacts such as file-content integrity receipts.
 
 ## Final audit accounting
 
-| Result | Count |
+| Baseline result | Count |
 |---|---:|
 | Material claims tested | 6 |
 | `FALSIFIED` | 3 |
@@ -594,8 +655,18 @@ should:
 | Probable live credentials in reachable history | 0 |
 | Confirmed unresolved privacy classes | 8 |
 
-The audit's finding is intentionally not described as reconciled. The current
-tree, reachable public history, and ignored local evidence each contain a
-different class of unresolved privacy risk. Remediation should begin with
-current-tree redaction and local retention controls, followed by an explicit
-owner decision on coordinated public-history rewriting.
+The non-history follow-up closed the six audited current-tree classes: raw
+reviewer/payment evidence, identifiable contact-strategy evidence, broader
+Atlas/proposal artifacts, named access mappings, embedded operational/test
+identities, and current-memory contacts. The bounded ignored-export
+fingerprint comparison now returns zero exact contact matches in tracked files.
+
+Two privacy classes remain unresolved:
+
+1. reachable public Git history; and
+2. ignored local evidence retention/access/disposal.
+
+The audit's finding is therefore intentionally not described as reconciled.
+Current-tree redaction does not remove earlier blobs, commit messages, clones,
+caches, or the ignored local corpus. The next actions still require explicit
+owner decisions; they were not implicitly authorized by this remediation.

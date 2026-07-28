@@ -6,10 +6,10 @@ const identityLabelingImport = require('../../docs/audits/reviewer-holistic-iden
 const activeIdentityLabelingImport = require(
   '../../docs/audits/reviewer-holistic-identity-labeling-import-v2.json'
 );
-const evaluationManifest = require('../../docs/audits/reviewer-holistic-evaluation-manifest-v1.json');
-const activeEvaluationManifest = require('../../docs/audits/reviewer-holistic-evaluation-manifest-v2.json');
-const proposalCohortProposal = require('../../docs/audits/reviewer-holistic-proposal-cohort-proposal-v1.json');
-const proposalDraft = require('../../docs/audits/reviewer-holistic-proposal-evaluation-v1.json');
+const evaluationManifest = require('../fixtures/reviewer-holistic-evaluation-manifest-v1.synthetic.json');
+const activeEvaluationManifest = require('../fixtures/reviewer-holistic-evaluation-manifest-v2.synthetic.json');
+const proposalCohortProposal = require('../fixtures/reviewer-holistic-proposal-cohort.synthetic.json');
+const proposalDraft = require('../fixtures/reviewer-holistic-proposal-evaluation.synthetic.json');
 const {
   aggregateChannelBaseline,
   blindCaseIdFor,
@@ -24,7 +24,6 @@ const {
   validateProposalManifestConsistency,
 } = require('../../scripts/lib/reviewer-holistic-m1');
 const {
-  DEFAULT_MANIFEST_PATH,
   parseCli: parseAssetCli,
   validateIdentityManifestConsistency,
 } = require('../../scripts/validate-reviewer-holistic-m1-assets');
@@ -157,13 +156,17 @@ function frozenProposals() {
 
 describe('M1 evaluation assets', () => {
   test('asset validator rejects unknown flags and extra paths', () => {
-    expect(() => parseAssetCli(['--unknown'])).toThrow('unknown arguments');
-    expect(() => parseAssetCli(['one.json', 'two.json', 'three.json'])).toThrow('unknown positional arguments');
+    expect(() => parseAssetCli(['--unknown'])).toThrow('unknown argument');
+    expect(() => parseAssetCli([])).toThrow('--manifest-file');
   });
 
-  test('asset validator derives the active identity pair from manifest v2 and fails closed on drift', () => {
-    const options = parseAssetCli([]);
-    expect(path.basename(DEFAULT_MANIFEST_PATH)).toBe('reviewer-holistic-evaluation-manifest-v2.json');
+  test('asset validator requires external proposal assets, derives the active identity pair, and fails closed on drift', () => {
+    const externalArgs = [
+      '--manifest-file=/secure/manifest.json',
+      '--proposal-evaluation-file=/secure/proposals.json',
+      '--cohort-file=/secure/cohort.json',
+    ];
+    const options = parseAssetCli(externalArgs, { manifest: activeEvaluationManifest });
     expect(path.basename(options.identityPath)).toBe('reviewer-holistic-identity-benchmark-v2.json');
     expect(path.basename(options.identityImportPath)).toBe('reviewer-holistic-identity-labeling-import-v2.json');
     expect(options.usesDefaultIdentity).toBe(true);
@@ -196,12 +199,20 @@ describe('M1 evaluation assets', () => {
     });
     const malformedManifest = clone(activeEvaluationManifest);
     malformedManifest.identityBenchmark.fixtureVersion = 'unknown-version';
-    expect(() => parseAssetCli([], { manifest: malformedManifest })).toThrow(
+    expect(() => parseAssetCli(externalArgs, { manifest: malformedManifest })).toThrow(
       'manifest identityBenchmark.fixtureVersion must match reviewer-identity-vN',
     );
-    expect(() => parseAssetCli(['custom-identity.json'])).toThrow(
+    expect(() => parseAssetCli([
+      ...externalArgs,
+      '--identity-file=custom-identity.json',
+    ], { manifest: activeEvaluationManifest })).toThrow(
       'identity benchmark path must be named reviewer-holistic-identity-benchmark-vN.json',
     );
+    expect(() => parseAssetCli([
+      `--manifest-file=${path.join(process.cwd(), 'tests/fixtures/reviewer-holistic-evaluation-manifest-v2.synthetic.json')}`,
+      '--proposal-evaluation-file=/secure/proposals.json',
+      '--cohort-file=/secure/cohort.json',
+    ])).toThrow('outside the repository');
   });
 
   test('identity collector has a balanced unique seed pool and fail-closed CLI', () => {
@@ -361,14 +372,14 @@ describe('M1 evaluation assets', () => {
     expect(validateProposalEvaluation(frozenProposals(), { requireFrozen: true })).toEqual({ ok: true, errors: [] });
   });
 
-  test('tracked frozen evaluation exactly matches the owner-approved cohort', () => {
+  test('synthetic frozen evaluation exactly matches the synthetic approved cohort', () => {
     expect(validateProposalCohortFreeze(proposalCohortProposal, proposalDraft)).toEqual({
       ok: true,
       errors: [],
     });
   });
 
-  test('draft overall manifest carries the exact frozen proposal IDs and hashes', () => {
+  test('synthetic manifest carries the exact frozen proposal IDs and hashes', () => {
     expect(validateProposalManifestConsistency(evaluationManifest, proposalDraft)).toEqual({
       ok: true,
       errors: [],
@@ -382,7 +393,7 @@ describe('M1 evaluation assets', () => {
     ]);
   });
 
-  test('owner-approved held-out cohort preserves the attestation boundary', () => {
+  test('synthetic owner-approved held-out cohort preserves the attestation boundary', () => {
     expect(validateProposalCohortProposal(proposalCohortProposal)).toEqual({ ok: true, errors: [] });
     expect(proposalCohortProposal.proposals.filter((item) => item.signalLevel === 'thin')).toHaveLength(5);
     expect(proposalCohortProposal.proposals.filter((item) => item.signalLevel === 'full')).toHaveLength(5);

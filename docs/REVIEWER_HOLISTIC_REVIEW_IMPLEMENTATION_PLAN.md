@@ -7,7 +7,7 @@ summary: "Active hybrid plan: safe slices reach main behind legacy-default seams
 canonical: false
 cataloged: 2026-07-12
 owner: product-engineering
-last_verified: 2026-07-22
+last_verified: 2026-07-27
 related:
   - docs/audits/reviewer-holistic-review-comparison-2026-07-09.md
   - docs/audits/reviewer-holistic-review-codex-2026-07-09.md
@@ -66,6 +66,15 @@ production route selects it, F2 has not started, and D1 cleanup remains gated.
 Recent reviewer save, applicant-suggestion, enrichment, eligibility, and search-
 history fixes are operational hardening, not evidence of W2 cutover or F2
 promotion.
+
+**[PRIVACY FOLLOW-UP 2026-07-27]** The four tracked production proposal
+cohort/evaluation/manifest assets were replaced with aggregate public receipts.
+Operational M1 planning, execution, runtime probing, and validation now require
+explicit external file arguments and fail before environment loading or live
+access when those inputs are absent. Schema-equivalent synthetic fixtures under
+`tests/fixtures/` preserve the public contract tests. Historical sections below
+still describe the completed July evaluation, but their former tracked paths
+must not be treated as executable production inputs.
 
 ## Evidence labels
 
@@ -180,7 +189,8 @@ No phase is complete after proving only a write path.
 incremental model. Runtime behavior and external-state gates remain scoped to
 their phases.
 
-Before the first redesign commit, create a tracked evaluation manifest containing:
+Before a redesign comparison, create a versioned, access-controlled evaluation
+manifest outside the repository containing:
 
 - exact `baselineCommit` from `origin/main` and redesign starting SHA;
 - frozen proposal IDs and document hashes;
@@ -191,26 +201,33 @@ Before the first redesign commit, create a tracked evaluation manifest containin
   evaluation/execution script versions, and executor commit.
 
 Changing a frozen item creates a new evaluation version. It may not silently
-replace the registered comparison.
+replace the registered comparison. The public repository retains only an
+aggregate receipt and synthetic contract fixtures.
 
-**Foundation built, frozen, and versioned:** the original contract remains at
-`docs/audits/reviewer-holistic-evaluation-manifest-v1.json` and retains identity
-fixture `reviewer-identity-v1`. The owner-clarified identity revision is
-recorded separately at
-`docs/audits/reviewer-holistic-evaluation-manifest-v2.json`, which changes only
-the manifest timestamp and identity fixture contract. `npm run
-eval:reviewer-holistic:manifest` defaults to and validates manifest v2 itself.
-`npm run eval:reviewer-holistic:m1` also defaults to v2, derives the
-benchmark/import pair from its fixture version, and fails closed if either
-asset is absent, non-frozen, or version-mismatched. Historical run-plan,
-runtime-probe, and paid executor entry points stay explicitly pinned to
-manifest v1 because the completed proposal execution was recorded under that
-path and identity is
-outside its fingerprint. Before any new comparison run, the applicable
-versioned manifest must pass
-`node scripts/validate-reviewer-holistic-evaluation-manifest.js
---require-frozen`. Changing another frozen item creates another evaluation
-version rather than mutating either registered comparison.
+**Foundation built, frozen, and versioned:** the July 2026 execution used two
+versioned operational manifests: v1 retained identity fixture
+`reviewer-identity-v1`, while v2 recorded the owner-clarified
+`reviewer-identity-v2` contract. Those production manifests and their proposal
+bundle now live outside the public repository. The former tracked paths
+`docs/audits/reviewer-holistic-evaluation-manifest-v1.json` and
+`docs/audits/reviewer-holistic-evaluation-manifest-v2.json` are aggregate
+receipts only.
+
+Before any new comparison run, supply the applicable access-controlled
+manifest explicitly:
+
+```bash
+npm run eval:reviewer-holistic:manifest -- \
+  --manifest-file=/secure/path/manifest.json --require-frozen
+```
+
+M1 asset validation additionally requires explicit proposal-evaluation and
+cohort files. The validator derives the benchmark/import pair from the supplied
+manifest's fixture version and fails closed if any asset is absent, non-frozen,
+or version-mismatched. Historical run-plan, runtime-probe, and paid-executor
+provenance remain part of the external v1 bundle. Changing another frozen item
+creates another external evaluation version rather than mutating a registered
+comparison.
 
 **Acceptance:** manifest reviewed before behavior changes; baseline checkout is
 reproducible; shared containment is merged or explicitly excluded before the
@@ -410,25 +427,25 @@ normalization rules, and the five owner-approved resolutions are preserved in
 `docs/audits/reviewer-holistic-identity-labeling-import-v1.json`; the source
 workbook itself remains outside the repository. This method makes no inter-rater
 or adjudication claim. The read-only M1.2 population and document inventory
-produced `docs/audits/reviewer-holistic-proposal-cohort-proposal-v1.json`: a
-mechanically stratified ten-proposal recommendation with five Phase I thin-signal
-documents, five Phase II full-signal documents, immutable SHA-256 hashes, four
-Science and Engineering Research cases, and six Medical Research cases. The
-repository reference sweep found no selected request numbers, but available API
-telemetry cannot prove request-level non-use. On 2026-07-16 the owner approved
-the ten, attested to the best of their knowledge that none tuned the redesign,
-and named Justin as the blinded scorer. The frozen evaluation stores ten opaque
-seed-derived proposal IDs and only the SHA-256 seed commitment; the raw seed is
-retained locally in ignored `.env.m1.local`. The tracked original evaluation
-asset remains empty by design; separate paid-run and scoped pilot artifacts are
-retained under `outputs/reviewer-holistic-m1/`. Manifest v1 remains frozen with
-the original `reviewer-identity-v1` fixture; manifest v2 records the clarified
+produced a mechanically stratified ten-proposal recommendation with five Phase
+I thin-signal documents, five Phase II full-signal documents, four Science and
+Engineering Research cases, and six Medical Research cases. The production
+cohort, evaluation, and immutable document hashes now form an
+access-controlled external bundle; the former tracked cohort/evaluation paths
+are aggregate receipts only. The repository reference sweep found no selected
+request numbers, but available API telemetry cannot prove request-level
+non-use. On 2026-07-16 the owner approved the ten, attested to the best of their
+knowledge that none tuned the redesign, and served as the blinded scorer. The
+raw seed and separate paid-run/scoped-pilot artifacts remain local outside the
+repository. External manifest v1 retains the original
+`reviewer-identity-v1` fixture; external manifest v2 records the clarified
 `reviewer-identity-v2` fixture as the active validation contract while
 preserving the proposal/runtime/execution fields. The baseline and redesign starting
 point are both pinned to post-containment `origin/main` commit
-`50140eb62dd8f3c04f6d3ab5e131d96711f804d7`. Default manifest and M1 asset
-validation now follow v2 mechanically; historical paid-execution entry points
-remain pinned to v1. The evaluation-only redesign is pinned to implementation
+`50140eb62dd8f3c04f6d3ab5e131d96711f804d7`. When supplied the external v2
+manifest, M1 asset validation follows its identity fixture mechanically;
+historical paid-execution provenance remains pinned to external v1. The
+evaluation-only redesign is pinned to implementation
 commit `166800a3142179db642af3beefd67b8dcc381173`, pipeline version
 `reviewer-holistic-applicant-neighborhood-seeds-v1`, evaluation-script version
 `reviewer-holistic-m1-run-plan-v2`, and paid-executor implementation commit
@@ -438,9 +455,10 @@ A read-only production probe pinned prompt row/version and exact payload hash,
 resolved model ID, reviewer count 15, temperature 0.3, the relevant model-
 override hash, and a per-proposal hash of the identical applicant-recommendation,
 PI/co-PI, and applicant-institution exclusions used by both arms. The read-only command
-`node --import ./scripts/lib/use-extensionless.mjs scripts/probe-reviewer-holistic-runtime-config.mjs --target=prod --check-manifest`
+`node --import ./scripts/lib/use-extensionless.mjs scripts/probe-reviewer-holistic-runtime-config.mjs --target=prod --proposal-evaluation-file=/secure/path/proposal-evaluation.json --check-manifest --manifest-file=/secure/path/manifest.json`
 now fails on live drift without making an LLM generation call or any write.
-`npm run eval:reviewer-holistic:m1-plan` deterministically verifies 60 unique,
+`npm run eval:reviewer-holistic:m1-plan -- --manifest-file=/secure/path/manifest.json --proposal-evaluation-file=/secure/path/proposal-evaluation.json`
+deterministically verifies 60 unique,
 commit- and version-attributed slots (10 proposals x 2 arms x 3 replicates)
 without downloading documents or calling an LLM. Paid execution completed all
 60 slots on 2026-07-16. On 2026-07-17 the owner approved a scoped pilot that
@@ -451,15 +469,21 @@ No production route or service selects the redesign.
 **M1.1 revised benchmark v2 (owner clarifications 2026-07-16):** The original
 v1 freeze remains preserved as history. A revised single-reviewer workbook and
 paired audit were frozen as `reviewer-identity-v2` after the owner supplied
-additional ORCID evidence and clarified Robert Sang, Alexandra Landsman,
-Li-Huei Tsai, and William Harcombe. The v2 set contains 25 Bind and 15 Abstain
-labels, is validated by the same fail-closed asset validator, and does not claim
-inter-rater or adjudication validity. The revised source workbook hash is
+additional ORCID evidence and clarified four benchmark cases. The v2 set
+contains 25 Bind and 15 Abstain labels, is validated by the same fail-closed
+asset validator, and does not claim inter-rater or adjudication validity. The
+revised source workbook hash is
 `fdabbb94efac182c719715740ecbd6ed7fdce3c510c3d7caafab983266183c94`.
 
 The paid executor is `scripts/run-reviewer-holistic-m1.mjs`. It is preflight-
-only by default and requires the literal `--execute --confirm-paid-runs=60`
-acknowledgement before generation. It verifies source equivalence, the live
+only by default and requires explicit `--manifest-file`,
+`--proposal-evaluation-file`, and `--cohort-file` paths outside the repository.
+The read-only planner, runtime-config probe, and proposal/manifest validators
+enforce the same boundary; tracked synthetic fixtures are library-level test
+inputs, not accepted operational CLI inputs.
+Generation additionally requires the literal
+`--execute --confirm-paid-runs=60` acknowledgement. It verifies source
+equivalence, the live
 runtime payload, all ten exact SharePoint file hashes/byte counts, request
 contexts, and applicant seeds before a paid call. An ignored local execution
 artifact checkpoints each deterministic run ID atomically; completed slots are
@@ -548,13 +572,16 @@ SHA + LIVE RUNTIME SNAPSHOT PINNED 2026-07-16; EVALUATION-ONLY REDESIGN ARM +
 60-SLOT RUN PLAN + RESUMABLE EXECUTOR BUILT/VERSIONED 2026-07-16; PAID
 EXECUTION COMPLETE 2026-07-16; SCOPED 10-CANDIDATE-PER-PROPOSAL PILOT
 SCORED/UNBLINDED 2026-07-17; ORIGINAL 345-CANDIDATE SCORE NOT PERFORMED]**
-`docs/audits/reviewer-holistic-proposal-evaluation-v1.json` is frozen with the
-approved ten, scorer Justin, a hashed randomization seed, immutable document
-hashes, and empty execution/scoring arrays. The recommendation and its
-production-read provenance live in
-`docs/audits/reviewer-holistic-proposal-cohort-proposal-v1.json`; the M1 asset
-validator checks its exact ten rows, 5/5 signal split, multi-program coverage,
-document hashes, owner approval, and exact agreement with the frozen evaluation.
+The completed July run's external proposal-evaluation file was frozen with the
+approved ten, an owner scorer, a hashed randomization seed, immutable document
+hashes, and empty execution/scoring arrays. Its external cohort file carries
+the production-read provenance. The tracked paths
+`docs/audits/reviewer-holistic-proposal-evaluation-v1.json` and
+`docs/audits/reviewer-holistic-proposal-cohort-proposal-v1.json` now retain
+aggregate methodology only. Given explicit external paths, the M1 asset
+validator checks the cohort's exact ten rows, 5/5 signal split, multi-program
+coverage, document hashes, owner approval, and exact agreement with the frozen
+evaluation.
 The frozen-asset validator requires an explicit non-tuning cohort, unique source and
 blind proposal IDs, document hashes, thin/full signal coverage, multiple
 program areas, a hashed randomization seed, and a named PD scorer before
@@ -564,15 +591,17 @@ post-unblinding map from every blind candidate ID to its baseline/redesign arm
 membership. The owner then approved a separate 10-candidate-per-proposal pilot;
 `outputs/reviewer-holistic-m1/reviewer-holistic-m1-10-pilot-scored-v1.json`
 contains the 100 workbook scores, passed the scored-artifact validator, and was
-unblinded into the matching pilot comparison artifact. The tracked original
-345-candidate evaluation remains unchanged and unscored.
+unblinded into the matching pilot comparison artifact. The external original
+345-candidate evaluation remains the historical, unscored record; it is no
+longer retained as a tracked production asset.
 
-Both versioned manifests freeze the same exact baseline/redesign commits,
+Both external versioned manifests freeze the same exact baseline/redesign commits,
 pipeline and evaluation-script versions, and identical prompt, model,
 candidate-count, temperature, exclusion, and environment configuration. They
 also pin the same prompt payload hash and executor commit/script/artifact
 versions; v2 differs only in its timestamp and active identity fixture. The
-historical read-only plan and executor preflight remain pinned to v1.
+historical read-only plan and executor preflight remain pinned to the external
+v1 contract.
 
 Run frozen main and completed redesign with identical documents, prompt/model
 configuration, candidate count, exclusions, and environment. Run three
@@ -1049,7 +1078,7 @@ the change into cleanup.
 | 1 | B0 manifest foundation | short Tier-0/1 branch → main | approved | validator + draft manifest |
 | 2 | M1 measurement | short behavior-free branches → main | label/rubric approval | blinded benchmark + observational baseline |
 | 3 | C0 containment | one Tier-2 branch per invariant → main | per-slice promotion | contract trace, tests, capture send gate |
-| 4 | freeze baseline | tracked manifest update | owner approval | exact post-containment commit + frozen inputs |
+| 4 | freeze baseline | external versioned manifest + tracked aggregate receipt | owner approval | exact post-containment commit + frozen inputs |
 | 5 | I1 binding contract | design/tests/seam branches → main, legacy default | schema/semantics | transition table + policy seam |
 | 6 | I2 expand/dual-write/backfill | separate Tier-2/3 branches → main | production schema + read switch | verified metadata, shadow parity, full fan-out |
 | 7 | H1 hardening | cohort-disabled branch → main | stratum/status choices | benchmark non-regression |

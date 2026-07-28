@@ -50,7 +50,10 @@ Fix lives in the Azure portal (External Identities → User flows → `wmkeckapp
 - **User attributes**: uncheck City, State/Province, Display Name. Keep Given Name + Surname.
 - **Application claims**: ensure Given Name, Surname, Email Addresses, User's Object ID stay checked (these map to `contactName`, `contactEmail`, `contactOid` in `pages/api/auth/[...nextauth].js`).
 
-Only affects new sign-ups. Existing test accounts (e.g. `nick_sludge.78@icloud.com` OID `3bba39e3-2712-4c06-ae2a-9646afd3d6ce`) won't see the new prompts unless deleted from the External tenant's Users list and re-registered.
+Only affects new sign-ups. Existing test accounts will not see the new prompts
+unless deleted from the External tenant's Users list and re-registered. Test
+account addresses and object identifiers are intentionally not retained in
+memory.
 
 ## Why deferred
 

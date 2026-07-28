@@ -23,7 +23,7 @@ Do not:
 
 Ground truth: `lib/services/review-manager/send-emails-service.js` (promotion logic), `lib/dataverse/adapters/contact.js`, `scripts/smoke-test-candidate.mjs`. Related: [[project-reviewer-workbench-invite-workflow]].
 
-The Reviewer Finder / Review Manager send-emails flow promotes recipients to CRM contacts on first outreach (find-or-create by email, then `setContactLink` on the `wmkf_potentialreviewer`). **Verified end-to-end on 2026-05-01** with a test send to `justingallivan@me.com` — `_wmkf_contact_value` populated correctly.
+The Reviewer Finder / Review Manager send-emails flow promotes recipients to CRM contacts on first outreach (find-or-create by email, then `setContactLink` on the `wmkf_potentialreviewer`). **Verified end-to-end on 2026-05-01** with a controlled test recipient — `_wmkf_contact_value` populated correctly. The recipient address is intentionally not retained in memory.
 
 **Why:** Connor granted `AppendTo` on Contact at BusinessUnitLevel to the app user's suite security role on 2026-05-01 (the role is `WMKF Research Review App Suite - Staff` — original notes said "`# WMK: Research Review App Suite` role", but that string is the app USER's display name; see [[project-wave1-closeout-role-tail]]). Prior to that, the create half worked (orphan contacts landed in CRM) but the link half 403'd.
 

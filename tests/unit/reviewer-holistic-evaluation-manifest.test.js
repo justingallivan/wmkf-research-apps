@@ -1,7 +1,8 @@
-const historicalManifest = require('../../docs/audits/reviewer-holistic-evaluation-manifest-v1.json');
-const trackedManifest = require('../../docs/audits/reviewer-holistic-evaluation-manifest-v2.json');
+const historicalManifest = require('../fixtures/reviewer-holistic-evaluation-manifest-v1.synthetic.json');
+const trackedManifest = require('../fixtures/reviewer-holistic-evaluation-manifest-v2.synthetic.json');
 const { execFileSync } = require('child_process');
 const {
+  parseCli,
   validateCommitReferences,
   validateManifest,
 } = require('../../scripts/validate-reviewer-holistic-evaluation-manifest');
@@ -44,12 +45,12 @@ function frozenManifest() {
 }
 
 describe('reviewer holistic evaluation manifest', () => {
-  test('historical v1 manifest retains its original identity fixture', () => {
+  test('synthetic v1 manifest retains its v1 identity fixture', () => {
     expect(validateManifest(historicalManifest, { requireFrozen: true })).toEqual({ ok: true, errors: [] });
     expect(historicalManifest.identityBenchmark.fixtureVersion).toBe('reviewer-identity-v1');
   });
 
-  test('manifest v2 changes only its timestamp and identity fixture contract', () => {
+  test('synthetic manifest v2 changes only its timestamp and identity fixture contract', () => {
     const historicalContract = clone(historicalManifest);
     const activeContract = clone(trackedManifest);
     historicalContract.createdAt = activeContract.createdAt;
@@ -58,28 +59,40 @@ describe('reviewer holistic evaluation manifest', () => {
     expect(activeContract).toEqual(historicalContract);
   });
 
-  test('tracked manifest is complete and frozen', () => {
+  test('synthetic manifest is complete and frozen', () => {
     expect(validateManifest(trackedManifest, { requireFrozen: true })).toEqual({ ok: true, errors: [] });
     expect(trackedManifest.proposalEvaluation.proposalIds).toHaveLength(10);
-    expect(trackedManifest.baseline.commit).toBe('50140eb62dd8f3c04f6d3ab5e131d96711f804d7');
+    expect(trackedManifest.baseline.commit).toBe('1'.repeat(40));
     expect(trackedManifest.redesign).toMatchObject({
       startingCommit: trackedManifest.baseline.commit,
-      implementationCommit: '166800a3142179db642af3beefd67b8dcc381173',
+      implementationCommit: '2'.repeat(40),
       pipelineVersion: 'reviewer-holistic-applicant-neighborhood-seeds-v1',
     });
     expect(trackedManifest.evaluationScriptVersion).toBe('reviewer-holistic-m1-run-plan-v2');
     expect(trackedManifest.execution).toEqual({
-      implementationCommit: 'e8796ce535954f5d8678f58b94abea1b9ceea66c',
+      implementationCommit: '3'.repeat(40),
       scriptVersion: 'reviewer-holistic-m1-executor-v3',
       artifactVersion: 'reviewer-holistic-m1-execution-v1',
     });
     expect(trackedManifest.identityBenchmark.fixtureVersion).toBe('reviewer-identity-v2');
     expect(trackedManifest.runtimeConfig).toMatchObject({
-      promptVersion: '2',
-      modelIds: ['claude-opus-4-8'],
+      promptVersion: '1',
+      modelIds: ['synthetic/model'],
       reviewerCount: 15,
       temperature: 0.3,
     });
+  });
+
+  test('manifest CLI requires an explicit external file path', () => {
+    expect(() => parseCli([])).toThrow('--manifest-file');
+    expect(() => parseCli(['manifest.json'])).toThrow('unknown argument');
+    expect(parseCli(['--manifest-file=/secure/manifest.json', '--require-frozen'])).toEqual({
+      manifestPath: '/secure/manifest.json',
+      requireFrozen: true,
+    });
+    expect(() => parseCli([
+      `--manifest-file=${process.cwd()}/tests/fixtures/reviewer-holistic-evaluation-manifest-v2.synthetic.json`,
+    ])).toThrow('outside the repository');
   });
 
   test('partially populated draft freeze fields fail closed when malformed', () => {

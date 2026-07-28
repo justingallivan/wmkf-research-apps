@@ -1,66 +1,34 @@
-Token acquired.
-Probe date: 2026-05-17 (dated evidence)
-Org: name LIKE "%California Institute of Technology%"  ·  aka LIKE "%Caltech%" (discovery only)
+REDACTED AGGREGATE EVIDENCE
+Probe date: 2026-05-17 (read-only production verification)
+Subject: primary-contact coverage for one research-institution cohort
 
-══ applicant accounts matching ══
-  "California Institute of Technology"  (aka: California Institute of Technology)  id=ae7e3b60-c18f-ee11-8179-000d3a341e8f
-  "Child Educational Center Caltech/JPL Community"  (aka: Child Educational Center Caltech/JPL Community)  id=4f68c746-998f-ee11-8179-000d3a341fd9
+Discovery
+---------
+The organization-name/alias search returned two applicant accounts. Account
+GUIDs and exact organization names are intentionally omitted.
 
-══ akoya_primarycontactid fill ══
-  total requests:       265
-  with primary contact: 122/265  (46%)
-  migrated: 96/234 have it  ·  native: 26/31 have it
+Aggregate observations
+----------------------
+- Requests in the cohort: 265.
+- Requests with `akoya_primarycontactid`: 122/265 (46%).
+- Migrated requests with a primary contact: 96/234.
+- Native requests with a primary contact: 26/31.
 
-══ requests — newest by decision date (Primary Contact in context) ══
-  #1002811 [nat 2026-04-23] Approved           (no program)
-     contact: Nelly Khidekel   · "Grant to California Institute of Technology "
-  #1001423 [nat 2026-02-27] Approved           (no program)
-     contact: Nelly Khidekel   · "Grant to California Institute of Technology "
-  #1000736 [nat 2026-02-27] Approved           (no program)
-     contact: (null)   · "Grant to California Institute of Technology "
-  #1000737 [nat 2026-02-27] Approved           (no program)
-     contact: (null)   · "Grant to California Institute of Technology "
-  #1000886 [nat 2026-02-27] Approved           (no program)
-     contact: Nelly Khidekel   · "Grant to California Institute of Technology "
-  #1001674 [nat 2026-02-27] Approved           (no program)
-     contact: Nelly Khidekel   · "Grant to California Institute of Technology "
-  #1001020 [nat 2026-02-27] Approved           (no program)
-     contact: Nelly Khidekel   · "Grant to California Institute of Technology "
-  #1001021 [nat 2026-02-27] Approved           (no program)
-     contact: Nelly Khidekel   · "Grant to California Institute of Technology "
-  #1000702 [nat 2026-02-27] Approved           (no program)
-     contact: (null)   · "Grant to California Institute of Technology "
-  #1001939 [nat 2025-12-15] Active             (no program)
-     contact: Nelly Khidekel   · "Grant to California Institute of Technology "
-  #1001585 [nat 2025-12-15] Active             (no program)
-     contact: Nelly Khidekel   · "The Fragment Generation Hypothesis to Explain a Ca"
-  #1001647 [nat 2025-12-15] Phase II Declined  (no program)
-     contact: Nelly Khidekel   · "Massively scalable connectomics through image-base"
-  #1002307 [nat 2025-11-17] Approved           (no program)
-     contact: Nelly Khidekel   · "Grant to California Institute of Technology "
-  #1002022 [nat 2025-10-29] Approved           (no program)
-     contact: Nelly Khidekel   · "Grant to California Institute of Technology "
-  #1002045 [nat 2025-10-29] Approved           (no program)
-     contact: Nelly Khidekel   · "Grant to California Institute of Technology "
-  #1002031 [nat 2025-10-23] Approved           (no program)
-     contact: Nelly Khidekel   · "Grant to California Institute of Technology "
-  #1002032 [nat 2025-10-23] Approved           (no program)
-     contact: Nelly Khidekel   · "Grant to California Institute of Technology "
-  #1002021 [nat 2025-10-22] Approved           (no program)
-     contact: Nelly Khidekel   · "Grant to California Institute of Technology "
-  #1002044 [nat 2025-10-22] Approved           (no program)
-     contact: Nelly Khidekel   · "Grant to California Institute of Technology "
-  #997394 [nat 2024-05-24] Closed             (no program)
-     contact: (null)   · ""
-  #997334 [nat 2024-01-31] Concept Done       (no program)
-     contact: (null)   · ""
-  #997149 [nat 2023-11-01] Phase I Declined   (no program)
-     contact: Nelly Khidekel   · "3D spatial mapping of genetic interactions of mari"
-  #997153 [nat 2023-11-01] Phase I Declined   (no program)
-     contact: Nelly Khidekel   · "A Cell-Based Screen for Global Mapping of Interact"
-  #996941 [MIG 2023-10-26] Closed             (no program)
-     contact: Thomas F. Rosenbaum   · ""
-  #997047 [MIG 2023-10-17] Closed             (no program)
-     contact: Thomas F. Rosenbaum   · ""
+A newest-by-decision-date spot-check showed that many native requests shared
+the same recurring institutional primary contact, including requests whose
+titles represented distinct research projects. Some requests had no primary
+contact; a small historical migrated sample used a different institutional
+contact.
 
-Done (read-only caltech primary-contact spot-check).
+Conclusion
+----------
+`akoya_primarycontactid` is useful for institutional correspondence but is not
+a reliable principal-investigator field. Native coverage was much higher than
+migrated coverage in this cohort, reinforcing the era-specific semantics.
+
+Redaction boundary
+------------------
+The original probe output included account GUIDs, request numbers, dates,
+statuses, proposal-title fragments, and contact names. They are not required
+to preserve the field-semantics conclusion and are intentionally excluded.
+Re-run the read-only production probe when row-level evidence is needed.

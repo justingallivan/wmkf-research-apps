@@ -37,19 +37,19 @@ beforeEach(() => {
 
 test('tolerant reader prefers EMAIL_SIGNATURE and falls back to legacy SENDER_INFO', () => {
   expect(readEmailSignaturePreference({
-    [PREFERENCE_KEYS.EMAIL_SIGNATURE]: JSON.stringify({ name: 'New', email: 'new@wmkeck.org', signature: 'New block' }),
-    [PREFERENCE_KEYS.SENDER_INFO]: JSON.stringify({ name: 'Old', email: 'old@wmkeck.org', signature: 'Old block' }),
-  })).toEqual({ name: 'New', email: 'new@wmkeck.org', signature: 'New block' });
+    [PREFERENCE_KEYS.EMAIL_SIGNATURE]: JSON.stringify({ name: 'New', email: 'new@example.org', signature: 'New block' }),
+    [PREFERENCE_KEYS.SENDER_INFO]: JSON.stringify({ name: 'Old', email: 'old@example.org', signature: 'Old block' }),
+  })).toEqual({ name: 'New', email: 'new@example.org', signature: 'New block' });
 
   expect(readEmailSignaturePreference({
-    [PREFERENCE_KEYS.SENDER_INFO]: { name: 'Old', email: 'old@wmkeck.org', signature: 'Old block' },
-  })).toEqual({ name: 'Old', email: 'old@wmkeck.org', signature: 'Old block' });
+    [PREFERENCE_KEYS.SENDER_INFO]: { name: 'Old', email: 'old@example.org', signature: 'Old block' },
+  })).toEqual({ name: 'Old', email: 'old@example.org', signature: 'Old block' });
 });
 
 test('tolerant reader treats an empty unified key as intentional and does not resurrect legacy', () => {
   expect(readEmailSignaturePreference({
     [PREFERENCE_KEYS.EMAIL_SIGNATURE]: '',
-    [PREFERENCE_KEYS.SENDER_INFO]: JSON.stringify({ name: 'Old', email: 'old@wmkeck.org', signature: 'Old block' }),
+    [PREFERENCE_KEYS.SENDER_INFO]: JSON.stringify({ name: 'Old', email: 'old@example.org', signature: 'Old block' }),
   })).toEqual({ name: '', email: '', signature: '' });
 });
 
@@ -63,18 +63,18 @@ test('normalizes malformed string values into a signature block', () => {
 
 test('profile resolver always ends with the Foundation line', () => {
   expect(resolveSignatureForProfile({
-    [PREFERENCE_KEYS.EMAIL_SIGNATURE]: JSON.stringify({ name: 'Beth Pruitt', signature: 'Beth Pruitt' }),
+    [PREFERENCE_KEYS.EMAIL_SIGNATURE]: JSON.stringify({ name: 'Avery Quinn', signature: 'Avery Quinn' }),
   })).toEqual({
-    name: 'Beth Pruitt',
+    name: 'Avery Quinn',
     email: '',
-    signature: 'Beth Pruitt\nW. M. Keck Foundation',
+    signature: 'Avery Quinn\nW. M. Keck Foundation',
   });
 });
 
 test('a saved block that already names the Foundation is used verbatim (no duplicate line)', () => {
-  const sig = 'Sincerely,\nJustin Gallivan\n--\nJustin Gallivan\nSenior Program Director\nW.M. Keck Foundation\nLos Angeles';
+  const sig = 'Sincerely,\nAvery Quinn\n--\nAvery Quinn\nSenior Program Director\nW.M. Keck Foundation\nLos Angeles';
   const out = resolveSignatureForProfile({
-    [PREFERENCE_KEYS.EMAIL_SIGNATURE]: JSON.stringify({ name: 'Justin Gallivan', signature: sig }),
+    [PREFERENCE_KEYS.EMAIL_SIGNATURE]: JSON.stringify({ name: 'Avery Quinn', signature: sig }),
   });
   expect(out.signature).toBe(sig);
   expect((out.signature.match(/Keck Foundation/g) || []).length).toBe(1);
@@ -86,7 +86,7 @@ test('request resolver reads the assigned PD profile preference', async () => {
       return Promise.resolve({ akoya_requestid: REQUEST_ID, _wmkf_programdirector_value: 'sys-1' });
     }
     if (entitySet === 'systemusers') {
-      return Promise.resolve({ systemuserid: 'sys-1', fullname: 'Fallback PD', internalemailaddress: 'pd@wmkeck.org' });
+      return Promise.resolve({ systemuserid: 'sys-1', fullname: 'Fallback PD', internalemailaddress: 'pd@example.org' });
     }
     return Promise.reject(new Error('unexpected'));
   });
@@ -94,14 +94,14 @@ test('request resolver reads the assigned PD profile preference', async () => {
   DatabaseService.getUserPreferences.mockResolvedValue({
     [PREFERENCE_KEYS.EMAIL_SIGNATURE]: JSON.stringify({
       name: 'Saved PD',
-      email: 'saved@wmkeck.org',
+      email: 'saved@example.org',
       signature: 'Saved PD\nCustom title\nW. M. Keck Foundation',
     }),
   });
 
   await expect(resolveSignatureForRequest(REQUEST_ID)).resolves.toEqual({
     name: 'Saved PD',
-    email: 'saved@wmkeck.org',
+    email: 'saved@example.org',
     signature: 'Saved PD\nCustom title\nW. M. Keck Foundation',
   });
   expect(resolveSystemUserToProfile).toHaveBeenCalledWith('sys-1');
@@ -114,7 +114,7 @@ test('request resolver falls back to systemuser fullname when no profile matches
       return Promise.resolve({ akoya_requestid: REQUEST_ID, _wmkf_programdirector_value: 'sys-2' });
     }
     if (entitySet === 'systemusers') {
-      return Promise.resolve({ systemuserid: 'sys-2', fullname: 'Unmapped PD', internalemailaddress: 'unmapped@wmkeck.org' });
+      return Promise.resolve({ systemuserid: 'sys-2', fullname: 'Unmapped PD', internalemailaddress: 'unmapped@example.org' });
     }
     return Promise.reject(new Error('unexpected'));
   });
@@ -122,7 +122,7 @@ test('request resolver falls back to systemuser fullname when no profile matches
 
   await expect(resolveSignatureForRequest(REQUEST_ID)).resolves.toEqual({
     name: 'Unmapped PD',
-    email: 'unmapped@wmkeck.org',
+    email: 'unmapped@example.org',
     signature: 'Unmapped PD\nW. M. Keck Foundation',
   });
   expect(DatabaseService.getUserPreferences).not.toHaveBeenCalled();
@@ -138,7 +138,7 @@ test('appendSignatureBlock appends the (already-finalized) block verbatim', () =
 test('appendSignatureBlock does not duplicate a Foundation line already in the saved block', () => {
   // Regression: a real saved block ending in a city, with its own org line above,
   // must not get a second "W. M. Keck Foundation" tacked on.
-  const block = { signature: 'Sincerely,\nJustin Gallivan\n--\nJustin Gallivan\nSenior Program Director\nW.M. Keck Foundation\nLos Angeles' };
+  const block = { signature: 'Sincerely,\nAvery Quinn\n--\nAvery Quinn\nSenior Program Director\nW.M. Keck Foundation\nLos Angeles' };
   const out = appendSignatureBlock('Thank you,', block);
   expect((out.match(/Keck Foundation/g) || []).length).toBe(1);
   expect(out.endsWith('Los Angeles')).toBe(true);

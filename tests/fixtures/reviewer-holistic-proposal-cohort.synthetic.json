@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "status": "owner_approved",
+  "proposalVersion": "reviewer-proposal-cohort-proposal-v1",
+  "observedAt": "2000-01-01T00:00:00.000Z",
+  "approvedAt": "2000-01-02T00:00:00.000Z",
+  "scorer": "synthetic-scorer",
+  "source": {
+    "target": "production",
+    "targetHostname": "synthetic.invalid",
+    "populationObservedAt": "2000-01-01T00:00:00.000Z",
+    "documentsObservedAt": "2000-01-01T00:00:00.000Z",
+    "eligibleCount": 11,
+    "filter": "synthetic fixture eligibility filter"
+  },
+  "selectionPolicy": "held_out_stratified_thin_and_full_signal",
+  "signalPolicy": {
+    "thin": "Synthetic thin-signal definition.",
+    "full": "Synthetic full-signal definition.",
+    "assignment": "Five synthetic proposals per signal stratum."
+  },
+  "tuningExclusion": {
+    "repositorySweepStatus": "passed_for_selected_request_numbers",
+    "selectedReferencesFound": 0,
+    "telemetryStatus": "insufficient_for_request_level_proof",
+    "ownerAttestation": "approved_best_of_owner_knowledge"
+  },
+  "proposals": [
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000001",
+      "requestNumber": "SYNTH-0001",
+      "title": "Synthetic Proposal 01",
+      "programArea": "Synthetic Area A",
+      "researchProgramAreas": ["Synthetic Research A"],
+      "signalLevel": "thin",
+      "documentFileKey": "Synthetic Library::Synthetic Folder::synthetic-proposal-01.pdf",
+      "documentHash": "0101010101010101010101010101010101010101010101010101010101010101",
+      "documentBytes": 10001,
+      "extractedChars": 20001,
+      "extractedWords": 3001,
+      "tuningStatus": "owner_attested_not_used_for_tuning"
+    },
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000002",
+      "requestNumber": "SYNTH-0002",
+      "title": "Synthetic Proposal 02",
+      "programArea": "Synthetic Area B",
+      "researchProgramAreas": ["Synthetic Research B"],
+      "signalLevel": "full",
+      "documentFileKey": "Synthetic Library::Synthetic Folder::synthetic-proposal-02.pdf",
+      "documentHash": "0202020202020202020202020202020202020202020202020202020202020202",
+      "documentBytes": 10002,
+      "extractedChars": 20002,
+      "extractedWords": 3002,
+      "tuningStatus": "owner_attested_not_used_for_tuning"
+    },
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000003",
+      "requestNumber": "SYNTH-0003",
+      "title": "Synthetic Proposal 03",
+      "programArea": "Synthetic Area A",
+      "researchProgramAreas": ["Synthetic Research A"],
+      "signalLevel": "thin",
+      "documentFileKey": "Synthetic Library::Synthetic Folder::synthetic-proposal-03.pdf",
+      "documentHash": "0303030303030303030303030303030303030303030303030303030303030303",
+      "documentBytes": 10003,
+      "extractedChars": 20003,
+      "extractedWords": 3003,
+      "tuningStatus": "owner_attested_not_used_for_tuning"
+    },
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000004",
+      "requestNumber": "SYNTH-0004",
+      "title": "Synthetic Proposal 04",
+      "programArea": "Synthetic Area B",
+      "researchProgramAreas": ["Synthetic Research B"],
+      "signalLevel": "full",
+      "documentFileKey": "Synthetic Library::Synthetic Folder::synthetic-proposal-04.pdf",
+      "documentHash": "0404040404040404040404040404040404040404040404040404040404040404",
+      "documentBytes": 10004,
+      "extractedChars": 20004,
+      "extractedWords": 3004,
+      "tuningStatus": "owner_attested_not_used_for_tuning"
+    },
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000005",
+      "requestNumber": "SYNTH-0005",
+      "title": "Synthetic Proposal 05",
+      "programArea": "Synthetic Area A",
+      "researchProgramAreas": ["Synthetic Research A"],
+      "signalLevel": "thin",
+      "documentFileKey": "Synthetic Library::Synthetic Folder::synthetic-proposal-05.pdf",
+      "documentHash": "0505050505050505050505050505050505050505050505050505050505050505",
+      "documentBytes": 10005,
+      "extractedChars": 20005,
+      "extractedWords": 3005,
+      "tuningStatus": "owner_attested_not_used_for_tuning"
+    },
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000006",
+      "requestNumber": "SYNTH-0006",
+      "title": "Synthetic Proposal 06",
+      "programArea": "Synthetic Area B",
+      "researchProgramAreas": ["Synthetic Research B"],
+      "signalLevel": "full",
+      "documentFileKey": "Synthetic Library::Synthetic Folder::synthetic-proposal-06.pdf",
+      "documentHash": "0606060606060606060606060606060606060606060606060606060606060606",
+      "documentBytes": 10006,
+      "extractedChars": 20006,
+      "extractedWords": 3006,
+      "tuningStatus": "owner_attested_not_used_for_tuning"
+    },
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000007",
+      "requestNumber": "SYNTH-0007",
+      "title": "Synthetic Proposal 07",
+      "programArea": "Synthetic Area A",
+      "researchProgramAreas": ["Synthetic Research A"],
+      "signalLevel": "thin",
+      "documentFileKey": "Synthetic Library::Synthetic Folder::synthetic-proposal-07.pdf",
+      "documentHash": "0707070707070707070707070707070707070707070707070707070707070707",
+      "documentBytes": 10007,
+      "extractedChars": 20007,
+      "extractedWords": 3007,
+      "tuningStatus": "owner_attested_not_used_for_tuning"
+    },
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000008",
+      "requestNumber": "SYNTH-0008",
+      "title": "Synthetic Proposal 08",
+      "programArea": "Synthetic Area B",
+      "researchProgramAreas": ["Synthetic Research B"],
+      "signalLevel": "full",
+      "documentFileKey": "Synthetic Library::Synthetic Folder::synthetic-proposal-08.pdf",
+      "documentHash": "0808080808080808080808080808080808080808080808080808080808080808",
+      "documentBytes": 10008,
+      "extractedChars": 20008,
+      "extractedWords": 3008,
+      "tuningStatus": "owner_attested_not_used_for_tuning"
+    },
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000009",
+      "requestNumber": "SYNTH-0009",
+      "title": "Synthetic Proposal 09",
+      "programArea": "Synthetic Area A",
+      "researchProgramAreas": ["Synthetic Research A"],
+      "signalLevel": "thin",
+      "documentFileKey": "Synthetic Library::Synthetic Folder::synthetic-proposal-09.pdf",
+      "documentHash": "0909090909090909090909090909090909090909090909090909090909090909",
+      "documentBytes": 10009,
+      "extractedChars": 20009,
+      "extractedWords": 3009,
+      "tuningStatus": "owner_attested_not_used_for_tuning"
+    },
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000010",
+      "requestNumber": "SYNTH-0010",
+      "title": "Synthetic Proposal 10",
+      "programArea": "Synthetic Area B",
+      "researchProgramAreas": ["Synthetic Research B"],
+      "signalLevel": "full",
+      "documentFileKey": "Synthetic Library::Synthetic Folder::synthetic-proposal-10.pdf",
+      "documentHash": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "documentBytes": 10010,
+      "extractedChars": 20010,
+      "extractedWords": 3010,
+      "tuningStatus": "owner_attested_not_used_for_tuning"
+    }
+  ],
+  "excludedCandidates": [
+    {
+      "proposalId": "00000000-0000-4000-8000-000000000099",
+      "requestNumber": "SYNTH-0099",
+      "reason": "Synthetic excluded candidate retained to exercise the one-exclusion contract."
+    }
+  ]
+}

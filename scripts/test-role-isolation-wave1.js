@@ -7,22 +7,24 @@
  * The app user (sysadmin in sandbox) has prvActOnBehalfOfAnotherUser and can
  * impersonate either party.
  *
- * Defaults to Justin + Kevin — both non-admin, so the test is fully symmetric
- * (each user blocked from the other's rows). Override via CLI flags to
- * re-test with different pairs.
+ * Both users must be supplied explicitly so operational identities are not
+ * stored in source control. Use two non-admin users for a fully symmetric test
+ * (each user blocked from the other's rows).
  *
  * Setup assumption: both users are assigned
  * 'WMKF Research Review App Suite - Staff' role. If not, run
  *   node scripts/apply-security-role.js --execute --assign=<emails>
  *
  * Usage:
- *   node scripts/test-role-isolation-wave1.js
- *   node scripts/test-role-isolation-wave1.js --keep
- *   node scripts/test-role-isolation-wave1.js --user-a=foo@wmkeck.org --user-b=bar@wmkeck.org
+ *   node scripts/test-role-isolation-wave1.js \
+ *     --user-a=staff.one@example.org --user-b=staff.two@example.org
+ *   node scripts/test-role-isolation-wave1.js \
+ *     --user-a=staff.one@example.org --user-b=staff.two@example.org --keep
  */
 
 const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse/client');
 
+const args = parseArgs(process.argv);
 loadEnvLocal();
 
 const SANDBOX = process.env.DYNAMICS_SANDBOX_URL;
@@ -30,8 +32,8 @@ if (!SANDBOX) throw new Error('DYNAMICS_SANDBOX_URL not set');
 
 function parseArgs(argv) {
   const out = {
-    userA: 'jgallivan@wmkeck.org',
-    userB: 'kmoses@wmkeck.org',
+    userA: null,
+    userB: null,
     keep: false,
   };
   for (const a of argv.slice(2)) {
@@ -42,6 +44,10 @@ function parseArgs(argv) {
       console.log('Usage: node scripts/test-role-isolation-wave1.js [--user-a=<email>] [--user-b=<email>] [--keep]');
       process.exit(0);
     } else { console.error(`Unknown flag: ${a}`); process.exit(1); }
+  }
+  if (!out.userA || !out.userB) {
+    console.error('Both --user-a=<email> and --user-b=<email> are required');
+    process.exit(1);
   }
   return out;
 }
@@ -54,7 +60,6 @@ function record(name, pass, detail) {
 }
 
 async function run() {
-  const args = parseArgs(process.argv);
   const token = await getAccessToken(SANDBOX);
   const admin = createClient({ resourceUrl: SANDBOX, token });
 

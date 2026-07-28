@@ -8,22 +8,13 @@
  * any baseline-vs-redesign run and rejects every incomplete freeze field.
  *
  * Usage:
- *   node scripts/validate-reviewer-holistic-evaluation-manifest.js
- *   node scripts/validate-reviewer-holistic-evaluation-manifest.js --require-frozen
- *   node scripts/validate-reviewer-holistic-evaluation-manifest.js path/to/manifest.json
+ *   node scripts/validate-reviewer-holistic-evaluation-manifest.js \
+ *     --manifest-file=/secure/path/manifest.json [--require-frozen]
  */
 
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-
-const DEFAULT_MANIFEST = path.join(
-  __dirname,
-  '..',
-  'docs',
-  'audits',
-  'reviewer-holistic-evaluation-manifest-v2.json',
-);
 
 const SHA1_RE = /^[0-9a-f]{40}$/i;
 const SHA256_RE = /^[0-9a-f]{64}$/i;
@@ -359,16 +350,39 @@ function validateCommitReferences(manifest, { repoRoot = path.join(__dirname, '.
   return { ok: errors.length === 0, errors };
 }
 
+const REPO_ROOT = path.resolve(__dirname, '..');
+
+function resolveExternalInput(value, flag) {
+  const candidate = path.resolve(value);
+  if (candidate === REPO_ROOT || candidate.startsWith(`${REPO_ROOT}${path.sep}`)) {
+    throw new Error(`${flag} must resolve outside the repository`);
+  }
+  return candidate;
+}
+
 function parseCli(argv) {
-  const requireFrozen = argv.includes('--require-frozen');
-  const positional = argv.filter((arg) => arg !== '--require-frozen');
-  return { requireFrozen, manifestPath: positional[0] || DEFAULT_MANIFEST };
+  const out = { requireFrozen: false, manifestPath: null };
+  for (const arg of argv) {
+    if (arg === '--require-frozen') {
+      out.requireFrozen = true;
+    } else if (arg.startsWith('--manifest-file=')) {
+      const value = arg.slice('--manifest-file='.length);
+      if (!value) throw new Error('--manifest-file=<path> requires a non-empty path');
+      out.manifestPath = resolveExternalInput(value, '--manifest-file');
+    } else {
+      throw new Error(`unknown argument: ${arg}`);
+    }
+  }
+  if (!out.manifestPath) throw new Error('--manifest-file=<path> is required');
+  return out;
 }
 
 function main() {
-  const { requireFrozen, manifestPath } = parseCli(process.argv.slice(2));
+  let requireFrozen;
+  let manifestPath;
   let manifest;
   try {
+    ({ requireFrozen, manifestPath } = parseCli(process.argv.slice(2)));
     manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   } catch (error) {
     console.error(`manifest read failed: ${error.message}`);
@@ -398,4 +412,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { DEFAULT_MANIFEST, validateCommitReferences, validateManifest };
+module.exports = { parseCli, validateCommitReferences, validateManifest };

@@ -14,10 +14,11 @@ Read before touching reviewer contact enrichment, the Serp/Scholar/Claude contac
 identity→enrichment handoff, or `save-candidates`/`saveToDatabase` field persistence. Pairs with
 [[project-reviewer-identity-resolution]] and [[project-reviewer-verify-fail-dangerous]].
 
-## The diagnosis (verified live on request 1002794, attosecond physics)
-Smirnova surfaced with an ITMO-namesake email; Chen surfaced with a *pianist's* email/website
-(`cliburn.org`) and a wrong h-index — **despite both having correct identity resolution** (Chen was
-`confirmed` via an `authorship_grounded` anchor; Smirnova ORCID-anchored to Max-Born-Institute).
+## The diagnosis (verified against a production reviewer search)
+Candidate A surfaced with a namesake's email; Candidate B surfaced with an
+unrelated person's email/website and a wrong h-index — **despite both having
+correct identity resolution** (one via an `authorship_grounded` anchor and one
+via an ORCID-grounded institution).
 
 Root cause: **identity resolution works; CONTACT/bibliometric enrichment was the failure locus.** It
 ran bare-name Google/Scholar searches that ignored the resolved anchors. When discovery affiliation was
@@ -61,31 +62,35 @@ anchors already fetched; do NOT add per-candidate round-trips (latency is the bi
   so the client select list is INTENTIONALLY stricter than the server save gate.
 
 ## How contact gets validated (final design — NOT lexical institution-name matching)
-The actual namesake fix is **Fix A's institution-scoped search** — searching `"<name>" <institution>
-email` returns the right person's email (Smirnova → `olga.smirnova@mbi-berlin.de`, not the ITMO
-namesake). The email is then validated against the **Google Scholar VERIFIED institutional domain**
-("Verified email at mbiberlin.de", already collected as `scholarVerifiedEmail`): a normalized domain
-MATCH (hyphen-insensitive; subdomain-aware) confirms the contact for persistence; a clear CONTRADICTION
-drops it as a likely namesake (ifmo.ru vs mbiberlin.de); with NO verified domain it trusts the scoped
-search and leaves the email alone. Lives in `_validateEmailAgainstVerifiedDomain`, run in `_finalize`
-after Scholar metrics.
+The actual namesake fix is **Fix A's institution-scoped search** — searching
+`"<name>" <institution> email` returned the anchored candidate's institutional
+address instead of the namesake's. The email is then validated against the
+**Google Scholar VERIFIED institutional domain** already collected as
+`scholarVerifiedEmail`: a normalized domain MATCH (hyphen-insensitive;
+subdomain-aware) confirms the contact for persistence; a clear CONTRADICTION
+drops it as a likely namesake; with NO verified domain it trusts the scoped
+search and leaves the email alone. Lives in
+`_validateEmailAgainstVerifiedDomain`, run in `_finalize` after Scholar
+metrics. Production-derived names, addresses, and domains are intentionally
+omitted from memory.
 
 ## Hazard that bit us (don't repeat) — lexical domain matching is the WRONG tool
 The first/second cuts tried a lexical "does the email DOMAIN appear in the institution NAME" contradiction
 guard. It false-positived on abbreviation/portmanteau/city-coded domains and — caught only by a LIVE
-smoke, not unit tests — **rejected the REAL target's own email**: `olga.smirnova@mbi-berlin.de` (MBI
-acronym + Berlin city) is nowhere in "Max-Born-Institute for Nonlinear Optics and Short Pulse
-Spectroscopy", so the guard suppressed her correct address (the whole point is to email her). Also hit
-ethz.ch/caltech.edu/gatech.edu. **Removed it entirely.** Lessons: (1) an institution NAME string cannot
+smoke, not unit tests — **rejected the REAL target's own email** because an
+abbreviated, location-coded institutional domain was not lexically present in
+the institution's full name, so the guard suppressed the correct address (the
+whole point is to email the reviewer). The same class affected several other
+institutional domains. **Removed it entirely.** Lessons: (1) an institution NAME string cannot
 validate an email domain — use a positive, signal-grounded anchor (Scholar-verified domain / ORCID /
 the institution's own faculty page) instead; (2) a contact heuristic must be keep-biased — prefer a
 false negative (wrong email shown) over suppressing a correct one; (3) **smoke against live search
-results** — the unit tests used a fabricated true-positive (metalab.ifmo.ru) and never exercised the real
-mbi-berlin.de case.
+results** — the unit tests used a fabricated true-positive and never exercised
+the real abbreviated-domain case.
 
 ## Still open for reliable invites (the email is needed to invite the reviewer)
 When the scoped search returns no email / a contradicted one: (a) fetch the anchored institution's own
-faculty page (we already surface it, e.g. `mbi-berlin.de/p/olgasmirnova`) and parse the email; (b) gate
+faculty page (we already surface its URL) and parse the email; (b) gate
 the INVITE on contact confidence (auto-allow only ORCID / Scholar-domain-matched / institution-page
 emails; else staff "confirm contact before sending"). Slice G (invite-confidence + manual-confirm gate)
 is IMPLEMENTED S235 (branch `reviewer-slice-g-invite-confidence`, design+impl in

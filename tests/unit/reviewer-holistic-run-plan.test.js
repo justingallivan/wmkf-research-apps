@@ -1,13 +1,14 @@
 /**
  * @jest-environment node
  */
-import trackedManifest from '../../docs/audits/reviewer-holistic-evaluation-manifest-v1.json';
-import proposalEvaluation from '../../docs/audits/reviewer-holistic-proposal-evaluation-v1.json';
+import trackedManifest from '../fixtures/reviewer-holistic-evaluation-manifest-v1.synthetic.json';
+import proposalEvaluation from '../fixtures/reviewer-holistic-proposal-evaluation.synthetic.json';
 import {
   REVIEWER_HOLISTIC_EVALUATION_SCRIPT_VERSION,
   buildReviewerHolisticRunPlan,
 } from '../../scripts/lib/reviewer-holistic-run-plan.mjs';
 import { REVIEWER_HOLISTIC_REDESIGN_PIPELINE_VERSION } from '../../scripts/lib/reviewer-holistic-pipelines.mjs';
+import { parseArgs as parsePlanArgs } from '../../scripts/plan-reviewer-holistic-m1.mjs';
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -23,6 +24,24 @@ function runnableManifest() {
 }
 
 describe('reviewer holistic M1.2 run plan', () => {
+  test('planner requires explicit external manifest and proposal paths', () => {
+    expect(() => parsePlanArgs([])).toThrow('--manifest-file');
+    expect(() => parsePlanArgs(['--manifest-file=/secure/manifest.json'])).toThrow(
+      '--proposal-evaluation-file',
+    );
+    expect(parsePlanArgs([
+      '--manifest-file=/secure/manifest.json',
+      '--proposal-evaluation-file=/secure/proposals.json',
+    ])).toEqual(expect.objectContaining({
+      manifestPath: '/secure/manifest.json',
+      proposalEvaluationPath: '/secure/proposals.json',
+    }));
+    expect(() => parsePlanArgs([
+      `--manifest-file=${process.cwd()}/tests/fixtures/reviewer-holistic-evaluation-manifest-v2.synthetic.json`,
+      '--proposal-evaluation-file=/secure/proposals.json',
+    ])).toThrow('outside the repository');
+  });
+
   test('builds 60 deterministic, unique, attributable slots', () => {
     const manifest = runnableManifest();
     const first = buildReviewerHolisticRunPlan({ manifest, proposalEvaluation });

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Validate the M1 identity-label and blinded proposal-evaluation assets,
- * including approved-cohort and manifest consistency for the tracked freeze.
+ * including approved-cohort and manifest consistency for an explicitly supplied
+ * external freeze.
  * Draft assets may be empty; any populated row must already satisfy its full
  * data-entry contract. Freeze/scored modes add the M1 cohort and completion
  * gates. This script is pure and performs no network or Dataverse access.
@@ -22,18 +23,14 @@ const {
 } = require('./validate-reviewer-holistic-evaluation-manifest');
 
 const ROOT = path.join(__dirname, '..');
-const DEFAULT_PROPOSAL_PATH = path.join(
-  ROOT,
-  'docs/audits/reviewer-holistic-proposal-evaluation-v1.json',
-);
-const DEFAULT_COHORT_PROPOSAL_PATH = path.join(
-  ROOT,
-  'docs/audits/reviewer-holistic-proposal-cohort-proposal-v1.json',
-);
-const DEFAULT_MANIFEST_PATH = path.join(
-  ROOT,
-  'docs/audits/reviewer-holistic-evaluation-manifest-v2.json',
-);
+function resolveExternalInput(value, flag) {
+  const candidate = path.resolve(value);
+  const root = path.resolve(ROOT);
+  if (candidate === root || candidate.startsWith(`${root}${path.sep}`)) {
+    throw new Error(`${flag} must resolve outside the repository`);
+  }
+  return candidate;
+}
 
 function identityFileForFixtureVersion(fixtureVersion) {
   const match = String(fixtureVersion || '').match(/^reviewer-identity-(v\d+)$/);
@@ -60,31 +57,71 @@ function readJson(filePath) {
 }
 
 function parseCli(argv, { manifest } = {}) {
-  const allowedFlags = new Set(['--require-frozen', '--require-scored']);
-  const unknownFlags = argv.filter((arg) => arg.startsWith('--') && !allowedFlags.has(arg));
-  if (unknownFlags.length > 0) {
-    throw new Error(`unknown arguments: ${unknownFlags.join(', ')}`);
+  const out = {
+    requireFrozen: false,
+    requireScored: false,
+    manifestPath: null,
+    proposalPath: null,
+    cohortProposalPath: null,
+    identityPath: null,
+    identityImportPath: null,
+  };
+  for (const arg of argv) {
+    if (arg === '--require-frozen') {
+      out.requireFrozen = true;
+    } else if (arg === '--require-scored') {
+      out.requireScored = true;
+    } else if (arg.startsWith('--manifest-file=')) {
+      const value = arg.slice('--manifest-file='.length);
+      if (!value) throw new Error('--manifest-file=<path> requires a non-empty path');
+      out.manifestPath = resolveExternalInput(value, '--manifest-file');
+    } else if (arg.startsWith('--proposal-evaluation-file=')) {
+      const value = arg.slice('--proposal-evaluation-file='.length);
+      if (!value) throw new Error('--proposal-evaluation-file=<path> requires a non-empty path');
+      out.proposalPath = resolveExternalInput(value, '--proposal-evaluation-file');
+    } else if (arg.startsWith('--cohort-file=')) {
+      const value = arg.slice('--cohort-file='.length);
+      if (!value) throw new Error('--cohort-file=<path> requires a non-empty path');
+      out.cohortProposalPath = resolveExternalInput(value, '--cohort-file');
+    } else if (arg.startsWith('--identity-file=')) {
+      const value = arg.slice('--identity-file='.length);
+      if (!value) throw new Error('--identity-file=<path> requires a non-empty path');
+      out.identityPath = path.resolve(value);
+    } else if (arg.startsWith('--identity-import-file=')) {
+      const value = arg.slice('--identity-import-file='.length);
+      if (!value) throw new Error('--identity-import-file=<path> requires a non-empty path');
+      out.identityImportPath = path.resolve(value);
+    } else {
+      throw new Error(`unknown argument: ${arg}`);
+    }
   }
-  const requireFrozen = argv.includes('--require-frozen');
-  const requireScored = argv.includes('--require-scored');
-  const positional = argv.filter((arg) => !arg.startsWith('--'));
-  if (positional.length > 2) {
-    throw new Error(`unknown positional arguments: ${positional.slice(2).join(', ')}`);
+  if (!out.manifestPath) throw new Error('--manifest-file=<path> is required');
+  if (!out.proposalPath) throw new Error('--proposal-evaluation-file=<path> is required');
+  if (!out.cohortProposalPath) throw new Error('--cohort-file=<path> is required');
+  if (out.identityImportPath && !out.identityPath) {
+    throw new Error('--identity-import-file requires --identity-file');
   }
-  const usesDefaultIdentity = positional[0] == null;
-  const activeManifest = manifest || readJson(DEFAULT_MANIFEST_PATH);
-  const identityPath = positional[0] || path.join(
-    ROOT,
-    'docs/audits',
-    identityFileForFixtureVersion(activeManifest?.identityBenchmark?.fixtureVersion),
+
+  const usesDefaultIdentity = out.identityPath == null;
+  const activeManifest = manifest;
+  const identityPath = out.identityPath || (
+    activeManifest
+      ? path.join(
+        ROOT,
+        'docs/audits',
+        identityFileForFixtureVersion(activeManifest?.identityBenchmark?.fixtureVersion),
+      )
+      : null
   );
   return {
-    requireFrozen,
-    requireScored,
+    ...out,
     usesDefaultIdentity,
     identityPath,
-    identityImportPath: path.join(path.dirname(identityPath), identityImportFileFor(identityPath)),
-    proposalPath: positional[1] || DEFAULT_PROPOSAL_PATH,
+    identityImportPath: out.identityImportPath || (
+      identityPath
+        ? path.join(path.dirname(identityPath), identityImportFileFor(identityPath))
+        : null
+    ),
   };
 }
 
@@ -120,10 +157,11 @@ function main() {
   let manifest;
   let proposals;
   try {
-    manifest = readJson(DEFAULT_MANIFEST_PATH);
+    options = parseCli(process.argv.slice(2));
+    manifest = readJson(options.manifestPath);
     options = parseCli(process.argv.slice(2), { manifest });
     identity = readJson(options.identityPath);
-    cohortProposal = readJson(DEFAULT_COHORT_PROPOSAL_PATH);
+    cohortProposal = readJson(options.cohortProposalPath);
     proposals = readJson(options.proposalPath);
     if (identity.status === 'frozen') identityImport = readJson(options.identityImportPath);
   } catch (error) {
@@ -151,12 +189,10 @@ function main() {
       'proposal cohort freeze consistency',
       validateProposalCohortFreeze(cohortProposal, proposals),
     ]);
-    if (path.resolve(options.proposalPath) === path.resolve(DEFAULT_PROPOSAL_PATH)) {
-      results.push([
-        'proposal manifest consistency',
-        validateProposalManifestConsistency(manifest, proposals),
-      ]);
-    }
+    results.push([
+      'proposal manifest consistency',
+      validateProposalManifestConsistency(manifest, proposals),
+    ]);
   }
   if (identity.status === 'frozen') {
     results.splice(1, 0, [
@@ -178,9 +214,6 @@ function main() {
 if (require.main === module) main();
 
 module.exports = {
-  DEFAULT_COHORT_PROPOSAL_PATH,
-  DEFAULT_MANIFEST_PATH,
-  DEFAULT_PROPOSAL_PATH,
   identityFileForFixtureVersion,
   identityImportFileFor,
   parseCli,

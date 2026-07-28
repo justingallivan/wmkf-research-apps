@@ -87,7 +87,7 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
       body: {
         requestId: REQUEST_ID,
         suggestionId: SUGGESTION_ID,
-        contact: { affiliation: 'JILA', email: 'jun.ye@colorado.edu' },
+        contact: { affiliation: 'Example Research Lab', email: 'ava.mercer@example.org' },
         // A bogus client person id must be IGNORED — the route uses findById's value.
         potentialReviewerId: '99999999-9999-9999-9999-999999999999',
       },
@@ -105,8 +105,8 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
       SUGGESTION_ID, { selected: true }, expect.anything(),
     );
     // Writes target the suggestion's OWN person, never the client-supplied id.
-    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { affiliation: 'JILA' }, expect.anything());
-    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { email: 'jun.ye@colorado.edu' }, expect.anything());
+    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { affiliation: 'Example Research Lab' }, expect.anything());
+    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { email: 'ava.mercer@example.org' }, expect.anything());
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalledWith('99999999-9999-9999-9999-999999999999', expect.anything(), expect.anything());
     // emailSource forced manual, AFTER the email write.
     expect(researcherAdapter.updateById).toHaveBeenCalledWith(PERSON_ID, { emailSource: 'manual' }, expect.anything());
@@ -117,14 +117,14 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
       if (updates && 'email' in updates) throw new Error('alt-key duplicate');
       return undefined;
     });
-    translateDuplicateKeyError.mockReturnValue({ field: 'wmkf_emailaddress', value: 'jun.ye@colorado.edu' });
+    translateDuplicateKeyError.mockReturnValue({ field: 'wmkf_emailaddress', value: 'ava.mercer@example.org' });
 
     const req = {
       method: 'POST',
       body: {
         requestId: REQUEST_ID,
         suggestionId: SUGGESTION_ID,
-        contact: { affiliation: 'JILA', email: 'jun.ye@colorado.edu' },
+        contact: { affiliation: 'Example Research Lab', email: 'ava.mercer@example.org' },
       },
     };
     const res = mockRes();
@@ -133,7 +133,7 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.partialSuccess).toBe(true);
-    expect(res.body.contactError).toMatchObject({ code: 'email_conflict', value: 'jun.ye@colorado.edu' });
+    expect(res.body.contactError).toMatchObject({ code: 'email_conflict', value: 'ava.mercer@example.org' });
     expect(res.body.savedFields).toContain('affiliation');
     expect(res.body.savedFields).not.toContain('email');
     // Promotion stuck despite the contact conflict.
@@ -160,7 +160,7 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
       _wmkf_potentialreviewer_value: PERSON_ID,
       wmkf_applicantdisposition: 100000000,
     });
-    const req = { method: 'POST', body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, contact: { email: 'x@y.edu' } } };
+    const req = { method: 'POST', body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, contact: { email: 'reviewer@example.org' } } };
     const res = mockRes();
     await handler(req, res);
 
@@ -202,7 +202,7 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
   test('backfills a vetted roster email, stamping the roster source (NOT manual)', async () => {
     findCandidateBySuggestion.mockResolvedValue({
       suggestionId: SUGGESTION_ID,
-      email: 'kaang@snu.ac.kr',
+      email: 'noor.patel@example.org',
       emailSource: 'claude_search',
       emailPersistAllowed: true,
     });
@@ -214,20 +214,20 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     // Read is id-anchored on requestId + suggestionId.
     expect(findCandidateBySuggestion).toHaveBeenCalledWith(REQUEST_ID, SUGGESTION_ID);
     // Email written to the suggestion's OWN person.
-    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { email: 'kaang@snu.ac.kr' }, expect.anything());
+    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { email: 'noor.patel@example.org' }, expect.anything());
     // Source forced from the vetted roster provenance — NOT 'manual'.
     expect(researcherAdapter.updateById).toHaveBeenCalledWith(PERSON_ID, { emailSource: 'claude_search' }, expect.anything());
   });
 
   test('does NOT backfill when emailPersistAllowed is not true', async () => {
-    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'x@y.edu', emailSource: 'serp_search', emailPersistAllowed: false });
+    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'reviewer@example.org', emailSource: 'serp_search', emailPersistAllowed: false });
     const res = await promote();
     expect(res.body.savedFields).not.toContain('email');
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
   });
 
   test('rejects identity-unresolved promotion before lifecycle or contact writes', async () => {
-    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'x@y.edu', emailSource: 'affiliation', emailPersistAllowed: true, needsIdentification: true });
+    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'reviewer@example.org', emailSource: 'affiliation', emailPersistAllowed: true, needsIdentification: true });
     const res = await promote();
     expect(res.statusCode).toBe(422);
     expect(res.body).toMatchObject({ code: 'identity_confirmation_required' });
@@ -236,37 +236,37 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
   });
 
   test('idempotent: does NOT override a person that already has an email', async () => {
-    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'roster@y.edu', emailSource: 'claude_search', emailPersistAllowed: true });
-    potentialReviewerAdapter.getById.mockResolvedValue({ wmkf_emailaddress: 'existing@y.edu' });
+    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'roster@example.org', emailSource: 'claude_search', emailPersistAllowed: true });
+    potentialReviewerAdapter.getById.mockResolvedValue({ wmkf_emailaddress: 'existing@example.org' });
     const res = await promote();
     expect(res.body.savedFields).not.toContain('email');
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
   });
 
   test('a manual email wins: backfill is skipped after the eligibility read', async () => {
-    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'roster@y.edu', emailSource: 'claude_search', emailPersistAllowed: true });
-    const req = { method: 'POST', body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, contact: { email: 'manual@y.edu' } } };
+    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'roster@example.org', emailSource: 'claude_search', emailPersistAllowed: true });
+    const req = { method: 'POST', body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, contact: { email: 'manual@example.org' } } };
     const res = mockRes();
     await handler(req, res);
     // Manual email persisted; the one roster read is the eligibility boundary,
     // and no separate email-backfill lookup occurs.
-    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { email: 'manual@y.edu' }, expect.anything());
+    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { email: 'manual@example.org' }, expect.anything());
     expect(researcherAdapter.updateById).toHaveBeenCalledWith(PERSON_ID, { emailSource: 'manual' }, expect.anything());
     expect(findCandidateBySuggestion).toHaveBeenCalledTimes(1);
   });
 
   test('duplicate-email collision on backfill is non-fatal (promoted + contactError)', async () => {
-    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'dup@y.edu', emailSource: 'serp_search', emailPersistAllowed: true });
+    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'duplicate@example.org', emailSource: 'serp_search', emailPersistAllowed: true });
     potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
       if (updates && 'email' in updates) throw new Error('alt-key duplicate');
       return undefined;
     });
-    translateDuplicateKeyError.mockReturnValue({ field: 'wmkf_emailaddress', value: 'dup@y.edu' });
+    translateDuplicateKeyError.mockReturnValue({ field: 'wmkf_emailaddress', value: 'duplicate@example.org' });
     const res = await promote();
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.partialSuccess).toBe(true);
-    expect(res.body.contactError).toMatchObject({ code: 'email_conflict', value: 'dup@y.edu' });
+    expect(res.body.contactError).toMatchObject({ code: 'email_conflict', value: 'duplicate@example.org' });
     expect(res.body.savedFields).not.toContain('email');
     // Promotion still stuck.
     expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(SUGGESTION_ID, { selected: true }, expect.anything());
@@ -283,18 +283,18 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
 
   test('a manual email that COLLIDES is not silently overwritten by the roster email', async () => {
     // PD typed a conflicting email; the manual write 409s → not in savedFields.
-    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'roster@y.edu', emailSource: 'claude_search', emailPersistAllowed: true });
+    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'roster@example.org', emailSource: 'claude_search', emailPersistAllowed: true });
     potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
       if (updates && 'email' in updates) throw new Error('alt-key duplicate');
       return undefined;
     });
-    translateDuplicateKeyError.mockReturnValue({ field: 'wmkf_emailaddress', value: 'manual@y.edu' });
-    const req = { method: 'POST', body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, contact: { email: 'manual@y.edu' } } };
+    translateDuplicateKeyError.mockReturnValue({ field: 'wmkf_emailaddress', value: 'manual@example.org' });
+    const req = { method: 'POST', body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, contact: { email: 'manual@example.org' } } };
     const res = mockRes();
     await handler(req, res);
     // The PD's explicit choice routes to merge — backfill must NOT run.
     expect(findCandidateBySuggestion).toHaveBeenCalledTimes(1);
-    expect(res.body.contactError).toMatchObject({ code: 'email_conflict', value: 'manual@y.edu' });
+    expect(res.body.contactError).toMatchObject({ code: 'email_conflict', value: 'manual@example.org' });
     expect(res.body.savedFields).not.toContain('email');
   });
 });

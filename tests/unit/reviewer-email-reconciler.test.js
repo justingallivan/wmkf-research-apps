@@ -47,7 +47,7 @@ const KEEPER = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
 // A vetted roster candidate (id-anchored, persistable email).
 const vettedCandidate = (over = {}) => ({
   suggestionId: SUG,
-  email: 'jun.ye@colorado.edu',
+  email: 'ava.mercer@example.org',
   emailSource: 'claude_search',
   emailPersistAllowed: true,
   ...over,
@@ -75,8 +75,8 @@ beforeEach(() => {
 test('WRITE: ownerless vetted email → written to the person with vetted source', async () => {
   seed(vettedCandidate());
   const r = await reconcileReviewerEmails({});
-  expect(r.written).toEqual([{ requestId: REQ, suggestionId: SUG, personId: PERSON, email: 'jun.ye@colorado.edu' }]);
-  expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON, { email: 'jun.ye@colorado.edu' }, expect.anything());
+  expect(r.written).toEqual([{ requestId: REQ, suggestionId: SUG, personId: PERSON, email: 'ava.mercer@example.org' }]);
+  expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON, { email: 'ava.mercer@example.org' }, expect.anything());
   expect(researcherAdapter.updateById).toHaveBeenCalledWith(PERSON, { emailSource: 'claude_search' }, expect.anything());
 });
 
@@ -89,7 +89,7 @@ test('Find-row anchor: reconciles a roster candidate stamped with suggestionId a
   const r = await reconcileReviewerEmails({});
   expect(suggestionAdapter.findById).toHaveBeenCalledWith(SUG);
   expect(r.scanned).toBe(1);
-  expect(r.written).toEqual([{ requestId: REQ, suggestionId: SUG, personId: PERSON, email: 'jun.ye@colorado.edu' }]);
+  expect(r.written).toEqual([{ requestId: REQ, suggestionId: SUG, personId: PERSON, email: 'ava.mercer@example.org' }]);
 });
 
 test('REPOINT: single active keeper with no colliding suggestion → repointed', async () => {
@@ -97,7 +97,7 @@ test('REPOINT: single active keeper with no colliding suggestion → repointed',
   potentialReviewerAdapter.findByEmailCandidates.mockResolvedValue({ one: true, id: KEEPER, row: { statecode: 0 } });
   const r = await reconcileReviewerEmails({});
   expect(suggestionAdapter.repointToPotentialReviewer).toHaveBeenCalledWith(SUG, KEEPER, expect.anything());
-  expect(r.repointed).toEqual([{ requestId: REQ, suggestionId: SUG, from: PERSON, to: KEEPER, email: 'jun.ye@colorado.edu' }]);
+  expect(r.repointed).toEqual([{ requestId: REQ, suggestionId: SUG, from: PERSON, to: KEEPER, email: 'ava.mercer@example.org' }]);
   expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
 });
 
@@ -130,7 +130,7 @@ test('does NOT repoint to an INACTIVE single owner → alert', async () => {
 
 test('idempotent: person already has an email → skipped', async () => {
   seed(vettedCandidate());
-  potentialReviewerAdapter.getById.mockResolvedValue({ wmkf_emailaddress: 'already@there.edu' });
+  potentialReviewerAdapter.getById.mockResolvedValue({ wmkf_emailaddress: 'existing@example.org' });
   const r = await reconcileReviewerEmails({});
   expect(r.skipped).toBe(1);
   expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();

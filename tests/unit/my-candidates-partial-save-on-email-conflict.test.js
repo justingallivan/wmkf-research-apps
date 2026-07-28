@@ -80,7 +80,7 @@ describe('my-candidates PATCH — partial save on email conflict', () => {
       return undefined;
     });
     translateDuplicateKeyError.mockReturnValue({
-      field: 'wmkf_emailaddress', value: 'jun.ye@colorado.edu', message: 'That email is already in use.',
+      field: 'wmkf_emailaddress', value: 'ava.mercer@example.org', message: 'That email is already in use.',
     });
     potentialReviewerAdapter.findByEmailCandidates.mockResolvedValue({
       one: true, id: CONFLICT_ID, row: { statecode: 0 },
@@ -90,9 +90,9 @@ describe('my-candidates PATCH — partial save on email conflict', () => {
       method: 'PATCH',
       body: {
         suggestionId: SUGGESTION_ID,
-        affiliation: 'JILA',
-        website: 'https://jila.colorado.edu',
-        email: 'jun.ye@colorado.edu',
+        affiliation: 'Example Research Lab',
+        website: 'https://research.example.org',
+        email: 'ava.mercer@example.org',
       },
     };
     const res = mockRes();
@@ -107,7 +107,7 @@ describe('my-candidates PATCH — partial save on email conflict', () => {
     // The non-email researcher write committed BEFORE the failed email write.
     expect(researcherAdapter.updateById).toHaveBeenCalledWith(
       PERSON_ID,
-      expect.objectContaining({ affiliation: 'JILA', website: 'https://jila.colorado.edu' }),
+      expect.objectContaining({ affiliation: 'Example Research Lab', website: 'https://research.example.org' }),
       expect.anything(),
     );
     // emailSource is NOT stamped manual when the email never landed.
@@ -124,8 +124,8 @@ describe('my-candidates PATCH — partial save on email conflict', () => {
       method: 'PATCH',
       body: {
         suggestionId: SUGGESTION_ID,
-        affiliation: 'JILA',
-        email: 'jun.ye@colorado.edu',
+        affiliation: 'Example Research Lab',
+        email: 'ava.mercer@example.org',
       },
     };
     const res = mockRes();
@@ -135,7 +135,7 @@ describe('my-candidates PATCH — partial save on email conflict', () => {
     expect(res.body.success).toBe(true);
     // Email is isolated: never bundled with affiliation in the same person PATCH.
     expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(
-      PERSON_ID, { email: 'jun.ye@colorado.edu' }, expect.anything(),
+      PERSON_ID, { email: 'ava.mercer@example.org' }, expect.anything(),
     );
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalledWith(
       PERSON_ID, expect.objectContaining({ email: expect.anything(), affiliation: expect.anything() }), expect.anything(),

@@ -1,129 +1,78 @@
-Research Reviewer field census — 2026-05-17T02:35:43.655Z (read-only)
+# Akoya reviewer payment-field census — redacted aggregate evidence
 
-Cohort: 87 rows (akoya_program=Research Reviewer)
+Original probe time: 2026-05-17T02:35:43.655Z
+Probe mode: read-only
+Original evidence commit: 75b98284 (2026-05-16)
+Current-tree redaction: 2026-07-27
 
-Split: 2 staff/test (submitter @wmkeck.org or known staff) · 85 real external reviewers
+## Cohort
 
-══ PAYMENT / BILL.COM / PAYEE CLUSTER (populated count — all 87 / real 85) ══
-  akoya_nextpaymentdue_date                   all  87/87   real  85/85
-  akoya_nextpaymentdue_state                  all  87/87   real  85/85
-  akoya_paid                                  all  87/87   real  85/85
-  akoya_paid_base                             all  87/87   real  85/85
-  akoya_paid_date                             all  87/87   real  85/85
-  akoya_paid_state                            all  87/87   real  85/85
-  wmkf_authorizationtoremitpaymentflag        all  87/87   real  85/85
-  wmkf_billcomcity                            all   8/87   real   7/85
-  wmkf_billcomcountry                         all   7/87   real   7/85
-  wmkf_billcomstate                           all   8/87   real   7/85
-  wmkf_billcomstreet1                         all   8/87   real   7/85
-  wmkf_billcomstreet2                         all   1/87   real   1/85
-  wmkf_billcomzipcode                         all   8/87   real   7/85
-  wmkf_creditcardpayment                      all  87/87   real  85/85
-  wmkf_emailaddressonbillcomaccount           all   8/87   real   7/85
-  wmkf_numberofpayments                       all  87/87   real  85/85
-  wmkf_numberofpayments_date                  all  87/87   real  85/85
-  wmkf_numberofpayments_state                 all  87/87   real  85/85
-  wmkf_organizationnameonbillcomaccount       all   8/87   real   7/85
-  wmkf_paymentnetworkidpni                    all   8/87   real   7/85
-  wmkf_pcgoverifycomplete                     all  87/87   real  85/85
-  wmkf_usingpayee                             all  87/87   real  85/85
-  wmkf_vendorverified                         all  87/87   real  85/85
+- Honorarium/reviewer requests: 87.
+- Staff/test-classified rows: 2.
+- External-reviewer rows: 85.
 
-══ GOAPPLY / IDENTITY-LINKAGE CLUSTER ══
-  _akoya_goapplyapplication_value             all  87/87   real  85/85
-  _akoya_goapplyphase_value                   all  87/87   real  85/85
-  _akoya_goapplysettings_value                all  87/87   real  85/85
-  _akoya_goapplysubmitter_value               all  87/87   real  85/85
-  _akoya_primarycontactid_value               all  87/87   real  85/85
-  akoya_requestsource                         all  87/87   real  85/85
+## Payment and payee field population
 
-══ FULL POPULATED-FIELD CATALOG (count/87, desc) ══
-   87/87 (100%)  akoya_requesttype
-   87/87 (100%)  _akoya_goapplyapplication_value
-   87/87 (100%)  _akoya_programid_value
-   87/87 (100%)  _modifiedby_value
-   87/87 (100%)  versionnumber
-   87/87 (100%)  wmkf_conceptcallparticipantflag
-   87/87 (100%)  wmkf_california
-   87/87 (100%)  akoya_nextpaymentdue_state
-   87/87 (100%)  _createdby_value
-   87/87 (100%)  _wmkf_type_value
-   87/87 (100%)  wmkf_organizationisgovernmententity
-   87/87 (100%)  statuscode
-   87/87 (100%)  statecode
-   87/87 (100%)  wmkf_meetingdate
-   87/87 (100%)  akoya_paid_base
-   87/87 (100%)  wmkf_galreadyforreview
-   87/87 (100%)  _owningbusinessunit_value
-   87/87 (100%)  akoya_nextrequirementdue_state
-   87/87 (100%)  _owninguser_value
-   87/87 (100%)  wmkf_usingpayee
-   87/87 (100%)  akoya_grantrecommendercertification
-   87/87 (100%)  _wmkf_grantprogram_value
-   87/87 (100%)  wmkf_phaseiicheckincomplete
-   87/87 (100%)  wmkf_request_type
-   87/87 (100%)  wmkf_groupexempt
-   87/87 (100%)  createdon
-   87/87 (100%)  wmkf_phistaffversioncompleteflag
-   87/87 (100%)  wmkf_typeforrollup
-   87/87 (100%)  timezoneruleversionnumber
-   87/87 (100%)  _akoya_goapplysettings_value
-   87/87 (100%)  _akoya_goapplyphase_value
-   87/87 (100%)  akoya_submitdatetime
-   87/87 (100%)  wmkf_granteemeetseligibilityflag
-   87/87 (100%)  akoya_anonymous
-   87/87 (100%)  akoya_paid
-   87/87 (100%)  wmkf_vendorverified
-   87/87 (100%)  wmkf_pcgoverifycomplete
-   87/87 (100%)  wmkf_firsttimegranteeflag
-   87/87 (100%)  wmkf_creditcardpayment
-   87/87 (100%)  wmkf_caftb
-   87/87 (100%)  wmkf_authorizationtoremitpaymentflag
-   87/87 (100%)  akoya_reviewcomplete
-   87/87 (100%)  wmkf_awardbasedonsubmissionflag
-   87/87 (100%)  wmkf_readyforreview
-   87/87 (100%)  modifiedon
-   87/87 (100%)  akoya_submitdate
-   87/87 (100%)  _ownerid_value
-   87/87 (100%)  akoya_requestnum
-   87/87 (100%)  _akoya_primarycontactid_value
-   87/87 (100%)  akoya_paid_state
-   87/87 (100%)  wmkf_numberofpayments_date
-   87/87 (100%)  exchangerate
-   87/87 (100%)  akoya_balanced
-   87/87 (100%)  akoya_requestsource
-   87/87 (100%)  akoya_nextpaymentdue_date
-   87/87 (100%)  akoya_fiscalyear
-   87/87 (100%)  wmkf_numberofpayments_state
-   87/87 (100%)  wmkf_numberofpayments
-   87/87 (100%)  akoya_nextrequirementdue_date
-   87/87 (100%)  _akoya_goapplysubmitter_value
-   87/87 (100%)  akoya_requestid
-   87/87 (100%)  akoya_requeststatus
-   87/87 (100%)  akoya_submissionaccepted
-   87/87 (100%)  _transactioncurrencyid_value
-   87/87 (100%)  wmkf_rationalesummarycompleted
-   87/87 (100%)  wmkf_numberofyearsoffunding
-   87/87 (100%)  wmkf_calculatedtime
-   87/87 (100%)  akoya_paid_date
-   86/87 ( 99%)  akoya_recommendedamount_base
-   86/87 ( 99%)  akoya_request_base
-   86/87 ( 99%)  wmkf_invitedamount_base
-   86/87 ( 99%)  akoya_recommendedamount
-   86/87 ( 99%)  wmkf_invitedamount
-   86/87 ( 99%)  akoya_request
-    8/87 (  9%)  wmkf_billcomstreet1
-    8/87 (  9%)  wmkf_billcomcity
-    8/87 (  9%)  wmkf_billcomstate
-    8/87 (  9%)  wmkf_billcomzipcode
-    8/87 (  9%)  wmkf_organizationnameonbillcomaccount
-    8/87 (  9%)  wmkf_paymentnetworkidpni
-    8/87 (  9%)  wmkf_emailaddressonbillcomaccount
-    7/87 (  8%)  wmkf_billcomcountry
-    1/87 (  1%)  wmkf_billcomstreet2
+Each field below was populated on 87/87 full-cohort rows and 85/85
+external-reviewer rows:
 
-══ Sample bill.com values (staff/test rows where present — shows the shape to preserve) ══
-  #1002668 (ctnoda@outlook.com): wmkf_billcomstreet1=704 31st street · wmkf_billcomcity=Manhattan Beach · wmkf_usingpayee=false · wmkf_billcomstate=CA · wmkf_billcomzipcode=90266 · wmkf_organizationnameonbillcomaccount=Connor Noda · wmkf_paymentnetworkidpni=5 · wmkf_emailaddressonbillcomaccount=ctnoda@outlook.com
-  #1002696 (shibler+1000@wmkeck.org): wmkf_usingpayee=false
+- `akoya_nextpaymentduedate`
+- `akoya_nextpaymentduedatestate`
+- `akoya_paid`
+- `akoya_paid_base`
+- `akoya_paiddate`
+- `akoya_paiddatestate`
+- `akoya_remitauthorizationflag`
+- `wmkf_creditcard`
+- `wmkf_numberofpayments`
+- `wmkf_numberofpaymentsdate`
+- `wmkf_numberofpaymentsdatestate`
+- `wmkf_pcverify`
+- `wmkf_usingpayee`
+- `wmkf_vendorverified`
 
-Done (read-only Research Reviewer field census).
+## Bill.com field population
+
+| Field | Full cohort | External-reviewer subset |
+|---|---:|---:|
+| `wmkf_billcomcity` | 8/87 | 7/85 |
+| `wmkf_billcomcountry` | 7/87 | 7/85 |
+| `wmkf_billcomstateprovince` | 8/87 | 7/85 |
+| `wmkf_billcomstreet1` | 8/87 | 7/85 |
+| `wmkf_billcomstreet2` | 1/87 | 1/85 |
+| `wmkf_billcomzipcode` | 8/87 | 7/85 |
+| `wmkf_emailaddressonbillcomaccount` | 8/87 | 7/85 |
+| `wmkf_organizationnameonbillcomaccount` | 8/87 | 7/85 |
+| `wmkf_paymentnetworkidpni` | 8/87 | 7/85 |
+
+## Identity-linkage field population
+
+Each field below was populated on 87/87 full-cohort rows and 85/85
+external-reviewer rows:
+
+- `_akoya_goapplyapplication_value`
+- `_akoya_goapplyphase_value`
+- `_akoya_goapplysettings_value`
+- `_akoya_goapplysubmitter_value`
+- `_akoya_primarycontactid_value`
+- `akoya_requestsource`
+
+## Conclusion
+
+The cohort has complete request-to-reviewer linkage and broadly populated
+payment-control fields, while Bill.com account details are sparse: 8/87 rows
+overall and 7/85 external-reviewer rows for most Bill.com fields. Population of
+a control/default field is not evidence that a payment was issued or that its
+value is operationally meaningful.
+
+## Redaction and reproducibility boundary
+
+The original evidence included row-level examples containing request
+identifiers, email addresses, mailing addresses, organization names, and
+payment-network identifiers. Those examples have been removed from the current
+tree. The aggregate counts and field names above are retained; no hashes or
+opaque derivatives of the removed values remain.
+
+Exact row-level verification requires rerunning the controlled read-only
+Dataverse probe under an authorized data-access context. Future tracked
+evidence should retain this aggregate form.
