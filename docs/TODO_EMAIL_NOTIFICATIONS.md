@@ -71,7 +71,7 @@ Three reasonable choices:
 - **A role mailbox** (e.g. `appsuite-notifications@wmkeck.org` or an existing IT shared mailbox) — durable across personnel changes. May require an IT ask if a fresh mailbox is needed.
 - **A dedicated `noreply@wmkeck.org`** — standard pattern but requires the mailbox to be a real systemuser with SSS, not just an alias.
 
-### Selected sender — `alerts@wmkeck.org` (owner decision 2026-07-27, NOT YET APPLIED)
+### Selected sender — `alerts@wmkeck.org` (owner decision + applied 2026-07-27)
 
 Program directors received the reviewer-quota alert (`lib/services/reviewer-quota.js`)
 from a named individual's mailbox, because `NOTIFICATION_EMAIL_FROM` was a specific
@@ -107,7 +107,15 @@ State of this change:
   `lib/services/notification-service.js:85-88`. Check the `mailboxes` row for this
   systemuser, or the Power Platform admin UI under Email Configuration →
   Mailboxes, before relying on alert email.
-- **[NOT APPLIED]** The Vercel `NOTIFICATION_EMAIL_FROM` value itself.
+- **[VERIFIED via owner report, session 2026-07-27]** `NOTIFICATION_EMAIL_FROM`
+  and `SCHOLARLY_POLITE_MAILTO` were both set to `alerts@wmkeck.org` in Vercel and
+  a deploy was started. Not independently confirmed here — Vercel sensitive env
+  values are not readable from a session.
+- **[PENDING MERGE]** `SCHOLARLY_POLITE_MAILTO` has no effect in production until
+  the code that reads it reaches `main` (branch `codex/claude-bug-fixes`). Until
+  then PubMed/Europe PMC fall back to `NOTIFICATION_EMAIL_FROM`, which is now the
+  same address — so the contact path is correct either way, and the new var is
+  simply inert.
 
 Note that `/api/test-email` cannot verify any of this: it sends from the
 authenticated superuser's own `azureEmail` and only honors a `from` body param
