@@ -71,6 +71,47 @@ Three reasonable choices:
 - **A role mailbox** (e.g. `appsuite-notifications@wmkeck.org` or an existing IT shared mailbox) — durable across personnel changes. May require an IT ask if a fresh mailbox is needed.
 - **A dedicated `noreply@wmkeck.org`** — standard pattern but requires the mailbox to be a real systemuser with SSS, not just an alias.
 
+### Selected sender — `alerts@wmkeck.org` (owner decision 2026-07-27, NOT YET APPLIED)
+
+Program directors received the reviewer-quota alert (`lib/services/reviewer-quota.js`)
+from a named individual's mailbox, because `NOTIFICATION_EMAIL_FROM` was a specific
+staff address. The owner named `alerts@wmkeck.org` as the replacement sender
+[VERIFIED via owner instruction, session 2026-07-27].
+
+State of this change:
+
+- **[DECIDED]** `alerts@wmkeck.org` is the intended sender for all system-alert
+  email. The var is global — it is not per-alert-type, so this changes every
+  alert's sender, not just the quota notice.
+- **[ASSUMED]** That the address is already a monitored contact: a dated Vercel
+  environment probe recorded `OPENALEX_POLITE_MAILTO=alerts@wmkeck.org`
+  (`docs/audits/memory-wiki-audit-2026-06-23.md:86`, 2026-06-23). Not re-verified
+  here — Vercel sensitive env values are not readable from a session.
+- **[UNVERIFIED]** Whether the address exists as a Dynamics `systemuser`
+  resolvable by `internalemailaddress` with outgoing Server-Side Sync. A monitored
+  M365 role mailbox is frequently *not* a licensed systemuser. If it is not,
+  `resolveSystemUser` throws `No Dynamics system user found for email:
+  alerts@wmkeck.org`. `notify()` catches that and logs
+  "email failed (alert still stored)", so **alert email delivery stops silently
+  while dashboard alerts keep working** — verified at
+  `lib/services/notification-service.js:85-88`.
+- **[UNVERIFIED]** The systemuser's `fullname`, which is the sender name recipients
+  actually see. A generic address with a personal display name does not solve the
+  reported problem.
+- **[NOT APPLIED]** The Vercel `NOTIFICATION_EMAIL_FROM` value itself.
+
+Verify with a read-only `systemusers?$filter=internalemailaddress eq
+'alerts@wmkeck.org'` query (plus the related `mailboxes` row for outgoing SSS
+state), or in the Power Platform admin UI under Email Configuration → Mailboxes.
+Note that `/api/test-email` cannot verify this: it sends from the authenticated
+superuser's own `azureEmail` and only honors a `from` body param when the session
+carries no email (`pages/api/test-email.js:46`).
+
+When applying it, also set `SCHOLARLY_POLITE_MAILTO` (see above). Because that
+address appears to be monitored, pointing it there as well is reasonable; the two
+vars stay separate so a later move to a genuinely unmonitored `noreply` does not
+silently strand the NCBI/Europe PMC contact path.
+
 ## Architecture
 
 ```
