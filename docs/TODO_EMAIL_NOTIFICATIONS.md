@@ -87,25 +87,31 @@ State of this change:
   environment probe recorded `OPENALEX_POLITE_MAILTO=alerts@wmkeck.org`
   (`docs/audits/memory-wiki-audit-2026-06-23.md:86`, 2026-06-23). Not re-verified
   here — Vercel sensitive env values are not readable from a session.
-- **[UNVERIFIED]** Whether the address exists as a Dynamics `systemuser`
-  resolvable by `internalemailaddress` with outgoing Server-Side Sync. A monitored
-  M365 role mailbox is frequently *not* a licensed systemuser. If it is not,
-  `resolveSystemUser` throws `No Dynamics system user found for email:
-  alerts@wmkeck.org`. `notify()` catches that and logs
-  "email failed (alert still stored)", so **alert email delivery stops silently
-  while dashboard alerts keep working** — verified at
-  `lib/services/notification-service.js:85-88`.
-- **[UNVERIFIED]** The systemuser's `fullname`, which is the sender name recipients
-  actually see. A generic address with a personal display name does not solve the
-  reported problem.
+- **[VERIFIED via read-only Dataverse probe of `wmkf.crm.dynamics.com`,
+  2026-07-27]** The address exists as a Dynamics `systemuser`
+  (`d57ddb27-c8db-ee11-904d-000d3a310f67`) with `isdisabled=false` and
+  `accessmode=0` (licensed Read-Write), and its `domainname` is
+  `alerts@wmkeck.org`. So `resolveSystemUser`'s `internalemailaddress` filter
+  resolves and the sender-party bind will succeed. This was the blocking
+  prerequisite; a monitored M365 role mailbox is frequently *not* a licensed
+  systemuser, and this one is.
+- **[VERIFIED via the same probe]** The systemuser's `fullname` is `# Alerts`,
+  which is the sender name recipients see — the leading `#` appears to be a
+  sort-to-top convention for Dynamics user lists. The owner reviewed this and
+  accepted it as-is (session 2026-07-27); no `systemuser` edit is required.
+- **[UNVERIFIED]** Outgoing Server-Side Sync state on the related `mailboxes`
+  row. If outgoing SSS is not enabled and succeeding for this mailbox, the send
+  fails *after* the sender resolves. `notify()` catches any such failure and logs
+  "email failed (alert still stored)", so **alert email delivery would stop
+  silently while dashboard alerts keep working** — verified at
+  `lib/services/notification-service.js:85-88`. Check the `mailboxes` row for this
+  systemuser, or the Power Platform admin UI under Email Configuration →
+  Mailboxes, before relying on alert email.
 - **[NOT APPLIED]** The Vercel `NOTIFICATION_EMAIL_FROM` value itself.
 
-Verify with a read-only `systemusers?$filter=internalemailaddress eq
-'alerts@wmkeck.org'` query (plus the related `mailboxes` row for outgoing SSS
-state), or in the Power Platform admin UI under Email Configuration → Mailboxes.
-Note that `/api/test-email` cannot verify this: it sends from the authenticated
-superuser's own `azureEmail` and only honors a `from` body param when the session
-carries no email (`pages/api/test-email.js:46`).
+Note that `/api/test-email` cannot verify any of this: it sends from the
+authenticated superuser's own `azureEmail` and only honors a `from` body param
+when the session carries no email (`pages/api/test-email.js:46`).
 
 When applying it, also set `SCHOLARLY_POLITE_MAILTO` (see above). Because that
 address appears to be monitored, pointing it there as well is reasonable; the two
