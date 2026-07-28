@@ -33,6 +33,7 @@ import { Card } from '../Layout';
 import InviteEmailModal from './InviteEmailModal';
 import CandidateEditModal from './CandidateEditModal';
 import RemoveEntirelyModal from './RemoveEntirelyModal';
+import ReleaseEmailModal from './ReleaseEmailModal';
 import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../lib/utils/scholar-url';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 
@@ -175,7 +176,7 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
   const [modal, setModal] = useState(null); // { candidates, allowResend } | null
   const [editing, setEditing] = useState(null); // candidate row being edited | null
   const [removingId, setRemovingId] = useState(null);
-  const [withdrawing, setWithdrawing] = useState(false);
+  const [releaseModal, setReleaseModal] = useState(null); // { suggestionIds } | null
   const [restoringId, setRestoringId] = useState(null);
   const [showRemoved, setShowRemoved] = useState(true);
   const [removeEntirelyTarget, setRemoveEntirelyTarget] = useState(null); // candidate row | null
@@ -314,30 +315,12 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
   // "no longer needed"-release (reviewer-engagement Phase 4 §3.C). Server re-guards this.
   const selectedPending = selectedRows.filter((c) => c.invited && !c.accepted && !c.declined && !c.responseType);
 
-  const handleWithdraw = async () => {
-    if (selectedPending.length === 0 || withdrawing) return;
-    const n = selectedPending.length;
-    const ok = window.confirm(
-      `Release ${n} pending reviewer${n === 1 ? '' : 's'} as "no longer needed"? `
-      + 'Each receives a polite thank-you and their invitation is closed — they can no longer respond.',
-    );
-    if (!ok) return;
-    setWithdrawing(true);
-    try {
-      const res = await fetch('/api/review-manager/withdraw-sufficient', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, suggestionIds: selectedPending.map((c) => c.suggestionId) }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
-      setSelected(new Set());
-      if (onRefresh) onRefresh();
-    } catch (e) {
-      window.alert(`Could not release reviewers: ${e.message}`);
-    } finally {
-      setWithdrawing(false);
-    }
+  // Staff review the rendered emails and can tune each one before anything is
+  // sent (staff request, 2026-07-27). The release itself still happens
+  // server-side in the same call as the send — see ReleaseEmailModal.
+  const handleWithdraw = () => {
+    if (selectedPending.length === 0) return;
+    setReleaseModal({ suggestionIds: selectedPending.map((c) => c.suggestionId) });
   };
 
   const openInvite = (rows, allowResend) => {
@@ -552,11 +535,10 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
               <button
                 type="button"
                 onClick={handleWithdraw}
-                disabled={withdrawing}
                 className="text-sm text-gray-600 underline disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Send a polite 'no longer needed' note and close these pending invitations"
+                title="Review and edit the 'no longer needed' note, then send it and close these pending invitations"
               >
-                {withdrawing ? 'Releasing…' : `Release ${selectedPending.length} as no longer needed`}
+                {`Review & release ${selectedPending.length} as no longer needed`}
               </button>
             )}
             <span className="text-xs text-gray-400">{invitable.length} invitable · {acceptedCount} accepted</span>
@@ -636,6 +618,15 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
           allowResend={modal.allowResend}
           onClose={() => setModal(null)}
           onSent={afterSent}
+        />
+      )}
+
+      {releaseModal && (
+        <ReleaseEmailModal
+          requestId={requestId}
+          suggestionIds={releaseModal.suggestionIds}
+          onClose={() => setReleaseModal(null)}
+          onReleased={() => { setSelected(new Set()); if (onRefresh) onRefresh(); }}
         />
       )}
 
