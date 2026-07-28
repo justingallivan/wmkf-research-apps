@@ -28,7 +28,7 @@ related:
 - **`confidenceBand` status→band map locked** (rejected/unresolved get *no* band).
 - **Identity-level `rejected` given a deterministic rule;** EvidenceSource adapter boundary tightened; Scholar enumeration decided (single-candidate + displayed-name floor in PR1; multi-result deferred); ambiguity tests ride on ORCID multi-match (which already abstains).
 
-**Relationship to prior work:** `docs/REVIEWER_IDENTITY_RESOLUTION_PLAN.md` (the redesign plan; this is its Phase 2). **Phase 1 shipped** (`40d7327`/`5bf8d3b`/`c836f4a`): Scholar displayed-name guard, ORCID name-scoring, persistence gates, prod audit+remediation. `outputs/perplexity_reviewer_identification_strategy.md` (principle adopted, scope rejected).
+**Relationship to prior work:** `docs/REVIEWER_IDENTITY_RESOLUTION_PLAN.md` (the redesign plan; this is its Phase 2). **Phase 1 shipped** (`40d7327`/`5bf8d3b`/`c836f4a`): Scholar displayed-name guard, ORCID name-scoring, persistence gates, prod audit+remediation. The private strategy note's principle was adopted and its scope rejected; that conclusion remains durable here, while the redundant ignored note was disposed under `docs/audits/local-operational-data-retention-audit-2026-07-27.md`.
 
 **Guiding principle:** *unresolved is acceptable; wrong-and-confident is not.*
 

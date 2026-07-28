@@ -23,8 +23,9 @@ outreach/promotion) is `lib/services/backprop-reviewer-orcid.js` via
 is `scripts/backfill-contact-orcid.js`. Both use the fill-only, conflict-surfacing,
 contact-never-created safety described below. A read-only production reconciliation
 confirmed all 162 historical fills still match exactly, so the PR2 rollback window is
-closed and its ignored checkpoints are audit-only disposal candidates. Read the design
-body as historical rationale.
+closed. The ignored checkpoint sources were disposed on 2026-07-27 after their
+byte-preserved private archive copies and the aggregate reconciliation were verified.
+Read the design body as historical rationale.
 **Author:** S216. **Depends on:** S214/S215 identity resolver + ORCID backfill
 (`docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md`, memory
 `project-reviewer-identity-resolution-phase1`).
@@ -257,10 +258,12 @@ the complete historical apply checkpoint with current Contact state. All 162 pro
 writes had an applied decision, all 162 target Contacts still held the intended normalized
 ORCID, and there were zero different-valid, missing, malformed, not-found, or read-failure
 outcomes. The rollback window is therefore closed. The two ignored checkpoints are now
-audit-only controlled-disposal candidates, not instructions for a future bulk clear.
-Clearing from those files could erase a value independently confirmed after the backfill.
+disposed source artifacts; their owner-only archived copies remain audit evidence, not
+instructions for a future bulk clear. Clearing values based on those historical records
+could erase a value independently confirmed after the backfill.
 Any future correction must be a new reviewed remediation based on current evidence and
-native record history.
+native record history. See
+`docs/audits/local-operational-data-retention-audit-2026-07-27.md`.
 
 ## 8. Decisions
 

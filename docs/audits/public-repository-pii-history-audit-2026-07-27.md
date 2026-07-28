@@ -3,13 +3,15 @@ title: Public Repository PII and History Audit — 2026-07-27
 domain: security-privacy
 kind: audit
 status: active
-summary: "Baseline public-repository privacy audit plus a current-tree remediation follow-up; reachable history and ignored local retention remain unresolved."
+summary: "Baseline public-repository privacy audit plus completed current-tree and ignored-source remediation; reachable public history remains unresolved."
 canonical: false
 cataloged: 2026-07-27
 last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/audits/documentation-memory-hygiene-sweep-2026-07-27.md
+  - docs/audits/local-operational-data-retention-audit-2026-07-27.md
+  - docs/audits/local-operational-source-disposal-receipt-2026-07-27.md
   - docs/CREDENTIALS_RUNBOOK.md
   - docs/CI_GATES_REFERENCE.md
   - .gitignore
@@ -63,9 +65,10 @@ were not copied into this report.
 - destructive remediation, history rewrite, force-push, clone invalidation,
   credential rotation, notification, or local evidence deletion.
 
-The excluded destructive and external actions require an explicit owner
-decision. This audit performed no live data writes and changed no repository
-history.
+The excluded history and external actions require an explicit owner decision.
+The baseline audit performed no live data writes, local deletion, or history
+rewrite. A later owner-approved follow-up disposed only the exact ignored
+repository-side regular-file scope after private preservation.
 
 ## Executive verdict
 
@@ -81,11 +84,17 @@ reserved fixtures, named access mappings were removed, genuine contact
 addresses were removed from current memory, and the production proposal
 evaluation bundle was externalized behind explicit file inputs.
 
-This follow-up does not rewrite reachable public history or dispose of ignored
-local evidence. Earlier revisions still retain personal contact and
-operational values, and a much larger personal-data corpus still exists in
-ignored local outputs. Those two classes keep the verdict at
-`CLAIM NOT RECONCILED`.
+This follow-up does not rewrite reachable public history. Earlier revisions
+still retain personal contact and operational values, which keeps the verdict
+at `CLAIM NOT RECONCILED`.
+
+The formerly unresolved ignored-local class is closed. The owner selected an
+organizational owner-only archive, confirmed visibility, approved the exact
+private source manifest, and retained private and tracked aggregate receipts.
+Fail-closed execution removed 139 ignored regular files totaling 15,287,781
+bytes with zero failures and zero residual regular files in the bounded scope.
+The private archive, directories, and five excluded dependency symlinks were
+not deletion targets.
 
 No probable live credential was identified in reachable Git history. The
 primary problem is durable personal and confidential data retention, not an
@@ -99,14 +108,15 @@ API-key or password leak.
 | Current-file deletion alone would close the exposure. | Deleted and earlier revisions containing personal contact values remain in reachable history. | `STALE-CONFLICT` |
 | Reachable history contains a probable live credential. | Three secret-shaped hits were deterministic scanner/test fixtures; independent assignment and credential-URL checks found no candidate. | `FALSIFIED` |
 | Current tracked archives conceal obvious secrets or high-risk identifiers. | Archive/XML/string inspection found none in the reviewed PPTX, ZIP, DOCX history, or PNG strings. | `FALSIFIED` within the stated binary limits |
-| Ignored output is adequately protected by `.gitignore`. | Ignored exports contain a large personal-data corpus without a documented retention/access-control contract. | `STALE-CONFLICT` |
+| Ignored output is adequately protected by `.gitignore`. | The baseline corpus disproved this claim. The follow-up established owner-only preservation, exact review, approved source disposal, and an aggregate receipt; zero scoped regular files remain. | Baseline: `STALE-CONFLICT`; follow-up: `RESOLVED` |
 | The current secret gate is a privacy gate. | It passed while tracked production-derived personal data remained present. | `FALSIFIED` |
 
 ## Current-tree remediation follow-up
 
-**Scope:** non-history changes only. No ignored output was deleted, no
-credential was rotated, no repository visibility changed, and no Git object
-or ref was rewritten.
+**Scope:** non-history changes only. The initial current-tree remediation did
+not delete ignored output; the later owner-approved local-retention follow-up
+deleted only the exact ignored regular-file source scope. No credential was
+rotated, repository visibility changed, or Git object/ref rewritten.
 
 | Invariant | Current-tree action | Verification |
 |---|---|---|
@@ -118,7 +128,7 @@ or ref was rewritten.
 | Current memory contains no genuine contact address from the audited corpus. | Removed operational contacts, a personal test recipient, an applicant test account, and named reviewer-contact examples. Preserved OData forms such as `@odata.bind`, which are code syntax rather than addresses. | Genuine-address classifier returned zero current `.claude-memory` matches after excluding OData annotations. |
 | Production proposal inputs are not retained in tracked evaluation assets. | Replaced four production proposal JSON assets with aggregate public receipts; operational planner/runner/validators require explicit external files, while tests use internally consistent synthetic fixtures. | Focused evaluator tests, syntax checks, and production-identifier scan. |
 | Deliberate public support content remains intentional and bounded. | Retained the additional-access/help contact only in `shared/components/WelcomeModal.js` and `pages/guide.js`. | Scoped current-tree scan and owner-context review. |
-| History and ignored-local boundaries remain explicit. | No history or local-retention mutation was performed. | Reachable-history and ignored-corpus baseline in this audit remains the governing evidence. |
+| History and ignored-local boundaries remain explicit. | Reachable history was not rewritten. The exact ignored regular-file scope was preserved, reviewed, approved, and source-disposed with aggregate receipts. | History baseline remains governing evidence; the local source component is closed by the linked retention audit and disposal receipt. |
 
 ## Findings
 
@@ -180,12 +190,18 @@ The largest concentration was under `outputs/reviewer-holistic-m1/`. Additional
 ignored operational exports with personal data exist under `scripts/`,
 including contact-enrichment and application-research snapshots.
 
-These files are not part of the observed Git exposure. They remain a
-high-severity local retention and access-control issue because `.gitignore`
-prevents accidental tracking but does not define who may access the files, how
-long they may remain, or how they are securely disposed of.
+These files were not part of the observed Git exposure. They established a
+high-severity baseline because `.gitignore` prevents accidental tracking but
+does not define access, retention, or secure disposal.
 
-**Status:** unresolved local retention risk.
+**Follow-up:** the owner selected and confirmed an organizational owner-only
+archive; preservation, finality, consumer, and semantic reviews resolved the
+load-bearing and sole-copy questions. The exact private manifest then
+authorized source-only deletion of 139 regular files totaling 15,287,781
+bytes. Execution had zero failures, and the post-scan found zero residual
+regular files in the bounded scope. Private archive evidence was preserved.
+
+**Status:** local ignored-regular-file retention risk resolved.
 
 ### P2 — broader production and proposal linkability
 
@@ -396,8 +412,10 @@ candidate evaluation.
 - The audit did not determine whether payment-network identifier exposure
   requires notification or identifier replacement; that is a security/data
   owner decision.
-- The audit did not establish an approved retention period or access-control
-  mechanism for ignored local evidence.
+- The follow-up established an owner-confirmed access-control location and
+  disposed of the bounded ignored regular-file source scope. It did not
+  establish a calendar retention period for the intentionally retained private
+  archive.
 
 ## Privacy-safe reproducibility appendix
 
@@ -602,8 +620,9 @@ live-source identities.
    controlled-roster references and role labels.
 5. **Completed for audited surfaces:** use reserved-domain fixtures and
    explicit operational inputs rather than embedded identities.
-6. **Still open; no deletion authorized:** inventory owners must approve and
-   enforce an access/retention/disposal rule for ignored operational exports.
+6. **Completed:** the owner confirmed an owner-only organizational archive,
+   approved the exact 139-file source manifest, and retained aggregate
+   receipts after zero-failure disposal and a zero-residual post-scan.
 7. **Still an owner decision:** classify whether the historically exposed
    payment-network identifiers require notification or replacement.
 
@@ -653,7 +672,8 @@ should:
 | `UNKNOWN` primary claims | 0 |
 | Explicit scope/coverage unknowns | 7 |
 | Probable live credentials in reachable history | 0 |
-| Confirmed unresolved privacy classes | 8 |
+| Confirmed unresolved privacy classes at baseline | 8 |
+| Current unresolved privacy classes | 1 |
 
 The non-history follow-up closed the six audited current-tree classes: raw
 reviewer/payment evidence, identifiable contact-strategy evidence, broader
@@ -661,12 +681,12 @@ Atlas/proposal artifacts, named access mappings, embedded operational/test
 identities, and current-memory contacts. The bounded ignored-export
 fingerprint comparison now returns zero exact contact matches in tracked files.
 
-Two privacy classes remain unresolved:
+One privacy class remains unresolved:
 
-1. reachable public Git history; and
-2. ignored local evidence retention/access/disposal.
+1. reachable public Git history.
 
 The audit's finding is therefore intentionally not described as reconciled.
-Current-tree redaction does not remove earlier blobs, commit messages, clones,
-caches, or the ignored local corpus. The next actions still require explicit
-owner decisions; they were not implicitly authorized by this remediation.
+Current-tree redaction and local source disposal do not remove earlier blobs,
+commit messages, clones, or caches. Any history rewrite or related
+notification decision still requires explicit owner authorization; it was not
+implicitly authorized by the local-retention remediation.

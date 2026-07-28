@@ -19,6 +19,22 @@ retry-cap, audit-link, complement-test, and stale-doc issues; those local issues
 were corrected; the bounded follow-up returned READY. Commit, governed prompt
 publication/deployment, and the controlled post-fix production smoke remain.
 
+## Local Operational Retention Milestone — Complete
+
+The owner-approved, fail-closed source disposal removed all 139 reviewed
+ignored, untracked regular files (15,287,781 bytes) with zero failures and zero
+residual regular files in scope. Preflight reverified every source hash, all 82
+archive-backed copies, all 20 separately preserved unique-source files, and
+source/archive separation. The owner-only organizational archive remains
+retained; five excluded dependency symlinks remain untouched.
+
+Use
+`docs/audits/local-operational-data-retention-audit-2026-07-27.md` and
+`docs/audits/local-operational-source-disposal-receipt-2026-07-27.md` for the
+privacy-safe evidence. This closes only the ignored local regular-file
+component; reachable public Git history remains unresolved under
+`docs/audits/public-repository-pii-history-audit-2026-07-27.md`.
+
 ## Session 378 Summary
 
 Session 378 executed the owner-authorized production review-synthesis smoke on
@@ -274,6 +290,9 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
 | `scripts/README.md` | Blocked legacy operational script guidance |
 | `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` | Current product execution sequence |
 | `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md` | App-access DAL Stage 4, now unblocked by deterministic context acceptance |
+| `docs/audits/local-operational-data-retention-audit-2026-07-27.md` | Local retention findings, preservation boundary, and completed source-disposal status |
+| `docs/audits/local-operational-source-disposal-receipt-2026-07-27.md` | Privacy-safe aggregate receipt for the completed 139-file disposal |
+| `docs/audits/public-repository-pii-history-audit-2026-07-27.md` | Current-tree privacy remediation and unresolved reachable-history findings |
 
 ## Testing
 

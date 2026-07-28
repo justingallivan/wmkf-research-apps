@@ -129,8 +129,9 @@ development log.
   This closure audit supplies that missing privacy-safe record.
 - **STALE, FIXED:** the local-retention audit left manifest repinning and the
   study's preservation window conditional on a future owner decision. It now
-  records the owner's closure decision and treats the raw chain as a
-  controlled disposal candidate.
+  records the owner's closure decision. A later exact private review, owner
+  approval, and zero-failure source disposal closed the raw-chain decision; see
+  `docs/audits/local-operational-source-disposal-receipt-2026-07-27.md`.
 - **HISTORICAL:** the 2026-07-09 comparison synthesis predates this experiment
   and remains planning input; it is not evidence of the later pilot outcome.
 
@@ -144,6 +145,6 @@ and owner-gated production work outside this completed study.
 The study's privacy-safe method, aggregate findings, limitations, and decision
 are now durable in tracked documentation. The reproducibility window is
 closed, so the exact seed and raw experiment chain no longer need indefinite
-retention for a future rerun. Any deletion still requires a private exact-path
-review, explicit owner approval, and an aggregate deletion receipt; this audit
-does not authorize deletion by itself.
+retention for a future rerun. The repository-side source copies were
+subsequently disposed after private exact-path review and explicit owner
+approval; the owner-only archive and privacy-safe aggregate receipt remain.
