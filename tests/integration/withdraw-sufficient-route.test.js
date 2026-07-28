@@ -97,7 +97,10 @@ test('still-pending row: writes withdrawn_sufficient (+ clears respond marker) B
     body: expect.stringContaining('Dear Dr. Reviewer,'),
   }));
   const email = createAndSendEmail.mock.calls[0][0];
-  expect(email.body).toContain('Thank you so much for your willingness to review the proposal “A Proposal” for the W. M. Keck Foundation.');
+  // The release only ever reaches a reviewer who never responded, so the copy
+  // thanks them for considering the request — not for a willingness to review.
+  expect(email.body).toContain('Thank you for considering our request to review the proposal “A Proposal” for the W. M. Keck Foundation.');
+  expect(email.body).toContain('a full slate of reviewers');
   expect(email.body).toContain('Dr. PD<br>W. M. Keck Foundation');
   expect(res._data).toMatchObject({ ok: true, withdrawn: 1 });
 });

@@ -38,7 +38,7 @@ export const EDITABLE_TEXT_DEFAULTS = [
     label: 'Reviewer respond-by reminder body',
     description: 'Default body copy for reviewer respond-by reminder emails. {{proposalClause}} renders as a proposal phrase in context, e.g. the proposal “X” (or a neutral phrase if untitled).',
     multiline: true,
-    placeholders: ['{{reviewerName}}', '{{proposalClause}}', '{{signature}}'],
+    placeholders: ['{{greeting}}', '{{reviewerName}}', '{{proposalClause}}', '{{signature}}'],
   },
   {
     key: 'email.reviewer_reminder_review_due.subject',
@@ -52,7 +52,7 @@ export const EDITABLE_TEXT_DEFAULTS = [
     label: 'Reviewer review-due reminder body',
     description: 'Default body copy for reviewer review-due reminder emails. {{proposalClause}} renders as a proposal phrase in context, e.g. the proposal “X” (or a neutral phrase if untitled).',
     multiline: true,
-    placeholders: ['{{reviewerName}}', '{{proposalClause}}', '{{reviewDueDate}}', '{{signature}}'],
+    placeholders: ['{{greeting}}', '{{reviewerName}}', '{{proposalClause}}', '{{reviewDueDate}}', '{{signature}}'],
   },
   {
     key: 'email.reviewer_acceptance.subject',
@@ -66,7 +66,7 @@ export const EDITABLE_TEXT_DEFAULTS = [
     label: 'Reviewer acceptance confirmation body',
     description: 'Default body copy for reviewer acceptance confirmation emails. Mustache {{tokens}}, not [brackets].',
     multiline: true,
-    placeholders: ['{{reviewerName}}', '{{proposalTitle}}', '{{reviewDueDate}}', '{{signature}}'],
+    placeholders: ['{{greeting}}', '{{reviewerName}}', '{{proposalTitle}}', '{{reviewDueDate}}', '{{signature}}'],
   },
   {
     key: 'email.reviewer_withdraw.subject',
@@ -80,7 +80,7 @@ export const EDITABLE_TEXT_DEFAULTS = [
     label: 'Reviewer withdraw-sufficient body',
     description: 'Default body copy for reviewer no-longer-needed withdrawal emails. {{proposalClause}} renders as a proposal phrase in context, e.g. the proposal “X” (or a neutral phrase if untitled).',
     multiline: true,
-    placeholders: ['{{reviewerName}}', '{{proposalClause}}', '{{signature}}'],
+    placeholders: ['{{greeting}}', '{{reviewerName}}', '{{proposalClause}}', '{{signature}}'],
   },
   {
     key: 'email.reviewer_invitation.subject',
