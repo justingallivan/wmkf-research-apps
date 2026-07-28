@@ -102,6 +102,7 @@
     "@vercel/blob": "^2.4.0",
     "@vercel/postgres": "^0.10.0",
     "balanced-match": "^1.0.2",
+    "brace-expansion": "file:vendor/brace-expansion-compat",
     "brace-expansion-upstream": "npm:brace-expansion@5.0.8",
     "busboy": "^1.6.0",
     "cors": "^2.8.6",
@@ -151,7 +152,7 @@
     "typescript": "^6.0.3"
   },
   "overrides": {
-    "brace-expansion": "file:vendor/brace-expansion-compat",
+    "brace-expansion": "$brace-expansion",
     "next": {
       "postcss": "8.5.18"
     },
