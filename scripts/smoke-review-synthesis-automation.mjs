@@ -531,7 +531,18 @@ async function main() {
       'the only staged eligible request must be Request 1002788',
     );
 
-    const cron = await callCron();
+    const cronAttempts = [await callCron()];
+    // A prior failed smoke may leave a retryable job whose fingerprint no
+    // longer exists after cleanup. One bounded drain cancels that stale lease;
+    // a second bounded drain may then claim the newly staged fingerprint.
+    if (
+      cronAttempts[0].ok
+      && cronAttempts[0].body?.completed === 0
+      && cronAttempts[0].body?.cancelled === 1
+    ) {
+      cronAttempts.push(await callCron());
+    }
+    const cron = cronAttempts[cronAttempts.length - 1];
     const [jobs, maintenanceRuns, aiRuns, request] = await Promise.all([
       readJobs(startedAt),
       readMaintenanceRuns(startedAt),
@@ -562,7 +573,7 @@ async function main() {
       stagedAnswerIds: stagedAnswers.map((row) => row.answerId),
       stagedAnswerKeys: stagedAnswers.map((row) => row.questionKey),
       stagedCensus,
-      cron,
+      cronAttempts,
       jobs,
       maintenanceRuns,
       aiRuns,
