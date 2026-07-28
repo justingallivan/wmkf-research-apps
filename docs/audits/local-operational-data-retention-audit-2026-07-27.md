@@ -3,7 +3,7 @@ title: Local Operational Data Retention Audit — 2026-07-27
 domain: security-privacy
 kind: audit
 status: active
-summary: "Privacy-safe inventory and preserve/archive/dispose proposal for ignored local operational artifacts; no operational artifact was moved, permissioned, or deleted."
+summary: "Privacy-safe retention inventory plus a verified owner-only OneDrive preservation copy; source artifacts remain unchanged and disposition is unresolved."
 canonical: false
 cataloged: 2026-07-27
 last_verified: 2026-07-27
@@ -56,8 +56,8 @@ to preserve, move, or delete.
 - remote copies, backups, CI artifacts, and files outside the repository;
 - semantic verification of every person, organization, proposal, or financial
   relationship;
-- selection or provisioning of a controlled external storage system; and
-- permission changes, file moves, archive creation, or deletion.
+- cloud-side OneDrive sharing membership and upload/sync confirmation; and
+- source permission changes, file moves, or deletion.
 
 The classifiers emitted only aggregate counts. No raw personal value, contact
 hash, person-bearing filename, or extracted OCR text was written to this
@@ -69,9 +69,13 @@ tracked report.
 
 **Verdict: `CLAIM NOT RECONCILED`.**
 
-The inventory is complete for the stated local scope, but the retention
-condition is not reconciled because the owner has not yet selected a secure
-destination, event-based retention rules, or an exact deletion set.
+The inventory is complete for the stated local scope. The owner selected an
+existing WMKF organizational OneDrive location, and the first preservation
+copy is complete and byte-verified through the local OneDrive mount. The
+retention condition is still not reconciled because cloud-side synchronization
+and access membership have not been independently verified, event-based
+retention decisions remain open, and no exact source deletion set has been
+approved.
 
 The ignored corpus contains 140 files totaling 15,288,067 bytes (about
 14.6 MiB). At least 63 text or structured files contain identity,
@@ -84,16 +88,18 @@ artifact-by-artifact disposition.
 
 The reviewer-holistic execution chain is the most important preservation
 boundary. Current ignored output includes unique, costly, and
-non-deterministic execution/scoring evidence and one proposal-evaluation file
-that passes its individual frozen validator. It does **not** include a usable
-complete external input bundle: structural validation found no current
-manifest or cohort file satisfying those contracts. The runner also rejects
-input paths inside the repository. Before related deletion or public-history
-remediation, preserve and provenance-check the existing proposal evaluation,
-recover or recreate the manifest and cohort in access-controlled external
-storage, validate the complete three-file contract, and repin the manifest to
-the final source commit. Recreate the proposal evaluation only if its
-provenance or currentness cannot be established.
+non-deterministic execution/scoring evidence and one scored
+proposal-evaluation file that passes its individual validator. The ignored
+tree does **not** include a usable complete external input bundle because it
+lacks a current manifest and cohort.
+
+The preservation follow-up recovered the last pre-redaction v2 manifest,
+frozen proposal evaluation, and owner-approved cohort directly from reachable
+history into the external archive. That three-file set passes the current full
+frozen validator. It is preserved separately from the later scored evaluation
+and was not returned to the public working tree. Repinning the manifest to the
+final source commit remains necessary only if the study stays reproducible and
+will be run again.
 
 `.gitignore` prevents accidental tracking. It does not provide encryption,
 access control, retention, recovery, or secure disposal.
@@ -103,9 +109,11 @@ access control, retention, recovery, or secure disposal.
 | Claim | Evidence | Classification |
 |---|---|---|
 | Ignored operational files are disposable. | Tracked code consumes ignored execution and smoke state; some final deliverables may be sole copies. | `FALSIFIED` |
-| The reviewer-holistic input bundle is locally complete. | One proposal-evaluation file passes its individual validator, but structural validation found zero current manifest-schema files and zero cohort-schema files. The complete contract is therefore unusable, and in-repository paths would be rejected by the runner. | `FALSIFIED` |
+| The reviewer-holistic input bundle is locally complete. | The ignored tree has one individually valid scored proposal evaluation but no current manifest or cohort. A separate pre-redaction three-file frozen contract was restored to the external archive and passes the full validator. | Ignored tree: `FALSIFIED`; external restoration: `VERIFIED locally` |
 | Reviewer-holistic execution output is cheaply reproducible. | Reproduction requires external inputs, credentials, an exact randomization seed, live services, paid calls, and non-deterministic responses. | `FALSIFIED` |
 | Current permissions adequately restrict flagged text files. | Fifty-eight of 63 flagged text/structured files have mode `0644`; only five have mode `0600`. | `FALSIFIED` |
+| The preservation copy is byte-complete and owner-only on the local mount. | Sixty-four copied files have zero source/destination checksum mismatches; eight directories are `0700`, all files are `0600`, and no symlink remains. | `VERIFIED locally` |
+| The preservation copy is synchronized and cloud access is correctly bounded. | The local OneDrive mount accepted and reread the copy, but no tenant URL or cloud-side access view was available for independent verification. | `UNKNOWN` |
 | A bounded first disposal set exists. | Zero-byte, current-state probe, merge receipt, generated schema, and smoke-log classes have no active tracked consumer after their conclusions or cleanup are verified. | `VERIFIED`, subject to owner approval |
 | Exact retention periods are established. | No repository policy or owner decision defines them. | `UNKNOWN` |
 
@@ -159,11 +167,40 @@ These are contextual classifiers, not a claim that every match is direct PII.
 They are sufficient to reject bulk treatment as harmless image or office
 output.
 
+## Preservation follow-up — 2026-07-27
+
+The owner selected an existing WMKF organizational OneDrive folder. The exact
+path and cloud access topology are private operational details and are not
+retained in this public report.
+
+The archive copy contains:
+
+| Sanitized class | Files | Status |
+|---|---:|---|
+| Complete reviewer-holistic output directory | 42 | Byte-identical to source |
+| Review-form production probe receipts | 13 | Byte-identical to source |
+| Smoke cleanup checkpoint | 1 | Byte-identical to source |
+| Application-research and Contact-ORCID rollback checkpoints | 3 | Byte-identical to source |
+| Seed-only reviewer-holistic environment file | 1 | Byte-identical to source; no unrelated credential file copied |
+| Recovered pre-redaction manifests, frozen proposal evaluation, and cohort | 4 | Byte-identical to the history extraction; v2 three-file contract passes the current full frozen validator |
+| **Total** | **64** | **8,666,629 bytes** |
+
+Local verification found eight archive directories at mode `0700`, 64 files at
+mode `0600`, zero symlinks, and zero checksum mismatches. A copied build-time
+dependency symlink was identified and removed from the archive without
+changing its target or the source tree. The temporary history-extraction
+directory was deleted after the four recovered files were checksum-verified.
+
+The source-side ignored files were not moved, changed, permissioned, or
+deleted. The local OneDrive mount does not expose authoritative cloud upload
+or sharing status, so cloud synchronization and access membership remain an
+explicit owner-verification gate.
+
 ## Load-bearing and disposition matrix
 
 | Sanitized artifact class | Dependency and reproducibility | Proposed disposition |
 |---|---|---|
-| External reviewer-holistic manifest, proposal evaluation, and cohort | The workflow collectively requires all three: the planner requires manifest plus proposal evaluation; the runtime probe requires proposal evaluation and optionally checks the manifest; validation and execution require the full set. One individually valid proposal evaluation exists, but no usable complete bundle exists in the ignored repo tree. | **Preserve and provenance-check the existing evaluation first.** Recover or recreate the missing manifest and cohort outside the repository, restrict access, validate the complete contract, and repin the manifest to the final source commit. Recreate the evaluation only if its provenance/currentness fails. |
+| External reviewer-holistic manifest, proposal evaluation, and cohort | The workflow collectively requires all three: the planner requires manifest plus proposal evaluation; the runtime probe requires proposal evaluation and optionally checks the manifest; validation and execution require the full set. One scored evaluation exists in ignored output but no usable complete bundle exists there. A separate frozen three-file bundle is now restored and passes full validation in the external archive. | **Preserve the verified frozen bundle separately from the scored output.** Confirm cloud sync/access, and repin the manifest to the final source commit only if the study remains active and reproducible. |
 | Reviewer-holistic execution checkpoints | Consumed by resume/retry and downstream cohort selection. Reproduction is paid, live-service-dependent, and non-deterministic. | **Preserve — highest priority.** Move only as one verified external bundle. |
 | Reviewer-holistic scoring package and unblinding map | Supports scoring, audit, and research. Reproduction depends on the execution chain, exact seed, and external inputs. | **Preserve securely.** Apply narrower access to the unblinding map. |
 | Reviewer identity/email research and chained evaluation outputs | Fourteen files are exactly referenced by tracked code; other results support manual judgments and experiment history. | **Preserve code-linked chain.** Review remaining files individually; do not bulk-delete the folder. |
@@ -192,8 +229,10 @@ owner decision. The safest current rules are event-based:
 
 1. **Secure destination first.** Use access-controlled storage outside the
    repository. The local staging directory should be owner-only (`0700`) and
-   copied files owner-readable/writable only (`0600`). Storage selection,
-   encryption, backup, and authorized users remain owner decisions.
+   copied files owner-readable/writable only (`0600`). The WMKF organizational
+   OneDrive storage class is selected and the local copy satisfies those mode
+   requirements. Cloud sharing membership, synchronization, encryption, and
+   backup remain owner/platform verification items.
 2. **Preserve a coherent experiment bundle.** Keep the verified three-file
    input contract, execution checkpoints, scoring package, unblinding map,
    exact randomization seed, final source commit, and a sanitized inventory
@@ -222,31 +261,31 @@ owner decision. The safest current rules are event-based:
 
 ## Safe execution sequence
 
-No step below has been executed.
-
-1. Select the access-controlled destination and authorized users.
-2. Preserve and provenance-check the individually valid reviewer-holistic
-   proposal evaluation. Recover or recreate the missing manifest and cohort
-   outside the repository; preserve the exact seed in controlled secret
-   storage, validate the frozen three-file contract, and repin the manifest.
-   Do not erase the only history source for a missing input before the external
-   bundle has been verified.
-3. Copy the load-bearing reviewer-holistic execution/scoring chain and any
-   sole-copy final deliverables; verify privately.
-4. Verify and complete any marker-gated smoke cleanup before deleting its
-   state file.
-5. Decide whether the application-research and Contact-ORCID back-propagation
-   rollback windows are closed.
-6. Produce an exact private candidate list for the approved categories.
-7. Delete only the approved files, then rerun the ignored-file inventory and
-   record aggregate before/after counts in a tracked receipt.
-8. Reconcile the local-only finding in
+1. **Partial:** the owner selected the WMKF organizational OneDrive
+   destination. The local copy is owner-only and byte-verified; cloud sync and
+   access membership still require confirmation.
+2. **Partial:** the scored proposal evaluation and exact seed are preserved.
+   The missing frozen manifest/cohort contract was recovered from history and
+   passes the full validator in the external archive. Manifest repinning is
+   pending if the study remains active.
+3. **Partial:** the load-bearing reviewer-holistic execution/scoring chain and
+   review-form evidence are copied and byte-verified. Sole-copy final
+   deliverables outside those directories still require review.
+4. **Pending:** verify and complete marker-gated smoke cleanup before deleting
+   its source state file.
+5. **Pending:** decide whether the application-research and Contact-ORCID
+   back-propagation rollback windows are closed.
+6. **Pending:** produce an exact private candidate list for the approved
+   disposal categories.
+7. **Pending:** delete only approved source files, rerun the ignored-file
+   inventory, and record aggregate before/after counts in a tracked receipt.
+8. **Pending:** reconcile the local-only finding in
    `docs/audits/public-repository-pii-history-audit-2026-07-27.md`.
 
 ## Owner decisions required
 
-1. What access-controlled destination should hold preserved operational
-   artifacts, and who should have access?
+1. Can the owner confirm that OneDrive reports the archive synchronized and
+   that its cloud access membership is limited to approved WMKF users?
 2. Is the reviewer-holistic study still active, or may its preservation window
    close after the external bundle is verified?
 3. Are the application-research and Contact-ORCID back-propagation rollback
@@ -256,9 +295,10 @@ No step below has been executed.
 5. May the first-wave disposal candidates be deleted after a private exact-path
    review and aggregate receipt?
 
-Until those decisions are recorded and the missing reviewer-holistic input
-contract is restored, the ignored-local component of the public PII/history
-audit remains `CLAIM NOT RECONCILED`.
+The missing reviewer-holistic input contract is now restored and locally
+verified in the external archive. Until cloud sync/access, retention-window,
+and exact disposal decisions are recorded, the ignored-local component of the
+public PII/history audit remains `CLAIM NOT RECONCILED`.
 
 ## Privacy-safe reproducibility
 
