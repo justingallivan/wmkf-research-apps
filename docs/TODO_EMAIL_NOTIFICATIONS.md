@@ -46,6 +46,15 @@ NOTIFICATION_EMAIL_FROM=<some-staff-or-role-mailbox@wmkeck.org>
 
 That's it. `DYNAMICS_*` credentials are already required for the rest of the app.
 
+### Related — keep the scholarly API contact reachable
+
+`NOTIFICATION_EMAIL_FROM` historically served double duty as the contact address
+sent to NCBI E-utilities and Europe PMC. When the sender is moved to an
+unmonitored role/noreply mailbox, set `SCHOLARLY_POLITE_MAILTO` to a monitored
+address so those providers can still reach a human about our API usage; it falls
+back to `NOTIFICATION_EMAIL_FROM` when unset. OpenAlex uses its own
+`OPENALEX_POLITE_MAILTO`.
+
 ### Recipient management (no env vars)
 
 Recipients = active superusers. To add or remove someone from the alert distribution, grant or revoke the `superuser` role via `/admin → User Access`. The change takes effect on the next alert send (no cache, no restart, no env-var update).
