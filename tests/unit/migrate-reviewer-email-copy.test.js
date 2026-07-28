@@ -76,6 +76,19 @@ describe('planReviewerCopyMigration', () => {
     }
   });
 
+  test('no body adds its own closing line — {{signature}} already carries one', () => {
+    // The per-PD signature block is free text and in production begins with a
+    // closing ("Thank you,\nJean\n--\n…"). A closing in the template therefore
+    // renders "With appreciation,\n\nThank you,\nJean". All four live bodies
+    // omit it; these must match that convention.
+    const CLOSING = /(thank you|with appreciation|with gratitude|sincerely|best regards|regards|warmly)\s*,?\s*$/i;
+    for (const target of REVIEWER_BODY_TARGETS) {
+      const beforeSignature = target.desired.split('{{signature}}')[0].trimEnd();
+      expect({ key: target.key, tail: beforeSignature.slice(-40) })
+        .toEqual({ key: target.key, tail: expect.not.stringMatching(CLOSING) });
+    }
+  });
+
   test('the withdraw target carries the corrected copy', () => {
     const withdraw = REVIEWER_BODY_TARGETS.find((t) => t.key === 'email.reviewer_withdraw.body');
     expect(withdraw.desired).toContain('Thank you for considering our request to review');
