@@ -3,7 +3,7 @@ title: Local Operational Data Retention Audit — 2026-07-27
 domain: security-privacy
 kind: audit
 status: active
-summary: "Privacy-safe retention inventory, private OneDrive preservation, closed study/smoke/rollback windows, and remaining final-copy and disposal decisions."
+summary: "Privacy-safe retention inventory, private OneDrive preservation, closed study/smoke/rollback/finality reviews, and remaining exact disposal decision."
 canonical: false
 cataloged: 2026-07-27
 last_verified: 2026-07-27
@@ -81,6 +81,12 @@ limitations, and decision are retained in a tracked closure audit.
 Read-only production reconciliation has also closed the application-research
 and Contact-ORCID rollback windows. Their three raw checkpoints are audit-only
 controlled-disposal candidates; no deletion is authorized by that finding.
+The 29-file rendered-artifact review identified three authoritative finals:
+two historical presentation decks and the complete frozen identity-benchmark
+workbook. All three are now byte-identical, owner-only copies in the local
+OneDrive mount. The remaining 26 rendered artifacts are derivatives,
+superseded work, or already-preserved operational/research evidence. Remote
+visibility of the three new copies still requires owner confirmation.
 
 The pre-cleanup ignored corpus contained 140 files totaling 15,288,067 bytes
 (about 14.6 MiB). At least 63 text or structured files contained identity,
@@ -114,16 +120,17 @@ access control, retention, recovery, or secure disposal.
 
 | Claim | Evidence | Classification |
 |---|---|---|
-| Ignored operational files are disposable. | Tracked code consumes ignored execution and smoke state; some final deliverables may be sole copies. | `FALSIFIED` |
+| Ignored operational files are disposable. | Tracked code consumes ignored execution and smoke state. Three authoritative finals existed only in the ignored source set before the follow-up preservation copy. | `FALSIFIED` |
 | The reviewer-holistic input bundle is locally complete. | The ignored tree has one individually valid scored proposal evaluation but no current manifest or cohort. A separate pre-redaction three-file frozen contract was restored to the external archive and passes the full validator. | Ignored tree: `FALSIFIED`; external restoration: `VERIFIED locally` |
 | Reviewer-holistic execution output is cheaply reproducible. | Reproduction requires external inputs, credentials, an exact randomization seed, live services, paid calls, and non-deterministic responses. | `FALSIFIED` |
 | Baseline source permissions adequately restrict flagged text files. | Fifty-eight of 63 flagged text/structured files had mode `0644`; only five had mode `0600`. | `FALSIFIED` |
-| The preservation copy is byte-complete and owner-only on the local mount. | Sixty-four copied files have zero source/destination checksum mismatches; eight directories are `0700`, all files are `0600`, and no symlink remains. | `VERIFIED locally` |
-| The preservation copy is synchronized and cloud access is correctly bounded. | The owner confirmed that the files are visible in OneDrive and that only the owner has access. | `VERIFIED via owner confirmation` |
+| The preservation copy is byte-complete and owner-only on the local mount. | Sixty-seven copied files have zero source/destination checksum mismatches; nine directories including the archive root are `0700`, all files are `0600`, and no symlink remains. | `VERIFIED locally` |
+| The preservation copy is synchronized and cloud access is correctly bounded. | The owner confirmed cloud visibility and owner-only access for the first 64 files. Three finality-follow-up files are byte-verified in the same local mount; their remote visibility has not yet been owner-confirmed. | `PARTIAL` |
 | The recorded smoke cleanup is complete. | Marker-gated cleanup deleted the current suggestion, marked potential reviewer, and marked linked Contact; independent production read-back found all absent and the source checkpoint cleared. | `VERIFIED` |
 | The reviewer-holistic study still needs an open reproducibility window. | The owner confirmed the study is complete; a tracked privacy-safe closure audit preserves its method, aggregate findings, limits, and decision. | `FALSIFIED via owner confirmation` |
 | The application-research migration still needs an open rollback window. | All 339 checkpoint links are unique and non-null; all 339 current target people exist; all three retired entities remain absent. The sole formerly populated field now empty exactly matches a documented intentional Scholar-identity correction. | `FALSIFIED via read-only production reconciliation` |
 | The Contact-ORCID historical backfill still needs an open rollback window. | All 162 projected writes had applied decisions and all 162 current Contact values match exactly, with zero mismatch, missing, malformed, not-found, or read-failure outcomes. | `FALSIFIED via read-only production reconciliation` |
+| The rendered-artifact set still contains unknown sole-copy finals. | Programmatic package inspection, visual review, exact hashing, source/reference tracing, and frozen-workbook reconciliation identified exactly three authoritative finals and copied all three byte-identically to the owner-only archive mount. | `FALSIFIED locally`; remote visibility confirmation pending |
 | A bounded first disposal set exists. | Zero-byte, current-state probe, merge receipt, generated schema, and smoke-log classes have no active tracked consumer after their conclusions or cleanup are verified. | `VERIFIED`, subject to owner approval |
 | Exact retention periods are established. | No repository policy or owner decision defines them. | `UNKNOWN` |
 
@@ -197,17 +204,20 @@ The archive copy contains:
 | Application-research and Contact-ORCID rollback checkpoints | 3 | Byte-identical to source |
 | Seed-only reviewer-holistic environment file | 1 | Byte-identical to source; no unrelated credential file copied |
 | Recovered pre-redaction manifests, frozen proposal evaluation, and cohort | 4 | Byte-identical to the history extraction; v2 three-file contract passes the current full frozen validator |
-| **Total** | **64** | **8,666,629 bytes** |
+| Authoritative rendered finals | 3 | Two self-contained presentation decks and one complete frozen benchmark workbook; byte-identical to source |
+| **Total** | **67** | **8,807,893 bytes** |
 
-Local verification found eight archive directories at mode `0700`, 64 files at
+Local verification found nine archive directories including the root at mode `0700`, 67 files at
 mode `0600`, zero symlinks, and zero checksum mismatches. A copied build-time
 dependency symlink was identified and removed from the archive without
 changing its target or the source tree. The temporary history-extraction
 directory was deleted after the four recovered files were checksum-verified.
 
 The source-side ignored files were not moved, changed, permissioned, or
-deleted. The owner confirmed after the copy that the files are visible in
-OneDrive and only the owner has access.
+deleted. The owner confirmed after the first 64-file copy that those files are
+visible in OneDrive and only the owner has access. The three finality-follow-up
+files use the same owner-only destination and are locally byte-verified; their
+remote visibility awaits owner confirmation.
 
 ## Smoke cleanup follow-up — 2026-07-27
 
@@ -296,6 +306,53 @@ Contact ORCIDs from a historical log could erase later independent
 confirmation. Any future correction requires a new reviewed remediation based
 on current evidence. Exact deletion remains separately approval-gated.
 
+## Rendered-artifact finality follow-up — 2026-07-27
+
+**Change surface:** 29 ignored binary/rendered artifacts: 21 PNG, three XLSX,
+two PPTX, two DOCX, and one PDF.
+
+The review combined package metadata and structure, exact hashes, spreadsheet
+formulas/completion state, tracked import receipts, current source and
+documentation references, visual rendering, slide-overflow checks, and
+privacy-safe OCR classification. No raw content or person-bearing path was
+written to this report. No source file was changed or deleted.
+
+Exactly three artifacts are authoritative finals:
+
+- two historical presentation decks, with five and 15 slides, are visually
+  complete, pass overflow checks, and contain no macro, embedded package,
+  external relationship, or unresolved comment dependency; and
+- one 40-case benchmark workbook is complete, matches the tracked frozen-v2
+  source hash, and records 40/40 completed decisions with no attention state.
+
+None of the three existed as an exact Git object or in the first preservation
+copy. All three were copied byte-identically to the owner-only OneDrive mount,
+adding 141,264 bytes. The editable presentation files are self-contained, and
+the workbook's row-level decisions also remain validated by the tracked
+frozen import receipt. Preserve the three external final copies. Their ignored
+source duplicates can join the exact disposal candidate list after remote
+visibility is owner-confirmed.
+
+The other 26 artifacts are not sole authoritative finals:
+
+- 20 PNGs are one-per-slide renders of the two decks and one PNG is their QA
+  contact sheet; all are sensitive but have no tracked consumer;
+- one workbook is a non-authoritative working copy whose cached summary reports
+  only 20/40 rows complete. All seven raw decision fields for all 40 rows match
+  the tracked v1 import exactly, all 46 formulas match the complete v2
+  workbook, and neither workbook contains comments, macros, or external links;
+- one scoring workbook belongs to the completed reviewer-holistic study and
+  is already byte-preserved as private row-level audit evidence; and
+- two DOCX and one PDF are review-form smoke evidence already byte-preserved
+  externally. The PDF is a derivative of the report DOCX, and the courtesy
+  copy's answer content is contained in that report.
+
+**Finality result:** the sole-copy question is resolved locally. Preserve the
+three external authoritative finals; classify all 29 source-side ignored
+copies as controlled disposal candidates once the three new archive copies
+are visibly synchronized and exact deletion is approved. This result does not
+authorize deletion.
+
 ## Load-bearing and disposition matrix
 
 | Sanitized artifact class | Dependency and reproducibility | Proposed disposition |
@@ -313,7 +370,10 @@ on current evidence. Exact deletion remains separately approval-gated.
 | Merge-probe raw receipts | Offline diagnostic evidence; the probe can be rerun. | **First-wave disposal candidate** after any needed aggregate conclusion is tracked. |
 | Generated schema diff | Regenerable from current metadata; no runtime consumer. | **First-wave disposal candidate** after any needed aggregate conclusion is tracked. |
 | Root smoke receipts and reproducible logs | No tracked consumer; represent point-in-time diagnostic output. | **First-wave disposal candidate** unless they are the only evidence for an unresolved incident. |
-| Rendered office/PDF/image output and final decks | Intermediates are usually rebuildable; a final human deliverable may be a sole copy. | **Preserve only final/sole copies externally; dispose intermediates** after visual/finality review. |
+| Historical presentation decks and complete frozen benchmark workbook | Exactly three authoritative finals passed structural and visual review and were copied byte-identically to the owner-only archive mount. | **Preserve the three external copies.** Source-side duplicates may be disposed after remote visibility confirmation and exact approval. |
+| Slide-render PNGs and contact sheet | Twenty slide renders map exactly to the two preserved decks; one contact sheet is QA-only. No tracked consumer exists. | **Controlled disposal candidates.** Preserve no PNG solely for local reproducibility. |
+| Superseded benchmark workbook | A non-authoritative working copy has a stale/incomplete cached summary, but every raw decision field matches the tracked v1 import and every formula matches the complete v2 workbook; it contains no comments, macros, or external links. | **Controlled disposal candidate.** |
+| Review-form DOCX/PDF evidence | Two DOCX and one derivative PDF are operational evidence, not business finals; all are already byte-preserved externally and their aggregate conclusion is tracked. | **Controlled disposal candidates** after exact approval. |
 | Other agent review and handoff output | Usually rerunnable but not byte-identical; conclusions may already be tracked. | **Review individually; dispose when durable conclusions exist elsewhere.** |
 
 The exact code-reference split in the reviewer-holistic directory is 14 files
@@ -351,9 +411,10 @@ owner decision. The safest current rules are event-based:
 5. **Dispose of reproducible diagnostics after receipt.** A tracked aggregate
    result may replace raw probes, schema diffs, smoke logs, and intermediate
    renders when no incident or audit obligation remains.
-6. **Review sole-copy deliverables.** Move final decks, workbooks, documents,
-   or reports that have continuing business value; do not preserve every
-   intermediate render merely because a final copy is valuable.
+6. **Review sole-copy deliverables.** Complete locally: three authoritative
+   finals were identified and copied byte-identically to the owner-only
+   archive mount. The 21 PNGs are render/QA intermediates, not finals.
+   Confirm remote visibility before source disposal.
 7. **Verify transfers and deletions.** Compare byte counts and cryptographic
    receipts privately after transfer, open representative copied artifacts,
    and generate a privacy-safe deletion receipt containing only category,
@@ -369,9 +430,11 @@ owner decision. The safest current rules are event-based:
    in the external archive. The owner closed the study and reproducibility
    window; a privacy-safe tracked audit preserves its design and findings, and
    manifest repinning is not required.
-3. **Partial:** the load-bearing reviewer-holistic execution/scoring chain and
-   review-form evidence are copied and byte-verified. Sole-copy final
-   deliverables outside those directories still require review.
+3. **Complete locally:** the load-bearing reviewer-holistic
+   execution/scoring chain and review-form evidence are copied and
+   byte-verified. The finality review identified three additional authoritative
+   finals and copied them byte-identically to the same owner-only archive
+   mount. Remote visibility of those three new files awaits owner confirmation.
 4. **Complete:** marker-gated cleanup deleted the marked smoke person, its
    current suggestion, and the marked linked Contact. Independent production
    read-back proved all are absent, and the source checkpoint is gone.
@@ -387,9 +450,7 @@ owner decision. The safest current rules are event-based:
 
 ## Owner decisions required
 
-1. Are any rendered decks, workbooks, documents, PDFs, or images the sole
-   authoritative final copy?
-2. May the reviewer-holistic raw bundle, the three closed-window checkpoints,
+1. May the reviewer-holistic raw bundle, the three closed-window checkpoints,
    preserved smoke checkpoint, and first-wave disposal candidates be deleted
    after a private exact-path review and aggregate receipt?
 
@@ -398,9 +459,11 @@ external archive, the study and reproducibility window are closed, and its
 privacy-safe design and findings are tracked. The owner also confirmed cloud
 presence and owner-only access. The application-research and Contact-ORCID
 rollback windows are also closed with aggregate reconciliation recorded above.
-Until the remaining final-copy and exact disposal decisions are recorded, the
-ignored-local component of the public PII/history audit remains
-`CLAIM NOT RECONCILED`.
+The finality review preserved the three authoritative finals and classified
+the other rendered artifacts. Until remote visibility of the three new copies
+is confirmed and the remaining exact disposal decision is recorded, the
+ignored-local component of the public PII/history audit remains `CLAIM NOT
+RECONCILED`.
 
 ## Privacy-safe reproducibility
 
@@ -424,5 +487,6 @@ raw matches, person-bearing basenames, reversible contact hashes, secret
 values, record identifiers, and OCR text.
 
 The bounded scan can miss semantically sensitive relationships that contain no
-classifier term. The final disposition therefore requires owner review of
-sole-copy deliverables and non-code-referenced research output.
+classifier term. The sole-copy binary review is complete; final disposition
+still requires exact owner approval for deletion and individual review of
+non-code-referenced research output.
