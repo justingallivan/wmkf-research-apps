@@ -6,12 +6,13 @@ status: draft
 summary: "System-alert emails are wired to the Dynamics email transport (DynamicsService.createAndSendEmail). When NOTIFICATION_EMAIL_FROM is set, the..."
 canonical: false
 cataloged: 2026-07-02
+last_verified: 2026-07-28
 owner: product-engineering
 ---
 
 # Email Notifications — Unified Notification Service
 
-## Current Status (as of 2026-05-23)
+## Current Status (as of 2026-07-28)
 
 System-alert emails are wired to the Dynamics email transport (`DynamicsService.createAndSendEmail`). When `NOTIFICATION_EMAIL_FROM` is set, the notification service automatically emails recipients on:
 
@@ -57,7 +58,10 @@ back to `NOTIFICATION_EMAIL_FROM` when unset. OpenAlex uses its own
 
 ### Recipient management (no env vars)
 
-Recipients = active superusers. To add or remove someone from the alert distribution, grant or revoke the `superuser` role via `/admin → User Access`. The change takes effect on the next alert send (no cache, no restart, no env-var update).
+Recipients are configured by category in `/admin` → **Alert Recipients**.
+Resolution falls back from the category to the configured default and then to
+the active superuser roster. Changes take effect on the next alert send (no
+restart or environment-variable update).
 
 ## Sender mailbox guidance
 
@@ -105,12 +109,10 @@ State of this change:
   and `SCHOLARLY_POLITE_MAILTO` were both set to `alerts@wmkeck.org` in Vercel and
   a deploy was started. Not independently confirmed here — Vercel sensitive env
   values are not readable from a session.
-- **[PENDING MERGE]** `SCHOLARLY_POLITE_MAILTO` has no effect in production until
-  the code that reads it reaches `main` (cleanup branch
-  `codex/reviewer-email-contract-cleanup`). Until
-  then PubMed/Europe PMC fall back to `NOTIFICATION_EMAIL_FROM`, which is now the
-  same address — so the contact path is correct either way, and the new var is
-  simply inert.
+- **[VERIFIED DEPLOYED 2026-07-28]** The `SCHOLARLY_POLITE_MAILTO` readers
+  reached `main` through PR #92 (`ab1d2943`) and a Ready production deployment.
+  PubMed and Europe PMC now read the dedicated value at call time, with
+  `NOTIFICATION_EMAIL_FROM` retained only as the compatibility fallback.
 
 Note that `/api/test-email` cannot verify any of this: it sends from the
 authenticated superuser's own `azureEmail` and only honors a `from` body param
@@ -128,7 +130,7 @@ NotificationService.notify()
   ├── AlertService.createAlert()                   ← always (dashboard)
   └── if (emailAdmins || severity ≥ error) and isEmailEnabled:
         NotificationService.sendAdminEmail()
-          ├── getAdminRecipients()                 ← SQL: active superusers
+          ├── AlertRecipients.resolveRecipients()  ← category/default/superuser fallback
           └── DynamicsService.createAndSendEmail() ← Dynamics SSS transport
 ```
 

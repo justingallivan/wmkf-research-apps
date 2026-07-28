@@ -3,10 +3,10 @@ title: "Workbench Reviews Tab — Consumption Build-Out Plan"
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Reviews tab deployed; deterministic consumers verified; local synthesis reliability fix awaits governed publication/deployment and post-fix smoke."
+summary: "Reviews tab deployed; synthesis reliability code deployed; governed prompt publication and post-fix smoke remain."
 canonical: false
 cataloged: 2026-07-03
-last_verified: 2026-07-27
+last_verified: 2026-07-28
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -45,9 +45,10 @@ the form, but the owner-authorized staged production submission proved the
 populated Compare/matrix and DOCX/PDF/courtesy outputs against canonical answer
 rows. The smoke data was atomically cleaned up. The 2026-07-27 follow-up also
 proved the staff Manual Review Entry producer and exact restoration path. AI
-synthesis remains the unresolved production runtime boundary. A local
-terminal-response/native-schema/bounded-retry fix passed focused tests on
-2026-07-27; governed prompt publication, deployment, and a post-fix smoke remain.
+synthesis remains the unresolved production runtime boundary. The
+terminal-response/native-schema/bounded-retry fix passed focused tests, merged
+through PR #92 (`ab1d2943`), and reached a Ready production deployment on
+2026-07-28. Governed prompt publication and a post-fix smoke remain.
 
 ## Context
 
@@ -270,9 +271,10 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   change. The local fix now requires `end_turn` before persistence, preserves
   stop/token/hash diagnostics, uses capability-gated native JSON schema, and
   retries only a typed `max_tokens` termination once with a bounded larger
-  budget. This is not yet a production-live claim: publish the governed prompt
-  version, deploy the independently reviewed code, and run one controlled
-  post-fix smoke before exposure.
+  budget. The independently reviewed code is production-deployed through PR #92
+  (`ab1d2943`), but the new behavior is not production-proven: publish the
+  governed prompt version and run one controlled post-fix smoke before
+  exposure.
 
 ## Verification per phase
 
