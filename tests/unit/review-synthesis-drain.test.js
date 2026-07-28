@@ -50,6 +50,7 @@ beforeEach(() => {
     records: [submittedRow()],
     capped: false,
   });
+  findByRequest.mockResolvedValue([submittedRow()]);
   loadReviewSynthesisContext.mockResolvedValue({
     readiness: { ready: true, inputHash: INPUT_HASH },
   });
@@ -94,6 +95,37 @@ test('cancels a claimed job when its current fingerprint changed', async () => {
     'input_fingerprint_changed_before_generation',
   );
   expect(synthesizeReviews).not.toHaveBeenCalled();
+});
+
+test('cancels a claimed job before content loading when readiness disappeared', async () => {
+  const job = {
+    id: 4,
+    request_id: REQUEST_ID,
+    input_hash: INPUT_HASH,
+    lease_token: '33333333-3333-4333-8333-333333333333',
+  };
+  claimAutomaticReviewSynthesisJobs.mockResolvedValueOnce([job]);
+  findByRequest.mockResolvedValueOnce([
+    submittedRow({
+      wmkf_reviewreceivedat: null,
+      wmkf_externaltokenhash: null,
+      wmkf_externaltokenissued: null,
+      wmkf_externaltokenexpires: null,
+    }),
+  ]);
+
+  const result = await drainReviewSynthesisJobs();
+
+  expect(result.cancelled).toBe(1);
+  expect(cancelReviewSynthesisJob).toHaveBeenCalledWith(
+    job,
+    'readiness_changed_before_generation',
+  );
+  // One call belongs to the enqueue scan; the claimed job never enters the
+  // content loader after lifecycle readiness has disappeared.
+  expect(loadReviewSynthesisContext).toHaveBeenCalledTimes(1);
+  expect(synthesizeReviews).not.toHaveBeenCalled();
+  expect(recordReviewSynthesisJobFailure).not.toHaveBeenCalled();
 });
 
 test('revalidates and runs a matching claimed job through automatic mode', async () => {
