@@ -108,9 +108,23 @@ dry run first — it prints each current value in full, and that transcript is t
 restore path. Rows that are missing or blank are reported, never silently
 populated; re-running after a successful migration writes nothing.
 
+Both scripts talk to Dataverse, so the target/write interlock applies. Run from a
+local checkout against production and every call is denied by default — reads
+included. Reads need `DATAVERSE_ALLOW_PROD_READS=yes`; writes additionally need
+the per-invocation operator ack `DATAVERSE_PROD_WRITE_ACK="<purpose> <YYYY-MM-DD>"`,
+whose date must be **today in UTC** (`resolveProdWriteAck` in
+`lib/dataverse/core/interlock.js`) — a stale date fails closed and silently. Set
+both in the operator shell only; never commit them and never set them in Vercel.
+See `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md`.
+
 ```bash
-node scripts/migrate-reviewer-email-copy.mjs > before.txt   # review, keep this
-node scripts/migrate-reviewer-email-copy.mjs --execute
+# review and KEEP before.txt — it is the restore path (and is not gitignored)
+DATAVERSE_ALLOW_PROD_READS=yes \
+  node scripts/migrate-reviewer-email-copy.mjs > before.txt
+
+DATAVERSE_ALLOW_PROD_READS=yes \
+  DATAVERSE_PROD_WRITE_ACK="migrate reviewer email copy $(date -u +%F)" \
+  node scripts/migrate-reviewer-email-copy.mjs --execute
 ```
 
 ## Reviewer Finder Testing
