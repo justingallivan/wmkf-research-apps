@@ -60,10 +60,12 @@ const ACTOR = 'su-1';
 
 let synthesizeReviews;
 let SynthesizeReviewsError;
+let loadReviewSynthesisContext;
 beforeAll(async () => {
   const mod = await import('../../lib/services/review-manager/synthesize-reviews-service');
   synthesizeReviews = mod.synthesizeReviews;
   SynthesizeReviewsError = mod.SynthesizeReviewsError;
+  loadReviewSynthesisContext = mod.loadReviewSynthesisContext;
 });
 
 function submittedSuggestion(over = {}) {
@@ -303,6 +305,29 @@ test('automatic generation requires a leased job matching the freshly loaded fin
   });
   expect(executePrompt).not.toHaveBeenCalled();
   expect(startManualReviewSynthesisJob).not.toHaveBeenCalled();
+});
+
+test('automatic generation uses the existing automated-background run source', async () => {
+  const context = await loadReviewSynthesisContext(REQ);
+  const out = await synthesizeReviews({
+    requestId: REQ,
+    overwrite: true,
+    actingUserSystemId: null,
+    mode: 'automatic',
+    job: {
+      id: 9,
+      lease_token: '99999999-9999-4999-8999-999999999999',
+      input_hash: context.readiness.inputHash,
+      attempts: 1,
+    },
+  });
+  expect(out.ok).toBe(true);
+  expect(startManualReviewSynthesisJob).not.toHaveBeenCalled();
+  expect(executePrompt).toHaveBeenCalledWith(expect.objectContaining({
+    runSource: 'PowerAutomate Auto',
+    forceOverwrite: true,
+    actingUserSystemId: null,
+  }));
 });
 
 test('confirmEarly:true permits a manual run while a participant remains unresolved', async () => {
