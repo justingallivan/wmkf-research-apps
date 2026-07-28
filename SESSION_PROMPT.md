@@ -126,9 +126,16 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
 
 2. **Continue the Workbench product sequence after synthesis release.**
    Evidence: `docs/CURRENT_WORK_QUEUE.md`;
-   `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
+   `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`;
+   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
    Calendar and freeze the full contract for Pre Site Visit Writeup, Site
-   Visit, Final Writeup, and Initial Writeup before implementing another tab.
+   Visit, Final Writeup, and J27 Initial Assessment before implementing another
+   tab. Owner-decided foundations: SharePoint Word is the canonical editable
+   narrative; Dataverse is the typed registry/workflow authority; Microsoft
+   Search supplies file-body search; version recovery, retention,
+   least-privilege editing, and immutable Board milestones are required.
+   Exact schema, file topology, library configuration, and remaining
+   stage-specific inputs are still open.
 
 ### Owner Decision Needed
 

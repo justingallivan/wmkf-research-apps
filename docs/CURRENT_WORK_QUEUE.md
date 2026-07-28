@@ -34,8 +34,8 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Remaining lifecycle design freeze | Calendar the fixed deadlines and define the full contract for Pre Site Visit Writeup, Site Visit, Final Writeup, and Initial Writeup. Existing June assumptions are inputs, not decisions. | Each tab has approved user, inputs, producer, persistence, consumer, access, recovery, and deadline. |
-| 2 | First deadline-bound writeup slice | Default candidate is Pre Site Visit Writeup, but only after the calendar and input/artifact contracts are approved. | One request produces a durable, editable Word artifact and visible Workbench state through a production smoke. |
+| 1 | Remaining lifecycle design freeze | Calendar the fixed deadlines and finish the contracts for Pre Site Visit Writeup, Site Visit, Final Writeup, and J27 Initial Assessment. SharePoint Word is the decided narrative authority; Dataverse is the typed registry/workflow authority. Exact schema, document topology, target-library protection settings, and remaining stage inputs are still open. | Each tab has approved user, inputs, producer, persistence, consumer, search, access, version/recovery/retention, milestone, and deadline contracts. |
+| 2 | First deadline-bound writeup slice | Default candidate is Pre Site Visit Writeup, but only after the calendar and input/artifact contracts are approved. | One request produces a durable, searchable, editable and recoverable Word artifact, a protected milestone snapshot, and visible Workbench state through a production smoke. |
 
 ## Audit follow-ups — verified open, not silently prioritized
 

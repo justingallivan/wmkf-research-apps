@@ -50,6 +50,13 @@ document inventory, and individual implementation plans do not establish priorit
   then became sole-current and the 2026-07-28 post-fix smoke persisted valid
   synthesis with complete audit evidence and exact synthetic-review cleanup. See
   `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
+- Writeup artifact direction (owner-decided 2026-07-28): SharePoint Word is the
+  canonical editable narrative; Dataverse is the typed document
+  registry/workflow/structured-decision authority; Microsoft Search supplies
+  body search; version recovery, retention, least-privilege editing, and frozen
+  Board milestones are required parts of the design. Exact schema, document
+  topology, and target-library configuration remain planned/unverified. See
+  `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel: `project-virtual-review-panel`.
 - Roadmap snapshots: `project-app-roadmap-2026-04-25`, `project-phase-i-summary-app-winddown`.

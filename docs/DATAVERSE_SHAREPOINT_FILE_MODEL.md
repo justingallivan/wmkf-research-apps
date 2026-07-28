@@ -3,12 +3,14 @@ title: Dataverse / SharePoint File Storage Model
 domain: dataverse
 kind: source-of-truth
 status: active
-summary: "File storage and linking in AkoyaGO/Dynamics, including the retained reviewer-upload path; current reviews use structured Dataverse answers."
+summary: "File storage and linking in AkoyaGO/Dynamics, including the governed SharePoint/Dataverse contract for editable staff writeups."
 canonical: true
 cataloged: 2026-07-02
+last_verified: 2026-07-28
 owner: product-engineering
 related:
   - scripts/probe-sharepoint-write.js
+  - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
 ---
 
 # Dataverse / SharePoint File Storage Model
@@ -37,6 +39,101 @@ files).** When you "attach a document to a request" in Dynamics, the file is
 silently stored in SharePoint and a pointer record is created in Dataverse —
 they look unified in the Dynamics UI, but are two separate systems under the
 hood.
+
+---
+
+## Governed staff writeups — target contract
+
+> **Owner-decided direction (2026-07-28); implementation still planned.**
+> This section governs the Initial Assessment, Pre Site Visit Writeup, and
+> Final Writeup design. It does not claim that the target Dataverse schema,
+> SharePoint library policy, prompts, or Workbench surfaces have been
+> provisioned.
+
+### Authority boundary
+
+- **SharePoint Word document:** authoritative editable narrative. Native Word
+  co-authoring, comments, tracked changes, AutoSave, and SharePoint version
+  history operate on this copy.
+- **Dataverse:** authoritative document identity, request/cycle relationship,
+  artifact type, lifecycle state, structured decisions, access/workflow
+  metadata, and durable SharePoint identity/version references.
+- **Workbench:** creates or finds the registered artifact, displays its state
+  and preview, opens it in Word, and exposes authorized recovery/milestone
+  actions.
+
+Do not mirror the Word body into an independently editable Dataverse memo. That
+would create two competing sources of truth and an unsafe Word→Dataverse merge
+problem after co-editing. If later search or AI requirements need extracted
+text, store it only as a derived, version-keyed representation that can be
+rebuilt from the SharePoint original.
+
+### Registry contract
+
+The exact Dataverse table/columns remain a design decision. The approved shape
+is a typed document registry rather than one ad hoc URL field per writeup. At a
+minimum, the persistence design must account for:
+
+- request and cycle;
+- artifact type (`initial-assessment`, `pre-site-visit`, or `final-writeup`);
+- SharePoint site/drive/item identity and human-facing URL;
+- current version/eTag and last-modified metadata;
+- producer and AI prompt/run provenance where applicable;
+- draft/review/board-ready/superseded/final lifecycle state; and
+- immutable milestone version/snapshot references.
+
+A URL alone is not the artifact identity, and a folder/filename convention is
+not a durable join contract.
+
+### Search contract
+
+SharePoint document bodies remain systematically searchable. The current
+`GraphService.searchFiles()` implementation calls Microsoft Graph Search with
+`driveItem` results and KQL path scoping; a read-only 2026-07-28 tenant probe
+with a quoted scientific phrase returned the implementation's 100-result cap
+across `.doc`, `.docx`, and `.pdf` body content.
+
+That proves platform and tenant capability, not a finished Workbench search
+contract. Before exposing corpus search, the implementation must add:
+
+- pagination/completeness beyond the current first 100 hits;
+- authorization appropriate to app-only Graph permissions;
+- a join from each result to its typed Dataverse document/request record;
+- cycle, program, artifact-type, and lifecycle filters; and
+- an explicit freshness posture for SharePoint's asynchronous index.
+
+Use Dataverse for structured narrowing and Microsoft Search for file-body
+matching. Add a separate derived text index only if measured freshness,
+completeness, or semantic-search requirements cannot be met that way.
+
+### Version and data-protection contract
+
+An editable SharePoint file is not production-ready until its recovery and
+records controls are verified:
+
+1. audit the target library's version-history limits and demonstrate
+   previous-version inspection and restoration;
+2. audit first/second-stage recycle-bin recovery and the applicable Microsoft
+   Purview retention policy or label;
+3. define an editor permission level that supports Word co-authoring without
+   granting ordinary editors unnecessary delete, move, rename, permission, or
+   version-deletion authority;
+4. expose current version, last-modified identity/time, and version history in
+   the Workbench; restrict restore to an approved administrative role; and
+5. freeze every official Board milestone with request/artifact identity,
+   SharePoint item and version ID, timestamp, actor, content hash, and retained
+   DOCX and/or PDF snapshot.
+
+Working prose remains editable and recoverable. An official milestone remains
+identifiable even after later edits to the working document. The current app
+can download, search, upload, and delete SharePoint files, but it does not yet
+implement Graph version-history, restore, retention, or milestone-snapshot
+operations.
+
+Platform references:
+[Microsoft Graph file versions](https://learn.microsoft.com/en-us/graph/api/driveitem-list-versions?view=graph-rest-1.0),
+[SharePoint version history](https://learn.microsoft.com/en-us/sharepoint/document-library-version-history-limits),
+[SharePoint retention](https://learn.microsoft.com/en-us/purview/retention-policies-sharepoint).
 
 ---
 

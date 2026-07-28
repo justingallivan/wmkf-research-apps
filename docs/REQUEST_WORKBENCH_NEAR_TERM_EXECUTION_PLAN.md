@@ -39,6 +39,67 @@ provides:
 
 Until then, “Week 1/2/3” are relative execution windows, not delivery promises.
 
+## Owner-decided lifecycle and document foundations — 2026-07-28
+
+These decisions now constrain every remaining writeup slice:
+
+### Lifecycle meaning
+
+- **D26:** the Initial Writeup placeholder corresponds to the approximately
+  one-page staff Phase I writeup completed before the Workbench was built. Do
+  not backfill or reinterpret it as a live D26 workflow.
+- **J27:** every complete single-submission proposal receives an AI-generated
+  **Initial Assessment** before the staff merits discussion and Board
+  advancement decision.
+- Staff deliberate from the Initial Assessments and recommend a subset to the
+  Board. The Board's decision to advance is recorded through the Workbench
+  dashboard and marks the internal Phase II transition.
+- Phase II remains a business-process stage but creates no second applicant
+  submission. Reviewer recruitment, returned reviews, and Pre Site Visit work
+  use the original full submission.
+
+The historical Group B proposal's `triage = Advancing` generation trigger is
+therefore wrong for the J27 Initial Assessment: an artifact used to decide
+advancement must exist before advancement and for every in-scope proposal.
+
+### Document authority
+
+- SharePoint Word is the canonical editable narrative and co-authoring surface.
+- Dataverse is the canonical registry for request/cycle/artifact identity,
+  stable SharePoint drive/item/version references, lifecycle state, structured
+  decisions, and workflow/audit metadata.
+- The Workbench is the creation, discovery, preview, open-in-Word, workflow,
+  milestone, and authorized recovery surface.
+- Do not maintain a second independently editable copy of the Word body in a
+  Dataverse memo. Derived extracted text may exist only as a version-keyed,
+  rebuildable search/AI representation.
+
+### Search
+
+Microsoft Graph Search can search indexed body text in SharePoint Word and PDF
+files. The current `GraphService.searchFiles()` implementation and a read-only
+tenant probe prove that capability, but the present method is limited to 100
+hits, has no pagination, and is exposed only through Dynamics Explorer.
+Workbench search must add authorization, pagination/completeness, typed
+Dataverse result joins, lifecycle filters, and an explicit index-freshness
+posture. Dataverse remains the structured-filter layer; SharePoint remains the
+file-body search layer.
+
+### Version and data protection
+
+- Before a target library is approved, verify its version limits, restore
+  behavior, recycle-bin recovery, Purview retention, and editor permissions.
+- Ordinary collaborators need content-edit rights, not uncontrolled
+  delete/move/rename/permission/version-deletion rights.
+- The Workbench must show current version and last-modified metadata, link to
+  version history, and restrict restore to an approved administrative role.
+- Every official Board milestone must retain the exact SharePoint item/version,
+  actor, timestamp, content hash, and a protected DOCX and/or PDF snapshot.
+
+The detailed target contract and current-vs-planned boundary live in
+`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`. Whether the three writeup stages use
+separate files or milestone versions of a smaller document set remains open.
+
 ## Production review-synthesis smoke — reliability proven
 
 On 2026-07-27, the owner-authorized staff-triggered production smoke ran against
@@ -166,6 +227,8 @@ leave the review with this contract:
 | Regeneration | Overwrite/version/history behavior. |
 | Access | Who may read, generate, edit, and approve. |
 | Failure recovery | What staff sees and how the operation is retried safely. |
+| Search | Which body/metadata searches are required, their scope, freshness, pagination, and authorization. |
+| Version/data protection | Version limits, restore rights, deletion recovery, retention, and milestone-freeze behavior. |
 | Deadline | Fixed date and minimum viable outcome. |
 
 Decision order:
@@ -176,8 +239,9 @@ Decision order:
    `akoya_sitevisitnotes` satisfy the real workflow.
 3. **Final Writeup** — define only after the Site Visit input and writeup artifact contract
    are settled.
-4. **Initial Writeup** — schedule from the next-cycle deadline; do not inherit the obsolete
-   D26 pilot assumption.
+4. **Initial Assessment** — design for every in-scope J27 proposal before
+   staff/Board advancement deliberation. The current D26 Initial Writeup
+   placeholder remains historical and requires no backfill.
 
 Explicit non-goals during design freeze:
 
@@ -194,17 +258,25 @@ The default candidate is Pre Site Visit Writeup, subject to the calendar gate.
 Build in producer-to-consumer order:
 
 1. approve the input contract and prompt identity;
-2. approve/provision the persistence contract;
+2. approve/provision the typed Dataverse document registry and governed
+   SharePoint destination;
 3. implement a request-bound server producer with idempotent retry behavior;
 4. write the Word artifact to the approved SharePoint destination;
-5. persist a durable pointer/version reference;
-6. render current state and “Open in Word” in the Workbench;
-7. add audit/observability and failure recovery;
-8. run contract, security, Atlas, and browser/API verification;
-9. perform a narrow production smoke with a designated test request.
+5. persist stable drive/item identity, current version/eTag, lifecycle state,
+   and generation provenance;
+6. render current state, version/last-modified metadata, and “Open in Word” in
+   the Workbench;
+7. add audit/observability, authorized version recovery, and explicit
+   partial-failure handling;
+8. verify full-text search, structured result joins, version restore,
+   delete/recycle recovery, retention posture, and milestone snapshot creation;
+9. run contract, security, Atlas, and browser/API verification;
+10. perform a narrow production smoke with a designated test request.
 
 Exit: one real request can move from ready inputs to a durable, editable Word artifact and
-back to a visible Workbench state without filename guesswork or silent partial success.
+back to a visible Workbench state without filename guesswork or silent partial
+success; an authorized user can identify and recover a prior version; and the
+official milestone can be proven independently of later working edits.
 
 ## Week 3+ — dependent lifecycle slices
 
@@ -212,7 +284,8 @@ back to a visible Workbench state without filename guesswork or silent partial s
   satisfy the approved contract.
 - **Final Writeup:** reuse the proven writeup artifact path and add the approved site-visit
   input.
-- **Initial Writeup:** reuse the same path when the next-cycle trigger and deadline require it.
+- **Initial Assessment:** reuse the proven artifact path for every in-scope J27
+  proposal before the staff/Board advancement decision.
 - **Overview:** add next-action/writeup signals only after their underlying state exists.
 
 Do not parallelize these dependent slices merely to fill tabs. A proven shared writeup
@@ -230,12 +303,24 @@ For every slice:
 - promote to production deliberately under the campaign release strategy;
 - record live-smoke evidence before changing status from planned/partial to verified.
 
-## Decision log to obtain from the owner
+## Decision log
 
-The next planning conversation needs:
+Owner-decided:
+
+1. J27 Initial Assessment purpose, audience, and pre-advancement timing;
+2. SharePoint Word as canonical editable narrative;
+3. Dataverse as typed registry/workflow/structured-decision authority;
+4. Microsoft Search for SharePoint body search rather than a second editable
+   Dataverse body; and
+5. version recovery, retention, least-privilege editing, and immutable Board
+   milestones as required parts of the artifact contract.
+
+Still required:
 
 1. fixed deadlines and minimum outcomes;
 2. Pre Site Visit inputs;
-3. writeup file/pointer/version contract;
-4. Site Visit field sufficiency;
-5. leadership/editor access timing.
+3. exact Dataverse registry schema and SharePoint destination;
+4. separate-files versus milestone-version document topology;
+5. target-library version, retention, recycle, and permission audit;
+6. Site Visit field sufficiency; and
+7. leadership/editor access timing and restore authority.
