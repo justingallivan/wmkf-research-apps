@@ -10,6 +10,25 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Reviewer email release contracts and live copy shipped (Session 381)
+
+**Milestone:** Reviewer release emails gained staff review-before-send with
+fail-closed recipient/sender binding, corrected greeting/copy, and explicit
+signature-closing preferences.
+**Sessions:** 380–381.
+**Ship state:**
+- PR #92 merged as `ab1d2943`; production deployment
+  `dpl_FUkr89hrrMCL59wkTkG2FtkRXxhb` reached Ready with all PR and main CI green.
+- The post-deploy Dataverse migration updated the four global reviewer bodies
+  (`updated=4 failed=0`); the verification dry run returned `no-change=4`.
+- Production sign-in and public reviewer error surfaces rendered; a full staff
+  login was not initiated because the existing browser session had expired.
+**Why it matters:** staff can edit each no-longer-needed message while the send
+remains bound to the reviewed reviewer and Program Director identities, and the
+corrected templates are live rather than only present in seed code.
+**Pointers:** `SESSION_PROMPT.md`;
+`docs/CLAUDE_TO_CODEX_HANDOFF_2026-07-27.md`; PR #92; merge `ab1d2943`.
+
 ## July 2026 — Ignored operational source disposal completed (Session 379)
 
 **Milestone:** The owner-approved local-retention review closed with a

@@ -4,7 +4,23 @@
 > `codex/claude-bug-fixes`. Codex created
 > `codex/reviewer-email-contract-cleanup`, added contract fixes, and merged the
 > completed `codex/local-retention-inventory` history into that isolated branch.
-> Nothing from this combined branch is merged to `main`.
+> PR #92 merged that combined branch to `main` at `ab1d2943` on 2026-07-28.
+
+## Session 381 Release — Complete
+
+- PR #92 passed Jest, Playwright, Gitleaks, Semgrep, Trivy, Vercel Preview, and
+  Claude review, then merged as `ab1d2943`.
+- Vercel production deployment `dpl_FUkr89hrrMCL59wkTkG2FtkRXxhb` reached
+  **Ready** and owns the `applications`, `reviews`, `grantees`, and
+  `submissions.wmkeck.org` aliases.
+- The signed-out production sign-in surface rendered, and the public reviewer
+  route returned its expected malformed-link state for a synthetic token. The
+  existing staff browser session had expired, so no Microsoft login was
+  initiated during the smoke.
+- The required post-deploy reviewer-copy migration first reported four
+  `change` rows, then wrote all four with `updated=4 failed=0`. A verification
+  dry run reported `no-change=4`; the pre-write transcript retains the complete
+  prior values as the rollback source.
 
 ## Session 380 Summary
 
@@ -155,24 +171,14 @@ partial write) and fully restored the synthetic state.
 
 ### Verified Open
 
-1. **Merge `codex/reviewer-email-contract-cleanup` to `main`, then run the copy migration —
-   in that order.**
-   Evidence: `docs/CLAUDE_TO_CODEX_HANDOFF_2026-07-27.md` Part 2;
-   `lib/services/email-defaults.js`.
-   The `{{greeting}}` token only renders once the renderer code ships. Running
-   `scripts/migrate-reviewer-email-copy.mjs --execute` before the merge deploys
-   puts a literal `{{greeting}},` into reviewer emails. Re-run the dry run first:
-   `before.txt` in the worktree is stale because the seed copy changed after it
-   was captured.
-
-2. **Verify outgoing Server-Side Sync on the `alerts@wmkeck.org` mailbox.**
+1. **Verify outgoing Server-Side Sync on the configured role mailbox.**
    Evidence: `lib/services/notification-service.js:85-88`.
    The sender resolves, but if SSS is not enabled the send fails *after*
    resolution and `notify()` swallows it — alert email stops silently while
    dashboard alerts keep working. Check the `mailboxes` row for that systemuser,
    or Power Platform admin → Email Configuration → Mailboxes.
 
-3. **Finish the review-synthesis promotion — the code is already committed.**
+2. **Finish the review-synthesis promotion — the code is already committed.**
    Evidence: `0afea876` on `main`; `docs/CURRENT_WORK_QUEUE.md`.
    Corrects a stale carryover: Session 379's prompt said "commit … remain", but
    the hardening landed at `0afea876`. What actually remains is publishing the

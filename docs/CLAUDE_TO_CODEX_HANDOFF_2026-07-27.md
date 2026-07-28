@@ -19,7 +19,11 @@ The original work remains unchanged on `codex/claude-bug-fixes`, with eleven
 commits pushed. Codex reviewed it from the isolated
 `codex/reviewer-email-contract-cleanup` branch, integrated the concurrent
 retention/privacy history there, and added the contract corrections in Part 5.
-Nothing from the combined cleanup branch is merged to `main`.
+Post-handoff release update: PR #92 merged the combined branch to `main` as
+`ab1d2943` on 2026-07-28. Production deployment
+`dpl_FUkr89hrrMCL59wkTkG2FtkRXxhb` reached Ready; the four-row reviewer-copy
+migration completed with `updated=4 failed=0`, and its verification dry run
+reported `no-change=4`.
 
 The owner asked for this handoff and explicitly instructed that the behavioral
 remediations in Part 4 **not** be implemented by Claude. They are proposals for
@@ -73,23 +77,20 @@ operation; the owner accepted edit-before-send instead.
 
 ---
 
-## Part 2 — State and what is NOT done
+## Part 2 — State at handoff and post-handoff release
 
 **Verified by Claude at `e3a471e7`** [VERIFIED via commands run in that session]: 525
 suites / 6259 tests; 15 gates plus 14 paired self-tests; Playwright 6/6 in a real
 browser; ESLint clean.
 
-Outstanding, all owner-gated:
+The first three handoff gates are now complete: the renderer merged and
+deployed before the migration; a fresh dry run captured all four prior values;
+the execute wrote four rows with zero failures; and a second dry run reported
+all four `no-change`.
 
-1. **Nothing from `codex/reviewer-email-contract-cleanup` is merged to `main`.**
-   The `{{greeting}}` token only renders once the renderer code ships.
-2. **Ordering constraint:** run `scripts/migrate-reviewer-email-copy.mjs
-   --execute` **after** the merge deploys. Running it first puts a literal
-   `{{greeting}},` in reviewer emails.
-3. `before.txt` in the worktree is a **stale** dry-run capture — the seed copy
-   changed after it was taken. Re-run the dry run before executing. Untracked
-   and not gitignored; do not commit it.
-4. **[UNVERIFIED]** Outgoing Server-Side Sync on the `alerts@wmkeck.org`
+Still outstanding:
+
+1. **[UNVERIFIED]** Outgoing Server-Side Sync on the configured role
    mailbox. The sender resolves, but if SSS is not enabled the send fails *after*
    resolution and `notify()` swallows it [VERIFIED via
    `lib/services/notification-service.js:85-88`] — alert email would stop
