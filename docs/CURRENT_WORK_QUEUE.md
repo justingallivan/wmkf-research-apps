@@ -34,7 +34,7 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Reviews/synthesis contract closure | The reliability fix is committed, independently reviewed READY, merged through PR #92 (`ab1d2943`), and deployed to production: prompt-level native JSON schema, terminal stop-reason enforcement, retained failure diagnostics, and one bounded `max_tokens` retry. Publish the governed prompt version that carries the tracked output-schema contract and run one controlled post-fix smoke; then implement the approved participating-invitation state machine, automatic all-in readiness, explicit manual early-run, stored-output visibility, and observable regeneration. | Controlled post-fix run produces valid persisted synthesis or a typed clean no-write failure; owner-approved state machine plus tested producer → persistence → consumer contract. |
+| 1 | Reviews/synthesis contract closure | Reliability is production-proven: governed `review-synthesis.generate` v3 is the sole current row with the tracked native JSON schema, and the 2026-07-28 controlled Request `1002788` smoke persisted valid synthesis on its first semantic attempt with complete audit evidence. Implement the approved participating-invitation state machine, automatic all-in readiness, explicit manual early-run, stored-output visibility, and observable regeneration. | Owner-approved state machine plus tested producer → persistence → consumer contract. |
 | 2 | Remaining lifecycle design freeze | Calendar the fixed deadlines and define the full contract for Pre Site Visit Writeup, Site Visit, Final Writeup, and Initial Writeup. Existing June assumptions are inputs, not decisions. | Each tab has approved user, inputs, producer, persistence, consumer, access, recovery, and deadline. |
 | 3 | First deadline-bound writeup slice | Default candidate is Pre Site Visit Writeup, but only after the calendar and input/artifact contracts are approved. | One request produces a durable, editable Word artifact and visible Workbench state through a production smoke. |
 
@@ -66,8 +66,15 @@ sequence.
   Focused and surrounding Executor/service suites passed 102 tests, and the
   model-registry gate plus self-test passed. The code merged through PR #92 as
   `ab1d2943` and reached a Ready production deployment on 2026-07-28.
-  Governed prompt publication and the controlled post-fix smoke remain;
-  production behavior under the new contract is therefore not yet proven.
+  Governed prompt v3
+  (`660d7e3f-9e8a-f111-ab0f-000d3a31c468`) was then published through the
+  version-preserving seed recovery path and verified as the sole current row
+  with exact tracked system/body/variables/schema/model/settings. The
+  2026-07-28 controlled Request `1002788` smoke completed on the first semantic
+  attempt (`end_turn`), persisted a valid synthesis, and wrote completed AI run
+  `20aec518-9f8a-f111-ab0f-6045bd018deb` against prompt version 3. The 11
+  synthetic answers and four staged parent fields were atomically restored;
+  the new synthesis and append-only audit remain as the intended proof.
   Independent follow-up review returned READY after the requested local changes.
 - Production review-synthesis smoke: the owner-authorized Request `1002788`
   smoke ran once on 2026-07-27 after a reversible staff Manual Review Entry.
@@ -78,8 +85,8 @@ sequence.
   11 synthetic answers and four staged parent fields were atomically restored,
   with no draft and no changes to other target/sibling email, reminder,
   materials, or thank-you state. The append-only failed audit row remains.
-  This closes the smoke item by its bounded-diagnosis alternative and advances
-  the queue to synthesis reliability.
+  This bounded failure supplied the diagnosis baseline for the successful
+  governed-v3 proof recorded immediately above.
 - Evidence-first sweep correction and bounded Workbench truth pass: the sweep now derives truth before
   searching prose, supports domain audits, requires producer→persistence→consumer evidence, and
   records supported/falsified claims. The scalar fact gate now derives Workbench tab counts and

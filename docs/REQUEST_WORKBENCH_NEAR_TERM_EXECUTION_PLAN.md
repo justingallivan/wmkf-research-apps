@@ -39,7 +39,7 @@ provides:
 
 Until then, “Week 1/2/3” are relative execution windows, not delivery promises.
 
-## Production review-synthesis smoke — completed as a bounded failure
+## Production review-synthesis smoke — reliability proven
 
 On 2026-07-27, the owner-authorized staff-triggered production smoke ran against
 Request `1002788`. A reversible synthetic review was entered through the normal
@@ -64,14 +64,21 @@ The first and only regeneration attempt failed cleanly:
   fields—including email, reminder, materials, and thank-you markers—unchanged.
   The append-only failed AI audit row intentionally remains.
 
-This satisfies the queue's bounded-diagnosis completion alternative, not the
-success criteria. The next task is reliability diagnosis/fix. Do not attempt a
-second blind regeneration, expose the multiselect form, or implement automatic
-triggering until that gate is closed.
+That bounded failure supplied the diagnosis baseline. On 2026-07-28, governed
+`review-synthesis.generate` v3
+(`660d7e3f-9e8a-f111-ab0f-000d3a31c468`) was published with the exact tracked
+native JSON-schema contract and verified as the sole current row. A second,
+owner-authorized Request `1002788` smoke then completed on its first semantic
+attempt with `end_turn`, persisted a valid five-key synthesis, and wrote
+completed AI run `20aec518-9f8a-f111-ab0f-6045bd018deb` against prompt version
+3. Cleanup atomically removed the 11 staged answers and restored the four
+parent fields while preserving the new synthesis and append-only audit.
+Reliability is therefore production-proven; reviewer exposure remains gated by
+the separate multiselect rollback/legacy-writer/final-smoke sequence.
 
 ## Week 1 — close the current Reviews contract
 
-### 1. Make synthesis generation reliable
+### 1. Make synthesis generation reliable — completed 2026-07-28
 
 - Use the three controlled current-v2 failures, including the 2026-07-27 run
   above, to diagnose the incomplete/truncated-JSON failure.
@@ -82,6 +89,10 @@ triggering until that gate is closed.
 
 Exit: repeated controlled runs produce valid, persisted synthesis or a clean failure with no
 memo write.
+
+Completed: v3 is the sole current governed prompt, and the first controlled
+post-fix run persisted valid synthesis with a completed, prompt-linked audit
+row. The three v2 no-write failures remain append-only historical evidence.
 
 ### 2. Implement the owner-approved lifecycle
 

@@ -3,7 +3,7 @@ title: "Workbench Reviews Tab — Consumption Build-Out Plan"
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Reviews tab deployed; synthesis reliability code deployed; governed prompt publication and post-fix smoke remain."
+summary: "Reviews tab and synthesis reliability are production-proven; lifecycle readiness and visibility remain."
 canonical: false
 cataloged: 2026-07-03
 last_verified: 2026-07-28
@@ -38,17 +38,23 @@ verification boundary was exercised on 2026-07-26 with controlled Request
 consumers passed. A third controlled current-v2 synthesis call on 2026-07-27
 again failed before writeback with incomplete JSON and created a failed
 append-only AI run; the prior request memo remained unchanged across all three
-attempts. Phase 4 therefore remains a red pre-exposure gate.
+attempts. On 2026-07-28, version-preserving publication made governed v3
+`660d7e3f-9e8a-f111-ab0f-000d3a31c468` the sole current row with the tracked
+native JSON schema. The controlled post-fix smoke then completed on its first
+semantic attempt, persisted valid synthesis, and wrote completed AI run
+`20aec518-9f8a-f111-ab0f-6045bd018deb` against prompt version 3. Phase 4
+reliability is production-proven; the lifecycle/readiness behavior remains.
 
 **Verification boundary update (S376):** no genuine external reviewer has used
 the form, but the owner-authorized staged production submission proved the
 populated Compare/matrix and DOCX/PDF/courtesy outputs against canonical answer
 rows. The smoke data was atomically cleaned up. The 2026-07-27 follow-up also
-proved the staff Manual Review Entry producer and exact restoration path. AI
-synthesis remains the unresolved production runtime boundary. The
+proved the staff Manual Review Entry producer and exact restoration path. The
 terminal-response/native-schema/bounded-retry fix passed focused tests, merged
 through PR #92 (`ab1d2943`), and reached a Ready production deployment on
-2026-07-28. Governed prompt publication and a post-fix smoke remain.
+2026-07-28. Governed v3 publication and a successful post-fix smoke completed
+the same day; the 11 synthetic answers and four staged parent fields were
+restored exactly while the new synthesis and audit remained.
 
 ## Context
 
@@ -272,9 +278,12 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   stop/token/hash diagnostics, uses capability-gated native JSON schema, and
   retries only a typed `max_tokens` termination once with a bounded larger
   budget. The independently reviewed code is production-deployed through PR #92
-  (`ab1d2943`), but the new behavior is not production-proven: publish the
-  governed prompt version and run one controlled post-fix smoke before
-  exposure.
+  (`ab1d2943`). Governed v3 was then published with the exact tracked schema,
+  and the 2026-07-28 controlled smoke succeeded on the first semantic attempt:
+  valid synthesis persisted and completed AI run
+  `20aec518-9f8a-f111-ab0f-6045bd018deb` records prompt version 3,
+  `end_turn`, and the redacted review digest. Exact cleanup removed the 11
+  staged answers and restored four parent fields without altering the new memo.
 
 ## Verification per phase
 

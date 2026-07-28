@@ -64,14 +64,16 @@ CI runtime, and deployed the result to production.
 
 ### Verified Open
 
-1. **Publish and prove the review-synthesis reliability contract.**
+1. **Implement the approved review-synthesis lifecycle contract.**
    Evidence: `docs/CURRENT_WORK_QUEUE.md`;
-   `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`; `0afea876`.
-   The reliability code is deployed, but the governed
-   `review-synthesis.generate` prompt version carrying the tracked output schema
-   still needs publication followed by one controlled post-fix production
-   smoke. Success is a valid persisted synthesis or a typed clean no-write
-   failure with complete audit evidence.
+   `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`; `ab1d2943`.
+   The reliability code is deployed, governed prompt v3 is the sole current
+   production row with the tracked native JSON-schema contract, and the
+   2026-07-28 controlled Request `1002788` smoke persisted valid synthesis on
+   the first semantic attempt with complete `wmkf_ai_run` evidence. Next,
+   implement the approved participating-invitation state machine, automatic
+   all-in readiness, explicit staff early-run override, stored-output
+   visibility, and observable regeneration.
 
 2. **Verify outgoing Server-Side Sync on the configured role mailbox.**
    Evidence: `docs/TODO_EMAIL_NOTIFICATIONS.md`;
@@ -139,9 +141,9 @@ CI runtime, and deployed the result to production.
 
 ### Verify Before Acting
 
-1. Read the live governed prompt row before synthesis publication. The tracked
-   prompt config is not proof that the new schema contract is current in
-   Dataverse.
+1. Re-read the live governed prompt row before any further synthesis prompt
+   publication. Version 3 is the verified current production baseline; tracked
+   config alone is not proof that a later schema contract is current.
 2. Re-freeze GitHub refs, artifacts, PRs, branches, and local worktrees
    immediately before any public-history action. The remediation plan's
    2026-07-27 topology is explicitly a dated baseline; PR #94 and the completed
@@ -150,8 +152,9 @@ CI runtime, and deployed the result to production.
    readiness state machine is implemented and tested.
 4. Do not replace the brace-expansion adapter based only on a scanner version;
    exercise legacy callable and modern named consumers under Node 20/npm 10.
-5. Leave the untracked `.codex/` directory alone. It contains local worktree
-   metadata, not session documentation.
+5. The former `.codex/` worktree directory was removed through
+   `git worktree remove` on 2026-07-28. Do not recreate it unless a new
+   worktree is deliberately needed.
 
 ### Do Not Reopen Without New Decision
 

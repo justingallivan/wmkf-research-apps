@@ -44,11 +44,11 @@ document inventory, and individual implementation plans do not establish priorit
 - Current priorities: `docs/CURRENT_WORK_QUEUE.md`.
 - Current Workbench truth and contradictions:
   `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md`.
-- Current near-term sequence: synthesis structured-output reliability and
-  lifecycle closure → remaining-tab design freeze → first deadline-bound
-  writeup slice. The 2026-07-27 Request `1002788` production smoke closed by
-  its bounded-failure alternative with no partial memo write and full synthetic
-  review restoration; do not schedule another blind regeneration. See
+- Current near-term sequence: synthesis lifecycle closure → remaining-tab
+  design freeze → first deadline-bound writeup slice. The 2026-07-27 Request
+  `1002788` v2 smoke closed by its bounded-failure alternative; governed v3
+  then became sole-current and the 2026-07-28 post-fix smoke persisted valid
+  synthesis with complete audit evidence and exact synthetic-review cleanup. See
   `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel: `project-virtual-review-panel`.

@@ -128,15 +128,16 @@ as shipped.
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
 
-1. diagnose and fix the review-synthesis structured-output reliability gate,
-   now reproduced in three controlled current-v2 production executions;
-2. finish the synthesis lifecycle contract, including all-in readiness, manual early-run, and stored-output visibility;
-3. freeze the user/input/storage/access/deadline contract for the four remaining Workbench lifecycle tabs;
-4. build the first deadline-bound writeup slice, provisionally Pre Site Visit Writeup.
+1. finish the synthesis lifecycle contract, including all-in readiness, manual
+   early-run, stored-output visibility, and observable regeneration;
+2. freeze the user/input/storage/access/deadline contract for the four remaining Workbench lifecycle tabs;
+3. build the first deadline-bound writeup slice, provisionally Pre Site Visit Writeup.
 
 The owner-authorized 2026-07-27 Request `1002788` smoke closed as a bounded
-failure with no partial memo write; its reversible synthetic review was fully
-restored. Another blind regeneration is not the next step.
+v2 failure with no partial memo write. On 2026-07-28, governed prompt v3 became
+the sole current row and the controlled post-fix smoke persisted valid
+synthesis on the first semantic attempt with complete audit evidence; its
+synthetic review was then restored exactly.
 
 The 2026-07-26 evidence-first audit found six live Workbench tabs and four placeholders,
 retired the contradictory forward roadmap, and separated shipped behavior from proposed

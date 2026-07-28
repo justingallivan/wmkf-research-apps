@@ -1,11 +1,11 @@
 ---
 name: project-review-form-checkbox-questions
-description: Multiselect release boundary: code/config and staff entry are live; synthesis failed three current-v2 runs; exposure is held.
+description: Multiselect release boundary: code/config, staff entry, and synthesis are production-proven; rollback and remaining rehearsals still hold exposure.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-27 via frozen plan, production evidence artifacts, current source, and focused contract tests
+  last_verified: 2026-07-28 via live prompt/request/answer/AI-run probes and the controlled production smoke
 ---
 
 ## Recall Rule
@@ -36,7 +36,7 @@ Ground truth: frozen plan above; source in
 `shared/utils/review-matrix.js`, and staff/external form consumers. Production
 evidence lives under `outputs/review-form-multiselect/`.
 
-## Current boundary (2026-07-27)
+## Current boundary (2026-07-28)
 
 [VERIFIED] Compatible code was merged at `5282cee8`; Wave 15 was applied/read
 back before deployment. The audited admin route published backward-compatible
@@ -54,8 +54,18 @@ The 2026-07-27 follow-up proved Manual Review Entry and exact restoration:
 memo hash/timestamp and outreach markers stayed unchanged; zero answers/draft
 remained. Failed run `be61f383-f289-f111-ab0f-70a8a59cded0` is append-only.
 
-[PLANNED / HELD] Fix synthesis, rehearse rollback, run a post-fix smoke, then
-decide exposure. [OWNER-CONFIRMED 2026-07-27] Automatic readiness covers
+[VERIFIED] Governed prompt v3
+`660d7e3f-9e8a-f111-ab0f-000d3a31c468` is the sole current production row and
+matches the tracked native JSON schema. The 2026-07-28 controlled Request
+`1002788` smoke completed on its first semantic attempt with `end_turn`,
+persisted valid synthesis, and wrote completed AI run
+`20aec518-9f8a-f111-ab0f-6045bd018deb` against prompt version 3. Cleanup
+deleted the exact 11 staged answers and restored the four parent fields while
+preserving the synthesis and append-only audit.
+
+[PLANNED / HELD] Rehearse the two legacy writers and rollback/republish, run
+the final exposure smoke, then decide exposure. [OWNER-CONFIRMED 2026-07-27]
+Automatic readiness covers
 selected, non-excluded invited/accepted rows and requires ≥1 receipt. Receipt
 resolves with content; decline/no-response/withdrawn-sufficient/withdrew/
 released or current revoked/expired token resolves without. Others block

@@ -323,9 +323,7 @@ number/title/institution/PI) uses whatever `proposals[0]` already carries
 DTO has no dedicated `piName` field, so `proposalAuthors` (project
 leader/applicant) stands in as the best-available PI identity.
 
-**Phase 4 BUILT (2026-07-03); prompt current in production 2026-07-26 —
-three controlled current-v2 executions failed on incomplete JSON; local
-reliability fix awaits promotion:**
+**Phase 4 BUILT (2026-07-03); reliability production-proven 2026-07-28:**
 Executor-based AI synthesis of a proposal's submitted reviews. New Tier-1
 prompt `review-synthesis.generate` (`shared/config/prompts/review-synthesis.js`,
 initially bootstrapped as v1 and published through the audited admin path as
@@ -365,9 +363,14 @@ staff Manual Review Entry path. The local 2026-07-27 change preserves joined
 response text/stop metadata, requires `end_turn` before persistence, uses
 capability-gated native JSON schema, and retries one typed `max_tokens`
 termination once with a bounded larger budget. Each semantic attempt retains
-its own AI-run audit attempt. This is not a production-live claim; the phase
-remains a red pre-exposure gate until governed prompt publication/deployment
-and one controlled post-fix smoke. Independent follow-up review returned READY.
+its own AI-run audit attempt. Governed v3
+`660d7e3f-9e8a-f111-ab0f-000d3a31c468` became the sole current production row
+on 2026-07-28 with the exact tracked native JSON schema. The controlled Request
+`1002788` smoke then completed on its first semantic attempt with `end_turn`,
+persisted valid synthesis, and wrote completed AI run
+`20aec518-9f8a-f111-ab0f-6045bd018deb` against prompt version 3. Exact cleanup
+deleted the 11 staged answers and restored four parent fields while preserving
+the synthesis and append-only audit. Independent follow-up review returned READY.
 
 **Owner-confirmed target lifecycle (2026-07-26; participation semantics closed
 2026-07-27; NOT YET IMPLEMENTED):** automatic synthesis is intended only after
