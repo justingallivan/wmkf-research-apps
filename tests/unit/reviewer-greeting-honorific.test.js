@@ -75,7 +75,7 @@ describe('buildReviewerGreeting', () => {
 });
 
 describe('{{greeting}} renders the honorific form on every reviewer email', () => {
-  const signatureBlock = { signature: 'Thank you,\nJean' };
+  const signatureBlock = { signature: 'Thank you,\nJean', isCustomSignature: true };
 
   test('release / no-longer-needed', () => {
     const body = buildWithdrawSufficientBodyText({
@@ -177,6 +177,7 @@ describe('conditional closing composition across all four reviewer action bodies
   test('a signature that opens with a valediction is preserved without a second closing', () => {
     const bodies = renderFourActionBodies({
       signature: 'Thank you,\nJean Kim\nW. M. Keck Foundation',
+      isCustomSignature: true,
     });
     for (const [bodyName, body] of Object.entries(bodies)) {
       expect({ bodyName, body }).toEqual({
@@ -188,8 +189,19 @@ describe('conditional closing composition across all four reviewer action bodies
     }
   });
 
+  test('an arbitrary custom closing is preserved verbatim', () => {
+    const bodies = renderFourActionBodies({
+      signature: 'Best wishes,\nJean Kim\nW. M. Keck Foundation',
+      isCustomSignature: true,
+    });
+    for (const body of Object.values(bodies)) {
+      expect((body.match(/Best wishes,/g) || [])).toHaveLength(1);
+      expect(body).not.toContain('With appreciation,');
+    }
+  });
+
   test.each([
-    ['bare name', { signature: 'Jean Kim\nW. M. Keck Foundation' }],
+    ['generated bare name', { signature: 'Jean Kim\nW. M. Keck Foundation', isCustomSignature: false }],
     ['fallback', null],
   ])('a %s signature receives one default closing', (_label, signatureBlock) => {
     const bodies = renderFourActionBodies(signatureBlock);
@@ -218,7 +230,7 @@ describe('release email copy', () => {
     bodyTemplate: REVIEWER_WITHDRAW_SEED_BODY,
     reviewerName: NAME,
     title: 'Genomic Lithography',
-    signatureBlock: { signature: 'Thank you,\nJean' },
+    signatureBlock: { signature: 'Thank you,\nJean', isCustomSignature: true },
   });
 
   test('does not assume the reviewer ever accepted', () => {

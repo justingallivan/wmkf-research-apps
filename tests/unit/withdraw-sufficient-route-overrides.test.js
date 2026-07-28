@@ -54,6 +54,8 @@ test('canonicalizes a mixed-case selected GUID and drops prototype-like and unre
       subject: 'Reviewed subject',
       bodyText: 'Reviewed body',
       to: 'reviewer@example.org',
+      from: 'pd@example.org',
+      senderId: '11111111-2222-4333-8444-555555555555',
       constructor: 'ignored',
       __proto__: 'ignored',
     },
@@ -81,11 +83,13 @@ test('canonicalizes a mixed-case selected GUID and drops prototype-like and unre
     subject: 'Reviewed subject',
     bodyText: 'Reviewed body',
     to: 'reviewer@example.org',
+    from: 'pd@example.org',
+    senderId: '11111111-2222-4333-8444-555555555555',
   });
   expect(Object.getPrototypeOf(serviceArgs.overrides)).toBeNull();
 });
 
-test('drops non-string override fields and array values', async () => {
+test('rejects incomplete or non-string selected overrides', async () => {
   const res = await run({
     [SUGGESTION_ID]: {
       subject: 42,
@@ -95,8 +99,7 @@ test('drops non-string override fields and array values', async () => {
     [OTHER_ID]: ['not', 'an', 'entry'],
   });
 
-  expect(res.statusCode).toBe(200);
-  const serviceArgs = withdrawSufficient.mock.calls[0][0];
-  expect(Object.keys(serviceArgs.overrides)).toEqual([]);
+  expect(res.statusCode).toBe(400);
+  expect(res._data.error).toMatch(/requires complete .* overrides/i);
+  expect(withdrawSufficient).not.toHaveBeenCalled();
 });
-

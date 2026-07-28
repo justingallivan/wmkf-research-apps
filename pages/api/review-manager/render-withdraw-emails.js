@@ -3,12 +3,15 @@
  *
  * POST /api/review-manager/render-withdraw-emails
  *   body: { requestId: <GUID>, suggestionIds: <GUID[]> }
- *   → { ok: true, drafts: [{ suggestionId, status, name?, to?, subject?, bodyText? }] }
+ *   → { ok: true, drafts: [{ suggestionId, status, name?, to?, from?,
+ *                            senderId?, subject?, bodyText? }] }
  *
  * Read-only counterpart to POST /api/review-manager/withdraw-sufficient, mirroring
  * the existing render-emails → send-emails split: this renders what WOULD be sent
  * so staff can edit it, and withdraws/sends nothing. Staff then post their edits
- * back to withdraw-sufficient as `overrides`.
+ * back to withdraw-sufficient as `overrides`. Recipient and sender identity
+ * values are expected-value guards: the send re-derives both and refuses a
+ * changed value before the lifecycle write.
  *
  * Thin route shell: method dispatch → auth guard → input validation →
  * withDalContext → one service call → result/error→HTTP mapping. The per-row

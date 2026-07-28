@@ -68,6 +68,7 @@ test('profile resolver always ends with the Foundation line', () => {
     name: 'Avery Quinn',
     email: '',
     signature: 'Avery Quinn\nW. M. Keck Foundation',
+    isCustomSignature: true,
   });
 });
 
@@ -103,6 +104,7 @@ test('request resolver reads the assigned PD profile preference', async () => {
     name: 'Saved PD',
     email: 'saved@example.org',
     signature: 'Saved PD\nCustom title\nW. M. Keck Foundation',
+    isCustomSignature: true,
   });
   expect(resolveSystemUserToProfile).toHaveBeenCalledWith('sys-1');
   expect(DatabaseService.getUserPreferences).toHaveBeenCalledWith(7, false);
@@ -124,6 +126,7 @@ test('request resolver falls back to systemuser fullname when no profile matches
     name: 'Unmapped PD',
     email: 'unmapped@example.org',
     signature: 'Unmapped PD\nW. M. Keck Foundation',
+    isCustomSignature: false,
   });
   expect(DatabaseService.getUserPreferences).not.toHaveBeenCalled();
 });

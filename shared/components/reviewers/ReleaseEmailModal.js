@@ -41,7 +41,9 @@ const SEND_RESULT_REASON = {
   withdrawn_email_skipped: 'The reviewer was released, but the email template was unavailable',
   withdrawn_no_email: 'The reviewer was released, but no email address was available',
   withdrawn_no_pd: 'The reviewer was released, but no active Program Director could send the email',
+  invalid_override: 'The reviewed email was incomplete; reopen and review it again',
   recipient_changed: 'The reviewer’s email address changed after preview; reopen and review the updated recipient',
+  sender_changed: 'The Program Director sender changed after preview; reopen and review the updated sender',
   not_pending: 'The reviewer already responded or was already closed',
   changed_skipped: 'The reviewer changed status while the release was being sent',
   write_failed: 'The invitation could not be closed',
@@ -122,14 +124,16 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
     setSendError(null);
     try {
       // Bind the send to the complete copy and recipient staff reviewed. The
-      // server still re-derives the recipient and treats `to` only as an
-      // expected-value guard; it can never redirect the email.
+      // server still re-derives recipient and sender and treats these values
+      // only as expected-value guards; they can never redirect the email.
       const overrides = {};
       for (const draft of sendable) {
         overrides[draft.suggestionId] = {
           subject: valueFor(draft, 'subject'),
           bodyText: valueFor(draft, 'bodyText'),
           to: draft.to,
+          from: draft.from,
+          senderId: draft.senderId,
         };
       }
 

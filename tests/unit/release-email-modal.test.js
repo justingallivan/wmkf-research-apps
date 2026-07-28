@@ -23,6 +23,8 @@ function draft(suggestionId, name, to) {
     status: 'ok',
     name,
     to,
+    from: 'pd@example.org',
+    senderId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     subject: `Subject for ${name}`,
     bodyText: `Dear ${name},\n\nReviewed body.`,
   };
@@ -121,14 +123,17 @@ test('sends complete reviewed rows and names every non-allowlisted result', asyn
       subject: first.subject,
       bodyText: 'Edited complete body',
       to: first.to,
+      from: first.from,
+      senderId: first.senderId,
     },
     [SECOND_ID]: {
       subject: second.subject,
       bodyText: second.bodyText,
       to: second.to,
+      from: second.from,
+      senderId: second.senderId,
     },
   });
   expect(onReleased).toHaveBeenCalledWith(results);
   expect(onClose).not.toHaveBeenCalled();
 });
-

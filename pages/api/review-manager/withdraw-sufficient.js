@@ -3,13 +3,15 @@
  *
  * POST /api/review-manager/withdraw-sufficient
  *   body: { requestId: <GUID>, suggestionIds: <GUID[]>,
- *           overrides?: { <suggestionId>: { subject?, bodyText?, to? } } }
+ *           overrides?: { <suggestionId>:
+ *             { subject, bodyText, to, from, senderId } } }
  *   → { ok: true, withdrawn: N, results: [{ suggestionId, status }] }
  *
- * `overrides` carries complete staff-reviewed copy plus the previewed recipient.
- * The recipient is always re-derived server-side; `to` is only an expected-value
- * binding and can never redirect the email. Omitting the override reproduces the
- * original fixed-template behavior.
+ * `overrides` carries complete staff-reviewed copy plus the previewed recipient
+ * and sender. Identity values are expected-value guards only and can never
+ * redirect the email. When present, every selected suggestion must have a
+ * complete override; omitting `overrides` reproduces the original fixed-template
+ * behavior.
  *
  * Thin route shell (Route→Service Consolidation Plan, Stage 1 pilot): method
  * dispatch → auth guard → input validation → withDalContext → one service
@@ -57,8 +59,9 @@ export default async function handler(req, res) {
   // Staff edits, keyed by suggestion. Keys are GUID-validated and narrowed to the
   // selected suggestionIds, so a key for an unrelated row is dropped rather than
   // carried into the service. Mixed-case GUID keys are canonicalized to the
-  // submitted suggestionId. Values are reduced to own string subject/bodyText/to
-  // properties; `to` is an expected-recipient binding, never a send destination.
+  // submitted suggestionId. Values are reduced to own string
+  // subject/bodyText/to/from/senderId properties. Identity fields are expected-
+  // value bindings, never send destinations.
   let overrides = null;
   const rawOverrides = req.body?.overrides;
   if (rawOverrides !== undefined && rawOverrides !== null) {
@@ -81,7 +84,28 @@ export default async function handler(req, res) {
       if (Object.prototype.hasOwnProperty.call(value, 'to') && typeof value.to === 'string') {
         entry.to = value.to;
       }
+      if (Object.prototype.hasOwnProperty.call(value, 'from') && typeof value.from === 'string') {
+        entry.from = value.from;
+      }
+      if (Object.prototype.hasOwnProperty.call(value, 'senderId') && typeof value.senderId === 'string') {
+        entry.senderId = value.senderId;
+      }
       if (Object.keys(entry).length > 0) overrides[canonicalId] = entry;
+    }
+
+    const incompleteId = suggestionIds.find((id) => {
+      const entry = overrides[id];
+      return !entry
+        || !entry.subject?.trim()
+        || !entry.bodyText?.trim()
+        || !entry.to?.trim()
+        || !entry.from?.trim()
+        || !entry.senderId?.trim();
+    });
+    if (incompleteId) {
+      return res.status(400).json({
+        error: 'each selected suggestion requires complete subject, bodyText, to, from, and senderId overrides',
+      });
     }
   }
 

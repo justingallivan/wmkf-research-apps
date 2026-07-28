@@ -64,6 +64,17 @@ function pendingRow(over = {}) {
   };
 }
 
+function reviewedOverride(over = {}) {
+  return {
+    subject: 'Reviewed',
+    bodyText: 'Edited',
+    to: 'rev@example.org',
+    from: 'pd@keck.org',
+    senderId: 'pd-1',
+    ...over,
+  };
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   getRequestById.mockResolvedValue({
@@ -96,6 +107,8 @@ describe('renderWithdrawPreviews', () => {
       status: 'ok',
       name: 'Karl Deisseroth',
       to: 'rev@example.org',
+      from: 'pd@keck.org',
+      senderId: 'pd-1',
       subject: 'Thank you — W. M. Keck Foundation review',
     });
     // Real renderer output — greeting resolved, proposal clause interpolated.
@@ -163,11 +176,10 @@ describe('withdrawSufficient overrides', () => {
       suggestionIds: [SUG],
       actingUserSystemId: 'u-1',
       overrides: {
-        [SUG]: {
+        [SUG]: reviewedOverride({
           subject: 'A kinder subject',
           bodyText: 'Dear Karl,\n\nWe are all set — thank you.',
-          to: 'rev@example.org',
-        },
+        }),
       },
     });
 
@@ -185,12 +197,9 @@ describe('withdrawSufficient overrides', () => {
       suggestionIds: [SUG],
       actingUserSystemId: 'u-1',
       overrides: {
-        [SUG]: {
-          subject: 'Reviewed',
-          bodyText: 'Edited',
+        [SUG]: reviewedOverride({
           to: 'REV@EXAMPLE.ORG',
-          from: 'attacker@example.com',
-        },
+        }),
       },
     });
     expect(result.results[0].status).toBe('withdrawn_emailed');
@@ -209,11 +218,7 @@ describe('withdrawSufficient overrides', () => {
       suggestionIds: [SUG],
       actingUserSystemId: 'u-1',
       overrides: {
-        [SUG]: {
-          subject: 'Reviewed',
-          bodyText: 'Edited',
-          to: 'rev@example.org',
-        },
+        [SUG]: reviewedOverride(),
       },
     });
 
@@ -226,43 +231,59 @@ describe('withdrawSufficient overrides', () => {
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
-  test('an override for a different suggestion does not affect this one', async () => {
-    await withdrawSufficient({
+  test('a changed current sender fails before the lifecycle write', async () => {
+    getSystemUserById.mockResolvedValue({
+      systemuserid: 'pd-2', internalemailaddress: 'new-pd@keck.org', isdisabled: false,
+    });
+    const result = await withdrawSufficient({
       requestId: REQ,
       suggestionIds: [SUG],
       actingUserSystemId: 'u-1',
-      overrides: { [OTHER_SUG]: { subject: 'not mine', bodyText: 'not mine' } },
+      overrides: { [SUG]: reviewedOverride() },
     });
-    const sent = createAndSendEmail.mock.calls[0][0];
-    expect(sent.subject).toBe('Thank you — W. M. Keck Foundation review');
-    expect(sent.body).toContain('Thank you for considering our request');
+
+    expect(result).toEqual({
+      ok: true,
+      withdrawn: 0,
+      results: [{ suggestionId: SUG, status: 'sender_changed' }],
+    });
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a reviewed batch missing this suggestion fails closed', async () => {
+    const result = await withdrawSufficient({
+      requestId: REQ,
+      suggestionIds: [SUG],
+      actingUserSystemId: 'u-1',
+      overrides: { [OTHER_SUG]: reviewedOverride() },
+    });
+    expect(result.results[0].status).toBe('invalid_override');
+    expect(readRequiredEmailDefaults).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
   test.each([
     ['blank', '   '],
     ['empty', ''],
-  ])('a %s override falls back to the rendered template rather than sending nothing', async (_label, bodyText) => {
-    await withdrawSufficient({
+  ])('a %s override fails closed rather than falling back to unreviewed copy', async (_label, bodyText) => {
+    const result = await withdrawSufficient({
       requestId: REQ,
       suggestionIds: [SUG],
       actingUserSystemId: 'u-1',
-      overrides: { [SUG]: { subject: bodyText, bodyText } },
+      overrides: { [SUG]: reviewedOverride({ subject: bodyText, bodyText }) },
     });
+    expect(result.results[0].status).toBe('invalid_override');
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('no reviewed payload retains the pre-modal behavior', async () => {
+    await withdrawSufficient({ requestId: REQ, suggestionIds: [SUG], actingUserSystemId: 'u-1' });
     const sent = createAndSendEmail.mock.calls[0][0];
     expect(sent.subject).toBe('Thank you — W. M. Keck Foundation review');
     expect(sent.body).toContain('Thank you for considering our request');
-  });
-
-  test('no overrides reproduces the pre-modal behavior exactly', async () => {
-    await withdrawSufficient({ requestId: REQ, suggestionIds: [SUG], actingUserSystemId: 'u-1' });
-    const withoutArg = createAndSendEmail.mock.calls[0][0];
-
-    createAndSendEmail.mockClear();
-    await withdrawSufficient({ requestId: REQ, suggestionIds: [SUG], actingUserSystemId: 'u-1', overrides: {} });
-    const withEmptyMap = createAndSendEmail.mock.calls[0][0];
-
-    expect(withEmptyMap.subject).toBe(withoutArg.subject);
-    expect(withEmptyMap.body).toBe(withoutArg.body);
   });
 
   test('an edit still cannot release a row that is no longer pending', async () => {

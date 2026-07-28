@@ -211,6 +211,8 @@ test('reviewed body markup is escaped through renderPlainTextEmailHtml', async (
         subject: 'Reviewed subject',
         bodyText: 'Hello <img src=x onerror="alert(1)">\n\n<script>alert(2)</script>',
         to: 'rev@example.org',
+        from: 'pd@keck.org',
+        senderId: 'pd-1',
       },
     },
   });
