@@ -1,0 +1,14 @@
+{
+  "name": "brace-expansion",
+  "version": "5.0.8",
+  "private": true,
+  "description": "Legacy CommonJS API adapter for the patched brace-expansion release",
+  "main": "index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "balanced-match": "^1.0.2",
+    "brace-expansion-upstream": "npm:brace-expansion@5.0.8"
+  }
+}

@@ -5,7 +5,7 @@
   "files": [
     {
       "originalPath": "package.json",
-      "backupPath": ".harness-backups/2026-06-27-positive-framing/package.json",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/package.snapshot.json",
       "sha256": "b601bc2e8661217d98590f339dd95b7a9512173dbeb37efa421ee8810f54aae1",
       "bytes": 6461
     },
@@ -130,5 +130,5 @@
       "bytes": 6173
     }
   ],
-  "updatedAt": "2026-06-27T20:28:46.086Z"
+  "updatedAt": "2026-07-28T14:23:51.000Z"
 }
