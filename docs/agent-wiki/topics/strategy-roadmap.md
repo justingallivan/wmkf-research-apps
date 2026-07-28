@@ -7,6 +7,7 @@ owner: product-strategy
 source_files:
   - docs/CURRENT_WORK_QUEUE.md
   - docs/SYSTEM_MODEL.md
+  - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
   - DEVELOPMENT_LOG.md
   - SESSION_PROMPT.md
   - docs/GROUP_B_WRITEUP_SPINE_DESIGN.md
@@ -15,6 +16,7 @@ source_files:
 canonical_docs:
   - docs/CURRENT_WORK_QUEUE.md
   - docs/SYSTEM_MODEL.md
+  - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
   - DEVELOPMENT_LOG.md
   - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
 watch_paths:
@@ -54,9 +56,19 @@ document inventory, and individual implementation plans do not establish priorit
   canonical editable narrative; Dataverse is the typed document
   registry/workflow/structured-decision authority; Microsoft Search supplies
   body search; version recovery, retention, least-privilege editing, and frozen
-  Board milestones are required parts of the design. Exact schema, document
-  topology, and target-library configuration remain planned/unverified. See
-  `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
+  Board milestones are required parts of the design. Initial Assessment,
+  Pre-Site, and Final are three distinct documents; Final is copied from a
+  selected Pre-Site version. Exact schema and target-library configuration
+  remain planned/unverified. See `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and
+  the near-term plan.
+- Site Visit direction (owner-decided 2026-07-28): the tab is a dossier, not a
+  fourth writeup. It gathers visit metadata, applicant materials, recording,
+  transcript, a version-bound derived summary, distributions, and the Final
+  draft. A narrow expiring applicant-material upload link is in scope without
+  reopening the parked general intake product. Prefer an acceptable
+  transcription-platform summary before a deliberate suite LLM fallback.
+  Exact token, schema, validation, folder, retention, summary-quality, and
+  partial-failure contracts remain planned.
 - Editor Dashboard direction (owner-confirmed 2026-07-28): preserve Allison's
   former single-folder editing workflow with a cycle-wide list of governed
   writeups, direct Open in Word, and an explicit per-editor Reviewed tracker.

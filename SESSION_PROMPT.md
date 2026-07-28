@@ -134,13 +134,22 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    narrative; Dataverse is the typed registry/workflow authority; Microsoft
    Search supplies file-body search; version recovery, retention,
    least-privilege editing, and immutable Board milestones are required.
+   Initial Assessment, Pre-Site, and Final are three separate documents; Final
+   is copied from a deliberately selected Pre-Site version. Site Visit is a
+   dossier rather than a fourth writeup, bringing together visit metadata,
+   applicant materials, recording, transcript, a version-bound derived
+   summary, distributions, and the Final draft. A narrow request-scoped
+   applicant-material upload link is in scope without reopening the parked
+   general intake product. Prefer an acceptable transcription-platform summary
+   before a deliberate suite LLM fallback.
    Allison is the confirmed primary user for a planned cycle-wide Editor
    Dashboard that replaces designated-folder browsing with one governed
    writeup list, direct Open in Word, and personal Reviewed tracking. Exact
    collaborator audience, marker granularity, coordinator view, access key,
    and delivery date remain open.
-   Exact schema, file topology, library configuration, and remaining
-   stage-specific inputs are still open.
+   Exact schema, library configuration, remaining stage-specific inputs,
+   upload token/validation/recovery behavior, and transcript-summary quality
+   contract are still open.
 
 ### Owner Decision Needed
 
@@ -167,7 +176,8 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    grant/revoke steps. Do not substitute the owner's superuser account.
 2. The four placeholder Workbench tabs until calendar and complete workflow
    contracts are approved.
-3. Applicant intake while WMKF evaluates the GOApply re-engineering.
+3. General applicant intake while WMKF evaluates the GOApply re-engineering.
+   This does not park the narrower Site Visit Materials Upload planning note.
 4. Automated BILL onboarding; honorarium payment remains offline.
 5. Brace-expansion vendor adapter removal until every installed parent accepts
    the official patched API.

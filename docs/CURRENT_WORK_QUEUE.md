@@ -34,7 +34,7 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Remaining lifecycle design freeze | Calendar the fixed deadlines and finish the contracts for Pre Site Visit Writeup, Site Visit, Final Writeup, J27 Initial Assessment, and the cycle-wide Editor Dashboard that preserves Allison's single-list editing workflow. SharePoint Word is the decided narrative authority; Dataverse is the typed registry/workflow authority. Exact schema, document topology, target-library protection settings, remaining stage inputs, dashboard audience/access, and Reviewed-marker granularity are still open. | Each tab has approved user, inputs, producer, persistence, consumer, search, access, version/recovery/retention, milestone, and deadline contracts; the Editor Dashboard has an approved audience, minimum list/filter/direct-edit view, progress-marker contract, and deadline. |
+| 1 | Remaining lifecycle design freeze | Calendar the fixed deadlines and finish the contracts for Pre Site Visit Writeup, the Site Visit dossier, Final Writeup, J27 Initial Assessment, and the cycle-wide Editor Dashboard that preserves Allison's single-list editing workflow. SharePoint Word is the decided narrative authority; Dataverse is the typed registry/workflow authority. The three writeups are separate documents, Final is copied from a selected Pre-Site version, and Site Visit is a dossier rather than a fourth writeup. Its planned external surface is a narrow request-scoped applicant-material upload link, and an acceptable transcription-platform summary is preferred before a suite LLM fallback. Exact schema, target-library protection settings, remaining inputs, upload/transcript contracts, dashboard audience/access, and Reviewed-marker granularity are still open. | Each tab has approved user, inputs, producer, persistence, consumer, search, access, version/recovery/retention, milestone, and deadline contracts; Site Visit has approved dossier, token/upload, transcript, summary-provenance, and partial-failure contracts; the Editor Dashboard has an approved audience, minimum list/filter/direct-edit view, progress-marker contract, and deadline. |
 | 2 | First deadline-bound writeup slice | Default candidate is Pre Site Visit Writeup, but only after the calendar and input/artifact contracts are approved. | One request produces a durable, searchable, editable and recoverable Word artifact, a protected milestone snapshot, and visible Workbench state through a production smoke. |
 
 ## Audit follow-ups — verified open, not silently prioritized
@@ -150,7 +150,10 @@ These are valid directions but are not current app-team delivery commitments:
 
 ## Parked — do not resurface without a new decision
 
-- Applicant intake product build — parked while WMKF evaluates the GOApply re-engineering.
+- Applicant intake product build — parked while WMKF evaluates the GOApply
+  re-engineering. The narrow request-scoped Site Visit Materials Upload planned
+  as part of the Workbench lifecycle does not reopen the general intake
+  product.
 - Automated BILL onboarding — tabled, possibly permanently; honorarium payment remains an offline
   operations process.
 - Whack-a-mole remediation workstreams — independent review returned `NEEDS REWORK`; owner

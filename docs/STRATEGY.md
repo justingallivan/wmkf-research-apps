@@ -136,7 +136,9 @@ store.
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
 
 1. freeze the user/input/storage/access/deadline contract for the four
-   remaining Workbench lifecycle tabs and the cycle-wide Editor Dashboard;
+   remaining Workbench lifecycle tabs and the cycle-wide Editor Dashboard,
+   including the three-document writeup lineage, Site Visit dossier, narrow
+   request-scoped applicant-material upload, and transcript-summary provenance;
 2. build the first deadline-bound writeup slice, provisionally Pre Site Visit
    Writeup; and
 3. reuse that artifact registry/read contract for the later writeup stages and
@@ -153,8 +155,11 @@ retired the contradictory forward roadmap, and separated shipped behavior from p
 writeup fields/prompts. See `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md`
 and `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
 
-Power Automate automation, the applicant-intake product, automated BILL onboarding, and broader
-reviewer cleanup have separate dependency or owner gates. They are not implied next steps.
+Power Automate automation, the general applicant-intake product, automated BILL
+onboarding, and broader reviewer cleanup have separate dependency or owner
+gates. The planned narrow Site Visit Materials Upload is part of the Workbench
+lifecycle contract and does not reopen general intake. None of the other parked
+programs are implied next steps.
 
 ---
 

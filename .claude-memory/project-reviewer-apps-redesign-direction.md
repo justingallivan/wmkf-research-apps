@@ -39,6 +39,20 @@ coordinator matrix, app/file access boundary, and deadline remain open. Use the
 near-term execution plan for current authority; the chronology below remains
 the rationale record.
 
+**2026-07-28 Site Visit/writeup reconciliation:** Initial Assessment,
+Pre-Site, and Final are three separate governed Word documents. Final is
+created from a deliberately selected Pre-Site version; Site Visit is a dossier,
+not a fourth writeup. The dossier gathers structured visit metadata, applicant
+materials, recording, transcript, a version-bound derived summary,
+distribution snapshots, and the Final draft. A narrow expiring
+request-scoped applicant-material upload link is planned without reopening the
+parked general applicant-intake product. Prefer an acceptable
+transcription-platform summary before a deliberate suite LLM fallback.
+Implementation, schema, token/validation/recovery behavior, and summary-quality
+contracts remain planned. Current authority is
+`docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` and
+`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
+
 ## Current source-backed state (2026-07-26)
 
 - Ten top-level tabs; six live (Overview, Proposal, Reviewers, Reviews, Status, Awardee)

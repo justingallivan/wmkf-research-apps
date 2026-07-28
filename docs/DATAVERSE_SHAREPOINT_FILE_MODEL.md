@@ -3,7 +3,7 @@ title: Dataverse / SharePoint File Storage Model
 domain: dataverse
 kind: source-of-truth
 status: active
-summary: "File storage and linking in AkoyaGO/Dynamics, including the governed SharePoint/Dataverse contract for editable staff writeups."
+summary: "File storage and linking in AkoyaGO/Dynamics, including governed staff writeups and Site Visit artifacts."
 canonical: true
 cataloged: 2026-07-02
 last_verified: 2026-07-28
@@ -42,13 +42,14 @@ hood.
 
 ---
 
-## Governed staff writeups — target contract
+## Governed staff writeups and Site Visit artifacts — target contract
 
 > **Owner-decided direction (2026-07-28); implementation still planned.**
 > This section governs the Initial Assessment, Pre Site Visit Writeup, and
-> Final Writeup design. It does not claim that the target Dataverse schema,
-> SharePoint library policy, prompts, or Workbench surfaces have been
-> provisioned.
+> Final Writeup design as well as the Site Visit dossier and its materials. It
+> does not claim that the target Dataverse schema, SharePoint library policy,
+> prompts, upload surface, or Workbench surfaces have been provisioned.
+> **[VERIFIED via owner decisions 2026-07-28; implementation PLANNED.]**
 
 ### Authority boundary
 
@@ -78,7 +79,11 @@ is a typed document registry rather than one ad hoc URL field per writeup. At a
 minimum, the persistence design must account for:
 
 - request and cycle;
-- artifact type (`initial-assessment`, `pre-site-visit`, or `final-writeup`);
+- artifact type. The three narrative types are `initial-assessment`,
+  `pre-site-visit`, and `final-writeup`; the Site Visit dossier also needs
+  typed supporting artifacts such as agenda, applicant materials/slides,
+  recording, transcript, transcript summary, and frozen distribution
+  snapshot;
 - SharePoint site/drive/item identity and human-facing URL;
 - current version/eTag and last-modified metadata;
 - producer and AI prompt/run provenance where applicable;
@@ -87,6 +92,89 @@ minimum, the persistence design must account for:
 
 A URL alone is not the artifact identity, and a folder/filename convention is
 not a durable join contract.
+
+### Writeup lineage and distribution
+
+The three writeup stages are three separate Word documents. The Final Writeup
+is created once from a staff-selected version of the Pre Site Visit Writeup.
+The registry must retain the source artifact identity and exact source
+version/hash used for that operation; subsequent edits do not keep the two
+documents synchronized.
+
+The Pre-Site stable proposal core may exist before every review is received.
+Its review-derived portion must therefore carry an evidence-coverage and as-of
+stamp, become visibly stale when a later review arrives, and support deliberate
+refresh. A redistributed Pre-Site document is a new frozen version/snapshot,
+not an overwrite of the evidence for what earlier recipients saw.
+
+Staff collaborators use the canonical SharePoint Word file. External Board
+members or consultants who join a visit receive a PDF attachment representing
+an exact frozen Pre-Site version. An anonymous or guest SharePoint document
+link is not required for this minimum contract.
+
+There is no separate Site Visit Writeup. Creating the Final copies the selected
+Pre-Site version and then lets the PD incorporate site observations, late
+reviews, transcript evidence, and editorial changes into the independent Final
+artifact.
+
+### Site Visit dossier and transcript-derived artifacts
+
+The planned Site Visit tab is a dossier, not primarily an editor for one notes
+memo. It joins:
+
+- structured visit metadata;
+- agenda, applicant slides, and other visit materials;
+- recording and transcript;
+- a transcript summary derived from a specific transcript version;
+- frozen Pre-Site distribution snapshots; and
+- the independent Final Writeup draft.
+
+The recording and transcript are authoritative evidence. A transcript summary
+is derived and replaceable. Prefer an acceptable summary emitted by the
+approved transcription platform; do not silently make a redundant suite LLM
+call. A suite LLM run is a deliberate fallback when no platform summary exists,
+staff explicitly requests one, or the platform result fails the approved
+quality contract.
+
+For every summary, the registry must preserve the producer/system and relevant
+version, source transcript item plus version/hash, generation time, lifecycle
+state, and current/stale relationship to the transcript. A changed transcript
+must not leave an old summary presented as current.
+
+### Site Visit Materials Upload contract
+
+The planned external surface is a narrow **Site Visit Materials Upload**, not
+the parked general applicant-intake portal. The conceptual precedent is the
+existing request-scoped external upload pattern, but its routes, tables, and
+persistence contract must not be reused without an explicit design review.
+**[VERIFIED via `docs/API_ROUTE_SECURITY_MATRIX.md` and the current
+`/api/external/grantee/[token]` routes, 2026-07-28.]**
+
+Minimum whole-flow invariants:
+
+1. An authorized staff action sends an expiring, request-scoped link to a
+   specified applicant contact. The token supports explicit expiry and
+   revocation and cannot be supplied as an arbitrary destination selector.
+2. The external recipient sees only the request identity, instructions, and
+   permitted upload types. The recipient cannot browse Dataverse or
+   SharePoint, choose another request, or supply a drive, folder, item, or
+   record identifier.
+3. The server resolves the request, Site Visit context, and server-controlled
+   SharePoint destination from the validated token.
+4. Before persistence, the server enforces rate, size, file-count, extension,
+   magic-byte, and malware checks and normalizes the stored filename/path.
+5. Successful bytes end in the governed SharePoint location and a typed
+   Dataverse registry row records stable identity and provenance. A temporary
+   Blob location, if later chosen for scanning, is transit rather than the
+   durable source of truth.
+6. The implementation must define idempotency and compensate safely when the
+   SharePoint write succeeds but registry creation fails, or vice versa.
+   Staff must see a retryable, auditable state rather than an unregistered
+   orphan or false success.
+
+Exact token implementation, contact binding, schema, folder, upload limits,
+accepted types, notifications, retention, and recovery behavior remain open
+design decisions.
 
 ### Cycle-wide Editor Dashboard contract
 

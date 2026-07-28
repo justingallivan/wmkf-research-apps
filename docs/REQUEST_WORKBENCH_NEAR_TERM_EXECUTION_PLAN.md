@@ -127,8 +127,67 @@ and delivery deadline remain open. App visibility and SharePoint file
 permission are separate controls and both must be enforced.
 
 The detailed target contract and current-vs-planned boundary live in
-`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`. Whether the three writeup stages use
-separate files or milestone versions of a smaller document set remains open.
+`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
+
+### Document lineage and Site Visit dossier
+
+**[VERIFIED via owner decisions 2026-07-28; implementation PLANNED.]**
+The three writeup stages are three distinct governed Word documents:
+
+1. **Initial Assessment** — the J27 proposal-level assessment used for staff
+   deliberation and the Board advancement decision. The D26 Initial Writeup
+   placeholder remains historical and requires no backfill.
+2. **Pre Site Visit Writeup** — the pre-decisional staff briefing. Its stable
+   proposal-derived core may be created when a request advances, while its
+   review analysis is refreshed explicitly from the reviews then available.
+   Every distribution version must state its review coverage and as-of time,
+   and the Workbench must mark the working document stale when later review
+   evidence arrives.
+3. **Final Writeup** — a separate Word document created from a deliberately
+   selected Pre Site Visit version. The registry must preserve the source
+   artifact and source version used for that copy. The Final then evolves
+   independently as the PD incorporates the visit, late reviews, transcript
+   evidence, and staff edits.
+
+There is no fourth “Site Visit Writeup.” The Site Visit tab is a dossier that
+brings together structured visit metadata, applicant materials such as slides
+and agendas, recordings, transcripts and their derived summaries, frozen
+Pre-Site distribution versions, and the emerging Final Writeup. “Create Final
+Writeup” copies the selected Pre-Site version into the separate Final artifact;
+it does not rename or overwrite the Pre-Site document.
+
+Internal staff receive the canonical Word link. When a Board member or
+consultant without staff access joins a visit, the minimum external
+distribution path is a PDF attachment representing an exact frozen Pre-Site
+version. Staff send that attachment through the ordinary approved email path;
+an external document-sharing portal is not required for this use case.
+
+The Pre-Site document is informational and normally does not need a Reviewed
+marker. The Final Writeup may expose a soft, optional Reviewed acknowledgement
+for expected readers, but that signal is not an approval/sign-off gate.
+Board-ready freeze remains a separate owner-controlled milestone.
+
+### Site Visit applicant materials and transcript summaries
+
+**[VERIFIED via owner decision 2026-07-28; implementation PLANNED.]**
+A narrow **Site Visit Materials Upload** surface is planned within the
+Workbench lifecycle. It does not reopen the parked general applicant-intake
+product. A staff user sends a request-scoped, expiring link to the designated
+applicant contact; the recipient sees only the request identity, upload
+instructions, and permitted material types. The recipient must not select a
+Dataverse record, SharePoint folder, or destination identifier. The server
+resolves those from the signed request context, validates the upload, places
+the bytes in the governed SharePoint location, and registers the artifact and
+its provenance in Dataverse.
+
+The recording and transcript remain the authoritative visit evidence. A
+transcript summary is a derived, version-bound artifact. Prefer the summary
+produced by the approved transcription platform when one is available and
+acceptable; do not automatically make a second suite LLM call. A suite LLM
+summary is a deliberate fallback when the platform supplies none, staff
+requests regeneration, or the supplied summary fails the approved quality
+contract. The registry must identify the summary producer/system, source
+transcript item and version/hash, generation time, and current/stale state.
 
 ## Production review-synthesis smoke — reliability proven
 
@@ -265,10 +324,10 @@ Decision order:
 
 1. **Pre Site Visit Writeup** — likely next operational slice because returned reviews are
    now present, but confirm the deadline and whether it consumes raw reviews, synthesis, or both.
-2. **Site Visit** — decide whether existing `akoya_sitevisitdate` and
-   `akoya_sitevisitnotes` satisfy the real workflow.
-3. **Final Writeup** — define only after the Site Visit input and writeup artifact contract
-   are settled.
+2. **Site Visit** — freeze the dossier metadata, artifact registry, narrow
+   applicant-upload, recording/transcript, and derived-summary contracts.
+3. **Final Writeup** — freeze the selected-Pre-Site copy/lineage contract and
+   the visit, late-review, and editorial inputs.
 4. **Initial Assessment** — design for every in-scope J27 proposal before
    staff/Board advancement deliberation. The current D26 Initial Writeup
    placeholder remains historical and requires no backfill.
@@ -313,10 +372,13 @@ official milestone can be proven independently of later working edits.
 
 ## Week 3+ — dependent lifecycle slices
 
-- **Site Visit:** build the smallest staff notes/date surface only if the existing fields
-  satisfy the approved contract.
-- **Final Writeup:** reuse the proven writeup artifact path and add the approved site-visit
-  input.
+- **Site Visit:** build the dossier read model and governed artifact paths,
+  including the narrow applicant-material request/upload flow, only after the
+  exact metadata, token, validation, persistence, and recovery contracts are
+  approved.
+- **Final Writeup:** create a distinct artifact from a selected Pre-Site
+  version, preserve that lineage, and add the approved visit and late-review
+  inputs.
 - **Initial Assessment:** reuse the proven artifact path for every in-scope J27
   proposal before the staff/Board advancement decision.
 - **Editor Dashboard:** reuse the typed registry and artifact read contract to
@@ -349,17 +411,31 @@ Owner-decided:
 4. Microsoft Search for SharePoint body search rather than a second editable
    Dataverse body; and
 5. version recovery, retention, least-privilege editing, and immutable Board
-   milestones as required parts of the artifact contract; and
+   milestones as required parts of the artifact contract;
 6. preserving Allison's cycle-wide review/edit workflow through a planned
-   Editor Dashboard rather than requiring per-request Workbench navigation.
+   Editor Dashboard rather than requiring per-request Workbench navigation;
+7. three distinct writeup documents, with Final copied from a deliberately
+   selected Pre-Site version and no separate Site Visit Writeup;
+8. the Site Visit tab as a dossier for metadata, applicant materials,
+   recording, transcript, derived summary, distributions, and Final draft;
+9. PDF attachment as the sufficient external Pre-Site distribution path;
+10. a narrow request-scoped Site Visit Materials Upload link that does not
+    reopen the general applicant-intake product; and
+11. transcription-platform summary reuse before any deliberate suite LLM
+    fallback.
 
 Still required:
 
 1. fixed deadlines and minimum outcomes;
 2. Pre Site Visit inputs;
 3. exact Dataverse registry schema and SharePoint destination;
-4. separate-files versus milestone-version document topology;
-5. target-library version, retention, recycle, and permission audit;
-6. Site Visit field sufficiency; and
-7. Editor Dashboard audience, Reviewed-marker granularity, coordinator view,
+4. target-library version, retention, recycle, and permission audit;
+5. exact Site Visit metadata and dossier read model;
+6. Site Visit Materials Upload token lifetime/revocation, contact binding,
+   file limits/types, destination, idempotency, partial-failure recovery,
+   notifications, audit, and retention;
+7. approved transcription provider/output contract, summary quality fallback,
+   and transcript/summary refresh behavior;
+8. Final Writeup creation inputs and source-version selection behavior; and
+9. Editor Dashboard audience, Reviewed-marker granularity, coordinator view,
    app/file access enforcement, delivery timing, and restore authority.
