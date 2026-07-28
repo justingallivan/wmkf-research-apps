@@ -6,7 +6,7 @@ status: active
 summary: "This guide explains how to configure Azure AD (Microsoft Entra ID) authentication to restrict app access to your organization only."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-07-26
+last_verified: 2026-07-28
 owner: product-engineering
 related:
   - lib/utils/auth.js
@@ -302,7 +302,7 @@ View sign-in logs in Azure Portal:
 | `lib/utils/auth-policy.js` | proxy-bundle-safe `isAuthRequired()` (shared by `proxy.js` Node.js runtime + `lib/utils/auth.js`) — `NODE_ENV=production` fails closed unless `EMERGENCY_AUTH_BYPASS=true` |
 | `lib/utils/auth.js` | Server-side auth helpers (`requireAuth`, `requireAuthWithProfile`, `requireAppAccess`, `requireSuperuser`) — app grants cached 2-min in-memory; `is_active` + superuser role read fresh each request (never cached) |
 | `pages/api/auth/[...nextauth].js` | NextAuth dual-provider configuration (`azure-ad` + `entra-external`) |
-| `pages/api/auth/status.js` | Auth status endpoint (checks kill switch) |
+| `pages/api/auth/status.js` | Public `{ enabled: boolean }` client-bootstrap endpoint; reports the same fail-closed `isAuthRequired()` enforcement state used by proxy/API guards |
 | `shared/components/RequireAuth.js` | Client-side auth guard |
 | `shared/components/RequireAppAccess.js` | Client-side per-app access guard |
 | `shared/config/appRegistry.js` | Single source of truth for app keys + `DEFAULT_APP_GRANTS` |

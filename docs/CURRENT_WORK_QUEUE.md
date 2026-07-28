@@ -40,12 +40,6 @@ sequence.
 
 ## Audit follow-ups — verified open, not silently prioritized
 
-- **Auth-status policy divergence (P1):** `/api/auth/status` reports
-  `AUTH_REQUIRED && credentials`, while server enforcement uses the fail-closed
-  `isAuthRequired()` policy. In a production-mode runtime the public endpoint can
-  return `enabled:false` while the server enforces authentication. A deliberate
-  product/security decision must choose whether the endpoint reports enforcement
-  state or remains a configuration hint; do not change it incidentally.
 - **Retired-table operational scripts:** 25 non-archive scripts mention the
   dropped `reviewer_suggestions` table. `scripts/README.md` now blocks the
   copy-pasteable commands, but code quarantine/removal requires an owner-approved
@@ -57,6 +51,13 @@ sequence.
 
 ## Completed in this execution
 
+- Auth-status policy reconciliation: `/api/auth/status` remains intentionally
+  public with the exact `{ enabled: boolean }` shape, but now delegates to the
+  same fail-closed `isAuthRequired()` policy used by the proxy and API guards.
+  Production-mode misconfiguration therefore reports enforcement enabled; the
+  explicit emergency bypass must permit the base kill-switch/configuration
+  predicate before the endpoint reports disabled. The endpoint policy matrix
+  is covered by a focused regression suite.
 - Review-synthesis reliability implementation and deployment: the Executor now parses
   complete normalized text, requires `end_turn` before persistence, preserves
   safe stop/token/hash diagnostics on failure, and capability-gates native JSON
