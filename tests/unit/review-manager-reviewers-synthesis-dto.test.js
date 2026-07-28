@@ -26,6 +26,39 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findByRequest: jest.fn(),
   RESPONSE_TYPE_BY_VALUE: {},
+  APPLICANT_DISPOSITION_EXCLUDED: 100000001,
+  RESPONSE_TYPE_MAP: {
+    accepted: 100000000,
+    declined: 100000001,
+    no_response: 100000002,
+    withdrawn_sufficient: 100000003,
+    held: 100000004,
+  },
+  REVIEW_STATUS_MAP: {
+    accepted: 100000000,
+    materials_sent: 100000001,
+    under_review: 100000002,
+    review_received: 100000003,
+    complete: 100000004,
+    withdrew: 100000005,
+    released: 100000006,
+  },
+}));
+jest.mock('../../lib/services/review-synthesis-job-service', () => ({
+  getReviewSynthesisJobState: jest.fn(async () => ({
+    current: false,
+    status: 'not_started',
+    mode: null,
+    runId: null,
+    attempts: 0,
+    lastError: null,
+    createdAt: null,
+    updatedAt: null,
+    startedAt: null,
+    completedAt: null,
+    currentRunId: null,
+    currentCompletedAt: null,
+  })),
 }));
 
 const REQUEST_ID = '550e8400-e29b-41d4-a716-446655440000';
@@ -130,4 +163,68 @@ test.each([
   await handler(req, res);
   expect(res.statusCode).toBe(200);
   expect(res._data.proposals[0].reviewSynthesis).toBeNull();
+});
+
+test('stored synthesis remains visible when no selected reviewer is accepted', async () => {
+  DynamicsService.getRecord.mockResolvedValue({
+    akoya_requestid: REQUEST_ID,
+    akoya_requestnum: '1002788',
+    akoya_title: 'Test',
+    wmkf_meetingdate: null,
+    wmkf_reviewsynthesisjson: JSON.stringify({
+      consensus: ['Retained historical synthesis'],
+      overall: 'Still visible',
+    }),
+  });
+  suggestionAdapter.findByRequest.mockResolvedValue([{
+    wmkf_appreviewersuggestionid: '33333333-3333-3333-8333-333333333333',
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_selected: true,
+    wmkf_invited: true,
+    wmkf_accepted: false,
+    wmkf_externaltokenhash: 'active-token',
+    wmkf_externaltokenissued: '2026-07-01T00:00:00Z',
+    wmkf_externaltokenexpires: '2099-07-01T00:00:00Z',
+    wmkf_externaltokenrevoked: false,
+  }]);
+  const { req, res } = get({ proposalId: REQUEST_ID });
+  await handler(req, res);
+  expect(res.statusCode).toBe(200);
+  expect(res._data.proposals).toHaveLength(1);
+  expect(res._data.proposals[0].reviewers).toEqual([]);
+  expect(res._data.proposals[0].reviewSynthesis.overall).toBe('Still visible');
+  expect(res._data.proposals[0].reviewSynthesisState).toMatchObject({
+    current: false,
+    ready: false,
+    canRunManually: false,
+    participantCount: 1,
+    blockingCount: 1,
+  });
+});
+
+test('a selected participant with a receipt remains in the submitted DTO when accepted is stale false', async () => {
+  DynamicsService.getRecord.mockResolvedValue({
+    akoya_requestid: REQUEST_ID,
+    akoya_requestnum: '1002788',
+    akoya_title: 'Test',
+    wmkf_meetingdate: null,
+    wmkf_reviewsynthesisjson: null,
+  });
+  suggestionAdapter.findByRequest.mockResolvedValue([{
+    wmkf_appreviewersuggestionid: '33333333-3333-3333-8333-333333333333',
+    _wmkf_request_value: REQUEST_ID,
+    _wmkf_potentialreviewer_value: null,
+    wmkf_selected: true,
+    wmkf_invited: true,
+    wmkf_accepted: false,
+    wmkf_reviewreceivedat: '2026-07-28T12:00:00Z',
+  }]);
+  const { req, res } = get({ proposalId: REQUEST_ID });
+  await handler(req, res);
+  expect(res.statusCode).toBe(200);
+  expect(res._data.proposals[0].reviewers).toHaveLength(1);
+  expect(res._data.proposals[0].reviewers[0]).toMatchObject({
+    submitted: true,
+    reviewReceivedAt: '2026-07-28T12:00:00Z',
+  });
 });

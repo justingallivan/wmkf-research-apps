@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-27
+last_verified: 2026-07-28
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -323,9 +323,7 @@ number/title/institution/PI) uses whatever `proposals[0]` already carries
 DTO has no dedicated `piName` field, so `proposalAuthors` (project
 leader/applicant) stands in as the best-available PI identity.
 
-**Phase 4 BUILT (2026-07-03); prompt current in production 2026-07-26 —
-three controlled current-v2 executions failed on incomplete JSON; local
-reliability fix awaits promotion:**
+**Phase 4 BUILT (2026-07-03); reliability production-proven 2026-07-28:**
 Executor-based AI synthesis of a proposal's submitted reviews. New Tier-1
 prompt `review-synthesis.generate` (`shared/config/prompts/review-synthesis.js`,
 initially bootstrapped as v1 and published through the audited admin path as
@@ -343,10 +341,14 @@ schema-as-code APPLIED TO PROD 2026-07-03 (column live-probed) from
 'reviewers')`, requestId GUID-validated) returns 409 `no_submitted_reviews`
 with zero submitted reviews (no LLM call); since the guard is
 always-overwrite, regeneration gating is enforced at THIS route instead — 409
-`already_exists` unless `overwrite: true` is passed. `GET
-/api/review-manager/reviewers` now projects `proposal.reviewSynthesis`
-(fail-soft JSON parse). `ReviewsTab` renders a Synthesis card (only when ≥1
-review is submitted) with a Generate/Regenerate action, plain-text only (no
+`already_exists` unless `overwrite: true` is passed. The release-pending
+lifecycle extension also requires explicit `confirmEarly:true` while
+participants remain unresolved and records each generation in
+`review_synthesis_jobs`. `GET /api/review-manager/reviewers` projects
+`proposal.reviewSynthesis` (fail-soft JSON parse) and, on the release-pending
+branch, `proposal.reviewSynthesisState`. `ReviewsTab` retains the Synthesis
+card even at zero accepted/submitted reviews, with Current/Stale, readiness,
+and queued/running/failed state. Output is plain-text only (no
 `dangerouslySetInnerHTML`); `composeReviewReport` accepts an optional
 `synthesis` param rendered additively in both export formats. Same
 verification boundary as Phases 2-3: Request #1002788 production-proved the
@@ -365,12 +367,18 @@ staff Manual Review Entry path. The local 2026-07-27 change preserves joined
 response text/stop metadata, requires `end_turn` before persistence, uses
 capability-gated native JSON schema, and retries one typed `max_tokens`
 termination once with a bounded larger budget. Each semantic attempt retains
-its own AI-run audit attempt. This is not a production-live claim; the phase
-remains a red pre-exposure gate until governed prompt publication/deployment
-and one controlled post-fix smoke. Independent follow-up review returned READY.
+its own AI-run audit attempt. Governed v3
+`660d7e3f-9e8a-f111-ab0f-000d3a31c468` became the sole current production row
+on 2026-07-28 with the exact tracked native JSON schema. The controlled Request
+`1002788` smoke then completed on its first semantic attempt with `end_turn`,
+persisted valid synthesis, and wrote completed AI run
+`20aec518-9f8a-f111-ab0f-6045bd018deb` against prompt version 3. Exact cleanup
+deleted the 11 staged answers and restored four parent fields while preserving
+the synthesis and append-only audit. Independent follow-up review returned READY.
 
-**Owner-confirmed target lifecycle (2026-07-26; participation semantics closed
-2026-07-27; NOT YET IMPLEMENTED):** automatic synthesis is intended only after
+**Owner-confirmed lifecycle (2026-07-26; participation semantics closed
+2026-07-27; implemented on release-pending branch 2026-07-28):** automatic
+synthesis runs only after
 all participating invitations resolve and at least one review is submitted;
 staff may explicitly generate it earlier after one submission. Participants are
 selected, not-applicant-excluded rows that entered invitation/engagement
@@ -385,8 +393,13 @@ but regeneration reopens readiness only when token state was the
 otherwise-participating, nonterminal row's sole resolution; it does not reselect
 a removed row or undo decline/withdraw/release. An existing synthesis remains
 visible but is not current until synthesis runs again after genuine reactivation
-and resolution. Current code has no automatic trigger, permits the manual action
-after one submission, and hides the entire Synthesis card at zero. Plan doc:
+and resolution. The exact answer digest plus lifecycle classification is hashed;
+a matching completed ledger row establishes Current state. The feature-gated
+`/api/cron/drain-review-syntheses` uses leased claims and revalidates readiness
+and the fingerprint before generation. It remains inert unless
+`REVIEW_SYNTHESIS_AUTOMATION_ENABLED=true`. **This extension is not deployed and
+migration 028 is live-applied with an empty verified table as of 2026-07-28;
+automation remains disabled.** Plan doc:
 `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 ## Email templates (admin org default + per-PD override)

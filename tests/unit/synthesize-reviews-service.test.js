@@ -11,6 +11,23 @@
 const findByRequest = jest.fn();
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findByRequest: (...a) => findByRequest(...a),
+  APPLICANT_DISPOSITION_EXCLUDED: 100000001,
+  RESPONSE_TYPE_MAP: {
+    accepted: 100000000,
+    declined: 100000001,
+    no_response: 100000002,
+    withdrawn_sufficient: 100000003,
+    held: 100000004,
+  },
+  REVIEW_STATUS_MAP: {
+    accepted: 100000000,
+    materials_sent: 100000001,
+    under_review: 100000002,
+    review_received: 100000003,
+    complete: 100000004,
+    withdrew: 100000005,
+    released: 100000006,
+  },
 }));
 const getRequestById = jest.fn();
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
@@ -27,6 +44,14 @@ jest.mock('../../lib/dataverse/adapters/review-answer', () => ({
 const executePrompt = jest.fn();
 jest.mock('../../lib/services/execute-prompt', () => ({
   executePrompt: (...a) => executePrompt(...a),
+}));
+const startManualReviewSynthesisJob = jest.fn();
+const completeReviewSynthesisJob = jest.fn();
+const recordReviewSynthesisJobFailure = jest.fn();
+jest.mock('../../lib/services/review-synthesis-job-service', () => ({
+  startManualReviewSynthesisJob: (...a) => startManualReviewSynthesisJob(...a),
+  completeReviewSynthesisJob: (...a) => completeReviewSynthesisJob(...a),
+  recordReviewSynthesisJobFailure: (...a) => recordReviewSynthesisJobFailure(...a),
 }));
 
 const REQ = '11111111-1111-4111-8111-111111111111';
@@ -48,6 +73,8 @@ function submittedSuggestion(over = {}) {
     wmkf_accepted: true,
     wmkf_reviewreceivedat: '2026-06-01T00:00:00Z',
     wmkf_revieweraffiliation: 'MIT',
+    wmkf_selected: true,
+    wmkf_invited: true,
     ...over,
   };
 }
@@ -64,6 +91,13 @@ beforeEach(() => {
     parsed: { synthesis: { summary: 'good' } },
     writeResults: { results: [{ output: 'synthesis', ok: true }] },
   });
+  startManualReviewSynthesisJob.mockResolvedValue({
+    id: 1,
+    lease_token: '44444444-4444-4444-8444-444444444444',
+    attempts: 1,
+  });
+  completeReviewSynthesisJob.mockResolvedValue({ id: 1, status: 'completed' });
+  recordReviewSynthesisJobFailure.mockResolvedValue({ id: 1, status: 'failed' });
 });
 
 test('success: digest reaches the Executor; returns synthesis payload', async () => {
@@ -189,12 +223,115 @@ test('ordinary malformed JSON and schema failures do not retry', async () => {
 });
 
 test('zero submitted reviews → 409 no_submitted_reviews WITHOUT calling the LLM', async () => {
-  findByRequest.mockResolvedValueOnce([submittedSuggestion({ wmkf_accepted: false })]);
+  findByRequest.mockResolvedValueOnce([submittedSuggestion({
+    wmkf_accepted: false,
+    wmkf_reviewreceivedat: null,
+  })]);
   const err = await synthesizeReviews({ requestId: REQ, overwrite: false, actingUserSystemId: null }).catch((e) => e);
   expect(err).toBeInstanceOf(SynthesizeReviewsError);
   expect(err.httpStatus).toBe(409);
   expect(err.body).toEqual({ ok: false, reason: 'no_submitted_reviews' });
   expect(executePrompt).not.toHaveBeenCalled();
+});
+
+test('a participating row with a receipt is synthesized even if its accepted flag is stale', async () => {
+  findByRequest.mockResolvedValueOnce([submittedSuggestion({ wmkf_accepted: false })]);
+  const out = await synthesizeReviews({
+    requestId: REQ,
+    overwrite: false,
+    actingUserSystemId: ACTOR,
+  });
+  expect(out.ok).toBe(true);
+  expect(executePrompt).toHaveBeenCalledTimes(1);
+});
+
+test('unresolved participant requires explicit early confirmation before a manual run', async () => {
+  findByRequest.mockResolvedValueOnce([
+    submittedSuggestion(),
+    {
+      wmkf_appreviewersuggestionid: '55555555-5555-4555-8555-555555555555',
+      wmkf_selected: true,
+      wmkf_invited: true,
+      wmkf_accepted: false,
+      wmkf_externaltokenhash: 'active-token-hash',
+      wmkf_externaltokenissued: '2026-07-27T00:00:00Z',
+      wmkf_externaltokenexpires: '2099-07-27T00:00:00Z',
+      wmkf_externaltokenrevoked: false,
+    },
+  ]);
+  const err = await synthesizeReviews({
+    requestId: REQ,
+    overwrite: false,
+    actingUserSystemId: ACTOR,
+  }).catch((error) => error);
+  expect(err).toBeInstanceOf(SynthesizeReviewsError);
+  expect(err.httpStatus).toBe(409);
+  expect(err.body).toMatchObject({
+    ok: false,
+    reason: 'early_confirmation_required',
+    readiness: {
+      ready: false,
+      canRunManually: true,
+      participantCount: 2,
+      submittedCount: 1,
+      blockingCount: 1,
+    },
+  });
+  expect(startManualReviewSynthesisJob).not.toHaveBeenCalled();
+  expect(executePrompt).not.toHaveBeenCalled();
+});
+
+test('automatic generation requires a leased job matching the freshly loaded fingerprint', async () => {
+  const err = await synthesizeReviews({
+    requestId: REQ,
+    overwrite: true,
+    actingUserSystemId: null,
+    mode: 'automatic',
+    job: {
+      id: 9,
+      lease_token: '99999999-9999-4999-8999-999999999999',
+      input_hash: 'f'.repeat(64),
+      attempts: 1,
+    },
+  }).catch((error) => error);
+  expect(err).toBeInstanceOf(SynthesizeReviewsError);
+  expect(err.httpStatus).toBe(409);
+  expect(err.body).toEqual({
+    ok: false,
+    reason: 'automatic_job_fingerprint_mismatch',
+    writtenToDynamics: false,
+  });
+  expect(executePrompt).not.toHaveBeenCalled();
+  expect(startManualReviewSynthesisJob).not.toHaveBeenCalled();
+});
+
+test('confirmEarly:true permits a manual run while a participant remains unresolved', async () => {
+  findByRequest.mockResolvedValueOnce([
+    submittedSuggestion(),
+    {
+      wmkf_appreviewersuggestionid: '55555555-5555-4555-8555-555555555555',
+      wmkf_selected: true,
+      wmkf_invited: true,
+      wmkf_accepted: false,
+      wmkf_externaltokenhash: 'active-token-hash',
+      wmkf_externaltokenissued: '2026-07-27T00:00:00Z',
+      wmkf_externaltokenexpires: '2099-07-27T00:00:00Z',
+      wmkf_externaltokenrevoked: false,
+    },
+  ]);
+  const out = await synthesizeReviews({
+    requestId: REQ,
+    overwrite: false,
+    confirmEarly: true,
+    actingUserSystemId: ACTOR,
+  });
+  expect(out.ok).toBe(true);
+  expect(startManualReviewSynthesisJob).toHaveBeenCalledWith({
+    requestId: REQ,
+    inputHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+    actingUserSystemId: ACTOR,
+  });
+  expect(executePrompt).toHaveBeenCalledTimes(1);
 });
 
 test('regeneration gate: populated column + no overwrite → 409 already_exists with modifiedOn, LLM not called', async () => {
@@ -232,6 +369,42 @@ test('writeback failure: concurrent_edit → 409; other/missing reason → 502 w
   err = await synthesizeReviews({ requestId: REQ, overwrite: false, actingUserSystemId: null }).catch((e) => e);
   expect(err.httpStatus).toBe(502);
   expect(err.body).toEqual({ ok: false, reason: 'writeback_failed', runId: 'run-4', writtenToDynamics: false });
+});
+
+test('successful Dataverse write with a lost completion lease is surfaced as an explicit partial failure', async () => {
+  completeReviewSynthesisJob.mockResolvedValueOnce(null);
+  const err = await synthesizeReviews({
+    requestId: REQ,
+    overwrite: false,
+    actingUserSystemId: ACTOR,
+  }).catch((error) => error);
+  expect(err.httpStatus).toBe(502);
+  expect(err.body).toEqual({
+    ok: false,
+    reason: 'tracking_completion_failed',
+    runId: 'run-1',
+    writtenToDynamics: true,
+  });
+  expect(recordReviewSynthesisJobFailure).toHaveBeenCalled();
+});
+
+test('successful Dataverse write with a ledger completion exception is surfaced as an explicit partial failure', async () => {
+  const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  completeReviewSynthesisJob.mockRejectedValueOnce(new Error('Postgres unavailable'));
+  const err = await synthesizeReviews({
+    requestId: REQ,
+    overwrite: false,
+    actingUserSystemId: ACTOR,
+  }).catch((error) => error);
+  expect(err.httpStatus).toBe(502);
+  expect(err.body).toEqual({
+    ok: false,
+    reason: 'tracking_completion_failed',
+    runId: 'run-1',
+    writtenToDynamics: true,
+  });
+  expect(recordReviewSynthesisJobFailure).toHaveBeenCalled();
+  consoleSpy.mockRestore();
 });
 
 test('capped answer query throws UNTYPED (shell maps to 500 server_error)', async () => {

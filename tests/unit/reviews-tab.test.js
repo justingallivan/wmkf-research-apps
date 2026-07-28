@@ -5,7 +5,7 @@
  * /api/review-manager/reviewers GET: shows only reviewers with a submitted
  * review (reviewReceivedAt), decodes the ratings, and links the file download.
  */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ReviewsTab from '../../shared/components/workbench/ReviewsTab';
 
 jest.mock('../../shared/components/Layout', () => ({
@@ -132,6 +132,147 @@ test('shows an empty state when no reviewer has submitted', async () => {
   expect(await screen.findByText(/No reviews submitted yet/i)).toBeInTheDocument();
   // Phase 3: no submitted reviews → no export affordance at all.
   expect(screen.queryByText('Export:')).not.toBeInTheDocument();
+});
+
+test('keeps a stored synthesis visible even when there are no accepted reviewer rows', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewers: [],
+        reviewSynthesis: {
+          consensus: ['Historical consensus'],
+          disagreements: [],
+          keyConcerns: [],
+          ratingSummaries: [],
+          overall: 'Historical overall assessment.',
+        },
+        reviewSynthesisState: {
+          current: false,
+          status: 'not_started',
+          ready: false,
+          canRunManually: false,
+          blockingCount: 1,
+        },
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  expect(await screen.findByText('Historical consensus')).toBeInTheDocument();
+  expect(screen.getByText('Historical overall assessment.')).toBeInTheDocument();
+  expect(screen.getByText('Stale')).toBeInTheDocument();
+  expect(screen.getByText(/stale or predates lifecycle tracking/i)).toBeInTheDocument();
+});
+
+test('manual early generation requires confirmation and sends confirmEarly:true', async () => {
+  const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+  const proposal = {
+    proposalId: 'req1',
+    reviewers: [{
+      suggestionId: 'g1',
+      name: 'Dr. Submitted',
+      reviewReceivedAt: '2026-07-20T00:00:00Z',
+      answers: [],
+    }],
+    reviewSynthesis: null,
+    reviewSynthesisState: {
+      current: false,
+      status: 'not_started',
+      ready: false,
+      canRunManually: true,
+      submittedCount: 1,
+      blockingCount: 1,
+    },
+  };
+  fetch
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true, proposals: [proposal] }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ok: true, synthesis: { overall: 'Generated' } }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true, proposals: [proposal] }),
+    });
+
+  render(<ReviewsTab requestId="req1" />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Generate synthesis' }));
+
+  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+  expect(confirmSpy).toHaveBeenCalledWith(expect.stringMatching(/before every participating reviewer is resolved/i));
+  const post = fetch.mock.calls.find(([url, options]) =>
+    url === '/api/review-manager/synthesize-reviews' && options?.method === 'POST');
+  expect(JSON.parse(post[1].body)).toEqual({
+    requestId: 'req1',
+    overwrite: false,
+    confirmEarly: true,
+  });
+  confirmSpy.mockRestore();
+});
+
+test('refreshes stored output and shows an actionable warning after partial tracking failure', async () => {
+  const initial = {
+    proposalId: 'req1',
+    reviewers: [{
+      suggestionId: 'g1',
+      name: 'Dr. Submitted',
+      reviewReceivedAt: '2026-07-20T00:00:00Z',
+      answers: [],
+    }],
+    reviewSynthesis: null,
+    reviewSynthesisState: {
+      current: false,
+      status: 'not_started',
+      ready: true,
+      canRunManually: true,
+      submittedCount: 1,
+      blockingCount: 0,
+    },
+  };
+  fetch
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true, proposals: [initial] }),
+    })
+    .mockResolvedValueOnce({
+      ok: false,
+      status: 502,
+      json: async () => ({
+        ok: false,
+        reason: 'tracking_completion_failed',
+        writtenToDynamics: true,
+      }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        proposals: [{
+          ...initial,
+          reviewSynthesis: {
+            consensus: ['Saved despite tracking failure'],
+            disagreements: [],
+            keyConcerns: [],
+            ratingSummaries: [],
+            overall: 'Refresh recovered the memo.',
+          },
+        }],
+      }),
+    });
+
+  render(<ReviewsTab requestId="req1" />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Generate synthesis' }));
+
+  expect(await screen.findByText(/saved, but its generation status could not be recorded/i))
+    .toBeInTheDocument();
+  expect(await screen.findByText('Saved despite tracking failure')).toBeInTheDocument();
+  expect(fetch).toHaveBeenCalledTimes(3);
 });
 
 test('terminal reviewers are excluded from Outstanding even without reviewReceivedAt', async () => {

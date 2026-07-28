@@ -4,8 +4,10 @@
  * AI synthesis of a proposal's SUBMITTED peer reviews (workbench Reviews tab
  * Phase 4, docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md).
  *
- * Body: { requestId: string, overwrite?: boolean } — requestId is a Dataverse
- * GUID, validated BEFORE it reaches any Dataverse selector.
+ * Body: { requestId: string, overwrite?: boolean, confirmEarly?: boolean } —
+ * requestId is a Dataverse GUID, validated BEFORE it reaches any Dataverse
+ * selector. confirmEarly is required when participating reviewers remain
+ * unresolved.
  *
  * Thin route shell (Route→Service Consolidation Plan, Stage 2): method
  * dispatch → auth guard → input validation → withDalContext → one service
@@ -36,14 +38,26 @@ export default async function handler(req, res) {
 
   const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
 
-  const { requestId, overwrite = false } = req.body || {};
+  const { requestId, overwrite = false, confirmEarly = false } = req.body || {};
   if (!requestId || typeof requestId !== 'string' || !isGuid(requestId)) {
     return res.status(400).json({ ok: false, reason: 'validation', errors: ['requestId must be a valid GUID.'] });
+  }
+  if (typeof overwrite !== 'boolean' || typeof confirmEarly !== 'boolean') {
+    return res.status(400).json({
+      ok: false,
+      reason: 'validation',
+      errors: ['overwrite and confirmEarly must be booleans when provided.'],
+    });
   }
 
   return withDalContext('review-manager-synthesize-reviews', async () => {
     try {
-      const result = await synthesizeReviews({ requestId, overwrite, actingUserSystemId });
+      const result = await synthesizeReviews({
+        requestId,
+        overwrite,
+        confirmEarly,
+        actingUserSystemId,
+      });
       return res.status(200).json(result);
     } catch (error) {
       if (error instanceof ServiceHttpError) {

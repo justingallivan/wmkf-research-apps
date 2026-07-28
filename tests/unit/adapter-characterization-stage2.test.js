@@ -161,6 +161,37 @@ describe('researcher.getByPotentialReviewer (characterization)', () => {
 
 // ─────────────────── reviewer-suggestion PD scope ───────────────────
 
+describe('reviewer-suggestion.findByRequest complete-read mode', () => {
+  test('uses the paginated reader and returns every selected row', async () => {
+    const rows = [{ wmkf_appreviewersuggestionid: GUID_B }];
+    const q = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: rows,
+      capped: false,
+    });
+    const out = await suggestion.findByRequest(GUID_A, {
+      selectedOnly: true,
+      requireComplete: true,
+    });
+    expect(out).toEqual(rows);
+    expect(q).toHaveBeenCalledWith('wmkf_appreviewersuggestions', expect.objectContaining({
+      select: SUGGESTION_SELECT,
+      filter: expect.stringContaining(`_wmkf_request_value eq ${GUID_A}`),
+      orderby: 'createdon desc',
+    }));
+  });
+
+  test('fails closed when the paginated reader reports a cap', async () => {
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: [],
+      capped: true,
+    });
+    await expect(suggestion.findByRequest(GUID_A, {
+      selectedOnly: true,
+      requireComplete: true,
+    })).rejects.toThrow(/5000-row cap/);
+  });
+});
+
 describe('reviewer-suggestion.findByPD (characterization)', () => {
   test('golden: two-step (akoya_requests → suggestions) with selected+notExcluded filter', async () => {
     const qAll = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({

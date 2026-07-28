@@ -25,6 +25,7 @@
     "024_reviewer_acceptance_jobs.sql",
     "025_reviewer_find_roster_candidate_key.sql",
     "026_reviewer_identity_shadow_log.sql",
-    "027_reviewer_find_roster_ineligible.sql"
+    "027_reviewer_find_roster_ineligible.sql",
+    "028_review_synthesis_jobs.sql"
   ]
 }

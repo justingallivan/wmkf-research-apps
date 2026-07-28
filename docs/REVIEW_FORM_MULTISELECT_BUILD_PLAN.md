@@ -46,8 +46,15 @@ first and only regeneration reproduced the same incomplete-JSON defect as HTTP
 synthesis memo retained its exact hash and modified timestamp. Cleanup deleted
 exactly the 11 staged answers and restored the four parent fields; no draft or
 unrelated email/material/reminder/thank-you change remained. The two legacy
-staff-writer success rehearsals, synthesis resolution, rollback/republish
-proof, final smoke, and reviewer exposure remain pending.
+staff-writer success rehearsals, rollback/republish proof, final exposure
+smoke, and reviewer exposure remain pending. Synthesis resolution itself
+completed on 2026-07-28: version-preserving publication made governed v3
+`660d7e3f-9e8a-f111-ab0f-000d3a31c468` the sole current prompt with the exact
+tracked native JSON schema, and the controlled Request #1002788 post-fix smoke
+persisted valid synthesis on its first semantic attempt. Completed AI run
+`20aec518-9f8a-f111-ab0f-6045bd018deb` records prompt version 3 and `end_turn`;
+cleanup deleted the exact 11 staged answers and restored the four parent fields
+while preserving the synthesis and append-only audit.
 The known fixture
 disposition completed 2026-07-26, as did the independently routed production
 HTTP proof for all four review writers. The 2026-07-26
@@ -900,8 +907,11 @@ Execute this sequence with external exposure held closed:
    submitted test suggestion. On 2026-07-27, a bounded follow-up exercised the
    structured Manual Review Entry path successfully and restored it exactly,
    while its single regeneration produced the third current-v2 incomplete-JSON
-   failure. Legacy upload and mark-received success rehearsals remain.
-   [PARTIALLY COMPLETED; SYNTHESIS FAILED 2026-07-26 AND 2026-07-27]
+   failure. On 2026-07-28, governed v3 became sole-current and the controlled
+   post-fix regeneration persisted valid synthesis on its first semantic
+   attempt; exact cleanup again restored the staged review state. Legacy upload
+   and mark-received success rehearsals remain.
+   [PARTIALLY COMPLETED; SYNTHESIS PASSED 2026-07-28]
 6. Execute the documented question rollback procedure in §4 and the audited prompt
    rollback in §5. Verify the exact prior question set and prior prompt, then
    republish the new prompt and target set and verify them again. [PLANNED]
@@ -1127,7 +1137,11 @@ cleanup satisfied this invariant. [VERIFIED]
    proved on 2026-07-27, followed by a third incomplete-JSON failure and exact
    restoration to zero answers/no draft with unchanged email/material/reminder/
    thank-you state. Legacy upload and mark-received success coverage remains.
-   [FAILED/PARTIALLY COMPLETED 2026-07-26; MANUAL ENTRY FOLLOW-UP 2026-07-27]
+   Governed v3 then became sole-current on 2026-07-28, and a controlled
+   post-fix run persisted valid synthesis on the first semantic attempt with a
+   completed prompt-linked audit row; the exact 11 answers/four parent fields
+   were restored afterward while the synthesis/audit proof remained.
+   [PARTIALLY COMPLETED; SYNTHESIS PASSED 2026-07-28]
 5. While external exposure remains closed, execute the §4 manual rollback
    changeset, require exact prior-version readback, and publish the recorded prior
    prompt as a new audited version. Then republish the new prompt and exact target
@@ -1278,7 +1292,9 @@ remain release gates and must not be inferred from code completion:
   2026-07-26. Alerts `361`/`362` are successful with no warnings; contacts and
   the separately preserved Tim Newhouse/St. Jude legacy test PDF were preserved.
 - [x] The prompt is published before production question-set activation.
-- [ ] Controlled production smoke and cleanup are green before external exposure.
+- [ ] Final controlled production exposure smoke and cleanup are green after
+  the rollback/republish rehearsal. The governed-v3 synthesis smoke and its
+  exact answer/parent cleanup passed on 2026-07-28.
 - [x] Question rollback is executable from the reviewed 23-PATCH manual manifest
   and preserved release evidence.
 - [ ] Question and prompt rollback are executed, ordered, and rehearsed; the
@@ -1286,8 +1302,9 @@ remain release gates and must not be inferred from code completion:
 - [x] Corrupt JSON, tampered labels, unknown values, and duplicates are tested.
 - [x] Matrix, cards, comparisons, DOCX, PDF, courtesy copy, and synthesis have
   source-level focused coverage.
-- [ ] Production presentation, synthesis, and unchanged thank-you behavior are
-  verified in the controlled rehearsal.
+- [ ] Production presentation and unchanged thank-you behavior are verified in
+  the final controlled rehearsal. Governed-v3 synthesis was verified in
+  production on 2026-07-28.
 - [x] Relevant gates, tests, and build are green for the feature branch.
 - [x] Atlas, service catalog, source prompt contract, and active memory agree with
   the published-but-rehearsal/exposure-pending boundary.

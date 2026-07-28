@@ -203,10 +203,13 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   with incomplete JSON (failed AI run
   `be61f383-f289-f111-ab0f-70a8a59cded0`). The original request memo and all
   email/material/reminder/thank-you markers remained unchanged; the 11 staged
-  answers, draft, and four parent fields were fully restored. Synthesis
-  resolution, the two legacy staff-writer success rehearsals,
-  rollback/republish, final smoke, and reviewer exposure remain separate
-  release gates. Known-fixture disposition cleared
+  answers, draft, and four parent fields were fully restored. On 2026-07-28,
+  governed prompt v3 became sole-current and the controlled post-fix smoke
+  persisted valid synthesis on its first semantic attempt with completed AI-run
+  evidence; exact cleanup again removed 11 staged answers and restored the four
+  parent fields while retaining the synthesis/audit proof. The two legacy
+  staff-writer success rehearsals, rollback/republish, final exposure smoke, and
+  reviewer exposure remain separate release gates. Known-fixture disposition cleared
   2026-07-26 via audited alerts `361`/`362`, with both CRM contacts and an
   initially unclassified Tim Newhouse/St. Jude PDF preserved. The owner later
   identified that PDF as another test artifact from the retired reviewer-PDF

@@ -61,7 +61,7 @@ related:
 | [PDF_EXPORT.md](PDF_EXPORT.md) | history | active |  | This document describes the PDF export system and how to add it to other apps in the suite. | 2026-07-02 |
 | [PDF_INPUT_FOR_BACKEND.md](PDF_INPUT_FOR_BACKEND.md) | history | historical |  | 2. PDF prompt-caching cuts subsequent calls by 90% and is verified working. The staged 3-pass pipeline drops from $0.39 → $0.20 per proposal and... | 2026-07-02 |
 | [REQUEST_WORKBENCH_BUILD_PLAN.md](REQUEST_WORKBENCH_BUILD_PLAN.md) | plan | historical |  | Historical implementation chronology for the D26 reviewer dashboard and early Workbench build; no longer owns forward lifecycle scope. | 2026-07-02 |
-| [REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md](REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md) | plan | canonical | yes | Evidence-backed critical path for stabilizing review synthesis and designing the remaining Workbench lifecycle before implementation. | 2026-07-26 |
+| [REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md](REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md) | plan | canonical | yes | Evidence-backed critical path: review-synthesis lifecycle implementation is release-pending; remaining Workbench lifecycle design follows. | 2026-07-26 |
 | [REQUEST_WORKBENCH_SCOPING.md](REQUEST_WORKBENCH_SCOPING.md) | plan | historical |  | Historical 2026-05 scoping record for the per-PD Workbench navigation model. | 2026-07-02 |
 | [REVIEW_FORM_MULTISELECT_BUILD_PLAN.md](REVIEW_FORM_MULTISELECT_BUILD_PLAN.md) | plan | active |  | Add multiselect end to end and publish the owner's reworked review question set, with rollback rehearsal before reviewer exposure. | 2026-07-25 |
 | [ROUTE_SERVICE_CONSOLIDATION_PLAN.md](ROUTE_SERVICE_CONSOLIDATION_PLAN.md) | plan | active | yes | COMPLETE (S331): route-to-service boundary census fell from 49 to 0; check:route-service-boundary is permanent law. | 2026-07-04 |
@@ -341,7 +341,7 @@ related:
 | [REVIEWER_STAGE2A_IDENTITY_CAPTURE_BUILD_PLAN.md](REVIEWER_STAGE2A_IDENTITY_CAPTURE_BUILD_PLAN.md) | plan | historical |  | Completed board-writeup identity capture; retained as the historical build plan. | 2026-07-02 |
 | [REVIEWER_TIMEOUT_BUDGET_PLAN.md](REVIEWER_TIMEOUT_BUDGET_PLAN.md) | plan | historical |  | Shipped reviewer search time-budget implementation and follow-up fixes; retained as historical record. | 2026-07-02 |
 | [REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md](REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md) | plan | active |  | Planning only. No feature code, migrations, API routes, or schema files were created for this pass. | 2026-07-02 |
-| [WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md](WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md) | plan | active |  | Reviews tab deployed; synthesis reliability code deployed; governed prompt publication and post-fix smoke remain. | 2026-07-03 |
+| [WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md](WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md) | plan | active |  | Reviews and synthesis reliability are production-proven; lifecycle readiness/currentness automation is implemented on a release-pending branch. | 2026-07-03 |
 
 ## reviewers
 

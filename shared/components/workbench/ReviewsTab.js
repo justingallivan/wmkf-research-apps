@@ -396,26 +396,48 @@ function CompareView({ submitted, liveQuestions }) {
 // as plain text nodes (NO dangerouslySetInnerHTML) per the plan's rendering
 // contract. `synthesis` is the stored `proposal.reviewSynthesis` (fail-soft
 // parsed server-side, or null when never generated / parse failed).
-function SynthesisCard({ requestId, synthesis, onUpdated }) {
+function SynthesisCard({ requestId, synthesis, state, onUpdated }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const automaticInFlight = state?.status === 'queued' || state?.status === 'running';
+  const canGenerate = state?.canRunManually === true && !automaticInFlight;
 
   const generate = useCallback(async (overwrite) => {
+    const confirmEarly = state?.ready !== true;
+    if (confirmEarly) {
+      const confirmed = window.confirm(
+        `Generate before every participating reviewer is resolved? `
+        + `${state?.submittedCount || 0} review(s) are submitted and `
+        + `${state?.blockingCount || 0} reviewer(s) remain unresolved.`,
+      );
+      if (!confirmed) return;
+    }
     setBusy(true);
     setError(null);
     try {
       const res = await fetch('/api/review-manager/synthesize-reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, overwrite: !!overwrite }),
+        body: JSON.stringify({
+          requestId,
+          overwrite: !!overwrite,
+          confirmEarly,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
+        if (data.writtenToDynamics === true) {
+          await onUpdated?.();
+        }
         setError(
           data.reason === 'no_submitted_reviews'
             ? 'No submitted reviews to synthesize.'
             : data.reason === 'already_exists'
               ? 'A synthesis already exists — use Regenerate to replace it.'
+              : data.reason === 'early_confirmation_required'
+                ? 'Confirm early generation before synthesizing unresolved reviews.'
+                : data.reason === 'tracking_completion_failed'
+                  ? 'The synthesis was saved, but its generation status could not be recorded. Refresh before retrying.'
               : (data.reason || 'Failed to generate synthesis.'),
         );
         return;
@@ -426,21 +448,64 @@ function SynthesisCard({ requestId, synthesis, onUpdated }) {
     } finally {
       setBusy(false);
     }
-  }, [requestId, onUpdated]);
+  }, [requestId, state, onUpdated]);
+
+  const statusText = (() => {
+    if (automaticInFlight) {
+      return state.status === 'running'
+        ? 'Automatic synthesis is generating.'
+        : 'Automatic synthesis is queued.';
+    }
+    if (state?.status === 'failed') {
+      return state.lastError
+        ? `Latest generation failed: ${state.lastError}`
+        : 'Latest generation failed.';
+    }
+    if (synthesis && state?.current) return 'Current for the participating reviews shown below.';
+    if (synthesis) return 'Stored synthesis is stale or predates lifecycle tracking.';
+    if (state?.ready) return 'All participating reviewers are resolved; synthesis is ready.';
+    if (state?.canRunManually) {
+      return `${state.blockingCount || 0} participating reviewer(s) remain unresolved. Early generation requires confirmation.`;
+    }
+    return 'At least one submitted review is required before synthesis.';
+  })();
 
   return (
     <Card hover={false}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold text-gray-900">AI Synthesis</p>
-        <button
-          type="button"
-          onClick={() => generate(!!synthesis)}
-          disabled={busy}
-          className="text-xs text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg px-2.5 py-1 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {busy ? 'Generating…' : synthesis ? 'Regenerate' : 'Generate synthesis'}
-        </button>
+        <div className="flex items-center gap-2">
+          {synthesis && (
+            <span className={`text-[10px] uppercase tracking-wide rounded-full px-2 py-1 ${
+              state?.current
+                ? 'bg-emerald-50 text-emerald-700'
+                : 'bg-amber-50 text-amber-700'
+            }`}>
+              {state?.current ? 'Current' : 'Stale'}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => generate(!!synthesis)}
+            disabled={busy || !canGenerate}
+            title={!state?.canRunManually
+              ? 'A submitted review is required'
+              : automaticInFlight
+                ? 'Automatic synthesis is already in progress'
+                : undefined}
+            className="text-xs text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg px-2.5 py-1 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {busy ? 'Generating…' : synthesis ? 'Regenerate' : 'Generate synthesis'}
+          </button>
+        </div>
       </div>
+      <p className={`text-xs mt-2 ${
+        state?.status === 'failed' || (synthesis && !state?.current)
+          ? 'text-amber-700'
+          : 'text-gray-500'
+      }`}>
+        {statusText}
+      </p>
       {error && <p className="text-xs text-amber-600 mt-2">{error}</p>}
       {!synthesis ? (
         <p className="text-sm text-gray-500 mt-2">No synthesis generated yet.</p>
@@ -665,14 +730,22 @@ export default function ReviewsTab({ requestId }) {
 
   if (submitted.length === 0 && outstanding.length === 0) {
     return (
-      <Card hover={false}>
-        <p className="text-sm text-gray-500">
-          No reviews submitted yet
-          {acceptedCount > 0
-            ? ` — ${acceptedCount} reviewer${acceptedCount === 1 ? '' : 's'} accepted and pending.`
-            : '.'}
-        </p>
-      </Card>
+      <div className="space-y-4">
+        <Card hover={false}>
+          <p className="text-sm text-gray-500">
+            No reviews submitted yet
+            {acceptedCount > 0
+              ? ` — ${acceptedCount} reviewer${acceptedCount === 1 ? '' : 's'} accepted and pending.`
+              : '.'}
+          </p>
+        </Card>
+        <SynthesisCard
+          requestId={requestId}
+          synthesis={proposal?.reviewSynthesis ?? null}
+          state={proposal?.reviewSynthesisState ?? null}
+          onUpdated={load}
+        />
+      </div>
     );
   }
 
@@ -750,9 +823,14 @@ export default function ReviewsTab({ requestId }) {
               <CompareView submitted={submitted} liveQuestions={liveQuestions} />
             </Card>
           )}
-          <SynthesisCard requestId={requestId} synthesis={proposal?.reviewSynthesis ?? null} onUpdated={load} />
         </>
       )}
+      <SynthesisCard
+        requestId={requestId}
+        synthesis={proposal?.reviewSynthesis ?? null}
+        state={proposal?.reviewSynthesisState ?? null}
+        onUpdated={load}
+      />
     </div>
   );
 }

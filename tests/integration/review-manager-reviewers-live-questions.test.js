@@ -33,6 +33,22 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 jest.mock('../../lib/external/review-question-fetcher', () => ({
   getActiveQuestionSet: jest.fn(),
 }));
+jest.mock('../../lib/services/review-synthesis-job-service', () => ({
+  getReviewSynthesisJobState: jest.fn(async () => ({
+    current: false,
+    status: 'not_started',
+    mode: null,
+    runId: null,
+    attempts: 0,
+    lastError: null,
+    createdAt: null,
+    updatedAt: null,
+    startedAt: null,
+    completedAt: null,
+    currentRunId: null,
+    currentCompletedAt: null,
+  })),
+}));
 
 const REQUEST_ID = '550e8400-e29b-41d4-a716-446655440000';
 const SUGGESTION_ID = '11111111-1111-1111-1111-111111111111';
@@ -54,6 +70,8 @@ beforeEach(() => {
     wmkf_appreviewersuggestionid: SUGGESTION_ID,
     _wmkf_request_value: REQUEST_ID,
     _wmkf_potentialreviewer_value: PERSON_ID,
+    wmkf_selected: true,
+    wmkf_invited: true,
     wmkf_accepted: true,
     wmkf_reviewstatus: 100000003, // review_received
     wmkf_reviewreceivedat: '2026-06-28T12:00:00Z',
@@ -132,6 +150,8 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
     wmkf_appreviewersuggestionid: SUGGESTION_ID,
     _wmkf_request_value: REQUEST_ID,
     _wmkf_potentialreviewer_value: PERSON_ID,
+    wmkf_selected: true,
+    wmkf_invited: true,
     wmkf_accepted: true,
     wmkf_reviewstatus: 100000003, // review_received
     wmkf_responsetype: 100000000,
@@ -189,6 +209,26 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
       meetingDate: null,
       reviewDeadline: '2026-09-09',
       reviewSynthesis: null,
+      reviewSynthesisState: {
+        ready: true,
+        canRunManually: true,
+        participantCount: 1,
+        submittedCount: 1,
+        resolvedCount: 1,
+        blockingCount: 0,
+        current: false,
+        status: 'not_started',
+        mode: null,
+        runId: null,
+        attempts: 0,
+        lastError: null,
+        createdAt: null,
+        updatedAt: null,
+        startedAt: null,
+        completedAt: null,
+        currentRunId: null,
+        currentCompletedAt: null,
+      },
       statusSummary: { review_received: 1 },
       reviewers: [{
         suggestionId: SUGGESTION_ID,

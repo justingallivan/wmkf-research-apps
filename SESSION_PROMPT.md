@@ -1,197 +1,200 @@
-# Session 383 Prompt: Synthesis promotion and operational follow-through
+# Session 384 Prompt: Release review-synthesis lifecycle safely
 
-## Session 382 Summary
+## Session 383 Summary
 
-Session 382 eliminated the accumulated Dependabot security backlog through one
-reviewed rollup, proved the dependency graph on the repository's Node 20/npm 10
-CI runtime, and deployed the result to production.
+Session 383 closed the auth-status divergence and routine dependency update,
+reconciled the post-synthesis operational evidence, then implemented the
+owner-approved review-synthesis lifecycle on a deliberate Tier feature branch.
+The lifecycle implementation is committed and fully tested. Draft PR #96 is
+open with all checks green, migration 028 is applied to production Postgres,
+and the code remains undeployed with automation disabled.
 
 ### What Was Completed
 
-1. **Dependabot vulnerability inventory and remediation**
-   - Verified 49 open alerts on `main`: 1 critical, 32 high, 9 moderate, and
-     7 low across 13 package families.
-   - Updated or overrode the affected NextAuth, Undici, DOMPurify, body-parser,
-     linkify-it, ws, js-yaml, Babel, PostCSS, Sharp, and UUID versions.
-   - Removed unused `multer` from the active dependency graph. Renamed the
-     immutable historical `.harness-backups/.../package.json` snapshot so
-     GitHub no longer treats it as an active npm manifest; its recorded hash
-     and byte count remain unchanged.
+1. **Auth-status policy and routine dependency releases**
+   - `/api/auth/status` now delegates to the same fail-closed auth policy used
+     by the proxy and server guards. PR #95 merged to `main` as `12981732`.
+   - Routine Dependabot PR #94 passed review/checks and merged to `main` as
+     `e9e20db2`.
+   - The retired-table annotation was corrected in `39dc08d7`.
 
-2. **Brace-expansion compatibility boundary**
-   - The newest brace-expansion advisory affects every upstream release through
-     5.0.7, but older minimatch consumers require the legacy callable API while
-     5.0.8 exposes a named `expand` API.
-   - Added `vendor/brace-expansion-compat`: a bounded legacy-compatible adapter
-     based on upstream 1.1.16 behavior, with output-count, accumulated-length,
-     and brace-depth limits. Its named API delegates to official 5.0.8.
-   - CI exposed an npm 11/npm 10 portability difference for override-only local
-     packages. `58d713a1` fixed it by declaring the local package directly and
-     referencing that exact dependency from the override. A clean npm 10.8.2
-     install then resolved both APIs correctly.
+2. **Review-synthesis lifecycle implementation**
+   - Added one fail-closed readiness state machine for selected,
+     invited/accepted, non-applicant-excluded participants. Receipts resolve
+     with content; explicit terminal outcomes and current revoked/expired
+     tokens resolve without content; live invitations and unknown/malformed
+     state block.
+   - Added an exact input fingerprint over the shared answer digest plus every
+     participant's lifecycle classification. Token expiry crossing changes the
+     classification/hash even though Dataverse fields do not change.
+   - Added explicit early-run confirmation for manual staff generation.
+     Manual invocations create leased ledger rows before the Executor call.
+   - Added migration `028_review_synthesis_jobs.sql`: queue/currentness,
+     deduplication, lease, retry, error, timing, and AI-run metadata only. It
+     stores no reviewer text; the Dataverse request memo remains the content
+     source of truth.
+   - Added `/api/cron/drain-review-syntheses`, scheduled every five minutes but
+     inert unless `REVIEW_SYNTHESIS_AUTOMATION_ENABLED` is exactly `true`.
+     Claims are small and leased, capped scans fail closed, readiness/hash are
+     revalidated before generation, retryable failures stop after three
+     attempts, and terminal fingerprints are not silently reopened.
+   - `ReviewsTab` now keeps stored output visible at zero accepted/submitted
+     rows, shows Current/Stale plus queued/running/failed/readiness state, and
+     refreshes the stored memo after an explicit partial tracking failure.
+   - `GET /api/review-manager/reviewers` preserves the proposal at zero accepted
+     rows and projects `reviewSynthesisState`. Job-state lookup is fail-soft
+     without hiding stored synthesis or submitted reviews.
+   - Contract reconciliation closed per-request pagination/truncation,
+     automatic job-to-fresh-fingerprint binding, stale accepted flags on
+     receipt-bearing rows, partial Dataverse-write/ledger-finalization behavior,
+     and caller → persistence → consumer currentness.
 
-3. **Compatibility and adversarial verification**
-   - Added real-package regressions for UUID-v5 identity stability, ExcelJS
-     conditional-format UUID use, malformed NextAuth Bearer input, and both
-     brace-expansion APIs including exploit-class bounded output.
-   - Local verification passed: `npm audit` at zero; 527 Jest suites / 6,269
-     tests; 24 Playwright tests; TypeScript; production builds under Turbopack
-     and Webpack; Node 20 focused tests and Sharp conversion; lint with zero
-     errors; harness, secret, and agent-invariant gates.
-   - Three independent review passes found the initially missed 2026
-     brace-expansion advisory, identified focused compatibility tests, and
-     removed one redundant direct ESLint-internals pin. No high- or
-     medium-severity finding remained.
-
-4. **Release and live security reconciliation**
-   - PR #93 passed Jest, Playwright, Gitleaks, Semgrep, Trivy, Vercel Preview,
-     and Claude review, then squash-merged to `main` as `c325afd5`.
-   - Production deployment `dpl_4LBja725wdLHsATtLhLVZkCMSso3` reached Ready on
-     all aliases. The post-deploy error-level log query returned no logs, and
-     public alias smokes returned their expected authentication redirects.
-   - All post-merge main checks passed. GitHub's live Dependabot count
-     reconciled from 49 open alerts to zero.
-   - PRs #83, #84, #85, #86, #87, #89, #90, and #91 were closed as superseded
-     by #93.
+3. **Durable truth and verification**
+   - Reconciled the Atlas, route security matrix, credentials runbook, work
+     queue, build plans, reviewer lifecycle wiki, canonical counts, and docs
+     catalog.
+   - Added
+     `docs/audits/AUDIT_REVIEW_SYNTHESIS_LIFECYCLE_2026-07-28.md`.
+   - The release preflight proved the local connection string exactly matched
+     Vercel Production, then `node scripts/apply-migrations.js` applied
+     `028_review_synthesis_jobs.sql` at `2026-07-28T19:25:49.479Z`.
+     Post-apply verification found the empty table with the expected 18
+     columns, eight constraints, and seven indexes. The production automation
+     flag remains absent.
+   - Full Jest: 532 suites / 6,317 tests passed. TypeScript and the Next.js
+     production build passed. ESLint passed with zero errors and 51 existing
+     warnings.
+   - Migration manifest, API-route matrix, Atlas, route-lifecycle auth, docs
+     catalog, canonical facts, doc-symbol references, doc currency, and all
+     required self-tests passed.
 
 ### Commits
 
-- `26523561` — Resolve Dependabot security alerts
-- `58d713a1` — Make the local brace-expansion override portable to npm 10
-- `c325afd5` — Squash merge PR #93 to `main`
+- `12981732` — Align auth status with enforcement policy (#95)
+- `e9e20db2` — build(deps): bump the minor-and-patch group with 11 updates (#94)
+- `39dc08d7` — Annotate retired reviewer table reference
+- `77028ff2` — Record successful review synthesis smoke
+- `f3037cc5` — Verify alert mailbox server-side sync
+- `e33374cf` — Implement review synthesis lifecycle
 
 ## Next Items
 
 ### Verified Open
 
-1. **Publish and prove the review-synthesis reliability contract.**
+1. **Review and release `codex/review-synthesis-lifecycle` deliberately.**
+   Evidence: `e33374cf`;
+   `docs/audits/AUDIT_REVIEW_SYNTHESIS_LIFECYCLE_2026-07-28.md`;
+   `docs/CURRENT_WORK_QUEUE.md`.
+   Required order:
+   1. ~~review/push/open the feature PR and obtain green Preview checks;~~
+      complete in draft PR #96;
+   2. ~~apply migration 028 to the existing database with
+      `node scripts/apply-migrations.js`;~~ complete and live-verified;
+   3. merge/deploy while `REVIEW_SYNTHESIS_AUTOMATION_ENABLED` remains unset;
+   4. perform signed-in manual/read-only Workbench verification and inspect the
+      ledger/currentness projection;
+   5. enable the exact `true` flag deliberately and redeploy;
+   6. run one bounded automatic smoke and inspect the job row, AI-run,
+      Dataverse memo, maintenance run, and logs before marking the lifecycle
+      live.
+
+2. **Continue the Workbench product sequence after synthesis release.**
    Evidence: `docs/CURRENT_WORK_QUEUE.md`;
-   `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`; `0afea876`.
-   The reliability code is deployed, but the governed
-   `review-synthesis.generate` prompt version carrying the tracked output schema
-   still needs publication followed by one controlled post-fix production
-   smoke. Success is a valid persisted synthesis or a typed clean no-write
-   failure with complete audit evidence.
-
-2. **Verify outgoing Server-Side Sync on the configured role mailbox.**
-   Evidence: `docs/TODO_EMAIL_NOTIFICATIONS.md`;
-   `docs/CLAUDE_TO_CODEX_HANDOFF_2026-07-27.md`.
-   Sender resolution is proven, but mailbox SSS remains explicitly
-   unverified. A post-resolution send failure is logged and swallowed while
-   the dashboard alert persists, so email delivery can stop without breaking
-   alert storage.
-
-3. **Execute Q9 app-access Stage 4 when it reaches the product sequence.**
-   Evidence: `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md`;
-   `.claude-memory/project-app-access-control.md`.
-   Stage 2 acceptance is satisfied and Stage 4 remains ready, not executed.
-   Preserve the bounded admin-list prerequisite, ordinary-user Preview smoke,
-   reversible grant/revoke restoration, authenticated override check, and
-   production log watch.
-
-4. **Resolve or explicitly defer the P1 auth-status policy divergence.**
-   Evidence: `docs/CURRENT_WORK_QUEUE.md`; `pages/api/auth/status.js`;
-   `lib/utils/auth-policy.js`.
-   The public status endpoint can report `enabled:false` while
-   production-mode server enforcement remains on. Use `/contract-reconcile`
-   before changing this client-bootstrap/server-enforcement contract.
-
-5. **Triage routine Dependabot PR #94 separately from the security release.**
-   Evidence: GitHub PR #94 and the live Dependabot alert API on 2026-07-28.
-   The PR contains 11 ordinary minor/patch updates, changes only
-   `package.json`/`package-lock.json`, and currently has green automated checks.
-   It is not a security regression: the live alert count remains zero. Review
-   it on normal maintenance priority rather than folding it into the completed
-   vulnerability incident.
+   `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
+   Calendar and freeze the full contract for Pre Site Visit Writeup, Site
+   Visit, Final Writeup, and Initial Writeup before implementing another tab.
 
 ### Owner Decision Needed
 
 1. **Public Git current-tree and history disposition.**
    Evidence: `docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md`;
    `docs/audits/public-repository-pii-history-audit-2026-07-27.md`.
-   Decide whether to privately archive/remove or sanitize the retired
-   `modules/expertise_matching` duplicate, then separately authorize or defer
-   the history rewrite, GitHub cleanup, and clone invalidation.
+   Decide the retired duplicate's current-tree disposition separately from any
+   authorized history rewrite/GitHub cleanup.
 
 2. **Retired-table operational scripts.**
    Evidence: `docs/CURRENT_WORK_QUEUE.md`; `scripts/README.md`.
-   Twenty-five non-archive scripts still mention the dropped
-   `reviewer_suggestions` table. They are blocked from casual use, but
-   quarantine/removal needs an owner-approved scope and caller review.
-
-3. **Whether reviewer follow-ups should use first names.**
-   Evidence: `docs/CLAUDE_TO_CODEX_HANDOFF_2026-07-27.md`.
-   `Dear Dr. <Last>` satisfies the explicit minimum. A warmer first-name mode
-   for established correspondence remains a separate product decision.
+   Twenty-five non-archive scripts still mention the historical
+   `reviewer_suggestions` table. They are blocked from casual use; removal or
+   quarantine remains owner-scoped.
 
 ### Parked
 
-1. **Brace-expansion vendor adapter removal.**
-   Evidence: `vendor/brace-expansion-compat/index.js`; `package.json`.
-   Remove only when every installed parent chain accepts the official patched
-   API. A blind 5.0.8 substitution breaks older minimatch consumers because
-   they call the package as a function.
+1. **Q9 app-access Stage 4 ordinary-user smoke until the owner is in the
+   office with another person's account.**
+   Evidence: `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md`;
+   `.claude-memory/project-app-access-control.md`; owner decision in Session
+   383. The other person only needs to sign into Preview and exercise the
+   bounded ordinary-user checks while the owner performs/reverses the
+   grant/revoke steps. Do not substitute the owner's superuser account.
 2. The four placeholder Workbench tabs until calendar and complete workflow
    contracts are approved.
 3. Applicant intake while WMKF evaluates the GOApply re-engineering.
 4. Automated BILL onboarding; honorarium payment remains offline.
+5. Brace-expansion vendor adapter removal until every installed parent accepts
+   the official patched API.
 
 ### Verify Before Acting
 
-1. Read the live governed prompt row before synthesis publication. The tracked
-   prompt config is not proof that the new schema contract is current in
-   Dataverse.
-2. Re-freeze GitHub refs, artifacts, PRs, branches, and local worktrees
-   immediately before any public-history action. The remediation plan's
-   2026-07-27 topology is explicitly a dated baseline; PR #94 and the completed
-   #93 release already prove that it has changed.
-3. Do not auto-trigger synthesis until the approved participating-invitation
-   readiness state machine is implemented and tested.
-4. Do not replace the brace-expansion adapter based only on a scanner version;
-   exercise legacy callable and modern named consumers under Node 20/npm 10.
-5. Leave the untracked `.codex/` directory alone. It contains local worktree
-   metadata, not session documentation.
+1. **Production now has the empty `review_synthesis_jobs` table, but the branch
+   is still undeployed.** Keep the release sequence deliberate and deploy with
+   automation unset before any enablement.
+2. **Do not enable automation with the first deployment.** Any value other than
+   exact `true` is intentionally inert so historical requests are not
+   backfilled unexpectedly.
+3. Re-read the live governed `review-synthesis.generate` row before any prompt
+   publication. Governed v3 was the verified sole-current production baseline
+   on 2026-07-28.
+4. Re-freeze refs/artifacts before any public-history operation; the prior
+   topology is a dated baseline.
+5. Do not replace the brace-expansion adapter from a scanner version alone;
+   exercise both legacy callable and modern named consumers under Node 20/npm
+   10.
 
 ### Do Not Reopen Without New Decision
 
-1. The completed 49-alert Dependabot security rollup. Re-open only for a new
-   alert or a demonstrated compatibility defect; routine PR #94 is separate.
-2. The eight superseded individual Dependabot PRs (#83–#91, excluding #88).
-3. The completed 139-file local source disposal.
-4. A drafts-folder workflow for reviewer release emails; edit-before-send is
-   the accepted workflow.
-5. The four-body reviewer-copy migration; verification already returned
-   `no-change=4`.
+1. The auth-status divergence fixed in PR #95.
+2. Routine dependency PR #94 and the completed 49-alert security rollup.
+3. The production-proven synthesis terminal-response/native-schema reliability
+   fix and governed-v3 smoke; the open work is lifecycle release only.
+4. A drafts-folder reviewer-email workflow; edit-before-send remains the
+   accepted behavior.
 
 ## Key Files Reference
 
 | File | Purpose |
 | --- | --- |
-| `package.json` | Direct dependency and global security-override contract |
-| `package-lock.json` | npm 10/11-compatible resolved dependency graph |
-| `vendor/brace-expansion-compat/` | Bounded legacy API plus official 5.0.8 named API |
-| `tests/unit/dependency-security-compat.test.js` | UUID, ExcelJS, and brace compatibility regressions |
-| `tests/unit/signin-server-props.test.js` | Real NextAuth malformed-Bearer regression |
-| `.github/dependabot.yml` | Exact sanitize-html 2.17.6 compatibility ignore |
-| `docs/CURRENT_WORK_QUEUE.md` | Canonical product sequence and audit follow-ups |
-| `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md` | Synthesis runtime evidence and promotion contract |
-| `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md` | App-access Stage 4 implementation and release gates |
-| `docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md` | Owner-gated current-tree/history cleanup plan |
+| `lib/services/review-synthesis-readiness.js` | Pure participant readiness and exact lifecycle fingerprint |
+| `lib/services/review-synthesis-content.js` | Shared digest/hash used by producer and read model |
+| `lib/services/review-synthesis-job-service.js` | Postgres enqueue/claim/complete/fail/currentness ledger |
+| `lib/services/review-synthesis-drain.js` | Automatic scan, enqueue, revalidation, and drain |
+| `pages/api/cron/drain-review-syntheses.js` | Authenticated, feature-gated five-minute cron |
+| `lib/db/migrations/028_review_synthesis_jobs.sql` | Existing-database ledger migration |
+| `lib/services/review-manager/synthesize-reviews-service.js` | Shared manual/automatic producer |
+| `lib/services/review-manager/reviewers-service.js` | Readiness/currentness DTO projection |
+| `shared/components/workbench/ReviewsTab.js` | Visibility, early confirmation, and observability UI |
+| `docs/audits/AUDIT_REVIEW_SYNTHESIS_LIFECYCLE_2026-07-28.md` | Contract and live-boundary audit |
+| `docs/CURRENT_WORK_QUEUE.md` | Canonical product/release sequence |
 
 ## Testing
 
 ```bash
-rtk npm ci --cache /tmp/wmkf-npm-cache
-rtk npm audit
 rtk npm test -- --runInBand
-rtk npx playwright test
+rtk npm run lint
 rtk npm run check:types
 rtk npm run build
+rtk npm run check:migrations-manifest
+rtk npm run check:api-routes
+rtk npm run check:api-routes:self-test
+rtk npm run check:atlas
+rtk npm run check:atlas:self-test
+rtk npm run check:route-lifecycle-auth
+rtk npm run check:route-lifecycle-auth:self-test
 rtk npm run check:docs-catalog
-rtk npm run check:fact-consistency && rtk npm run check:fact-consistency:self-test
-rtk npm run check:doc-symbol-refs && rtk npm run check:doc-symbol-refs:self-test
-rtk npm run check:memory-router && rtk npm run check:memory-router:self-test
-rtk npm run check:doc-currency && rtk npm run check:doc-currency:self-test
-rtk npm run check:secret-scan && rtk npm run check:secret-scan:self-test
-rtk npm run check:agent-invariants
+rtk npm run check:fact-consistency
+rtk npm run check:fact-consistency:self-test
+rtk npm run check:doc-symbol-refs
+rtk npm run check:doc-symbol-refs:self-test
+rtk npm run check:doc-currency
+rtk npm run check:doc-currency:self-test
 ```
