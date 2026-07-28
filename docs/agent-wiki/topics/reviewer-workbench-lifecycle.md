@@ -341,12 +341,12 @@ schema-as-code APPLIED TO PROD 2026-07-03 (column live-probed) from
 'reviewers')`, requestId GUID-validated) returns 409 `no_submitted_reviews`
 with zero submitted reviews (no LLM call); since the guard is
 always-overwrite, regeneration gating is enforced at THIS route instead — 409
-`already_exists` unless `overwrite: true` is passed. The release-pending
-lifecycle extension also requires explicit `confirmEarly:true` while
+`already_exists` unless `overwrite: true` is passed. The deployed lifecycle
+extension also requires explicit `confirmEarly:true` while
 participants remain unresolved and records each generation in
 `review_synthesis_jobs`. `GET /api/review-manager/reviewers` projects
-`proposal.reviewSynthesis` (fail-soft JSON parse) and, on the release-pending
-branch, `proposal.reviewSynthesisState`. `ReviewsTab` retains the Synthesis
+`proposal.reviewSynthesis` (fail-soft JSON parse) and
+`proposal.reviewSynthesisState`. `ReviewsTab` retains the Synthesis
 card even at zero accepted/submitted reviews, with Current/Stale, readiness,
 and queued/running/failed state. Output is plain-text only (no
 `dangerouslySetInnerHTML`); `composeReviewReport` accepts an optional
@@ -377,7 +377,7 @@ deleted the 11 staged answers and restored four parent fields while preserving
 the synthesis and append-only audit. Independent follow-up review returned READY.
 
 **Owner-confirmed lifecycle (2026-07-26; participation semantics closed
-2026-07-27; implemented on release-pending branch 2026-07-28):** automatic
+2026-07-27; production-deployed with automation disabled 2026-07-28):** automatic
 synthesis runs only after
 all participating invitations resolve and at least one review is submitted;
 staff may explicitly generate it earlier after one submission. Participants are
@@ -397,9 +397,11 @@ and resolution. The exact answer digest plus lifecycle classification is hashed;
 a matching completed ledger row establishes Current state. The feature-gated
 `/api/cron/drain-review-syntheses` uses leased claims and revalidates readiness
 and the fingerprint before generation. It remains inert unless
-`REVIEW_SYNTHESIS_AUTOMATION_ENABLED=true`. **This extension is not deployed and
-migration 028 is live-applied with an empty verified table as of 2026-07-28;
-automation remains disabled.** Plan doc:
+`REVIEW_SYNTHESIS_AUTOMATION_ENABLED=true`. **This extension is production-deployed
+in merge `70956477` / deployment `dpl_2tgAYjUXFFx4nQo7FgE2Z3TBMqP9`;
+migration 028 is live-applied, the table remained empty after deployment, and
+the authenticated cron probe confirmed automation remains disabled. Signed-in
+manual/read-only verification remains.** Plan doc:
 `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 ## Email templates (admin org default + per-PD override)

@@ -5,9 +5,10 @@
 Session 383 closed the auth-status divergence and routine dependency update,
 reconciled the post-synthesis operational evidence, then implemented the
 owner-approved review-synthesis lifecycle on a deliberate Tier feature branch.
-The lifecycle implementation is committed and fully tested. Draft PR #96 is
-open with all checks green, migration 028 is applied to production Postgres,
-and the code remains undeployed with automation disabled.
+The lifecycle implementation is fully tested, merged through PR #96 as
+`70956477`, and production-deployed in Vercel deployment
+`dpl_2tgAYjUXFFx4nQo7FgE2Z3TBMqP9`. Migration 028 is applied to production
+Postgres, its ledger remains empty, and automation remains disabled.
 
 ### What Was Completed
 
@@ -59,8 +60,15 @@ and the code remains undeployed with automation disabled.
      Vercel Production, then `node scripts/apply-migrations.js` applied
      `028_review_synthesis_jobs.sql` at `2026-07-28T19:25:49.479Z`.
      Post-apply verification found the empty table with the expected 18
-     columns, eight constraints, and seven indexes. The production automation
-     flag remains absent.
+     columns, eight constraints, and seven indexes.
+   - PR #96 merged as `70956477` and Vercel production deployment
+     `dpl_2tgAYjUXFFx4nQo7FgE2Z3TBMqP9` reached READY. The exact merge commit was
+     independently associated with the successful production deployment.
+     `/api/auth/status` returned 200, the authenticated
+     `/api/cron/drain-review-syntheses` probe returned
+     `{ok:true,enabled:false,reason:"automation_disabled"}`, the production
+     automation flag remained absent, and `review_synthesis_jobs` remained at
+     zero rows.
    - Full Jest: 532 suites / 6,317 tests passed. TypeScript and the Next.js
      production build passed. ESLint passed with zero errors and 51 existing
      warnings.
@@ -76,13 +84,14 @@ and the code remains undeployed with automation disabled.
 - `77028ff2` — Record successful review synthesis smoke
 - `f3037cc5` — Verify alert mailbox server-side sync
 - `e33374cf` — Implement review synthesis lifecycle
+- `70956477` — Implement review synthesis lifecycle (#96)
 
 ## Next Items
 
 ### Verified Open
 
-1. **Review and release `codex/review-synthesis-lifecycle` deliberately.**
-   Evidence: `e33374cf`;
+1. **Verify and complete the review-synthesis lifecycle rollout deliberately.**
+   Evidence: `70956477`;
    `docs/audits/AUDIT_REVIEW_SYNTHESIS_LIFECYCLE_2026-07-28.md`;
    `docs/CURRENT_WORK_QUEUE.md`.
    Required order:
@@ -90,7 +99,10 @@ and the code remains undeployed with automation disabled.
       complete in draft PR #96;
    2. ~~apply migration 028 to the existing database with
       `node scripts/apply-migrations.js`;~~ complete and live-verified;
-   3. merge/deploy while `REVIEW_SYNTHESIS_AUTOMATION_ENABLED` remains unset;
+   3. ~~merge/deploy while `REVIEW_SYNTHESIS_AUTOMATION_ENABLED` remains
+      unset;~~ complete in production deployment
+      `dpl_2tgAYjUXFFx4nQo7FgE2Z3TBMqP9`, with authenticated disabled-path probe
+      and zero-row ledger verification;
    4. perform signed-in manual/read-only Workbench verification and inspect the
       ledger/currentness projection;
    5. enable the exact `true` flag deliberately and redeploy;
@@ -136,9 +148,10 @@ and the code remains undeployed with automation disabled.
 
 ### Verify Before Acting
 
-1. **Production now has the empty `review_synthesis_jobs` table, but the branch
-   is still undeployed.** Keep the release sequence deliberate and deploy with
-   automation unset before any enablement.
+1. **Production has the deployed lifecycle code and an empty
+   `review_synthesis_jobs` table; automation remains disabled.** The next
+   boundary is signed-in manual/read-only Workbench verification before any
+   enablement.
 2. **Do not enable automation with the first deployment.** Any value other than
    exact `true` is intentionally inert so historical requests are not
    backfilled unexpectedly.

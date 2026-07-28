@@ -3,7 +3,7 @@ title: "Workbench Reviews Tab — Consumption Build-Out Plan"
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Reviews and synthesis reliability are production-proven; lifecycle readiness/currentness automation is implemented on a release-pending branch."
+summary: "Reviews and synthesis reliability are proven; lifecycle readiness/currentness is deployed disabled, pending signed-in verification and bounded smoke."
 canonical: false
 cataloged: 2026-07-03
 last_verified: 2026-07-28
@@ -43,10 +43,11 @@ attempts. On 2026-07-28, version-preserving publication made governed v3
 native JSON schema. The controlled post-fix smoke then completed on its first
 semantic attempt, persisted valid synthesis, and wrote completed AI run
 `20aec518-9f8a-f111-ab0f-6045bd018deb` against prompt version 3. Phase 4
-reliability is production-proven. The lifecycle/readiness extension is now
-implemented and focused-test-proven on a feature branch, but remains
-**UNDEPLOYED**; its Postgres migration was applied and live-verified empty on
-2026-07-28, while automatic generation remains disabled.
+reliability is production-proven. The lifecycle/readiness extension merged
+through PR #96 as `70956477` and reached READY production deployment
+`dpl_2tgAYjUXFFx4nQo7FgE2Z3TBMqP9`. Its Postgres migration is live, the ledger
+remained empty after deployment, and an authenticated cron probe confirmed
+automatic generation remains disabled.
 
 **Verification boundary update (S376):** no genuine external reviewer has used
 the form, but the owner-authorized staged production submission proved the
@@ -129,8 +130,8 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
    share the sweep's exclusion/dedupe record so manual + cron cannot double-send.
    Outward-facing email = high-risk surface; the send guard is the review point.
 6. **Synthesis readiness and visibility (owner-confirmed 2026-07-26 and
-   participation semantics confirmed 2026-07-27; implemented on the
-   release-pending feature branch 2026-07-28).**
+   participation semantics confirmed 2026-07-27; production-deployed with
+   automation disabled 2026-07-28).**
    Automatic synthesis is allowed only when all participating invitations
    are resolved, with at least one submitted review. Staff may explicitly run
    synthesis earlier as a deliberate manual override after at least one
@@ -160,9 +161,10 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
    stores only job/hash state in Postgres, leaves content in the Dataverse memo,
    and exposes Current/Stale plus queued/running/failed state. The automatic cron
    is inert unless `REVIEW_SYNTHESIS_AUTOMATION_ENABLED` is exactly `true`.
-   **Release boundary:** none of this extension is deployed as of 2026-07-28;
-   production has the empty, live-verified `review_synthesis_jobs` table, and
-   automation remains disabled.
+   **Release boundary:** merge `70956477` is production-deployed in
+   `dpl_2tgAYjUXFFx4nQo7FgE2Z3TBMqP9`; production has the empty, live-verified
+   `review_synthesis_jobs` table; automation remains disabled. Signed-in
+   manual/read-only verification and the later bounded enablement smoke remain.
 
 ## Phases (independently shippable, in order)
 
@@ -247,13 +249,13 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   409 `no_submitted_reviews` on zero submitted reviews (no LLM call); since the
   prompt's output guard is `always-overwrite`, regeneration gating lives at
   this route instead — 409 `already_exists` when a synthesis is already stored
-  and `overwrite` was not passed. On the release-pending branch, an early run
+  and `overwrite` was not passed. In the deployed lifecycle extension, an early run
   also requires boolean `confirmEarly:true`, every manual invocation has a
   leased `review_synthesis_jobs` audit row, and ledger-finalization failure
   after Dataverse persistence returns an explicit partial 502.
 - `GET /api/review-manager/reviewers` DTO includes
   `proposal.reviewSynthesis` (fail-soft JSON parse of
-  `wmkf_reviewsynthesisjson`). On the release-pending branch it also retains the
+  `wmkf_reviewsynthesisjson`). The deployed lifecycle extension also retains the
   proposal at zero accepted rows and projects `proposal.reviewSynthesisState`:
   fail-closed readiness, exact-fingerprint Current/Stale state, latest job
   status, timestamps, and sanitized error text. A ledger read failure degrades
