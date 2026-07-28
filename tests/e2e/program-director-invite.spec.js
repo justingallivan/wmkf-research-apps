@@ -15,6 +15,8 @@ const REQUEST_ID = '00000000-0000-4000-8000-000000000001';
 const REQUEST_NUM = '1002788';
 const REVIEW_TOKEN = 'pd-e2e-reviewer-token';
 const TEST_EMAIL = 'berets.eyeful-0f@icloud.com';
+const PROGRAM_DIRECTOR_EMAIL = 'program.director@example.org';
+const PROGRAM_DIRECTOR_SYSTEMUSER_ID = '77777777-7777-4777-8777-777777777777';
 const NEXTAUTH_SECRET = 'e2e-throwaway-nextauth-secret-32-chars';
 
 function workbenchUrl(baseURL, sub = 'candidates') {
@@ -47,7 +49,7 @@ async function installStaffSession(context, baseURL) {
     token: {
       sub: 'pd-e2e-user',
       name: 'Program Director',
-      email: 'program.director@example.org',
+      email: PROGRAM_DIRECTOR_EMAIL,
       azureId: 'pd-e2e-azure-id',
       userType: 'staff',
       lastActivity: Date.now(),
@@ -103,6 +105,7 @@ function makeReviewer(overrides = {}) {
 async function installInviteMocks(context, baseURL, {
   candidates = [makeCandidate()],
   reviewers = [],
+  withdrawStatuses = {},
   campaignConfig = {
     respondOffsetDays: 10,
     reviewDueDate: '2099-07-22',
@@ -119,6 +122,7 @@ async function installInviteMocks(context, baseURL, {
   const campaignReads = [];
   const campaignWrites = [];
   const withdrawBodies = [];
+  const withdrawRenderBodies = [];
   let candidatesState = candidates.map((c) => ({ ...c }));
   let reviewersState = reviewers.map((r) => ({ ...r }));
   let campaignState = { ...campaignConfig };
@@ -234,20 +238,66 @@ async function installInviteMocks(context, baseURL, {
         malformed: false,
       }),
     }));
+  await context.route('**/api/review-manager/render-withdraw-emails', (route) => {
+    const body = route.request().postDataJSON();
+    withdrawRenderBodies.push(body);
+    const drafts = body.suggestionIds.map((suggestionId) => {
+      const recipient = findRecipient(suggestionId);
+      return {
+        suggestionId,
+        status: 'ok',
+        name: recipient?.name || 'Reviewer',
+        to: recipient?.email || '',
+        from: PROGRAM_DIRECTOR_EMAIL,
+        senderId: PROGRAM_DIRECTOR_SYSTEMUSER_ID,
+        subject: `Thank you — Request ${REQUEST_NUM}`,
+        bodyText: `Dear ${recipient?.name || 'Reviewer'},\n\nThank you for considering this review.\n\nProgram Director`,
+      };
+    });
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, drafts }),
+    });
+  });
   await context.route('**/api/review-manager/withdraw-sufficient', (route) => {
     const body = route.request().postDataJSON();
     withdrawBodies.push(body);
     const ids = new Set(body.suggestionIds || []);
+    const incompleteId = [...ids].find((suggestionId) => {
+      const override = body.overrides?.[suggestionId];
+      return !override?.subject?.trim()
+        || !override?.bodyText?.trim()
+        || !override?.to?.trim()
+        || !override?.from?.trim()
+        || !override?.senderId?.trim();
+    });
+    if (incompleteId) {
+      return route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: 'each selected suggestion requires complete subject, bodyText, to, from, and senderId overrides',
+        }),
+      });
+    }
+    const results = [...ids].map((suggestionId) => ({
+      suggestionId,
+      status: withdrawStatuses[suggestionId] || 'withdrawn_emailed',
+    }));
+    const withdrawnIds = new Set(results
+      .filter(({ status }) => status.startsWith('withdrawn_'))
+      .map(({ suggestionId }) => suggestionId));
     candidatesState = candidatesState.map((c) => (
-      ids.has(c.suggestionId) ? { ...c, responseType: 'withdrawn_sufficient' } : c
+      withdrawnIds.has(c.suggestionId) ? { ...c, responseType: 'withdrawn_sufficient' } : c
     ));
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         ok: true,
-        withdrawn: ids.size,
-        results: [...ids].map((suggestionId) => ({ suggestionId, status: 'withdrawn_no_pd' })),
+        withdrawn: withdrawnIds.size,
+        results,
       }),
     });
   });
@@ -347,7 +397,15 @@ async function installInviteMocks(context, baseURL, {
     });
   });
 
-  return { sentBodies, renderBodies, campaignReads, campaignWrites, withdrawBodies, reviewerUrl };
+  return {
+    sentBodies,
+    renderBodies,
+    campaignReads,
+    campaignWrites,
+    withdrawBodies,
+    withdrawRenderBodies,
+    reviewerUrl,
+  };
 }
 
 test.describe('Program Director reviewer invitation flow', () => {
@@ -537,23 +595,86 @@ test.describe('Program Director reviewer invitation flow', () => {
       name: 'Dr. Pending Invitee',
       invited: true,
     });
-    const { withdrawBodies } = await installInviteMocks(context, baseURL, { candidates: [pending] });
+    const { withdrawBodies, withdrawRenderBodies } = await installInviteMocks(
+      context,
+      baseURL,
+      { candidates: [pending] },
+    );
 
     await page.goto(workbenchUrl(baseURL));
     await expect(page.getByText('Dr. Pending Invitee')).toBeVisible();
     await page.getByLabel('Select Dr. Pending Invitee').check();
 
+    await page.getByRole('button', { name: /review & release 1 as no longer needed/i }).click();
+    await expect(page.getByText('Review release emails')).toBeVisible();
+    await expect.poll(() => withdrawRenderBodies.length).toBe(1);
+
+    const modal = page.locator('.fixed').filter({ hasText: 'Review release emails' });
+    await modal.getByLabel('Subject').fill('Reviewed release subject');
+    await modal.getByLabel('Message').fill('Dear Dr. Pending Invitee,\n\nWe have completed the reviewer slate. Thank you.');
+
     page.once('dialog', async (dialog) => {
-      expect(dialog.message()).toContain('Release 1 pending reviewer as "no longer needed"?');
+      expect(dialog.message()).toContain('Send and release 1 reviewer?');
       await dialog.accept();
     });
-    await page.getByRole('button', { name: /release 1 as no longer needed/i }).click();
+    await modal.getByRole('button', { name: /send and release 1/i }).click();
 
     await expect.poll(() => withdrawBodies.length).toBe(1);
     expect(withdrawBodies[0]).toEqual({
       requestId: REQUEST_ID,
       suggestionIds: [pending.suggestionId],
+      overrides: {
+        [pending.suggestionId]: {
+          subject: 'Reviewed release subject',
+          bodyText: 'Dear Dr. Pending Invitee,\n\nWe have completed the reviewer slate. Thank you.',
+          to: TEST_EMAIL,
+          from: PROGRAM_DIRECTOR_EMAIL,
+          senderId: PROGRAM_DIRECTOR_SYSTEMUSER_ID,
+        },
+      },
     });
     await expect(page.getByText('Released — no longer needed')).toBeVisible();
+  });
+
+  test('names an email failure in a partial-success release', async ({ page, context }, testInfo) => {
+    const baseURL = testInfo.project.use.baseURL || 'http://localhost:3100';
+    await installStaffSession(context, baseURL);
+    const emailed = makeCandidate({
+      suggestionId: '55555555-5555-4555-8555-555555555555',
+      name: 'Dr. Emailed Reviewer',
+      invited: true,
+    });
+    const failed = makeCandidate({
+      suggestionId: '66666666-6666-4666-8666-666666666666',
+      name: 'Dr. Failed Reviewer',
+      email: 'failed@example.org',
+      invited: true,
+    });
+    await installInviteMocks(context, baseURL, {
+      candidates: [emailed, failed],
+      withdrawStatuses: {
+        [emailed.suggestionId]: 'withdrawn_emailed',
+        [failed.suggestionId]: 'withdrawn_email_failed',
+      },
+    });
+
+    await page.goto(workbenchUrl(baseURL));
+    await page.getByLabel('Select Dr. Emailed Reviewer').check();
+    await page.getByLabel('Select Dr. Failed Reviewer').check();
+    await page.getByRole('button', { name: /review & release 2 as no longer needed/i }).click();
+
+    const modal = page.locator('.fixed').filter({ hasText: 'Review release emails' });
+    // exact: the draft textarea also contains the name ("Dear Dr. Failed Reviewer,"),
+    // so a substring match resolves to two elements and trips strict mode.
+    await expect(modal.getByText('Dr. Failed Reviewer', { exact: true })).toBeVisible();
+    page.once('dialog', async (dialog) => {
+      expect(dialog.message()).toContain('Send and release 2 reviewers?');
+      await dialog.accept();
+    });
+    await modal.getByRole('button', { name: /send and release 2/i }).click();
+
+    await expect(modal.getByText(/1 emailed\. 1 issue:/i)).toBeVisible();
+    await expect(modal.getByText(/Dr\. Failed Reviewer — The reviewer was released, but the email failed/i)).toBeVisible();
+    await expect(modal).toBeVisible();
   });
 });

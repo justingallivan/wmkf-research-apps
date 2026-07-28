@@ -26,10 +26,10 @@ jest.mock('../../shared/context/ProfileContext', () => ({
   useProfile: () => ({
     status: 'ready',
     isLoading: false,
-    currentProfile: { id: 1, name: 'Beth', displayName: 'Beth Pruitt', avatarColor: '#6366f1', isDefault: true },
-    profiles: [{ id: 1, name: 'Beth', displayName: 'Beth Pruitt', avatarColor: '#6366f1', isDefault: true, lastUsedAt: '2026-06-20T00:00:00.000Z' }],
+    currentProfile: { id: 1, name: 'Bailey', displayName: 'Bailey Stone', avatarColor: '#6366f1', isDefault: true },
+    profiles: [{ id: 1, name: 'Bailey', displayName: 'Bailey Stone', avatarColor: '#6366f1', isDefault: true, lastUsedAt: '2026-06-20T00:00:00.000Z' }],
     preferences: {
-      reviewer_finder_sender_info: JSON.stringify({ name: 'Legacy Beth', email: 'legacy@wmkeck.org', signature: 'Legacy block' }),
+      reviewer_finder_sender_info: JSON.stringify({ name: 'Legacy Bailey', email: 'legacy@example.org', signature: 'Legacy block' }),
     },
     setPreference,
     deletePreference,
@@ -65,17 +65,19 @@ afterEach(() => {
 test('saves the unified email_signature key from the Profile Settings editor', async () => {
   render(<ProfileSettings />);
 
-  fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Beth Pruitt' } });
-  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'beth@wmkeck.org' } });
-  fireEvent.change(screen.getByLabelText('Signature'), { target: { value: 'Beth Pruitt\nProgram Director' } });
+  fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Bailey Stone' } });
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'bailey.stone@example.org' } });
+  fireEvent.change(screen.getByLabelText('Signature'), { target: { value: 'Until next time,\nBailey Stone\nProgram Director' } });
+  fireEvent.click(screen.getByLabelText(/already includes its own closing/i));
   fireEvent.click(screen.getByRole('button', { name: /save email signature/i }));
 
   await waitFor(() => expect(setPreference).toHaveBeenCalled());
   expect(setPreference.mock.calls[0][0]).toBe(PREFERENCE_KEYS.EMAIL_SIGNATURE);
   expect(JSON.parse(setPreference.mock.calls[0][1])).toEqual({
-    name: 'Beth Pruitt',
-    email: 'beth@wmkeck.org',
-    signature: 'Beth Pruitt\nProgram Director',
+    name: 'Bailey Stone',
+    email: 'bailey.stone@example.org',
+    signature: 'Until next time,\nBailey Stone\nProgram Director',
+    customClosing: true,
   });
 });
 

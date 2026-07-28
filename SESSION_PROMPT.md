@@ -1,268 +1,256 @@
-# Session 379 Prompt: Review-synthesis reliability and lifecycle closure
+# Session 381 Prompt: Reviewer email cleanup, merge, and migration
 
-## Session 379 In-Progress Summary
+> **Branch note.** The original Claude work remains unchanged on
+> `codex/claude-bug-fixes`. Codex created
+> `codex/reviewer-email-contract-cleanup`, added contract fixes, and merged the
+> completed `codex/local-retention-inventory` history into that isolated branch.
+> Nothing from this combined branch is merged to `main`.
 
-The local review-synthesis reliability change is implemented and focused
-verification is green. `executePrompt` now preserves the normalized full text
-and stop metadata, requires `stopReason=end_turn` before either raw or JSON
-output can reach persistence, retains policy-compliant failure diagnostics, and
-capability-gates prompt-level Anthropic native JSON schema. The synthesis prompt
-uses a strict schema, and `synthesizeReviews` retries one confirmed
-`claude_output_truncated` invocation once with a bounded doubled budget. Because
-the retry is caller-owned, both semantic model invocations independently attempt
-their own append-only `wmkf_ai_run` row.
+## Session 380 Summary
 
-Verification so far: 102 focused/surrounding Executor and synthesis tests
-passed; `check:model-registry` and its six-case self-test passed. Independent
-post-implementation review found no P0 and identified fail-open mode validation,
-retry-cap, audit-link, complement-test, and stale-doc issues; those local issues
-were corrected; the bounded follow-up returned READY. Commit, governed prompt
-publication/deployment, and the controlled post-fix production smoke remain.
+Session 380 began as a configuration question — program directors received the
+reviewer-quota alert from a named individual's mailbox — and expanded into
+reviewer email copy, a staff review-before-send step for the reviewer release,
+and a live-settings migration. A Codex adversarial review returned **no-ship**
+with seven findings; Codex applied the fixes and Claude reviewed them, finding
+one further defect in Codex's own work.
 
-## Session 378 Summary
+The original eleven Claude commits remain pushed on
+`codex/claude-bug-fixes`. Codex's cleanup branch adds fail-closed reviewed-email
+contracts and preserves the concurrent retention/privacy work.
 
-Session 378 executed the owner-authorized production review-synthesis smoke on
-Request `1002788`, stopped after the first regeneration failure, restored the
-reversible synthetic review, and reconciled the changed durable facts.
+## Local Operational Retention Milestone — Complete
 
-### What Was Completed
+The owner-approved, fail-closed source disposal removed all 139 reviewed
+ignored, untracked regular files (15,287,781 bytes) with zero failures and zero
+residual regular files in scope. Preflight reverified every source hash, all 82
+archive-backed copies, all 20 separately preserved unique-source files, and
+source/archive separation. The owner-only organizational archive remains
+retained; five excluded dependency symlinks remain untouched.
 
-1. **Production smoke executed as a bounded failure**
-   - A controlled review was entered through the signed-in staff Manual Review
-     Entry path, creating exactly 11 answer rows and changing only receipt,
-     status, affiliation, and staff-upload fields.
-   - The first and only Regenerate attempt returned HTTP 500.
-   - Vercel and Dataverse recorded
-     `Claude output not valid JSON: Unexpected end of JSON input`.
-   - Failed AI run `be61f383-f289-f111-ab0f-70a8a59cded0`
-     (`2026-27-07-1355`) used `claude-sonnet-5`,
-     `review-synthesis.generate` v2, and Vercel Interactive source; its review
-     input override is redacted.
+Use
+`docs/audits/local-operational-data-retention-audit-2026-07-27.md` and
+`docs/audits/local-operational-source-disposal-receipt-2026-07-27.md` for the
+privacy-safe evidence. This closes only the ignored local regular-file
+component; reachable public Git history remains unresolved under
+`docs/audits/public-repository-pii-history-audit-2026-07-27.md`.
 
-2. **No partial synthesis write**
-   - `wmkf_reviewsynthesisjson` remained exactly 1,709 characters with SHA-256
-     `a91f05cc0a20cad72341db9d7fc5fe808ed3b28610a35dfdaca82d69beebbcba`.
-   - The request `modifiedOn` remained `2026-07-24T18:43:25Z`.
-   - This is the third controlled current-v2 incomplete-JSON failure; it is not
-     evidence that the successful v1 memo is invalid.
+## Public Git History Remediation — Owner Decisions Pending
 
-3. **Synthetic state fully restored**
-   - Deleted exactly the 11 staged answer IDs.
-   - Restored the four suggestion fields to their exact baseline.
-   - Verified zero answers, no draft, unchanged target non-staging fields,
-     unchanged sibling fields, and unchanged email/material/reminder/thank-you
-     markers.
-   - The append-only failed AI audit row intentionally remains.
-   - A signed-in production reload again showed zero submitted and two
-     outstanding reviews.
+Read-only GitHub preflight and a disposable `git-filter-repo` simulation are
+complete. The 2026-07-27 preflight found 68 branch refs, one tag, 91 PR head
+refs, nine PR merge refs, nine open PRs, 1,942 Actions artifacts, zero forks,
+and four linked local worktrees. That worktree count is a dated snapshot; new
+isolated cleanup worktrees have since been added.
 
-4. **Queue and durable documentation reconciled**
-   - The production-smoke item closed through its documented bounded-diagnosis
-     alternative.
-   - The next task is synthesis structured-output reliability and the approved
-     lifecycle contract—not another blind regeneration.
+The targeted simulation selected 694 non-current historical blobs across 65
+audited paths plus three history-only commit-message contacts. It removed all
+selected objects/values, preserved the then-current public `main` tree exactly,
+and passed object-integrity checks. All 91 PR head refs changed, so a real
+rewrite requires GitHub Support cleanup and full old-clone invalidation.
 
-## Prior Session 377 Summary
+A later semantic review reopened the current-tree privacy prerequisite:
+`modules/expertise_matching` is a non-production reference/demo that
+duplicates the protected 38-person production roster and retains person-linked
+cycle assignment/usage findings. The production app, authenticated API, and
+database remain live and are not removal targets. The owner must decide
+whether to privately archive and remove the retired duplicate or retain a
+sanitized public design/findings record. The earlier dry-run counts validate
+mechanics but are not a complete final removal specification.
 
-Session 377 completed a repository-wide material-claim audit against current
-source, tests, migrations, configuration, and dated probe evidence. It repaired
-the highest-risk false claims, recorded residual drift and live-state unknowns,
-and explicitly stopped short of claiming sentence-perfect or live-environment
-reconciliation.
-
-Three domain agents divided the initial evidence gathering. A separate Codex
-adversarial review challenged the report, and Claude Code then performed an
-independent read-only adversarial pass. Claude found nine additional issues; the
-documentation-scoped findings were corrected, and the one runtime issue was
-registered as an open P1 rather than silently changed.
-
-The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
+No external or destructive action is yet authorized. Use
+`docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md` for the execution invariants,
+alternatives, exact decision list, and final-freeze requirement.
 
 ### What Was Completed
 
-1. **Repository-wide material-claim audit and partial reconciliation**
-   - Audited current documentation, memory, source comments, guides, Atlas
-     pages, instruction surfaces, gate claims, and selected tests against code.
-   - Durable report:
-     `docs/audits/AUDIT_FULL_DOCUMENTATION_TRUTH_2026-07-26.md`.
-   - The report names active residual drift, mixed historical/current plans,
-     unsafe operational scripts, invalid line references, and live probes that
-     were not run.
+1. **System-alert sender moved off an individual mailbox**
+   - `NOTIFICATION_EMAIL_FROM` was doing double duty as the Dynamics sender and
+     the NCBI/Europe PMC contact address; `SCHOLARLY_POLITE_MAILTO` now carries
+     the latter, falling back to the old var when unset.
+   - A read-only Dataverse probe confirmed the configured role mailbox resolves
+     to an enabled, write-capable Dynamics sender. Row identity and display
+     metadata are intentionally not retained in public documentation.
+   - The owner set both vars in Vercel and deployed.
 
-2. **High-risk false claims repaired**
-   - Emergency auth documentation now names the actual
-     `NODE_ENV=production` predicate and the required
-     `EMERGENCY_AUTH_BYPASS=true`.
-   - The BILL/discovery expected-red exemption was closed after the exact suites
-     passed 78/78 tests.
-   - Integrity Screener guides no longer promise a History tab or durable
-     dismissal suppression.
-   - Executor failure/audit/output semantics, Virtual Review Panel provider
-     selection, Dynamics Explorer context trimming, Blob-token ownership,
-     reviewer persistence, prompt paths, and model/gate enforcement claims were
-     reconciled.
-   - `AI_PROMPTS_DETAILED.md` is historical/noncanonical rather than a false
-     exhaustive source of prompt truth.
+2. **Reviewer email greeting and release copy**
+   - `{{greeting}}` renders `Dear Dr. <Last>` on every reviewer email, not only
+     invitations; `buildReviewerGreeting` is the single definition.
+   - Release copy no longer thanks an unresponsive reviewer for a "willingness
+     to review" they never expressed.
+   - Fixed two live parsing defects: `"Jane Roe, Ph.D."` yielded surname
+     `"Roe,"`, and `Mrs.` resolved to `Mr.`
 
-3. **Operational hazards surfaced without destructive action**
-   - Twenty-five non-archive scripts mention the dropped `reviewer_suggestions`
-     table; some contain direct mutations.
-   - `scripts/README.md` no longer provides copy-pasteable commands for those
-     retired-table flows and marks them blocked.
-   - Script quarantine/removal was not performed because it changes operational
-     capability and requires owner-approved scope.
+3. **Review-before-send for the reviewer release**
+   - New read-only `POST /api/review-manager/render-withdraw-emails`;
+     `withdraw-sufficient` accepts per-suggestion `overrides`; new
+     `ReleaseEmailModal`. Staff edit each note before it sends.
+   - Sending **is** the release (the lifecycle write deliberately precedes the
+     email), so a true "save to drafts" was not built; the owner accepted
+     edit-before-send instead.
 
-4. **Independent adversarial review completed**
-   - Codex review caught report self-drift, omitted active reviewer documents,
-     overbroad Atlas verification, and unsupported owner-policy language.
-   - Claude found nine further issues, including the auth-status divergence,
-     incorrect Dynamics history wording, false prompt canonicality, stale seed
-     comments, and gate/CI overclaims.
-   - Claude's follow-up verdict after repairs: ready to commit, with no remaining
-     documentation blocker.
+4. **Live-settings migration**
+   - `scripts/migrate-reviewer-email-copy.mjs` pushes seed copy onto the live
+     `wmkf_appsystemsettings` rows. Dry-run default; `--execute` writes; aborts
+     before any write when a read fails.
 
-5. **Verification completed**
-   - Full Jest: 517/517 suites, 6,150/6,150 tests.
-   - Focused post-Claude auth/Executor verification: 74/74 tests.
-   - Production build passed.
-   - ESLint exited with 0 errors and 50 pre-existing warnings.
-   - Relevant documentation, Atlas, API, wiki, memory, instruction, model,
-     prompt-injection, trust/data-boundary, and secret gates passed; paired
-     self-tests passed where defined.
+5. **Review loop**
+   - Codex adversarial review: 7 findings, no-ship. Codex fixed all 7.
+   - Claude's review of those fixes found Codex's rewritten Playwright test
+     failed on a strict-mode locator violation — Codex had reported Playwright
+     as unverifiable when in fact Chromium merely would not launch in its
+     sandbox.
+   - Full handoff, including Claude's self-assessment and three unimplemented
+     remediation proposals: `docs/CLAUDE_TO_CODEX_HANDOFF_2026-07-27.md`.
+
+6. **Codex cleanup of the reviewed-email contract**
+   - A reviewed batch now requires complete subject, body, recipient, and sender
+     bindings for every selected suggestion; missing or partial overrides fail
+     before the lifecycle write.
+   - Recipient or Program Director sender drift after preview fails closed.
+   - Profile Settings now persists an explicit “signature includes its own
+     closing” flag. New arbitrary staff-authored closings are preserved when
+     marked; a bounded recognizer exists only for legacy pre-flag preferences.
+   - Final-correction verification: focused contract run 9 suites / 110 tests;
+     related-test impact run 63 suites / 652 tests; Playwright
+     reviewer-invite/release flow 6/6 after a successful production build;
+     TypeScript and targeted ESLint clean. The full Jest run had 524 suites /
+     6,262 tests pass; its only failures were the three `selftest-fixture`
+     tests because the auxiliary-worktree sandbox denied their temporary
+     directories. The API
+     route self-test then passed outside that sandbox, status-parity self-test
+     passed 17/17, and the route, parity, docs, memory, fact, and secret gates
+     are green.
+
+### Verification at `ac41a7c7`
+
+525 suites / 6259 tests; Playwright 6/6 in a real browser; 15 code gates and 11
+doc gates with their paired self-tests; ESLint clean.
 
 ### Commits
 
-- `4adafb62` — Trim derivable CLAUDE.md content and record two verification lessons
-- `9bb2e6d4` — Reconcile Project Shape removal and record the npm/brew install-path hazard
-- `e5d9b78f` — Reconcile live Dataverse row counts
-- `0263e07f` — Reconcile documentation claims with code
+- `677a0b32` — Separate the scholarly API contact address from the alert sender
+- `b4ef3a25` — Record alerts@wmkeck.org as the selected alert sender
+- `b413d5c6` — Confirm alerts@wmkeck.org resolves as a Dynamics sender
+- `ec5c8a2c` — Reconcile the sender change to applied
+- `a497d158` — Greet reviewers by honorific and fix the release-email copy
+- `82f4edf2` — Add the reviewer email copy migration
+- `0f7d1348` — Document the interlock requirements for the email settings scripts
+- `66a5fb28` — Drop the closing lines that would double the PD signature
+- `c91244ee` — Let staff review and edit release emails before sending
+- `e3a471e7` — Fix the review findings on the release flow and reviewer emails
+- `ac41a7c7` — Hand off the reviewer-email session to Codex
+
+## Prior Session 379 Summary
+
+Session 379 implemented review-synthesis structured-output reliability:
+`executePrompt` preserves normalized full text and stop metadata, requires
+`stopReason=end_turn` before persistence, and capability-gates prompt-level
+native JSON schema; `synthesizeReviews` retries one confirmed
+`claude_output_truncated` once with a bounded doubled budget. Session 378 had
+run the bounded production smoke that failed as designed (incomplete JSON, no
+partial write) and fully restored the synthetic state.
 
 ## Next Items
 
 ### Verified Open
 
-1. **FIRST: finish review-synthesis structured-output reliability promotion.**
-   Evidence: `docs/CURRENT_WORK_QUEUE.md`,
-   `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`, and
-   `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
-   Three controlled current-v2 production calls failed before writeback with
-   incomplete JSON. The local fix and focused tests are complete: native JSON
-   schema is prompt-opt-in/capability-gated, nonterminal responses fail before
-   persistence, and only confirmed `max_tokens` gets one caller-owned bounded
-   retry. Independent follow-up review is READY and the gates are green. Commit,
-   publish the governed prompt version, deploy deliberately, then run one
-   controlled post-fix smoke.
+1. **Merge `codex/reviewer-email-contract-cleanup` to `main`, then run the copy migration —
+   in that order.**
+   Evidence: `docs/CLAUDE_TO_CODEX_HANDOFF_2026-07-27.md` Part 2;
+   `lib/services/email-defaults.js`.
+   The `{{greeting}}` token only renders once the renderer code ships. Running
+   `scripts/migrate-reviewer-email-copy.mjs --execute` before the merge deploys
+   puts a literal `{{greeting}},` into reviewer emails. Re-run the dry run first:
+   `before.txt` in the worktree is stale because the seed copy changed after it
+   was captured.
 
-2. **Resolve or explicitly defer the P1 auth-status policy divergence.**
-   Evidence: `pages/api/auth/status.js`, `lib/utils/auth-policy.js`, and the
-   audit report's high-risk disposition table.
+2. **Verify outgoing Server-Side Sync on the `alerts@wmkeck.org` mailbox.**
+   Evidence: `lib/services/notification-service.js:85-88`.
+   The sender resolves, but if SSS is not enabled the send fails *after*
+   resolution and `notify()` swallows it — alert email stops silently while
+   dashboard alerts keep working. Check the `mailboxes` row for that systemuser,
+   or Power Platform admin → Email Configuration → Mailboxes.
+
+3. **Finish the review-synthesis promotion — the code is already committed.**
+   Evidence: `0afea876` on `main`; `docs/CURRENT_WORK_QUEUE.md`.
+   Corrects a stale carryover: Session 379's prompt said "commit … remain", but
+   the hardening landed at `0afea876`. What actually remains is publishing the
+   governed prompt version, a deliberate deploy, and one controlled post-fix
+   production smoke.
+
+4. **Resolve or explicitly defer the P1 auth-status policy divergence.**
+   Evidence: `pages/api/auth/status.js`, `lib/utils/auth-policy.js`.
    `/api/auth/status` can report `enabled:false` while production-mode server
-   enforcement remains enabled. Use `/contract-reconcile` before changing the
-   response because `RequireAuth`, `Layout`, and the home page consume it.
-
-3. **Continue the deadline and lifecycle implementation discussion.**
-   Evidence: `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` Calendar Gate
-   and Decision Log.
-   Obtain each fixed date, audience, and minimum required artifact/action before
-   converting the relative sequence into calendar commitments. Synthesis
-   participation semantics were owner-confirmed on 2026-07-27; use the plan's
-   resolved state machine rather than reopening that decision.
-
-4. **Plan the next reconciliation slice without claiming the repository clean.**
-   Evidence:
-   `docs/audits/AUDIT_FULL_DOCUMENTATION_TRUTH_2026-07-26.md`.
-   Highest-value candidates are read-only live probes, retired-table script
-   quarantine, reconciliation-generator redesign, line-reference validation,
-   and full-body reclassification of the explicitly named mixed plans.
+   enforcement remains on. Use `/contract-reconcile` first — `RequireAuth`,
+   `Layout`, and the home page consume it.
 
 5. **Proceed with Q9 app-access Stage 4 from the deterministic acceptance
    baseline.**
-   Evidence: `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md` and
-   `docs/audits/q9-app-access-stage2-acceptance-2026-07-27.md`.
-   The owner replaced the low-signal passive warn soak with
-   `DATAVERSE_DAL_UNIVERSAL=on` contract acceptance across each app-access
-   entry-point class plus a read-only live inventory. All 33 focused assertions
-   passed. Stage 2 is satisfied; Stage 4 is ready to execute. Preserve its
-   required deliberately designated ordinary-user Preview smoke, reversible
-   grant/revoke restoration check, authenticated reviewer-finder
-   `analyze`/`discover` check with a known prompt override, and production log
-   watch at release time.
+   Evidence: `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md`.
+   Stage 2 is satisfied; preserve the required ordinary-user Preview smoke,
+   reversible grant/revoke check, authenticated reviewer-finder check, and
+   production log watch.
 
 ### Owner Decision Needed
 
-1. **Auth-status contract.**
-   Decide whether `/api/auth/status` should report the effective
-   `isAuthRequired()` enforcement state or remain a narrower configuration hint
-   with consumers changed accordingly.
+1. **Whether the staff "first name basis" feedback wants more than
+   `Dr. <Last>`.**
+   Evidence: staff feedback relayed 2026-07-27; the individual's name is not
+   retained in this public handoff.
+   They asked for "Dr. [Last Name] **at least**", which reads as a floor. If
+   warmer first-name follow-ups are wanted for reviewers already in
+   correspondence, that is a separate change.
 
-2. **Retired-table script disposition.**
-   Authorize and scope quarantine, fail-closed guards, archival, or removal for
-   operational scripts that still target dropped reviewer tables.
+2. **Public Git history remediation decisions.** The current-tree
+   expertise-matching duplicate and the owner-gated history rewrite remain
+   unresolved under `docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md`.
 
-3. **Read-only live probe pack.**
-   Authorize a dated pass over Vercel environment posture, Postgres/Dataverse
-   counts and statuses, prompt/question rows, external reviewer usage, BILL,
-   Blob, and external automation state.
-
-4. **Fixed deadlines.**
-   Provide the fixed dates and minimum outcomes for the remaining Workbench
-   lifecycle. Synthesis participation semantics are closed in
-   `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
+3. **Retired-table script disposition** and the **read-only live probe pack** —
+   both carried forward from Session 379, unchanged.
 
 ### Parked
 
-1. **Automatic synthesis triggering and another production regeneration until
-   the synthesis reliability defect is fixed, reviewed, and tested and the
-   approved readiness state machine is implemented.**
-
-2. **Implementation of the four placeholder tabs until the design/calendar
-   gate is complete.**
-
-3. **Mechanical status-flipping of large plans.**
-   Each named mixed plan needs a full-body historical/current rewrite before
-   frontmatter changes.
-
-4. **Destructive reviewer cleanup or retired-table script execution.**
-   Current person reuse and dropped-table state make inherited cleanup guidance
-   unsafe.
+1. Automatic synthesis triggering and another production regeneration until the
+   approved readiness state machine is implemented.
+2. Implementation of the four placeholder Workbench tabs pending the
+   design/calendar gate.
+3. A drafts-folder workflow for reviewer emails. The owner closed this: sending
+   is the release, and edit-before-send meets the need.
 
 ### Verify Before Acting
 
-1. **Do not cite the audit as a sentence-perfect or live-environment-complete
-   reconciliation.**
-   It is a repository-wide material-claim audit with partial reconciliation.
+1. **`before.txt` is stale.** Re-capture the dry run before any `--execute`.
+2. **The migration overwrites staff-edited wording** on four global reviewer
+   bodies. It does not touch per-PD invitation/materials templates.
+3. **Do not treat "could not verify" from any agent as a caveat.** Codex
+   reported Playwright unverifiable; it ran fine in Claude's environment and
+   immediately exposed a real defect in Codex's own fix.
+4. **Do not cite the seed constants as a runtime fallback.** They are init data;
+   a blank live row skips the send with an ops alert.
 
-2. **Do not cite the earlier 55-command startup result as a complete registered
-   gate battery.**
-   No machine-readable command receipt identified the omitted command.
+### Do Not Reopen Without New Decision
 
-3. **Do not change `/api/auth/status` as a comment-only cleanup.**
-   It is a live cross-layer behavior contract with multiple consumers.
-
-4. **Do not run or repair retired-table scripts from their names alone.**
-   Inventory callers, tables, and destructive behavior first.
-
-5. **Do not promote probe-required external state to verified.**
-   Source truth cannot establish current Vercel, Dataverse, Postgres, BILL,
-   Blob, SharePoint, or Power Automate state without a dated probe.
-
-### Do Not Reopen Without New Evidence
-
-1. **The BILL/discovery test exemption is closed.**
-   The exact suites passed 78/78 and are no longer expected-red.
-
-2. **Integrity Screener has no current History UI or durable dismissal
-   suppression.**
-
-3. **The detailed AI prompt inventory is historical/noncanonical.**
-   Current truth comes from source plus live prompt rows.
-
-4. **The S376 Workbench pass was bounded, not a complete domain audit.**
+1. **The configured role mailbox's visible sender name** — owner reviewed and
+   accepted; public docs intentionally omit the internal display value.
+2. **Drafts-folder delivery for reviewer emails** — owner closed it as a
+   non-issue.
+3. **The acceptance-body content change** — owner chose the fuller copy
+   (inline withdraw link + PD contact line) over a greeting-only edit.
 
 ## Key Files Reference
 
 | File | Purpose |
 | --- | --- |
+| `docs/CLAUDE_TO_CODEX_HANDOFF_2026-07-27.md` | Session outcomes, unrun follow-ups, self-assessment, unimplemented proposals |
+| `lib/services/review-manager/withdraw-sufficient-service.js` | Release preview + send, per-row guards, recipient and sender binding |
+| `shared/components/reviewers/ReleaseEmailModal.js` | Staff review-before-send UI |
+| `pages/api/review-manager/render-withdraw-emails.js` | Read-only draft renderer |
+| `lib/utils/email-generator.js` | `buildReviewerGreeting` + `parseRecipientName` (live invitation path) |
+| `lib/utils/reviewer-email-closing.js` | Custom/fallback signature-closing composition |
+| `scripts/migrate-reviewer-email-copy.mjs` | Live-settings copy migration (dry-run default) |
+| `lib/services/email-defaults.js` | Why seed constants are not a runtime fallback |
+| `docs/TODO_EMAIL_NOTIFICATIONS.md` | Sender contract and the SSS verification steps |
 | `docs/audits/AUDIT_FULL_DOCUMENTATION_TRUTH_2026-07-26.md` | Audit method, corrections, residual drift, probe boundary, and recommendations |
 | `docs/CURRENT_WORK_QUEUE.md` | Canonical priority queue plus verified audit follow-ups |
 | `docs/CI_GATES_REFERENCE.md` | Actual enforcement tiers and serial fixture guidance |
@@ -274,25 +262,24 @@ The complete audit commit was fast-forwarded to `main` and pushed as `0263e07f`.
 | `scripts/README.md` | Blocked legacy operational script guidance |
 | `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` | Current product execution sequence |
 | `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md` | App-access DAL Stage 4, now unblocked by deterministic context acceptance |
+| `docs/audits/local-operational-data-retention-audit-2026-07-27.md` | Local retention findings, preservation boundary, and completed source-disposal status |
+| `docs/audits/local-operational-source-disposal-receipt-2026-07-27.md` | Privacy-safe aggregate receipt for the completed 139-file disposal |
+| `docs/audits/public-repository-pii-history-audit-2026-07-27.md` | Current-tree privacy findings, including the unresolved retired expertise-matching duplicate, and reachable-history findings |
 
 ## Testing
 
 ```bash
+rtk npx jest tests/unit tests/integration --runInBand
+rtk npx playwright test tests/e2e/program-director-invite.spec.js
+rtk npm run check:types
+rtk npm run check:api-routes && rtk npm run check:api-routes:self-test
+rtk npm run check:fact-consistency && rtk npm run check:fact-consistency:self-test
 rtk npm run check:docs-catalog
-rtk npm run check:doc-currency
-rtk npm run check:doc-currency:self-test
-rtk npm run check:fact-consistency
-rtk npm run check:fact-consistency:self-test
-rtk npm run check:atlas
-rtk npm run check:atlas:self-test
-rtk npm run check:api-routes
-rtk npm run check:api-routes:self-test
-rtk npm run check:agent-wiki
-rtk npm run check:agent-wiki:self-test
-rtk npm run check:memory-router
-rtk npm run check:memory-router:self-test
-rtk npm run check:instruction-architecture
-rtk npm run check:agent-invariants
 rtk npm run lint
-rtk npm test -- --runInBand --silent
 ```
+
+`check:agent-invariants` cannot pass from this auxiliary Git worktree because
+Git's shared-worktree layout does not materialize the root-only
+`.agents/skills` and `.claude-memory` symlink invariants there. Run it again
+from the final integrated primary checkout; no invariant file was changed by
+the reviewer-email cleanup.

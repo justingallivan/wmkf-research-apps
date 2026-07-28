@@ -3,6 +3,12 @@
  * One-shot historical contact-ORCID backfill (PR2,
  * docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md §6/§9).
  *
+ * COMPLETED S217. A read-only production reconciliation on 2026-07-27 found
+ * all 162 applied values still matched exactly. The rollback window is closed;
+ * both ignored checkpoints are audit-only controlled-disposal candidates.
+ * Do not clear Contact ORCIDs from those logs, and do not rerun resolve/apply
+ * without a new owner-reviewed remediation plan.
+ *
  * PR1 makes resolver-gated reviewer ORCIDs flow onto matched contacts at the
  * moment of outreach/promotion. This catches up the ALREADY-eligible pool: for
  * every reviewer carrying a valid wmkf_orcid + a persist-eligible

@@ -72,11 +72,13 @@ export const DEFAULT_VALUES = {
     name: '',
     email: '',
     signature: '',
+    customClosing: false,
   },
   SENDER_INFO: {
     name: '',
     email: '',
     signature: '',
+    customClosing: false,
   },
   GRANT_CYCLE_SETTINGS: {
     programName: 'W. M. Keck Foundation',
@@ -108,6 +110,19 @@ Thank you for considering this invitation.
   },
 };
 
+// Compatibility only for preferences saved before `customClosing` existed.
+// Every new save persists the explicit boolean, so arbitrary staff-authored
+// closings do not depend on this bounded legacy recognizer.
+const LEGACY_CUSTOM_CLOSING_PATTERN =
+  /^(?:thank you(?: very much)?|thanks|with appreciation|with gratitude|sincerely|best|all the best|best wishes|best regards|kind regards|warm regards|regards|warmly|respectfully|cordially|cheers)\s*[,!]?\s*$/i;
+
+function inferLegacyCustomClosing(signature) {
+  const firstLine = String(signature || '')
+    .split(/\r?\n/)
+    .find((line) => line.trim());
+  return LEGACY_CUSTOM_CLOSING_PATTERN.test(String(firstLine || '').trim());
+}
+
 export function normalizeEmailSignatureValue(value) {
   if (value === null || value === undefined || value === '') {
     return { ...DEFAULT_VALUES.EMAIL_SIGNATURE };
@@ -126,10 +141,14 @@ export function normalizeEmailSignatureValue(value) {
     return { ...DEFAULT_VALUES.EMAIL_SIGNATURE };
   }
 
+  const signature = typeof decoded.signature === 'string' ? decoded.signature : '';
   return {
-    signature: typeof decoded.signature === 'string' ? decoded.signature : '',
+    signature,
     name: typeof decoded.name === 'string' ? decoded.name : '',
     email: typeof decoded.email === 'string' ? decoded.email : '',
+    customClosing: typeof decoded.customClosing === 'boolean'
+      ? decoded.customClosing
+      : inferLegacyCustomClosing(signature),
   };
 }
 

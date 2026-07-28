@@ -9,8 +9,10 @@ on:
   pull_request:
     paths:
       - 'pages/api/external/**'
+      - 'pages/api/review-manager/**'
       - 'pages/external/**'
       - 'shared/components/external/**'
+      - 'shared/components/reviewers/**'
       # lib/bill = the honorarium-onboarding orchestrator + service the accept
       # path invokes; a change here can alter the e2e-covered accept behavior.
       - 'lib/bill/**'

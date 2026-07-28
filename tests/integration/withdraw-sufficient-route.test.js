@@ -97,7 +97,10 @@ test('still-pending row: writes withdrawn_sufficient (+ clears respond marker) B
     body: expect.stringContaining('Dear Dr. Reviewer,'),
   }));
   const email = createAndSendEmail.mock.calls[0][0];
-  expect(email.body).toContain('Thank you so much for your willingness to review the proposal “A Proposal” for the W. M. Keck Foundation.');
+  // The release only ever reaches a reviewer who never responded, so the copy
+  // thanks them for considering the request — not for a willingness to review.
+  expect(email.body).toContain('Thank you for considering our request to review the proposal “A Proposal” for the W. M. Keck Foundation.');
+  expect(email.body).toContain('a full slate of reviewers');
   expect(email.body).toContain('Dr. PD<br>W. M. Keck Foundation');
   expect(res._data).toMatchObject({ ok: true, withdrawn: 1 });
 });
@@ -196,6 +199,31 @@ test('email-send failure still reports the reviewer as withdrawn (state already 
   const res = await run({ requestId: REQ, suggestionIds: [SUG] });
   expect(res._data.withdrawn).toBe(1);
   expect(res._data.results[0].status).toBe('withdrawn_email_failed');
+});
+
+test('reviewed body markup is escaped through renderPlainTextEmailHtml', async () => {
+  findById.mockResolvedValue(pendingRow());
+  const res = await run({
+    requestId: REQ,
+    suggestionIds: [SUG],
+    overrides: {
+      [SUG]: {
+        subject: 'Reviewed subject',
+        bodyText: 'Hello <img src=x onerror="alert(1)">\n\n<script>alert(2)</script>',
+        to: 'rev@example.org',
+        from: 'pd@keck.org',
+        senderId: 'pd-1',
+      },
+    },
+  });
+
+  expect(res.statusCode).toBe(200);
+  const sent = createAndSendEmail.mock.calls[0][0];
+  expect(sent.subject).toBe('Reviewed subject');
+  expect(sent.body).toContain('&lt;img src=x onerror="alert(1)"&gt;');
+  expect(sent.body).toContain('&lt;script&gt;alert(2)&lt;/script&gt;');
+  expect(sent.body).not.toContain('<img');
+  expect(sent.body).not.toContain('<script>');
 });
 
 // --- Characterization additions (Stage 1 pilot, Route→Service Consolidation Plan) ---

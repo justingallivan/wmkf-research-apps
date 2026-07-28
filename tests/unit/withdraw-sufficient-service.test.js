@@ -132,6 +132,17 @@ test('row from another request → wrong_request, no write', async () => {
   expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
+test.each([
+  ['null', null],
+  ['empty', ''],
+])('%s request relationship → wrong_request, no write', async (_label, requestValue) => {
+  findById.mockResolvedValue(pendingRow({ _wmkf_request_value: requestValue }));
+  const out = await withdrawSufficient(ARGS);
+  expect(out.results).toEqual([{ suggestionId: SUG, status: 'wrong_request' }]);
+  expect(updateLifecycle).not.toHaveBeenCalled();
+  expect(createAndSendEmail).not.toHaveBeenCalled();
+});
+
 test('accepted row → not_pending, never touched', async () => {
   findById.mockResolvedValue(pendingRow({ wmkf_accepted: true }));
   const out = await withdrawSufficient(ARGS);

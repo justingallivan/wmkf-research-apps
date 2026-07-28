@@ -95,8 +95,9 @@ plan's Wave 13 binding model rather than duplicating it.
   27/40 frozen subjects (20 `ready`, 7 `quick_check`); it uses full-name/ORCID
   identity matching, candidate-affiliation corroboration, and distinct-work
   counting. `[VERIFIED via
-  outputs/reviewer-holistic-m1/reviewer-email-scholarly-production-40-v1.json
-  and lib/services/contact-enrichment/scholarly-email.js]`
+  the owner-only archived frozen scholarly-email receipt,
+  lib/services/contact-enrichment/scholarly-email.js, and
+  docs/audits/local-operational-data-retention-audit-2026-07-27.md]`
 - ORCID is not a unique key in practice (duplicate iDs). `[owner-stated + EXTERNAL — audit §5b.1]`
 
 ## Guiding invariants (apply to every phase)
@@ -280,7 +281,8 @@ deployed environment; production cutover.
   production behavior is unchanged. Revisit only with a failing benchmark case
   where full text contains a candidate-linked address absent from the core
   record. `[VERIFIED via
-  outputs/reviewer-holistic-m1/reviewer-email-scholarly-fulltext-40-v2.json]`
+  the owner-only archived full-text trial receipt; its redundant ignored
+  source was disposed under the local operational-data retention audit]`
 - **W3.2 Alternates-not-conflict — NARROW RULE IMPLEMENTED 2026-07-18.** On an
   exact publication-support tie, select an address only when exactly one email
   domain has an exact non-generic label from the candidate's claimed/current
@@ -295,8 +297,9 @@ deployed environment; production cutover.
   institution and one-hop consistency substrate, but email promotion still
   requires its own frozen-case evaluation rather than inheriting a COI or
   identity decision. `[VERIFIED via
-  outputs/reviewer-holistic-m1/reviewer-email-scholarly-alternates-40-v3.json
-  and tests/unit/scholarly-email.test.js]`
+  the owner-only archived alternates trial receipt,
+  tests/unit/scholarly-email.test.js, and the local operational-data retention
+  audit]`
 - **W3.3 Preferred email is reviewer-owned — IMPLEMENTED 2026-07-18.** The
   deliverable address sends the invitation and prefills the magic-link accept
   form. Acceptance confirms or corrects the engagement-scoped address on the

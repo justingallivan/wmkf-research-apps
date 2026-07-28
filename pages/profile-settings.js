@@ -50,7 +50,12 @@ export default function ProfileSettings() {
   const [newProfileName, setNewProfileName] = useState('');
   const [newProfileColor, setNewProfileColor] = useState(AVATAR_COLORS[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [signatureForm, setSignatureForm] = useState({ name: '', email: '', signature: '' });
+  const [signatureForm, setSignatureForm] = useState({
+    name: '',
+    email: '',
+    signature: '',
+    customClosing: false,
+  });
   const [isSavingSignature, setIsSavingSignature] = useState(false);
   const [signatureStatus, setSignatureStatus] = useState(null);
   const [error, setError] = useState(null);
@@ -91,7 +96,10 @@ export default function ProfileSettings() {
       [PREFERENCE_KEYS.SENDER_INFO]: senderInfoPreference,
     });
     setSignatureForm(prev => (
-      prev.name === next.name && prev.email === next.email && prev.signature === next.signature
+      prev.name === next.name
+        && prev.email === next.email
+        && prev.signature === next.signature
+        && prev.customClosing === next.customClosing
         ? prev
         : next
     ));
@@ -360,6 +368,18 @@ export default function ProfileSettings() {
                   rows={6}
                   className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
                 />
+              </label>
+              <label className="flex items-start gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={signatureForm.customClosing}
+                  onChange={(e) => updateSignatureField('customClosing', e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span>
+                  My signature already includes its own closing (for example,
+                  {' '}“Best wishes,”).
+                </span>
               </label>
               {signatureStatus === 'error' && (
                 <p className="text-sm text-red-700">Could not save the email signature.</p>

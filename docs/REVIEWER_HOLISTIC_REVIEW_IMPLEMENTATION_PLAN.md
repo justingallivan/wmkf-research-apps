@@ -588,12 +588,15 @@ program areas, a hashed randomization seed, and a named PD scorer before
 freeze. A scored artifact additionally requires exactly three unique run IDs
 per arm and complete scores keyed only by blind candidate IDs, with an exact
 post-unblinding map from every blind candidate ID to its baseline/redesign arm
-membership. The owner then approved a separate 10-candidate-per-proposal pilot;
-`outputs/reviewer-holistic-m1/reviewer-holistic-m1-10-pilot-scored-v1.json`
-contains the 100 workbook scores, passed the scored-artifact validator, and was
+membership. The owner then approved a separate 10-candidate-per-proposal pilot.
+The owner-only archived scored-pilot receipt contains the 100 workbook scores,
+passed the scored-artifact validator, and was
 unblinded into the matching pilot comparison artifact. The external original
 345-candidate evaluation remains the historical, unscored record; it is no
-longer retained as a tracked production asset.
+longer retained as a tracked production asset. The redundant ignored source
+copy was disposed after the study closed; see
+`docs/audits/reviewer-holistic-m1-scoped-pilot-closure-2026-07-27.md` and
+`docs/audits/local-operational-data-retention-audit-2026-07-27.md`.
 
 Both external versioned manifests freeze the same exact baseline/redesign commits,
 pipeline and evaluation-script versions, and identical prompt, model,

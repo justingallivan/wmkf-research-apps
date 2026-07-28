@@ -64,31 +64,29 @@ gone. A real-looking Tim Newhouse/St. Jude review PDF found in the same folder
 was excluded from the deletion allowlist and remains in SharePoint. The owner
 subsequently identified it as a second test artifact from the retired reviewer-PDF
 experiment, not a genuine review; no additional deletion was authorized. [VERIFIED
-via `outputs/review-form-multiselect/preactivation-evidence-2026-07-26.json`,
-`outputs/review-form-multiselect/thankyou-provenance-2026-07-26.json`, and commit
+via the owner-only archived preactivation and thank-you provenance receipts, and commit
 `ada645de`; cleanup durably recorded in Postgres `system_alerts` 361 and 362.
-The gitignored local evidence copy is
-`outputs/review-form-multiselect/fixture-cleanup-evidence-2026-07-26.json`,
+The owner-only archived fixture-cleanup receipt has
 SHA-256 `021c21fc8b2f90aee2651aab3df19f04df3d79d76d36c8385f86a999f5d6666e`;
-it is intentionally not a fresh-clone source of truth because it contains live
-production identifiers and test email addresses. Prompt publication evidence,
-including the complete v1 rollback payload, is
-`outputs/review-form-multiselect/prompt-publication-evidence-2026-07-26.json`,
+it is intentionally outside the fresh-clone source of truth because it contains
+live production identifiers and test email addresses. The owner-only archived
+prompt-publication receipt, including the complete v1 rollback payload, has
 SHA-256 `50b7a4974e6bcd5e7dd1135bf1edd228f300fe42de406d5951c3ca10dbdbe428`.
 Question publication completed under audit request
 `3d0c7160-3a09-4d96-ab9f-36ebe63e0e7a`, with 12 exact target rows active, 11
 legacy rows inactive, no audit warnings, and a preserved 23-PATCH rollback
-manifest. Evidence:
-`outputs/review-form-multiselect/question-publication-evidence-2026-07-26.json`,
+manifest. Evidence: the owner-only archived question-publication receipt,
 SHA-256 `9f5dead9ecc9989e2701f7ec6573c6313eb295a68a40b1ebc6992d3faade16cf`.]
-Primary smoke evidence is the gitignored local artifact
-`outputs/review-form-multiselect/primary-smoke-evidence-2026-07-26.json`,
+The owner-only archived primary-smoke receipt has
 SHA-256 `1eb2b8b7542cdd829ed5bcc87b2a090ad4a02a14e8ebdce751001bd8eb6645da`;
 it contains production/test identifiers and the preserved pre-smoke test
 synthesis, so it is not a fresh-clone source of truth. [VERIFIED 2026-07-26 via
 production route IDs, direct Dataverse/Postgres readback, two failed AI audit
 rows, generated artifact hashes, and the 12-operation cleanup changeset recorded
-in that evidence]
+in that evidence. All private receipts above remain byte-preserved in the
+owner-only operational archive; their redundant ignored source copies were
+disposed on 2026-07-27 under
+`docs/audits/local-operational-data-retention-audit-2026-07-27.md`.]
 **Target go-live: 2026-08-15** (owner-set; the date external reviewers first see the
 new form).
 
@@ -171,8 +169,8 @@ content hash, recent question/prompt publication audits, both fixture consumer
 graphs, four isolated no-write service-boundary checks, and a deliberately blocked
 rollback template. The full JSON evidence digest is
 `a22c5029bdd7341fe81f74d53d4668b37f6f77699fea7370135cba5bd9155e30`.
-[VERIFIED via
-`outputs/review-form-multiselect/preactivation-evidence-2026-07-26.json`]
+[VERIFIED via the owner-only archived preactivation receipt and the local
+operational-data retention audit]
 
 The four service probes each resolved the same live version in a fresh local
 process targeting production Dataverse and stopped before their first write:
@@ -186,8 +184,8 @@ legacy upload and mark-received stopped at `400` form validation. Separate
 `x-vercel-id` values were captured for every request. The suggestion ETag and
 review-domain state digest were byte-identical before/after; it retained zero
 answers, no received timestamp or file pointer, and one pre-existing draft.
-[VERIFIED service-level and production HTTP-level via
-`outputs/review-form-multiselect/production-http-writer-evidence-2026-07-26.json`,
+[VERIFIED service-level and production HTTP-level via the owner-only archived
+production HTTP-writer receipt,
 SHA-256 `b6885185ab7281c53ac658c62803f831941732f69f75cbb3ee4784960a2c1b62`;
 the gitignored local artifact contains production/test identifiers but no token,
 cookie, JWT, or environment-secret value]
@@ -219,8 +217,7 @@ and commit supply the provenance. This reclassifies the marker as a deliberate
 synthetic validation side effect, not genuine reviewer correspondence, but it
 did not itself waive §8's stop or authorize cleanup. The provenance evidence digest is
 `b5e3fcbde1d0e30275d310f246b38e3e05b67bae1d6d016385eeb60727d4d2d9`.
-[VERIFIED via
-`outputs/review-form-multiselect/thankyou-provenance-2026-07-26.json`,
+[VERIFIED via the owner-only archived thank-you provenance receipt,
 `git show ada645de`, and
 `git show ef233a0e:pages/api/review-manager/send-emails.js`]
 
@@ -243,8 +240,8 @@ potential-reviewer rows retain their original CRM contact links; no honorarium w
 deleted; and both request synthesis hashes and `modifiedon` values are unchanged.
 The execution evidence digest is
 `021c21fc8b2f90aee2651aab3df19f04df3d79d76d36c8385f86a999f5d6666e`.
-[VERIFIED via
-`outputs/review-form-multiselect/fixture-cleanup-evidence-2026-07-26.json`]
+[VERIFIED via the owner-only archived fixture-cleanup receipt; its checksum and
+source-disposal status are recorded above]
 
 ### 0.2 Dependency: question-set coherence at write boundaries — SHIPPED
 
@@ -944,9 +941,8 @@ changed; cutover was blocked at that point. The follow-up provenance investigati
 confirmed that the marker belongs to the April 30 production validation send to
 the fixture email address, not to the later EICAR upload or a genuine reviewer.
 That finding made the later owner decision informed without silently relaxing the
-stop condition. Pre-approval evidence bundles:
-`outputs/review-form-multiselect/preactivation-evidence-2026-07-26.json` and
-`outputs/review-form-multiselect/thankyou-provenance-2026-07-26.json`.
+   stop condition. The owner-only archive retains the pre-approval
+   preactivation and thank-you provenance receipts.
 [HISTORICAL STOP VERIFIED; LATER CLEANUP VERIFIED IN §0.1b]
 
 The existing hard-removal service performs a preflight, writes a durable system

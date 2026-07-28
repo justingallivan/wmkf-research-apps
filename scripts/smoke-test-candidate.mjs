@@ -199,11 +199,11 @@ async function teardownPerson(personId) {
   // pre-existing contact email, so it's ours). Defense-in-depth: only delete it
   // if its name is the marker — never delete a contact that isn't clearly ours.
   //
-  // NB (S213): the app user has Create/AppendTo on Contact (that's how
-  // invite-accept promotes a reviewer) but NOT DeleteAccess, so this delete
-  // ALWAYS 403s in the live environment — the contact is left orphaned. We
-  // detect that case and return it so cleanup() can report PARTIAL cleanup
-  // rather than a misleading "complete". Returns the orphaned contact (or null).
+  // Historical S213 runs observed missing Contact DeleteAccess, while the
+  // verified 2026-07-27 cleanup succeeded with the current application
+  // identity. Preserve the partial-cleanup path because permissions can still
+  // differ by environment or change later. Returns the orphaned contact (or
+  // null).
   if (contactId) {
     try {
       const c = await DynamicsService.getRecord('contacts', contactId, { select: 'contactid,fullname,emailaddress1' });
@@ -219,7 +219,7 @@ async function teardownPerson(personId) {
       } catch (delErr) {
         const noDeleteRight = /DeleteAccess|0x80048306|unManagedIdsAccessDenied|403/.test(delErr.message || '');
         if (noDeleteRight) {
-          console.log(`  ⚠ could NOT delete contact ${contactId} — the app user has no DeleteAccess on Contact (expected in this env).`);
+          console.log(`  ⚠ could NOT delete contact ${contactId} — the current application identity lacks Contact DeleteAccess.`);
         } else {
           console.log(`  ⚠ could not delete contact ${contactId}: ${delErr.message}`);
         }
@@ -244,7 +244,7 @@ function reportCleanup(orphans, suffix = '') {
     console.log(`\nCleanup complete${suffix}. State file cleared.`);
     return;
   }
-  console.log(`\n⚠ Cleanup PARTIAL${suffix}: person + suggestion(s) removed, but ${orphans.length} promoted contact(s) could NOT be deleted (app user lacks DeleteAccess on Contact):`);
+  console.log(`\n⚠ Cleanup PARTIAL${suffix}: person + suggestion(s) removed, but ${orphans.length} promoted contact(s) could NOT be deleted:`);
   for (const o of orphans) {
     console.log(`    contact ${o.id} — "${o.fullname}"${o.email ? ` <${o.email}>` : ''}`);
   }

@@ -88,6 +88,45 @@ node scripts/test-retractions.js
 node scripts/test-name-matching.js
 ```
 
+## Email Template Settings
+
+| Script | Description |
+|--------|-------------|
+| `migrate-email-token-syntax.mjs` | Rewrite legacy `[bracket]` email tokens to `{{mustache}}` in the live settings. Dry run by default; `--execute` writes. |
+| `migrate-reviewer-email-copy.mjs` | Push the current `lib/seed/email-defaults/` reviewer body copy onto the four live global reviewer email settings. Dry run by default; `--execute` writes. |
+
+The seed constants in `lib/seed/email-defaults/` are **init data, not a runtime
+fallback** — `readRequiredEmailDefaults` reads the live `wmkf_appsystemsettings`
+row and skips the send (with an ops alert) when it is blank. A code-only copy
+change therefore never reaches a recipient; these scripts, or a staff edit in
+`/admin` → Email Defaults, are the ways live copy actually changes.
+
+`migrate-reviewer-email-copy.mjs` **overwrites staff-edited wording** on the four
+global reviewer bodies (withdraw, acceptance, respond-by reminder, review-due
+reminder). It does not touch per-PD invitation/materials templates. Capture the
+dry run first — it prints each current value in full, and that transcript is the
+restore path. Rows that are missing or blank are reported, never silently
+populated; re-running after a successful migration writes nothing.
+
+Both scripts talk to Dataverse, so the target/write interlock applies. Run from a
+local checkout against production and every call is denied by default — reads
+included. Reads need `DATAVERSE_ALLOW_PROD_READS=yes`; writes additionally need
+the per-invocation operator ack `DATAVERSE_PROD_WRITE_ACK="<purpose> <YYYY-MM-DD>"`,
+whose date must be **today in UTC** (`resolveProdWriteAck` in
+`lib/dataverse/core/interlock.js`) — a stale date fails closed and silently. Set
+both in the operator shell only; never commit them and never set them in Vercel.
+See `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md`.
+
+```bash
+# review and KEEP before.txt — it is the restore path (and is not gitignored)
+DATAVERSE_ALLOW_PROD_READS=yes \
+  node scripts/migrate-reviewer-email-copy.mjs > before.txt
+
+DATAVERSE_ALLOW_PROD_READS=yes \
+  DATAVERSE_PROD_WRITE_ACK="migrate reviewer email copy $(date -u +%F)" \
+  node scripts/migrate-reviewer-email-copy.mjs --execute
+```
+
 ## Reviewer Finder Testing
 
 | Script | Description |
