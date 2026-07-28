@@ -2,7 +2,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** live shape 2026-05-07 via `scripts/audit-dataverse-state.js`; discriminator/era distributions 2026-05-15 via `scripts/probe-akoya-request-discriminators.js`; application routing 2026-07-27 via source and caller inspection; automatic review-synthesis lifecycle 2026-07-28 via the controlled Production smoke and exact cleanup
+**Last verified:** live shape 2026-05-07 via `scripts/audit-dataverse-state.js`; discriminator/era distributions 2026-05-15 via `scripts/probe-akoya-request-discriminators.js`; application routing 2026-07-27 via source and caller inspection; automatic review-synthesis lifecycle 2026-07-28 via the controlled Production smoke and exact cleanup; writeup document-authority/search interpretation reconciled 2026-07-28 against the governed artifact contract and Graph tenant probe
 **Live row count:** **~25,561** (FetchXML aggregate, 2026-05-15). ⚠️ OData `/$count` returns **5,000** — Dataverse caps `$count` at 5,000; the "5,000" figure is the cap, not the total. Use FetchXML aggregate / RetrieveTotalRecordCount for the true count.
 **Entity set:** `akoya_requests`
 
@@ -181,6 +181,16 @@ All user-driven writes use `MSCRMCallerID` (impersonation contract per `docs/DYN
 | `grant_cycles.short_code` | derives from `akoya_request.wmkf_meetingdate` via `cycle-code.js` | not stored on request |
 
 ## Polymorphism & era distribution (live-probed 2026-05-15)
+
+> **2026-07-28 document-authority correction for the field-only chronology
+> below:** SharePoint Word/PDF bodies are searchable through Microsoft Search;
+> the current `GraphService.searchFiles()` path and a read-only tenant probe
+> establish that capability. The governed writeup target keeps editable prose
+> in SharePoint Word and registers typed identity, workflow state, and
+> structured decisions in Dataverse. Later phrases saying “filename/title
+> only,” “no content search,” or moving writeup prose onto Dataverse tables are
+> superseded; structured decline fields and optional bulk extraction remain
+> separate concerns.
 
 `akoya_request` is **polymorphic** — "grant" is a *view* over it, not the entity. No single discriminator; it is a **composite**. ⚠️ **Correction (S157, 2026-05-16, `scripts/probe-akoya-field-dictionary.js` on a verified record):** the S157 composite `wmkf_request_type` × `wmkf_grantprogram` × `akoya_requesttype` **omitted a distinct axis** — the AkoyaGO UI field labelled **"Type"** is **`wmkf_type` (Lookup → `wmkf_type` table)**, *not* the `wmkf_request_type` Picklist. They are different concepts: `wmkf_request_type` (Picklist) = *interaction kind* (Request / Concept / Office Visit / …); `wmkf_type` (Lookup) = *grant type* (e.g. `Discretionary`). The axes are **correlated cross-cutting axes, NOT a flat composite and NOT strictly nested** (S157, `scripts/probe-akoya-wmkf-type-taxonomy.js`, corrected by `scripts/probe-akoya-codex-followups.js` block B): `wmkf_type` is the **coarse class** (`Program` / `Discretionary` / `Site Visit` / `Special Grants` / `Special Projects` / `Individual` / `Miscellaneous`); `wmkf_grantprogram` & `akoya_programid` are **finer program axes that span most `wmkf_type` values, not contained within `wmkf_type=Program`** — the joint group-by shows a program present on **13,754 rows under `wmkf_type=Program` vs 10,991 under other `wmkf_type` values**, so "program ⊂ Program" is false. They are NOT redundant either — joint `wmkf_type`×`wmkf_grantprogram` same-label only 21%, and that 21% is entirely the `Discretionary`×`Discretionary` cell (5,345 = the Puzzle-1 directed/no-ask giving mode; the two axes are the *same population* there — a strong correlation, not a hierarchy). 🔴 **Pervasive-polymorphism invariant:** *every* type-ish axis mixes grant categories with non-grant operational/interaction buckets — `Site Visit`/`Office Visit` in `wmkf_type` *and* `wmkf_request_type`; `Research Reviewer` in `akoya_program`; `Individual` (wmkf_type) ≡ `Research Reviewer` (akoya_program), same Jan-2026 all-native 87-row cohort. Any "real grants" filter must strip operational buckets on **every** axis. **`akoya_programid` ("Internal Program", Lookup → `akoya_program`) is form-required *now*** — the most granular program classifier (816 legacy nulls; better than `wmkf_grantprogram`'s 4,634-null but not guaranteed). Hazard differential: `wmkf_type` has *no* duplicate-name issue + low null (159) — "key by GUID" is a defensive default justified by `akoya_program` specifically, not universal. Business-label → logical map for the program/type cluster: "Type"→`wmkf_type`, "Grant Program"→`wmkf_grantprogram`, "Internal Program"→`akoya_programid` (all Lookups). Counts below are still valid per-field; re-probe `wmkf_type`/`akoya_programid` distributions before relying on the type taxonomy. FetchXML aggregate counts (within the 50k aggregate reliable range):
 

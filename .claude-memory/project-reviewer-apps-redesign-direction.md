@@ -29,6 +29,16 @@ Ground truth: `pages/workbench/[requestId].js`,
 contracts. `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` and
 `docs/REQUEST_WORKBENCH_SCOPING.md` are historical chronology/rationale.
 
+**2026-07-28 editor-direction reconciliation:** Allison is now a confirmed
+primary user for the future Editor lens. The current contract preserves the
+former single-folder workflow as a cycle-wide Editor Dashboard with direct
+entry to the canonical SharePoint Word files and explicit per-editor Reviewed
+tracking. The requirement is current; implementation remains planned. Exact
+additional collaborators, request-versus-artifact-stage marker granularity,
+coordinator matrix, app/file access boundary, and deadline remain open. Use the
+near-term execution plan for current authority; the chronology below remains
+the rationale record.
+
 ## Current source-backed state (2026-07-26)
 
 - Ten top-level tabs; six live (Overview, Proposal, Reviewers, Reviews, Status, Awardee)

@@ -134,6 +134,11 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    narrative; Dataverse is the typed registry/workflow authority; Microsoft
    Search supplies file-body search; version recovery, retention,
    least-privilege editing, and immutable Board milestones are required.
+   Allison is the confirmed primary user for a planned cycle-wide Editor
+   Dashboard that replaces designated-folder browsing with one governed
+   writeup list, direct Open in Word, and personal Reviewed tracking. Exact
+   collaborator audience, marker granularity, coordinator view, access key,
+   and delivery date remain open.
    Exact schema, file topology, library configuration, and remaining
    stage-specific inputs are still open.
 

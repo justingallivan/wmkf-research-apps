@@ -390,6 +390,15 @@ Two entries in `shared/config/appRegistry.js`, admin-assignable to their own gro
 
 ## Codex review reconciliation (S157 — era / field-shape work)
 
+> **2026-07-28 correction to the Puzzle 2c chronology below:** its “no
+> content search” statement and recommendation to move review-writeup prose
+> into Dataverse tables are superseded. `GraphService.searchFiles()` plus a
+> read-only tenant probe demonstrate SharePoint Word/PDF body search. The
+> governed writeup contract keeps editable narrative in SharePoint Word and
+> stores typed identity, workflow, and structured decisions in Dataverse.
+> Structured decline reason fields still belong in Dataverse; deterministic
+> bulk rationale extraction remains a separate performance/product choice.
+
 Review of the era probes + Artifact 3. Findings were not just softened — four of five were tested by a follow-up robustness probe (`scripts/probe-akoya-era-robustness.js`) and a fresh exact-rate probe (`scripts/probe-akoya-export-col-rates.js`), which **overturned several claims**:
 
 - **(a) Sampling — substantiated the critique.** GUID-ordered n=1,200 was proven biased in the migrated cohort (`akoya_grant` asc 95% / desc 61%; `grantprogram` asc 58% / desc 99%). All Artifact 3 rates replaced with **exact full-cohort FetchXML aggregates**; the sampled probe is demoted to a field-discovery tool.

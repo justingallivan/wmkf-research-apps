@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-27
+last_verified: 2026-07-28
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -57,11 +57,20 @@ document inventory, and individual implementation plans do not establish priorit
   Board milestones are required parts of the design. Exact schema, document
   topology, and target-library configuration remain planned/unverified. See
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
+- Editor Dashboard direction (owner-confirmed 2026-07-28): preserve Allison's
+  former single-folder editing workflow with a cycle-wide list of governed
+  writeups, direct Open in Word, and an explicit per-editor Reviewed tracker.
+  It reuses the typed registry and canonical SharePoint file; it is not a
+  second editor. Exact collaborator audience, marker granularity, coordinator
+  view, access key, and delivery date remain open. See the near-term plan.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel: `project-virtual-review-panel`.
 - Roadmap snapshots: `project-app-roadmap-2026-04-25`, `project-phase-i-summary-app-winddown`.
 - Phasing/cycle scoping: `project-grant-phasing-evolution`, `feedback-cycle-vs-executor-scope`, `feedback-concepts-vs-phase-i`.
-- J27 document-capture & Proposal-tab evolution (doc→Dataverse-table direction; D26 filename-match is interim; near-term planning): `project-j27-doc-capture-evolution`.
+- J27 document-capture & Proposal-tab evolution (document identity/metadata →
+  typed Dataverse registry; file bytes and editable narrative remain in
+  SharePoint; D26 filename-match is interim; near-term planning):
+  `project-j27-doc-capture-evolution`.
 - Historical Group B writeup proposal: `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md`. Its proposed
   URL fields and `writeup.*` prompt rows are not live, and its D26 pilot timing is obsolete.
 - Planned review/proposal work: `project-staged-review-pipeline`, `project-proposal-context-extraction`.

@@ -61,6 +61,9 @@ hood.
 - **Workbench:** creates or finds the registered artifact, displays its state
   and preview, opens it in Word, and exposes authorized recovery/milestone
   actions.
+- **Editor Dashboard (planned):** queries the same typed registry across a
+  cycle so approved collaborators can review progress and open the canonical
+  Word files without visiting every request separately.
 
 Do not mirror the Word body into an independently editable Dataverse memo. That
 would create two competing sources of truth and an unsafe Word→Dataverse merge
@@ -84,6 +87,28 @@ minimum, the persistence design must account for:
 
 A URL alone is not the artifact identity, and a folder/filename convention is
 not a durable join contract.
+
+### Cycle-wide Editor Dashboard contract
+
+Allison is the confirmed primary user for a cycle-wide editing surface; other
+writeup collaborators may be included once the audience is approved. The
+dashboard must replace the useful affordance of the former designated
+SharePoint folder—a single browsable set of writeups—without copying the files
+or rebuilding Word editing.
+
+It should list the registered artifacts by cycle and expose request identity,
+institution, program/PD, artifact type/stage, lifecycle state, current version,
+last modified, preview, and **Open in Word**. The earlier design also established
+an explicit per-editor **Reviewed** marker and personal “N of M” progress.
+That marker is tracking, not approval; SharePoint “has edits” evidence is only
+a secondary hint because no edits can mean either “reviewed; no changes” or
+“not reviewed.”
+
+The Reviewed marker requires durable per-editor state, likely a child row keyed
+to the editor and registered artifact. Its exact granularity (request versus
+artifact stage), coordinator matrix, access key, and deadline remain design
+decisions. App list visibility and SharePoint edit permission are separate
+authorization boundaries; passing one must not imply the other.
 
 ### Search contract
 

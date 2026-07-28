@@ -68,8 +68,12 @@ advancement must exist before advancement and for every in-scope proposal.
 - Dataverse is the canonical registry for request/cycle/artifact identity,
   stable SharePoint drive/item/version references, lifecycle state, structured
   decisions, and workflow/audit metadata.
-- The Workbench is the creation, discovery, preview, open-in-Word, workflow,
-  milestone, and authorized recovery surface.
+- The Workbench is the per-request creation, discovery, preview, open-in-Word,
+  workflow, milestone, and authorized recovery surface.
+- A planned cycle-wide **Editor Dashboard** is the cross-request discovery and
+  progress surface for Allison and other approved writeup collaborators. It
+  opens the same registered SharePoint artifacts; it does not create another
+  editable copy.
 - Do not maintain a second independently editable copy of the Word body in a
   Dataverse memo. Derived extracted text may exist only as a version-keyed,
   rebuildable search/AI representation.
@@ -95,6 +99,32 @@ file-body search layer.
   version history, and restrict restore to an approved administrative role.
 - Every official Board milestone must retain the exact SharePoint item/version,
   actor, timestamp, content hash, and a protected DOCX and/or PDF snapshot.
+
+### Cycle-wide editing
+
+Allison historically reviewed and edited writeups from one designated
+SharePoint folder. Removing that folder-browsing workflow must not force her to
+open each request separately in the Workbench.
+
+The planned replacement is an **Editor Dashboard**, not the broader historical
+“Executive Dashboard” proposal. Its minimum contract is:
+
+- one cycle-scoped list of registered writeup artifacts, with request,
+  institution, program/PD, artifact stage, lifecycle state, and last-modified
+  context;
+- direct preview and **Open in Word** against the canonical SharePoint file;
+- filters for cycle, program/PD, artifact stage, and editing/review state;
+- an explicit per-editor **Reviewed** marker to distinguish “reviewed; no
+  changes needed” from “not yet reviewed”; and
+- personal progress such as “reviewed N of M.” A coordinator matrix may be
+  added only if Sarah or another coordinator needs it.
+
+“Reviewed” is a progress signal, not an approval gate. SharePoint revisions or
+tracked changes may provide a secondary “has edits” hint, but they cannot
+replace the explicit marker. The exact approved collaborator group, marker
+granularity (request versus artifact stage), coordinator view, app-access key,
+and delivery deadline remain open. App visibility and SharePoint file
+permission are separate controls and both must be enforced.
 
 The detailed target contract and current-vs-planned boundary live in
 `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`. Whether the three writeup stages use
@@ -222,7 +252,7 @@ leave the review with this contract:
 | Inputs | Exact Dataverse fields, SharePoint files, reviews, synthesis, or staff entry used. |
 | Producer | Manual staff action, app action, Power Automate, or status event. |
 | Persistence | Exact Dataverse column/child row and SharePoint path/file contract. |
-| Consumer | Workbench tab, Word, executive view, downstream automation, or board material. |
+| Consumer | Workbench tab, Word, Editor Dashboard, downstream automation, or board material. |
 | Readiness | The condition under which generation/editing is allowed. |
 | Regeneration | Overwrite/version/history behavior. |
 | Access | Who may read, generate, edit, and approve. |
@@ -245,7 +275,10 @@ Decision order:
 
 Explicit non-goals during design freeze:
 
-- no Executive Dashboard build without a near-term user/deadline;
+- no Editor Dashboard implementation until its audience, minimum view,
+  Reviewed-marker contract, access boundary, and deadline are fixed; the need
+  to preserve Allison's cycle-wide editing workflow is no longer an optional
+  historical idea;
 - no Reviewer Pool build without observed need and owner priority;
 - no new writeup URL fields merely because the June proposal named them;
 - no automatic status-driven workflow until its event, idempotency, retry, and ownership
@@ -265,7 +298,7 @@ Build in producer-to-consumer order:
 5. persist stable drive/item identity, current version/eTag, lifecycle state,
    and generation provenance;
 6. render current state, version/last-modified metadata, and “Open in Word” in
-   the Workbench;
+   the Workbench through a read contract the Editor Dashboard can reuse;
 7. add audit/observability, authorized version recovery, and explicit
    partial-failure handling;
 8. verify full-text search, structured result joins, version restore,
@@ -286,6 +319,9 @@ official milestone can be proven independently of later working edits.
   input.
 - **Initial Assessment:** reuse the proven artifact path for every in-scope J27
   proposal before the staff/Board advancement decision.
+- **Editor Dashboard:** reuse the typed registry and artifact read contract to
+  provide the cycle-wide list, direct Word entry, and per-editor Reviewed
+  tracking once its deadline and access contract are approved.
 - **Overview:** add next-action/writeup signals only after their underlying state exists.
 
 Do not parallelize these dependent slices merely to fill tabs. A proven shared writeup
@@ -313,7 +349,9 @@ Owner-decided:
 4. Microsoft Search for SharePoint body search rather than a second editable
    Dataverse body; and
 5. version recovery, retention, least-privilege editing, and immutable Board
-   milestones as required parts of the artifact contract.
+   milestones as required parts of the artifact contract; and
+6. preserving Allison's cycle-wide review/edit workflow through a planned
+   Editor Dashboard rather than requiring per-request Workbench navigation.
 
 Still required:
 
@@ -323,4 +361,5 @@ Still required:
 4. separate-files versus milestone-version document topology;
 5. target-library version, retention, recycle, and permission audit;
 6. Site Visit field sufficiency; and
-7. leadership/editor access timing and restore authority.
+7. Editor Dashboard audience, Reviewed-marker granularity, coordinator view,
+   app/file access enforcement, delivery timing, and restore authority.

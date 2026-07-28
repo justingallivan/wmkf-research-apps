@@ -6,7 +6,7 @@ status: active
 summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-07-27
+last_verified: 2026-07-28
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -18,7 +18,7 @@ related:
 
 # Where We're Headed
 
-**Last verified: 2026-07-27.** This document owns long-term direction and principles. The
+**Last verified: 2026-07-28.** This document owns long-term direction and principles. The
 ordered, current delivery agenda lives in `docs/CURRENT_WORK_QUEUE.md`; this document is not a
 backlog.
 
@@ -96,6 +96,13 @@ as shipped.
 
 **Create a unified view of data and documents.** From the user's perspective, data and documents should be part of a single record, despite being stored in Dataverse and SharePoint separately. This is something AkoyaGO cannot do natively.
 
+**Preserve cycle-wide editorial work.** The per-request Workbench is not the
+only useful view. Allison and other approved writeup collaborators need a
+cycle-scoped Editor Dashboard that lists the governed artifacts, tracks
+personal review progress, and opens the same canonical SharePoint Word files
+directly. It is an index and workflow surface, not a second editor or document
+store.
+
 **Build for where we're going, not where we've been.** The new grant cycle and the new tools should shape each other. Don't replicate the old process in code — build capabilities that serve whatever comes next.
 
 ---
@@ -128,10 +135,12 @@ as shipped.
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
 
-1. finish the synthesis lifecycle contract, including all-in readiness, manual
-   early-run, stored-output visibility, and observable regeneration;
-2. freeze the user/input/storage/access/deadline contract for the four remaining Workbench lifecycle tabs;
-3. build the first deadline-bound writeup slice, provisionally Pre Site Visit Writeup.
+1. freeze the user/input/storage/access/deadline contract for the four
+   remaining Workbench lifecycle tabs and the cycle-wide Editor Dashboard;
+2. build the first deadline-bound writeup slice, provisionally Pre Site Visit
+   Writeup; and
+3. reuse that artifact registry/read contract for the later writeup stages and
+   the Editor Dashboard.
 
 The owner-authorized 2026-07-27 Request `1002788` smoke closed as a bounded
 v2 failure with no partial memo write. On 2026-07-28, governed prompt v3 became
