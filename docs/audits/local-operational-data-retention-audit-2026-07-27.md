@@ -3,7 +3,7 @@ title: Local Operational Data Retention Audit — 2026-07-27
 domain: security-privacy
 kind: audit
 status: active
-summary: "Privacy-safe retention inventory, private OneDrive preservation, completed study and smoke closure, and remaining rollback/finality disposition decisions."
+summary: "Privacy-safe retention inventory, private OneDrive preservation, closed study/smoke/rollback windows, and remaining final-copy and disposal decisions."
 canonical: false
 cataloged: 2026-07-27
 last_verified: 2026-07-27
@@ -78,6 +78,9 @@ retention decisions remain open and no exact source deletion set has been
 approved. The owner has now closed the reviewer-holistic study and its
 reproducibility window; its privacy-safe design, aggregate findings,
 limitations, and decision are retained in a tracked closure audit.
+Read-only production reconciliation has also closed the application-research
+and Contact-ORCID rollback windows. Their three raw checkpoints are audit-only
+controlled-disposal candidates; no deletion is authorized by that finding.
 
 The pre-cleanup ignored corpus contained 140 files totaling 15,288,067 bytes
 (about 14.6 MiB). At least 63 text or structured files contained identity,
@@ -119,6 +122,8 @@ access control, retention, recovery, or secure disposal.
 | The preservation copy is synchronized and cloud access is correctly bounded. | The owner confirmed that the files are visible in OneDrive and that only the owner has access. | `VERIFIED via owner confirmation` |
 | The recorded smoke cleanup is complete. | Marker-gated cleanup deleted the current suggestion, marked potential reviewer, and marked linked Contact; independent production read-back found all absent and the source checkpoint cleared. | `VERIFIED` |
 | The reviewer-holistic study still needs an open reproducibility window. | The owner confirmed the study is complete; a tracked privacy-safe closure audit preserves its method, aggregate findings, limits, and decision. | `FALSIFIED via owner confirmation` |
+| The application-research migration still needs an open rollback window. | All 339 checkpoint links are unique and non-null; all 339 current target people exist; all three retired entities remain absent. The sole formerly populated field now empty exactly matches a documented intentional Scholar-identity correction. | `FALSIFIED via read-only production reconciliation` |
+| The Contact-ORCID historical backfill still needs an open rollback window. | All 162 projected writes had applied decisions and all 162 current Contact values match exactly, with zero mismatch, missing, malformed, not-found, or read-failure outcomes. | `FALSIFIED via read-only production reconciliation` |
 | A bounded first disposal set exists. | Zero-byte, current-state probe, merge receipt, generated schema, and smoke-log classes have no active tracked consumer after their conclusions or cleanup are verified. | `VERIFIED`, subject to owner approval |
 | Exact retention periods are established. | No repository policy or owner decision defines them. | `UNKNOWN` |
 
@@ -253,6 +258,44 @@ OneDrive checkpoint, proved:
 preserved OneDrive checkpoint is now a disposal candidate rather than active
 recovery state.
 
+## Rollback-window closure follow-up — 2026-07-27
+
+**Change surface:** the application-research collapse snapshot and the two
+Contact-ORCID historical backfill checkpoints, all ignored and already copied
+byte-identically to the owner-only external archive.
+
+The aggregate-only verifier read the checkpoints locally and queried current
+production Dataverse state through the explicit read-only acknowledgement. It
+emitted no names, addresses, ORCIDs, record identifiers, or row-level values.
+No live write or deletion occurred.
+
+For the application-research collapse:
+
+- all 339 snapshot links were non-null and unique;
+- all 339 linked target people still exist;
+- the three retired entities remain absent;
+- every historically populated value remains populated except one Scholar URL;
+  that exception exactly fingerprints the previously documented intentional
+  correction of a wrong Scholar identity, where the complete Scholar identity
+  bundle was cleared; and
+- later populated changes to a small set of fields are current state, not
+  migration loss.
+
+For the Contact-ORCID backfill:
+
+- the resolve checkpoint contains 1,533 decisions: 162 write, 14 noop, seven
+  ambiguous, 1,349 no-contact, and one null-status outcome;
+- all 162 projected writes have a corresponding applied decision; and
+- current read-back found 162 exact normalized matches and zero
+  different-valid, missing, malformed, not-found, or read-failure outcomes.
+
+**Closure result:** both rollback windows are closed. The three raw checkpoints
+are audit-only controlled-disposal candidates. They must not be used for a
+bulk rollback: the application-research source schema is gone, and clearing
+Contact ORCIDs from a historical log could erase later independent
+confirmation. Any future correction requires a new reviewed remediation based
+on current evidence. Exact deletion remains separately approval-gated.
+
 ## Load-bearing and disposition matrix
 
 | Sanitized artifact class | Dependency and reproducibility | Proposed disposition |
@@ -263,8 +306,8 @@ recovery state.
 | Reviewer identity/email research and chained evaluation outputs | Fourteen files are exactly referenced by tracked code; other results support manual judgments and experiment history. | **Preserve code-linked chain.** Review remaining files individually; do not bulk-delete the folder. |
 | Review-form production probe receipts | Current state can be reprobed, but the historical state and durable claims cannot be reconstructed exactly. | **Preserve until sanitized tracked receipts replace any citations**, then archive or dispose. |
 | Smoke-test candidate state | The marker-gated production cleanup and independent read-back are complete; no person, suggestion, or Contact remains. The source checkpoint was cleared automatically, while the preserved OneDrive copy remains. | **Dispose of the preserved checkpoint** after the aggregate cleanup receipt is accepted. |
-| Application-research rollback snapshot | No current code reader; source tables were dropped, so the historical rollback evidence is not reproducible. | **Owner decision:** controlled short archive if rollback/audit value remains; otherwise dispose after explicit sign-off. |
-| Contact-ORCID back-propagation checkpoints | Historical decisions are not reproducible, although current state can be reprobed. The one-shot workflow has shipped. | **Short archive or aggregate receipt**, then dispose after owner confirms rollback is no longer required. |
+| Application-research rollback snapshot | Aggregate reconciliation found all 339 target people and confirmed the only empty historical value is the documented intentional Scholar correction; the three source entities remain absent. | **Controlled disposal candidate.** Rollback window closed; retain only until exact-path approval and aggregate deletion receipt. |
+| Contact-ORCID back-propagation checkpoints | Aggregate reconciliation found all 162 intended writes still match exactly. Historical clearing would risk erasing later confirmation. | **Controlled disposal candidate.** Rollback window closed; retain only until exact-path approval and aggregate deletion receipt. |
 | Cross-store and contact probes | No tracked downstream consumer; current state is reproducible. | **First-wave disposal candidate** after confirming durable aggregate conclusions. |
 | Zero-byte identity-audit output | No downstream consumer and no retained evidence. | **First-wave disposal candidate.** |
 | Merge-probe raw receipts | Offline diagnostic evidence; the probe can be rerun. | **First-wave disposal candidate** after any needed aggregate conclusion is tracked. |
@@ -301,9 +344,10 @@ owner decision. The safest current rules are event-based:
    until read-back proves that synthetic rows are gone. The state file should
    be deleted after verified cleanup so stale identifiers cannot be mistaken
    for active work.
-4. **Close rollback windows deliberately.** Retain one-shot rollback evidence
-   only until the data owner confirms the migrated state and ends the rollback
-   window. Then preserve an aggregate receipt and dispose of row-level files.
+4. **Close rollback windows deliberately.** The application-research and
+   Contact-ORCID migrations were reconciled against current production state
+   and their rollback windows are closed. Their aggregate receipt is tracked
+   above; row-level files remain only until exact disposal approval.
 5. **Dispose of reproducible diagnostics after receipt.** A tracked aggregate
    result may replace raw probes, schema diffs, smoke logs, and intermediate
    renders when no incident or audit obligation remains.
@@ -331,8 +375,9 @@ owner decision. The safest current rules are event-based:
 4. **Complete:** marker-gated cleanup deleted the marked smoke person, its
    current suggestion, and the marked linked Contact. Independent production
    read-back proved all are absent, and the source checkpoint is gone.
-5. **Pending:** decide whether the application-research and Contact-ORCID
-   back-propagation rollback windows are closed.
+5. **Complete:** read-only production reconciliation closed the
+   application-research and Contact-ORCID rollback windows. The three raw
+   checkpoints are audit-only controlled-disposal candidates.
 6. **Pending:** produce an exact private candidate list for the approved
    disposal categories.
 7. **Pending:** delete only approved source files, rerun the ignored-file
@@ -342,20 +387,20 @@ owner decision. The safest current rules are event-based:
 
 ## Owner decisions required
 
-1. Are the application-research and Contact-ORCID back-propagation rollback
-   windows closed?
-2. Are any rendered decks, workbooks, documents, PDFs, or images the sole
+1. Are any rendered decks, workbooks, documents, PDFs, or images the sole
    authoritative final copy?
-3. May the reviewer-holistic raw bundle, preserved smoke checkpoint, and
-   first-wave disposal candidates be deleted after a private exact-path review
-   and aggregate receipt?
+2. May the reviewer-holistic raw bundle, the three closed-window checkpoints,
+   preserved smoke checkpoint, and first-wave disposal candidates be deleted
+   after a private exact-path review and aggregate receipt?
 
 The missing reviewer-holistic input contract is restored and verified in the
 external archive, the study and reproducibility window are closed, and its
 privacy-safe design and findings are tracked. The owner also confirmed cloud
-presence and owner-only access. Until the remaining rollback, final-copy, and
-exact disposal decisions are recorded, the ignored-local component of the
-public PII/history audit remains `CLAIM NOT RECONCILED`.
+presence and owner-only access. The application-research and Contact-ORCID
+rollback windows are also closed with aggregate reconciliation recorded above.
+Until the remaining final-copy and exact disposal decisions are recorded, the
+ignored-local component of the public PII/history audit remains
+`CLAIM NOT RECONCILED`.
 
 ## Privacy-safe reproducibility
 

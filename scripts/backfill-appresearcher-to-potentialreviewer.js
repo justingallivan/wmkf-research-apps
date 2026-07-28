@@ -2,6 +2,13 @@
 /**
  * ONE-SHOT BACKFILL (appresearcher collapse, S213 — docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md Phase 2).
  *
+ * COMPLETED S213. A read-only production reconciliation on 2026-07-27 found
+ * all 339 linked target people present and all three retired entities still
+ * absent. The sole historically populated field now empty exactly matches the
+ * documented intentional correction of a wrong Scholar identity. The rollback
+ * window is closed; the ignored snapshot is an audit-only controlled-disposal
+ * candidate. Do not rerun this script against the dropped source entity.
+ *
  * Copies each wmkf_appresearcher sidecar's bibliometric fields onto its linked
  * wmkf_potentialreviewers person row (the 17 fields added in Phase 1). After
  * Phase 4 caller switchover, the sidecar is dropped (Phase 5); this moves the
@@ -21,8 +28,9 @@
  *     the person's existing affiliation when promoting to the 500-char field).
  *
  * Gates (Codex P0 #1): refuses to write unless the sidecar→person link audit is
- * clean (0 null / 0 dangling / 0 duplicate). Writes a JSONL snapshot of every
- * sidecar row first (rollback insurance).
+ * clean (0 null / 0 dangling / 0 duplicate). At execution time it wrote a JSONL
+ * snapshot of every sidecar row as bounded rollback insurance; that snapshot is
+ * audit-only now.
  */
 
 import fs from 'fs';
@@ -96,7 +104,7 @@ await bypassDynamicsRestrictions('backfill-appresearcher', async () => {
   }
   console.log('Audit CLEAN.\n');
 
-  // ── JSONL snapshot (rollback insurance) ───────────────────────────────────
+  // ── JSONL snapshot (historical execution step; audit-only now) ────────────
   const snapPath = path.join(__dirname, `.appresearcher-snapshot.jsonl`);
   fs.writeFileSync(snapPath, sidecars.map(s => JSON.stringify(s)).join('\n'));
   console.log(`Snapshot written: ${snapPath} (${sidecars.length} rows)\n`);

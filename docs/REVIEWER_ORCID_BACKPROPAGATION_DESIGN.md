@@ -3,7 +3,7 @@ title: "Reviewer ORCID Back-Propagation Design (S216)"
 domain: reviewer-identity
 kind: spec
 status: active
-summary: "Author: S216. Depends on: S214/S215 identity resolver + ORCID backfill (docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md, memory..."
+summary: "Shipped reviewer-to-Contact ORCID propagation design; the historical backfill's rollback window closed after aggregate production reconciliation."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -16,12 +16,15 @@ related:
 
 # Reviewer ORCID Back-Propagation Design (S216)
 
-**Status:** **SHIPPED** (updated S253, 2026-06-13) — was "DESIGN rev3, build-ready for PR1". Both
+**Status:** **SHIPPED** (updated 2026-07-27) — was "DESIGN rev3, build-ready for PR1". Both
 increments are live: PR1 (resolver-gated reviewer ORCIDs flow onto matched contacts at
 outreach/promotion) is `lib/services/backprop-reviewer-orcid.js` via
 `contactAdapter.setOrcidIfAbsent`; PR2 (one-shot historical catch-up of the already-eligible pool)
 is `scripts/backfill-contact-orcid.js`. Both use the fill-only, conflict-surfacing,
-contact-never-created safety described below. Read the design body as historical rationale.
+contact-never-created safety described below. A read-only production reconciliation
+confirmed all 162 historical fills still match exactly, so the PR2 rollback window is
+closed and its ignored checkpoints are audit-only disposal candidates. Read the design
+body as historical rationale.
 **Author:** S216. **Depends on:** S214/S215 identity resolver + ORCID backfill
 (`docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md`, memory
 `project-reviewer-identity-resolution-phase1`).
@@ -231,7 +234,7 @@ resumable two-phase shape:
 - Writes through `bypassDynamicsRestrictions('backfill-contact-orcid', …)` with the same
   gated adapter path production uses.
 
-## 7. Provenance & reversibility — via native Dataverse audit (resolves Codex #15/#16)
+## 7. Provenance and closed rollback window — via native Dataverse audit
 
 Codex #15 (HIGH) correctly flagged that a gitignored JSONL is not durable provenance for
 runtime writes. **Resolved without new schema by an S216 capability probe**
@@ -245,11 +248,19 @@ runtime writes. **Resolved without new schema by an S216 capability probe**
 So every back-prop write is **durably captured natively**: actor distinguishes our
 service principal from GOapply's "# BCO akoyaGO Integration" and manual "Bromelkamp Admin"
 edits; the prior value is retained. **No `wmkf_orcidsource` field** (§8.3). Reversibility
-(Codex #16): the JSONL/runtime counters are the *index* of contacts we touched; the
-Dataverse per-record audit is the *durable truth*. A future rollback iterates our touched
-contactIds and reverts only where the current value still equals our written value AND the
-audit shows no later third-party edit — so we never erase a value a user has since
-re-confirmed.
+(Codex #16) was available during the bounded post-run window: the JSONL/runtime counters
+indexed contacts touched, while the Dataverse per-record audit remained the durable
+truth.
+
+**Rollback-window closure (2026-07-27).** A read-only production reconciliation compared
+the complete historical apply checkpoint with current Contact state. All 162 projected
+writes had an applied decision, all 162 target Contacts still held the intended normalized
+ORCID, and there were zero different-valid, missing, malformed, not-found, or read-failure
+outcomes. The rollback window is therefore closed. The two ignored checkpoints are now
+audit-only controlled-disposal candidates, not instructions for a future bulk clear.
+Clearing from those files could erase a value independently confirmed after the backfill.
+Any future correction must be a new reviewed remediation based on current evidence and
+native record history.
 
 ## 8. Decisions
 
