@@ -6,9 +6,9 @@
  *
  * Also handles profile linking for first-time Azure logins.
  *
- * IMPORTANT: Authentication is OPTIONAL until Azure AD is configured.
- * If AZURE_AD_CLIENT_ID is not set, this component passes through children
- * without requiring authentication.
+ * The public status endpoint mirrors the shared server enforcement policy.
+ * Production-mode deployments fail closed; local development can still opt
+ * out when the policy says authentication is disabled.
  */
 
 import { useSession, signIn } from 'next-auth/react';
