@@ -204,6 +204,12 @@ related:
 |---|---|---|---|---|---|
 | [PROMPT_CACHING_AUDIT.md](PROMPT_CACHING_AUDIT.md) | plan | active |  | July 2026 cache audit: R1/R3 and identical-rerun Executor mitigation shipped; cross-document composition and conditional R5 remain. |  |
 
+## process
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [CLAUDE_TO_CODEX_HANDOFF_2026-07-27.md](CLAUDE_TO_CODEX_HANDOFF_2026-07-27.md) | status | active |  | Reviewer-email session outcomes, unrun follow-ups, and Claude's self-assessment with three unimplemented remediation proposals for Codex to evaluate. | 2026-07-27 |
+
 ## prompt-executor
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
