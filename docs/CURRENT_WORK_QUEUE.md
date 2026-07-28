@@ -34,9 +34,8 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Reviews/synthesis contract closure | Reliability is production-proven. The approved participating-invitation state machine, exact-fingerprint currentness ledger, automatic all-in drain, explicit manual early-run, stored-output visibility, and observability are production-deployed in merge `70956477` / deployment `dpl_2tgAYjUXFFx4nQo7FgE2Z3TBMqP9`. Migration 028 is live and verified empty; automation remains disabled. | Complete signed-in manual/read-only verification, then deliberately enable and redeploy before smoking the bounded automatic path and declaring completion. |
-| 2 | Remaining lifecycle design freeze | Calendar the fixed deadlines and define the full contract for Pre Site Visit Writeup, Site Visit, Final Writeup, and Initial Writeup. Existing June assumptions are inputs, not decisions. | Each tab has approved user, inputs, producer, persistence, consumer, access, recovery, and deadline. |
-| 3 | First deadline-bound writeup slice | Default candidate is Pre Site Visit Writeup, but only after the calendar and input/artifact contracts are approved. | One request produces a durable, editable Word artifact and visible Workbench state through a production smoke. |
+| 1 | Remaining lifecycle design freeze | Calendar the fixed deadlines and define the full contract for Pre Site Visit Writeup, Site Visit, Final Writeup, and Initial Writeup. Existing June assumptions are inputs, not decisions. | Each tab has approved user, inputs, producer, persistence, consumer, access, recovery, and deadline. |
+| 2 | First deadline-bound writeup slice | Default candidate is Pre Site Visit Writeup, but only after the calendar and input/artifact contracts are approved. | One request produces a durable, editable Word artifact and visible Workbench state through a production smoke. |
 
 ## Audit follow-ups — verified open, not silently prioritized
 
@@ -51,6 +50,16 @@ sequence.
 
 ## Completed in this execution
 
+- Review-synthesis lifecycle rollout: signed-in read-only verification passed;
+  Production automation was deliberately enabled; and the controlled Request
+  `1002788` smoke completed job `2`, maintenance run `27723`, and prompt-v3 AI
+  run `1b882cf6-bf8a-f111-ab0f-7ced8d3d15a6` in one claim. Exact cleanup
+  removed 11 temporary answers, restored four parent fields, left no draft, and
+  returned the census to 157 participant rows / 25 requests / zero eligible.
+  PR #98 fixed the automatic run-source defect found before the first attempt's
+  LLM boundary; PR #99 moved claimed-job readiness revalidation before content
+  loading. Final deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready with
+  automation enabled; the post-deploy zero-eligible drain was clean.
 - Auth-status policy reconciliation: `/api/auth/status` remains intentionally
   public with the exact `{ enabled: boolean }` shape, but now delegates to the
   same fail-closed `isAuthRequired()` policy used by the proxy and API guards.

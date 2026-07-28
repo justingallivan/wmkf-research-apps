@@ -377,7 +377,7 @@ deleted the 11 staged answers and restored four parent fields while preserving
 the synthesis and append-only audit. Independent follow-up review returned READY.
 
 **Owner-confirmed lifecycle (2026-07-26; participation semantics closed
-2026-07-27; production-deployed with automation disabled 2026-07-28):** automatic
+2026-07-27; production-deployed and enabled 2026-07-28):** automatic
 synthesis runs only after
 all participating invitations resolve and at least one review is submitted;
 staff may explicitly generate it earlier after one submission. Participants are
@@ -398,10 +398,14 @@ a matching completed ledger row establishes Current state. The feature-gated
 `/api/cron/drain-review-syntheses` uses leased claims and revalidates readiness
 and the fingerprint before generation. It remains inert unless
 `REVIEW_SYNTHESIS_AUTOMATION_ENABLED=true`. **This extension is production-deployed
-in merge `70956477` / deployment `dpl_2tgAYjUXFFx4nQo7FgE2Z3TBMqP9`;
-migration 028 is live-applied, the table remained empty after deployment, and
-the authenticated cron probe confirmed automation remains disabled. Signed-in
-manual/read-only verification remains.** Plan doc:
+and enabled after signed-in verification plus the controlled Request `1002788`
+automatic smoke. Job `2`, maintenance run `27723`, and AI run
+`1b882cf6-bf8a-f111-ab0f-7ced8d3d15a6` completed in one claim; exact cleanup
+returned the census to zero eligible requests and the retained memo to Stale.
+PR #98 corrected the automatic Executor run source; PR #99 moved lifecycle
+revalidation before content loading so vanished inputs cancel. Final deployment
+`dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready, and a post-deploy bounded drain
+returned zero eligible/enqueued/claimed/failed.** Plan doc:
 `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 ## Email templates (admin org default + per-PD override)

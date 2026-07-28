@@ -110,6 +110,20 @@ Both written by `execute-prompt.js` `writeRunRow()`. Migration plans touching ei
   redacted override and latency/token/boundary diagnostics. Exact cleanup
   removed the 11 staged answers and restored four parent fields while
   preserving the synthesis and append-only audit.
+- **Controlled automatic lifecycle proof (2026-07-28):** with
+  `REVIEW_SYNTHESIS_AUTOMATION_ENABLED=true` in Production, the bounded drain
+  found exactly one eligible request, enqueued and completed job `2` in one
+  attempt, and wrote completed AI run
+  `1b882cf6-bf8a-f111-ab0f-7ced8d3d15a6` against prompt version 3 using
+  `claude-sonnet-5`, `end_turn`, and `semanticAttempt=1`. The automatic
+  invocation uses the existing `PowerAutomate Auto` run-source option; the
+  initial `Vercel Cron` label was rejected by Dataverse before any model call
+  and was corrected in PR #98. Exact cleanup removed only the 11 staged answer
+  rows and restored the four parent review fields while intentionally
+  preserving the new request synthesis and append-only run/job/maintenance
+  audit records. The post-cleanup census returned to zero eligible requests,
+  and a post-PR-#99 production drain again scanned 25 requests with zero
+  eligible, claimed, completed, cancelled, or failed jobs.
 - Production prompt writes occur through controlled admin publication or seed
   operations; ordinary prompt execution remains read-only on this entity.
 

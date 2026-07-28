@@ -130,8 +130,8 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
    share the sweep's exclusion/dedupe record so manual + cron cannot double-send.
    Outward-facing email = high-risk surface; the send guard is the review point.
 6. **Synthesis readiness and visibility (owner-confirmed 2026-07-26 and
-   participation semantics confirmed 2026-07-27; production-deployed with
-   automation disabled 2026-07-28).**
+   participation semantics confirmed 2026-07-27; production-deployed and
+   enabled 2026-07-28).**
    Automatic synthesis is allowed only when all participating invitations
    are resolved, with at least one submitted review. Staff may explicitly run
    synthesis earlier as a deliberate manual override after at least one
@@ -161,10 +161,13 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
    stores only job/hash state in Postgres, leaves content in the Dataverse memo,
    and exposes Current/Stale plus queued/running/failed state. The automatic cron
    is inert unless `REVIEW_SYNTHESIS_AUTOMATION_ENABLED` is exactly `true`.
-   **Release boundary:** merge `70956477` is production-deployed in
-   `dpl_2tgAYjUXFFx4nQo7FgE2Z3TBMqP9`; production has the empty, live-verified
-   `review_synthesis_jobs` table; automation remains disabled. Signed-in
-   manual/read-only verification and the later bounded enablement smoke remain.
+   **Release boundary:** migration 028 and merge `70956477` are live; signed-in
+   verification passed and Production automation is enabled. The controlled
+   Request `1002788` smoke completed job `2`, maintenance run `27723`, and AI
+   run `1b882cf6-bf8a-f111-ab0f-7ced8d3d15a6` in one claim. Exact cleanup
+   returned zero answers/drafts/eligible requests and the retained memo to
+   Stale. PRs #98 and #99 closed the run-source and vanished-input cancellation
+   defects; final deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready.
 
 ## Phases (independently shippable, in order)
 
@@ -268,10 +271,23 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
 - `/api/cron/drain-review-syntheses` plus
   `review-synthesis-drain.js` implement the automatic all-in path with an exact
   request+fingerprint dedupe key, small leased claims, pre-generation
-  readiness/fingerprint revalidation, and three-attempt bounded retries.
+  lifecycle-readiness/content-fingerprint revalidation, and three-attempt bounded retries.
   Terminal fingerprints are not automatically reopened. The route is
   deployment-safe by default because any value other than exact
   `REVIEW_SYNTHESIS_AUTOMATION_ENABLED=true` returns an inert response.
+- **Automatic production result (2026-07-28):** signed-in read-only verification
+  passed, the Production flag was deliberately enabled, and a controlled
+  Request #1002788 review made the global census exactly one eligible request.
+  The bounded drain enqueued/claimed/completed job `2` in one attempt,
+  maintenance run `27723` recorded `eligible=1/enqueued=1/claimed=1/completed=1`,
+  and prompt-v3 AI run `1b882cf6-bf8a-f111-ab0f-7ced8d3d15a6` ended with
+  `end_turn` and wrote the synthesis. Cleanup atomically removed the 11 staged
+  answers and restored the four parent fields; zero answers/drafts/eligible
+  requests remain and the retained memo correctly reports Stale. The first
+  pre-LLM attempt exposed unsupported `Vercel Cron` run-source labeling (fixed
+  by PR #98); the sweep then closed vanished-input cancellation before content
+  loading in PR #99. Final production deployment
+  `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready with automation enabled.
 - `shared/utils/review-report.js#composeReviewReport` accepts an optional
   `synthesis` param → `synthesisSection` on the composed report, additive in
   both the DOCX and PDF renderers; `ExportMenu` passes
