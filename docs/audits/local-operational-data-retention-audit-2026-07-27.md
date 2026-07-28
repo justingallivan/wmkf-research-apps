@@ -3,13 +3,14 @@ title: Local Operational Data Retention Audit — 2026-07-27
 domain: security-privacy
 kind: audit
 status: active
-summary: "Privacy-safe retention inventory, private OneDrive preservation, and verified smoke cleanup; retention-window and final disposition decisions remain."
+summary: "Privacy-safe retention inventory, private OneDrive preservation, completed study and smoke closure, and remaining rollback/finality disposition decisions."
 canonical: false
 cataloged: 2026-07-27
 last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/audits/public-repository-pii-history-audit-2026-07-27.md
+  - docs/audits/reviewer-holistic-m1-scoped-pilot-closure-2026-07-27.md
   - docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md
   - docs/CREDENTIALS_RUNBOOK.md
   - .gitignore
@@ -74,7 +75,9 @@ copy is complete and byte-verified through the local OneDrive mount. The owner
 then confirmed that the files are visible in OneDrive and only the owner has
 access. The retention condition is still not reconciled because event-based
 retention decisions remain open and no exact source deletion set has been
-approved.
+approved. The owner has now closed the reviewer-holistic study and its
+reproducibility window; its privacy-safe design, aggregate findings,
+limitations, and decision are retained in a tracked closure audit.
 
 The pre-cleanup ignored corpus contained 140 files totaling 15,288,067 bytes
 (about 14.6 MiB). At least 63 text or structured files contained identity,
@@ -96,9 +99,10 @@ The preservation follow-up recovered the last pre-redaction v2 manifest,
 frozen proposal evaluation, and owner-approved cohort directly from reachable
 history into the external archive. That three-file set passes the current full
 frozen validator. It is preserved separately from the later scored evaluation
-and was not returned to the public working tree. Repinning the manifest to the
-final source commit remains necessary only if the study stays reproducible and
-will be run again.
+and was not returned to the public working tree. The owner confirmed that the
+study is complete and will not be kept active for a rerun, so manifest
+repinning is not required. The raw bundle remains controlled pending exact
+disposal approval, not as active reproducibility state.
 
 `.gitignore` prevents accidental tracking. It does not provide encryption,
 access control, retention, recovery, or secure disposal.
@@ -114,6 +118,7 @@ access control, retention, recovery, or secure disposal.
 | The preservation copy is byte-complete and owner-only on the local mount. | Sixty-four copied files have zero source/destination checksum mismatches; eight directories are `0700`, all files are `0600`, and no symlink remains. | `VERIFIED locally` |
 | The preservation copy is synchronized and cloud access is correctly bounded. | The owner confirmed that the files are visible in OneDrive and that only the owner has access. | `VERIFIED via owner confirmation` |
 | The recorded smoke cleanup is complete. | Marker-gated cleanup deleted the current suggestion, marked potential reviewer, and marked linked Contact; independent production read-back found all absent and the source checkpoint cleared. | `VERIFIED` |
+| The reviewer-holistic study still needs an open reproducibility window. | The owner confirmed the study is complete; a tracked privacy-safe closure audit preserves its method, aggregate findings, limits, and decision. | `FALSIFIED via owner confirmation` |
 | A bounded first disposal set exists. | Zero-byte, current-state probe, merge receipt, generated schema, and smoke-log classes have no active tracked consumer after their conclusions or cleanup are verified. | `VERIFIED`, subject to owner approval |
 | Exact retention periods are established. | No repository policy or owner decision defines them. | `UNKNOWN` |
 
@@ -252,9 +257,9 @@ recovery state.
 
 | Sanitized artifact class | Dependency and reproducibility | Proposed disposition |
 |---|---|---|
-| External reviewer-holistic manifest, proposal evaluation, and cohort | The workflow collectively requires all three: the planner requires manifest plus proposal evaluation; the runtime probe requires proposal evaluation and optionally checks the manifest; validation and execution require the full set. One scored evaluation exists in ignored output but no usable complete bundle exists there. A separate frozen three-file bundle is now restored and passes full validation in the external archive. | **Preserve the verified frozen bundle separately from the scored output.** Cloud presence and owner-only access are confirmed; repin the manifest to the final source commit only if the study remains active and reproducible. |
-| Reviewer-holistic execution checkpoints | Consumed by resume/retry and downstream cohort selection. Reproduction is paid, live-service-dependent, and non-deterministic. | **Preserve — highest priority.** Move only as one verified external bundle. |
-| Reviewer-holistic scoring package and unblinding map | Supports scoring, audit, and research. Reproduction depends on the execution chain, exact seed, and external inputs. | **Preserve securely.** Apply narrower access to the unblinding map. |
+| External reviewer-holistic manifest, proposal evaluation, and cohort | The completed workflow required all three. A separate frozen three-file bundle is restored and passes full validation in the external archive. The tracked closure audit now preserves the privacy-safe method and decision. | **Controlled disposal candidate.** The study and reproducibility window are closed; no manifest repin is required. Retain until exact-path approval and aggregate deletion receipt. |
+| Reviewer-holistic execution checkpoints | Supported resume/retry and downstream cohort selection during the completed study. Reproduction was paid, live-service-dependent, and non-deterministic. | **Controlled disposal candidate.** No longer operational recovery state; retain only until exact-path approval and aggregate deletion receipt. |
+| Reviewer-holistic scoring package and unblinding map | Supports the private row-level audit trail. The tracked closure audit preserves aggregate findings and limitations without identifiers. | **Controlled disposal candidate.** Keep access narrow until exact-path approval; do not publish the unblinding map. |
 | Reviewer identity/email research and chained evaluation outputs | Fourteen files are exactly referenced by tracked code; other results support manual judgments and experiment history. | **Preserve code-linked chain.** Review remaining files individually; do not bulk-delete the folder. |
 | Review-form production probe receipts | Current state can be reprobed, but the historical state and durable claims cannot be reconstructed exactly. | **Preserve until sanitized tracked receipts replace any citations**, then archive or dispose. |
 | Smoke-test candidate state | The marker-gated production cleanup and independent read-back are complete; no person, suggestion, or Contact remains. The source checkpoint was cleared automatically, while the preserved OneDrive copy remains. | **Dispose of the preserved checkpoint** after the aggregate cleanup receipt is accepted. |
@@ -285,14 +290,13 @@ owner decision. The safest current rules are event-based:
    OneDrive storage class is selected and the local copy satisfies those mode
    requirements. The owner confirmed cloud presence and owner-only access;
    encryption and backup remain platform controls.
-2. **Preserve a coherent experiment bundle.** Keep the verified three-file
-   input contract, execution checkpoints, scoring package, unblinding map,
-   exact randomization seed, final source commit, and a sanitized inventory
-   receipt together. Keep the seed in controlled secret storage, never tracked
-   documentation. If the owner explicitly closes the reproducibility window
-   or the seed is already unavailable, a non-reversible receipt may document
-   that fact, but it cannot substitute for the seed; label the retained bundle
-   audit-only and non-reproducible.
+2. **Close completed experiment bundles deliberately.** The owner closed the
+   reviewer-holistic reproducibility window after the verified external copy.
+   Its tracked closure audit now preserves privacy-safe design, aggregate
+   findings, limitations, and the decision. The raw input, execution, scoring,
+   unblinding, and seed bundle is audit-only pending an exact private disposal
+   review; it does not require repinning or indefinite reproducibility
+   retention.
 3. **Finish cleanup-dependent workflows.** Retain exact marker/state files
    until read-back proves that synthetic rows are gone. The state file should
    be deleted after verified cleanup so stale identifiers cannot be mistaken
@@ -316,10 +320,11 @@ owner decision. The safest current rules are event-based:
 1. **Complete:** the owner selected the WMKF organizational OneDrive
    destination. The local copy is owner-only and byte-verified; the owner
    confirmed cloud presence and owner-only access.
-2. **Partial:** the scored proposal evaluation and exact seed are preserved.
-   The missing frozen manifest/cohort contract was recovered from history and
-   passes the full validator in the external archive. Manifest repinning is
-   pending if the study remains active.
+2. **Complete:** the scored proposal evaluation and exact seed are preserved,
+   and the recovered frozen manifest/cohort contract passes the full validator
+   in the external archive. The owner closed the study and reproducibility
+   window; a privacy-safe tracked audit preserves its design and findings, and
+   manifest repinning is not required.
 3. **Partial:** the load-bearing reviewer-holistic execution/scoring chain and
    review-form evidence are copied and byte-verified. Sole-copy final
    deliverables outside those directories still require review.
@@ -337,20 +342,20 @@ owner decision. The safest current rules are event-based:
 
 ## Owner decisions required
 
-1. Is the reviewer-holistic study still active, or may its preservation window
-   close after the external bundle is verified?
-2. Are the application-research and Contact-ORCID back-propagation rollback
+1. Are the application-research and Contact-ORCID back-propagation rollback
    windows closed?
-3. Are any rendered decks, workbooks, documents, PDFs, or images the sole
+2. Are any rendered decks, workbooks, documents, PDFs, or images the sole
    authoritative final copy?
-4. May the preserved smoke checkpoint and first-wave disposal candidates be
-   deleted after a private exact-path review and aggregate receipt?
+3. May the reviewer-holistic raw bundle, preserved smoke checkpoint, and
+   first-wave disposal candidates be deleted after a private exact-path review
+   and aggregate receipt?
 
 The missing reviewer-holistic input contract is restored and verified in the
-external archive, and the owner confirmed cloud presence and owner-only
-access. Until retention-window and exact disposal decisions are recorded, the
-ignored-local component of the public PII/history audit remains
-`CLAIM NOT RECONCILED`.
+external archive, the study and reproducibility window are closed, and its
+privacy-safe design and findings are tracked. The owner also confirmed cloud
+presence and owner-only access. Until the remaining rollback, final-copy, and
+exact disposal decisions are recorded, the ignored-local component of the
+public PII/history audit remains `CLAIM NOT RECONCILED`.
 
 ## Privacy-safe reproducibility
 
