@@ -115,8 +115,9 @@ CI runtime, and deployed the result to production.
 
 2. **Retired-table operational scripts.**
    Evidence: `docs/CURRENT_WORK_QUEUE.md`; `scripts/README.md`.
-   Twenty-five non-archive scripts still mention the dropped
-   `reviewer_suggestions` table. They are blocked from casual use, but
+   Twenty-five non-archive scripts still mention the
+   historical `reviewer_suggestions` table. It was dropped after the
+   Dataverse drain. They are blocked from casual use, but
    quarantine/removal needs an owner-approved scope and caller review.
 
 3. **Whether reviewer follow-ups should use first names.**
