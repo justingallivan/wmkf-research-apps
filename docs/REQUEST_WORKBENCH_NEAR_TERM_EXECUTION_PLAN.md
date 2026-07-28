@@ -3,10 +3,10 @@ title: "Request Workbench — near-term execution plan"
 domain: architecture
 kind: plan
 status: canonical
-summary: "Evidence-backed critical path for stabilizing review synthesis and designing the remaining Workbench lifecycle before implementation."
+summary: "Evidence-backed critical path: review-synthesis lifecycle implementation is release-pending; remaining Workbench lifecycle design follows."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-07-27
+last_verified: 2026-07-28
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -94,7 +94,7 @@ Completed: v3 is the sole current governed prompt, and the first controlled
 post-fix run persisted valid synthesis with a completed, prompt-linked audit
 row. The three v2 no-write failures remain append-only historical evidence.
 
-### 2. Implement the owner-approved lifecycle
+### 2. Implement the owner-approved lifecycle — implementation prepared 2026-07-28
 
 - Generation readiness: automatic only when every participating invitation is complete.
 - Manual staff override: allow an early run with explicit confirmation.
@@ -122,11 +122,23 @@ row. The three v2 no-write failures remain append-only historical evidence.
 Exit: one documented state machine, one tested readiness calculation, one automatic trigger
 path, and one manual override path.
 
-### 3. Finish Reviews observability
+Tracked branch result: the state machine, exact digest+lifecycle fingerprint,
+manual early-confirmation path, durable Postgres job/currentness ledger, and
+feature-gated automatic drain are implemented with focused tests. Stored output
+is visible independently of submitted count and is labeled Current/Stale from a
+matching completed fingerprint. The branch is not deployed, production migration
+028 is not applied (`to_regclass` returned `NULL` on 2026-07-28), and automatic
+generation remains disabled pending release verification.
+
+### 3. Finish Reviews observability — implementation prepared 2026-07-28
 
 - Surface last-generated time and generation state.
 - Keep generation errors visible and actionable without hiding returned reviews.
 - Record the production-smoke evidence in the Reviews buildout plan.
+
+Tracked branch result: the DTO/UI expose readiness, queued/running/failed state,
+last/current completion time, sanitized failure detail, and Current/Stale status
+without hiding returned reviews. Release and signed-in smoke evidence remain.
 
 ## Week 1–2 — lifecycle design freeze
 

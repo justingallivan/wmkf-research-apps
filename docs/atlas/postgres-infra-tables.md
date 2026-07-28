@@ -96,6 +96,31 @@ One row per applicant submit click (idempotency-keyed). `/api/intake/submit` INS
 **Source of truth:** Postgres-only follow-up ledger. `024_reviewer_acceptance_jobs.sql`.
 One row per reviewer acceptance timestamp (`UNIQUE (suggestion_id, accepted_at)`). `/api/external/review/[token]/respond` stages the row before a fresh Dataverse accept PATCH and returns after the PATCH commits; repeat accepts reuse/requeue the same logical job. Payload schema v2 stores the portal token encrypted (never plaintext) so the asynchronous acceptance email can include a secure `?action=decline` withdrawal link. `/api/cron/drain-reviewer-acceptances` claims ready rows with `FOR UPDATE SKIP LOCKED` + `lease_token`, re-reads `wmkf_appreviewersuggestion`, and runs the formerly-inline accept tail: honorarium/contact capture, self-reported ORCID, board identity, contact name/title sync, mismatch alerts, acceptance confirmation email, and quota notification. Every lease-guarded step/cancel/complete/failure update must return a row; a stale-token no-op is classified as lease loss rather than completion or retry. On self-withdrawal, unlocked active jobs are cancelled; a leased worker remains retryable, re-checks Dataverse after honorarium creation, and removes any late-created linked honorarium before stopping. Drain telemetry records claimed ids plus per-outcome ids, and deployed-smoke attribution consumes only `completedJobIds`. Dataverse `wmkf_appreviewersuggestion` remains the authoritative accepted/declined state; this table records side-effect progress, retry scheduling, terminal deterministic failures, and completion. Stale `accept_pending` rows are cancelled if the Dataverse accept never landed.
 
+### `review_synthesis_jobs` — TRACKED, NOT LIVE-APPLIED
+**Source of truth:** Postgres generation/currentness ledger. Migration
+`028_review_synthesis_jobs.sql`; the production `to_regclass` probe returned
+`NULL` on 2026-07-28, so this section describes tracked branch state, not a live
+table.
+
+One row records one manual generation or one exact automatic input fingerprint.
+`input_hash` is a SHA-256 over the exact answer digest plus participating
+reviewer lifecycle classifications; reviewer text is never stored. Automatic
+rows use `UNIQUE dedupe_key =
+automatic:<requestId>:<inputHash>`. Terminal automatic rows are not silently
+reopened, preserving the three-attempt retry bound. Manual rows use a unique
+generation-scoped key and start under a lease.
+
+`/api/cron/drain-review-syntheses` is inert unless
+`REVIEW_SYNTHESIS_AUTOMATION_ENABLED=true`. When enabled, it scans selected,
+invited/accepted, non-excluded suggestions, fails closed if the Dataverse query
+is capped, enqueues ready fingerprints, and claims a small batch using `FOR
+UPDATE SKIP LOCKED`. Before calling the shared synthesis producer it re-reads
+readiness and cancels a job whose lifecycle or fingerprint changed. Statuses are
+`queued`, `running`, `completed`, `failed`, and `cancelled`; lease, retry,
+last-error, timing, and `wmkf_ai_run` id fields make work observable.
+`akoya_request.wmkf_reviewsynthesisjson` in Dataverse remains the synthesis
+content source of truth.
+
 ## Monitoring / observability
 
 ### `health_check_history` (2,964 rows), `system_alerts` (150 rows), `maintenance_runs` (1,498 rows)

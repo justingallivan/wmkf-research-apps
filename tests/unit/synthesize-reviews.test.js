@@ -29,9 +29,35 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 }));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findByRequest: jest.fn(),
+  APPLICANT_DISPOSITION_EXCLUDED: 100000001,
+  RESPONSE_TYPE_MAP: {
+    accepted: 100000000,
+    declined: 100000001,
+    no_response: 100000002,
+    withdrawn_sufficient: 100000003,
+    held: 100000004,
+  },
+  REVIEW_STATUS_MAP: {
+    accepted: 100000000,
+    materials_sent: 100000001,
+    under_review: 100000002,
+    review_received: 100000003,
+    complete: 100000004,
+    withdrew: 100000005,
+    released: 100000006,
+  },
 }));
 jest.mock('../../lib/services/execute-prompt', () => ({
   executePrompt: jest.fn(),
+}));
+jest.mock('../../lib/services/review-synthesis-job-service', () => ({
+  startManualReviewSynthesisJob: jest.fn(async () => ({
+    id: 1,
+    lease_token: '44444444-4444-4444-8444-444444444444',
+    attempts: 1,
+  })),
+  completeReviewSynthesisJob: jest.fn(async () => ({ id: 1, status: 'completed' })),
+  recordReviewSynthesisJobFailure: jest.fn(async () => ({ id: 1, status: 'failed' })),
 }));
 
 const REQUEST_ID = '550e8400-e29b-41d4-a716-446655440000';
@@ -130,9 +156,27 @@ test('rejects a non-GUID requestId with 400, before any Dataverse call', async (
   expect(suggestionAdapter.findByRequest).not.toHaveBeenCalled();
 });
 
+test('rejects non-boolean overwrite/confirmEarly flags at the route boundary', async () => {
+  const { req, res } = post({
+    requestId: REQUEST_ID,
+    overwrite: 'yes',
+    confirmEarly: 1,
+  });
+  await handler(req, res);
+  expect(res.statusCode).toBe(400);
+  expect(res._data).toMatchObject({ ok: false, reason: 'validation' });
+  expect(suggestionAdapter.findByRequest).not.toHaveBeenCalled();
+});
+
 test('zero submitted reviews → 409 no_submitted_reviews, no LLM call', async () => {
   suggestionAdapter.findByRequest.mockResolvedValue([
-    { wmkf_appreviewersuggestionid: SUGGESTION_ID, wmkf_accepted: true, wmkf_reviewreceivedat: null },
+    {
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      wmkf_selected: true,
+      wmkf_invited: true,
+      wmkf_accepted: true,
+      wmkf_reviewreceivedat: null,
+    },
   ]);
   const { req, res } = post({ requestId: REQUEST_ID });
   await handler(req, res);
@@ -146,6 +190,8 @@ test('already-populated synthesis + no overwrite → 409 already_exists, no LLM 
     {
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
       _wmkf_potentialreviewer_value: PERSON_ID,
+      wmkf_selected: true,
+      wmkf_invited: true,
       wmkf_accepted: true,
       wmkf_reviewreceivedat: '2026-06-01T00:00:00Z',
       wmkf_revieweraffiliation: 'Test University',
@@ -167,6 +213,8 @@ test('overwrite:true bypasses the already-exists gate and passes forceOverwrite 
     {
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
       _wmkf_potentialreviewer_value: PERSON_ID,
+      wmkf_selected: true,
+      wmkf_invited: true,
       wmkf_accepted: true,
       wmkf_reviewreceivedat: '2026-06-01T00:00:00Z',
       wmkf_revieweraffiliation: 'Test University',
@@ -222,6 +270,8 @@ test('200 success pins the full response envelope (ok, synthesis, runId, written
     {
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
       _wmkf_potentialreviewer_value: PERSON_ID,
+      wmkf_selected: true,
+      wmkf_invited: true,
       wmkf_accepted: true,
       wmkf_reviewreceivedat: '2026-06-01T00:00:00Z',
       wmkf_revieweraffiliation: 'Test University',
@@ -248,6 +298,8 @@ test('no prior synthesis (empty memo) proceeds without overwrite flag', async ()
     {
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
       _wmkf_potentialreviewer_value: PERSON_ID,
+      wmkf_selected: true,
+      wmkf_invited: true,
       wmkf_accepted: true,
       wmkf_reviewreceivedat: '2026-06-01T00:00:00Z',
       wmkf_revieweraffiliation: 'Test University',
@@ -277,6 +329,8 @@ test.each([
     {
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
       _wmkf_potentialreviewer_value: PERSON_ID,
+      wmkf_selected: true,
+      wmkf_invited: true,
       wmkf_accepted: true,
       wmkf_reviewreceivedat: '2026-06-01T00:00:00Z',
       wmkf_revieweraffiliation: 'Test University',

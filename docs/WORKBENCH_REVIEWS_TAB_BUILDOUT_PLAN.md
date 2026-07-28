@@ -3,7 +3,7 @@ title: "Workbench Reviews Tab — Consumption Build-Out Plan"
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Reviews tab and synthesis reliability are production-proven; lifecycle readiness and visibility remain."
+summary: "Reviews and synthesis reliability are production-proven; lifecycle readiness/currentness automation is implemented on a release-pending branch."
 canonical: false
 cataloged: 2026-07-03
 last_verified: 2026-07-28
@@ -43,7 +43,10 @@ attempts. On 2026-07-28, version-preserving publication made governed v3
 native JSON schema. The controlled post-fix smoke then completed on its first
 semantic attempt, persisted valid synthesis, and wrote completed AI run
 `20aec518-9f8a-f111-ab0f-6045bd018deb` against prompt version 3. Phase 4
-reliability is production-proven; the lifecycle/readiness behavior remains.
+reliability is production-proven. The lifecycle/readiness extension is now
+implemented and focused-test-proven on a feature branch, but remains
+**UNDEPLOYED**; its Postgres migration is **NOT LIVE-APPLIED** and automatic
+generation remains disabled.
 
 **Verification boundary update (S376):** no genuine external reviewer has used
 the form, but the owner-authorized staged production submission proved the
@@ -61,8 +64,8 @@ restored exactly while the new synthesis and audit remained.
 > The first two paragraphs below describe the pre-build S326 baseline. They are
 > retained as implementation history, not current Workbench behavior. Phases
 > 1–3 now provide Outstanding tracking, comparison/matrix, and DOCX/PDF export.
-> The current gap is the Phase-4 synthesis lifecycle/readiness behavior described
-> in decision 6 and Phase 4.
+> The remaining gap is release and live verification of the Phase-4 synthesis
+> lifecycle/readiness behavior described in decision 6 and Phase 4.
 
 The reviewer-facing submission pipeline is COMPLETE and LIVE (see
 `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md` and
@@ -126,16 +129,14 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
    share the sweep's exclusion/dedupe record so manual + cron cannot double-send.
    Outward-facing email = high-risk surface; the send guard is the review point.
 6. **Synthesis readiness and visibility (owner-confirmed 2026-07-26 and
-   participation semantics confirmed 2026-07-27; planned, not implemented).**
-   The target is automatic synthesis only when all participating invitations
+   participation semantics confirmed 2026-07-27; implemented on the
+   release-pending feature branch 2026-07-28).**
+   Automatic synthesis is allowed only when all participating invitations
    are resolved, with at least one submitted review. Staff may explicitly run
    synthesis earlier as a deliberate manual override after at least one
    submission. Display is independent of generation readiness:
    an existing stored synthesis must remain visible even when there are currently
-   zero submitted reviews. The present implementation does not enforce this
-   contract: it has no automatic trigger, its manual card appears once at least
-   one review is submitted, the route rejects only zero submitted reviews, and
-   the card (including already-stored output) is hidden at zero submissions.
+   zero submitted reviews.
    The readiness population is every selected, not-applicant-excluded suggestion
    that has entered the invitation/engagement lifecycle (`wmkf_invited=true` or
    `wmkf_accepted=true`). A row resolves with review content when
@@ -154,7 +155,13 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
    row's sole resolved-without-review condition; it does not reselect a removed
    row or undo decline/withdraw/release. A synthesis generated before a genuine
    reactivation remains visible but is not current until the population resolves
-   and synthesis runs again.
+   and synthesis runs again. The tracked implementation calculates readiness
+   fail-closed, fingerprints the exact digest plus lifecycle classification,
+   stores only job/hash state in Postgres, leaves content in the Dataverse memo,
+   and exposes Current/Stale plus queued/running/failed state. The automatic cron
+   is inert unless `REVIEW_SYNTHESIS_AUTOMATION_ENABLED` is exactly `true`.
+   **Release boundary:** none of this extension is deployed as of 2026-07-28;
+   production does not yet have `review_synthesis_jobs`.
 
 ## Phases (independently shippable, in order)
 
@@ -239,24 +246,29 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   409 `no_submitted_reviews` on zero submitted reviews (no LLM call); since the
   prompt's output guard is `always-overwrite`, regeneration gating lives at
   this route instead — 409 `already_exists` when a synthesis is already stored
-  and `overwrite` was not passed. Exemplar caller followed:
-  `pages/api/phase-i-dynamics/summarize-v2.js:71-89`.
-- `GET /api/review-manager/reviewers` DTO extended with `proposal.reviewSynthesis`
-  (fail-soft JSON parse of `wmkf_reviewsynthesisjson`, added to the
-  `fetchRequestByIdOrNumber` request-row select).
-- `ReviewsTab`'s Synthesis card (renders only when ≥1 review is submitted):
-  stored synthesis sections or a "Generate synthesis" / "Regenerate" action;
-  plain-text rendering only (LLM output; no `dangerouslySetInnerHTML`).
-- **Known workflow/UI gap (owner decisions 2026-07-26 and 2026-07-27; not yet
-  implemented):**
-  preserve the explicit staff action as the early-run override, add automatic
-  execution only after all reviews are in, and decouple stored synthesis display
-  from readiness so a populated memo is never hidden merely because the current
-  submitted count is zero. The current ≥1 client gate and zero-only service gate
-  are implementation evidence, not the intended final workflow. Implement the
-  participation state machine in governing decision 6, including revoked/expired
-  tokens as resolved-without-review and replacement-token minting as
-  reactivation only for otherwise-participating, nonterminal rows.
+  and `overwrite` was not passed. On the release-pending branch, an early run
+  also requires boolean `confirmEarly:true`, every manual invocation has a
+  leased `review_synthesis_jobs` audit row, and ledger-finalization failure
+  after Dataverse persistence returns an explicit partial 502.
+- `GET /api/review-manager/reviewers` DTO includes
+  `proposal.reviewSynthesis` (fail-soft JSON parse of
+  `wmkf_reviewsynthesisjson`). On the release-pending branch it also retains the
+  proposal at zero accepted rows and projects `proposal.reviewSynthesisState`:
+  fail-closed readiness, exact-fingerprint Current/Stale state, latest job
+  status, timestamps, and sanitized error text. A ledger read failure degrades
+  to unavailable/stale without hiding submitted reviews or stored synthesis.
+- `ReviewsTab`'s Synthesis card renders stored synthesis independently of
+  accepted/submitted count and shows Current/Stale plus readiness and
+  queued/running/failed state. Early manual generation uses an explicit browser
+  confirmation and sends `confirmEarly:true`. LLM output remains plain-text
+  only (no `dangerouslySetInnerHTML`).
+- `/api/cron/drain-review-syntheses` plus
+  `review-synthesis-drain.js` implement the automatic all-in path with an exact
+  request+fingerprint dedupe key, small leased claims, pre-generation
+  readiness/fingerprint revalidation, and three-attempt bounded retries.
+  Terminal fingerprints are not automatically reopened. The route is
+  deployment-safe by default because any value other than exact
+  `REVIEW_SYNTHESIS_AUTOMATION_ENABLED=true` returns an inert response.
 - `shared/utils/review-report.js#composeReviewReport` accepts an optional
   `synthesis` param → `synthesisSection` on the composed report, additive in
   both the DOCX and PDF renderers; `ExportMenu` passes
@@ -288,7 +300,7 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
 ## Verification per phase
 
 Relevant red gates before completion claims: `check:api-routes`(+self-test) and
-`check:route-lifecycle-auth`(+self-test) for any new route; `check:atlas` if any
-Postgres surface changes (none anticipated); unit tests for the DTO extension,
+`check:route-lifecycle-auth`(+self-test) for any new route; `check:atlas`
+(+self-test) for the new Postgres surface; unit tests for the DTO extension,
 matrix derivation (drift/retired/not-asked cases), composition module, and nudge
 dedupe; E2E drive of the tab for each shipped phase.

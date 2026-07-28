@@ -341,10 +341,14 @@ schema-as-code APPLIED TO PROD 2026-07-03 (column live-probed) from
 'reviewers')`, requestId GUID-validated) returns 409 `no_submitted_reviews`
 with zero submitted reviews (no LLM call); since the guard is
 always-overwrite, regeneration gating is enforced at THIS route instead — 409
-`already_exists` unless `overwrite: true` is passed. `GET
-/api/review-manager/reviewers` now projects `proposal.reviewSynthesis`
-(fail-soft JSON parse). `ReviewsTab` renders a Synthesis card (only when ≥1
-review is submitted) with a Generate/Regenerate action, plain-text only (no
+`already_exists` unless `overwrite: true` is passed. The release-pending
+lifecycle extension also requires explicit `confirmEarly:true` while
+participants remain unresolved and records each generation in
+`review_synthesis_jobs`. `GET /api/review-manager/reviewers` projects
+`proposal.reviewSynthesis` (fail-soft JSON parse) and, on the release-pending
+branch, `proposal.reviewSynthesisState`. `ReviewsTab` retains the Synthesis
+card even at zero accepted/submitted reviews, with Current/Stale, readiness,
+and queued/running/failed state. Output is plain-text only (no
 `dangerouslySetInnerHTML`); `composeReviewReport` accepts an optional
 `synthesis` param rendered additively in both export formats. Same
 verification boundary as Phases 2-3: Request #1002788 production-proved the
@@ -372,8 +376,9 @@ persisted valid synthesis, and wrote completed AI run
 deleted the 11 staged answers and restored four parent fields while preserving
 the synthesis and append-only audit. Independent follow-up review returned READY.
 
-**Owner-confirmed target lifecycle (2026-07-26; participation semantics closed
-2026-07-27; NOT YET IMPLEMENTED):** automatic synthesis is intended only after
+**Owner-confirmed lifecycle (2026-07-26; participation semantics closed
+2026-07-27; implemented on release-pending branch 2026-07-28):** automatic
+synthesis runs only after
 all participating invitations resolve and at least one review is submitted;
 staff may explicitly generate it earlier after one submission. Participants are
 selected, not-applicant-excluded rows that entered invitation/engagement
@@ -388,8 +393,12 @@ but regeneration reopens readiness only when token state was the
 otherwise-participating, nonterminal row's sole resolution; it does not reselect
 a removed row or undo decline/withdraw/release. An existing synthesis remains
 visible but is not current until synthesis runs again after genuine reactivation
-and resolution. Current code has no automatic trigger, permits the manual action
-after one submission, and hides the entire Synthesis card at zero. Plan doc:
+and resolution. The exact answer digest plus lifecycle classification is hashed;
+a matching completed ledger row establishes Current state. The feature-gated
+`/api/cron/drain-review-syntheses` uses leased claims and revalidates readiness
+and the fingerprint before generation. It remains inert unless
+`REVIEW_SYNTHESIS_AUTOMATION_ENABLED=true`. **This extension is not deployed and
+migration 028 is not live-applied as of 2026-07-28.** Plan doc:
 `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 ## Email templates (admin org default + per-PD override)

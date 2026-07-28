@@ -82,6 +82,10 @@
       "schedule": "*/2 * * * *"
     },
     {
+      "path": "/api/cron/drain-review-syntheses",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/pricing-canary",
       "schedule": "0 10 * * 1"
     },

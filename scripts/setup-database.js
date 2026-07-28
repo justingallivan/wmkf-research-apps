@@ -542,6 +542,54 @@ const v36Statements = [
      WHERE legacy_decision IS DISTINCT FROM works_decision`,
 ];
 
+// V37: Review synthesis generation ledger and automatic queue. Existing
+// databases use migration 028_review_synthesis_jobs.sql; this fresh-install
+// block creates the same table directly. Review text remains in Dataverse and
+// is never copied into this ledger.
+const v37Statements = [
+  `CREATE TABLE IF NOT EXISTS review_synthesis_jobs (
+    id                    BIGSERIAL PRIMARY KEY,
+    generation_key        UUID NOT NULL UNIQUE,
+    dedupe_key             TEXT NOT NULL UNIQUE,
+    request_id             UUID NOT NULL,
+    input_hash             TEXT NOT NULL,
+    mode                   TEXT NOT NULL,
+    status                 TEXT NOT NULL DEFAULT 'queued',
+    acting_user_system_id  UUID,
+    run_id                 TEXT,
+    attempts               INTEGER NOT NULL DEFAULT 0,
+    last_error             TEXT,
+    next_attempt_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    locked_until           TIMESTAMPTZ,
+    lease_token            UUID,
+    created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    started_at             TIMESTAMPTZ,
+    completed_at           TIMESTAMPTZ,
+    CONSTRAINT review_synthesis_jobs_mode_check
+      CHECK (mode IN ('automatic', 'manual')),
+    CONSTRAINT review_synthesis_jobs_status_check
+      CHECK (status IN ('queued', 'running', 'completed', 'failed', 'cancelled')),
+    CONSTRAINT review_synthesis_jobs_hash_check
+      CHECK (input_hash ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT review_synthesis_jobs_attempts_nonneg
+      CHECK (attempts >= 0),
+    CONSTRAINT review_synthesis_jobs_completed_when_terminal CHECK (
+      (status IN ('completed', 'failed', 'cancelled')) = (completed_at IS NOT NULL)
+    )
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_review_synthesis_jobs_ready
+     ON review_synthesis_jobs (next_attempt_at, locked_until, created_at)
+     WHERE status = 'queued'`,
+  `CREATE INDEX IF NOT EXISTS idx_review_synthesis_jobs_request_latest
+     ON review_synthesis_jobs (request_id, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_review_synthesis_jobs_request_hash_completed
+     ON review_synthesis_jobs (request_id, input_hash, completed_at DESC)
+     WHERE status = 'completed'`,
+  `CREATE INDEX IF NOT EXISTS idx_review_synthesis_jobs_status
+     ON review_synthesis_jobs (status)`,
+];
+
 // V32: model pricing audit history (S181).
 // Monthly drift cron (/api/cron/pricing-refresh) writes one row per
 // (model, token_type) per run. Compared against lib/utils/model-pricing.js;
@@ -1212,6 +1260,24 @@ async function runMigration() {
       }
     }
 
+    // Run V37 table creation (review synthesis generation ledger)
+    console.log(`\nApplying v37 schema updates - Review synthesis jobs (${v37Statements.length} statements)...`);
+    for (let i = 0; i < v37Statements.length; i++) {
+      const statement = v37Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v37-${i + 1}/${v37Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v37-${i + 1}/${v37Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v37-${i + 1}/${v37Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
     console.log('\n✓ Database migration completed successfully!');
     console.log('\nTables created/updated:');
     console.log('  • search_cache (API search result caching)');
@@ -1266,7 +1332,9 @@ async function runMigration() {
     console.log('  • submission_jobs (async submission queue — idempotency-keyed, drained by cron)');
     console.log('\nV35 new tables (Reviewer acceptance follow-up jobs):');
     console.log('  • reviewer_acceptance_jobs (post-accept side-effect queue — drained by cron)');
-    console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35)');
+    console.log('\nV37 new tables (Review synthesis generation jobs):');
+    console.log('  • review_synthesis_jobs (automatic/manual generation ledger — drained by cron)');
+    console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37)');
 
   } catch (error) {
     console.error('\n✗ Migration failed:', error.message);
