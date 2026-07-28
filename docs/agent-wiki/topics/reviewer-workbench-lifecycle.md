@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-27
+last_verified: 2026-07-28
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -398,7 +398,8 @@ a matching completed ledger row establishes Current state. The feature-gated
 `/api/cron/drain-review-syntheses` uses leased claims and revalidates readiness
 and the fingerprint before generation. It remains inert unless
 `REVIEW_SYNTHESIS_AUTOMATION_ENABLED=true`. **This extension is not deployed and
-migration 028 is not live-applied as of 2026-07-28.** Plan doc:
+migration 028 is live-applied with an empty verified table as of 2026-07-28;
+automation remains disabled.** Plan doc:
 `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 ## Email templates (admin org default + per-PD override)

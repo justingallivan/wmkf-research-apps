@@ -45,8 +45,8 @@ semantic attempt, persisted valid synthesis, and wrote completed AI run
 `20aec518-9f8a-f111-ab0f-6045bd018deb` against prompt version 3. Phase 4
 reliability is production-proven. The lifecycle/readiness extension is now
 implemented and focused-test-proven on a feature branch, but remains
-**UNDEPLOYED**; its Postgres migration is **NOT LIVE-APPLIED** and automatic
-generation remains disabled.
+**UNDEPLOYED**; its Postgres migration was applied and live-verified empty on
+2026-07-28, while automatic generation remains disabled.
 
 **Verification boundary update (S376):** no genuine external reviewer has used
 the form, but the owner-authorized staged production submission proved the
@@ -161,7 +161,8 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
    and exposes Current/Stale plus queued/running/failed state. The automatic cron
    is inert unless `REVIEW_SYNTHESIS_AUTOMATION_ENABLED` is exactly `true`.
    **Release boundary:** none of this extension is deployed as of 2026-07-28;
-   production does not yet have `review_synthesis_jobs`.
+   production has the empty, live-verified `review_synthesis_jobs` table, and
+   automation remains disabled.
 
 ## Phases (independently shippable, in order)
 

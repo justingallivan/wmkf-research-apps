@@ -5,8 +5,9 @@
 Session 383 closed the auth-status divergence and routine dependency update,
 reconciled the post-synthesis operational evidence, then implemented the
 owner-approved review-synthesis lifecycle on a deliberate Tier feature branch.
-The lifecycle implementation is committed and fully tested, but it is not
-deployed and its Postgres migration is not applied.
+The lifecycle implementation is committed and fully tested. Draft PR #96 is
+open with all checks green, migration 028 is applied to production Postgres,
+and the code remains undeployed with automation disabled.
 
 ### What Was Completed
 
@@ -54,9 +55,12 @@ deployed and its Postgres migration is not applied.
      catalog.
    - Added
      `docs/audits/AUDIT_REVIEW_SYNTHESIS_LIFECYCLE_2026-07-28.md`.
-   - Read-only production probe:
-     `to_regclass('public.review_synthesis_jobs') = NULL`. The migration is
-     definitively not live-applied as of 2026-07-28.
+   - The release preflight proved the local connection string exactly matched
+     Vercel Production, then `node scripts/apply-migrations.js` applied
+     `028_review_synthesis_jobs.sql` at `2026-07-28T19:25:49.479Z`.
+     Post-apply verification found the empty table with the expected 18
+     columns, eight constraints, and seven indexes. The production automation
+     flag remains absent.
    - Full Jest: 532 suites / 6,317 tests passed. TypeScript and the Next.js
      production build passed. ESLint passed with zero errors and 51 existing
      warnings.
@@ -82,10 +86,11 @@ deployed and its Postgres migration is not applied.
    `docs/audits/AUDIT_REVIEW_SYNTHESIS_LIFECYCLE_2026-07-28.md`;
    `docs/CURRENT_WORK_QUEUE.md`.
    Required order:
-   1. review/push/open the feature PR and obtain green Preview checks;
-   2. apply migration 028 to the existing database with
-      `node scripts/apply-migrations.js`;
-   3. deploy while `REVIEW_SYNTHESIS_AUTOMATION_ENABLED` remains unset;
+   1. ~~review/push/open the feature PR and obtain green Preview checks;~~
+      complete in draft PR #96;
+   2. ~~apply migration 028 to the existing database with
+      `node scripts/apply-migrations.js`;~~ complete and live-verified;
+   3. merge/deploy while `REVIEW_SYNTHESIS_AUTOMATION_ENABLED` remains unset;
    4. perform signed-in manual/read-only Workbench verification and inspect the
       ledger/currentness projection;
    5. enable the exact `true` flag deliberately and redeploy;
@@ -131,9 +136,9 @@ deployed and its Postgres migration is not applied.
 
 ### Verify Before Acting
 
-1. **Do not deploy this branch before migration sequencing is explicit.**
-   Production does not have `review_synthesis_jobs`; manual synthesis now
-   requires that table.
+1. **Production now has the empty `review_synthesis_jobs` table, but the branch
+   is still undeployed.** Keep the release sequence deliberate and deploy with
+   automation unset before any enablement.
 2. **Do not enable automation with the first deployment.** Any value other than
    exact `true` is intentionally inert so historical requests are not
    backfilled unexpectedly.
