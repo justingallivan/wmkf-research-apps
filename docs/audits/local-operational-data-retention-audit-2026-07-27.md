@@ -3,7 +3,7 @@ title: Local Operational Data Retention Audit — 2026-07-27
 domain: security-privacy
 kind: audit
 status: active
-summary: "Privacy-safe retention inventory plus a verified owner-only OneDrive preservation copy; source artifacts remain unchanged and disposition is unresolved."
+summary: "Privacy-safe retention inventory, private OneDrive preservation, and verified smoke cleanup; retention-window and final disposition decisions remain."
 canonical: false
 cataloged: 2026-07-27
 last_verified: 2026-07-27
@@ -56,7 +56,6 @@ to preserve, move, or delete.
 - remote copies, backups, CI artifacts, and files outside the repository;
 - semantic verification of every person, organization, proposal, or financial
   relationship;
-- cloud-side OneDrive sharing membership and upload/sync confirmation; and
 - source permission changes, file moves, or deletion.
 
 The classifiers emitted only aggregate counts. No raw personal value, contact
@@ -71,14 +70,14 @@ tracked report.
 
 The inventory is complete for the stated local scope. The owner selected an
 existing WMKF organizational OneDrive location, and the first preservation
-copy is complete and byte-verified through the local OneDrive mount. The
-retention condition is still not reconciled because cloud-side synchronization
-and access membership have not been independently verified, event-based
-retention decisions remain open, and no exact source deletion set has been
+copy is complete and byte-verified through the local OneDrive mount. The owner
+then confirmed that the files are visible in OneDrive and only the owner has
+access. The retention condition is still not reconciled because event-based
+retention decisions remain open and no exact source deletion set has been
 approved.
 
-The ignored corpus contains 140 files totaling 15,288,067 bytes (about
-14.6 MiB). At least 63 text or structured files contain identity,
+The pre-cleanup ignored corpus contained 140 files totaling 15,288,067 bytes
+(about 14.6 MiB). At least 63 text or structured files contained identity,
 production-record, proposal, reviewer, access, location, or finance signals.
 Fifty-eight of those 63 files have mode `0644`, which allows reads by other
 local accounts under ordinary Unix permission semantics. The 29 Office, PDF,
@@ -111,15 +110,16 @@ access control, retention, recovery, or secure disposal.
 | Ignored operational files are disposable. | Tracked code consumes ignored execution and smoke state; some final deliverables may be sole copies. | `FALSIFIED` |
 | The reviewer-holistic input bundle is locally complete. | The ignored tree has one individually valid scored proposal evaluation but no current manifest or cohort. A separate pre-redaction three-file frozen contract was restored to the external archive and passes the full validator. | Ignored tree: `FALSIFIED`; external restoration: `VERIFIED locally` |
 | Reviewer-holistic execution output is cheaply reproducible. | Reproduction requires external inputs, credentials, an exact randomization seed, live services, paid calls, and non-deterministic responses. | `FALSIFIED` |
-| Current permissions adequately restrict flagged text files. | Fifty-eight of 63 flagged text/structured files have mode `0644`; only five have mode `0600`. | `FALSIFIED` |
+| Baseline source permissions adequately restrict flagged text files. | Fifty-eight of 63 flagged text/structured files had mode `0644`; only five had mode `0600`. | `FALSIFIED` |
 | The preservation copy is byte-complete and owner-only on the local mount. | Sixty-four copied files have zero source/destination checksum mismatches; eight directories are `0700`, all files are `0600`, and no symlink remains. | `VERIFIED locally` |
-| The preservation copy is synchronized and cloud access is correctly bounded. | The local OneDrive mount accepted and reread the copy, but no tenant URL or cloud-side access view was available for independent verification. | `UNKNOWN` |
+| The preservation copy is synchronized and cloud access is correctly bounded. | The owner confirmed that the files are visible in OneDrive and that only the owner has access. | `VERIFIED via owner confirmation` |
+| The recorded smoke cleanup is complete. | Marker-gated cleanup deleted the current suggestion, marked potential reviewer, and marked linked Contact; independent production read-back found all absent and the source checkpoint cleared. | `VERIFIED` |
 | A bounded first disposal set exists. | Zero-byte, current-state probe, merge receipt, generated schema, and smoke-log classes have no active tracked consumer after their conclusions or cleanup are verified. | `VERIFIED`, subject to owner approval |
 | Exact retention periods are established. | No repository policy or owner decision defines them. | `UNKNOWN` |
 
 ## Aggregate inventory
 
-### Location and size
+### Location and size — pre-cleanup baseline
 
 | Sanitized class | Files | Bytes | Notes |
 |---|---:|---:|---|
@@ -129,6 +129,10 @@ access control, retention, recovery, or secure disposal.
 | Ignored generated schema artifact | 1 | 65,843 | Regenerable current-state output |
 | Ignored root smoke receipts | 2 | 32,539 | Reproducible smoke output |
 | **Total** | **140** | **15,288,067** | |
+
+After verified smoke cleanup removed the 286-byte source checkpoint, the
+current scoped corpus is 139 files totaling 15,287,781 bytes. No other scoped
+file changed.
 
 ### Age
 
@@ -192,20 +196,68 @@ changing its target or the source tree. The temporary history-extraction
 directory was deleted after the four recovered files were checksum-verified.
 
 The source-side ignored files were not moved, changed, permissioned, or
-deleted. The local OneDrive mount does not expose authoritative cloud upload
-or sharing status, so cloud synchronization and access membership remain an
-explicit owner-verification gate.
+deleted. The owner confirmed after the copy that the files are visible in
+OneDrive and only the owner has access.
+
+## Smoke cleanup follow-up — 2026-07-27
+
+**Change surface:** one ignored local checkpoint consumed by
+`scripts/smoke-test-candidate.mjs` and
+`scripts/live-reviewer-invite-smoke.mjs`.
+
+**Persistence:** the checkpoint records a production Dataverse potential
+reviewer, reviewer suggestion, request, and test address. Cleanup can delete
+suggestions, the potential reviewer, and a promoted Contact. The source
+commentary expected Contact deletion to fail for missing permission, but this
+live run disproved that stale expectation: the same application identity
+deleted the marker-verified Contact successfully.
+
+A read-only production probe used the repository's explicit
+`DATAVERSE_ALLOW_PROD_READS=yes` acknowledgement and found:
+
+- one complete checkpoint record;
+- the recorded potential reviewer still exists and its normalized name
+  contains the required smoke marker;
+- the potential reviewer links to a Contact found by the test address, and
+  that Contact also contains the smoke marker;
+- the originally recorded suggestion identifier no longer resolves; and
+- exactly one current suggestion remains linked to the recorded potential
+  reviewer.
+
+The cleanup contract remained applicable despite the stale suggestion
+identifier: after the person-level marker gate passed, cleanup queried all
+suggestions linked to the recorded person.
+
+The owner authorized production cleanup. The first attempt used the local
+calendar date rather than the interlock's UTC date; the target interlock denied
+the first DELETE before any write. The retry used the current UTC
+acknowledgement and deleted the one current suggestion, the marked potential
+reviewer, and the marker-verified promoted Contact. The script then cleared the
+local checkpoint.
+
+An independent read-only production verification, using the preserved
+OneDrive checkpoint, proved:
+
+- the potential reviewer is absent;
+- the originally recorded suggestion is absent;
+- zero suggestions remain linked to the recorded person;
+- no Contact remains for the test address; and
+- the local checkpoint is absent.
+
+**Cleanup result:** complete, with no administrator follow-up required. The
+preserved OneDrive checkpoint is now a disposal candidate rather than active
+recovery state.
 
 ## Load-bearing and disposition matrix
 
 | Sanitized artifact class | Dependency and reproducibility | Proposed disposition |
 |---|---|---|
-| External reviewer-holistic manifest, proposal evaluation, and cohort | The workflow collectively requires all three: the planner requires manifest plus proposal evaluation; the runtime probe requires proposal evaluation and optionally checks the manifest; validation and execution require the full set. One scored evaluation exists in ignored output but no usable complete bundle exists there. A separate frozen three-file bundle is now restored and passes full validation in the external archive. | **Preserve the verified frozen bundle separately from the scored output.** Confirm cloud sync/access, and repin the manifest to the final source commit only if the study remains active and reproducible. |
+| External reviewer-holistic manifest, proposal evaluation, and cohort | The workflow collectively requires all three: the planner requires manifest plus proposal evaluation; the runtime probe requires proposal evaluation and optionally checks the manifest; validation and execution require the full set. One scored evaluation exists in ignored output but no usable complete bundle exists there. A separate frozen three-file bundle is now restored and passes full validation in the external archive. | **Preserve the verified frozen bundle separately from the scored output.** Cloud presence and owner-only access are confirmed; repin the manifest to the final source commit only if the study remains active and reproducible. |
 | Reviewer-holistic execution checkpoints | Consumed by resume/retry and downstream cohort selection. Reproduction is paid, live-service-dependent, and non-deterministic. | **Preserve — highest priority.** Move only as one verified external bundle. |
 | Reviewer-holistic scoring package and unblinding map | Supports scoring, audit, and research. Reproduction depends on the execution chain, exact seed, and external inputs. | **Preserve securely.** Apply narrower access to the unblinding map. |
 | Reviewer identity/email research and chained evaluation outputs | Fourteen files are exactly referenced by tracked code; other results support manual judgments and experiment history. | **Preserve code-linked chain.** Review remaining files individually; do not bulk-delete the folder. |
 | Review-form production probe receipts | Current state can be reprobed, but the historical state and durable claims cannot be reconstructed exactly. | **Preserve until sanitized tracked receipts replace any citations**, then archive or dispose. |
-| Smoke-test candidate state | Contains exact record identifiers needed for marker-gated cleanup. | **Do not delete** until cleanup read-back proves no test rows remain. Delete promptly after that proof. |
+| Smoke-test candidate state | The marker-gated production cleanup and independent read-back are complete; no person, suggestion, or Contact remains. The source checkpoint was cleared automatically, while the preserved OneDrive copy remains. | **Dispose of the preserved checkpoint** after the aggregate cleanup receipt is accepted. |
 | Application-research rollback snapshot | No current code reader; source tables were dropped, so the historical rollback evidence is not reproducible. | **Owner decision:** controlled short archive if rollback/audit value remains; otherwise dispose after explicit sign-off. |
 | Contact-ORCID back-propagation checkpoints | Historical decisions are not reproducible, although current state can be reprobed. The one-shot workflow has shipped. | **Short archive or aggregate receipt**, then dispose after owner confirms rollback is no longer required. |
 | Cross-store and contact probes | No tracked downstream consumer; current state is reproducible. | **First-wave disposal candidate** after confirming durable aggregate conclusions. |
@@ -231,8 +283,8 @@ owner decision. The safest current rules are event-based:
    repository. The local staging directory should be owner-only (`0700`) and
    copied files owner-readable/writable only (`0600`). The WMKF organizational
    OneDrive storage class is selected and the local copy satisfies those mode
-   requirements. Cloud sharing membership, synchronization, encryption, and
-   backup remain owner/platform verification items.
+   requirements. The owner confirmed cloud presence and owner-only access;
+   encryption and backup remain platform controls.
 2. **Preserve a coherent experiment bundle.** Keep the verified three-file
    input contract, execution checkpoints, scoring package, unblinding map,
    exact randomization seed, final source commit, and a sanitized inventory
@@ -261,9 +313,9 @@ owner decision. The safest current rules are event-based:
 
 ## Safe execution sequence
 
-1. **Partial:** the owner selected the WMKF organizational OneDrive
-   destination. The local copy is owner-only and byte-verified; cloud sync and
-   access membership still require confirmation.
+1. **Complete:** the owner selected the WMKF organizational OneDrive
+   destination. The local copy is owner-only and byte-verified; the owner
+   confirmed cloud presence and owner-only access.
 2. **Partial:** the scored proposal evaluation and exact seed are preserved.
    The missing frozen manifest/cohort contract was recovered from history and
    passes the full validator in the external archive. Manifest repinning is
@@ -271,8 +323,9 @@ owner decision. The safest current rules are event-based:
 3. **Partial:** the load-bearing reviewer-holistic execution/scoring chain and
    review-form evidence are copied and byte-verified. Sole-copy final
    deliverables outside those directories still require review.
-4. **Pending:** verify and complete marker-gated smoke cleanup before deleting
-   its source state file.
+4. **Complete:** marker-gated cleanup deleted the marked smoke person, its
+   current suggestion, and the marked linked Contact. Independent production
+   read-back proved all are absent, and the source checkpoint is gone.
 5. **Pending:** decide whether the application-research and Contact-ORCID
    back-propagation rollback windows are closed.
 6. **Pending:** produce an exact private candidate list for the approved
@@ -284,21 +337,20 @@ owner decision. The safest current rules are event-based:
 
 ## Owner decisions required
 
-1. Can the owner confirm that OneDrive reports the archive synchronized and
-   that its cloud access membership is limited to approved WMKF users?
-2. Is the reviewer-holistic study still active, or may its preservation window
+1. Is the reviewer-holistic study still active, or may its preservation window
    close after the external bundle is verified?
-3. Are the application-research and Contact-ORCID back-propagation rollback
+2. Are the application-research and Contact-ORCID back-propagation rollback
    windows closed?
-4. Are any rendered decks, workbooks, documents, PDFs, or images the sole
+3. Are any rendered decks, workbooks, documents, PDFs, or images the sole
    authoritative final copy?
-5. May the first-wave disposal candidates be deleted after a private exact-path
-   review and aggregate receipt?
+4. May the preserved smoke checkpoint and first-wave disposal candidates be
+   deleted after a private exact-path review and aggregate receipt?
 
-The missing reviewer-holistic input contract is now restored and locally
-verified in the external archive. Until cloud sync/access, retention-window,
-and exact disposal decisions are recorded, the ignored-local component of the
-public PII/history audit remains `CLAIM NOT RECONCILED`.
+The missing reviewer-holistic input contract is restored and verified in the
+external archive, and the owner confirmed cloud presence and owner-only
+access. Until retention-window and exact disposal decisions are recorded, the
+ignored-local component of the public PII/history audit remains
+`CLAIM NOT RECONCILED`.
 
 ## Privacy-safe reproducibility
 
