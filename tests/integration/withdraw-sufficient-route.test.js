@@ -201,6 +201,29 @@ test('email-send failure still reports the reviewer as withdrawn (state already 
   expect(res._data.results[0].status).toBe('withdrawn_email_failed');
 });
 
+test('reviewed body markup is escaped through renderPlainTextEmailHtml', async () => {
+  findById.mockResolvedValue(pendingRow());
+  const res = await run({
+    requestId: REQ,
+    suggestionIds: [SUG],
+    overrides: {
+      [SUG]: {
+        subject: 'Reviewed subject',
+        bodyText: 'Hello <img src=x onerror="alert(1)">\n\n<script>alert(2)</script>',
+        to: 'rev@example.org',
+      },
+    },
+  });
+
+  expect(res.statusCode).toBe(200);
+  const sent = createAndSendEmail.mock.calls[0][0];
+  expect(sent.subject).toBe('Reviewed subject');
+  expect(sent.body).toContain('&lt;img src=x onerror="alert(1)"&gt;');
+  expect(sent.body).toContain('&lt;script&gt;alert(2)&lt;/script&gt;');
+  expect(sent.body).not.toContain('<img');
+  expect(sent.body).not.toContain('<script>');
+});
+
 // --- Characterization additions (Stage 1 pilot, Route→Service Consolidation Plan) ---
 
 test('wrong HTTP method (GET) -> 405 with Allow: POST, no work performed', async () => {

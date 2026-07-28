@@ -85,6 +85,10 @@ export async function planReviewerCopyMigration({ getSettingStrict, targets = RE
  */
 export async function executeReviewerCopyMigration({ setSetting, plan, dryRun = true, logger = console }) {
   if (dryRun) return { updated: 0, failed: 0 };
+  const readErrors = plan.filter((row) => row.status === 'error');
+  if (readErrors.length > 0) {
+    throw new Error(`Cannot execute reviewer email copy migration: ${readErrors.length} setting read failed`);
+  }
   if (typeof setSetting !== 'function') throw new Error('setSetting is required for execute mode');
   let updated = 0;
   let failed = 0;
@@ -133,32 +137,49 @@ function report(plan, logger = console) {
   }
 }
 
-async function main() {
-  const execute = process.argv.includes('--execute');
+export async function main({
+  execute = process.argv.includes('--execute'),
+  getSettingStrict = null,
+  setSetting = null,
+  logger = console,
+  loadEnvironment = true,
+} = {}) {
   const dryRun = !execute;
-  loadEnvLocal();
+  if (loadEnvironment) loadEnvLocal();
 
-  const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
-  const settings = await import('../lib/services/settings-service.js');
-  enterDynamicsBypassForScript('migrate-reviewer-email-copy');
+  if (typeof getSettingStrict !== 'function') {
+    const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
+    const settings = await import('../lib/services/settings-service.js');
+    enterDynamicsBypassForScript('migrate-reviewer-email-copy');
+    getSettingStrict = settings.getSettingStrict || settings.default?.getSettingStrict;
+    setSetting = setSetting || settings.setSetting || settings.default?.setSetting;
+  }
 
-  console.log(`migrate-reviewer-email-copy: ${dryRun ? 'DRY RUN (pass --execute to write)' : 'EXECUTE'}`);
+  logger.log(`migrate-reviewer-email-copy: ${dryRun ? 'DRY RUN (pass --execute to write)' : 'EXECUTE'}`);
   const plan = await planReviewerCopyMigration({
-    getSettingStrict: settings.getSettingStrict || settings.default?.getSettingStrict,
+    getSettingStrict,
   });
-  report(plan);
+  report(plan, logger);
+
+  const readErrors = plan.filter((row) => row.status === 'error');
+  if (execute && readErrors.length > 0) {
+    logger.error(`ABORTED: ${readErrors.length} setting read failed; no writes were attempted.`);
+    process.exitCode = 1;
+    return { plan, result: { updated: 0, failed: 0 } };
+  }
 
   const result = await executeReviewerCopyMigration({
-    setSetting: settings.setSetting || settings.default?.setSetting,
+    setSetting,
     plan,
     dryRun,
-    logger: console,
+    logger,
   });
 
   const counts = plan.reduce((acc, r) => ({ ...acc, [r.status]: (acc[r.status] || 0) + 1 }), {});
-  console.log(`\ndone: ${JSON.stringify(counts)} updated=${result.updated} failed=${result.failed}`);
-  if (dryRun) console.log('No writes were made. Re-run with --execute to apply.');
-  if (result.failed > 0) process.exitCode = 1;
+  logger.log(`\ndone: ${JSON.stringify(counts)} updated=${result.updated} failed=${result.failed}`);
+  if (dryRun) logger.log('No writes were made. Re-run with --execute to apply.');
+  if (readErrors.length > 0 || result.failed > 0) process.exitCode = 1;
+  return { plan, result };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

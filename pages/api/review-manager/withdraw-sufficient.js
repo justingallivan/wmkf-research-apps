@@ -3,13 +3,13 @@
  *
  * POST /api/review-manager/withdraw-sufficient
  *   body: { requestId: <GUID>, suggestionIds: <GUID[]>,
- *           overrides?: { <suggestionId>: { subject?, bodyText? } } }
+ *           overrides?: { <suggestionId>: { subject?, bodyText?, to? } } }
  *   → { ok: true, withdrawn: N, results: [{ suggestionId, status }] }
  *
- * `overrides` carries staff edits from the review-before-send modal (rendered by
- * POST /api/review-manager/render-withdraw-emails). Subject/body only — the
- * recipient is always re-derived server-side, so an edited draft cannot redirect
- * the email. Omitting it reproduces the original fixed-template behavior.
+ * `overrides` carries complete staff-reviewed copy plus the previewed recipient.
+ * The recipient is always re-derived server-side; `to` is only an expected-value
+ * binding and can never redirect the email. Omitting the override reproduces the
+ * original fixed-template behavior.
  *
  * Thin route shell (Route→Service Consolidation Plan, Stage 1 pilot): method
  * dispatch → auth guard → input validation → withDalContext → one service
@@ -56,23 +56,32 @@ export default async function handler(req, res) {
 
   // Staff edits, keyed by suggestion. Keys are GUID-validated and narrowed to the
   // selected suggestionIds, so a key for an unrelated row is dropped rather than
-  // carried into the service. Values are reduced to subject/bodyText strings —
-  // never a recipient — so an edited draft cannot redirect the email.
+  // carried into the service. Mixed-case GUID keys are canonicalized to the
+  // submitted suggestionId. Values are reduced to own string subject/bodyText/to
+  // properties; `to` is an expected-recipient binding, never a send destination.
   let overrides = null;
   const rawOverrides = req.body?.overrides;
   if (rawOverrides !== undefined && rawOverrides !== null) {
     if (typeof rawOverrides !== 'object' || Array.isArray(rawOverrides)) {
       return res.status(400).json({ error: 'overrides must be an object keyed by suggestionId' });
     }
-    const selected = new Set(suggestionIds.map((id) => id.toLowerCase()));
-    overrides = {};
+    const selected = new Map(suggestionIds.map((id) => [id.toLowerCase(), id]));
+    overrides = Object.create(null);
     for (const [key, value] of Object.entries(rawOverrides)) {
-      if (!isGuid(key) || !selected.has(key.toLowerCase())) continue;
-      if (!value || typeof value !== 'object') continue;
+      const canonicalId = selected.get(String(key).toLowerCase());
+      if (!isGuid(key) || !canonicalId) continue;
+      if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
       const entry = {};
-      if (typeof value.subject === 'string') entry.subject = value.subject;
-      if (typeof value.bodyText === 'string') entry.bodyText = value.bodyText;
-      if (Object.keys(entry).length > 0) overrides[key] = entry;
+      if (Object.prototype.hasOwnProperty.call(value, 'subject') && typeof value.subject === 'string') {
+        entry.subject = value.subject;
+      }
+      if (Object.prototype.hasOwnProperty.call(value, 'bodyText') && typeof value.bodyText === 'string') {
+        entry.bodyText = value.bodyText;
+      }
+      if (Object.prototype.hasOwnProperty.call(value, 'to') && typeof value.to === 'string') {
+        entry.to = value.to;
+      }
+      if (Object.keys(entry).length > 0) overrides[canonicalId] = entry;
     }
   }
 

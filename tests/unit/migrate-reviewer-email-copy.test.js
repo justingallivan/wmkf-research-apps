@@ -11,6 +11,9 @@ const {
   executeReviewerCopyMigration,
   REVIEWER_BODY_TARGETS,
 } = require('../../scripts/migrate-reviewer-email-copy.mjs');
+const { spawnSync } = require('child_process');
+const path = require('path');
+const { pathToFileURL } = require('url');
 
 const TARGETS = [
   { key: 'email.reviewer_withdraw.body', desired: 'NEW WITHDRAW' },
@@ -76,11 +79,10 @@ describe('planReviewerCopyMigration', () => {
     }
   });
 
-  test('no body adds its own closing line — {{signature}} already carries one', () => {
-    // The per-PD signature block is free text and in production begins with a
-    // closing ("Thank you,\nJean\n--\n…"). A closing in the template therefore
-    // renders "With appreciation,\n\nThank you,\nJean". All four live bodies
-    // omit it; these must match that convention.
+  test('no body hard-codes a closing line — renderers compose one conditionally', () => {
+    // reviewer-email-closing preserves a signature that opens with a valediction
+    // and prepends a default only to bare-name/fallback blocks. The four live
+    // bodies therefore leave the closing out of the stored template.
     const CLOSING = /(thank you|with appreciation|with gratitude|sincerely|best regards|regards|warmly)\s*,?\s*$/i;
     for (const target of REVIEWER_BODY_TARGETS) {
       const beforeSignature = target.desired.split('{{signature}}')[0].trimEnd();
@@ -98,24 +100,27 @@ describe('planReviewerCopyMigration', () => {
 });
 
 describe('executeReviewerCopyMigration', () => {
-  const plan = [
+  const safePlan = [
     { key: 'a', status: 'change', desired: 'A' },
     { key: 'b', status: 'no-change', desired: 'B' },
     { key: 'c', status: 'missing', desired: 'C' },
+  ];
+  const planWithError = [
+    ...safePlan,
     { key: 'd', status: 'error', desired: 'D' },
   ];
 
   test('dry run writes nothing', async () => {
     const setSetting = jest.fn();
-    const result = await executeReviewerCopyMigration({ setSetting, plan, dryRun: true });
+    const result = await executeReviewerCopyMigration({ setSetting, plan: planWithError, dryRun: true });
     expect(setSetting).not.toHaveBeenCalled();
     expect(result).toEqual({ updated: 0, failed: 0 });
   });
 
-  test('execute writes ONLY change rows — missing and error rows are left alone', async () => {
+  test('execute writes ONLY change rows when every read succeeded', async () => {
     const setSetting = jest.fn(async () => true);
     const result = await executeReviewerCopyMigration({
-      setSetting, plan, dryRun: false, logger: { log: () => {}, error: () => {} },
+      setSetting, plan: safePlan, dryRun: false, logger: { log: () => {}, error: () => {} },
     });
     expect(setSetting).toHaveBeenCalledTimes(1);
     expect(setSetting).toHaveBeenCalledWith('a', 'A', null);
@@ -125,15 +130,25 @@ describe('executeReviewerCopyMigration', () => {
   test('a rejected write is counted as failed, not reported as updated', async () => {
     const setSetting = jest.fn(async () => false);
     const result = await executeReviewerCopyMigration({
-      setSetting, plan, dryRun: false, logger: { log: () => {}, error: () => {} },
+      setSetting, plan: safePlan, dryRun: false, logger: { log: () => {}, error: () => {} },
     });
     expect(result).toEqual({ updated: 0, failed: 1 });
   });
 
   test('execute without a setSetting implementation refuses rather than no-oping', async () => {
     await expect(
-      executeReviewerCopyMigration({ setSetting: undefined, plan, dryRun: false }),
+      executeReviewerCopyMigration({ setSetting: undefined, plan: safePlan, dryRun: false }),
     ).rejects.toThrow('setSetting is required');
+  });
+
+  test('execute aborts an error-bearing plan before the first write', async () => {
+    const setSetting = jest.fn(async () => true);
+    await expect(executeReviewerCopyMigration({
+      setSetting,
+      plan: planWithError,
+      dryRun: false,
+    })).rejects.toThrow('setting read failed');
+    expect(setSetting).not.toHaveBeenCalled();
   });
 
   test('re-running against already-migrated settings writes nothing', async () => {
@@ -151,4 +166,29 @@ describe('executeReviewerCopyMigration', () => {
     expect(setSetting).not.toHaveBeenCalled();
     expect(result.updated).toBe(0);
   });
+});
+
+test('CLI main exits nonzero and makes no writes for a mixed change+error plan', () => {
+  const moduleUrl = pathToFileURL(path.resolve(__dirname, '../../scripts/migrate-reviewer-email-copy.mjs')).href;
+  const childScript = `
+    const { main } = await import(${JSON.stringify(moduleUrl)});
+    const getSettingStrict = async (key) => {
+      if (key === 'email.reviewer_acceptance.body') throw new Error('simulated read failure');
+      return { found: true, value: 'OLD COPY' };
+    };
+    const setSetting = async () => {
+      console.log('WRITE_WAS_ATTEMPTED');
+      return true;
+    };
+    await main({ execute: true, getSettingStrict, setSetting, loadEnvironment: false });
+  `;
+  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', childScript], {
+    cwd: path.resolve(__dirname, '../..'),
+    encoding: 'utf8',
+  });
+
+  expect(result.status).toBe(1);
+  expect(result.stdout).not.toContain('WRITE_WAS_ATTEMPTED');
+  expect(result.stderr).not.toContain('WRITE_WAS_ATTEMPTED');
+  expect(`${result.stdout}\n${result.stderr}`).toContain('ABORTED: 1 setting read failed');
 });

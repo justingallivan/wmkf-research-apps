@@ -119,6 +119,17 @@ describe('renderWithdrawPreviews', () => {
     expect(updateLifecycle).not.toHaveBeenCalled();
   });
 
+  test.each([
+    ['null', null],
+    ['empty', ''],
+  ])('a %s request relationship fails closed as wrong_request', async (_label, requestValue) => {
+    findById.mockResolvedValue(pendingRow({ _wmkf_request_value: requestValue }));
+    const { drafts } = await renderWithdrawPreviews({ requestId: REQ, suggestionIds: [SUG] });
+    expect(drafts[0]).toMatchObject({ suggestionId: SUG, status: 'wrong_request' });
+    expect(drafts[0].bodyText).toBeUndefined();
+    expect(updateLifecycle).not.toHaveBeenCalled();
+  });
+
   test('a reviewer with no address is reported, not offered as editable', async () => {
     getReviewerByIdWithSelect.mockResolvedValue({ wmkf_name: 'No Address', wmkf_emailaddress: null });
     const { drafts } = await renderWithdrawPreviews({ requestId: REQ, suggestionIds: [SUG] });
@@ -151,26 +162,68 @@ describe('withdrawSufficient overrides', () => {
       requestId: REQ,
       suggestionIds: [SUG],
       actingUserSystemId: 'u-1',
-      overrides: { [SUG]: { subject: 'A kinder subject', bodyText: 'Dear Karl,\n\nWe are all set — thank you.' } },
+      overrides: {
+        [SUG]: {
+          subject: 'A kinder subject',
+          bodyText: 'Dear Karl,\n\nWe are all set — thank you.',
+          to: 'rev@example.org',
+        },
+      },
     });
 
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(readRequiredEmailDefaults).not.toHaveBeenCalled();
     const sent = createAndSendEmail.mock.calls[0][0];
     expect(sent.subject).toBe('A kinder subject');
     expect(sent.body).toContain('We are all set — thank you.');
     expect(sent.body).not.toContain('Thank you for considering our request');
   });
 
-  test('the recipient is re-derived server-side and cannot be redirected by an edit', async () => {
-    await withdrawSufficient({
+  test('the previewed recipient is a case-insensitive binding, never a redirect destination', async () => {
+    const result = await withdrawSufficient({
       requestId: REQ,
       suggestionIds: [SUG],
       actingUserSystemId: 'u-1',
-      overrides: { [SUG]: { bodyText: 'edited', to: 'attacker@example.com', from: 'attacker@example.com' } },
+      overrides: {
+        [SUG]: {
+          subject: 'Reviewed',
+          bodyText: 'Edited',
+          to: 'REV@EXAMPLE.ORG',
+          from: 'attacker@example.com',
+        },
+      },
     });
+    expect(result.results[0].status).toBe('withdrawn_emailed');
     const sent = createAndSendEmail.mock.calls[0][0];
     expect(sent.to).toBe('rev@example.org');
     expect(sent.from).toBe('pd@keck.org');
+  });
+
+  test('a changed current recipient fails before the lifecycle write', async () => {
+    getReviewerByIdWithSelect.mockResolvedValue({
+      wmkf_name: 'Karl Deisseroth',
+      wmkf_emailaddress: 'new-address@example.org',
+    });
+    const result = await withdrawSufficient({
+      requestId: REQ,
+      suggestionIds: [SUG],
+      actingUserSystemId: 'u-1',
+      overrides: {
+        [SUG]: {
+          subject: 'Reviewed',
+          bodyText: 'Edited',
+          to: 'rev@example.org',
+        },
+      },
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      withdrawn: 0,
+      results: [{ suggestionId: SUG, status: 'recipient_changed' }],
+    });
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
   test('an override for a different suggestion does not affect this one', async () => {

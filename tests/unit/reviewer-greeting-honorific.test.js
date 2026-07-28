@@ -39,9 +39,19 @@ describe('buildReviewerGreeting', () => {
     expect(buildReviewerGreeting(NAME)).toBe('Dear Dr. Deisseroth');
   });
 
-  test('respects an honorific already stored on the name', () => {
-    expect(buildReviewerGreeting('Professor Jane Roe')).toBe('Dear Professor Roe');
-    expect(buildReviewerGreeting('Ms. Jane Roe')).toBe('Dear Ms. Roe');
+  test.each([
+    ['Mrs. Jane Roe', 'Dear Mrs. Roe'],
+    ['Mrs Jane Roe', 'Dear Mrs. Roe'],
+    ['Mr. John Roe', 'Dear Mr. Roe'],
+    ['Mr John Roe', 'Dear Mr. Roe'],
+    ['Ms. Jane Roe', 'Dear Ms. Roe'],
+    ['Ms Jane Roe', 'Dear Ms. Roe'],
+    ['Dr. Jane Roe', 'Dear Dr. Roe'],
+    ['Dr Jane Roe', 'Dear Dr. Roe'],
+    ['Prof. Jane Roe', 'Dear Professor Roe'],
+    ['Prof Jane Roe', 'Dear Professor Roe'],
+  ])('respects dotted and undotted stored honorifics: %s', (storedName, expected) => {
+    expect(buildReviewerGreeting(storedName)).toBe(expected);
   });
 
   test('ignores generational and degree suffixes', () => {
@@ -127,6 +137,65 @@ describe('{{greeting}} renders the honorific form on every reviewer email', () =
   test('invitation path still agrees (single shared definition)', () => {
     const data = buildTemplateData({ name: NAME }, {}, {});
     expect(data.greeting).toBe('Dear Dr. Deisseroth');
+  });
+});
+
+function renderFourActionBodies(signatureBlock) {
+  return {
+    release: buildWithdrawSufficientBodyText({
+      bodyTemplate: REVIEWER_WITHDRAW_SEED_BODY,
+      reviewerName: NAME,
+      title: 'Genomic Lithography',
+      signatureBlock,
+    }),
+    respondReminder: buildRespondReminderBodyText({
+      bodyTemplate: REVIEWER_REMINDER_RESPOND_BY_SEED_BODY,
+      reviewerName: NAME,
+      title: 'Genomic Lithography',
+      signatureBlock,
+    }),
+    reviewDueReminder: buildReviewDueReminderBodyText({
+      bodyTemplate: REVIEWER_REMINDER_REVIEW_DUE_SEED_BODY,
+      reviewerName: NAME,
+      title: 'Genomic Lithography',
+      reviewDueDate: '2026-09-01',
+      signatureBlock,
+    }),
+    acceptance: renderAcceptanceConfirmationEmail({
+      subjectTemplate: 'Review accepted',
+      bodyTemplate: REVIEWER_ACCEPTANCE_SEED_BODY,
+      reviewer: { wmkf_name: NAME },
+      request: { akoya_title: 'Genomic Lithography' },
+      signatureBlock,
+      programDirector: { name: 'Jean Kim', email: 'jkim@wmkeck.org' },
+      withdrawUrl: 'https://example.org/w',
+    }).body,
+  };
+}
+
+describe('conditional closing composition across all four reviewer action bodies', () => {
+  test('a signature that opens with a valediction is preserved without a second closing', () => {
+    const bodies = renderFourActionBodies({
+      signature: 'Thank you,\nJean Kim\nW. M. Keck Foundation',
+    });
+    for (const [bodyName, body] of Object.entries(bodies)) {
+      expect({ bodyName, body }).toEqual({
+        bodyName,
+        body: expect.stringContaining('Thank you,'),
+      });
+      expect((body.match(/Thank you,/g) || [])).toHaveLength(1);
+      expect(body).not.toContain('With appreciation,');
+    }
+  });
+
+  test.each([
+    ['bare name', { signature: 'Jean Kim\nW. M. Keck Foundation' }],
+    ['fallback', null],
+  ])('a %s signature receives one default closing', (_label, signatureBlock) => {
+    const bodies = renderFourActionBodies(signatureBlock);
+    for (const body of Object.values(bodies)) {
+      expect((body.match(/With appreciation,/g) || [])).toHaveLength(1);
+    }
   });
 });
 

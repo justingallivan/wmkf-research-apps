@@ -25,7 +25,7 @@
  *   - onReleased() — called after a successful release so the parent can refresh
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const EXCLUDED_REASON = {
   not_found: 'No longer in this request',
@@ -36,6 +36,20 @@ const EXCLUDED_REASON = {
   defaults_unavailable: 'The withdrawal email template is missing or blank in Admin',
 };
 
+const SEND_RESULT_REASON = {
+  withdrawn_email_failed: 'The reviewer was released, but the email failed',
+  withdrawn_email_skipped: 'The reviewer was released, but the email template was unavailable',
+  withdrawn_no_email: 'The reviewer was released, but no email address was available',
+  withdrawn_no_pd: 'The reviewer was released, but no active Program Director could send the email',
+  recipient_changed: 'The reviewer’s email address changed after preview; reopen and review the updated recipient',
+  not_pending: 'The reviewer already responded or was already closed',
+  changed_skipped: 'The reviewer changed status while the release was being sent',
+  write_failed: 'The invitation could not be closed',
+  not_found: 'The reviewer is no longer available',
+  wrong_request: 'The reviewer no longer belongs to this request',
+  missing_result: 'The server did not return a result for this reviewer',
+};
+
 export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, onReleased }) {
   const [drafts, setDrafts] = useState(null);
   const [edits, setEdits] = useState({}); // suggestionId -> { subject?, bodyText? }
@@ -43,6 +57,9 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
   const [loadError, setLoadError] = useState(null);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(null);
+  const mountedRef = useRef(true);
+  const sendGenerationRef = useRef(0);
+  const sendingRef = useRef(false);
 
   useEffect(() => {
     // No setLoading(true)/setLoadError(null) here: initial state already is
@@ -66,6 +83,11 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
     return () => { cancelled = true; };
   }, [requestId, suggestionIds]);
 
+  useEffect(() => () => {
+    mountedRef.current = false;
+    sendGenerationRef.current += 1;
+  }, []);
+
   const sendable = useMemo(() => (drafts || []).filter((d) => d.status === 'ok'), [drafts]);
   const excluded = useMemo(() => (drafts || []).filter((d) => d.status !== 'ok'), [drafts]);
 
@@ -79,8 +101,13 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
   // which is not what someone who just cleared the box expects. Block instead.
   const blankEdit = sendable.some((d) => !String(valueFor(d, 'subject')).trim() || !String(valueFor(d, 'bodyText')).trim());
 
+  const requestClose = () => {
+    if (sendingRef.current) return;
+    onClose();
+  };
+
   const handleSend = async () => {
-    if (sendable.length === 0 || sending || blankEdit) return;
+    if (sendable.length === 0 || sendingRef.current || blankEdit) return;
     const n = sendable.length;
     const ok = window.confirm(
       `Send and release ${n} reviewer${n === 1 ? '' : 's'}? `
@@ -88,19 +115,22 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
     );
     if (!ok) return;
 
+    const sendGeneration = sendGenerationRef.current + 1;
+    sendGenerationRef.current = sendGeneration;
+    sendingRef.current = true;
     setSending(true);
     setSendError(null);
     try {
-      // Send only edits for rows still being released, and only fields that
-      // actually differ from what the server rendered.
+      // Bind the send to the complete copy and recipient staff reviewed. The
+      // server still re-derives the recipient and treats `to` only as an
+      // expected-value guard; it can never redirect the email.
       const overrides = {};
       for (const draft of sendable) {
-        const entry = {};
-        const subject = valueFor(draft, 'subject');
-        const bodyText = valueFor(draft, 'bodyText');
-        if (subject !== draft.subject) entry.subject = subject;
-        if (bodyText !== draft.bodyText) entry.bodyText = bodyText;
-        if (Object.keys(entry).length > 0) overrides[draft.suggestionId] = entry;
+        overrides[draft.suggestionId] = {
+          subject: valueFor(draft, 'subject'),
+          bodyText: valueFor(draft, 'bodyText'),
+          to: draft.to,
+        };
       }
 
       const resp = await fetch('/api/review-manager/withdraw-sufficient', {
@@ -113,36 +143,62 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
         }),
       });
       const data = await resp.json().catch(() => ({}));
+      if (!mountedRef.current || sendGeneration !== sendGenerationRef.current) return;
       if (!resp.ok) {
         setSendError(data.error || `Release failed (${resp.status})`);
         return;
       }
-      // Partial success is normal here (a reviewer can accept mid-flight), so
-      // surface per-row failures instead of reporting a clean success.
-      const failed = (data.results || []).filter((r) => !String(r.status).startsWith('withdrawn'));
+
+      // Only an explicitly emailed row is a clean success. Every other status,
+      // including all "withdrawn_*" email failures, remains named and visible.
+      const resultById = new Map((Array.isArray(data.results) ? data.results : [])
+        .map((result) => [String(result.suggestionId).toLowerCase(), result]));
+      const outcomes = sendable.map((draft) => ({
+        draft,
+        result: resultById.get(String(draft.suggestionId).toLowerCase())
+          || { suggestionId: draft.suggestionId, status: 'missing_result' },
+      }));
+      const failed = outcomes.filter(({ result }) => result.status !== 'withdrawn_emailed');
       if (failed.length > 0) {
+        const emailed = outcomes.length - failed.length;
         setSendError(
-          `${data.withdrawn || 0} released. ${failed.length} skipped: `
-          + failed.map((r) => r.status).join(', '),
+          `${emailed} emailed. ${failed.length} issue${failed.length === 1 ? '' : 's'}: `
+          + failed.map(({ draft, result }) => (
+            `${draft.name || draft.suggestionId} — ${SEND_RESULT_REASON[result.status] || result.status}`
+          )).join('; '),
         );
-        if (onReleased) onReleased();
+        if ((data.withdrawn || 0) > 0 && onReleased) onReleased(data.results || []);
         return;
       }
-      if (onReleased) onReleased();
+      if (onReleased) onReleased(data.results || []);
+      sendingRef.current = false;
       onClose();
     } catch (err) {
-      setSendError(`Network error: ${err.message}`);
+      if (mountedRef.current && sendGeneration === sendGenerationRef.current) {
+        setSendError(`Network error: ${err.message}`);
+      }
     } finally {
-      setSending(false);
+      if (mountedRef.current && sendGeneration === sendGenerationRef.current) {
+        sendingRef.current = false;
+        setSending(false);
+      }
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={requestClose}>
       <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
           <h3 className="font-semibold text-gray-900">Review release emails</h3>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600" aria-label="Close">✕</button>
+          <button
+            type="button"
+            onClick={requestClose}
+            disabled={sending}
+            className="text-gray-400 hover:text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label="Close"
+          >
+            ✕
+          </button>
         </div>
 
         <div className="p-4 space-y-4">
@@ -206,7 +262,12 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
           {sendError && <p className="text-sm text-red-600">{sendError}</p>}
 
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800">
+            <button
+              type="button"
+              onClick={requestClose}
+              disabled={sending}
+              className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               Cancel
             </button>
             <button
