@@ -88,13 +88,15 @@ deployed before the migration; a fresh dry run captured all four prior values;
 the execute wrote four rows with zero failures; and a second dry run reported
 all four `no-change`.
 
-Still outstanding:
+Post-handoff follow-up completed:
 
-1. **[UNVERIFIED]** Outgoing Server-Side Sync on the configured role
-   mailbox. The sender resolves, but if SSS is not enabled the send fails *after*
-   resolution and `notify()` swallows it [VERIFIED via
-   `lib/services/notification-service.js:85-88`] — alert email would stop
-   silently while dashboard alerts keep working.
+1. **[VERIFIED 2026-07-28]** Outgoing Server-Side Sync works on the configured
+   role mailbox. A controlled self-addressed message sent through
+   `DynamicsService.createAndSendEmail` moved from `Pending Send` to `Sent`
+   after 20 seconds with one delivery attempt. The sender now has end-to-end
+   production transport proof; `notify()` still deliberately swallows a future
+   send failure while retaining the dashboard alert
+   (`lib/services/notification-service.js:85-88`).
 ---
 
 ## Part 3 — Review history

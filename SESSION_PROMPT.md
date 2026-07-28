@@ -75,15 +75,7 @@ CI runtime, and deployed the result to production.
    all-in readiness, explicit staff early-run override, stored-output
    visibility, and observable regeneration.
 
-2. **Verify outgoing Server-Side Sync on the configured role mailbox.**
-   Evidence: `docs/TODO_EMAIL_NOTIFICATIONS.md`;
-   `docs/CLAUDE_TO_CODEX_HANDOFF_2026-07-27.md`.
-   Sender resolution is proven, but mailbox SSS remains explicitly
-   unverified. A post-resolution send failure is logged and swallowed while
-   the dashboard alert persists, so email delivery can stop without breaking
-   alert storage.
-
-3. **Execute Q9 app-access Stage 4 when it reaches the product sequence.**
+2. **Execute Q9 app-access Stage 4 when it reaches the product sequence.**
    Evidence: `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md`;
    `.claude-memory/project-app-access-control.md`.
    Stage 2 acceptance is satisfied and Stage 4 remains ready, not executed.
@@ -91,14 +83,14 @@ CI runtime, and deployed the result to production.
    reversible grant/revoke restoration, authenticated override check, and
    production log watch.
 
-4. **Resolve or explicitly defer the P1 auth-status policy divergence.**
+3. **Resolve or explicitly defer the P1 auth-status policy divergence.**
    Evidence: `docs/CURRENT_WORK_QUEUE.md`; `pages/api/auth/status.js`;
    `lib/utils/auth-policy.js`.
    The public status endpoint can report `enabled:false` while
    production-mode server enforcement remains on. Use `/contract-reconcile`
    before changing this client-bootstrap/server-enforcement contract.
 
-5. **Triage routine Dependabot PR #94 separately from the security release.**
+4. **Triage routine Dependabot PR #94 separately from the security release.**
    Evidence: GitHub PR #94 and the live Dependabot alert API on 2026-07-28.
    The PR contains 11 ordinary minor/patch updates, changes only
    `package.json`/`package-lock.json`, and currently has green automated checks.

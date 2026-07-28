@@ -97,14 +97,18 @@ State of this change:
   row identity, access metadata, and display value are intentionally omitted
   from public documentation. The owner reviewed and accepted the visible sender
   name; no `systemuser` edit is required.
-- **[UNVERIFIED]** Outgoing Server-Side Sync state on the related `mailboxes`
-  row. If outgoing SSS is not enabled and succeeding for this mailbox, the send
-  fails *after* the sender resolves. `notify()` catches any such failure and logs
-  "email failed (alert still stored)", so **alert email delivery would stop
-  silently while dashboard alerts keep working** — verified at
-  `lib/services/notification-service.js:85-88`. Check the `mailboxes` row for this
-  systemuser, or the Power Platform admin UI under Email Configuration →
-  Mailboxes, before relying on alert email.
+- **[VERIFIED 2026-07-28 via controlled production send]** Outgoing
+  Server-Side Sync succeeds for the configured role mailbox. A clearly labeled,
+  self-addressed `alerts@wmkeck.org` verification message was created through
+  the same `DynamicsService.createAndSendEmail` transport used by
+  `NotificationService`. The email moved from `Pending Send` with zero delivery
+  attempts to `Sent` after 20 seconds with one delivery attempt. The app
+  registration can resolve the system user and its default-mailbox lookup but
+  does not have direct ReadAccess to the mailbox row; the observed terminal
+  send state is therefore the stronger end-to-end proof. The best-effort
+  failure caveat still applies to future incidents: `notify()` catches send
+  failures and keeps the dashboard alert durable
+  (`lib/services/notification-service.js:85-88`).
 - **[VERIFIED via owner report, session 2026-07-27]** `NOTIFICATION_EMAIL_FROM`
   and `SCHOLARLY_POLITE_MAILTO` were both set to `alerts@wmkeck.org` in Vercel and
   a deploy was started. Not independently confirmed here — Vercel sensitive env
