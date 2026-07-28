@@ -35,6 +35,23 @@ privacy-safe evidence. This closes only the ignored local regular-file
 component; reachable public Git history remains unresolved under
 `docs/audits/public-repository-pii-history-audit-2026-07-27.md`.
 
+## Public Git History Remediation — Owner Decisions Pending
+
+Read-only GitHub preflight and a disposable `git-filter-repo` simulation are
+complete. The public repository currently has 68 branch refs, one tag, 91 PR
+head refs, nine PR merge refs, nine open PRs, 1,942 Actions artifacts, zero
+forks, and four linked local worktrees. Two worktrees contain untracked files.
+
+The targeted simulation selected 694 non-current historical blobs across 65
+audited paths plus three history-only commit-message contacts. It removed all
+selected objects/values, preserved the current public `main` tree exactly, and
+passed object-integrity checks. All 91 PR head refs changed, so a real rewrite
+requires GitHub Support cleanup and full old-clone invalidation.
+
+No external or destructive action is yet authorized. Use
+`docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md` for the execution invariants,
+alternatives, exact decision list, and final-freeze requirement.
+
 ## Session 378 Summary
 
 Session 378 executed the owner-authorized production review-synthesis smoke on

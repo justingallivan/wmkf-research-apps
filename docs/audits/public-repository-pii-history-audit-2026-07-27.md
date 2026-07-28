@@ -12,6 +12,7 @@ related:
   - docs/audits/documentation-memory-hygiene-sweep-2026-07-27.md
   - docs/audits/local-operational-data-retention-audit-2026-07-27.md
   - docs/audits/local-operational-source-disposal-receipt-2026-07-27.md
+  - docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md
   - docs/CREDENTIALS_RUNBOOK.md
   - docs/CI_GATES_REFERENCE.md
   - .gitignore
@@ -643,6 +644,30 @@ A history rewrite would require explicit authorization, a backup and rollback
 plan, force-push coordination, clone invalidation, fork/cache/artifact review,
 and post-rewrite verification. None of those destructive actions was performed
 by this audit.
+
+### Pre-rewrite planning follow-up — 2026-07-27
+
+Read-only GitHub and local preflight found a public repository with 68 branch
+refs, one lightweight tag, 91 pull-request head refs, nine pull-request merge
+refs, nine open PRs, 1,942 Actions artifacts, zero forks, zero releases, one
+direct collaborator, and no branch protection or repository ruleset. Four
+linked local worktrees exist, and two have untracked changes that must be
+preserved or closed before any rewrite.
+
+An official `git-filter-repo` 2.47.0 simulation in a disposable mirror selected
+694 non-current historical blobs across 65 audited paths and three
+history-only commit-message contact values. It removed every selected value,
+preserved the current `main` tree exactly, and passed Git object-integrity
+verification. The rewrite changed 169 refs, including all 91 PR head refs, and
+rewrote 3,385 of 3,400 commits because the affected graph includes signed
+early history. This makes PR-ref cleanup and old-clone invalidation mandatory,
+not optional.
+
+The privacy-safe execution strategy, invariants, alternatives, dry-run counts,
+and owner decisions are recorded in
+`docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md`. The simulation did not mutate
+the repository, GitHub refs, pull requests, artifacts, visibility, local
+worktrees, or deployments.
 
 ### Prevention
 
