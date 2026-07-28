@@ -3,13 +3,16 @@ title: Public Repository PII and History Audit — 2026-07-27
 domain: security-privacy
 kind: audit
 status: active
-summary: "Baseline public-repository privacy audit plus a current-tree remediation follow-up; reachable history and ignored local retention remain unresolved."
+summary: "Public-repository privacy audit: one retired current-tree roster duplicate and reachable public history remain unresolved; ignored-source disposal is complete."
 canonical: false
 cataloged: 2026-07-27
 last_verified: 2026-07-27
 owner: product-engineering
 related:
   - docs/audits/documentation-memory-hygiene-sweep-2026-07-27.md
+  - docs/audits/local-operational-data-retention-audit-2026-07-27.md
+  - docs/audits/local-operational-source-disposal-receipt-2026-07-27.md
+  - docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md
   - docs/CREDENTIALS_RUNBOOK.md
   - docs/CI_GATES_REFERENCE.md
   - .gitignore
@@ -63,9 +66,10 @@ were not copied into this report.
 - destructive remediation, history rewrite, force-push, clone invalidation,
   credential rotation, notification, or local evidence deletion.
 
-The excluded destructive and external actions require an explicit owner
-decision. This audit performed no live data writes and changed no repository
-history.
+The excluded history and external actions require an explicit owner decision.
+The baseline audit performed no live data writes, local deletion, or history
+rewrite. A later owner-approved follow-up disposed only the exact ignored
+repository-side regular-file scope after private preservation.
 
 ## Executive verdict
 
@@ -74,18 +78,37 @@ history.
 **Verdict: `CLAIM NOT RECONCILED`.**
 
 The baseline audit is complete, but the overall privacy condition is not
-reconciled. The original tracked-tree findings have now been remediated on the
-current branch: audited raw evidence was replaced with aggregate receipts,
-operational identities were externalized, test identities were replaced with
-reserved fixtures, named access mappings were removed, genuine contact
-addresses were removed from current memory, and the production proposal
-evaluation bundle was externalized behind explicit file inputs.
+reconciled. The original tracked-tree findings were remediated on the current
+branch: audited raw evidence was replaced with aggregate receipts, operational
+identities were externalized, test identities were replaced with reserved
+fixtures, named access mappings were removed, genuine contact addresses were
+removed from current memory, and the production proposal evaluation bundle
+was externalized behind explicit file inputs.
 
-This follow-up does not rewrite reachable public history or dispose of ignored
-local evidence. Earlier revisions still retain personal contact and
-operational values, and a much larger personal-data corpus still exists in
-ignored local outputs. Those two classes keep the verdict at
-`CLAIM NOT RECONCILED`.
+A later pushed reviewer-email branch reintroduced a bounded identity class:
+the configured alert sender's internal Dynamics row identity, access state, and
+display value in four public documentation surfaces; a real-looking staff
+contact fixture in one unit test; and a named attribution for staff feedback in
+the session handoff. The cleanup branch removes those fields and replaces the
+test identity with a reserved-domain fixture while retaining the necessary
+operational and product facts. Because the original branch revisions were
+pushed, their public-history component remains part of the final rewrite
+specification.
+
+A later semantic follow-up found one additional current-tree class: the
+non-production `modules/expertise_matching` reference/demo duplicates the
+protected 38-person production roster and contains person-linked cycle
+assignment/usage findings. Its public-tree disposition is unresolved. This
+follow-up also does not rewrite reachable public history. Both conditions keep
+the verdict at `CLAIM NOT RECONCILED`.
+
+The formerly unresolved ignored-local class is closed. The owner selected an
+organizational owner-only archive, confirmed visibility, approved the exact
+private source manifest, and retained private and tracked aggregate receipts.
+Fail-closed execution removed 139 ignored regular files totaling 15,287,781
+bytes with zero failures and zero residual regular files in the bounded scope.
+The private archive, directories, and five excluded dependency symlinks were
+not deletion targets.
 
 No probable live credential was identified in reachable Git history. The
 primary problem is durable personal and confidential data retention, not an
@@ -95,18 +118,19 @@ API-key or password leak.
 
 | Claim | Evidence | Classification |
 |---|---|---|
-| The current public tree is PII-free. | The baseline contained production-derived reviewer contact/payment evidence, identifiable evaluation evidence, access rosters, and proposal metadata. The audited high-risk surfaces are resolved in the follow-up, but an absolute whole-tree semantic absence claim remains beyond the bounded classifiers. | Baseline: `STALE-CONFLICT`; follow-up: audited surfaces resolved, absolute claim `UNKNOWN` |
+| The current public tree is PII-free. | The baseline contained production-derived reviewer contact/payment evidence, identifiable evaluation evidence, access rosters, and proposal metadata. Those audited surfaces are resolved, but the later semantic follow-up found the retired expertise-matching roster/assignment duplicate. | Baseline and current follow-up: `STALE-CONFLICT` |
 | Current-file deletion alone would close the exposure. | Deleted and earlier revisions containing personal contact values remain in reachable history. | `STALE-CONFLICT` |
 | Reachable history contains a probable live credential. | Three secret-shaped hits were deterministic scanner/test fixtures; independent assignment and credential-URL checks found no candidate. | `FALSIFIED` |
 | Current tracked archives conceal obvious secrets or high-risk identifiers. | Archive/XML/string inspection found none in the reviewed PPTX, ZIP, DOCX history, or PNG strings. | `FALSIFIED` within the stated binary limits |
-| Ignored output is adequately protected by `.gitignore`. | Ignored exports contain a large personal-data corpus without a documented retention/access-control contract. | `STALE-CONFLICT` |
+| Ignored output is adequately protected by `.gitignore`. | The baseline corpus disproved this claim. The follow-up established owner-only preservation, exact review, approved source disposal, and an aggregate receipt; zero scoped regular files remain. | Baseline: `STALE-CONFLICT`; follow-up: `RESOLVED` |
 | The current secret gate is a privacy gate. | It passed while tracked production-derived personal data remained present. | `FALSIFIED` |
 
 ## Current-tree remediation follow-up
 
-**Scope:** non-history changes only. No ignored output was deleted, no
-credential was rotated, no repository visibility changed, and no Git object
-or ref was rewritten.
+**Scope:** non-history changes only. The initial current-tree remediation did
+not delete ignored output; the later owner-approved local-retention follow-up
+deleted only the exact ignored regular-file source scope. No credential was
+rotated, repository visibility changed, or Git object/ref rewritten.
 
 | Invariant | Current-tree action | Verification |
 |---|---|---|
@@ -118,7 +142,9 @@ or ref was rewritten.
 | Current memory contains no genuine contact address from the audited corpus. | Removed operational contacts, a personal test recipient, an applicant test account, and named reviewer-contact examples. Preserved OData forms such as `@odata.bind`, which are code syntax rather than addresses. | Genuine-address classifier returned zero current `.claude-memory` matches after excluding OData annotations. |
 | Production proposal inputs are not retained in tracked evaluation assets. | Replaced four production proposal JSON assets with aggregate public receipts; operational planner/runner/validators require explicit external files, while tests use internally consistent synthetic fixtures. | Focused evaluator tests, syntax checks, and production-identifier scan. |
 | Deliberate public support content remains intentional and bounded. | Retained the additional-access/help contact only in `shared/components/WelcomeModal.js` and `pages/guide.js`. | Scoped current-tree scan and owner-context review. |
-| History and ignored-local boundaries remain explicit. | No history or local-retention mutation was performed. | Reachable-history and ignored-corpus baseline in this audit remains the governing evidence. |
+| Later reviewer-email work does not reintroduce unnecessary staff or operational identity. | Removed the alert sender's internal Dynamics row identity, access-state fields, and display value; replaced a real-looking staff contact fixture with a reserved-domain identity; removed the named attribution from staff feedback. Retained the configured address, successful sender-resolution fact, owner acceptance, unverified Server-Side Sync state, and product decision. | Exact-value and semantic scans across current docs/tests; pushed predecessor revisions remain in public-history scope. |
+| The retired expertise-matching reference/demo does not publish the protected roster or person-linked findings. | No remediation yet. Its CSV and embedded component reproduce all 38 roster profiles; supporting documents retain named assignment/usage context. | Source/caller trace, privacy-safe aggregate scan, Git history trace, and read-only production row-count probe. |
+| History and ignored-local boundaries remain explicit. | Reachable history was not rewritten. The exact ignored regular-file scope was preserved, reviewed, approved, and source-disposed with aggregate receipts. | History baseline remains governing evidence; the local source component is closed by the linked retention audit and disposal receipt. |
 
 ## Findings
 
@@ -166,6 +192,47 @@ contact details, person URLs, or reversible identity aliases.
 **Status:** current-tree component resolved; reachable-history component
 unresolved.
 
+### P1 — retired expertise-matching module duplicates a protected roster
+
+The tracked `modules/expertise_matching` reference/demo is not a production
+caller, but it contains a public duplicate of the same roster used by the
+protected production Expertise Finder:
+
+- the master CSV contains 38 person profiles: 25 consultants, nine board
+  members, and four research-program staff;
+- 15 profiles include ORCIDs, 16 include foundation-affiliation values, and
+  four include detailed affiliation relationships;
+- the standalone JSX embeds all 38 people and all 15 ORCIDs;
+- the cycle usage report names 27 roster members 55 times in assignment/usage
+  context;
+- the project context names all 38 people, and the operational skill document
+  names 14; and
+- aggregate pattern checks found no email address, phone number, or UUID in
+  these files.
+
+Names, professional affiliations, and ORCIDs can be public independently.
+Their collection into a foundation roster and linkage to internal role,
+selection, and cycle-usage context makes this a confidential operational
+mapping unsuitable for an unrestricted public source tree.
+
+Source/caller tracing found no production import of the standalone module.
+Production consumers read `expertise_roster` through the authenticated
+Expertise Finder API and service, with prompt rules in
+`shared/config/prompts/expertise-finder.js`. A read-only live probe confirmed
+38 active roster rows and 344 match-history rows. The unregistered
+`scripts/seed-expertise-roster.js` is a manual CSV importer and has no
+`package.json` command.
+
+The module entered history in `92e0c56f`; the seed helper was later changed in
+`79742e69`. Both commits are ancestors of the public default branch and the
+audited remote branches. Removal from the current tree would therefore not
+close the historical copies.
+
+**Status:** current-tree and reachable-history components unresolved. Preserve
+any required identifiable source privately, and retain only sanitized design
+and aggregate findings publicly, subject to explicit owner approval. The
+production database and authorized app/API are outside this disposal target.
+
 ### P1 local-only — ignored operational evidence
 
 The ignored `outputs/` tree contained 125 files with approximately:
@@ -180,12 +247,18 @@ The largest concentration was under `outputs/reviewer-holistic-m1/`. Additional
 ignored operational exports with personal data exist under `scripts/`,
 including contact-enrichment and application-research snapshots.
 
-These files are not part of the observed Git exposure. They remain a
-high-severity local retention and access-control issue because `.gitignore`
-prevents accidental tracking but does not define who may access the files, how
-long they may remain, or how they are securely disposed of.
+These files were not part of the observed Git exposure. They established a
+high-severity baseline because `.gitignore` prevents accidental tracking but
+does not define access, retention, or secure disposal.
 
-**Status:** unresolved local retention risk.
+**Follow-up:** the owner selected and confirmed an organizational owner-only
+archive; preservation, finality, consumer, and semantic reviews resolved the
+load-bearing and sole-copy questions. The exact private manifest then
+authorized source-only deletion of 139 regular files totaling 15,287,781
+bytes. Execution had zero failures, and the post-scan found zero residual
+regular files in the bounded scope. Private archive evidence was preserved.
+
+**Status:** local ignored-regular-file retention risk resolved.
 
 ### P2 — broader production and proposal linkability
 
@@ -239,6 +312,27 @@ contains generic permission architecture, not a person-to-access mapping, and
 was retained.
 
 **Status:** audited current-tree roster mappings resolved.
+
+### P2 — staff and operational identity metadata on a pushed reviewer-email branch
+
+The pushed reviewer-email branch recorded more Dynamics identity detail than a
+public runbook needs: the configured role mailbox's internal row identifier,
+access-state fields, and exact display value. It also introduced a real-looking
+staff contact in a reviewer-email unit-test fixture and named the individual
+whose feedback shaped the greeting decision. The sender address, successful
+resolution fact, and anonymous product feedback are necessary evidence; the
+extra identity metadata is not.
+
+**Follow-up:** the cleanup branch removes the excess fields from
+`SESSION_PROMPT.md`, `docs/CLAUDE_TO_CODEX_HANDOFF_2026-07-27.md`,
+`docs/TODO_EMAIL_NOTIFICATIONS.md`, and `docs/CREDENTIALS_RUNBOOK.md`. It
+also replaces the unit-test contact with a fictional reserved-domain identity
+and removes the staff-feedback attribution. It preserves the operationally
+relevant verified state, the still-unverified Server-Side Sync requirement, and
+the greeting decision itself.
+
+**Status:** cleanup-tree component resolved; the original pushed branch tip and
+earlier revisions remain in reachable public-history scope.
 
 ### P2 — real-looking identities in code and fixtures
 
@@ -392,12 +486,18 @@ candidate evaluation.
   not inventoried.
 - Regex and fingerprint checks cannot reliably identify every human name,
   physical address, or semantically sensitive relationship.
+- The bounded baseline classifiers did not flag the standalone
+  expertise-matching roster. Its later discovery through semantic source
+  review demonstrates why the current-tree result cannot be generalized
+  beyond inspected surfaces.
 - Two PNGs were not OCRed.
 - The audit did not determine whether payment-network identifier exposure
   requires notification or identifier replacement; that is a security/data
   owner decision.
-- The audit did not establish an approved retention period or access-control
-  mechanism for ignored local evidence.
+- The follow-up established an owner-confirmed access-control location and
+  disposed of the bounded ignored regular-file source scope. It did not
+  establish a calendar retention period for the intentionally retained private
+  archive.
 
 ## Privacy-safe reproducibility appendix
 
@@ -591,20 +691,25 @@ live-source identities.
 
 ### Immediate, non-history remediation — follow-up status
 
-1. **Completed in current tree:** replace raw reviewer/payment evidence with
+1. **Still an owner decision:** privately preserve any required identifiable
+   expertise-matching source, then remove or sanitize the retired public
+   roster duplicate and person-linked cycle findings while retaining an
+   aggregate design/findings record.
+2. **Completed in current tree:** replace raw reviewer/payment evidence with
    aggregate receipts containing no person-level rows.
-2. **Completed in current tree:** remove identifiable subjects from the
+3. **Completed in current tree:** remove identifiable subjects from the
    reviewer contact-strategy audit while retaining method and aggregate
    results.
-3. **Completed for audited surfaces:** replace representative Atlas row dumps
+4. **Completed for audited surfaces:** replace representative Atlas row dumps
    with aggregates and externalize the production proposal-evaluation bundle.
-4. **Completed for audited surfaces:** replace named access rosters with
+5. **Completed for audited surfaces:** replace named access rosters with
    controlled-roster references and role labels.
-5. **Completed for audited surfaces:** use reserved-domain fixtures and
+6. **Completed for audited surfaces:** use reserved-domain fixtures and
    explicit operational inputs rather than embedded identities.
-6. **Still open; no deletion authorized:** inventory owners must approve and
-   enforce an access/retention/disposal rule for ignored operational exports.
-7. **Still an owner decision:** classify whether the historically exposed
+7. **Completed:** the owner confirmed an owner-only organizational archive,
+   approved the exact 139-file source manifest, and retained aggregate
+   receipts after zero-failure disposal and a zero-residual post-scan.
+8. **Still an owner decision:** classify whether the historically exposed
    payment-network identifiers require notification or replacement.
 
 ### Public-history decision
@@ -617,6 +722,10 @@ must target exact blobs and metadata across:
 - identifiable evaluation evidence;
 - deleted operational/probe scripts and documents;
 - relevant historical session/memory revisions;
+- pushed reviewer-email branch revisions containing excess staff and
+  alert-sender operational identity metadata;
+- the retired expertise-matching roster duplicate and person-linked cycle
+  report;
 - commit-message contact values where policy requires removal; and
 - any additional objects identified during the pre-rewrite dry run.
 
@@ -624,6 +733,37 @@ A history rewrite would require explicit authorization, a backup and rollback
 plan, force-push coordination, clone invalidation, fork/cache/artifact review,
 and post-rewrite verification. None of those destructive actions was performed
 by this audit.
+
+### Pre-rewrite planning follow-up — 2026-07-27
+
+Read-only GitHub and local preflight found a public repository with 68 branch
+refs, one lightweight tag, 91 pull-request head refs, nine pull-request merge
+refs, nine open PRs, 1,942 Actions artifacts, zero forks, zero releases, one
+direct collaborator, and no branch protection or repository ruleset. Four
+linked local worktrees exist, and two have untracked changes that must be
+preserved or closed before any rewrite.
+
+An official `git-filter-repo` 2.47.0 simulation in a disposable mirror selected
+694 non-current historical blobs across 65 audited paths and three
+history-only commit-message contact values. It removed every selected value,
+preserved the then-current `main` tree exactly, and passed Git object-integrity
+verification. The rewrite changed 169 refs, including all 91 PR head refs, and
+rewrote 3,385 of 3,400 commits because the affected graph includes signed
+early history. This makes PR-ref cleanup and old-clone invalidation mandatory,
+not optional.
+
+That simulation predates the expertise-matching discovery and the later pushed
+reviewer-email documentation revisions. It remains valid evidence for rewrite
+mechanics and blast radius, but is not a scope-complete removal specification.
+The final dry run must follow the approved current-tree disposition and include
+every historical roster/assignment revision plus the bounded reviewer-email
+identity revisions identified above.
+
+The privacy-safe execution strategy, invariants, alternatives, dry-run counts,
+and owner decisions are recorded in
+`docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md`. The simulation did not mutate
+the repository, GitHub refs, pull requests, artifacts, visibility, local
+worktrees, or deployments.
 
 ### Prevention
 
@@ -653,20 +793,25 @@ should:
 | `UNKNOWN` primary claims | 0 |
 | Explicit scope/coverage unknowns | 7 |
 | Probable live credentials in reachable history | 0 |
-| Confirmed unresolved privacy classes | 8 |
+| Confirmed unresolved privacy classes at baseline | 8 |
+| Current unresolved privacy classes | 2 |
 
-The non-history follow-up closed the six audited current-tree classes: raw
-reviewer/payment evidence, identifiable contact-strategy evidence, broader
-Atlas/proposal artifacts, named access mappings, embedded operational/test
-identities, and current-memory contacts. The bounded ignored-export
-fingerprint comparison now returns zero exact contact matches in tracked files.
+The non-history follow-up closed the six originally audited current-tree
+classes: raw reviewer/payment evidence, identifiable contact-strategy
+evidence, broader Atlas/proposal artifacts, named access mappings, embedded
+operational/test identities, and current-memory contacts. The bounded
+ignored-export fingerprint comparison now returns zero exact contact matches
+in tracked files. Later semantic review found the separate
+expertise-matching roster/assignment class.
 
 Two privacy classes remain unresolved:
 
-1. reachable public Git history; and
-2. ignored local evidence retention/access/disposal.
+1. the current-tree expertise-matching roster/assignment duplicate; and
+2. reachable public Git history.
 
 The audit's finding is therefore intentionally not described as reconciled.
-Current-tree redaction does not remove earlier blobs, commit messages, clones,
-caches, or the ignored local corpus. The next actions still require explicit
-owner decisions; they were not implicitly authorized by this remediation.
+The current-tree duplicate requires an explicit owner disposition, and its
+future redaction or removal would not remove earlier blobs, commit messages,
+clones, or caches. Any current-tree disposal, history rewrite, or related
+notification decision still requires explicit owner authorization; none was
+implicitly authorized by the local-retention remediation.

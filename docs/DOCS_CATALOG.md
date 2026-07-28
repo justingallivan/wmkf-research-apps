@@ -208,7 +208,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [CLAUDE_TO_CODEX_HANDOFF_2026-07-27.md](CLAUDE_TO_CODEX_HANDOFF_2026-07-27.md) | status | active |  | Reviewer-email session outcomes, unrun follow-ups, and Claude's self-assessment with three unimplemented remediation proposals for Codex to evaluate. | 2026-07-27 |
+| [CLAUDE_TO_CODEX_HANDOFF_2026-07-27.md](CLAUDE_TO_CODEX_HANDOFF_2026-07-27.md) | status | active |  | Reviewer-email session outcomes, Claude's self-assessment, and Codex's disposition of the implementation and three remediation proposals. | 2026-07-27 |
 
 ## prompt-executor
 
@@ -288,7 +288,7 @@ related:
 | [REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md](REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md) | spec | active |  | - confirmed is explicitly NOT reachable in PR1 (needs the deferred faculty-page + publication-cluster evidence). PR1 tops out at probable. | 2026-07-02 |
 | [REVIEWER_IDENTITY_SHADOW_LOGGER_HANDOFF.md](REVIEWER_IDENTITY_SHADOW_LOGGER_HANDOFF.md) | runbook | active |  | Durable Postgres resolver-comparison logger deployed with migration 026 applied; combined-mode cutover remains disabled. | 2026-07-19 |
 | [REVIEWER_IDENTITY_STRATEGY_EVALUATION.md](REVIEWER_IDENTITY_STRATEGY_EVALUATION.md) | decision | active |  | Scope: strategy-level evaluation of reviewer identity/contact enrichment failures for request 1002794, grounded in HEAD versions of:. | 2026-07-02 |
-| [REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md](REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md) | spec | active |  | Author: S216. Depends on: S214/S215 identity resolver + ORCID backfill (docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md, memory... | 2026-07-02 |
+| [REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md](REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md) | spec | active |  | Shipped reviewer-to-Contact ORCID propagation design; the historical backfill's rollback window closed after aggregate production reconciliation. | 2026-07-02 |
 | [REVIEWER_ORCID_NAME_PROMOTION_DESIGN.md](REVIEWER_ORCID_NAME_PROMOTION_DESIGN.md) | spec | active |  | - (C) Identity note. Add orcid_name_confirmed to buildIdentityNote() corroboration list (evidence.js:421-436), e.g. \"ORCID profile name\". | 2026-07-02 |
 | [REVIEWER_ORCID_SPINE_SPEC.md](REVIEWER_ORCID_SPINE_SPEC.md) | spec | active |  | - [NEW] lib/services/openalex-service.js — author search only (presence + ORCID discovery + institution + topics). NEVER trusted for... | 2026-07-02 |
 | [REVIEWER_PAGE_FIRST_EMAIL_EXPERIMENT_PLAN.md](REVIEWER_PAGE_FIRST_EMAIL_EXPERIMENT_PLAN.md) | plan | historical |  | Completed staged page-first email experiment: safe but only +1/20 on the fresh cohort, so the cascade was not promoted. | 2026-07-18 |
@@ -371,6 +371,12 @@ related:
 | [WAVE1_PROD_RUNBOOK.md](WAVE1_PROD_RUNBOOK.md) | runbook | active |  | Wave 1 of the Postgres → Dataverse migration has been applied end-to-end in sandbox (orgd9e66399) and verified at every layer:. | 2026-07-02 |
 | [WAVE1_REVERT_TEMP_ELEVATIONS.md](WAVE1_REVERT_TEMP_ELEVATIONS.md) | history | active |  | Purpose: Remove the elevated privileges the app user needed for the prod cutover, leaving it with the minimal permanent surface. | 2026-07-02 |
 | [WAVE1_VERCEL_FLAG_ROLLOUT.md](WAVE1_VERCEL_FLAG_ROLLOUT.md) | plan | historical |  | Status: ✅ CLOSED 2026-05-12. This runbook is preserved as the historical record of how the flags were flipped and the trailing-newline gotcha that... | 2026-07-02 |
+
+## security-privacy
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md](PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md) | plan | active |  | Owner-gated plan for removing the audited personal and confidential data from public Git history without changing the approved current main tree. | 2026-07-27 |
 
 ## testing
 

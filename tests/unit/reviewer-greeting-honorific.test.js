@@ -75,7 +75,7 @@ describe('buildReviewerGreeting', () => {
 });
 
 describe('{{greeting}} renders the honorific form on every reviewer email', () => {
-  const signatureBlock = { signature: 'Thank you,\nJean', isCustomSignature: true };
+  const signatureBlock = { signature: 'Thank you,\nJordan', customClosing: true };
 
   test('release / no-longer-needed', () => {
     const body = buildWithdrawSufficientBodyText({
@@ -128,7 +128,7 @@ describe('{{greeting}} renders the honorific form on every reviewer email', () =
       reviewer: { wmkf_name: NAME },
       request: { akoya_title: 'Genomic Lithography' },
       signatureBlock,
-      programDirector: { name: 'Jean Kim', email: 'jkim@wmkeck.org' },
+      programDirector: { name: 'Jordan Lee', email: 'jordan.lee@example.org' },
       withdrawUrl: 'https://example.org/w',
     });
     expect(body).toContain('Dear Dr. Deisseroth,');
@@ -167,17 +167,17 @@ function renderFourActionBodies(signatureBlock) {
       reviewer: { wmkf_name: NAME },
       request: { akoya_title: 'Genomic Lithography' },
       signatureBlock,
-      programDirector: { name: 'Jean Kim', email: 'jkim@wmkeck.org' },
+      programDirector: { name: 'Jordan Lee', email: 'jordan.lee@example.org' },
       withdrawUrl: 'https://example.org/w',
     }).body,
   };
 }
 
 describe('conditional closing composition across all four reviewer action bodies', () => {
-  test('a signature that opens with a valediction is preserved without a second closing', () => {
+  test('a signature explicitly marked with a closing is preserved without a second closing', () => {
     const bodies = renderFourActionBodies({
-      signature: 'Thank you,\nJean Kim\nW. M. Keck Foundation',
-      isCustomSignature: true,
+      signature: 'Thank you,\nJordan Lee\nW. M. Keck Foundation',
+      customClosing: true,
     });
     for (const [bodyName, body] of Object.entries(bodies)) {
       expect({ bodyName, body }).toEqual({
@@ -191,8 +191,8 @@ describe('conditional closing composition across all four reviewer action bodies
 
   test('an arbitrary custom closing is preserved verbatim', () => {
     const bodies = renderFourActionBodies({
-      signature: 'Best wishes,\nJean Kim\nW. M. Keck Foundation',
-      isCustomSignature: true,
+      signature: 'Best wishes,\nJordan Lee\nW. M. Keck Foundation',
+      customClosing: true,
     });
     for (const body of Object.values(bodies)) {
       expect((body.match(/Best wishes,/g) || [])).toHaveLength(1);
@@ -201,7 +201,7 @@ describe('conditional closing composition across all four reviewer action bodies
   });
 
   test.each([
-    ['generated bare name', { signature: 'Jean Kim\nW. M. Keck Foundation', isCustomSignature: false }],
+    ['generated bare name', { signature: 'Jordan Lee\nW. M. Keck Foundation', customClosing: false }],
     ['fallback', null],
   ])('a %s signature receives one default closing', (_label, signatureBlock) => {
     const bodies = renderFourActionBodies(signatureBlock);
@@ -230,7 +230,7 @@ describe('release email copy', () => {
     bodyTemplate: REVIEWER_WITHDRAW_SEED_BODY,
     reviewerName: NAME,
     title: 'Genomic Lithography',
-    signatureBlock: { signature: 'Thank you,\nJean', isCustomSignature: true },
+    signatureBlock: { signature: 'Thank you,\nJordan', customClosing: true },
   });
 
   test('does not assume the reviewer ever accepted', () => {

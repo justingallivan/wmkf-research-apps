@@ -72,6 +72,11 @@
 - Partial remediation shipped: prompt-cache audit/root mitigation completed (S341); remaining R4 cross-document Executor composition and conditional R5 measurement: project-cache-hit-rate-review.md
 - RESOLVED (S350): spec-audit design-docs recovered to main (1420d79c); accept-fast-response verified SHIPPED; quota-PD-email BUILT S352 (+admin default 4, modal prefill, first-send seed): project-spec-audit-docs-recovery-parked.md
 - Private-repo CI (why CodeQL gone, Semgrep split, Pro needed for branch protection): project-private-repo-ci-visibility.md
+- Local retention and completed source disposal: ../docs/audits/local-operational-data-retention-audit-2026-07-27.md; ../docs/audits/local-operational-source-disposal-receipt-2026-07-27.md
+  Public privacy remains unresolved: the retired expertise-matching duplicate
+  needs an owner disposition, and reachable history needs the owner-gated
+  rewrite plan: ../docs/audits/public-repository-pii-history-audit-2026-07-27.md;
+  ../docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md
 
 ## Archive
 - Closed & shipped work index: project-closed-work-archive.md (includes the resolved reviewer E2E re-baseline)

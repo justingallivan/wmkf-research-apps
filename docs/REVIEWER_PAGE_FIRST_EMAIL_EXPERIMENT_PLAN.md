@@ -57,22 +57,23 @@ first-party page links as staff research leads, keep raw Claude/Serp emails
 structured tier. A subsequent W3.1 `fullTextXML` fallback trial added 0/40
 addresses and was also not promoted. No production behavior or environment
 configuration changed. `[VERIFIED via Stage 3
-promotionDecision.status='do_not_promote' and
-outputs/reviewer-holistic-m1/reviewer-email-scholarly-fulltext-40-v2.json]`
+promotionDecision.status='do_not_promote' in the owner-only archived evidence
+and the tracked aggregate outcome below]`
 
 The experiment used an owner-approved evaluation-only fallback from an absent
 identity-anchored domain to a strongly matched claimed-institution domain. That
 authorization existed only inside cloned evaluator state; the production
 anchored-domain fetch policy was not weakened.
 
-Authoritative local evidence:
+Authoritative evidence:
 
 - `scripts/evaluate-reviewer-page-first-email.mjs`
 - `scripts/select-reviewer-page-first-stage3-cohort.mjs`
-- `outputs/reviewer-holistic-m1/reviewer-email-page-first-stage1-replay-v1.json`
-- `outputs/reviewer-holistic-m1/reviewer-email-page-first-stage2-v1.json`
-- `outputs/reviewer-holistic-m1/reviewer-email-page-first-stage3-cohort-v1.json`
-- `outputs/reviewer-holistic-m1/reviewer-email-page-first-stage3-v1.json`
+- the owner-only archived Stage 1 replay, Stage 2 comparison, Stage 3 cohort,
+  and Stage 3 result receipts; and
+- this document's tracked aggregate outcome plus
+  `docs/audits/local-operational-data-retention-audit-2026-07-27.md`, which
+  records byte-preservation and disposal of the redundant ignored sources.
 
 The remaining sections preserve the pre-execution protocol. Their `[PLANNED]`
 labels describe the historical design state; this outcome section is
@@ -117,9 +118,8 @@ first-party page. `[PLANNED]`
    lib/services/contact-enrichment/tiers.js]`
 4. The previous 40-person query-variant experiment measured raw search evidence,
    not page-grounded sendable yield, and it did not compare Claude with SerpAPI.
-   `[VERIFIED via
-   outputs/reviewer-holistic-m1/reviewer-email-serp-lab-query-variants-v1.json
-   and the companion audit]`
+   `[VERIFIED via the owner-only archived query-variant receipt and the
+   companion audit]`
 
 Therefore this plan tests a small identity/domain prepass followed by
 page-oriented Google queries. It does not relax any name, domain, grounding, or

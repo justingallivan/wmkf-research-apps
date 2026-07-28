@@ -88,17 +88,11 @@ State of this change:
   (`docs/audits/memory-wiki-audit-2026-06-23.md:86`, 2026-06-23). Not re-verified
   here — Vercel sensitive env values are not readable from a session.
 - **[VERIFIED via read-only Dataverse probe of `wmkf.crm.dynamics.com`,
-  2026-07-27]** The address exists as a Dynamics `systemuser`
-  (`d57ddb27-c8db-ee11-904d-000d3a310f67`) with `isdisabled=false` and
-  `accessmode=0` (licensed Read-Write), and its `domainname` is
-  `alerts@wmkeck.org`. So `resolveSystemUser`'s `internalemailaddress` filter
-  resolves and the sender-party bind will succeed. This was the blocking
-  prerequisite; a monitored M365 role mailbox is frequently *not* a licensed
-  systemuser, and this one is.
-- **[VERIFIED via the same probe]** The systemuser's `fullname` is `# Alerts`,
-  which is the sender name recipients see — the leading `#` appears to be a
-  sort-to-top convention for Dynamics user lists. The owner reviewed this and
-  accepted it as-is (session 2026-07-27); no `systemuser` edit is required.
+  2026-07-27]** The address resolves through `resolveSystemUser` to an enabled,
+  write-capable Dynamics sender, so the sender-party bind can succeed. Internal
+  row identity, access metadata, and display value are intentionally omitted
+  from public documentation. The owner reviewed and accepted the visible sender
+  name; no `systemuser` edit is required.
 - **[UNVERIFIED]** Outgoing Server-Side Sync state on the related `mailboxes`
   row. If outgoing SSS is not enabled and succeeding for this mailbox, the send
   fails *after* the sender resolves. `notify()` catches any such failure and logs
@@ -112,7 +106,8 @@ State of this change:
   a deploy was started. Not independently confirmed here — Vercel sensitive env
   values are not readable from a session.
 - **[PENDING MERGE]** `SCHOLARLY_POLITE_MAILTO` has no effect in production until
-  the code that reads it reaches `main` (branch `codex/claude-bug-fixes`). Until
+  the code that reads it reaches `main` (cleanup branch
+  `codex/reviewer-email-contract-cleanup`). Until
   then PubMed/Europe PMC fall back to `NOTIFICATION_EMAIL_FROM`, which is now the
   same address — so the contact path is correct either way, and the new var is
   simply inert.

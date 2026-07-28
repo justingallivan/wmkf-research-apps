@@ -80,9 +80,9 @@ describe('planReviewerCopyMigration', () => {
   });
 
   test('no body hard-codes a closing line — renderers compose one conditionally', () => {
-    // reviewer-email-closing preserves a signature that opens with a valediction
-    // and prepends a default only to bare-name/fallback blocks. The four live
-    // bodies therefore leave the closing out of the stored template.
+    // reviewer-email-closing preserves a signature explicitly marked as already
+    // containing a closing and prepends a default to identity/fallback blocks.
+    // The four live bodies therefore leave the closing out of the stored template.
     const CLOSING = /(thank you|with appreciation|with gratitude|sincerely|best regards|regards|warmly)\s*,?\s*$/i;
     for (const target of REVIEWER_BODY_TARGETS) {
       const beforeSignature = target.desired.split('{{signature}}')[0].trimEnd();

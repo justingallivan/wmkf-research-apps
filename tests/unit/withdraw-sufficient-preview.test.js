@@ -33,7 +33,10 @@ jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: { createAndSendEmail: (...a) => createAndSendEmail(...a) },
 }));
 jest.mock('../../lib/services/email-signature', () => ({
-  resolveSignatureForRequest: jest.fn(async () => ({ signature: 'Thank you,\nJean' })),
+  resolveSignatureForRequest: jest.fn(async () => ({
+    signature: 'Thank you,\nAvery Quinn',
+    customClosing: true,
+  })),
 }));
 const readRequiredEmailDefaults = jest.fn();
 jest.mock('../../lib/services/email-defaults', () => ({
@@ -231,9 +234,9 @@ describe('withdrawSufficient overrides', () => {
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
-  test('a changed current sender fails before the lifecycle write', async () => {
+  test('a changed current sender record fails before the lifecycle write', async () => {
     getSystemUserById.mockResolvedValue({
-      systemuserid: 'pd-2', internalemailaddress: 'new-pd@keck.org', isdisabled: false,
+      systemuserid: 'pd-2', internalemailaddress: 'pd@keck.org', isdisabled: false,
     });
     const result = await withdrawSufficient({
       requestId: REQ,
@@ -247,6 +250,38 @@ describe('withdrawSufficient overrides', () => {
       withdrawn: 0,
       results: [{ suggestionId: SUG, status: 'sender_changed' }],
     });
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a changed current sender address fails before the lifecycle write', async () => {
+    getSystemUserById.mockResolvedValue({
+      systemuserid: 'pd-1', internalemailaddress: 'new-pd@keck.org', isdisabled: false,
+    });
+    const result = await withdrawSufficient({
+      requestId: REQ,
+      suggestionIds: [SUG],
+      actingUserSystemId: 'u-1',
+      overrides: { [SUG]: reviewedOverride() },
+    });
+
+    expect(result.results[0].status).toBe('sender_changed');
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a disabled current sender fails before the lifecycle write', async () => {
+    getSystemUserById.mockResolvedValue({
+      systemuserid: 'pd-1', internalemailaddress: 'pd@keck.org', isdisabled: true,
+    });
+    const result = await withdrawSufficient({
+      requestId: REQ,
+      suggestionIds: [SUG],
+      actingUserSystemId: 'u-1',
+      overrides: { [SUG]: reviewedOverride() },
+    });
+
+    expect(result.results[0].status).toBe('sender_changed');
     expect(updateLifecycle).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });

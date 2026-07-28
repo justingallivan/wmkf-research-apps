@@ -3,7 +3,7 @@ title: Claude → Codex Handoff (Session 2026-07-27, reviewer email work)
 domain: process
 kind: status
 status: active
-summary: Reviewer-email session outcomes, unrun follow-ups, and Claude's self-assessment with three unimplemented remediation proposals for Codex to evaluate.
+summary: Reviewer-email session outcomes, Claude's self-assessment, and Codex's disposition of the implementation and three remediation proposals.
 canonical: false
 cataloged: 2026-07-27
 owner: product-engineering
@@ -15,8 +15,11 @@ related:
 
 # Claude → Codex Handoff (2026-07-27)
 
-Branch `codex/claude-bug-fixes`, 10 commits, all pushed. Worktree
-`/Users/gallivan/Code/WMKF_Apps-claude-bugs`. Nothing merged to `main`.
+The original work remains unchanged on `codex/claude-bug-fixes`, with eleven
+commits pushed. Codex reviewed it from the isolated
+`codex/reviewer-email-contract-cleanup` branch, integrated the concurrent
+retention/privacy history there, and added the contract corrections in Part 5.
+Nothing from the combined cleanup branch is merged to `main`.
 
 The owner asked for this handoff and explicitly instructed that the behavioral
 remediations in Part 4 **not** be implemented by Claude. They are proposals for
@@ -35,7 +38,7 @@ individual") and grew into three areas.
 |---|---|
 | `677a0b32` | Split `SCHOLARLY_POLITE_MAILTO` out of `NOTIFICATION_EMAIL_FROM`, which was doing double duty as the Dynamics sender AND the NCBI/Europe PMC contact address [VERIFIED via `lib/services/pubmed-service.js`, `lib/services/contact-enrichment/scholarly-email.js`]. Falls back to the old var when unset, so unset environments are unchanged. |
 | `b4ef3a25` | Recorded `alerts@wmkeck.org` as the selected sender. |
-| `b413d5c6` | Read-only Dataverse probe confirmed it resolves: systemuser `d57ddb27-c8db-ee11-904d-000d3a310f67`, `isdisabled=false`, `accessmode=0`, `fullname` `# Alerts` (owner accepted that display name) [VERIFIED via read-only probe of `wmkf.crm.dynamics.com`, 2026-07-27]. |
+| `b413d5c6` | Read-only Dataverse probe confirmed the configured role mailbox resolves to an enabled, write-capable Dynamics sender. The owner accepted its visible sender name. Internal row identity, access metadata, and display value are intentionally omitted from public documentation. |
 | `ec5c8a2c` | Reconciled to applied after the owner set both vars in Vercel [VERIFIED via owner report; Vercel values are not readable from a session]. |
 
 ### Reviewer email copy and greeting
@@ -72,14 +75,14 @@ operation; the owner accepted edit-before-send instead.
 
 ## Part 2 — State and what is NOT done
 
-**Verified at `e3a471e7`** [VERIFIED via commands run in this session]: 525
+**Verified by Claude at `e3a471e7`** [VERIFIED via commands run in that session]: 525
 suites / 6259 tests; 15 gates plus 14 paired self-tests; Playwright 6/6 in a real
 browser; ESLint clean.
 
 Outstanding, all owner-gated:
 
-1. **Nothing is merged to `main`.** The `{{greeting}}` token only renders once
-   the renderer code ships.
+1. **Nothing from `codex/reviewer-email-contract-cleanup` is merged to `main`.**
+   The `{{greeting}}` token only renders once the renderer code ships.
 2. **Ordering constraint:** run `scripts/migrate-reviewer-email-copy.mjs
    --execute` **after** the merge deploys. Running it first puts a literal
    `{{greeting}},` in reviewer emails.
@@ -91,11 +94,6 @@ Outstanding, all owner-gated:
    resolution and `notify()` swallows it [VERIFIED via
    `lib/services/notification-service.js:85-88`] — alert email would stop
    silently while dashboard alerts keep working.
-5. Session docs (`SESSION_PROMPT.md`) were **not** written. `/stop` was started
-   and paused: HEAD is a feature branch and a concurrent Codex session owns
-   `codex/local-retention-inventory`, so where they land is an open owner
-   decision.
-
 ---
 
 ## Part 3 — Review history
@@ -160,29 +158,35 @@ therefore the least promising remedy.
 
 ### Proposal 1 — extend `check:status-enum-parity` to catch heuristic consumers
 
-Today it compares producer status sets against consumer label/bucket **maps**
-[VERIFIED via the gate's own output line: "producer↔consumer key parity
-(status/enum/workRemaining vs label/bucket maps)"]. It stayed green here because
-the consumers were prefix and truthiness tests, not maps. Proposal: where a
-status set is defined, flag consumers applying `startsWith`/`includes`/truthiness
-to that value instead of an exhaustive map or explicit allowlist.
+The gate compares six manually registered producer/consumer pairs extracted
+with regexes from named object, array, and return-literal structures. It does
+not discover status vocabularies or consumers generically [VERIFIED via
+`scripts/check-status-enum-parity.js`].
 
-Would have caught findings 1, 3, 6 — including the high-severity one — as a red
-gate, independent of author confidence.
+**Codex disposition: do not implement this proposal as stated.** A generic ban
+on `startsWith`, `includes`, or truthiness would have a large unrelated
+false-positive surface, while two cited findings are not producer/consumer
+enum-parity problems: a nullable request relationship and a migration read
+error. The current gate could catch the modal status defect only after a new,
+explicitly registered producer/consumer contract existed. The direct fix is an
+explicit allowlist/map plus complement tests at that consumer; those tests are
+now present.
 
-**[ASSUMED] Open questions for Codex:** whether the gate's producer-set
-derivation is actually extensible to non-map consumers, and what the
-false-positive rate is against the current tree. Claude did **not** read
-`scripts/check-status-enum-parity.js`; do not treat extensibility as settled.
+Extending the gate remains possible for a future concrete named pair, but no
+generic heuristic-consumer change is justified by this incident.
 
 ### Proposal 2 — make "verified" mean every suite touching the diff
 
 Finding 7 was not a judgment failure — Claude never asked which existing tests
-referenced the changed files. Proposal: a script taking `git diff --name-only`,
-grepping `tests/` (**including `tests/e2e/`**) for those paths and their exported
-symbols, and running what it finds. Smallest of the three and probably the
-highest yield: the stale spec would have surfaced within a minute of being
-broken rather than hours later from a reviewer.
+referenced the changed files. The proposed path/symbol grep is incomplete
+because tests often reach changed code through indirect imports, dynamic UI
+composition, or route calls.
+
+**Codex disposition: adopt the intent, not the proposed implementation.** Use
+Jest's related-test discovery for Jest-covered imports and maintain an explicit
+Playwright mapping for user flows because Jest cannot discover browser specs
+from a changed route or component. No repository-wide runner was added in this
+cleanup; designing one requires its own bounded contract and self-test.
 
 ### Proposal 3 — session scoping (owner-level, not automatable)
 
@@ -193,8 +197,48 @@ script across nine commits, with review only at the end. Proposal: when work
 crosses into new routes or new UI, it becomes its own session with review
 **before** commits accumulate.
 
+**Codex disposition: accepted as process guidance.** It does not require a code
+change. The isolated cleanup branch and pre-merge review are the corrective
+application for this work.
+
 ### What Claude explicitly does not propose
 
 Additional prose rules in `CLAUDE.md` or `.claude/rules`, or an undertaking to
 be more careful. Both are unfalsifiable and this session is evidence against
 them.
+
+---
+
+## Part 5 — Codex implementation review and corrections
+
+Codex found three additional behavioral gaps after the handoff:
+
+1. An incomplete `overrides` payload could silently fall back to live,
+   unreviewed template copy.
+2. Preview bound the recipient but not the Program Director sender, allowing a
+   reassignment between preview and send to mismatch the reviewed signature and
+   actual sender.
+3. Closing detection recognized a finite list of valedictions while claiming
+   to preserve any custom signature, so an arbitrary saved closing could receive
+   a second default closing.
+
+The cleanup branch fixes all three:
+
+- every selected suggestion in reviewed mode requires nonblank
+  `subject`, `bodyText`, `to`, `from`, and `senderId`;
+- recipient and sender identity are re-read and compared before any lifecycle
+  write;
+- Profile Settings persists an explicit “signature includes its own closing”
+  flag, and marked signatures are used verbatim; a bounded recognizer remains
+  only for preferences saved before the flag existed.
+
+Final-correction verification: focused contract run 9 suites / 110 tests;
+related-test impact run 63 suites / 652 tests; Playwright
+reviewer-invite/release flow 6/6 after a successful production build;
+TypeScript and targeted ESLint clean. The full Jest run had 524 suites / 6,262
+tests pass; its only failures were the three `selftest-fixture` tests because
+the auxiliary-worktree sandbox denied their temporary directories. The API-route
+self-test then passed outside that sandbox, status-parity self-test passed
+17/17, and the route, parity, docs, memory, fact, and secret gates are green.
+The independent final adversarial review remains required before merge
+readiness is declared.

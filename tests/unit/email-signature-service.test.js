@@ -39,18 +39,28 @@ test('tolerant reader prefers EMAIL_SIGNATURE and falls back to legacy SENDER_IN
   expect(readEmailSignaturePreference({
     [PREFERENCE_KEYS.EMAIL_SIGNATURE]: JSON.stringify({ name: 'New', email: 'new@example.org', signature: 'New block' }),
     [PREFERENCE_KEYS.SENDER_INFO]: JSON.stringify({ name: 'Old', email: 'old@example.org', signature: 'Old block' }),
-  })).toEqual({ name: 'New', email: 'new@example.org', signature: 'New block' });
+  })).toEqual({
+    name: 'New',
+    email: 'new@example.org',
+    signature: 'New block',
+    customClosing: false,
+  });
 
   expect(readEmailSignaturePreference({
     [PREFERENCE_KEYS.SENDER_INFO]: { name: 'Old', email: 'old@example.org', signature: 'Old block' },
-  })).toEqual({ name: 'Old', email: 'old@example.org', signature: 'Old block' });
+  })).toEqual({
+    name: 'Old',
+    email: 'old@example.org',
+    signature: 'Old block',
+    customClosing: false,
+  });
 });
 
 test('tolerant reader treats an empty unified key as intentional and does not resurrect legacy', () => {
   expect(readEmailSignaturePreference({
     [PREFERENCE_KEYS.EMAIL_SIGNATURE]: '',
     [PREFERENCE_KEYS.SENDER_INFO]: JSON.stringify({ name: 'Old', email: 'old@example.org', signature: 'Old block' }),
-  })).toEqual({ name: '', email: '', signature: '' });
+  })).toEqual({ name: '', email: '', signature: '', customClosing: false });
 });
 
 test('normalizes malformed string values into a signature block', () => {
@@ -58,7 +68,28 @@ test('normalizes malformed string values into a signature block', () => {
     name: '',
     email: '',
     signature: '{not json',
+    customClosing: false,
   });
+});
+
+test('legacy preferences recognize common closings without classifying identity-only blocks', () => {
+  expect(normalizeEmailSignatureValue(JSON.stringify({
+    signature: 'Best wishes,\nAvery Quinn',
+  })).customClosing).toBe(true);
+  expect(normalizeEmailSignatureValue(JSON.stringify({
+    signature: 'Senior Program Director\nW. M. Keck Foundation',
+  })).customClosing).toBe(false);
+});
+
+test('an explicit closing flag is authoritative for arbitrary or closing-like text', () => {
+  expect(normalizeEmailSignatureValue({
+    signature: 'Until next time,\nAvery Quinn',
+    customClosing: true,
+  }).customClosing).toBe(true);
+  expect(normalizeEmailSignatureValue({
+    signature: 'Sincerely,\nAvery Quinn',
+    customClosing: false,
+  }).customClosing).toBe(false);
 });
 
 test('profile resolver always ends with the Foundation line', () => {
@@ -68,16 +99,21 @@ test('profile resolver always ends with the Foundation line', () => {
     name: 'Avery Quinn',
     email: '',
     signature: 'Avery Quinn\nW. M. Keck Foundation',
-    isCustomSignature: true,
+    customClosing: false,
   });
 });
 
 test('a saved block that already names the Foundation is used verbatim (no duplicate line)', () => {
   const sig = 'Sincerely,\nAvery Quinn\n--\nAvery Quinn\nSenior Program Director\nW.M. Keck Foundation\nLos Angeles';
   const out = resolveSignatureForProfile({
-    [PREFERENCE_KEYS.EMAIL_SIGNATURE]: JSON.stringify({ name: 'Avery Quinn', signature: sig }),
+    [PREFERENCE_KEYS.EMAIL_SIGNATURE]: JSON.stringify({
+      name: 'Avery Quinn',
+      signature: sig,
+      customClosing: true,
+    }),
   });
   expect(out.signature).toBe(sig);
+  expect(out.customClosing).toBe(true);
   expect((out.signature.match(/Keck Foundation/g) || []).length).toBe(1);
 });
 
@@ -104,7 +140,7 @@ test('request resolver reads the assigned PD profile preference', async () => {
     name: 'Saved PD',
     email: 'saved@example.org',
     signature: 'Saved PD\nCustom title\nW. M. Keck Foundation',
-    isCustomSignature: true,
+    customClosing: false,
   });
   expect(resolveSystemUserToProfile).toHaveBeenCalledWith('sys-1');
   expect(DatabaseService.getUserPreferences).toHaveBeenCalledWith(7, false);
@@ -126,7 +162,7 @@ test('request resolver falls back to systemuser fullname when no profile matches
     name: 'Unmapped PD',
     email: 'unmapped@example.org',
     signature: 'Unmapped PD\nW. M. Keck Foundation',
-    isCustomSignature: false,
+    customClosing: false,
   });
   expect(DatabaseService.getUserPreferences).not.toHaveBeenCalled();
 });

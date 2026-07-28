@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 /**
  * ONE-SHOT DROP (appresearcher collapse, S213 — docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md Phase 5).
+ * COMPLETED S213; all three entities were reconfirmed absent on 2026-07-27.
+ * The historical snapshot is audit-only and the rollback window is closed.
+ * Do not rerun this destructive script without a new owner-reviewed plan.
+ *
  * POINT OF NO RETURN. Drops the wmkf_appresearcher sidecar + the two empty
  * publication tables AFTER the caller cutover (Phases 3–4) is live and smoke-
  * verified. The bibliometric data already lives on wmkf_potentialreviewers

@@ -63,9 +63,11 @@ throughput was too low to wait for. The objective is now satisfied.
   the success and failure `completeRun` paths. Smoke attribution requires the
   exact job in `completedJobIds`, never merely in the claimed set.
 
-The controlling analysis is the Session 362 review artifact
-`outputs/reviewer-identity-binding-production-smoke-adversarial-review-2026-07-13.md`
-(gitignored, local): §9 is the smoke contract, §5 records the original
+The controlling Session 362 analysis is reconciled into this tracked execution
+record; its byte-preserved private copy remains in the owner-only operational
+archive after the redundant ignored source was disposed on 2026-07-27 under
+`docs/audits/local-operational-data-retention-audit-2026-07-27.md`. Section 9
+of that archived review is the smoke contract, §5 records the original
 findings (F1 shipped there; F2 lease-loss and F3 blocked-retry classification
 are now resolved on this branch), and §10 records the owner gates.
 
@@ -167,8 +169,9 @@ the shipped F1 normalization at the self-report capture boundary.
   self-tests passed sequentially; `docs/DOCS_CATALOG.md` was regenerated.
 - Round-4 post-fix independent focused review: **NO FINDINGS**.
 - Production smoke passed on 2026-07-13 against the exact expected deployment;
-  cleanup passed and retained job `25`. Recovery artifact (gitignored, local):
-  `outputs/smoke-reviewer-binding-20260713232414-result.json`.
+  cleanup passed and retained job `25`. The recovery receipt remains
+  byte-preserved in the owner-only operational archive; its redundant ignored
+  source copy was disposed in the 2026-07-27 source-only cleanup.
 - A post-smoke Vercel error-level scan found no smoke failure. It did surface
   one unrelated PostgreSQL SSL-mode deprecation warning on
   `/api/cron/drain-submissions`; that request returned HTTP 200.

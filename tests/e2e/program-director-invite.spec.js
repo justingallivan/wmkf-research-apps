@@ -15,6 +15,8 @@ const REQUEST_ID = '00000000-0000-4000-8000-000000000001';
 const REQUEST_NUM = '1002788';
 const REVIEW_TOKEN = 'pd-e2e-reviewer-token';
 const TEST_EMAIL = 'berets.eyeful-0f@icloud.com';
+const PROGRAM_DIRECTOR_EMAIL = 'program.director@example.org';
+const PROGRAM_DIRECTOR_SYSTEMUSER_ID = '77777777-7777-4777-8777-777777777777';
 const NEXTAUTH_SECRET = 'e2e-throwaway-nextauth-secret-32-chars';
 
 function workbenchUrl(baseURL, sub = 'candidates') {
@@ -47,7 +49,7 @@ async function installStaffSession(context, baseURL) {
     token: {
       sub: 'pd-e2e-user',
       name: 'Program Director',
-      email: 'program.director@example.org',
+      email: PROGRAM_DIRECTOR_EMAIL,
       azureId: 'pd-e2e-azure-id',
       userType: 'staff',
       lastActivity: Date.now(),
@@ -246,6 +248,8 @@ async function installInviteMocks(context, baseURL, {
         status: 'ok',
         name: recipient?.name || 'Reviewer',
         to: recipient?.email || '',
+        from: PROGRAM_DIRECTOR_EMAIL,
+        senderId: PROGRAM_DIRECTOR_SYSTEMUSER_ID,
         subject: `Thank you — Request ${REQUEST_NUM}`,
         bodyText: `Dear ${recipient?.name || 'Reviewer'},\n\nThank you for considering this review.\n\nProgram Director`,
       };
@@ -260,6 +264,23 @@ async function installInviteMocks(context, baseURL, {
     const body = route.request().postDataJSON();
     withdrawBodies.push(body);
     const ids = new Set(body.suggestionIds || []);
+    const incompleteId = [...ids].find((suggestionId) => {
+      const override = body.overrides?.[suggestionId];
+      return !override?.subject?.trim()
+        || !override?.bodyText?.trim()
+        || !override?.to?.trim()
+        || !override?.from?.trim()
+        || !override?.senderId?.trim();
+    });
+    if (incompleteId) {
+      return route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: 'each selected suggestion requires complete subject, bodyText, to, from, and senderId overrides',
+        }),
+      });
+    }
     const results = [...ids].map((suggestionId) => ({
       suggestionId,
       status: withdrawStatuses[suggestionId] || 'withdrawn_emailed',
@@ -607,6 +628,8 @@ test.describe('Program Director reviewer invitation flow', () => {
           subject: 'Reviewed release subject',
           bodyText: 'Dear Dr. Pending Invitee,\n\nWe have completed the reviewer slate. Thank you.',
           to: TEST_EMAIL,
+          from: PROGRAM_DIRECTOR_EMAIL,
+          senderId: PROGRAM_DIRECTOR_SYSTEMUSER_ID,
         },
       },
     });

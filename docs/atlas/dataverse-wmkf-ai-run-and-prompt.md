@@ -73,10 +73,11 @@ Both written by `execute-prompt.js` `writeRunRow()`. Migration plans touching ei
   `codex-review-synthesis-multiselect-2026-07-26`. The final
   `prompt_publish_audit` row is `completed` with no warnings. Only the system
   prompt changed; v1's complete body/system/variables rollback payload and all
-  before/after hashes are preserved in
-  `outputs/review-form-multiselect/prompt-publication-evidence-2026-07-26.json`
+  before/after hashes remain in the owner-only archived publication receipt
   (SHA-256
   `50b7a4974e6bcd5e7dd1135bf1edd228f300fe42de406d5951c3ca10dbdbe428`).
+  Its redundant ignored source copy was disposed under
+  `docs/audits/local-operational-data-retention-audit-2026-07-27.md`.
 - **Controlled v2 executions (2026-07-26 and 2026-07-27):** three Request
   #1002788 synthesis attempts failed before writeback with
   `Claude output not valid JSON: Unexpected end of JSON input`. All resolved

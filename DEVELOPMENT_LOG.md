@@ -10,6 +10,26 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Ignored operational source disposal completed (Session 379)
+
+**Milestone:** The owner-approved local-retention review closed with a
+fail-closed disposal of the exact reviewed repository-side source scope.
+**Sessions:** 379.
+**Ship state:**
+- Removed 139 ignored, untracked regular files (15,287,781 bytes), with zero
+  failures and zero residual scoped regular files.
+- Preflight verified every source hash, all 82 archive-backed copies, all 20
+  separately preserved unique-source files, and strict source/archive
+  separation; five excluded dependency symlinks were not touched.
+- The owner-only organizational archive remains retained; reachable public Git
+  history remains an explicit unresolved privacy workstream.
+**Why it matters:** deleted ignored artifacts no longer masquerade as durable
+project memory, while preservation evidence and the unresolved public-history
+boundary remain retrievable from tracked, privacy-safe records.
+**Pointers:** `docs/audits/local-operational-data-retention-audit-2026-07-27.md`;
+`docs/audits/local-operational-source-disposal-receipt-2026-07-27.md`;
+`docs/audits/public-repository-pii-history-audit-2026-07-27.md`.
+
 ## July 2026 — Multiselect production smoke passes form pipeline, exposes synthesis defect (Session 376)
 
 **Milestone:** The first controlled production smoke of the published multiselect
@@ -27,8 +47,9 @@ synthesis.
 **Why it matters:** the form/storage/report contract is production-proven, while
 the release remains safely closed on a real synthesis-runtime defect rather than
 being declared green from unit coverage.
-**Pointers:** `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` §7/§9; gitignored
-`outputs/review-form-multiselect/primary-smoke-evidence-2026-07-26.json`.
+**Pointers:** `docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md` §7/§9;
+`docs/audits/local-operational-data-retention-audit-2026-07-27.md`;
+`docs/audits/local-operational-source-disposal-receipt-2026-07-27.md`.
 
 ## July 2026 — Dataverse target/write interlock enforced in production (Session 368)
 
@@ -65,7 +86,10 @@ to explicit fail-closed enforcement in local, Preview, and Production.
 - Synthetic Dataverse rows were deleted and absence-verified; the Wave 13 population returned to its pre-smoke baseline (person 1 / suggestion 0).
 - The completed Postgres queue row remains as the audit record by explicit owner decision.
 **Why it matters:** the first promoted Wave 13 writer path is now production-proven end to end, including deployment attribution and fail-closed recovery/cleanup, rather than only unit- and preflight-proven.
-**Pointers:** `docs/REVIEWER_BINDING_SMOKE_CODEX_HANDOFF.md`; commits `de60fb96`, `a872fbcf`, merge `5bb6a8b8`; local gitignored artifact `outputs/smoke-reviewer-binding-20260713232414-result.json`.
+**Pointers:** `docs/REVIEWER_BINDING_SMOKE_CODEX_HANDOFF.md`; commits `de60fb96`,
+`a872fbcf`, merge `5bb6a8b8`;
+`docs/audits/local-operational-data-retention-audit-2026-07-27.md`;
+`docs/audits/local-operational-source-disposal-receipt-2026-07-27.md`.
 
 ## July 2026 — BILL API integration tabled; address-based reviewer onboarding instead (Session 357)
 
