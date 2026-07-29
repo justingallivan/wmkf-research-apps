@@ -379,6 +379,85 @@ describe('researcher.upsertByPotentialReviewer — writes bibliometrics onto the
     expect(update.mock.calls[0][2].wmkf_emailsource).toBeUndefined(); // ordinary search: fill-only, not overwritten
   });
 
+  // S387: the narrow scholarly_multi upgrade became a general tier rule, because
+  // fill-if-empty pinned a person's address tier to whatever source happened to be
+  // recorded first. Live case (request 1002874): a stored `serp_search` kept an address
+  // research-only — unsendable — after another request's enrichment found the SAME
+  // address embedded in the reviewer's own PubMed affiliation string (`affiliation`).
+  test('a stronger tier upgrades a weaker stored source for the same address', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      wmkf_potentialreviewersid: 'pr-5',
+      wmkf_emailaddress: 'pmali@ucsd.edu',
+      wmkf_emailsource: 'serp_search',
+      _etag: 'W/"5"',
+    });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    await upsertByPotentialReviewer('pr-5', { email: 'pmali@ucsd.edu', emailSource: 'affiliation' });
+    expect(update.mock.calls[0][2].wmkf_emailsource).toBe('affiliation');
+    expect(update.mock.calls[0][3].ifMatch).toBe('W/"5"');
+  });
+
+  test('a weaker tier never downgrades a stored source, and an equal tier never churns it', async () => {
+    const get = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      wmkf_potentialreviewersid: 'pr-6',
+      wmkf_emailaddress: 'same@y.edu',
+      wmkf_emailsource: 'affiliation',
+      _etag: 'W/"6"',
+    });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    // Weaker (research_only) — must not touch the field.
+    await upsertByPotentialReviewer('pr-6', { email: 'same@y.edu', emailSource: 'serp_search' });
+    expect(update.mock.calls[0][2].wmkf_emailsource).toBeUndefined();
+
+    // Equal tier (quick_check → quick_check).
+    update.mockClear();
+    await upsertByPotentialReviewer('pr-6', { email: 'same@y.edu', emailSource: 'scholarly_single' });
+    expect(update.mock.calls[0][2].wmkf_emailsource).toBeUndefined();
+
+    // A staff attestation is not displaced by a same-tier machine source.
+    get.mockResolvedValue({
+      wmkf_potentialreviewersid: 'pr-6',
+      wmkf_emailaddress: 'same@y.edu',
+      wmkf_emailsource: 'staff_verified',
+      _etag: 'W/"6"',
+    });
+    update.mockClear();
+    await upsertByPotentialReviewer('pr-6', { email: 'same@y.edu', emailSource: 'affiliation' });
+    expect(update.mock.calls[0][2].wmkf_emailsource).toBeUndefined();
+  });
+
+  test('an upgrade requires the same address, a known incoming source, and an ETag', async () => {
+    const get = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      wmkf_potentialreviewersid: 'pr-7',
+      wmkf_emailaddress: 'same@y.edu',
+      wmkf_emailsource: 'serp_search',
+      _etag: 'W/"7"',
+    });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    // Different address — the source describes one specific address, so no relabelling.
+    await upsertByPotentialReviewer('pr-7', { email: 'other@y.edu', emailSource: 'affiliation' });
+    expect(update.mock.calls[0][2].wmkf_emailsource).toBeUndefined();
+
+    // Unrecognized incoming source earns no precedence.
+    update.mockClear();
+    await upsertByPotentialReviewer('pr-7', { email: 'same@y.edu', emailSource: 'not_a_real_source' });
+    expect(update.mock.calls[0][2].wmkf_emailsource).toBeUndefined();
+
+    // No ETag → no unconditional overwrite.
+    get.mockResolvedValue({
+      wmkf_potentialreviewersid: 'pr-7',
+      wmkf_emailaddress: 'same@y.edu',
+      wmkf_emailsource: 'serp_search',
+    });
+    update.mockClear();
+    await upsertByPotentialReviewer('pr-7', { email: 'same@y.edu', emailSource: 'affiliation' });
+    expect(update.mock.calls[0][2].wmkf_emailsource).toBeUndefined();
+    expect(update.mock.calls[0][3]?.ifMatch).toBeUndefined();
+  });
+
   test('scholarly_multi upgrades only the exact stored email and never displaces a ready source', async () => {
     const get = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
       wmkf_potentialreviewersid: 'pr-4',

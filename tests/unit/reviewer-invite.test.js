@@ -5,7 +5,14 @@
  * to an already-invited candidate is skipped unless an explicit re-invite, while
  * materials/followup/thankyou stay re-sendable.
  */
-const { shouldSkipDuplicateInvitation, sendAllowsAttachments, recipientMayReceiveAttachments, emailConfidence } = require('../../lib/utils/reviewer-invite');
+const {
+  shouldSkipDuplicateInvitation,
+  sendAllowsAttachments,
+  recipientMayReceiveAttachments,
+  emailConfidence,
+  emailSourceTier,
+  emailSourceOutranks,
+} = require('../../lib/utils/reviewer-invite');
 
 describe('shouldSkipDuplicateInvitation', () => {
   test('skips an already-invited invitation by default', () => {
@@ -130,5 +137,55 @@ describe('emailConfidence — Slice G invite-confidence gate', () => {
       level: 'low',
       action: 'missing',
     });
+  });
+});
+
+// S387: address-provenance precedence. `emailSourceTier` is a SECOND statement of the
+// same source→tier facts emailConfidence encodes in its branch order, so the first test
+// here locks them together — if a source is ever added to one and not the other, this
+// fails rather than silently letting the adapter and the send gate disagree.
+describe('emailSourceTier / emailSourceOutranks', () => {
+  const KNOWN_SOURCES = [
+    'orcid', 'institution_page', 'scholarly_multi',
+    'manual', 'staff_verified', 'affiliation', 'scholarly_single', 'pubmed',
+    'serp_search', 'claude_search', 'search_contested',
+  ];
+
+  test('every known source tiers exactly as emailConfidence classifies it', () => {
+    for (const source of KNOWN_SOURCES) {
+      expect(emailSourceTier(source)).toBe(emailConfidence({ wmkf_emailsource: source }).action);
+    }
+  });
+
+  test('an unknown or absent source earns no precedence claim, though it stays sendable-with-check', () => {
+    for (const source of ['', null, undefined, 'not_a_real_source']) {
+      expect(emailSourceTier(source)).toBeNull();
+    }
+    // Deliberate asymmetry: the live send gate still asks for a human check rather than
+    // refusing an unrecognized source outright.
+    expect(emailConfidence({ wmkf_emailsource: 'not_a_real_source' }).action).toBe('quick_check');
+  });
+
+  test('case and surrounding whitespace do not change the tier', () => {
+    expect(emailSourceTier('  ORCID ')).toBe('ready');
+    expect(emailSourceTier('Serp_Search')).toBe('research_only');
+  });
+
+  test('outranking is strict, directional, and only between known sources', () => {
+    // The live case this was built for: request 1002874, an affiliation-embedded address
+    // pinned behind a stored serp_search value.
+    expect(emailSourceOutranks('affiliation', 'serp_search')).toBe(true);
+    expect(emailSourceOutranks('serp_search', 'affiliation')).toBe(false);
+    expect(emailSourceOutranks('scholarly_multi', 'pubmed')).toBe(true);
+    expect(emailSourceOutranks('orcid', 'staff_verified')).toBe(true);
+    // Equal tier never outranks — no churn, and a staff attestation is not displaced by a
+    // same-tier machine source.
+    expect(emailSourceOutranks('affiliation', 'staff_verified')).toBe(false);
+    expect(emailSourceOutranks('orcid', 'institution_page')).toBe(false);
+    expect(emailSourceOutranks('serp_search', 'claude_search')).toBe(false);
+    // Unknown on either side answers false in BOTH directions.
+    expect(emailSourceOutranks('affiliation', 'not_a_real_source')).toBe(false);
+    expect(emailSourceOutranks('not_a_real_source', 'serp_search')).toBe(false);
+    expect(emailSourceOutranks('affiliation', null)).toBe(false);
   });
 });

@@ -151,6 +151,27 @@ only). Manual email edits stamp `emailSource='manual'`. The researcher adapter t
 and `search_contested` as authoritative source overwrites so stale provenance cannot make an
 address look more trusted than it is.
 
+**Source PRECEDENCE (S387).** `wmkf_emailsource` used to be fill-if-empty apart from those two
+overwrites and a narrow `scholarly_multi` upgrade, so the FIRST source ever recorded for a person
+pinned their address tier permanently — a reviewer captured as `serp_search` stayed
+`research_only` (unsendable) even after another request's enrichment found the SAME address in
+their own PubMed affiliation string. `researcher.upsertByPotentialReviewer` now lets a strictly
+stronger tier supersede a weaker one, where the tier ranking is `ready` > `quick check` >
+`research only` and is derived from `emailSourceTier`/`emailSourceOutranks` in
+`lib/utils/reviewer-invite.js` — the same module that defines the send-gate buckets, so the
+adapter cannot disagree with the gate about which source is stronger. Preconditions: the SAME
+normalized address (a source describes one specific address), both sides a KNOWN source (an
+unrecognized value neither upgrades nor is upgraded, even though the live gate still treats it as
+quick-check), strictly greater (an equal tier never churns the value, so a staff attestation is
+not displaced by a same-tier machine source), and ETag-conditional. Downgrades remain explicit —
+only `manual`/`search_contested` overwrite, because those are safety assertions rather than
+evidence claims. NOTE the deliberate consequence: `ready` first-party evidence for the same
+address DOES supersede a `manual`/`staff_verified` value, which removes that recipient's
+send-time acknowledgement; the tier ranking is applied uniformly rather than exempting
+human-entered values. Existing pinned rows are corrected by
+`scripts/backfill-email-source-precedence.mjs` (dry-run default; writes route through the adapter
+inside `withDalContext`, so DAL enforcement and the target/write interlock both apply).
+
 **Why.** The API is the enforced boundary — the modal acknowledgement alone is not trusted.
 
 ---
