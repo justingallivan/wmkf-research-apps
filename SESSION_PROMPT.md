@@ -1,4 +1,4 @@
-# Session 387 Prompt: Build the governed Initial Assessment pilot
+# Session 387 Prompt: Complete and provision the Initial Assessment pilot
 
 ## Session 386 Summary
 
@@ -89,18 +89,16 @@ next returning machine does not repeat it.
 
 ### Verified Open
 
-1. **Build the governed Initial Assessment pilot.**
+1. **Complete review, commit, and prepare live provisioning for the Initial Assessment pilot.**
    Evidence: `docs/CURRENT_WORK_QUEUE.md` rows 1-2;
    `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`;
    `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
-   [VERIFIED 2026-07-29] Zero `.js`/`.mjs`/`.sql` files anywhere in the repo
-   (checked the complement set too — `scripts/`, `tests/`, and migrations, not
-   just `lib/`/`pages/`/`shared/`) match `initial[-_ ]?assessment`, so no
-   implementation exists yet. Build the smallest
-   complete producer → SharePoint artifact → Dataverse registry →
-   Workbench/Editor Dashboard read path for the 2026-08-10 human pilot. Blocked
-   in part by the owner decisions below, but the shared governed-artifact spine
-   and the SharePoint/Dataverse plumbing do not depend on the template choice.
+   [VERIFIED 2026-07-29 via source, focused tests, gates, DOCX render, and
+   production build] Branch `codex/initial-assessment-pilot` implements the
+   smallest complete producer → `Artifacts/Initial Assessment/` SharePoint
+   artifact → Dataverse registry → Workbench/Editor Dashboard read path.
+   Live provisioning and the human pilot remain gated by the named environment,
+   designated proposal, authorized testers, and SharePoint control verification.
 
 2. **Run the Q9 ordinary-user app-access smoke in the office.**
    Evidence: `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md:47,245,428`;
@@ -116,18 +114,15 @@ next returning machine does not repeat it.
    Evidence: `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
    Gates the 2026-08-10 pilot; intake begins around 2026-08-18.
 
-2. **First approved Initial Assessment prompt/template pair.**
-   Evidence: `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
-   The D26 structure is a starting point only. Preserve the decided
-   applicant-title (`akoya_title`) and staff-authored Foundation Opportunity
-   requirements.
-
-3. **Artifact registry and SharePoint target-library controls.**
+2. **SharePoint target-library controls.**
    Evidence: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
-   Finalize exact Dataverse schema plus SharePoint version, restore, recycle,
-   retention, permission, and milestone-snapshot behavior.
+   The exact pilot registry schema, prompt/template pair, applicant-title
+   (`akoya_title`) source, and staff-authored Foundation Opportunity requirement
+   are implemented in source. Verify SharePoint version, restore, recycle,
+   retention, permission, and milestone-snapshot behavior in the chosen live
+   environment.
 
-4. **Later Site Visit operational details.**
+3. **Later Site Visit operational details.**
    Evidence: `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
    Sender/reply-to and lead-PD copy behavior need staff coordination.
    Notification audience/window, large-file scanner, and transcript workflow
@@ -145,7 +140,9 @@ next returning machine does not repeat it.
 ### Verify Before Acting
 
 1. **Re-probe live Dataverse/SharePoint state** before schema, migration, or
-   production claims. The Initial Assessment flow remains planned, not built.
+   production claims. The Initial Assessment flow is implemented on
+   `codex/initial-assessment-pilot`, but its Dataverse table, prompt row, and
+   real SharePoint artifact are not provisioned or verified live.
 2. **Re-read the live governed prompt rows** before publishing or modifying any
    prompt.
 3. `codex/local-main-preserved-20260728` is recovery-only historical provenance,

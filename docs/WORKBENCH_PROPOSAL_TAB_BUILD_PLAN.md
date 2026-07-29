@@ -37,10 +37,11 @@ replaces the SharePoint read-pain workaround" (`docs/mockups/lifecycle-ui-mockup
 **In:** the Proposal tab, three stacked sections (below); Field Primer PD-triggered
 generation + persistence + regenerate; the enabling route/app-access/helper work.
 
-**Out (J27 / future, do NOT build here):**
-- `wmkf_requestdocument` Dataverse table for direct doc references — converging but
-  undecided; D26 uses the SharePoint filename-match bridge. See
-  `[[project-j27-doc-capture-evolution]]`.
+**Out (not part of this historical Proposal-tab slice):**
+- `wmkf_requestdocument` direct artifact references. The Initial Assessment
+  pilot implemented this registry in source on 2026-07-29; live provisioning
+  remains gated. D26 proposal-input discovery still uses the SharePoint
+  filename-match bridge. See `[[project-j27-doc-capture-evolution]]`.
 - ~~Un-scaffolding the reviewer hold step (contingent on J27 single-submission).~~
   Done early — the hold step was RETIRED in S279 (onboarding-at-accept), independent of J27.
 - Rendering the structured budget (`wmkf_proposalbudgetline`) — show the two scalar

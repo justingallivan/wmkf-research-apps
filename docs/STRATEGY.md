@@ -135,9 +135,9 @@ index and workflow surface, not a second editor or document store.
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
 
-1. deliver the governed-artifact foundation and a human-in-the-loop,
-   end-to-end Initial Assessment pilot by 2026-08-10, ahead of proposal intake
-   around 2026-08-18. Authorized staff must generate from a designated real
+1. provision and exercise the source-built governed-artifact foundation in a
+   human-in-the-loop, end-to-end Initial Assessment pilot by 2026-08-10, ahead
+   of proposal intake around 2026-08-18. Authorized staff must generate from a designated real
    test proposal, inspect and edit the canonical SharePoint Word artifact, find
    and open the same registered file from both the Workbench and staff-wide
    Editor Dashboard, and exercise one safe failure/retry path;

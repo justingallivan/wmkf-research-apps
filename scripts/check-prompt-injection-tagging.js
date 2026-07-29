@@ -408,6 +408,17 @@ const SURFACES = [
     promptFiles: ['shared/config/prompts/review-synthesis.js'],
     callSiteFiles: ['lib/services/execute-prompt.js'],
   },
+  {
+    // Executor-driven (initial-assessment.generate, via the Request Workbench).
+    // Proposal text is declared untrusted in the seed script; the Executor
+    // supplies nonce wrapping + hardening preamble. Foundation Opportunity is
+    // not a prompt output and remains staff-owned in the DOCX template.
+    id: 'initial-assessment-generate',
+    inv: 29,
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/initial-assessment.js'],
+    callSiteFiles: ['lib/services/execute-prompt.js'],
+  },
 ];
 
 // Prompt-builder files known NOT to be untrusted-content surfaces (so the

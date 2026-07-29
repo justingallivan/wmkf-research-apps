@@ -128,13 +128,16 @@ document inventory, and individual implementation plans do not establish priorit
   coordination with a program coordinator.
   Exact token, schema/read model, validation, folder, retention,
   summary-quality, and partial-failure contracts remain planned.
-- Editor Dashboard direction (owner-confirmed 2026-07-28): preserve Allison's
+- Editor Dashboard direction (owner-confirmed 2026-07-28; pilot list implemented
+  in source 2026-07-29): preserve Allison's
   former single-folder editing workflow with a staff-wide cycle list of
   governed writeups, direct Open in Word, and an explicit per-editor Reviewed
-  tracker. All PDs are expected eventually to evaluate the materials and
-  designated staff proofreaders also need access. It reuses the typed registry
-  and canonical SharePoint file; it is not a second editor. Marker granularity,
-  coordinator view, and the enforced app/file access key remain open.
+  tracker. The pilot cycle list/direct Word entry uses the existing `reviewers`
+  app grant; live SharePoint permission verification remains pending. All PDs
+  are expected eventually to evaluate the materials and designated staff
+  proofreaders also need access. It reuses the typed registry and canonical
+  SharePoint file; it is not a second editor. Marker granularity and coordinator
+  view remain open.
 - Calendar direction (owner-confirmed 2026-07-28): the first fixed gate is a
   human-in-the-loop, end-to-end Initial Assessment pilot by 2026-08-10, before
   proposals begin arriving around 2026-08-18. Authorized staff must generate

@@ -1,0 +1,15 @@
+{
+  "name": "akoya_request_initial_assessment_pointer",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "relationships": [
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_request_currentinitialassessment",
+      "referencedEntity": "wmkf_requestdocument",
+      "lookupSchemaName": "wmkf_CurrentInitialAssessment",
+      "lookupDisplayName": "Current Initial Assessment",
+      "lookupDescription": "Canonical governed Initial Assessment for this request. Updated atomically with Ready activation and prior-artifact supersession."
+    }
+  ]
+}
