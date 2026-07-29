@@ -123,6 +123,9 @@ async function create(email, requestNum) {
     wmkf_firstname: 'ZZZ Smoke',
     wmkf_lastname: 'Test (DELETE)',
     wmkf_emailaddress: email,
+    // S387: an address is never created without its provenance, fixtures included — this
+    // row is real to every reader (including the invite send gate) while it exists.
+    wmkf_emailsource: 'manual',
     wmkf_organizationname: 'Smoke Test Institution',
     wmkf_areaofexpertise: 'smoke test',
     wmkf_whyreviewerwaschosen: 'Throwaway candidate for the Workbench invite end-to-end smoke. Safe to delete.',

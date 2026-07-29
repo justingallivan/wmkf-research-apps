@@ -184,11 +184,17 @@ it, so every CALLER must supply a source. Three successive reviews each found a 
 previous claim had missed, so the invariant is now enforced by a scanner rather than by
 enumeration: `tests/unit/email-source-pairing-invariant.test.js` walks `lib/`, `pages/`,
 `scripts/`, and `shared/`, extracts each `create`/`upsertByEmail`/`update` call's object literal,
-and fails when one passes `email` without `emailSource`. It carries a positive control (a literal
-of the exact production shape both reviews found) so an empty scan cannot pass silently, and an
-explicit — currently empty — exemption set, so skipping a site requires arguing for it in code.
-That scanner immediately found five call sites neither review named, including a live one in
-`contact-enrichment/persistence.js`; all are now paired. The one remaining source-only writer is deliberate — the `verifyEmailAddress`
+and fails when one passes `email` without `emailSource`. A second scan covers RAW Dataverse
+payloads that set `wmkf_emailaddress` directly, bypassing the adapter (smoke tests and probes do
+this, and the adapter cannot enforce anything about them). It carries a positive control (a
+literal of the exact production shape the reviews found) so an empty or broken scan cannot pass
+silently, and an exemption set where each entry states its reason. That scanner found **seven**
+sites the three reviews never named — a live one in `contact-enrichment/persistence.js`, two
+historical backfills, three fixture/smoke scripts, and one raw smoke payload — all now paired.
+Two entries are exempt and argued in code: the field-DESCRIPTION map in
+`shared/config/prompts/dynamics-explorer.js` (documentation, not a write) and
+`scripts/probe-merge-altkey-ordering.mjs` (its purpose is to observe `wmkf_emailaddress_unique`
+alt-key behavior by setting the address alone; pairing would change what it measures). The one remaining source-only writer is deliberate — the `verifyEmailAddress`
 attestation, which re-labels the address ALREADY stored and is ETag-guarded, so it has no address
 to pair with. Previously each of these wrote the address, then
 the source, in two calls — so an address that landed while the source write failed left the row

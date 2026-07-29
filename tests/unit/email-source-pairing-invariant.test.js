@@ -29,9 +29,19 @@ const CALL_PATTERNS = [
   /\bcreatePotentialReviewer\s*\(/g,
 ];
 
-// Deliberate exemptions, each with a reason. Empty by design: adding one should require
-// arguing for it here rather than quietly omitting a source.
-const EXEMPT = new Set([]);
+// Deliberate exemptions, each with its reason stated. Adding one requires arguing for it
+// here rather than quietly omitting a source. These two are NOT writers of application
+// state in the sense the invariant governs:
+const EXEMPT = new Set([
+  // A field-DESCRIPTION map inside a prompt (`wmkf_emailaddress: 'string — email'`), not a
+  // write payload. It documents the entity's shape for the model; pairing a doc entry with
+  // a provenance entry would be meaningless.
+  'shared/config/prompts/dynamics-explorer.js',
+  // A probe whose entire PURPOSE is to observe Dataverse's `wmkf_emailaddress_unique`
+  // alt-key behavior — it sets the address alone, deliberately, to see which orderings 412.
+  // Adding a source would change what it measures, and it writes throwaway probe rows.
+  'scripts/probe-merge-altkey-ordering.mjs',
+]);
 
 function listFiles(dir) {
   const out = [];
@@ -70,6 +80,45 @@ function objectLiteralAfter(text, from) {
   return null;
 }
 
+/** Balanced-brace slice of the object literal ENCLOSING `index`, or null. */
+function enclosingObjectLiteral(text, index) {
+  let depth = 0;
+  let open = -1;
+  for (let i = index; i >= 0; i--) {
+    if (text[i] === '}') depth += 1;
+    else if (text[i] === '{') {
+      if (depth === 0) { open = i; break; }
+      depth -= 1;
+    }
+  }
+  if (open === -1) return null;
+  return objectLiteralAfter(text, open);
+}
+
+/**
+ * Second class of writer: a RAW Dataverse payload that sets `wmkf_emailaddress` directly,
+ * bypassing the adapter (smoke tests and probes do this). The adapter cannot enforce
+ * anything about these, so the scan has to see them too — `$select` strings are naturally
+ * excluded because they list fields comma-separated, without a colon.
+ */
+function rawPayloadViolationsIn(file) {
+  const text = fs.readFileSync(file, 'utf8');
+  const rel = path.relative(ROOT, file);
+  if (EXEMPT.has(rel)) return [];
+  const found = [];
+  const pattern = /wmkf_emailaddress\s*:/g;
+  let match = pattern.exec(text);
+  while (match) {
+    const literal = enclosingObjectLiteral(text, match.index);
+    if (literal && !/wmkf_emailsource/.test(literal)) {
+      const line = text.slice(0, match.index).split('\n').length;
+      found.push(`${rel}:${line} — raw payload sets wmkf_emailaddress with no wmkf_emailsource`);
+    }
+    match = pattern.exec(text);
+  }
+  return found;
+}
+
 function violationsIn(file) {
   const text = fs.readFileSync(file, 'utf8');
   const rel = path.relative(ROOT, file);
@@ -92,6 +141,11 @@ function violationsIn(file) {
 
 test('every potential-reviewer write that sets an address also sets its provenance', () => {
   const violations = SCAN_DIRS.flatMap((dir) => listFiles(dir).flatMap(violationsIn));
+  expect(violations).toEqual([]);
+});
+
+test('no raw Dataverse payload sets the address field without its source field', () => {
+  const violations = SCAN_DIRS.flatMap((dir) => listFiles(dir).flatMap(rawPayloadViolationsIn));
   expect(violations).toEqual([]);
 });
 
