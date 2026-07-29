@@ -201,12 +201,13 @@ persistence contract must not be reused without an explicit design review.
 
 Minimum whole-flow invariants:
 
-1. An authorized workflow sends an expiring, request-scoped link. The actor
-   who triggers the request, recipient/contact selection, and lifecycle timing
-   remain product decisions. The token supports explicit expiry and revocation
-   and cannot be supplied as an arbitrary destination selector. The owner
-   expects little need after the Site Visit date, but the exact expiry
-   default/maximum remains open.
+1. An authorized staff user manually triggers an expiring, request-scoped
+   link. Entering or changing the Site Visit date never sends it automatically.
+   Exact staff-role eligibility, visible sender/reply-to, recipient/contact
+   selection, and lifecycle timing remain product decisions. The token supports
+   explicit expiry and revocation and cannot be supplied as an arbitrary
+   destination selector. The owner expects little need after the Site Visit
+   date, but the exact expiry default/maximum remains open.
 2. The external recipient sees only the request identity, instructions, and
    the permitted **applicant slides** and **other applicant materials**
    categories. The recipient cannot upload recordings, transcripts, transcript
@@ -238,10 +239,11 @@ Minimum whole-flow invariants:
    designated staff. The additional staff audience, batching, and message
    timing remain open.
 
-Exact email trigger/sender, recipient/contact binding, lifecycle timing, token
-implementation and expiry, cross-contact file-management scope, schema, folder,
-size/count limits, notification audience/timing, retention, and delete/replace
-persistence and recovery behavior remain open design decisions.
+Exact authorized staff roles, sender/reply-to, recipient/contact binding,
+lifecycle timing, token implementation and expiry, cross-contact
+file-management scope, schema, folder, size/count limits, notification
+audience/timing, retention, and delete/replace persistence and recovery
+behavior remain open design decisions.
 
 ### Cycle-wide Editor Dashboard contract
 

@@ -276,11 +276,12 @@ their evidence provenance is unambiguous.
 **[VERIFIED via owner decision 2026-07-28; implementation PLANNED.]**
 A narrow **Site Visit Materials Upload** surface is planned within the
 Workbench lifecycle. It does not reopen the parked general applicant-intake
-product. An authorized future workflow sends a request-scoped, expiring link;
-the triggering actor, recipient selection, and lifecycle timing still require
-product design. The owner expects little reason for access after the Site Visit
-date, but the exact default/maximum expiry remains negotiable rather than
-locked.
+product. An authorized staff user manually triggers the request from the Site
+Visit workflow. Entering or changing a visit date does not send the email
+automatically. The exact authorized staff roles, visible sender/reply-to,
+recipient selection, and lifecycle timing still require product design. The
+owner expects little reason for access after the Site Visit date, but the exact
+default/maximum expiry remains negotiable rather than locked.
 
 The recipient sees only the request identity, upload instructions, permitted
 material types, and the applicant files they are authorized to manage. The
@@ -452,9 +453,11 @@ Decision order:
    contract.
 2. **Site Visit** — the dossier metadata, six material categories,
    paste-friendly observations shape, and basic applicant file-management
-   behavior are owner-decided. Next freeze the request-email trigger,
-   recipient/timing/expiry, applicant-file ownership and recovery, and
-   recording/transcript/summary contracts plus persistence and access.
+   behavior are owner-decided. The materials request is a manual staff action,
+   not a date-driven automatic send. Next freeze the authorized staff roles,
+   sender identity, recipient/timing/expiry, applicant-file ownership and
+   recovery, and recording/transcript/summary contracts plus persistence and
+   access.
 3. **Final Writeup** — freeze the selected-Pre-Site copy/lineage contract and
    the visit, late-review, and editorial inputs.
 4. **Initial Assessment** — design for every in-scope J27 proposal before
@@ -578,7 +581,9 @@ Owner-decided:
 21. applicant-facing material formats limited to PDF and PPTX;
 22. additional uploads allowed while access remains active; and
 23. applicant-material changes notify the lead PD and other designated staff,
-    with the additional audience still to be decided.
+    with the additional audience still to be decided; and
+24. the applicant-material request is manually staff-triggered rather than
+    automatically sent when the Site Visit is scheduled or its date changes.
 
 Still required:
 
@@ -589,7 +594,7 @@ Still required:
 4. target-library version, retention, recycle, and permission audit;
 5. exact Dataverse schema and dossier read model for the decided Site Visit
    metadata, material categories, and observations;
-6. Site Visit Materials Upload request-email trigger, sender/actor,
+6. Site Visit Materials Upload authorized staff roles, visible sender/reply-to,
    recipient/contact binding, lifecycle timing, token expiry/revocation,
    cross-contact file visibility, file size/count limits, destination,
    delete/replace persistence and recovery, idempotency, partial-failure

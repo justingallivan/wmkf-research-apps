@@ -145,9 +145,11 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    revision workflow is planned absent observed need, but the applicant upload
    surface explicitly supports recoverable delete/replace. It accepts PDF/PPTX,
    permits additional uploads while access remains active, and notifies the
-   lead PD plus other designated staff after successful changes. The
-   request-email trigger, recipients, timing, exact expiry, cross-contact file
-   scope, size/count limits, and notification audience remain open. Pre-Site
+   lead PD plus other designated staff after successful changes. An authorized
+   staff user manually triggers the request; entering or changing the Site
+   Visit date never sends it automatically. Exact requester roles, visible
+   sender/reply-to, recipients, timing, expiry, cross-contact file scope,
+   size/count limits, and notification audience remain open. Pre-Site
    distributions and Final remain linked writeups rather than Site Visit
    material categories. This narrow request-scoped applicant-material link
    does not reopen the parked general intake product. Prefer an acceptable
@@ -171,9 +173,9 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    collaborator audience, marker granularity, coordinator view, access key,
    and delivery date remain open.
    Exact schema/read model, first Pre-Site prompt/template pair, library
-   configuration, later-stage inputs, upload request/recipient/timing/expiry
-   and token/validation/recovery behavior, and transcript-summary quality
-   contract are still open.
+   configuration, later-stage inputs, upload requester permissions,
+   sender/recipient/timing/expiry and token/validation/recovery behavior, and
+   transcript-summary quality contract are still open.
 
 ### Owner Decision Needed
 
