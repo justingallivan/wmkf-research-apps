@@ -86,9 +86,11 @@ document inventory, and individual implementation plans do not establish priorit
   without reopening the parked general intake product; it accepts PDF/PPTX and
   additional uploads while active, and successful changes notify the lead PD
   plus other designated staff. An authorized staff user manually triggers the
-  request; a visit-date change never sends it automatically. Exact requester
-  roles, sender identity, recipients, timing, expiry, cross-contact file scope,
-  limits, and notification audience remain open. Prefer an acceptable
+  request; a visit-date change never sends it automatically. Recipient choices
+  are the Dataverse-linked liaison and PI—normally liaison in To, or PI in To
+  with liaison optionally copied. Exact requester roles, sender identity,
+  CC/link entitlement, timing, expiry, cross-contact file scope, limits, and
+  notification audience remain open. Prefer an acceptable
   transcription-platform summary before a deliberate suite LLM fallback.
   Exact token, schema/read model, validation, folder, retention,
   summary-quality, and partial-failure contracts remain planned.

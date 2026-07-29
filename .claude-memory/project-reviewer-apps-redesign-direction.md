@@ -53,15 +53,16 @@ delete/replace rather than inferred replacement. It accepts PDF/PPTX, permits
 additional uploads while access remains active, and notifies the lead PD plus
 other designated staff after successful changes. An authorized staff user
 manually triggers the request; entering or changing the Site Visit date never
-sends it automatically. Exact requester roles, visible sender/reply-to,
-recipients, timing, expiry, cross-contact file scope, size/count limits, and
-notification audience remain open. Pre-Site distributions and Final remain
-linked writeups, not dossier material categories. The narrow expiring
-request-scoped applicant-material upload link does not reopen the parked
-general applicant-intake product. Prefer an acceptable
-transcription-platform summary before a deliberate suite LLM fallback.
-Implementation, schema/read model, token/validation/recovery behavior, and
-summary-quality contracts remain planned. Current authority is
+sends it automatically. Recipient choices are the Dataverse-linked liaison and
+PI—normally liaison in To, or PI in To with liaison optionally copied. Exact
+requester roles, visible sender/reply-to, CC/link entitlement, timing, expiry,
+cross-contact file scope, size/count limits, and notification audience remain
+open. Pre-Site distributions and Final remain linked writeups, not dossier
+material categories. The narrow expiring request-scoped applicant-material
+upload link does not reopen the parked general applicant-intake product.
+Prefer an acceptable transcription-platform summary before a deliberate suite
+LLM fallback. Implementation, schema/read model, token/validation/recovery
+behavior, and summary-quality contracts remain planned. Current authority is
 `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` and
 `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
 

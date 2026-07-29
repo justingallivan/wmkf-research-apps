@@ -203,47 +203,55 @@ Minimum whole-flow invariants:
 
 1. An authorized staff user manually triggers an expiring, request-scoped
    link. Entering or changing the Site Visit date never sends it automatically.
-   Exact staff-role eligibility, visible sender/reply-to, recipient/contact
-   selection, and lifecycle timing remain product decisions. The token supports
-   explicit expiry and revocation and cannot be supplied as an arbitrary
-   destination selector. The owner expects little need after the Site Visit
-   date, but the exact expiry default/maximum remains open.
-2. The external recipient sees only the request identity, instructions, and
+   Exact staff-role eligibility, visible sender/reply-to, and lifecycle timing
+   remain product decisions. The token supports explicit expiry and revocation
+   and cannot be supplied as an arbitrary destination selector. The owner
+   expects little need after the Site Visit date, but the exact expiry
+   default/maximum remains open.
+2. Recipient choices are the request's Dataverse-linked liaison and PI. The
+   normal default is the liaison in **To**; staff may instead address the PI
+   and optionally copy the liaison. The server resolves the selected contacts
+   and current email addresses from Dataverse at send time; the minimum product
+   has no free-form recipient requirement. Missing/duplicate contact handling
+   remains open. To/CC does not itself grant portal rights: whether a copied
+   liaison receives an independent link, shared management rights, or
+   notification only remains a separate decision.
+3. The external recipient sees only the request identity, instructions, and
    the permitted **applicant slides** and **other applicant materials**
    categories. The recipient cannot upload recordings, transcripts, transcript
    summaries, or staff observations; browse Dataverse or SharePoint; choose
    another request; or supply a drive, folder, item, or record identifier.
-3. The server resolves the request, Site Visit context, and server-controlled
+4. The server resolves the request, Site Visit context, and server-controlled
    SharePoint destination from the validated token.
-4. Applicant uploads are limited to **PDF** and **PPTX**. Before persistence,
+5. Applicant uploads are limited to **PDF** and **PPTX**. Before persistence,
    the server enforces rate, size, file-count, extension, MIME/magic-byte, and
    malware checks and normalizes the stored filename/path.
-5. Successful bytes end in the governed SharePoint location and a typed
+6. Successful bytes end in the governed SharePoint location and a typed
    Dataverse registry row records stable identity and provenance. A temporary
    Blob location, if later chosen for scanning, is transit rather than the
    durable source of truth.
-6. The implementation must define idempotency and compensate safely when the
+7. The implementation must define idempotency and compensate safely when the
    SharePoint write succeeds but registry creation fails, or vice versa.
    Staff must see a retryable, auditable state rather than an unregistered
    orphan or false success.
-7. Additional uploads are allowed while access remains active. The external
+8. Additional uploads are allowed while access remains active. The external
    surface lists only the applicant files the token holder is authorized to
    manage and supports explicit delete and replace actions. Exact visibility
    and management rights across multiple applicant contacts remain open.
-8. A replacement first uploads and registers the new file successfully; only
+9. A replacement first uploads and registers the new file successfully; only
    then may the prior file be retired or recycled. A failed replacement leaves
    the prior file intact. Delete and replacement accept only a server-resolved
    opaque artifact identity scoped to the request/token, never a client-supplied
    SharePoint path, and preserve an audit/recovery trail.
-9. Successful applicant-material changes notify the lead PD and other
+10. Successful applicant-material changes notify the lead PD and other
    designated staff. The additional staff audience, batching, and message
    timing remain open.
 
-Exact authorized staff roles, sender/reply-to, recipient/contact binding,
-lifecycle timing, token implementation and expiry, cross-contact
-file-management scope, schema, folder, size/count limits, notification
-audience/timing, retention, and delete/replace persistence and recovery
-behavior remain open design decisions.
+Exact authorized staff roles, sender/reply-to, missing/duplicate contact
+handling, CC/link-entitlement behavior, lifecycle timing, token implementation
+and expiry, cross-contact file-management scope, schema, folder, size/count
+limits, notification audience/timing, retention, and delete/replace persistence
+and recovery behavior remain open design decisions.
 
 ### Cycle-wide Editor Dashboard contract
 

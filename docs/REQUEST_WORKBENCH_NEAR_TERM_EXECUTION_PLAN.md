@@ -279,7 +279,12 @@ Workbench lifecycle. It does not reopen the parked general applicant-intake
 product. An authorized staff user manually triggers the request from the Site
 Visit workflow. Entering or changing a visit date does not send the email
 automatically. The exact authorized staff roles, visible sender/reply-to,
-recipient selection, and lifecycle timing still require product design. The
+and lifecycle timing still require product design. Recipient choices come from
+the request's Dataverse-linked liaison and PI. The normal default is the
+liaison in **To**; staff may instead address the PI and optionally copy the
+liaison. The server re-resolves the selected contacts and email addresses from
+Dataverse at send time rather than trusting client-supplied addresses. No
+free-form recipient requirement is established for the minimum product. The
 owner expects little reason for access after the Site Visit date, but the exact
 default/maximum expiry remains negotiable rather than locked.
 
@@ -300,6 +305,11 @@ recoverable, and the exact cross-contact visibility and underlying
 SharePoint/Dataverse replacement mechanism remain open. Recording, transcript,
 transcript summary, and staff observations remain staff- or system-side
 categories and are never manageable through this link.
+
+The email's **To/CC** model does not by itself decide portal authorization.
+Whether a copied liaison receives file-management rights, receives an
+independent contact-bound link, or receives notification only remains an open
+security/product decision.
 
 A successful applicant-material change should notify the lead PD and other
 designated staff. The exact additional staff audience, event batching, and
@@ -455,9 +465,9 @@ Decision order:
    paste-friendly observations shape, and basic applicant file-management
    behavior are owner-decided. The materials request is a manual staff action,
    not a date-driven automatic send. Next freeze the authorized staff roles,
-   sender identity, recipient/timing/expiry, applicant-file ownership and
-   recovery, and recording/transcript/summary contracts plus persistence and
-   access.
+   sender identity, CC/link-entitlement behavior, timing/expiry,
+   applicant-file ownership and recovery, and recording/transcript/summary
+   contracts plus persistence and access.
 3. **Final Writeup** — freeze the selected-Pre-Site copy/lineage contract and
    the visit, late-review, and editorial inputs.
 4. **Initial Assessment** — design for every in-scope J27 proposal before
@@ -583,7 +593,11 @@ Owner-decided:
 23. applicant-material changes notify the lead PD and other designated staff,
     with the additional audience still to be decided; and
 24. the applicant-material request is manually staff-triggered rather than
-    automatically sent when the Site Visit is scheduled or its date changes.
+    automatically sent when the Site Visit is scheduled or its date changes;
+    and
+25. request recipients are selected from the Dataverse-linked liaison and PI,
+    normally the liaison in To, with the option to address the PI and copy the
+    liaison.
 
 Still required:
 
@@ -595,10 +609,11 @@ Still required:
 5. exact Dataverse schema and dossier read model for the decided Site Visit
    metadata, material categories, and observations;
 6. Site Visit Materials Upload authorized staff roles, visible sender/reply-to,
-   recipient/contact binding, lifecycle timing, token expiry/revocation,
-   cross-contact file visibility, file size/count limits, destination,
-   delete/replace persistence and recovery, idempotency, partial-failure
-   recovery, exact notification audience/timing, audit, and retention;
+   missing/duplicate contact handling, whether CC confers portal access,
+   lifecycle timing, token expiry/revocation, cross-contact file visibility,
+   file size/count limits, destination, delete/replace persistence and
+   recovery, idempotency, partial-failure recovery, exact notification
+   audience/timing, audit, and retention;
 7. approved transcription provider/output contract, summary quality fallback,
    and transcript/summary refresh behavior;
 8. Final Writeup creation inputs and source-version selection behavior; and
