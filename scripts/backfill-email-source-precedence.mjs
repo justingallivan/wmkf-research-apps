@@ -101,11 +101,16 @@ for (const row of rosterRows) {
   if (!current || emailSourceOutranks(pair.source, current)) bestByEmail.set(email, pair.source);
 }
 
+let personsScanned = 0;
 const plan = await withDalContext('backfill-email-source-precedence-scan', async () => {
-  const { records } = await potentialReviewerAdapter.queryReviewers({
+  // queryAllReviewers, NOT queryReviewers: the latter returns ONE 25-row page plus
+  // `hasMore`, so the first successful run of this script scanned 25 of ~385 person rows
+  // and reported "0 pinned" — a vacuous clean result indistinguishable from a real one.
+  const { records } = await potentialReviewerAdapter.queryAllReviewers({
     select: 'wmkf_potentialreviewersid,wmkf_name,wmkf_emailaddress,wmkf_emailsource',
     filter: 'wmkf_emailaddress ne null and wmkf_emailsource ne null',
   });
+  personsScanned = (records || []).length;
   const out = [];
   for (const person of records || []) {
     const email = String(person.wmkf_emailaddress || '').trim();
@@ -133,8 +138,15 @@ const blocked = plan.filter((p) => p.storedTier === 'research_only');
 console.log(`Address-provenance precedence backfill (${execute ? 'EXECUTE' : 'DRY RUN'})`);
 console.log(`  roster rows contributing evidence: ${rosterRowsConsidered} (rejected by the envelope / pairing check: ${rosterRowsRejected})`);
 console.log(`  roster addresses with an asserted source: ${bestByEmail.size}`);
+// Print the DENOMINATOR. "0 pinned" out of 25 scanned and "0 pinned" out of 385 scanned look
+// identical without it, and the first version of this script silently reported the former.
+console.log(`  person rows scanned (address + source): ${personsScanned}`);
 console.log(`  person rows pinned below available evidence: ${plan.length}`);
 console.log(`    currently research_only (NOT invitable today): ${blocked.length}\n`);
+if (personsScanned === 0) {
+  console.error('REFUSED: the person query returned nothing. That is a broken read, not an empty population.');
+  process.exit(1);
+}
 for (const p of plan) {
   console.log(`  ${(p.name || '').padEnd(24)} ${p.email.padEnd(34)} ${p.stored} (${p.storedTier}) → ${p.best} (${p.bestTier})`);
 }

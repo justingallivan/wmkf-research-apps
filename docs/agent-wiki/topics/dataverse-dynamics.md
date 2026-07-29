@@ -102,6 +102,19 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
 
 ## Operating Notes
 
+- **`queryRecords` returns ONE PAGE (25 rows) plus `hasMore` — a sweep that ignores it
+  reports a vacuous clean result (S387).** `DynamicsService.queryRecords` (and every
+  adapter passthrough over it, e.g. `potential-reviewer.queryReviewers`) is page-at-a-time;
+  `DynamicsService.queryAllRecords` is the auto-paginating form, exposed for the person
+  entity as `potential-reviewer.queryAllReviewers`. Live cost of getting this wrong: a
+  maintenance backfill scanned 25 of 385 person rows and printed "0 rows pinned below
+  available evidence" — indistinguishable from a genuinely clean population, and it had
+  survived three adversarial reviews plus a Codex fix pass because none of them ran it.
+  Rule: whenever the ANSWER depends on having seen every row, use the `All` variant, and
+  print the DENOMINATOR (rows scanned) next to the numerator so a broken read cannot look
+  like an empty result set. `[VERIFIED 2026-07-29 — probe returned records=25,
+  hasMore=true against a 385-row filtered population]`
+
 - **Data-access layer migration is COMPLETE as of Stage 8 (S329): all 9
   stages executed in one session.** `lib/dataverse/core/` (odata / entity-registry
   / errors / changeset / context) + 18 per-entity adapters `[VERIFIED via
