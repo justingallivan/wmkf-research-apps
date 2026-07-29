@@ -135,11 +135,12 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    Search supplies file-body search; version recovery, retention,
    least-privilege editing, and immutable Board milestones are required.
    Initial Assessment, Pre-Site, and Final are three separate documents; Final
-   is copied from a deliberately selected Pre-Site version. Site Visit is a
-   dossier rather than a fourth writeup. Its logistics are date, time/time
-   zone, format, location/link, lead PD, WMKF staff, applicant participants,
-   and Board/consultant participants; no separate visit-status field is
-   needed. Its categories are applicant slides, other applicant materials,
+   is copied from the latest Pre-Site version at action time, with a rare
+   explicit regeneration option that preserves the prior Final content. Site
+   Visit is a dossier rather than a fourth writeup. Its logistics are date,
+   time/time zone, format, location/link, lead PD, WMKF staff, applicant
+   participants, and Board/consultant participants; no separate visit-status
+   field is needed. Its categories are applicant slides, other applicant materials,
    recording, transcript, transcript summary, and one paste-friendly staff-
    observations area without per-entry timestamps. No general material-
    revision workflow is planned absent observed need, but the applicant upload
@@ -147,9 +148,11 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    permits additional uploads while access remains active, and is capped at
    1 GB per file and 20 current applicant files per request. Files land in the
    request's governed SharePoint folder under
-   `Site Visit/Applicant Materials/Slides` or `Other`. It sends an
-   automated email to the lead PD plus the still-to-be-defined relevant staff
-   audience after every successful upload, replacement, or deletion. An
+   `Site Visit/Applicant Materials/Slides` or `Other`. Successful uploads,
+   replacements, and deletions are batched into a short automated digest to the
+   lead PD plus the still-to-be-defined relevant staff audience; a program
+   coordinator may be included, but must not be hard-coded as the only
+   additional recipient. An
    authorized staff user manually triggers the request; entering or changing
    the Site Visit date never sends it automatically. Recipient choices are the
    Dataverse-linked liaison and PI—normally liaison in To, or PI in To with
@@ -172,9 +175,9 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    access may send, resend, or reissue. Exact visible sender/reply-to and
    lead-PD copy behavior remain open pending the owner's discussion with
    staff. Historically, non-PD staff sent these requests without PD
-   involvement; that is context, not the future contract. Standalone
-   revocation, the large-file scanner contract, and the additional notification
-   audience/batching remain open.
+   involvement; that is context, not the future contract. No standalone Revoke
+   action is needed in the minimum product. The large-file scanner contract and
+   the additional notification audience/digest window remain open.
    SharePoint is the byte store; a new resumable Graph upload-session path is
    required because the current buffered helper stops at 60 MB. Dataverse holds
    the artifact registry and Postgres only expiring-link/resumable-session
@@ -196,17 +199,21 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    and the retained PDF route still uses `createSummarizationPrompt()`; the new
    Dataverse-native pipeline must adopt and iterate the governed prompt rather
    than extend the sunset route.
-   Allison is the confirmed primary user for a planned cycle-wide Editor
+   Allison is a confirmed primary user for a planned staff-wide cycle Editor
    Dashboard that replaces designated-folder browsing with one governed
-   writeup list, direct Open in Word, and personal Reviewed tracking. Exact
-   collaborator audience, marker granularity, coordinator view, access key,
-   and delivery date remain open.
+   writeup list, direct Open in Word, and personal Reviewed tracking. All PDs
+   are expected eventually to evaluate the materials and designated staff
+   proofreaders also need access. Marker granularity, coordinator view, and
+   enforced app/file access remain open.
+   The first fixed delivery gate is draft-functional operation by 2026-08-10,
+   before proposal intake begins around 2026-08-18. The exact minimum feature
+   set included in that gate still must be enumerated.
    Exact schema/read model, first Pre-Site prompt/template pair, library
-   configuration, later-stage inputs, sender/reply-to and lead-PD copy behavior
-   after staff coordination, standalone revocation,
-   token/validation/recovery behavior, large-file scanner implementation,
-   additional notification-audience/batching, and
-   transcript-summary quality contract are still open.
+   configuration, safe Final regeneration details and any inputs beyond the
+   latest Pre-Site copy, sender/reply-to and lead-PD copy behavior after staff
+   coordination, token/validation/recovery behavior, large-file scanner
+   implementation, additional notification audience/digest window, and the
+   transcript-summary quality contract after PC coordination are still open.
 
 ### Owner Decision Needed
 

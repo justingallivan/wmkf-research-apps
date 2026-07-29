@@ -58,9 +58,10 @@ document inventory, and individual implementation plans do not establish priorit
   body search; version recovery, retention, least-privilege editing, and frozen
   Board milestones are required parts of the design. Initial Assessment,
   Pre-Site, and Final are three distinct documents; Final is copied from a
-  selected Pre-Site version. Exact schema and target-library configuration
-  remain planned/unverified. See `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and
-  the near-term plan.
+  the latest Pre-Site version at action time, with a rare explicit regeneration
+  option that preserves prior Final content. Exact schema and target-library
+  configuration remain planned/unverified. See
+  `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
 - Pre-Site input direction (owner-decided 2026-07-28): draft factual material
   from the full proposal through an iterated governed `phase-ii.summarize`;
   supply authoritative request metadata from Dataverse; use
@@ -87,9 +88,11 @@ document inventory, and individual implementation plans do not establish priorit
   additional uploads while active, capped at 1 GB per file and 20 current
   applicant files per request. Files land inside the request's governed
   SharePoint folder under `Site Visit/Applicant Materials/Slides` or `Other`.
-  Every successful upload, replacement, or
-  deletion sends an automated email to the lead PD plus the still-to-be-defined
-  relevant staff audience. An authorized staff user manually triggers the
+  Successful uploads, replacements, and deletions are batched into a short
+  automated digest to the lead PD plus the still-to-be-defined relevant staff
+  audience. A program coordinator may be among the recipients, but the design
+  must not hard-code that role as the only additional recipient. An authorized
+  staff user manually triggers the
   request; a visit-date change never sends it automatically. Recipient choices
   are the Dataverse-linked liaison and PI—normally liaison in To, or PI in To
   with liaison optionally copied. Missing, invalid, or duplicate selected
@@ -107,26 +110,34 @@ document inventory, and individual implementation plans do not establish priorit
   Resend preserves the active link and original expiry; Reissue/restart stages
   a replacement and revokes the old link only after the new invitation is
   accepted for sending, so a failed replacement does not destroy a still-active
-  link. Any staff member with Workbench Site Visit
+  link. No standalone Revoke action is needed in the minimum product. Any
+  staff member with Workbench Site Visit
   access may send, resend, or reissue. Exact sender/reply-to and lead-PD copy
   behavior remain open pending the owner's staff discussion; historically,
   non-PD staff sent these requests without PD involvement, but that is not yet
-  the future contract. Standalone revocation, the large-file scanner contract,
-  and the additional notification audience/batching remain open. SharePoint
+  the future contract. The large-file scanner contract and the additional
+  notification audience/digest window remain open. SharePoint
   remains the byte store; a new
   resumable Graph upload-session path is required because the current buffered
   helper stops at 60 MB. Dataverse holds the artifact registry and Postgres only
   the expiring-link/resumable-session workflow state.
   Prefer an acceptable
   transcription-platform summary before a deliberate suite LLM fallback.
+  Transcript provider, handoff, timing, and ownership details remain pending
+  coordination with a program coordinator.
   Exact token, schema/read model, validation, folder, retention,
   summary-quality, and partial-failure contracts remain planned.
 - Editor Dashboard direction (owner-confirmed 2026-07-28): preserve Allison's
-  former single-folder editing workflow with a cycle-wide list of governed
-  writeups, direct Open in Word, and an explicit per-editor Reviewed tracker.
-  It reuses the typed registry and canonical SharePoint file; it is not a
-  second editor. Exact collaborator audience, marker granularity, coordinator
-  view, access key, and delivery date remain open. See the near-term plan.
+  former single-folder editing workflow with a staff-wide cycle list of
+  governed writeups, direct Open in Word, and an explicit per-editor Reviewed
+  tracker. All PDs are expected eventually to evaluate the materials and
+  designated staff proofreaders also need access. It reuses the typed registry
+  and canonical SharePoint file; it is not a second editor. Marker granularity,
+  coordinator view, and the enforced app/file access key remain open.
+- Calendar direction (owner-confirmed 2026-07-28): the first fixed gate is a
+  draft-functional workflow by 2026-08-10, before proposals begin arriving
+  around 2026-08-18. The exact feature set included in that first gate still
+  must be enumerated. See the near-term plan.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel: `project-virtual-review-panel`.
 - Roadmap snapshots: `project-app-roadmap-2026-04-25`, `project-phase-i-summary-app-winddown`.

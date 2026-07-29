@@ -97,10 +97,12 @@ not a durable join contract.
 ### Writeup lineage and distribution
 
 The three writeup stages are three separate Word documents. The Final Writeup
-is created once from a staff-selected version of the Pre Site Visit Writeup.
-The registry must retain the source artifact identity and exact source
-version/hash used for that operation; subsequent edits do not keep the two
-documents synchronized.
+is created from the latest version of the Pre Site Visit Writeup available when
+staff invokes the action. The registry must retain the source artifact identity
+and exact source version/hash used for that operation; subsequent edits do not
+keep the two documents synchronized. Staff may rarely invoke a deliberate
+regenerate-from-latest action, but it must preserve the prior Final version and
+must never silently overwrite staff edits.
 
 The Pre-Site stable proposal core may exist before every review is received.
 It is drafted from the full proposal through an iterated governed
@@ -175,6 +177,10 @@ call. A suite LLM run is a deliberate fallback when no platform summary exists,
 staff explicitly requests one, or the platform result fails the approved
 quality contract.
 
+The operational transcript workflow must be coordinated with a program
+coordinator; provider, handoff, timing, and ownership details remain pending
+that discussion.
+
 For every summary, the registry must preserve the producer/system and relevant
 version, source transcript item plus version/hash, generation time, lifecycle
 state, and current/stale relationship to the transcript. A changed transcript
@@ -224,7 +230,9 @@ Minimum whole-flow invariants:
    new invitation must be accepted by the email transport before the old
    active link is revoked and the replacement becomes active. A failed
    replacement therefore leaves a still-active prior link usable; if none was
-   active, staff may restart again.
+   active, staff may restart again. The minimum product has no standalone
+   Revoke action: normal access ends through the 60-day expiry, while Reissue
+   uses the underlying revocation state only to retire the superseded link.
 2. Recipient choices are the request's Dataverse-linked liaison and PI. The
    normal default is the liaison in **To**; staff may instead address the PI
    and optionally copy the liaison. The server resolves the selected contacts
@@ -283,17 +291,20 @@ Minimum whole-flow invariants:
    version/recycle recovery protects the bytes. The minimum product gives
    neither applicants nor Workbench users a custom restore control; authorized
    staff recover through SharePoint when needed.
-10. Every successful upload, replacement, or deletion sends an automated email
-    to the lead PD and the relevant staff audience. The additional staff
-    recipients and any batching/digest behavior remain open.
+10. Successful uploads, replacements, and deletions are batched into a short
+    automated digest to the lead PD and the relevant staff audience rather than
+    generating one message per operation. A program coordinator may be among
+    the recipients, but changing staffing means that role must not be
+    hard-coded as the only additional recipient. The exact staff-recipient
+    policy and short batching window remain open.
 11. Staff audit display identifies the action, file name, category, size,
     timestamp, request, and shared-link identity. It does not claim whether the
     PI or liaison acted. Applicants receive no activity log.
 
 Exact sender/reply-to and lead-PD copy behavior after owner/staff coordination,
-standalone revocation, exact registry schema and target-library configuration,
-large-file malware-scanning contract, additional notification
-audience/batching, and retention remain open design decisions.
+exact registry schema and target-library configuration, large-file
+malware-scanning contract, additional notification audience and short-digest
+window, and retention remain open design decisions.
 
 ### Applicant large-file infrastructure boundary
 
@@ -328,11 +339,11 @@ and [PostgreSQL limits](https://www.postgresql.org/docs/current/limits.html).
 
 ### Cycle-wide Editor Dashboard contract
 
-Allison is the confirmed primary user for a cycle-wide editing surface; other
-writeup collaborators may be included once the audience is approved. The
-dashboard must replace the useful affordance of the former designated
-SharePoint folder—a single browsable set of writeups—without copying the files
-or rebuilding Word editing.
+Allison is a confirmed primary user for a staff-wide cycle editing surface.
+All PDs are expected eventually to evaluate the materials, and designated
+staff proofreaders also need access. The dashboard must replace the useful
+affordance of the former designated SharePoint folder—a single browsable set of
+writeups—without copying the files or rebuilding Word editing.
 
 It should list the registered artifacts by cycle and expose request identity,
 institution, program/PD, artifact type/stage, lifecycle state, current version,
@@ -344,9 +355,11 @@ a secondary hint because no edits can mean either “reviewed; no changes” or
 
 The Reviewed marker requires durable per-editor state, likely a child row keyed
 to the editor and registered artifact. Its exact granularity (request versus
-artifact stage), coordinator matrix, access key, and deadline remain design
-decisions. App list visibility and SharePoint edit permission are separate
-authorization boundaries; passing one must not imply the other.
+artifact stage), coordinator matrix, and access key remain design decisions.
+The first draft-functional delivery gate is 2026-08-10, before proposal intake
+begins around 2026-08-18; the exact feature set included in that gate still
+must be enumerated. App list visibility and SharePoint edit permission are
+separate authorization boundaries; passing one must not imply the other.
 
 ### Search contract
 

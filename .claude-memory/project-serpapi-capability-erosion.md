@@ -58,8 +58,9 @@ discovered 2026-06-28). This is the data source the parked admin-observability i
   = **259** when checked; the billing cycle resets ~the 20th (account created 2025-11-20), so 259
   was only ~8 days of a cycle → a full cycle projects to ~900–1,000 at that rate — which is exactly
   why Developer (5,000), not Starter (1,000): a peak review cycle (~3 residual SerpAPI calls/candidate:
-  contact #1 + PubPeer #6 + news #7) could clear 1,000. Re-check a full peak cycle (J27 ~Dec 2026)
-  before considering Starter. Ladder: Free $0/250 · Starter $25/1k · Developer $75/5k · Production
+  contact #1 + PubPeer #6 + news #7) could clear 1,000. Re-check a full peak
+  J27 reviewer-work window—proposal intake now begins around 2026-08-18—before
+  considering Starter. Ladder: Free $0/250 · Starter $25/1k · Developer $75/5k · Production
   $150/15k · Big Data $275/30k.
 - Full migration plan + per-slice disposition: `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md`.
 

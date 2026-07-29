@@ -30,14 +30,14 @@ the Atlas, tests, and live probes.
 
 ## Calendar gate
 
-The work is ordered below, but exact calendar dates cannot be assigned until the owner
-provides:
+The first fixed owner deadline is **2026-08-10**: the new workflow must be
+functional in draft form no later than that date, ahead of proposal intake
+beginning around **2026-08-18**. The exact minimum feature set included in
+“functional in draft form” still needs to be enumerated before implementation
+is scheduled; do not silently interpret it as every later-cycle tab.
 
-1. each fixed deadline;
-2. the audience using the system at that deadline; and
-3. the minimum artifact or action that must work by that date.
-
-Until then, “Week 1/2/3” are relative execution windows, not delivery promises.
+“Week 1/2/3” below remain relative execution windows until that minimum
+August 10 outcome and the later lifecycle deadlines are assigned.
 
 ## Owner-decided lifecycle and document foundations — 2026-07-28
 
@@ -71,7 +71,7 @@ advancement must exist before advancement and for every in-scope proposal.
 - The Workbench is the per-request creation, discovery, preview, open-in-Word,
   workflow, milestone, and authorized recovery surface.
 - A planned cycle-wide **Editor Dashboard** is the cross-request discovery and
-  progress surface for Allison and other approved writeup collaborators. It
+  progress surface for Allison and the staff-wide writeup audience. It
   opens the same registered SharePoint artifacts; it does not create another
   editable copy.
 - Do not maintain a second independently editable copy of the Word body in a
@@ -106,8 +106,10 @@ Allison historically reviewed and edited writeups from one designated
 SharePoint folder. Removing that folder-browsing workflow must not force her to
 open each request separately in the Workbench.
 
-The planned replacement is an **Editor Dashboard**, not the broader historical
-“Executive Dashboard” proposal. Its minimum contract is:
+The planned replacement is a staff-wide **Editor Dashboard**, not the broader
+historical “Executive Dashboard” proposal. Allison remains a primary user, but
+all PDs are expected eventually to evaluate the materials and designated staff
+proofreaders also need access. Its minimum contract is:
 
 - one cycle-scoped list of registered writeup artifacts, with request,
   institution, program/PD, artifact stage, lifecycle state, and last-modified
@@ -121,10 +123,12 @@ The planned replacement is an **Editor Dashboard**, not the broader historical
 
 “Reviewed” is a progress signal, not an approval gate. SharePoint revisions or
 tracked changes may provide a secondary “has edits” hint, but they cannot
-replace the explicit marker. The exact approved collaborator group, marker
-granularity (request versus artifact stage), coordinator view, app-access key,
-and delivery deadline remain open. App visibility and SharePoint file
-permission are separate controls and both must be enforced.
+replace the explicit marker. The audience direction is staff-wide, including
+all PDs and designated staff proofreaders; exact app/file authorization still
+must be enforced rather than inferred from employment. Marker granularity
+(request versus artifact stage), coordinator view, and app-access key remain
+open. The first draft-functional delivery gate is August 10. App visibility
+and SharePoint file permission are separate controls and both must be enforced.
 
 The detailed target contract and current-vs-planned boundary live in
 `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
@@ -143,19 +147,22 @@ The three writeup stages are three distinct governed Word documents:
    Every distribution version must state its review coverage and as-of time,
    and the Workbench must mark the working document stale when later review
    evidence arrives.
-3. **Final Writeup** — a separate Word document created from a deliberately
-   selected Pre Site Visit version. The registry must preserve the source
-   artifact and source version used for that copy. The Final then evolves
-   independently as the PD incorporates the visit, late reviews, transcript
-   evidence, and staff edits.
+3. **Final Writeup** — a separate Word document created from the latest
+   Pre Site Visit version available when staff invokes creation. The registry
+   must preserve the source artifact and exact source version used for that
+   copy. The Final then evolves independently as the PD incorporates the visit,
+   late reviews, transcript evidence, and staff edits. A rare, explicit
+   regenerate-from-latest action is required, but it must preserve the prior
+   Final version and must never silently overwrite staff edits.
 
 There is no fourth “Site Visit Writeup.” The Site Visit tab is a dossier that
 brings together structured visit metadata, applicant slides and other
 applicant materials, recordings, transcripts and their derived summaries, and
 staff observations. Pre-Site distribution snapshots and the Final Writeup
 remain linked lifecycle documents rather than Site Visit material categories.
-“Create Final Writeup” copies the selected Pre-Site version into the separate
-Final artifact; it does not rename or overwrite the Pre-Site document.
+“Create Final Writeup” copies the latest Pre-Site version at action time into
+the separate Final artifact; it does not rename or overwrite the Pre-Site
+document.
 
 Internal staff receive the canonical Word link. When a Board member or
 consultant without staff access joins a visit, the minimum external
@@ -314,6 +321,12 @@ new invitation, and only then activate the replacement and revoke the old
 link. If no active link exists, a failed attempt leaves none active and staff
 may restart again.
 
+The minimum product has no standalone **Revoke upload link** action. The
+Foundation wants the invited recipients to respond, normal access ends through
+the 60-day expiry, and Reissue already revokes the superseded link as part of a
+safe replacement. This does not remove the underlying revocation state needed
+to enforce Reissue.
+
 The recipient sees only the request identity, upload instructions, permitted
 material types, and the applicant files they are authorized to manage. The
 recipient must not select a Dataverse record, SharePoint folder, or destination
@@ -360,10 +373,13 @@ the SharePoint file and Dataverse registry state are reconciled, must preserve
 the prior working file when replacement fails, and must expose a retryable
 staff-visible exception instead of silently orphaning or deleting evidence.
 
-Every successful applicant-material upload, replacement, or deletion sends an
-automated email to the lead PD and the relevant staff audience. The exact
-additional staff recipients and any batching/digest behavior remain to be
-decided alongside the request-email workflow.
+Successful applicant-material uploads, replacements, and deletions are
+summarized in a short automated digest rather than generating one email per
+operation. The digest goes to the lead PD and the relevant staff audience. A
+designated program coordinator may be part of that audience, but staffing is
+changing and the product must not hard-code the PC as the only additional
+recipient. The exact recipient policy and short batching window remain to be
+settled with staff.
 
 **[VERIFIED 2026-07-28 via current source and vendor documentation; feature
 implementation PLANNED.]** File bytes belong in SharePoint, not Postgres or
@@ -389,6 +405,9 @@ summary is a deliberate fallback when the platform supplies none, staff
 requests regeneration, or the supplied summary fails the approved quality
 contract. The registry must identify the summary producer/system, source
 transcript item and version/hash, generation time, and current/stale state.
+The operational transcript workflow still requires coordination with a
+program coordinator; provider, handoff, timing, and ownership details remain
+pending.
 
 ## Production review-synthesis smoke — reliability proven
 
@@ -531,12 +550,12 @@ Decision order:
    paste-friendly observations shape, and basic applicant file-management
    behavior are owner-decided. The materials request is a manual staff action,
    not a date-driven automatic send. Next freeze the sender/reply-to and
-   lead-PD copy behavior after the owner's staff discussion, plus standalone
-   revocation, the exact automated-notification audience, and the large-file
-   scanner contract, plus recording/transcript/summary contracts and
-   persistence/access.
-3. **Final Writeup** — freeze the selected-Pre-Site copy/lineage contract and
-   the visit, late-review, and editorial inputs.
+   lead-PD copy behavior after the owner's staff discussion, plus the exact
+   automated-notification audience and digest window, the large-file scanner
+   contract, recording/transcript/summary contracts, and persistence/access.
+3. **Final Writeup** — freeze the latest-Pre-Site copy/lineage contract, safe
+   explicit regeneration behavior, and the visit, late-review, and editorial
+   inputs.
 4. **Initial Assessment** — design for every in-scope J27 proposal before
    staff/Board advancement deliberation. The current D26 Initial Writeup
    placeholder remains historical and requires no backfill.
@@ -554,7 +573,10 @@ Explicit non-goals during design freeze:
 
 ## Week 2–3 — build the first complete writeup slice
 
-The default candidate is Pre Site Visit Writeup, subject to the calendar gate.
+The build order must now be tested against the August 10 draft-functional gate
+and the August 18 proposal-intake date. The exact minimum August 10 feature set
+is still required before the former default candidate—Pre Site Visit
+Writeup—can be treated as the first slice.
 
 Build in producer-to-consumer order:
 
@@ -585,9 +607,10 @@ official milestone can be proven independently of later working edits.
   including the narrow applicant-material request/upload flow, only after the
   exact metadata, token, validation, persistence, and recovery contracts are
   approved.
-- **Final Writeup:** create a distinct artifact from a selected Pre-Site
-  version, preserve that lineage, and add the approved visit and late-review
-  inputs.
+- **Final Writeup:** create a distinct artifact from the latest Pre-Site
+  version at action time, preserve that lineage, and add the approved visit
+  and late-review inputs. A deliberate rare regeneration preserves the prior
+  Final version and never silently overwrites staff edits.
 - **Initial Assessment:** reuse the proven artifact path for every in-scope J27
   proposal before the staff/Board advancement decision.
 - **Editor Dashboard:** reuse the typed registry and artifact read contract to
@@ -623,8 +646,8 @@ Owner-decided:
    milestones as required parts of the artifact contract;
 6. preserving Allison's cycle-wide review/edit workflow through a planned
    Editor Dashboard rather than requiring per-request Workbench navigation;
-7. three distinct writeup documents, with Final copied from a deliberately
-   selected Pre-Site version and no separate Site Visit Writeup;
+7. three distinct writeup documents, with Final copied from the latest
+   Pre-Site version at action time and no separate Site Visit Writeup;
 8. the Site Visit tab as a dossier for metadata, applicant materials,
    recording, transcript, derived summary, and staff observations;
 9. PDF attachment as the sufficient external Pre-Site distribution path;
@@ -657,9 +680,11 @@ Owner-decided:
     file-recovery layer;
 21. applicant-facing material formats limited to PDF and PPTX;
 22. additional uploads allowed while access remains active; and
-23. applicant-material changes notify the lead PD and other designated staff,
-    through an automated email after every successful upload, replacement, or
-    deletion, with the additional audience and batching still to be decided;
+23. applicant-material changes notify the lead PD and other relevant staff
+    through a short automated digest rather than a message per operation; the
+    exact additional audience and batching window still require staff input,
+    and the design must not hard-code a program coordinator as the only
+    additional recipient;
     and
 24. the applicant-material request is manually staff-triggered rather than
     automatically sent when the Site Visit is scheduled or its date changes;
@@ -697,11 +722,24 @@ Owner-decided:
     attribution; applicants do not receive an activity log; and
 36. applicant files land inside the request's governed SharePoint folder under
     `Site Visit/Applicant Materials/Slides` or
-    `Site Visit/Applicant Materials/Other`.
+    `Site Visit/Applicant Materials/Other`;
+37. no standalone applicant-upload-link revocation action is needed in the
+    minimum product; normal access ends at 60 days and Reissue revokes the
+    superseded link;
+38. Final Writeup creation uses the latest Pre-Site version available at action
+    time, records that exact lineage, and offers a rare deliberate regeneration
+    path that preserves prior Final content;
+39. the Editor Dashboard audience is staff-wide, including all PDs and
+    designated staff proofreaders, subject to explicit app and SharePoint file
+    authorization; and
+40. the first fixed gate is draft-functional delivery by 2026-08-10, before
+    proposal intake begins around 2026-08-18; the exact minimum feature set for
+    that gate still must be enumerated.
 
 Still required:
 
-1. fixed deadlines and minimum outcomes;
+1. the exact minimum feature set for the August 10 draft-functional gate and
+   deadlines for later lifecycle stages;
 2. first approved Pre-Site Word template and prompt/template compatibility
    contract;
 3. exact Dataverse registry schema and target-library configuration for the
@@ -710,12 +748,13 @@ Still required:
 5. exact Dataverse schema and dossier read model for the decided Site Visit
    metadata, material categories, and observations;
 6. Site Visit Materials Upload visible sender/reply-to and lead-PD copy
-   behavior after owner/staff coordination, standalone revocation,
-   large-file malware scanning, idempotency, partial-failure
-   recovery, exact additional notification audience/batching, audit, and
-   retention;
+   behavior after owner/staff coordination, large-file malware scanning,
+   idempotency, partial-failure recovery, exact additional notification
+   audience and short-digest window, audit, and retention;
 7. approved transcription provider/output contract, summary quality fallback,
-   and transcript/summary refresh behavior;
-8. Final Writeup creation inputs and source-version selection behavior; and
-9. Editor Dashboard audience, Reviewed-marker granularity, coordinator view,
-   app/file access enforcement, delivery timing, and restore authority.
+   and transcript/summary refresh behavior after coordination with a program
+   coordinator;
+8. exact safe regeneration behavior and any additional Final Writeup inputs
+   beyond copying the latest Pre-Site version; and
+9. Editor Dashboard Reviewed-marker granularity, coordinator view, app/file
+   access enforcement, and restore authority.

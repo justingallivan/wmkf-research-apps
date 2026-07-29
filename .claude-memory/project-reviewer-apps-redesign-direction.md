@@ -29,20 +29,24 @@ Ground truth: `pages/workbench/[requestId].js`,
 contracts. `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` and
 `docs/REQUEST_WORKBENCH_SCOPING.md` are historical chronology/rationale.
 
-**2026-07-28 editor-direction reconciliation:** Allison is now a confirmed
-primary user for the future Editor lens. The current contract preserves the
-former single-folder workflow as a cycle-wide Editor Dashboard with direct
-entry to the canonical SharePoint Word files and explicit per-editor Reviewed
-tracking. The requirement is current; implementation remains planned. Exact
-additional collaborators, request-versus-artifact-stage marker granularity,
-coordinator matrix, app/file access boundary, and deadline remain open. Use the
-near-term execution plan for current authority; the chronology below remains
-the rationale record.
+**2026-07-28 editor-direction reconciliation:** Allison is a confirmed primary
+user for the future Editor lens. The current contract preserves the former
+single-folder workflow as a staff-wide cycle Editor Dashboard with direct entry
+to the canonical SharePoint Word files and explicit per-editor Reviewed
+tracking. All PDs are expected eventually to evaluate the materials, and
+designated staff proofreaders also need access. The requirement is current;
+implementation remains planned. Request-versus-artifact-stage marker
+granularity, coordinator matrix, and enforced app/file access remain open. The
+first fixed gate is draft-functional delivery by 2026-08-10, ahead of proposal
+intake around 2026-08-18; its exact minimum feature set still must be
+enumerated. Use the near-term execution plan for current authority; the
+chronology below remains the rationale record.
 
 **2026-07-28 Site Visit/writeup reconciliation:** Initial Assessment,
 Pre-Site, and Final are three separate governed Word documents. Final is
-created from a deliberately selected Pre-Site version; Site Visit is a dossier,
-not a fourth writeup. Its logistics are date, time/time zone, format,
+created from the latest Pre-Site version at action time, with a rare deliberate
+regeneration option that preserves prior Final content; Site Visit is a
+dossier, not a fourth writeup. Its logistics are date, time/time zone, format,
 location/link, lead PD, WMKF staff, applicant participants, and
 Board/consultant participants; no separate visit-status field is needed. Its
 categories are applicant slides, other applicant materials, recording,
@@ -53,9 +57,10 @@ delete/replace rather than inferred replacement. It accepts PDF/PPTX, permits
 additional uploads while access remains active, and is capped at 1 GB per file
 and 20 current applicant files per request. Files land in the request's
 governed SharePoint folder under `Site Visit/Applicant Materials/Slides` or
-`Other`. It sends an automated email
-to the lead PD plus the still-to-be-defined relevant staff audience after every
-successful upload, replacement, or deletion. An authorized staff user
+`Other`. Successful uploads, replacements, and deletions are batched into a
+short automated digest to the lead PD plus the still-to-be-defined relevant
+staff audience. A program coordinator may be included, but the design must not
+hard-code that role as the only additional recipient. An authorized staff user
 manually triggers the request; entering or changing the Site Visit date never
 sends it automatically. Recipient choices are the Dataverse-linked liaison and
 PI—normally liaison in To, or PI in To with liaison optionally copied. To and
@@ -78,9 +83,9 @@ still-active link. Any staff member with Workbench Site Visit access may send,
 resend, or reissue. Exact visible
 sender/reply-to and lead-PD copy behavior remain open pending the owner's staff
 discussion. Historically, non-PD staff sent these requests without PD
-involvement; that is context, not the future contract. Standalone
-revocation, the large-file scanner contract, and the additional notification
-audience/batching remain open. SharePoint is
+involvement; that is context, not the future contract. No standalone Revoke
+action is needed in the minimum product. The large-file scanner contract and
+the additional notification audience/digest window remain open. SharePoint is
 the byte store; a new resumable Graph upload-session path is required because
 the current buffered helper stops at 60 MB. Dataverse holds the artifact
 registry and Postgres only expiring-link/resumable-session workflow state.
@@ -88,8 +93,10 @@ Pre-Site distributions and Final remain linked writeups, not dossier material
 categories. The narrow expiring request-scoped applicant-material upload link
 does not reopen the parked general applicant-intake product. Prefer an
 acceptable transcription-platform summary before a deliberate suite LLM
-fallback. Implementation, schema/read model, token/validation/recovery
-behavior, and summary-quality contracts remain planned. Current authority is
+fallback. The transcript workflow will be coordinated with a program
+coordinator; details remain pending. Implementation, schema/read model,
+token/validation/recovery behavior, and summary-quality contracts remain
+planned. Current authority is
 `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` and
 `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
 
@@ -162,7 +169,10 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 - **Tier-stitching positions taken in the mockup:** default home = cycle dashboard (not the launcher; launcher demoted to a "Tools" menu); context preserved via persistent cycle switcher + breadcrumbs. Tools menu mirrors current appRegistry apps; Reviewer Finder and Review Manager are now rehomed under the Workbench rather than standalone app entries. **Access (Justin Q, 2026-05-31):** the mockup shows everything, but real visibility filters by per-user app-access grants (Dataverse `wmkf_appuserappaccesses`, admin-managed; `Layout.js`→`hasAccess()`) — and that filter must extend to the per-request Workbench TABS, not just the Tools menu. **A tab can map to MULTIPLE existing grants:** the Reviewers tab consolidates BOTH `reviewer-finder` (Find) and `review-manager` (Invite/Track/Completed). **DECIDED (Justin S206): Option B — mint ONE new `reviewers` grant** replacing `reviewer-finder` + `review-manager`. **Status (S261):** legacy-only user probe passed, standalone pages/appRegistry entries retired, and API route legacy grant strings intentionally remain until a separate cleanup.
 - **Tier-2 is a FAMILY of per-person role "lenses" over one cycle request list (Justin 2026-05-31; started as "two dashboards," grew to three).** Same request list, role-specific columns/actions; default landing = your primary lens. The lens-unification is a proposed framing; the surfaces are real:
   - **Reviewer lens** (what the mockup shows) = the *post-shortlist* surface, per-PD reviewer management → Workbench. Build now (D26).
-  - **Triage lens** (J27) = upstream winnowing; NOT the entry point for single-submission (full proposals arrive Dec 2026, up to ~300, most never reviewed); winnows to the pursue-set (≈ [[project-staged-review-pipeline]]). Replaces the triage spreadsheet.
+  - **Triage lens** (J27) = upstream winnowing; proposal intake begins around
+    2026-08-18, with up to ~300 full proposals and most never reviewed; winnows
+    to the pursue-set (≈ [[project-staged-review-pipeline]]). Replaces the
+    triage spreadsheet.
   - **Editor lens** (future) = writeup **"Reviewed"** tracker for the writeup-collaborator set (PDs + CSO + President). Per-person ("reviewed N of M"); same shape as the reviewer "Completed" tab but for editors. The President only looks at writeups, so this is effectively her whole cycle view. **Tracking, NOT a gate (Justin 2026-05-31)** — sign-off was never rigorously enforced (often just a "I looked at your writeups" email). Its real job is to **resolve the silent case**: writeups use track-changes, so "has edits" is visible, but *no edits* is ambiguous (reviewed-nothing-to-change vs not-yet-looked). So: an **explicit per-editor "Reviewed" marker** (the signal track-changes can't give) + **track-changes presence as a secondary auto-hint** ("has edits", derived from the SharePoint Word doc, not stored). Row per editor: untouched / has edits / reviewed. "Reviewed" reads truer than "Sign-off" (not an approval gate). NEW data: the marker is per-`(editor, writeup)` (new Dataverse child/records). STILL OPEN: granularity (per request vs writeup-stage); personal view vs a who-reviewed-what matrix (Sarah).
   - Flow: triage → winnow → reviewer (manage reviewers) → … → editor (writeup "Reviewed" tracking) → board.
   - **The winnowing is a concrete staff funnel, currently a SPREADSHEET (Justin 2026-05-31).** D26 example: Phase I long list **~200 → ~32 → ~28** intended to invite to Phase II; the final set is advanced AS A GROUP. So the J27 triage dashboard's core job is precise: **replace that spreadsheet** — long list → short list → final list, ending in an **advance-the-group** action (which in J27 is the real phase trigger that hands the set to the reviewer dashboard). Note volumes differ by cycle: D26 Phase I long list ≈ 200; J27 single-submission inflow up to ~300. Consequence for the #2 actionability work: the reviewer dashboard's rows stay **reviewer-centric** (find→invite→track→approve&pay); the 300-proposal triage actionability is a SEPARATE future design, do not jam it into the reviewer dashboard.
@@ -251,7 +261,11 @@ The reason this redesign is now urgent: Connor maintains a parallel SharePoint f
 ## Build sequence
 
 - **Now (S196 → mid-June 2026):** Reviewer-lifecycle slice as Workbench v1 + Reviewer Pool. URL pattern is the holistic one (`/workbench/[requestId]/...`) even though only one functional area lands.
-- **Next cycle (J27, single-submission):** the upstream triage / cycle dashboard (winnow ~300 Dec-2026 proposals; ≈ [[project-staged-review-pipeline]]) + automation tier (proposal-submitted fan-out, artifact materialization) + writeup tab + analyses tabs. Runway: doesn't need to be live until J27 accepts submissions (Dec 2026).
+- **Next cycle (J27, single-submission):** the upstream triage / cycle dashboard
+  (winnow up to ~300 proposals beginning around 2026-08-18; ≈
+  [[project-staged-review-pipeline]]) + automation tier (proposal-submitted
+  fan-out, artifact materialization) + writeup tab + analyses tabs. The first
+  draft-functional gate is 2026-08-10.
 - **Holistic Workbench is the destination**, built incrementally tab-by-tab as the automation tier matures.
 
 ---

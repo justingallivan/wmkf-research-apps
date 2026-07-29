@@ -5,7 +5,7 @@ type: project
 originSessionId: 8d412c2f-d6c6-4080-a43c-79e0e04e9653
 status: active
 scope: strategy
-last_verified: 2026-07-22 via my-proposals-service.js, dashboard-service.js, and the akoya-request Atlas; J27 shape remains owner-confirmed planning context
+last_verified: 2026-07-28 via my-proposals-service.js, dashboard-service.js, the akoya-request Atlas, and current owner calendar decisions; J27 shape remains owner-confirmed planning context
 ---
 
 ## Recall Rule
@@ -15,7 +15,9 @@ Read this when: writing document-loading or phase-gating logic, or planning for 
 Do:
 - Gate reviewer-finding on the internal Phase II label (`akoya_requeststatus = 'Phase II Pending'`) — stays correct across both dual-phase (D26) and single-submission (J27) cycles.
 - Treat the Phase I→II flip as a first-class lifecycle event (a status flip, not a second submission).
-- Plan an upstream per-PD triage/cycle dashboard for J27 (~300 full proposals arrive ~Dec 2026, most never sent for outside review).
+- Plan an upstream per-PD triage/cycle dashboard for J27 (proposal intake
+  begins around 2026-08-18; up to ~300 full proposals, most never sent for
+  outside review).
 
 Do not:
 - Hard-code "Phase II is a different file than Phase I" — next cycle they're the same relabeled document.
@@ -34,7 +36,15 @@ the future J27 submission shape is an owner-confirmed plan, not code state.
 
 **Concepts are going away.** Future cycles will not have a concept stage. Already noted broadly in `project-strategy-direction.md` ("Grant cycle is being redesigned").
 
-**Next cycle (J27 — single-submission begins; D26 is the current/last dual-phase cycle):** Single-package submission, but internal phasing remains. Full proposals arrive **~Dec 2026, up to ~300, and most are never sent for outside review** (user, 2026-05-31) — so J27 needs an upstream per-PD triage/cycle dashboard to winnow to the pursue-set BEFORE the reviewer dashboard applies (see [[project-reviewer-apps-redesign-direction]] — the tier-2 lens family: reviewer / triage / editor).
+**Next cycle (J27 — single-submission begins; D26 is the current/last
+dual-phase cycle):** Single-package submission, but internal phasing remains.
+Proposal intake begins around **2026-08-18** (current owner decision,
+2026-07-28), with up to ~300 full proposals and most never sent for outside
+review. The older ~December 2026 intake assumption is superseded. J27 therefore
+needs an upstream per-PD triage/cycle dashboard to winnow to the pursue-set
+BEFORE the reviewer dashboard applies (see
+[[project-reviewer-apps-redesign-direction]] — the tier-2 lens family:
+reviewer / triage / editor).
 - Applicants submit **once** — one document called "Phase I." No separate Phase II document.
 - Staff still classifies proposals internally as Phase I or Phase II.
 - "Phase II" becomes a **label change on the original document**, not a new submission.
