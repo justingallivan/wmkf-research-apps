@@ -6,7 +6,7 @@ status: active
 summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-07-28
+last_verified: 2026-07-29
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -137,10 +137,13 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term 
 
 1. provision and exercise the source-built governed-artifact foundation in a
    human-in-the-loop, end-to-end Initial Assessment pilot by 2026-08-10, ahead
-   of proposal intake around 2026-08-18. Authorized staff must generate from a designated real
-   test proposal, inspect and edit the canonical SharePoint Word artifact, find
-   and open the same registered file from both the Workbench and staff-wide
-   Editor Dashboard, and exercise one safe failure/retry path;
+   of proposal intake around 2026-08-18. The owner chose a controlled
+   production rehearsal with colleague-created representative dummy requests
+   instead of building the existing Dataverse sandbox organization into an
+   integrated application/file test environment. Authorized staff must inspect
+   and edit the canonical SharePoint Word artifact, find and open the same
+   registered file from both the Workbench and staff-wide Editor Dashboard,
+   and exercise one safe failure/retry path;
 2. finish the user/input/storage/access/deadline contract for the remaining
    Workbench lifecycle tabs, including the three-document writeup lineage,
    Site Visit dossier, narrow request-scoped applicant-material upload, and

@@ -6,7 +6,7 @@ status: canonical
 summary: "Review synthesis lifecycle is production-proved with automation enabled; the next sequence is the remaining Workbench lifecycle design freeze."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-07-28
+last_verified: 2026-07-29
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -36,8 +36,9 @@ ahead of proposal intake beginning around **2026-08-18**.
 
 The August 10 acceptance path is a real human-in-the-loop pilot:
 
-1. authorized staff starts Initial Assessment generation for a designated test
-   proposal through the intended Workbench entry point;
+1. authorized staff starts Initial Assessment generation for a dedicated
+   representative dummy production request through the intended Workbench
+   entry point;
 2. the server reads the real proposal and authoritative Dataverse metadata,
    executes the governed prompt, and creates the canonical Word artifact in
    the governed SharePoint location;
@@ -51,13 +52,17 @@ The August 10 acceptance path is a real human-in-the-loop pilot:
    lets an authorized staff tester find and open it without navigating request
    by request.
 
-The pilot must use realistic source data and human review, not mocked records
-or UI-only placeholders. It must also exercise one safe failure/retry path and
-prove that no success is reported before the SharePoint artifact and Dataverse
-registry agree. Exact named testers, pilot environment, and schedule remain to
-be assigned. Passing this draft-functional gate is not a production-readiness
-claim and does not require the later Pre-Site, Site Visit, or Final slices to
-be built by August 10.
+The pilot must use representative source data and human review, not route
+mocks or UI-only placeholders. The owner decided 2026-07-29 to use a
+controlled production rehearsal with colleague-created dummy requests rather
+than build the existing Dataverse sandbox organization into an integrated
+application/file test environment. It must also exercise one safe
+failure/retry path and prove that no success is reported before the SharePoint
+artifact and Dataverse registry agree. The production dummy request IDs and
+content shape, exact named testers, and schedule remain to be assigned.
+Passing this draft-functional gate is not a broad production-readiness claim
+and does not require the later Pre-Site, Site Visit, or Final slices to be
+built by August 10.
 
 “Week 1/2/3” below remain relative execution windows for later lifecycle work
 until those stages receive their own deadlines.
@@ -663,9 +668,10 @@ Explicit non-goals during design freeze:
 > visibility during a failed replacement, false-success prevention after a
 > post-upload registry failure, and
 > content-hash recovery without a second AI call. The entity/prompt are **not
-> provisioned live**, and no pilot request has
-> run; steps 8–11 and the live portions of steps 2/4/5 remain open until the
-> owner names the environment, proposal, and testers.
+> provisioned live**, and no pilot request has run; steps 8–11 and the live
+> portions of steps 2/4/5 remain open until colleagues create and identify the
+> representative production dummy request(s) and the owner names the testers
+> and schedule.
 
 The August 10 minimum changes the former default. Build the shared governed
 artifact spine through the J27 Initial Assessment first; Pre Site Visit becomes
@@ -687,15 +693,18 @@ Build in producer-to-consumer order:
 8. verify full-text search, structured result joins, version restore,
    delete/recycle recovery, retention posture, and milestone snapshot creation;
 9. run contract, security, Atlas, and browser/API verification;
-10. complete the human-in-the-loop August 10 pilot with designated staff and a
-    test proposal, including a safe failure/retry exercise; and
-11. perform a separate narrow production smoke only when the draft slice is
-    approved for deliberate production promotion.
+10. after separate approval of production schema, prompt, and application
+    promotion, complete the human-in-the-loop August 10 controlled-production
+    pilot with designated staff and a dedicated dummy request, including a
+    safe failure/retry exercise; and
+11. reconcile every expected production write and retained/removed test
+    artifact before deciding whether to scale beyond the dummy request set.
 
-Exit: one real request can move from ready inputs to a durable, editable Word artifact and
-back to a visible Workbench state without filename guesswork or silent partial
-success; an authorized user can identify and recover a prior version; and the
-official milestone can be proven independently of later working edits.
+Exit: one dedicated production dummy request can move from ready inputs to a
+durable, editable Word artifact and back to a visible Workbench state without
+filename guesswork or silent partial success; an authorized user can identify
+and recover a prior version; and the official milestone can be proven
+independently of later working edits.
 
 ## Dependent lifecycle slices
 
@@ -842,12 +851,17 @@ Owner-decided:
 42. Foundation Opportunity is a visibly incomplete staff-authored slot, while
     the institution and applicant-submitted title come from authoritative
     Dataverse metadata rather than model inference; the exact document format
-    remains intentionally open to iteration during the single-phase transition.
+    remains intentionally open to iteration during the single-phase
+    transition; and
+43. the Initial Assessment pilot uses a controlled production rehearsal with
+    colleague-created representative dummy requests; building the existing
+    Dataverse sandbox organization into an integrated application/file test
+    environment is out of scope.
 
 Still required:
 
-1. named human testers, the safe pilot environment/schedule, and deadlines for
-   later lifecycle stages;
+1. production dummy request IDs and representative content shape, named human
+   testers, the exact pilot schedule, and deadlines for later lifecycle stages;
 2. first approved Pre-Site Word template and prompt/template compatibility
    contract;
 3. exact Dataverse registry schema and target-library configuration for the

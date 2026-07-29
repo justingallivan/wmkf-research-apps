@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-28
+last_verified: 2026-07-29
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -140,13 +140,16 @@ document inventory, and individual implementation plans do not establish priorit
   view remain open.
 - Calendar direction (owner-confirmed 2026-07-28): the first fixed gate is a
   human-in-the-loop, end-to-end Initial Assessment pilot by 2026-08-10, before
-  proposals begin arriving around 2026-08-18. Authorized staff must generate
-  from a designated real test proposal, inspect and edit the canonical
-  SharePoint Word file, and find/open the same registered artifact in both the
-  Workbench and staff-wide Editor Dashboard. The pilot also exercises a safe
-  failure/retry path. It is draft-functional proof, not production readiness,
-  and does not require the later lifecycle tabs. Named testers, environment,
-  and schedule remain open. See the near-term plan.
+  proposals begin arriving around 2026-08-18. The 2026-07-29 environment
+  decision is a controlled production rehearsal using colleague-created
+  representative dummy requests; building the existing Dataverse sandbox
+  organization into an integrated application/file test environment is out of
+  scope. Authorized staff inspect and edit the canonical SharePoint Word file
+  and find/open the same registered artifact in both the Workbench and
+  staff-wide Editor Dashboard. The pilot also exercises a safe failure/retry
+  path. It is draft-functional proof, not broad production readiness, and does
+  not require the later lifecycle tabs. Dummy request IDs/content shape, named
+  testers, and schedule remain open. See the near-term plan.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel: `project-virtual-review-panel`.
 - Roadmap snapshots: `project-app-roadmap-2026-04-25`, `project-phase-i-summary-app-winddown`.

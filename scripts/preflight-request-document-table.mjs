@@ -5,6 +5,11 @@
  *
  * Classifies every declared artifact as absent, exact, or divergent. The schema
  * applier is creation-only, so any divergent result blocks deployment.
+ *
+ * Usage:
+ *   node scripts/preflight-request-document-table.mjs --target=prod
+ *   node scripts/preflight-request-document-table.mjs --target=sandbox
+ *   node scripts/preflight-request-document-table.mjs --self-test
  */
 
 import { readFileSync } from 'fs';
@@ -25,14 +30,23 @@ for (const envFile of ['.env', '.env.local']) {
   } catch {}
 }
 
-const target = (process.argv.find((arg) => arg.startsWith('--target=')) || '--target=sandbox')
-  .slice('--target='.length);
-if (!['sandbox', 'prod'].includes(target)) throw new Error(`Unknown target "${target}".`);
+const selfTest = process.argv.includes('--self-test');
+const targetArg = process.argv.find((arg) => arg.startsWith('--target='));
+const target = targetArg?.slice('--target='.length) || null;
+if (!selfTest && !target) {
+  throw new Error('Missing required --target=sandbox or --target=prod.');
+}
+if (target && !['sandbox', 'prod'].includes(target)) {
+  throw new Error(`Unknown target "${target}".`);
+}
 const resourceUrl = target === 'sandbox'
   ? process.env.DYNAMICS_SANDBOX_URL
-  : process.env.DYNAMICS_URL;
+  : target === 'prod'
+    ? process.env.DYNAMICS_URL
+    : null;
 const { DYNAMICS_TENANT_ID, DYNAMICS_CLIENT_ID, DYNAMICS_CLIENT_SECRET } = process.env;
-if (!resourceUrl || !DYNAMICS_TENANT_ID || !DYNAMICS_CLIENT_ID || !DYNAMICS_CLIENT_SECRET) {
+if (!selfTest
+    && (!resourceUrl || !DYNAMICS_TENANT_ID || !DYNAMICS_CLIENT_ID || !DYNAMICS_CLIENT_SECRET)) {
   throw new Error(`Missing Dataverse credentials for target=${target}.`);
 }
 
@@ -90,6 +104,24 @@ function result(state, notes = []) {
   return { state, notes };
 }
 
+function attributeSelect(attribute) {
+  const common = ['LogicalName', 'AttributeType', 'RequiredLevel'];
+  switch (attribute.type) {
+    case 'String':
+      return [...common, 'MaxLength', 'FormatName', 'IsPrimaryName'].join(',');
+    case 'Memo':
+      return [...common, 'MaxLength', 'Format', 'IsPrimaryName'].join(',');
+    case 'Integer':
+      return [...common, 'MinValue', 'MaxValue'].join(',');
+    case 'DateTime':
+      return [...common, 'Format', 'DateTimeBehavior'].join(',');
+    case 'Picklist':
+      return common.join(',');
+    default:
+      throw new Error(`Unsupported attribute type "${attribute.type}".`);
+  }
+}
+
 async function probeEntity(token) {
   const response = await getJson(
     token,
@@ -112,13 +144,12 @@ async function probeEntity(token) {
 async function probeAttribute(token, attribute) {
   const logical = attribute.schemaName.toLowerCase();
   const cast = CAST[attribute.type];
-  const select = attribute.type === 'Picklist'
-    ? '$select=LogicalName,AttributeType,RequiredLevel&$expand=OptionSet'
-    : '$select=LogicalName,AttributeType,RequiredLevel,MaxLength,Format,FormatName,'
-      + 'MinValue,MaxValue,DateTimeBehavior,IsPrimaryName';
+  if (!cast) throw new Error(`Unsupported attribute type "${attribute.type}".`);
+  const select = `$select=${attributeSelect(attribute)}`;
+  const expand = attribute.type === 'Picklist' ? '&$expand=OptionSet' : '';
   const response = await getJson(
     token,
-    `/EntityDefinitions(LogicalName='${entity}')/Attributes(LogicalName='${logical}')/Microsoft.Dynamics.CRM.${cast}?${select}`,
+    `/EntityDefinitions(LogicalName='${entity}')/Attributes(LogicalName='${logical}')/Microsoft.Dynamics.CRM.${cast}?${select}${expand}`,
   );
   if (response.status === 404) return result('absent');
   const notes = [];
@@ -295,12 +326,84 @@ async function main() {
     console.error('ABORT: creation-only schema apply cannot reconcile divergent live metadata.');
     process.exit(1);
   }
+  console.log('READ-ONLY PREFLIGHT COMPLETE: no metadata changes were made.');
   console.log(
-    `PROCEED: node scripts/apply-dataverse-schema.js --target=${target} --wave=16-request-document-registry --execute`,
+    'CREATION-COMPATIBLE: after explicit approval, the apply command would be '
+      + `node scripts/apply-dataverse-schema.js --target=${target} `
+      + '--wave=16-request-document-registry --execute',
   );
 }
 
-main().catch((error) => {
-  console.error('ERROR:', error.message);
-  process.exit(1);
-});
+function runSelfTest() {
+  const cases = [
+    {
+      type: 'String',
+      includes: ['MaxLength', 'FormatName', 'IsPrimaryName'],
+      excludes: ['Format', 'MinValue', 'MaxValue', 'DateTimeBehavior'],
+    },
+    {
+      type: 'Memo',
+      includes: ['MaxLength', 'Format', 'IsPrimaryName'],
+      excludes: ['FormatName', 'MinValue', 'MaxValue', 'DateTimeBehavior'],
+    },
+    {
+      type: 'Integer',
+      includes: ['MinValue', 'MaxValue'],
+      excludes: ['MaxLength', 'Format', 'FormatName', 'DateTimeBehavior', 'IsPrimaryName'],
+    },
+    {
+      type: 'DateTime',
+      includes: ['Format', 'DateTimeBehavior'],
+      excludes: ['MaxLength', 'FormatName', 'MinValue', 'MaxValue', 'IsPrimaryName'],
+    },
+    {
+      type: 'Picklist',
+      includes: [],
+      excludes: [
+        'MaxLength',
+        'Format',
+        'FormatName',
+        'MinValue',
+        'MaxValue',
+        'DateTimeBehavior',
+        'IsPrimaryName',
+      ],
+    },
+  ];
+
+  for (const testCase of cases) {
+    const fields = new Set(attributeSelect(testCase).split(','));
+    for (const common of ['LogicalName', 'AttributeType', 'RequiredLevel']) {
+      if (!fields.has(common)) throw new Error(`${testCase.type} omitted ${common}.`);
+    }
+    for (const included of testCase.includes) {
+      if (!fields.has(included)) throw new Error(`${testCase.type} omitted ${included}.`);
+    }
+    for (const excluded of testCase.excludes) {
+      if (fields.has(excluded)) throw new Error(`${testCase.type} included invalid ${excluded}.`);
+    }
+  }
+
+  let rejectedUnknown = false;
+  try {
+    attributeSelect({ type: 'Unknown' });
+  } catch {
+    rejectedUnknown = true;
+  }
+  if (!rejectedUnknown) throw new Error('Unknown attribute types must fail closed.');
+  console.log('request-document preflight self-test passed.');
+}
+
+if (selfTest) {
+  try {
+    runSelfTest();
+  } catch (error) {
+    console.error('SELF-TEST ERROR:', error.message);
+    process.exit(1);
+  }
+} else {
+  main().catch((error) => {
+    console.error('ERROR:', error.message);
+    process.exit(1);
+  });
+}

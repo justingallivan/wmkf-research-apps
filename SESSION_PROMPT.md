@@ -129,9 +129,12 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
 
 ### Owner Decision Needed
 
-1. **Pilot proposal, human testers, environment, and exact schedule.**
-   Evidence: `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`. Gates the 2026-08-10
-   pilot; intake begins around 2026-08-18.
+1. **Production dummy request IDs, human testers, and exact schedule.**
+   Evidence: `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
+   The intended path is an owner-approved controlled production rehearsal after
+   colleagues create representative dummy requests. Building an integrated
+   Dataverse sandbox environment is out of scope. These remaining inputs gate
+   the 2026-08-10 pilot; intake begins around 2026-08-18.
 
 2. **First approved Initial Assessment prompt/template pair.**
    Evidence: same plan. The D26 structure is a starting point only; preserve the decided
@@ -139,6 +142,11 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
 
 3. **Artifact registry and SharePoint target-library controls.**
    Evidence: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
+   The exact pilot registry schema, prompt/template pair, applicant-title
+   (`akoya_title`) source, and staff-authored Foundation Opportunity requirement
+   are implemented in source. Verify SharePoint version, restore, recycle,
+   retention, permission, and milestone-snapshot behavior against the dedicated
+   production dummy requests before the controlled rehearsal.
 
 4. **Re-key the 12 `candidate:`-keyed saved rows that carry a suggestion anchor.**
    Evidence: S387 probe — they are `saved`, so there is no live dead-end; left untouched.
