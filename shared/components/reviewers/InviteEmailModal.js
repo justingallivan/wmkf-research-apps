@@ -167,6 +167,9 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   // it does not send email or stamp the suggestion invited. A separate,
   // confirmed action records the invitation only after staff sends it.
   const [manualLinkCopyState, setManualLinkCopyState] = useState({});
+  // Per-recipient state for the S387 staff address attestation offered on the same
+  // research-only rows: suggestionId -> { verifying, error }.
+  const [verifyState, setVerifyState] = useState({});
   const mountedRef = useRef(true);
   const timelineError = validateInvitationTimeline(timing);
 
@@ -354,6 +357,51 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
         ...prev,
         [draft.suggestionId]: { ...prev[draft.suggestionId], marking: false, markError: e.message },
       }));
+    }
+  };
+
+  // S387: record a staff attestation that a research-only (web-search-found) address
+  // is correct, so the reviewer can be invited in-app. Sends the address BACK for the
+  // server to compare against the stored value — the server never takes the address
+  // from here. On success the previews re-render, which re-classifies the row as
+  // sendable and mints a fresh secure link.
+  const verifyResearchOnlyAddress = async (draft) => {
+    if (!draft?.suggestionId || !draft?.candidateEmail) return;
+    // Surface the SERVER's reason in the prompt. It matters which research-only case
+    // this is: a plain search lead is merely unproven, while `search_contested` means
+    // the address contradicts verified identity evidence — a staffer waving that one
+    // through should see so before attesting.
+    const ok = window.confirm(
+      `Confirm that ${draft.candidateEmail} is the correct address for `
+      + `${draft.candidateName || 'this reviewer'}.\n\n`
+      + `Why the app withheld it: ${draft.emailConfidence?.reason || 'address provenance is unproven'}.\n\n`
+      + 'Only continue if you have checked it against an independent source — the '
+      + 'institution directory, their lab page, or previous correspondence. This is '
+      + 'recorded as your verification and makes the address sendable.'
+    );
+    if (!ok) return;
+    setVerifyState((prev) => ({ ...prev, [draft.suggestionId]: { verifying: true, error: null } }));
+    try {
+      const res = await fetch('/api/reviewer-finder/my-candidates', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          suggestionId: draft.suggestionId,
+          verifyEmailAddress: true,
+          verifiedEmail: draft.candidateEmail,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not record the verification.');
+      if (!mountedRef.current) return;
+      setVerifyState((prev) => ({ ...prev, [draft.suggestionId]: { verifying: false, error: null } }));
+      // Re-classify this row: the render service re-reads the person's email source,
+      // so the row returns as sendable (quick_check) with a fresh secure link. Not
+      // onSent — nothing was sent.
+      await renderPreviews();
+    } catch (e) {
+      if (!mountedRef.current) return;
+      setVerifyState((prev) => ({ ...prev, [draft.suggestionId]: { verifying: false, error: e.message } }));
     }
   };
 
@@ -661,10 +709,37 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                           {d.skipped === 'email_research_only' && (
                             <div className="mt-2 rounded border border-amber-200 bg-white/70 p-2">
                               <p>
-                                The app will not send to an address found only through web search. If you independently
-                                verify it, use Edit contact after closing this window. Or copy the secure link below
+                                The app will not send to an address found only through web search. If you check it
+                                against an independent source — the institution directory, their lab page, previous
+                                correspondence — record that below and it becomes sendable. To use a different
+                                address, use Edit contact after closing this window. Or copy the secure link below
                                 and paste it into a message you send yourself.
                               </p>
+                              {/* S387: the in-app recovery. Edit contact cannot fix the common case
+                                  (the verified address is the one already stored — CandidateEditModal
+                                  omits an unchanged email), so a staff attestation is its own action. */}
+                              <div className="mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => verifyResearchOnlyAddress(d)}
+                                  disabled={verifyState[d.suggestionId]?.verifying === true}
+                                  className="rounded border border-amber-400 bg-white px-2.5 py-1 font-medium text-amber-900 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                  title={`Record that you verified ${d.candidateEmail} against an independent source`}
+                                >
+                                  {verifyState[d.suggestionId]?.verifying
+                                    ? 'Recording…'
+                                    : `✓ I verified ${d.candidateEmail} is correct`}
+                                </button>
+                                {verifyState[d.suggestionId]?.error && (
+                                  <p role="alert" className="mt-1 text-[11px] text-red-700">
+                                    {verifyState[d.suggestionId].error}
+                                  </p>
+                                )}
+                                <p className="mt-1 text-[11px] text-amber-700">
+                                  Recorded as your verification. The address still needs the per-recipient
+                                  confirmation below before sending.
+                                </p>
+                              </div>
                               <p className="mt-1 text-[11px] text-amber-700">
                                 Copying sends nothing. After you send the message yourself, record it below so the
                                 app does not invite the reviewer again and can follow the normal reminder timeline.

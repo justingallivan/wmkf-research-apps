@@ -78,8 +78,11 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` before changing file paths.
 - Invitation address gating is enforced in `send-emails.js` via
   `lib/utils/reviewer-invite.js`: quick-check recipients require per-recipient
-  acknowledgement, while research-only addresses are never invitation-sendable —
-  see the [Reviewer Identity](reviewer-identity.md) page for the full gate semantics.
+  acknowledgement, while research-only addresses are never invitation-sendable at
+  that provenance — a staff attestation (`verifyEmailAddress` → `staff_verified`,
+  S387) or a different address via the contact editor (`manual`) moves them into
+  quick-check first; the send gate itself never yields to a client label. See the
+  [Reviewer Identity](reviewer-identity.md) page for the full gate semantics.
 
 ## Operating Notes
 

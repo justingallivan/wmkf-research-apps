@@ -114,12 +114,21 @@ never authorizes a send.
 
 - **Ready** = `orcid`, `institution_page`, or `scholarly_multi` (the same address on at least
   two distinct recent, identity-matched scholarly works). Sends without an extra address check.
-- **Quick check** = `scholarly_single`, legacy `pubmed`, `manual`, `affiliation`, or unknown/null
-  source. The recipient's `suggestionId` must be in `confirmedLowConfidenceIds`; the
+- **Quick check** = `scholarly_single`, legacy `pubmed`, `manual`, `affiliation`, `staff_verified`,
+  or unknown/null source. The recipient's `suggestionId` must be in `confirmedLowConfidenceIds`; the
   acknowledgement is recipient-specific, not a batch boolean.
 - **Research only** = `serp_search`, `claude_search`, or `search_contested`. The server always
   skips the invitation with `email_research_only`; a checkbox or forged allowlist entry cannot
-  override it.
+  override it. The ONLY way out is a durable provenance change: either a different address via
+  the contact editor (`manual`), or an explicit staff attestation for the SAME address —
+  `PATCH /api/reviewer-finder/my-candidates { verifyEmailAddress:true, verifiedEmail }` stamps
+  `emailSource='staff_verified'` (S387). That action re-reads the stored address and requires
+  `verifiedEmail` to match it, refuses any source that is not currently `research_only` (so it
+  can neither downgrade a `ready` address nor re-stamp itself), and lands in **quick check**, not
+  ready — the per-recipient acknowledgement still applies at send. It exists because the previously
+  documented hatch ("verify it, then Edit contact") is a no-op when the verified address is the one
+  already stored: `CandidateEditModal` omits an unchanged email, so `emailSource` never moved and
+  the reviewer could not be invited in-app at all.
 - **Missing** = no address. There is nothing to send.
 - **Scope.** Gated to `templateType==='invitation'` only. Post-acceptance materials / followup /
   thankyou are NOT re-gated.
