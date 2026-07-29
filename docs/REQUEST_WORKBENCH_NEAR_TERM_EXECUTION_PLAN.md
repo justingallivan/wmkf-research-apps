@@ -289,8 +289,9 @@ liaison in **To**; staff may instead address the PI and optionally copy the
 liaison. The server re-resolves the selected contacts and email addresses from
 Dataverse at send time rather than trusting client-supplied addresses. No
 free-form recipient requirement is established for the minimum product. The
-owner expects little reason for access after the Site Visit date, but the exact
-default/maximum expiry remains negotiable rather than locked.
+server sets link expiration to exactly 60 days after the invitation is
+successfully sent. Staff do not enter or edit an expiry date, and moving the
+Site Visit date does not change the expiration.
 
 The recipient sees only the request identity, upload instructions, permitted
 material types, and the applicant files they are authorized to manage. The
@@ -470,9 +471,9 @@ Decision order:
    paste-friendly observations shape, and basic applicant file-management
    behavior are owner-decided. The materials request is a manual staff action,
    not a date-driven automatic send. Next freeze the authorized staff roles,
-   sender identity, expiry, applicant-file recovery and shared-link audit
-   behavior, and recording/transcript/summary contracts plus persistence and
-   access.
+   sender identity, resend/reissue behavior, applicant-file recovery and
+   shared-link audit behavior, and recording/transcript/summary contracts plus
+   persistence and access.
 3. **Final Writeup** — freeze the selected-Pre-Site copy/lineage contract and
    the visit, late-review, and editorial inputs.
 4. **Initial Assessment** — design for every in-scope J27 proposal before
@@ -607,7 +608,10 @@ Owner-decided:
     applicant-material files, without person-level action attribution; and
 27. the manual materials-request action is available once the promptly
     scheduled Site Visit date is recorded, roughly in the reviewer-invitation
-    window, without waiting for reviews, synthesis, or a Pre-Site Writeup.
+    window, without waiting for reviews, synthesis, or a Pre-Site Writeup; and
+28. link expiration is exactly 60 days after a successful invitation send,
+    requires no staff-entered date, and is unaffected by Site Visit
+    rescheduling.
 
 Still required:
 
@@ -619,10 +623,10 @@ Still required:
 5. exact Dataverse schema and dossier read model for the decided Site Visit
    metadata, material categories, and observations;
 6. Site Visit Materials Upload authorized staff roles, visible sender/reply-to,
-   missing/duplicate contact handling, token expiry/revocation, shared-link
-   audit disclosure, file size/count limits, destination, delete/replace
-   persistence and recovery, idempotency, partial-failure recovery, exact
-   notification audience/timing, audit, and retention;
+   missing/duplicate contact handling, resend/reissue and revocation behavior,
+   shared-link audit disclosure, file size/count limits, destination,
+   delete/replace persistence and recovery, idempotency, partial-failure
+   recovery, exact notification audience/timing, audit, and retention;
 7. approved transcription provider/output contract, summary quality fallback,
    and transcript/summary refresh behavior;
 8. Final Writeup creation inputs and source-version selection behavior; and

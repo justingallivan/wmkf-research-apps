@@ -59,9 +59,11 @@ CC share one request-scoped link and may manage the same file list; without
 sign-in or personalized links, the audit does not promise PI-versus-liaison
 attribution. Visits are scheduled promptly after advancement around reviewer
 invitations; once the date is recorded, staff may send without waiting for
-reviews, synthesis, or a Pre-Site Writeup. Exact requester roles, visible
-sender/reply-to, expiry, shared-link audit disclosure, size/count limits, and
-notification audience remain open. Pre-Site distributions and Final remain
+reviews, synthesis, or a Pre-Site Writeup. Expiration is automatically 60 days
+after successful send, requires no staff-entered date, and is unaffected by
+visit rescheduling. Exact requester roles, visible sender/reply-to,
+resend/revocation behavior, shared-link audit disclosure, size/count limits,
+and notification audience remain open. Pre-Site distributions and Final remain
 linked writeups, not dossier material categories. The narrow expiring
 request-scoped applicant-material upload link does not reopen the parked
 general applicant-intake product. Prefer an acceptable transcription-platform

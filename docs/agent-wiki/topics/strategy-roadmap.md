@@ -93,9 +93,11 @@ document inventory, and individual implementation plans do not establish priorit
   audit does not promise PI-versus-liaison attribution. Visits are scheduled
   promptly after advancement around reviewer invitations; once the date is
   recorded, staff may send without waiting for reviews, synthesis, or a
-  Pre-Site Writeup. Exact requester roles, sender identity, expiry, shared-link
-  audit disclosure, limits, and notification audience remain open. Prefer an
-  acceptable
+  Pre-Site Writeup. Expiration is automatically 60 days after successful send,
+  requires no staff-entered date, and is unaffected by visit rescheduling.
+  Exact requester roles, sender identity, resend/revocation behavior,
+  shared-link audit disclosure, limits, and notification audience remain open.
+  Prefer an acceptable
   transcription-platform summary before a deliberate suite LLM fallback.
   Exact token, schema/read model, validation, folder, retention,
   summary-quality, and partial-failure contracts remain planned.

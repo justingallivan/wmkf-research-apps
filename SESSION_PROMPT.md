@@ -154,7 +154,9 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    does not promise PI-versus-liaison attribution. Visits are scheduled
    promptly after advancement around reviewer invitations; once the date is
    recorded, staff may send without waiting for reviews, synthesis, or a
-   Pre-Site Writeup. Exact requester roles, visible sender/reply-to, expiry,
+   Pre-Site Writeup. Expiration is automatically 60 days after successful send,
+   requires no staff-entered date, and is unaffected by visit rescheduling.
+   Exact requester roles, visible sender/reply-to, resend/revocation behavior,
    shared-link audit disclosure, size/count limits, and notification audience
    remain open. Pre-Site distributions and Final remain linked writeups rather
    than Site Visit material categories. This narrow request-scoped
@@ -181,8 +183,8 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    and delivery date remain open.
    Exact schema/read model, first Pre-Site prompt/template pair, library
    configuration, later-stage inputs, upload requester permissions,
-   sender/expiry and token/validation/recovery behavior, shared-link audit
-   disclosure, and transcript-summary quality contract are still open.
+   sender/resend/revocation and token/validation/recovery behavior, shared-link
+   audit disclosure, and transcript-summary quality contract are still open.
 
 ### Owner Decision Needed
 

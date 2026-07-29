@@ -207,10 +207,11 @@ Minimum whole-flow invariants:
    invitations begin. Once the date is recorded, the action is available and
    staff chooses when to send; review receipt, synthesis, and Pre-Site Writeup
    readiness are not gates. Exact staff-role eligibility and visible
-   sender/reply-to remain product decisions. The token supports explicit expiry
-   and revocation and cannot be supplied as an arbitrary destination selector.
-   The owner expects little need after the Site Visit date, but the exact
-   expiry default/maximum remains open.
+   sender/reply-to remain product decisions. The server sets token expiration
+   to exactly 60 days after a successful invitation send; staff do not enter or
+   edit the expiry, and moving the Site Visit date has no effect. The token
+   supports revocation and cannot be supplied as an arbitrary destination
+   selector.
 2. Recipient choices are the request's Dataverse-linked liaison and PI. The
    normal default is the liaison in **To**; staff may instead address the PI
    and optionally copy the liaison. The server resolves the selected contacts
@@ -253,7 +254,7 @@ Minimum whole-flow invariants:
    timing remain open.
 
 Exact authorized staff roles, sender/reply-to, missing/duplicate contact
-handling, token implementation and expiry, shared-link audit disclosure,
+handling, resend/reissue and revocation behavior, shared-link audit disclosure,
 schema, folder, size/count limits, notification audience/timing, retention,
 and delete/replace persistence and recovery behavior remain open design
 decisions.
