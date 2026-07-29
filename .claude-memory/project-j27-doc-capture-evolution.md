@@ -44,3 +44,11 @@ the exact table fields, producer timing, and migration before building.
 ## Sequencing / urgency (user, S258)
 
 J27 design is a **large planning effort with many moving parts** that must **start soon after the bulk of the D26 Workbench work lands** — treat it as the next major planning push, not a someday item. J27 specifics (exactly what is collected up front, timing, final table shape) are **not yet decided** — re-confirm with Justin/Connor before building.
+
+Ground truth: [VERIFIED 2026-07-29 via
+`shared/config/workbenchProposalDocuments.js`,
+`lib/services/grant-reporting/classify-file.js`,
+`lib/services/reviewer-finder/load-proposal-service.js`, and
+`docs/CURRENT_WORK_QUEUE.md`]. The typed-registry shape remains a planning
+direction, not a built table; re-probe Dataverse and confirm the schema before
+implementation.

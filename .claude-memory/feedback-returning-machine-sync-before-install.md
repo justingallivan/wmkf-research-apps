@@ -54,5 +54,6 @@ Prior art that already knew this but was not reachable from the startup path:
 fact force-downgraded. Guidance buried in an audit doc does not fire at the
 moment of need; that is why this lives in the memory router.
 
-Ground truth: `~/.bash_history`, `git reflog --date=iso`, `stat -f %SB .git`;
+Ground truth: [VERIFIED 2026-07-29 via `~/.bash_history`,
+`git reflog --date=iso`, `stat -f %SB .git`, and isolated lockfile audits];
 cross-refs [[project-dev-environment]], [[feedback-verify-branch-before-git-action]].

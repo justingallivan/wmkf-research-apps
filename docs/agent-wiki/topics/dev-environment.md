@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-18
+last_verified: 2026-07-29
 stale_after_days: 90
 owner: dev-ops
 source_files:
@@ -48,6 +48,7 @@ Claude config sync, and environment-specific operating notes.
 - Dev environment and Vercel deploy: `project-dev-environment`, `project-vercel-sensitive-env-pull-empty`, `project-vercel-cli-deploy-preview-auth`.
 - Claude config sync: `claude-config-git-sync`.
 - Local Jest/build/git operating notes: `local-jest-build-environment`, `env-broken-git-autogc`.
+- Returning-machine sync and install safety: `feedback-returning-machine-sync-before-install`.
 - Decision log: `decision-module-typeless-warning-accept`.
 
 ## Operating Notes
@@ -83,6 +84,11 @@ Claude config sync, and environment-specific operating notes.
   `docs/CREDENTIALS_RUNBOOK.md`). `--worktree NAME` also sets up a sibling Codex
   worktree. Run the `parallel-agent-worktree` skill for the guided procedure;
   `docs/PARALLEL_AGENT_WORKTREE_RUNBOOK.md` is the full command-level detail.
+- **Returning-machine setup starts with `/start`, then install.** Sync and inspect the
+  handoff before `npm ci`/`npm install`, because installing first can rewrite a lockfile
+  against a stale checkout. Never use `npm audit fix --force` as routine cleanup, and
+  never clone into an existing checkout to "refresh" it. Policy memory:
+  `feedback-returning-machine-sync-before-install`.
 - **CodeGraph index is per-machine, auto-synced, and never committed.** `.codegraph/`
   (a ~86 MB SQLite DB + WAL, daemon pid/socket/log) is gitignored twice — root
   `.gitignore` and a self-written `.codegraph/.gitignore` (`*` + `!.gitignore`). It is a

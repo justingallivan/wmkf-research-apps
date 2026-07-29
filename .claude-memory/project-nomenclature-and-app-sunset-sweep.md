@@ -4,16 +4,18 @@ description: "Owner-requested initiative (2026-06-25) to fix overloaded/stale re
 metadata:
   node_type: memory
   type: project
-  status: active
+  status: closed
   scope: repo
-  last_verified: 2026-06-26
+  last_verified: 2026-07-29
 ---
 
 ## Recall Rule
 
-Read this when planning any reviewer-domain rename, app sunset, or memory/wiki
-cleanup session. This is the owner's parked "deeper sweep" TODO — a candidate
-initiative, NOT green-lit work. Verify live callers before any destructive step
+Read this only when reconstructing the completed reviewer-domain nomenclature and
+app-sunset work. It is a historical index, not a parked initiative or current
+backlog item. For any new rename or route-lifecycle decision, verify the live
+`shared/config/appRegistry.js` registry and its callers first; do not infer current
+work from this file. Verify live callers before any destructive step
 ([[feedback-verify-before-destructive-carryover]]).
 
 ## Status (2026-06-26): Phases 1-4 SHIPPED

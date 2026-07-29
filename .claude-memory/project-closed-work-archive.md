@@ -5,7 +5,7 @@ metadata:
   type: reference
   status: closed
   scope: docs
-  last_verified: 2026-07-26 via documentation truth audit
+  last_verified: 2026-07-29 via memory-router semantic reconciliation
 ---
 
 ## Recall Rule
@@ -35,6 +35,9 @@ These items are **done, closed, or point-in-time** and no longer earn a slot in 
 - **External reviewer file access** (SHIPPED 2026-05-03) — token primitive, `/external/*` endpoints, SharePoint upload, event-driven token expiry. [[project-external-reviewer-file-access]].
 - **Reviewer E2E re-baseline** (RESOLVED 2026-07-04) — 23/23 green after client-UX fixture updates for board identity, missing email, and low-confidence confirmation. [[project-e2e-reviewer-rebaseline-parked]].
 - **BILL/discovery unit-test expected-red exception** (CLOSED 2026-07-26) — the formerly exempt suites now pass 78/78 tests. Future failures are regressions, not accepted noise. [[project-bill-com-integration-tests-known-red]].
+- **Reviewer nomenclature and app-lifecycle sweep** (SHIPPED S291-S292) — registry, glossary, lifecycle gates, archive moves, and component rename completed; borrowed API namespaces remain live contracts. [[project-nomenclature-and-app-sunset-sweep]], `docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md`.
+- **Prompt legacy audit** (RESOLVED S344) — sunset apps and dead generators were removed and peer-review execution was migrated; current prompt behavior lives in the Prompt/Executor wiki. [[project-prompt-legacy-audit-followup]], `docs/PROMPT_LEGACY_AUDIT.md`.
+- **Spec-audit docs recovery** (RESOLVED S350-S352) — design docs were recovered, accept-fast-response verified, and quota/PD-email behavior built. [[project-spec-audit-docs-recovery-parked]].
 
 ## Point-in-time status snapshots (superseded by live SESSION_PROMPT handoffs)
 - **Intake pilot decisions 2026-05-06** — six-decision walkthrough; items 1C+1D superseded by the 2026-05-13 Track-1 decisions (still in index). [[project-intake-portal-pilot-decisions-2026-05-06]].
