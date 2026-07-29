@@ -60,6 +60,7 @@
 - App-access grants and Q9 raw-client migration/acceptance posture: project-app-access-control.md; ../docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md
 - Integrity screener / Retraction Watch / PubPeer / News: ../docs/agent-wiki/topics/integrity-screener.md
 - Dev environment / secrets / Vercel deploy / local build: ../docs/agent-wiki/topics/dev-environment.md; ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
+- Returning/idle machine setup, npm audit noise, multi-machine handoff wording (sync before install; never `audit fix --force`): feedback-returning-machine-sync-before-install.md
 - Vercel plugin disabled for context cost (S377) — what it provides and how to re-enable before deploy debugging: project-vercel-plugin-disabled-restore.md
 - Strategy / current queue / system model / roadmap / phasing / Virtual Review Panel: ../docs/CURRENT_WORK_QUEUE.md; ../docs/agent-wiki/topics/strategy-roadmap.md
 - Proposal docs / phasing / Phase I-II: project-j27-doc-capture-evolution.md; project-grant-phasing-evolution.md; project-phaseistatus-decision-lifecycle.md
