@@ -46,8 +46,9 @@ document inventory, and individual implementation plans do not establish priorit
 - Current priorities: `docs/CURRENT_WORK_QUEUE.md`.
 - Current Workbench truth and contradictions:
   `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md`.
-- Current near-term sequence: synthesis lifecycle closure → remaining-tab
-  design freeze → first deadline-bound writeup slice. The 2026-07-27 Request
+- Current near-term sequence: synthesis lifecycle closure → governed artifact
+  foundation plus the August 10 Initial Assessment pilot → remaining-tab
+  design freeze and dependent lifecycle slices. The 2026-07-27 Request
   `1002788` v2 smoke closed by its bounded-failure alternative; governed v3
   then became sole-current and the 2026-07-28 post-fix smoke persisted valid
   synthesis with complete audit evidence and exact synthetic-review cleanup. See
@@ -135,9 +136,14 @@ document inventory, and individual implementation plans do not establish priorit
   and canonical SharePoint file; it is not a second editor. Marker granularity,
   coordinator view, and the enforced app/file access key remain open.
 - Calendar direction (owner-confirmed 2026-07-28): the first fixed gate is a
-  draft-functional workflow by 2026-08-10, before proposals begin arriving
-  around 2026-08-18. The exact feature set included in that first gate still
-  must be enumerated. See the near-term plan.
+  human-in-the-loop, end-to-end Initial Assessment pilot by 2026-08-10, before
+  proposals begin arriving around 2026-08-18. Authorized staff must generate
+  from a designated real test proposal, inspect and edit the canonical
+  SharePoint Word file, and find/open the same registered artifact in both the
+  Workbench and staff-wide Editor Dashboard. The pilot also exercises a safe
+  failure/retry path. It is draft-functional proof, not production readiness,
+  and does not require the later lifecycle tabs. Named testers, environment,
+  and schedule remain open. See the near-term plan.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel: `project-virtual-review-panel`.
 - Roadmap snapshots: `project-app-roadmap-2026-04-25`, `project-phase-i-summary-app-winddown`.

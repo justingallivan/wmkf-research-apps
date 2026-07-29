@@ -97,11 +97,11 @@ as shipped.
 **Create a unified view of data and documents.** From the user's perspective, data and documents should be part of a single record, despite being stored in Dataverse and SharePoint separately. This is something AkoyaGO cannot do natively.
 
 **Preserve cycle-wide editorial work.** The per-request Workbench is not the
-only useful view. Allison and other approved writeup collaborators need a
-cycle-scoped Editor Dashboard that lists the governed artifacts, tracks
+only useful view. Allison, all PDs, and designated staff proofreaders need a
+staff-wide cycle Editor Dashboard that lists the governed artifacts, tracks
 personal review progress, and opens the same canonical SharePoint Word files
-directly. It is an index and workflow surface, not a second editor or document
-store.
+directly. Explicit app and SharePoint permissions still govern access. It is an
+index and workflow surface, not a second editor or document store.
 
 **Build for where we're going, not where we've been.** The new grant cycle and the new tools should shape each other. Don't replicate the old process in code — build capabilities that serve whatever comes next.
 
@@ -135,14 +135,19 @@ store.
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
 
-1. freeze the user/input/storage/access/deadline contract for the four
-   remaining Workbench lifecycle tabs and the cycle-wide Editor Dashboard,
-   including the three-document writeup lineage, Site Visit dossier, narrow
-   request-scoped applicant-material upload, and transcript-summary provenance;
-2. build the first deadline-bound writeup slice, provisionally Pre Site Visit
-   Writeup; and
-3. reuse that artifact registry/read contract for the later writeup stages and
-   the Editor Dashboard.
+1. deliver the governed-artifact foundation and a human-in-the-loop,
+   end-to-end Initial Assessment pilot by 2026-08-10, ahead of proposal intake
+   around 2026-08-18. Authorized staff must generate from a designated real
+   test proposal, inspect and edit the canonical SharePoint Word artifact, find
+   and open the same registered file from both the Workbench and staff-wide
+   Editor Dashboard, and exercise one safe failure/retry path;
+2. finish the user/input/storage/access/deadline contract for the remaining
+   Workbench lifecycle tabs, including the three-document writeup lineage,
+   Site Visit dossier, narrow request-scoped applicant-material upload, and
+   transcript-summary provenance; and
+3. reuse the proven artifact registry/read contract for Pre Site Visit, Final
+   Writeup, and Initial Assessment scale-out. The August 10 pilot is
+   draft-functional proof rather than production readiness.
 
 The owner-authorized 2026-07-27 Request `1002788` smoke closed as a bounded
 v2 failure with no partial memo write. On 2026-07-28, governed prompt v3 became

@@ -37,10 +37,16 @@ tracking. All PDs are expected eventually to evaluate the materials, and
 designated staff proofreaders also need access. The requirement is current;
 implementation remains planned. Request-versus-artifact-stage marker
 granularity, coordinator matrix, and enforced app/file access remain open. The
-first fixed gate is draft-functional delivery by 2026-08-10, ahead of proposal
-intake around 2026-08-18; its exact minimum feature set still must be
-enumerated. Use the near-term execution plan for current authority; the
-chronology below remains the rationale record.
+first fixed gate is a human-in-the-loop, end-to-end Initial Assessment pilot by
+2026-08-10, ahead of proposal intake around 2026-08-18. Authorized staff use a
+designated real test proposal to generate, inspect, and edit the canonical
+SharePoint Word artifact and then find/open that same registered file from the
+Workbench and staff-wide Editor Dashboard. The pilot also exercises one safe
+failure/retry path and proves no false cross-store success. It is
+draft-functional proof, not production readiness, and does not require the
+later lifecycle tabs. Named testers, environment, and schedule remain open.
+Use the near-term execution plan for current authority; the chronology below
+remains the rationale record.
 
 **2026-07-28 Site Visit/writeup reconciliation:** Initial Assessment,
 Pre-Site, and Final are three separate governed Word documents. Final is
@@ -265,7 +271,9 @@ The reason this redesign is now urgent: Connor maintains a parallel SharePoint f
   (winnow up to ~300 proposals beginning around 2026-08-18; ≈
   [[project-staged-review-pipeline]]) + automation tier (proposal-submitted
   fan-out, artifact materialization) + writeup tab + analyses tabs. The first
-  draft-functional gate is 2026-08-10.
+  draft-functional gate is the human-in-the-loop Initial Assessment pilot on
+  2026-08-10; the governed artifact spine and Initial Assessment now precede
+  Pre-Site implementation.
 - **Holistic Workbench is the destination**, built incrementally tab-by-tab as the automation tier matures.
 
 ---

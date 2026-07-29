@@ -205,9 +205,16 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    are expected eventually to evaluate the materials and designated staff
    proofreaders also need access. Marker granularity, coordinator view, and
    enforced app/file access remain open.
-   The first fixed delivery gate is draft-functional operation by 2026-08-10,
-   before proposal intake begins around 2026-08-18. The exact minimum feature
-   set included in that gate still must be enumerated.
+   The first fixed delivery gate is a human-in-the-loop, end-to-end Initial
+   Assessment pilot by 2026-08-10, before proposal intake begins around
+   2026-08-18. Authorized staff must use a designated real test proposal to
+   generate the canonical SharePoint Word artifact, inspect and edit it, and
+   find/open the same registered file in both the Workbench and staff-wide
+   Editor Dashboard. The pilot also exercises one safe failure/retry path and
+   proves no success before SharePoint and Dataverse agree. It is
+   draft-functional proof rather than production readiness and does not require
+   the later lifecycle tabs. Named testers, environment, and schedule remain
+   open.
    Exact schema/read model, first Pre-Site prompt/template pair, library
    configuration, safe Final regeneration details and any inputs beyond the
    latest Pre-Site copy, sender/reply-to and lead-PD copy behavior after staff

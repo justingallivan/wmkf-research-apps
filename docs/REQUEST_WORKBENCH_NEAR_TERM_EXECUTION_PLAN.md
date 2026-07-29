@@ -30,14 +30,37 @@ the Atlas, tests, and live probes.
 
 ## Calendar gate
 
-The first fixed owner deadline is **2026-08-10**: the new workflow must be
-functional in draft form no later than that date, ahead of proposal intake
-beginning around **2026-08-18**. The exact minimum feature set included in
-“functional in draft form” still needs to be enumerated before implementation
-is scheduled; do not silently interpret it as every later-cycle tab.
+The first fixed owner deadline is **2026-08-10**: the shared governed-artifact
+foundation and the J27 Initial Assessment must work end to end in draft form,
+ahead of proposal intake beginning around **2026-08-18**.
 
-“Week 1/2/3” below remain relative execution windows until that minimum
-August 10 outcome and the later lifecycle deadlines are assigned.
+The August 10 acceptance path is a real human-in-the-loop pilot:
+
+1. authorized staff starts Initial Assessment generation for a designated test
+   proposal through the intended Workbench entry point;
+2. the server reads the real proposal and authoritative Dataverse metadata,
+   executes the governed prompt, and creates the canonical Word artifact in
+   the governed SharePoint location;
+3. Dataverse records the typed artifact identity, exact SharePoint item/version,
+   template/prompt/run provenance, lifecycle state, and last-modified context;
+4. the Workbench displays the created artifact and opens that same file in
+   Word;
+5. a staff tester reviews and edits the canonical Word document, and the saved
+   SharePoint version remains discoverable from the Workbench; and
+6. the staff-wide Editor Dashboard lists that same registered artifact and
+   lets an authorized staff tester find and open it without navigating request
+   by request.
+
+The pilot must use realistic source data and human review, not mocked records
+or UI-only placeholders. It must also exercise one safe failure/retry path and
+prove that no success is reported before the SharePoint artifact and Dataverse
+registry agree. Exact named testers, pilot environment, and schedule remain to
+be assigned. Passing this draft-functional gate is not a production-readiness
+claim and does not require the later Pre-Site, Site Visit, or Final slices to
+be built by August 10.
+
+“Week 1/2/3” below remain relative execution windows for later lifecycle work
+until those stages receive their own deadlines.
 
 ## Owner-decided lifecycle and document foundations — 2026-07-28
 
@@ -571,12 +594,11 @@ Explicit non-goals during design freeze:
 - no automatic status-driven workflow until its event, idempotency, retry, and ownership
   contracts are explicit.
 
-## Week 2–3 — build the first complete writeup slice
+## First deadline-bound slice — governed Initial Assessment pilot
 
-The build order must now be tested against the August 10 draft-functional gate
-and the August 18 proposal-intake date. The exact minimum August 10 feature set
-is still required before the former default candidate—Pre Site Visit
-Writeup—can be treated as the first slice.
+The August 10 minimum changes the former default. Build the shared governed
+artifact spine through the J27 Initial Assessment first; Pre Site Visit becomes
+a dependent reuse of that proven contract.
 
 Build in producer-to-consumer order:
 
@@ -594,14 +616,17 @@ Build in producer-to-consumer order:
 8. verify full-text search, structured result joins, version restore,
    delete/recycle recovery, retention posture, and milestone snapshot creation;
 9. run contract, security, Atlas, and browser/API verification;
-10. perform a narrow production smoke with a designated test request.
+10. complete the human-in-the-loop August 10 pilot with designated staff and a
+    test proposal, including a safe failure/retry exercise; and
+11. perform a separate narrow production smoke only when the draft slice is
+    approved for deliberate production promotion.
 
 Exit: one real request can move from ready inputs to a durable, editable Word artifact and
 back to a visible Workbench state without filename guesswork or silent partial
 success; an authorized user can identify and recover a prior version; and the
 official milestone can be proven independently of later working edits.
 
-## Week 3+ — dependent lifecycle slices
+## Dependent lifecycle slices
 
 - **Site Visit:** build the dossier read model and governed artifact paths,
   including the narrow applicant-material request/upload flow, only after the
@@ -611,8 +636,8 @@ official milestone can be proven independently of later working edits.
   version at action time, preserve that lineage, and add the approved visit
   and late-review inputs. A deliberate rare regeneration preserves the prior
   Final version and never silently overwrites staff edits.
-- **Initial Assessment:** reuse the proven artifact path for every in-scope J27
-  proposal before the staff/Board advancement decision.
+- **Initial Assessment scale-out:** after the designated pilot, extend the
+  proven path to every in-scope J27 proposal before staff/Board advancement.
 - **Editor Dashboard:** reuse the typed registry and artifact read contract to
   provide the cycle-wide list, direct Word entry, and per-editor Reviewed
   tracking once its deadline and access contract are approved.
@@ -732,14 +757,17 @@ Owner-decided:
 39. the Editor Dashboard audience is staff-wide, including all PDs and
     designated staff proofreaders, subject to explicit app and SharePoint file
     authorization; and
-40. the first fixed gate is draft-functional delivery by 2026-08-10, before
-    proposal intake begins around 2026-08-18; the exact minimum feature set for
-    that gate still must be enumerated.
+40. the first fixed gate is a human-in-the-loop, end-to-end Initial Assessment
+    pilot by 2026-08-10, before proposal intake begins around 2026-08-18. It
+    covers real proposal/metadata inputs, governed generation, SharePoint Word
+    creation and human editing, Dataverse registry/provenance, Workbench
+    discovery/opening, staff-wide Editor Dashboard discovery/opening, and one
+    safe failure/retry path; it does not require later lifecycle tabs.
 
 Still required:
 
-1. the exact minimum feature set for the August 10 draft-functional gate and
-   deadlines for later lifecycle stages;
+1. named human testers, the safe pilot environment/schedule, and deadlines for
+   later lifecycle stages;
 2. first approved Pre-Site Word template and prompt/template compatibility
    contract;
 3. exact Dataverse registry schema and target-library configuration for the
