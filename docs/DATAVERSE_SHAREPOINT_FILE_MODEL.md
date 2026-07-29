@@ -203,11 +203,14 @@ Minimum whole-flow invariants:
 
 1. An authorized staff user manually triggers an expiring, request-scoped
    link. Entering or changing the Site Visit date never sends it automatically.
-   Exact staff-role eligibility, visible sender/reply-to, and lifecycle timing
-   remain product decisions. The token supports explicit expiry and revocation
-   and cannot be supplied as an arbitrary destination selector. The owner
-   expects little need after the Site Visit date, but the exact expiry
-   default/maximum remains open.
+   Site Visits are scheduled promptly after advancement, roughly when reviewer
+   invitations begin. Once the date is recorded, the action is available and
+   staff chooses when to send; review receipt, synthesis, and Pre-Site Writeup
+   readiness are not gates. Exact staff-role eligibility and visible
+   sender/reply-to remain product decisions. The token supports explicit expiry
+   and revocation and cannot be supplied as an arbitrary destination selector.
+   The owner expects little need after the Site Visit date, but the exact
+   expiry default/maximum remains open.
 2. Recipient choices are the request's Dataverse-linked liaison and PI. The
    normal default is the liaison in **To**; staff may instead address the PI
    and optionally copy the liaison. The server resolves the selected contacts
@@ -250,10 +253,10 @@ Minimum whole-flow invariants:
    timing remain open.
 
 Exact authorized staff roles, sender/reply-to, missing/duplicate contact
-handling, lifecycle timing, token implementation and expiry, shared-link audit
-disclosure, schema, folder, size/count limits, notification audience/timing,
-retention, and delete/replace persistence and recovery behavior remain open
-design decisions.
+handling, token implementation and expiry, shared-link audit disclosure,
+schema, folder, size/count limits, notification audience/timing, retention,
+and delete/replace persistence and recovery behavior remain open design
+decisions.
 
 ### Cycle-wide Editor Dashboard contract
 

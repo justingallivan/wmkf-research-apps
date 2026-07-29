@@ -57,15 +57,17 @@ sends it automatically. Recipient choices are the Dataverse-linked liaison and
 PI—normally liaison in To, or PI in To with liaison optionally copied. To and
 CC share one request-scoped link and may manage the same file list; without
 sign-in or personalized links, the audit does not promise PI-versus-liaison
-attribution. Exact requester roles, visible sender/reply-to, timing, expiry,
-shared-link audit disclosure, size/count limits, and notification audience
-remain open. Pre-Site distributions and Final remain linked writeups, not
-dossier material categories. The narrow expiring request-scoped
-applicant-material upload link does not reopen the parked general
-applicant-intake product. Prefer an acceptable transcription-platform summary
-before a deliberate suite LLM fallback. Implementation, schema/read model,
-token/validation/recovery behavior, and summary-quality contracts remain
-planned. Current authority is
+attribution. Visits are scheduled promptly after advancement around reviewer
+invitations; once the date is recorded, staff may send without waiting for
+reviews, synthesis, or a Pre-Site Writeup. Exact requester roles, visible
+sender/reply-to, expiry, shared-link audit disclosure, size/count limits, and
+notification audience remain open. Pre-Site distributions and Final remain
+linked writeups, not dossier material categories. The narrow expiring
+request-scoped applicant-material upload link does not reopen the parked
+general applicant-intake product. Prefer an acceptable transcription-platform
+summary before a deliberate suite LLM fallback. Implementation, schema/read
+model, token/validation/recovery behavior, and summary-quality contracts
+remain planned. Current authority is
 `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` and
 `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
 

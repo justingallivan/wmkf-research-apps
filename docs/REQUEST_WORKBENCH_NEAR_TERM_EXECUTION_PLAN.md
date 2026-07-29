@@ -278,9 +278,13 @@ A narrow **Site Visit Materials Upload** surface is planned within the
 Workbench lifecycle. It does not reopen the parked general applicant-intake
 product. An authorized staff user manually triggers the request from the Site
 Visit workflow. Entering or changing a visit date does not send the email
-automatically. The exact authorized staff roles, visible sender/reply-to,
-and lifecycle timing still require product design. Recipient choices come from
-the request's Dataverse-linked liaison and PI. The normal default is the
+automatically. The exact authorized staff roles and visible sender/reply-to
+still require product design. Site Visits are scheduled soon after a request
+advances, roughly when reviewer invitations begin. Once the visit date is
+recorded, the manual request action is available and staff chooses when to send
+it; review receipt, review synthesis, and Pre-Site Writeup readiness do not gate
+the action. Recipient choices come from the request's Dataverse-linked liaison
+and PI. The normal default is the
 liaison in **To**; staff may instead address the PI and optionally copy the
 liaison. The server re-resolves the selected contacts and email addresses from
 Dataverse at send time rather than trusting client-supplied addresses. No
@@ -466,9 +470,9 @@ Decision order:
    paste-friendly observations shape, and basic applicant file-management
    behavior are owner-decided. The materials request is a manual staff action,
    not a date-driven automatic send. Next freeze the authorized staff roles,
-   sender identity, timing/expiry, applicant-file recovery and shared-link
-   audit behavior, and recording/transcript/summary contracts plus persistence
-   and access.
+   sender identity, expiry, applicant-file recovery and shared-link audit
+   behavior, and recording/transcript/summary contracts plus persistence and
+   access.
 3. **Final Writeup** — freeze the selected-Pre-Site copy/lineage contract and
    the visit, late-review, and editorial inputs.
 4. **Initial Assessment** — design for every in-scope J27 proposal before
@@ -600,7 +604,10 @@ Owner-decided:
     normally the liaison in To, with the option to address the PI and copy the
     liaison; and
 26. To and CC recipients share one request-scoped link and may manage the same
-    applicant-material files, without person-level action attribution.
+    applicant-material files, without person-level action attribution; and
+27. the manual materials-request action is available once the promptly
+    scheduled Site Visit date is recorded, roughly in the reviewer-invitation
+    window, without waiting for reviews, synthesis, or a Pre-Site Writeup.
 
 Still required:
 
@@ -612,11 +619,10 @@ Still required:
 5. exact Dataverse schema and dossier read model for the decided Site Visit
    metadata, material categories, and observations;
 6. Site Visit Materials Upload authorized staff roles, visible sender/reply-to,
-   missing/duplicate contact handling, lifecycle timing, token
-   expiry/revocation, shared-link audit disclosure, file size/count limits,
-   destination, delete/replace persistence and recovery, idempotency,
-   partial-failure recovery, exact notification audience/timing, audit, and
-   retention;
+   missing/duplicate contact handling, token expiry/revocation, shared-link
+   audit disclosure, file size/count limits, destination, delete/replace
+   persistence and recovery, idempotency, partial-failure recovery, exact
+   notification audience/timing, audit, and retention;
 7. approved transcription provider/output contract, summary quality fallback,
    and transcript/summary refresh behavior;
 8. Final Writeup creation inputs and source-version selection behavior; and
