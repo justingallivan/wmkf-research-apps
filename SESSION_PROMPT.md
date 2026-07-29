@@ -97,8 +97,12 @@ next returning machine does not repeat it.
    production build] Branch `codex/initial-assessment-pilot` implements the
    smallest complete producer → `Artifacts/Initial Assessment/` SharePoint
    artifact → Dataverse registry → Workbench/Editor Dashboard read path.
-   Live provisioning and the human pilot remain gated by the named environment,
-   designated proposal, authorized testers, and SharePoint control verification.
+   Live provisioning and the human pilot remain gated by explicit production
+   change approval, colleague-created representative dummy request IDs,
+   authorized testers, the exact schedule, and SharePoint control verification.
+   The owner decided 2026-07-29 not to build out the existing Dataverse sandbox
+   organization into an integrated pilot environment because its missing schema
+   and unverified file/runtime dependencies make that disproportionately complex.
 
 2. **Run the Q9 ordinary-user app-access smoke in the office.**
    Evidence: `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md:47,245,428`;
@@ -110,17 +114,20 @@ next returning machine does not repeat it.
 
 ### Owner Decision Needed
 
-1. **Pilot proposal, human testers, environment, and exact schedule.**
+1. **Production dummy request IDs, human testers, and exact schedule.**
    Evidence: `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
-   Gates the 2026-08-10 pilot; intake begins around 2026-08-18.
+   The intended path is an owner-approved controlled production rehearsal after
+   colleagues create representative dummy requests. Building an integrated
+   Dataverse sandbox environment is out of scope. These remaining inputs gate
+   the 2026-08-10 pilot; intake begins around 2026-08-18.
 
 2. **SharePoint target-library controls.**
    Evidence: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
    The exact pilot registry schema, prompt/template pair, applicant-title
    (`akoya_title`) source, and staff-authored Foundation Opportunity requirement
    are implemented in source. Verify SharePoint version, restore, recycle,
-   retention, permission, and milestone-snapshot behavior in the chosen live
-   environment.
+   retention, permission, and milestone-snapshot behavior against the dedicated
+   production dummy requests before the controlled rehearsal.
 
 3. **Later Site Visit operational details.**
    Evidence: `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.

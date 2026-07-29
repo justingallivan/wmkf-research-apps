@@ -4,7 +4,7 @@ description: D26 proposal inputs still resolve by a fragile SharePoint filename 
 type: project
 status: active
 scope: strategy
-last_verified: 2026-07-29 via Initial Assessment source implementation and owner document-authority decision; live provisioning and broader J27 capture/timing remain open
+last_verified: 2026-07-29 via Initial Assessment source implementation and owner production-pilot environment decision; live provisioning and broader J27 capture/timing remain open
 ---
 
 ## Recall Rule
@@ -38,6 +38,14 @@ exists in `wmkf_apprequestperson.wmkf_biosketchurl`. The first producer is the
 request-bound Initial Assessment service; broader applicant-capture producers
 remain future work. Re-confirm the live target and run the committed metadata
 preflight before provisioning.
+
+**Pilot environment decision (owner, 2026-07-29):** do not build the reachable
+but incompletely provisioned Dataverse sandbox organization into an integrated
+application/file test environment for this pilot. Use a controlled production
+rehearsal after colleagues create representative dummy `akoya_request` records.
+Their IDs/content shape, named testers, and schedule remain pending. Production
+schema apply, prompt seeding, and application promotion still require separate
+explicit approval.
 
 **Hold step already RETIRED (S279) — this contingency resolved early, for a different reason.** The reviewer "hold step" ([[project-reviewer-hold-step-decouple]]) was removed in S279 (commit `a8676af1`) when the direction shifted to onboarding at a single final Accept — independent of J27. So the earlier "single-submission may un-scaffold the hold step" note is now moot: there is no hold step left to un-scaffold. (Kept here only so the J27 doc-capture planning doesn't re-raise it.)
 

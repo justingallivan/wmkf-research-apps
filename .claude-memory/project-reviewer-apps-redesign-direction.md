@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-28 via source/live probes, Workbench truth audit, and owner design decisions
+  last_verified: 2026-07-29 via source/live probes, Workbench truth audit, and owner production-pilot environment decision
 ---
 
 ## Recall Rule
@@ -40,12 +40,16 @@ Request-versus-artifact-stage marker granularity, coordinator matrix, and
 SharePoint file-permission verification remain open. The
 first fixed gate is a human-in-the-loop, end-to-end Initial Assessment pilot by
 2026-08-10, ahead of proposal intake around 2026-08-18. Authorized staff use a
-designated real test proposal to generate, inspect, and edit the canonical
+dedicated representative dummy production request to generate, inspect, and edit the canonical
 SharePoint Word artifact and then find/open that same registered file from the
 Workbench and staff-wide Editor Dashboard. The pilot also exercises one safe
 failure/retry path and proves no false cross-store success. It is
 draft-functional proof, not production readiness, and does not require the
-later lifecycle tabs. Named testers, environment, and schedule remain open.
+later lifecycle tabs. The owner chose a controlled production rehearsal using
+colleague-created representative dummy requests rather than building the
+existing Dataverse sandbox organization into an integrated application/file
+test environment. Dummy request IDs/content shape, named testers, and schedule
+remain open.
 Use the near-term execution plan for current authority; the chronology below
 remains the rationale record.
 

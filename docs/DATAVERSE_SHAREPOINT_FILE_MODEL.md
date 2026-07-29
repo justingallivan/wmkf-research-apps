@@ -6,7 +6,7 @@ status: active
 summary: "File storage and linking in AkoyaGO/Dynamics, including governed staff writeups and Site Visit artifacts."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-07-28
+last_verified: 2026-07-29
 owner: product-engineering
 related:
   - scripts/probe-sharepoint-write.js
@@ -413,9 +413,12 @@ create and register a real canonical Word artifact, let authorized staff open
 and edit it, and let staff find and open that same registered artifact from
 both the Workbench and this dashboard. One safe failure/retry path must prove
 that the SharePoint bytes and Dataverse registry reconcile before success.
-Named testers, pilot environment, and schedule remain open. App list visibility
-and SharePoint edit permission are separate authorization boundaries; passing
-one must not imply the other.
+The owner chose a controlled production rehearsal using colleague-created
+representative dummy requests rather than building the existing Dataverse
+sandbox organization into an integrated application/file test environment.
+The dummy request IDs and content shape, named testers, and schedule remain
+open. App list visibility and SharePoint edit permission are separate
+authorization boundaries; passing one must not imply the other.
 
 ### Search contract
 
