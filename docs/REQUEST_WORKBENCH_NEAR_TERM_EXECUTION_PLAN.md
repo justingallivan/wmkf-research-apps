@@ -205,7 +205,7 @@ current source, and a read-only production Dataverse probe; implementation
 PLANNED.]** The D26 examples provide the starting content contract for the J27
 Initial Assessment. Each is a one-page Word document with this sequence:
 
-1. the italic house-style Keck title beginning **“To …”**;
+1. the applicant-submitted proposal title;
 2. the institution display name;
 3. **Summary** narrative;
 4. a **Rationale** heading; and
@@ -219,8 +219,8 @@ slot for it and mark staff completion as outstanding; the model must not
 invent Foundation Opportunity prose merely to make the document appear
 complete.
 
-The two heading values are authoritative Dataverse metadata rather than model
-output:
+The title and institution are authoritative Dataverse metadata rather than
+model output:
 
 - **Institution:** use `akoya_request.wmkf_organizationname` when populated,
   otherwise the formatted applicant lookup
@@ -228,29 +228,26 @@ output:
   applies this fallback. All four supplied D26 example rows have a null direct
   organization-name field and obtain the expected institution display name
   from the applicant lookup.
-- **Keck title:** use
-  `akoya_request.wmkf_wmkfprojectdescription`, not the applicant's proposal
-  title in `akoya_title`. Production rows `1002912`, `1002874`, `1002903`, and
-  `1002959` contain the exact “To …” titles displayed in the four supplied
-  Word examples.
+- **Title:** use the applicant-submitted proposal title in
+  `akoya_request.akoya_title`. Do not use the later house-style Keck title in
+  `wmkf_wmkfprojectdescription` for the Initial Assessment. The current
+  Workbench resolver already selects `akoya_title` and returns it as `title`,
+  so this metadata input is available without waiting for the post-decision
+  Keck-title workflow.
 
-The current Workbench request resolver selects `akoya_title` but does not yet
-select `wmkf_wmkfprojectdescription`; the Initial Assessment read contract
-must add the Keck-title field explicitly. The existing governed
-`grantee-title.generate` producer derives the Keck title from `akoya_title`
-plus `wmkf_abstract` and persists it only when the destination is empty.
-However, its automatic cron currently considers only Research requests whose
-Phase I status is already **Invited**. That is too late to guarantee a title
-for every J27 Initial Assessment, which must exist before the advancement
-decision. The product still needs an explicit missing-title rule: either run
-the governed title producer as a safe no-overwrite precursor to Initial
-Assessment generation, or block and require staff to supply the field.
+The four D26 examples place an italic “To …” Keck title at the top, and a
+read-only production probe matched those displayed titles to
+`wmkf_wmkfprojectdescription`. That verifies the examples' provenance but does
+not make the field part of the J27 Initial Assessment contract. The owner chose
+the applicant-submitted title because the house-style Keck title is created
+later, after advancement.
 
 These examples establish the first semantic structure, not a permanently
-hard-coded layout. The actual Word implementation remains a versioned,
-replaceable template with recorded template/prompt provenance so spacing,
-styles, labels, and future cycle structures can change without rewriting prior
-artifacts.
+hard-coded layout. The exact format remains in flux during the single-phase
+transition. Treat the sample structure as the starting point for iteration,
+implemented through a versioned, replaceable template with recorded
+template/prompt provenance so spacing, styles, labels, and future cycle
+structures can change without rewriting prior artifacts.
 
 ### Pre Site Visit input, regeneration, and template contract
 
@@ -818,12 +815,14 @@ Owner-decided:
     discovery/opening, staff-wide Editor Dashboard discovery/opening, and one
     safe failure/retry path; it does not require later lifecycle tabs;
 41. the starting Initial Assessment structure is a one-page Word document with
-    the Keck “To …” title, institution, Summary, and a Rationale comprising
+    the applicant-submitted proposal title, institution, Summary, and a
+    Rationale comprising
     Significance & Impact, Research Plan, Team Expertise, and Foundation
     Opportunity; and
 42. Foundation Opportunity is a visibly incomplete staff-authored slot, while
-    the institution and Keck title come from authoritative Dataverse metadata
-    rather than model inference.
+    the institution and applicant-submitted title come from authoritative
+    Dataverse metadata rather than model inference; the exact document format
+    remains intentionally open to iteration during the single-phase transition.
 
 Still required:
 
@@ -847,7 +846,6 @@ Still required:
    beyond copying the latest Pre-Site version; and
 9. Editor Dashboard Reviewed-marker granularity, coordinator view, app/file
    access enforcement, and restore authority; and
-10. the Initial Assessment governed prompt/template pair and the rule for a
-    missing `wmkf_wmkfprojectdescription` before advancement, because the
-    current automatic title cron runs only after Phase I status becomes
-    Invited.
+10. the first approved Initial Assessment governed prompt/template pair and
+    any format revisions identified while testing the provisional D26-derived
+    structure during the single-phase transition.
