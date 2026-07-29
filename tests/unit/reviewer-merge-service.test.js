@@ -237,7 +237,10 @@ describe('executeMerge', () => {
     expect(deps.potentialReviewer.deactivate).not.toHaveBeenCalled();
   });
 
-  test('email move: clears loser email, sets keeper, stamps manual provenance — in that order', async () => {
+  // S387: the keeper's address and its 'manual' provenance move in ONE patch, so a
+  // failure can no longer leave the keeper holding the moved address under its OLD
+  // source (which the invite gate could read as a stronger tier than the evidence).
+  test('email move: clears loser email, then sets keeper address + manual provenance atomically', async () => {
     const calls = [];
     const deps = makeDeps({
       keeperRow: { ...bareKeeper, wmkf_emailaddress: 'old@example.org' },
@@ -245,13 +248,19 @@ describe('executeMerge', () => {
       loserSug: [],
     });
     deps.potentialReviewer.clearEmail = jest.fn(async () => { calls.push('clearLoser'); });
-    deps.potentialReviewer.update = jest.fn(async (id, u) => { if (u.email) calls.push('setKeeper'); });
+    deps.potentialReviewer.update = jest.fn(async (id, u) => {
+      if (u.email) calls.push(u.emailSource ? 'setKeeperWithProvenance' : 'setKeeperAddressOnly');
+    });
     deps.researcher.updateById = jest.fn(async (id, u) => { if (u.emailSource) calls.push('stampManual'); });
 
     const summary = await executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: { email: 'loser' } }, deps);
     expect(summary.emailMoved).toBe(true);
-    expect(calls).toEqual(['clearLoser', 'setKeeper', 'stampManual']);
-    expect(deps.researcher.updateById).toHaveBeenCalledWith(KEEPER, { emailSource: 'manual' }, expect.any(Object));
+    expect(calls).toEqual(['clearLoser', 'setKeeperWithProvenance']);
+    expect(deps.potentialReviewer.update).toHaveBeenCalledWith(
+      KEEPER, { email: 'avery.quinn@example.org', emailSource: 'manual' }, expect.any(Object),
+    );
+    // No separate provenance write that could land without its address.
+    expect(deps.researcher.updateById).not.toHaveBeenCalledWith(KEEPER, { emailSource: 'manual' }, expect.any(Object));
   });
 
   test('step 6 keeper email update failure stays a 500 email-move failure', async () => {

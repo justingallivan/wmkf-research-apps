@@ -35,7 +35,17 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { sql } from '@vercel/postgres';
-import { emailSourceTier, emailSourceOutranks } from '../lib/utils/reviewer-invite.js';
+import {
+  emailSourceTier,
+  emailSourceOutranks,
+  emailSourceUpgradeAllowed,
+} from '../lib/utils/reviewer-invite.js';
+import { pickVettedEmail } from '../lib/utils/reviewer-vetted-email.js';
+
+// Blast-radius cap (Codex adversarial review, finding 4). The measured population is 6-7
+// rows; anything materially larger means the roster or the connection is not what this
+// pass was reasoned about, so refuse rather than write.
+const MAX_ROWS = 25;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.join(__dirname, '..', '.env.local');
@@ -60,18 +70,63 @@ const { withDalContext } = await import('../lib/dataverse/core/context.js');
 const potentialReviewerAdapter = await import('../lib/dataverse/adapters/potential-reviewer.js');
 const researcherAdapter = await import('../lib/dataverse/adapters/researcher.js');
 
-// Best roster-observed source per normalized address.
+/**
+ * The (address, source) pair a roster blob actually ASSERTS TOGETHER.
+ *
+ * Codex adversarial review, finding 1: the first version of this script SELECTed the
+ * address and the source with two independent SQL COALESCEs, so it could pair a top-level
+ * address with `contactEnrichment`'s provenance for a DIFFERENT address — re-asserting a
+ * source that was never evidence for the address being upgraded. `pruneCandidateForRoster`
+ * makes that shape reachable: it persists `email: c.email || e.email` but
+ * `emailSource: e.emailSource`.
+ *
+ * So: take BOTH fields from the SAME object, and only when that object names the address
+ * being upgraded. Stricter than `pickVettedEmail` (whose own source pick falls back across
+ * objects) on purpose — this writes provenance, so it must not guess.
+ */
+function assertedPair(candidate) {
+  if (!candidate || typeof candidate !== 'object') return null;
+  const enr = (candidate.contactEnrichment && typeof candidate.contactEnrichment === 'object')
+    ? candidate.contactEnrichment
+    : {};
+  const top = String(candidate.email ?? '').trim();
+  const topSrc = String(candidate.emailSource ?? '').trim();
+  const enrEmail = String(enr.email ?? '').trim();
+  const enrSrc = String(enr.emailSource ?? '').trim();
+
+  if (top && topSrc) return { email: top, source: topSrc };
+  // Enrichment's pair counts only when it is not contradicted by a different top-level
+  // address (that would mean the source describes the enrichment address, not this row's).
+  if (enrEmail && enrSrc && (!top || top.toLowerCase() === enrEmail.toLowerCase())) {
+    return { email: enrEmail, source: enrSrc };
+  }
+  return null;
+}
+
+// Best roster-observed source per normalized address, restricted to rows that cleared the
+// same persistence envelope save/promote require (`pickVettedEmail`: persistable, resolved
+// identity, no anti-scrape munge) and to statuses that represent real candidates.
 const { rows: rosterRows } = await sql`
-  SELECT lower(COALESCE(NULLIF(candidate->>'email',''), NULLIF(candidate->'contactEnrichment'->>'email',''))) AS email,
-         COALESCE(candidate->>'emailSource', candidate->'contactEnrichment'->>'emailSource') AS src
+  SELECT candidate_key, status, display_name, candidate
   FROM reviewer_find_roster
-  WHERE COALESCE(NULLIF(candidate->>'email',''), NULLIF(candidate->'contactEnrichment'->>'email','')) IS NOT NULL
+  WHERE status IN ('active', 'saved')
 `;
 const bestByEmail = new Map();
+let rosterRowsConsidered = 0;
+let rosterRowsRejected = 0;
 for (const row of rosterRows) {
-  if (!row.email || !row.src) continue;
-  const current = bestByEmail.get(row.email);
-  if (!current || emailSourceOutranks(row.src, current)) bestByEmail.set(row.email, row.src);
+  const pair = assertedPair(row.candidate);
+  if (!pair) { rosterRowsRejected += 1; continue; }
+  const vetted = pickVettedEmail(row.candidate);
+  // The envelope must pass AND must be talking about the same address this row asserts.
+  if (!vetted || String(vetted.email).trim().toLowerCase() !== pair.email.toLowerCase()) {
+    rosterRowsRejected += 1;
+    continue;
+  }
+  rosterRowsConsidered += 1;
+  const email = pair.email.toLowerCase();
+  const current = bestByEmail.get(email);
+  if (!current || emailSourceOutranks(pair.source, current)) bestByEmail.set(email, pair.source);
 }
 
 const plan = await withDalContext('backfill-email-source-precedence-scan', async () => {
@@ -84,7 +139,10 @@ const plan = await withDalContext('backfill-email-source-precedence-scan', async
     const email = String(person.wmkf_emailaddress || '').trim();
     const best = bestByEmail.get(email.toLowerCase());
     if (!best) continue;
-    if (!emailSourceOutranks(best, person.wmkf_emailsource)) continue;
+    // `emailSourceUpgradeAllowed`, not `emailSourceOutranks`: a stored human assertion
+    // (`manual`/`staff_verified`) is terminal against machine evidence, so it is never
+    // upgraded here either — the script must not do what the adapter refuses to do.
+    if (!emailSourceUpgradeAllowed(best, person.wmkf_emailsource)) continue;
     out.push({
       personId: person.wmkf_potentialreviewersid,
       name: person.wmkf_name,
@@ -99,23 +157,51 @@ const plan = await withDalContext('backfill-email-source-precedence-scan', async
 });
 
 const blocked = plan.filter((p) => p.storedTier === 'research_only');
-const humanSourced = plan.filter((p) => ['manual', 'staff_verified'].includes(String(p.stored).toLowerCase()));
 
 console.log(`Address-provenance precedence backfill (${execute ? 'EXECUTE' : 'DRY RUN'})`);
-console.log(`  roster addresses with a recorded source: ${bestByEmail.size}`);
+console.log(`  roster rows contributing evidence: ${rosterRowsConsidered} (rejected by the envelope / pairing check: ${rosterRowsRejected})`);
+console.log(`  roster addresses with an asserted source: ${bestByEmail.size}`);
 console.log(`  person rows pinned below available evidence: ${plan.length}`);
-console.log(`    currently research_only (NOT invitable today): ${blocked.length}`);
-console.log(`    stored value is a HUMAN assertion (upgrade removes that recipient's send-time tick): ${humanSourced.length}\n`);
+console.log(`    currently research_only (NOT invitable today): ${blocked.length}\n`);
 for (const p of plan) {
-  const flag = humanSourced.includes(p) ? '  ⚠ human-sourced' : '';
-  console.log(`  ${(p.name || '').padEnd(24)} ${p.email.padEnd(34)} ${p.stored} (${p.storedTier}) → ${p.best} (${p.bestTier})${flag}`);
+  console.log(`  ${(p.name || '').padEnd(24)} ${p.email.padEnd(34)} ${p.stored} (${p.storedTier}) → ${p.best} (${p.bestTier})`);
 }
 
+// A manifest is what makes --execute reviewable: the operator sees the exact plan in a dry
+// run, and the execute pass refuses unless the plan still matches the manifest they read
+// (Codex adversarial review, finding 4). Keyed on personId+email+stored+best, so any drift
+// in the population between the two runs halts instead of silently writing a new set.
+const manifestOf = (rows) => rows
+  .map((p) => `${p.personId}|${p.email.toLowerCase()}|${p.stored}|${p.best}`)
+  .sort()
+  .join('\n');
+const manifestDir = path.join(__dirname, '.roster-dedupe-backup');
+const manifestPath = path.join(manifestDir, 'email-source-precedence-manifest.txt');
+
 if (!execute) {
-  console.log('\nNo writes performed. Re-run with --execute to re-assert the stronger sources.');
+  fs.mkdirSync(manifestDir, { recursive: true });
+  fs.writeFileSync(manifestPath, manifestOf(plan));
+  console.log(`\nManifest written to ${manifestPath}`);
+  console.log('No writes performed. Review the plan above, then re-run with --execute — it');
+  console.log('will refuse if the population has changed since this manifest.');
   process.exit(0);
 }
 if (plan.length === 0) { console.log('\nNothing to do.'); process.exit(0); }
+if (plan.length > MAX_ROWS) {
+  console.error(`\nREFUSED: ${plan.length} rows exceeds the ${MAX_ROWS}-row cap. The measured population`);
+  console.error('was 6-7 rows; a set this large means the inputs are not what this pass assumes.');
+  process.exit(1);
+}
+if (!fs.existsSync(manifestPath)) {
+  console.error('\nREFUSED: no manifest. Run the dry run first and review its plan.');
+  process.exit(1);
+}
+const reviewed = fs.readFileSync(manifestPath, 'utf8').trim();
+if (reviewed !== manifestOf(plan)) {
+  console.error('\nREFUSED: the plan no longer matches the reviewed manifest — the population changed.');
+  console.error('Re-run the dry run, review the new plan, then execute.');
+  process.exit(1);
+}
 
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 const backupDir = path.join(__dirname, '.roster-dedupe-backup');
@@ -140,16 +226,29 @@ await withDalContext('backfill-email-source-precedence', async () => {
         select: 'wmkf_potentialreviewersid,wmkf_emailaddress,wmkf_emailsource',
       });
       const now = after?.wmkf_emailsource || null;
-      if (String(now).toLowerCase() === String(p.best).toLowerCase()) {
+      const addressNow = String(after?.wmkf_emailaddress || '').trim();
+      // Verify BOTH halves: the source moved to the expected value AND it still describes
+      // the address the evidence was for. Checking only the source would pass even if the
+      // address had changed underneath (Codex adversarial review, finding 4).
+      const addressHeld = addressNow.toLowerCase() === p.email.toLowerCase();
+      if (String(now).toLowerCase() === String(p.best).toLowerCase() && addressHeld) {
         upgraded += 1;
-        console.log(`  ${(p.name || '').padEnd(24)} ${p.stored} → ${now}`);
+        console.log(`  ${(p.name || '').padEnd(24)} ${p.stored} → ${now}  (address held: ${addressNow})`);
+      } else if (!addressHeld) {
+        // The address moved mid-pass; stop rather than continue against shifting state.
+        console.error(`  ABORT ${p.name}: address is now ${addressNow || '(empty)'}, expected ${p.email}. Source reads ${now}.`);
+        failed += 1;
+        break;
       } else {
         unchanged += 1;
         console.log(`  NO-OP ${(p.name || '').padEnd(20)} still ${now} (the adapter declined — re-run the dry run to see why)`);
       }
     } catch (err) {
+      // Abort-on-first-error: a mixed population is worse than a partial one, and the
+      // manifest check makes resuming safe after the cause is understood.
       failed += 1;
-      console.error(`  ERROR ${p.name} (${p.personId}): ${err?.message || err}`);
+      console.error(`  ABORT ${p.name} (${p.personId}): ${err?.message || err}`);
+      break;
     }
   }
 });

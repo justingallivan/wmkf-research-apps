@@ -428,6 +428,30 @@ describe('researcher.upsertByPotentialReviewer — writes bibliometrics onto the
     expect(update.mock.calls[0][2].wmkf_emailsource).toBeUndefined();
   });
 
+  // Reversed after adversarial review: a stored HUMAN assertion is terminal against
+  // machine evidence, including READY-tier evidence. Promoting it would delete that
+  // recipient's send-time acknowledgement on every request sharing the person row.
+  test.each([
+    ['manual', 'orcid'],
+    ['manual', 'institution_page'],
+    ['manual', 'scholarly_multi'],
+    ['staff_verified', 'orcid'],
+    ['staff_verified', 'institution_page'],
+    ['staff_verified', 'scholarly_multi'],
+  ])('stored %s is NOT upgraded by ready-tier %s', async (stored, incoming) => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      wmkf_potentialreviewersid: 'pr-8',
+      wmkf_emailaddress: 'same@y.edu',
+      wmkf_emailsource: stored,
+      _etag: 'W/"8"',
+    });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    await upsertByPotentialReviewer('pr-8', { email: 'same@y.edu', emailSource: incoming });
+    expect(update.mock.calls[0][2].wmkf_emailsource).toBeUndefined();
+    expect(update.mock.calls[0][3]?.ifMatch).toBeUndefined();
+  });
+
   test('an upgrade requires the same address, a known incoming source, and an ETag', async () => {
     const get = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
       wmkf_potentialreviewersid: 'pr-7',

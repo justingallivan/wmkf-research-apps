@@ -187,8 +187,12 @@ test('B1 backfill: vetted roster email written with roster provenance when no ma
   });
   const body = await promoteApplicantReviewer(args());
   expect(body.savedFields).toEqual(['email']);
-  expect(update).toHaveBeenCalledWith(PERSON, { email: 'kaang@snu.ac.kr' }, { actingUserSystemId: 'u-1' });
-  expect(updateById).toHaveBeenCalledWith(PERSON, { emailSource: 'claude_search' }, { actingUserSystemId: 'u-1' });
+  // S387: the vetted address and its roster provenance land in ONE patch, so a rejected
+  // address cannot leave the row labelled with a source for a different one.
+  expect(update).toHaveBeenCalledWith(
+    PERSON, { email: 'kaang@snu.ac.kr', emailSource: 'claude_search' }, { actingUserSystemId: 'u-1' },
+  );
+  expect(updateById).not.toHaveBeenCalledWith(PERSON, { emailSource: 'claude_search' }, { actingUserSystemId: 'u-1' });
 });
 
 test('B1 idempotency: existing person email blocks the backfill', async () => {

@@ -163,14 +163,38 @@ adapter cannot disagree with the gate about which source is stronger. Preconditi
 normalized address (a source describes one specific address), both sides a KNOWN source (an
 unrecognized value neither upgrades nor is upgraded, even though the live gate still treats it as
 quick-check), strictly greater (an equal tier never churns the value, so a staff attestation is
-not displaced by a same-tier machine source), and ETag-conditional. Downgrades remain explicit —
-only `manual`/`search_contested` overwrite, because those are safety assertions rather than
-evidence claims. NOTE the deliberate consequence: `ready` first-party evidence for the same
-address DOES supersede a `manual`/`staff_verified` value, which removes that recipient's
-send-time acknowledgement; the tier ranking is applied uniformly rather than exempting
-human-entered values. Existing pinned rows are corrected by
-`scripts/backfill-email-source-precedence.mjs` (dry-run default; writes route through the adapter
-inside `withDalContext`, so DAL enforcement and the target/write interlock both apply).
+not displaced by a same-tier machine source), ETag-conditional, and — reversed after adversarial
+review — **the stored value must not be a human assertion**. `manual`/`staff_verified` are
+TERMINAL against machine evidence (`emailSourceUpgradeAllowed`): their quick-check tier is not
+merely a weaker evidence claim, it is what keeps a human in the loop at send for an address a
+person had to vouch for, and because the person row is shared across requests an automatic
+promotion to `ready` would delete that acknowledgement everywhere — including on the request
+where the staffer made the assertion. A human still supersedes a human: `manual` and
+`search_contested` overwrite unconditionally, so a staff re-entry or fresh contradicting evidence
+still moves the value. Downgrades remain explicit for the same reason — those two are safety
+assertions rather than evidence claims.
+
+**Address + source are ONE patch.** Every path that writes the ADDRESS now writes its source in
+the same Dataverse PATCH (`potential-reviewer.update` maps `emailSource`) [VERIFIED via a grep of
+every `emailSource` write across `lib/services`, `lib/dataverse/adapters`, `pages/api`]:
+`my-candidates` hand-edit, promote's hand-correction, promote's B1 backfill, the email
+reconciler, and the merge email-move. The one remaining source-only writer is deliberate — the
+`verifyEmailAddress` attestation, which changes provenance for the address ALREADY stored and is
+ETag-guarded, so it has no address to pair with. Previously each of these wrote the address, then
+the source, in two calls — so an address that landed while the source write failed left the row
+describing the NEW address under the OLD source, and a hand-typed address inheriting a stored
+`orcid` reads as `ready` and sends with no acknowledgement. One patch means a duplicate-key
+rejection drops both; email stays isolated from the other person fields, so its 409 still yields
+`partialSuccess` for them.
+
+Existing pinned rows are corrected by `scripts/backfill-email-source-precedence.mjs` (dry-run
+default). Writes route through the adapter inside `withDalContext`, so DAL enforcement, the
+target/write interlock, the precedence rule, and the ETag all apply. It pairs each address with
+the source asserted by the SAME roster object — never two independent COALESCEs, which could
+re-assert provenance that was never evidence for that address — requires `pickVettedEmail`'s
+persistence envelope on the contributing row, restricts contributors to `active`/`saved` rows,
+caps the population, aborts on the first error, verifies the address still holds after each
+write, and refuses to execute unless the plan matches the manifest from a reviewed dry run.
 
 **Why.** The API is the enforced boundary — the modal acknowledgement alone is not trusted.
 

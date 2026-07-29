@@ -294,19 +294,22 @@ describe('verifyEmailAddress — the other research-only source', () => {
   });
 });
 
-// Codex adversarial review, finding 3: `staff_verified` is NOT in the researcher
-// adapter's no-upgrade source set, so a later enrichment that corroborates the SAME
-// address on two distinct recent works overwrites it with `scholarly_multi` → `ready`,
-// dropping the send-time acknowledgement. That is deliberate, not an oversight: two
-// independent recent works are stronger evidence than one human attestation, and it is
-// the same tier every other corroborated address gets. This test exists so the
-// precedence is asserted rather than assumed — flip it if the policy ever changes.
+// CORRECTED. A previous version of this file recorded that a later `scholarly_multi`
+// corroboration supersedes `staff_verified` to `ready`, and called that deliberate. A
+// second adversarial review argued the other side and was right: `staff_verified`'s
+// quick-check tier is not merely a weaker evidence claim, it is what keeps a human in the
+// loop at send for an address a person had to vouch for — and the person row is shared
+// across requests, so an automatic promotion would delete that acknowledgement everywhere.
+// A stored human assertion is now TERMINAL against machine evidence
+// (`emailSourceUpgradeAllowed`); only another human (`manual`) or contradicting evidence
+// (`search_contested`) moves it.
 describe('staff_verified provenance precedence', () => {
-  const { emailConfidence } = require('../../lib/utils/reviewer-invite');
+  const { emailConfidence, emailSourceUpgradeAllowed } = require('../../lib/utils/reviewer-invite');
 
-  test('staff_verified is quick_check, and scholarly_multi outranks it as ready', () => {
+  test('staff_verified is quick_check; ready-tier evidence outranks the TIER but cannot upgrade it', () => {
     expect(emailConfidence({ wmkf_emailsource: 'staff_verified' }).action).toBe('quick_check');
     expect(emailConfidence({ wmkf_emailsource: 'scholarly_multi' }).action).toBe('ready');
+    expect(emailSourceUpgradeAllowed('scholarly_multi', 'staff_verified')).toBe(false);
   });
 
   test('a contest downgrades it again — search_contested outranks staff_verified', () => {

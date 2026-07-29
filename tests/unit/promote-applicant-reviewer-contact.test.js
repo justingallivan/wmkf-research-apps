@@ -106,10 +106,13 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
     );
     // Writes target the suggestion's OWN person, never the client-supplied id.
     expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { affiliation: 'Example Research Lab' }, expect.anything());
-    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { email: 'ava.mercer@example.org' }, expect.anything());
+    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { email: 'ava.mercer@example.org', emailSource: 'manual' }, expect.anything());
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalledWith('99999999-9999-9999-9999-999999999999', expect.anything(), expect.anything());
-    // emailSource forced manual, AFTER the email write.
-    expect(researcherAdapter.updateById).toHaveBeenCalledWith(PERSON_ID, { emailSource: 'manual' }, expect.anything());
+    // S387: emailSource is forced manual in the SAME patch as the address, never as a
+    // follow-up write — a source must not be able to outlive the address it describes.
+    expect(researcherAdapter.updateById).not.toHaveBeenCalledWith(
+      PERSON_ID, { emailSource: 'manual' }, expect.anything(),
+    );
   });
 
   test('email collision: still promoted, partialSuccess with a contactError', async () => {
@@ -214,9 +217,10 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     // Read is id-anchored on requestId + suggestionId.
     expect(findCandidateBySuggestion).toHaveBeenCalledWith(REQUEST_ID, SUGGESTION_ID);
     // Email written to the suggestion's OWN person.
-    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { email: 'noor.patel@example.org' }, expect.anything());
-    // Source forced from the vetted roster provenance — NOT 'manual'.
-    expect(researcherAdapter.updateById).toHaveBeenCalledWith(PERSON_ID, { emailSource: 'claude_search' }, expect.anything());
+    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { email: 'noor.patel@example.org', emailSource: 'claude_search' }, expect.anything());
+    // Source forced from the vetted roster provenance — NOT 'manual' — and written in the
+    // SAME patch as the address (S387), not as a follow-up call.
+    expect(researcherAdapter.updateById).not.toHaveBeenCalledWith(PERSON_ID, { emailSource: 'claude_search' }, expect.anything());
   });
 
   test('does NOT backfill when emailPersistAllowed is not true', async () => {
@@ -250,8 +254,11 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     await handler(req, res);
     // Manual email persisted; the one roster read is the eligibility boundary,
     // and no separate email-backfill lookup occurs.
-    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { email: 'manual@example.org' }, expect.anything());
-    expect(researcherAdapter.updateById).toHaveBeenCalledWith(PERSON_ID, { emailSource: 'manual' }, expect.anything());
+    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { email: 'manual@example.org', emailSource: 'manual' }, expect.anything());
+    // S387: one atomic patch, not an address write followed by a source write.
+    expect(researcherAdapter.updateById).not.toHaveBeenCalledWith(
+      PERSON_ID, { emailSource: 'manual' }, expect.anything(),
+    );
     expect(findCandidateBySuggestion).toHaveBeenCalledTimes(1);
   });
 

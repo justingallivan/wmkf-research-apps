@@ -76,8 +76,9 @@ test('WRITE: ownerless vetted email → written to the person with vetted source
   seed(vettedCandidate());
   const r = await reconcileReviewerEmails({});
   expect(r.written).toEqual([{ requestId: REQ, suggestionId: SUG, personId: PERSON, email: 'ava.mercer@example.org' }]);
-  expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON, { email: 'ava.mercer@example.org' }, expect.anything());
-  expect(researcherAdapter.updateById).toHaveBeenCalledWith(PERSON, { emailSource: 'claude_search' }, expect.anything());
+  // S387: address + vetted source in ONE patch, never a follow-up source write.
+  expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON, { email: 'ava.mercer@example.org', emailSource: 'claude_search' }, expect.anything());
+  expect(researcherAdapter.updateById).not.toHaveBeenCalledWith(PERSON, { emailSource: 'claude_search' }, expect.anything());
 });
 
 test('Find-row anchor: reconciles a roster candidate stamped with suggestionId after save-candidates', async () => {

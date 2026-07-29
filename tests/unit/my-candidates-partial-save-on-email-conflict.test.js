@@ -133,15 +133,17 @@ describe('my-candidates PATCH — partial save on email conflict', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
-    // Email is isolated: never bundled with affiliation in the same person PATCH.
+    // Email is isolated from the OTHER fields (so a duplicate-key 409 rejects only the
+    // address), but S387 pairs it with its own provenance in that same PATCH — a source
+    // must never outlive the address it describes.
     expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(
-      PERSON_ID, { email: 'ava.mercer@example.org' }, expect.anything(),
+      PERSON_ID, { email: 'ava.mercer@example.org', emailSource: 'manual' }, expect.anything(),
     );
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalledWith(
       PERSON_ID, expect.objectContaining({ email: expect.anything(), affiliation: expect.anything() }), expect.anything(),
     );
-    // emailSource stamped manual only AFTER the successful email write.
-    expect(researcherAdapter.updateById).toHaveBeenCalledWith(
+    // …and NOT as a follow-up write that could land without its address.
+    expect(researcherAdapter.updateById).not.toHaveBeenCalledWith(
       PERSON_ID, { emailSource: 'manual' }, expect.anything(),
     );
   });

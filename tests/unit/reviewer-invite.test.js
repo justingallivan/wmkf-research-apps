@@ -12,6 +12,8 @@ const {
   emailConfidence,
   emailSourceTier,
   emailSourceOutranks,
+  emailSourceUpgradeAllowed,
+  isHumanAssertedEmailSource,
 } = require('../../lib/utils/reviewer-invite');
 
 describe('shouldSkipDuplicateInvitation', () => {
@@ -187,5 +189,42 @@ describe('emailSourceTier / emailSourceOutranks', () => {
     expect(emailSourceOutranks('affiliation', 'not_a_real_source')).toBe(false);
     expect(emailSourceOutranks('not_a_real_source', 'serp_search')).toBe(false);
     expect(emailSourceOutranks('affiliation', null)).toBe(false);
+  });
+
+  // Reversed after adversarial review: a stored human assertion is TERMINAL against
+  // machine evidence. Its quick-check tier is what keeps a human in the loop at send for
+  // an address someone had to vouch for, and the person row is shared across requests, so
+  // an automatic promotion to `ready` would delete that acknowledgement everywhere —
+  // including on the request where the staffer made the assertion.
+  test('a stored human assertion is never upgraded by machine evidence', () => {
+    for (const stored of ['manual', 'staff_verified', 'MANUAL', ' staff_verified ']) {
+      for (const incoming of ['orcid', 'institution_page', 'scholarly_multi']) {
+        // The tier comparison still says "stronger"…
+        expect(emailSourceOutranks(incoming, stored)).toBe(true);
+        // …but the upgrade is refused.
+        expect(emailSourceUpgradeAllowed(incoming, stored)).toBe(false);
+      }
+    }
+    expect(isHumanAssertedEmailSource('manual')).toBe(true);
+    expect(isHumanAssertedEmailSource('staff_verified')).toBe(true);
+    expect(isHumanAssertedEmailSource('affiliation')).toBe(false);
+    expect(isHumanAssertedEmailSource(null)).toBe(false);
+  });
+
+  test('machine sources still upgrade each other', () => {
+    expect(emailSourceUpgradeAllowed('affiliation', 'serp_search')).toBe(true);
+    expect(emailSourceUpgradeAllowed('institution_page', 'claude_search')).toBe(true);
+    expect(emailSourceUpgradeAllowed('scholarly_multi', 'pubmed')).toBe(true);
+    // …and never downgrade or churn.
+    expect(emailSourceUpgradeAllowed('serp_search', 'affiliation')).toBe(false);
+    expect(emailSourceUpgradeAllowed('affiliation', 'scholarly_single')).toBe(false);
+  });
+
+  test('a human assertion may still be superseded BY a human (the adapter overwrite path)', () => {
+    // `manual` and `search_contested` overwrite unconditionally in
+    // researcher.upsertByPotentialReviewer, so these two are deliberately NOT routed
+    // through the upgrade predicate — asserted here so the exemption stays visible.
+    expect(emailSourceUpgradeAllowed('manual', 'staff_verified')).toBe(false);
+    expect(emailSourceUpgradeAllowed('search_contested', 'manual')).toBe(false);
   });
 });
