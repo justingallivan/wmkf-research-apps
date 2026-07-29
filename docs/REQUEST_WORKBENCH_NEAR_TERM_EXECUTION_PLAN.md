@@ -167,6 +167,65 @@ marker. The Final Writeup may expose a soft, optional Reviewed acknowledgement
 for expected readers, but that signal is not an approval/sign-off gate.
 Board-ready freeze remains a separate owner-controlled milestone.
 
+### Pre Site Visit input, regeneration, and template contract
+
+**[VERIFIED via owner decisions 2026-07-28; document pipeline PLANNED.]**
+The Pre-Site draft has two independently refreshable source layers:
+
+1. **Proposal-derived factual material.** Use the full proposal text with an
+   iterated form of the existing `phase-ii.summarize` prompt. Where the
+   document repeats authoritative request metadata such as institution,
+   requested amount, project period, or named request relationships, source
+   those values from Dataverse rather than asking the model to infer them from
+   the proposal.
+2. **Review-derived analysis.** Use `review-synthesis.generate` over **all
+   currently submitted reviews**. Staff do not select a subset. Staff may edit
+   the resulting synthesis in the canonical Word document.
+
+The two named prompt surfaces do not currently have the same runtime posture:
+
+- **[VERIFIED via
+  `shared/config/prompts/phase-ii-dynamics.js`, `pages/api/process.js`, and a
+  read-only production prompt inventory probe on 2026-07-28.]**
+  `phase-ii.summarize` has one current production v1 row and a tracked config,
+  but the retained sunset-candidate PDF route still calls the older
+  `createSummarizationPrompt()` builder; the row currently drives nothing.
+  The new Dataverse-native Pre-Site producer must adopt, iterate, and execute
+  the governed prompt through the shared Executor rather than extend the
+  retained PDF-upload route.
+- **[VERIFIED via
+  `lib/services/review-manager/synthesize-reviews-service.js`.]**
+  `review-synthesis.generate` already receives a server-composed digest of all
+  selected review engagements carrying `wmkf_reviewreceivedat`, reads their
+  answer snapshots, and supports deliberate regeneration. Its current service
+  requires at least one submitted review.
+
+The Site Visit date governs distribution; review completeness does not.
+Therefore:
+
+- zero reviews must not block creating or distributing the Pre-Site document;
+  the review section states that no reviews were received as of the document's
+  evidence timestamp;
+- one or more reviews use the latest `review-synthesis.generate` output and
+  disclose submitted-review count/coverage and as-of time;
+- a late review makes the review-derived section stale and permits
+  `review-synthesis.generate` to run again;
+- rerunning review synthesis does not regenerate the proposal-derived core;
+  and
+- because staff may have edited the Word prose, a new synthesis must not
+  silently overwrite that section. The Workbench presents a deliberate
+  refresh/incorporation action and preserves the earlier distributed version.
+
+Use the supplied Pre-Site and Final example documents plus the current prompts
+as the starting design reference. Formatting and section structure may change
+between cycles. The implementation must therefore use a versioned,
+replaceable Word template rather than hard-code layout in a Workbench
+component. Each generation records the template identity/version and prompt
+identity/version. A structural change publishes a compatible prompt/template
+pair for new documents without rewriting earlier artifacts. The exact initial
+template and template-storage mechanism remain to be approved during the
+writeup slice.
+
 ### Site Visit applicant materials and transcript summaries
 
 **[VERIFIED via owner decision 2026-07-28; implementation PLANNED.]**
@@ -322,8 +381,10 @@ leave the review with this contract:
 
 Decision order:
 
-1. **Pre Site Visit Writeup** — likely next operational slice because returned reviews are
-   now present, but confirm the deadline and whether it consumes raw reviews, synthesis, or both.
+1. **Pre Site Visit Writeup** — input and regeneration behavior are
+   owner-decided. Next freeze its calendar, first versioned Word template,
+   prompt/template compatibility contract, and artifact persistence/access
+   contract.
 2. **Site Visit** — freeze the dossier metadata, artifact registry, narrow
    applicant-upload, recording/transcript, and derived-summary contracts.
 3. **Final Writeup** — freeze the selected-Pre-Site copy/lineage contract and
@@ -422,12 +483,24 @@ Owner-decided:
 10. a narrow request-scoped Site Visit Materials Upload link that does not
     reopen the general applicant-intake product; and
 11. transcription-platform summary reuse before any deliberate suite LLM
-    fallback.
+    fallback;
+12. Pre-Site proposal material from an iterated `phase-ii.summarize` over the
+    full proposal, with authoritative request metadata supplied from
+    Dataverse;
+13. review analysis from `review-synthesis.generate` over every currently
+    submitted review, with deliberate rerun when a late review arrives;
+14. Site Visit date—not review count—as the distribution gate, including a
+    valid zero-review document state;
+15. independent proposal/review refresh so a late review does not regenerate
+    the factual core or silently overwrite staff-edited Word prose; and
+16. a versioned, replaceable Word template, initially based on the supplied
+    examples and existing prompts, with prompt/template provenance retained.
 
 Still required:
 
 1. fixed deadlines and minimum outcomes;
-2. Pre Site Visit inputs;
+2. first approved Pre-Site Word template and prompt/template compatibility
+   contract;
 3. exact Dataverse registry schema and SharePoint destination;
 4. target-library version, retention, recycle, and permission audit;
 5. exact Site Visit metadata and dossier read model;

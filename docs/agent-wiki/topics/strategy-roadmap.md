@@ -61,6 +61,17 @@ document inventory, and individual implementation plans do not establish priorit
   selected Pre-Site version. Exact schema and target-library configuration
   remain planned/unverified. See `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and
   the near-term plan.
+- Pre-Site input direction (owner-decided 2026-07-28): draft factual material
+  from the full proposal through an iterated governed `phase-ii.summarize`;
+  supply authoritative request metadata from Dataverse; use
+  `review-synthesis.generate` over all currently submitted reviews; and allow
+  distribution with zero reviews because the Site Visit date controls timing.
+  Late reviews regenerate only the synthesis and mark the review-derived
+  section stale; they do not silently replace staff-edited Word prose or
+  regenerate the factual core. Use a versioned prompt/template pair based
+  initially on the supplied examples. The new pipeline is planned:
+  `phase-ii.summarize` currently drives no route, while the legacy retained
+  PDF route still uses `createSummarizationPrompt()`.
 - Site Visit direction (owner-decided 2026-07-28): the tab is a dossier, not a
   fourth writeup. It gathers visit metadata, applicant materials, recording,
   transcript, a version-bound derived summary, distributions, and the Final

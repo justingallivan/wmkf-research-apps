@@ -142,14 +142,27 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    applicant-material upload link is in scope without reopening the parked
    general intake product. Prefer an acceptable transcription-platform summary
    before a deliberate suite LLM fallback.
+   Pre-Site inputs are also owner-decided: use the full proposal through an
+   iterated governed `phase-ii.summarize`, authoritative request metadata from
+   Dataverse, and `review-synthesis.generate` over all currently submitted
+   reviews. The Site Visit date—not review count—governs distribution, so a
+   zero-review document is valid. A late review regenerates only the synthesis
+   and marks the review-derived section stale; it must not silently overwrite
+   staff-edited Word prose or regenerate the proposal core. The Word layout is
+   a versioned replaceable template initially based on the supplied examples.
+   Source verification found that `review-synthesis.generate` is a live
+   Executor path, while the existing `phase-ii.summarize` row drives nothing
+   and the retained PDF route still uses `createSummarizationPrompt()`; the new
+   Dataverse-native pipeline must adopt and iterate the governed prompt rather
+   than extend the sunset route.
    Allison is the confirmed primary user for a planned cycle-wide Editor
    Dashboard that replaces designated-folder browsing with one governed
    writeup list, direct Open in Word, and personal Reviewed tracking. Exact
    collaborator audience, marker granularity, coordinator view, access key,
    and delivery date remain open.
-   Exact schema, library configuration, remaining stage-specific inputs,
-   upload token/validation/recovery behavior, and transcript-summary quality
-   contract are still open.
+   Exact schema, first Pre-Site prompt/template pair, library configuration,
+   later-stage inputs, upload token/validation/recovery behavior, and
+   transcript-summary quality contract are still open.
 
 ### Owner Decision Needed
 

@@ -86,7 +86,8 @@ minimum, the persistence design must account for:
   snapshot;
 - SharePoint site/drive/item identity and human-facing URL;
 - current version/eTag and last-modified metadata;
-- producer and AI prompt/run provenance where applicable;
+- producer, input coverage/fingerprint, AI prompt/run provenance, and
+  Word-template identity/version where applicable;
 - draft/review/board-ready/superseded/final lifecycle state; and
 - immutable milestone version/snapshot references.
 
@@ -102,10 +103,30 @@ version/hash used for that operation; subsequent edits do not keep the two
 documents synchronized.
 
 The Pre-Site stable proposal core may exist before every review is received.
-Its review-derived portion must therefore carry an evidence-coverage and as-of
-stamp, become visibly stale when a later review arrives, and support deliberate
-refresh. A redistributed Pre-Site document is a new frozen version/snapshot,
-not an overwrite of the evidence for what earlier recipients saw.
+It is drafted from the full proposal through an iterated governed
+`phase-ii.summarize` prompt, with authoritative request metadata supplied from
+Dataverse. Its review-derived portion uses `review-synthesis.generate` over all
+currently submitted reviews; staff do not select a subset. The two layers have
+independent prompt/run provenance and refresh behavior.
+
+The Site Visit date, not review completeness, controls distribution. A
+zero-review document is valid and states that no reviews were received as of
+its evidence timestamp. Otherwise the review-derived portion carries submitted
+review count/coverage and an as-of stamp. A later review makes that portion
+visibly stale and supports deliberate synthesis regeneration without
+regenerating the proposal core.
+
+Because staff edit the canonical Word prose, a new review synthesis must not
+silently replace the edited review section. Staff deliberately incorporates or
+refreshes it, and the earlier distributed version remains frozen. A
+redistributed Pre-Site document is a new frozen version/snapshot, not an
+overwrite of the evidence for what earlier recipients saw.
+
+The Word layout is a versioned, replaceable template initially based on the
+owner-supplied Pre-Site/Final examples and current prompt structure. Each
+generated artifact records both template and prompt versions. New structural
+requirements publish a compatible prompt/template pair for future generations
+without altering the historical layout or meaning of existing documents.
 
 Staff collaborators use the canonical SharePoint Word file. External Board
 members or consultants who join a visit receive a PDF attachment representing
