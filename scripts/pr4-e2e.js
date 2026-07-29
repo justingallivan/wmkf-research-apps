@@ -113,6 +113,7 @@ async function setupCase({ caseName, requestId, prefillOrcid }) {
   const { id: personId } = await potentialReviewer.upsertByEmail({
     name,
     email,
+    emailSource: 'manual', // S387: fixture addresses carry provenance like real ones
     affiliation: 'PR4 E2E Test Institution',
     expertise: 'e2e testing',
   });

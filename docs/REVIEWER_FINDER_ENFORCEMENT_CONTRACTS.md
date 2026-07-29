@@ -179,11 +179,16 @@ assertions rather than evidence claims.
 payload: `update`, `create`, `upsertByEmail`, and `clearEmail` (which nulls BOTH — a source left
 behind describes an address the row no longer has, so the next address written without a source
 would inherit it; in the merge flow that is a loser row keeping `orcid` after its address moved to
-the keeper). Callers supply their source: `my-candidates` hand-edit, promote's hand-correction,
-promote's B1 backfill, the email reconciler, the merge email-move, `save-candidates`' person
-upsert, and manual-add's two create branches. [VERIFIED via a grep of every `emailSource` write
-AND every `wmkf_emailaddress` writer across `lib/services`, `lib/dataverse/adapters`,
-`pages/api`.] The one remaining source-only writer is deliberate — the `verifyEmailAddress`
+the keeper). Adapter support is NOT the invariant, though — `pruneEmpty` drops the field when a caller omits
+it, so every CALLER must supply a source. Three successive reviews each found a caller the
+previous claim had missed, so the invariant is now enforced by a scanner rather than by
+enumeration: `tests/unit/email-source-pairing-invariant.test.js` walks `lib/`, `pages/`,
+`scripts/`, and `shared/`, extracts each `create`/`upsertByEmail`/`update` call's object literal,
+and fails when one passes `email` without `emailSource`. It carries a positive control (a literal
+of the exact production shape both reviews found) so an empty scan cannot pass silently, and an
+explicit — currently empty — exemption set, so skipping a site requires arguing for it in code.
+That scanner immediately found five call sites neither review named, including a live one in
+`contact-enrichment/persistence.js`; all are now paired. The one remaining source-only writer is deliberate — the `verifyEmailAddress`
 attestation, which re-labels the address ALREADY stored and is ETag-guarded, so it has no address
 to pair with. Previously each of these wrote the address, then
 the source, in two calls — so an address that landed while the source write failed left the row

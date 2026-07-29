@@ -537,6 +537,7 @@ try {
   const person = await potentialReviewer.upsertByEmail({
     name: `Smoke Binding Reviewer ${smokeKey.slice(-6)}`,
     email,
+    emailSource: 'manual', // S387: fixture addresses carry provenance like real ones
     affiliation: 'Smoke Reviewer Binding Test Institution',
     expertise: 'smoke test',
   });

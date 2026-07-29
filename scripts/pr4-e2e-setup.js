@@ -83,7 +83,7 @@ await bypassDynamicsRestrictions('pr4-e2e-setup', async () => {
 
   // 2. Person (proxy email).
   const { id: personId } = await potentialReviewer.upsertByEmail({
-    name: NAME, email: EMAIL, affiliation: 'PR4 E2E Test Institution', expertise: 'e2e testing',
+    name: NAME, email: EMAIL, emailSource: 'manual', affiliation: 'PR4 E2E Test Institution', expertise: 'e2e testing',
   });
   console.log(`person : ${personId}  (${NAME} <${EMAIL}>)`);
 

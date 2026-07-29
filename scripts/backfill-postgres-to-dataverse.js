@@ -1,5 +1,14 @@
 #!/usr/bin/env node
 /**
+ * INERT SINCE MIGRATION 018 (S387 note). Every SELECT below reads
+ * `reviewer_suggestions`, which `018_drop_reviewer_finder_postgres_tables.sql:85` DROPped
+ * along with `researchers`/`publications`/`proposal_searches` — so this script cannot run
+ * against the current database; it fails on its first query. Kept for the historical record
+ * of how the Postgres→Dataverse migration was performed, NOT as a runnable tool. Retiring
+ * or deleting it is an owner decision, not cleanup. Its write call was still brought in
+ * line with the address+provenance pairing invariant so a future revival against a restored
+ * table cannot reintroduce the split write.
+ *
  * Backfill: Postgres reviewer_suggestions → Dataverse
  *
  * Walks every Postgres row that has a request_number, resolves the request to
@@ -190,6 +199,10 @@ const LIMIT = limitArg ? parseInt(limitArg.split('=')[1] || args[args.indexOf(li
       const { id: prId } = await potentialReviewerAdapter.upsertByEmail({
         name: row.researcher_name,
         email: row.email,
+        // Provenance rides with the address (S387): the researcher upsert below still owns
+        // fill/upgrade semantics, but the person row must never exist holding this address
+        // with no source because that second write failed.
+        emailSource: row.email_source || undefined,
         affiliation: row.primary_affiliation,
         expertise,
         whyChosen: matchReason,

@@ -194,6 +194,8 @@ for (const c of toBackfill) {
     if (c.needsPerson) {
       const personRow = await potentialReviewerAdapter.upsertByEmail({
         email: c.pg.email,
+        // S387: address + provenance together (this script is a historical backfill; see header).
+        emailSource: c.pg.email_source || undefined,
         name: c.pg.name,
       });
       personId = personRow.id;
