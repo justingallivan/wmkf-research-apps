@@ -636,16 +636,36 @@ Decision order:
 
 Explicit non-goals during design freeze:
 
-- no Editor Dashboard implementation until its audience, minimum view,
-  Reviewed-marker contract, access boundary, and deadline are fixed; the need
-  to preserve Allison's cycle-wide editing workflow is no longer an optional
-  historical idea;
+- no expansion of the implemented pilot Editor Dashboard beyond its approved
+  staff-wide cycle list/direct Word entry under the existing `reviewers` grant
+  until the Reviewed-marker and coordinator-view contracts are fixed;
 - no Reviewer Pool build without observed need and owner priority;
 - no new writeup URL fields merely because the June proposal named them;
 - no automatic status-driven workflow until its event, idempotency, retry, and ownership
   contracts are explicit.
 
 ## First deadline-bound slice — governed Initial Assessment pilot
+
+> **Implementation checkpoint (2026-07-29): [VERIFIED via repository source,
+> not live state].** The branch implementation now includes the
+> `wmkf_requestdocument` schema wave/adapter, governed prompt seed, versioned
+> DOCX producer, `Artifacts/Initial Assessment/` destination, deterministic
+> retry/recovery contract, Workbench Initial Assessment panel, and a cycle-wide
+> **pilot locator** under the existing `reviewers` app grant. The locator
+> supports the August 10 discovery/Open-in-Word path only; it is not the full
+> Editor Dashboard minimum contract above and does not yet provide program/PD,
+> stage, or editing-state filters, preview, current-version detail, or
+> per-editor Reviewed progress. Unit tests prove Ready-row no-overwrite,
+> atomic replacement-Ready/prior-supersession, exact-input reactivation, exact
+> request-pointer fencing across concurrent first-time activations,
+> approved path with a positively resolved request-library parent, claim-lost
+> upload cleanup with durable cleanup work on delete failure, canonical-file
+> visibility during a failed replacement, false-success prevention after a
+> post-upload registry failure, and
+> content-hash recovery without a second AI call. The entity/prompt are **not
+> provisioned live**, and no pilot request has
+> run; steps 8–11 and the live portions of steps 2/4/5 remain open until the
+> owner names the environment, proposal, and testers.
 
 The August 10 minimum changes the former default. Build the shared governed
 artifact spine through the J27 Initial Assessment first; Pre Site Visit becomes
@@ -844,8 +864,8 @@ Still required:
    coordinator;
 8. exact safe regeneration behavior and any additional Final Writeup inputs
    beyond copying the latest Pre-Site version; and
-9. Editor Dashboard Reviewed-marker granularity, coordinator view, app/file
-   access enforcement, and restore authority; and
-10. the first approved Initial Assessment governed prompt/template pair and
-    any format revisions identified while testing the provisional D26-derived
-    structure during the single-phase transition.
+9. Editor Dashboard Reviewed-marker granularity, coordinator view, SharePoint
+   file-access verification, and restore authority; and
+10. any Initial Assessment prompt/template revisions identified while testing
+    the approved v1 pair and provisional D26-derived structure during the
+    single-phase transition.

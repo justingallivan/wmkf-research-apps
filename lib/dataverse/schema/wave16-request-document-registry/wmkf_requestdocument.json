@@ -1,0 +1,324 @@
+{
+  "name": "wmkf_requestdocument",
+  "kind": "new-entity",
+  "schemaName": "wmkf_RequestDocument",
+  "displayName": "Request Document",
+  "displayCollectionName": "Request Documents",
+  "description": "Governed artifact registry for request-scoped documents. SharePoint owns bytes and document versions; this row owns stable drive/item identity, lifecycle, operation state, provenance, and retry reconciliation.",
+  "ownershipType": "OrganizationOwned",
+  "primaryNameAttribute": {
+    "schemaName": "wmkf_Name",
+    "displayName": "Name",
+    "description": "Synthetic display name for the governed request artifact.",
+    "maxLength": 200,
+    "requiredLevel": "ApplicationRequired"
+  },
+  "attributes": [
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_ArtifactType",
+      "displayName": "Artifact Type",
+      "description": "Governed artifact family. Mirrors shared/config/requestDocument.js.",
+      "requiredLevel": "ApplicationRequired",
+      "options": [
+        { "value": 100000000, "label": "Initial Assessment" },
+        { "value": 100000001, "label": "Pre Site Visit" },
+        { "value": 100000002, "label": "Final Writeup" },
+        { "value": 100000003, "label": "Applicant Slides" },
+        { "value": 100000004, "label": "Other Applicant Materials" },
+        { "value": 100000005, "label": "Recording" },
+        { "value": 100000006, "label": "Transcript" },
+        { "value": 100000007, "label": "Transcript Summary" }
+      ]
+    },
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_OperationStatus",
+      "displayName": "Operation Status",
+      "description": "Cross-store operation state. Ready is set only after SharePoint bytes and this registry row agree.",
+      "requiredLevel": "ApplicationRequired",
+      "options": [
+        { "value": 100000000, "label": "Generating" },
+        { "value": 100000001, "label": "Ready" },
+        { "value": 100000002, "label": "Failed" }
+      ]
+    },
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_LifecycleState",
+      "displayName": "Lifecycle State",
+      "description": "Editorial lifecycle independent of the producer operation.",
+      "requiredLevel": "ApplicationRequired",
+      "options": [
+        { "value": 100000000, "label": "Draft" },
+        { "value": 100000001, "label": "Review" },
+        { "value": 100000002, "label": "Board Ready" },
+        { "value": 100000003, "label": "Superseded" },
+        { "value": 100000004, "label": "Final" }
+      ]
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_GenerationKey",
+      "displayName": "Generation Key",
+      "description": "Deterministic SHA-256 key for request + artifact + input + prompt + template. Exact retries converge on one row.",
+      "maxLength": 64,
+      "requiredLevel": "ApplicationRequired"
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_CycleCode",
+      "displayName": "Cycle Code",
+      "description": "Normalized grant cycle code for cycle-wide dashboards.",
+      "maxLength": 20,
+      "requiredLevel": "ApplicationRequired"
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_InputFingerprint",
+      "displayName": "Input Fingerprint",
+      "description": "SHA-256 of the authoritative request metadata and proposal source used for generation.",
+      "maxLength": 64,
+      "requiredLevel": "ApplicationRequired"
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_ClaimToken",
+      "displayName": "Claim Token",
+      "description": "Opaque producer fencing token. Only the current claimant may upload, finalize, or persist failure state.",
+      "maxLength": 64
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_Producer",
+      "displayName": "Producer",
+      "description": "Application/service that produced the artifact.",
+      "maxLength": 100,
+      "requiredLevel": "ApplicationRequired"
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_TemplateId",
+      "displayName": "Template ID",
+      "description": "Stable code-backed template identifier.",
+      "maxLength": 150
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_TemplateVersion",
+      "displayName": "Template Version",
+      "description": "Code-backed template version.",
+      "maxLength": 50
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_PromptName",
+      "displayName": "Prompt Name",
+      "description": "Governed Executor prompt name.",
+      "maxLength": 200
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_PromptVersion",
+      "displayName": "Prompt Version",
+      "description": "Governed Executor prompt version.",
+      "minValue": 1,
+      "maxValue": 2147483647
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_SharePointSiteId",
+      "displayName": "SharePoint Site ID",
+      "description": "Stable Microsoft Graph site ID.",
+      "maxLength": 300
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_SharePointDriveId",
+      "displayName": "SharePoint Drive ID",
+      "description": "Stable Microsoft Graph drive ID.",
+      "maxLength": 300
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_SharePointItemId",
+      "displayName": "SharePoint Item ID",
+      "description": "Stable Microsoft Graph drive-item ID. This is the document identity used by consumers.",
+      "maxLength": 300
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_SharePointWebUrl",
+      "displayName": "SharePoint Web URL",
+      "description": "Human-openable SharePoint URL.",
+      "format": "Url",
+      "maxLength": 2000
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_SharePointVersionId",
+      "displayName": "SharePoint Version ID",
+      "description": "SharePoint/Graph version identity observed after upload.",
+      "maxLength": 300
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_SharePointETag",
+      "displayName": "SharePoint ETag",
+      "description": "SharePoint/Graph ETag observed after upload.",
+      "maxLength": 300
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_SharePointFolderPath",
+      "displayName": "SharePoint Folder Path",
+      "description": "Request-relative organizational folder path; never used as the registry identity.",
+      "maxLength": 1000
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_FileName",
+      "displayName": "File Name",
+      "description": "Human-readable filename; never used as the registry identity.",
+      "maxLength": 300
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_FileSize",
+      "displayName": "File Size",
+      "description": "Uploaded byte count.",
+      "minValue": 0,
+      "maxValue": 2147483647
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_ContentHash",
+      "displayName": "Content Hash",
+      "description": "SHA-256 of the produced DOCX bytes, used to reconcile an upload whose final registry patch failed.",
+      "maxLength": 64
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_SourceVersionId",
+      "displayName": "Source Version ID",
+      "description": "Exact source SharePoint version used when deriving a later artifact.",
+      "maxLength": 300
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_SourceContentHash",
+      "displayName": "Source Content Hash",
+      "description": "Content hash of the exact source version used for derivation.",
+      "maxLength": 64
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_MilestoneVersionId",
+      "displayName": "Milestone Version ID",
+      "description": "Immutable SharePoint version selected as the official distributed/review milestone.",
+      "maxLength": 300
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_MilestoneContentHash",
+      "displayName": "Milestone Content Hash",
+      "description": "Content hash of the immutable milestone version.",
+      "maxLength": 64
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_MilestoneCreatedAt",
+      "displayName": "Milestone Created At",
+      "description": "UTC date/time when the official milestone version was selected.",
+      "format": "DateAndTime",
+      "behavior": "UserLocal"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_SharePointLastModified",
+      "displayName": "SharePoint Last Modified",
+      "description": "Last-modified timestamp returned by Microsoft Graph.",
+      "format": "DateAndTime",
+      "behavior": "UserLocal"
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_AttemptCount",
+      "displayName": "Attempt Count",
+      "description": "Number of producer claims for this deterministic generation.",
+      "minValue": 0,
+      "maxValue": 2147483647
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_LastErrorCode",
+      "displayName": "Last Error Code",
+      "description": "Sanitized producer failure code.",
+      "maxLength": 100
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_LastErrorMessage",
+      "displayName": "Last Error Message",
+      "description": "Sanitized producer failure summary. Never stores credentials or raw provider payloads.",
+      "maxLength": 2000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_OrphanCleanupJson",
+      "displayName": "Orphan Cleanup JSON",
+      "description": "Bounded durable cleanup work for claim-specific SharePoint items that could not be deleted after a lost producer claim.",
+      "maxLength": 10000
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_LastFailedAt",
+      "displayName": "Last Failed At",
+      "description": "UTC date/time of the most recent producer failure.",
+      "format": "DateAndTime",
+      "behavior": "UserLocal"
+    }
+  ],
+  "relationships": [
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_requestdocument_request",
+      "referencedEntity": "akoya_request",
+      "lookupSchemaName": "wmkf_Request",
+      "lookupDisplayName": "Request",
+      "lookupDescription": "The grant request that owns this artifact.",
+      "required": "ApplicationRequired"
+    },
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_requestdocument_aiprompt",
+      "referencedEntity": "wmkf_ai_prompt",
+      "lookupSchemaName": "wmkf_AIPrompt",
+      "lookupDisplayName": "AI Prompt",
+      "lookupDescription": "Exact governed prompt row used to produce the artifact."
+    },
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_requestdocument_airun",
+      "referencedEntity": "wmkf_ai_run",
+      "lookupSchemaName": "wmkf_AIRun",
+      "lookupDisplayName": "AI Run",
+      "lookupDescription": "Executor audit run that produced the artifact content."
+    },
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_requestdocument_source",
+      "referencedEntity": "wmkf_requestdocument",
+      "lookupSchemaName": "wmkf_SourceDocument",
+      "lookupDisplayName": "Source Document",
+      "lookupDescription": "Earlier governed artifact used to derive this artifact."
+    }
+  ],
+  "alternateKeys": [
+    {
+      "schemaName": "wmkf_requestdocument_generation_key",
+      "displayName": "Generation Key",
+      "keyAttributes": ["wmkf_generationkey"]
+    }
+  ]
+}

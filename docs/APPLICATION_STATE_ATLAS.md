@@ -76,6 +76,7 @@ The canonical reference for the live state of the application's data layer.
 | `wmkf_ai_run` | 351 | append-only AI invocation audit ledger | [dataverse-wmkf-ai-run-and-prompt.md](atlas/dataverse-wmkf-ai-run-and-prompt.md) |
 | `wmkf_ai_prompt` | 17 | staff-editable prompt rows for Executor | same page |
 | `wmkf_granteedeliverable` | 3 | **LIVE S271** grantee deliverable package lifecycle/image/date side table; production schema and service-principal CRUD verified | [dataverse-wmkf-granteedeliverable.md](atlas/dataverse-wmkf-granteedeliverable.md) |
+| `wmkf_requestdocument` | — | **SCHEMA-AS-CODE / NOT YET PROVISIONED (2026-07-29)** governed request-artifact registry for stable SharePoint identity, lifecycle, operation state, generation provenance, and bounded orphan-cleanup work; paired with the source-built `akoya_request.wmkf_CurrentInitialAssessment` canonical pointer/shared ETag fence. Pilot code exists; no live count or write claim until named-environment preflight/apply/readback. | [dataverse-wmkf-requestdocument.md](atlas/dataverse-wmkf-requestdocument.md) |
 
 ### Vendor entities — Dynamics Explorer read-only
 
@@ -108,12 +109,12 @@ Promote any of these to a per-entity page if app code starts writing to it.
 
 ## Adapter inventory (`lib/dataverse/adapters/`)
 
-**[VERIFIED 2026-07-26 via directory inventory]** The adapter layer contains
-19 files:
+**[VERIFIED 2026-07-29 via directory inventory]** The adapter layer contains
+20 files:
 
 `account.js`, `ai-prompt.js`, `ai-run.js`, `app-request-person.js`,
 `contact.js`, `grant-cycle.js`, `grant-request.js`,
-`grantee-deliverable.js`, `membership.js`, `policy.js`,
+`grantee-deliverable.js`, `membership.js`, `policy.js`, `request-document.js`,
 `potential-reviewer.js`, `proposal-budget-line.js`, `researcher.js`,
 `review-answer.js`, `review-question.js`, `reviewer-suggestion.js`,
 `sharepoint-document-location.js`, `system-user.js`, and
@@ -157,6 +158,7 @@ The high-leverage services for data-layer work — full source remains authorita
 | `external-token.js` | none (read/write live on `wmkf_appreviewersuggestion` extension fields) | `wmkf_appreviewersuggestion` | HMAC JWT primitive |
 | `review-upload.js` | none | `wmkf_appreviewersuggestion` (PATCH) + SharePoint | shared writer for staff + reviewer paths |
 | `grantee-deliverable-record.js` | none | `wmkf_granteedeliverable` | canonical package helper; read-only `getDeliverableForRequest()` never creates, staff write paths use `ensureDeliverableForRequest()` and `patchDeliverable()` |
+| `initial-assessment/artifact-service.js` | none | `akoya_request`, `wmkf_requestdocument`, `wmkf_ai_prompt`, `wmkf_ai_run`, and SharePoint `akoya_request` | governed Initial Assessment producer/read model; exact retry convergence, Ready-row no-overwrite, atomic request-pointer/Ready/supersession activation, post-upload registry recovery, bounded claim-lost cleanup work, and stable Graph identity. Source exists; live schema/prompt/pilot remain gated. |
 | `claude-reviewer-service.js` | none | none | legacy; new code uses `llm-client.js` |
 | `discovery-service.js` external clients (`pubmed-service.js`, `openalex-service.js`, `arxiv-service.js`, `biorxiv-service.js`, `chemrxiv-service.js`, `orcid-service.js`, `serp-contact-service.js`) | none | none | external research-DB clients |
 | `literature-search-service.js` | none | none | shared search shim |

@@ -7,8 +7,8 @@
  * content + Field Primer, S258/S260), Reviews (read-back of submitted reviews —
  * decoded Q1/Q3/Q10 ratings + file download), and — Group A, S260 — Overview
  * (per-request command center) + Status (read-only akoya_requeststatus
- * reflection), and Awardee (grantee-deliverables workflow). The other 4 tabs
- * are placeholders for the rest of the request
+ * reflection), Awardee (grantee-deliverables workflow), and Initial Assessment
+ * (governed DOCX producer/read model). The other 3 tabs are placeholders for the rest of the request
  * lifecycle. The default landing is Overview. Tab + sub-tab selection is
  * query-string driven (?tab=reviewers&sub=track) for deep-links.
  */
@@ -28,14 +28,15 @@ import ProposalTab from '../../shared/components/workbench/ProposalTab';
 import OverviewTab from '../../shared/components/workbench/OverviewTab';
 import StatusTab from '../../shared/components/workbench/StatusTab';
 import AwardeeTab from '../../shared/components/workbench/AwardeeTab';
+import InitialAssessmentTab from '../../shared/components/workbench/InitialAssessmentTab';
 import { computeCanManage } from '../../shared/components/reviewers/reviewer-modes';
 
-// Live tabs: Overview, Proposal, Reviewers, Reviews, Status, Awardee. The other
-// 4 are placeholders for the full request lifecycle.
+// Implemented tabs: Overview, Proposal, Initial Assessment, Reviewers, Reviews,
+// Status, Awardee. The other 3 are placeholders for the full request lifecycle.
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'proposal', label: 'Proposal' },
-  { key: 'initial-writeup', label: 'Initial Writeup' },
+  { key: 'initial-writeup', label: 'Initial Assessment' },
   { key: 'reviewers', label: 'Reviewers' },
   { key: 'reviews', label: 'Reviews' },
   { key: 'pre-site-visit', label: 'Pre Site Visit Writeup' },
@@ -160,6 +161,11 @@ function WorkbenchRequest() {
         />
       ) : activeTab === 'proposal' ? (
         <ProposalTab context={ctx} />
+      ) : activeTab === 'initial-writeup' ? (
+        <InitialAssessmentTab
+          key={typeof requestId === 'string' ? requestId : ''}
+          requestId={typeof requestId === 'string' ? requestId : ''}
+        />
       ) : activeTab === 'reviews' ? (
         <ReviewsTab requestId={typeof requestId === 'string' ? requestId : ''} />
       ) : activeTab === 'status' ? (

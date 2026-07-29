@@ -1,10 +1,10 @@
 ---
 name: J27 document capture & Proposal-tab evolution
-description: D26 resolves request docs by SharePoint filename-match — a FRAGILE interim bridge. Durable direction = typed Dataverse document registry plus canonical SharePoint files; exact schema remains open. The reviewer hold step is already retired.
+description: D26 proposal inputs still resolve by a fragile SharePoint filename bridge. The governed-artifact pilot now has a typed wmkf_requestdocument schema plus canonical SharePoint files; live provisioning and broader J27 capture remain open. The reviewer hold step is retired.
 type: project
 status: active
 scope: strategy
-last_verified: 2026-07-28 via owner document-authority decision and Graph search evidence; exact J27 schema/timing still open
+last_verified: 2026-07-29 via Initial Assessment source implementation and owner document-authority decision; live provisioning and broader J27 capture/timing remain open
 ---
 
 ## Recall Rule
@@ -24,20 +24,20 @@ copy the co-edited Word body into a second editable Dataverse memo.
 
 **Filename-match is FRAGILE — but do NOT assert it "will break in J27."** (Corrected S265, Justin: the earlier "J27 will use new naming conventions / a different collection mechanism, so filename-match WILL break" claim was **unsubstantiated** — Connor pushed back on dropping filename-reconciliation on that premise. There is **no evidence** J27 changes naming; filename-match only breaks **if the names actually change**, which isn't established.) The real, durable case for moving OFF filename-match is **fragility + Dataverse legibility**, NOT a J27-will-break prediction: it depends on PDs naming files consistently/correctly, with **no structured fallback** when they don't. **Strongest argument:** if we **auto-generate writeups** in a future cycle, there is **nowhere structured to store them that the apps can read back** — a filename heuristic can't anchor a machine-produced doc that a PD may never (re)name correctly. Keep the D26 name→label map in one small per-cycle config; never hard-code D26 names as permanent (consistent with [[project-grant-phasing-evolution]]).
 
-**Converging target (registry direction owner-decided 2026-07-28; exact
-schema still open): associate documents with a typed Dataverse table on the
-request** so the apps point at each doc **directly** instead of folder-walking
-and filename heuristics. Shape under consideration: a child table (for example
-`wmkf_requestdocument`) with `request lookup + doc-type picklist + stable
-SharePoint/Graph identity + filename/content-type + lifecycle/provenance`.
+**Initial governed-artifact implementation (source-backed 2026-07-29; live
+provisioning pending): associate documents with the typed
+`wmkf_requestdocument` Dataverse table on the request** so the apps point at
+each registered artifact **directly** instead of filename joins. The schema
+includes request/cycle, artifact and lifecycle/status option sets, stable
+SharePoint/Graph identity, version/eTag, prompt/run/input/template provenance,
+lineage/milestone fields, and a deterministic generation alternate key.
 This makes document identity, relationships, workflow, and structured
 decisions legible to the apps while the file bytes and editable Word narrative
 remain in SharePoint. Precedent for a document reference on a row already
-exists in `wmkf_apprequestperson.wmkf_biosketchurl`. The natural producer is
-the intake portal (machine-legible capture, private Blob via
-`INTAKE_BLOB_RW_TOKEN`)—see [[project-machine-legible-form-capture]] and the
-intake-portal memories. Treat the registry direction as settled, but re-confirm
-the exact table fields, producer timing, and migration before building.
+exists in `wmkf_apprequestperson.wmkf_biosketchurl`. The first producer is the
+request-bound Initial Assessment service; broader applicant-capture producers
+remain future work. Re-confirm the live target and run the committed metadata
+preflight before provisioning.
 
 **Hold step already RETIRED (S279) — this contingency resolved early, for a different reason.** The reviewer "hold step" ([[project-reviewer-hold-step-decouple]]) was removed in S279 (commit `a8676af1`) when the direction shifted to onboarding at a single final Accept — independent of J27. So the earlier "single-submission may un-scaffold the hold step" note is now moot: there is no hold step left to un-scaffold. (Kept here only so the J27 doc-capture planning doesn't re-raise it.)
 
