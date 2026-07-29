@@ -318,25 +318,41 @@ The recipient sees only the request identity, upload instructions, permitted
 material types, and the applicant files they are authorized to manage. The
 recipient must not select a Dataverse record, SharePoint folder, or destination
 identifier. The server resolves those from the signed request context,
-validates the operation, places the bytes in the governed SharePoint location,
-and registers the artifact and its provenance in Dataverse.
+validates the operation, places the bytes inside the request's governed
+SharePoint folder under `Site Visit/Applicant Materials/Slides` or
+`Site Visit/Applicant Materials/Other`, and registers the artifact and its
+provenance in Dataverse.
 
 Applicant-facing uploads are limited to **PDF** and **PPTX** files in the
 **applicant slides** and **other applicant materials** categories. Multiple
-upload sessions are allowed while access remains active. The applicant should
-be able to see, delete, or replace an authorized applicant file; replacement
-must first persist and register the new file successfully so a partial failure
-does not remove the prior working file. Delete/replace must be auditable and
-recoverable, and the exact cross-contact visibility and underlying
-SharePoint/Dataverse replacement mechanism remain open. Recording, transcript,
-transcript summary, and staff observations remain staff- or system-side
-categories and are never manageable through this link.
+upload sessions are allowed while access remains active. Each file may be up to
+**1 GB**, and a request may have at most **20 current applicant files** across
+the two categories. Retired/replaced versions do not count toward that current
+file limit. A request already at 20 current files may still replace one of
+those files: the replacement operation reserves the target's slot and makes
+the new registry row current only as the prior row becomes retired. A
+twenty-first unrelated current file remains blocked. The 1 GB ceiling leaves
+approximately fourfold headroom over the roughly 250 MB files the owner has
+encountered; no known file has exceeded 1 GB.
+
+The applicant sees only the current file list and may delete or replace an
+authorized current file. Replacement must first persist and register the new
+file successfully so a partial failure does not remove the prior working file.
+The prior registry record remains as retired/removed provenance, and native
+SharePoint version/recycle recovery protects the bytes. The minimum product has
+no applicant restore function and no dedicated Workbench restore button for
+these materials; authorized staff recover through SharePoint when needed.
+Recording, transcript, transcript summary, and staff observations remain
+staff- or system-side categories and are never manageable through this link.
 
 The email contains one shared request-scoped bearer link. Both the **To** and
 **CC** recipients may use it and manage the same applicant-material file list.
 The system records actions against the request/link, but without sign-in or
 separate personalized links it must not claim whether the PI or liaison
-performed a particular action.
+performed a particular action. The applicant sees the current file list and
+success/error confirmations, not an activity log. Staff sees each upload,
+replacement, and deletion with file name, category, size, timestamp, request,
+and link identity; the audit does not label the actor as PI or liaison.
 
 Cross-store partial-failure handling is an engineering acceptance invariant,
 not an owner workflow question. The build must never report success until both
@@ -361,8 +377,9 @@ field has a 1 GB logical ceiling; neither is the chosen byte store. The current
 60 MB, and the current external reviewer upload route caps files at 25 MB.
 Therefore, supporting applicant files that are impractical to email requires a
 new resumable/chunked Graph upload-session path; the existing buffered helper
-must not simply have its limit raised. The product file-size/count cap remains
-open until the target library and large-file malware-scanning path are proved.
+must not simply have its limit raised. The product cap is 1 GB per file and 20
+current applicant files per request. The target-library and large-file
+malware-scanning paths must still be proved before implementation is complete.
 
 The recording and transcript remain the authoritative visit evidence. A
 transcript summary is a derived, version-bound artifact. Prefer the summary
@@ -515,9 +532,9 @@ Decision order:
    behavior are owner-decided. The materials request is a manual staff action,
    not a date-driven automatic send. Next freeze the sender/reply-to and
    lead-PD copy behavior after the owner's staff discussion, plus standalone
-   revocation, applicant-file recovery and shared-link audit behavior, the
-   exact automated-notification audience, and the large-file cap/scanner
-   contract, plus recording/transcript/summary contracts and persistence/access.
+   revocation, the exact automated-notification audience, and the large-file
+   scanner contract, plus recording/transcript/summary contracts and
+   persistence/access.
 3. **Final Writeup** — freeze the selected-Pre-Site copy/lineage contract and
    the visit, late-review, and editorial inputs.
 4. **Initial Assessment** — design for every in-scope J27 proposal before
@@ -667,22 +684,34 @@ Owner-decided:
 31. invalid or duplicate liaison/PI email data blocks sending and is corrected
     in Dataverse rather than bypassed with a free-form address; and
 32. restart/reissue is the backup recovery path, and a failed replacement must
-    not revoke a still-active prior link.
+    not revoke a still-active prior link; and
+33. applicant uploads are capped at 1 GB per file and 20 current applicant
+    files per request across both categories, with retired/replaced versions
+    excluded from the current-file count and replacement at the cap reserving
+    the target file's slot;
+34. applicants see only current files and operation confirmations; authorized
+    staff use native SharePoint version/recycle recovery, with no custom
+    applicant or Workbench restore control in the minimum product;
+35. staff audit display records action, file name, category, size, timestamp,
+    request, and shared-link identity without claiming PI-versus-liaison
+    attribution; applicants do not receive an activity log; and
+36. applicant files land inside the request's governed SharePoint folder under
+    `Site Visit/Applicant Materials/Slides` or
+    `Site Visit/Applicant Materials/Other`.
 
 Still required:
 
 1. fixed deadlines and minimum outcomes;
 2. first approved Pre-Site Word template and prompt/template compatibility
    contract;
-3. exact Dataverse registry schema and SharePoint destination;
+3. exact Dataverse registry schema and target-library configuration for the
+   decided request-relative SharePoint destination;
 4. target-library version, retention, recycle, and permission audit;
 5. exact Dataverse schema and dossier read model for the decided Site Visit
    metadata, material categories, and observations;
 6. Site Visit Materials Upload visible sender/reply-to and lead-PD copy
    behavior after owner/staff coordination, standalone revocation,
-   shared-link audit disclosure, file size/count limits and large-file malware
-   scanning, destination,
-   delete/replace persistence and recovery, idempotency, partial-failure
+   large-file malware scanning, idempotency, partial-failure
    recovery, exact additional notification audience/batching, audit, and
    retention;
 7. approved transcription provider/output contract, summary quality fallback,

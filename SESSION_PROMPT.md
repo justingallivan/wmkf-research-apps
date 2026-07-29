@@ -144,7 +144,10 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    observations area without per-entry timestamps. No general material-
    revision workflow is planned absent observed need, but the applicant upload
    surface explicitly supports recoverable delete/replace. It accepts PDF/PPTX,
-   permits additional uploads while access remains active, and sends an
+   permits additional uploads while access remains active, and is capped at
+   1 GB per file and 20 current applicant files per request. Files land in the
+   request's governed SharePoint folder under
+   `Site Visit/Applicant Materials/Slides` or `Other`. It sends an
    automated email to the lead PD plus the still-to-be-defined relevant staff
    audience after every successful upload, replacement, or deletion. An
    authorized staff user manually triggers the request; entering or changing
@@ -154,7 +157,10 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    block sending until staff corrects Dataverse; there is no free-form bypass.
    To and CC share one request-scoped link and may manage the same file list;
    without sign-in or personalized links, the audit does not promise
-   PI-versus-liaison attribution. Visits are scheduled promptly after
+   PI-versus-liaison attribution. Applicants see current files and operation
+   confirmations only. Staff sees action/file/category/size/time/request/link
+   metadata and uses native SharePoint recovery; no custom applicant or
+   Workbench restore control is required initially. Visits are scheduled promptly after
    advancement around reviewer invitations; once the date is recorded, staff
    may send without waiting for reviews, synthesis, or a Pre-Site Writeup.
    Expiration is automatically 60 days after successful send, requires no
@@ -167,8 +173,8 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    lead-PD copy behavior remain open pending the owner's discussion with
    staff. Historically, non-PD staff sent these requests without PD
    involvement; that is context, not the future contract. Standalone
-   revocation, shared-link audit disclosure, the large-file cap/scanner
-   contract, and the additional notification audience/batching remain open.
+   revocation, the large-file scanner contract, and the additional notification
+   audience/batching remain open.
    SharePoint is the byte store; a new resumable Graph upload-session path is
    required because the current buffered helper stops at 60 MB. Dataverse holds
    the artifact registry and Postgres only expiring-link/resumable-session
@@ -198,8 +204,8 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    Exact schema/read model, first Pre-Site prompt/template pair, library
    configuration, later-stage inputs, sender/reply-to and lead-PD copy behavior
    after staff coordination, standalone revocation,
-   token/validation/recovery behavior, shared-link audit disclosure, large-file
-   cap/scanner, additional notification-audience/batching, and
+   token/validation/recovery behavior, large-file scanner implementation,
+   additional notification-audience/batching, and
    transcript-summary quality contract are still open.
 
 ### Owner Decision Needed

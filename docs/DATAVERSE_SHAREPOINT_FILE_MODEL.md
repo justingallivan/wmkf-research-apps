@@ -245,13 +245,21 @@ Minimum whole-flow invariants:
    summaries, or staff observations; browse Dataverse or SharePoint; choose
    another request; or supply a drive, folder, item, or record identifier.
 4. The server resolves the request, Site Visit context, and server-controlled
-   SharePoint destination from the validated token.
+   SharePoint destination from the validated token. Files land inside the
+   request's governed SharePoint folder under
+   `Site Visit/Applicant Materials/Slides` or
+   `Site Visit/Applicant Materials/Other`.
 5. Applicant uploads are limited to **PDF** and **PPTX**. Before persistence,
    the server enforces rate, size, file-count, extension, MIME/magic-byte, and
    malware checks and normalizes the stored filename/path. Large-file support
    requires a resumable/chunked Microsoft Graph upload session; it must not
    buffer an entire large file in a Vercel function or merely raise the current
-   `GraphService.uploadFile()` 60 MB guard.
+   `GraphService.uploadFile()` 60 MB guard. The product limit is **1 GB per
+   file** and **20 current applicant files per request** across both categories.
+   Retired/replaced versions do not count as current files. At the 20-file cap,
+   replacement remains allowed by reserving the target file's slot and making
+   the new registry row current only as the prior row becomes retired; an
+   unrelated twenty-first current file remains blocked.
 6. Successful bytes end in the governed SharePoint location and a typed
    Dataverse registry row records stable identity and provenance. A temporary
    Blob location, if later chosen for scanning, is transit rather than the
@@ -264,21 +272,28 @@ Minimum whole-flow invariants:
 8. Additional uploads are allowed while access remains active. The external
    surface lists the shared applicant files authorized by the request-scoped
    link and supports explicit delete and replace actions for both To and CC
-   recipients.
+   recipients. It shows only current files and success/error confirmations,
+   not an applicant-facing activity or recovery log.
 9. A replacement first uploads and registers the new file successfully; only
    then may the prior file be retired or recycled. A failed replacement leaves
    the prior file intact. Delete and replacement accept only a server-resolved
    opaque artifact identity scoped to the request/token, never a client-supplied
-   SharePoint path, and preserve an audit/recovery trail.
+   SharePoint path, and preserve an audit/recovery trail. The prior registry
+   row remains as retired/removed provenance, while native SharePoint
+   version/recycle recovery protects the bytes. The minimum product gives
+   neither applicants nor Workbench users a custom restore control; authorized
+   staff recover through SharePoint when needed.
 10. Every successful upload, replacement, or deletion sends an automated email
     to the lead PD and the relevant staff audience. The additional staff
     recipients and any batching/digest behavior remain open.
+11. Staff audit display identifies the action, file name, category, size,
+    timestamp, request, and shared-link identity. It does not claim whether the
+    PI or liaison acted. Applicants receive no activity log.
 
 Exact sender/reply-to and lead-PD copy behavior after owner/staff coordination,
-standalone revocation, shared-link audit disclosure, schema, folder, size/count
-limits and large-file malware-scanning contract, additional notification
-audience/batching, retention, and delete/replace persistence and recovery
-behavior remain open design decisions.
+standalone revocation, exact registry schema and target-library configuration,
+large-file malware-scanning contract, additional notification
+audience/batching, and retention remain open design decisions.
 
 ### Applicant large-file infrastructure boundary
 
@@ -299,9 +314,11 @@ Site Visit implementation PLANNED.]**
 - The target contract is therefore SharePoint bytes, Dataverse registry and
   provenance, and Postgres only for expiring-link/resumable-session workflow
   state. A new Graph upload-session flow must support retry/resume and
-  server-controlled destination resolution. The exact product cap stays open
-  until the target-library behavior and the large-file malware-scanning path
-  have been exercised.
+  server-controlled destination resolution. The product cap is 1 GB per file
+  and 20 current applicant files per request, leaving roughly fourfold
+  headroom over the approximately 250 MB files reported by the owner. The
+  target-library behavior and large-file malware-scanning path must still be
+  exercised.
 
 Primary references:
 [SharePoint limits](https://learn.microsoft.com/en-us/office365/servicedescriptions/sharepoint-online-service-description/sharepoint-online-limits),

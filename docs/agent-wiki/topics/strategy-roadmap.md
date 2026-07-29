@@ -84,16 +84,22 @@ document inventory, and individual implementation plans do not establish priorit
   files. Pre-Site distributions and Final remain linked writeups, not material
   categories. A narrow expiring applicant-material upload link is in scope
   without reopening the parked general intake product; it accepts PDF/PPTX and
-  additional uploads while active. Every successful upload, replacement, or
+  additional uploads while active, capped at 1 GB per file and 20 current
+  applicant files per request. Files land inside the request's governed
+  SharePoint folder under `Site Visit/Applicant Materials/Slides` or `Other`.
+  Every successful upload, replacement, or
   deletion sends an automated email to the lead PD plus the still-to-be-defined
   relevant staff audience. An authorized staff user manually triggers the
   request; a visit-date change never sends it automatically. Recipient choices
   are the Dataverse-linked liaison and PI—normally liaison in To, or PI in To
   with liaison optionally copied. Missing, invalid, or duplicate selected
   addresses block sending until staff corrects Dataverse; there is no free-form
-  bypass. To and CC share one request-scoped link and
-  may manage the same file list; without sign-in or personalized links, the
-  audit does not promise PI-versus-liaison attribution. Visits are scheduled
+  bypass. To and CC share one request-scoped link and may manage the same file
+  list; without sign-in or personalized links, the audit does not promise
+  PI-versus-liaison attribution. Applicants see current files and operation
+  confirmations only. Staff sees action/file/category/size/time/request/link
+  metadata and uses native SharePoint recovery; no custom applicant or
+  Workbench restore control is required initially. Visits are scheduled
   promptly after advancement around reviewer invitations; once the date is
   recorded, staff may send without waiting for reviews, synthesis, or a
   Pre-Site Writeup. Expiration is automatically 60 days after successful send,
@@ -105,9 +111,9 @@ document inventory, and individual implementation plans do not establish priorit
   access may send, resend, or reissue. Exact sender/reply-to and lead-PD copy
   behavior remain open pending the owner's staff discussion; historically,
   non-PD staff sent these requests without PD involvement, but that is not yet
-  the future contract. Standalone revocation, shared-link audit disclosure,
-  the large-file cap/scanner contract, and the additional notification
-  audience/batching remain open. SharePoint remains the byte store; a new
+  the future contract. Standalone revocation, the large-file scanner contract,
+  and the additional notification audience/batching remain open. SharePoint
+  remains the byte store; a new
   resumable Graph upload-session path is required because the current buffered
   helper stops at 60 MB. Dataverse holds the artifact registry and Postgres only
   the expiring-link/resumable-session workflow state.
