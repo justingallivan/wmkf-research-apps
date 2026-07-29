@@ -50,25 +50,33 @@ transcript, transcript summary, and one paste-friendly staff-observations area
 without per-entry timestamps. No general material-revision workflow is planned
 absent observed need, but the applicant surface explicitly supports recoverable
 delete/replace rather than inferred replacement. It accepts PDF/PPTX, permits
-additional uploads while access remains active, and notifies the lead PD plus
-other designated staff after successful changes. An authorized staff user
+additional uploads while access remains active, and sends an automated email
+to the lead PD plus the still-to-be-defined relevant staff audience after every
+successful upload, replacement, or deletion. An authorized staff user
 manually triggers the request; entering or changing the Site Visit date never
 sends it automatically. Recipient choices are the Dataverse-linked liaison and
 PI—normally liaison in To, or PI in To with liaison optionally copied. To and
-CC share one request-scoped link and may manage the same file list; without
-sign-in or personalized links, the audit does not promise PI-versus-liaison
-attribution. Visits are scheduled promptly after advancement around reviewer
-invitations; once the date is recorded, staff may send without waiting for
-reviews, synthesis, or a Pre-Site Writeup. Expiration is automatically 60 days
-after successful send, requires no staff-entered date, and is unaffected by
-visit rescheduling. Resend preserves the active link and original expiry;
-Reissue revokes it and starts a fresh 60-day period. Any staff member with
-Workbench Site Visit access may send, resend, or reissue. Exact visible
+CC share one request-scoped link and may manage the same file list. Missing,
+invalid, or duplicate selected addresses block sending until staff corrects
+Dataverse; there is no free-form bypass. Without sign-in or personalized links,
+the audit does not promise PI-versus-liaison attribution. Visits are scheduled
+promptly after advancement around reviewer invitations; once the date is
+recorded, staff may send without waiting for reviews, synthesis, or a Pre-Site
+Writeup. Expiration is automatically 60 days after successful send, requires no
+staff-entered date, and is unaffected by visit rescheduling. Resend preserves
+the active link and original expiry;
+Reissue/restart stages a replacement and revokes the old link only after the
+new invitation is accepted for sending, so failure does not destroy a
+still-active link. Any staff member with Workbench Site Visit access may send,
+resend, or reissue. Exact visible
 sender/reply-to and lead-PD copy behavior remain open pending the owner's staff
 discussion. Historically, non-PD staff sent these requests without PD
 involvement; that is context, not the future contract. Standalone
-revocation/failed-reissue recovery, shared-link audit disclosure, size/count
-limits, and notification audience remain open.
+revocation, shared-link audit disclosure, the large-file cap/scanner contract,
+and the additional notification audience/batching remain open. SharePoint is
+the byte store; a new resumable Graph upload-session path is required because
+the current buffered helper stops at 60 MB. Dataverse holds the artifact
+registry and Postgres only expiring-link/resumable-session workflow state.
 Pre-Site distributions and Final remain linked writeups, not dossier material
 categories. The narrow expiring request-scoped applicant-material upload link
 does not reopen the parked general applicant-intake product. Prefer an

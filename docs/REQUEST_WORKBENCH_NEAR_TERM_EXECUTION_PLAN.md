@@ -294,7 +294,11 @@ liaison in **To**; staff may instead address the PI and optionally copy the
 liaison. The server re-resolves the selected contacts and email addresses from
 Dataverse at send time rather than trusting client-supplied addresses. No
 free-form recipient requirement is established for the minimum product. The
-server sets link expiration to exactly 60 days after the invitation is
+owner expects the liaison/PI data to remain complete and non-duplicative. The
+send boundary must still fail closed if the selected contact is missing, has no
+valid email, or the selected To/CC records resolve to the same address; staff
+corrects the Dataverse contact data rather than typing a substitute address.
+The server sets link expiration to exactly 60 days after the invitation is
 successfully sent. Staff do not enter or edit an expiry date, and moving the
 Site Visit date does not change the expiration.
 
@@ -303,7 +307,12 @@ again and retains its original expiration. It never silently extends access.
 **Reissue link** is a separate deliberate action that revokes the prior link,
 creates a replacement, and starts a new 60-day period from the successful
 reissue send. An expired or revoked link cannot be resent as though it were
-active; staff must reissue.
+active; staff must reissue. This is also the recovery path when staff needs to
+restart the process. A failed replacement attempt must not destroy a still
+active prior link: stage the replacement, have the email transport accept the
+new invitation, and only then activate the replacement and revoke the old
+link. If no active link exists, a failed attempt leaves none active and staff
+may restart again.
 
 The recipient sees only the request identity, upload instructions, permitted
 material types, and the applicant files they are authorized to manage. The
@@ -329,9 +338,31 @@ The system records actions against the request/link, but without sign-in or
 separate personalized links it must not claim whether the PI or liaison
 performed a particular action.
 
-A successful applicant-material change should notify the lead PD and other
-designated staff. The exact additional staff audience, event batching, and
-message timing remain to be decided alongside the request-email workflow.
+Cross-store partial-failure handling is an engineering acceptance invariant,
+not an owner workflow question. The build must never report success until both
+the SharePoint file and Dataverse registry state are reconciled, must preserve
+the prior working file when replacement fails, and must expose a retryable
+staff-visible exception instead of silently orphaning or deleting evidence.
+
+Every successful applicant-material upload, replacement, or deletion sends an
+automated email to the lead PD and the relevant staff audience. The exact
+additional staff recipients and any batching/digest behavior remain to be
+decided alongside the request-email workflow.
+
+**[VERIFIED 2026-07-28 via current source and vendor documentation; feature
+implementation PLANNED.]** File bytes belong in SharePoint, not Postgres or
+Dataverse. Postgres may hold expiring-link and resumable-upload workflow state;
+Dataverse holds the typed artifact registry and provenance. SharePoint Online
+allows an individual file up to 250 GB, and Microsoft Graph upload sessions
+accept sequential fragments smaller than 60 MiB. Dataverse file columns can
+reach 10 GB only through chunked APIs, while an ordinary PostgreSQL variable
+field has a 1 GB logical ceiling; neither is the chosen byte store. The current
+`GraphService.uploadFile()` buffers the whole file and deliberately stops at
+60 MB, and the current external reviewer upload route caps files at 25 MB.
+Therefore, supporting applicant files that are impractical to email requires a
+new resumable/chunked Graph upload-session path; the existing buffered helper
+must not simply have its limit raised. The product file-size/count cap remains
+open until the target library and large-file malware-scanning path are proved.
 
 The recording and transcript remain the authoritative visit evidence. A
 transcript summary is a derived, version-bound artifact. Prefer the summary
@@ -484,9 +515,9 @@ Decision order:
    behavior are owner-decided. The materials request is a manual staff action,
    not a date-driven automatic send. Next freeze the sender/reply-to and
    lead-PD copy behavior after the owner's staff discussion, plus standalone
-   revocation and failed-reissue recovery,
-   applicant-file recovery and shared-link audit behavior, and
-   recording/transcript/summary contracts plus persistence and access.
+   revocation, applicant-file recovery and shared-link audit behavior, the
+   exact automated-notification audience, and the large-file cap/scanner
+   contract, plus recording/transcript/summary contracts and persistence/access.
 3. **Final Writeup** — freeze the selected-Pre-Site copy/lineage contract and
    the visit, late-review, and editorial inputs.
 4. **Initial Assessment** — design for every in-scope J27 proposal before
@@ -610,7 +641,9 @@ Owner-decided:
 21. applicant-facing material formats limited to PDF and PPTX;
 22. additional uploads allowed while access remains active; and
 23. applicant-material changes notify the lead PD and other designated staff,
-    with the additional audience still to be decided; and
+    through an automated email after every successful upload, replacement, or
+    deletion, with the additional audience and batching still to be decided;
+    and
 24. the applicant-material request is manually staff-triggered rather than
     automatically sent when the Site Visit is scheduled or its date changes;
     and
@@ -630,7 +663,11 @@ Owner-decided:
     the successful replacement send; and
 30. any authenticated staff member with access to the Workbench Site Visit
     workflow may send, resend, or reissue the materials request, without a
-    lead-PD or administrative-role restriction.
+    lead-PD or administrative-role restriction; and
+31. invalid or duplicate liaison/PI email data blocks sending and is corrected
+    in Dataverse rather than bypassed with a free-form address; and
+32. restart/reissue is the backup recovery path, and a failed replacement must
+    not revoke a still-active prior link.
 
 Still required:
 
@@ -642,11 +679,12 @@ Still required:
 5. exact Dataverse schema and dossier read model for the decided Site Visit
    metadata, material categories, and observations;
 6. Site Visit Materials Upload visible sender/reply-to and lead-PD copy
-   behavior after owner/staff coordination, missing/duplicate contact
-   handling, standalone revocation and failed-reissue recovery,
-   shared-link audit disclosure, file size/count limits, destination,
+   behavior after owner/staff coordination, standalone revocation,
+   shared-link audit disclosure, file size/count limits and large-file malware
+   scanning, destination,
    delete/replace persistence and recovery, idempotency, partial-failure
-   recovery, exact notification audience/timing, audit, and retention;
+   recovery, exact additional notification audience/batching, audit, and
+   retention;
 7. approved transcription provider/output contract, summary quality fallback,
    and transcript/summary refresh behavior;
 8. Final Writeup creation inputs and source-version selection behavior; and

@@ -220,12 +220,21 @@ Minimum whole-flow invariants:
    its original expiry. Reissue deliberately revokes the prior link, creates a
    replacement, and starts a fresh 60-day period from the successful
    replacement send. Expired or revoked links require reissue, not resend.
+   Reissue is also the backup restart path. A replacement is staged and the
+   new invitation must be accepted by the email transport before the old
+   active link is revoked and the replacement becomes active. A failed
+   replacement therefore leaves a still-active prior link usable; if none was
+   active, staff may restart again.
 2. Recipient choices are the request's Dataverse-linked liaison and PI. The
    normal default is the liaison in **To**; staff may instead address the PI
    and optionally copy the liaison. The server resolves the selected contacts
    and current email addresses from Dataverse at send time; the minimum product
-   has no free-form recipient requirement. Missing/duplicate contact handling
-   remains open. The message contains one shared request-scoped bearer link;
+   has no free-form recipient requirement. The owner expects these contacts to
+   remain complete and non-duplicative. The server nevertheless fails closed
+   when a selected contact is missing, lacks a valid email, or the selected
+   To/CC contacts resolve to the same address. Staff corrects Dataverse rather
+   than entering a substitute address. The message contains one shared
+   request-scoped bearer link;
    both To and CC recipients may use it and manage the same applicant-material
    file list. Without sign-in or separate personalized links, audit can identify
    the request/link but cannot attribute an action reliably to the PI or
@@ -239,7 +248,10 @@ Minimum whole-flow invariants:
    SharePoint destination from the validated token.
 5. Applicant uploads are limited to **PDF** and **PPTX**. Before persistence,
    the server enforces rate, size, file-count, extension, MIME/magic-byte, and
-   malware checks and normalizes the stored filename/path.
+   malware checks and normalizes the stored filename/path. Large-file support
+   requires a resumable/chunked Microsoft Graph upload session; it must not
+   buffer an entire large file in a Vercel function or merely raise the current
+   `GraphService.uploadFile()` 60 MB guard.
 6. Successful bytes end in the governed SharePoint location and a typed
    Dataverse registry row records stable identity and provenance. A temporary
    Blob location, if later chosen for scanning, is transit rather than the
@@ -247,7 +259,8 @@ Minimum whole-flow invariants:
 7. The implementation must define idempotency and compensate safely when the
    SharePoint write succeeds but registry creation fails, or vice versa.
    Staff must see a retryable, auditable state rather than an unregistered
-   orphan or false success.
+   orphan or false success. This is an engineering acceptance invariant, not
+   an owner workflow decision.
 8. Additional uploads are allowed while access remains active. The external
    surface lists the shared applicant files authorized by the request-scoped
    link and supports explicit delete and replace actions for both To and CC
@@ -257,15 +270,44 @@ Minimum whole-flow invariants:
    the prior file intact. Delete and replacement accept only a server-resolved
    opaque artifact identity scoped to the request/token, never a client-supplied
    SharePoint path, and preserve an audit/recovery trail.
-10. Successful applicant-material changes notify the lead PD and other
-   designated staff. The additional staff audience, batching, and message
-   timing remain open.
+10. Every successful upload, replacement, or deletion sends an automated email
+    to the lead PD and the relevant staff audience. The additional staff
+    recipients and any batching/digest behavior remain open.
 
 Exact sender/reply-to and lead-PD copy behavior after owner/staff coordination,
-missing/duplicate contact handling, standalone revocation and failed-reissue
-recovery, shared-link audit disclosure, schema, folder, size/count limits,
-notification audience/timing, retention, and delete/replace persistence and
-recovery behavior remain open design decisions.
+standalone revocation, shared-link audit disclosure, schema, folder, size/count
+limits and large-file malware-scanning contract, additional notification
+audience/batching, retention, and delete/replace persistence and recovery
+behavior remain open design decisions.
+
+### Applicant large-file infrastructure boundary
+
+**[VERIFIED 2026-07-28 via current source and primary vendor documentation;
+Site Visit implementation PLANNED.]**
+
+- SharePoint Online permits an individual file up to 250 GB. Microsoft Graph
+  upload sessions accept sequential fragments smaller than 60 MiB, with
+  non-final fragment sizes divisible by 320 KiB.
+- Dataverse file columns can be configured up to 10 GB through code and require
+  chunking above 128 MB. PostgreSQL variable-length fields have a 1 GB logical
+  ceiling. Those are platform capabilities, not reasons to store the applicant
+  bytes there.
+- The existing `GraphService.uploadFile()` accepts an in-memory `Buffer` and
+  rejects content above 60 MB. The current external reviewer route buffers each
+  file and caps it at 25 MB. Raising either number would increase function
+  memory pressure without providing resumability.
+- The target contract is therefore SharePoint bytes, Dataverse registry and
+  provenance, and Postgres only for expiring-link/resumable-session workflow
+  state. A new Graph upload-session flow must support retry/resume and
+  server-controlled destination resolution. The exact product cap stays open
+  until the target-library behavior and the large-file malware-scanning path
+  have been exercised.
+
+Primary references:
+[SharePoint limits](https://learn.microsoft.com/en-us/office365/servicedescriptions/sharepoint-online-service-description/sharepoint-online-limits),
+[Microsoft Graph upload sessions](https://learn.microsoft.com/en-us/graph/api/driveitem-createuploadsession?view=graph-rest-1.0),
+[Dataverse file columns](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/file-attributes),
+and [PostgreSQL limits](https://www.postgresql.org/docs/current/limits.html).
 
 ### Cycle-wide Editor Dashboard contract
 
