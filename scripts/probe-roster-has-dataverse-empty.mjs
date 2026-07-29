@@ -3,9 +3,10 @@
  * READ-ONLY: examine reviewers where the Postgres roster candidate blob HAS an
  * email but the Dataverse person record's wmkf_emailaddress is EMPTY. For each:
  * roster email + source + emailPersistAllowed + contactStatus + roster.updated_at,
- * vs the Dataverse person's email/createdon/modifiedon. Timing tells a genuine
- * SAVE-TIME DROP (roster had the email at/before save, Dataverse never got it)
- * apart from RE-ENRICHED-AFTER-SAVE (roster updated after the save; never re-saved).
+ * vs the Dataverse person's email/createdon/modifiedon. A roster timestamp at/before
+ * the suggestion proves a save-time drop. A later timestamp is ambiguous because the
+ * normal save flow stamps the suggestion anchor and marks the roster row saved after
+ * the Dataverse write; it does NOT by itself prove post-save re-enrichment.
  * Only POST is the OAuth token; every Dataverse call is a GET; Postgres read-only.
  */
 import fs from 'fs'; import path from 'path'; import { fileURLToPath } from 'url';
@@ -58,7 +59,7 @@ async function getAll(token, urlPath) {
 
   const reqIds = [...new Set(noEmail.map((r) => r.requestId))];
   const roster = {};
-  const res = await sql.query(`SELECT request_id, display_name, candidate, updated_at FROM reviewer_find_roster WHERE request_id = ANY($1)`, [reqIds]);
+  const res = await sql.query(`SELECT request_id, display_name, status, candidate, updated_at FROM reviewer_find_roster WHERE request_id = ANY($1)`, [reqIds]);
   for (const row of res.rows) {
     const c = row.candidate || {}; const enr = c.contactEnrichment || {};
     roster[`${row.request_id}::${norm(row.display_name)}`] = {
@@ -66,6 +67,7 @@ async function getAll(token, urlPath) {
       source: c.emailSource || enr.emailSource || null,
       epa: (c.emailPersistAllowed ?? enr.emailPersistAllowed),
       contactStatus: (c.contactStatus || enr.contactStatus || null),
+      status: row.status,
       updatedAt: row.updated_at,
     };
   }
@@ -84,9 +86,17 @@ async function getAll(token, urlPath) {
     const rr = roster[r.key]; if (!rr || !rr.email) continue;
     n++;
     const rosterAfterSave = rr.updatedAt && r.savedAt ? (new Date(rr.updatedAt) > new Date(r.savedAt)) : null;
+    const deltaMs = rr.updatedAt && r.savedAt ? new Date(rr.updatedAt) - new Date(r.savedAt) : null;
+    const timingNote = rosterAfterSave === false
+      ? '→ roster had email AT/BEFORE save (SAVE DROPPED it)'
+      : rosterAfterSave === true && rr.status === 'saved' && deltaMs <= 60_000
+        ? '→ roster saved/stamped immediately after Dataverse write (current blob likely save payload; timestamp alone is not proof)'
+        : rosterAfterSave === true
+          ? '→ roster changed AFTER save (current blob cannot prove what the save payload contained)'
+          : '';
     console.log(`• ${r.name}  (req ${reqNum[r.requestId] || '?'})`);
-    console.log(`    roster: email=${rr.email}  source=${rr.source || '∅'}  emailPersistAllowed=${rr.epa}  contactStatus=${rr.contactStatus || '∅'}`);
-    console.log(`    timing: saved=${fmt(r.savedAt)}  rosterUpdated=${fmt(rr.updatedAt)}  ${rosterAfterSave === true ? '→ roster updated AFTER save (re-enriched, not re-saved)' : rosterAfterSave === false ? '→ roster had email AT/BEFORE save (SAVE DROPPED it)' : ''}`);
+    console.log(`    roster: status=${rr.status}  email=${rr.email}  source=${rr.source || '∅'}  emailPersistAllowed=${rr.epa}  contactStatus=${rr.contactStatus || '∅'}`);
+    console.log(`    timing: saved=${fmt(r.savedAt)}  rosterUpdated=${fmt(rr.updatedAt)}  ${timingNote}`);
     console.log(`    dataverse: email=∅  personModified=${fmt(r.pModified)}`);
   }
   console.log(`\nTotal: ${n}`);
