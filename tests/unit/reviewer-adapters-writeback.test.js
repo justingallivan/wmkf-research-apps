@@ -513,6 +513,40 @@ describe('researcher.upsertByPotentialReviewer — writes bibliometrics onto the
 // wmkf_name is stored raw (Dynamics does not recompute it), so the adapter must
 // normalize whitespace on every write or padded/double-spaced values persist
 // (agent-wiki dataverse-dynamics note; the " Test 3 Reviewer " prod finding).
+// S387 (second adversarial review): an address must never be written without its
+// provenance. The `update` path was fixed first; these lock the CREATE/UPSERT/CLEAR paths,
+// which the review found still split the two writes.
+describe('potential-reviewer — address and provenance are written together', () => {
+  test('create carries emailSource in the same payload as the address', async () => {
+    const create = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue({ wmkf_potentialreviewersid: 'pr-9' });
+    await createPotentialReviewer({ name: 'Ada Reviewer', email: 'ada@x.edu', emailSource: 'manual' });
+    expect(create.mock.calls[0][1]).toMatchObject({
+      wmkf_emailaddress: 'ada@x.edu',
+      wmkf_emailsource: 'manual',
+    });
+  });
+
+  test('create without a source to assert is unchanged (no empty source written)', async () => {
+    const create = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue({ wmkf_potentialreviewersid: 'pr-9' });
+    await createPotentialReviewer({ name: 'Ada Reviewer', email: 'ada@x.edu' });
+    expect(create.mock.calls[0][1].wmkf_emailaddress).toBe('ada@x.edu');
+    expect(create.mock.calls[0][1]).not.toHaveProperty('wmkf_emailsource');
+  });
+
+  test('upsertByEmail (create branch) carries emailSource with the address', async () => {
+    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
+    const create = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue({ wmkf_potentialreviewersid: 'pr-10' });
+    await upsertPotentialReviewerByEmail(
+      { name: 'Ada Reviewer', email: 'ada@x.edu', emailSource: 'affiliation' },
+      { existing: null },
+    );
+    expect(create.mock.calls[0][1]).toMatchObject({
+      wmkf_emailaddress: 'ada@x.edu',
+      wmkf_emailsource: 'affiliation',
+    });
+  });
+});
+
 describe('potential-reviewer.wmkf_name whitespace normalization', () => {
   test('create trims ends and collapses internal runs', async () => {
     const create = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue({ wmkf_potentialreviewersid: 'pr-1' });

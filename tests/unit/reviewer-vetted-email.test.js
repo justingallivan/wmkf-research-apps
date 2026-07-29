@@ -53,3 +53,60 @@ describe('anti-scrape munge rejection', () => {
       .toEqual({ email: 'ava.mercer@example.org', source: 'affiliation' });
   });
 });
+
+// S387 (second adversarial review). pickAssertedEmailPair answers a DIFFERENT question
+// from pickVettedEmail: not "may this address be persisted" but "does this blob vouch for
+// this address having this provenance". The distinction matters because a pruned roster row
+// is not internally coherent — pruneCandidateForRoster stores `email: c.email || e.email`
+// but `emailSource: e.emailSource`, so a top-level address that did NOT come from
+// enrichment carries a top-level source describing the enrichment address instead.
+describe('pickAssertedEmailPair', () => {
+  const { pickAssertedEmailPair } = require('../../lib/utils/reviewer-vetted-email');
+  const { pruneCandidateForRoster } = require('../../shared/components/reviewers/reviewer-search-logic');
+
+  test('pairs a coherent blob (both addresses agree)', () => {
+    expect(pickAssertedEmailPair({
+      email: 'ava.mercer@example.org',
+      contactEnrichment: { email: 'ava.mercer@example.org', emailSource: 'institution_page' },
+    })).toEqual({ email: 'ava.mercer@example.org', source: 'institution_page' });
+  });
+
+  test('pairs when only one side carries an address', () => {
+    expect(pickAssertedEmailPair({ email: 'a@x.edu', emailSource: 'affiliation' }))
+      .toEqual({ email: 'a@x.edu', source: 'affiliation' });
+    expect(pickAssertedEmailPair({ contactEnrichment: { email: 'a@x.edu', emailSource: 'orcid' } }))
+      .toEqual({ email: 'a@x.edu', source: 'orcid' });
+  });
+
+  // THE REGRESSION. Built from real prune output so it fails if prune's field derivation
+  // ever changes underneath this reasoning: the pruned row ends up with the manual
+  // top-level address and enrichment's institution_page source, which describes the OTHER
+  // address. Pairing those would assert provenance that was never evidence for it.
+  test('rejects a pruned blob whose two addresses disagree', () => {
+    const pruned = pruneCandidateForRoster({
+      name: 'Ava Mercer',
+      email: 'new@school.edu', // e.g. a hand-correction or promoted lead
+      contactEnrichment: { email: 'old@lab.edu', emailSource: 'institution_page' },
+    });
+    // Prune really does produce the contaminated shape this guards against.
+    expect(pruned.email).toBe('new@school.edu');
+    expect(pruned.emailSource).toBe('institution_page');
+    expect(pruned.contactEnrichment.email).toBe('old@lab.edu');
+
+    expect(pickAssertedEmailPair(pruned)).toBeNull();
+  });
+
+  test('rejects a blob with no source at all, and a non-object', () => {
+    expect(pickAssertedEmailPair({ email: 'a@x.edu' })).toBeNull();
+    expect(pickAssertedEmailPair({ email: 'a@x.edu', contactEnrichment: { email: 'a@x.edu' } })).toBeNull();
+    expect(pickAssertedEmailPair(null)).toBeNull();
+    expect(pickAssertedEmailPair('nope')).toBeNull();
+  });
+
+  test('address comparison ignores case and surrounding whitespace', () => {
+    expect(pickAssertedEmailPair({
+      email: ' Ava.Mercer@Example.org ',
+      contactEnrichment: { email: 'ava.mercer@example.org', emailSource: 'pubmed' },
+    })).toEqual({ email: 'Ava.Mercer@Example.org', source: 'pubmed' });
+  });
+});

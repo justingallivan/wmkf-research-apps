@@ -174,13 +174,18 @@ where the staffer made the assertion. A human still supersedes a human: `manual`
 still moves the value. Downgrades remain explicit for the same reason — those two are safety
 assertions rather than evidence claims.
 
-**Address + source are ONE patch.** Every path that writes the ADDRESS now writes its source in
-the same Dataverse PATCH (`potential-reviewer.update` maps `emailSource`) [VERIFIED via a grep of
-every `emailSource` write across `lib/services`, `lib/dataverse/adapters`, `pages/api`]:
-`my-candidates` hand-edit, promote's hand-correction, promote's B1 backfill, the email
-reconciler, and the merge email-move. The one remaining source-only writer is deliberate — the
-`verifyEmailAddress` attestation, which changes provenance for the address ALREADY stored and is
-ETag-guarded, so it has no address to pair with. Previously each of these wrote the address, then
+**Address + source are ONE write, enforced at the ADAPTER rather than per caller.** Every
+`wmkf_emailaddress` writer in `potential-reviewer.js` carries `wmkf_emailsource` in the same
+payload: `update`, `create`, `upsertByEmail`, and `clearEmail` (which nulls BOTH — a source left
+behind describes an address the row no longer has, so the next address written without a source
+would inherit it; in the merge flow that is a loser row keeping `orcid` after its address moved to
+the keeper). Callers supply their source: `my-candidates` hand-edit, promote's hand-correction,
+promote's B1 backfill, the email reconciler, the merge email-move, `save-candidates`' person
+upsert, and manual-add's two create branches. [VERIFIED via a grep of every `emailSource` write
+AND every `wmkf_emailaddress` writer across `lib/services`, `lib/dataverse/adapters`,
+`pages/api`.] The one remaining source-only writer is deliberate — the `verifyEmailAddress`
+attestation, which re-labels the address ALREADY stored and is ETag-guarded, so it has no address
+to pair with. Previously each of these wrote the address, then
 the source, in two calls — so an address that landed while the source write failed left the row
 describing the NEW address under the OLD source, and a hand-typed address inheriting a stored
 `orcid` reads as `ready` and sends with no acknowledgement. One patch means a duplicate-key

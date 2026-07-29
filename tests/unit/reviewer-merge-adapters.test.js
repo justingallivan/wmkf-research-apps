@@ -52,10 +52,14 @@ describe('potential-reviewer merge helpers', () => {
     await expect(potentialReviewer.getByIdForMerge()).rejects.toThrow(/id required/);
   });
 
-  test('clearEmail blanks wmkf_emailaddress (frees the alt-key)', async () => {
+  // S387: clearing the address clears its provenance too. A source left behind describes
+  // an address the row no longer has, so a later address written by any path that does not
+  // set a source would silently inherit it (in the merge flow: a loser row keeping `orcid`
+  // after its address moved to the keeper).
+  test('clearEmail blanks wmkf_emailaddress AND its source (frees the alt-key)', async () => {
     await potentialReviewer.clearEmail(LOSER, { actingUserSystemId: 'sys', ifMatch: 'W/"1"' });
     expect(DynamicsService.updateRecord).toHaveBeenCalledWith(
-      'wmkf_potentialreviewerses', LOSER, { wmkf_emailaddress: null },
+      'wmkf_potentialreviewerses', LOSER, { wmkf_emailaddress: null, wmkf_emailsource: null },
       { actingUserSystemId: 'sys', ifMatch: 'W/"1"' },
     );
   });

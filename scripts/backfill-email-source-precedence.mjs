@@ -40,7 +40,7 @@ import {
   emailSourceOutranks,
   emailSourceUpgradeAllowed,
 } from '../lib/utils/reviewer-invite.js';
-import { pickVettedEmail } from '../lib/utils/reviewer-vetted-email.js';
+import { pickVettedEmail, pickAssertedEmailPair } from '../lib/utils/reviewer-vetted-email.js';
 
 // Blast-radius cap (Codex adversarial review, finding 4). The measured population is 6-7
 // rows; anything materially larger means the roster or the connection is not what this
@@ -70,39 +70,6 @@ const { withDalContext } = await import('../lib/dataverse/core/context.js');
 const potentialReviewerAdapter = await import('../lib/dataverse/adapters/potential-reviewer.js');
 const researcherAdapter = await import('../lib/dataverse/adapters/researcher.js');
 
-/**
- * The (address, source) pair a roster blob actually ASSERTS TOGETHER.
- *
- * Codex adversarial review, finding 1: the first version of this script SELECTed the
- * address and the source with two independent SQL COALESCEs, so it could pair a top-level
- * address with `contactEnrichment`'s provenance for a DIFFERENT address — re-asserting a
- * source that was never evidence for the address being upgraded. `pruneCandidateForRoster`
- * makes that shape reachable: it persists `email: c.email || e.email` but
- * `emailSource: e.emailSource`.
- *
- * So: take BOTH fields from the SAME object, and only when that object names the address
- * being upgraded. Stricter than `pickVettedEmail` (whose own source pick falls back across
- * objects) on purpose — this writes provenance, so it must not guess.
- */
-function assertedPair(candidate) {
-  if (!candidate || typeof candidate !== 'object') return null;
-  const enr = (candidate.contactEnrichment && typeof candidate.contactEnrichment === 'object')
-    ? candidate.contactEnrichment
-    : {};
-  const top = String(candidate.email ?? '').trim();
-  const topSrc = String(candidate.emailSource ?? '').trim();
-  const enrEmail = String(enr.email ?? '').trim();
-  const enrSrc = String(enr.emailSource ?? '').trim();
-
-  if (top && topSrc) return { email: top, source: topSrc };
-  // Enrichment's pair counts only when it is not contradicted by a different top-level
-  // address (that would mean the source describes the enrichment address, not this row's).
-  if (enrEmail && enrSrc && (!top || top.toLowerCase() === enrEmail.toLowerCase())) {
-    return { email: enrEmail, source: enrSrc };
-  }
-  return null;
-}
-
 // Best roster-observed source per normalized address, restricted to rows that cleared the
 // same persistence envelope save/promote require (`pickVettedEmail`: persistable, resolved
 // identity, no anti-scrape munge) and to statuses that represent real candidates.
@@ -115,7 +82,11 @@ const bestByEmail = new Map();
 let rosterRowsConsidered = 0;
 let rosterRowsRejected = 0;
 for (const row of rosterRows) {
-  const pair = assertedPair(row.candidate);
+  // `pickAssertedEmailPair` rejects a blob whose two addresses disagree, because a pruned
+  // row's top-level source is always enrichment-derived and would then describe the OTHER
+  // address (S387, second adversarial review — the first version of this check was
+  // illusory for exactly that shape).
+  const pair = pickAssertedEmailPair(row.candidate);
   if (!pair) { rosterRowsRejected += 1; continue; }
   const vetted = pickVettedEmail(row.candidate);
   // The envelope must pass AND must be talking about the same address this row asserts.
