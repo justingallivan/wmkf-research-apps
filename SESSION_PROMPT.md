@@ -141,12 +141,16 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    and Board/consultant participants; no separate visit-status field is
    needed. Its categories are applicant slides, other applicant materials,
    recording, transcript, transcript summary, and one paste-friendly staff-
-   observations area without per-entry timestamps. No app-level material-
-   revision workflow is planned absent observed need; native SharePoint
-   history protects edits to individual files. Pre-Site distributions and
-   Final remain linked writeups rather than Site Visit material categories. A
-   narrow request-scoped applicant-material upload link is in scope without
-   reopening the parked general intake product. Prefer an acceptable
+   observations area without per-entry timestamps. No general material-
+   revision workflow is planned absent observed need, but the applicant upload
+   surface explicitly supports recoverable delete/replace. It accepts PDF/PPTX,
+   permits additional uploads while access remains active, and notifies the
+   lead PD plus other designated staff after successful changes. The
+   request-email trigger, recipients, timing, exact expiry, cross-contact file
+   scope, size/count limits, and notification audience remain open. Pre-Site
+   distributions and Final remain linked writeups rather than Site Visit
+   material categories. This narrow request-scoped applicant-material link
+   does not reopen the parked general intake product. Prefer an acceptable
    transcription-platform summary before a deliberate suite LLM fallback.
    Pre-Site inputs are also owner-decided: use the full proposal through an
    iterated governed `phase-ii.summarize`, authoritative request metadata from
@@ -167,8 +171,9 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    collaborator audience, marker granularity, coordinator view, access key,
    and delivery date remain open.
    Exact schema/read model, first Pre-Site prompt/template pair, library
-   configuration, later-stage inputs, upload token/validation/recovery
-   behavior, and transcript-summary quality contract are still open.
+   configuration, later-stage inputs, upload request/recipient/timing/expiry
+   and token/validation/recovery behavior, and transcript-summary quality
+   contract are still open.
 
 ### Owner Decision Needed
 

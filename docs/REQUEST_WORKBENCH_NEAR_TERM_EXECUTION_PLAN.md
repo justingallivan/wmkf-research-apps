@@ -259,30 +259,50 @@ separate entries, authors, or timestamps. Normal Dataverse audit and
 modified-by/modified-on metadata may still protect the record behind the
 scenes.
 
-Do not introduce an app-level revision chain, replacement workflow, or
-current-version selector for Site Visit materials without observed need.
-Register each uploaded file independently and display both if an unexpected
-second file appears in the same category rather than inferring that one
-replaces the other. Native SharePoint version history remains the recovery
-layer for edits to an individual file. Transcript summaries still record the
-exact source transcript item and version/hash so their evidence provenance is
-unambiguous.
+Do not introduce a general app-level revision chain or current-version selector
+for staff- or system-managed Site Visit materials without observed need.
+Register each file independently and display both if an unexpected second file
+appears in the same category rather than inferring that one replaces the
+other. The applicant upload surface is the narrow exception: while authorized
+access remains active, an applicant may deliberately delete or replace an
+applicant-material file. That action must be explicit and recoverable rather
+than inferred from category or filename. Native SharePoint version/recycle
+history and Dataverse audit/provenance remain the protection layers. Transcript
+summaries still record the exact source transcript item and version/hash so
+their evidence provenance is unambiguous.
 
 ### Site Visit applicant materials and transcript summaries
 
 **[VERIFIED via owner decision 2026-07-28; implementation PLANNED.]**
 A narrow **Site Visit Materials Upload** surface is planned within the
 Workbench lifecycle. It does not reopen the parked general applicant-intake
-product. A staff user sends a request-scoped, expiring link to the designated
-applicant contact; the recipient sees only the request identity, upload
-instructions, and permitted material types. The recipient must not select a
-Dataverse record, SharePoint folder, or destination identifier. The server
-resolves those from the signed request context, validates the upload, places
-the bytes in the governed SharePoint location, and registers the artifact and
-its provenance in Dataverse. Applicant-facing uploads are limited to
-**applicant slides** and **other applicant materials**. Recording, transcript,
+product. An authorized future workflow sends a request-scoped, expiring link;
+the triggering actor, recipient selection, and lifecycle timing still require
+product design. The owner expects little reason for access after the Site Visit
+date, but the exact default/maximum expiry remains negotiable rather than
+locked.
+
+The recipient sees only the request identity, upload instructions, permitted
+material types, and the applicant files they are authorized to manage. The
+recipient must not select a Dataverse record, SharePoint folder, or destination
+identifier. The server resolves those from the signed request context,
+validates the operation, places the bytes in the governed SharePoint location,
+and registers the artifact and its provenance in Dataverse.
+
+Applicant-facing uploads are limited to **PDF** and **PPTX** files in the
+**applicant slides** and **other applicant materials** categories. Multiple
+upload sessions are allowed while access remains active. The applicant should
+be able to see, delete, or replace an authorized applicant file; replacement
+must first persist and register the new file successfully so a partial failure
+does not remove the prior working file. Delete/replace must be auditable and
+recoverable, and the exact cross-contact visibility and underlying
+SharePoint/Dataverse replacement mechanism remain open. Recording, transcript,
 transcript summary, and staff observations remain staff- or system-side
-categories.
+categories and are never manageable through this link.
+
+A successful applicant-material change should notify the lead PD and other
+designated staff. The exact additional staff audience, event batching, and
+message timing remain to be decided alongside the request-email workflow.
 
 The recording and transcript remain the authoritative visit evidence. A
 transcript summary is a derived, version-bound artifact. Prefer the summary
@@ -431,8 +451,9 @@ Decision order:
    prompt/template compatibility contract, and artifact persistence/access
    contract.
 2. **Site Visit** — the dossier metadata, six material categories,
-   paste-friendly observations shape, and no-revision posture are
-   owner-decided. Next freeze the narrow applicant-upload and
+   paste-friendly observations shape, and basic applicant file-management
+   behavior are owner-decided. Next freeze the request-email trigger,
+   recipient/timing/expiry, applicant-file ownership and recovery, and
    recording/transcript/summary contracts plus persistence and access.
 3. **Final Writeup** — freeze the selected-Pre-Site copy/lineage contract and
    the visit, late-review, and editorial inputs.
@@ -550,9 +571,14 @@ Owner-decided:
     observations;
 19. one paste-friendly staff-observations area without a per-entry
     author/timestamp workflow; and
-20. no app-level Site Visit revision chain, replacement workflow, or current
-    version picker absent observed need, while native SharePoint history
-    remains the file-recovery layer.
+20. no general app-level Site Visit revision chain or current-version picker
+    absent observed need, while applicant materials support deliberate,
+    recoverable delete/replace and native SharePoint history remains a
+    file-recovery layer;
+21. applicant-facing material formats limited to PDF and PPTX;
+22. additional uploads allowed while access remains active; and
+23. applicant-material changes notify the lead PD and other designated staff,
+    with the additional audience still to be decided.
 
 Still required:
 
@@ -563,9 +589,11 @@ Still required:
 4. target-library version, retention, recycle, and permission audit;
 5. exact Dataverse schema and dossier read model for the decided Site Visit
    metadata, material categories, and observations;
-6. Site Visit Materials Upload token lifetime/revocation, contact binding,
-   file format/size/count limits, destination, idempotency, partial-failure recovery,
-   notifications, audit, and retention;
+6. Site Visit Materials Upload request-email trigger, sender/actor,
+   recipient/contact binding, lifecycle timing, token expiry/revocation,
+   cross-contact file visibility, file size/count limits, destination,
+   delete/replace persistence and recovery, idempotency, partial-failure
+   recovery, exact notification audience/timing, audit, and retention;
 7. approved transcription provider/output contract, summary quality fallback,
    and transcript/summary refresh behavior;
 8. Final Writeup creation inputs and source-version selection behavior; and

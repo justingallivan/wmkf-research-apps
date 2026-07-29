@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-26 via source, live metadata/prompt probes, and Workbench truth audit
+  last_verified: 2026-07-28 via source/live probes, Workbench truth audit, and owner design decisions
 ---
 
 ## Recall Rule
@@ -47,15 +47,19 @@ location/link, lead PD, WMKF staff, applicant participants, and
 Board/consultant participants; no separate visit-status field is needed. Its
 categories are applicant slides, other applicant materials, recording,
 transcript, transcript summary, and one paste-friendly staff-observations area
-without per-entry timestamps. No app-level material-revision workflow is
-planned absent observed need; native SharePoint history protects edits to
-individual files. Pre-Site distributions and Final remain linked writeups,
-not dossier material categories. A narrow expiring request-scoped
-applicant-material upload link is planned without reopening the parked general
-applicant-intake product. Prefer an acceptable transcription-platform summary
-before a deliberate suite LLM fallback. Implementation, schema/read model,
-token/validation/recovery behavior, and summary-quality contracts remain
-planned. Current authority is
+without per-entry timestamps. No general material-revision workflow is planned
+absent observed need, but the applicant surface explicitly supports recoverable
+delete/replace rather than inferred replacement. It accepts PDF/PPTX, permits
+additional uploads while access remains active, and notifies the lead PD plus
+other designated staff after successful changes. The request-email trigger,
+recipients, timing, exact expiry, cross-contact file scope, size/count limits,
+and notification audience remain open. Pre-Site distributions and Final remain
+linked writeups, not dossier material categories. The narrow expiring
+request-scoped applicant-material upload link does not reopen the parked
+general applicant-intake product. Prefer an acceptable
+transcription-platform summary before a deliberate suite LLM fallback.
+Implementation, schema/read model, token/validation/recovery behavior, and
+summary-quality contracts remain planned. Current authority is
 `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` and
 `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
 

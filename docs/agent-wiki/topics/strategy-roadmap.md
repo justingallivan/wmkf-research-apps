@@ -78,14 +78,19 @@ document inventory, and individual implementation plans do not establish priorit
   Board/consultant participants; no separate visit-status field is needed.
   Its categories are applicant slides, other applicant materials, recording,
   transcript, transcript summary, and one paste-friendly staff-observations
-  area without per-entry timestamps. Do not add an app-level material-revision
-  workflow absent observed need; native SharePoint history protects edits to
-  individual files. Pre-Site distributions and Final remain linked writeups,
-  not material categories. A narrow expiring applicant-material upload link is
-  in scope without reopening the parked general intake product. Prefer an
-  acceptable transcription-platform summary before a deliberate suite LLM
-  fallback. Exact token, schema/read model, validation, folder, retention,
-  summary-quality, and partial-failure contracts remain planned.
+  area without per-entry timestamps. Do not add a general material-revision
+  workflow absent observed need, but the applicant surface explicitly supports
+  recoverable delete/replace rather than inferring replacement from duplicate
+  files. Pre-Site distributions and Final remain linked writeups, not material
+  categories. A narrow expiring applicant-material upload link is in scope
+  without reopening the parked general intake product; it accepts PDF/PPTX and
+  additional uploads while active, and successful changes notify the lead PD
+  plus other designated staff. The request-email trigger, recipients, timing,
+  exact expiry, cross-contact file scope, limits, and notification audience
+  remain open. Prefer an acceptable transcription-platform summary before a
+  deliberate suite LLM fallback. Exact token, schema/read model, validation,
+  folder, retention, summary-quality, and partial-failure contracts remain
+  planned.
 - Editor Dashboard direction (owner-confirmed 2026-07-28): preserve Allison's
   former single-folder editing workflow with a cycle-wide list of governed
   writeups, direct Open in Word, and an explicit per-editor Reviewed tracker.
