@@ -68,6 +68,50 @@ describe('findCandidateBySuggestion', () => {
     expect(queryTextOf(0)).toMatch(/candidate_key\s*=/);
     expect(allInterpolations()).toContain('suggestion:sug-1');
   });
+
+  // The promote path depends on this staying canonical-key-only: an anchor-stamped row
+  // that predates the identity spine must remain invisible here, because its gate inputs
+  // are null and resolving it would wave it through promotion (S387).
+  test('still requires the canonical key, not just the anchor', async () => {
+    await store.findCandidateBySuggestion(REQ, 'SUG-1');
+    expect(queryTextOf(0)).toMatch(/candidate_key\s*=/);
+  });
+});
+
+describe('findCandidateBySuggestionAnchor', () => {
+  test('resolves a row whose key is a pre-anchor placeholder', async () => {
+    sql.mockResolvedValueOnce({ rows: [{
+      candidate_key: 'legacy-row:369',
+      status: 'active',
+      display_name: 'W. Lee Kraus',
+      candidate: { name: 'W. Lee Kraus', suggestionId: 'SUG-1', candidateKey: 'legacy-row:369' },
+      source_kind: 'applicant_suggested',
+      updated_at_token: '2026-07-29 17:36:31+00',
+    }] });
+
+    await expect(store.findCandidateBySuggestionAnchor(REQ, 'SUG-1')).resolves.toMatchObject({
+      name: 'W. Lee Kraus',
+      candidateKey: 'legacy-row:369',
+      rosterStatus: 'active',
+    });
+    // Matches on the ANCHOR — the key appears only as an ORDER BY tiebreak, never as a
+    // filter, which is the whole point: a placeholder-keyed row must be findable.
+    expect(queryTextOf(0)).toMatch(/candidate->>'suggestionId'/);
+    const whereClause = queryTextOf(0).split(/ORDER BY/i)[0].split(/WHERE/i)[1] || '';
+    expect(whereClause).not.toMatch(/candidate_key/);
+    expect(queryTextOf(0)).toMatch(/ORDER BY \(candidate_key/);
+  });
+
+  test('prefers the canonical row when both shapes exist', async () => {
+    await store.findCandidateBySuggestionAnchor(REQ, 'SUG-1');
+    expect(queryTextOf(0)).toMatch(/ORDER BY \(candidate_key\s*=/);
+    expect(allInterpolations()).toContain('suggestion:sug-1');
+  });
+
+  test('returns null without querying when the anchor is missing', async () => {
+    await expect(store.findCandidateBySuggestionAnchor(REQ, '')).resolves.toBeNull();
+    expect(sql).not.toHaveBeenCalled();
+  });
 });
 
 describe('findCandidatesByKeys', () => {

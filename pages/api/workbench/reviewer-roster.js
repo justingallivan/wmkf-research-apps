@@ -25,7 +25,7 @@ import {
   confirmIdentity,
   markSaved,
   listForRequest,
-  findCandidateBySuggestion,
+  findCandidateBySuggestionAnchor,
   findCandidatesByKeys,
   removePreviousActiveSearchResults,
 } from '../../../lib/services/reviewer-roster-store';
@@ -77,9 +77,16 @@ function isServerManagedApplicantCandidate(candidate) {
   );
 }
 
+// Resolves by the Dataverse anchor, not the canonical key, so an anchor-stamped row
+// still keyed `legacy-row:<id>` / `candidate:<fingerprint>` can be excluded, marked
+// saved, or identity-confirmed instead of 409-ing with no way forward (S387; Codex
+// adversarial review of 5a6c863c). The `candidateKey` equality below is unchanged and
+// still binds the action to the exact row the client was shown — the anchor lookup
+// widens WHICH row can be found, never WHOSE claim is trusted. Promotion deliberately
+// keeps the canonical-key-only lookup: see findCandidateBySuggestionAnchor's header.
 async function authoritativeApplicantCandidate(requestId, candidate) {
   if (!candidate?.suggestionId) return null;
-  const stored = await findCandidateBySuggestion(requestId, candidate.suggestionId);
+  const stored = await findCandidateBySuggestionAnchor(requestId, candidate.suggestionId);
   if (!stored || stored.candidateKey !== candidate.candidateKey) return null;
   return pruneCandidateForRoster(stored);
 }

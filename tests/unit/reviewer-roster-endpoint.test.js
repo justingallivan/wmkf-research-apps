@@ -17,6 +17,10 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   confirmIdentity: jest.fn(async () => ({ confirmationId: 'confirm-1', candidate: { name: 'Ann Lee' } })),
   markSaved: jest.fn(async () => 1),
   findCandidateBySuggestion: jest.fn(async () => null),
+  // S387: the roster route resolves an applicant row by its Dataverse ANCHOR, so an
+  // anchor-stamped row still carrying a pre-anchor placeholder key can be excluded /
+  // marked saved / identity-confirmed instead of 409-ing with no way forward.
+  findCandidateBySuggestionAnchor: jest.fn(async () => null),
   findCandidatesByKeys: jest.fn(async () => []),
   removePreviousActiveSearchResults: jest.fn(async () => ({
     removed: 2,
@@ -43,6 +47,7 @@ beforeEach(() => {
   requireAppAccess.mockResolvedValue({ profileId: 5 });
   verifyAutomatedIdentityAttestation.mockResolvedValue({ valid: false, reason: 'no_token' });
   store.findCandidateBySuggestion.mockResolvedValue(null);
+  store.findCandidateBySuggestionAnchor.mockResolvedValue(null);
   store.findCandidatesByKeys.mockResolvedValue([]);
 });
 
@@ -253,9 +258,55 @@ describe('PATCH', () => {
     expect(store.setExcluded).toHaveBeenCalledWith(REQ, expect.objectContaining({ name: 'Bob Roe' }));
   });
 
+  // S387 regression: before the anchor lookup, an applicant row whose key was still a
+  // migration-025 placeholder could not be resolved at all, so exclude/saved/
+  // confirm_identity 409'd and staff could not even set the card aside.
+  it('exclude works for an anchor-stamped row still keyed with a pre-anchor placeholder', async () => {
+    const suggestionId = '44444444-4444-4444-4444-444444444444';
+    store.findCandidateBySuggestionAnchor.mockResolvedValueOnce({
+      name: 'Legacy Applicant',
+      suggestionId,
+      candidateKey: 'legacy-row:369',
+      isApplicantRecommended: true,
+    });
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'exclude',
+      candidate: { name: 'Legacy Applicant', suggestionId, candidateKey: 'legacy-row:369' },
+    } }, r);
+
+    expect(r.statusCode).toBe(200);
+    expect(store.setExcluded).toHaveBeenCalledWith(REQ, expect.objectContaining({
+      name: 'Legacy Applicant',
+      candidateKey: 'legacy-row:369',
+    }));
+  });
+
+  // The anchor lookup widened WHICH row is found, not WHOSE claim is trusted: the client
+  // must still be acting on the row the server actually stored.
+  it('still refuses when the client key disagrees with the stored row', async () => {
+    const suggestionId = '55555555-5555-5555-5555-555555555555';
+    store.findCandidateBySuggestionAnchor.mockResolvedValueOnce({
+      name: 'Legacy Applicant',
+      suggestionId,
+      candidateKey: 'legacy-row:369',
+      isApplicantRecommended: true,
+    });
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'exclude',
+      candidate: { name: 'Legacy Applicant', suggestionId, candidateKey: `suggestion:${suggestionId}` },
+    } }, r);
+
+    expect(r.statusCode).toBe(409);
+    expect(store.setExcluded).not.toHaveBeenCalled();
+  });
+
   it('exclude of an applicant row uses the existing server blob, not the browser blob', async () => {
     const suggestionId = '33333333-3333-3333-3333-333333333333';
-    store.findCandidateBySuggestion.mockResolvedValueOnce({
+    store.findCandidateBySuggestionAnchor.mockResolvedValueOnce({
       name: 'Applicant Reviewer',
       suggestionId,
       candidateKey: `suggestion:${suggestionId}`,
@@ -421,7 +472,7 @@ describe('PATCH', () => {
 
   it('marks an applicant saved with the complete server confirmation, not the browser blob', async () => {
     const suggestionId = '33333333-3333-3333-3333-333333333333';
-    store.findCandidateBySuggestion.mockResolvedValueOnce({
+    store.findCandidateBySuggestionAnchor.mockResolvedValueOnce({
       name: 'Applicant Reviewer',
       suggestionId,
       candidateKey: `suggestion:${suggestionId}`,
@@ -483,7 +534,7 @@ describe('PATCH', () => {
 
   it('confirm_identity keeps applicant identity evidence from the server row', async () => {
     const suggestionId = '33333333-3333-3333-3333-333333333333';
-    store.findCandidateBySuggestion.mockResolvedValueOnce({
+    store.findCandidateBySuggestionAnchor.mockResolvedValueOnce({
       name: 'Applicant Reviewer',
       suggestionId,
       candidateKey: `suggestion:${suggestionId}`,
