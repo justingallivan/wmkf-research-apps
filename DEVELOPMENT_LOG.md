@@ -10,6 +10,38 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Reviewer address/identity gates repaired; four roster data sweeps (Session 387)
+
+**Milestone:** Reviewers who could not be invited at all became invitable, and the roster
+key/provenance corruption behind it was remediated in production.
+
+**Sessions:** 387 (`3f56bb7d..c688aa0c`, 15 commits, auto-deployed).
+
+**Ship state:**
+- Two dead-ends closed: an applicant card selectable while the promote route refused it
+  (client tested 3 of the server's 4 identity clauses), and one person rendering twice
+  because `stampSuggestionAnchor` stamps an anchor without re-keying the row.
+- `wmkf_emailsource` stopped being fill-if-empty: a strictly stronger tier now supersedes a
+  weaker one for the same address. Human assertions (`manual`/`staff_verified`) are terminal
+  against machine evidence — an automatic promotion to `ready` would delete a send-time
+  acknowledgement across every request sharing the person row.
+- Address and provenance are written in one Dataverse payload by all four writers, enforced
+  by a repo-walking scanner that found seven call sites three adversarial reviews missed.
+- New staff attestation (`verifyEmailAddress`) for a web-search-only address, whose prior
+  escape hatch was a no-op when the verified address was the one already stored.
+- Four production sweeps: 28 duplicate roster rows deleted (17 emails preserved as
+  quarantined leads), 156 rows re-canonicalized with 50 stamped fail-closed, 35 ungated
+  applicant rows stamped, 6 pinned person rows upgraded.
+
+**Why it matters:** the failures were silent and structural — a checkbox that lied, and a
+provenance field that pinned a reviewer's address tier permanently on first write. Both
+produced "this reviewer cannot be contacted" with no path forward in the UI.
+
+**Pointers:** `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` (send gate + precedence),
+`docs/atlas/postgres-reviewer-find-roster.md` (key hazards, sweep results),
+`docs/agent-wiki/topics/dataverse-dynamics.md` (the paginated-read trap that made a broken
+sweep look clean), `SESSION_PROMPT.md` (S388 handoff).
+
 ## July 2026 — Dependabot security backlog eliminated (Session 382)
 
 **Milestone:** The public repository's 49-alert dependency-security backlog was
