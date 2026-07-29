@@ -73,13 +73,19 @@ document inventory, and individual implementation plans do not establish priorit
   `phase-ii.summarize` currently drives no route, while the legacy retained
   PDF route still uses `createSummarizationPrompt()`.
 - Site Visit direction (owner-decided 2026-07-28): the tab is a dossier, not a
-  fourth writeup. It gathers visit metadata, applicant materials, recording,
-  transcript, a version-bound derived summary, distributions, and the Final
-  draft. A narrow expiring applicant-material upload link is in scope without
-  reopening the parked general intake product. Prefer an acceptable
-  transcription-platform summary before a deliberate suite LLM fallback.
-  Exact token, schema, validation, folder, retention, summary-quality, and
-  partial-failure contracts remain planned.
+  fourth writeup. Its logistics are date, time/time zone, format,
+  location/link, lead PD, WMKF staff, applicant participants, and
+  Board/consultant participants; no separate visit-status field is needed.
+  Its categories are applicant slides, other applicant materials, recording,
+  transcript, transcript summary, and one paste-friendly staff-observations
+  area without per-entry timestamps. Do not add an app-level material-revision
+  workflow absent observed need; native SharePoint history protects edits to
+  individual files. Pre-Site distributions and Final remain linked writeups,
+  not material categories. A narrow expiring applicant-material upload link is
+  in scope without reopening the parked general intake product. Prefer an
+  acceptable transcription-platform summary before a deliberate suite LLM
+  fallback. Exact token, schema/read model, validation, folder, retention,
+  summary-quality, and partial-failure contracts remain planned.
 - Editor Dashboard direction (owner-confirmed 2026-07-28): preserve Allison's
   former single-folder editing workflow with a cycle-wide list of governed
   writeups, direct Open in Word, and an explicit per-editor Reviewed tracker.

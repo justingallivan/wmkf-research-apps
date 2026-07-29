@@ -136,12 +136,18 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    least-privilege editing, and immutable Board milestones are required.
    Initial Assessment, Pre-Site, and Final are three separate documents; Final
    is copied from a deliberately selected Pre-Site version. Site Visit is a
-   dossier rather than a fourth writeup, bringing together visit metadata,
-   applicant materials, recording, transcript, a version-bound derived
-   summary, distributions, and the Final draft. A narrow request-scoped
-   applicant-material upload link is in scope without reopening the parked
-   general intake product. Prefer an acceptable transcription-platform summary
-   before a deliberate suite LLM fallback.
+   dossier rather than a fourth writeup. Its logistics are date, time/time
+   zone, format, location/link, lead PD, WMKF staff, applicant participants,
+   and Board/consultant participants; no separate visit-status field is
+   needed. Its categories are applicant slides, other applicant materials,
+   recording, transcript, transcript summary, and one paste-friendly staff-
+   observations area without per-entry timestamps. No app-level material-
+   revision workflow is planned absent observed need; native SharePoint
+   history protects edits to individual files. Pre-Site distributions and
+   Final remain linked writeups rather than Site Visit material categories. A
+   narrow request-scoped applicant-material upload link is in scope without
+   reopening the parked general intake product. Prefer an acceptable
+   transcription-platform summary before a deliberate suite LLM fallback.
    Pre-Site inputs are also owner-decided: use the full proposal through an
    iterated governed `phase-ii.summarize`, authoritative request metadata from
    Dataverse, and `review-synthesis.generate` over all currently submitted
@@ -160,9 +166,9 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    writeup list, direct Open in Word, and personal Reviewed tracking. Exact
    collaborator audience, marker granularity, coordinator view, access key,
    and delivery date remain open.
-   Exact schema, first Pre-Site prompt/template pair, library configuration,
-   later-stage inputs, upload token/validation/recovery behavior, and
-   transcript-summary quality contract are still open.
+   Exact schema/read model, first Pre-Site prompt/template pair, library
+   configuration, later-stage inputs, upload token/validation/recovery
+   behavior, and transcript-summary quality contract are still open.
 
 ### Owner Decision Needed
 

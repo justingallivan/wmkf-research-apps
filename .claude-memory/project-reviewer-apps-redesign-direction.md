@@ -42,14 +42,20 @@ the rationale record.
 **2026-07-28 Site Visit/writeup reconciliation:** Initial Assessment,
 Pre-Site, and Final are three separate governed Word documents. Final is
 created from a deliberately selected Pre-Site version; Site Visit is a dossier,
-not a fourth writeup. The dossier gathers structured visit metadata, applicant
-materials, recording, transcript, a version-bound derived summary,
-distribution snapshots, and the Final draft. A narrow expiring
-request-scoped applicant-material upload link is planned without reopening the
-parked general applicant-intake product. Prefer an acceptable
-transcription-platform summary before a deliberate suite LLM fallback.
-Implementation, schema, token/validation/recovery behavior, and summary-quality
-contracts remain planned. Current authority is
+not a fourth writeup. Its logistics are date, time/time zone, format,
+location/link, lead PD, WMKF staff, applicant participants, and
+Board/consultant participants; no separate visit-status field is needed. Its
+categories are applicant slides, other applicant materials, recording,
+transcript, transcript summary, and one paste-friendly staff-observations area
+without per-entry timestamps. No app-level material-revision workflow is
+planned absent observed need; native SharePoint history protects edits to
+individual files. Pre-Site distributions and Final remain linked writeups,
+not dossier material categories. A narrow expiring request-scoped
+applicant-material upload link is planned without reopening the parked general
+applicant-intake product. Prefer an acceptable transcription-platform summary
+before a deliberate suite LLM fallback. Implementation, schema/read model,
+token/validation/recovery behavior, and summary-quality contracts remain
+planned. Current authority is
 `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` and
 `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
 

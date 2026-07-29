@@ -150,11 +150,12 @@ The three writeup stages are three distinct governed Word documents:
    evidence, and staff edits.
 
 There is no fourth “Site Visit Writeup.” The Site Visit tab is a dossier that
-brings together structured visit metadata, applicant materials such as slides
-and agendas, recordings, transcripts and their derived summaries, frozen
-Pre-Site distribution versions, and the emerging Final Writeup. “Create Final
-Writeup” copies the selected Pre-Site version into the separate Final artifact;
-it does not rename or overwrite the Pre-Site document.
+brings together structured visit metadata, applicant slides and other
+applicant materials, recordings, transcripts and their derived summaries, and
+staff observations. Pre-Site distribution snapshots and the Final Writeup
+remain linked lifecycle documents rather than Site Visit material categories.
+“Create Final Writeup” copies the selected Pre-Site version into the separate
+Final artifact; it does not rename or overwrite the Pre-Site document.
 
 Internal staff receive the canonical Word link. When a Board member or
 consultant without staff access joins a visit, the minimum external
@@ -226,6 +227,47 @@ pair for new documents without rewriting earlier artifacts. The exact initial
 template and template-storage mechanism remain to be approved during the
 writeup slice.
 
+### Site Visit dossier content contract
+
+**[VERIFIED via owner decisions 2026-07-28; implementation PLANNED.]**
+The Site Visit dossier captures this structured visit information:
+
+- visit date;
+- start and end time, with time zone;
+- in-person, virtual, or hybrid format;
+- physical location and/or meeting link;
+- lead PD;
+- participating WMKF staff;
+- applicant participants; and
+- participating Board members or consultants.
+
+Do not add a separate visit-status field such as Scheduled, Completed,
+Cancelled, or Rescheduled unless a consuming workflow is later identified.
+
+The dossier's material categories are limited to:
+
+1. applicant slides;
+2. other applicant materials;
+3. recording;
+4. transcript;
+5. transcript summary; and
+6. staff observations.
+
+The first five categories are file-backed artifacts. Staff observations are
+one paste-friendly notes area for the lead PD; the product does not require
+separate entries, authors, or timestamps. Normal Dataverse audit and
+modified-by/modified-on metadata may still protect the record behind the
+scenes.
+
+Do not introduce an app-level revision chain, replacement workflow, or
+current-version selector for Site Visit materials without observed need.
+Register each uploaded file independently and display both if an unexpected
+second file appears in the same category rather than inferring that one
+replaces the other. Native SharePoint version history remains the recovery
+layer for edits to an individual file. Transcript summaries still record the
+exact source transcript item and version/hash so their evidence provenance is
+unambiguous.
+
 ### Site Visit applicant materials and transcript summaries
 
 **[VERIFIED via owner decision 2026-07-28; implementation PLANNED.]**
@@ -237,7 +279,10 @@ instructions, and permitted material types. The recipient must not select a
 Dataverse record, SharePoint folder, or destination identifier. The server
 resolves those from the signed request context, validates the upload, places
 the bytes in the governed SharePoint location, and registers the artifact and
-its provenance in Dataverse.
+its provenance in Dataverse. Applicant-facing uploads are limited to
+**applicant slides** and **other applicant materials**. Recording, transcript,
+transcript summary, and staff observations remain staff- or system-side
+categories.
 
 The recording and transcript remain the authoritative visit evidence. A
 transcript summary is a derived, version-bound artifact. Prefer the summary
@@ -385,8 +430,10 @@ Decision order:
    owner-decided. Next freeze its calendar, first versioned Word template,
    prompt/template compatibility contract, and artifact persistence/access
    contract.
-2. **Site Visit** — freeze the dossier metadata, artifact registry, narrow
-   applicant-upload, recording/transcript, and derived-summary contracts.
+2. **Site Visit** — the dossier metadata, six material categories,
+   paste-friendly observations shape, and no-revision posture are
+   owner-decided. Next freeze the narrow applicant-upload and
+   recording/transcript/summary contracts plus persistence and access.
 3. **Final Writeup** — freeze the selected-Pre-Site copy/lineage contract and
    the visit, late-review, and editorial inputs.
 4. **Initial Assessment** — design for every in-scope J27 proposal before
@@ -478,7 +525,7 @@ Owner-decided:
 7. three distinct writeup documents, with Final copied from a deliberately
    selected Pre-Site version and no separate Site Visit Writeup;
 8. the Site Visit tab as a dossier for metadata, applicant materials,
-   recording, transcript, derived summary, distributions, and Final draft;
+   recording, transcript, derived summary, and staff observations;
 9. PDF attachment as the sufficient external Pre-Site distribution path;
 10. a narrow request-scoped Site Visit Materials Upload link that does not
     reopen the general applicant-intake product; and
@@ -494,7 +541,18 @@ Owner-decided:
 15. independent proposal/review refresh so a late review does not regenerate
     the factual core or silently overwrite staff-edited Word prose; and
 16. a versioned, replaceable Word template, initially based on the supplied
-    examples and existing prompts, with prompt/template provenance retained.
+    examples and existing prompts, with prompt/template provenance retained;
+17. Site Visit logistics comprising date, time/time zone, format,
+    location/link, lead PD, WMKF staff, applicant participants, and
+    Board/consultant participants, without a separate status field;
+18. Site Visit material categories limited to applicant slides, other
+    applicant materials, recording, transcript, transcript summary, and staff
+    observations;
+19. one paste-friendly staff-observations area without a per-entry
+    author/timestamp workflow; and
+20. no app-level Site Visit revision chain, replacement workflow, or current
+    version picker absent observed need, while native SharePoint history
+    remains the file-recovery layer.
 
 Still required:
 
@@ -503,9 +561,10 @@ Still required:
    contract;
 3. exact Dataverse registry schema and SharePoint destination;
 4. target-library version, retention, recycle, and permission audit;
-5. exact Site Visit metadata and dossier read model;
+5. exact Dataverse schema and dossier read model for the decided Site Visit
+   metadata, material categories, and observations;
 6. Site Visit Materials Upload token lifetime/revocation, contact binding,
-   file limits/types, destination, idempotency, partial-failure recovery,
+   file format/size/count limits, destination, idempotency, partial-failure recovery,
    notifications, audit, and retention;
 7. approved transcription provider/output contract, summary quality fallback,
    and transcript/summary refresh behavior;

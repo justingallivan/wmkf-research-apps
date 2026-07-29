@@ -81,9 +81,9 @@ minimum, the persistence design must account for:
 - request and cycle;
 - artifact type. The three narrative types are `initial-assessment`,
   `pre-site-visit`, and `final-writeup`; the Site Visit dossier also needs
-  typed supporting artifacts such as agenda, applicant materials/slides,
-  recording, transcript, transcript summary, and frozen distribution
-  snapshot;
+  typed file artifacts for applicant slides, other applicant materials,
+  recording, transcript, and transcript summary. Staff observations are
+  structured notes rather than a file artifact;
 - SharePoint site/drive/item identity and human-facing URL;
 - current version/eTag and last-modified metadata;
 - producer, input coverage/fingerprint, AI prompt/run provenance, and
@@ -143,12 +143,30 @@ artifact.
 The planned Site Visit tab is a dossier, not primarily an editor for one notes
 memo. It joins:
 
-- structured visit metadata;
-- agenda, applicant slides, and other visit materials;
-- recording and transcript;
-- a transcript summary derived from a specific transcript version;
-- frozen Pre-Site distribution snapshots; and
-- the independent Final Writeup draft.
+- visit date;
+- start and end time, with time zone;
+- in-person, virtual, or hybrid format;
+- physical location and/or meeting link;
+- lead PD;
+- participating WMKF staff;
+- applicant participants;
+- participating Board members or consultants;
+- applicant slides;
+- other applicant materials;
+- recording;
+- transcript;
+- transcript summary; and
+- staff observations.
+
+Do not add a separate Scheduled/Completed/Cancelled/Rescheduled status unless a
+consuming workflow is later identified. Applicant slides, other applicant
+materials, recording, transcript, and transcript summary are file-backed
+artifacts. Staff observations are one paste-friendly lead-PD notes area rather
+than separate timestamped entries; normal Dataverse audit and modified
+metadata may still apply behind the scenes.
+
+Pre-Site distribution snapshots and the Final Writeup are linked lifecycle
+documents, not Site Visit material categories.
 
 The recording and transcript are authoritative evidence. A transcript summary
 is derived and replaceable. Prefer an acceptable summary emitted by the
@@ -161,6 +179,12 @@ For every summary, the registry must preserve the producer/system and relevant
 version, source transcript item plus version/hash, generation time, lifecycle
 state, and current/stale relationship to the transcript. A changed transcript
 must not leave an old summary presented as current.
+
+Do not build an app-level revision chain, replacement workflow, or current-file
+picker for Site Visit materials without observed need. Register every uploaded
+file independently and display both if a second file unexpectedly appears in
+the same category. Native SharePoint version history remains the recovery
+mechanism for edits to an individual file.
 
 ### Site Visit Materials Upload contract
 
@@ -177,9 +201,10 @@ Minimum whole-flow invariants:
    specified applicant contact. The token supports explicit expiry and
    revocation and cannot be supplied as an arbitrary destination selector.
 2. The external recipient sees only the request identity, instructions, and
-   permitted upload types. The recipient cannot browse Dataverse or
-   SharePoint, choose another request, or supply a drive, folder, item, or
-   record identifier.
+   the permitted **applicant slides** and **other applicant materials**
+   categories. The recipient cannot upload recordings, transcripts, transcript
+   summaries, or staff observations; browse Dataverse or SharePoint; choose
+   another request; or supply a drive, folder, item, or record identifier.
 3. The server resolves the request, Site Visit context, and server-controlled
    SharePoint destination from the validated token.
 4. Before persistence, the server enforces rate, size, file-count, extension,
