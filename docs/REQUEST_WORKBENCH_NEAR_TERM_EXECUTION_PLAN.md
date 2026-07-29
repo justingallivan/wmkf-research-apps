@@ -280,8 +280,11 @@ product. An authorized staff user manually triggers the request from the Site
 Visit workflow. Entering or changing a visit date does not send the email
 automatically. Any authenticated staff member with access to the Workbench Site
 Visit workflow may send, resend, or reissue the request; there is no lead-PD or
-administrative-role restriction. The visible sender/reply-to still requires
-product design. Site Visits are scheduled soon after a request advances,
+administrative-role restriction. The visible sender/reply-to and whether or
+how the lead PD is copied remain unresolved. The owner will settle those
+questions with staff before implementation. Historically, non-PD staff usually
+sent these requests without PD involvement; that is context for the discussion,
+not the future contract. Site Visits are scheduled soon after a request advances,
 roughly when reviewer invitations begin. Once the visit date is recorded, the
 manual request action is available and staff chooses when to send it; review
 receipt, review synthesis, and Pre-Site Writeup readiness do not gate the
@@ -479,8 +482,9 @@ Decision order:
 2. **Site Visit** — the dossier metadata, six material categories,
    paste-friendly observations shape, and basic applicant file-management
    behavior are owner-decided. The materials request is a manual staff action,
-   not a date-driven automatic send. Next freeze the sender identity,
-   standalone revocation and failed-reissue recovery,
+   not a date-driven automatic send. Next freeze the sender/reply-to and
+   lead-PD copy behavior after the owner's staff discussion, plus standalone
+   revocation and failed-reissue recovery,
    applicant-file recovery and shared-link audit behavior, and
    recording/transcript/summary contracts plus persistence and access.
 3. **Final Writeup** — freeze the selected-Pre-Site copy/lineage contract and
@@ -637,8 +641,9 @@ Still required:
 4. target-library version, retention, recycle, and permission audit;
 5. exact Dataverse schema and dossier read model for the decided Site Visit
    metadata, material categories, and observations;
-6. Site Visit Materials Upload visible sender/reply-to, missing/duplicate
-   contact handling, standalone revocation and failed-reissue recovery,
+6. Site Visit Materials Upload visible sender/reply-to and lead-PD copy
+   behavior after owner/staff coordination, missing/duplicate contact
+   handling, standalone revocation and failed-reissue recovery,
    shared-link audit disclosure, file size/count limits, destination,
    delete/replace persistence and recovery, idempotency, partial-failure
    recovery, exact notification audience/timing, audit, and retention;

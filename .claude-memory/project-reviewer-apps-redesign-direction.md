@@ -64,8 +64,11 @@ after successful send, requires no staff-entered date, and is unaffected by
 visit rescheduling. Resend preserves the active link and original expiry;
 Reissue revokes it and starts a fresh 60-day period. Any staff member with
 Workbench Site Visit access may send, resend, or reissue. Exact visible
-sender/reply-to, standalone revocation/failed-reissue recovery, shared-link
-audit disclosure, size/count limits, and notification audience remain open.
+sender/reply-to and lead-PD copy behavior remain open pending the owner's staff
+discussion. Historically, non-PD staff sent these requests without PD
+involvement; that is context, not the future contract. Standalone
+revocation/failed-reissue recovery, shared-link audit disclosure, size/count
+limits, and notification audience remain open.
 Pre-Site distributions and Final remain linked writeups, not dossier material
 categories. The narrow expiring request-scoped applicant-material upload link
 does not reopen the parked general applicant-intake product. Prefer an

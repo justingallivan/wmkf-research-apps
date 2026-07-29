@@ -158,9 +158,12 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    requires no staff-entered date, and is unaffected by visit rescheduling.
    Resend preserves the active link and original expiry; Reissue revokes it and
    starts a fresh 60-day period. Any staff member with Workbench Site Visit
-   access may send, resend, or reissue. Exact visible sender/reply-to,
-   standalone revocation/failed-reissue recovery, shared-link audit disclosure,
-   size/count limits, and notification audience remain open. Pre-Site
+   access may send, resend, or reissue. Exact visible sender/reply-to and
+   lead-PD copy behavior remain open pending the owner's discussion with
+   staff. Historically, non-PD staff sent these requests without PD
+   involvement; that is context, not the future contract. Standalone
+   revocation/failed-reissue recovery, shared-link audit disclosure, size/count
+   limits, and notification audience remain open. Pre-Site
    distributions and Final remain linked writeups rather than Site Visit
    material categories. This narrow request-scoped applicant-material link
    does not reopen the parked general intake product. Prefer an acceptable
@@ -184,8 +187,9 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    collaborator audience, marker granularity, coordinator view, access key,
    and delivery date remain open.
    Exact schema/read model, first Pre-Site prompt/template pair, library
-   configuration, later-stage inputs, sender/standalone-revocation/
-   failed-reissue and token/validation/recovery behavior, shared-link audit
+   configuration, later-stage inputs, sender/reply-to and lead-PD copy behavior
+   after staff coordination, standalone-revocation/failed-reissue and
+   token/validation/recovery behavior, shared-link audit
    disclosure, and transcript-summary quality contract are still open.
 
 ### Owner Decision Needed

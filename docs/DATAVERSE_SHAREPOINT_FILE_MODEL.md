@@ -208,8 +208,11 @@ Minimum whole-flow invariants:
    staff chooses when to send; review receipt, synthesis, and Pre-Site Writeup
    readiness are not gates. Any authenticated staff member with access to the
    Workbench Site Visit workflow may send, resend, or reissue; there is no
-   lead-PD or administrative-role restriction. Visible sender/reply-to remains
-   a product decision. The server sets token expiration to exactly 60 days
+   lead-PD or administrative-role restriction. Visible sender/reply-to and
+   whether or how the lead PD is copied remain product decisions pending the
+   owner's coordination with staff. Historically, non-PD staff usually sent
+   these requests without PD involvement; do not encode that prior convention
+   as the future contract. The server sets token expiration to exactly 60 days
    after a successful invitation send; staff do not enter or edit the expiry,
    and moving the Site Visit date has no effect. The token supports revocation
    and cannot be supplied as an arbitrary destination selector. Resend is
@@ -258,10 +261,11 @@ Minimum whole-flow invariants:
    designated staff. The additional staff audience, batching, and message
    timing remain open.
 
-Exact sender/reply-to, missing/duplicate contact handling, standalone
-revocation and failed-reissue recovery, shared-link audit disclosure, schema,
-folder, size/count limits, notification audience/timing, retention, and
-delete/replace persistence and recovery behavior remain open design decisions.
+Exact sender/reply-to and lead-PD copy behavior after owner/staff coordination,
+missing/duplicate contact handling, standalone revocation and failed-reissue
+recovery, shared-link audit disclosure, schema, folder, size/count limits,
+notification audience/timing, retention, and delete/replace persistence and
+recovery behavior remain open design decisions.
 
 ### Cycle-wide Editor Dashboard contract
 

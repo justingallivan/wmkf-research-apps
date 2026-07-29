@@ -97,9 +97,12 @@ document inventory, and individual implementation plans do not establish priorit
   requires no staff-entered date, and is unaffected by visit rescheduling.
   Resend preserves the active link and original expiry; Reissue revokes it and
   starts a fresh 60-day period. Any staff member with Workbench Site Visit
-  access may send, resend, or reissue. Exact sender identity, standalone
-  revocation/failed-reissue recovery, shared-link audit disclosure, limits, and
-  notification audience remain open. Prefer an acceptable
+  access may send, resend, or reissue. Exact sender/reply-to and lead-PD copy
+  behavior remain open pending the owner's staff discussion; historically,
+  non-PD staff sent these requests without PD involvement, but that is not yet
+  the future contract. Standalone revocation/failed-reissue recovery,
+  shared-link audit disclosure, limits, and notification audience remain open.
+  Prefer an acceptable
   transcription-platform summary before a deliberate suite LLM fallback.
   Exact token, schema/read model, validation, folder, retention,
   summary-quality, and partial-failure contracts remain planned.
