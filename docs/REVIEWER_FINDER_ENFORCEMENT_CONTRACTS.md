@@ -121,11 +121,20 @@ never authorizes a send.
   skips the invitation with `email_research_only`; a checkbox or forged allowlist entry cannot
   override it. The ONLY way out is a durable provenance change: either a different address via
   the contact editor (`manual`), or an explicit staff attestation for the SAME address —
-  `PATCH /api/reviewer-finder/my-candidates { verifyEmailAddress:true, verifiedEmail }` stamps
-  `emailSource='staff_verified'` (S387). That action re-reads the stored address and requires
-  `verifiedEmail` to match it, refuses any source that is not currently `research_only` (so it
-  can neither downgrade a `ready` address nor re-stamp itself), and lands in **quick check**, not
-  ready — the per-recipient acknowledgement still applies at send. It exists because the previously
+  `PATCH /api/reviewer-finder/my-candidates { requestId, suggestionId, verifyEmailAddress:true,
+  verifiedEmail }` stamps `emailSource='staff_verified'` (S387). Preconditions, all server-side:
+  `requestId` must be a GUID matching the suggestion's `_wmkf_request_value` (the address lives on
+  the SHARED person row, so an unscoped attestation would change send behavior for every request
+  using that person); the suggestion must be `wmkf_selected`, not invited, and not already
+  responded; `verifiedEmail` must match the re-read stored address (the address is never taken
+  from the client); the current source must be `research_only`, which both prevents downgrading a
+  `ready` address and makes a second click a refusal rather than a duplicate write; and the write
+  is **ETag-conditional** on the person row, so a concurrent address swap yields 409
+  `stale_person_row` instead of stamping "verified" on a string nobody attested. It lands in
+  **quick check**, not ready — the per-recipient acknowledgement still applies at send.
+  Precedence: a later `scholarly_multi` corroboration of the same address DOES supersede it to
+  `ready` (two independent recent works outrank one attestation), and an incoming
+  `search_contested` re-blocks it; both are asserted in `tests/unit/my-candidates-verify-address.test.js`. It exists because the previously
   documented hatch ("verify it, then Edit contact") is a no-op when the verified address is the one
   already stored: `CandidateEditModal` omits an unchanged email, so `emailSource` never moved and
   the reviewer could not be invited in-app at all.

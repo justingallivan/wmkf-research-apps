@@ -386,6 +386,9 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          // requestId scopes the attestation to the request being previewed — the
+          // server rejects a suggestion that belongs to another request.
+          requestId,
           suggestionId: draft.suggestionId,
           verifyEmailAddress: true,
           verifiedEmail: draft.candidateEmail,
@@ -722,7 +725,14 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                 <button
                                   type="button"
                                   onClick={() => verifyResearchOnlyAddress(d)}
-                                  disabled={verifyState[d.suggestionId]?.verifying === true}
+                                  disabled={
+                                    verifyState[d.suggestionId]?.verifying === true
+                                    // `requestId` defaults to null on this component; the
+                                    // server requires it for scoping, so don't offer a
+                                    // button that can only 400.
+                                    || !requestId
+                                    || !d.candidateEmail
+                                  }
                                   className="rounded border border-amber-400 bg-white px-2.5 py-1 font-medium text-amber-900 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
                                   title={`Record that you verified ${d.candidateEmail} against an independent source`}
                                 >

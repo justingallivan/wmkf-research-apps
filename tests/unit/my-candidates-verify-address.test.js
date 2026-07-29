@@ -58,13 +58,37 @@ const { patchMyCandidates } = require('../../lib/services/reviewer-finder/my-can
 
 const SUGGESTION_ID = '11111111-2222-3333-4444-555555555555';
 const PERSON_ID = '66666666-7777-8888-9999-000000000000';
+const REQUEST_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+const OTHER_REQUEST_ID = 'ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee';
 const EMAIL = 'pmali@ucsd.edu';
+const ETAG = 'W/"1234567"';
 
 function verify(overrides = {}) {
   return patchMyCandidates({
-    body: { suggestionId: SUGGESTION_ID, verifyEmailAddress: true, verifiedEmail: EMAIL, ...overrides },
+    body: {
+      requestId: REQUEST_ID,
+      suggestionId: SUGGESTION_ID,
+      verifyEmailAddress: true,
+      verifiedEmail: EMAIL,
+      ...overrides,
+    },
     actingUserSystemId: 'staff-1',
   });
+}
+
+function suggestionRow(overrides = {}) {
+  return {
+    wmkf_appreviewersuggestionid: SUGGESTION_ID,
+    _wmkf_request_value: REQUEST_ID,
+    _wmkf_potentialreviewer_value: PERSON_ID,
+    wmkf_selected: true,
+    wmkf_invited: false,
+    wmkf_emailsentat: null,
+    wmkf_accepted: false,
+    wmkf_declined: false,
+    wmkf_responsetype: null,
+    ...overrides,
+  };
 }
 
 function personRow(overrides = {}) {
@@ -73,16 +97,14 @@ function personRow(overrides = {}) {
     wmkf_emailaddress: EMAIL,
     wmkf_emailsource: 'serp_search',
     wmkf_identitystatus: 'unresolved',
+    _etag: ETAG,
     ...overrides,
   };
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
-  suggestionAdapter.findById.mockResolvedValue({
-    wmkf_appreviewersuggestionid: SUGGESTION_ID,
-    _wmkf_potentialreviewer_value: PERSON_ID,
-  });
+  suggestionAdapter.findById.mockResolvedValue(suggestionRow());
   potentialReviewerAdapter.getByIdWithSelect.mockResolvedValue(personRow());
 });
 
@@ -92,7 +114,7 @@ describe('verifyEmailAddress — happy path', () => {
     expect(researcherAdapter.updateById).toHaveBeenCalledWith(
       PERSON_ID,
       { emailSource: 'staff_verified' },
-      { actingUserSystemId: 'staff-1' },
+      { actingUserSystemId: 'staff-1', ifMatch: ETAG },
     );
     expect(result).toMatchObject({
       success: true,
@@ -143,8 +165,94 @@ describe('verifyEmailAddress — refusals (all must write nothing)', () => {
   });
 
   test('rejects a suggestion with no linked person', async () => {
-    suggestionAdapter.findById.mockResolvedValue({ wmkf_appreviewersuggestionid: SUGGESTION_ID });
+    suggestionAdapter.findById.mockResolvedValue(
+      suggestionRow({ _wmkf_potentialreviewer_value: null }),
+    );
     await expect(verify()).rejects.toMatchObject({ httpStatus: 409, body: { code: 'person_missing' } });
+  });
+
+  // ── Scoping + lifecycle (Codex adversarial review, finding 1) ──
+  // The attested address lives on the SHARED person row, so an unscoped write would
+  // change send behavior for every request using that person.
+
+  test('requires a requestId', async () => {
+    await expect(verify({ requestId: undefined })).rejects.toMatchObject({
+      httpStatus: 400, body: { code: 'request_id_required' },
+    });
+  });
+
+  test('rejects a non-GUID requestId before it reaches an adapter', async () => {
+    await expect(verify({ requestId: 'not-a-guid' })).rejects.toMatchObject({
+      httpStatus: 400, body: { code: 'request_id_required' },
+    });
+    expect(suggestionAdapter.findById).not.toHaveBeenCalled();
+  });
+
+  test('rejects a suggestion belonging to another request', async () => {
+    suggestionAdapter.findById.mockResolvedValue(
+      suggestionRow({ _wmkf_request_value: OTHER_REQUEST_ID }),
+    );
+    await expect(verify()).rejects.toMatchObject({ httpStatus: 409, body: { code: 'wrong_request' } });
+  });
+
+  test('rejects an unselected (removed) candidate', async () => {
+    suggestionAdapter.findById.mockResolvedValue(suggestionRow({ wmkf_selected: false }));
+    await expect(verify()).rejects.toMatchObject({
+      httpStatus: 409, body: { code: 'candidate_not_selected' },
+    });
+  });
+
+  test.each([
+    ['wmkf_invited', true],
+    ['wmkf_emailsentat', '2026-07-01T00:00:00Z'],
+  ])('rejects an already-invited candidate (%s)', async (field, value) => {
+    suggestionAdapter.findById.mockResolvedValue(suggestionRow({ [field]: value }));
+    await expect(verify()).rejects.toMatchObject({ httpStatus: 409, body: { code: 'already_invited' } });
+  });
+
+  test.each([
+    ['wmkf_accepted', true],
+    ['wmkf_declined', true],
+    ['wmkf_responsetype', 100000001],
+  ])('rejects a candidate who already responded (%s)', async (field, value) => {
+    suggestionAdapter.findById.mockResolvedValue(suggestionRow({ [field]: value }));
+    await expect(verify()).rejects.toMatchObject({ httpStatus: 409, body: { code: 'already_responded' } });
+  });
+
+  // ── Optimistic concurrency (Codex adversarial review, finding 2) ──
+
+  test('refuses to write when the person row carries no ETag', async () => {
+    potentialReviewerAdapter.getByIdWithSelect.mockResolvedValue(personRow({ _etag: undefined }));
+    await expect(verify()).rejects.toMatchObject({
+      httpStatus: 409, body: { code: 'person_state_unavailable' },
+    });
+  });
+});
+
+describe('verifyEmailAddress — concurrency', () => {
+  test('a 412 from the conditional write surfaces as a stale-row 409, not a 500', async () => {
+    researcherAdapter.updateById.mockRejectedValueOnce(
+      Object.assign(new Error('Precondition Failed'), { status: 412 }),
+    );
+    await expect(verify()).rejects.toMatchObject({
+      httpStatus: 409, body: { code: 'stale_person_row' },
+    });
+  });
+
+  test('a non-412 write failure is not swallowed as a stale row', async () => {
+    researcherAdapter.updateById.mockRejectedValueOnce(
+      Object.assign(new Error('boom'), { status: 500 }),
+    );
+    await expect(verify()).rejects.toThrow(/boom|Failed/);
+  });
+
+  // The interleaving Codex described: A attests old@, B swaps the address, the write
+  // must NOT land. The guard is the ifMatch argument — assert it is the ETag from the
+  // row this request actually validated, not a fresh read inside the adapter.
+  test('the write is conditioned on the ETag of the row that was validated', async () => {
+    await verify();
+    const [, , options] = researcherAdapter.updateById.mock.calls[0];
+    expect(options.ifMatch).toBe(ETAG);
   });
 
   // The downgrade guard. Every one of these sources classifies as something OTHER than
@@ -181,7 +289,29 @@ describe('verifyEmailAddress — the other research-only source', () => {
     );
     await expect(verify()).resolves.toMatchObject({ success: true });
     expect(researcherAdapter.updateById).toHaveBeenCalledWith(
-      PERSON_ID, { emailSource: 'staff_verified' }, { actingUserSystemId: 'staff-1' },
+      PERSON_ID, { emailSource: 'staff_verified' }, { actingUserSystemId: 'staff-1', ifMatch: ETAG },
     );
+  });
+});
+
+// Codex adversarial review, finding 3: `staff_verified` is NOT in the researcher
+// adapter's no-upgrade source set, so a later enrichment that corroborates the SAME
+// address on two distinct recent works overwrites it with `scholarly_multi` → `ready`,
+// dropping the send-time acknowledgement. That is deliberate, not an oversight: two
+// independent recent works are stronger evidence than one human attestation, and it is
+// the same tier every other corroborated address gets. This test exists so the
+// precedence is asserted rather than assumed — flip it if the policy ever changes.
+describe('staff_verified provenance precedence', () => {
+  const { emailConfidence } = require('../../lib/utils/reviewer-invite');
+
+  test('staff_verified is quick_check, and scholarly_multi outranks it as ready', () => {
+    expect(emailConfidence({ wmkf_emailsource: 'staff_verified' }).action).toBe('quick_check');
+    expect(emailConfidence({ wmkf_emailsource: 'scholarly_multi' }).action).toBe('ready');
+  });
+
+  test('a contest downgrades it again — search_contested outranks staff_verified', () => {
+    // researcher.js treats an incoming `search_contested` as an authoritative overwrite,
+    // so new evidence that the address contradicts verified identity re-blocks the send.
+    expect(emailConfidence({ wmkf_emailsource: 'search_contested' }).action).toBe('research_only');
   });
 });
