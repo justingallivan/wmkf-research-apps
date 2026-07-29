@@ -164,14 +164,17 @@ function registry() {
   // 4. Reviewer status write map ⇔ UI pipeline ⇔ service reverse-read map.
   //    All three must remain total: a missing pipeline key hides the row from
   //    Workbench modes; a missing inverse value emits undefined from the API.
+  //    The canonical literal lives in shared/config/reviewerLifecycle.js; the
+  //    adapter only re-exports it for backwards compatibility, so extract from
+  //    the config (extracting from the adapter yields null → vacuous failure).
   {
-    const adapter = read('lib/dataverse/adapters/reviewer-suggestion.js');
+    const lifecycle = read('shared/config/reviewerLifecycle.js');
     const modes = read('shared/components/reviewers/reviewer-modes.js');
     const service = read('lib/services/review-manager/reviewers-service.js');
-    const produced = extractObjectKeys(adapter, 'REVIEW_STATUS_MAP');
+    const produced = extractObjectKeys(lifecycle, 'REVIEW_STATUS_MAP');
     checks.push({
       name: 'REVIEW_STATUS_MAP ⇔ STATUS_PIPELINE',
-      producer: 'REVIEW_STATUS_MAP keys (reviewer-suggestion.js)',
+      producer: 'REVIEW_STATUS_MAP keys (reviewerLifecycle.js)',
       consumer: 'STATUS_PIPELINE key values (reviewer-modes.js)',
       produced,
       consumed: extractArrayObjectPropertyStrings(modes, 'STATUS_PIPELINE', 'key'),
@@ -179,7 +182,7 @@ function registry() {
     });
     checks.push({
       name: 'REVIEW_STATUS_MAP ⇔ REVIEW_STATUS_BY_VALUE',
-      producer: 'REVIEW_STATUS_MAP keys (reviewer-suggestion.js)',
+      producer: 'REVIEW_STATUS_MAP keys (reviewerLifecycle.js)',
       consumer: 'REVIEW_STATUS_BY_VALUE string values (reviewers-service.js)',
       produced,
       consumed: extractObjectStringValues(service, 'REVIEW_STATUS_BY_VALUE'),
