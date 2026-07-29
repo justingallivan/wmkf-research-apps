@@ -71,6 +71,12 @@ Assessment pilot by 2026-08-10. The design work is committed and pushed on
 5. **Multi-machine handoff**
    - The feature history was reconciled with the content-identical rollout
      commit already on `main`, then fast-forwarded to `main` as `5c685da7`.
+   - A stale local `main` line containing three older documentation commits was
+     preserved non-destructively as
+     `codex/local-main-preserved-20260728`; local `main` was recreated from
+     authoritative `origin/main`. Do not merge the preservation branch without
+     a fresh content review because its old tree predates the shipped
+     review-synthesis implementation.
    - The owner has separately preserved `.env.local` in an editable/restorable
      format.
    - On the office machine, a fresh clone of the default `main` branch contains
@@ -160,6 +166,9 @@ Assessment pilot by 2026-08-10. The design work is committed and pushed on
    production claims. The new Initial Assessment flow remains planned.
 4. Re-read the live governed prompt rows before publishing or modifying any
    prompt.
+5. Treat `codex/local-main-preserved-20260728` as recovery-only historical
+   provenance, not an integration candidate; its three commits sit on a stale
+   pre-rollout tree.
 
 ### Do Not Reopen Without New Decision
 
