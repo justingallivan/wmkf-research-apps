@@ -1,140 +1,126 @@
-# Session 386 Prompt: Build the governed Initial Assessment pilot
+# Session 387 Prompt: Build the governed Initial Assessment pilot
 
-## Session 385 Summary
+## Session 386 Summary
 
-Session 385 closed the review-synthesis production rollout, worked through the
-remaining Request Workbench lifecycle design questions with the owner, and
-established the first deadline-bound delivery slice: a human-in-the-loop Initial
-Assessment pilot by 2026-08-10. The design work is committed and pushed on
-`main` through merge commit `5c685da7`.
+Session 386 was an office-machine recovery session. No feature work was
+attempted. The machine was brought from a three-week-stale, dependency-mangled
+state to fully verified, one pre-existing red gate was fixed, and the
+multi-machine handoff instructions that caused the mess were corrected so the
+next returning machine does not repeat it.
 
 ### What Was Completed
 
-1. **Review-synthesis rollout closeout**
-   - Confirmed the production lifecycle rollout, controlled automatic smoke,
-     cleanup, two smoke-discovered fixes, and final zero-eligible probe were
-     complete.
-   - Production automation remains enabled. The final Ready deployment remains
-     `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1`.
+1. **Diagnosed and repaired the office-machine setup failure**
+   - `~/Code/WMKF_Apps` was 364 commits behind `origin/main` (local HEAD
+     `7dc53760`, Session 351-era) but a clean ancestor, so a fast-forward was
+     safe. Fast-forwarded to `964b8bce`; `.env.local` was untracked and survived
+     untouched, so no restore was needed.
+   - `package.json` / `package-lock.json` held uncommitted dependency
+     **downgrades** (`exceljs` 4.4.0→3.4.0, `eslint-config-next` 16.2.12→0.2.4,
+     3,338 lock-file lines deleted — 3,342 across both files, 4 of them in
+     `package.json`) from 11 runs of `npm audit fix --force`. Backed up to the
+     session scratchpad, then discarded.
+   - Root cause [VERIFIED via isolated `npm audit --package-lock-only` on both
+     lockfiles]: the stale Session-351 lockfile audits to **14 vulnerabilities**
+     (1 critical, 8 high); the same lockfile at `origin/main` audits to **0**.
+     364 commits of upstream updates had already fixed every finding. Syncing was
+     the entire fix; `--force` was actively undoing it.
+   - `npm ci` after sync: 1,013 packages, 0 vulnerabilities.
 
-2. **Governed writeup architecture**
-   - SharePoint Word is the canonical editable narrative; Dataverse is the
-     typed registry/workflow authority.
-   - Initial Assessment, Pre Site Visit Writeup, and Final Writeup are three
-     separate documents. Final is copied from the latest Pre-Site version at
-     action time, with a rare explicit regeneration path that preserves prior
-     Final content.
-   - Site Visit is a dossier rather than a fourth writeup.
-   - The planned staff-wide Editor Dashboard preserves Allison's single-list
-     editing workflow while supporting all PDs and designated proofreaders.
-   - SharePoint body search, native version recovery, least-privilege editing,
-     and immutable Board milestone snapshots are required parts of the design.
+2. **Removed a redundant nested clone**
+   - `wmkf-research-apps/` was a full second repo nested inside the checkout,
+     created by `git clone <url>` with **no destination argument** run from
+     inside `~/Code/WMKF_Apps` [VERIFIED via `~/.bash_history` lines 305-312].
+   - Verified safe before deletion: tree hash identical to `origin/main`
+     (`67d09862`), no uncommitted or untracked files, no stashes, no unpushed
+     commits, only `main` tracking origin. Removed; 52 MB reclaimed. The
+     CodeGraph daemon purged its entries automatically (1,644 files indexed, 0
+     stale).
 
-3. **Pre-Site and Site Visit contracts**
-   - Pre-Site proposal material uses an iterated governed
-     `phase-ii.summarize`; review analysis uses
-     `review-synthesis.generate` over all submitted reviews.
-   - The Site Visit date—not review completeness—governs distribution.
-     Zero-review distribution is valid; late reviews refresh only the synthesis
-     layer and must not silently overwrite edited Word prose.
-   - The Site Visit dossier contains visit logistics, applicant slides, other
-     applicant materials, recording, transcript, transcript summary, and one
-     paste-friendly staff-observations area.
-   - Applicant materials use a manually staff-triggered, request-scoped shared
-     link for the liaison and/or PI. It expires 60 days after successful send.
-     Resend preserves the link/expiry; Reissue safely replaces it.
-   - Applicant uploads are PDF/PPTX, up to 1 GB each and 20 current files per
-     request, with explicit recoverable delete/replace. SharePoint stores bytes;
-     Dataverse holds the registry; Postgres holds only expiring-link/resumable
-     workflow state.
+3. **Fixed red gate `check:status-enum-parity` (`d1fb6f15`)**
+   - `REVIEW_STATUS_MAP`'s object literal moved to
+     `shared/config/reviewerLifecycle.js:19` in `70956477` (review synthesis
+     lifecycle, #96) so browser-safe lifecycle readers avoid the Dataverse
+     service graph; `lib/dataverse/adapters/reviewer-suggestion.js:24-29` only
+     re-exports it now. The gate still extracted the producer textually from the
+     adapter, so `extractObjectKeys` returned `null`.
+   - Not a real parity break: the 7 producer keys match `STATUS_PIPELINE` and
+     `REVIEW_STATUS_BY_VALUE` exactly. The gate correctly refused to pass
+     vacuously (its `validateCheck` treats empty extraction as failure, Codex
+     S260).
+   - This gate backs `.claude/hooks/enum-parity-commit-guard.js`, so **every
+     commit was blocked** while it was red.
 
-4. **Initial Assessment pilot and starting content contract**
-   - The first fixed gate is a real human-in-the-loop pilot by 2026-08-10,
-     before proposal intake begins around 2026-08-18.
-   - The pilot must exercise real proposal/Dataverse inputs, governed prompt
-     execution, canonical SharePoint Word creation and human editing, typed
-     Dataverse registry/provenance, Workbench and Editor Dashboard discovery,
-     and one safe failure/retry path.
-   - Four D26 Phase I examples established a provisional one-page starting
-     structure: applicant-submitted proposal title, institution, Summary, and
-     Rationale sections for Significance & Impact, Research Plan, Team
-     Expertise, and Foundation Opportunity.
-   - Foundation Opportunity is staff-authored and must remain visibly
-     incomplete until staff fills it.
-   - The Initial Assessment uses `akoya_title`, not the later house-style Keck
-     title in `wmkf_wmkfprojectdescription`. The current Workbench resolver
-     already supplies `akoya_title`.
-   - The exact format remains in flux during the single-phase transition. The
-     D26 structure is a versioned-template starting point, not a permanent
-     layout contract.
+4. **Verified the machine end to end**
+   - 56 of 57 `check:*` scripts green (32 main gates + 24 self-tests). Only
+     `check:memory-drift` was skipped, deliberately, for the read-only
+     `check:memory-drift:no-write`.
+   - Tests 6,319/6,319 in 532 suites. Lint 0 errors (51 pre-existing warnings).
+     Production build succeeds. Both per-machine symlinks verified.
+   - `.env.local` has 55 keys and `DATAVERSE_TARGET_INTERLOCK="on"`. The 6 keys
+     present in `.env.example` but absent are all safely optional — each gates a
+     disabled feature (`BILL_ENABLED`, `REVIEWER_PAGE_EMAIL_TIER_ENABLED`),
+     falls back to a var that IS set (`REVIEWER_PORTAL_BASE_URL`→`NEXTAUTH_URL`,
+     `SCHOLARLY_POLITE_MAILTO`→`NOTIFICATION_EMAIL_FROM`), or skips gracefully
+     (`VERCEL_API_TOKEN`/`VERCEL_PROJECT_ID` → cron returns `skipped: true`).
 
-5. **Multi-machine handoff**
-   - The feature history was reconciled with the content-identical rollout
-     commit already on `main`, then fast-forwarded to `main` as `5c685da7`.
-   - A stale local `main` line containing three older documentation commits was
-     preserved non-destructively as
-     `codex/local-main-preserved-20260728`; local `main` was recreated from
-     authoritative `origin/main`. Do not merge the preservation branch without
-     a fresh content review because its old tree predates the shipped
-     review-synthesis implementation.
-   - The owner has separately preserved `.env.local` in an editable/restorable
-     format.
-   - On the office machine, a fresh clone of the default `main` branch contains
-     this handoff. Restore `.env.local`, run `npm ci`, and then invoke `/start`.
+5. **Corrected the handoff instructions that caused this**
+   - The Session 386 prompt told the office machine to fresh-clone into
+     `~/Code/WMKF_Apps`. That path had held a checkout since 2026-05-27
+     [VERIFIED via `stat -f %SB .git`], and git refuses a non-empty destination,
+     so the instruction was impossible as written. It was also mis-ordered:
+     `npm ci` before `/start` audits an unsynced tree, and `/start` is what
+     syncs.
+   - Recorded the rule in
+     `.claude-memory/feedback-returning-machine-sync-before-install.md` and
+     routed it from `MEMORY.md`. Cross-referenced
+     `docs/security-audit/SECURITY_AUDIT_2026-06-11.md:247`, which warned about
+     `audit fix --force` downgrades and named `exceljs` 7 weeks before the
+     downgrade happened — the guidance existed but was unreachable from the
+     startup path.
 
 ### Commits
 
-- `70dba3c8` — Document governed writeup artifact contract
-- `60163cc7` — Document cycle-wide editor dashboard
-- `39f5601e` — Document site visit dossier and upload plan
-- `353f095b` — Define pre-site writeup input contract
-- `27c79dfb` — Define site visit dossier content contract
-- `235cdd9c` — Refine site visit applicant upload contract
-- `10eb3703` — Set site visit materials request trigger
-- `6956d84a` — Define site visit materials recipients
-- `2ebc8430` — Define shared applicant materials access
-- `d06df4c2` — Define site visit materials request timing
-- `ffda9b3f` — Set applicant materials link expiry
-- `5957d0d6` — Define applicant link resend and reissue
-- `1459f450` — Set materials request staff access
-- `2c934632` — Record site visit email sender action item
-- `0f0eeb08` — Refine site visit materials upload contract
-- `150918f6` — Lock site visit applicant file defaults
-- `e3921b23` — Lock remaining Workbench design decisions
-- `8470d1d5` — Define August Initial Assessment pilot
-- `be27fdd1` — Define Initial Assessment template inputs
-- `d2e68229` — Use applicant title for Initial Assessments
-- `0f7e16e5` — Document Session 385 and create Session 386 prompt
-- `5c685da7` — Reconcile the feature history with `main`
+- `d1fb6f15` — fix(gates): status-enum-parity read REVIEW_STATUS_MAP from its canonical file
+- `2bf33bc1` — docs(memory): record returning-machine sync-before-install lesson
+- `d4dd098a` — docs: reconcile the office-setup handoff items with what actually happened
 
 ## Next Items
 
 ### Verified Open
 
 1. **Build the governed Initial Assessment pilot.**
-   Evidence: `docs/CURRENT_WORK_QUEUE.md`;
+   Evidence: `docs/CURRENT_WORK_QUEUE.md` rows 1-2;
    `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`;
    `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
-   Build the smallest complete producer → SharePoint artifact → Dataverse
-   registry → Workbench/Editor Dashboard read path needed for the 2026-08-10
-   human pilot. No implementation exists yet for this new document flow.
+   [VERIFIED 2026-07-29] Zero `.js`/`.mjs`/`.sql` files anywhere in the repo
+   (checked the complement set too — `scripts/`, `tests/`, and migrations, not
+   just `lib/`/`pages/`/`shared/`) match `initial[-_ ]?assessment`, so no
+   implementation exists yet. Build the smallest
+   complete producer → SharePoint artifact → Dataverse registry →
+   Workbench/Editor Dashboard read path for the 2026-08-10 human pilot. Blocked
+   in part by the owner decisions below, but the shared governed-artifact spine
+   and the SharePoint/Dataverse plumbing do not depend on the template choice.
 
 2. **Run the Q9 ordinary-user app-access smoke in the office.**
-   Evidence: `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md`;
+   Evidence: `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md:47,245,428`;
    `.claude-memory/project-app-access-control.md`.
-   Use another person's ordinary staff account in Preview while the owner
-   performs and reverses the bounded grant/revoke steps. Do not substitute the
-   owner's superuser account.
+   [VERIFIED 2026-07-29] Still a required Stage 4 release gate; the plan records
+   that no ordinary-user session was available to the prior run. Needs another
+   person's ordinary staff account in Preview while the owner performs and
+   reverses the bounded grant/revoke steps. A superuser account cannot substitute.
 
 ### Owner Decision Needed
 
 1. **Pilot proposal, human testers, environment, and exact schedule.**
    Evidence: `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
+   Gates the 2026-08-10 pilot; intake begins around 2026-08-18.
 
 2. **First approved Initial Assessment prompt/template pair.**
    Evidence: `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
-   The D26 structure is only the starting point; preserve the decided
-   applicant-title and staff-authored Foundation Opportunity requirements.
+   The D26 structure is a starting point only. Preserve the decided
+   applicant-title (`akoya_title`) and staff-authored Foundation Opportunity
+   requirements.
 
 3. **Artifact registry and SharePoint target-library controls.**
    Evidence: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
@@ -143,9 +129,9 @@ Assessment pilot by 2026-08-10. The design work is committed and pushed on
 
 4. **Later Site Visit operational details.**
    Evidence: `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
-   Sender/reply-to and lead-PD copy behavior require staff coordination.
+   Sender/reply-to and lead-PD copy behavior need staff coordination.
    Notification audience/window, large-file scanner, and transcript workflow
-   also remain open.
+   remain open.
 
 ### Parked
 
@@ -153,40 +139,34 @@ Assessment pilot by 2026-08-10. The design work is committed and pushed on
    narrow Site Visit Materials Upload does not reopen it.
 2. Automated BILL onboarding; honorarium payment remains offline.
 3. Retired-table script deletion/quarantine without a new owner-approved scope.
-4. Public Git history rewriting or repository cleanup without a separate
-   explicit authorization and fresh preflight.
+4. Public Git history rewriting or repository cleanup without separate explicit
+   authorization and a fresh preflight.
 
 ### Verify Before Acting
 
-1. DONE (Session 352, 2026-07-29) — the office machine is synced and verified;
-   no clone was needed. The fresh-clone instruction above was wrong for this
-   machine: `~/Code/WMKF_Apps` had existed since 2026-05-27, so git refused the
-   non-empty destination and the clone nested a redundant second repo (since
-   removed). For a returning machine the order is `/start` (which syncs) THEN
-   `npm ci` — never install before sync, and never `npm audit fix --force`.
-   See `.claude-memory/feedback-returning-machine-sync-before-install.md`.
-2. DONE (Session 352) — `.env.local` restored by the owner, `npm ci` clean at
-   0 vulnerabilities, both per-machine symlinks verified. 56 of the 57 `check:*`
-   scripts ran green (32 main gates + 24 self-tests); only `check:memory-drift`
-   was skipped, deliberately, in favor of the read-only `check:memory-drift:no-write`.
-   One pre-existing red gate was fixed in `d1fb6f15`. Tests 6319/6319, lint 0
-   errors, production build succeeds.
-3. Re-probe live Dataverse/SharePoint state before schema, migration, or
-   production claims. The new Initial Assessment flow remains planned.
-4. Re-read the live governed prompt rows before publishing or modifying any
+1. **Re-probe live Dataverse/SharePoint state** before schema, migration, or
+   production claims. The Initial Assessment flow remains planned, not built.
+2. **Re-read the live governed prompt rows** before publishing or modifying any
    prompt.
-5. Treat `codex/local-main-preserved-20260728` as recovery-only historical
-   provenance, not an integration candidate; its three commits sit on a stale
-   pre-rollout tree.
+3. `codex/local-main-preserved-20260728` is recovery-only historical provenance,
+   NOT an integration candidate — its three commits sit on a stale pre-rollout
+   tree. Still present on `origin`.
+4. Three commits from this session carry the wrong session number in their
+   **commit message text** ("Session 352"; the correct number is 386). The
+   durable files were corrected; the messages were not, because public history
+   rewriting is parked. Trust the files, not those three messages.
 
 ### Do Not Reopen Without New Decision
 
-1. Do not use `wmkf_wmkfprojectdescription` as the Initial Assessment title;
-   use the applicant-submitted `akoya_title`.
+1. Do not use `wmkf_wmkfprojectdescription` as the Initial Assessment title; use
+   the applicant-submitted `akoya_title`.
 2. Do not backfill the D26 Initial Writeup placeholder.
 3. Do not make review count a Pre-Site distribution gate.
 4. Do not create a fourth Site Visit Writeup.
 5. Do not mirror the editable Word body into a competing Dataverse memo.
+6. Do not run `npm audit fix --force` in this repo, and do not instruct a
+   returning machine to clone into an existing checkout path. Evidence:
+   `.claude-memory/feedback-returning-machine-sync-before-install.md`.
 
 ## Key Files Reference
 
@@ -196,20 +176,23 @@ Assessment pilot by 2026-08-10. The design work is committed and pushed on
 | `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` | Lifecycle decisions and August pilot |
 | `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` | Governed artifact/storage contract |
 | `lib/services/workbench/resolve-request-service.js` | Existing request metadata, including applicant title and institution |
-| `lib/services/grantee-title-service.js` | Later Keck-title producer; not the Initial Assessment title source |
+| `lib/services/grantee-title-service.js` | Later Keck-title producer; NOT the Initial Assessment title source |
+| `shared/config/reviewerLifecycle.js` | Canonical reviewer lifecycle option maps; the adapter only re-exports them |
 | `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md` | Office ordinary-user smoke contract |
+| `.claude-memory/feedback-returning-machine-sync-before-install.md` | Returning-machine setup order and `audit fix --force` prohibition |
 
 ## Testing
 
-The session's documentation changes passed:
+This session verified the machine rather than a feature. Reproduce with:
 
 ```bash
-rtk npm run check:doc-currency
-rtk npm run check:doc-currency:self-test
-rtk npm run check:fact-consistency
-rtk npm run check:fact-consistency:self-test
-rtk npm run check:docs-catalog
+rtk npm ci                          # expect 0 vulnerabilities
+rtk npm test                        # expect 532 suites / 6319 tests green
+rtk npm run lint                    # expect 0 errors
+rtk npm run build                   # expect success
+rtk npm run check:status-enum-parity && rtk npm run check:status-enum-parity:self-test
 ```
 
-On the office machine, `/start` must run the complete current `check:*` gate
-inventory and each applicable self-test sequentially.
+`/start` runs the full `check:*` inventory. Enumerate it from `package.json`
+rather than trusting a hard-coded list; there are currently 33 main gates and 24
+self-tests, and each gate runs sequentially with its own self-test.

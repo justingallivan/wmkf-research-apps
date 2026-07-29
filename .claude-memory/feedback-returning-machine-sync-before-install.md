@@ -31,7 +31,7 @@ Do not:
   so the operator improvises — typically a bare clone that nests a second repo
   inside the first.
 
-**Why:** Session 352 (2026-07-29). The Session 386 handoff assumed the office
+**Why:** Session 386 (2026-07-29). The Session 386 handoff assumed the office
 machine needed a fresh clone; that checkout had existed since 2026-05-27 with
 local commits through 2026-07-09. The clone therefore ran with no destination
 from inside `~/Code/WMKF_Apps` and nested at `wmkf-research-apps/`, while
