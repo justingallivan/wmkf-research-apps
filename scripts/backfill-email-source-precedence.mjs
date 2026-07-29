@@ -27,9 +27,10 @@
  *     concurrent change makes this a no-op rather than a downgrade
  *   - before/after sources are re-read and reported per row; a gitignored backup of the
  *     before-state is written prior to any write
- *   - `manual` / `staff_verified` stored values ARE upgradeable by `ready` first-party
- *     evidence, which removes that recipient's send-time acknowledgement. Those rows are
- *     listed separately so the operator sees them before executing.
+ *   - `manual` / `staff_verified` stored values are terminal against machine evidence,
+ *     even `ready` first-party evidence. The script uses the same
+ *     `emailSourceUpgradeAllowed` predicate as the adapter, so it cannot remove a
+ *     send-time human acknowledgement from a shared person row.
  */
 import fs from 'fs';
 import path from 'path';

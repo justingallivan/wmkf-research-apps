@@ -15,19 +15,33 @@
 
 const fs = require('fs');
 const path = require('path');
+// `@babel/parser` is a declared dependency; `@babel/traverse` is NOT — it is only present
+// as a transitive of @babel/core, so importing it would make this test depend on hoisting
+// that no manifest guarantees. The walk below is 10 lines and needs nothing extra.
+const parser = require('@babel/parser');
+
+/** Depth-first visit of every AST node of a given type. */
+function walk(node, type, visit, seen = new Set()) {
+  if (!node || typeof node !== 'object' || seen.has(node)) return;
+  seen.add(node);
+  if (Array.isArray(node)) {
+    for (const child of node) walk(child, type, visit, seen);
+    return;
+  }
+  if (node.type === type) visit(node);
+  for (const key of Object.keys(node)) {
+    if (key === 'loc' || key === 'leadingComments' || key === 'trailingComments') continue;
+    walk(node[key], type, visit, seen);
+  }
+}
 
 const ROOT = path.join(__dirname, '..', '..');
 const SCAN_DIRS = ['lib', 'pages', 'scripts', 'shared'];
 
-// Receivers known to be the potential-reviewer adapter. A bare `upsertByEmail(` is included
-// for test/alias imports; `.update(`/`.create(` are qualified to avoid matching other
-// adapters that legitimately take an `email:` field with no provenance concept.
-const CALL_PATTERNS = [
-  /\bupsertByEmail\s*\(/g,
-  /\b(?:potentialReviewerAdapter|potentialReviewer|prAdapter|pr)\s*\.\s*create\s*\(/g,
-  /\b(?:potentialReviewerAdapter|potentialReviewer|prAdapter|pr)\s*\.\s*update\s*\(/g,
-  /\bcreatePotentialReviewer\s*\(/g,
-];
+// Receivers known to be the potential-reviewer adapter. A bare `upsertByEmail` is included
+// for test/alias imports and known adapter aliases may call `.upsertByEmail`, `.update`,
+// or `.create`; the generic method names stay qualified to avoid matching other adapters
+// that legitimately take an `email` field with no provenance concept.
 
 // Deliberate exemptions, each with its reason stated. Adding one requires arguing for it
 // here rather than quietly omitting a source. These two are NOT writers of application
@@ -46,6 +60,9 @@ const EXEMPT = new Set([
 function listFiles(dir) {
   const out = [];
   const stack = [path.join(ROOT, dir)];
+  if (!fs.existsSync(stack[0])) {
+    throw new Error(`email-source scanner root is missing: ${dir}`);
+  }
   while (stack.length) {
     const current = stack.pop();
     if (!fs.existsSync(current)) continue;
@@ -62,37 +79,50 @@ function listFiles(dir) {
   return out;
 }
 
-/** Balanced-brace slice of the first object literal after `from`, or null. */
-function objectLiteralAfter(text, from) {
-  const open = text.indexOf('{', from);
-  if (open === -1) return null;
-  // Bail if a ')' closes the call before any '{' — then there is no object literal arg.
-  const closeParen = text.indexOf(')', from);
-  if (closeParen !== -1 && closeParen < open) return null;
-  let depth = 0;
-  for (let i = open; i < text.length; i++) {
-    if (text[i] === '{') depth += 1;
-    else if (text[i] === '}') {
-      depth -= 1;
-      if (depth === 0) return text.slice(open, i + 1);
-    }
+function parseFile(file) {
+  const ast = parser.parse(fs.readFileSync(file, 'utf8'), {
+    sourceType: 'unambiguous',
+    plugins: ['jsx', 'importAssertions', 'topLevelAwait'],
+    errorRecovery: true,
+  });
+  // `errorRecovery` keeps a syntax the plugin list does not cover from throwing — but a
+  // partially-parsed file would be scanned partially and SILENTLY, which is the vacuous-pass
+  // failure this scanner exists to avoid. Zero of the 1053 scanned files produce errors
+  // today, so make a future one loud instead of invisible.
+  if (ast.errors?.length) {
+    const detail = ast.errors.slice(0, 3).map((e) => e.reasonCode || e.message).join(', ');
+    throw new Error(`email-source scanner could not fully parse ${path.relative(ROOT, file)}: ${detail}`);
   }
+  return ast;
+}
+
+function keyName(key) {
+  if (!key) return null;
+  if (key.type === 'Identifier') return key.name;
+  if (key.type === 'StringLiteral') return key.value;
   return null;
 }
 
-/** Balanced-brace slice of the object literal ENCLOSING `index`, or null. */
-function enclosingObjectLiteral(text, index) {
-  let depth = 0;
-  let open = -1;
-  for (let i = index; i >= 0; i--) {
-    if (text[i] === '}') depth += 1;
-    else if (text[i] === '{') {
-      if (depth === 0) { open = i; break; }
-      depth -= 1;
-    }
-  }
-  if (open === -1) return null;
-  return objectLiteralAfter(text, open);
+function hasObjectProperty(node, name) {
+  return node?.type === 'ObjectExpression'
+    && node.properties.some((prop) => prop.type === 'ObjectProperty' && keyName(prop.key) === name);
+}
+
+function calleeName(callee) {
+  if (callee?.type === 'Identifier') return callee.name;
+  if (callee?.type !== 'MemberExpression') return null;
+  const object = callee.object?.type === 'Identifier' ? callee.object.name : null;
+  const property = keyName(callee.property);
+  return object && property ? `${object}.${property}` : null;
+}
+
+function isPotentialReviewerWriteCallee(name) {
+  if (name === 'upsertByEmail' || name === 'createPotentialReviewer') return true;
+  return /^(potentialReviewerAdapter|potentialReviewer|prAdapter|pr)\.(create|update|upsertByEmail)$/.test(name || '');
+}
+
+function lineOf(node) {
+  return node.loc?.start?.line || 0;
 }
 
 /**
@@ -102,68 +132,87 @@ function enclosingObjectLiteral(text, index) {
  * excluded because they list fields comma-separated, without a colon.
  */
 function rawPayloadViolationsIn(file) {
-  const text = fs.readFileSync(file, 'utf8');
   const rel = path.relative(ROOT, file);
   if (EXEMPT.has(rel)) return [];
   const found = [];
-  const pattern = /wmkf_emailaddress\s*:/g;
-  let match = pattern.exec(text);
-  while (match) {
-    const literal = enclosingObjectLiteral(text, match.index);
-    if (literal && !/wmkf_emailsource/.test(literal)) {
-      const line = text.slice(0, match.index).split('\n').length;
-      found.push(`${rel}:${line} — raw payload sets wmkf_emailaddress with no wmkf_emailsource`);
+  const ast = parseFile(file);
+  walk(ast.program, 'ObjectExpression', (object) => {
+    if (hasObjectProperty(object, 'wmkf_emailaddress') && !hasObjectProperty(object, 'wmkf_emailsource')) {
+      found.push(`${rel}:${lineOf(object)} — raw payload sets wmkf_emailaddress with no wmkf_emailsource`);
     }
-    match = pattern.exec(text);
-  }
+  });
   return found;
 }
 
 function violationsIn(file) {
-  const text = fs.readFileSync(file, 'utf8');
   const rel = path.relative(ROOT, file);
   if (EXEMPT.has(rel)) return [];
   const found = [];
-  for (const pattern of CALL_PATTERNS) {
-    pattern.lastIndex = 0;
-    let match = pattern.exec(text);
-    while (match) {
-      const literal = objectLiteralAfter(text, match.index + match[0].length - 1);
-      if (literal && /(^|[^a-zA-Z])email\s*[:,}]/.test(literal) && !/emailSource/.test(literal)) {
-        const line = text.slice(0, match.index).split('\n').length;
-        found.push(`${rel}:${line} — ${match[0].trim()} passes an address with no emailSource`);
+  const ast = parseFile(file);
+  walk(ast.program, 'CallExpression', (call) => {
+    const name = calleeName(call.callee);
+    if (!isPotentialReviewerWriteCallee(name)) return;
+    for (const arg of call.arguments) {
+      if (hasObjectProperty(arg, 'email') && !hasObjectProperty(arg, 'emailSource')) {
+        found.push(`${rel}:${lineOf(arg)} — ${name} passes an address with no emailSource`);
       }
-      match = pattern.exec(text);
     }
-  }
+  });
   return found;
 }
 
 test('every potential-reviewer write that sets an address also sets its provenance', () => {
-  const violations = SCAN_DIRS.flatMap((dir) => listFiles(dir).flatMap(violationsIn));
+  const files = SCAN_DIRS.flatMap(listFiles);
+  expect(files.length).toBeGreaterThan(0);
+  const violations = files.flatMap(violationsIn);
   expect(violations).toEqual([]);
 });
 
 test('no raw Dataverse payload sets the address field without its source field', () => {
-  const violations = SCAN_DIRS.flatMap((dir) => listFiles(dir).flatMap(rawPayloadViolationsIn));
+  const files = SCAN_DIRS.flatMap(listFiles);
+  expect(files.length).toBeGreaterThan(0);
+  const violations = files.flatMap(rawPayloadViolationsIn);
   expect(violations).toEqual([]);
 });
 
+/** Run the real call-site detector over a source string. */
+function detectInSource(source) {
+  const ast = parser.parse(source, { sourceType: 'unambiguous' });
+  const found = [];
+  walk(ast.program, 'CallExpression', (call) => {
+    const name = calleeName(call.callee);
+    if (!isPotentialReviewerWriteCallee(name)) return;
+    for (const arg of call.arguments) {
+      if (hasObjectProperty(arg, 'email') && !hasObjectProperty(arg, 'emailSource')) {
+        found.push(`${name}@${lineOf(arg)}`);
+      }
+    }
+  });
+  return found;
+}
+
 test('the scanner actually detects the shape it guards (would fail if the guard were empty)', () => {
-  // Positive control: the exact shape both reviews found in production code.
-  const sample = `
+  // Positive control: the exact shape the reviews found in production code.
+  expect(detectInSource(`
     const { id } = await potentialReviewerAdapter.upsertByEmail({
       name: row.name,
       email: row.email,
       affiliation: row.affiliation,
     });
-  `;
-  const literal = objectLiteralAfter(sample, sample.indexOf('upsertByEmail('));
-  expect(literal).toContain('email:');
-  expect(literal).not.toContain('emailSource');
+  `)).toHaveLength(1);
 
   // …and does NOT flag the paired shape.
-  const paired = `await potentialReviewerAdapter.update(id, { email, emailSource: 'manual' });`;
-  const pairedLiteral = objectLiteralAfter(paired, paired.indexOf('update('));
-  expect(/emailSource/.test(pairedLiteral)).toBe(true);
+  expect(detectInSource(
+    `await potentialReviewerAdapter.update(id, { email, emailSource: 'manual' });`,
+  )).toEqual([]);
+
+  // Shapes a regex/brace scanner got wrong and an AST walk must not: an address inside a
+  // template string, a comment, or a regex containing braces is NOT a write.
+  expect(detectInSource('const q = `upsertByEmail({ email: x })`;')).toEqual([]);
+  expect(detectInSource('// potentialReviewerAdapter.update(id, { email: x })')).toEqual([]);
+  expect(detectInSource('const re = /update\\(id, \\{ email: x \\}\\)/;')).toEqual([]);
+  // …and a NESTED literal must not hide a violation from the walk.
+  expect(detectInSource(`
+    await potentialReviewerAdapter.update(id, { email: e, meta: { emailSource: 'manual' } });
+  `)).toHaveLength(1);
 });
