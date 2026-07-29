@@ -9,8 +9,12 @@ const {
   provenanceLabelForCandidate,
   hasGroundedProvenanceRankingBonus,
   isIdentityReviewExemptProvenance,
+  requiresStaffIdentityConfirmation,
   PROVENANCE_KINDS,
 } = require('../../lib/utils/reviewer-provenance');
+// The client selectability gate is asserted against the server predicate in this file so
+// the two can never drift apart silently again (S387).
+const { isCandidateSelectable } = require('../../shared/components/reviewers/reviewer-search-logic');
 
 describe('reviewer provenance DTO helper', () => {
   test('maps literature candidates to ordered scholarly sources plus provenance kind for save', () => {
@@ -171,5 +175,80 @@ describe('referred provenance (S249)', () => {
     const provenanceWithoutReferrer = { kind: 'referred', sources: [], seedRole: 'referred_by', groundingWorkIds: [] };
     const p = buildReviewerProvenance({ name: 'X', provenance: provenanceWithoutReferrer, referredBy: 'Dr. Abby Doyle' });
     expect(p.referredBy).toBe('Dr. Abby Doyle');
+  });
+});
+
+// S387: an applicant card was selectable while the promotion route 422'd it — the client
+// group test read three of the server gate's four clauses. These lock the two clauses that
+// were missing, and lock the group ↔ server-gate equivalence itself.
+describe('applicant identity gate parity with promote-applicant-reviewer', () => {
+  const applicant = (extra) => ({ name: 'Applicant Pick', isApplicantRecommended: true, ...extra });
+
+  test('institutionMismatch routes an applicant row to needs identity review', () => {
+    const candidate = applicant({ institutionMismatch: true });
+    expect(requiresStaffIdentityConfirmation(candidate)).toBe(true);
+    expect(provenanceGroupOf(candidate)).toBe('needs_identity_review');
+    expect(isCandidateSelectable(candidate)).toBe(false);
+  });
+
+  test('an identityStatus outside confirmed/probable routes to needs identity review', () => {
+    for (const identityStatus of ['ambiguous', 'abstain', 'unknown']) {
+      const candidate = applicant({ identityStatus });
+      expect(requiresStaffIdentityConfirmation(candidate)).toBe(true);
+      expect(provenanceGroupOf(candidate)).toBe('needs_identity_review');
+      expect(isCandidateSelectable(candidate)).toBe(false);
+    }
+  });
+
+  test('the enrichment identity verdict is read when no top-level identityStatus is persisted', () => {
+    const candidate = applicant({ contactEnrichment: { identity: { status: 'ambiguous' } } });
+    expect(requiresStaffIdentityConfirmation(candidate)).toBe(true);
+    expect(provenanceGroupOf(candidate)).toBe('needs_identity_review');
+  });
+
+  test('a resolved applicant row stays selectable in its own group', () => {
+    for (const identityStatus of ['confirmed', 'probable']) {
+      const candidate = applicant({ identityStatus });
+      expect(requiresStaffIdentityConfirmation(candidate)).toBe(false);
+      expect(provenanceGroupOf(candidate)).toBe('applicant_suggested');
+      expect(isCandidateSelectable(candidate)).toBe(true);
+    }
+  });
+
+  test('a staff-confirmed applicant row becomes selectable again', () => {
+    const candidate = applicant({ institutionMismatch: true, pdIdentityConfirmed: true });
+    expect(requiresStaffIdentityConfirmation(candidate)).toBe(true);
+    expect(provenanceGroupOf(candidate)).toBe('applicant_suggested');
+    expect(isCandidateSelectable(candidate)).toBe(true);
+  });
+
+  // The defect was a selectable card the server refuses. Assert the equivalence over the
+  // whole flag cross-product, so re-adding a clause to one side alone fails here.
+  test('no applicant row is selectable while the server gate would refuse it', () => {
+    const values = [undefined, true, false];
+    const statuses = [null, 'confirmed', 'probable', 'unresolved', 'ambiguous', 'abstain'];
+    for (const needsIdentification of values) {
+      for (const institutionMismatch of values) {
+        for (const identityStatus of statuses) {
+          for (const verificationStatus of [null, 'unresolved', 'verified']) {
+            const candidate = applicant({
+              needsIdentification, institutionMismatch, identityStatus, verificationStatus,
+            });
+            const serverWouldRefuse = requiresStaffIdentityConfirmation(candidate);
+            expect(isCandidateSelectable(candidate)).toBe(!serverWouldRefuse);
+          }
+        }
+      }
+    }
+  });
+
+  // Guardrail for the deliberate narrowing: the other kinds must NOT inherit this gate,
+  // because save-candidates gates on the explicit unresolved markers instead.
+  test('institutionMismatch alone does not gate a literature-retrieved row', () => {
+    const candidate = {
+      name: 'Lit Row', source: 'claude_suggestion', verificationSource: 'pubmed',
+      identityStatus: 'confirmed', institutionMismatch: true,
+    };
+    expect(provenanceGroupOf(candidate)).toBe('literature_retrieved');
   });
 });

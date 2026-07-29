@@ -18,6 +18,10 @@ const SOURCE_LABELS = {
   orcid: 'ORCID',
   pubmed: 'PubMed',
   manual_probe: 'manual probe',
+  // S387: contact carried over from a superseded duplicate roster row (see
+  // scripts/dedupe-reviewer-roster-suggestion-twins.mjs). Labeled honestly — it was
+  // found by an earlier enrichment run of this same request, not by a live search.
+  prior_enrichment: 'earlier enrichment run',
 };
 
 export function leadSourceLabel(source) {
