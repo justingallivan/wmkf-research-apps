@@ -306,10 +306,11 @@ SharePoint/Dataverse replacement mechanism remain open. Recording, transcript,
 transcript summary, and staff observations remain staff- or system-side
 categories and are never manageable through this link.
 
-The email's **To/CC** model does not by itself decide portal authorization.
-Whether a copied liaison receives file-management rights, receives an
-independent contact-bound link, or receives notification only remains an open
-security/product decision.
+The email contains one shared request-scoped bearer link. Both the **To** and
+**CC** recipients may use it and manage the same applicant-material file list.
+The system records actions against the request/link, but without sign-in or
+separate personalized links it must not claim whether the PI or liaison
+performed a particular action.
 
 A successful applicant-material change should notify the lead PD and other
 designated staff. The exact additional staff audience, event batching, and
@@ -465,9 +466,9 @@ Decision order:
    paste-friendly observations shape, and basic applicant file-management
    behavior are owner-decided. The materials request is a manual staff action,
    not a date-driven automatic send. Next freeze the authorized staff roles,
-   sender identity, CC/link-entitlement behavior, timing/expiry,
-   applicant-file ownership and recovery, and recording/transcript/summary
-   contracts plus persistence and access.
+   sender identity, timing/expiry, applicant-file recovery and shared-link
+   audit behavior, and recording/transcript/summary contracts plus persistence
+   and access.
 3. **Final Writeup** — freeze the selected-Pre-Site copy/lineage contract and
    the visit, late-review, and editorial inputs.
 4. **Initial Assessment** — design for every in-scope J27 proposal before
@@ -597,7 +598,9 @@ Owner-decided:
     and
 25. request recipients are selected from the Dataverse-linked liaison and PI,
     normally the liaison in To, with the option to address the PI and copy the
-    liaison.
+    liaison; and
+26. To and CC recipients share one request-scoped link and may manage the same
+    applicant-material files, without person-level action attribution.
 
 Still required:
 
@@ -609,11 +612,11 @@ Still required:
 5. exact Dataverse schema and dossier read model for the decided Site Visit
    metadata, material categories, and observations;
 6. Site Visit Materials Upload authorized staff roles, visible sender/reply-to,
-   missing/duplicate contact handling, whether CC confers portal access,
-   lifecycle timing, token expiry/revocation, cross-contact file visibility,
-   file size/count limits, destination, delete/replace persistence and
-   recovery, idempotency, partial-failure recovery, exact notification
-   audience/timing, audit, and retention;
+   missing/duplicate contact handling, lifecycle timing, token
+   expiry/revocation, shared-link audit disclosure, file size/count limits,
+   destination, delete/replace persistence and recovery, idempotency,
+   partial-failure recovery, exact notification audience/timing, audit, and
+   retention;
 7. approved transcription provider/output contract, summary quality fallback,
    and transcript/summary refresh behavior;
 8. Final Writeup creation inputs and source-version selection behavior; and

@@ -213,9 +213,11 @@ Minimum whole-flow invariants:
    and optionally copy the liaison. The server resolves the selected contacts
    and current email addresses from Dataverse at send time; the minimum product
    has no free-form recipient requirement. Missing/duplicate contact handling
-   remains open. To/CC does not itself grant portal rights: whether a copied
-   liaison receives an independent link, shared management rights, or
-   notification only remains a separate decision.
+   remains open. The message contains one shared request-scoped bearer link;
+   both To and CC recipients may use it and manage the same applicant-material
+   file list. Without sign-in or separate personalized links, audit can identify
+   the request/link but cannot attribute an action reliably to the PI or
+   liaison.
 3. The external recipient sees only the request identity, instructions, and
    the permitted **applicant slides** and **other applicant materials**
    categories. The recipient cannot upload recordings, transcripts, transcript
@@ -235,9 +237,9 @@ Minimum whole-flow invariants:
    Staff must see a retryable, auditable state rather than an unregistered
    orphan or false success.
 8. Additional uploads are allowed while access remains active. The external
-   surface lists only the applicant files the token holder is authorized to
-   manage and supports explicit delete and replace actions. Exact visibility
-   and management rights across multiple applicant contacts remain open.
+   surface lists the shared applicant files authorized by the request-scoped
+   link and supports explicit delete and replace actions for both To and CC
+   recipients.
 9. A replacement first uploads and registers the new file successfully; only
    then may the prior file be retired or recycled. A failed replacement leaves
    the prior file intact. Delete and replacement accept only a server-resolved
@@ -248,10 +250,10 @@ Minimum whole-flow invariants:
    timing remain open.
 
 Exact authorized staff roles, sender/reply-to, missing/duplicate contact
-handling, CC/link-entitlement behavior, lifecycle timing, token implementation
-and expiry, cross-contact file-management scope, schema, folder, size/count
-limits, notification audience/timing, retention, and delete/replace persistence
-and recovery behavior remain open design decisions.
+handling, lifecycle timing, token implementation and expiry, shared-link audit
+disclosure, schema, folder, size/count limits, notification audience/timing,
+retention, and delete/replace persistence and recovery behavior remain open
+design decisions.
 
 ### Cycle-wide Editor Dashboard contract
 

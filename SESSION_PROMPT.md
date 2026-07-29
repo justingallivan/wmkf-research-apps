@@ -149,13 +149,15 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    staff user manually triggers the request; entering or changing the Site
    Visit date never sends it automatically. Recipient choices are the
    Dataverse-linked liaison and PI—normally liaison in To, or PI in To with
-   liaison optionally copied. Exact requester roles, visible sender/reply-to,
-   CC/link entitlement, timing, expiry, cross-contact file scope, size/count
-   limits, and notification audience remain open. Pre-Site distributions and
-   Final remain linked writeups rather than Site Visit material categories.
-   This narrow request-scoped applicant-material link does not reopen the
-   parked general intake product. Prefer an acceptable transcription-platform
-   summary before a deliberate suite LLM fallback.
+   liaison optionally copied. To and CC share one request-scoped link and may
+   manage the same file list; without sign-in or personalized links, the audit
+   does not promise PI-versus-liaison attribution. Exact requester roles,
+   visible sender/reply-to, timing, expiry, shared-link audit disclosure,
+   size/count limits, and notification audience remain open. Pre-Site
+   distributions and Final remain linked writeups rather than Site Visit
+   material categories. This narrow request-scoped applicant-material link
+   does not reopen the parked general intake product. Prefer an acceptable
+   transcription-platform summary before a deliberate suite LLM fallback.
    Pre-Site inputs are also owner-decided: use the full proposal through an
    iterated governed `phase-ii.summarize`, authoritative request metadata from
    Dataverse, and `review-synthesis.generate` over all currently submitted
@@ -176,8 +178,8 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    and delivery date remain open.
    Exact schema/read model, first Pre-Site prompt/template pair, library
    configuration, later-stage inputs, upload requester permissions,
-   sender/CC-entitlement/timing/expiry and token/validation/recovery behavior,
-   and transcript-summary quality contract are still open.
+   sender/timing/expiry and token/validation/recovery behavior, shared-link
+   audit disclosure, and transcript-summary quality contract are still open.
 
 ### Owner Decision Needed
 

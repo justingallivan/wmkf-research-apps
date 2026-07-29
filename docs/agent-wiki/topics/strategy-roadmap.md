@@ -88,8 +88,10 @@ document inventory, and individual implementation plans do not establish priorit
   plus other designated staff. An authorized staff user manually triggers the
   request; a visit-date change never sends it automatically. Recipient choices
   are the Dataverse-linked liaison and PI—normally liaison in To, or PI in To
-  with liaison optionally copied. Exact requester roles, sender identity,
-  CC/link entitlement, timing, expiry, cross-contact file scope, limits, and
+  with liaison optionally copied. To and CC share one request-scoped link and
+  may manage the same file list; without sign-in or personalized links, the
+  audit does not promise PI-versus-liaison attribution. Exact requester roles,
+  sender identity, timing, expiry, shared-link audit disclosure, limits, and
   notification audience remain open. Prefer an acceptable
   transcription-platform summary before a deliberate suite LLM fallback.
   Exact token, schema/read model, validation, folder, retention,
