@@ -211,7 +211,11 @@ Minimum whole-flow invariants:
    to exactly 60 days after a successful invitation send; staff do not enter or
    edit the expiry, and moving the Site Visit date has no effect. The token
    supports revocation and cannot be supplied as an arbitrary destination
-   selector.
+   selector. Resend is available only for a current active link, reuses that
+   link, and preserves its original expiry. Reissue deliberately revokes the
+   prior link, creates a replacement, and starts a fresh 60-day period from the
+   successful replacement send. Expired or revoked links require reissue, not
+   resend.
 2. Recipient choices are the request's Dataverse-linked liaison and PI. The
    normal default is the liaison in **To**; staff may instead address the PI
    and optionally copy the liaison. The server resolves the selected contacts
@@ -254,10 +258,10 @@ Minimum whole-flow invariants:
    timing remain open.
 
 Exact authorized staff roles, sender/reply-to, missing/duplicate contact
-handling, resend/reissue and revocation behavior, shared-link audit disclosure,
-schema, folder, size/count limits, notification audience/timing, retention,
-and delete/replace persistence and recovery behavior remain open design
-decisions.
+handling, standalone revocation and failed-reissue recovery, shared-link audit
+disclosure, schema, folder, size/count limits, notification audience/timing,
+retention, and delete/replace persistence and recovery behavior remain open
+design decisions.
 
 ### Cycle-wide Editor Dashboard contract
 

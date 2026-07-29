@@ -293,6 +293,13 @@ server sets link expiration to exactly 60 days after the invitation is
 successfully sent. Staff do not enter or edit an expiry date, and moving the
 Site Visit date does not change the expiration.
 
+While the current link is active, **Resend invitation** sends that same link
+again and retains its original expiration. It never silently extends access.
+**Reissue link** is a separate deliberate action that revokes the prior link,
+creates a replacement, and starts a new 60-day period from the successful
+reissue send. An expired or revoked link cannot be resent as though it were
+active; staff must reissue.
+
 The recipient sees only the request identity, upload instructions, permitted
 material types, and the applicant files they are authorized to manage. The
 recipient must not select a Dataverse record, SharePoint folder, or destination
@@ -471,9 +478,9 @@ Decision order:
    paste-friendly observations shape, and basic applicant file-management
    behavior are owner-decided. The materials request is a manual staff action,
    not a date-driven automatic send. Next freeze the authorized staff roles,
-   sender identity, resend/reissue behavior, applicant-file recovery and
-   shared-link audit behavior, and recording/transcript/summary contracts plus
-   persistence and access.
+   sender identity, standalone revocation and failed-reissue recovery,
+   applicant-file recovery and shared-link audit behavior, and
+   recording/transcript/summary contracts plus persistence and access.
 3. **Final Writeup** — freeze the selected-Pre-Site copy/lineage contract and
    the visit, late-review, and editorial inputs.
 4. **Initial Assessment** — design for every in-scope J27 proposal before
@@ -611,7 +618,10 @@ Owner-decided:
     window, without waiting for reviews, synthesis, or a Pre-Site Writeup; and
 28. link expiration is exactly 60 days after a successful invitation send,
     requires no staff-entered date, and is unaffected by Site Visit
-    rescheduling.
+    rescheduling; and
+29. Resend reuses an active link without extending its original expiration,
+    while Reissue revokes the prior link and starts a fresh 60-day period from
+    the successful replacement send.
 
 Still required:
 
@@ -623,10 +633,11 @@ Still required:
 5. exact Dataverse schema and dossier read model for the decided Site Visit
    metadata, material categories, and observations;
 6. Site Visit Materials Upload authorized staff roles, visible sender/reply-to,
-   missing/duplicate contact handling, resend/reissue and revocation behavior,
-   shared-link audit disclosure, file size/count limits, destination,
-   delete/replace persistence and recovery, idempotency, partial-failure
-   recovery, exact notification audience/timing, audit, and retention;
+   missing/duplicate contact handling, standalone revocation and failed-reissue
+   recovery, shared-link audit disclosure, file size/count limits,
+   destination, delete/replace persistence and recovery, idempotency,
+   partial-failure recovery, exact notification audience/timing, audit, and
+   retention;
 7. approved transcription provider/output contract, summary quality fallback,
    and transcript/summary refresh behavior;
 8. Final Writeup creation inputs and source-version selection behavior; and

@@ -61,15 +61,17 @@ attribution. Visits are scheduled promptly after advancement around reviewer
 invitations; once the date is recorded, staff may send without waiting for
 reviews, synthesis, or a Pre-Site Writeup. Expiration is automatically 60 days
 after successful send, requires no staff-entered date, and is unaffected by
-visit rescheduling. Exact requester roles, visible sender/reply-to,
-resend/revocation behavior, shared-link audit disclosure, size/count limits,
-and notification audience remain open. Pre-Site distributions and Final remain
-linked writeups, not dossier material categories. The narrow expiring
-request-scoped applicant-material upload link does not reopen the parked
-general applicant-intake product. Prefer an acceptable transcription-platform
-summary before a deliberate suite LLM fallback. Implementation, schema/read
-model, token/validation/recovery behavior, and summary-quality contracts
-remain planned. Current authority is
+visit rescheduling. Resend preserves the active link and original expiry;
+Reissue revokes it and starts a fresh 60-day period. Exact requester roles,
+visible sender/reply-to, standalone revocation/failed-reissue recovery,
+shared-link audit disclosure, size/count limits, and notification audience
+remain open. Pre-Site distributions and Final remain linked writeups, not
+dossier material categories. The narrow expiring request-scoped
+applicant-material upload link does not reopen the parked general
+applicant-intake product. Prefer an acceptable transcription-platform summary
+before a deliberate suite LLM fallback. Implementation, schema/read model,
+token/validation/recovery behavior, and summary-quality contracts remain
+planned. Current authority is
 `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` and
 `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
 

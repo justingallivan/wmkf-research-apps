@@ -156,13 +156,14 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    recorded, staff may send without waiting for reviews, synthesis, or a
    Pre-Site Writeup. Expiration is automatically 60 days after successful send,
    requires no staff-entered date, and is unaffected by visit rescheduling.
-   Exact requester roles, visible sender/reply-to, resend/revocation behavior,
-   shared-link audit disclosure, size/count limits, and notification audience
-   remain open. Pre-Site distributions and Final remain linked writeups rather
-   than Site Visit material categories. This narrow request-scoped
-   applicant-material link does not reopen the parked general intake product.
-   Prefer an acceptable transcription-platform summary before a deliberate
-   suite LLM fallback.
+   Resend preserves the active link and original expiry; Reissue revokes it and
+   starts a fresh 60-day period. Exact requester roles, visible
+   sender/reply-to, standalone revocation/failed-reissue recovery, shared-link
+   audit disclosure, size/count limits, and notification audience remain open.
+   Pre-Site distributions and Final remain linked writeups rather than Site
+   Visit material categories. This narrow request-scoped applicant-material
+   link does not reopen the parked general intake product. Prefer an acceptable
+   transcription-platform summary before a deliberate suite LLM fallback.
    Pre-Site inputs are also owner-decided: use the full proposal through an
    iterated governed `phase-ii.summarize`, authoritative request metadata from
    Dataverse, and `review-synthesis.generate` over all currently submitted
@@ -183,8 +184,9 @@ deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready and aliased to
    and delivery date remain open.
    Exact schema/read model, first Pre-Site prompt/template pair, library
    configuration, later-stage inputs, upload requester permissions,
-   sender/resend/revocation and token/validation/recovery behavior, shared-link
-   audit disclosure, and transcript-summary quality contract are still open.
+   sender/standalone-revocation/failed-reissue and token/validation/recovery
+   behavior, shared-link audit disclosure, and transcript-summary quality
+   contract are still open.
 
 ### Owner Decision Needed
 
