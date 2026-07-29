@@ -198,6 +198,60 @@ marker. The Final Writeup may expose a soft, optional Reviewed acknowledgement
 for expected readers, but that signal is not an approval/sign-off gate.
 Board-ready freeze remains a separate owner-controlled milestone.
 
+### Initial Assessment source and first-template contract
+
+**[VERIFIED 2026-07-28 via four owner-supplied D26 Phase I Word examples,
+current source, and a read-only production Dataverse probe; implementation
+PLANNED.]** The D26 examples provide the starting content contract for the J27
+Initial Assessment. Each is a one-page Word document with this sequence:
+
+1. the italic house-style Keck title beginning **“To …”**;
+2. the institution display name;
+3. **Summary** narrative;
+4. a **Rationale** heading; and
+5. four labeled rationale bullets: **Significance & Impact**, **Research
+   Plan**, **Team Expertise**, and **Foundation Opportunity**.
+
+The AI drafts Summary, Significance & Impact, Research Plan, and Team
+Expertise from the approved proposal inputs. **Foundation Opportunity is a
+staff-authored section.** Generation must create a clearly visible editable
+slot for it and mark staff completion as outstanding; the model must not
+invent Foundation Opportunity prose merely to make the document appear
+complete.
+
+The two heading values are authoritative Dataverse metadata rather than model
+output:
+
+- **Institution:** use `akoya_request.wmkf_organizationname` when populated,
+  otherwise the formatted applicant lookup
+  `_akoya_applicantid_value_formatted`. The current Workbench resolver already
+  applies this fallback. All four supplied D26 example rows have a null direct
+  organization-name field and obtain the expected institution display name
+  from the applicant lookup.
+- **Keck title:** use
+  `akoya_request.wmkf_wmkfprojectdescription`, not the applicant's proposal
+  title in `akoya_title`. Production rows `1002912`, `1002874`, `1002903`, and
+  `1002959` contain the exact “To …” titles displayed in the four supplied
+  Word examples.
+
+The current Workbench request resolver selects `akoya_title` but does not yet
+select `wmkf_wmkfprojectdescription`; the Initial Assessment read contract
+must add the Keck-title field explicitly. The existing governed
+`grantee-title.generate` producer derives the Keck title from `akoya_title`
+plus `wmkf_abstract` and persists it only when the destination is empty.
+However, its automatic cron currently considers only Research requests whose
+Phase I status is already **Invited**. That is too late to guarantee a title
+for every J27 Initial Assessment, which must exist before the advancement
+decision. The product still needs an explicit missing-title rule: either run
+the governed title producer as a safe no-overwrite precursor to Initial
+Assessment generation, or block and require staff to supply the field.
+
+These examples establish the first semantic structure, not a permanently
+hard-coded layout. The actual Word implementation remains a versioned,
+replaceable template with recorded template/prompt provenance so spacing,
+styles, labels, and future cycle structures can change without rewriting prior
+artifacts.
+
 ### Pre Site Visit input, regeneration, and template contract
 
 **[VERIFIED via owner decisions 2026-07-28; document pipeline PLANNED.]**
@@ -762,7 +816,14 @@ Owner-decided:
     covers real proposal/metadata inputs, governed generation, SharePoint Word
     creation and human editing, Dataverse registry/provenance, Workbench
     discovery/opening, staff-wide Editor Dashboard discovery/opening, and one
-    safe failure/retry path; it does not require later lifecycle tabs.
+    safe failure/retry path; it does not require later lifecycle tabs;
+41. the starting Initial Assessment structure is a one-page Word document with
+    the Keck “To …” title, institution, Summary, and a Rationale comprising
+    Significance & Impact, Research Plan, Team Expertise, and Foundation
+    Opportunity; and
+42. Foundation Opportunity is a visibly incomplete staff-authored slot, while
+    the institution and Keck title come from authoritative Dataverse metadata
+    rather than model inference.
 
 Still required:
 
@@ -785,4 +846,8 @@ Still required:
 8. exact safe regeneration behavior and any additional Final Writeup inputs
    beyond copying the latest Pre-Site version; and
 9. Editor Dashboard Reviewed-marker granularity, coordinator view, app/file
-   access enforcement, and restore authority.
+   access enforcement, and restore authority; and
+10. the Initial Assessment governed prompt/template pair and the rule for a
+    missing `wmkf_wmkfprojectdescription` before advancement, because the
+    current automatic title cron runs only after Phase I status becomes
+    Invited.

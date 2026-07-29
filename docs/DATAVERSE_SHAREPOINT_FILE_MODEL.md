@@ -130,6 +130,25 @@ generated artifact records both template and prompt versions. New structural
 requirements publish a compatible prompt/template pair for future generations
 without altering the historical layout or meaning of existing documents.
 
+The starting Initial Assessment template is derived from four owner-supplied
+D26 Phase I examples verified on 2026-07-28. It targets one page and contains
+the Keck “To …” title, institution, Summary, and a Rationale with Significance
+& Impact, Research Plan, Team Expertise, and Foundation Opportunity. The AI
+drafts the first three rationale sections and the Summary. Foundation
+Opportunity is an explicit staff-authored slot and must remain visibly
+outstanding until staff fills it; model-generated filler is not authoritative.
+
+Institution and Keck title are structured inputs, not prose to infer. Resolve
+institution from `akoya_request.wmkf_organizationname`, falling back to the
+formatted applicant lookup. Resolve the Keck title from
+`akoya_request.wmkf_wmkfprojectdescription`, not `akoya_title`. A read-only
+production probe matched the four example documents to their exact stored
+Keck titles; those four rows used the applicant-lookup fallback for institution.
+The existing title cron does not guarantee pre-advancement availability because
+it fills empty Keck titles only after a Research request becomes Phase I
+Invited. The Initial Assessment producer therefore still needs an approved
+missing-title rule before its prompt/template contract is complete.
+
 Staff collaborators use the canonical SharePoint Word file. External Board
 members or consultants who join a visit receive a PDF attachment representing
 an exact frozen Pre-Site version. An anonymous or guest SharePoint document
