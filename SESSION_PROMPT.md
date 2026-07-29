@@ -158,10 +158,19 @@ Assessment pilot by 2026-08-10. The design work is committed and pushed on
 
 ### Verify Before Acting
 
-1. A fresh office clone of `main` must resolve to `5c685da7` or a later commit
-   before `/start`; no feature-branch switch is now required.
-2. Restore `.env.local`, run `npm ci`, and let `/start` verify the per-machine
-   memory and `.agents/skills` symlinks before feature work.
+1. DONE (Session 352, 2026-07-29) — the office machine is synced and verified;
+   no clone was needed. The fresh-clone instruction above was wrong for this
+   machine: `~/Code/WMKF_Apps` had existed since 2026-05-27, so git refused the
+   non-empty destination and the clone nested a redundant second repo (since
+   removed). For a returning machine the order is `/start` (which syncs) THEN
+   `npm ci` — never install before sync, and never `npm audit fix --force`.
+   See `.claude-memory/feedback-returning-machine-sync-before-install.md`.
+2. DONE (Session 352) — `.env.local` restored by the owner, `npm ci` clean at
+   0 vulnerabilities, both per-machine symlinks verified. 56 of the 57 `check:*`
+   scripts ran green (32 main gates + 24 self-tests); only `check:memory-drift`
+   was skipped, deliberately, in favor of the read-only `check:memory-drift:no-write`.
+   One pre-existing red gate was fixed in `d1fb6f15`. Tests 6319/6319, lint 0
+   errors, production build succeeds.
 3. Re-probe live Dataverse/SharePoint state before schema, migration, or
    production claims. The new Initial Assessment flow remains planned.
 4. Re-read the live governed prompt rows before publishing or modifying any

@@ -47,5 +47,12 @@ audit claim by extracting both lockfiles to a scratch dir and running
 `npm audit --package-lock-only` on each, rather than trusting the advisory count
 in the working tree.
 
+Prior art that already knew this but was not reachable from the startup path:
+`docs/security-audit/SECURITY_AUDIT_2026-06-11.md` lines 247 and 279 warned that
+`npm audit fix --force` "proposed breaking/downgrade-like changes" and named
+`exceljs` as needing deliberate update review — 7 weeks before `exceljs` was in
+fact force-downgraded. Guidance buried in an audit doc does not fire at the
+moment of need; that is why this lives in the memory router.
+
 Ground truth: `~/.bash_history`, `git reflog --date=iso`, `stat -f %SB .git`;
 cross-refs [[project-dev-environment]], [[feedback-verify-branch-before-git-action]].
