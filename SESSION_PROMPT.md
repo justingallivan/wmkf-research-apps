@@ -6,7 +6,7 @@ Session 385 closed the review-synthesis production rollout, worked through the
 remaining Request Workbench lifecycle design questions with the owner, and
 established the first deadline-bound delivery slice: a human-in-the-loop Initial
 Assessment pilot by 2026-08-10. The design work is committed and pushed on
-`codex/review-synthesis-auto-rollout-record`; it has not been merged to `main`.
+`main` through merge commit `5c685da7`.
 
 ### What Was Completed
 
@@ -69,13 +69,12 @@ Assessment pilot by 2026-08-10. The design work is committed and pushed on
      layout contract.
 
 5. **Multi-machine handoff**
-   - The feature branch was pushed and matched its remote at `d2e68229` before
-     this `/stop` update.
+   - The feature history was reconciled with the content-identical rollout
+     commit already on `main`, then fast-forwarded to `main` as `5c685da7`.
    - The owner has separately preserved `.env.local` in an editable/restorable
      format.
-   - On the office machine, clone and switch to
-     `codex/review-synthesis-auto-rollout-record` before invoking `/start`.
-     `/start` deliberately will not switch away from `main` automatically.
+   - On the office machine, a fresh clone of the default `main` branch contains
+     this handoff. Restore `.env.local`, run `npm ci`, and then invoke `/start`.
 
 ### Commits
 
@@ -99,6 +98,8 @@ Assessment pilot by 2026-08-10. The design work is committed and pushed on
 - `8470d1d5` — Define August Initial Assessment pilot
 - `be27fdd1` — Define Initial Assessment template inputs
 - `d2e68229` — Use applicant title for Initial Assessments
+- `0f7e16e5` — Document Session 385 and create Session 386 prompt
+- `5c685da7` — Reconcile the feature history with `main`
 
 ## Next Items
 
@@ -151,9 +152,8 @@ Assessment pilot by 2026-08-10. The design work is committed and pushed on
 
 ### Verify Before Acting
 
-1. The office clone must switch to
-   `codex/review-synthesis-auto-rollout-record` before `/start`; a fresh clone
-   otherwise begins on `main` and will not see this session handoff.
+1. A fresh office clone of `main` must resolve to `5c685da7` or a later commit
+   before `/start`; no feature-branch switch is now required.
 2. Restore `.env.local`, run `npm ci`, and let `/start` verify the per-machine
    memory and `.agents/skills` symlinks before feature work.
 3. Re-probe live Dataverse/SharePoint state before schema, migration, or
