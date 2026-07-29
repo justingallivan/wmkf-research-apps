@@ -206,16 +206,17 @@ Minimum whole-flow invariants:
    Site Visits are scheduled promptly after advancement, roughly when reviewer
    invitations begin. Once the date is recorded, the action is available and
    staff chooses when to send; review receipt, synthesis, and Pre-Site Writeup
-   readiness are not gates. Exact staff-role eligibility and visible
-   sender/reply-to remain product decisions. The server sets token expiration
-   to exactly 60 days after a successful invitation send; staff do not enter or
-   edit the expiry, and moving the Site Visit date has no effect. The token
-   supports revocation and cannot be supplied as an arbitrary destination
-   selector. Resend is available only for a current active link, reuses that
-   link, and preserves its original expiry. Reissue deliberately revokes the
-   prior link, creates a replacement, and starts a fresh 60-day period from the
-   successful replacement send. Expired or revoked links require reissue, not
-   resend.
+   readiness are not gates. Any authenticated staff member with access to the
+   Workbench Site Visit workflow may send, resend, or reissue; there is no
+   lead-PD or administrative-role restriction. Visible sender/reply-to remains
+   a product decision. The server sets token expiration to exactly 60 days
+   after a successful invitation send; staff do not enter or edit the expiry,
+   and moving the Site Visit date has no effect. The token supports revocation
+   and cannot be supplied as an arbitrary destination selector. Resend is
+   available only for a current active link, reuses that link, and preserves
+   its original expiry. Reissue deliberately revokes the prior link, creates a
+   replacement, and starts a fresh 60-day period from the successful
+   replacement send. Expired or revoked links require reissue, not resend.
 2. Recipient choices are the request's Dataverse-linked liaison and PI. The
    normal default is the liaison in **To**; staff may instead address the PI
    and optionally copy the liaison. The server resolves the selected contacts
@@ -257,11 +258,10 @@ Minimum whole-flow invariants:
    designated staff. The additional staff audience, batching, and message
    timing remain open.
 
-Exact authorized staff roles, sender/reply-to, missing/duplicate contact
-handling, standalone revocation and failed-reissue recovery, shared-link audit
-disclosure, schema, folder, size/count limits, notification audience/timing,
-retention, and delete/replace persistence and recovery behavior remain open
-design decisions.
+Exact sender/reply-to, missing/duplicate contact handling, standalone
+revocation and failed-reissue recovery, shared-link audit disclosure, schema,
+folder, size/count limits, notification audience/timing, retention, and
+delete/replace persistence and recovery behavior remain open design decisions.
 
 ### Cycle-wide Editor Dashboard contract
 
