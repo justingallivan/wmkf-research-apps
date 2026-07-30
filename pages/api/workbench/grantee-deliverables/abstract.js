@@ -5,7 +5,8 @@
  * will be PUBLISHED, from the Workbench Awardee tab (S278).
  *
  *   GET ?requestId=  -> { abstractFormatted, abstractApproved, effective,
- *                         effectiveField, etag, status, statusLabel, editable }
+ *                         effectiveField, etag, status, statusLabel, editable,
+ *                         caption, imageRef, imageUrl, hasImage, submittedAt }
  *   PUT { requestId, text, etag, baseField }
  *
  * Thin multi-verb route shell (Route→Service Consolidation Plan, Stage 4

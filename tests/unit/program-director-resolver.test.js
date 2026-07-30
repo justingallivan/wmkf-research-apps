@@ -73,3 +73,40 @@ test('resolveByEmail doubles single quotes in the internalemailaddress filter', 
   const options = DynamicsService.queryRecords.mock.calls[0][1];
   expect(options.filter).toContain("internalemailaddress eq 'o''brien@example.com'");
 });
+
+// skipCache: recipient decisions at the moment of a durable event must not reuse a
+// warm entry, or a reassignment inside the 10-minute TTL routes to the former PD.
+test('skipCache re-reads the assignment instead of serving the warm entry', async () => {
+  let pd = PD_ID;
+  let email = 'first@example.com';
+  DynamicsService.getRecord.mockImplementation((entity) => {
+    if (entity === 'akoya_requests') return Promise.resolve({ _wmkf_programdirector_value: pd });
+    return Promise.resolve({ internalemailaddress: email, isdisabled: false });
+  });
+
+  expect(await resolveProgramDirectorEmailForRequest(REQUEST_ID)).toBe('first@example.com');
+
+  // Staff reassigns the request to a different PD.
+  pd = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+  email = 'second@example.com';
+
+  // Cached read still returns the stale address...
+  expect(await resolveProgramDirectorEmailForRequest(REQUEST_ID)).toBe('first@example.com');
+  // ...while skipCache sees the current assignment.
+  expect(await resolveProgramDirectorEmailForRequest(REQUEST_ID, { skipCache: true }))
+    .toBe('second@example.com');
+  // And the refreshed value is what later cached callers get.
+  expect(await resolveProgramDirectorEmailForRequest(REQUEST_ID)).toBe('second@example.com');
+});
+
+test('skipCache still returns null for a PD disabled since the warm read', async () => {
+  let disabled = false;
+  DynamicsService.getRecord.mockImplementation((entity) => {
+    if (entity === 'akoya_requests') return Promise.resolve({ _wmkf_programdirector_value: PD_ID });
+    return Promise.resolve({ internalemailaddress: 'pd@example.com', isdisabled: disabled });
+  });
+
+  expect(await resolveProgramDirectorEmailForRequest(REQUEST_ID)).toBe('pd@example.com');
+  disabled = true;
+  expect(await resolveProgramDirectorEmailForRequest(REQUEST_ID, { skipCache: true })).toBeNull();
+});

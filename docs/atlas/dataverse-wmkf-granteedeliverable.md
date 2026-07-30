@@ -43,6 +43,7 @@ Data:
 - `pages/api/external/grantee/[token]/context.js` — fail-closed editable/view derivation from package status; external surface never exposes raw image ref.
 - `pages/api/external/grantee/[token]/submit.js` — fail-closed editable guard from package status.
 - `pages/api/workbench/grantee-deliverables/awardees.js` — per-awardee status label.
+- `pages/api/workbench/grantee-deliverables/abstract.js` (GET) — staff Awardee-tab read of `wmkf_imagecaption`, `wmkf_imagefileref`, and `wmkf_waiverackedat` alongside status. The image ref is exposed to STAFF only, and only as a link when it is an absolute http(s) URL (the writer's fallback is a relative library path). `wmkf_waiverackedat` is surfaced as the de-facto submission time and labeled as the waiver acknowledgment, since no submitted-date field exists. Added 2026-07-29.
 - `lib/services/grantee-document-assembly.js` — reads image ref/caption for staff website/cycle export and image presence for previews.
 - `pages/api/cron/grantee-deliverable-reminders.js` — paged query of Invited packages where `wmkf_inviteddate` is 12+ days old; no `$expand`.
 

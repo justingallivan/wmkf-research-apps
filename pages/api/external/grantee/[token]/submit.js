@@ -7,7 +7,8 @@
  *
  * Order (fail-fast): method → rate-limit → verify token (aud:'grantee') → record
  * outcome → editable-status guard → parse multipart → verify waiver render token →
- * writeGranteeDeliverables (validate image magic → scan → upload → atomic changeset).
+ * writeGranteeDeliverables (validate image magic → scan → upload → atomic changeset)
+ * → notifyGranteeSubmission (post-commit, best-effort, never throws).
  *
  * Publication waiver (as of 2026-07-09): the checkbox is still a client-side submit
  * gate, but the ACKNOWLEDGED VERSION is now recorded. The client echoes the signed
@@ -26,6 +27,8 @@ import { WAIVER_SLOT_CODE } from '../../../../../lib/external/grantee-waiver-pol
 import { isGuid } from '../../../../../lib/utils/guid';
 import NotificationService from '../../../../../lib/services/notification-service';
 import { isGranteeEditableStatus } from '../../../../../shared/config/granteeDeliverableStatus';
+import { notifyGranteeSubmission } from '../../../../../lib/services/grantee-submit-notification';
+import { keepAlive } from '../../../../../lib/utils/keep-alive';
 
 /**
  * Best-effort operator alert when a grantee submit is blocked by a waiver-token
@@ -131,9 +134,35 @@ export default async function handler(req, res) {
       // Generic, non-leaky reasons (service already logged specifics server-side).
       return res.status(result.status || 500).json({ ok: false, reason: result.reason });
     }
-    return res.status(200).json({ ok: true });
+
+    // RESPOND FIRST, then hand the notification to the runtime. The package is
+    // committed, so the grantee's 200 must not depend on anything that follows:
+    // notifying before responding risks the platform ending the invocation before
+    // the 200 is written, and the grantee would see a timeout on a submission that
+    // DID commit (their retry then 409s not_editable). But bare post-response work
+    // has no lifecycle guarantee on Vercel — the invocation may be frozen once the
+    // response ends — so `waitUntil` registers the promise and keeps the invocation
+    // alive until it settles. Both guarantees hold: immediate 200, delivered
+    // notification.
+    //
+    // hasImage describes the package AFTER this submit: a resubmit with no new file
+    // (REVISION_REQUESTED is editable) retains the existing ref, because the writer
+    // only patches wmkf_imagefileref when it uploaded something.
+    const notifying = notifyGranteeSubmission({
+      requestId: verified.requestId,
+      requestNum: request?.akoya_requestnum || null,
+      title: request?.akoya_title || null,
+      hasImage: Boolean(imageFile || deliverable?.wmkf_imagefileref),
+      captionPresent: Boolean(caption && caption.trim()),
+    });
+    res.status(200).json({ ok: true });
+    await keepAlive(notifying);
+    return undefined;
   } catch (e) {
     console.error('[grantee/submit] unexpected error:', e?.message || e);
+    // The success path responds before notifying, so never try to re-send after it.
+    // (notifyGranteeSubmission does not throw; this is defence in depth.)
+    if (res.headersSent) return undefined;
     return res.status(500).json({ ok: false, reason: 'server_error' });
   }
 }

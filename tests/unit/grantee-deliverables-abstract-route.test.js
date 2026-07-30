@@ -104,6 +104,13 @@ test('GET resolves the DRAFT as effective when approved is empty (full envelope 
     status: GRANTEE_DELIVERABLE_STATUS.DRAFTED,
     statusLabel: 'Drafted',
     editable: true,
+    // The read-only record of what the grantee returned. Null/false pre-submit —
+    // the DRAFTED fixture has no caption, image, or waiver acknowledgment.
+    caption: null,
+    imageRef: null,
+    imageUrl: null,
+    hasImage: false,
+    submittedAt: null,
   });
 });
 

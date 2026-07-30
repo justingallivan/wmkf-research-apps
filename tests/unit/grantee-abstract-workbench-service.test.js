@@ -58,6 +58,68 @@ test('load: effective flips to approved once present; editability follows the st
   expect(body.editable).toBe(false);
 });
 
+describe('load: grantee submission fields (caption / image / waiver time)', () => {
+  const SP_URL = 'https://wmkf.sharepoint.com/sites/grants/Shared%20Documents/1002794_ABC/Grantee_Uploads/fig.png';
+
+  test('absolute SharePoint webUrl is linkable', async () => {
+    getDeliverableForRequest.mockResolvedValue({
+      wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.SUBMITTED,
+      wmkf_imagefileref: SP_URL,
+      wmkf_imagecaption: 'Cryo-EM structure.',
+      wmkf_waiverackedat: '2026-07-12T15:04:05Z',
+    });
+    const body = await loadGranteeAbstract({ requestId: GUID });
+    expect(body.imageUrl).toBe(SP_URL);
+    expect(body.imageRef).toBe(SP_URL);
+    expect(body.hasImage).toBe(true);
+    expect(body.caption).toBe('Cryo-EM structure.');
+    expect(body.submittedAt).toBe('2026-07-12T15:04:05Z');
+  });
+
+  // THE TRAP: grantee-upload falls back to `${folder}/${filename}` when Graph
+  // returns no webUrl. Linkifying that would render a broken same-origin link.
+  test('relative library path → hasImage true but NOT linkable', async () => {
+    getDeliverableForRequest.mockResolvedValue({
+      wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.SUBMITTED,
+      wmkf_imagefileref: '1002794_ABCDEF/Grantee_Uploads/fig.png',
+    });
+    const body = await loadGranteeAbstract({ requestId: GUID });
+    expect(body.hasImage).toBe(true);
+    expect(body.imageRef).toBe('1002794_ABCDEF/Grantee_Uploads/fig.png');
+    expect(body.imageUrl).toBeNull();
+  });
+
+  test.each([
+    ['javascript:alert(1)'],
+    ['JavaScript:alert(1)'],
+    ['data:text/html,<script>alert(1)</script>'],
+    ['file:///etc/passwd'],
+  ])('hostile scheme %s never becomes a link', async (ref) => {
+    getDeliverableForRequest.mockResolvedValue({
+      wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.SUBMITTED,
+      wmkf_imagefileref: ref,
+    });
+    const body = await loadGranteeAbstract({ requestId: GUID });
+    expect(body.imageUrl).toBeNull();
+  });
+
+  test('no deliverable row → all submission fields null/false, no throw', async () => {
+    getDeliverableForRequest.mockResolvedValue(null);
+    const body = await loadGranteeAbstract({ requestId: GUID });
+    expect(body).toMatchObject({
+      caption: null, imageRef: null, imageUrl: null, hasImage: false, submittedAt: null,
+    });
+  });
+
+  test('pre-submit row → nothing to show', async () => {
+    getDeliverableForRequest.mockResolvedValue({ wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.INVITED });
+    const body = await loadGranteeAbstract({ requestId: GUID });
+    expect(body.hasImage).toBe(false);
+    expect(body.caption).toBeNull();
+    expect(body.submittedAt).toBeNull();
+  });
+});
+
 test('save: baseField flip → 409 stale with currentField in the body, no write', async () => {
   getById.mockResolvedValue(row({ wmkf_abstractapproved: APPROVED }));
   getDeliverableForRequest.mockResolvedValue({ wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.SUBMITTED });
