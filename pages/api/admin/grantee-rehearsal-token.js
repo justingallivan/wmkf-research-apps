@@ -30,9 +30,5 @@ export default async function handler(req, res) {
 
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
   const token = await mintForRequest({ requestId: REHEARSAL_REQUEST_ID, expiresAt });
-  return res.status(200).json({
-    url: token.url,
-    jti: token.jti,
-    expiresAt: token.expiresAt.toISOString(),
-  });
+  return res.redirect(302, token.url);
 }
