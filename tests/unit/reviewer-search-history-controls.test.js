@@ -37,6 +37,11 @@ const applicantCandidate = {
   isApplicantRecommended: true,
   enrichedProposalKey: 'proposal',
   applicantEnrichmentCacheVersion: APPLICANT_ENRICHMENT_CACHE_VERSION,
+  applicantKnownReviewer: {
+    status: 'known',
+    email: 'applicant@example.edu',
+    emailSource: 'pubmed',
+  },
   provenance: {
     kind: 'applicant_suggested',
     sources: ['applicant_form'],
