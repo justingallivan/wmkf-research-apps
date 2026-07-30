@@ -104,7 +104,23 @@ Methods:
 - `pages/api/review-manager/render-emails.js` — `DynamicsService.getRecord('wmkf_potentialreviewerses', personId)` to hydrate person fields per email draft
 - `pages/api/review-manager/reviewers.js` `fetchPotentialReviewers` — chunked OR-chain on `wmkf_potentialreviewersid` to hydrate the Review Manager reviewer list
 - `pages/api/reviewer-finder/{save-candidates,my-candidates}.js`
-- `pages/api/workbench/enrich-recommended.js`, `lib/services/contact-enrichment-service.js`, `adapters/researcher.js` — read the bibliometric fields here (S213: was the `wmkf_appresearcher` sidecar)
+- `lib/services/workbench/applicant-known-reviewer-service.js` — exact-GUID,
+  read-only applicant-link hydration for ingestion, enrichment, and promotion.
+  It projects the person email and source as one bounded pair and verifies that
+  any active email owner is the same person; it never falls back to a name
+  match. `applicant-reviewers-service.js` runs this after suggestion
+  materialization so a person-read outage cannot masquerade as a suggestion
+  write failure.
+- `pages/api/workbench/enrich-recommended.js`,
+  `lib/services/contact-enrichment-service.js`, `adapters/researcher.js` — read
+  bibliometric fields here (S213: was the `wmkf_appresearcher` sidecar).
+  Applicant enrichment additionally seeds exact-person affiliation/ORCID and
+  retains the bounded `applicantKnownReviewer` projection in the Postgres
+  roster; per-person read failures remain explicit and retryable.
+- `lib/services/workbench/promote-applicant-reviewer-service.js` — freshly
+  re-reads the exact applicant-linked person and active email ownership before
+  promotion. Canonical contact reuse performs no email write and cannot bypass
+  identity, current-request COI, or the invitation send classifier.
 - `lib/services/reviewer-identity-binding-writer.js` — fail-closed binding snapshot read; first production caller is live in acceptance-drain self-report
 
 ## Write paths

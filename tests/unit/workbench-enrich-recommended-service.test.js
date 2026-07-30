@@ -18,8 +18,10 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 }));
 
 const getPersonById = jest.fn();
+const findPersonByEmailCandidates = jest.fn();
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   getById: (...a) => getPersonById(...a),
+  findByEmailCandidates: (...a) => findPersonByEmailCandidates(...a),
 }));
 
 const upsertByPotentialReviewer = jest.fn(async () => ({}));
@@ -48,9 +50,10 @@ const institutionDirectMatch = jest.fn((left, right) => {
   const r = normalize(right);
   return !!l && !!r && (l === r || l.includes(r) || r.includes(l));
 });
+const markInstitutionCOIResolved = jest.fn(async (c) => c);
 jest.mock('../../lib/services/deduplication-service', () => ({
   DeduplicationService: {
-    markInstitutionCOIResolved: jest.fn(async (c) => c),
+    markInstitutionCOIResolved: (...a) => markInstitutionCOIResolved(...a),
     institutionDirectMatch: (...a) => institutionDirectMatch(...a),
   },
 }));
@@ -71,7 +74,7 @@ jest.mock('../../lib/services/claude-reviewer-service', () => ({
 jest.mock('../../lib/services/proposal-pi-identity', () => ({
   resolveProposalPI: jest.fn(async () => null),
   appendPiName: jest.fn((names) => names || []),
-  piInstitutions: jest.fn(() => []),
+  piInstitutions: jest.fn((_pi, fallback) => fallback ? [fallback] : []),
 }));
 
 jest.mock('../../lib/utils/proposal-authors', () => ({
@@ -104,7 +107,7 @@ jest.mock('../../lib/services/reviewer-request-context', () => ({
 }));
 
 jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
-  APPLICANT_ENRICHMENT_CACHE_VERSION: 2,
+  APPLICANT_ENRICHMENT_CACHE_VERSION: 3,
   pruneCandidateForRoster: jest.fn((c) => c),
 }));
 
@@ -154,6 +157,11 @@ beforeEach(() => {
     { _wmkf_potentialreviewer_value: PR, _wmkf_potentialreviewer_value_formatted: 'Dr. Rec One', wmkf_appreviewersuggestionid: SUG },
   ]);
   getPersonById.mockResolvedValue({ wmkf_primaryaffiliation: 'Rec University' });
+  findPersonByEmailCandidates.mockResolvedValue({
+    one: true,
+    id: PR,
+    row: { wmkf_potentialreviewersid: PR, statecode: 0 },
+  });
   verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
     verified: suggestions.map((s) => ({ ...s, verified: true, publications: [] })),
     unverified: [],
@@ -186,7 +194,7 @@ test('happy path: progress frames strictly precede one terminal complete; never 
   expect(recordSurfaced).toHaveBeenCalledTimes(1);
   expect(recordSurfaced).toHaveBeenCalledWith(
     REQ,
-    [expect.objectContaining({ applicantEnrichmentCacheVersion: 2 })],
+    [expect.objectContaining({ applicantEnrichmentCacheVersion: 3 })],
     { expectedUpdatedAt: null },
   );
 });
@@ -258,7 +266,104 @@ test('rerun preserves an authenticated staff-confirmed row without automated ove
   );
 });
 
-test('empty frames: no junction rows, and rows yielding no valid suggestions → complete { recommended: [] }', async () => {
+test('transient person-read failure preserves prior actor-confirmed canonical evidence and reports a retryable failure', async () => {
+  findCandidateBySuggestion.mockResolvedValue({
+    candidateKey: `suggestion:${SUG}`,
+    suggestionId: SUG,
+    name: 'Dr. Rec One',
+    email: 'staff-confirmed@example.edu',
+    identityStatus: 'unresolved',
+    needsIdentification: true,
+    isApplicantRecommended: true,
+    applicantKnownReviewer: {
+      status: 'known',
+      potentialReviewerId: PR,
+      email: 'staff-confirmed@example.edu',
+      emailSource: 'manual',
+    },
+    pdIdentityConfirmed: true,
+    pdIdentityConfirmationId: 'confirm-1',
+    staffIdentityConfirmation: { confirmationId: 'confirm-1', source: 'staff_confirmed' },
+  });
+  getPersonById.mockRejectedValue(new Error('Dataverse unavailable'));
+
+  const rec = recorder();
+  await enrichRecommended(args({ analysisResult: undefined, apiKey: undefined }), rec.onEvent);
+
+  expect(rec.events).toContainEqual({
+    event: 'progress',
+    data: expect.objectContaining({
+      stage: 'applicant_hydration',
+      status: 'failed',
+      suggestionId: SUG,
+      potentialReviewerId: PR,
+      code: 'person_unavailable',
+    }),
+  });
+  expect(rec.events.at(-1)).toEqual({
+    event: 'complete',
+    data: {
+      recommended: [expect.objectContaining({
+        pdIdentityConfirmed: true,
+        applicantKnownReviewer: expect.objectContaining({
+          status: 'known',
+          email: 'staff-confirmed@example.edu',
+        }),
+      })],
+    },
+  });
+});
+
+test('one failed exact-person read coexists with a successful sibling that still runs request COI', async () => {
+  const pr2 = '44444444-4444-4444-4444-444444444444';
+  const sug2 = '55555555-5555-5555-5555-555555555555';
+  findApplicantRecommendedByRequest.mockResolvedValue([
+    {
+      _wmkf_potentialreviewer_value: PR,
+      _wmkf_potentialreviewer_value_formatted: 'Failed Reviewer',
+      wmkf_appreviewersuggestionid: SUG,
+    },
+    {
+      _wmkf_potentialreviewer_value: pr2,
+      _wmkf_potentialreviewer_value_formatted: 'Successful Reviewer',
+      wmkf_appreviewersuggestionid: sug2,
+    },
+  ]);
+  getPersonById.mockImplementation(async (personId) => {
+    if (personId === PR) throw new Error('one person unavailable');
+    return {
+      wmkf_potentialreviewersid: pr2,
+      wmkf_name: 'Successful Reviewer',
+      wmkf_primaryaffiliation: 'Rec University',
+      wmkf_emailaddress: null,
+      statecode: 0,
+    };
+  });
+
+  const rec = recorder();
+  await enrichRecommended(args(), rec.onEvent);
+
+  const completed = rec.events.at(-1).data.recommended;
+  expect(completed).toHaveLength(2);
+  expect(completed).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      potentialReviewerId: PR,
+      applicantKnownReviewer: expect.objectContaining({ status: 'unavailable' }),
+    }),
+    expect.objectContaining({
+      potentialReviewerId: pr2,
+      applicantKnownReviewer: expect.objectContaining({ status: 'known' }),
+    }),
+  ]));
+  expect(markInstitutionCOIResolved).toHaveBeenCalledWith(
+    expect.arrayContaining([expect.objectContaining({ potentialReviewerId: pr2 })]),
+    expect.anything(),
+    expect.anything(),
+  );
+  expect(recordSurfaced).toHaveBeenCalledTimes(2);
+});
+
+test('empty junctions complete empty; malformed linked rows complete with an explicit unresolved result', async () => {
   findApplicantRecommendedByRequest.mockResolvedValue([]);
   let rec = recorder();
   await enrichRecommended(args(), rec.onEvent);
@@ -267,7 +372,164 @@ test('empty frames: no junction rows, and rows yielding no valid suggestions →
   findApplicantRecommendedByRequest.mockResolvedValue([{ _wmkf_potentialreviewer_value: null }]);
   rec = recorder();
   await enrichRecommended(args(), rec.onEvent);
-  expect(rec.events).toEqual([{ event: 'complete', data: { recommended: [] } }]);
+  expect(rec.events.some((event) => (
+    event.event === 'progress'
+    && event.data?.stage === 'applicant_hydration'
+    && event.data?.code === 'person_unavailable'
+  ))).toBe(true);
+  const complete = rec.events.find((event) => event.event === 'complete');
+  expect(complete.data.recommended).toHaveLength(1);
+  expect(complete.data.recommended[0]).toMatchObject({
+    isApplicantRecommended: true,
+    needsIdentification: true,
+    applicantKnownReviewer: { status: 'unavailable' },
+  });
+});
+
+test('stored Dataverse ORCID and affiliation reach verification/contact enrichment as identity hints', async () => {
+  getPersonById.mockResolvedValue({
+    wmkf_potentialreviewersid: PR,
+    wmkf_name: 'Dr. Rec One',
+    wmkf_primaryaffiliation: 'Canonical University',
+    wmkf_orcid: '0000-0001-2345-6789',
+    statecode: 0,
+  });
+  const rec = recorder();
+  await enrichRecommended(args(), rec.onEvent);
+  expect(verifyClaudeSuggestions).toHaveBeenCalledWith(
+    [expect.objectContaining({
+      potentialReviewerId: PR,
+      name: 'Dr. Rec One',
+      affiliation: 'Canonical University',
+      orcid: '0000-0001-2345-6789',
+      applicantKnownReviewer: expect.objectContaining({
+        status: 'known',
+        orcid: '0000-0001-2345-6789',
+      }),
+    })],
+    expect.any(Function),
+    expect.any(Object),
+  );
+  expect(enrichCandidates).toHaveBeenCalledWith(
+    [expect.objectContaining({ orcid: '0000-0001-2345-6789' })],
+    expect.any(Object),
+  );
+});
+
+test('all exact-person reads failing returns unresolved rows instead of false clean empty success', async () => {
+  getPersonById.mockRejectedValue(new Error('Dataverse unavailable'));
+  const rec = recorder();
+  await enrichRecommended(args(), rec.onEvent);
+  expect(verifyClaudeSuggestions).not.toHaveBeenCalled();
+  expect(enrichCandidates).not.toHaveBeenCalled();
+  const failure = rec.events.find((event) => (
+    event.event === 'progress'
+    && event.data?.stage === 'applicant_hydration'
+  ));
+  expect(failure?.data).toMatchObject({
+    status: 'failed',
+    suggestionId: SUG,
+    potentialReviewerId: PR,
+    code: 'person_unavailable',
+  });
+  const complete = rec.events.find((event) => event.event === 'complete');
+  expect(complete.data.recommended).toEqual([
+    expect.objectContaining({
+      suggestionId: SUG,
+      needsIdentification: true,
+      applicantKnownReviewer: expect.objectContaining({ status: 'unavailable' }),
+    }),
+  ]);
+});
+
+test('stored A plus enriched B surfaces a mismatch and never relabels A with B provenance', async () => {
+  getPersonById.mockResolvedValue({
+    wmkf_potentialreviewersid: PR,
+    wmkf_name: 'Dr. Rec One',
+    wmkf_primaryaffiliation: 'Rec University',
+    wmkf_emailaddress: 'stored@example.edu',
+    wmkf_emailsource: null,
+    statecode: 0,
+  });
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((candidate) => ({
+      ...candidate,
+      email: 'new@example.edu',
+      contactEnrichment: {
+        identity: { status: 'probable' },
+        email: 'new@example.edu',
+        emailSource: 'scholarly_multi',
+      },
+    })),
+  }));
+  const rec = recorder();
+  await enrichRecommended(args(), rec.onEvent);
+  expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
+    PR,
+    expect.objectContaining({ email: null, emailSource: null }),
+    { actingUserSystemId: 'u-1' },
+  );
+  const complete = rec.events.find((event) => event.event === 'complete');
+  expect(complete.data.recommended[0]).toMatchObject({
+    email: 'stored@example.edu',
+    emailSource: null,
+    applicantContactMismatch: true,
+    applicantKnownReviewer: {
+      status: 'known',
+      email: 'stored@example.edu',
+      emailSource: null,
+    },
+  });
+  expect(rec.events.some((event) => event.data?.code === 'contact_claim_mismatch')).toBe(true);
+});
+
+test('vetted email for a person with no stored address stays paired in the roster but does not orphan its source in Dataverse', async () => {
+  getPersonById.mockResolvedValue({
+    wmkf_potentialreviewersid: PR,
+    wmkf_name: 'Dr. Rec One',
+    wmkf_primaryaffiliation: 'Rec University',
+    wmkf_emailaddress: null,
+    wmkf_emailsource: null,
+    statecode: 0,
+  });
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((candidate) => ({
+      ...candidate,
+      email: 'new@example.edu',
+      contactEnrichment: {
+        identity: { status: 'probable' },
+        email: 'new@example.edu',
+        emailSource: 'scholarly_multi',
+        emailPersistAllowed: true,
+      },
+    })),
+  }));
+
+  const rec = recorder();
+  await enrichRecommended(args(), rec.onEvent);
+
+  expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
+    PR,
+    expect.objectContaining({
+      email: 'new@example.edu',
+      emailSource: null,
+    }),
+    { actingUserSystemId: 'u-1' },
+  );
+  expect(rec.events.at(-1).data.recommended[0]).toMatchObject({
+    email: 'new@example.edu',
+    emailSource: 'scholarly_multi',
+    contactEnrichment: {
+      email: 'new@example.edu',
+      emailSource: 'scholarly_multi',
+      emailPersistAllowed: true,
+    },
+    applicantKnownReviewer: {
+      status: 'known',
+      email: null,
+      emailSource: null,
+    },
+  });
 });
 
 test('pre-pipeline aborts emit exactly one error event and resolve', async () => {
@@ -300,21 +562,32 @@ test('structured author-affiliation evidence preserves an opaque scholarly email
       contactEnrichment: {
         email: 'lab-director@stanford.edu',
         emailSource: 'scholarly_multi',
+        emailPersistAllowed: true,
         identity: { status: 'probable' },
       },
     })),
   }));
 
-  const { onEvent } = recorder();
-  await enrichRecommended(args(), onEvent);
+  const rec = recorder();
+  await enrichRecommended(args(), rec.onEvent);
   expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
     PR,
     expect.objectContaining({
       email: 'lab-director@stanford.edu',
-      emailSource: 'scholarly_multi',
+      emailSource: null,
     }),
     expect.anything(),
   );
+  const complete = rec.events.at(-1).data.recommended[0];
+  expect(complete).toMatchObject({
+    email: 'lab-director@stanford.edu',
+    emailSource: 'scholarly_multi',
+    contactEnrichment: {
+      email: 'lab-director@stanford.edu',
+      emailSource: 'scholarly_multi',
+      emailPersistAllowed: true,
+    },
+  });
 });
 
 test('a top-level email cannot borrow the scholarly name-guard bypass for another address', async () => {

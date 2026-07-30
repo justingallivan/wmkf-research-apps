@@ -181,15 +181,34 @@ Read:
 - `pages/api/external/review/[token]/context.js` — reader (via `verify-suggestion-token`) AND best-effort writer (`wmkf_proposalfirstaccessed` stamp on first access; non-fatal on failure)
 
 Write (verified 2026-05-07; +Phase 3 ingestion S210):
-- `pages/api/workbench/applicant-reviewers.js` — adapter `ensureApplicantRecommended` per populated legacy slot (lazy on Find-tab open). Writes only `disposition=recommended`, `wmkf_selected=false` rows; **writes NO `disposition=excluded` rows** (S210 option B — excluded names are parsed via `lib/services/reviewer-exclusion-parser.js` and returned for the search soft-block only, nothing global touched).
-- `pages/api/workbench/enrich-recommended.js` — adapter `findApplicantRecommendedByRequest` reads applicant-recommended rows regardless of `wmkf_selected`; writes deterministic COI tags to `wmkf_matchreason` through `setMatchReason` and per-person enrichment through the researcher adapter.
+- `pages/api/workbench/applicant-reviewers.js` — adapter
+  `ensureApplicantRecommended` per populated legacy slot (lazy on Find-tab
+  open). Writes only `disposition=recommended`, `wmkf_selected=false` rows;
+  **writes NO `disposition=excluded` rows** (S210 option B — excluded names are
+  parsed via `lib/services/reviewer-exclusion-parser.js` and returned for the
+  search soft-block only, nothing global touched). After materialization, the
+  service independently hydrates the exact linked person into the bounded
+  `applicantKnownReviewer` response projection; a person-read failure does not
+  roll back or relabel the suggestion result.
+- `pages/api/workbench/enrich-recommended.js` — adapter
+  `findApplicantRecommendedByRequest` reads applicant-recommended rows
+  regardless of `wmkf_selected`; exact person data is re-read before external
+  enrichment, stored affiliation/ORCID seed identity resolution, and the
+  bounded email/source pair is persisted only in the existing Postgres roster.
+  Writes deterministic COI tags to `wmkf_matchreason` through `setMatchReason`
+  and per-person enrichment through the researcher adapter. Stored/enriched
+  address disagreement is surfaced as `applicantContactMismatch` and cannot
+  relabel the stored address with the enriched source; all-person read failure
+  returns explicit unresolved rows rather than a false clean empty result.
 - `pages/api/workbench/promote-applicant-reviewer.js` — requires the canonical
-  roster row/key, rechecks canonical contact authority (including bounded
-  backfill followed by a fresh person read), then uses adapter `findById` and
-  `updateLifecycle(suggestionId, { selected: true })`. Only after selection
-  succeeds does the server finalize the exact roster key as `saved`; missing
-  contact, identity conflict, absent roster authority, or roster-finalization
-  failure never reports a clean promotion.
+  roster row/key, freshly re-reads the suggestion and exact applicant-linked
+  person, and rechecks active email ownership. It may reuse the canonical
+  email/source pair without an email write; inactive, missing, conflicting, or
+  stored/enriched-mismatch contact fails with a stable code. It then uses
+  adapter `findById` and `updateLifecycle(suggestionId, { selected: true })`.
+  Only after selection succeeds does the server finalize the exact roster key
+  as `saved`; missing contact, identity conflict, absent roster authority, or
+  roster-finalization failure never reports a clean promotion.
 - `pages/api/workbench/manual-reviewer.js` — adapter `ensureStaffManualCandidate` for sparse staff-entered reviewers. Creates/reuses the person through `potential-reviewer.upsertByEmail`, stamps any staff-entered email as `wmkf_emailsource=manual` through `researcher.updateById`, then writes/reselects the per-request suggestion with `staff_manual` in `wmkf_sources`.
 - `pages/api/reviewer-finder/save-candidates.js` — canonical contact projection
   and v3/staff-confirmation authority are checked before person/suggestion

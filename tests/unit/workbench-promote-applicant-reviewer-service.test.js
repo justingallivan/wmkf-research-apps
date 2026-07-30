@@ -44,6 +44,11 @@ jest.mock('../../lib/services/notification-service', () => ({
   default: { notify: jest.fn(async () => ({ id: 'alert-1' })) },
 }));
 
+const loadApplicantKnownReviewerContext = jest.fn();
+jest.mock('../../lib/services/workbench/applicant-known-reviewer-service', () => ({
+  loadApplicantKnownReviewerContext: (...a) => loadApplicantKnownReviewerContext(...a),
+}));
+
 import { promoteApplicantReviewer } from '../../lib/services/workbench/promote-applicant-reviewer-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 
@@ -72,6 +77,21 @@ beforeEach(() => {
   });
   finalizeCandidatePromotion.mockResolvedValue({ saved: true, candidateKey: 'candidate:applicant' });
   translateDuplicateKeyError.mockReturnValue(null);
+  loadApplicantKnownReviewerContext.mockResolvedValue({
+    applicantKnownReviewer: {
+      status: 'known',
+      code: null,
+      potentialReviewerId: PERSON,
+      email: 'existing@example.edu',
+      emailSource: 'scholarly_multi',
+      emailReadiness: {
+        level: 'high',
+        action: 'ready',
+        reason: 'Address source: scholarly_multi',
+      },
+    },
+    contactId: null,
+  });
 });
 
 test('wrong-request suggestion → 404 typed error, no lifecycle write', async () => {
@@ -113,7 +133,164 @@ test('plain promote: canonical email verified, selected flipped, roster finalize
     rosterFinalized: true,
     partialSuccess: false,
     contactError: null,
+    emailAction: 'ready',
+    emailActionReason: 'Address source: scholarly_multi',
   });
+});
+
+test('source-null canonical contact promotes without an email write and reports quick_check', async () => {
+  loadApplicantKnownReviewerContext.mockResolvedValue({
+    applicantKnownReviewer: {
+      status: 'known',
+      potentialReviewerId: PERSON,
+      email: 'existing@example.edu',
+      emailSource: null,
+      emailReadiness: {
+        level: 'low',
+        action: 'quick_check',
+        reason: 'Email source not recorded — confirm before sending',
+      },
+    },
+  });
+  const body = await promoteApplicantReviewer(args());
+  expect(update).not.toHaveBeenCalled();
+  expect(body).toMatchObject({ success: true, emailAction: 'quick_check' });
+});
+
+test('research-only canonical contact preserves promotion behavior and reports the send block', async () => {
+  loadApplicantKnownReviewerContext.mockResolvedValue({
+    applicantKnownReviewer: {
+      status: 'known',
+      potentialReviewerId: PERSON,
+      email: 'existing@example.edu',
+      emailSource: 'serp_search',
+      emailReadiness: {
+        level: 'low',
+        action: 'research_only',
+        reason: 'Search lead lacks address-specific first-party evidence',
+      },
+    },
+  });
+  const body = await promoteApplicantReviewer(args());
+  expect(updateLifecycle).toHaveBeenCalled();
+  expect(body).toMatchObject({ success: true, emailAction: 'research_only' });
+});
+
+test.each([
+  ['inactive', 'person_inactive', 422],
+  ['email_conflict', 'email_conflict', 409],
+  ['unavailable', 'contact_verification_unavailable', 503],
+])('%s exact-person state blocks promotion with a stable code', async (status, code, httpStatus) => {
+  loadApplicantKnownReviewerContext.mockResolvedValue({
+    applicantKnownReviewer: {
+      status,
+      code: status === 'unavailable' ? 'person_unavailable' : code,
+      potentialReviewerId: PERSON,
+      email: status === 'unavailable' ? null : 'existing@example.edu',
+      emailSource: null,
+    },
+  });
+  const err = await promoteApplicantReviewer(args()).catch((error) => error);
+  expect(err).toBeInstanceOf(ServiceHttpError);
+  expect(err.httpStatus).toBe(httpStatus);
+  expect(err.body).toMatchObject({ code });
+  expect(updateLifecycle).not.toHaveBeenCalled();
+  expect(update).not.toHaveBeenCalled();
+});
+
+test('known exact person with no stored or vetted email remains in Find', async () => {
+  loadApplicantKnownReviewerContext.mockResolvedValue({
+    applicantKnownReviewer: {
+      status: 'known',
+      potentialReviewerId: PERSON,
+      email: null,
+      emailSource: null,
+    },
+  });
+  getById.mockResolvedValue({});
+  const err = await promoteApplicantReviewer(args()).catch((error) => error);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    code: 'missing_verified_email',
+    decision: 'missing_email',
+  });
+  expect(updateLifecycle).not.toHaveBeenCalled();
+});
+
+test('stored/enriched email mismatch blocks promotion and does not select the suggestion', async () => {
+  findCandidateBySuggestion.mockResolvedValue({
+    candidateKey: 'candidate:applicant',
+    suggestionId: SUG,
+    identityStatus: 'probable',
+    needsIdentification: false,
+    email: 'new@example.edu',
+  });
+  const err = await promoteApplicantReviewer(args()).catch((error) => error);
+  expect(err.httpStatus).toBe(409);
+  expect(err.body).toMatchObject({ code: 'contact_claim_mismatch' });
+  expect(updateLifecycle).not.toHaveBeenCalled();
+});
+
+test('actor-confirmed manual correction clears a historical mismatch, writes first, then passes the fresh exact-person gate', async () => {
+  findCandidateBySuggestion.mockResolvedValue({
+    candidateKey: 'candidate:applicant',
+    suggestionId: SUG,
+    identityStatus: 'unresolved',
+    needsIdentification: true,
+    email: 'corrected@example.edu',
+    emailSource: 'manual',
+    manualContactFields: ['email'],
+    applicantContactMismatch: true,
+    pdIdentityConfirmed: true,
+    pdIdentityConfirmationId: 'confirm-1',
+    staffIdentityConfirmation: { confirmationId: 'confirm-1', source: 'staff_confirmed' },
+  });
+  loadApplicantKnownReviewerContext
+    .mockResolvedValueOnce({
+      applicantKnownReviewer: {
+        status: 'known',
+        potentialReviewerId: PERSON,
+        email: 'stored@example.edu',
+        emailSource: null,
+      },
+    })
+    .mockResolvedValueOnce({
+      applicantKnownReviewer: {
+        status: 'known',
+        potentialReviewerId: PERSON,
+        email: 'corrected@example.edu',
+        emailSource: 'manual',
+        emailReadiness: {
+          level: 'low',
+          action: 'quick_check',
+          reason: 'Manual address — confirm before sending',
+        },
+      },
+    });
+
+  const body = await promoteApplicantReviewer(args({
+    contact: { email: 'corrected@example.edu' },
+  }));
+
+  expect(update).toHaveBeenCalledWith(
+    PERSON,
+    { email: 'corrected@example.edu', emailSource: 'manual' },
+    { actingUserSystemId: 'u-1' },
+  );
+  expect(updateLifecycle).toHaveBeenCalled();
+  expect(body).toMatchObject({ success: true, emailAction: 'quick_check' });
+});
+
+test('anti-scrape manual correction is rejected before any person write', async () => {
+  const err = await promoteApplicantReviewer(args({
+    contact: { email: 'reviewer@nospam.example.edu', affiliation: 'Example U' },
+  })).catch((error) => error);
+  expect(err).toBeInstanceOf(ServiceHttpError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({ code: 'anti_scrape_email' });
+  expect(update).not.toHaveBeenCalled();
+  expect(updateById).not.toHaveBeenCalled();
+  expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
 test('missing authoritative roster row is rejected before lifecycle promotion', async () => {
@@ -206,11 +383,24 @@ test('B1 backfill: vetted roster email written with roster provenance when no ma
     identityStatus: 'probable',
     email: 'kaang@snu.ac.kr',
     emailSource: 'claude_search',
-    emailPersistAllowed: true,
+    contactEnrichment: {
+      identity: { status: 'probable' },
+      email: 'kaang@snu.ac.kr',
+      emailSource: 'claude_search',
+      emailPersistAllowed: true,
+    },
   });
   getById
     .mockResolvedValueOnce({})
     .mockResolvedValueOnce({ wmkf_emailaddress: 'kaang@snu.ac.kr' });
+  loadApplicantKnownReviewerContext.mockResolvedValue({
+    applicantKnownReviewer: {
+      status: 'known',
+      potentialReviewerId: PERSON,
+      email: 'kaang@snu.ac.kr',
+      emailSource: 'claude_search',
+    },
+  });
   const body = await promoteApplicantReviewer(args());
   expect(body.savedFields).toEqual(['email']);
   // S387: the vetted address and its roster provenance land in ONE patch, so a rejected
@@ -230,7 +420,15 @@ test('B1 idempotency: existing person email blocks the backfill', async () => {
     emailSource: 'claude_search',
     emailPersistAllowed: true,
   });
-  getById.mockResolvedValue({ wmkf_emailaddress: 'existing@y.edu' });
+  getById.mockResolvedValue({ wmkf_emailaddress: 'x@y.edu' });
+  loadApplicantKnownReviewerContext.mockResolvedValue({
+    applicantKnownReviewer: {
+      status: 'known',
+      potentialReviewerId: PERSON,
+      email: 'x@y.edu',
+      emailSource: 'claude_search',
+    },
+  });
   const body = await promoteApplicantReviewer(args());
   expect(body.savedFields).toEqual([]);
   expect(update).not.toHaveBeenCalled();

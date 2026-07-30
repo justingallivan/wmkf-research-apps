@@ -22,7 +22,17 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
 }));
 
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
-  getById: jest.fn(async () => ({ wmkf_emailaddress: 'applicant@example.edu' })),
+  getById: jest.fn(async () => ({
+    wmkf_potentialreviewersid: 'potential-reviewer-1',
+    wmkf_emailaddress: 'applicant@example.edu',
+    wmkf_emailsource: 'scholarly_multi',
+    statecode: 0,
+  })),
+  findByEmailCandidates: jest.fn(async () => ({
+    one: true,
+    id: 'potential-reviewer-1',
+    row: { wmkf_potentialreviewersid: 'potential-reviewer-1', statecode: 0 },
+  })),
   update: jest.fn(async () => undefined),
 }));
 
@@ -151,6 +161,8 @@ it('selects the existing applicant-recommended row', async () => {
     rosterFinalized: true,
     partialSuccess: false,
     contactError: null,
+    emailAction: 'ready',
+    emailActionReason: 'Address source: scholarly_multi',
   });
   expect(updateLifecycle).toHaveBeenCalledWith(
     SUGGESTION_ID,

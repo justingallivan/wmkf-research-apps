@@ -429,6 +429,58 @@ uninformative.
 
 ---
 
+## 9. Exact applicant-linked canonical contact reuse `[VERIFIED 2026-07-29]`
+
+**Contract.** A populated applicant-recommended reviewer slot is already an
+exact `wmkf_potentialreviewers` GUID. This path may hydrate and reuse only that
+person; it never searches or merges by normalized name. The canonical email and
+`wmkf_emailsource` travel as one bounded `applicantKnownReviewer` pair. An
+address is reusable only when the person is active and the active exact-email
+owner is the same person. Missing, inactive, unavailable, conflicting, or
+stored/enriched-mismatch contact remains blocked with a stable reason.
+
+GET ingestion materializes the suggestion first and performs person hydration
+in a separate failure boundary. SSE enrichment freshly re-reads the exact
+person, seeds stored affiliation/ORCID into identity resolution, persists only
+the bounded applicant projection in roster JSON, and reports per-row hydration
+failures. If every person read fails, the result contains explicit unresolved
+rows rather than a false clean empty success. Roster cache version 3 prevents
+pre-contract JSON from suppressing a retry.
+
+Promotion ignores client-supplied canonical-contact claims and freshly
+revalidates the suggestion, person, and active email ownership. Canonical reuse
+does not write the email. `quick_check` and `research_only` retain their
+existing promotion semantics; the invitation send classifier remains the final
+authority and still requires acknowledgement or blocks sending as applicable.
+When the exact person has no stored address, an identity-vetted enrichment
+address remains a paired roster claim and can reach the server-owned B1 write;
+address and source land in one PATCH before canonical re-read. The bibliometric
+writer receives no source unless it describes the already stored canonical
+address. Anti-scrape manual input is rejected before any person write, and an
+unavailable applicant-linked person cannot receive staff confirmation through
+either the UI or the authenticated roster endpoint.
+Applicant-link evidence is rendered as “Existing linked reviewer record” and
+is deliberately distinct from general-search `dataverseContactEvidence`.
+Late request-A ingestion success or failure is discarded after the UI has
+switched to request B.
+
+**Enforcement points.**
+`lib/services/workbench/applicant-known-reviewer-service.js`,
+`lib/utils/applicant-known-reviewer.js`,
+`lib/services/workbench/applicant-reviewers-service.js`,
+`lib/services/workbench/enrich-recommended-service.js`,
+`lib/services/workbench/promote-applicant-reviewer-service.js`, and
+`shared/components/reviewers/ReviewerFindPanel.js`.
+
+**Audits.** `tests/unit/applicant-known-reviewer.test.js`,
+`tests/unit/workbench-applicant-reviewers-service.test.js`,
+`tests/unit/workbench-enrich-recommended-service.test.js`,
+`tests/unit/workbench-promote-applicant-reviewer-service.test.js`,
+`tests/unit/reviewer-search-logic.test.js`, and
+`tests/unit/reviewer-find-panel-stale-ingestion.test.js`.
+
+---
+
 ## Contract → enforcement-point index
 
 | # | Contract | Primary enforcement point |
@@ -441,3 +493,4 @@ uninformative.
 | 6 | OpenAlex bibliometrics/verified-domain | `contact-enrichment-service.js` (`_attachOpenAlexMetrics`, `_validateEmailAgainstVerifiedDomain`) |
 | 7 | Faculty-page guarded fetch + ranked mailbox ownership | `safe-fetch.js` + `contact-enrichment/page-email.js` + roster/UI evidence projection |
 | 8 | Work-grounding rescue | `reviewer-identity-evidence.js` (`rescueByWorkGrounding`) |
+| 9 | Exact applicant-linked canonical contact reuse | `applicant-known-reviewer-service.js` + `applicant-known-reviewer.js` + `promote-applicant-reviewer-service.js` |

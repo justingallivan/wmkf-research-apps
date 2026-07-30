@@ -13,6 +13,7 @@ import {
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
   candidateWasSaved,
+  getCandidatePromotionDecision,
   getCandidateEmailReadiness,
   pruneCandidateForRoster,
   pruneEmailEvidence,
@@ -23,8 +24,110 @@ import {
   reviewerCandidateKey,
   withReviewerCandidateKey,
 } from '../../shared/components/reviewers/reviewer-search-logic.js';
+import { projectCanonicalApplicantContact } from '../../lib/utils/applicant-known-reviewer.js';
 const { PROVENANCE_KINDS, provenanceGroupOf, provenanceKindOf, provenanceLabelForCandidate } = require('../../lib/utils/reviewer-provenance');
 const { normalizeReviewerName: normName } = require('../../lib/utils/reviewer-name-match');
+
+test('applicant canonical email/source pair and promotion decision survive roster pruning', () => {
+  const candidate = {
+    name: 'Known Applicant Reviewer',
+    potentialReviewerId: '22222222-2222-2222-2222-222222222222',
+    suggestionId: '33333333-3333-3333-3333-333333333333',
+    isApplicantRecommended: true,
+    identityStatus: 'probable',
+    emailPersistAllowed: false,
+    applicantKnownReviewer: {
+      status: 'known',
+      potentialReviewerId: '22222222-2222-2222-2222-222222222222',
+      name: 'Known Applicant Reviewer',
+      email: 'known@example.edu',
+      emailSource: null,
+      affiliation: 'Example University',
+      orcid: '0000-0001-2345-6789',
+    },
+  };
+  const before = projectCanonicalApplicantContact({
+    applicantKnownReviewer: candidate.applicantKnownReviewer,
+    candidate,
+  });
+  const pruned = pruneCandidateForRoster(candidate);
+  const after = projectCanonicalApplicantContact({
+    applicantKnownReviewer: pruned.applicantKnownReviewer,
+    candidate: pruned,
+  });
+  expect(pruned.applicantKnownReviewer).toMatchObject({
+    email: 'known@example.edu',
+    emailSource: null,
+    emailReadiness: { action: 'quick_check' },
+  });
+  expect(after).toEqual(before);
+  expect(isCandidateSelectable(pruned)).toBe(true);
+});
+
+test('vetted enrichment pair stays selectable when the exact applicant person has no stored email', () => {
+  const pruned = pruneCandidateForRoster({
+    name: 'Applicant With New Email',
+    suggestionId: '33333333-3333-3333-3333-333333333333',
+    isApplicantRecommended: true,
+    identityStatus: 'probable',
+    applicantKnownReviewer: {
+      status: 'known',
+      potentialReviewerId: '22222222-2222-2222-2222-222222222222',
+      email: null,
+      emailSource: null,
+    },
+    email: 'new@example.edu',
+    emailSource: 'scholarly_multi',
+    contactEnrichment: {
+      identity: { status: 'probable' },
+      email: 'new@example.edu',
+      emailSource: 'scholarly_multi',
+      emailPersistAllowed: true,
+    },
+  });
+  expect(pruned).toMatchObject({
+    email: 'new@example.edu',
+    emailSource: 'scholarly_multi',
+    emailPersistAllowed: true,
+    contactEnrichment: {
+      email: 'new@example.edu',
+      emailSource: 'scholarly_multi',
+      emailPersistAllowed: true,
+    },
+  });
+  expect(getCandidatePromotionDecision(pruned)).toMatchObject({
+    decision: 'ready',
+    email: 'new@example.edu',
+    emailSource: 'scholarly_multi',
+  });
+  expect(isCandidateSelectable(pruned)).toBe(true);
+});
+
+test('applicant contact-claim mismatch survives roster pruning and remains non-selectable until staff correction', () => {
+  const pruned = pruneCandidateForRoster({
+    name: 'Conflicted Applicant Reviewer',
+    suggestionId: '33333333-3333-3333-3333-333333333333',
+    isApplicantRecommended: true,
+    identityStatus: 'probable',
+    applicantContactMismatch: true,
+    applicantKnownReviewer: {
+      status: 'known',
+      potentialReviewerId: '22222222-2222-2222-2222-222222222222',
+      email: 'stored@example.edu',
+      emailSource: 'scholarly_multi',
+    },
+  });
+  expect(pruned.applicantContactMismatch).toBe(true);
+  expect(isCandidateSelectable(pruned)).toBe(false);
+  expect(isCandidateSelectable({
+    ...pruned,
+    email: 'corrected@example.edu',
+    emailSource: 'manual',
+    contactEnrichment: { email: 'corrected@example.edu', emailSource: 'manual' },
+    pdIdentityConfirmed: true,
+    manualContactFields: ['email'],
+  })).toBe(true);
+});
 
 describe('parseReferredSeeds', () => {
   test('parses one-per-line referred reviewer seeds with referrer context', () => {
@@ -881,6 +984,12 @@ describe('hasValidApplicantEnrichmentCache', () => {
     isApplicantRecommended: true,
     enrichedProposalKey: proposalKey,
     applicantEnrichmentCacheVersion: APPLICANT_ENRICHMENT_CACHE_VERSION,
+    applicantKnownReviewer: {
+      status: 'known',
+      potentialReviewerId: 'person-1',
+      email: 'applicant@example.edu',
+      emailSource: null,
+    },
     identityStatus: 'probable',
   };
 
@@ -907,6 +1016,25 @@ describe('hasValidApplicantEnrichmentCache', () => {
     expect(hasValidApplicantEnrichmentCache([
       { ...canonical, applicantEnrichmentCacheVersion: APPLICANT_ENRICHMENT_CACHE_VERSION - 1 },
     ], proposalKey, expected)).toBe(false);
+  });
+
+  test('retries transient hydration outages but caches stable conflicts and mismatches', () => {
+    expect(hasValidApplicantEnrichmentCache([
+      {
+        ...canonical,
+        applicantKnownReviewer: { status: 'unavailable', potentialReviewerId: 'person-1' },
+      },
+    ], proposalKey, expected)).toBe(false);
+    expect(hasValidApplicantEnrichmentCache([
+      { ...canonical, applicantContactMismatch: true },
+    ], proposalKey, expected)).toBe(true);
+    expect(hasValidApplicantEnrichmentCache([
+      {
+        ...canonical,
+        identityStatus: 'unresolved',
+        applicantKnownReviewer: { status: 'email_conflict', potentialReviewerId: 'person-1' },
+      },
+    ], proposalKey, expected)).toBe(true);
   });
 
   test('ignores legacy-key rows once the canonical row exists and rejects partial canonical batches', () => {

@@ -23,6 +23,11 @@ jest.mock('../../lib/services/reviewer-exclusion-parser', () => ({
   extractExcludedReviewers: (...a) => extractExcludedReviewers(...a),
 }));
 
+const loadApplicantKnownReviewer = jest.fn();
+jest.mock('../../lib/services/workbench/applicant-known-reviewer-service', () => ({
+  loadApplicantKnownReviewer: (...a) => loadApplicantKnownReviewer(...a),
+}));
+
 const loadModelOverrides = jest.fn(async () => {});
 jest.mock('../../lib/services/model-override-loader', () => ({
   loadModelOverrides: (...a) => loadModelOverrides(...a),
@@ -49,6 +54,15 @@ beforeEach(() => {
   getById.mockResolvedValue(baseRequest());
   ensureApplicantRecommended.mockResolvedValue({ id: 'sug-1', created: true, skippedExcluded: false });
   extractExcludedReviewers.mockResolvedValue({ names: [], substantive: false, parseFailed: false });
+  loadApplicantKnownReviewer.mockImplementation(async (personId) => ({
+    status: 'known',
+    code: null,
+    potentialReviewerId: personId,
+    name: 'Known Reviewer',
+    email: 'known@example.edu',
+    emailSource: null,
+    emailReadiness: { action: 'quick_check', level: 'low', reason: 'Check' },
+  }));
 });
 
 const args = { requestId: REQ, actingUserSystemId: 'u-1', userProfileId: 7 };
@@ -84,6 +98,7 @@ test('dedupes the same person across slots (single response entry, slotsPopulate
   expect(body.slotsPopulated).toBe(2);
   expect(body.recommendedCreated).toBe(2);
   expect(body.recommendedComplete).toBe(true);
+  expect(body.knownLookupComplete).toBe(true);
 });
 
 test('per-slot failure is partial: failed slot lands in recommendedFailed/errors, others still materialize', async () => {
@@ -105,6 +120,29 @@ test('per-slot failure is partial: failed slot lands in recommendedFailed/errors
   expect(body.recommendedComplete).toBe(false);
   expect(body.slotsPopulated).toBe(2);
   expect(body.errors).toHaveLength(1);
+});
+
+test('exact-person hydration failure does not recast a successful materialization as failed', async () => {
+  getById.mockResolvedValue(baseRequest({
+    _wmkf_potentialreviewer1_value: P1,
+    _wmkf_potentialreviewer1_value_formatted: 'Dr. One',
+  }));
+  loadApplicantKnownReviewer.mockResolvedValue({
+    status: 'unavailable',
+    code: 'person_unavailable',
+    potentialReviewerId: P1,
+  });
+  const body = await ingestApplicantReviewers(args);
+  expect(body.recommended).toHaveLength(1);
+  expect(body.recommendedComplete).toBe(true);
+  expect(body.recommendedFailed).toBeUndefined();
+  expect(body.knownLookupComplete).toBe(false);
+  expect(body.knownLookupFailed).toEqual([{
+    slot: 1,
+    potentialReviewerId: P1,
+    suggestionId: 'sug-1',
+    code: 'person_unavailable',
+  }]);
 });
 
 test('extraction failure never blocks recommended ingestion (excludedParseFailed + stage error)', async () => {
