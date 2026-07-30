@@ -2,8 +2,8 @@
 title: Dataverse wmkf_requestdocument
 domain: application-state
 kind: atlas
-status: planned-live
-summary: Governed request-artifact registry schema and pilot data flow; not yet provisioned in a named Dataverse environment.
+status: active
+summary: Governed request-artifact registry and Initial Assessment pilot data flow; production schema is live, while application deployment and the controlled pilot remain pending.
 canonical: false
 owner: product-engineering
 related:
@@ -21,10 +21,21 @@ related:
 read API, Workbench panel, and cycle-wide pilot locator are implemented on the
 Initial Assessment pilot branch. The full Editor Dashboard remains planned.
 
-**[NOT YET VERIFIED LIVE]** The entity, relationships, alternate key, prompt
-row, SharePoint write, and pilot artifact have not been provisioned or exercised
-in a named environment. Do not infer a live entity-set count or production
-read/write capability from the source implementation.
+**[VERIFIED 2026-07-30 via production Wave 16 apply and idempotent read-only
+rerun]** The entity, attributes, five relationships, generation-key alternate
+key, and `akoya_request.wmkf_CurrentInitialAssessment` pointer are live in
+Production.
+
+**[VERIFIED 2026-07-30 via production count probes]** The registry has 0 rows
+and the request pointer has 0 populated rows. The governed
+`initial-assessment.generate` prompt exists as version 1 at
+`fc8a4c3b-5e8c-f111-ab0f-7ced8d3d15a6`; a repeat create-only seed refused to
+overwrite it.
+
+**[NOT YET EXERCISED LIVE]** The application branch has not yet been promoted,
+no SharePoint artifact has been generated, and the controlled dummy-request
+pilot has not run. Live schema and prompt availability must not be described as
+a completed application or artifact pilot.
 
 ## Ownership
 
@@ -93,15 +104,17 @@ transition.
 
 ## Deployment/probe sequence
 
-1. Name the pilot Dataverse target and proposal/testers.
-2. Run `node scripts/preflight-request-document-table.mjs --target=<target>`.
-3. If every artifact is absent or exact, run
+1. **Completed 2026-07-30:** name Production as the schema/prompt target.
+2. **Completed 2026-07-30:** run
+   `node scripts/preflight-request-document-table.mjs --target=prod`.
+3. **Completed 2026-07-30:** with every artifact absent, run
    `node scripts/apply-dataverse-schema.js --target=<target> --wave=16-request-document-registry --execute`.
-4. Re-run the preflight and verify the expected entity-set name
+4. **Completed 2026-07-30:** re-run the preflight and verify the expected entity-set name
    `wmkf_requestdocuments` and request lookup
    `akoya_request.wmkf_CurrentInitialAssessment`.
-5. Seed `initial-assessment.generate` with
+5. **Completed 2026-07-30:** seed `initial-assessment.generate` with
    `node scripts/seed-initial-assessment-prompt.js --execute`.
-6. Exercise one authorized end-to-end pilot, including an intentional retry.
+6. **Open:** promote the reviewed application branch.
+7. **Open:** exercise one authorized end-to-end pilot, including an intentional retry.
 
 No live command in this sequence is authorized merely by this page.

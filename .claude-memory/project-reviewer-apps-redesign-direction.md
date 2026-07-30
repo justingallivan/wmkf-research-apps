@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has seven implemented tabs and three placeholders in source; the Initial Assessment tab and cycle-wide pilot locator await live deployment, while the full Editor Dashboard remains planned and the near-term execution plan owns forward sequencing.
+description: The unified Request Workbench has seven implemented tabs and three placeholders in source; Initial Assessment production schema and prompt v1 are live while the application and controlled pilot await promotion, and the full Editor Dashboard remains planned.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-29 via source/live probes, Workbench truth audit, and owner production-pilot environment decision
+  last_verified: 2026-07-30 via source/live probes, production schema/prompt apply and readback, Workbench truth audit, and owner production-pilot decisions
 ---
 
 ## Recall Rule
@@ -115,8 +115,9 @@ planned. Current authority is
 
 - Ten top-level tabs; seven implemented in source (Overview, Proposal, Initial
   Assessment, Reviewers, Reviews, Status, Awardee) and three placeholders (Pre
-  Site Visit Writeup, Site Visit, Final Writeup). Initial Assessment live-state
-  provisioning and the human pilot remain pending.
+  Site Visit Writeup, Site Visit, Final Writeup). Initial Assessment production
+  registry/pointer schema and governed prompt v1 are live and verified;
+  application promotion and the human pilot remain pending.
 - Reviews is built and production-proved: governed-v3 structured output
   persisted successfully, the automatic all-in drain is enabled, and its
   producer/persistence/consumer lifecycle completed a controlled production
@@ -125,8 +126,10 @@ planned. Current authority is
   `wmkf_granteedeliverable` persistence. GAL-trigger automation remains separate/unknown.
 - The proposed writeup URL fields and `writeup.*` prompt rows remain absent.
   Their June design is historical input; the implemented pilot instead uses
-  schema-as-code `wmkf_requestdocument` plus governed
-  `initial-assessment.generate`, neither yet provisioned live.
+  the production-provisioned `wmkf_requestdocument` registry and governed
+  `initial-assessment.generate` v1. Fresh production probes on 2026-07-30 found
+  zero registry rows and zero populated request pointers, so no artifact pilot
+  has yet occurred.
 - Reviewer Pool remains planned and optional, not a shipped Workbench-v1 deliverable.
 
 ## Historical decision chronology

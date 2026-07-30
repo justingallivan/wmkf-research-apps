@@ -6,7 +6,7 @@ status: active
 summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-07-29
+last_verified: 2026-07-30
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -135,9 +135,11 @@ index and workflow surface, not a second editor or document store.
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
 
-1. provision and exercise the source-built governed-artifact foundation in a
+1. promote and exercise the source-built governed-artifact application in a
    human-in-the-loop, end-to-end Initial Assessment pilot by 2026-08-10, ahead
-   of proposal intake around 2026-08-18. The owner chose a controlled
+   of proposal intake around 2026-08-18. The production registry/pointer schema
+   and governed prompt v1 were provisioned and verified 2026-07-30; no artifact
+   exists yet. The owner chose a controlled
    production rehearsal with colleague-created representative dummy requests
    instead of building the existing Dataverse sandbox organization into an
    integrated application/file test environment. Authorized staff must inspect

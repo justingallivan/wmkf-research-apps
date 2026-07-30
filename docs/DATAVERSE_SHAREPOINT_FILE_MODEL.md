@@ -6,7 +6,7 @@ status: active
 summary: "File storage and linking in AkoyaGO/Dynamics, including governed staff writeups and Site Visit artifacts."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-07-29
+last_verified: 2026-07-30
 owner: product-engineering
 related:
   - scripts/probe-sharepoint-write.js
@@ -45,12 +45,13 @@ hood.
 ## Governed staff writeups and Site Visit artifacts — target contract
 
 > **Owner-decided direction (2026-07-28); Initial Assessment pilot implemented
-> in source 2026-07-29, live provisioning/pilot still pending.**
+> in source 2026-07-29; production registry/pointer schema and governed prompt
+> v1 provisioned and verified 2026-07-30.**
 > This section governs the Initial Assessment, Pre Site Visit Writeup, and
 > Final Writeup design as well as the Site Visit dossier and its materials. It
-> does not claim that the target Dataverse schema, prompt row, or pilot artifact
-> has been provisioned. **[VERIFIED via owner decisions 2026-07-28 and repository
-> source 2026-07-29; live state NOT YET VERIFIED.]**
+> does not claim that the application has been deployed or that a pilot artifact
+> has been generated. **[VERIFIED via owner decisions 2026-07-28, repository
+> source 2026-07-29, and production apply/readback/count probes 2026-07-30.]**
 
 ### Authority boundary
 
@@ -94,8 +95,11 @@ rebuilt from the SharePoint original.
 ### Registry contract
 
 The approved typed registry is implemented in schema-as-code as
-`wmkf_requestdocument` (expected entity set `wmkf_requestdocuments`) rather
-than one ad hoc URL field per writeup. Its live provisioning remains gated.
+`wmkf_requestdocument` (entity set `wmkf_requestdocuments`) rather than one ad
+hoc URL field per writeup. Its complete Wave 16 schema, alternate key,
+relationships, and request pointer are live in Production as of 2026-07-30;
+the fresh registry and pointer counts were both zero before application
+promotion and the controlled pilot.
 The persistence contract accounts for:
 
 - request and cycle;

@@ -88,6 +88,18 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    `potential-reviewer.queryAllReviewers`, a printed denominator, and a refusal on a
    zero-row read. Recorded in `docs/agent-wiki/topics/dataverse-dynamics.md`.
 
+8. **Initial Assessment production schema and prompt gates completed 2026-07-30**
+   The owner accepted the provisional v1 prompt/template pair and explicitly
+   authorized the additive Production writes. Wave 16 created and read back the
+   complete `wmkf_requestdocument` entity, attributes, five relationships,
+   generation-key alternate key, and
+   `akoya_request.wmkf_CurrentInitialAssessment` pointer. The create-only seed
+   published `initial-assessment.generate` v1 at
+   `fc8a4c3b-5e8c-f111-ab0f-7ced8d3d15a6`; a repeat dry-run refused overwrite.
+   Fresh production probes found 0 registry rows and 0 populated request
+   pointers. The application has not yet been promoted and no SharePoint
+   artifact or live AI run has been created.
+
 ### Commits
 
 15 commits, `3f56bb7d..c688aa0c` on `main`. Highlights:
@@ -107,7 +119,7 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
 
 ### Verified Open
 
-1. **Promote the recovered governed Initial Assessment pilot only after its live gates are approved.**
+1. **Promote the recovered governed Initial Assessment application, then verify the deployment.**
    Evidence: `codex/initial-assessment-pilot-recovery` contains the two recovered pilot
    commits plus current documentation and contract reconciliation. A fresh independent
    adversarial review found and drove fixes for finalize ambiguity, canonical-pointer
@@ -115,9 +127,11 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    drift, route-body closure, pagination, and run provenance; its final verdict is READY.
    The full unit/integration suite passes (544 suites / 6,553 tests), the production build
    passes, lint has 0 errors (51 existing warnings), and relevant contract, Atlas, route,
-   prompt, Dataverse, documentation, memory, and type gates pass. No Initial Assessment
-   schema, prompt, application code, or artifact has been promoted or written live. Owner
-   decisions below still gate that work.
+   prompt, Dataverse, documentation, memory, and type gates pass. The complete
+   Production schema and governed prompt v1 are now live and verified. The
+   application code is not yet deployed, and no artifact has been generated.
+   Promote PR #102 only after this live-state documentation reconciliation is
+   committed and its checks are green.
 
 2. **Exercise address attestation only when a truthful eligible production row exists.**
    Evidence: the signed-in Workbench inspection covered requests `1002912` and `1002874`.
@@ -139,28 +153,24 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    Dataverse sandbox environment is out of scope. These remaining inputs gate
    the 2026-08-10 pilot; intake begins around 2026-08-18.
 
-2. **Accept or revise the provisional Initial Assessment v1 prompt/template pair.**
-   Evidence: same plan. The source implementation preserves the decided applicant-title
-   (`akoya_title`) and staff-authored Foundation Opportunity requirements, but source
-   implementation is not owner approval for production seeding.
-
-3. **Artifact registry and SharePoint target-library controls.**
+2. **Artifact registry and SharePoint target-library controls.**
    Evidence: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
-   The pilot registry schema, provisional prompt/template pair, applicant-title
-   (`akoya_title`) source, and staff-authored Foundation Opportunity requirement
-   are implemented in source. Verify SharePoint version, restore, recycle,
+   The pilot registry schema and governed prompt v1 are live in Production; the
+   application, applicant-title (`akoya_title`) source, and staff-authored
+   Foundation Opportunity requirement are implemented in source. Verify
+   SharePoint version, restore, recycle,
    retention, permission, and milestone-snapshot behavior against the dedicated
    production dummy requests before the controlled rehearsal. The generic registry has
    source-document/version/hash fields, but this pilot producer currently fingerprints
    the extracted Project Description content rather than binding a governed source
    artifact/version; decide whether that stronger lineage is required before rehearsal.
 
-4. **Re-key the 12 `candidate:`-keyed saved rows that carry a suggestion anchor.**
+3. **Re-key the 12 `candidate:`-keyed saved rows that carry a suggestion anchor.**
    Evidence: S387 probe — they are `saved`, so there is no live dead-end; left untouched.
    Re-keying would make `savedKeys` count them. Cosmetic until someone re-opens those
    requests.
 
-5. **The 3 person rows with `wmkf_emailsource='database'`.**
+4. **The 3 person rows with `wmkf_emailsource='database'`.**
    Evidence: S387 probe of 385 person rows. An unrecognized source: `emailConfidence`
    classifies it `quick_check`, `emailSourceTier` gives it no precedence claim. Decide
    whether `database` is a real source to classify or a value to retire.

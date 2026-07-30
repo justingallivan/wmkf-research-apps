@@ -1,7 +1,8 @@
 # Atlas: `wmkf_ai_run` + `wmkf_ai_prompt` (Dataverse)
 
-**Last verified:** 2026-07-28 for governed `review-synthesis.generate` v3 and
-its successful controlled production execution; 2026-07-12 for the broader entity inventory via
+**Last verified:** 2026-07-30 for governed `initial-assessment.generate` v1
+production provisioning and the 20-row prompt count; 2026-07-28 for governed
+`review-synthesis.generate` v3 and its successful controlled production execution; 2026-07-12 for the broader entity inventory via
 `scripts/reconcile-memory-claims.js`
 **Source spec:** `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` (canonical; v2 archived)
 
@@ -65,6 +66,15 @@ Both written by `execute-prompt.js` `writeRunRow()`. Migration plans touching ei
 - `scripts/seed-phase-i-summary-prompt.js`, `scripts/seed-phase-ii-prompts.js` (4 `phase-ii.*` rows), `scripts/seed-reviewer-finder-prompts.js` (2 `reviewer-finder.*` rows), `scripts/seed-peer-review-summarizer-prompts.js` (2 `peer-review-summarizer.*` rows) — **upsert** prompt rows keyed on `wmkf_ai_promptname` + `wmkf_ai_iscurrent` (update-in-place when current). LEGACY pattern; not yet converted (a separate audited sweep — S269 Codex review).
 - **Seed governance (S269) — `lib/services/prompt-seed.js`, the GO-FORWARD default for Tier-1 system prompts.** The two grantee seeds (`seed-grantee-title-prompt.js`, `seed-grantee-abstract-prompt.js`) use it: **create-only by default** (refuses if ANY row for the name exists — admin's versioned history is never clobbered; the file is a bootstrap artifact, not the live state), and **`--force` is version-preserving** (publishes `max(version)+1` as a new current row, flips priors with ETag — same invariant as the admin publish path). Stamps `wmkf_ai_publisheddatetime` on every version. **Dataverse `wmkf_ai_prompts` is the source of truth; after bootstrap, `/admin` versioned publish is the governed edit path.** Admin publish clones the prior row's Executor metadata, and rejects an unreviewed concrete Claude `wmkf_ai_model` before writing a new version. Provenance is legible via `createdon` (version created) / `wmkf_ai_publisheddatetime` (domain publish) / `modifiedon` (last touch) / `_modifiedby_value` (seed = app identity, admin = superuser). Rationale: [[project-prompt-governance]].
 - **Two-tier prompt/preference model (S269):** *Tier 1* — shared **system/core** prompts here in `wmkf_ai_prompts`, versioned. *Tier 2* — **per-user** overrides that LAYER over a Tier-1 base: the S222 reviewer-finder override (`pages/api/reviewer-finder/prompt-override.js`, the `PREFERENCE_KEYS` user-preference store), default sourced from the Tier-1 base, `staleOverride` when the base version advances. A new prompt goes in Tier 1 if system/superuser-run; Tier 2 if per-user (e.g. email text).
+- **`initial-assessment.generate` production bootstrap (2026-07-30):**
+  create-only seed published version 1
+  `fc8a4c3b-5e8c-f111-ab0f-7ced8d3d15a6` with the exact tracked
+  system/body/variables/output schema and hash-only raw-output retention. A
+  repeat dry-run refused to overwrite the existing name, confirming the
+  version-history guard. The production entity held 20 prompt rows after this
+  seed. A fresh lookup-scoped count probe found 0 `wmkf_ai_run` rows linked to
+  this prompt. The prompt is live, but application promotion and the controlled
+  dummy-request pilot remain separate gates.
 - **`review-synthesis.generate` production publication (2026-07-26):** the
   authenticated superuser admin route published current v2
   `7423049a-3f89-f111-ab0f-7ced8d3d15a6` and retired v1

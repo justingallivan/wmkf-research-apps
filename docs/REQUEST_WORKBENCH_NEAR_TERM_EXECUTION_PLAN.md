@@ -6,7 +6,7 @@ status: canonical
 summary: "Review synthesis lifecycle is production-proved with automation enabled; the next sequence is the remaining Workbench lifecycle design freeze."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-07-29
+last_verified: 2026-07-30
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -205,9 +205,11 @@ Board-ready freeze remains a separate owner-controlled milestone.
 
 ### Initial Assessment source and first-template contract
 
-**[VERIFIED 2026-07-29 via four owner-supplied D26 Phase I Word examples,
-current source, and a read-only production Dataverse probe; pilot implementation
-BUILT IN SOURCE, live provisioning and owner acceptance pending.]** The D26 examples provide the starting content contract for the J27
+**[VERIFIED 2026-07-30 via four owner-supplied D26 Phase I Word examples,
+current source, production Dataverse apply/readback probes, and owner
+acceptance; pilot implementation BUILT IN SOURCE, production schema and
+governed prompt v1 LIVE, application promotion and controlled pilot pending.]**
+The D26 examples provide the starting content contract for the J27
 Initial Assessment. Each is a one-page Word document with this sequence:
 
 1. the applicant-submitted proposal title;
@@ -652,8 +654,8 @@ Explicit non-goals during design freeze:
 
 ## First deadline-bound slice — governed Initial Assessment pilot
 
-> **Implementation checkpoint (2026-07-29): [VERIFIED via repository source,
-> not live state].** The branch implementation now includes the
+> **Implementation checkpoint (2026-07-30): [VERIFIED via repository source
+> plus Production schema/prompt apply and readback].** The branch implementation now includes the
 > `wmkf_requestdocument` schema wave/adapter, governed prompt seed, versioned
 > DOCX producer, `Artifacts/Initial Assessment/` destination, deterministic
 > retry/recovery contract, Workbench Initial Assessment panel, and a cycle-wide
@@ -672,13 +674,16 @@ Explicit non-goals during design freeze:
 > post-upload registry failure, and
 > content-hash recovery without a second AI call when bytes match, and
 > fresh-filename regeneration while retaining mismatched-item identity when
-> they do not. The entity/prompt are **not
-> provisioned live**, and no pilot request has run; steps 8–11 and the live
-> portions of steps 2/4/5 remain open until colleagues create and identify the
-> representative production dummy request(s) and the owner names the testers
-> and schedule.
+> they do not. **[VERIFIED 2026-07-30]** The complete Wave 16 entity,
+> relationships, alternate key, and request pointer are live in Production,
+> and governed `initial-assessment.generate` v1 is live at
+> `fc8a4c3b-5e8c-f111-ab0f-7ced8d3d15a6`; the fresh registry and pointer counts
+> remain zero. The application has not yet been promoted and no pilot request
+> has run. Steps 8–11 and the live SharePoint/application portions of steps
+> 4–6 remain open until colleagues create and identify the representative
+> production dummy request(s) and the owner names the testers and schedule.
 
-The August 10 minimum changes the former default. Provision and exercise the
+The August 10 minimum changes the former default. Promote and exercise the
 source-built governed artifact spine through the J27 Initial Assessment first;
 Pre Site Visit becomes a dependent reuse of that proven contract.
 
@@ -861,7 +866,11 @@ Owner-decided:
 43. the Initial Assessment pilot uses a controlled production rehearsal with
     colleague-created representative dummy requests; building the existing
     Dataverse sandbox organization into an integrated application/file test
-    environment is out of scope.
+    environment is out of scope; and
+44. on 2026-07-30 the owner accepted the provisional v1 prompt/template pair
+    and explicitly authorized the additive Production writes. Wave 16 and
+    `initial-assessment.generate` v1 were applied and independently read back;
+    application promotion and artifact generation remain separate gates.
 
 Still required:
 
@@ -869,9 +878,9 @@ Still required:
    testers, the exact pilot schedule, and deadlines for later lifecycle stages;
 2. first approved Pre-Site Word template and prompt/template compatibility
    contract;
-3. named-target provisioning/readback of the source-built Dataverse registry
-   schema and target-library configuration for the decided request-relative
-   SharePoint destination;
+3. target-library configuration/readback for the decided request-relative
+   SharePoint destination; the production Dataverse registry/pointer
+   provisioning and readback are complete;
 4. target-library version, retention, recycle, and permission audit;
 5. exact Dataverse schema and dossier read model for the decided Site Visit
    metadata, material categories, and observations;
@@ -885,7 +894,4 @@ Still required:
 8. exact safe regeneration behavior and any additional Final Writeup inputs
    beyond copying the latest Pre-Site version; and
 9. Editor Dashboard Reviewed-marker granularity, coordinator view, SharePoint
-   file-access verification, and restore authority; and
-10. owner acceptance of the provisional Initial Assessment v1 prompt/template
-    pair and any revisions identified while testing its D26-derived structure
-    during the single-phase transition.
+   file-access verification, and restore authority.
