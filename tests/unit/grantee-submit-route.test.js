@@ -217,7 +217,8 @@ describe('submitted notification (best-effort, post-commit)', () => {
     expect(notifyArg().explicitRecipients).toEqual(['pd@wmkf.example']);
     // Resolved by request id through the shared resolver — NOT read off the
     // token-verified request object, whose projection carries no PD field.
-    expect(resolveProgramDirectorEmailForRequest).toHaveBeenCalledWith('r1');
+    // skipCache: a recipient decision must not reuse a warm 10-minute entry.
+    expect(resolveProgramDirectorEmailForRequest).toHaveBeenCalledWith('r1', { skipCache: true });
     // And the PI name comes from a FRESH request read for the same reason.
     expect(grantRequestAdapter.getById).toHaveBeenCalledWith('r1', expect.objectContaining({
       select: expect.stringContaining('_wmkf_projectleader_value'),
@@ -339,7 +340,7 @@ describe('submitted notification (best-effort, post-commit)', () => {
     resolveProgramDirectorEmailForRequest.mockResolvedValue('pd@wmkf.example');
     await handler(successReq(), mockRes());
 
-    expect(resolveProgramDirectorEmailForRequest).toHaveBeenCalledWith('r1');
+    expect(resolveProgramDirectorEmailForRequest).toHaveBeenCalledWith('r1', { skipCache: true });
     const [addr] = notifyArg().explicitRecipients;
     expect(addr).toBe(addr.trim().toLowerCase());
   });

@@ -416,6 +416,14 @@ Where the shipped code differs from, or resolves, the plan above:
   configured `pd@wmkf.org` survives as two entries and emails the PD twice. The service now keeps only
   one read of its own — `_wmkf_projectleader_value` for the PI name, taken from the `_formatted`
   annotation rather than a separate contact read.
+- **…but with `skipCache: true`, added for this caller.** The resolver caches for 10 minutes
+  `[VERIFIED via program-director-resolver.js:18]`, which is right for the detection-alert callers that
+  merely annotate an alert, and wrong here: this picks a **recipient** at the moment of a durable event,
+  so a warm entry would route the notification to a PD who was reassigned off the request (or disabled)
+  between the invite and the grantee's submit. `skipCache` is an additive option — the three existing
+  callers (`review-upload`, `reviewer-quota`, `reviewer-withdrawal`) are untouched and keep the cache —
+  and it still refreshes the entry for later readers. Two tests in the resolver's own suite pin the
+  reassignment and disabled-since-warm-read cases.
 - **`hasImage` describes the package, not the upload.** `REVISION_REQUESTED` is an editable status
   `[VERIFIED via shared/config/granteeDeliverableStatus.js:74-79]`, and the writer patches
   `wmkf_imagefileref` only when it uploaded something
@@ -428,7 +436,7 @@ Where the shipped code differs from, or resolves, the plan above:
   `check:dataverse-access-layer`, `check:dynamics-context-boundary`, `check:odata-escape`,
   `check:atlas`, `check:doc-symbol-refs`, `check:doc-currency`, `check:fact-consistency`,
   `check:agent-wiki`, and `check:docs-catalog` all exit 0. `npm run build` succeeds with the new
-  dependency. Unit suite: **504/504 suites, 6064/6064 tests passing.** Earlier in this work two suites
+  dependency. Unit suite: **504/504 suites, 6066/6066 tests passing.** Earlier in this work two suites
   (`signin-server-props`, `dependency-security-compat`) failed identically on a stashed clean tree —
   pre-existing and unrelated; installing `@vercel/functions` refreshed `node_modules` and both now pass.
   ESLint reports no issues on the changed files (`AwardeeTab.js` keeps the same four pre-existing
