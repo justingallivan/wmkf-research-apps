@@ -60,7 +60,11 @@ identity/version. A Ready row returns without another model call or SharePoint
 upload. A failed/stale operation can reclaim by ETag. If SharePoint upload
 succeeded but the final registry PATCH failed, the row retains the expected
 content hash and deterministic target; retry downloads the item, verifies the
-hash, and finalizes the stable item identity without rerunning AI.
+hash, and finalizes the stable item identity without rerunning AI. If the
+existing item's bytes no longer match, the producer retains its exact
+drive/item identity for operator cleanup and generates to a fresh
+claim-specific filename instead of overwriting the changed file or dead-ending
+every retry.
 
 Changed authoritative inputs or cycle create a distinct generation row. Its
 Ready transition, the supersession of prior Ready rows, and the
@@ -74,8 +78,12 @@ pointer
 while exposing a newer pending/failed replacement separately. A claimant that
 loses ownership after uploading deletes its exact claim-specific item; if
 Graph deletion fails, exact drive/item cleanup work is retained in bounded
-registry JSON. Ordinary post-upload registry failures retain their item for
-hash-verified recovery.
+registry JSON and surfaced by the read model. The queue has no automated drain
+yet. If its primary field reaches capacity, the exact new identity is written
+to a dedicated overflow field and further generation for that deterministic
+artifact is blocked until an operator resolves the cleanup; unresolved
+identifiers are never silently evicted. Ordinary post-upload registry failures
+retain their item for hash-verified recovery.
 
 The governed writer requires positive resolution of the Dynamics-tracked
 `akoya_request` parent library; it does not inherit the shared read helper's

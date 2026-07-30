@@ -267,8 +267,15 @@
       "type": "Memo",
       "schemaName": "wmkf_OrphanCleanupJson",
       "displayName": "Orphan Cleanup JSON",
-      "description": "Bounded durable cleanup work for claim-specific SharePoint items that could not be deleted after a lost producer claim.",
+      "description": "Bounded operator-visible cleanup queue for claim-specific or hash-mismatched SharePoint items; exact identifiers are retained and capacity overflow fails loudly rather than evicting unresolved entries.",
       "maxLength": 10000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_OrphanCleanupOverflowJson",
+      "displayName": "Orphan Cleanup Overflow JSON",
+      "description": "Durable exact-identity overflow storage used when the primary cleanup queue reaches capacity. Any entry blocks further generation for the deterministic artifact until an operator resolves the cleanup work.",
+      "maxLength": 1048576
     },
     {
       "type": "DateTime",

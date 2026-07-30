@@ -56,7 +56,13 @@ export default async function handler(req, res) {
         return res.status(200).json(body);
       }
 
-      const requestId = String(req.body?.requestId || '').trim();
+      if (!req.body
+        || typeof req.body !== 'object'
+        || Array.isArray(req.body)
+        || Object.keys(req.body).some((key) => key !== 'requestId')) {
+        return res.status(400).json({ error: 'POST body must contain only requestId' });
+      }
+      const requestId = String(req.body.requestId || '').trim();
       if (!isGuid(requestId)) {
         return res.status(400).json({ error: 'requestId is required and must be a GUID' });
       }

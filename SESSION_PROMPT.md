@@ -5,8 +5,9 @@
 Session 387 did **not** do the work its own prompt planned. The owner opened with a
 production bug — a reviewer who could not be invited — and the session became a
 diagnosis-and-remediation run on the reviewer address/identity gates. The Initial
-Assessment pilot proceeded in parallel on `codex/initial-assessment-pilot` (Codex) and is
-now committed but unmerged; see Next Items.
+Assessment pilot proceeded in parallel on `codex/initial-assessment-pilot` (Codex). Its
+two commits have now been recovered onto current `main` as
+`codex/initial-assessment-pilot-recovery`; see Next Items.
 
 Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and verified
 `● Ready`). Four production data sweeps were executed and verified.
@@ -106,21 +107,23 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
 
 ### Verified Open
 
-1. **Resume the governed Initial Assessment pilot.**
-   Evidence: `codex/initial-assessment-pilot` is **2 commits ahead of `main` and 15 behind**
-   (`d5b5747a`, `8e9d9da6`); 6 `initial-assessment` files are TRACKED on it; the primary
-   checkout at `~/Code/WMKF_Apps` is clean.
-   **The prior prompt's claim that "no implementation exists yet" is now STALE** — Codex
-   built the artifact pilot during S387. Next step is to rebase/merge that branch onto the
-   new `main` and continue, not to start from zero. Owner decisions below still gate the
-   template and schedule.
+1. **Promote the recovered governed Initial Assessment pilot only after its live gates are approved.**
+   Evidence: `codex/initial-assessment-pilot-recovery` contains the two recovered pilot
+   commits plus current documentation and contract reconciliation. A fresh independent
+   adversarial review found and drove fixes for finalize ambiguity, canonical-pointer
+   multiplicity/lifecycle, cleanup overflow/races, UI refresh sequencing, prompt boundary
+   drift, route-body closure, pagination, and run provenance; its final verdict is READY.
+   The full unit/integration suite passes (544 suites / 6,553 tests), the production build
+   passes, lint has 0 errors (51 existing warnings), and relevant contract, Atlas, route,
+   prompt, Dataverse, documentation, memory, and type gates pass. No Initial Assessment
+   schema, prompt, application code, or artifact has been promoted or written live. Owner
+   decisions below still gate that work.
 
-2. **Click the attestation button once in a browser.**
-   Evidence: no browser verification exists for any of S387; all verification was
-   unit/integration tests plus production data probes.
-   The "✓ I verified \<address\> is correct" control in `InviteEmailModal` shipped to
-   production unexercised by a human. The fallback if it misbehaves is unchanged (copy the
-   secure link, then "I sent it — mark manually sent").
+2. **Exercise address attestation only when a truthful eligible production row exists.**
+   Evidence: the signed-in Workbench inspection covered requests `1002912` and `1002874`.
+   Every checked research-address candidate had already been invited, so the server's
+   selected/not-invited/not-responded gate correctly made none eligible. No invitation was
+   sent and no shared-person provenance was falsely stamped merely to satisfy a smoke.
 
 3. **Run the Q9 ordinary-user app-access smoke in the office.**
    Evidence: `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md:47,245,428`;
@@ -136,17 +139,21 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    Dataverse sandbox environment is out of scope. These remaining inputs gate
    the 2026-08-10 pilot; intake begins around 2026-08-18.
 
-2. **First approved Initial Assessment prompt/template pair.**
-   Evidence: same plan. The D26 structure is a starting point only; preserve the decided
-   applicant-title (`akoya_title`) and staff-authored Foundation Opportunity requirements.
+2. **Accept or revise the provisional Initial Assessment v1 prompt/template pair.**
+   Evidence: same plan. The source implementation preserves the decided applicant-title
+   (`akoya_title`) and staff-authored Foundation Opportunity requirements, but source
+   implementation is not owner approval for production seeding.
 
 3. **Artifact registry and SharePoint target-library controls.**
    Evidence: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
-   The exact pilot registry schema, prompt/template pair, applicant-title
+   The pilot registry schema, provisional prompt/template pair, applicant-title
    (`akoya_title`) source, and staff-authored Foundation Opportunity requirement
    are implemented in source. Verify SharePoint version, restore, recycle,
    retention, permission, and milestone-snapshot behavior against the dedicated
-   production dummy requests before the controlled rehearsal.
+   production dummy requests before the controlled rehearsal. The generic registry has
+   source-document/version/hash fields, but this pilot producer currently fingerprints
+   the extracted Project Description content rather than binding a governed source
+   artifact/version; decide whether that stronger lineage is required before rehearsal.
 
 4. **Re-key the 12 `candidate:`-keyed saved rows that carry a suggestion anchor.**
    Evidence: S387 probe — they are `saved`, so there is no live dead-end; left untouched.
@@ -214,7 +221,7 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
 ## Testing
 
 ```bash
-rtk npx jest tests/unit tests/integration   # 534 suites / 6390 tests green
+rtk npx jest tests/unit tests/integration   # 544 suites / 6553 tests green
 rtk npm run lint
 rtk npm run check:agent-wiki && rtk npm run check:agent-wiki:self-test
 rtk npm run check:atlas && rtk npm run check:atlas:self-test

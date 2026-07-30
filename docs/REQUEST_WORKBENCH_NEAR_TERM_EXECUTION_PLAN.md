@@ -48,9 +48,9 @@ The August 10 acceptance path is a real human-in-the-loop pilot:
    Word;
 5. a staff tester reviews and edits the canonical Word document, and the saved
    SharePoint version remains discoverable from the Workbench; and
-6. the staff-wide Editor Dashboard lists that same registered artifact and
-   lets an authorized staff tester find and open it without navigating request
-   by request.
+6. the cycle-wide pilot locator lists that same registered artifact and lets
+   an authorized staff tester find and open it without navigating request by
+   request. This proves the shared read contract, not the full Editor Dashboard.
 
 The pilot must use representative source data and human review, not route
 mocks or UI-only placeholders. The owner decided 2026-07-29 to use a
@@ -205,9 +205,9 @@ Board-ready freeze remains a separate owner-controlled milestone.
 
 ### Initial Assessment source and first-template contract
 
-**[VERIFIED 2026-07-28 via four owner-supplied D26 Phase I Word examples,
-current source, and a read-only production Dataverse probe; implementation
-PLANNED.]** The D26 examples provide the starting content contract for the J27
+**[VERIFIED 2026-07-29 via four owner-supplied D26 Phase I Word examples,
+current source, and a read-only production Dataverse probe; pilot implementation
+BUILT IN SOURCE, live provisioning and owner acceptance pending.]** The D26 examples provide the starting content contract for the J27
 Initial Assessment. Each is a one-page Word document with this sequence:
 
 1. the applicant-submitted proposal title;
@@ -635,13 +635,14 @@ Decision order:
 3. **Final Writeup** — freeze the latest-Pre-Site copy/lineage contract, safe
    explicit regeneration behavior, and the visit, late-review, and editorial
    inputs.
-4. **Initial Assessment** — design for every in-scope J27 proposal before
-   staff/Board advancement deliberation. The current D26 Initial Writeup
-   placeholder remains historical and requires no backfill.
+4. **Initial Assessment** — provision and exercise the source-built pilot
+   before staff/Board advancement deliberation, then decide scale-out to every
+   in-scope J27 proposal. The current D26 Initial Writeup placeholder remains
+   historical and requires no backfill.
 
 Explicit non-goals during design freeze:
 
-- no expansion of the implemented pilot Editor Dashboard beyond its approved
+- no expansion of the implemented pilot locator beyond its approved
   staff-wide cycle list/direct Word entry under the existing `reviewers` grant
   until the Reviewed-marker and coordinator-view contracts are fixed;
 - no Reviewer Pool build without observed need and owner priority;
@@ -664,18 +665,22 @@ Explicit non-goals during design freeze:
 > atomic replacement-Ready/prior-supersession, exact-input reactivation, exact
 > request-pointer fencing across concurrent first-time activations,
 > approved path with a positively resolved request-library parent, claim-lost
-> upload cleanup with durable cleanup work on delete failure, canonical-file
+> upload cleanup with operator-visible exact cleanup work on delete failure
+> (manual cleanup; bounded primary capacity spills exact identities to durable
+> overflow storage and then blocks further generation), canonical-file
 > visibility during a failed replacement, false-success prevention after a
 > post-upload registry failure, and
-> content-hash recovery without a second AI call. The entity/prompt are **not
+> content-hash recovery without a second AI call when bytes match, and
+> fresh-filename regeneration while retaining mismatched-item identity when
+> they do not. The entity/prompt are **not
 > provisioned live**, and no pilot request has run; steps 8–11 and the live
 > portions of steps 2/4/5 remain open until colleagues create and identify the
 > representative production dummy request(s) and the owner names the testers
 > and schedule.
 
-The August 10 minimum changes the former default. Build the shared governed
-artifact spine through the J27 Initial Assessment first; Pre Site Visit becomes
-a dependent reuse of that proven contract.
+The August 10 minimum changes the former default. Provision and exercise the
+source-built governed artifact spine through the J27 Initial Assessment first;
+Pre Site Visit becomes a dependent reuse of that proven contract.
 
 Build in producer-to-consumer order:
 
@@ -841,7 +846,7 @@ Owner-decided:
     pilot by 2026-08-10, before proposal intake begins around 2026-08-18. It
     covers real proposal/metadata inputs, governed generation, SharePoint Word
     creation and human editing, Dataverse registry/provenance, Workbench
-    discovery/opening, staff-wide Editor Dashboard discovery/opening, and one
+    discovery/opening, cycle-wide pilot-locator discovery/opening, and one
     safe failure/retry path; it does not require later lifecycle tabs;
 41. the starting Initial Assessment structure is a one-page Word document with
     the applicant-submitted proposal title, institution, Summary, and a
@@ -864,8 +869,9 @@ Still required:
    testers, the exact pilot schedule, and deadlines for later lifecycle stages;
 2. first approved Pre-Site Word template and prompt/template compatibility
    contract;
-3. exact Dataverse registry schema and target-library configuration for the
-   decided request-relative SharePoint destination;
+3. named-target provisioning/readback of the source-built Dataverse registry
+   schema and target-library configuration for the decided request-relative
+   SharePoint destination;
 4. target-library version, retention, recycle, and permission audit;
 5. exact Dataverse schema and dossier read model for the decided Site Visit
    metadata, material categories, and observations;
@@ -880,6 +886,6 @@ Still required:
    beyond copying the latest Pre-Site version; and
 9. Editor Dashboard Reviewed-marker granularity, coordinator view, SharePoint
    file-access verification, and restore authority; and
-10. any Initial Assessment prompt/template revisions identified while testing
-    the approved v1 pair and provisional D26-derived structure during the
-    single-phase transition.
+10. owner acceptance of the provisional Initial Assessment v1 prompt/template
+    pair and any revisions identified while testing its D26-derived structure
+    during the single-phase transition.

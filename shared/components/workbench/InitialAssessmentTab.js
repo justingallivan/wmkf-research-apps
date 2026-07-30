@@ -8,29 +8,34 @@ export default function InitialAssessmentTab({ requestId }) {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
-  const requestSequence = useRef(0);
+  const loadSequence = useRef(0);
+  const generationSequence = useRef(0);
   const monitoredStatus = (latestAttempt || artifact)?.operationStatus;
 
   useEffect(() => {
     if (!requestId) return undefined;
-    const sequence = ++requestSequence.current;
+    const sequence = ++loadSequence.current;
+    generationSequence.current += 1;
     (async () => {
       try {
         const response = await fetch(
           `/api/workbench/initial-assessment?requestId=${encodeURIComponent(requestId)}`,
         );
         const body = await response.json().catch(() => ({}));
-        if (requestSequence.current !== sequence) return;
+        if (loadSequence.current !== sequence) return;
         if (!response.ok) throw new Error(body.error || `Failed to load artifact (${response.status})`);
         setArtifact(body.artifacts?.[0] || null);
         setLatestAttempt(body.latestAttempts?.[0] || null);
       } catch (loadError) {
-        if (requestSequence.current === sequence) setError(loadError.message);
+        if (loadSequence.current === sequence) setError(loadError.message);
       } finally {
-        if (requestSequence.current === sequence) setLoading(false);
+        if (loadSequence.current === sequence) setLoading(false);
       }
     })();
-    return () => { requestSequence.current += 1; };
+    return () => {
+      loadSequence.current += 1;
+      generationSequence.current += 1;
+    };
   }, [requestId]);
 
   useEffect(() => {
@@ -40,19 +45,19 @@ export default function InitialAssessmentTab({ requestId }) {
     }
     const interval = setInterval(async () => {
       const id = requestId;
-      const sequence = ++requestSequence.current;
+      const sequence = ++loadSequence.current;
       try {
         const response = await fetch(
           `/api/workbench/initial-assessment?requestId=${encodeURIComponent(id)}`,
         );
         const body = await response.json().catch(() => ({}));
-        if (requestSequence.current !== sequence || id !== requestId) return;
+        if (loadSequence.current !== sequence || id !== requestId) return;
         if (!response.ok) throw new Error(body.error || `Failed to refresh artifact (${response.status})`);
         setArtifact(body.artifacts?.[0] || null);
         setLatestAttempt(body.latestAttempts?.[0] || null);
         setError(null);
       } catch (pollError) {
-        if (requestSequence.current === sequence) setError(pollError.message);
+        if (loadSequence.current === sequence) setError(pollError.message);
       }
     }, 5000);
     return () => clearInterval(interval);
@@ -60,7 +65,8 @@ export default function InitialAssessmentTab({ requestId }) {
 
   const generate = async () => {
     const id = requestId;
-    const sequence = ++requestSequence.current;
+    loadSequence.current += 1;
+    const sequence = ++generationSequence.current;
     setGenerating(true);
     setError(null);
     try {
@@ -70,7 +76,7 @@ export default function InitialAssessmentTab({ requestId }) {
         body: JSON.stringify({ requestId: id }),
       });
       const body = await response.json().catch(() => ({}));
-      if (requestSequence.current !== sequence || id !== requestId) return;
+      if (generationSequence.current !== sequence || id !== requestId) return;
       if (!response.ok) throw new Error(body.error || `Generation failed (${response.status})`);
       const returned = body.artifact || null;
       if (returned?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.READY) {
@@ -83,9 +89,9 @@ export default function InitialAssessmentTab({ requestId }) {
         setLatestAttempt(null);
       }
     } catch (generationError) {
-      if (requestSequence.current === sequence) setError(generationError.message);
+      if (generationSequence.current === sequence) setError(generationError.message);
     } finally {
-      if (requestSequence.current === sequence) setGenerating(false);
+      if (generationSequence.current === sequence) setGenerating(false);
     }
   };
 
@@ -121,13 +127,12 @@ export default function InitialAssessmentTab({ requestId }) {
             disabled={
               generating
               || (inProgress && !retryable)
-              || (ready && !latestAttempt)
               || !requestId
             }
             className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium disabled:opacity-50"
           >
             {ready && !latestAttempt
-              ? 'Draft created'
+              ? 'Refresh from current inputs'
               : generating || (inProgress && !retryable)
                 ? 'Generating…'
                 : retryable
@@ -161,6 +166,13 @@ export default function InitialAssessmentTab({ requestId }) {
                 Last attempt: {artifact.lastError.message}
               </p>
             )}
+            {artifact.cleanupRequired?.length > 0 && (
+              <p className="mt-3 text-amber-800">
+                SharePoint cleanup is required for {artifact.cleanupRequired.length} retained
+                file{artifact.cleanupRequired.length === 1 ? '' : 's'}. The exact item IDs are
+                recorded for an administrator.
+              </p>
+            )}
             {inProgress && !retryable && attempt.retryAfterAt && (
               <p className="mt-3 text-gray-500">
                 This operation is being monitored. If it stalls, retry unlocks after{' '}
@@ -180,6 +192,12 @@ export default function InitialAssessmentTab({ requestId }) {
             {latestAttempt.lastError && (
               <p className="mt-2 text-red-700">
                 Last attempt: {latestAttempt.lastError.message}
+              </p>
+            )}
+            {latestAttempt.cleanupRequired?.length > 0 && (
+              <p className="mt-2 text-amber-900">
+                SharePoint cleanup is required for {latestAttempt.cleanupRequired.length} retained
+                file{latestAttempt.cleanupRequired.length === 1 ? '' : 's'}.
               </p>
             )}
           </div>

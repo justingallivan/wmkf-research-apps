@@ -34,3 +34,37 @@ export const USER_PROMPT_TEMPLATE = `Draft the four permitted Initial Assessment
 {{proposal_text}}
 
 Return only the required JSON object.`;
+
+export const INITIAL_ASSESSMENT_REQUIRED_OUTPUTS = Object.freeze([
+  'summary',
+  'significance_impact',
+  'research_plan',
+  'team_expertise',
+]);
+
+export const INITIAL_ASSESSMENT_PROMPT_VARIABLES = Object.freeze({
+  variables: [{
+    name: 'proposal_text',
+    source: { kind: 'override' },
+    required: true,
+    cacheable: true,
+    placement: 'user',
+    dataClass: 'proposal_text',
+    maxChars: 100000,
+    untrusted: true,
+  }],
+});
+
+export const INITIAL_ASSESSMENT_PROMPT_OUTPUT_SCHEMA = Object.freeze({
+  outputs: [{ name: 'assessment', type: 'object', target: { kind: 'none' } }],
+  parseMode: 'json',
+  jsonSchema: {
+    type: 'object',
+    additionalProperties: false,
+    required: INITIAL_ASSESSMENT_REQUIRED_OUTPUTS,
+    properties: Object.fromEntries(
+      INITIAL_ASSESSMENT_REQUIRED_OUTPUTS.map((key) => [key, { type: 'string' }]),
+    ),
+  },
+  rawOutputRetention: 'hash',
+});

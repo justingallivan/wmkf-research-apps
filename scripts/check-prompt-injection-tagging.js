@@ -418,6 +418,11 @@ const SURFACES = [
     status: 'migrated',
     promptFiles: ['shared/config/prompts/initial-assessment.js'],
     callSiteFiles: ['lib/services/execute-prompt.js'],
+    requiredMarkers: [
+      'untrusted: true',
+      "dataClass: 'proposal_text'",
+      'maxChars: 100000',
+    ],
   },
 ];
 
@@ -496,6 +501,15 @@ function checkSurface(surface, readFile) {
       `${surface.id}: no registered file references ${PREAMBLE_MARKER} ` +
         '(migrated surface lost its hardening preamble).',
     );
+  }
+  for (const marker of surface.requiredMarkers || []) {
+    const found = files.some((file) => {
+      const content = readFile(file);
+      return content != null && content.includes(marker);
+    });
+    if (!found) {
+      errors.push(`${surface.id}: required boundary marker missing: ${marker}`);
+    }
   }
 
   // Call-site-granular layer: when the surface declares `builders`, every

@@ -60,8 +60,9 @@ document inventory, and individual implementation plans do not establish priorit
   Board milestones are required parts of the design. Initial Assessment,
   Pre-Site, and Final are three distinct documents; Final is copied from a
   the latest Pre-Site version at action time, with a rare explicit regeneration
-  option that preserves prior Final content. Exact schema and target-library
-  configuration remain planned/unverified. See
+  option that preserves prior Final content. The Initial Assessment registry
+  schema is implemented in source; named-target provisioning and target-library
+  configuration remain unverified. See
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
 - Pre-Site input direction (owner-decided 2026-07-28): draft factual material
   from the full proposal through an iterated governed `phase-ii.summarize`;
@@ -146,7 +147,7 @@ document inventory, and individual implementation plans do not establish priorit
   organization into an integrated application/file test environment is out of
   scope. Authorized staff inspect and edit the canonical SharePoint Word file
   and find/open the same registered artifact in both the Workbench and
-  staff-wide Editor Dashboard. The pilot also exercises a safe failure/retry
+  cycle-wide pilot locator. The pilot also exercises a safe failure/retry
   path. It is draft-functional proof, not broad production readiness, and does
   not require the later lifecycle tabs. Dummy request IDs/content shape, named
   testers, and schedule remain open. See the near-term plan.

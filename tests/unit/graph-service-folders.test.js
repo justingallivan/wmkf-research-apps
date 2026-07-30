@@ -77,3 +77,20 @@ it('fails closed when a path segment is a file', async () => {
     '1003001_REQUEST/Artifacts/Initial Assessment',
   )).rejects.toThrow('exists but is not a folder');
 });
+
+it('reuses a supplied site id when resolving a drive', async () => {
+  const siteSpy = jest.spyOn(GraphService, 'getSiteId');
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn().mockResolvedValueOnce(response(200, {
+    value: [{
+      id: 'drive-from-site',
+      name: 'Request',
+      webUrl: 'https://example.sharepoint.com/akoya_request',
+    }],
+  }));
+
+  await expect(GraphService.getDriveId('akoya_request', { siteId: 'known-site' }))
+    .resolves.toBe('drive-from-site');
+  expect(siteSpy).not.toHaveBeenCalled();
+  expect(global.fetch.mock.calls[0][0]).toContain('/sites/known-site/drives');
+});

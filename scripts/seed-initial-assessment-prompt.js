@@ -39,46 +39,25 @@ if (!DRY && !EXECUTE) {
 
 const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
 const { planSeed, seedPromptRow } = await import('../lib/services/prompt-seed.js');
-const { SYSTEM_PROMPT, USER_PROMPT_TEMPLATE } = await import(
+const {
+  INITIAL_ASSESSMENT_PROMPT_OUTPUT_SCHEMA,
+  INITIAL_ASSESSMENT_PROMPT_VARIABLES,
+  INITIAL_ASSESSMENT_REQUIRED_OUTPUTS,
+  SYSTEM_PROMPT,
+  USER_PROMPT_TEMPLATE,
+} = await import(
   '../shared/config/prompts/initial-assessment.js'
 );
 enterDynamicsBypassForScript('seed-initial-assessment-prompt');
 
 const PROMPT_NAME = 'initial-assessment.generate';
 const PROMPTSTATUS_PUBLISHED = 682090001;
-const required = ['summary', 'significance_impact', 'research_plan', 'team_expertise'];
-
-const promptVariables = {
-  variables: [{
-    name: 'proposal_text',
-    source: { kind: 'override' },
-    required: true,
-    cacheable: true,
-    placement: 'user',
-    dataClass: 'proposal_text',
-    maxChars: 100000,
-    untrusted: true,
-  }],
-};
-
-const promptOutputSchema = {
-  outputs: [{ name: 'assessment', type: 'object', target: { kind: 'none' } }],
-  parseMode: 'json',
-  jsonSchema: {
-    type: 'object',
-    additionalProperties: false,
-    required,
-    properties: Object.fromEntries(required.map((key) => [key, { type: 'string' }])),
-  },
-  rawOutputRetention: 'hash',
-};
-
 const recordData = {
   wmkf_ai_promptname: PROMPT_NAME,
   wmkf_ai_systemprompt: SYSTEM_PROMPT,
   wmkf_ai_promptbody: USER_PROMPT_TEMPLATE,
-  wmkf_ai_promptvariables: JSON.stringify(promptVariables, null, 2),
-  wmkf_ai_promptoutputschema: JSON.stringify(promptOutputSchema, null, 2),
+  wmkf_ai_promptvariables: JSON.stringify(INITIAL_ASSESSMENT_PROMPT_VARIABLES, null, 2),
+  wmkf_ai_promptoutputschema: JSON.stringify(INITIAL_ASSESSMENT_PROMPT_OUTPUT_SCHEMA, null, 2),
   wmkf_ai_model: 'sonnet',
   wmkf_ai_temperature: 0.2,
   wmkf_ai_maxtokens: 2200,
@@ -90,7 +69,7 @@ const recordData = {
 console.log(`Seed: ${PROMPT_NAME}`);
 console.log(`  systemprompt: ${SYSTEM_PROMPT.length} chars`);
 console.log(`  promptbody: ${USER_PROMPT_TEMPLATE.length} chars`);
-console.log(`  required outputs: ${required.join(', ')}`);
+console.log(`  required outputs: ${INITIAL_ASSESSMENT_REQUIRED_OUTPUTS.join(', ')}`);
 
 const plan = await planSeed({ promptName: PROMPT_NAME });
 

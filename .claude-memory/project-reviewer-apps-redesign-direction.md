@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has seven implemented tabs and three placeholders in source; the Initial Assessment tab and Editor Dashboard await live provisioning, while current truth and forward sequencing are owned by the near-term execution plan and this entry preserves the redesign chronology.
+description: The unified Request Workbench has seven implemented tabs and three placeholders in source; the Initial Assessment tab and cycle-wide pilot locator await live deployment, while the full Editor Dashboard remains planned and the near-term execution plan owns forward sequencing.
 metadata:
   type: project
   status: active
@@ -30,11 +30,11 @@ contracts. `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` and
 `docs/REQUEST_WORKBENCH_SCOPING.md` are historical chronology/rationale.
 
 **2026-07-29 editor-direction implementation checkpoint:** Allison is a confirmed primary
-user for the Editor lens. The current contract preserves the former
+user for the Editor lens. The target contract preserves the former
 single-folder workflow as a staff-wide cycle Editor Dashboard with direct entry
 to the canonical SharePoint Word files and explicit per-editor Reviewed
-tracking. The pilot cycle list and direct Word entry are implemented in source
-under the existing `reviewers` app grant. All PDs are expected eventually to
+tracking. A narrower pilot locator with a cycle list and direct Word entry is
+implemented in source under the existing `reviewers` app grant. All PDs are expected eventually to
 evaluate the materials, and designated staff proofreaders also need access.
 Request-versus-artifact-stage marker granularity, coordinator matrix, and
 SharePoint file-permission verification remain open. The
@@ -42,7 +42,7 @@ first fixed gate is a human-in-the-loop, end-to-end Initial Assessment pilot by
 2026-08-10, ahead of proposal intake around 2026-08-18. Authorized staff use a
 dedicated representative dummy production request to generate, inspect, and edit the canonical
 SharePoint Word artifact and then find/open that same registered file from the
-Workbench and staff-wide Editor Dashboard. The pilot also exercises one safe
+Workbench and cycle-wide pilot locator. The pilot also exercises one safe
 failure/retry path and proves no false cross-store success. It is
 draft-functional proof, not production readiness, and does not require the
 later lifecycle tabs. The owner chose a controlled production rehearsal using
@@ -117,8 +117,10 @@ planned. Current authority is
   Assessment, Reviewers, Reviews, Status, Awardee) and three placeholders (Pre
   Site Visit Writeup, Site Visit, Final Writeup). Initial Assessment live-state
   provisioning and the human pilot remain pending.
-- Reviews is built; its synthesis producer/persistence/consumer path exists, but the
-  production structured-output smoke is still red and automatic all-in triggering is not built.
+- Reviews is built and production-proved: governed-v3 structured output
+  persisted successfully, the automatic all-in drain is enabled, and its
+  producer/persistence/consumer lifecycle completed a controlled production
+  smoke on request `1002788`.
 - Awardee includes the distinct live `/external/grantee/[token]` portal and
   `wmkf_granteedeliverable` persistence. GAL-trigger automation remains separate/unknown.
 - The proposed writeup URL fields and `writeup.*` prompt rows remain absent.

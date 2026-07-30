@@ -121,7 +121,13 @@ humans but registers the Graph site, drive, and item IDs as identity. Exact
 retries use a deterministic SHA-256 alternate key; a Ready row is never
 regenerated or overwritten. If upload succeeds before the final registry PATCH
 fails, retry verifies the stored content hash against the deterministic
-SharePoint item and repairs the registry without another model call.
+SharePoint item and repairs the registry without another model call. If that
+item's bytes no longer match, the producer preserves its exact identity in the
+operator-visible cleanup queue and generates to a fresh claim-specific
+filename; it does not overwrite or repeatedly dead-end on the changed file.
+If the primary cleanup queue reaches capacity, exact new work is retained in a
+dedicated overflow field and that deterministic generation is blocked until
+manual cleanup resolves the overflow.
 
 ### Writeup lineage and distribution
 

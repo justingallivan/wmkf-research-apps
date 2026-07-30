@@ -315,6 +315,45 @@ it('does not return success when SharePoint upload succeeds but final registry P
   );
 });
 
+it('links an Executor failure to the failed AI run recorded on the thrown error', async () => {
+  const failedRunId = '88888888-8888-8888-8888-888888888888';
+  const executorError = new Error('provider rejected the request');
+  executorError.runId = failedRunId;
+  executePrompt.mockRejectedValueOnce(executorError);
+
+  await expect(generateInitialAssessment({ requestId: REQUEST_ID })).rejects.toMatchObject({
+    httpStatus: 500,
+    body: { runId: failedRunId },
+  });
+  expect(requestDocumentAdapter.update).toHaveBeenCalledWith(
+    ARTIFACT_ID,
+    expect.objectContaining({
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+      'wmkf_AIRun@odata.bind': `/wmkf_ai_runs(${failedRunId})`,
+    }),
+    expect.any(Object),
+  );
+});
+
+it('replaces stale run provenance with the current failed Executor run on retry', async () => {
+  const failedRunId = '99999999-8888-8888-8888-888888888888';
+  currentRegistryRow = registryRow({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+    _wmkf_airun_value: '11111111-8888-8888-8888-888888888888',
+  });
+  const executorError = new Error('retry provider failure');
+  executorError.runId = failedRunId;
+  executePrompt.mockRejectedValueOnce(executorError);
+
+  await expect(generateInitialAssessment({ requestId: REQUEST_ID })).rejects.toMatchObject({
+    body: { runId: failedRunId },
+  });
+  expect(currentRegistryRow).toMatchObject({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+    'wmkf_AIRun@odata.bind': `/wmkf_ai_runs(${failedRunId})`,
+  });
+});
+
 it('accepts a committed Ready changeset when only the transport response is lost', async () => {
   runChangeset.mockImplementationOnce(async (operations) => {
     for (const operation of operations) {
@@ -339,6 +378,44 @@ it('accepts a committed Ready changeset when only the transport response is lost
   expect(result.artifact.operationStatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.READY);
   expect(result.artifact.file).toMatchObject({ driveId: 'drive', itemId: 'item' });
   expect(request._wmkf_currentinitialassessment_value).toBe(ARTIFACT_ID);
+});
+
+it('preserves the canonical upload when post-commit verification initially fails', async () => {
+  let failVerificationRead = false;
+  requestDocumentAdapter.findByGenerationKey.mockImplementation(async () => {
+    if (failVerificationRead) {
+      failVerificationRead = false;
+      throw new Error('Dataverse verification read unavailable');
+    }
+    return { records: currentRegistryRow ? [currentRegistryRow] : [] };
+  });
+  runChangeset.mockImplementationOnce(async (operations) => {
+    for (const operation of operations) {
+      if (operation.entitySet === 'akoya_requests') {
+        request._wmkf_currentinitialassessment_value = operation.body[
+          'wmkf_CurrentInitialAssessment@odata.bind'
+        ].match(/\(([^)]+)\)$/)?.[1] || null;
+        request._etag = 'W/"request-post-commit-read-failure"';
+      } else {
+        await requestDocumentAdapter.update(
+          operation.key,
+          operation.body,
+          { ifMatch: operation.ifMatch },
+        );
+      }
+    }
+    failVerificationRead = true;
+    throw new Error('transport response lost after commit');
+  });
+
+  await expect(generateInitialAssessment({ requestId: REQUEST_ID }))
+    .rejects.toMatchObject({
+      body: { code: 'initial_assessment_failed' },
+    });
+  expect(currentRegistryRow.wmkf_operationstatus)
+    .toBe(REQUEST_DOCUMENT_OPERATION_STATUS.READY);
+  expect(request._wmkf_currentinitialassessment_value).toBe(ARTIFACT_ID);
+  expect(GraphService.deleteFile).not.toHaveBeenCalled();
 });
 
 it('rejects an ambiguous transport error when the canonical pointer does not match', async () => {
@@ -399,14 +476,34 @@ it('classifies a Ready-changeset 412 from a newer claim and removes the losing u
   expect(currentRegistryRow.wmkf_claimtoken).toBe('newer-worker-claim');
 });
 
+it('removes the losing upload when a non-412 finalize failure coincides with claim loss', async () => {
+  runChangeset.mockImplementationOnce(async () => {
+    currentRegistryRow = {
+      ...currentRegistryRow,
+      wmkf_claimtoken: 'newer-worker-claim',
+      _etag: 'W/"99"',
+      modifiedon: new Date().toISOString(),
+    };
+    throw new Error('Dataverse transport failed before the response');
+  });
+
+  await expect(generateInitialAssessment({ requestId: REQUEST_ID })).rejects.toMatchObject({
+    httpStatus: 409,
+    body: { code: 'claim_lost' },
+  });
+  expect(GraphService.deleteFile).toHaveBeenCalledWith('drive', 'item');
+  expect(currentRegistryRow.wmkf_claimtoken).toBe('newer-worker-claim');
+});
+
 it('durably records exact cleanup work if a claim-lost upload cannot be deleted', async () => {
   GraphService.uploadFile.mockImplementation(async () => {
-    const existingCleanup = Array.from({ length: 19 }, (_, index) => ({
+    const existingCleanup = Array.from({ length: 2 }, (_, index) => ({
       driveId: `drive-${index}`,
       itemId: `item-${index}`,
       name: `old-${index}.docx`,
       recordedAt: '2026-07-29T12:00:00.000Z',
-      error: 'x'.repeat(1000),
+      reason: 'claim_lost_delete_failed',
+      error: 'prior cleanup',
     }));
     currentRegistryRow = {
       ...currentRegistryRow,
@@ -439,7 +536,149 @@ it('durably records exact cleanup work if a claim-lost upload cannot be deleted'
     driveId: 'drive',
     itemId: 'orphan-item',
     name: 'orphan.docx',
+    reason: 'claim_lost_delete_failed',
   }));
+  expect(projectArtifact(currentRegistryRow).cleanupRequired).toHaveLength(3);
+});
+
+it('retains exact overflow cleanup work without discarding older identifiers', async () => {
+  const existingCleanup = Array.from({ length: 20 }, (_, index) => ({
+    driveId: `drive-${index}`,
+    itemId: `item-${index}`,
+    name: `old-${index}.docx`,
+    recordedAt: '2026-07-29T12:00:00.000Z',
+    reason: 'claim_lost_delete_failed',
+    error: 'x'.repeat(350),
+  }));
+  const originalQueue = JSON.stringify(existingCleanup);
+  GraphService.uploadFile.mockImplementation(async () => {
+    currentRegistryRow = {
+      ...currentRegistryRow,
+      wmkf_claimtoken: 'newer-worker-claim',
+      wmkf_orphancleanupjson: originalQueue,
+      _etag: 'W/"99"',
+      modifiedon: new Date().toISOString(),
+    };
+    return {
+      siteId: 'site',
+      driveId: 'drive',
+      id: 'overflow-item',
+      name: 'overflow.docx',
+      size: DOCX.length,
+      webUrl: 'https://example.sharepoint.com/overflow-item',
+      eTag: '"overflow-etag"',
+      versionId: '1.0',
+      lastModified: '2026-07-29T12:00:00Z',
+    };
+  });
+  GraphService.deleteFile.mockRejectedValueOnce(new Error('Graph unavailable'));
+
+  await expect(generateInitialAssessment({ requestId: REQUEST_ID })).rejects.toMatchObject({
+    httpStatus: 500,
+    body: { code: 'orphan_cleanup_capacity_exceeded' },
+  });
+  expect(currentRegistryRow.wmkf_orphancleanupjson).toBe(originalQueue);
+  expect(JSON.parse(currentRegistryRow.wmkf_orphancleanupoverflowjson)).toEqual([
+    expect.objectContaining({
+      driveId: 'drive',
+      itemId: 'overflow-item',
+      name: 'overflow.docx',
+      reason: 'claim_lost_delete_failed',
+    }),
+  ]);
+  expect(projectArtifact(currentRegistryRow).cleanupRequired).toHaveLength(21);
+});
+
+it('blocks another upload for a generation with unresolved cleanup overflow', async () => {
+  currentRegistryRow = registryRow({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+    wmkf_orphancleanupoverflowjson: JSON.stringify([{
+      driveId: 'drive',
+      itemId: 'unresolved-overflow-item',
+      name: 'unresolved.docx',
+      recordedAt: '2026-07-29T12:00:00.000Z',
+      reason: 'claim_lost_delete_failed',
+      error: 'Graph unavailable',
+    }]),
+  });
+
+  await expect(generateInitialAssessment({ requestId: REQUEST_ID })).rejects.toMatchObject({
+    httpStatus: 409,
+    body: { code: 'orphan_cleanup_required' },
+  });
+  expect(executePrompt).not.toHaveBeenCalled();
+  expect(GraphService.uploadFile).not.toHaveBeenCalled();
+});
+
+it('stops an active successor when cleanup overflow appears after preparation', async () => {
+  currentRegistryRow = registryRow({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+  });
+  executePrompt.mockImplementationOnce(async () => {
+    currentRegistryRow = {
+      ...currentRegistryRow,
+      wmkf_orphancleanupoverflowjson: JSON.stringify([{
+        driveId: 'drive',
+        itemId: 'stale-worker-orphan',
+        recordedAt: '2026-07-29T12:00:00.000Z',
+        reason: 'claim_lost_delete_failed',
+        error: 'Graph unavailable',
+      }]),
+      _etag: 'W/"overflow-after-prepare"',
+    };
+    return {
+      parsed: generated,
+      runId: '55555555-5555-5555-5555-555555555555',
+      blocked: false,
+      meta: {
+        promptName: 'initial-assessment.generate',
+        promptVersion: 1,
+        promptId: '66666666-6666-6666-6666-666666666666',
+      },
+    };
+  });
+
+  await expect(generateInitialAssessment({ requestId: REQUEST_ID })).rejects.toMatchObject({
+    httpStatus: 409,
+    body: { code: 'orphan_cleanup_required' },
+  });
+  expect(GraphService.uploadFile).not.toHaveBeenCalled();
+});
+
+it('removes an upload if cleanup overflow appears after the final pre-upload fence', async () => {
+  currentRegistryRow = registryRow({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+  });
+  GraphService.uploadFile.mockImplementationOnce(async () => {
+    currentRegistryRow = {
+      ...currentRegistryRow,
+      wmkf_orphancleanupoverflowjson: JSON.stringify([{
+        driveId: 'drive',
+        itemId: 'stale-worker-orphan',
+        recordedAt: '2026-07-29T12:00:00.000Z',
+        reason: 'claim_lost_delete_failed',
+        error: 'Graph unavailable',
+      }]),
+      _etag: 'W/"overflow-after-upload"',
+    };
+    return {
+      siteId: 'site',
+      driveId: 'drive',
+      id: 'racing-upload',
+      name: currentRegistryRow.wmkf_filename,
+      size: DOCX.length,
+      webUrl: 'https://example.sharepoint.com/racing-upload',
+      eTag: '"racing-upload-etag"',
+      versionId: '1.0',
+      lastModified: '2026-07-29T12:00:00Z',
+    };
+  });
+
+  await expect(generateInitialAssessment({ requestId: REQUEST_ID })).rejects.toMatchObject({
+    httpStatus: 409,
+    body: { code: 'orphan_cleanup_required' },
+  });
+  expect(GraphService.deleteFile).toHaveBeenCalledWith('drive', 'racing-upload');
 });
 
 it('repairs a prior post-upload registry failure by content hash without rerunning AI', async () => {
@@ -467,6 +706,46 @@ it('repairs a prior post-upload registry failure by content hash without rerunni
   expect(result).toMatchObject({ reused: true, recovered: true });
   expect(executePrompt).not.toHaveBeenCalled();
   expect(GraphService.uploadFile).not.toHaveBeenCalled();
+});
+
+it('retains a hash-mismatched recovery item for cleanup and generates a fresh claim file', async () => {
+  const failed = registryRow({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+    wmkf_contenthash: crypto.createHash('sha256').update(DOCX).digest('hex'),
+  });
+  const priorFilename = failed.wmkf_filename;
+  currentRegistryRow = failed;
+  GraphService.getFileMetadataByPath.mockResolvedValue({
+    siteId: 'site',
+    driveId: 'drive',
+    id: 'edited-item',
+    name: priorFilename,
+    size: DOCX.length,
+    webUrl: 'https://example.sharepoint.com/edited-item',
+    eTag: '"edited-etag"',
+    versionId: '2.0',
+    lastModified: '2026-07-29T13:00:00Z',
+  });
+  GraphService.downloadFile.mockResolvedValue({ buffer: Buffer.from('staff-edited bytes') });
+
+  const result = await generateInitialAssessment({ requestId: REQUEST_ID });
+
+  expect(result.artifact.operationStatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.READY);
+  expect(executePrompt).toHaveBeenCalledTimes(1);
+  expect(GraphService.uploadFile).toHaveBeenCalledWith(
+    'akoya_request',
+    failed.wmkf_sharepointfolderpath,
+    expect.not.stringContaining(priorFilename),
+    DOCX,
+    expect.any(String),
+  );
+  expect(projectArtifact(currentRegistryRow).cleanupRequired).toEqual([
+    expect.objectContaining({
+      driveId: 'drive',
+      itemId: 'edited-item',
+      reason: 'content_hash_mismatch_retained',
+    }),
+  ]);
 });
 
 it('does not let an expired worker overwrite or fail a newer claim', async () => {
@@ -735,6 +1014,87 @@ it('keeps the canonical Ready artifact while exposing a newer failed attempt sep
   expect(result.latestAttempts[0].artifactId).toBe(newer.wmkf_requestdocumentid);
   expect(result.latestAttempts[0].operationStatus)
     .toBe(REQUEST_DOCUMENT_OPERATION_STATUS.FAILED);
+});
+
+it('fails closed when a non-null request pointer does not resolve to the active Ready row', async () => {
+  const ready = registryRow({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_sharepointdriveid: 'drive',
+    wmkf_sharepointitemid: 'ready-item',
+  });
+  requestDocumentAdapter.findByRequest.mockResolvedValue({ records: [ready] });
+  request._wmkf_currentinitialassessment_value = '99999999-9999-9999-9999-999999999999';
+
+  await expect(listInitialAssessmentArtifacts({ requestId: REQUEST_ID }))
+    .rejects.toThrow('invalid request-level canonical pointer');
+});
+
+it('fails closed when more than one non-superseded Ready row is active', async () => {
+  const pointed = registryRow({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_sharepointdriveid: 'drive',
+    wmkf_sharepointitemid: 'pointed-item',
+  });
+  const duplicate = registryRow({
+    wmkf_requestdocumentid: '99999999-9999-9999-9999-999999999999',
+    wmkf_generationkey: '9'.repeat(64),
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_sharepointdriveid: 'drive',
+    wmkf_sharepointitemid: 'duplicate-item',
+  });
+  requestDocumentAdapter.findByRequest.mockResolvedValue({
+    records: [pointed, duplicate],
+  });
+  request._wmkf_currentinitialassessment_value = pointed.wmkf_requestdocumentid;
+
+  await expect(listInitialAssessmentArtifacts({ requestId: REQUEST_ID }))
+    .rejects.toThrow('invalid request-level canonical pointer');
+});
+
+it('fails closed when the request pointer targets a superseded Ready row', async () => {
+  const supersededReady = registryRow({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED,
+    wmkf_sharepointdriveid: 'drive',
+    wmkf_sharepointitemid: 'superseded-item',
+  });
+  requestDocumentAdapter.findByRequest.mockResolvedValue({
+    records: [supersededReady],
+  });
+  request._wmkf_currentinitialassessment_value = supersededReady.wmkf_requestdocumentid;
+
+  await expect(listInitialAssessmentArtifacts({ requestId: REQUEST_ID }))
+    .rejects.toThrow('invalid request-level canonical pointer');
+});
+
+it('loads request pointers in bounded batches when a cycle contains more than 100 artifacts', async () => {
+  const requestIds = Array.from({ length: 101 }, (_, index) => (
+    `${String(index + 1).padStart(8, '0')}-1111-1111-1111-111111111111`
+  ));
+  const rows = requestIds.map((ownerRequestId, index) => registryRow({
+    wmkf_requestdocumentid:
+      `${String(index + 1001).padStart(8, '0')}-2222-2222-2222-222222222222`,
+    wmkf_generationkey: String(index).padStart(64, '0'),
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    _wmkf_request_value: ownerRequestId,
+    createdon: `2026-07-29T12:${String(index % 60).padStart(2, '0')}:00Z`,
+  }));
+  const rowByRequest = new Map(rows.map((row) => [row._wmkf_request_value, row]));
+  requestDocumentAdapter.findByCycle.mockResolvedValue({ records: rows });
+  grantRequestAdapter.findByIds.mockImplementation(async (ids) => ({
+    records: ids.map((id) => ({
+      ...request,
+      akoya_requestid: id,
+      _wmkf_currentinitialassessment_value: rowByRequest.get(id).wmkf_requestdocumentid,
+    })),
+  }));
+
+  const result = await listInitialAssessmentArtifacts({ cycleCode: 'D26' });
+
+  expect(result.artifacts).toHaveLength(101);
+  expect(grantRequestAdapter.findByIds).toHaveBeenCalledTimes(3);
+  expect(grantRequestAdapter.findByIds.mock.calls.map(([ids]) => ids.length))
+    .toEqual([50, 50, 1]);
 });
 
 it('derives staff-wide dashboard cycles from the artifact registry, not PD-scoped requests', async () => {

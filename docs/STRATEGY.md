@@ -18,7 +18,7 @@ related:
 
 # Where We're Headed
 
-**Last verified: 2026-07-28.** This document owns long-term direction and principles. The
+**Last verified: 2026-07-29.** This document owns long-term direction and principles. The
 ordered, current delivery agenda lives in `docs/CURRENT_WORK_QUEUE.md`; this document is not a
 backlog.
 
@@ -142,7 +142,7 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term 
    instead of building the existing Dataverse sandbox organization into an
    integrated application/file test environment. Authorized staff must inspect
    and edit the canonical SharePoint Word artifact, find and open the same
-   registered file from both the Workbench and staff-wide Editor Dashboard,
+   registered file from both the Workbench and cycle-wide pilot locator,
    and exercise one safe failure/retry path;
 2. finish the user/input/storage/access/deadline contract for the remaining
    Workbench lifecycle tabs, including the three-document writeup lineage,
