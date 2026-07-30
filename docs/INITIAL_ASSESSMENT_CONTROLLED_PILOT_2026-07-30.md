@@ -3,7 +3,7 @@ title: Initial Assessment Controlled Production Pilot — 2026-07-30
 domain: architecture
 kind: audit
 status: active
-summary: Request 1002788 pilot evidence: generation, consumers, and retry passed; recovery hashing and AI-run request linkage remain open.
+summary: Request 1002788 pilot evidence and the tested source fixes for recovery hashing and future AI-run request linkage; production re-proof remains open.
 canonical: false
 cataloged: 2026-07-30
 last_verified: 2026-07-30
@@ -23,13 +23,25 @@ related:
 proved the primary producer → persistence → consumer flow and exact-input
 idempotency. It did not close the full pilot acceptance contract.
 
-Two defects were found:
+Two defects were found during the rehearsal:
 
 1. post-upload recovery compares downloaded SharePoint bytes with the
    producer's pre-upload DOCX hash, but SharePoint rewrites the Office package
    during ingestion; and
 2. the Initial Assessment Executor call did not pass `requestId`, so the exact
    AI run has prompt lineage but a null `wmkf_ai_request` lookup.
+
+**[VERIFIED in source/tests on
+`codex/initial-assessment-runtime-fixes`; NOT YET DEPLOYED OR PRODUCTION
+RE-PROVED]** The candidate fix stores a `gdc1:`-tagged SHA-256 of normalized
+governed `word/` package content while canonicalizing only
+SharePoint-injected `customXml` relationships, and passes `requestId` to the
+Executor with a fail-closed no-persistence requirement. Synthetic complement
+tests passed, and a one-off check against the actual pilot packages produced
+the same normalized hash for the producer and SharePoint v1 files while
+distinguishing the later v2 file. Legacy untagged hashes are recoverable only
+when the downloaded package bytes still match exactly; otherwise retry blocks
+for operator reconciliation without another model call or upload.
 
 Human opening, AutoSave, and SharePoint version creation were observed. A
 substantive human content edit was not verified: visible document text remained
@@ -41,11 +53,11 @@ staff-input marker.
 | Contract | Producer/source | Persistence | Consumer/readback | Result |
 | --- | --- | --- | --- | --- |
 | Generate canonical artifact | Signed-in Workbench generation for Request `1002788` (`feabe26f-dc1b-f111-8341-000d3a306da2`) | Registry row `fb995f0f-628c-f111-ab0f-6045bd018a07`; request pointer set to that row; SharePoint item `01G4GVMS77A2SBVPGA4VFINZFWAFIZGVFG` | Workbench showed `Ready · Draft` and opened the canonical item | PASS |
-| Prompt/run/template lineage | `initial-assessment.generate` v1; template `initial-assessment-standard-business-brief` v1.0.0 | Prompt `fc8a4c3b-5e8c-f111-ab0f-7ced8d3d15a6`; run `b7ae9b17-628c-f111-ab0f-000d3a31c468`; generation key and input fingerprint persisted | Registry readback matched the generating prompt, run, template, and request | PARTIAL — run's request lookup is null |
+| Prompt/run/template lineage | `initial-assessment.generate` v1; template `initial-assessment-standard-business-brief` v1.0.0 | Prompt `fc8a4c3b-5e8c-f111-ab0f-7ced8d3d15a6`; run `b7ae9b17-628c-f111-ab0f-000d3a31c468`; generation key and input fingerprint persisted | Registry readback matched the generating prompt, run, template, and request | PARTIAL — historical pilot run lookup is null; future-run fix is source-tested, not production-proved |
 | Shared discovery contract | Same canonical registry row | Stable drive/item identity and request pointer | Per-request Workbench and `/workbench/artifacts` both listed the same artifact and Open link | PASS |
 | Exact-input retry | `Refresh from current inputs` on the Ready artifact | Still one registry row; same row, run, SharePoint item, timestamps, and attempt count | UI returned the existing Ready artifact | PASS — no model call, upload, overwrite, or duplicate |
 | Editable SharePoint lifecycle | Opened canonical Word file | SharePoint created version `2.0`, modified by Justin Gallivan | Current file remained reachable from both application consumers | PARTIAL — open/AutoSave proven; substantive edit not proven |
-| Post-upload recovery | `recoverUploadedFile()` compares downloaded bytes to `wmkf_contenthash` | Registry hash is the pre-upload producer hash | SharePoint version `1.0` already had a different byte hash because Office package parts were injected/repacked | FAIL — recovery would reject the untouched canonical upload |
+| Post-upload recovery | Pilot code compared whole-package bytes; candidate code stores a `gdc1:`-tagged normalized governed Word digest | The historical row retains an untagged legacy digest; future rows are scheme-tagged | Actual producer and SharePoint v1 packages normalize equally; later v2 differs | SOURCE-VERIFIED — production deployment and interrupted-finalization rehearsal pending |
 
 ## Exact persisted lineage
 
@@ -67,6 +79,9 @@ staff-input marker.
 
 The upload-time registry hash was
 `66d665daf8f7e2102986b90823312405d2e02875ecd5c162cd381fc08a2b6933`.
+It is an untagged legacy whole-package digest; the historical Ready row does
+not enter recovery, and the candidate does not misinterpret that value as a
+`gdc1:` digest.
 The canonical SharePoint version `1.0` download hashed to
 `41717302c77229923cfdf688955720e6a5944e869f72bbec5ccaaea7ed563b34`.
 Inspection of the DOCX packages showed SharePoint-added/repacked Office parts,
@@ -75,13 +90,15 @@ not an intervening staff edit. Version `2.0` later hashed to
 
 ## Required follow-up
 
-1. Define and persist a canonical post-upload hash (or explicitly separate the
-   producer-buffer hash from the canonical SharePoint hash), then make recovery
-   compare like-for-like.
-2. Pass the request GUID into the Initial Assessment `executePrompt()` call and
-   verify the resulting `wmkf_ai_run.wmkf_ai_request` lookup.
-3. Exercise the intended post-upload/final-registry-failure recovery branch
-   after the hash contract is corrected.
+1. Complete adversarial review and promote the source fix deliberately. The
+   schema-as-code field description is corrected on this branch, but the
+   creation-only schema applicator does not update an existing Dataverse
+   attribute description; that optional live metadata cleanup is separate and
+   does not block the runtime fix.
+2. Exercise the post-upload/final-registry-failure recovery branch and verify
+   it reuses the canonical SharePoint item without another model call/upload.
+3. Generate a new controlled artifact and verify the resulting
+   `wmkf_ai_run.wmkf_ai_request` lookup.
 4. Complete a substantive authorized staff review/edit, including Foundation
    Opportunity, and verify the saved version through both consumers.
 5. Complete the broader target-library restore, recycle-bin, retention,

@@ -119,6 +119,25 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    editing is not yet proven. Durable evidence:
    `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`.
 
+10. **Initial Assessment runtime fixes are source-tested on
+    `codex/initial-assessment-runtime-fixes`.**
+    New `wmkf_contenthash` values use a `gdc1:`-tagged SHA-256 of normalized
+    governed DOCX content: every `word/` package part remains covered, while
+    the document relationship part is canonicalized only to remove
+    SharePoint-injected `customXml` relationships and XML
+    ordering/whitespace. Synthetic complement tests prove SharePoint metadata
+    normalization is ignored while Word-body changes are detected. A one-off
+    test against the actual pilot producer, SharePoint-v1, and v2 packages
+    proved producer=v1 and producer≠v2. Unverifiable legacy raw hashes now
+    block for operator reconciliation instead of being mislabeled as an edit
+    and triggering a duplicate model/upload attempt. Recovery-stage exceptions
+    persist Failed state immediately. The Executor call includes the request
+    GUID with `requireNoPersistence`, so a mutable prompt row cannot turn this
+    producer into an `akoya_request` writer. Production promotion,
+    interrupted-finalization recovery proof, and a new linked AI run remain
+    open after an Opus `READY WITH CHANGES` review whose material findings were
+    addressed locally.
+
 ### Commits
 
 15 commits, `3f56bb7d..c688aa0c` on `main`. Highlights:
@@ -139,12 +158,13 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
 ### Verified Open
 
 1. **Close the partial governed Initial Assessment artifact pilot.**
-   Correct the producer/canonical hash contract, pass the request GUID into the
-   Executor, and exercise the interrupted-finalization recovery branch. Then
-   complete a substantive authorized staff edit—including Foundation
-   Opportunity—and verify the saved version through both consumers. Finish
-   target-library restore, recycle-bin, retention, permission, and milestone
-   checks before describing the artifact system as production-ready.
+   Complete adversarial review, promote the source-tested recovery and
+   request-linkage fixes, and exercise the interrupted-finalization recovery
+   branch plus one new linked AI run. Then complete a substantive authorized
+   staff edit—including Foundation Opportunity—and verify the saved version
+   through both consumers. Finish target-library restore, recycle-bin,
+   retention, permission, and milestone checks before describing the artifact
+   system as production-ready.
 
 2. **Exercise address attestation only when a truthful eligible production row exists.**
    Evidence: the signed-in Workbench inspection covered requests `1002912` and `1002874`.

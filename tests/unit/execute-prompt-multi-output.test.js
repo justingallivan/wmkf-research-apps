@@ -139,6 +139,26 @@ async function run(outputs, parsedOutput) {
 const DEFAULT_GET_RECORD = async () => null;
 
 describe('persistOutputs — multi-output PATCH coalescing', () => {
+  test('requireNoPersistence rejects a mutable prompt write target before the model call', async () => {
+    const outputs = [
+      { name: 'summary', type: 'string', target: { kind: 'akoya_request', field: 'wmkf_ai_summary' }, guard: 'always-overwrite' },
+    ];
+    promptRow = buildPromptRow(outputs);
+    setClaudeJson({ summary: 'S' });
+    getRecordImpl = async () => REQUEST_ROW;
+
+    await expect(executePrompt({
+      promptName: 'test.multi-output',
+      requestId: '11111111-1111-1111-1111-111111111111',
+      runSource: 'Vercel Test',
+      overrideVariables: { x: 'value' },
+      requireNoPersistence: true,
+    })).rejects.toThrow('requires pass-through-only outputs');
+
+    expect(fetchedBodies.filter(({ url }) => url.includes('/v1/messages'))).toHaveLength(0);
+    expect(updateCalls.filter(c => c.entitySet === 'akoya_requests')).toHaveLength(0);
+  });
+
   test('two direct-field outputs land in a single PATCH', async () => {
     const outputs = [
       { name: 'summary', type: 'string', target: { kind: 'akoya_request', field: 'wmkf_ai_summary' }, guard: 'always-overwrite' },

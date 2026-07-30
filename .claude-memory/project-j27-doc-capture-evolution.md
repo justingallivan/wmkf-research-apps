@@ -1,6 +1,6 @@
 ---
 name: J27 document capture & Proposal-tab evolution
-description: D26 proposal inputs still resolve by a fragile SharePoint filename bridge. The governed-artifact pilot has a live typed registry and a partially successful Request 1002788 rehearsal; recovery hashing, run linkage, human editing, and broader J27 capture remain open.
+description: D26 proposal inputs still resolve by a fragile SharePoint filename bridge. The Request 1002788 artifact pilot is partial; recovery/run-linkage fixes are source-tested while production proof, human editing, and broader J27 capture remain open.
 type: project
 status: active
 scope: strategy
@@ -41,9 +41,12 @@ request-bound Initial Assessment service; broader applicant-capture producers
 remain future work. The controlled Request `1002788` rehearsal generated the
 canonical artifact, populated the registry/pointer, exposed the same item in
 both consumers, and proved exact-input retry without another run or upload.
-It also showed that SharePoint repacks the DOCX so the current pre-upload hash
-cannot support interrupted-finalization recovery, and that the producer omitted
-the Executor `requestId`, leaving the run lookup null.
+It also showed that SharePoint repacks the DOCX so whole-package hashing cannot
+support interrupted-finalization recovery, and that the deployed producer
+omitted the Executor `requestId`, leaving the run lookup null. Branch
+`codex/initial-assessment-runtime-fixes` now hashes normalized governed Word
+parts and passes the request GUID; focused tests and the actual pilot packages
+verify the hash complement. Production promotion/re-proof remains open.
 
 **Pilot environment decision (owner, 2026-07-29):** do not build the reachable
 but incompletely provisioned Dataverse sandbox organization into an integrated
@@ -51,8 +54,9 @@ application/file test environment for this pilot. Use a controlled production
 rehearsal after colleagues create representative dummy `akoya_request` records.
 Request `1002788` became the authorized target. Production schema apply, prompt
 seeding, application promotion, generation, shared discovery, and exact retry
-completed on 2026-07-30. Recovery correction, substantive staff editing, and
-target-library controls remain controlled follow-up work.
+completed on 2026-07-30. Recovery/run-linkage fixes are source-tested;
+production promotion/re-proof, substantive staff editing, and target-library
+controls remain controlled follow-up work.
 
 **Hold step already RETIRED (S279) — this contingency resolved early, for a different reason.** The reviewer "hold step" ([[project-reviewer-hold-step-decouple]]) was removed in S279 (commit `a8676af1`) when the direction shifted to onboarding at a single final Accept — independent of J27. So the earlier "single-submission may un-scaffold the hold step" note is now moot: there is no hold step left to un-scaffold. (Kept here only so the J27 doc-capture planning doesn't re-raise it.)
 

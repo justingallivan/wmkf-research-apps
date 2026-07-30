@@ -3,7 +3,7 @@ title: Dataverse wmkf_requestdocument
 domain: application-state
 kind: atlas
 status: active
-summary: Governed request-artifact registry and Initial Assessment pilot data flow; the controlled Request 1002788 rehearsal proved generation, consumers, and exact retry while exposing a recovery-hash defect.
+summary: Governed request-artifact registry and Initial Assessment pilot flow; normalized recovery hashing is source-tested while production re-proof remains open.
 canonical: false
 owner: product-engineering
 related:
@@ -42,10 +42,20 @@ post-deploy error scan was clean.
 **[PARTIAL PILOT 2026-07-30]** A same-input UI retry returned the existing
 Ready row without another run, upload, overwrite, or duplicate. Opening the
 canonical Word file created a native SharePoint version. The broader pilot is
-not complete: no substantive staff content edit was verified, and the
-post-upload recovery hash contract is invalid for this library because
-SharePoint rewrites the DOCX package during ingestion. Exact evidence:
+not complete: no substantive staff content edit was verified, and the deployed
+post-upload recovery contract has not passed an interrupted-finalization
+rehearsal. Exact evidence:
 `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`.
+
+**[VERIFIED IN SOURCE/TESTS 2026-07-30; NOT YET DEPLOYED]** Branch
+`codex/initial-assessment-runtime-fixes` replaces whole-package byte hashing
+with a `gdc1:`-tagged normalized governed-DOCX digest. It covers every `word/`
+part and canonicalizes the document relationship part only to remove
+SharePoint-injected `customXml` relationships and ordering/whitespace noise.
+The actual pilot producer and SharePoint v1 packages hash equally; v2 differs.
+The historical pilot row retains an untagged legacy digest. A non-Ready legacy
+row recovers only if downloaded bytes match that digest exactly; otherwise it
+blocks for operator reconciliation without a model call or duplicate upload.
 
 ## Ownership
 
@@ -80,13 +90,13 @@ authoritative input fingerprint, prompt identity/version, and template
 identity/version. A Ready row returns without another model call or SharePoint
 upload. A failed/stale operation can reclaim by ETag. If SharePoint upload
 succeeded but the final registry PATCH failed, the row retains the expected
-producer content hash and deterministic target. The intended retry downloads
-the item, verifies the hash, and finalizes stable identity without rerunning
-AI. **That recovery branch is not currently safe in Production:** SharePoint
-rewrites Office package bytes during upload, so its canonical version `1.0`
-already differs from the pre-upload producer hash. Until a canonical
-post-upload hash (or explicit dual-hash contract) is persisted, recovery will
-misclassify an untouched upload as changed. If the
+scheme-tagged governed-DOCX content hash and deterministic target. The intended
+retry downloads the item, verifies normalized Word content, and finalizes
+stable identity without rerunning AI. Recovery-stage errors transition an
+owned claim to Failed immediately rather than leaving a misleading Generating
+lease. The candidate source fix is test-proven against the actual pilot
+packages but remains unproven in Production until promoted and exercised
+through the interrupted-finalization branch. If the
 existing item's bytes no longer match, the producer retains its exact
 drive/item identity for operator cleanup and generates to a fresh
 claim-specific filename instead of overwriting the changed file or dead-ending
@@ -109,8 +119,7 @@ yet. If its primary field reaches capacity, the exact new identity is written
 to a dedicated overflow field and further generation for that deterministic
 artifact is blocked until an operator resolves the cleanup; unresolved
 identifiers are never silently evicted. Ordinary post-upload registry failures
-retain their item for recovery after the canonical SharePoint hash contract is
-corrected.
+retain their item for normalized governed-content recovery.
 
 The governed writer requires positive resolution of the Dynamics-tracked
 `akoya_request` parent library; it does not inherit the shared read helper's
@@ -134,7 +143,8 @@ transition.
    `dpl_AxxroabhpXLX1pz75MW6486fB4ci` Ready.
 7. **Partially completed 2026-07-30:** Request `1002788` generation, lineage,
    both consumers, Word opening/version creation, and exact-input retry passed.
-   Recovery-hash correction, request-linked AI-run proof, substantive human
-   editing, and target-library protection checks remain open.
+   The recovery-hash and future-run linkage fixes are source-tested; production
+   promotion/re-proof, substantive human editing, and target-library
+   protection checks remain open.
 
 No live command in this sequence is authorized merely by this page.

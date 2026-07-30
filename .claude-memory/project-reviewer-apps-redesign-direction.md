@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has seven implemented tabs and three placeholders; the Request 1002788 Initial Assessment pilot proved generation, shared discovery, and exact retry while recovery and lineage defects remain, and the full Editor Dashboard remains planned.
+description: The unified Request Workbench has seven implemented tabs and three placeholders; the partial Initial Assessment pilot has source-tested recovery/run-linkage fixes awaiting production proof, and the full Editor Dashboard remains planned.
 metadata:
   type: project
   status: active
@@ -50,9 +50,10 @@ colleague-created representative dummy requests rather than building the
 existing Dataverse sandbox organization into an integrated application/file
 test environment. Request `1002788` became the authorized target. Generation,
 registry/pointer lineage, both consumer surfaces, native SharePoint version
-creation, and exact-input retry passed on 2026-07-30. Recovery hashing, the
-AI-run request lookup, substantive human editing, and target-library controls
-remain open.
+creation, and exact-input retry passed on 2026-07-30. Normalized recovery
+hashing and future-run request linkage are source-tested on the candidate
+branch; production re-proof, substantive human editing, and target-library
+controls remain open.
 Use the near-term execution plan for current authority; the chronology below
 remains the rationale record.
 
@@ -132,9 +133,10 @@ planned. Current authority is
   the production-provisioned `wmkf_requestdocument` registry and governed
   `initial-assessment.generate` v1. The controlled production rehearsal created
   one Ready/Draft registry row, populated the request pointer, and proved both
-  consumers plus exact-input retry. It also exposed the pre-upload hash
-  mismatch against SharePoint-canonicalized DOCX bytes and a null AI-run
-  request lookup.
+  consumers plus exact-input retry. It also exposed whole-package hash drift
+  after SharePoint canonicalization and a null AI-run request lookup. The
+  candidate branch fixes both for future generations; production re-proof
+  remains open.
 - Reviewer Pool remains planned and optional, not a shipped Workbench-v1 deliverable.
 
 ## Historical decision chronology

@@ -194,7 +194,7 @@
       "type": "String",
       "schemaName": "wmkf_ContentHash",
       "displayName": "Content Hash",
-      "description": "SHA-256 of the produced DOCX bytes, used to reconcile an upload whose final registry patch failed.",
+      "description": "Scheme-tagged SHA-256 of normalized governed DOCX word content (gdc1), used to reconcile an upload whose final registry patch failed despite SharePoint package normalization.",
       "maxLength": 64
     },
     {

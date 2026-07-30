@@ -140,10 +140,12 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term 
    Request `1002788` rehearsal generated and registered the canonical
    SharePoint artifact, exposed that same item in Workbench and the cycle
    locator, created native version history, and proved exact-input no-duplicate
-   retry. It also exposed a pre-upload-versus-canonical SharePoint hash defect
-   in interrupted-finalization recovery and a missing AI-run request lookup.
-   Correct those defects, exercise recovery, complete substantive staff
-   editing, and verify target-library protections;
+   retry. It also exposed whole-package SharePoint hash drift in
+   interrupted-finalization recovery and a missing AI-run request lookup. The
+   candidate branch now uses normalized governed-DOCX hashing and supplies the
+   request GUID to the Executor; tests include the actual pilot packages.
+   Review/promote those fixes, exercise recovery, prove a new linked run,
+   complete substantive staff editing, and verify target-library protections;
 2. finish the user/input/storage/access/deadline contract for the remaining
    Workbench lifecycle tabs, including the three-document writeup lineage,
    Site Visit dossier, narrow request-scoped applicant-material upload, and

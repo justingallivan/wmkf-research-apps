@@ -3,7 +3,7 @@ title: "Request Workbench — near-term execution plan"
 domain: architecture
 kind: plan
 status: canonical
-summary: "Initial Assessment pilot partially passed; recovery hashing, run linkage, substantive editing, and library controls remain."
+summary: "Initial Assessment fixes are source-tested; production recovery/run-linkage proof, substantive editing, and library controls remain."
 canonical: true
 cataloged: 2026-07-26
 last_verified: 2026-07-30
@@ -60,11 +60,13 @@ controlled production rehearsal with colleague-created dummy requests rather
 than build the existing Dataverse sandbox organization into an integrated
 application/file test environment. Request `1002788` became the authorized
 pilot target. Its same-input retry passed, but the intended post-upload
-recovery path is not yet safe: SharePoint canonicalized the DOCX package, so
-the downloaded version did not match the producer's pre-upload hash. The
-linked Executor run also has a null request lookup because the producer omitted
-`requestId`. These defects, a substantive staff edit, and the target-library
-protection checks remain required before the pilot is complete.
+recovery path exposed whole-package byte-hash drift when SharePoint
+canonicalized the DOCX, and the historical linked Executor run has a null
+request lookup. Branch `codex/initial-assessment-runtime-fixes` now hashes
+normalized governed Word parts and passes `requestId`; focused synthetic tests
+and the actual pilot packages verify the hash complement. Production
+promotion/re-proof, a substantive staff edit, and target-library protection
+checks remain required before the pilot is complete.
 Passing this draft-functional gate is not a broad production-readiness claim
 and does not require the later Pre-Site, Site Visit, or Final slices to be
 built by August 10.
@@ -678,9 +680,9 @@ Explicit non-goals during design freeze:
 > visibility during a failed replacement, false-success prevention after a
 > post-upload registry failure, and
 > intended content-hash recovery without a second AI call. The 2026-07-30
-> pilot showed that the current pre-upload hash cannot match SharePoint's
-> canonicalized DOCX bytes, so this branch remains blocked pending a
-> canonical post-upload hash contract, and
+> pilot falsified whole-package hashing; the candidate source now uses a
+> normalized governed-DOCX hash that matches the actual producer/v1 packages
+> and distinguishes v2, with production proof still pending, and
 > fresh-filename regeneration while retaining mismatched-item identity when
 > they do not. **[VERIFIED 2026-07-30]** The complete Wave 16 entity,
 > relationships, alternate key, and request pointer are live in Production,
@@ -882,9 +884,9 @@ Owner-decided:
     PR #102 then merged as `1e958ee0` and deployed Ready as
     `dpl_AxxroabhpXLX1pz75MW6486fB4ci`. Artifact generation remains the
     separate controlled pilot gate. The 2026-07-30 Request `1002788` rehearsal
-    proved generation, shared consumers, and exact retry, while leaving
-    recovery hashing, run-request linkage, substantive editing, and
-    target-library controls open.
+    proved generation, shared consumers, and exact retry. Recovery hashing and
+    future-run linkage are now source-tested; production promotion/re-proof,
+    substantive editing, and target-library controls remain open.
 
 Still required:
 
