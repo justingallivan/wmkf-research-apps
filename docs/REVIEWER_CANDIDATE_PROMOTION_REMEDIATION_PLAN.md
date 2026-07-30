@@ -21,13 +21,15 @@ related:
 
 # Reviewer Candidate Promotion Remediation Plan
 
-> **Status: IMPLEMENTED AND LOCALLY VERIFIED ON
-> `codex/reviewer-promotion-remediation`; NOT DEPLOYED.** The forward-path
-> implementation is built. The production classifier was run read-only on
-> 2026-07-29 and produced
+> **Status: DEPLOYED TO PRODUCTION 2026-07-29.** The forward-path
+> implementation is live from commit
+> `5c565fa3abdc629d737df059d9e2edadb936f1f6` (Vercel deployment
+> `dpl_EWKwe6R3raJ4d2kSnVwdrXjPZRPk`). The production classifier was run
+> read-only on 2026-07-29 and produced
 > `docs/audits/reviewer-promotion-repair-manifest-2026-07-29.json`; all eight
 > rows classified `U`, so there is no authorized automatic repair set.
-> Migration 029 has not been applied and no production repair is authorized.
+> Migration 029 was applied before deployment. No production repair is
+> authorized.
 > Every production repair still requires an explicit reviewed allowlist and
 > separate execute authorization.
 
@@ -40,11 +42,10 @@ related:
 - **[VERIFIED via local production read-only probe artifacts 2026-07-29]**
   means the finding was observed live, but the per-person output is deliberately
   gitignored and is not independently reproducible from the repository alone.
-- **[IMPLEMENTED IN SOURCE; NOT DEPLOYED]** means the behavior is present on
-  the remediation branch and covered by local tests, but is not yet a
-  production-state claim.
-- **[PLANNED]** now applies only to deployment, live classification, or
-  separately authorized repair execution.
+- **[DEPLOYED TO PRODUCTION 2026-07-29]** means the behavior is present in
+  production from commit `5c565fa3`.
+- **[PLANNED]** applies only to separately authorized repair execution or
+  follow-up observability.
 - **[ASSUMED]** means implementation must confirm the claim before relying on
   it.
 
@@ -53,7 +54,7 @@ related:
 The Find roster and the Invite candidate pool must no longer share one
 ambiguous "Save selected" transition.
 
-**[IMPLEMENTED IN SOURCE; NOT DEPLOYED]** A candidate may be retained in the
+**[DEPLOYED TO PRODUCTION 2026-07-29]** A candidate may be retained in the
 per-request Find roster while
 still being ineligible for promotion. Promotion to Invite succeeds only when
 the server can persist or reuse a specific person with an authoritative email,
@@ -148,7 +149,7 @@ The remedy is not to persist the uncertain email. It is to stop conflating
 
 ### 1. One server-authoritative decision
 
-**[IMPLEMENTED IN SOURCE; NOT DEPLOYED]** The pure
+**[DEPLOYED TO PRODUCTION 2026-07-29]** The pure
 `projectReviewerContact` helper computes a complete persistence
 projection before any write:
 
@@ -190,7 +191,7 @@ does not bypass this promotion matrix.
 
 ### 3. Attestation v3 binds contact authority
 
-**[IMPLEMENTED IN SOURCE; NOT DEPLOYED]** Projection v3 binds:
+**[DEPLOYED TO PRODUCTION 2026-07-29]** Projection v3 binds:
 
 - exact normalized effective email;
 - exact email source;
@@ -216,7 +217,7 @@ must re-enrich/re-attest or use an exact staff confirmation.
 
 ### 4. Staff confirmation reuses the existing exact-value contract
 
-**[IMPLEMENTED IN SOURCE; NOT DEPLOYED]** The save boundary uses the existing
+**[DEPLOYED TO PRODUCTION 2026-07-29]** The save boundary uses the existing
 server-stored, actor-bound confirmation shape
 from `reviewer-manual-confirmation.js`. Confirmation binds the canonical name,
 email, website, and affiliation values actually approved by staff. It does not
@@ -231,13 +232,13 @@ closed and staff must reconfirm.
 null-email person-creation shape: it operates on an existing suggestion/person
 behind server-read identity gates and does not call `upsertByEmail`. It still
 shares the client-authoritative roster-`saved` seam and a legacy successful
-no-roster-row path. **[IMPLEMENTED IN SOURCE; NOT DEPLOYED]** It now uses the
+no-roster-row path. **[DEPLOYED TO PRODUCTION 2026-07-29]** It now uses the
 same server-owned finalization and fails closed when the canonical roster row
 is absent.
 
 `pickVettedEmail`, applicant B1 backfill, and the email reconciler currently
 implement related but divergent persistence envelopes.
-**[IMPLEMENTED IN SOURCE; NOT DEPLOYED]**
+**[DEPLOYED TO PRODUCTION 2026-07-29]**
 
 - make `pickVettedEmail` a thin caller of the canonical contact projection
   instead of claiming an informal mirror of `save-candidates`;
@@ -271,7 +272,7 @@ email.
 
 ### 7. Suggestion and roster success semantics
 
-**[IMPLEMENTED IN SOURCE; NOT DEPLOYED]**
+**[DEPLOYED TO PRODUCTION 2026-07-29]**
 
 - Check `skippedExcluded` and return `applicant_excluded`; do not count or stamp
   the row as saved. Persist/render the terminal
@@ -305,7 +306,7 @@ refers to the same binding.
 
 ### Identity transitions
 
-**[IMPLEMENTED IN SOURCE; NOT DEPLOYED]**
+**[DEPLOYED TO PRODUCTION 2026-07-29]**
 
 - `confirmed` is sticky against every automated write.
 - `probable` is not downgraded by `unresolved` or `ambiguous` evidence from a
@@ -333,7 +334,7 @@ without classifying populated legacy rows would fail closed on those rows.
 
 ### Contact edits
 
-**[IMPLEMENTED IN SOURCE; NOT DEPLOYED]**
+**[DEPLOYED TO PRODUCTION 2026-07-29]**
 
 - Normal updates omit absent fields; they do not translate empty UI values into
   clears.
@@ -355,7 +356,8 @@ without classifying populated legacy rows would fail closed on those rows.
 | Shared-person monotonicity + explicit contact clear | Implemented | Identity sticky/conflict and my-candidates clear/ETag tests |
 | Merge repair ETag prerequisite | Implemented | Person, suggestion, and applicant-slot missing/stale ETag tests |
 | Read-only repair classifier | Implemented and run against production read-only on 2026-07-29 | Eight `U` rows; manifest hash `55170e8d7e28c...`; pure classifier/manifest tests and script syntax check |
-| Migration 029 / production deployment / repair execution | Not performed | Requires deliberate release and separate repair authorization |
+| Migration 029 / production deployment | Applied / deployed 2026-07-29 | Production deployment `dpl_EWKwe6R3raJ4d2kSnVwdrXjPZRPk`; signed-in read-only smoke passed |
+| Production repair execution | Not performed | Requires staff same-person confirmation, a reviewed allowlist, and separate execute authorization |
 
 The final focused local regression run on 2026-07-29 passed 20 suites and 497
 tests. Lint (zero errors), production build, types, and the relevant migration,
@@ -434,13 +436,16 @@ full legacy binding-writer adoption remains a separate classification task.
 
 ### Phase 4 — Production repair after forward fix
 
-**Operational status:** classification complete; repair not authorized. The
-merge ETag prerequisite is complete in source. Preview/production deployment
-and any repair execution remain separately authorized work.
+**Operational status:** forward fix deployed and signed-in read-only smoke
+complete; repair not authorized. The merge ETag prerequisite is deployed.
+Any repair execution remains separately authorized work.
 
-1. Deploy and smoke the forward fix in Preview with email capture/no live send.
-2. Run the production classifier read-only and save its hash-stable manifest.
-3. Verify the implemented `reviewer-merge` hardening in the deployed build:
+1. **Complete 2026-07-29:** deploy and smoke the forward fix in Preview with
+   no live send.
+2. **Complete 2026-07-29:** run the production classifier read-only and save
+   its hash-stable manifest.
+3. **Complete 2026-07-29:** verify the implemented `reviewer-merge` hardening
+   in the deployed build:
    every planned person, suggestion, applicant-slot, email-move, and deactivate
    operation requires a non-null ETag and passes `ifMatch`; missing ETags force
    a re-plan. Raw one-off PATCH scripts are not an approved Phase 4 mechanism.
@@ -518,11 +523,12 @@ proposed action
 
 Expected initial classification:
 
-- Rotem Sorek and Brenda Schulman: **[ASSUMED pending durable Phase 0
-  re-derivation]** likely `D`, with the older
-  email-bearing person as keeper and the new email-empty person as loser. The
-  executor must independently re-prove same-person evidence, absence of
-  engagement, collision handling, and merge-plan safety.
+- Rotem Sorek and Brenda Schulman: **[VERIFIED via production read-only probe
+  2026-07-29]** both classify `U`, not `D`. Each has a plausible email-bearing
+  keeper and email-empty selected loser, and guarded merge planning currently
+  reports complete references/no other references, but neither has
+  contact-bound same-person authority. Staff must first confirm each exact
+  identity; only then may a separately authorized guarded merge be planned.
 - Prashant Mali: **[VERIFIED via local production read-only probe artifacts
   2026-07-29 and `SESSION_PROMPT.md`]** not a duplicate-person merge case;
   inspect only for shared-state downgrade/field clearing.
@@ -531,7 +537,7 @@ Expected initial classification:
   failure that must abort the batch.
 
 The existing `reviewer-merge.js` `planMerge`/`executeMerge` service is the only
-approved person-merge mechanism. **[IMPLEMENTED IN SOURCE; NOT DEPLOYED]** It
+approved person-merge mechanism. **[DEPLOYED TO PRODUCTION 2026-07-29]** It
 re-evaluates pre-engagement, contact, collision, applicant-slot, and
 confirmed-identity guards; requires non-null keeper, loser, suggestion, and
 applicant-slot ETags; and passes `ifMatch` through every guarded mutation.
