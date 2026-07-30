@@ -445,6 +445,22 @@ Where the shipped code differs from, or resolves, the plan above:
   `system_alerts` (PG) write and the Dynamics/M365 email side effect plus the two extra Dataverse reads;
   the abstract row records the five new GET response fields, that `imageRef` is a private SharePoint
   reference exposed to staff only, and that `imageUrl` is absolute-http(s)-only.
-- **Not yet verified live.** No Dataverse or M365 round-trip, and `NOTIFICATION_EMAIL_FROM` /
-  `NEXTAUTH_URL` per-environment values remain `[ASSUMED]`. A submitted-package smoke test is the
-  promotion gate.
+- **Smoke test: `scripts/smoke-grantee-submit-visibility.mjs`.** Read-only, no residue, exit 0/1.
+  Probes the live assumptions unit tests mock away and that fail *silently* if wrong: that the PI name
+  really arrives as a `FormattedValue` annotation, that the request's PD resolves to an enabled
+  systemuser with an email, that the deliverable select including `wmkf_waiverackedat` is valid (a
+  wrong field name 400s rather than nulling), and how live `wmkf_imagefileref` values classify into the
+  link vs plain-text branches. It also reports the Dataverse host it probed, warns when
+  `NOTIFICATION_EMAIL_FROM` is unset, and warns when `NEXTAUTH_URL` is a *localhost* origin — "set" is
+  not the bar, since a localhost deep link is correct locally and useless in a real inbox.
+  First run (2026-07-29, against production Dataverse, read-only): **10/10 hard checks passed**, two
+  warnings — the `grantee-deliverables` alert category is unconfigured (falls back to the default
+  roster; the PD is unaffected), and no submitted package has an image yet, so the `imageUrl` branch is
+  still unproven against real data. Re-run after the first real submission.
+  It deliberately does **not** cover the M365 send (use `/test-email`), the `system_alerts` insert, or
+  `waitUntil` lifecycle behavior — none is observable read-only from a script.
+- **Still unverified after the smoke run.** The Dataverse read paths are now confirmed live, but the
+  M365 send, the `system_alerts` insert, and the `waitUntil` handoff are not. `NEXTAUTH_URL` and
+  `NOTIFICATION_EMAIL_FROM` are confirmed only for the local environment — their Preview/Production
+  values remain `[ASSUMED]`, and the local `NEXTAUTH_URL` is a localhost origin, so those must be
+  checked per environment before promotion. A real submitted package is the promotion gate.
