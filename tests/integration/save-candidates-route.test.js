@@ -46,6 +46,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   stampSuggestionAnchor: jest.fn(async () => ({ updated: 1 })),
   findEligibilityByCandidateKey: jest.fn(async () => null),
+  finalizeCandidatePromotion: jest.fn(async () => ({ saved: true })),
 }));
 jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
   lookupReviewerIdentity: jest.fn(async () => ({ outcome: 'none' })),
@@ -147,7 +148,14 @@ test('happy-path response envelope is pinned exactly (single resolved candidate)
       proposalTitle: 'A Proposal',
       programArea: 'Science',
       grantCycleCode: 'J26',
-      candidates: [{ name: 'Dr X', email: 'x@mit.edu', affiliation: 'MIT' }],
+      candidates: [{
+        name: 'Dr X',
+        email: 'x@mit.edu',
+        emailSource: 'pubmed',
+        emailPersistAllowed: true,
+        identityStatus: 'probable',
+        affiliation: 'MIT',
+      }],
     },
   };
   const res = mockRes();
@@ -162,9 +170,20 @@ test('happy-path response envelope is pinned exactly (single resolved candidate)
     totalRequested: 1,
     rejectedInvalid: undefined,
     rejectedUnresolved: undefined,
+    rejectedMissingEmail: undefined,
     rejectedInstitutionCOI: undefined,
     rejectedIneligible: undefined,
+    rejectedExcluded: undefined,
     errors: undefined,
+    results: [{
+      outcome: 'saved',
+      name: 'Dr X',
+      candidateKey: 'candidate:x|email:x%40mit.edu|orcid:-|affiliation:mit',
+      index: 0,
+      suggestionId: 'S1',
+      potentialReviewerId: 'PID-1',
+      rosterFinalized: true,
+    }],
   });
   expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalledWith(
     expect.objectContaining({ potentialReviewerId: 'PID-1', requestId: 'REQ-1', selected: true }),
@@ -193,14 +212,25 @@ test('422 envelope pinned exactly when every candidate is rejected as unresolved
     totalRequested: 1,
     rejectedInvalid: 0,
     rejectedUnresolved: 1,
+    rejectedMissingEmail: 0,
     rejectedInstitutionCOI: 0,
     rejectedIneligible: 0,
+    rejectedExcluded: 0,
     errors: [{
       name: 'Dr Unresolved',
       candidateKey: expect.any(String),
       index: 0,
       error: 'Candidate identity is unresolved (needs identity review); not saved.',
       code: 'identity_unresolved',
+      outcome: 'withheld',
+    }],
+    results: [{
+      name: 'Dr Unresolved',
+      candidateKey: expect.any(String),
+      index: 0,
+      error: 'Candidate identity is unresolved (needs identity review); not saved.',
+      code: 'identity_unresolved',
+      outcome: 'withheld',
     }],
   });
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
@@ -210,7 +240,16 @@ test('500 envelope pinned exactly when every candidate fails a non-identity adap
   potentialReviewerAdapter.upsertByEmail.mockRejectedValue(new Error('Dataverse write failed'));
   const req = {
     method: 'POST',
-    body: { requestId: 'REQ-1', candidates: [{ name: 'Dr Fails' }] },
+    body: {
+      requestId: 'REQ-1',
+      candidates: [{
+        name: 'Dr Fails',
+        email: 'fails@example.edu',
+        emailSource: 'pubmed',
+        emailPersistAllowed: true,
+        identityStatus: 'probable',
+      }],
+    },
   };
   const res = mockRes();
   await handler(req, res);
@@ -225,13 +264,23 @@ test('500 envelope pinned exactly when every candidate fails a non-identity adap
     totalRequested: 1,
     rejectedInvalid: undefined,
     rejectedUnresolved: undefined,
+    rejectedMissingEmail: undefined,
     rejectedInstitutionCOI: undefined,
     rejectedIneligible: undefined,
+    rejectedExcluded: undefined,
     errors: [expect.objectContaining({
       name: 'Dr Fails',
       candidateKey: expect.any(String),
       index: 0,
       error: 'Dataverse write failed',
+    })],
+    results: [expect.objectContaining({
+      outcome: 'failed',
+      name: 'Dr Fails',
+      candidateKey: expect.any(String),
+      index: 0,
+      error: 'Dataverse write failed',
+      code: 'candidate_save_failed',
     })],
   });
 });
