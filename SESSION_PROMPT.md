@@ -97,8 +97,9 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    published `initial-assessment.generate` v1 at
    `fc8a4c3b-5e8c-f111-ab0f-7ced8d3d15a6`; a repeat dry-run refused overwrite.
    Fresh production probes found 0 registry rows and 0 populated request
-   pointers. The application has not yet been promoted and no SharePoint
-   artifact or live AI run has been created.
+   pointers and 0 AI runs linked to the new prompt. PR #102 subsequently merged
+   as `1e958ee0` and deployed Ready as
+   `dpl_AxxroabhpXLX1pz75MW6486fB4ci`; no SharePoint artifact has been created.
 
 ### Commits
 
@@ -119,7 +120,7 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
 
 ### Verified Open
 
-1. **Promote the recovered governed Initial Assessment application, then verify the deployment.**
+1. **Run the controlled governed Initial Assessment artifact pilot.**
    Evidence: `codex/initial-assessment-pilot-recovery` contains the two recovered pilot
    commits plus current documentation and contract reconciliation. A fresh independent
    adversarial review found and drove fixes for finalize ambiguity, canonical-pointer
@@ -128,10 +129,12 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    The full unit/integration suite passes (544 suites / 6,553 tests), the production build
    passes, lint has 0 errors (51 existing warnings), and relevant contract, Atlas, route,
    prompt, Dataverse, documentation, memory, and type gates pass. The complete
-   Production schema and governed prompt v1 are now live and verified. The
-   application code is not yet deployed, and no artifact has been generated.
-   Promote PR #102 only after this live-state documentation reconciliation is
-   committed and its checks are green.
+   Production schema and governed prompt v1 are live and verified. PR #102
+   passed all seven checks, merged as `1e958ee0`, and deployed Ready as
+   `dpl_AxxroabhpXLX1pz75MW6486fB4ci`. The production aliases fail closed to
+   sign-in when unauthenticated, and the initial error-log scan was clean. No
+   artifact has been generated; the remaining gate is the designated
+   dummy-request/tester rehearsal below.
 
 2. **Exercise address attestation only when a truthful eligible production row exists.**
    Evidence: the signed-in Workbench inspection covered requests `1002912` and `1002874`.

@@ -207,8 +207,8 @@ Board-ready freeze remains a separate owner-controlled milestone.
 
 **[VERIFIED 2026-07-30 via four owner-supplied D26 Phase I Word examples,
 current source, production Dataverse apply/readback probes, and owner
-acceptance; pilot implementation BUILT IN SOURCE, production schema and
-governed prompt v1 LIVE, application promotion and controlled pilot pending.]**
+acceptance; production schema, governed prompt v1, and application LIVE;
+controlled pilot pending.]**
 The D26 examples provide the starting content contract for the J27
 Initial Assessment. Each is a one-page Word document with this sequence:
 
@@ -678,13 +678,14 @@ Explicit non-goals during design freeze:
 > relationships, alternate key, and request pointer are live in Production,
 > and governed `initial-assessment.generate` v1 is live at
 > `fc8a4c3b-5e8c-f111-ab0f-7ced8d3d15a6`; the fresh registry and pointer counts
-> remain zero. The application has not yet been promoted and no pilot request
-> has run. Steps 8–11 and the live SharePoint/application portions of steps
-> 4–6 remain open until colleagues create and identify the representative
+> remain zero. PR #102 merged as `1e958ee0`, and production deployment
+> `dpl_AxxroabhpXLX1pz75MW6486fB4ci` is Ready on the expected aliases with a
+> clean initial error scan. No pilot request has run. Steps 8–11 and the live
+> SharePoint/artifact portions of steps 4–6 remain open until colleagues create and identify the representative
 > production dummy request(s) and the owner names the testers and schedule.
 
-The August 10 minimum changes the former default. Promote and exercise the
-source-built governed artifact spine through the J27 Initial Assessment first;
+The August 10 minimum changes the former default. Exercise the now-live
+governed artifact spine through the J27 Initial Assessment first;
 Pre Site Visit becomes a dependent reuse of that proven contract.
 
 Build in producer-to-consumer order:
@@ -870,7 +871,9 @@ Owner-decided:
 44. on 2026-07-30 the owner accepted the provisional v1 prompt/template pair
     and explicitly authorized the additive Production writes. Wave 16 and
     `initial-assessment.generate` v1 were applied and independently read back;
-    application promotion and artifact generation remain separate gates.
+    PR #102 then merged as `1e958ee0` and deployed Ready as
+    `dpl_AxxroabhpXLX1pz75MW6486fB4ci`. Artifact generation remains the
+    separately controlled pilot gate.
 
 Still required:
 

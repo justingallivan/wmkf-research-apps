@@ -1,10 +1,10 @@
 ---
 name: J27 document capture & Proposal-tab evolution
-description: D26 proposal inputs still resolve by a fragile SharePoint filename bridge. The governed-artifact pilot now has a typed wmkf_requestdocument schema plus canonical SharePoint files; live provisioning and broader J27 capture remain open. The reviewer hold step is retired.
+description: D26 proposal inputs still resolve by a fragile SharePoint filename bridge. The governed-artifact pilot now has a live typed wmkf_requestdocument schema, governed prompt, and application; its controlled artifact rehearsal and broader J27 capture remain open. The reviewer hold step is retired.
 type: project
 status: active
 scope: strategy
-last_verified: 2026-07-29 via Initial Assessment source implementation and owner production-pilot environment decision; live provisioning and broader J27 capture/timing remain open
+last_verified: 2026-07-30 via Initial Assessment production schema/prompt/app deployment verification; controlled artifact pilot and broader J27 capture/timing remain open
 ---
 
 ## Recall Rule
@@ -24,8 +24,8 @@ copy the co-edited Word body into a second editable Dataverse memo.
 
 **Filename-match is FRAGILE — but do NOT assert it "will break in J27."** (Corrected S265, Justin: the earlier "J27 will use new naming conventions / a different collection mechanism, so filename-match WILL break" claim was **unsubstantiated** — Connor pushed back on dropping filename-reconciliation on that premise. There is **no evidence** J27 changes naming; filename-match only breaks **if the names actually change**, which isn't established.) The real, durable case for moving OFF filename-match is **fragility + Dataverse legibility**, NOT a J27-will-break prediction: it depends on PDs naming files consistently/correctly, with **no structured fallback** when they don't. **Strongest argument:** if we **auto-generate writeups** in a future cycle, there is **nowhere structured to store them that the apps can read back** — a filename heuristic can't anchor a machine-produced doc that a PD may never (re)name correctly. Keep the D26 name→label map in one small per-cycle config; never hard-code D26 names as permanent (consistent with [[project-grant-phasing-evolution]]).
 
-**Initial governed-artifact implementation (source-backed 2026-07-29; live
-provisioning pending): associate documents with the typed
+**Initial governed-artifact implementation (source-backed 2026-07-29;
+production-provisioned and deployed 2026-07-30): associate documents with the typed
 `wmkf_requestdocument` Dataverse table on the request** so the apps point at
 each registered artifact **directly** instead of filename joins. The schema
 includes request/cycle, artifact and lifecycle/status option sets, stable
@@ -33,19 +33,21 @@ SharePoint/Graph identity, version/eTag, prompt/run/input/template provenance,
 lineage/milestone fields, and a deterministic generation alternate key.
 This makes document identity, relationships, workflow, and structured
 decisions legible to the apps while the file bytes and editable Word narrative
-remain in SharePoint. Precedent for a document reference on a row already
+remain in SharePoint. Production Wave 16 and governed
+`initial-assessment.generate` v1 are live; PR #102 deployed Ready as
+`dpl_AxxroabhpXLX1pz75MW6486fB4ci`. Precedent for a document reference on a row already
 exists in `wmkf_apprequestperson.wmkf_biosketchurl`. The first producer is the
 request-bound Initial Assessment service; broader applicant-capture producers
-remain future work. Re-confirm the live target and run the committed metadata
-preflight before provisioning.
+remain future work. The controlled dummy-request artifact rehearsal has not
+yet run.
 
 **Pilot environment decision (owner, 2026-07-29):** do not build the reachable
 but incompletely provisioned Dataverse sandbox organization into an integrated
 application/file test environment for this pilot. Use a controlled production
 rehearsal after colleagues create representative dummy `akoya_request` records.
 Their IDs/content shape, named testers, and schedule remain pending. Production
-schema apply, prompt seeding, and application promotion still require separate
-explicit approval.
+schema apply, prompt seeding, and application promotion were separately
+approved and completed on 2026-07-30; artifact generation remains controlled.
 
 **Hold step already RETIRED (S279) — this contingency resolved early, for a different reason.** The reviewer "hold step" ([[project-reviewer-hold-step-decouple]]) was removed in S279 (commit `a8676af1`) when the direction shifted to onboarding at a single final Accept — independent of J27. So the earlier "single-submission may un-scaffold the hold step" note is now moot: there is no hold step left to un-scaffold. (Kept here only so the J27 doc-capture planning doesn't re-raise it.)
 
@@ -53,10 +55,10 @@ explicit approval.
 
 J27 design is a **large planning effort with many moving parts** that must **start soon after the bulk of the D26 Workbench work lands** — treat it as the next major planning push, not a someday item. J27 specifics (exactly what is collected up front, timing, final table shape) are **not yet decided** — re-confirm with Justin/Connor before building.
 
-Ground truth: [VERIFIED 2026-07-29 via
+Ground truth: [VERIFIED 2026-07-30 via
 `shared/config/workbenchProposalDocuments.js`,
 `lib/services/grant-reporting/classify-file.js`,
 `lib/services/reviewer-finder/load-proposal-service.js`, and
-`docs/CURRENT_WORK_QUEUE.md`]. The typed-registry shape remains a planning
-direction, not a built table; re-probe Dataverse and confirm the schema before
-implementation.
+`docs/CURRENT_WORK_QUEUE.md`, production Wave 16 readback, prompt verification,
+and deployment inspection]. The typed registry is live; broader J27
+applicant-capture producers and the controlled artifact rehearsal remain open.

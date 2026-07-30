@@ -3,7 +3,7 @@ title: Dataverse wmkf_requestdocument
 domain: application-state
 kind: atlas
 status: active
-summary: Governed request-artifact registry and Initial Assessment pilot data flow; production schema is live, while application deployment and the controlled pilot remain pending.
+summary: Governed request-artifact registry and Initial Assessment pilot data flow; production schema, prompt, and application are live, while the controlled artifact pilot remains pending.
 canonical: false
 owner: product-engineering
 related:
@@ -32,10 +32,15 @@ and the request pointer has 0 populated rows. The governed
 `fc8a4c3b-5e8c-f111-ab0f-7ced8d3d15a6`; a repeat create-only seed refused to
 overwrite it.
 
-**[NOT YET EXERCISED LIVE]** The application branch has not yet been promoted,
-no SharePoint artifact has been generated, and the controlled dummy-request
-pilot has not run. Live schema and prompt availability must not be described as
-a completed application or artifact pilot.
+**[VERIFIED 2026-07-30 via GitHub merge status, Vercel inspection, production
+alias probes, and error-log scan]** PR #102 merged as `1e958ee0`; production
+deployment `dpl_AxxroabhpXLX1pz75MW6486fB4ci` is Ready on the expected aliases.
+The new route fails closed to sign-in when unauthenticated, and the initial
+post-deploy error scan was clean.
+
+**[NOT YET EXERCISED LIVE]** No SharePoint artifact has been generated and the
+controlled dummy-request pilot has not run. Live schema, prompt, and
+application availability must not be described as a completed artifact pilot.
 
 ## Ownership
 
@@ -114,7 +119,8 @@ transition.
    `akoya_request.wmkf_CurrentInitialAssessment`.
 5. **Completed 2026-07-30:** seed `initial-assessment.generate` with
    `node scripts/seed-initial-assessment-prompt.js --execute`.
-6. **Open:** promote the reviewed application branch.
+6. **Completed 2026-07-30:** merge PR #102 and verify production deployment
+   `dpl_AxxroabhpXLX1pz75MW6486fB4ci` Ready.
 7. **Open:** exercise one authorized end-to-end pilot, including an intentional retry.
 
 No live command in this sequence is authorized merely by this page.

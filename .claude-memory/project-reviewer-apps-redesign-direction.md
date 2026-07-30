@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has seven implemented tabs and three placeholders in source; Initial Assessment production schema and prompt v1 are live while the application and controlled pilot await promotion, and the full Editor Dashboard remains planned.
+description: The unified Request Workbench has seven implemented tabs and three placeholders; Initial Assessment production schema, prompt v1, and application are live while the controlled artifact pilot remains pending, and the full Editor Dashboard remains planned.
 metadata:
   type: project
   status: active
@@ -116,8 +116,8 @@ planned. Current authority is
 - Ten top-level tabs; seven implemented in source (Overview, Proposal, Initial
   Assessment, Reviewers, Reviews, Status, Awardee) and three placeholders (Pre
   Site Visit Writeup, Site Visit, Final Writeup). Initial Assessment production
-  registry/pointer schema and governed prompt v1 are live and verified;
-  application promotion and the human pilot remain pending.
+  registry/pointer schema, governed prompt v1, and application are live and
+  verified; the human artifact pilot remains pending.
 - Reviews is built and production-proved: governed-v3 structured output
   persisted successfully, the automatic all-in drain is enabled, and its
   producer/persistence/consumer lifecycle completed a controlled production

@@ -135,7 +135,7 @@ index and workflow surface, not a second editor or document store.
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
 
-1. promote and exercise the source-built governed-artifact application in a
+1. exercise the now-live governed-artifact application in a
    human-in-the-loop, end-to-end Initial Assessment pilot by 2026-08-10, ahead
    of proposal intake around 2026-08-18. The production registry/pointer schema
    and governed prompt v1 were provisioned and verified 2026-07-30; no artifact

@@ -49,9 +49,10 @@ hood.
 > v1 provisioned and verified 2026-07-30.**
 > This section governs the Initial Assessment, Pre Site Visit Writeup, and
 > Final Writeup design as well as the Site Visit dossier and its materials. It
-> does not claim that the application has been deployed or that a pilot artifact
-> has been generated. **[VERIFIED via owner decisions 2026-07-28, repository
-> source 2026-07-29, and production apply/readback/count probes 2026-07-30.]**
+> The application deployed Ready on 2026-07-30, but this section does not claim
+> that a pilot artifact has been generated. **[VERIFIED via owner decisions
+> 2026-07-28, repository source 2026-07-29, and production
+> apply/readback/count/deployment probes 2026-07-30.]**
 
 ### Authority boundary
 
@@ -65,13 +66,13 @@ hood.
 - **Workbench:** creates or finds the registered artifact, displays its state
   and preview, opens it in Word, and exposes authorized recovery/milestone
   actions.
-- **Initial Assessment pilot locator (implemented in source; live pilot
+- **Initial Assessment pilot locator (deployed; live artifact pilot
   pending):** queries the same typed registry across a cycle so approved
   collaborators can find and open the canonical Word files without visiting
   every request separately. This narrow cycle list does not yet implement the
   full Editor Dashboard filters, preview/version context, or Reviewed progress
   contract below.
-- **Replacement/current rule (implemented in source; live pilot pending):**
+- **Replacement/current rule (deployed; live artifact pilot pending):**
   changed authoritative inputs or cycle produce a distinct generation row. The
   replacement's Ready transition and prior-Ready supersession are one
   ETag-guarded Dataverse changeset with
@@ -81,7 +82,7 @@ hood.
   the canonical Ready document through that pointer
   while exposing a newer pending/failed replacement separately, preserving
   both file access and retry visibility.
-- **Governed write location (implemented in source; live pilot pending):** the
+- **Governed write location (deployed; live artifact pilot pending):** the
   producer requires a positively resolved Dynamics-tracked `akoya_request`
   parent library. The best-effort fallback retained for legacy read-only bucket
   discovery is never accepted as a write target.

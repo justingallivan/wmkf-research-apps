@@ -61,9 +61,9 @@ document inventory, and individual implementation plans do not establish priorit
   Pre-Site, and Final are three distinct documents; Final is copied from a
   the latest Pre-Site version at action time, with a rare explicit regeneration
   option that preserves prior Final content. The Initial Assessment registry
-  and request pointer are live in Production, and governed prompt v1 is
-  provisioned and verified as of 2026-07-30. Application promotion,
-  target-library configuration/readback, and the controlled artifact pilot
+  and request pointer are live in Production, governed prompt v1 is
+  provisioned, and the application is deployed as of 2026-07-30.
+  Target-library configuration/readback and the controlled artifact pilot
   remain open. See
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
 - Pre-Site input direction (owner-decided 2026-07-28): draft factual material

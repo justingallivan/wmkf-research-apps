@@ -73,8 +73,8 @@ Both written by `execute-prompt.js` `writeRunRow()`. Migration plans touching ei
   repeat dry-run refused to overwrite the existing name, confirming the
   version-history guard. The production entity held 20 prompt rows after this
   seed. A fresh lookup-scoped count probe found 0 `wmkf_ai_run` rows linked to
-  this prompt. The prompt is live, but application promotion and the controlled
-  dummy-request pilot remain separate gates.
+  this prompt. The prompt and application are live, but the controlled
+  dummy-request artifact pilot remains a separate gate.
 - **`review-synthesis.generate` production publication (2026-07-26):** the
   authenticated superuser admin route published current v2
   `7423049a-3f89-f111-ab0f-7ced8d3d15a6` and retired v1
