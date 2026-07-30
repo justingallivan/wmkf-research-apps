@@ -3,7 +3,7 @@ title: "Grantee Submission Visibility — Spec"
 domain: grantee-portal
 kind: spec
 status: active
-summary: "Built: a best-effort submit notification to the assigned PD, plus caption and image visibility on the staff Awardee tab."
+summary: "Production-verified submit notification to the assigned PD, plus caption and image visibility on the staff Awardee tab."
 canonical: false
 cataloged: 2026-07-29
 owner: product-engineering
@@ -17,11 +17,13 @@ related:
 
 # Grantee Submission Visibility — Spec
 
-Status: **BUILT (2026-07-29), unpromoted.** Both features are implemented on
-`claude/grantee-submit-visibility-spec` with unit coverage; neither has been exercised against live
-Dataverse/M365, and the branch has not been promoted. The `[PLANNED]` labels below record the design
-intent this was built to — they are retained deliberately, since the shipped code follows them.
-Deltas between spec and code are called out in **Implementation notes** at the end.
+Status: **PRODUCTION-VERIFIED (2026-07-30).** Both features are on `main` and were exercised through
+the signed-in production UI plus the public grantee portal against controlled request `1002788`.
+The rehearsal verified the Dataverse changeset, SharePoint upload, durable alert, one M365
+notification, and staff Awardee-tab rendering; the temporary abstract, deliverable row, SharePoint
+file, alert state, and recipient override were then restored or removed. The `[PLANNED]` labels below
+record the design intent this was built to — they are retained deliberately, since the shipped code
+follows them. Deltas between spec and code are called out in **Implementation notes** at the end.
 
 Every as-built claim about *pre-existing* code is labeled `[VERIFIED via file:line]` against a file
 read while drafting (2026-07-29). Read `docs/GRANTEE_PORTAL_SPEC.md` first — that is the canonical
@@ -464,8 +466,20 @@ Where the shipped code differs from, or resolves, the plan above:
   still unproven against real data. Re-run after the first real submission.
   It deliberately does **not** cover the M365 send (use `/test-email`), the `system_alerts` insert, or
   `waitUntil` lifecycle behavior — none is observable read-only from a script.
-- **Still unverified after the smoke run.** The Dataverse read paths are now confirmed live, but the
-  M365 send, the `system_alerts` insert, and the `waitUntil` handoff are not. `NEXTAUTH_URL` and
-  `NOTIFICATION_EMAIL_FROM` are confirmed only for the local environment — their Preview/Production
-  values remain `[ASSUMED]`, and the local `NEXTAUTH_URL` is a localhost origin, so those must be
-  checked per environment before promotion. A real submitted package is the promotion gate.
+- **Production rehearsal (2026-07-30) closed the live verification gap.** Release commit
+  `a6c0d048` deployed READY, and a signed-in controlled rehearsal on request `1002788` produced a
+  submitted package with an acknowledged waiver, approved abstract, caption, and SharePoint image.
+  The staff Awardee tab rendered all five surfaces. Postgres contained one active submission alert,
+  and Dataverse recorded one outgoing `Sent` email to `jgallivan@wmkeck.org`; the second activity with
+  the same CRM tracking subject was the corresponding incoming `Received` copy, not a second send.
+  `[VERIFIED via production UI, Dataverse email/activityparty reads, Postgres alert read, and
+  SharePoint folder read]`
+- **The rehearsal found and fixed one lifecycle defect before closeout.** The original 10-second
+  promise race detached a healthy 36-second Dataverse/M365 operation from `waitUntil`; commit
+  `11e486bd` removed that race and production deployment
+  `dpl_7X6q5XYog3YcuJoAfXuaMQ3zE4xM` reached READY with all canonical aliases. Scoped gates, the full
+  **539-suite / 6509-test** run, and the production build passed before promotion.
+- **Cleanup is verified, not assumed.** Request `1002788` again has a null approved abstract, zero
+  deliverable rows, and an empty `Grantee_Uploads` folder; the rehearsal alert is resolved; the
+  `grantee-deliverables` recipient override is absent from persisted config; and the Awardee tab is
+  back to `Not started`. The one sent email remains as the intended audit record.
