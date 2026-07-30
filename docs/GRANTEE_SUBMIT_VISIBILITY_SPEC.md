@@ -395,15 +395,20 @@ Where the shipped code differs from, or resolves, the plan above:
   jest, scripts) it is a silent no-op that would orphan the work, so `keepAlive` probes for a real
   runtime `waitUntil` and awaits inline when there isn't one. `tests/unit/keep-alive.test.js` pins both
   branches plus the context-without-waitUntil case.
-- **`NOTIFY_BUDGET_MS` was re-scoped to 10s.** It began as a 3s guard protecting the response; once the
-  runtime owns the lifetime that job is gone, and a tight bound would actively *abandon* sends about to
-  succeed. It is now only a leak stop for a wedged send, and its test asserts a generous floor rather
-  than a tight ceiling — the intent changed, so the assertion had to change with it.
+- **Production rehearsal removed the notification's internal 10s race (2026-07-30).** Request
+  `1002788` committed its package and alert, then the notification promise hit the 10-second race and
+  logged `abandoned`; the underlying Dataverse/M365 operation nevertheless completed and sent one
+  email at 16:49:26Z. `[VERIFIED via Vercel runtime log plus Dataverse email/activityparty reads]`
+  The race did not cancel the work — it only resolved the promise registered with `waitUntil`, thereby
+  detaching the still-running send from runtime ownership. `notifyGranteeSubmission` now remains
+  pending until `NotificationService.notify` settles. The platform invocation limit is the outer
+  bound; adding another non-cancelling promise race would recreate the defect.
 - **The late-error path cannot double-respond.** The outer catch returns early on `res.headersSent`.
   `notifyGranteeSubmission` does not throw, so this is defence in depth; the test suite's `mockRes`
   counts sends so a regression would show up as `sends: 2`.
-- **`budgetMs` is an injectable test seam.** Jest fake timers deadlock the route's busboy stream, so
-  the timeout is exercised by calling the service directly with a small budget instead.
+- **Lifecycle regression coverage waits on a controlled notify promise.** The service test proves it
+  stays pending until that promise settles, while the route test separately proves the 200 is written
+  first. Together those assertions pin both sides of the contract without a wall-clock timeout.
 - **Recipient resolution degrades per-read.** A failed PD lookup keeps the PI name the request read
   already produced; only a failed *request* read yields both nulls. Pinned by two tests.
 - **PD resolution reuses `resolveProgramDirectorEmailForRequest`, it does not re-roll it.** The spec

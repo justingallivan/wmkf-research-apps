@@ -39,7 +39,7 @@ import NotificationService from '../../lib/services/notification-service';
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
 import { resolveProgramDirectorEmailForRequest } from '../../lib/services/program-director-resolver';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
-import { NOTIFY_BUDGET_MS, notifyGranteeSubmission } from '../../lib/services/grantee-submit-notification';
+import { notifyGranteeSubmission } from '../../lib/services/grantee-submit-notification';
 import handler from '../../pages/api/external/grantee/[token]/submit';
 
 const VER = '33333333-3333-3333-3333-333333333333';
@@ -297,27 +297,28 @@ describe('submitted notification (best-effort, post-commit)', () => {
     expect(notifyArg().explicitRecipients).toEqual(['pd@wmkf.example']);
   });
 
-  // A committed submit must not be held hostage by a hanging notification: the
-  // platform could kill the invocation before the 200 is written, and the grantee
-  // would see a timeout on a package that DID commit (their retry then 409s).
-  // Driven on the service directly with a tiny budget — fake timers deadlock the
-  // route's multipart stream, and the route does not thread budgetMs through.
-  test('hanging notify → the service still resolves, bounded by its budget', async () => {
-    NotificationService.notify.mockReturnValue(new Promise(() => {})); // never settles
-    const started = Date.now();
-    await expect(notifyGranteeSubmission({
+  // REGRESSION: an internal 10-second race used to resolve this promise while the
+  // Dataverse send continued in the background. That detached the real work from
+  // Vercel waitUntil; production proved a healthy send can take longer than 10s.
+  // The service must remain pending until the send itself settles so keepAlive keeps
+  // runtime ownership for the whole operation.
+  test('the service remains pending until notify settles', async () => {
+    let finishNotify;
+    NotificationService.notify.mockReturnValue(new Promise((resolve) => {
+      finishNotify = resolve;
+    }));
+    let settled = false;
+    const notifying = notifyGranteeSubmission({
       requestId: 'r1', requestNum: '1002794', title: 't',
-      hasImage: true, captionPresent: true, budgetMs: 25,
-    })).resolves.toBeUndefined();
-    expect(Date.now() - started).toBeLessThan(2000);
-  });
+      hasImage: true, captionPresent: true,
+    }).then(() => { settled = true; });
 
-  // The budget is a leak stop, not a delivery deadline: the route already responded
-  // and handed the promise to the runtime, so cutting off too early would abandon
-  // sends that were about to succeed. Bounded, but generous.
-  test('the shipped default budget is bounded but not tight', () => {
-    expect(NOTIFY_BUDGET_MS).toBeGreaterThanOrEqual(10000);
-    expect(NOTIFY_BUDGET_MS).toBeLessThanOrEqual(30000);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(settled).toBe(false);
+
+    finishNotify({});
+    await expect(notifying).resolves.toBeUndefined();
+    expect(settled).toBe(true);
   });
 
   // Disabled PD / no PD assigned both surface as a null from the shared resolver,
