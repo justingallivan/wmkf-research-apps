@@ -15,7 +15,9 @@ try {
   }
 } catch {}
 const args = process.argv.slice(2);
-const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// Dataverse record IDs use the GUID shape but are not guaranteed to carry an
+// RFC 4122 version/variant nibble (for example, request 1002912 contains `f111`).
+const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 let guid = args.includes('--guid') ? args[args.indexOf('--guid') + 1] : null;
 const requestNumber = args.includes('--request') ? args[args.indexOf('--request') + 1] : null;
 const grepIdx = args.indexOf('--grep');
