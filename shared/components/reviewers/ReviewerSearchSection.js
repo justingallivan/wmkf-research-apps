@@ -710,6 +710,25 @@ export default function ReviewerSearchSection({
   const genRef = useRef(0);
   const excludeEditedRef = useRef(false);
 
+  const applyRosterSnapshot = useCallback((data) => {
+    setRosterActive(Array.isArray(data?.active) ? data.active : []);
+    setRosterExcluded(Array.isArray(data?.excluded) ? data.excluded : []);
+    setRosterIneligible(Array.isArray(data?.ineligible) ? data.ineligible : []);
+    setRosterBlocked(Array.isArray(data?.blocked) ? data.blocked : []);
+    setRosterSavedKeys(Array.isArray(data?.savedKeys) ? data.savedKeys : []);
+    setRosterNames(Array.isArray(data?.allNames) ? data.allNames : []);
+  }, []);
+
+  const reloadRoster = useCallback(async (expectedGeneration = genRef.current) => {
+    if (!requestId) return null;
+    const res = await fetch(`/api/workbench/reviewer-roster?requestId=${encodeURIComponent(requestId)}`);
+    const data = await res.json().catch(() => ({}));
+    if (genRef.current !== expectedGeneration) return null;
+    if (!res.ok || !data.success) return null;
+    applyRosterSnapshot(data);
+    return data;
+  }, [requestId, applyRosterSnapshot]);
+
   // Reset everything when the request or the loaded proposal changes — stale
   // candidates must never be savable under a different proposal (Finding 6).
   // Also (re)loads the durable per-request roster (genRef-guarded) so the
@@ -738,17 +757,7 @@ export default function ReviewerSearchSection({
     if (requestId) {
       (async () => {
         try {
-          const res = await fetch(`/api/workbench/reviewer-roster?requestId=${encodeURIComponent(requestId)}`);
-          const data = await res.json().catch(() => ({}));
-          if (genRef.current !== myGen) return; // context changed — discard
-          if (res.ok && data.success) {
-            setRosterActive(Array.isArray(data.active) ? data.active : []);
-            setRosterExcluded(Array.isArray(data.excluded) ? data.excluded : []);
-            setRosterIneligible(Array.isArray(data.ineligible) ? data.ineligible : []);
-            setRosterBlocked(Array.isArray(data.blocked) ? data.blocked : []);
-            setRosterSavedKeys(Array.isArray(data.savedKeys) ? data.savedKeys : []);
-            setRosterNames(Array.isArray(data.allNames) ? data.allNames : []);
-          }
+          await reloadRoster(myGen);
         } catch { /* best-effort — a missing roster just means no dedup/restore this load */ }
         finally { if (genRef.current === myGen) setRosterLoaded(true); }
       })();
@@ -756,7 +765,7 @@ export default function ReviewerSearchSection({
       setRosterLoaded(true); // no request → nothing to load; don't block the form
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestId, blobUrl]);
+  }, [requestId, blobUrl, reloadRoster]);
 
   // When the applicant exclude list finishes loading (it can arrive after the
   // proposal), prefill the box — unless the user has already edited it.
@@ -1194,6 +1203,7 @@ export default function ReviewerSearchSection({
   const promoteCandidate = useCallback(async (cand) => {
     const key = candKey(cand);
     if (!key || !requestId) return;
+    const myGen = genRef.current;
     setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
     setRosterActive((prev) => dedupeByName([cand, ...prev]));
     try {
@@ -1202,13 +1212,26 @@ export default function ReviewerSearchSection({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId, action: 'promote', candidateKey: key }),
       });
-      if (!res.ok) throw new Error('promote failed');
+      const data = await res.json().catch(() => ({}));
+      if (genRef.current !== myGen) return;
+      if (res.status === 409 && data.code === 'candidate_not_excluded') {
+        const snapshot = await reloadRoster(myGen);
+        if (genRef.current === myGen) {
+          setRosterNote(snapshot
+            ? 'That reviewer changed elsewhere, so the reviewer roster was reloaded.'
+            : 'That reviewer changed elsewhere. Reload this request before continuing.');
+        }
+        return;
+      }
+      if (!res.ok || !data.success) throw new Error(data.error || 'promote failed');
     } catch {
-      setRosterActive((prev) => prev.filter((c) => candKey(c) !== key));
-      setRosterExcluded((prev) => dedupeByName([cand, ...prev]));
-      setRosterNote("Couldn't promote that reviewer — please try again.");
+      if (genRef.current === myGen) {
+        setRosterActive((prev) => prev.filter((c) => candKey(c) !== key));
+        setRosterExcluded((prev) => dedupeByName([cand, ...prev]));
+        setRosterNote("Couldn't promote that reviewer — please try again.");
+      }
     }
-  }, [requestId]);
+  }, [requestId, reloadRoster]);
 
   const removePreviousResults = useCallback(async () => {
     if (!requestId || busy || removingPrevious || previousSearchRefs.length === 0) return;
@@ -1364,6 +1387,98 @@ export default function ReviewerSearchSection({
     setRosterActive((prev) => prev.map(stamp));
   }, [requestId, setManualContact]);
 
+  const refreshExpiredVerification = useCallback(async (staleCandidates, expectedGeneration) => {
+    if (!requestId || !Array.isArray(staleCandidates) || staleCandidates.length === 0) {
+      return { refreshed: [], failures: [], stale: false };
+    }
+    const failures = staleCandidates
+      .filter((candidate) => Array.isArray(candidate?.manualContactFields) && candidate.manualContactFields.length > 0)
+      .map((candidate) => ({
+        name: candidate.name || 'Unknown candidate',
+        error: 'Manual contact details were not overwritten by automated refresh; confirm the contact again before promoting.',
+      }));
+    const refreshableCandidates = staleCandidates.filter((candidate) => (
+      !Array.isArray(candidate?.manualContactFields) || candidate.manualContactFields.length === 0
+    ));
+    if (refreshableCandidates.length === 0) {
+      return { refreshed: [], failures, stale: false };
+    }
+    pushProgress(`Refreshing contact verification for ${refreshableCandidates.length} reviewer(s)…`);
+    const enrichmentResponse = await fetch('/api/reviewer-finder/enrich-contacts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        candidates: refreshableCandidates,
+        options: { usePubmed: true, useOrcid: true, useSerpSearch: true, useClaudeSearch: true },
+        authorInstitution: analysis?.proposalInfo?.authorInstitution || null,
+        requestId,
+      }),
+    });
+    let enrichmentResults = null;
+    let streamError = null;
+    await readSseStream(enrichmentResponse, ({ event, data }) => {
+      if (event === 'error' || data?.type === 'error') {
+        streamError = data?.message || 'contact verification refresh failed';
+        return;
+      }
+      if (data?.type === 'progress' && data.overall && genRef.current === expectedGeneration) {
+        pushProgress(`Refreshing verification ${data.overall.current}/${data.overall.total}…`);
+      }
+      if (data?.type === 'complete') enrichmentResults = data.results;
+    });
+    if (genRef.current !== expectedGeneration) {
+      return { refreshed: [], failures: [], stale: true };
+    }
+    if (streamError || !Array.isArray(enrichmentResults)) {
+      throw new Error(streamError || 'Contact verification refresh returned no results.');
+    }
+
+    const merged = mergeEnrichment(refreshableCandidates, enrichmentResults);
+    const ready = [];
+    for (let index = 0; index < refreshableCandidates.length; index += 1) {
+      const before = refreshableCandidates[index];
+      const after = merged[index];
+      const newReceipt = after?.automatedIdentityAttestation;
+      if (!newReceipt || newReceipt === before?.automatedIdentityAttestation) {
+        failures.push({
+          name: before?.name || 'Unknown candidate',
+          error: 'Contact verification could not be refreshed.',
+        });
+      } else {
+        ready.push(after);
+      }
+    }
+
+    // POST one row at a time because the roster endpoint returns a count, not
+    // per-row identifiers. A recorded=1 response is therefore an exact durable
+    // acknowledgement for this candidate; recorded=0 stays retryable.
+    const refreshed = [];
+    for (const candidate of ready) {
+      const rosterResponse = await fetch('/api/workbench/reviewer-roster', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId,
+          candidates: [pruneCandidateForRoster(candidate)],
+        }),
+      });
+      const rosterData = await rosterResponse.json().catch(() => ({}));
+      if (rosterResponse.ok && rosterData.success && rosterData.recorded === 1) {
+        refreshed.push(candidate);
+      } else {
+        failures.push({
+          name: candidate.name || 'Unknown candidate',
+          error: rosterData.error || 'Refreshed verification could not be written to the active roster.',
+        });
+      }
+    }
+    return {
+      refreshed,
+      failures,
+      stale: genRef.current !== expectedGeneration,
+    };
+  }, [requestId, analysis, pushProgress]);
+
   const saveSelected = useCallback(async () => {
     const myGen = genRef.current;
     if (savingRef.current === myGen) return;
@@ -1394,7 +1509,12 @@ export default function ReviewerSearchSection({
 
       let saved = 0;
       let savedKeys = [];
+      let savedRosterKeys = [];
       let blockedKeys = [];
+      let expiredKeys = [];
+      let needsRosterReload = false;
+      let refreshedVerificationCandidates = [];
+      const rosterWarnings = [];
       if (toSave.length > 0) {
         pushProgress(`Saving ${toSave.length} candidate(s)…`);
         let receivedResponse = false;
@@ -1412,15 +1532,28 @@ export default function ReviewerSearchSection({
           });
           receivedResponse = true;
           const sData = await sRes.json().catch(() => ({}));
+          const saveResults = Array.isArray(sData.results) ? sData.results : [];
           saved = sData.savedCount || 0;
           savedKeys = Array.isArray(sData.savedKeys) ? sData.savedKeys : [];
-          blockedKeys = (Array.isArray(sData.results) ? sData.results : [])
+          blockedKeys = saveResults
             .filter((result) => (
               result?.outcome === 'failed'
               && result?.code === 'applicant_excluded'
               && typeof result?.candidateKey === 'string'
             ))
             .map((result) => result.candidateKey);
+          expiredKeys = saveResults
+            .filter((result) => (
+              result?.code === 'identity_attestation_required'
+              && typeof result?.candidateKey === 'string'
+            ))
+            .map((result) => result.candidateKey);
+          needsRosterReload = saveResults.some((result) => (
+            result?.outcome === 'saved' && result?.rosterFinalized === false
+          ));
+          if (needsRosterReload) {
+            rosterWarnings.push('A reviewer was saved, but the Find roster could not be finalized.');
+          }
           if (Array.isArray(sData.errors)) failures.push(...sData.errors);
           if ((!sRes.ok || !sData.success) && saved === 0) {
             const detail = formatSaveFailureDetails(sData.errors);
@@ -1437,29 +1570,53 @@ export default function ReviewerSearchSection({
             // this as unknown-outcome and reload the server-owned roster before a
             // retry can create another person/suggestion.
             try {
-              const rosterRes = await fetch(`/api/workbench/reviewer-roster?requestId=${encodeURIComponent(requestId)}`);
-              const rosterData = await rosterRes.json().catch(() => ({}));
-              if (isCurrent() && rosterRes.ok && rosterData.success) {
+              const rosterData = await reloadRoster(myGen);
+              if (isCurrent() && rosterData) {
                 const currentSavedKeys = Array.isArray(rosterData.savedKeys) ? rosterData.savedKeys : [];
-                savedKeys = currentSavedKeys;
+                savedRosterKeys = currentSavedKeys;
                 saved = toSave.filter((candidate) => currentSavedKeys.includes(candKey(candidate))).length;
-                setRosterActive(Array.isArray(rosterData.active) ? rosterData.active : []);
-                setRosterExcluded(Array.isArray(rosterData.excluded) ? rosterData.excluded : []);
-                setRosterIneligible(Array.isArray(rosterData.ineligible) ? rosterData.ineligible : []);
-                setRosterBlocked(Array.isArray(rosterData.blocked) ? rosterData.blocked : []);
-                setRosterSavedKeys(currentSavedKeys);
-                setRosterNames(Array.isArray(rosterData.allNames) ? rosterData.allNames : []);
               }
             } catch { /* retain unknown-outcome error below */ }
           }
           failures.push(...toSave
-            .filter((candidate) => !savedKeys.includes(candKey(candidate)))
+            .filter((candidate) => (
+              !candidateWasSaved(candidate, savedKeys)
+              && !savedRosterKeys.includes(candKey(candidate))
+            ))
             .map((c) => ({
               name: c.name || 'Unknown candidate',
               error: receivedResponse ? e.message : 'Save outcome is unknown; roster state was refreshed before retry.',
             })));
         }
+
+        const expiredCandidates = toSave.filter((candidate) => candidateWasSaved(candidate, expiredKeys));
+        if (expiredCandidates.length > 0 && isCurrent()) {
+          try {
+            const refreshResult = await refreshExpiredVerification(expiredCandidates, myGen);
+            if (refreshResult.stale || !isCurrent()) return;
+            refreshedVerificationCandidates = refreshResult.refreshed;
+            failures.unshift(...refreshResult.failures);
+            if (refreshedVerificationCandidates.length > 0) {
+              rosterWarnings.push(
+                `Contact verification was refreshed for ${refreshedVerificationCandidates.length} reviewer`
+                + `${refreshedVerificationCandidates.length === 1 ? '' : 's'}. Review the updated contact details, then select and promote again.`,
+              );
+            }
+            if (refreshResult.failures.length > 0) {
+              rosterWarnings.push(
+                `Verification could not be refreshed for ${refreshResult.failures.length} reviewer`
+                + `${refreshResult.failures.length === 1 ? '' : 's'}; those rows remain unchanged and retryable.`,
+              );
+            }
+          } catch (refreshError) {
+            failures.push({
+              name: 'Contact verification refresh',
+              error: refreshError.message,
+            });
+          }
+        }
       }
+      if (!isCurrent()) return;
 
       let promoted = 0;
       const promotedCandidates = [];
@@ -1502,8 +1659,9 @@ export default function ReviewerSearchSection({
           if (result.ok) {
             promoted += 1;
             promotedCandidates.push(result.candidate);
-            if (!result.rosterFinalized && isCurrent()) {
-              setRosterNote('A promoted reviewer was saved, but the Find roster could not be finalized. Reload before retrying.');
+            if (!result.rosterFinalized) {
+              needsRosterReload = true;
+              rosterWarnings.push('A promoted reviewer was saved, but the Find roster could not be finalized.');
             }
           } else {
             failures.push({ name: result.candidate.name || 'Applicant-referred reviewer', error: result.error });
@@ -1513,42 +1671,66 @@ export default function ReviewerSearchSection({
 
       // The server owns the durable `saved` transition. The browser only
       // reconciles exact successful keys into its current view.
-      if (savedKeys.length > 0) {
-        const wasSaved = (candidate) => candidateWasSaved(candidate, savedKeys);
+      if (savedKeys.length > 0 || savedRosterKeys.length > 0) {
+        const wasSaved = (candidate) => (
+          candidateWasSaved(candidate, savedKeys)
+          || savedRosterKeys.includes(candKey(candidate))
+        );
         if (isCurrent()) {
+          const matchedSavedCandidates = displayCandidates.filter(wasSaved);
+          const matchedSavedRosterKeys = matchedSavedCandidates.map(candKey).filter(Boolean);
           setCandidates((prev) => prev.filter((c) => !wasSaved(c)));
           setRosterActive((prev) => prev.filter((c) => !wasSaved(c)));
-          setRosterSavedKeys((prev) => Array.from(new Set([...prev, ...savedKeys])));
+          setRosterSavedKeys((prev) => Array.from(new Set([...prev, ...matchedSavedRosterKeys])));
           setSelected((prev) => {
             const next = new Set(prev);
-            displayCandidates.filter(wasSaved).forEach((candidate) => next.delete(candKey(candidate)));
+            matchedSavedCandidates.forEach((candidate) => next.delete(candKey(candidate)));
             return next;
           });
         }
       }
       if (blockedKeys.length > 0 && isCurrent()) {
-        const blockedSet = new Set(blockedKeys);
+        const wasBlocked = (candidate) => candidateWasSaved(candidate, blockedKeys);
         const blockedCandidates = displayCandidates
-          .filter((candidate) => blockedSet.has(candKey(candidate)))
+          .filter(wasBlocked)
           .map((candidate) => ({
             ...candidate,
             promotionDecision: 'blocked_applicant_excluded',
             promotionBlockCode: 'applicant_excluded',
             promotionBlockReason: 'This reviewer is applicant-excluded for the request and cannot be promoted.',
           }));
-        setCandidates((prev) => prev.filter((candidate) => !blockedSet.has(candKey(candidate))));
-        setRecCandidates((prev) => prev.filter((candidate) => !blockedSet.has(candKey(candidate))));
-        setRosterActive((prev) => prev.filter((candidate) => !blockedSet.has(candKey(candidate))));
+        setCandidates((prev) => prev.filter((candidate) => !wasBlocked(candidate)));
+        setRecCandidates((prev) => prev.filter((candidate) => !wasBlocked(candidate)));
+        setRosterActive((prev) => prev.filter((candidate) => !wasBlocked(candidate)));
         setRosterBlocked((prev) => dedupeByName([...blockedCandidates, ...prev]));
         setSelected((prev) => {
           const next = new Set(prev);
-          blockedKeys.forEach((key) => next.delete(key));
+          displayCandidates.filter(wasBlocked).forEach((candidate) => next.delete(candKey(candidate)));
+          return next;
+        });
+      }
+      if (refreshedVerificationCandidates.length > 0 && isCurrent()) {
+        const refreshedByRosterKey = new Map(
+          refreshedVerificationCandidates.map((candidate) => [candKey(candidate), candidate]),
+        );
+        const applyRefresh = (candidate) => refreshedByRosterKey.get(candKey(candidate)) || candidate;
+        setCandidates((prev) => prev.map(applyRefresh));
+        setRecCandidates((prev) => prev.map(applyRefresh));
+        setRosterActive((prev) => prev.map(applyRefresh));
+        setSelected((prev) => {
+          const next = new Set(prev);
+          refreshedVerificationCandidates.forEach((candidate) => next.delete(candKey(candidate)));
           return next;
         });
       }
 
       const totalSucceeded = saved + promoted;
       if (totalSucceeded === 0) {
+        if (refreshedVerificationCandidates.length > 0 && isCurrent()) {
+          setRosterNote(Array.from(new Set(rosterWarnings)).join(' '));
+          setPhase('results');
+          return;
+        }
         const detail = formatSaveFailureDetails(failures);
         throw new Error(detail ? `No candidates were saved: ${detail}` : 'No candidates were saved.');
       }
@@ -1576,6 +1758,17 @@ export default function ReviewerSearchSection({
           setRosterSavedKeys((prev) => Array.from(new Set([...prev, ...promotedKeys])));
         }
       }
+      if (needsRosterReload && isCurrent()) {
+        const snapshot = await reloadRoster(myGen);
+        if (isCurrent()) {
+          rosterWarnings.push(snapshot
+            ? 'The server-owned roster was reloaded before another attempt.'
+            : 'Reload this request before another attempt.');
+        }
+      }
+      if (isCurrent() && rosterWarnings.length > 0) {
+        setRosterNote(Array.from(new Set(rosterWarnings)).join(' '));
+      }
       if (isCurrent() && onSaved && totalSucceeded > 0) onSaved();
     } catch (e) {
       if (isCurrent()) {
@@ -1585,7 +1778,17 @@ export default function ReviewerSearchSection({
     } finally {
       if (savingRef.current === myGen) savingRef.current = null;
     }
-  }, [displayCandidates, selected, requestId, analysis, cycleCode, onSaved, pushProgress]);
+  }, [
+    displayCandidates,
+    selected,
+    requestId,
+    analysis,
+    cycleCode,
+    onSaved,
+    pushProgress,
+    refreshExpiredVerification,
+    reloadRoster,
+  ]);
 
   // Export the SELECTED candidates to an Excel workbook (Request Info + Candidates
   // sheets, built server-side). Slim DTO per row resolves the same fields the card
@@ -1895,7 +2098,7 @@ export default function ReviewerSearchSection({
           {/* Durable roster + this-run results — rendered INDEPENDENT of `phase`
               so the per-request candidate list (active + the collapsed Excluded
               set) shows on reload and even when no proposal is loaded. */}
-          {(displayCandidates.length > 0 || rosterExcluded.length > 0 || rosterIneligible.length > 0 || rosterBlocked.length > 0 || phase === 'results' || phase === 'done') && (
+          {(rosterNote || displayCandidates.length > 0 || rosterExcluded.length > 0 || rosterIneligible.length > 0 || rosterBlocked.length > 0 || phase === 'results' || phase === 'done') && (
             <div className="space-y-3 mt-3">
               {savedMsg && <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm">{savedMsg}</div>}
               {enrichNote && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{enrichNote}</div>}

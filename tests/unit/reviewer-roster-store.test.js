@@ -389,10 +389,18 @@ describe('staff identity confirmation', () => {
   });
 
   test('findIdentityConfirmation is request + opaque-id scoped', async () => {
-    sql.mockResolvedValueOnce({ rows: [{ confirmation: { source: 'staff_confirmed', email: 'ann@example.edu' } }] });
-    await expect(store.findIdentityConfirmation(REQ, 'confirm-1')).resolves.toMatchObject({
-      source: 'staff_confirmed', email: 'ann@example.edu',
+    sql.mockResolvedValueOnce({
+      rows: [{
+        candidate_key: 'candidate:ann',
+        confirmation: { source: 'staff_confirmed', email: 'ann@example.edu' },
+      }],
     });
+    await expect(store.findIdentityConfirmation(REQ, 'confirm-1')).resolves.toMatchObject({
+      source: 'staff_confirmed',
+      email: 'ann@example.edu',
+      rosterCandidateKey: 'candidate:ann',
+    });
+    expect(queryTextOf(0)).toMatch(/SELECT candidate_key/);
     expect(queryTextOf(0)).toMatch(/candidate->>'pdIdentityConfirmationId'/);
     expect(allInterpolations()).toEqual(expect.arrayContaining([REQ, 'confirm-1']));
   });

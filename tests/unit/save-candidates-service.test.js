@@ -280,6 +280,84 @@ test.each([
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
 });
 
+test('stored staff confirmation supplies the authoritative roster key when the automated receipt expired', async () => {
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce({ valid: false, reason: 'expired' });
+  reviewerRosterStore.findIdentityConfirmation.mockResolvedValueOnce({
+    source: 'staff_confirmed',
+    normalizedName: 'ann lee',
+    email: 'ann@example.edu',
+    website: '',
+    affiliation: 'Example University',
+    rosterCandidateKey: 'candidate:staff-confirmed',
+  });
+
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Ann Lee',
+      email: 'ann@example.edu',
+      emailSource: 'manual',
+      affiliation: 'Example University',
+      candidateKey: 'candidate:staff-confirmed',
+      automatedIdentityAttestation: 'expired-token',
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'confirm-1',
+    }],
+  });
+
+  expect(reviewerRosterStore.findEligibilityByCandidateKey)
+    .toHaveBeenCalledWith(BASE.requestId, 'candidate:staff-confirmed');
+  expect(reviewerRosterStore.finalizeCandidatePromotion).toHaveBeenCalledWith(
+    BASE.requestId,
+    expect.objectContaining({ name: 'Ann Lee', email: 'ann@example.edu' }),
+    expect.objectContaining({ candidateKey: 'candidate:staff-confirmed' }),
+  );
+  expect(out.savedCount).toBe(1);
+});
+
+test('staff and automated roster bindings that disagree fail closed before writes', async () => {
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+    valid: true,
+    rosterCandidateKey: 'candidate:automated',
+    identityDecisionBound: true,
+    contactAuthorityBound: true,
+  });
+  reviewerRosterStore.findIdentityConfirmation.mockResolvedValueOnce({
+    source: 'staff_confirmed',
+    normalizedName: 'ann lee',
+    email: 'ann@example.edu',
+    website: '',
+    affiliation: 'Example University',
+    rosterCandidateKey: 'candidate:staff-confirmed',
+  });
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Ann Lee',
+      email: 'ann@example.edu',
+      emailSource: 'manual',
+      affiliation: 'Example University',
+      candidateKey: 'candidate:staff-confirmed',
+      automatedIdentityAttestation: 'signed-token',
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'confirm-1',
+    }],
+  }).catch((error) => error);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    rejectedInvalid: 1,
+    errors: [expect.objectContaining({
+      code: 'invalid_candidate',
+      error: expect.stringMatching(/different roster candidates/i),
+    })],
+  });
+  expect(reviewerRosterStore.findEligibilityByCandidateKey).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+});
+
 test('500 SaveCandidatesError when nothing saved for non-rejection reasons; rejected* keys stay undefined', async () => {
   potentialReviewerAdapter.upsertByEmail.mockRejectedValue(new Error('Dataverse write failed'));
   const err = await saveCandidates({
