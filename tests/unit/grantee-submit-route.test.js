@@ -232,20 +232,24 @@ describe('submitted notification (best-effort, post-commit)', () => {
     expect(res.sends).toBe(1);
   });
 
-  // The 200 must be on the wire BEFORE any notification work: the platform can end
-  // the invocation at any point after the changeset, and a bounded in-service wait
+  // The 200 must be on the wire BEFORE the notification is waited on: the platform
+  // can end the invocation any time after the changeset, and an in-service budget
   // cannot know how much of the deadline the scan + upload + changeset already used.
-  test('the 200 is written before notify is called', async () => {
+  // (The notification promise is *started* just before the send, then handed to the
+  // runtime via keepAlive — so what matters is that notify never blocks the 200.)
+  test('the 200 is written before the notification is awaited', async () => {
     verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
     const res = mockRes();
-    let sentBeforeNotify = null;
+    let sentBeforeNotifyResolved = null;
     NotificationService.notify.mockImplementation(async () => {
-      sentBeforeNotify = { sends: res.sends, status: res.statusCode, body: res.body };
+      // Yield once so the handler reaches res.json() while this is still pending.
+      await new Promise((r) => setTimeout(r, 5));
+      sentBeforeNotifyResolved = { sends: res.sends, status: res.statusCode, body: res.body };
       return {};
     });
     await handler(successReq(), res);
 
-    expect(sentBeforeNotify).toEqual({ sends: 1, status: 200, body: { ok: true } });
+    expect(sentBeforeNotifyResolved).toEqual({ sends: 1, status: 200, body: { ok: true } });
     expect(res.sends).toBe(1); // and never re-sent afterwards
   });
 
@@ -303,9 +307,12 @@ describe('submitted notification (best-effort, post-commit)', () => {
     expect(Date.now() - started).toBeLessThan(2000);
   });
 
-  test('the shipped default budget is bounded well under a platform timeout', () => {
-    expect(NOTIFY_BUDGET_MS).toBeGreaterThan(0);
-    expect(NOTIFY_BUDGET_MS).toBeLessThanOrEqual(5000);
+  // The budget is a leak stop, not a delivery deadline: the route already responded
+  // and handed the promise to the runtime, so cutting off too early would abandon
+  // sends that were about to succeed. Bounded, but generous.
+  test('the shipped default budget is bounded but not tight', () => {
+    expect(NOTIFY_BUDGET_MS).toBeGreaterThanOrEqual(10000);
+    expect(NOTIFY_BUDGET_MS).toBeLessThanOrEqual(30000);
   });
 
   test('disabled PD is not a recipient', async () => {

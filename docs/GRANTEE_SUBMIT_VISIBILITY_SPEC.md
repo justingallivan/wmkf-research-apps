@@ -375,21 +375,30 @@ Where the shipped code differs from, or resolves, the plan above:
   `lib/dataverse/adapters/*` and the PD lookup needs two adapter reads — `check:route-service-boundary`
   is a law-mode gate and failed on the first attempt. The route calls
   `notifyGranteeSubmission()` and nothing else.
-- **The route responds BEFORE notifying.** `res.status(200).json({ ok: true })` is written first, then
-  the notification runs. This is the third iteration of that decision and the reasoning matters: this
-  route is absent from `vercel.json`'s `functions` map, so it runs on the platform default duration,
-  and by the time the notification starts the request has already spent time on virus scan, SharePoint
-  upload, and the changeset. Notifying *before* responding risks the platform ending the invocation
-  before the 200 reaches the grantee — a submission that *did* commit would look failed, and the retry
-  would 409 `not_editable`. A try/catch cannot catch platform termination, and an in-service time
-  budget cannot know how much of the deadline is left. Responding first removes the coupling outright.
-  Pinned by a test that captures response state from inside the `notify` mock.
-  `waitUntil` was considered and rejected: it needs `@vercel/functions`, which the project does not
-  depend on, and responding first achieves the same guarantee with no new dependency.
-- **The bounded wait is kept as defence in depth.** `NOTIFY_BUDGET_MS` (3s) still caps how long the
-  invocation lingers after responding, and the service still catches everything. On expiry the send is
-  abandoned — it may still land, since `notify()` is not transactional — and the pull surfaces
-  (Awardee tab, awardees list) remain the backstop.
+- **Respond first, then `waitUntil` — both guarantees, owner-approved dependency.** The route writes
+  `res.status(200).json({ ok: true })` and hands the notification promise to the runtime through
+  `lib/utils/keep-alive.js`, which wraps `waitUntil` from `@vercel/functions` (added 2026-07-29 with
+  owner sign-off). This settled a genuine either/or that two review rounds pushed back and forth:
+  - *Awaiting before responding* risks the platform ending the invocation before the 200 reaches the
+    grantee. This route is absent from `vercel.json`'s `functions` map, so it runs on the platform
+    default duration, and by then the request has already spent time on virus scan, SharePoint upload,
+    and the changeset. A committed submission would look failed and the retry would 409 `not_editable`.
+    A try/catch cannot catch platform termination, and an in-service budget cannot know how much
+    deadline is left.
+  - *Bare post-response work* protects the response but has no lifecycle guarantee — the invocation may
+    be frozen once the response ends, silently dropping the recipient reads, the `system_alerts` insert,
+    and the email.
+  - `waitUntil` removes both horns: immediate 200, runtime-guaranteed completion.
+- **`keepAlive` must detect a missing runtime context.** `waitUntil` resolves the context off a
+  `globalThis` symbol and *optional-calls* it — `getContext().waitUntil?.(promise)`
+  `[VERIFIED via node_modules/@vercel/functions/wait-until.js]`. With no context (local `next dev`,
+  jest, scripts) it is a silent no-op that would orphan the work, so `keepAlive` probes for a real
+  runtime `waitUntil` and awaits inline when there isn't one. `tests/unit/keep-alive.test.js` pins both
+  branches plus the context-without-waitUntil case.
+- **`NOTIFY_BUDGET_MS` was re-scoped to 10s.** It began as a 3s guard protecting the response; once the
+  runtime owns the lifetime that job is gone, and a tight bound would actively *abandon* sends about to
+  succeed. It is now only a leak stop for a wedged send, and its test asserts a generous floor rather
+  than a tight ceiling — the intent changed, so the assertion had to change with it.
 - **The late-error path cannot double-respond.** The outer catch returns early on `res.headersSent`.
   `notifyGranteeSubmission` does not throw, so this is defence in depth; the test suite's `mockRes`
   counts sends so a regression would show up as `sends: 2`.
@@ -412,10 +421,12 @@ Where the shipped code differs from, or resolves, the plan above:
 - **Gate results.** `check:route-service-boundary`, `check:api-routes`, `check:trust-boundary-guid`,
   `check:dataverse-access-layer`, `check:dynamics-context-boundary`, `check:odata-escape`,
   `check:atlas`, `check:doc-symbol-refs`, `check:doc-currency`, `check:fact-consistency`,
-  `check:agent-wiki`, and `check:docs-catalog` all exit 0. Unit suite: 6057 passing. Two suites fail
-  (`signin-server-props`, `dependency-security-compat`) — both fail identically on a stashed clean tree,
-  so they are pre-existing and unrelated. ESLint adds no new warnings (`AwardeeTab.js` carries the same
-  four pre-existing `react-hooks/set-state-in-effect` warnings before and after).
+  `check:agent-wiki`, and `check:docs-catalog` all exit 0. `npm run build` succeeds with the new
+  dependency. Unit suite: **504/504 suites, 6064/6064 tests passing.** Earlier in this work two suites
+  (`signin-server-props`, `dependency-security-compat`) failed identically on a stashed clean tree —
+  pre-existing and unrelated; installing `@vercel/functions` refreshed `node_modules` and both now pass.
+  ESLint reports no issues on the changed files (`AwardeeTab.js` keeps the same four pre-existing
+  `react-hooks/set-state-in-effect` warnings it had before this work).
 - **`docs/API_ROUTE_SECURITY_MATRIX.md` is reconciled.** The submit row now records the post-response
   `system_alerts` (PG) write and the Dynamics/M365 email side effect plus the two extra Dataverse reads;
   the abstract row records the five new GET response fields, that `imageRef` is a private SharePoint
