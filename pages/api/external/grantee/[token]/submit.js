@@ -134,10 +134,17 @@ export default async function handler(req, res) {
       return res.status(result.status || 500).json({ ok: false, reason: result.reason });
     }
 
-    // Post-commit and best-effort. The service never throws and bounds its own wait
-    // (NOTIFY_BUDGET_MS), so it can neither change this response nor let the platform
-    // kill the invocation before the 200 is written — a timeout here would look like
-    // a failed submit on a package that DID commit, and the retry would 409.
+    // RESPOND FIRST. The package is committed, so the grantee's 200 must not depend
+    // on anything that follows. Notifying before responding — even with the service's
+    // own bounded wait — still risks the platform ending the invocation before the
+    // 200 is written, because that budget cannot know how much of the deadline the
+    // scan + SharePoint upload + changeset already consumed. The grantee would then
+    // see a timeout on a submission that DID commit, and their retry would 409
+    // not_editable. Writing the response first removes that coupling entirely; the
+    // notification is best-effort and its worst case is now "staff learn from the
+    // Awardee tab instead", never "a committed submit looks failed".
+    res.status(200).json({ ok: true });
+
     // hasImage describes the package AFTER this submit: a resubmit with no new file
     // (REVISION_REQUESTED is editable) retains the existing ref, because the writer
     // only patches wmkf_imagefileref when it uploaded something.
@@ -148,9 +155,12 @@ export default async function handler(req, res) {
       hasImage: Boolean(imageFile || deliverable?.wmkf_imagefileref),
       captionPresent: Boolean(caption && caption.trim()),
     });
-    return res.status(200).json({ ok: true });
+    return undefined;
   } catch (e) {
     console.error('[grantee/submit] unexpected error:', e?.message || e);
+    // The success path responds before notifying, so never try to re-send after it.
+    // (notifyGranteeSubmission does not throw; this is defence in depth.)
+    if (res.headersSent) return undefined;
     return res.status(500).json({ ok: false, reason: 'server_error' });
   }
 }

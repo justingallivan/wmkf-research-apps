@@ -46,6 +46,13 @@ function mockRes() {
   res.status = (c) => { res.statusCode = c; return res; };
   res.json = (b) => { res.body = b; return res; };
   res.setHeader = (k, v) => { res.headers[k] = v; };
+  // The success path responds BEFORE notifying, so the route checks headersSent
+  // before any late error re-send. Mirror that here, and count sends so a
+  // double-response would be visible rather than silently overwriting body.
+  res.sends = 0;
+  res.headersSent = false;
+  const json = res.json;
+  res.json = (b) => { res.sends += 1; res.headersSent = true; return json(b); };
   return res;
 }
 
@@ -222,6 +229,36 @@ describe('submitted notification (best-effort, post-commit)', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({ ok: true });
+    expect(res.sends).toBe(1);
+  });
+
+  // The 200 must be on the wire BEFORE any notification work: the platform can end
+  // the invocation at any point after the changeset, and a bounded in-service wait
+  // cannot know how much of the deadline the scan + upload + changeset already used.
+  test('the 200 is written before notify is called', async () => {
+    verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+    const res = mockRes();
+    let sentBeforeNotify = null;
+    NotificationService.notify.mockImplementation(async () => {
+      sentBeforeNotify = { sends: res.sends, status: res.statusCode, body: res.body };
+      return {};
+    });
+    await handler(successReq(), res);
+
+    expect(sentBeforeNotify).toEqual({ sends: 1, status: 200, body: { ok: true } });
+    expect(res.sends).toBe(1); // and never re-sent afterwards
+  });
+
+  test('a throw after the response is not re-sent as a 500', async () => {
+    verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+    // Force a post-response throw past the service's own swallow.
+    grantRequestAdapter.getById.mockImplementation(() => { throw new Error('boom'); });
+    const res = mockRes();
+    await handler(successReq(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ ok: true });
+    expect(res.sends).toBe(1);
   });
 
   test('PD read throws → still notifies, empty explicitRecipients, PI name KEPT', async () => {

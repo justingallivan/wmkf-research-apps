@@ -375,16 +375,24 @@ Where the shipped code differs from, or resolves, the plan above:
   `lib/dataverse/adapters/*` and the PD lookup needs two adapter reads — `check:route-service-boundary`
   is a law-mode gate and failed on the first attempt. The route calls
   `notifyGranteeSubmission()` and nothing else.
-- **It is awaited, cannot throw, and cannot stall the response.** The service catches everything
-  internally, and it bounds its own wait at `NOTIFY_BUDGET_MS` (3s). The bound matters because this
-  route is absent from `vercel.json`'s `functions` map — it runs on the platform default duration,
-  after the request has already spent time on virus scan, SharePoint upload, and the changeset. An
-  unbounded await could let the platform kill the invocation before the 200 is written, so the grantee
-  would see a timeout on a submission that *did* commit and their retry would 409 `not_editable`. A
-  try/catch cannot catch platform termination; only bounding the wait helps. On expiry the send is
+- **The route responds BEFORE notifying.** `res.status(200).json({ ok: true })` is written first, then
+  the notification runs. This is the third iteration of that decision and the reasoning matters: this
+  route is absent from `vercel.json`'s `functions` map, so it runs on the platform default duration,
+  and by the time the notification starts the request has already spent time on virus scan, SharePoint
+  upload, and the changeset. Notifying *before* responding risks the platform ending the invocation
+  before the 200 reaches the grantee — a submission that *did* commit would look failed, and the retry
+  would 409 `not_editable`. A try/catch cannot catch platform termination, and an in-service time
+  budget cannot know how much of the deadline is left. Responding first removes the coupling outright.
+  Pinned by a test that captures response state from inside the `notify` mock.
+  `waitUntil` was considered and rejected: it needs `@vercel/functions`, which the project does not
+  depend on, and responding first achieves the same guarantee with no new dependency.
+- **The bounded wait is kept as defence in depth.** `NOTIFY_BUDGET_MS` (3s) still caps how long the
+  invocation lingers after responding, and the service still catches everything. On expiry the send is
   abandoned — it may still land, since `notify()` is not transactional — and the pull surfaces
-  (Awardee tab, awardees list) remain the backstop. Tests: `notify throws → submit still 200`, and a
-  hanging `notify` resolving inside a tiny injected budget.
+  (Awardee tab, awardees list) remain the backstop.
+- **The late-error path cannot double-respond.** The outer catch returns early on `res.headersSent`.
+  `notifyGranteeSubmission` does not throw, so this is defence in depth; the test suite's `mockRes`
+  counts sends so a regression would show up as `sends: 2`.
 - **`budgetMs` is an injectable test seam.** Jest fake timers deadlock the route's busboy stream, so
   the timeout is exercised by calling the service directly with a small budget instead.
 - **Recipient resolution degrades per-read.** A failed PD lookup keeps the PI name the request read
@@ -404,10 +412,14 @@ Where the shipped code differs from, or resolves, the plan above:
 - **Gate results.** `check:route-service-boundary`, `check:api-routes`, `check:trust-boundary-guid`,
   `check:dataverse-access-layer`, `check:dynamics-context-boundary`, `check:odata-escape`,
   `check:atlas`, `check:doc-symbol-refs`, `check:doc-currency`, `check:fact-consistency`,
-  `check:agent-wiki`, and `check:docs-catalog` all exit 0. Unit suite: 6055 passing. Two suites fail
+  `check:agent-wiki`, and `check:docs-catalog` all exit 0. Unit suite: 6057 passing. Two suites fail
   (`signin-server-props`, `dependency-security-compat`) — both fail identically on a stashed clean tree,
   so they are pre-existing and unrelated. ESLint adds no new warnings (`AwardeeTab.js` carries the same
   four pre-existing `react-hooks/set-state-in-effect` warnings before and after).
+- **`docs/API_ROUTE_SECURITY_MATRIX.md` is reconciled.** The submit row now records the post-response
+  `system_alerts` (PG) write and the Dynamics/M365 email side effect plus the two extra Dataverse reads;
+  the abstract row records the five new GET response fields, that `imageRef` is a private SharePoint
+  reference exposed to staff only, and that `imageUrl` is absolute-http(s)-only.
 - **Not yet verified live.** No Dataverse or M365 round-trip, and `NOTIFICATION_EMAIL_FROM` /
   `NEXTAUTH_URL` per-environment values remain `[ASSUMED]`. A submitted-package smoke test is the
   promotion gate.
