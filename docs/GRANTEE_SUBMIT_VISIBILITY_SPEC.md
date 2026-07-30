@@ -406,10 +406,16 @@ Where the shipped code differs from, or resolves, the plan above:
   the timeout is exercised by calling the service directly with a small budget instead.
 - **Recipient resolution degrades per-read.** A failed PD lookup keeps the PI name the request read
   already produced; only a failed *request* read yields both nulls. Pinned by two tests.
-- **Two reads, as specified.** `grantRequestAdapter.getById` for
-  `_wmkf_programdirector_value,_wmkf_projectleader_value`, then `systemUserAdapter.getByIdWithSelect`
-  for the PD's `internalemailaddress` + `isdisabled`. The PI name comes from the
-  `_wmkf_projectleader_value_formatted` annotation on the first read rather than a third contact read.
+- **PD resolution reuses `resolveProgramDirectorEmailForRequest`, it does not re-roll it.** The spec
+  above described hand-rolling the two reads the reminder cron does; a review pass found that
+  `lib/services/program-director-resolver.js` already does exactly this lookup, skips disabled users,
+  caches per request, and — load-bearing — **trims and lowercases** the address. That normalization is
+  not cosmetic: `AlertRecipients` lowercases category recipients `[VERIFIED via alert-recipients.js:68]`
+  while `sendAdminEmail` dedupes the union with a case-**sensitive** `Set`
+  `[VERIFIED via notification-service.js:158-161]`, so an un-normalized `PD@wmkf.org` alongside a
+  configured `pd@wmkf.org` survives as two entries and emails the PD twice. The service now keeps only
+  one read of its own — `_wmkf_projectleader_value` for the PI name, taken from the `_formatted`
+  annotation rather than a separate contact read.
 - **`hasImage` describes the package, not the upload.** `REVISION_REQUESTED` is an editable status
   `[VERIFIED via shared/config/granteeDeliverableStatus.js:74-79]`, and the writer patches
   `wmkf_imagefileref` only when it uploaded something

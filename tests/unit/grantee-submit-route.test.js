@@ -23,10 +23,13 @@ jest.mock('../../lib/services/grantee-upload', () => ({
 jest.mock('../../lib/services/external-token', () => ({ verifyWaiverRenderToken: jest.fn() }));
 jest.mock('../../lib/services/notification-service', () => ({ __esModule: true, default: { notify: jest.fn() } }));
 // lib/services/grantee-submit-notification (called by the route) re-reads the request
-// for the PD/PI lookup values — verify-grantee-token's projection carries neither —
-// and then reads the PD user. Mocked here so the route test drives the real service.
+// for the PI name — verify-grantee-token's projection does not carry it — and resolves
+// the PD email through the shared program-director-resolver, which normalizes and
+// caches. Mocked here so the route test drives the real notification service.
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({ getById: jest.fn() }));
-jest.mock('../../lib/dataverse/adapters/system-user.js', () => ({ getByIdWithSelect: jest.fn() }));
+jest.mock('../../lib/services/program-director-resolver', () => ({
+  resolveProgramDirectorEmailForRequest: jest.fn(),
+}));
 
 import { checkRateLimit, recordTokenOutcome } from '../../lib/external/rate-limit';
 import { verifyGranteeToken } from '../../lib/external/verify-grantee-token';
@@ -34,7 +37,7 @@ import { writeGranteeDeliverables } from '../../lib/services/grantee-upload';
 import { verifyWaiverRenderToken } from '../../lib/services/external-token';
 import NotificationService from '../../lib/services/notification-service';
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
-import * as systemUserAdapter from '../../lib/dataverse/adapters/system-user.js';
+import { resolveProgramDirectorEmailForRequest } from '../../lib/services/program-director-resolver';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 import { NOTIFY_BUDGET_MS, notifyGranteeSubmission } from '../../lib/services/grantee-submit-notification';
 import handler from '../../pages/api/external/grantee/[token]/submit';
@@ -100,13 +103,10 @@ beforeEach(() => {
   verifyWaiverRenderToken.mockReset().mockResolvedValue({ valid: true, requestId: 'r1', versionId: VER, bodyHash: 'bodyhash-abc' });
   NotificationService.notify.mockReset().mockResolvedValue({});
   grantRequestAdapter.getById.mockReset().mockResolvedValue({
-    _wmkf_programdirector_value: 'pd-1',
     _wmkf_projectleader_value: 'pi-1',
     _wmkf_projectleader_value_formatted: 'Dr. Ada Lovelace',
   });
-  systemUserAdapter.getByIdWithSelect.mockReset().mockResolvedValue({
-    systemuserid: 'pd-1', internalemailaddress: 'pd@wmkf.example', isdisabled: false,
-  });
+  resolveProgramDirectorEmailForRequest.mockReset().mockResolvedValue('pd@wmkf.example');
 });
 
 /** The multipart body every success-path test uses. */
@@ -215,9 +215,12 @@ describe('submitted notification (best-effort, post-commit)', () => {
     await handler(successReq(), mockRes());
 
     expect(notifyArg().explicitRecipients).toEqual(['pd@wmkf.example']);
-    // Resolved from a FRESH request read, not the token-verified request object.
+    // Resolved by request id through the shared resolver — NOT read off the
+    // token-verified request object, whose projection carries no PD field.
+    expect(resolveProgramDirectorEmailForRequest).toHaveBeenCalledWith('r1');
+    // And the PI name comes from a FRESH request read for the same reason.
     expect(grantRequestAdapter.getById).toHaveBeenCalledWith('r1', expect.objectContaining({
-      select: expect.stringContaining('_wmkf_programdirector_value'),
+      select: expect.stringContaining('_wmkf_projectleader_value'),
     }));
   });
 
@@ -265,9 +268,10 @@ describe('submitted notification (best-effort, post-commit)', () => {
     expect(res.sends).toBe(1);
   });
 
-  test('PD read throws → still notifies, empty explicitRecipients, PI name KEPT', async () => {
+  test('PD resolution yields nothing → still notifies, empty explicitRecipients, PI name KEPT', async () => {
     verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
-    systemUserAdapter.getByIdWithSelect.mockRejectedValue(new Error('dataverse 503'));
+    // The shared resolver swallows its own failures and returns null.
+    resolveProgramDirectorEmailForRequest.mockResolvedValue(null);
     const res = mockRes();
     await handler(successReq(), res);
 
@@ -288,8 +292,8 @@ describe('submitted notification (best-effort, post-commit)', () => {
 
     expect(res.statusCode).toBe(200);
     expect(notifyArg().metadata.pi).toBeNull();
-    expect(notifyArg().explicitRecipients).toEqual([]);
-    expect(systemUserAdapter.getByIdWithSelect).not.toHaveBeenCalled();
+    // The PD lookup is independent of the PI read, so it still ran and still landed.
+    expect(notifyArg().explicitRecipients).toEqual(['pd@wmkf.example']);
   });
 
   // A committed submit must not be held hostage by a hanging notification: the
@@ -315,23 +319,29 @@ describe('submitted notification (best-effort, post-commit)', () => {
     expect(NOTIFY_BUDGET_MS).toBeLessThanOrEqual(30000);
   });
 
-  test('disabled PD is not a recipient', async () => {
+  // Disabled PD / no PD assigned both surface as a null from the shared resolver,
+  // whose own suite covers those branches. Here: a null must not become a recipient.
+  test('no resolvable PD → still notifies, no empty-string recipient', async () => {
     verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
-    systemUserAdapter.getByIdWithSelect.mockResolvedValue({
-      systemuserid: 'pd-1', internalemailaddress: 'pd@wmkf.example', isdisabled: true,
-    });
+    resolveProgramDirectorEmailForRequest.mockResolvedValue(null);
     await handler(successReq(), mockRes());
 
+    expect(NotificationService.notify).toHaveBeenCalledTimes(1);
     expect(notifyArg().explicitRecipients).toEqual([]);
   });
 
-  test('no PD assigned → still notifies, no PD lookup', async () => {
+  // REGRESSION: AlertRecipients lowercases category recipients and sendAdminEmail
+  // dedupes the union with a case-SENSITIVE Set, so an un-normalized PD address
+  // would survive as a second entry and email the PD twice. The shared resolver
+  // trims + lowercases; this pins that we go through it rather than round our own.
+  test('the PD address is the normalized one from the shared resolver', async () => {
     verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
-    grantRequestAdapter.getById.mockResolvedValue({ _wmkf_programdirector_value: null });
+    resolveProgramDirectorEmailForRequest.mockResolvedValue('pd@wmkf.example');
     await handler(successReq(), mockRes());
 
-    expect(notifyArg().explicitRecipients).toEqual([]);
-    expect(systemUserAdapter.getByIdWithSelect).not.toHaveBeenCalled();
+    expect(resolveProgramDirectorEmailForRequest).toHaveBeenCalledWith('r1');
+    const [addr] = notifyArg().explicitRecipients;
+    expect(addr).toBe(addr.trim().toLowerCase());
   });
 
   test('deep link is absolute against NEXTAUTH_URL (staff origin)', async () => {
