@@ -2,7 +2,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** live shape 2026-05-07 via `scripts/audit-dataverse-state.js`; discriminator/era distributions 2026-05-15 via `scripts/probe-akoya-request-discriminators.js`; application routing 2026-07-27 via source and caller inspection; automatic review-synthesis lifecycle 2026-07-28 via the controlled Production smoke and exact cleanup; writeup document-authority/search interpretation reconciled 2026-07-28 against the governed artifact contract and Graph tenant probe
+**Last verified:** live shape 2026-05-07 via `scripts/audit-dataverse-state.js`; discriminator/era distributions 2026-05-15 via `scripts/probe-akoya-request-discriminators.js`; application routing 2026-07-27 via source and caller inspection; automatic review-synthesis lifecycle 2026-07-28 via the controlled Production smoke and exact cleanup; writeup document-authority/search interpretation reconciled 2026-07-28 against the governed artifact contract and Graph tenant probe; Initial Assessment canonical pointer provisioned and count-probed 2026-07-30
 **Live row count:** **~25,561** (FetchXML aggregate, 2026-05-15). ⚠️ OData `/$count` returns **5,000** — Dataverse caps `$count` at 5,000; the "5,000" figure is the cap, not the total. Use FetchXML aggregate / RetrieveTotalRecordCount for the true count.
 **Entity set:** `akoya_requests`
 
@@ -50,6 +50,15 @@ People (lookups):
 Content / abstract:
 - `wmkf_abstract` (full proposal abstract; added by WMKF, not in vendor schema)
 - `wmkf_excludedreviewers` (free-form names)
+
+Governed artifact pointers:
+- `wmkf_currentinitialassessment` (Lookup →
+  `wmkf_requestdocument`; relationship
+  `wmkf_request_currentinitialassessment`) — **LIVE in Production 2026-07-30
+  via Wave 16 apply and idempotent metadata readback.** This is the canonical
+  Initial Assessment pointer and shared request-level ETag fence. A fresh
+  production count probe found 0 populated pointers before application
+  promotion and the controlled pilot.
 
 WMKF AI writeback fields (canonical: `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` — v2 is archived, do not use):
 - `wmkf_ai_summary` (Memo) — Phase I summary text. **Field Set A: ready, live writeback active.**

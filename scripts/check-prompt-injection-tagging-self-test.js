@@ -173,6 +173,37 @@ function fakeReader(map) {
   );
 }
 
+// 5d. Surface-specific boundary markers close gaps that the generic Executor
+// wrapper/preamble markers cannot see (for example, a seed losing
+// `untrusted:true` while still calling the shared Executor).
+{
+  const surface = {
+    id: 'fx-required-marker',
+    status: 'migrated',
+    promptFiles: ['p.js'],
+    callSiteFiles: ['c.js'],
+    requiredMarkers: ['untrusted: true'],
+  };
+  const missingReader = fakeReader({
+    'p.js': 'buildUntrustedContentPreamble',
+    'c.js': 'wrapUntrustedContent',
+  });
+  const presentReader = fakeReader({
+    'p.js': 'buildUntrustedContentPreamble; untrusted: true',
+    'c.js': 'wrapUntrustedContent',
+  });
+  assert(
+    'surface-specific required boundary marker is enforced',
+    checkSurface(surface, missingReader).errors.some((error) => (
+      /required boundary marker missing/.test(error)
+    )),
+  );
+  assert(
+    'surface-specific required boundary marker passes when present',
+    checkSurface(surface, presentReader).errors.length === 0,
+  );
+}
+
 // ── checkSurface — call-site-granular `builders` layer ────────────────────
 
 // 9. The masking bug: a surface with two builders in one file — one carries
@@ -340,4 +371,4 @@ if (failures > 0) {
   console.error(`\nprompt-injection-tagging self-test FAILED — ${failures} case(s).`);
   process.exit(1);
 }
-console.log('\nprompt-injection-tagging self-test OK — 16/16 cases.');
+console.log('\nprompt-injection-tagging self-test OK — 18/18 cases.');

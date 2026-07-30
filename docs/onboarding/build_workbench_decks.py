@@ -166,10 +166,10 @@ def build_pd():
 
     section_slide(prs, "3", SPINE[2])
     content_slide(prs, "STEP 3", "The tab strip", [
-        "Six tabs are live today:",
-        (1, "Overview · Proposal · Reviewers · Reviews · Status · Awardee"),
-        "Four more are placeholders for the rest of the request lifecycle:",
-        (1, "Initial Writeup · Pre Site Visit · Site Visit · Final Writeup — they say \"coming in a later update.\""),
+        "Seven tabs are implemented in source:",
+        (1, "Overview · Proposal · Initial Assessment · Reviewers · Reviews · Status · Awardee"),
+        "Three remain placeholders for the later request lifecycle:",
+        (1, "Pre Site Visit · Site Visit · Final Writeup — they say \"coming in a later update.\""),
         "You'll spend most of your time on the Reviewers tab.",
     ])
 
@@ -302,9 +302,9 @@ def build_tech():
     content_slide(prs, "ARCHITECTURE", "The shell", [
         "Per-request shell: pages/workbench/[requestId].js (tier-3 page).",
         "Tab + sub-tab selection is query-string driven: ?tab=reviewers&sub=track (deep-linkable; legacy sub=invite/completed normalize to track).",
-        "Live tab components:",
-        (1, "OverviewTab · ProposalTab · ReviewersTab · ReviewsTab · StatusTab · AwardeeTab (shared/components/...)."),
-        (1, "The other 4 tab keys fall through to a \"coming in a later update\" card."),
+        "Implemented tab components:",
+        (1, "OverviewTab · ProposalTab · InitialAssessmentTab · ReviewersTab · ReviewsTab · StatusTab · AwardeeTab (shared/components/...)."),
+        (1, "The other 3 tab keys fall through to a \"coming in a later update\" card."),
         "Consolidation: the Workbench merges the old reviewer-finder + review-manager apps; one app-access grant ('reviewers') now covers them.",
     ])
     content_slide(prs, "ARCHITECTURE", "Access & auth", [

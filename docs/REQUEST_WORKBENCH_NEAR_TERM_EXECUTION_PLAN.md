@@ -6,7 +6,7 @@ status: canonical
 summary: "Review synthesis lifecycle is production-proved with automation enabled; the next sequence is the remaining Workbench lifecycle design freeze."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-07-28
+last_verified: 2026-07-30
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -36,8 +36,9 @@ ahead of proposal intake beginning around **2026-08-18**.
 
 The August 10 acceptance path is a real human-in-the-loop pilot:
 
-1. authorized staff starts Initial Assessment generation for a designated test
-   proposal through the intended Workbench entry point;
+1. authorized staff starts Initial Assessment generation for a dedicated
+   representative dummy production request through the intended Workbench
+   entry point;
 2. the server reads the real proposal and authoritative Dataverse metadata,
    executes the governed prompt, and creates the canonical Word artifact in
    the governed SharePoint location;
@@ -47,17 +48,21 @@ The August 10 acceptance path is a real human-in-the-loop pilot:
    Word;
 5. a staff tester reviews and edits the canonical Word document, and the saved
    SharePoint version remains discoverable from the Workbench; and
-6. the staff-wide Editor Dashboard lists that same registered artifact and
-   lets an authorized staff tester find and open it without navigating request
-   by request.
+6. the cycle-wide pilot locator lists that same registered artifact and lets
+   an authorized staff tester find and open it without navigating request by
+   request. This proves the shared read contract, not the full Editor Dashboard.
 
-The pilot must use realistic source data and human review, not mocked records
-or UI-only placeholders. It must also exercise one safe failure/retry path and
-prove that no success is reported before the SharePoint artifact and Dataverse
-registry agree. Exact named testers, pilot environment, and schedule remain to
-be assigned. Passing this draft-functional gate is not a production-readiness
-claim and does not require the later Pre-Site, Site Visit, or Final slices to
-be built by August 10.
+The pilot must use representative source data and human review, not route
+mocks or UI-only placeholders. The owner decided 2026-07-29 to use a
+controlled production rehearsal with colleague-created dummy requests rather
+than build the existing Dataverse sandbox organization into an integrated
+application/file test environment. It must also exercise one safe
+failure/retry path and prove that no success is reported before the SharePoint
+artifact and Dataverse registry agree. The production dummy request IDs and
+content shape, exact named testers, and schedule remain to be assigned.
+Passing this draft-functional gate is not a broad production-readiness claim
+and does not require the later Pre-Site, Site Visit, or Final slices to be
+built by August 10.
 
 “Week 1/2/3” below remain relative execution windows for later lifecycle work
 until those stages receive their own deadlines.
@@ -200,9 +205,11 @@ Board-ready freeze remains a separate owner-controlled milestone.
 
 ### Initial Assessment source and first-template contract
 
-**[VERIFIED 2026-07-28 via four owner-supplied D26 Phase I Word examples,
-current source, and a read-only production Dataverse probe; implementation
-PLANNED.]** The D26 examples provide the starting content contract for the J27
+**[VERIFIED 2026-07-30 via four owner-supplied D26 Phase I Word examples,
+current source, production Dataverse apply/readback probes, and owner
+acceptance; pilot implementation BUILT IN SOURCE, production schema and
+governed prompt v1 LIVE, application promotion and controlled pilot pending.]**
+The D26 examples provide the starting content contract for the J27
 Initial Assessment. Each is a one-page Word document with this sequence:
 
 1. the applicant-submitted proposal title;
@@ -630,16 +637,16 @@ Decision order:
 3. **Final Writeup** — freeze the latest-Pre-Site copy/lineage contract, safe
    explicit regeneration behavior, and the visit, late-review, and editorial
    inputs.
-4. **Initial Assessment** — design for every in-scope J27 proposal before
-   staff/Board advancement deliberation. The current D26 Initial Writeup
-   placeholder remains historical and requires no backfill.
+4. **Initial Assessment** — provision and exercise the source-built pilot
+   before staff/Board advancement deliberation, then decide scale-out to every
+   in-scope J27 proposal. The current D26 Initial Writeup placeholder remains
+   historical and requires no backfill.
 
 Explicit non-goals during design freeze:
 
-- no Editor Dashboard implementation until its audience, minimum view,
-  Reviewed-marker contract, access boundary, and deadline are fixed; the need
-  to preserve Allison's cycle-wide editing workflow is no longer an optional
-  historical idea;
+- no expansion of the implemented pilot locator beyond its approved
+  staff-wide cycle list/direct Word entry under the existing `reviewers` grant
+  until the Reviewed-marker and coordinator-view contracts are fixed;
 - no Reviewer Pool build without observed need and owner priority;
 - no new writeup URL fields merely because the June proposal named them;
 - no automatic status-driven workflow until its event, idempotency, retry, and ownership
@@ -647,9 +654,38 @@ Explicit non-goals during design freeze:
 
 ## First deadline-bound slice — governed Initial Assessment pilot
 
-The August 10 minimum changes the former default. Build the shared governed
-artifact spine through the J27 Initial Assessment first; Pre Site Visit becomes
-a dependent reuse of that proven contract.
+> **Implementation checkpoint (2026-07-30): [VERIFIED via repository source
+> plus Production schema/prompt apply and readback].** The branch implementation now includes the
+> `wmkf_requestdocument` schema wave/adapter, governed prompt seed, versioned
+> DOCX producer, `Artifacts/Initial Assessment/` destination, deterministic
+> retry/recovery contract, Workbench Initial Assessment panel, and a cycle-wide
+> **pilot locator** under the existing `reviewers` app grant. The locator
+> supports the August 10 discovery/Open-in-Word path only; it is not the full
+> Editor Dashboard minimum contract above and does not yet provide program/PD,
+> stage, or editing-state filters, preview, current-version detail, or
+> per-editor Reviewed progress. Unit tests prove Ready-row no-overwrite,
+> atomic replacement-Ready/prior-supersession, exact-input reactivation, exact
+> request-pointer fencing across concurrent first-time activations,
+> approved path with a positively resolved request-library parent, claim-lost
+> upload cleanup with operator-visible exact cleanup work on delete failure
+> (manual cleanup; bounded primary capacity spills exact identities to durable
+> overflow storage and then blocks further generation), canonical-file
+> visibility during a failed replacement, false-success prevention after a
+> post-upload registry failure, and
+> content-hash recovery without a second AI call when bytes match, and
+> fresh-filename regeneration while retaining mismatched-item identity when
+> they do not. **[VERIFIED 2026-07-30]** The complete Wave 16 entity,
+> relationships, alternate key, and request pointer are live in Production,
+> and governed `initial-assessment.generate` v1 is live at
+> `fc8a4c3b-5e8c-f111-ab0f-7ced8d3d15a6`; the fresh registry and pointer counts
+> remain zero. The application has not yet been promoted and no pilot request
+> has run. Steps 8–11 and the live SharePoint/application portions of steps
+> 4–6 remain open until colleagues create and identify the representative
+> production dummy request(s) and the owner names the testers and schedule.
+
+The August 10 minimum changes the former default. Promote and exercise the
+source-built governed artifact spine through the J27 Initial Assessment first;
+Pre Site Visit becomes a dependent reuse of that proven contract.
 
 Build in producer-to-consumer order:
 
@@ -667,15 +703,18 @@ Build in producer-to-consumer order:
 8. verify full-text search, structured result joins, version restore,
    delete/recycle recovery, retention posture, and milestone snapshot creation;
 9. run contract, security, Atlas, and browser/API verification;
-10. complete the human-in-the-loop August 10 pilot with designated staff and a
-    test proposal, including a safe failure/retry exercise; and
-11. perform a separate narrow production smoke only when the draft slice is
-    approved for deliberate production promotion.
+10. after separate approval of production schema, prompt, and application
+    promotion, complete the human-in-the-loop August 10 controlled-production
+    pilot with designated staff and a dedicated dummy request, including a
+    safe failure/retry exercise; and
+11. reconcile every expected production write and retained/removed test
+    artifact before deciding whether to scale beyond the dummy request set.
 
-Exit: one real request can move from ready inputs to a durable, editable Word artifact and
-back to a visible Workbench state without filename guesswork or silent partial
-success; an authorized user can identify and recover a prior version; and the
-official milestone can be proven independently of later working edits.
+Exit: one dedicated production dummy request can move from ready inputs to a
+durable, editable Word artifact and back to a visible Workbench state without
+filename guesswork or silent partial success; an authorized user can identify
+and recover a prior version; and the official milestone can be proven
+independently of later working edits.
 
 ## Dependent lifecycle slices
 
@@ -812,7 +851,7 @@ Owner-decided:
     pilot by 2026-08-10, before proposal intake begins around 2026-08-18. It
     covers real proposal/metadata inputs, governed generation, SharePoint Word
     creation and human editing, Dataverse registry/provenance, Workbench
-    discovery/opening, staff-wide Editor Dashboard discovery/opening, and one
+    discovery/opening, cycle-wide pilot-locator discovery/opening, and one
     safe failure/retry path; it does not require later lifecycle tabs;
 41. the starting Initial Assessment structure is a one-page Word document with
     the applicant-submitted proposal title, institution, Summary, and a
@@ -822,16 +861,26 @@ Owner-decided:
 42. Foundation Opportunity is a visibly incomplete staff-authored slot, while
     the institution and applicant-submitted title come from authoritative
     Dataverse metadata rather than model inference; the exact document format
-    remains intentionally open to iteration during the single-phase transition.
+    remains intentionally open to iteration during the single-phase
+    transition; and
+43. the Initial Assessment pilot uses a controlled production rehearsal with
+    colleague-created representative dummy requests; building the existing
+    Dataverse sandbox organization into an integrated application/file test
+    environment is out of scope; and
+44. on 2026-07-30 the owner accepted the provisional v1 prompt/template pair
+    and explicitly authorized the additive Production writes. Wave 16 and
+    `initial-assessment.generate` v1 were applied and independently read back;
+    application promotion and artifact generation remain separate gates.
 
 Still required:
 
-1. named human testers, the safe pilot environment/schedule, and deadlines for
-   later lifecycle stages;
+1. production dummy request IDs and representative content shape, named human
+   testers, the exact pilot schedule, and deadlines for later lifecycle stages;
 2. first approved Pre-Site Word template and prompt/template compatibility
    contract;
-3. exact Dataverse registry schema and target-library configuration for the
-   decided request-relative SharePoint destination;
+3. target-library configuration/readback for the decided request-relative
+   SharePoint destination; the production Dataverse registry/pointer
+   provisioning and readback are complete;
 4. target-library version, retention, recycle, and permission audit;
 5. exact Dataverse schema and dossier read model for the decided Site Visit
    metadata, material categories, and observations;
@@ -844,8 +893,5 @@ Still required:
    coordinator;
 8. exact safe regeneration behavior and any additional Final Writeup inputs
    beyond copying the latest Pre-Site version; and
-9. Editor Dashboard Reviewed-marker granularity, coordinator view, app/file
-   access enforcement, and restore authority; and
-10. the first approved Initial Assessment governed prompt/template pair and
-    any format revisions identified while testing the provisional D26-derived
-    structure during the single-phase transition.
+9. Editor Dashboard Reviewed-marker granularity, coordinator view, SharePoint
+   file-access verification, and restore authority.

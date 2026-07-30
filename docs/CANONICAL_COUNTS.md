@@ -32,13 +32,13 @@ are machine-verified — `N` against the derive, the anchor against this registr
 
 ## requireappaccess-endpoint-count
 
-- **Live value:** 88
+- **Live value:** 89
 - **Description:** pages/api files with requireAppAccess() call sites
 - **Derive:** `pages/api/**/*.{js,mjs,cjs,jsx,ts,tsx}` → count of files containing at least one `requireAppAccess(...)` call
 
 ## api-route-file-count
 
-- **Live value:** 151
+- **Live value:** 152
 - **Description:** pages/api route files (matches check:api-routes walker)
 - **Derive:** `pages/api/**/*.js` → count of route files (same predicate `scripts/check-api-route-security-matrix.js` uses)
 
@@ -50,12 +50,12 @@ are machine-verified — `N` against the derive, the anchor against this registr
 
 ## workbench-placeholder-tab-count
 
-- **Live value:** 4
+- **Live value:** 3
 - **Description:** Request Workbench placeholder tabs
 - **Derive:** `pages/workbench/[requestId].js` → `TABS` keys without a literal `activeTab === <key>` implementation branch
 
 ## workbench-live-tab-count
 
-- **Live value:** 6
+- **Live value:** 7
 - **Description:** implemented Request Workbench top-level tabs
 - **Derive:** `pages/workbench/[requestId].js` → distinct literal `activeTab === <TABS key>` implementation branches

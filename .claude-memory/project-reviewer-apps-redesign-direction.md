@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench is live with six implemented tabs and four placeholders; current truth and forward sequencing are owned by the 2026-07-26 audit and near-term execution plan, while this entry preserves the redesign chronology.
+description: The unified Request Workbench has seven implemented tabs and three placeholders in source; Initial Assessment production schema and prompt v1 are live while the application and controlled pilot await promotion, and the full Editor Dashboard remains planned.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-28 via source/live probes, Workbench truth audit, and owner design decisions
+  last_verified: 2026-07-30 via source/live probes, production schema/prompt apply and readback, Workbench truth audit, and owner production-pilot decisions
 ---
 
 ## Recall Rule
@@ -29,22 +29,27 @@ Ground truth: `pages/workbench/[requestId].js`,
 contracts. `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` and
 `docs/REQUEST_WORKBENCH_SCOPING.md` are historical chronology/rationale.
 
-**2026-07-28 editor-direction reconciliation:** Allison is a confirmed primary
-user for the future Editor lens. The current contract preserves the former
+**2026-07-29 editor-direction implementation checkpoint:** Allison is a confirmed primary
+user for the Editor lens. The target contract preserves the former
 single-folder workflow as a staff-wide cycle Editor Dashboard with direct entry
 to the canonical SharePoint Word files and explicit per-editor Reviewed
-tracking. All PDs are expected eventually to evaluate the materials, and
-designated staff proofreaders also need access. The requirement is current;
-implementation remains planned. Request-versus-artifact-stage marker
-granularity, coordinator matrix, and enforced app/file access remain open. The
+tracking. A narrower pilot locator with a cycle list and direct Word entry is
+implemented in source under the existing `reviewers` app grant. All PDs are expected eventually to
+evaluate the materials, and designated staff proofreaders also need access.
+Request-versus-artifact-stage marker granularity, coordinator matrix, and
+SharePoint file-permission verification remain open. The
 first fixed gate is a human-in-the-loop, end-to-end Initial Assessment pilot by
 2026-08-10, ahead of proposal intake around 2026-08-18. Authorized staff use a
-designated real test proposal to generate, inspect, and edit the canonical
+dedicated representative dummy production request to generate, inspect, and edit the canonical
 SharePoint Word artifact and then find/open that same registered file from the
-Workbench and staff-wide Editor Dashboard. The pilot also exercises one safe
+Workbench and cycle-wide pilot locator. The pilot also exercises one safe
 failure/retry path and proves no false cross-store success. It is
 draft-functional proof, not production readiness, and does not require the
-later lifecycle tabs. Named testers, environment, and schedule remain open.
+later lifecycle tabs. The owner chose a controlled production rehearsal using
+colleague-created representative dummy requests rather than building the
+existing Dataverse sandbox organization into an integrated application/file
+test environment. Dummy request IDs/content shape, named testers, and schedule
+remain open.
 Use the near-term execution plan for current authority; the chronology below
 remains the rationale record.
 
@@ -106,16 +111,25 @@ planned. Current authority is
 `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` and
 `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
 
-## Current source-backed state (2026-07-26)
+## Current source-backed state (2026-07-29)
 
-- Ten top-level tabs; six live (Overview, Proposal, Reviewers, Reviews, Status, Awardee)
-  and four placeholders (Initial Writeup, Pre Site Visit Writeup, Site Visit, Final Writeup).
-- Reviews is built; its synthesis producer/persistence/consumer path exists, but the
-  production structured-output smoke is still red and automatic all-in triggering is not built.
+- Ten top-level tabs; seven implemented in source (Overview, Proposal, Initial
+  Assessment, Reviewers, Reviews, Status, Awardee) and three placeholders (Pre
+  Site Visit Writeup, Site Visit, Final Writeup). Initial Assessment production
+  registry/pointer schema and governed prompt v1 are live and verified;
+  application promotion and the human pilot remain pending.
+- Reviews is built and production-proved: governed-v3 structured output
+  persisted successfully, the automatic all-in drain is enabled, and its
+  producer/persistence/consumer lifecycle completed a controlled production
+  smoke on request `1002788`.
 - Awardee includes the distinct live `/external/grantee/[token]` portal and
   `wmkf_granteedeliverable` persistence. GAL-trigger automation remains separate/unknown.
-- The proposed writeup URL fields and `writeup.*` prompt rows are absent; the June writeup
-  design is historical input, not implementation truth.
+- The proposed writeup URL fields and `writeup.*` prompt rows remain absent.
+  Their June design is historical input; the implemented pilot instead uses
+  the production-provisioned `wmkf_requestdocument` registry and governed
+  `initial-assessment.generate` v1. Fresh production probes on 2026-07-30 found
+  zero registry rows and zero populated request pointers, so no artifact pilot
+  has yet occurred.
 - Reviewer Pool remains planned and optional, not a shipped Workbench-v1 deliverable.
 
 ## Historical decision chronology
@@ -125,7 +139,7 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 **BUILD STARTED S208 (2026-05-31) — shipped to prod, in phases (see `docs/REQUEST_WORKBENCH_BUILD_PLAN.md`):**
 - **Phase 0** (`79a343d`): additive `reviewers` app grant (the 18 reviewer-finder/review-manager routes accept it via variadic `requireAppAccess`; legacy route-gate strings remain as deferred cleanup after S261 registry retirement). New `wmkf_applicantdisposition` picklist on `wmkf_appreviewersuggestion` (Recommended=100000000 / Excluded=100000001; null=staff/Claude-discovered) **deployed to prod Dataverse** (wave6). Excluded rows filtered from all candidate/count readers via null-safe `notExcludedFilter()` (see [[project-dataverse-odata-null-filter]]); fail-closed chokepoints (`findById`, `updateLifecycle` every-write, `ensureToken`/`regenerate-token`, `verifySuggestionToken`). `wmkf_completedat` stamped on EVERY complete transition (centralized in adapter `updateLifecycle`).
 - **Phase 1** (`44c10b6`): `/workbench` tier-2 cycle dashboard + `/api/workbench/{dashboard,resolve-request}`. Additive union: status-gated query ∪ (for D26) a committed allowlist of 35 going-forward request NUMBERS (`shared/config/d26Allowlist.js`, throwaway) — they're Phase I Pending so the normal gate excludes them. `my-proposals.js` untouched. Scope my/all. Per-request work-remaining rollup.
-- **Per-request shell** (`eeb5da3`): `/workbench/[requestId].js` shell (tab strip + placeholder panels) so dashboard rows resolve. *(At this commit all panels were stubs; the Reviewers panel was made live by Phases 2–3 below, the Proposal tab later (S258), Overview + Status in Group A (S260), Reviews, and Awardee/grantee-deliverables later; the other 4 tabs remain placeholders.)*
+- **Per-request shell** (`eeb5da3`): `/workbench/[requestId].js` shell (tab strip + placeholder panels) so dashboard rows resolve. *(At this commit all panels were stubs; the Reviewers panel was made live by Phases 2–3 below, the Proposal tab later (S258), Overview + Status in Group A (S260), Reviews, Awardee/grantee-deliverables, and now Initial Assessment later; only the still-unimplemented lifecycle tabs remain placeholders.)*
 - **Phase 2 — SHIPPED S209 (`64f694f`):** real Manage panel `shared/components/reviewers/ReviewerManagePanel.js`, shared by Review Manager + Workbench; `ReviewersTab.js` wires the Reviewers tab (Invite/Track/Completed + state-aware landing).
 - **Phase 3 — SHIPPED S210 (`79a2840`) + S211 (`bd95087`):** `ReviewerFindPanel.js` (auto-load proposal, in-panel `analyze→discover→enrich→save` search at full standalone parity), applicant-reviewer ingestion (`/api/workbench/applicant-reviewers.js`, recommended→candidates / excluded→per-request soft-block), and the new **Candidates** saved-roster sub-tab (`CandidatesPanel.js` + real invitations). Manual reviewer add SHIPPED S236 (`/api/workbench/manual-reviewer.js`). At S210–S211 the live Reviewers tab had **5** sub-tabs (Find · Candidates · Invite · Track · Completed), not the 4 of the S206 design; it was later **collapsed to 3 (Find · Invite Reviewers · Track Reviewers, S280, commit `4d45b4c8`)**. Authoritative phase status: `docs/REQUEST_WORKBENCH_BUILD_PLAN.md`.
 - **Historical operational note:** the original pilot grant/browser-smoke checkpoint is

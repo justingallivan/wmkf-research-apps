@@ -6,7 +6,7 @@ status: canonical
 summary: "If you're touching a service or utility, read its header before this catalog. If a header is sparse or stale, fix it in the same commit as your..."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-07-29
+last_verified: 2026-07-30
 owner: product-engineering
 related:
   - lib/services/
@@ -60,7 +60,9 @@ If you're touching a service or utility, read its header before this catalog. If
 ### Storage / persistence
 
 - **`database-service.js`** — Vercel Postgres operations; Wave 1 dispatch lives here.
-- **`graph-service.js`** — Microsoft Graph (SharePoint files, listing/download, content search).
+- **`graph-service.js`** — Microsoft Graph (SharePoint files, listing/download, content search, idempotent folder-path creation, stable path-to-item metadata, and upload responses carrying site/drive/item/eTag/version metadata).
+- **`initial-assessment/artifact-service.js`** — Governed Initial Assessment producer + shared Workbench/pilot-locator read model. Resolves authoritative request/proposal inputs, requires a positively resolved Dynamics-tracked request library, converges exact retries through `wmkf_requestdocument`, never overwrites Ready artifacts, and atomically commits replacement Ready + prior supersession (or exact-input reactivation) with the shared `akoya_request.wmkf_CurrentInitialAssessment` ETag fence. It preserves the canonical file while exposing a failed replacement separately, cleans up claim-lost uploads with character-bounded durable cleanup work on delete failure, writes DOCX bytes to the request's `Artifacts/Initial Assessment/` folder, and returns success only after stable SharePoint identity, canonical pointer, and full-lineage read-back are confirmed in Dataverse. The production schema and governed prompt v1 are live and verified as of 2026-07-30; application promotion and the controlled pilot remain gated. The source-built locator is narrower than the planned full Editor Dashboard.
+- **`initial-assessment/template.js`** — Versioned `standard_business_brief` DOCX template. AI content is limited to Summary, Significance & Impact, Research Plan, and Team Expertise; Foundation Opportunity is always rendered as staff-required.
 
 ### Intake portal
 

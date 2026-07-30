@@ -174,6 +174,14 @@ function WorkbenchDashboard() {
           🏆 View awardees &amp; grantee deliverables{cycleCode ? ` (${cycleCode})` : ''} →
         </Link>
       </div>
+      <div className="mb-4">
+        <Link
+          href="/workbench/artifacts"
+          className="text-sm text-blue-700 hover:underline"
+        >
+          📝 View Initial Assessment Pilot Locator →
+        </Link>
+      </div>
 
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-4 mb-6">

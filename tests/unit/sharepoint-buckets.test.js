@@ -2,7 +2,8 @@
  * Contract test for lib/utils/sharepoint-buckets.js's getRequestSharePointBuckets.
  * Golden path: Dynamics-tracked bucket + speculative archive buckets are merged
  * and de-duplicated. Failure path: the parent-location lookup failing falls back
- * to the 'akoya_request' library name rather than throwing.
+ * to the 'akoya_request' library name for legacy read callers, while governed
+ * writers can require positive parent resolution and fail closed.
  *
  * @jest-environment node
  */
@@ -47,6 +48,21 @@ describe('getRequestSharePointBuckets (golden path)', () => {
 
     const buckets = await getRequestSharePointBuckets(REQUEST_ID, REQUEST_NUM);
     expect(buckets[0]).toEqual({ library: 'akoya_request', folder: 'Proposals/R-1000', source: 'dynamics' });
+  });
+
+  test('governed writer mode fails closed when the parent library cannot be verified', async () => {
+    jest.spyOn(DynamicsService, 'queryRecords').mockImplementation((entity, opts) => {
+      if (opts.select === 'name,relativeurl,_parentsiteorlocation_value') {
+        return Promise.resolve({ records: [{ name: 'loc1', relativeurl: 'Proposals/R-1000', _parentsiteorlocation_value: 'parent-1' }] });
+      }
+      return Promise.reject(new Error('boom'));
+    });
+
+    await expect(getRequestSharePointBuckets(
+      REQUEST_ID,
+      REQUEST_NUM,
+      { requireResolvedParents: true },
+    )).rejects.toThrow(/Unable to verify the request SharePoint parent library/);
   });
 
   test('missing requestId throws', async () => {

@@ -6,7 +6,7 @@ status: active
 summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-07-28
+last_verified: 2026-07-30
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -18,7 +18,7 @@ related:
 
 # Where We're Headed
 
-**Last verified: 2026-07-28.** This document owns long-term direction and principles. The
+**Last verified: 2026-07-29.** This document owns long-term direction and principles. The
 ordered, current delivery agenda lives in `docs/CURRENT_WORK_QUEUE.md`; this document is not a
 backlog.
 
@@ -135,12 +135,17 @@ index and workflow surface, not a second editor or document store.
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
 
-1. deliver the governed-artifact foundation and a human-in-the-loop,
-   end-to-end Initial Assessment pilot by 2026-08-10, ahead of proposal intake
-   around 2026-08-18. Authorized staff must generate from a designated real
-   test proposal, inspect and edit the canonical SharePoint Word artifact, find
-   and open the same registered file from both the Workbench and staff-wide
-   Editor Dashboard, and exercise one safe failure/retry path;
+1. promote and exercise the source-built governed-artifact application in a
+   human-in-the-loop, end-to-end Initial Assessment pilot by 2026-08-10, ahead
+   of proposal intake around 2026-08-18. The production registry/pointer schema
+   and governed prompt v1 were provisioned and verified 2026-07-30; no artifact
+   exists yet. The owner chose a controlled
+   production rehearsal with colleague-created representative dummy requests
+   instead of building the existing Dataverse sandbox organization into an
+   integrated application/file test environment. Authorized staff must inspect
+   and edit the canonical SharePoint Word artifact, find and open the same
+   registered file from both the Workbench and cycle-wide pilot locator,
+   and exercise one safe failure/retry path;
 2. finish the user/input/storage/access/deadline contract for the remaining
    Workbench lifecycle tabs, including the three-document writeup lineage,
    Site Visit dossier, narrow request-scoped applicant-material upload, and

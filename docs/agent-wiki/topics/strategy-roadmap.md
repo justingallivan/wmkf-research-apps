@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-28
+last_verified: 2026-07-30
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -60,8 +60,11 @@ document inventory, and individual implementation plans do not establish priorit
   Board milestones are required parts of the design. Initial Assessment,
   Pre-Site, and Final are three distinct documents; Final is copied from a
   the latest Pre-Site version at action time, with a rare explicit regeneration
-  option that preserves prior Final content. Exact schema and target-library
-  configuration remain planned/unverified. See
+  option that preserves prior Final content. The Initial Assessment registry
+  and request pointer are live in Production, and governed prompt v1 is
+  provisioned and verified as of 2026-07-30. Application promotion,
+  target-library configuration/readback, and the controlled artifact pilot
+  remain open. See
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
 - Pre-Site input direction (owner-decided 2026-07-28): draft factual material
   from the full proposal through an iterated governed `phase-ii.summarize`;
@@ -128,22 +131,28 @@ document inventory, and individual implementation plans do not establish priorit
   coordination with a program coordinator.
   Exact token, schema/read model, validation, folder, retention,
   summary-quality, and partial-failure contracts remain planned.
-- Editor Dashboard direction (owner-confirmed 2026-07-28): preserve Allison's
+- Editor Dashboard direction (owner-confirmed 2026-07-28; pilot list implemented
+  in source 2026-07-29): preserve Allison's
   former single-folder editing workflow with a staff-wide cycle list of
   governed writeups, direct Open in Word, and an explicit per-editor Reviewed
-  tracker. All PDs are expected eventually to evaluate the materials and
-  designated staff proofreaders also need access. It reuses the typed registry
-  and canonical SharePoint file; it is not a second editor. Marker granularity,
-  coordinator view, and the enforced app/file access key remain open.
+  tracker. The pilot cycle list/direct Word entry uses the existing `reviewers`
+  app grant; live SharePoint permission verification remains pending. All PDs
+  are expected eventually to evaluate the materials and designated staff
+  proofreaders also need access. It reuses the typed registry and canonical
+  SharePoint file; it is not a second editor. Marker granularity and coordinator
+  view remain open.
 - Calendar direction (owner-confirmed 2026-07-28): the first fixed gate is a
   human-in-the-loop, end-to-end Initial Assessment pilot by 2026-08-10, before
-  proposals begin arriving around 2026-08-18. Authorized staff must generate
-  from a designated real test proposal, inspect and edit the canonical
-  SharePoint Word file, and find/open the same registered artifact in both the
-  Workbench and staff-wide Editor Dashboard. The pilot also exercises a safe
-  failure/retry path. It is draft-functional proof, not production readiness,
-  and does not require the later lifecycle tabs. Named testers, environment,
-  and schedule remain open. See the near-term plan.
+  proposals begin arriving around 2026-08-18. The 2026-07-29 environment
+  decision is a controlled production rehearsal using colleague-created
+  representative dummy requests; building the existing Dataverse sandbox
+  organization into an integrated application/file test environment is out of
+  scope. Authorized staff inspect and edit the canonical SharePoint Word file
+  and find/open the same registered artifact in both the Workbench and
+  cycle-wide pilot locator. The pilot also exercises a safe failure/retry
+  path. It is draft-functional proof, not broad production readiness, and does
+  not require the later lifecycle tabs. Dummy request IDs/content shape, named
+  testers, and schedule remain open. See the near-term plan.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel: `project-virtual-review-panel`.
 - Roadmap snapshots: `project-app-roadmap-2026-04-25`, `project-phase-i-summary-app-winddown`.

@@ -6,7 +6,7 @@ status: active
 summary: "File storage and linking in AkoyaGO/Dynamics, including governed staff writeups and Site Visit artifacts."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-07-28
+last_verified: 2026-07-30
 owner: product-engineering
 related:
   - scripts/probe-sharepoint-write.js
@@ -44,12 +44,14 @@ hood.
 
 ## Governed staff writeups and Site Visit artifacts — target contract
 
-> **Owner-decided direction (2026-07-28); implementation still planned.**
+> **Owner-decided direction (2026-07-28); Initial Assessment pilot implemented
+> in source 2026-07-29; production registry/pointer schema and governed prompt
+> v1 provisioned and verified 2026-07-30.**
 > This section governs the Initial Assessment, Pre Site Visit Writeup, and
 > Final Writeup design as well as the Site Visit dossier and its materials. It
-> does not claim that the target Dataverse schema, SharePoint library policy,
-> prompts, upload surface, or Workbench surfaces have been provisioned.
-> **[VERIFIED via owner decisions 2026-07-28; implementation PLANNED.]**
+> does not claim that the application has been deployed or that a pilot artifact
+> has been generated. **[VERIFIED via owner decisions 2026-07-28, repository
+> source 2026-07-29, and production apply/readback/count probes 2026-07-30.]**
 
 ### Authority boundary
 
@@ -58,13 +60,31 @@ hood.
   history operate on this copy.
 - **Dataverse:** authoritative document identity, request/cycle relationship,
   artifact type, lifecycle state, structured decisions, access/workflow
-  metadata, and durable SharePoint identity/version references.
+  metadata, durable SharePoint identity/version references, and the
+  request-level canonical Initial Assessment pointer.
 - **Workbench:** creates or finds the registered artifact, displays its state
   and preview, opens it in Word, and exposes authorized recovery/milestone
   actions.
-- **Editor Dashboard (planned):** queries the same typed registry across a
-  cycle so approved collaborators can review progress and open the canonical
-  Word files without visiting every request separately.
+- **Initial Assessment pilot locator (implemented in source; live pilot
+  pending):** queries the same typed registry across a cycle so approved
+  collaborators can find and open the canonical Word files without visiting
+  every request separately. This narrow cycle list does not yet implement the
+  full Editor Dashboard filters, preview/version context, or Reviewed progress
+  contract below.
+- **Replacement/current rule (implemented in source; live pilot pending):**
+  changed authoritative inputs or cycle produce a distinct generation row. The
+  replacement's Ready transition and prior-Ready supersession are one
+  ETag-guarded Dataverse changeset with
+  `akoya_request.wmkf_CurrentInitialAssessment`. The request ETag provides the
+  shared fence across otherwise-disjoint generation rows. Reverted inputs
+  reactivate the exact earlier Ready artifact atomically. Pilot reads resolve
+  the canonical Ready document through that pointer
+  while exposing a newer pending/failed replacement separately, preserving
+  both file access and retry visibility.
+- **Governed write location (implemented in source; live pilot pending):** the
+  producer requires a positively resolved Dynamics-tracked `akoya_request`
+  parent library. The best-effort fallback retained for legacy read-only bucket
+  discovery is never accepted as a write target.
 
 Do not mirror the Word body into an independently editable Dataverse memo. That
 would create two competing sources of truth and an unsafe Word→Dataverse merge
@@ -74,9 +94,13 @@ rebuilt from the SharePoint original.
 
 ### Registry contract
 
-The exact Dataverse table/columns remain a design decision. The approved shape
-is a typed document registry rather than one ad hoc URL field per writeup. At a
-minimum, the persistence design must account for:
+The approved typed registry is implemented in schema-as-code as
+`wmkf_requestdocument` (entity set `wmkf_requestdocuments`) rather than one ad
+hoc URL field per writeup. Its complete Wave 16 schema, alternate key,
+relationships, and request pointer are live in Production as of 2026-07-30;
+the fresh registry and pointer counts were both zero before application
+promotion and the controlled pilot.
+The persistence contract accounts for:
 
 - request and cycle;
 - artifact type. The three narrative types are `initial-assessment`,
@@ -93,6 +117,21 @@ minimum, the persistence design must account for:
 
 A URL alone is not the artifact identity, and a folder/filename convention is
 not a durable join contract.
+
+For the Initial Assessment pilot, the producer writes to the existing
+Dynamics-tracked `akoya_request` request folder under the exact request-relative
+path `Artifacts/Initial Assessment/`. It records the friendly path/filename for
+humans but registers the Graph site, drive, and item IDs as identity. Exact
+retries use a deterministic SHA-256 alternate key; a Ready row is never
+regenerated or overwritten. If upload succeeds before the final registry PATCH
+fails, retry verifies the stored content hash against the deterministic
+SharePoint item and repairs the registry without another model call. If that
+item's bytes no longer match, the producer preserves its exact identity in the
+operator-visible cleanup queue and generates to a fresh claim-specific
+filename; it does not overwrite or repeatedly dead-end on the changed file.
+If the primary cleanup queue reaches capacity, exact new work is retained in a
+dedicated overflow field and that deterministic generation is blocked until
+manual cleanup resolves the overflow.
 
 ### Writeup lineage and distribution
 
@@ -384,9 +423,12 @@ create and register a real canonical Word artifact, let authorized staff open
 and edit it, and let staff find and open that same registered artifact from
 both the Workbench and this dashboard. One safe failure/retry path must prove
 that the SharePoint bytes and Dataverse registry reconcile before success.
-Named testers, pilot environment, and schedule remain open. App list visibility
-and SharePoint edit permission are separate authorization boundaries; passing
-one must not imply the other.
+The owner chose a controlled production rehearsal using colleague-created
+representative dummy requests rather than building the existing Dataverse
+sandbox organization into an integrated application/file test environment.
+The dummy request IDs and content shape, named testers, and schedule remain
+open. App list visibility and SharePoint edit permission are separate
+authorization boundaries; passing one must not imply the other.
 
 ### Search contract
 
