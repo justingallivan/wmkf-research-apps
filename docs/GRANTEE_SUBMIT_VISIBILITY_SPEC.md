@@ -82,6 +82,25 @@ treating a disabled user as unresolvable
 `explicitRecipients: pdEmail ? [pdEmail] : []`, matching three existing callers
 `[VERIFIED via lib/services/review-upload.js:583-586, reviewer-quota.js:99, reviewer-withdrawal.js:70]`.
 
+**The request object in hand does not carry the fields this needs — do not read them off `verified.request`.**
+`[VERIFIED via lib/external/verify-grantee-token.js:22-31]` The token verifier's `REQUEST_SELECT` is
+`akoya_requestid, akoya_requestnum, akoya_title, wmkf_meetingdate, wmkf_abstract,
+wmkf_abstractformatted, wmkf_abstractapproved` — it contains **neither**
+`_wmkf_programdirector_value` **nor** `_wmkf_projectleader_value`. An implementation that reaches for
+`verified.request._wmkf_programdirector_value` gets `undefined`, silently falls back to
+`explicitRecipients: []`, and the PD never receives the email — the feature's whole point, failing
+quietly. The PI name for `metadata` is missing for the same reason.
+
+Resolution: **do a fresh request read inside the notification path** for
+`_wmkf_programdirector_value,_wmkf_projectleader_value`, rather than widening the verifier's
+projection. That projection is a minimal read on a *public token-authed* surface and widening it would
+pull staff-assignment fields into the external grantee request path for every portal page load; keeping
+the extra read on the notification path confines it to the staff-facing side effect. Two reads on a
+best-effort path that already cannot fail the submit is the right trade.
+
+Either way the null path stays live: an unresolvable PD still notifies category recipients. A test
+must pin this specifically — see the tests below.
+
 An unresolvable PD is **not** an error — category recipients still receive it. Never make the
 grantee's submit outcome depend on PD resolution.
 
@@ -96,8 +115,30 @@ grantee's submit outcome depend on PD resolution.
 | `explicitRecipients` | `[pdEmail]` when resolvable, else `[]` |
 | `autoResolveKey` | **omit** — each submission is a distinct event, not a condition that clears |
 | `title` | `Grantee deliverables submitted (<requestNum>)` |
-| `metadata` | `requestId`, `requestNumber`, `title`, `pi`, `hasImage`, `captionPresent` |
+| `message` | `<pi> submitted deliverables for <title>. Review them on the Awardee tab: <awardeeTabUrl>` |
+| `metadata` | `requestId`, `requestNumber`, `title`, `pi`, `hasImage`, `captionPresent`, `awardeeTabUrl` |
 | `source` | `grantee-portal` |
+
+### The deep link needs an explicit origin `[PLANNED]`
+
+`notify` renders only `title`, `message`, and `metadata` into the email
+`[VERIFIED via notification-service.js:79-84,231]` — there is no separate link or action field, so the
+deep link has to travel in `message` (and in `metadata` for the dashboard row). Both are listed above.
+
+The path is `/workbench/<requestId>?tab=awardee`, matching the link the awardees list already builds
+`[VERIFIED via pages/workbench/awardees.js:119]`. It must be made **absolute** for an email, and the
+origin is not obvious:
+
+- Use `process.env.NEXTAUTH_URL` (trailing slash stripped) — the staff app origin.
+- Do **not** use `getGranteePortalBaseUrl()`. It prefers `GRANTEE_PORTAL_BASE_URL`, which is
+  documented as the *public grantee portal* base and explicitly independent of other branded domains
+  `[VERIFIED via lib/external/grantee-token-lifecycle.js:32-38]`. Pointing a staff deep link at the
+  grantee-facing origin would produce a URL that either 404s or lands external users on a staff route.
+
+If `NEXTAUTH_URL` is unset, emit the notification with a **relative** path rather than a malformed
+absolute URL, and never interpolate an empty origin into `https:///workbench/...`. Whether
+`NEXTAUTH_URL` is set in every environment is `[ASSUMED]` — confirm against
+`docs/CREDENTIALS_RUNBOOK.md` at implementation time.
 
 Add `{ key: 'grantee-deliverables', description: '...' }` to `SEED_CATEGORIES`
 `[VERIFIED via lib/services/alert-recipients.js:25-34]`. That list is discoverability scaffolding for
@@ -153,8 +194,13 @@ Extend `tests/unit/grantee-submit-route.test.js`:
 
 - success → `notify` called once with `type: 'grantee_deliverable_submitted'` and the PD email in
   `explicitRecipients`
+- **PD email is non-empty when the request has a PD** — this is the regression test for the
+  `verified.request` trap above. Assert on the actual address, not merely that `notify` was called;
+  a test that only checks the call would pass with `explicitRecipients: []`.
 - `notify` rejects → route still returns 200 `{ ok: true }` (**the load-bearing test**)
 - PD unresolvable or disabled → `explicitRecipients: []`, still notifies
+- `message` and `metadata.awardeeTabUrl` contain `/workbench/<requestId>?tab=awardee`; with
+  `NEXTAUTH_URL` unset the value is relative, never `https:///workbench/...`
 - waiver-block path → still emits `grantee_waiver_block`, no submitted notification
 - non-editable 409 and rate-limited 429 → no notification
 
@@ -263,13 +309,22 @@ path instead of a SharePoint URL.
 
 ### Tests `[PLANNED]`
 
-Extend `tests/unit/grantee-abstract-service.test.js`:
+Extend `tests/unit/grantee-abstract-workbench-service.test.js` — **not**
+`tests/unit/grantee-abstract-service.test.js`, which covers the unrelated LLM generator
+(`generateGranteeAbstract` via `executePrompt`)
+`[VERIFIED via tests/unit/grantee-abstract-service.test.js:13-14; grep for loadGranteeAbstract across tests/unit matches only the workbench suite]`:
 
 - absolute `webUrl` ref → `imageUrl === imageRef`, `hasImage: true`
 - relative-path ref → `imageUrl: null`, `hasImage: true` (**the trap test**)
 - `javascript:` or other non-http scheme → `imageUrl: null`
 - no deliverable row / null fields → all five fields null-or-false, no throw
 - `wmkf_waiverackedat` surfaces as `submittedAt`
+
+`tests/unit/grantee-deliverables-abstract-route.test.js` **will fail and must be updated in the same
+change**: it pins the GET body with `expect(res.body).toEqual({...})` over the exact eight-key envelope
+`[VERIFIED via tests/unit/grantee-deliverables-abstract-route.test.js:93-107]`, so adding five fields
+breaks it. That is the envelope pin doing its job — update it deliberately; do not loosen `toEqual` to
+`toMatchObject` to make it pass.
 
 Extend `tests/unit/awardee-tab.test.js`:
 
