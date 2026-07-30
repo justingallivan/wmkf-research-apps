@@ -63,8 +63,10 @@ document inventory, and individual implementation plans do not establish priorit
   option that preserves prior Final content. The Initial Assessment registry
   and request pointer are live in Production, governed prompt v1 is
   provisioned, and the application is deployed as of 2026-07-30.
-  Target-library configuration/readback and the controlled artifact pilot
-  remain open. See
+  The controlled Request `1002788` rehearsal proved generation, registry and
+  pointer lineage, both consumers, native version creation, and exact-input
+  retry. It exposed a recovery-hash mismatch and a null AI-run request lookup;
+  substantive staff editing and target-library controls also remain open. See
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
 - Pre-Site input direction (owner-decided 2026-07-28): draft factual material
   from the full proposal through an iterated governed `phase-ii.summarize`;
@@ -151,8 +153,10 @@ document inventory, and individual implementation plans do not establish priorit
   and find/open the same registered artifact in both the Workbench and
   cycle-wide pilot locator. The pilot also exercises a safe failure/retry
   path. It is draft-functional proof, not broad production readiness, and does
-  not require the later lifecycle tabs. Dummy request IDs/content shape, named
-  testers, and schedule remain open. See the near-term plan.
+  not require the later lifecycle tabs. Request `1002788` is the authorized
+  pilot target; generation and exact retry passed, while recovery, complete
+  run lineage, substantive editing, and library controls remain open. See the
+  near-term plan.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel: `project-virtual-review-panel`.
 - Roadmap snapshots: `project-app-roadmap-2026-04-25`, `project-phase-i-summary-app-winddown`.

@@ -34,8 +34,8 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Remaining lifecycle design freeze | Complete the human-in-the-loop Initial Assessment pilot by 2026-08-10, before proposal intake begins around 2026-08-18, then finish the contracts for Pre Site Visit Writeup, the Site Visit dossier, Final Writeup, J27 Initial Assessment scale-out, and the staff-wide Editor Dashboard. The production registry/pointer schema, governed prompt v1, Workbench producer, and cycle-wide pilot locator are live and verified as of 2026-07-30 (`1e958ee0`; `dpl_AxxroabhpXLX1pz75MW6486fB4ci`). No artifact has been generated. Production dummy request IDs/content, named testers, exact schedule, target-library protection/readback, SharePoint permission/recovery controls, and the safe failure/retry exercise remain open. Detailed decided contracts remain in the near-term plan and Dataverse/SharePoint model. | The August 10 controlled-production pilot succeeds end to end with representative dummy source data, human review/editing, the same registered artifact visible in Workbench and the pilot locator, and safe retry without false success; each later tab has approved user, inputs, producer, persistence, consumer, search, access, version/recovery/retention, milestone, and deadline contracts. |
-| 2 | First deadline-bound writeup slice | Exercise the now-live governed-artifact spine through the J27 Initial Assessment first. Pre Site Visit becomes the next reuse after the pilot rather than the default first slice. | One dedicated production dummy request produces a durable, searchable, editable and recoverable Word artifact; authorized staff review/edit it and find the same registered file from Workbench and the staff-wide pilot locator; one failure/retry path proves write-on-success. The full Editor Dashboard contract remains a later reuse. |
+| 1 | Close the partial Initial Assessment pilot | The controlled Request `1002788` rehearsal generated one Ready/Draft artifact, set the canonical pointer, exposed the same file in Workbench and the cycle locator, created native SharePoint version history, and proved exact-input no-duplicate retry. Before declaring the August 10 gate complete: correct the pre-upload-versus-canonical SharePoint hash contract, pass `requestId` to the Executor, exercise the post-upload recovery branch, complete a substantive staff edit including Foundation Opportunity, and finish target-library protection/readback checks. | The corrected recovery path repairs an interrupted finalization without a second model call or overwrite; the run has its request lookup; an authorized staff edit is visible through both consumers; restore/permission/retention boundaries are recorded. |
+| 2 | First deadline-bound writeup slice | Treat the governed-artifact spine as production-proved for generation, lineage, shared discovery, and exact retry—but not yet recoverable. Pre Site Visit becomes the next reuse only after the pilot blockers above close. | One dedicated production request produces a durable, searchable, editable, and recoverable Word artifact with complete prompt/run/request lineage and verified human review. The full Editor Dashboard contract remains a later reuse. |
 
 ## Audit follow-ups — verified open, not silently prioritized
 
@@ -49,6 +49,16 @@ sequence.
   bill of health.
 
 ## Completed in this execution
+
+- Initial Assessment controlled-production rehearsal: Request `1002788`
+  generated registry row `fb995f0f-628c-f111-ab0f-6045bd018a07`, the matching
+  request pointer, completed AI run
+  `b7ae9b17-628c-f111-ab0f-000d3a31c468`, and canonical SharePoint item
+  `01G4GVMS77A2SBVPGA4VFINZFWAFIZGVFG`. Both Workbench consumers opened the
+  same item, and a same-input retry preserved the one row/run/item with no new
+  attempt. The rehearsal also exposed the recovery hash mismatch and null
+  AI-run request lookup recorded in
+  [the pilot report](INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md).
 
 - Review-synthesis lifecycle rollout: signed-in read-only verification passed;
   Production automation was deliberately enabled; and the controlled Request

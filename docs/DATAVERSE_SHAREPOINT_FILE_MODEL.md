@@ -44,15 +44,19 @@ hood.
 
 ## Governed staff writeups and Site Visit artifacts — target contract
 
-> **Owner-decided direction (2026-07-28); Initial Assessment pilot implemented
-> in source 2026-07-29; production registry/pointer schema and governed prompt
-> v1 provisioned and verified 2026-07-30.**
+> **Owner-decided direction (2026-07-28); Initial Assessment implemented in
+> source 2026-07-29; production registry/pointer schema and governed prompt v1
+> provisioned 2026-07-30; controlled Request `1002788` pilot partially passed
+> 2026-07-30.**
 > This section governs the Initial Assessment, Pre Site Visit Writeup, and
 > Final Writeup design as well as the Site Visit dossier and its materials. It
-> The application deployed Ready on 2026-07-30, but this section does not claim
-> that a pilot artifact has been generated. **[VERIFIED via owner decisions
-> 2026-07-28, repository source 2026-07-29, and production
-> apply/readback/count/deployment probes 2026-07-30.]**
+> The application generated and registered the canonical artifact, both
+> consumers found it, and exact-input retry created no duplicate. The pilot is
+> not closed because post-upload hash recovery and complete request→AI-run
+> lineage failed their contracts and substantive staff editing remains
+> unverified. **[VERIFIED via owner decisions 2026-07-28, repository source,
+> production Dataverse/Graph probes, and signed-in consumer checks
+> 2026-07-30.]**
 
 ### Authority boundary
 
@@ -66,13 +70,13 @@ hood.
 - **Workbench:** creates or finds the registered artifact, displays its state
   and preview, opens it in Word, and exposes authorized recovery/milestone
   actions.
-- **Initial Assessment pilot locator (deployed; live artifact pilot
-  pending):** queries the same typed registry across a cycle so approved
+- **Initial Assessment pilot locator (deployed and exercised):** queries the
+  same typed registry across a cycle so approved
   collaborators can find and open the canonical Word files without visiting
   every request separately. This narrow cycle list does not yet implement the
   full Editor Dashboard filters, preview/version context, or Reviewed progress
   contract below.
-- **Replacement/current rule (deployed; live artifact pilot pending):**
+- **Replacement/current rule (deployed; exact-input retry exercised):**
   changed authoritative inputs or cycle produce a distinct generation row. The
   replacement's Ready transition and prior-Ready supersession are one
   ETag-guarded Dataverse changeset with
@@ -82,7 +86,7 @@ hood.
   the canonical Ready document through that pointer
   while exposing a newer pending/failed replacement separately, preserving
   both file access and retry visibility.
-- **Governed write location (deployed; live artifact pilot pending):** the
+- **Governed write location (deployed and exercised):** the
   producer requires a positively resolved Dynamics-tracked `akoya_request`
   parent library. The best-effort fallback retained for legacy read-only bucket
   discovery is never accepted as a write target.
@@ -98,9 +102,9 @@ rebuilt from the SharePoint original.
 The approved typed registry is implemented in schema-as-code as
 `wmkf_requestdocument` (entity set `wmkf_requestdocuments`) rather than one ad
 hoc URL field per writeup. Its complete Wave 16 schema, alternate key,
-relationships, and request pointer are live in Production as of 2026-07-30;
-the fresh registry and pointer counts were both zero before application
-promotion and the controlled pilot.
+relationships, and request pointer are live in Production as of 2026-07-30.
+The controlled pilot created one Ready/Draft row and populated the pointer for
+Request `1002788`.
 The persistence contract accounts for:
 
 - request and cycle;
@@ -124,11 +128,17 @@ Dynamics-tracked `akoya_request` request folder under the exact request-relative
 path `Artifacts/Initial Assessment/`. It records the friendly path/filename for
 humans but registers the Graph site, drive, and item IDs as identity. Exact
 retries use a deterministic SHA-256 alternate key; a Ready row is never
-regenerated or overwritten. If upload succeeds before the final registry PATCH
-fails, retry verifies the stored content hash against the deterministic
-SharePoint item and repairs the registry without another model call. If that
-item's bytes no longer match, the producer preserves its exact identity in the
-operator-visible cleanup queue and generates to a fresh claim-specific
+regenerated or overwritten. The Request `1002788` exact-input retry proved
+that Ready-row behavior. If upload succeeds before the final registry PATCH
+fails, the intended recovery downloads the deterministic SharePoint item and
+compares it with the stored producer hash. **The controlled pilot disproved
+that comparison contract for the target library:** SharePoint repacks the DOCX
+during ingestion, so the untouched canonical version already has different
+bytes. Recovery must store and compare a canonical post-upload hash (or an
+explicitly separate producer and canonical hash) before this path is described
+as working. Once that contract is corrected, if an item's canonical bytes no
+longer match, the producer should preserve its exact identity in the
+operator-visible cleanup queue and generate to a fresh claim-specific
 filename; it does not overwrite or repeatedly dead-end on the changed file.
 If the primary cleanup queue reaches capacity, exact new work is retained in a
 dedicated overflow field and that deterministic generation is blocked until

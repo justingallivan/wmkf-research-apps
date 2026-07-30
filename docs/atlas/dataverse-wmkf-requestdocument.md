@@ -3,7 +3,7 @@ title: Dataverse wmkf_requestdocument
 domain: application-state
 kind: atlas
 status: active
-summary: Governed request-artifact registry and Initial Assessment pilot data flow; production schema, prompt, and application are live, while the controlled artifact pilot remains pending.
+summary: Governed request-artifact registry and Initial Assessment pilot data flow; the controlled Request 1002788 rehearsal proved generation, consumers, and exact retry while exposing a recovery-hash defect.
 canonical: false
 owner: product-engineering
 related:
@@ -26,11 +26,12 @@ rerun]** The entity, attributes, five relationships, generation-key alternate
 key, and `akoya_request.wmkf_CurrentInitialAssessment` pointer are live in
 Production.
 
-**[VERIFIED 2026-07-30 via production count probes]** The registry has 0 rows
-and the request pointer has 0 populated rows. The governed
-`initial-assessment.generate` prompt exists as version 1 at
-`fc8a4c3b-5e8c-f111-ab0f-7ced8d3d15a6`; a repeat create-only seed refused to
-overwrite it.
+**[VERIFIED 2026-07-30 via controlled production generation and exact
+readback]** Request `1002788` now has one Ready/Draft registry row
+`fb995f0f-628c-f111-ab0f-6045bd018a07`; its
+`wmkf_CurrentInitialAssessment` pointer resolves to that row. The row preserves
+the prompt, template, AI-run, input, cycle, and stable Graph item lineage and is
+visible from both the request Workbench and cycle-wide locator.
 
 **[VERIFIED 2026-07-30 via GitHub merge status, Vercel inspection, production
 alias probes, and error-log scan]** PR #102 merged as `1e958ee0`; production
@@ -38,9 +39,13 @@ deployment `dpl_AxxroabhpXLX1pz75MW6486fB4ci` is Ready on the expected aliases.
 The new route fails closed to sign-in when unauthenticated, and the initial
 post-deploy error scan was clean.
 
-**[NOT YET EXERCISED LIVE]** No SharePoint artifact has been generated and the
-controlled dummy-request pilot has not run. Live schema, prompt, and
-application availability must not be described as a completed artifact pilot.
+**[PARTIAL PILOT 2026-07-30]** A same-input UI retry returned the existing
+Ready row without another run, upload, overwrite, or duplicate. Opening the
+canonical Word file created a native SharePoint version. The broader pilot is
+not complete: no substantive staff content edit was verified, and the
+post-upload recovery hash contract is invalid for this library because
+SharePoint rewrites the DOCX package during ingestion. Exact evidence:
+`docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`.
 
 ## Ownership
 
@@ -75,8 +80,13 @@ authoritative input fingerprint, prompt identity/version, and template
 identity/version. A Ready row returns without another model call or SharePoint
 upload. A failed/stale operation can reclaim by ETag. If SharePoint upload
 succeeded but the final registry PATCH failed, the row retains the expected
-content hash and deterministic target; retry downloads the item, verifies the
-hash, and finalizes the stable item identity without rerunning AI. If the
+producer content hash and deterministic target. The intended retry downloads
+the item, verifies the hash, and finalizes stable identity without rerunning
+AI. **That recovery branch is not currently safe in Production:** SharePoint
+rewrites Office package bytes during upload, so its canonical version `1.0`
+already differs from the pre-upload producer hash. Until a canonical
+post-upload hash (or explicit dual-hash contract) is persisted, recovery will
+misclassify an untouched upload as changed. If the
 existing item's bytes no longer match, the producer retains its exact
 drive/item identity for operator cleanup and generates to a fresh
 claim-specific filename instead of overwriting the changed file or dead-ending
@@ -99,7 +109,8 @@ yet. If its primary field reaches capacity, the exact new identity is written
 to a dedicated overflow field and further generation for that deterministic
 artifact is blocked until an operator resolves the cleanup; unresolved
 identifiers are never silently evicted. Ordinary post-upload registry failures
-retain their item for hash-verified recovery.
+retain their item for recovery after the canonical SharePoint hash contract is
+corrected.
 
 The governed writer requires positive resolution of the Dynamics-tracked
 `akoya_request` parent library; it does not inherit the shared read helper's
@@ -121,6 +132,9 @@ transition.
    `node scripts/seed-initial-assessment-prompt.js --execute`.
 6. **Completed 2026-07-30:** merge PR #102 and verify production deployment
    `dpl_AxxroabhpXLX1pz75MW6486fB4ci` Ready.
-7. **Open:** exercise one authorized end-to-end pilot, including an intentional retry.
+7. **Partially completed 2026-07-30:** Request `1002788` generation, lineage,
+   both consumers, Word opening/version creation, and exact-input retry passed.
+   Recovery-hash correction, request-linked AI-run proof, substantive human
+   editing, and target-library protection checks remain open.
 
 No live command in this sequence is authorized merely by this page.

@@ -1,10 +1,10 @@
 ---
 name: J27 document capture & Proposal-tab evolution
-description: D26 proposal inputs still resolve by a fragile SharePoint filename bridge. The governed-artifact pilot now has a live typed wmkf_requestdocument schema, governed prompt, and application; its controlled artifact rehearsal and broader J27 capture remain open. The reviewer hold step is retired.
+description: D26 proposal inputs still resolve by a fragile SharePoint filename bridge. The governed-artifact pilot has a live typed registry and a partially successful Request 1002788 rehearsal; recovery hashing, run linkage, human editing, and broader J27 capture remain open.
 type: project
 status: active
 scope: strategy
-last_verified: 2026-07-30 via Initial Assessment production schema/prompt/app deployment verification; controlled artifact pilot and broader J27 capture/timing remain open
+last_verified: 2026-07-30 via controlled Request 1002788 generation, registry/Graph readback, both Workbench consumers, and exact-input retry
 ---
 
 ## Recall Rule
@@ -38,16 +38,21 @@ remain in SharePoint. Production Wave 16 and governed
 `dpl_AxxroabhpXLX1pz75MW6486fB4ci`. Precedent for a document reference on a row already
 exists in `wmkf_apprequestperson.wmkf_biosketchurl`. The first producer is the
 request-bound Initial Assessment service; broader applicant-capture producers
-remain future work. The controlled dummy-request artifact rehearsal has not
-yet run.
+remain future work. The controlled Request `1002788` rehearsal generated the
+canonical artifact, populated the registry/pointer, exposed the same item in
+both consumers, and proved exact-input retry without another run or upload.
+It also showed that SharePoint repacks the DOCX so the current pre-upload hash
+cannot support interrupted-finalization recovery, and that the producer omitted
+the Executor `requestId`, leaving the run lookup null.
 
 **Pilot environment decision (owner, 2026-07-29):** do not build the reachable
 but incompletely provisioned Dataverse sandbox organization into an integrated
 application/file test environment for this pilot. Use a controlled production
 rehearsal after colleagues create representative dummy `akoya_request` records.
-Their IDs/content shape, named testers, and schedule remain pending. Production
-schema apply, prompt seeding, and application promotion were separately
-approved and completed on 2026-07-30; artifact generation remains controlled.
+Request `1002788` became the authorized target. Production schema apply, prompt
+seeding, application promotion, generation, shared discovery, and exact retry
+completed on 2026-07-30. Recovery correction, substantive staff editing, and
+target-library controls remain controlled follow-up work.
 
 **Hold step already RETIRED (S279) — this contingency resolved early, for a different reason.** The reviewer "hold step" ([[project-reviewer-hold-step-decouple]]) was removed in S279 (commit `a8676af1`) when the direction shifted to onboarding at a single final Accept — independent of J27. So the earlier "single-submission may un-scaffold the hold step" note is now moot: there is no hold step left to un-scaffold. (Kept here only so the J27 doc-capture planning doesn't re-raise it.)
 
@@ -60,5 +65,6 @@ Ground truth: [VERIFIED 2026-07-30 via
 `lib/services/grant-reporting/classify-file.js`,
 `lib/services/reviewer-finder/load-proposal-service.js`, and
 `docs/CURRENT_WORK_QUEUE.md`, production Wave 16 readback, prompt verification,
-and deployment inspection]. The typed registry is live; broader J27
-applicant-capture producers and the controlled artifact rehearsal remain open.
+and deployment inspection plus the Request `1002788` production rehearsal].
+The typed registry is live and exercised; broader J27 applicant-capture
+producers and the partial-pilot blockers remain open.

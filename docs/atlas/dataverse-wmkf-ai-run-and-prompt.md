@@ -8,7 +8,9 @@ production provisioning and the 20-row prompt count; 2026-07-28 for governed
 
 ## `wmkf_ai_run` (mutable row count; probe before quoting)
 
-**Source of truth:** Dataverse-only. Append-only audit ledger for every AI invocation against a grant request.
+**Source of truth:** Dataverse-only. Append-only audit ledger for AI
+invocations. Request linkage is present only when the Executor caller supplies
+`requestId`; the Initial Assessment pilot exposed one live caller that did not.
 
 **Entity set:** `wmkf_ai_runs`
 
@@ -35,7 +37,10 @@ production provisioning and the 20-row prompt count; 2026-07-28 for governed
 
 **Write paths:**
 - `lib/services/dynamics-service.js` `logAiRun` — canonical writer. Truncates `wmkf_ai_rawoutput` with `…[truncated N chars]` marker as safety valve.
-- `lib/services/execute-prompt.js` `writeRunRow()` — Executor contract; logs every prompt run with `wmkf_ai_Prompt@odata.bind` + `wmkf_ai_Request@odata.bind` (both capital — see nav-prop case warning above)
+- `lib/services/execute-prompt.js` `writeRunRow()` — Executor contract; logs
+  every prompt run with `wmkf_ai_Prompt@odata.bind` and, when the caller passes
+  `requestId`, `wmkf_ai_Request@odata.bind` (both capital — see nav-prop case
+  warning above)
 - `pages/api/phase-i-dynamics/summarize.js` — Phase I summarization
 - `pages/api/grant-reporting/extract.js` — Grant Reporting writeback
 - `scripts/probe-impersonation-resmoke.js`, `scripts/probe-impersonation-as-user.js` — write sentinel rows during impersonation testing (S135). Filter `wmkf_ai_model='impersonation-resmoke'` to find them.
@@ -44,7 +49,9 @@ production provisioning and the 20-row prompt count; 2026-07-28 for governed
 **Cross-system links from `wmkf_ai_run`:**
 - `wmkf_ai_Prompt@odata.bind` → `wmkf_ai_prompt` (which prompt was used)
 - `wmkf_ai_Request@odata.bind` → `akoya_request` (which grant request was processed)
-Both written by `execute-prompt.js` `writeRunRow()`. Migration plans touching either entity must preserve these foreign keys.
+The prompt link is always written for governed prompt execution; the request
+link is caller-supplied and must be passed by request-bound producers.
+Migration plans touching either entity must preserve these foreign keys.
 
 **Migration disposition:** stays in Dataverse. No Postgres counterpart. Dynamics Explorer treats `wmkf_ai_run` as an operational log, not business data: `pages/api/dynamics-explorer/chat.js` denies direct schema requests for the table and strips `wmkf_ai_run` hits from Dataverse Search results before tool output reaches Claude.
 
@@ -72,9 +79,12 @@ Both written by `execute-prompt.js` `writeRunRow()`. Migration plans touching ei
   system/body/variables/output schema and hash-only raw-output retention. A
   repeat dry-run refused to overwrite the existing name, confirming the
   version-history guard. The production entity held 20 prompt rows after this
-  seed. A fresh lookup-scoped count probe found 0 `wmkf_ai_run` rows linked to
-  this prompt. The prompt and application are live, but the controlled
-  dummy-request artifact pilot remains a separate gate.
+  seed. The controlled Request `1002788` pilot created completed run
+  `b7ae9b17-628c-f111-ab0f-000d3a31c468` against this prompt with
+  `claude-sonnet-5`. Its `wmkf_ai_request` lookup is null because the Initial
+  Assessment producer omitted `requestId` from `executePrompt()`; the registry
+  still links the exact run to the exact request artifact. This is a verified
+  lineage defect, not a claim that the run belongs to no request.
 - **`review-synthesis.generate` production publication (2026-07-26):** the
   authenticated superuser admin route published current v2
   `7423049a-3f89-f111-ab0f-7ced8d3d15a6` and retired v1

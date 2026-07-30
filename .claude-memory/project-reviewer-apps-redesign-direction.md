@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has seven implemented tabs and three placeholders; Initial Assessment production schema, prompt v1, and application are live while the controlled artifact pilot remains pending, and the full Editor Dashboard remains planned.
+description: The unified Request Workbench has seven implemented tabs and three placeholders; the Request 1002788 Initial Assessment pilot proved generation, shared discovery, and exact retry while recovery and lineage defects remain, and the full Editor Dashboard remains planned.
 metadata:
   type: project
   status: active
@@ -48,7 +48,10 @@ draft-functional proof, not production readiness, and does not require the
 later lifecycle tabs. The owner chose a controlled production rehearsal using
 colleague-created representative dummy requests rather than building the
 existing Dataverse sandbox organization into an integrated application/file
-test environment. Dummy request IDs/content shape, named testers, and schedule
+test environment. Request `1002788` became the authorized target. Generation,
+registry/pointer lineage, both consumer surfaces, native SharePoint version
+creation, and exact-input retry passed on 2026-07-30. Recovery hashing, the
+AI-run request lookup, substantive human editing, and target-library controls
 remain open.
 Use the near-term execution plan for current authority; the chronology below
 remains the rationale record.
@@ -117,7 +120,7 @@ planned. Current authority is
   Assessment, Reviewers, Reviews, Status, Awardee) and three placeholders (Pre
   Site Visit Writeup, Site Visit, Final Writeup). Initial Assessment production
   registry/pointer schema, governed prompt v1, and application are live and
-  verified; the human artifact pilot remains pending.
+  verified; the Request `1002788` human artifact pilot is a partial pass.
 - Reviews is built and production-proved: governed-v3 structured output
   persisted successfully, the automatic all-in drain is enabled, and its
   producer/persistence/consumer lifecycle completed a controlled production
@@ -127,9 +130,11 @@ planned. Current authority is
 - The proposed writeup URL fields and `writeup.*` prompt rows remain absent.
   Their June design is historical input; the implemented pilot instead uses
   the production-provisioned `wmkf_requestdocument` registry and governed
-  `initial-assessment.generate` v1. Fresh production probes on 2026-07-30 found
-  zero registry rows and zero populated request pointers, so no artifact pilot
-  has yet occurred.
+  `initial-assessment.generate` v1. The controlled production rehearsal created
+  one Ready/Draft registry row, populated the request pointer, and proved both
+  consumers plus exact-input retry. It also exposed the pre-upload hash
+  mismatch against SharePoint-canonicalized DOCX bytes and a null AI-run
+  request lookup.
 - Reviewer Pool remains planned and optional, not a shipped Workbench-v1 deliverable.
 
 ## Historical decision chronology

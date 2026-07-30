@@ -135,17 +135,15 @@ index and workflow surface, not a second editor or document store.
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
 
-1. exercise the now-live governed-artifact application in a
-   human-in-the-loop, end-to-end Initial Assessment pilot by 2026-08-10, ahead
-   of proposal intake around 2026-08-18. The production registry/pointer schema
-   and governed prompt v1 were provisioned and verified 2026-07-30; no artifact
-   exists yet. The owner chose a controlled
-   production rehearsal with colleague-created representative dummy requests
-   instead of building the existing Dataverse sandbox organization into an
-   integrated application/file test environment. Authorized staff must inspect
-   and edit the canonical SharePoint Word artifact, find and open the same
-   registered file from both the Workbench and cycle-wide pilot locator,
-   and exercise one safe failure/retry path;
+1. close the partially successful human-in-the-loop Initial Assessment pilot
+   by 2026-08-10, ahead of proposal intake around 2026-08-18. The controlled
+   Request `1002788` rehearsal generated and registered the canonical
+   SharePoint artifact, exposed that same item in Workbench and the cycle
+   locator, created native version history, and proved exact-input no-duplicate
+   retry. It also exposed a pre-upload-versus-canonical SharePoint hash defect
+   in interrupted-finalization recovery and a missing AI-run request lookup.
+   Correct those defects, exercise recovery, complete substantive staff
+   editing, and verify target-library protections;
 2. finish the user/input/storage/access/deadline contract for the remaining
    Workbench lifecycle tabs, including the three-document writeup lineage,
    Site Visit dossier, narrow request-scoped applicant-material upload, and

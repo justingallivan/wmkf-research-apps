@@ -56,9 +56,10 @@ Governed artifact pointers:
   `wmkf_requestdocument`; relationship
   `wmkf_request_currentinitialassessment`) — **LIVE in Production 2026-07-30
   via Wave 16 apply and idempotent metadata readback.** This is the canonical
-  Initial Assessment pointer and shared request-level ETag fence. A fresh
-  production count probe found 0 populated pointers before application
-  promotion and the controlled pilot.
+  Initial Assessment pointer and shared request-level ETag fence. The
+  controlled production pilot populated it for Request `1002788` with registry
+  row `fb995f0f-628c-f111-ab0f-6045bd018a07`; exact-input retry preserved that
+  same pointer and row.
 
 WMKF AI writeback fields (canonical: `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` — v2 is archived, do not use):
 - `wmkf_ai_summary` (Memo) — Phase I summary text. **Field Set A: ready, live writeback active.**

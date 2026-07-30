@@ -3,7 +3,7 @@ title: "Request Workbench — near-term execution plan"
 domain: architecture
 kind: plan
 status: canonical
-summary: "Review synthesis lifecycle is production-proved with automation enabled; the next sequence is the remaining Workbench lifecycle design freeze."
+summary: "Initial Assessment pilot partially passed; recovery hashing, run linkage, substantive editing, and library controls remain."
 canonical: true
 cataloged: 2026-07-26
 last_verified: 2026-07-30
@@ -34,7 +34,9 @@ The first fixed owner deadline is **2026-08-10**: the shared governed-artifact
 foundation and the J27 Initial Assessment must work end to end in draft form,
 ahead of proposal intake beginning around **2026-08-18**.
 
-The August 10 acceptance path is a real human-in-the-loop pilot:
+The August 10 acceptance path is a real human-in-the-loop pilot. On
+2026-07-30, Request `1002788` completed steps 1–4 and 6 below, proved
+exact-input no-duplicate retry, and created native SharePoint version history:
 
 1. authorized staff starts Initial Assessment generation for a dedicated
    representative dummy production request through the intended Workbench
@@ -56,10 +58,13 @@ The pilot must use representative source data and human review, not route
 mocks or UI-only placeholders. The owner decided 2026-07-29 to use a
 controlled production rehearsal with colleague-created dummy requests rather
 than build the existing Dataverse sandbox organization into an integrated
-application/file test environment. It must also exercise one safe
-failure/retry path and prove that no success is reported before the SharePoint
-artifact and Dataverse registry agree. The production dummy request IDs and
-content shape, exact named testers, and schedule remain to be assigned.
+application/file test environment. Request `1002788` became the authorized
+pilot target. Its same-input retry passed, but the intended post-upload
+recovery path is not yet safe: SharePoint canonicalized the DOCX package, so
+the downloaded version did not match the producer's pre-upload hash. The
+linked Executor run also has a null request lookup because the producer omitted
+`requestId`. These defects, a substantive staff edit, and the target-library
+protection checks remain required before the pilot is complete.
 Passing this draft-functional gate is not a broad production-readiness claim
 and does not require the later Pre-Site, Site Visit, or Final slices to be
 built by August 10.
@@ -206,9 +211,9 @@ Board-ready freeze remains a separate owner-controlled milestone.
 ### Initial Assessment source and first-template contract
 
 **[VERIFIED 2026-07-30 via four owner-supplied D26 Phase I Word examples,
-current source, production Dataverse apply/readback probes, and owner
-acceptance; production schema, governed prompt v1, and application LIVE;
-controlled pilot pending.]**
+current source, production Dataverse/Graph readback, and signed-in Workbench
+checks; production schema, governed prompt v1, and application LIVE; controlled
+pilot PARTIAL.]**
 The D26 examples provide the starting content contract for the J27
 Initial Assessment. Each is a one-page Word document with this sequence:
 
@@ -672,7 +677,10 @@ Explicit non-goals during design freeze:
 > overflow storage and then blocks further generation), canonical-file
 > visibility during a failed replacement, false-success prevention after a
 > post-upload registry failure, and
-> content-hash recovery without a second AI call when bytes match, and
+> intended content-hash recovery without a second AI call. The 2026-07-30
+> pilot showed that the current pre-upload hash cannot match SharePoint's
+> canonicalized DOCX bytes, so this branch remains blocked pending a
+> canonical post-upload hash contract, and
 > fresh-filename regeneration while retaining mismatched-item identity when
 > they do not. **[VERIFIED 2026-07-30]** The complete Wave 16 entity,
 > relationships, alternate key, and request pointer are live in Production,
@@ -873,7 +881,10 @@ Owner-decided:
     `initial-assessment.generate` v1 were applied and independently read back;
     PR #102 then merged as `1e958ee0` and deployed Ready as
     `dpl_AxxroabhpXLX1pz75MW6486fB4ci`. Artifact generation remains the
-    separately controlled pilot gate.
+    separate controlled pilot gate. The 2026-07-30 Request `1002788` rehearsal
+    proved generation, shared consumers, and exact retry, while leaving
+    recovery hashing, run-request linkage, substantive editing, and
+    target-library controls open.
 
 Still required:
 

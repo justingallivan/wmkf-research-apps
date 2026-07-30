@@ -1,4 +1,4 @@
-# Session 388 Prompt: Resume the governed Initial Assessment pilot
+# Session 388 Prompt: Close the partial governed Initial Assessment pilot
 
 ## Session 387 Summary
 
@@ -96,10 +96,28 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    `akoya_request.wmkf_CurrentInitialAssessment` pointer. The create-only seed
    published `initial-assessment.generate` v1 at
    `fc8a4c3b-5e8c-f111-ab0f-7ced8d3d15a6`; a repeat dry-run refused overwrite.
-   Fresh production probes found 0 registry rows and 0 populated request
-   pointers and 0 AI runs linked to the new prompt. PR #102 subsequently merged
-   as `1e958ee0` and deployed Ready as
-   `dpl_AxxroabhpXLX1pz75MW6486fB4ci`; no SharePoint artifact has been created.
+   PR #102 subsequently merged as `1e958ee0` and deployed Ready as
+   `dpl_AxxroabhpXLX1pz75MW6486fB4ci`.
+
+9. **Controlled Initial Assessment pilot partially passed on Request `1002788`.**
+   Signed-in generation created Ready/Draft registry row
+   `fb995f0f-628c-f111-ab0f-6045bd018a07`, populated the canonical request
+   pointer, wrote SharePoint item `01G4GVMS77A2SBVPGA4VFINZFWAFIZGVFG`,
+   and recorded completed AI run
+   `b7ae9b17-628c-f111-ab0f-000d3a31c468`. The per-request Workbench and
+   cycle-wide locator opened the same item. A same-input UI retry preserved
+   the one row/run/item, timestamps, and attempt count, proving no duplicate,
+   overwrite, upload, or second model call. Opening the Word file created
+   SharePoint version `2.0`.
+
+   The pilot also exposed two defects. SharePoint repacked the uploaded DOCX,
+   so canonical version `1.0` did not match the registry's pre-upload hash;
+   `recoverUploadedFile()` would reject an untouched upload. The producer also
+   omitted `requestId` from `executePrompt()`, leaving the exact run's
+   `wmkf_ai_request` lookup null. Visible v1/v2 text was semantically unchanged
+   and Foundation Opportunity still required staff input, so substantive human
+   editing is not yet proven. Durable evidence:
+   `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`.
 
 ### Commits
 
@@ -120,21 +138,13 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
 
 ### Verified Open
 
-1. **Run the controlled governed Initial Assessment artifact pilot.**
-   Evidence: `codex/initial-assessment-pilot-recovery` contains the two recovered pilot
-   commits plus current documentation and contract reconciliation. A fresh independent
-   adversarial review found and drove fixes for finalize ambiguity, canonical-pointer
-   multiplicity/lifecycle, cleanup overflow/races, UI refresh sequencing, prompt boundary
-   drift, route-body closure, pagination, and run provenance; its final verdict is READY.
-   The full unit/integration suite passes (544 suites / 6,553 tests), the production build
-   passes, lint has 0 errors (51 existing warnings), and relevant contract, Atlas, route,
-   prompt, Dataverse, documentation, memory, and type gates pass. The complete
-   Production schema and governed prompt v1 are live and verified. PR #102
-   passed all seven checks, merged as `1e958ee0`, and deployed Ready as
-   `dpl_AxxroabhpXLX1pz75MW6486fB4ci`. The production aliases fail closed to
-   sign-in when unauthenticated, and the initial error-log scan was clean. No
-   artifact has been generated; the remaining gate is the designated
-   dummy-request/tester rehearsal below.
+1. **Close the partial governed Initial Assessment artifact pilot.**
+   Correct the producer/canonical hash contract, pass the request GUID into the
+   Executor, and exercise the interrupted-finalization recovery branch. Then
+   complete a substantive authorized staff edit—including Foundation
+   Opportunity—and verify the saved version through both consumers. Finish
+   target-library restore, recycle-bin, retention, permission, and milestone
+   checks before describing the artifact system as production-ready.
 
 2. **Exercise address attestation only when a truthful eligible production row exists.**
    Evidence: the signed-in Workbench inspection covered requests `1002912` and `1002874`.
@@ -149,14 +159,7 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
 
 ### Owner Decision Needed
 
-1. **Production dummy request IDs, human testers, and exact schedule.**
-   Evidence: `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
-   The intended path is an owner-approved controlled production rehearsal after
-   colleagues create representative dummy requests. Building an integrated
-   Dataverse sandbox environment is out of scope. These remaining inputs gate
-   the 2026-08-10 pilot; intake begins around 2026-08-18.
-
-2. **Artifact registry and SharePoint target-library controls.**
+1. **Artifact registry and SharePoint target-library controls.**
    Evidence: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
    The pilot registry schema and governed prompt v1 are live in Production; the
    application, applicant-title (`akoya_title`) source, and staff-authored
@@ -168,12 +171,12 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    the extracted Project Description content rather than binding a governed source
    artifact/version; decide whether that stronger lineage is required before rehearsal.
 
-3. **Re-key the 12 `candidate:`-keyed saved rows that carry a suggestion anchor.**
+2. **Re-key the 12 `candidate:`-keyed saved rows that carry a suggestion anchor.**
    Evidence: S387 probe — they are `saved`, so there is no live dead-end; left untouched.
    Re-keying would make `savedKeys` count them. Cosmetic until someone re-opens those
    requests.
 
-4. **The 3 person rows with `wmkf_emailsource='database'`.**
+3. **The 3 person rows with `wmkf_emailsource='database'`.**
    Evidence: S387 probe of 385 person rows. An unrecognized source: `emailConfidence`
    classifies it `quick_check`, `emailSourceTier` gives it no precedence claim. Decide
    whether `database` is a real source to classify or a value to retire.
