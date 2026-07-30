@@ -1,0 +1,274 @@
+{
+  "artifactType": "reviewer_promotion_repair_classifier_v1",
+  "dryRun": true,
+  "observedAt": "2026-07-30T03:58:23.704Z",
+  "rows": [
+    {
+      "classification": "U",
+      "contactEvidence": {
+        "affiliationPersistAllowed": false,
+        "assertedEmailPresent": false,
+        "decision": "needs_identity_confirmation",
+        "emailPersistAllowed": false,
+        "emailSource": null,
+        "reason": "identity_not_resolved",
+        "websitePersistAllowed": false
+      },
+      "exactEmailOwners": [],
+      "personEtag": "W/\"88509462\"",
+      "personId": "75d0ff06-e37e-f111-ab0e-000d3a3236d2",
+      "proposedAction": "staff_identity_review",
+      "reasons": [
+        "contact_projection_needs_identity_confirmation"
+      ],
+      "references": {
+        "applicantSlotCount": 0,
+        "contactLinked": false,
+        "engagedSuggestionCount": 0,
+        "otherReferenceCount": 0,
+        "scanComplete": true,
+        "suggestionCount": 1
+      },
+      "requestId": "68520e1d-6042-f111-88b4-000d3a306da2",
+      "requestNumber": "1002833",
+      "rosterCandidateKey": null,
+      "rosterUpdatedAt": null,
+      "suggestionEtag": "W/\"88509466\"",
+      "suggestionId": "38f15307-e37e-f111-ab0e-000d3a32b07f"
+    },
+    {
+      "classification": "U",
+      "contactEvidence": {
+        "affiliationPersistAllowed": false,
+        "assertedEmailPresent": false,
+        "decision": "needs_identity_confirmation",
+        "emailPersistAllowed": false,
+        "emailSource": null,
+        "reason": "identity_not_resolved",
+        "websitePersistAllowed": false
+      },
+      "exactEmailOwners": [],
+      "personEtag": "W/\"87029259\"",
+      "personId": "a840c313-d770-f111-ab0d-000d3a306da2",
+      "proposedAction": "staff_identity_review",
+      "reasons": [
+        "contact_projection_needs_identity_confirmation"
+      ],
+      "references": {
+        "applicantSlotCount": 0,
+        "contactLinked": false,
+        "engagedSuggestionCount": 0,
+        "otherReferenceCount": 0,
+        "scanComplete": true,
+        "suggestionCount": 1
+      },
+      "requestId": "a7505178-7742-f111-88b5-000d3a3065b8",
+      "requestNumber": "1002835",
+      "rosterCandidateKey": null,
+      "rosterUpdatedAt": null,
+      "suggestionEtag": "W/\"88610709\"",
+      "suggestionId": "f4a2bd14-d770-f111-ab0d-000d3a3065b8"
+    },
+    {
+      "classification": "U",
+      "contactEvidence": {
+        "affiliationPersistAllowed": false,
+        "assertedEmailPresent": false,
+        "decision": "needs_identity_confirmation",
+        "emailPersistAllowed": false,
+        "emailSource": null,
+        "reason": "identity_not_resolved",
+        "websitePersistAllowed": false
+      },
+      "exactEmailOwners": [],
+      "personEtag": "W/\"87028562\"",
+      "personId": "dad53109-b870-f111-ab0d-000d3a306d45",
+      "proposedAction": "staff_identity_review",
+      "reasons": [
+        "contact_projection_needs_identity_confirmation"
+      ],
+      "references": {
+        "applicantSlotCount": 0,
+        "contactLinked": false,
+        "engagedSuggestionCount": 0,
+        "otherReferenceCount": 0,
+        "scanComplete": true,
+        "suggestionCount": 1
+      },
+      "requestId": "e9fc9101-0944-f111-88b5-000d3a3065b8",
+      "requestNumber": "1002860",
+      "rosterCandidateKey": null,
+      "rosterUpdatedAt": null,
+      "suggestionEtag": "W/\"86366736\"",
+      "suggestionId": "bacbd409-b870-f111-ab0d-6045bd080f57"
+    },
+    {
+      "classification": "U",
+      "contactEvidence": {
+        "affiliationPersistAllowed": true,
+        "assertedEmailPresent": false,
+        "decision": "needs_identity_confirmation",
+        "emailPersistAllowed": true,
+        "emailSource": null,
+        "reason": "identity_not_resolved",
+        "websitePersistAllowed": false
+      },
+      "exactEmailOwners": [],
+      "personEtag": "W/\"91074966\"",
+      "personId": "971e9669-a68b-f111-ab0f-000d3a31cc6b",
+      "proposedAction": "staff_identity_review",
+      "reasons": [
+        "contact_projection_needs_identity_confirmation"
+      ],
+      "references": {
+        "applicantSlotCount": 0,
+        "contactLinked": false,
+        "engagedSuggestionCount": 0,
+        "otherReferenceCount": 0,
+        "scanComplete": true,
+        "suggestionCount": 1
+      },
+      "requestId": "078498df-ce44-f111-88b4-000d3a306da2",
+      "requestNumber": "1002912",
+      "rosterCandidateKey": "candidate:rotem%20sorek|email:-|orcid:-|affiliation:department%20of%20molecular%20genetics%2C%20weizmann%20institute%20of%20science%2C%20rehovot%2C%207610001%2C%20israel.",
+      "rosterUpdatedAt": "2026-07-29 23:37:21.830621+00",
+      "suggestionEtag": "W/\"91074973\"",
+      "suggestionId": "522d186b-a68b-f111-ab0f-70a8a59cded0"
+    },
+    {
+      "classification": "U",
+      "contactEvidence": {
+        "affiliationPersistAllowed": true,
+        "assertedEmailPresent": false,
+        "decision": "needs_identity_confirmation",
+        "emailPersistAllowed": true,
+        "emailSource": null,
+        "reason": "identity_not_resolved",
+        "websitePersistAllowed": false
+      },
+      "exactEmailOwners": [],
+      "personEtag": "W/\"91074999\"",
+      "personId": "ced1f76c-a68b-f111-ab0f-6045bd018a07",
+      "proposedAction": "staff_identity_review",
+      "reasons": [
+        "contact_projection_needs_identity_confirmation"
+      ],
+      "references": {
+        "applicantSlotCount": 0,
+        "contactLinked": false,
+        "engagedSuggestionCount": 0,
+        "otherReferenceCount": 0,
+        "scanComplete": true,
+        "suggestionCount": 1
+      },
+      "requestId": "078498df-ce44-f111-88b4-000d3a306da2",
+      "requestNumber": "1002912",
+      "rosterCandidateKey": "candidate:brenda%20schulman|email:-|orcid:-|affiliation:department%20of%20molecular%20machines%20and%20signaling%2C%20max%20planck%20institute%20of%20biochemistry%2C%20martinsried%2C%20germany.%20schulman%40biochem.mpg.de.",
+      "rosterUpdatedAt": "2026-07-29 23:37:21.895453+00",
+      "suggestionEtag": "W/\"91075000\"",
+      "suggestionId": "b01e9669-a68b-f111-ab0f-000d3a31cc6b"
+    },
+    {
+      "classification": "U",
+      "contactEvidence": {
+        "affiliationPersistAllowed": false,
+        "assertedEmailPresent": false,
+        "decision": "needs_identity_confirmation",
+        "emailPersistAllowed": false,
+        "emailSource": null,
+        "reason": "identity_not_resolved",
+        "websitePersistAllowed": false
+      },
+      "exactEmailOwners": [],
+      "personEtag": "W/\"87230766\"",
+      "personId": "8f04a421-5976-f111-ab0f-000d3a306da2",
+      "proposedAction": "staff_identity_review",
+      "reasons": [
+        "contact_projection_needs_identity_confirmation"
+      ],
+      "references": {
+        "applicantSlotCount": 0,
+        "contactLinked": false,
+        "engagedSuggestionCount": 0,
+        "otherReferenceCount": 0,
+        "scanComplete": true,
+        "suggestionCount": 1
+      },
+      "requestId": "f17ce1a8-d344-f111-88b5-000d3a3064b7",
+      "requestNumber": "1002926",
+      "rosterCandidateKey": null,
+      "rosterUpdatedAt": null,
+      "suggestionEtag": "W/\"87230770\"",
+      "suggestionId": "9704a421-5976-f111-ab0f-000d3a306da2"
+    },
+    {
+      "classification": "U",
+      "contactEvidence": {
+        "affiliationPersistAllowed": true,
+        "assertedEmailPresent": false,
+        "decision": "needs_identity_confirmation",
+        "emailPersistAllowed": true,
+        "emailSource": null,
+        "reason": "identity_not_resolved",
+        "websitePersistAllowed": true
+      },
+      "exactEmailOwners": [],
+      "personEtag": "W/\"87027903\"",
+      "personId": "fa3558f2-1874-f111-ab0f-000d3a3065b8",
+      "proposedAction": "staff_identity_review",
+      "reasons": [
+        "contact_projection_needs_identity_confirmation"
+      ],
+      "references": {
+        "applicantSlotCount": 0,
+        "contactLinked": false,
+        "engagedSuggestionCount": 0,
+        "otherReferenceCount": 0,
+        "scanComplete": true,
+        "suggestionCount": 1
+      },
+      "requestId": "8a0efbb3-8d45-f111-88b4-000d3a306da2",
+      "requestNumber": "1003020",
+      "rosterCandidateKey": "suggestion:da0eaaf5-1874-f111-ab0f-000d3a306da2",
+      "rosterUpdatedAt": "2026-07-29 20:03:45.372851+00",
+      "suggestionEtag": "W/\"86818635\"",
+      "suggestionId": "da0eaaf5-1874-f111-ab0f-000d3a306da2"
+    },
+    {
+      "classification": "U",
+      "contactEvidence": {
+        "affiliationPersistAllowed": true,
+        "assertedEmailPresent": false,
+        "decision": "missing_email",
+        "emailPersistAllowed": false,
+        "emailSource": null,
+        "reason": "email_missing",
+        "websitePersistAllowed": true
+      },
+      "exactEmailOwners": [],
+      "personEtag": "W/\"88419226\"",
+      "personId": "63c6730d-5a7d-f111-ab0f-000d3a306da2",
+      "proposedAction": "staff_identity_review",
+      "reasons": [
+        "contact_projection_missing_email"
+      ],
+      "references": {
+        "applicantSlotCount": 0,
+        "contactLinked": false,
+        "engagedSuggestionCount": 0,
+        "otherReferenceCount": 0,
+        "scanComplete": true,
+        "suggestionCount": 1
+      },
+      "requestId": "caf12b83-9a45-f111-88b4-6045bd0261cd",
+      "requestNumber": "1003038",
+      "rosterCandidateKey": "suggestion:7bc6730d-5a7d-f111-ab0f-000d3a306da2",
+      "rosterUpdatedAt": "2026-07-29 20:03:46.755721+00",
+      "suggestionEtag": "W/\"88419230\"",
+      "suggestionId": "7bc6730d-5a7d-f111-ab0f-000d3a306da2"
+    }
+  ],
+  "schemaVersion": 1,
+  "sourceCommit": "150105abb44ae919d1d92025baa4b34c58b0d88a",
+  "manifestHash": "55170e8d7e28dcb3f9df553e7af2cdfeba0eb626f3361d1efcbdaf227cc1e1b3"
+}

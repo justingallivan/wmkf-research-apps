@@ -23,10 +23,13 @@ related:
 
 > **Status: IMPLEMENTED AND LOCALLY VERIFIED ON
 > `codex/reviewer-promotion-remediation`; NOT DEPLOYED.** The forward-path
-> implementation and read-only classifier are built. Migration 029 has not
-> been applied and no production repair is authorized. Every production repair
-> still requires an explicit reviewed allowlist and separate execute
-> authorization.
+> implementation is built. The production classifier was run read-only on
+> 2026-07-29 and produced
+> `docs/audits/reviewer-promotion-repair-manifest-2026-07-29.json`; all eight
+> rows classified `U`, so there is no authorized automatic repair set.
+> Migration 029 has not been applied and no production repair is authorized.
+> Every production repair still requires an explicit reviewed allowlist and
+> separate execute authorization.
 
 ## Evidence labels
 
@@ -351,7 +354,7 @@ without classifying populated legacy rows would fail closed on those rows.
 | Exact-email reuse/race/compensation | Implemented | Potential-reviewer, suggestion-race, save compensation, and alert tests |
 | Shared-person monotonicity + explicit contact clear | Implemented | Identity sticky/conflict and my-candidates clear/ETag tests |
 | Merge repair ETag prerequisite | Implemented | Person, suggestion, and applicant-slot missing/stale ETag tests |
-| Read-only repair classifier | Implemented; not run against production in this change | Pure classifier/manifest tests and script syntax check |
+| Read-only repair classifier | Implemented and run against production read-only on 2026-07-29 | Eight `U` rows; manifest hash `55170e8d7e28c...`; pure classifier/manifest tests and script syntax check |
 | Migration 029 / production deployment / repair execution | Not performed | Requires deliberate release and separate repair authorization |
 
 The final focused local regression run on 2026-07-29 passed 20 suites and 497
@@ -364,8 +367,8 @@ gates passed; gate self-tests passed where defined.
 
 ### Phase 0 — Freeze the contract with tests and a read-only classifier
 
-**Source status:** complete except for the intentionally deferred live
-production manifest and baseline counters.
+**Source status:** complete. The production read-only manifest was captured on
+2026-07-29; aggregate rollout counters remain follow-up observability work.
 
 1. Add complement tests for the contradictory envelope seen in request
    `1002912`: top-level verified/selectable signals plus nested unresolved
@@ -431,9 +434,9 @@ full legacy binding-writer adoption remains a separate classification task.
 
 ### Phase 4 — Production repair after forward fix
 
-**Operational status:** not started. The merge ETag prerequisite is complete in
-source; Preview/production deployment, live classification, review, and any
-execution remain separately authorized work.
+**Operational status:** classification complete; repair not authorized. The
+merge ETag prerequisite is complete in source. Preview/production deployment
+and any repair execution remain separately authorized work.
 
 1. Deploy and smoke the forward fix in Preview with email capture/no live send.
 2. Run the production classifier read-only and save its hash-stable manifest.
