@@ -348,6 +348,7 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md](REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md) | audit | active |  | Reviewer analyze now sources request metadata from Dataverse and normalizes program-area writes instead of trusting LLM metadata extraction. | 2026-07-02 |
+| [REVIEWER_CANDIDATE_PROMOTION_REMEDIATION_PLAN.md](REVIEWER_CANDIDATE_PROMOTION_REMEDIATION_PLAN.md) | plan | active |  | Prevent silent contact withholding, duplicate person creation, and cross-request identity downgrades when Find candidates are promoted to Invite. | 2026-07-29 |
 | [REVIEWER_EMAIL_PERSIST_FIX_PLAN.md](REVIEWER_EMAIL_PERSIST_FIX_PLAN.md) | plan | historical |  | Shipped reviewer email-persist fixes; remaining follow-ups are closed-deprecated. | 2026-07-02 |
 | [REVIEWER_GATING_STRATEGY_REDESIGN.md](REVIEWER_GATING_STRATEGY_REDESIGN.md) | spec | active |  | Per-gate over-gating verdict + redesign recovering or surfacing all 5 Cause #2 email misses without opening a wrong-person send path. | 2026-07-03 |
 | [REVIEWER_GATING_STRATEGY_REVIEW_PROMPT.md](REVIEWER_GATING_STRATEGY_REVIEW_PROMPT.md) | draft | active |  | Brief for a fresh reviewing LLM: assess whether reviewer-finder fail-closed gates over-gate or fire at the wrong stage/input, and produce a redesign doc. | 2026-07-03 |
