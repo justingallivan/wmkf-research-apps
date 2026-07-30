@@ -50,6 +50,7 @@ const vettedCandidate = (over = {}) => ({
   email: 'ava.mercer@example.org',
   emailSource: 'claude_search',
   emailPersistAllowed: true,
+  identityStatus: 'probable',
   ...over,
 });
 

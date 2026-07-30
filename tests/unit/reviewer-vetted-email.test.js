@@ -9,22 +9,49 @@
 const { pickVettedEmail } = require('../../lib/utils/reviewer-vetted-email');
 
 test('returns email + vetted source for a persistable, resolved candidate', () => {
-  expect(pickVettedEmail({ email: 'ava.mercer@example.org', emailSource: 'claude_search', emailPersistAllowed: true }))
+  expect(pickVettedEmail({
+    email: 'ava.mercer@example.org',
+    emailSource: 'claude_search',
+    emailPersistAllowed: true,
+    identityStatus: 'probable',
+  }))
     .toEqual({ email: 'ava.mercer@example.org', source: 'claude_search' });
 });
 
 test('reads email/flags from contactEnrichment when top-level is absent', () => {
-  expect(pickVettedEmail({ contactEnrichment: { email: 'fixture@example.org', emailSource: 'affiliation', emailPersistAllowed: true } }))
+  expect(pickVettedEmail({
+    contactEnrichment: {
+      email: 'fixture@example.org',
+      emailSource: 'affiliation',
+      emailPersistAllowed: true,
+      identity: { status: 'confirmed' },
+    },
+  }))
     .toEqual({ email: 'fixture@example.org', source: 'affiliation' });
 });
 
 test('null when not persistable (emailPersistAllowed !== true)', () => {
-  expect(pickVettedEmail({ email: 'fixture@example.org', emailSource: 'serp_search', emailPersistAllowed: false })).toBeNull();
+  expect(pickVettedEmail({
+    email: 'fixture@example.org',
+    emailSource: 'serp_search',
+    emailPersistAllowed: false,
+    identityStatus: 'probable',
+  })).toBeNull();
 });
 
 test('null when identity is unresolved even if persistable', () => {
-  expect(pickVettedEmail({ email: 'fixture@example.org', emailPersistAllowed: true, needsIdentification: true })).toBeNull();
-  expect(pickVettedEmail({ email: 'fixture@example.org', emailPersistAllowed: true, identityStatus: 'unresolved' })).toBeNull();
+  expect(pickVettedEmail({
+    email: 'fixture@example.org',
+    emailSource: 'serp_search',
+    emailPersistAllowed: true,
+    needsIdentification: true,
+  })).toBeNull();
+  expect(pickVettedEmail({
+    email: 'fixture@example.org',
+    emailSource: 'serp_search',
+    emailPersistAllowed: true,
+    identityStatus: 'unresolved',
+  })).toBeNull();
 });
 
 test('null for no email / bad input', () => {
@@ -45,11 +72,21 @@ describe('anti-scrape munge rejection', () => {
   ];
   for (const email of cases) {
     test(`rejects ${email} even when enrichment blessed it`, () => {
-      expect(pickVettedEmail({ email, emailSource: 'serp_search', emailPersistAllowed: true })).toBeNull();
+      expect(pickVettedEmail({
+        email,
+        emailSource: 'serp_search',
+        emailPersistAllowed: true,
+        identityStatus: 'probable',
+      })).toBeNull();
     });
   }
   test('does NOT reject a legitimate address', () => {
-    expect(pickVettedEmail({ email: 'ava.mercer@example.org', emailSource: 'affiliation', emailPersistAllowed: true }))
+    expect(pickVettedEmail({
+      email: 'ava.mercer@example.org',
+      emailSource: 'affiliation',
+      emailPersistAllowed: true,
+      identityStatus: 'probable',
+    }))
       .toEqual({ email: 'ava.mercer@example.org', source: 'affiliation' });
   });
 });

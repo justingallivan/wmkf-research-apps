@@ -182,7 +182,14 @@ describe('referred provenance (S249)', () => {
 // group test read three of the server gate's four clauses. These lock the two clauses that
 // were missing, and lock the group ↔ server-gate equivalence itself.
 describe('applicant identity gate parity with promote-applicant-reviewer', () => {
-  const applicant = (extra) => ({ name: 'Applicant Pick', isApplicantRecommended: true, ...extra });
+  const applicant = (extra) => ({
+    name: 'Applicant Pick',
+    email: 'applicant.pick@example.edu',
+    emailSource: 'applicant_form',
+    emailPersistAllowed: true,
+    isApplicantRecommended: true,
+    ...extra,
+  });
 
   test('institutionMismatch routes an applicant row to needs identity review', () => {
     const candidate = applicant({ institutionMismatch: true });
@@ -224,7 +231,7 @@ describe('applicant identity gate parity with promote-applicant-reviewer', () =>
 
   // The defect was a selectable card the server refuses. Assert the equivalence over the
   // whole flag cross-product, so re-adding a clause to one side alone fails here.
-  test('no applicant row is selectable while the server gate would refuse it', () => {
+  test('applicant selectability requires both server identity clearance and resolved contact identity', () => {
     const values = [undefined, true, false];
     const statuses = [null, 'confirmed', 'probable', 'unresolved', 'ambiguous', 'abstain'];
     for (const needsIdentification of values) {
@@ -235,7 +242,8 @@ describe('applicant identity gate parity with promote-applicant-reviewer', () =>
               needsIdentification, institutionMismatch, identityStatus, verificationStatus,
             });
             const serverWouldRefuse = requiresStaffIdentityConfirmation(candidate);
-            expect(isCandidateSelectable(candidate)).toBe(!serverWouldRefuse);
+            const contactIdentityResolved = identityStatus === 'confirmed' || identityStatus === 'probable';
+            expect(isCandidateSelectable(candidate)).toBe(!serverWouldRefuse && contactIdentityResolved);
           }
         }
       }

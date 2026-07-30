@@ -15,6 +15,15 @@ jest.mock('../../lib/services/dynamics-context', () => ({
 
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   findCandidateBySuggestion: jest.fn(async () => null),
+  finalizeCandidatePromotion: jest.fn(async (_requestId, candidate) => ({
+    saved: true,
+    candidateKey: candidate.candidateKey,
+  })),
+}));
+
+jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
+  getById: jest.fn(async () => ({ wmkf_emailaddress: 'applicant@example.edu' })),
+  update: jest.fn(async () => undefined),
 }));
 
 const findById = jest.fn();
@@ -54,10 +63,15 @@ beforeEach(() => {
   findById.mockResolvedValue({
     wmkf_appreviewersuggestionid: SUGGESTION_ID,
     _wmkf_request_value: REQUEST_ID,
+    _wmkf_potentialreviewer_value: 'potential-reviewer-1',
     wmkf_applicantdisposition: 100000000,
   });
   findCandidateBySuggestion.mockResolvedValue({
     suggestionId: SUGGESTION_ID,
+    candidateKey: `suggestion:${SUGGESTION_ID}`,
+    email: 'applicant@example.edu',
+    emailSource: 'applicant_form',
+    emailPersistAllowed: true,
     identityStatus: 'probable',
     needsIdentification: false,
   });
@@ -129,9 +143,15 @@ it('selects the existing applicant-recommended row', async () => {
   await handler(post({ requestId: REQUEST_ID, suggestionId: SUGGESTION_ID }), r);
 
   expect(r.statusCode).toBe(200);
-  // S306: the response now carries the contact partial-success contract. With no
-  // `contact` payload nothing is written, so it's an empty/clean result.
-  expect(r.body).toEqual({ success: true, suggestionId: SUGGESTION_ID, savedFields: [], partialSuccess: false, contactError: null });
+  expect(r.body).toEqual({
+    success: true,
+    suggestionId: SUGGESTION_ID,
+    candidateKey: `suggestion:${SUGGESTION_ID}`,
+    savedFields: [],
+    rosterFinalized: true,
+    partialSuccess: false,
+    contactError: null,
+  });
   expect(updateLifecycle).toHaveBeenCalledWith(
     SUGGESTION_ID,
     { selected: true },

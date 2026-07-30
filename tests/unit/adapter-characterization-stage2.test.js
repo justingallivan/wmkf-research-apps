@@ -23,7 +23,7 @@ const CONTACT_SELECT =
   'contactid,firstname,lastname,fullname,emailaddress1,wmkf_orcid,statecode';
 const PR_SELECT =
   'wmkf_potentialreviewersid,wmkf_name,wmkf_firstname,wmkf_lastname,wmkf_emailaddress,' +
-  'wmkf_orcid,wmkf_organizationname,wmkf_primaryaffiliation,wmkf_areaofexpertise,' +
+  'wmkf_emailsource,wmkf_orcid,wmkf_organizationname,wmkf_primaryaffiliation,wmkf_areaofexpertise,' +
   'wmkf_whyreviewerwaschosen,wmkf_academicrank,wmkf_primarydepartment,wmkf_maininstitution,' +
   '_wmkf_contact_value,statecode';
 
@@ -101,16 +101,19 @@ describe('contact.normalizeEmail (characterization)', () => {
 // ──────────────────── potential-reviewer ────────────────────
 
 describe('potential-reviewer.getByEmail (characterization)', () => {
-  test('golden: queries top:1 with quoted email filter, returns records[0]', async () => {
+  test('golden: queries two possible owners, verifies exact email, returns the unique row', async () => {
     const q = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
-      records: [{ wmkf_potentialreviewersid: GUID_A }],
+      records: [{ wmkf_potentialreviewersid: GUID_A, wmkf_emailaddress: 'a@b.org' }],
     });
     const out = await pr.getByEmail('a@b.org');
-    expect(out).toEqual({ wmkf_potentialreviewersid: GUID_A });
+    expect(out).toEqual({
+      wmkf_potentialreviewersid: GUID_A,
+      wmkf_emailaddress: 'a@b.org',
+    });
     expect(q).toHaveBeenCalledWith('wmkf_potentialreviewerses', {
       select: PR_SELECT,
       filter: "wmkf_emailaddress eq 'a@b.org'",
-      top: 1,
+      top: 2,
     });
   });
   test('failure/edge: falsy email → null, no query', async () => {

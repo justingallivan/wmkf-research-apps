@@ -76,14 +76,23 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   recordSurfaced: jest.fn(async () => 1),
   findCandidateBySuggestion: jest.fn(async () => null),
   findEligibilityByCandidateKey: jest.fn(async () => null),
-  stampSuggestionAnchor: jest.fn(async () => ({ updated: 1 })),
   findIdentityConfirmation: jest.fn(async () => null),
+  finalizeCandidatePromotion: jest.fn(async (_requestId, candidate, anchors) => ({
+    saved: true,
+    candidateKey: anchors.candidateKey || candidate.candidateKey,
+  })),
+  markPromotionBlocked: jest.fn(async (_requestId, candidateKey) => ({
+    blocked: true,
+    candidateKey,
+  })),
 }));
 jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
-  verifyAutomatedIdentityAttestation: jest.fn(async (_token, { candidate } = {}) => ({
+  verifyAutomatedIdentityAttestation: jest.fn(async (token, { candidate } = {}) => ({
     valid: true,
     source: 'automated_resolver',
-    ...(candidate?.candidateKey ? { rosterCandidateKey: candidate.candidateKey } : {}),
+    identityDecisionBound: true,
+    contactAuthorityBound: true,
+    ...(token && candidate?.candidateKey ? { rosterCandidateKey: candidate.candidateKey } : {}),
   })),
 }));
 jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
@@ -127,10 +136,20 @@ function mockRes() {
 
 const enrichmentFor = (identity) => ({
   email: 'x@mit.edu', emailSource: 'orcid',
+  emailPersistAllowed: true,
   orcidId: '0000-0001', orcidUrl: 'https://orcid.org/0000-0001',
   googleScholarId: 'ABC', googleScholarUrl: 'https://scholar.google.com/citations?user=ABC',
   hIndex: 40, i10Index: 30, totalCitations: 9000,
   tierResults: {}, identity,
+});
+
+const readyCandidate = (name, email, extra = {}) => ({
+  name,
+  email,
+  emailSource: 'pubmed',
+  emailPersistAllowed: true,
+  identityStatus: 'probable',
+  ...extra,
 });
 
 // ── /api/reviewer-finder/save-candidates ──────────────────────────────────────
@@ -140,15 +159,16 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     reviewerSuggestionAdapter.upsert.mockResolvedValue({ id: 'S1' });
-    rosterStore.stampSuggestionAnchor.mockResolvedValue({ updated: 1 });
     contactAdapter.getInstitutionById.mockResolvedValue(null);
     accountAdapter.getById.mockResolvedValue(null);
     lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
     NotificationService.notify.mockResolvedValue({ id: 'alert-1' });
-    verifyAutomatedIdentityAttestation.mockImplementation(async (_token, { candidate } = {}) => ({
+    verifyAutomatedIdentityAttestation.mockImplementation(async (token, { candidate } = {}) => ({
       valid: true,
       source: 'automated_resolver',
-      ...(candidate?.candidateKey ? { rosterCandidateKey: candidate.candidateKey } : {}),
+      identityDecisionBound: true,
+      contactAuthorityBound: true,
+      ...(token && candidate?.candidateKey ? { rosterCandidateKey: candidate.candidateKey } : {}),
     }));
     rosterStore.findIdentityConfirmation.mockResolvedValue(null);
   });
@@ -187,6 +207,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
       valid: true,
       source: 'automated_resolver',
       identityDecisionBound: false,
+      contactAuthorityBound: true,
     });
 
     await run({
@@ -213,8 +234,8 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
       body: {
         requestId: 'REQ-1',
         candidates: [
-          { name: 'Dr Forty One', relevanceScore: 41 },
-          { name: 'Dr Eighty Seven', relevanceScore: 87 },
+          readyCandidate('Dr Forty One', 'forty.one@example.edu', { relevanceScore: 41 }),
+          readyCandidate('Dr Eighty Seven', 'eighty.seven@example.edu', { relevanceScore: 87 }),
         ],
       },
     };
@@ -226,7 +247,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(reviewerSuggestionAdapter.upsert.mock.calls[1][0].relevanceScore).toBe(87);
   });
 
-  test('stamps the exact roster row with suggestion/person ids after save', async () => {
+  test('finalizes the exact roster row with suggestion/person ids after save', async () => {
     const req = {
       method: 'POST',
       body: {
@@ -234,6 +255,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
         candidates: [{
           name: 'Dr. Anchor Row',
           candidateKey: 'candidate:anchor-row',
+          automatedIdentityAttestation: 'signed-anchor-row',
           contactEnrichment: enrichmentFor({ status: 'probable' }),
         }],
       },
@@ -245,11 +267,15 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     await handler(req, res);
 
     expect(res.statusCode).toBe(200);
-    expect(rosterStore.stampSuggestionAnchor).toHaveBeenCalledWith('REQ-1', 'Dr. Anchor Row', {
-      candidateKey: 'candidate:anchor-row',
-      suggestionId: 'SUG-ANCHOR',
-      potentialReviewerId: 'PID-ANCHOR',
-    });
+    expect(rosterStore.finalizeCandidatePromotion).toHaveBeenCalledWith(
+      'REQ-1',
+      expect.objectContaining({ name: 'Dr. Anchor Row' }),
+      {
+        candidateKey: 'candidate:anchor-row',
+        suggestionId: 'SUG-ANCHOR',
+        potentialReviewerId: 'PID-ANCHOR',
+      },
+    );
   });
 
   test('validated referred seed anchor reuses the existing potential reviewer instead of email-upserting', async () => {
@@ -278,6 +304,9 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
           name: 'Seed Existing',
           candidateKey: 'person:pid-seed',
           email: 'seed@example.edu',
+          emailSource: 'referred',
+          emailPersistAllowed: true,
+          automatedIdentityAttestation: 'signed-seed-row',
           source: 'referred',
           referredBy: 'Dr. Abby Doyle',
           reasoning: 'Referred by Dr. Abby Doyle.',
@@ -298,16 +327,20 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
       potentialReviewerId: 'PID-SEED',
       matchReason: 'Referred by Dr. Abby Doyle.',
     }));
-    expect(rosterStore.stampSuggestionAnchor).toHaveBeenCalledWith('REQ-1', 'Seed Existing', {
-      candidateKey: 'person:pid-seed',
-      suggestionId: 'SUG-SEED',
-      potentialReviewerId: 'PID-SEED',
-    });
+    expect(rosterStore.finalizeCandidatePromotion).toHaveBeenCalledWith(
+      'REQ-1',
+      expect.objectContaining({ name: 'Seed Existing' }),
+      {
+        candidateKey: 'person:pid-seed',
+        suggestionId: 'SUG-SEED',
+        potentialReviewerId: 'PID-SEED',
+      },
+    );
   });
 
-  test('roster anchor stamp failure is non-fatal after Dataverse save succeeds', async () => {
+  test('roster finalization failure is explicit but non-fatal after Dataverse save succeeds', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    rosterStore.stampSuggestionAnchor.mockRejectedValueOnce(new Error('postgres down'));
+    rosterStore.finalizeCandidatePromotion.mockRejectedValueOnce(new Error('postgres down'));
     const req = {
       method: 'POST',
       body: {
@@ -322,8 +355,11 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.savedCount).toBe(1);
+    expect(res.body.results).toEqual([
+      expect.objectContaining({ name: 'Dr. Non Fatal', rosterFinalized: false }),
+    ]);
     expect(warn).toHaveBeenCalledWith(
-      '[save-candidates] roster suggestion anchor stamp failed (non-fatal):',
+      '[save-candidates] roster promotion finalization failed (non-fatal):',
       'postgres down',
     );
     warn.mockRestore();
@@ -373,7 +409,13 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
       outcome: 'confident',
       match: { reviewerId: null, contactId: 'CONTACT-ORCID', matchKey: 'orcid', nameConsistent: true, context: {} },
     });
-    const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Dr ORCID', email: 'orcid@example.edu', orcid: '0000-0002-1825-0097' }] } };
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: 'REQ-1',
+        candidates: [readyCandidate('Dr ORCID', 'orcid@example.edu', { orcid: '0000-0002-1825-0097' })],
+      },
+    };
     const res = mockRes();
     await handler(req, res);
 
@@ -392,7 +434,10 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
       outcome: 'confident',
       match: { reviewerId: null, contactId: 'CONTACT-EMAIL', matchKey: 'email', nameConsistent: true, context: {} },
     });
-    const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Dr Email', email: 'email@example.edu' }] } };
+    const req = {
+      method: 'POST',
+      body: { requestId: 'REQ-1', candidates: [readyCandidate('Dr Email', 'email@example.edu')] },
+    };
     const res = mockRes();
     await handler(req, res);
 
@@ -401,10 +446,13 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(NotificationService.notify).not.toHaveBeenCalled();
   });
 
-  test('name-only candidates outcome → saves unlinked and alerts staff review', async () => {
+  test('ambiguous identity candidates outcome → saves authoritative contact unlinked and alerts staff review', async () => {
     const candidates = [{ source: 'reviewer', reviewerId: 'PID-EXISTING', contactId: null, matchKey: 'name', context: { name: 'Dr Name' } }];
     lookupReviewerIdentity.mockResolvedValueOnce({ outcome: 'candidates', candidates });
-    const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Dr Name' }] } };
+    const req = {
+      method: 'POST',
+      body: { requestId: 'REQ-1', candidates: [readyCandidate('Dr Name', 'name@example.edu')] },
+    };
     const res = mockRes();
     await handler(req, res);
 
@@ -430,7 +478,13 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   test('conflict outcome → saves unlinked and alerts with conflict reason/details', async () => {
     const details = { emailContactId: 'C-EMAIL', orcidContactId: 'C-ORCID' };
     lookupReviewerIdentity.mockResolvedValueOnce({ outcome: 'conflict', reason: 'orcid_email_split', details });
-    const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Dr Split', email: 'split@example.edu', orcid: '0000-0002-1825-0097' }] } };
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: 'REQ-1',
+        candidates: [readyCandidate('Dr Split', 'split@example.edu', { orcid: '0000-0002-1825-0097' })],
+      },
+    };
     const res = mockRes();
     await handler(req, res);
 
@@ -450,7 +504,10 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
 
   test('lookup none → saves without link or alert', async () => {
     lookupReviewerIdentity.mockResolvedValueOnce({ outcome: 'none' });
-    const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Dr None', email: 'none@example.edu' }] } };
+    const req = {
+      method: 'POST',
+      body: { requestId: 'REQ-1', candidates: [readyCandidate('Dr None', 'none@example.edu')] },
+    };
     const res = mockRes();
     await handler(req, res);
 
@@ -464,7 +521,10 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       lookupReviewerIdentity.mockRejectedValueOnce(new Error('lookup down'));
-      const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Dr Lookup Down', email: 'down@example.edu' }] } };
+      const req = {
+        method: 'POST',
+        body: { requestId: 'REQ-1', candidates: [readyCandidate('Dr Lookup Down', 'down@example.edu')] },
+      };
       const res = mockRes();
       await handler(req, res);
 
@@ -501,7 +561,10 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
         code: 'reviewer_linked_elsewhere',
         details: { existingContactId: 'CONTACT-LIVE' },
       }));
-      const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Dr Race', email: 'race@example.edu' }] } };
+      const req = {
+        method: 'POST',
+        body: { requestId: 'REQ-1', candidates: [readyCandidate('Dr Race', 'race@example.edu')] },
+      };
       const res = mockRes();
       await handler(req, res);
 
@@ -531,8 +594,8 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
         requestId: 'REQ-1',
         proposalTitle: 'Proposal',
         candidates: [
-          { name: 'Saved Candidate', email: 'saved@example.edu', relevanceScore: 41 },
-          { name: 'Failing Candidate', email: 'fail@example.edu', relevanceScore: 87 },
+          readyCandidate('Saved Candidate', 'saved@example.edu', { relevanceScore: 41 }),
+          readyCandidate('Failing Candidate', 'fail@example.edu', { relevanceScore: 87 }),
         ],
       },
     };
@@ -728,7 +791,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(researcherAdapter.clearIdentityFields).toHaveBeenCalled();
   });
 
-  test('explicit contact persist flags false → confirmed identity still saves no sendable contact fields', async () => {
+  test('explicit contact persist flags false → promotion is withheld before person writes', async () => {
     const ce = {
       ...enrichmentFor({ status: 'confirmed' }),
       affiliation: 'Wrong Institution',
@@ -755,17 +818,18 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     const res = mockRes();
     await handler(req, res);
 
-    expect(potentialReviewerAdapter.upsertByEmail.mock.calls[0][0]).toEqual(expect.objectContaining({
-      email: null,
-      affiliation: null,
-    }));
-    const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
-    expect(payload.email).toBeNull();
-    expect(payload.emailSource).toBeNull();
-    expect(payload.affiliation).toBeNull();
-    expect(payload.website).toBeNull();
-    expect(payload.facultyPageUrl).toBeNull();
-    expect(payload.orcid).toBe('0000-0001');
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toMatchObject({
+      savedCount: 0,
+      rejectedUnresolved: 1,
+      errors: [expect.objectContaining({
+        name: 'Dr X',
+        code: 'identity_confirmation_required',
+        reason: 'email_not_authoritative',
+      })],
+    });
+    expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+    expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
   });
 
   test('document facultyPageUrl is nulled before save-candidates persistence', async () => {
@@ -789,11 +853,10 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(payload.facultyPageUrl).toBeNull();
   });
 
-  // S235 — a PI-named / cited candidate is SAVED even when identity is unresolved (the proposal
-  // author vouched for this specific person), but ALL contact + identity-derived fields are
-  // force-nulled at the boundary (Codex HIGH) — a selectable-but-unverified row can't carry a
-  // wrong-person email/ORCID. System-discovered unresolved rows are still 422-rejected.
-  test('PI-named row without resolver verdict ignores forged verified body claims and keeps only proposal-scoped reasoning', async () => {
+  // Proposal provenance may retain a row in Find, but it cannot waive the Invite
+  // contact contract. An unresolved PI-named row stays retryable and creates no
+  // name-only person/suggestion records.
+  test('PI-named row without resolver verdict is withheld despite forged verified body claims', async () => {
     const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{
       name: 'Olga Smirnova', source: 'proposal_named',
       needsIdentification: true,
@@ -817,26 +880,18 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     const res = mockRes();
     await handler(req, res);
 
-    expect(res.statusCode).toBe(200);
-    expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalled(); // the row IS saved (not rejected)
-    const person = potentialReviewerAdapter.upsertByEmail.mock.calls[0][0];
-    expect(person.email).toBeNull();
-    expect(person.affiliation).toBeNull();
-    expect(person.expertise).toBeNull();
-    expect(person.whyChosen).toBe('The PI named this reviewer in the proposal.');
-    const researcher = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
-    expect(researcher.email).toBeNull();
-    expect(researcher.orcid).toBeNull();
-    expect(researcher.website).toBeNull();
-    expect(researcher.facultyPageUrl).toBeNull();
-    expect(researcher.googleScholarId).toBeNull();
-    expect(researcher.department).toBeNull();
-    expect(researcher.keywords).toBeNull();
-
-    const suggestion = reviewerSuggestionAdapter.upsert.mock.calls[0][0];
-    expect(suggestion.matchReason).toBe('The PI named this reviewer in the proposal.');
-    expect(suggestion.relevanceScore).toBe(87);
-    expect(suggestion.suggestionLabel).toBeNull();
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toMatchObject({
+      savedCount: 0,
+      rejectedUnresolved: 1,
+      errors: [expect.objectContaining({
+        name: 'Olga Smirnova',
+        code: 'identity_confirmation_required',
+      })],
+    });
+    expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+    expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
+    expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
   });
 
   test('a system-discovered (literature_retrieved) UNRESOLVED candidate is still 422-rejected', async () => {
@@ -876,7 +931,13 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
 
   test('all-failed non-identity save returns non-2xx with per-row errors', async () => {
     reviewerSuggestionAdapter.upsert.mockRejectedValueOnce(new Error('Dataverse range validation failed'));
-    const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Range Bug', relevanceScore: 41 }] } };
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: 'REQ-1',
+        candidates: [readyCandidate('Range Bug', 'range.bug@example.edu', { relevanceScore: 41 })],
+      },
+    };
     const res = mockRes();
     await handler(req, res);
 
@@ -902,8 +963,8 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
         requestId: 'REQ-1',
         proposalTitle: 'Proposal',
         candidates: [
-          { name: 'Saved Candidate', relevanceScore: 41 },
-          { name: 'Failing Candidate', relevanceScore: 87 },
+          readyCandidate('Saved Candidate', 'saved@example.edu', { relevanceScore: 41 }),
+          readyCandidate('Failing Candidate', 'failing@example.edu', { relevanceScore: 87 }),
         ],
       },
     };
@@ -933,7 +994,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
           name: 'Christopher Walsh',
           affiliation: "Division of Genetics and Genomics, Boston Children's Hospital, Boston, MA, USA. christopher.walsh@childrens.harvard.edu.",
           // enrichment ran but produced no email (mirrors the live req-1003020 rows)
-          contactEnrichment: { emailPersistAllowed: false, affiliationPersistAllowed: true },
+          contactEnrichment: { emailPersistAllowed: true, affiliationPersistAllowed: true },
         }],
       },
     };
@@ -974,7 +1035,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1].emailSource).toBe('pubmed');
   });
 
-  test('no rescue when the affiliation has no email (email stays null)', async () => {
+  test('no rescue when the affiliation has no email → promotion is withheld', async () => {
     const req = {
       method: 'POST',
       body: {
@@ -989,12 +1050,17 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     const res = mockRes();
     await handler(req, res);
 
-    expect(res.statusCode).toBe(200);
-    expect(potentialReviewerAdapter.upsertByEmail.mock.calls[0][0].email).toBeNull();
-    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1].emailSource).toBeNull();
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toMatchObject({
+      savedCount: 0,
+      rejectedMissingEmail: 1,
+      errors: [expect.objectContaining({ name: 'Dr NoEmail', code: 'missing_verified_email' })],
+    });
+    expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+    expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
   });
 
-  test('rejects an anti-scrape MUNGED email even when enrichment blessed it', async () => {
+  test('anti-scrape MUNGED email is withheld even when enrichment blessed it', async () => {
     const req = {
       method: 'POST',
       body: {
@@ -1010,10 +1076,14 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     const res = mockRes();
     await handler(req, res);
 
-    expect(res.statusCode).toBe(200);
-    expect(res.body.savedCount).toBe(1); // row still saves, just without the junk email
-    expect(potentialReviewerAdapter.upsertByEmail.mock.calls[0][0].email).toBeNull();
-    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1].emailSource).toBeNull();
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toMatchObject({
+      savedCount: 0,
+      rejectedMissingEmail: 1,
+      errors: [expect.objectContaining({ name: 'Dr Munged', code: 'missing_verified_email' })],
+    });
+    expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+    expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
   });
 
   test('search_contested email persists only via explicit emailPersistAllowed flag', async () => {
@@ -1044,7 +1114,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     });
   });
 
-  test('search_contested source is default-denied when emailPersistAllowed is missing', async () => {
+  test('search_contested source without emailPersistAllowed is withheld', async () => {
     const req = {
       method: 'POST',
       body: {
@@ -1059,9 +1129,18 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     };
     const res = mockRes();
     await handler(req, res);
-    expect(res.statusCode).toBe(200);
-    expect(potentialReviewerAdapter.upsertByEmail.mock.calls[0][0].email).toBeNull();
-    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1].emailSource).toBeNull();
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toMatchObject({
+      savedCount: 0,
+      rejectedUnresolved: 1,
+      errors: [expect.objectContaining({
+        name: 'Dr Contested Default Deny',
+        code: 'identity_confirmation_required',
+        reason: 'email_not_authoritative',
+      })],
+    });
+    expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+    expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
   });
 });
 

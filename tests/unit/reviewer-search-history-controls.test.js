@@ -17,6 +17,8 @@ const generatedCandidate = {
   candidateKey: 'candidate:prior-generated',
   name: 'Prior Generated Reviewer',
   email: 'prior@example.edu',
+  emailSource: 'openalex',
+  emailPersistAllowed: true,
   identityStatus: 'probable',
   verificationConfidence: 0.8,
   rosterUpdatedAt: '2026-07-19T16:00:00.000Z',
