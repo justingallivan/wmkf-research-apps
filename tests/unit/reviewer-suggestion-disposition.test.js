@@ -540,6 +540,34 @@ describe('upsert never converts an excluded row into a candidate', () => {
     expect(result).toEqual({ id: SUGGESTION_ID, created: false, skippedExcluded: true });
     expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   });
+
+  test('concurrent alternate-key create converges to the winning suggestion', async () => {
+    const winner = {
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      wmkf_applicantdisposition: null,
+    };
+    DynamicsService.queryRecords
+      .mockResolvedValueOnce({ records: [] })
+      .mockResolvedValueOnce({ records: [winner] });
+    DynamicsService.createRecord.mockRejectedValue(
+      Object.assign(new Error('A record with matching key values already exists'), { status: 412 }),
+    );
+
+    await expect(upsert({
+      potentialReviewerId: PR_ID,
+      requestId: REQUEST_ID,
+      relevanceScore: 90,
+      sources: 'claude',
+      selected: true,
+    })).resolves.toEqual({ id: SUGGESTION_ID, created: false });
+
+    expect(DynamicsService.updateRecord).toHaveBeenCalledWith(
+      'wmkf_appreviewersuggestions',
+      SUGGESTION_ID,
+      expect.objectContaining({ wmkf_selected: true, wmkf_sources: 'claude' }),
+      { actingUserSystemId: undefined },
+    );
+  });
 });
 
 describe('upsert relevance-score range guard', () => {

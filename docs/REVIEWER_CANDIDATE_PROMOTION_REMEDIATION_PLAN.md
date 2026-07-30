@@ -21,10 +21,12 @@ related:
 
 # Reviewer Candidate Promotion Remediation Plan
 
-> **Status: PROPOSED — no code or production-data mutation is authorized by
-> this document.** The plan fixes the forward path first, then classifies
-> historical rows with a dry-run manifest. Every production repair still
-> requires an explicit reviewed allowlist and separate execute authorization.
+> **Status: IMPLEMENTED AND LOCALLY VERIFIED ON
+> `codex/reviewer-promotion-remediation`; NOT DEPLOYED.** The forward-path
+> implementation and read-only classifier are built. Migration 029 has not
+> been applied and no production repair is authorized. Every production repair
+> still requires an explicit reviewed allowlist and separate execute
+> authorization.
 
 ## Evidence labels
 
@@ -35,7 +37,11 @@ related:
 - **[VERIFIED via local production read-only probe artifacts 2026-07-29]**
   means the finding was observed live, but the per-person output is deliberately
   gitignored and is not independently reproducible from the repository alone.
-- **[PLANNED]** means this document proposes the behavior; it is not built.
+- **[IMPLEMENTED IN SOURCE; NOT DEPLOYED]** means the behavior is present on
+  the remediation branch and covered by local tests, but is not yet a
+  production-state claim.
+- **[PLANNED]** now applies only to deployment, live classification, or
+  separately authorized repair execution.
 - **[ASSUMED]** means implementation must confirm the claim before relying on
   it.
 
@@ -44,7 +50,8 @@ related:
 The Find roster and the Invite candidate pool must no longer share one
 ambiguous "Save selected" transition.
 
-**[PLANNED]** A candidate may be retained in the per-request Find roster while
+**[IMPLEMENTED IN SOURCE; NOT DEPLOYED]** A candidate may be retained in the
+per-request Find roster while
 still being ineligible for promotion. Promotion to Invite succeeds only when
 the server can persist or reuse a specific person with an authoritative email,
 or when a staff confirmation binds the exact identity and contact values.
@@ -90,7 +97,10 @@ anchors/gates, and upgraded email provenance. **[VERIFIED via local production
 read-only probe and repair artifacts 2026-07-29]** That work addressed known
 rows but does not prove that the forward promotion contract is safe.
 
-## Current contract trace
+## Pre-remediation contract trace (historical baseline)
+
+This trace records the behavior that produced the incident and motivated this
+work. It is not the contract implemented on the remediation branch.
 
 | Layer | Current behavior | Risk |
 |---|---|---|
@@ -135,7 +145,8 @@ The remedy is not to persist the uncertain email. It is to stop conflating
 
 ### 1. One server-authoritative decision
 
-**[PLANNED]** Add a pure server helper that computes a complete persistence
+**[IMPLEMENTED IN SOURCE; NOT DEPLOYED]** The pure
+`projectReviewerContact` helper computes a complete persistence
 projection before any write:
 
 ```text
@@ -176,7 +187,7 @@ does not bypass this promotion matrix.
 
 ### 3. Attestation v3 binds contact authority
 
-**[PLANNED]** Add projection v3 and bind:
+**[IMPLEMENTED IN SOURCE; NOT DEPLOYED]** Projection v3 binds:
 
 - exact normalized effective email;
 - exact email source;
@@ -202,7 +213,8 @@ must re-enrich/re-attest or use an exact staff confirmation.
 
 ### 4. Staff confirmation reuses the existing exact-value contract
 
-**[PLANNED]** Use the existing server-stored, actor-bound confirmation shape
+**[IMPLEMENTED IN SOURCE; NOT DEPLOYED]** The save boundary uses the existing
+server-stored, actor-bound confirmation shape
 from `reviewer-manual-confirmation.js`. Confirmation binds the canonical name,
 email, website, and affiliation values actually approved by staff. It does not
 bless resolver metrics, ORCID, Scholar data, or COI evidence.
@@ -216,11 +228,13 @@ closed and staff must reconfirm.
 null-email person-creation shape: it operates on an existing suggestion/person
 behind server-read identity gates and does not call `upsertByEmail`. It still
 shares the client-authoritative roster-`saved` seam and a legacy successful
-no-roster-row path. **[PLANNED]** It must use the same server-owned finalization
-and fail closed when the canonical roster row is absent.
+no-roster-row path. **[IMPLEMENTED IN SOURCE; NOT DEPLOYED]** It now uses the
+same server-owned finalization and fails closed when the canonical roster row
+is absent.
 
 `pickVettedEmail`, applicant B1 backfill, and the email reconciler currently
-implement related but divergent persistence envelopes. **[PLANNED]**
+implement related but divergent persistence envelopes.
+**[IMPLEMENTED IN SOURCE; NOT DEPLOYED]**
 
 - make `pickVettedEmail` a thin caller of the canonical contact projection
   instead of claiming an informal mirror of `save-candidates`;
@@ -254,7 +268,7 @@ email.
 
 ### 7. Suggestion and roster success semantics
 
-**[PLANNED]**
+**[IMPLEMENTED IN SOURCE; NOT DEPLOYED]**
 
 - Check `skippedExcluded` and return `applicant_excluded`; do not count or stamp
   the row as saved. Persist/render the terminal
@@ -288,7 +302,7 @@ refers to the same binding.
 
 ### Identity transitions
 
-**[PLANNED]**
+**[IMPLEMENTED IN SOURCE; NOT DEPLOYED]**
 
 - `confirmed` is sticky against every automated write.
 - `probable` is not downgraded by `unresolved` or `ambiguous` evidence from a
@@ -316,7 +330,7 @@ without classifying populated legacy rows would fail closed on those rows.
 
 ### Contact edits
 
-**[PLANNED]**
+**[IMPLEMENTED IN SOURCE; NOT DEPLOYED]**
 
 - Normal updates omit absent fields; they do not translate empty UI values into
   clears.
@@ -327,9 +341,31 @@ without classifying populated legacy rows would fail closed on those rows.
 - A stale person ETag returns a conflict and forces refresh; last-writer-wins is
   not acceptable for a person shared by multiple requests.
 
+## Implementation status and evidence
+
+| Surface | Branch state | Verification |
+|---|---|---|
+| Canonical contact projection + v3 receipt | Implemented | Attestation, readiness, contradictory-envelope, and tamper tests |
+| Save/applicant promotion + server roster finalization | Implemented | Service, endpoint, roster-store, partial-result, and blocked-state tests |
+| Find/Invite UI reconciliation | Implemented | Search logic, stale/partial save, blocked promotion, and Invite diagnostic tests |
+| Exact-email reuse/race/compensation | Implemented | Potential-reviewer, suggestion-race, save compensation, and alert tests |
+| Shared-person monotonicity + explicit contact clear | Implemented | Identity sticky/conflict and my-candidates clear/ETag tests |
+| Merge repair ETag prerequisite | Implemented | Person, suggestion, and applicant-slot missing/stale ETag tests |
+| Read-only repair classifier | Implemented; not run against production in this change | Pure classifier/manifest tests and script syntax check |
+| Migration 029 / production deployment / repair execution | Not performed | Requires deliberate release and separate repair authorization |
+
+The final focused local regression run on 2026-07-29 passed 20 suites and 497
+tests. Lint (zero errors), production build, types, and the relevant migration,
+API-security, Atlas, docs, fact-consistency, Dataverse-layer, OData,
+route-boundary, lifecycle-auth, enum, secret, instruction, and canonical-pointer
+gates passed; gate self-tests passed where defined.
+
 ## Implementation sequence
 
 ### Phase 0 — Freeze the contract with tests and a read-only classifier
+
+**Source status:** complete except for the intentionally deferred live
+production manifest and baseline counters.
 
 1. Add complement tests for the contradictory envelope seen in request
    `1002912`: top-level verified/selectable signals plus nested unresolved
@@ -347,6 +383,8 @@ without classifying populated legacy rows would fail closed on those rows.
 
 ### Phase 1 — Server projection, v3 receipt, and response contract
 
+**Source status:** complete.
+
 1. Add the pure promotion projection helper.
 2. Add v3 contact binding while retaining per-version v1/v2 verification and
    identity-only authority for legacy receipts.
@@ -361,6 +399,8 @@ without classifying populated legacy rows would fail closed on those rows.
    stamp roster `saved` server-side only after success.
 
 ### Phase 2 — Find UX and Invite readback
+
+**Source status:** complete.
 
 1. Render server decision/reason on each Find card.
 2. Split **Keep for identity review** / **Add or verify email** from
@@ -378,6 +418,9 @@ without classifying populated legacy rows would fail closed on those rows.
 
 ### Phase 3 — Shared-person monotonicity and concurrency
 
+**Source status:** complete using the narrow ETag-guarded compatibility writer;
+full legacy binding-writer adoption remains a separate classification task.
+
 1. Add the ETag-guarded compatibility identity writer.
 2. Prevent probable→unresolved/ambiguous downgrades and unrelated automated
    clears.
@@ -388,12 +431,16 @@ without classifying populated legacy rows would fail closed on those rows.
 
 ### Phase 4 — Production repair after forward fix
 
+**Operational status:** not started. The merge ETag prerequisite is complete in
+source; Preview/production deployment, live classification, review, and any
+execution remain separately authorized work.
+
 1. Deploy and smoke the forward fix in Preview with email capture/no live send.
 2. Run the production classifier read-only and save its hash-stable manifest.
-3. Before any repair, harden `reviewer-merge` so every planned suggestion,
-   applicant-slot, email-move, and deactivate operation requires a non-null
-   ETag and passes `ifMatch`; missing ETags skip the row. Raw one-off PATCH
-   scripts are not an approved Phase 4 mechanism.
+3. Verify the implemented `reviewer-merge` hardening in the deployed build:
+   every planned person, suggestion, applicant-slot, email-move, and deactivate
+   operation requires a non-null ETag and passes `ifMatch`; missing ETags force
+   a re-plan. Raw one-off PATCH scripts are not an approved Phase 4 mechanism.
 4. Have a human review every proposed person merge/repoint/update.
 5. Execute only an explicitly approved manifest, aborting on ETag, lifecycle,
    email-owner, or reference drift.
@@ -441,8 +488,8 @@ and partial dependency failure.
 
 ## Repair classifier
 
-The repair tool is dry-run by default and emits one row per affected selected
-suggestion:
+The implemented classifier is read-only, refuses `--execute`, and emits one
+redacted, hash-stable row per affected selected suggestion:
 
 ```text
 request
@@ -481,13 +528,13 @@ Expected initial classification:
   failure that must abort the batch.
 
 The existing `reviewer-merge.js` `planMerge`/`executeMerge` service is the only
-approved person-merge mechanism. It already re-evaluates pre-engagement,
-contact, collision, applicant-slot, and confirmed-identity guards, but its ETag
-coverage is currently incomplete: null suggestion/slot ETags can degrade to
-unconditional writes, and email-move/deactivate do not consistently pass
-`ifMatch`. **[VERIFIED via source]** Phase 4 hardening closes those gaps before
-the repair tool may execute. The repair tool supplies exact allowlisted pairs;
-it does not duplicate or weaken merge logic.
+approved person-merge mechanism. **[IMPLEMENTED IN SOURCE; NOT DEPLOYED]** It
+re-evaluates pre-engagement, contact, collision, applicant-slot, and
+confirmed-identity guards; requires non-null keeper, loser, suggestion, and
+applicant-slot ETags; and passes `ifMatch` through every guarded mutation.
+Missing or stale ETags force a fresh plan. The classifier supplies exact
+evidence to that planner; it does not duplicate or weaken merge logic, and this
+change adds no repair executor.
 
 The previously identified ungated applicant-roster rows remain owned by their
 separate stamping workflow. Phase 4 must report them as a separate ownership
@@ -496,7 +543,9 @@ repair manifest.
 
 ## Observability and rollback
 
-Add structured counters/events for:
+The implementation emits the existing structured alerts/errors at the named
+failure seams. The following dedicated aggregate counters remain rollout
+follow-up rather than a prerequisite for the fail-closed contract:
 
 - `promotion_ready`
 - `promotion_withheld_identity`
@@ -530,10 +579,10 @@ is skipped, never force-applied.
 | Route every current write immediately through the Wave 13 binding writer | Populated legacy rows require explicit classification; an unplanned cutover would fail closed or misclassify lineage. |
 | Patch known production rows before the forward fix | Recurrence remains possible and repair results can be overwritten by the same path. |
 
-## Contract and documentation reconciliation on implementation
+## Contract and documentation reconciliation
 
-The current behavior remains authoritative until code ships. The implementation
-PR must update, in the same change:
+The implementation branch updates the maintained contracts below in the same
+change. These are source-state claims, not deployment-state claims:
 
 - `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` Contract 2 and receipt details;
 - the receipt contract in

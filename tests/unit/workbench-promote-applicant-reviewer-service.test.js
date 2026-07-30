@@ -4,8 +4,8 @@
  * lib/services/workbench/promote-applicant-reviewer-service — logic-level
  * tests (adapters mocked), Stage 4 series A extraction. The two route
  * characterization suites pin the full partial-success matrix; this suite
- * pins the service's typed errors, savedFields/contactError accumulation,
- * and the promote-before-contact ordering.
+ * pins the service's typed errors, canonical-contact gate, savedFields, and
+ * server-owned roster finalization.
  */
 
 const findById = jest.fn();
@@ -17,7 +17,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 }));
 
 const update = jest.fn(async () => {});
-const getById = jest.fn(async () => ({}));
+const getById = jest.fn(async () => ({ wmkf_emailaddress: 'existing@example.edu' }));
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   update: (...a) => update(...a),
   getById: (...a) => getById(...a),
@@ -34,8 +34,14 @@ jest.mock('../../lib/dataverse/duplicate-key', () => ({
 }));
 
 const findCandidateBySuggestion = jest.fn(async () => null);
+const finalizeCandidatePromotion = jest.fn(async () => ({ saved: true, candidateKey: 'candidate:applicant' }));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   findCandidateBySuggestion: (...a) => findCandidateBySuggestion(...a),
+  finalizeCandidatePromotion: (...a) => finalizeCandidatePromotion(...a),
+}));
+jest.mock('../../lib/services/notification-service', () => ({
+  __esModule: true,
+  default: { notify: jest.fn(async () => ({ id: 'alert-1' })) },
 }));
 
 import { promoteApplicantReviewer } from '../../lib/services/workbench/promote-applicant-reviewer-service';
@@ -57,12 +63,14 @@ beforeEach(() => {
   });
   update.mockResolvedValue(undefined);
   updateById.mockResolvedValue(undefined);
-  getById.mockResolvedValue({});
+  getById.mockResolvedValue({ wmkf_emailaddress: 'existing@example.edu' });
   findCandidateBySuggestion.mockResolvedValue({
+    candidateKey: 'candidate:applicant',
     suggestionId: SUG,
     identityStatus: 'probable',
     needsIdentification: false,
   });
+  finalizeCandidatePromotion.mockResolvedValue({ saved: true, candidateKey: 'candidate:applicant' });
   translateDuplicateKeyError.mockReturnValue(null);
 });
 
@@ -94,10 +102,18 @@ test('typed 404 is NOT eaten by the applicant-excluded regex translation (P1m no
   expect(err.httpStatus).toBe(404);
 });
 
-test('plain promote: selected flipped, empty clean result', async () => {
+test('plain promote: canonical email verified, selected flipped, roster finalized', async () => {
   const body = await promoteApplicantReviewer(args());
   expect(updateLifecycle).toHaveBeenCalledWith(SUG, { selected: true }, { actingUserSystemId: 'u-1' });
-  expect(body).toEqual({ success: true, suggestionId: SUG, savedFields: [], partialSuccess: false, contactError: null });
+  expect(body).toEqual({
+    success: true,
+    suggestionId: SUG,
+    candidateKey: 'candidate:applicant',
+    savedFields: [],
+    rosterFinalized: true,
+    partialSuccess: false,
+    contactError: null,
+  });
 });
 
 test('missing authoritative roster row is rejected before lifecycle promotion', async () => {
@@ -112,6 +128,7 @@ test('missing authoritative roster row is rejected before lifecycle promotion', 
 test('deceased applicant-recommended reviewer is rejected before lifecycle promotion', async () => {
   findCandidateBySuggestion.mockResolvedValue({
     name: 'Dr Deceased',
+    candidateKey: 'candidate:deceased',
     suggestionId: SUG,
     eligibilityStatus: 'deceased',
   });
@@ -125,6 +142,7 @@ test('deceased applicant-recommended reviewer is rejected before lifecycle promo
 test('durable ineligible status blocks promotion even when the candidate blob lacks its marker', async () => {
   findCandidateBySuggestion.mockResolvedValue({
     name: 'Dr Deceased',
+    candidateKey: 'candidate:deceased',
     suggestionId: SUG,
     rosterStatus: 'ineligible',
   });
@@ -137,6 +155,7 @@ test('durable ineligible status blocks promotion even when the candidate blob la
 test('identity-review applicant is rejected before lifecycle promotion without server confirmation', async () => {
   findCandidateBySuggestion.mockResolvedValue({
     name: 'Dr Namesake',
+    candidateKey: 'candidate:namesake',
     suggestionId: SUG,
     needsIdentification: true,
     identityStatus: 'unresolved',
@@ -153,6 +172,7 @@ test('identity-review applicant is rejected before lifecycle promotion without s
 test('server-recorded staff confirmation permits promotion of an identity-review applicant', async () => {
   findCandidateBySuggestion.mockResolvedValue({
     name: 'Dr Namesake',
+    candidateKey: 'candidate:namesake',
     suggestionId: SUG,
     needsIdentification: true,
     identityStatus: 'unresolved',
@@ -165,26 +185,32 @@ test('server-recorded staff confirmation permits promotion of an identity-review
   expect(updateLifecycle).toHaveBeenCalledWith(SUG, { selected: true }, { actingUserSystemId: 'u-1' });
 });
 
-test('manual email collision: promotion stands, partialSuccess + email_conflict, backfill skipped', async () => {
+test('manual email collision withholds promotion and returns a merge-required conflict', async () => {
   update.mockImplementation(async (_id, updates) => {
     if (updates && 'email' in updates) throw new Error('alt-key duplicate');
   });
   translateDuplicateKeyError.mockReturnValue({ field: 'wmkf_emailaddress', value: 'a@b.edu' });
-  const body = await promoteApplicantReviewer(args({ contact: { affiliation: 'JILA', email: 'a@b.edu' } }));
-  expect(body.success).toBe(true);
-  expect(body.partialSuccess).toBe(true);
-  expect(body.contactError).toMatchObject({ code: 'email_conflict', value: 'a@b.edu' });
-  expect(body.savedFields).toEqual(['affiliation']);
-  // One server-side roster read still enforces deceased eligibility; the
-  // manual attempt gates only the email backfill's second read.
+  const err = await promoteApplicantReviewer(args({ contact: { affiliation: 'JILA', email: 'a@b.edu' } }))
+    .catch((error) => error);
+  expect(err).toBeInstanceOf(ServiceHttpError);
+  expect(err.httpStatus).toBe(409);
+  expect(err.body.contactError).toMatchObject({ code: 'email_conflict', value: 'a@b.edu' });
   expect(findCandidateBySuggestion).toHaveBeenCalledTimes(1);
-  expect(updateLifecycle).toHaveBeenCalled(); // promotion stuck
+  expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
 test('B1 backfill: vetted roster email written with roster provenance when no manual email', async () => {
   findCandidateBySuggestion.mockResolvedValue({
-    suggestionId: SUG, email: 'kaang@snu.ac.kr', emailSource: 'claude_search', emailPersistAllowed: true,
+    candidateKey: 'candidate:kaang',
+    suggestionId: SUG,
+    identityStatus: 'probable',
+    email: 'kaang@snu.ac.kr',
+    emailSource: 'claude_search',
+    emailPersistAllowed: true,
   });
+  getById
+    .mockResolvedValueOnce({})
+    .mockResolvedValueOnce({ wmkf_emailaddress: 'kaang@snu.ac.kr' });
   const body = await promoteApplicantReviewer(args());
   expect(body.savedFields).toEqual(['email']);
   // S387: the vetted address and its roster provenance land in ONE patch, so a rejected
@@ -196,7 +222,14 @@ test('B1 backfill: vetted roster email written with roster provenance when no ma
 });
 
 test('B1 idempotency: existing person email blocks the backfill', async () => {
-  findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUG, email: 'x@y.edu', emailSource: 'claude_search', emailPersistAllowed: true });
+  findCandidateBySuggestion.mockResolvedValue({
+    candidateKey: 'candidate:x',
+    suggestionId: SUG,
+    identityStatus: 'probable',
+    email: 'x@y.edu',
+    emailSource: 'claude_search',
+    emailPersistAllowed: true,
+  });
   getById.mockResolvedValue({ wmkf_emailaddress: 'existing@y.edu' });
   const body = await promoteApplicantReviewer(args());
   expect(body.savedFields).toEqual([]);
@@ -212,12 +245,14 @@ test('eligibility roster read failure returns retryable 503 before lifecycle mut
   expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
-test('safe-field write failure: contact_write_failed reported, promotion stands', async () => {
+test('safe-field write failure blocks promotion with a retryable error', async () => {
   update.mockImplementation(async (_id, updates) => {
     if (updates && 'affiliation' in updates) throw new Error('boom');
   });
-  const body = await promoteApplicantReviewer(args({ contact: { affiliation: 'JILA' } }));
-  expect(body.partialSuccess).toBe(true);
-  expect(body.contactError).toMatchObject({ code: 'contact_write_failed' });
-  expect(body.savedFields).toEqual([]);
+  const err = await promoteApplicantReviewer(args({ contact: { affiliation: 'JILA' } }))
+    .catch((error) => error);
+  expect(err).toBeInstanceOf(ServiceHttpError);
+  expect(err.httpStatus).toBe(503);
+  expect(err.body.contactError).toMatchObject({ code: 'contact_write_failed' });
+  expect(updateLifecycle).not.toHaveBeenCalled();
 });

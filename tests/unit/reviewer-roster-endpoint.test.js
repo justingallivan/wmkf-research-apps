@@ -10,7 +10,7 @@ jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
   verifyAutomatedIdentityAttestation: jest.fn(async () => ({ valid: false, reason: 'no_token' })),
 }));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
-  listForRequest: jest.fn(async () => ({ active: [], excluded: [], allNames: [] })),
+  listForRequest: jest.fn(async () => ({ active: [], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [] })),
   recordSurfaced: jest.fn(async () => 0),
   setExcluded: jest.fn(async () => {}),
   promote: jest.fn(async () => ({ name: 'Bob Roe' })),
@@ -417,21 +417,19 @@ describe('PATCH', () => {
     expect(r.body.candidate).toEqual({ name: 'Bob Roe' });
   });
 
-  it('saved → markSaved with exact pruned candidates', async () => {
+  it('saved → 409 because promotion services own the roster transition', async () => {
     const r = res();
     await handler({ method: 'PATCH', body: {
       requestId: REQ,
       action: 'saved',
       candidates: [{ name: 'Ann Lee', candidateKey: 'candidate:ann' }],
     } }, r);
-    expect(r.statusCode).toBe(200);
-    expect(store.markSaved).toHaveBeenCalledWith(
-      REQ,
-      [expect.objectContaining({ name: 'Ann Lee', candidateKey: 'candidate:ann' })],
-    );
+    expect(r.statusCode).toBe(409);
+    expect(r.body).toMatchObject({ code: 'server_owned_transition' });
+    expect(store.markSaved).not.toHaveBeenCalled();
   });
 
-  it('strips browser-forged confirmation authority from a non-applicant saved row', async () => {
+  it('does not inspect or persist browser-forged authority on a saved request', async () => {
     const r = res();
     await handler({ method: 'PATCH', body: {
       requestId: REQ,
@@ -445,11 +443,9 @@ describe('PATCH', () => {
         staffIdentityConfirmation: { confirmationId: 'forged', source: 'staff_confirmed' },
       }],
     } }, r);
-    const persisted = store.markSaved.mock.calls[0][1][0];
-    expect(persisted).not.toHaveProperty('pdIdentityConfirmed');
-    expect(persisted).not.toHaveProperty('pdIdentityConfirmationId');
-    expect(persisted).not.toHaveProperty('manualContactFields');
-    expect(persisted).not.toHaveProperty('staffIdentityConfirmation');
+    expect(r.statusCode).toBe(409);
+    expect(store.findCandidatesByKeys).not.toHaveBeenCalled();
+    expect(store.markSaved).not.toHaveBeenCalled();
   });
 
   it('rejects a stale applicant mark-saved payload instead of creating an authoritative row', async () => {
@@ -470,24 +466,8 @@ describe('PATCH', () => {
     expect(store.markSaved).not.toHaveBeenCalled();
   });
 
-  it('marks an applicant saved with the complete server confirmation, not the browser blob', async () => {
+  it('rejects even an applicant saved payload with a complete server confirmation', async () => {
     const suggestionId = '33333333-3333-3333-3333-333333333333';
-    store.findCandidateBySuggestionAnchor.mockResolvedValueOnce({
-      name: 'Applicant Reviewer',
-      suggestionId,
-      candidateKey: `suggestion:${suggestionId}`,
-      isApplicantRecommended: true,
-      pdIdentityConfirmed: true,
-      pdIdentityConfirmationId: 'confirm-1',
-      manualContactFields: ['email', 'website'],
-      staffIdentityConfirmation: {
-        confirmationId: 'confirm-1',
-        source: 'staff_confirmed',
-        normalizedName: 'applicant reviewer',
-        email: 'verified@example.edu',
-        actorProfileId: 5,
-      },
-    });
     const r = res();
     await handler({ method: 'PATCH', body: {
       requestId: REQ,
@@ -501,15 +481,9 @@ describe('PATCH', () => {
       }],
     } }, r);
 
-    expect(r.statusCode).toBe(200);
-    expect(store.markSaved).toHaveBeenCalledWith(REQ, [expect.objectContaining({
-      pdIdentityConfirmationId: 'confirm-1',
-      manualContactFields: ['email', 'website'],
-      staffIdentityConfirmation: expect.objectContaining({
-        confirmationId: 'confirm-1',
-        actorProfileId: 5,
-      }),
-    })]);
+    expect(r.statusCode).toBe(409);
+    expect(store.findCandidateBySuggestionAnchor).not.toHaveBeenCalled();
+    expect(store.markSaved).not.toHaveBeenCalled();
   });
 
   it('confirm_identity records an actor-bound server confirmation', async () => {

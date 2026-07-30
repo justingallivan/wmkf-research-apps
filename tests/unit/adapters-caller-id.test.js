@@ -86,7 +86,7 @@ describe('contact adapter', () => {
 describe('potential-reviewer adapter', () => {
   test('upsertByEmail (existing path) forwards on update', async () => {
     DynamicsService.queryRecords.mockResolvedValue({
-      records: [{ wmkf_potentialreviewersid: PR_ID, wmkf_name: null }],
+      records: [{ wmkf_potentialreviewersid: PR_ID, wmkf_name: null, wmkf_emailaddress: 'a@b.org', statecode: 0 }],
     });
     await potentialReviewerAdapter.upsertByEmail(
       { name: 'Alice', email: 'a@b.org' },

@@ -2,7 +2,11 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-07-20 (production read-only aggregate + canonical applicant-cache/authority reconciliation; migration 027 adds the durable `ineligible` status and migration 025 keeps mutations keyed by `candidate_key`).
+**Last verified:** 2026-07-29 in source on branch
+`codex/reviewer-promotion-remediation` (not deployed). Migration 029 adds the
+durable `blocked` status; migration 027 adds `ineligible`; migration 025 keeps
+mutations keyed by `candidate_key`. The live row-count note below predates
+migration 029 and is not a deployment claim.
 **Live row count:** 164 at verification time.
 
 ## NOT a regression of the S219/migration-018 Dataverse cutover
@@ -11,7 +15,26 @@ Migration 018 dropped the **canonical reviewer-identity** Postgres tables (`rese
 
 ## Source of truth
 
-**Postgres-primary.** This table IS the source of truth for the Find-tab per-request candidate roster (which candidates a request's searches or applicant-suggested enrichment have surfaced, and their active/excluded/ineligible/saved disposition for that request). It also stores the discovery-time institution-COI hard-drop ledger (`status='coi_dropped'`) for observability only. `status='ineligible'` is a visible, non-selectable deceased-evidence ledger: it requires a resolved identity, a trusted institution domain, and a successfully fetched first-party page whose title/sole H1 identifies the candidate and whose page text directly binds the death statement to that person. Browser-posted direct-search rows may enter this state only when a request/candidate-bound server receipt also binds the eligibility evidence; applicant-recommended enrichment writes through the trusted server-internal path. Phase-C flagged institution-COI rows are not ledger rows; they are normal `active` rows with `candidate.hasInstitutionCOI=true` and `candidate.institutionCOIDetails.dropDecision='flagged'`, which the UI renders read-only and the save route rejects. The canonical reviewer pool (saved candidates) remains Dataverse `wmkf_appreviewersuggestion`; a candidate flips to `status='saved'` here only as a dedup marker after it is saved to Dataverse via `save-candidates.js` or after an applicant-suggested row is explicitly promoted via `promote-applicant-reviewer.js`.
+**Postgres-primary.** This table IS the source of truth for the Find-tab
+per-request candidate roster (which candidates a request's searches or
+applicant-suggested enrichment have surfaced, and their
+active/excluded/ineligible/saved/blocked disposition for that request). It also
+stores the discovery-time institution-COI hard-drop ledger
+(`status='coi_dropped'`) for observability only. `status='ineligible'` is a
+visible, non-selectable deceased-evidence ledger: it requires a resolved
+identity, a trusted institution domain, and a successfully fetched first-party
+page whose title/sole H1 identifies the candidate and whose page text directly
+binds the death statement to that person. Browser-posted direct-search rows may
+enter this state only when a request/candidate-bound server receipt also binds
+the eligibility evidence; applicant-recommended enrichment writes through the
+trusted server-internal path. Phase-C flagged institution-COI rows are normal
+`active` rows with `candidate.hasInstitutionCOI=true` and
+`candidate.institutionCOIDetails.dropDecision='flagged'`, which the UI renders
+read-only and the save route rejects. The canonical reviewer pool remains
+Dataverse `wmkf_appreviewersuggestion`. Only the server that confirmed the
+Dataverse outcome may finalize an exact roster key as `saved`; an
+applicant-excluded collision is finalized as `blocked` instead of being hidden
+or retried indefinitely.
 
 ## Schema (10 columns)
 
@@ -22,32 +45,79 @@ Migration 018 dropped the **canonical reviewer-identity** Postgres tables (`rese
 | candidate_key | text | Stable surfaced-row correlation key; unique within a request. Not an identity-resolution decision. |
 | normalized_name | text | `normalizeReviewerName(candidate.name)` — conservative cross-run search exclusion only |
 | display_name | text | surface-time `candidate.name` for re-render |
-| status | text | `active` \| `excluded` \| `ineligible` \| `saved` \| `coi_dropped` (CHECK-constrained) |
-| candidate | jsonb | pruned render DTO (only card/render evidence fields, not raw enrichment internals). Applicant-suggested enrichment rows carry `enrichedProposalKey` (`library::folder::name`), `applicantEnrichmentCacheVersion`, and an explicit `identityStatus` gate result (`confirmed`, `probable`, or `unresolved`). The UI restores the cache only when every currently expected recommendation either has its exact canonical `suggestion:<suggestionId>` active/ineligible row for that proposal with the current `APPLICANT_ENRICHMENT_CACHE_VERSION` and a terminal gate result, or its canonical key is already terminal by staff action (`excluded`/`saved`). Legacy, unversioned, older-version, and unknown terminal rows cannot satisfy a missing expected row; a missing/partial non-terminal canonical batch re-enriches. Applicant institution contradictions route to `unresolved` only after the shared identity-consistency checker has ruled out direct or one-hop associated-institution compatibility. For that final coherence check, a current-run PubMed/ORCID verification institution outranks the applicant/stored institution; the latter is used only when the current verifier has no institution, so a stale prior affiliation cannot veto a coherent current identity or self-confirm a later namesake substitution. Direct eligibility evidence carries `eligibilityStatus`, reason, and a bounded fetched first-party page DTO (URL/title/evidence sentence/domain/check time). Institution-COI ledger and flagged active rows carry `hasInstitutionCOI` and `institutionCOIDetails` (`piInstitution`, reviewer affiliation, `dropDecision`, corroboration reason, drop stage/source where applicable). An authenticated `confirm_identity` action may add bounded `staffIdentityConfirmation` (opaque id, canonical manual contact, actor ids, timestamp, source), `manualContactFields`, and its UI marker. Browser-authored POST/exclude/saved blobs have those authority fields stripped; one bounded request/candidate-key roster read then restores only an existing server confirmation and its canonical manual contact, while applicant mutations re-read the full canonical server blob. Automated candidates may carry a server-signed `automatedIdentityAttestation`; it binds the request, immutable surfaced roster key, identity-bearing persistence bundle, and eligibility evidence without storing raw provider payloads. |
+| status | text | `active` \| `excluded` \| `ineligible` \| `saved` \| `blocked` \| `coi_dropped` (CHECK-constrained) |
+| candidate | jsonb | pruned render DTO (only card/render evidence fields, not raw enrichment internals). Applicant-suggested enrichment rows carry `enrichedProposalKey` (`library::folder::name`), `applicantEnrichmentCacheVersion`, and an explicit `identityStatus` gate result (`confirmed`, `probable`, or `unresolved`). The UI restores the cache only when every currently expected recommendation either has its exact canonical `suggestion:<suggestionId>` active/ineligible row for that proposal with the current `APPLICANT_ENRICHMENT_CACHE_VERSION` and a terminal gate result, or its canonical key is already terminal by staff action (`excluded`/`saved`/`blocked`). Legacy, unversioned, older-version, and unknown terminal rows cannot satisfy a missing expected row; a missing/partial non-terminal canonical batch re-enriches. Applicant institution contradictions route to `unresolved` only after the shared identity-consistency checker has ruled out direct or one-hop associated-institution compatibility. For that final coherence check, a current-run PubMed/ORCID verification institution outranks the applicant/stored institution; the latter is used only when the current verifier has no institution, so a stale prior affiliation cannot veto a coherent current identity or self-confirm a later namesake substitution. Direct eligibility evidence carries `eligibilityStatus`, reason, and a bounded fetched first-party page DTO (URL/title/evidence sentence/domain/check time). Institution-COI ledger and flagged active rows carry `hasInstitutionCOI` and `institutionCOIDetails` (`piInstitution`, reviewer affiliation, `dropDecision`, corroboration reason, drop stage/source where applicable). An authenticated `confirm_identity` action may add bounded `staffIdentityConfirmation` (opaque id, canonical manual contact, actor ids, timestamp, source), `manualContactFields`, and its UI marker. Browser-authored POST/exclude blobs have those authority fields stripped; one bounded request/candidate-key roster read restores only an existing server confirmation and its canonical manual contact, while applicant mutations re-read the full canonical server blob. Automated candidates may carry a server-signed `automatedIdentityAttestation`; v3 binds the request, immutable surfaced roster key, identity-bearing persistence bundle, eligibility evidence, and exact contact projection without storing raw provider payloads. A blocked row also stores its server-owned promotion decision/code/reason. |
 | source_kind | text | Provenance kind: `cited_reference` \| `proposal_named` \| `applicant_suggested` \| `literature_retrieved` \| `grounded_seed` \| `barred_parametric`. Legacy rows may hold `claude_verified` or `database`; reads normalize those to a `provenance` DTO without rewriting the row. |
 | first_seen_at | timestamptz | |
 | updated_at | timestamptz | |
 
 Indexes: `uq_reviewer_find_roster_req_candidate` UNIQUE `(request_id, candidate_key)` + `idx_reviewer_find_roster_req_name (request_id, normalized_name)` + `idx_reviewer_find_roster_req_status (request_id, status)`.
 
-**Status semantics:** `active` = surfaced list row (selectable unless the candidate blob itself carries a read-only gate such as `hasInstitutionCOI`) · `excluded` = staff set-aside (collapsed recoverable section) · `ineligible` = direct official evidence reports the person is deceased (visible source link, never selectable/promotable/savable) · `saved` = graduated to the Dataverse pool (not rendered on Find, kept for dedup) · `coi_dropped` = discovery-time institution-COI hard-drop ledger (not rendered as selectable, not recoverable/promotable). The cross-run search-exclusion union = **all roster names for the request, every status**; that name union may intentionally suppress a later same-name result, but it never merges two candidates surfaced in the same run or authorizes a row mutation. `recordSurfaced` may move `active` → `ineligible` on new direct deceased evidence and refresh `ineligible` only with another direct deceased result; a later unknown result cannot reactivate it. It never downgrades `excluded`/`saved`/`coi_dropped` to active/ineligible, and enforces a per-request row cap (oldest `active`/`saved` evicted; never `excluded`, `ineligible`, or `coi_dropped`).
+**Status semantics:** `active` = surfaced list row; canonical contact projection
+still determines whether it is promotion-selectable · `excluded` = staff
+set-aside (collapsed recoverable section) · `ineligible` = direct official
+evidence reports the person is deceased (visible source link, never
+selectable/promotable/savable) · `saved` = server-confirmed graduation to the
+Dataverse pool (not rendered on Find, kept for dedup) · `blocked` = an exact
+promotion attempt hit an authoritative terminal collision such as applicant
+exclusion (rendered read-only with its stored decision/reason) · `coi_dropped`
+= discovery-time institution-COI hard-drop ledger (not rendered as selectable,
+not recoverable/promotable). The cross-run search-exclusion union = **all roster
+names for the request, every status**; that name union may suppress a later
+same-name result, but it never merges two candidates or authorizes a mutation.
+`recordSurfaced` may move `active` → `ineligible` on new direct deceased
+evidence and refresh `ineligible` only with another direct deceased result; a
+later unknown result cannot reactivate it. It never downgrades
+`excluded`/`saved`/`blocked`/`coi_dropped` to active/ineligible, and enforces a
+per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
+`ineligible`, `blocked`, or `coi_dropped`).
 
 **Provenance semantics:** `candidate.provenance` is the durable render DTO for origin/grounding (`kind`, ordered `sources[]`, `seedRole`, `groundingWorkIds[]`). `source_kind` is a queryable copy of `provenance.kind`, not a Claude-vs-database flag. During the migration window, candidate JSON also keeps legacy `source`, `sources`, and `isClaudeSuggestion` fields for downstream compatibility.
 
 ## Read paths
 
-- `lib/services/reviewer-roster-store.js` `listForRequest(requestId)` reads the rendered roster and returns active/excluded/ineligible candidates, canonical saved applicant suggestion keys (`savedKeys`), and the all-status name union. `findCandidateBySuggestion(requestId, suggestionId)` reads only the canonical `(request_id, suggestion:<id>)` row, rechecks the embedded suggestion id, and returns its `updated_at` token; promotion and applicant-row browser mutations fail closed when it is absent. `findIdentityConfirmation(requestId, confirmationId)` is the fail-closed save-boundary read for a staff confirmation and returns only the server-stored confirmation object; `findEligibilityByCandidateKey` is the request/candidate-key save-boundary read for ineligible state. The roster GET is consumed by `shared/components/reviewers/ReviewerSearchSection.js` (load-on-mount → active/excluded/ineligible render + saved/excluded terminal applicant keys + the dedup name union fed into `/analyze` + `/discover`). `coi_dropped` rows are excluded from render buckets and contribute only through `allNames`.
+- `lib/services/reviewer-roster-store.js` `listForRequest(requestId)` reads the
+  rendered roster and returns active/excluded/ineligible/blocked candidates,
+  canonical saved applicant suggestion keys (`savedKeys`), and the all-status
+  name union. `findCandidateBySuggestion(requestId, suggestionId)` reads only
+  the canonical `(request_id, suggestion:<id>)` row, rechecks the embedded
+  suggestion id, and returns its `updated_at` token; applicant promotion fails
+  closed when it is absent. `findIdentityConfirmation` is the fail-closed
+  save-boundary read for an exact actor-bound staff confirmation;
+  `findEligibilityByCandidateKey` is the request/candidate-key save-boundary
+  read for ineligible state. The roster GET is consumed by
+  `ReviewerSearchSection` for active/excluded/ineligible/blocked rendering,
+  exact saved keys, and the dedup name union. `coi_dropped` contributes only
+  through `allNames`.
 
 ## Write paths
 
-- `lib/services/reviewer-roster-store.js` only: `recordSurfaced` (candidate-keyed bulk upsert `active` or direct-deceased `ineligible`, monotonic ineligible guard, optional `updated_at` optimistic-concurrency guard for long applicant-enrichment runs, actual affected-row count, active/saved row cap), `recordCoiDropped` (candidate-keyed bulk upsert `coi_dropped`, compact hard-drop ledger, never overwrites active/excluded/ineligible/saved rows), `setExcluded` (candidate-keyed upsert → `excluded`, cannot overwrite ineligible), `promote` (exact candidate key, `excluded`→`active`), `confirmIdentity` (exact candidate key, active-row-only authenticated staff confirmation), `markSaved` (exact candidate keys, active/saved → `saved`), `removePreviousActiveSearchResults` (exact client-visible candidate keys bound to server-issued `updated_at` tokens plus an active/generated-provenance allowlist; preserves applicant-suggested, saved, excluded, ineligible, COI-ledger, active COI-flagged, concurrently refreshed/current-run, and unknown-provenance rows).
-- `pages/api/workbench/reviewer-roster.js` (POST/PATCH), driven by `ReviewerSearchSection` actions (record-on-results, Exclude, Promote, authenticated identity confirmation, remove labeled prior-search results, save-graduation after `save-candidates`, applicant-promotion graduation after `promote-applicant-reviewer`). Browser POST cannot create applicant/suggestion-shaped rows. Exclude, saved, and identity-confirmation actions on an applicant row first retrieve the canonical server blob and reject stale/missing rows, so the client may change disposition or supply manual contact but cannot replace identity/eligibility evidence. Ordinary browser POST/exclude/saved paths strip client-supplied staff authority, then perform one bounded request/candidate-key roster read and carry forward only a genuine stored confirmation plus its canonical manual contact; POST also clears client eligibility fields and reconstructs them only from a valid request/candidate/evidence-bound automated receipt before `recordSurfaced`.
+- `lib/services/reviewer-roster-store.js` only: `recordSurfaced`
+  (candidate-keyed upsert `active`/`ineligible`), `recordCoiDropped`,
+  `setExcluded`, `promote`, `confirmIdentity`,
+  `finalizeCandidatePromotion` (server-only exact-key `active`→`saved` after a
+  confirmed Dataverse suggestion success), `markPromotionBlocked`
+  (server-only exact-key `active`→`blocked` with decision/code/reason), and
+  `removePreviousActiveSearchResults`. Terminal states are monotonic against
+  ordinary result refreshes.
+- `pages/api/workbench/reviewer-roster.js` handles record-on-results, Exclude,
+  Promote, authenticated identity confirmation, and scoped removal. Browser
+  `action:'saved'` returns 409 `server_owned_transition`; clients cannot create
+  saved/blocked authority. Browser-authored blobs have staff authority stripped
+  and eligibility reconstructed only from a valid bound receipt.
 - `pages/api/workbench/enrich-recommended.js` snapshots each canonical suggestion row and its roster `updated_at`, preserves complete actor-bound staff confirmations through the bounded prune, and records applicant-suggested output via concurrency-guarded `recordSurfaced` as `active` or direct-deceased `ineligible`, stamped with `candidate.enrichedProposalKey` and the current `candidate.applicantEnrichmentCacheVersion`. A row confirmed, excluded, saved, or otherwise changed while enrichment is running is left unchanged and reported in progress; a suggestion with no row at snapshot may still insert normally. Deceased rows skip Dataverse contact/identity/metric writeback.
 - `pages/api/reviewer-finder/discover.js` records institution-COI candidates hard-dropped by Track A verified discovery and referred-seed discovery as `status='coi_dropped'`. `lib/services/discovery-service.js` returns Track B institution-COI hard drops to the route for the same request-scoped write. Phase-C flag-not-drop candidates flow through the existing `recordSurfaced` active-row path instead.
 
 ## Cross-system
 
-No Dataverse equivalent — operational/ephemeral by design. Crossing points: a candidate saved via `save-candidates.js` lands in Dataverse `wmkf_appreviewersuggestion` (canonical) and is independently flipped to `status='saved'` here as a dedup marker; an applicant-suggested row promoted via `promote-applicant-reviewer.js` flips the existing Dataverse junction row to `wmkf_selected=true` and is also marked `status='saved'` here. The two stores are not transactionally linked; the roster never governs the Dataverse `wmkf_applicantdisposition` picklist.
+No Dataverse equivalent — operational/ephemeral by design. Crossing points:
+`save-candidates-service.js` creates/reuses the canonical person and suggestion,
+then finalizes the exact roster key as `saved`; applicant promotion selects the
+existing suggestion, then performs the same server-owned finalization.
+Dataverse and Postgres are not one transaction, so a finalization failure emits
+an operational alert and the canonical Dataverse row remains authoritative.
+Applicant-excluded no-ops become `blocked`; the roster never governs the
+Dataverse `wmkf_applicantdisposition` picklist.
 
 ## Migration disposition / gotchas
 
@@ -55,7 +125,16 @@ No Dataverse equivalent — operational/ephemeral by design. Crossing points: a 
 - PATCH handlers are eviction-tolerant (upsert from the submitted blob / no-op) so a row evicted by the cap while still on screen can't 404 a card action.
 - Stores a pruned render DTO, never raw provider payloads or `tierResults`. Eligibility retains only the bounded fetched first-party page evidence needed for staff verification.
 - Staff confirmation authority is not the client boolean. `save-candidates` must retrieve the opaque confirmation id under the same request and match the canonical name/email/website/affiliation; missing, mismatched, cross-request, or failed reads stop before writes.
-- Automated `confirmed` / `probable` fields are deny-only without a valid signed receipt. The receipt uses existing `NEXTAUTH_SECRET`, is request-, immutable-roster-key-, identity-bundle-, and eligibility-evidence-bound, and expires after 14 days. New roster-managed candidates fail closed unless that receipt carries the verified immutable roster key, which save uses for its durable eligibility re-read because enrichment may change the email/affiliation correlation fingerprint. Only bare pre-roster payloads with neither an explicit roster candidate key nor an automated receipt retain the old mutable-correlation compatibility path.
+- Automated `confirmed` / `probable` fields are deny-only without a valid signed
+  receipt. Projection v3 uses `NEXTAUTH_SECRET`, expires after 14 days, and
+  binds request, immutable roster key, identity bundle, eligibility evidence,
+  exact normalized effective email/source, and contact persistence flags. Mint
+  and save use the same `projectReviewerContact` derivation. V1/v2 tokens remain
+  verifiable against their own historical projections during the TTL but are
+  identity-only evidence and never authorize contact promotion. New
+  roster-managed candidates fail closed unless the receipt carries the verified
+  immutable roster key; only bare pre-roster compatibility payloads retain the
+  old mutable-correlation path.
 - Applicant-suggested restore is keyed on the complete expected canonical suggestion-key set plus `candidate.enrichedProposalKey` and the current `candidate.applicantEnrichmentCacheVersion`, not the proposal Blob URL. Canonical excluded/saved suggestion keys are subtracted as terminal staff actions, so promotion or exclusion does not trigger perpetual enrichment or re-display; unrelated/non-canonical keys cannot hide a missing expected row. Unversioned and older-version rows refresh once; the successful refresh persists the current version. `load-proposal` uses `addRandomSuffix:true`, so `blobUrl` changes across reloads and is not a stable cache key. A completed batch exposes **Update applicant suggestions** even when its cache is valid, allowing a staff-requested rerun after source data or resolver behavior changes; reruns preserve actor-bound staff confirmations and manual contact.
 - Migration 025 backfills pre-existing rows with their stored `candidate.candidateKey` when present, otherwise an opaque `legacy-row:<id>` key, and writes that key into the candidate JSON so subsequent client actions remain exact.
 - **Anchor-stamped placeholder keys split one person across two rows (S387).** `stampSuggestionAnchor` writes `suggestionId` into a blob but never re-keys the row [VERIFIED via `lib/services/reviewer-roster-store.js:368-384`], so a migration-025 `legacy-row:<id>` row can carry a suggestion anchor while the canonical `suggestion:<id>` row is written separately by applicant enrichment. The unique index is `(request_id, candidate_key)` [VERIFIED via `lib/db/migrations/025_reviewer_find_roster_candidate_key.sql:22-23`], so both rows persist; the client keys cards off the stored `candidate.candidateKey` [VERIFIED via `lib/utils/reviewer-candidate-key.js:18-21`], so the person renders twice — once selectable from the placeholder row (pre-identity-spine flags, so it looks clean) and once read-only from the canonical row carrying the real verdict. `findCandidateBySuggestion` resolves a suggestion ONLY to the canonical key, so promoting the selectable copy always 422s. Live counts [VERIFIED 2026-07-29 via production read-only probe]: 184 `legacy-row:` rows carry a suggestion anchor; 26 of those had a canonical twin (deleted by `scripts/dedupe-reviewer-roster-suggestion-twins.mjs`, dry-run by default, backup written before any delete). The other 158 had NO canonical twin. Codex adversarial review established the impact is wider than promotion: `authoritativeApplicantCandidate` (`pages/api/workbench/reviewer-roster.js`) resolved applicant rows through the canonical-key lookup too, so `exclude`, `saved`, AND `confirm_identity` also 409'd — staff could see an applicant card they could neither action nor set aside. Two-part remediation:

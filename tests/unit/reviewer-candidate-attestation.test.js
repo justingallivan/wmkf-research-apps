@@ -5,6 +5,8 @@
 import { decodeJwt, SignJWT } from 'jose';
 import crypto from 'crypto';
 import {
+  contactAttestationProjection,
+  identityAttestationProjection,
   legacyIdentityAttestationProjection,
   mintAutomatedIdentityAttestation,
   PROJECTION_VERSION,
@@ -20,6 +22,8 @@ const REQUEST = '11111111-1111-1111-1111-111111111111';
 const CANDIDATE = {
   name: 'Dr Jane Smith',
   email: 'jane@example.edu',
+  emailSource: 'pubmed',
+  emailPersistAllowed: true,
   affiliation: 'Example University',
   orcid: '0000-0002-1825-0097',
   googleScholarId: 'SCHOLAR-1',
@@ -207,7 +211,60 @@ test('legacy receipts remain valid for bound metrics but cannot authorize identi
     source: 'automated_resolver',
     identityDecisionBound: false,
     eligibilityEvidenceBound: false,
+    contactAuthorityBound: false,
+    projectionVersion: 1,
   });
+});
+
+test('pre-deployment v2 receipt still verifies as identity-only authority', async () => {
+  const projection = identityAttestationProjection(CANDIDATE);
+  const token = await new SignJWT({
+    typ: 'reviewer-auto-identity',
+    requestId: REQUEST,
+    candidateKey: projection.candidateKey,
+    projectionVersion: 2,
+    baseIdentityDigest: crypto.createHash('sha256')
+      .update(JSON.stringify(legacyIdentityAttestationProjection(CANDIDATE)))
+      .digest('base64url'),
+    identityDigest: crypto.createHash('sha256')
+      .update(JSON.stringify(projection))
+      .digest('base64url'),
+  })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuedAt()
+    .setExpirationTime(Math.floor(Date.now() / 1000) + TTL_SECONDS)
+    .sign(new TextEncoder().encode(process.env.NEXTAUTH_SECRET));
+
+  await expect(verifyAutomatedIdentityAttestation(token, {
+    requestId: REQUEST,
+    candidate: CANDIDATE,
+  })).resolves.toMatchObject({
+    valid: true,
+    identityDecisionBound: true,
+    contactAuthorityBound: false,
+    projectionVersion: 2,
+  });
+});
+
+test('v3 binds the exact email, source, and persist flags', async () => {
+  expect(contactAttestationProjection(CANDIDATE)).toMatchObject({
+    decision: 'ready',
+    email: 'jane@example.edu',
+    emailSource: 'pubmed',
+    emailPersistAllowed: true,
+  });
+  const token = await mintAutomatedIdentityAttestation({ requestId: REQUEST, candidate: CANDIDATE });
+
+  for (const candidate of [
+    { ...CANDIDATE, email: 'other@example.edu' },
+    { ...CANDIDATE, emailSource: 'manual' },
+    { ...CANDIDATE, emailPersistAllowed: false },
+  ]) {
+    await expect(verifyAutomatedIdentityAttestation(token, {
+      requestId: REQUEST,
+      candidate,
+    })).resolves.toEqual({ valid: false, reason: 'claim_mismatch' });
+  }
 });
 
 test('contact changes invalidate a receipt bound to the submitted candidate key', async () => {
@@ -236,6 +293,8 @@ test('receipt survives the real enrichment merge and roster pruning shape', asyn
     contactEnrichment: {
       identity: { status: 'probable' },
       email: 'jane@example.edu',
+      emailSource: 'pubmed',
+      emailPersistAllowed: true,
       affiliation: 'Current University',
       orcidId: '0000-0002-1825-0097',
       googleScholarId: 'SCHOLAR-1',

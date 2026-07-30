@@ -18,6 +18,7 @@ import {
   withReviewerCandidateKey as _withReviewerCandidateKey,
 } from '../../../lib/utils/reviewer-candidate-key';
 import { emailConfidence } from '../../../lib/utils/reviewer-invite';
+import { projectReviewerContact } from '../../../lib/utils/reviewer-vetted-email';
 
 // Increment when applicant-recommended enrichment semantics change in a way
 // that requires existing roster JSON to be recomputed. Unversioned legacy rows
@@ -48,15 +49,19 @@ export const sanitizeInstitutionCOIDetails = _sanitizeInstitutionCOIDetails;
 export function isCandidateSelectable(c) {
   const eligibilityStatus = c?.eligibilityStatus || c?.contactEnrichment?.eligibilityStatus || 'unknown';
   return eligibilityStatus !== 'deceased'
-    && (provenanceGroupOf(c) !== 'needs_identity_review' || c?.pdIdentityConfirmed === true)
+    && projectReviewerContact(c, { staffConfirmed: c?.pdIdentityConfirmed === true })?.decision === 'ready'
     && !c?.hasInstitutionCOI;
 }
 
-export function candidateWasSaved(candidate, savedKeys = [], savedNames = []) {
+export function candidateWasSaved(candidate, savedKeys = []) {
   const stableKeys = new Set(Array.isArray(savedKeys) ? savedKeys : []);
-  if (stableKeys.size > 0) return stableKeys.has(reviewerSaveKey(candidate));
-  const legacyNames = new Set((Array.isArray(savedNames) ? savedNames : []).map(_normalizeReviewerName));
-  return legacyNames.has(_normalizeReviewerName(candidate?.name));
+  return stableKeys.has(reviewerSaveKey(candidate));
+}
+
+export function getCandidatePromotionDecision(candidate) {
+  return projectReviewerContact(candidate, {
+    staffConfirmed: candidate?.pdIdentityConfirmed === true,
+  });
 }
 
 /**

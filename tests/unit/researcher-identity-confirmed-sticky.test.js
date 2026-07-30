@@ -23,16 +23,20 @@ const decision = (status) => ({
   anchors: [],
 });
 
-function mockStoredState(storedState) {
+function mockStoredState(storedState, anchors = []) {
   if (storedState === 'read_failure') {
     return jest.spyOn(DynamicsService, 'getRecord').mockRejectedValue(new Error('status read failed'));
   }
-  return jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ wmkf_identitystatus: storedState });
+  return jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+    wmkf_identitystatus: storedState,
+    wmkf_identityverifiedanchorsjson: JSON.stringify(anchors),
+    _etag: 'W/"7"',
+  });
 }
 
 describe('writeIdentityDecision — origin × incoming status × stored state', () => {
   test('automated W4.1 anchors reach the existing verified-anchors memo intact', async () => {
-    mockStoredState('probable');
+    mockStoredState('probable', [{ canonicalKey: 'openalex:A100' }]);
     const updateRecord = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
     const input = {
       ...decision('probable'),
@@ -59,6 +63,7 @@ describe('writeIdentityDecision — origin × incoming status × stored state', 
       sourceUrl: 'https://openalex.org/A100',
       verifier: 'reviewerWorksFirst@2.0.0-works-first',
     }]);
+    expect(updateRecord.mock.calls[0][3]).toMatchObject({ ifMatch: 'W/"7"' });
   });
 
   describe.each(['confirmed', 'probable', 'read_failure'])('self_report, stored=%s', (storedState) => {
@@ -106,7 +111,7 @@ describe('writeIdentityDecision — origin × incoming status × stored state', 
         expect(updateRecord).not.toHaveBeenCalled();
       } else {
         await promise;
-        if (storedState === 'confirmed') {
+        if (storedState === 'confirmed' || storedState === 'probable') {
           expect(updateRecord).not.toHaveBeenCalled();
         } else {
           expect(updateRecord).toHaveBeenCalledTimes(1);
@@ -149,6 +154,44 @@ describe('writeIdentityDecision — origin × incoming status × stored state', 
     expect(getRecord).not.toHaveBeenCalled();
     expect(updateRecord).not.toHaveBeenCalled();
   });
+
+  test('stored probable refreshes only for an overlapping binding and uses If-Match', async () => {
+    mockStoredState('probable', [{ canonicalKey: 'openalex:A100' }]);
+    const updateRecord = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    const result = await writeIdentityDecision('pr-1', {
+      ...decision('probable'),
+      anchors: [{ canonicalKey: 'openalex:A100', type: 'authorship_grounded' }],
+    }, { identityOrigin: IDENTITY_DECISION_ORIGIN.AUTOMATED });
+
+    expect(result).toEqual({ updated: true });
+    expect(updateRecord.mock.calls[0][3]).toMatchObject({ ifMatch: 'W/"7"' });
+  });
+
+  test('different automated binding cannot overwrite stored probable', async () => {
+    mockStoredState('probable', [{ canonicalKey: 'openalex:A100' }]);
+    const updateRecord = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    await expect(writeIdentityDecision('pr-1', {
+      ...decision('probable'),
+      anchors: [{ canonicalKey: 'orcid:0000-0001-5109-3700' }],
+    }, { identityOrigin: IDENTITY_DECISION_ORIGIN.AUTOMATED }))
+      .resolves.toEqual({ updated: false, reason: 'binding_conflict' });
+    expect(updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('automated write fails closed when the person ETag is missing', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      wmkf_identitystatus: 'unresolved',
+      _etag: null,
+    });
+    const updateRecord = jest.spyOn(DynamicsService, 'updateRecord');
+
+    await expect(writeIdentityDecision('pr-1', decision('probable'), {
+      identityOrigin: IDENTITY_DECISION_ORIGIN.AUTOMATED,
+    })).rejects.toMatchObject({ code: 'identity_etag_missing', status: 409 });
+    expect(updateRecord).not.toHaveBeenCalled();
+  });
 });
 
 describe('clearIdentityFields — origin × stored state', () => {
@@ -163,15 +206,16 @@ describe('clearIdentityFields — origin × stored state', () => {
     expect(updateRecord).not.toHaveBeenCalled();
   });
 
-  test('automated + stored non-confirmed clears fields', async () => {
+  test('automated + stored non-confirmed abstains without field lineage', async () => {
     mockStoredState('probable');
     const updateRecord = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
 
-    await clearIdentityFields('pr-1', ['wmkf_orcid', 'wmkf_orcidurl'], {
+    const result = await clearIdentityFields('pr-1', ['wmkf_orcid', 'wmkf_orcidurl'], {
       identityOrigin: IDENTITY_DECISION_ORIGIN.AUTOMATED,
     });
 
-    expect(updateRecord.mock.calls[0][2]).toEqual({ wmkf_orcid: null, wmkf_orcidurl: null });
+    expect(result).toEqual({ cleared: false, reason: 'probable_sticky' });
+    expect(updateRecord).not.toHaveBeenCalled();
   });
 
   test('automated + read failure fails closed', async () => {

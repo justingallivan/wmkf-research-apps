@@ -19,7 +19,13 @@ related:
 **Status:** MAINTAINED current-state reference (owns the live behavioral guarantees below).
 **Owner:** reviewer-finder.
 **Created:** 2026-06-13 (S253).
-**Last verified:** 2026-07-06 (save-time institution-COI F2/F4 recompute) — contract 5 re-verified against the server-side save recompute, applicant-alias fail-closed context, and `lookupReviewerIdentity` ordering; contracts 3 and 7 last re-verified 2026-07-03 (S321 + Contract 5 follow-up through Phase C); others last traced 2026-06-13 (S253). See `[VERIFIED]` tags per section.
+**Last verified:** 2026-07-29 on branch
+`codex/reviewer-promotion-remediation` (not deployed) — Contracts 1–3 were
+re-traced through the canonical contact projection, v3 attestation,
+server-owned roster finalization, explicit contact-clear command, and focused
+tests. Contract 5 was last re-verified 2026-07-06 against the server-side save
+recompute; Contract 7 was last re-verified 2026-07-03. See `[VERIFIED]` tags per
+section.
 
 > **What this doc is.** The single maintained home for the Reviewer Finder feature's
 > *live* fail-closed enforcement contracts — the hard blocks, force-nulls, and
@@ -41,68 +47,74 @@ Authoritative source files: `pages/api/reviewer-finder/save-candidates.js`,
 `pages/api/review-manager/send-emails.js`, `lib/utils/reviewer-invite.js`,
 `lib/utils/reviewer-provenance.js`, `lib/services/proposal-pi-identity.js`,
 `lib/services/reviewer-identity-evidence.js`, `lib/services/contact-enrichment-service.js`.
+Promotion contact authority additionally lives in
+`lib/utils/reviewer-vetted-email.js`,
+`lib/services/reviewer-candidate-attestation.js`, and
+`lib/services/reviewer-finder/save-candidates-service.js`.
 
 ---
 
-## 1. Slice-E identity-unresolved gate — client/server asymmetry `[VERIFIED 2026-06-13]`
+## 1. Identity-unresolved retention and promotion gate `[VERIFIED 2026-07-29 IN SOURCE; NOT DEPLOYED]`
 
-**Contract.** An identity-unresolved candidate is gated at TWO boundaries, and the two
-are **intentionally asymmetric**: the client FIND select list is *stricter* than the
-server save gate.
+**Contract.** Find retention and Invite promotion are separate decisions. An
+unresolved row may remain visible and actionable for staff resolution, but it
+does not become selectable for promotion and the server writes neither a
+person nor a suggestion until the canonical contact projection is `ready`.
 
-- **Client (FIND select list).** Both the Workbench and the standalone
-  `reviewer-finder.js` gate selectability on `provenanceGroupOf(c) !== 'needs_identity_review'`
-  — the `needs_identity_review` group renders read-only and is excluded from
-  select-all/save. `provenanceGroupOf` (`lib/utils/reviewer-provenance.js:~221`) routes a row
-  to `needs_identity_review` when `needsIdentification===true || identityStatus==='unresolved'
-  || verificationStatus==='unresolved'`, OR when the provenance kind is barred/unknown AND the
-  row has NO positive identity. A positively-resolved row (confirmed/probable/verified) is
-  ALWAYS selectable even with a barred kind.
+- **Client (Find select list).** `isCandidateSelectable` requires both the
+  existing provenance/identity group to be selectable and
+  `projectReviewerContact(candidate).decision === 'ready'`. Rows needing
+  identity confirmation or an authoritative email remain visible with the
+  exact required action, but are excluded from select-all/promotion.
 - **Server (`lib/services/reviewer-finder/save-candidates-service.js`,
-  `isUnresolvedIdentity`).** HARD-REJECTS only the
-  EXPLICIT-unresolved triple (`needsIdentification`/`identityStatus`/`verificationStatus`),
-  per-row. It deliberately does NOT gate on the full `provenanceGroupOf` — a barred/unknown-kind
-  row with no top-level identity is legitimately saved here from other paths (a contact-enriched
-  person with a resolver verdict but no top-level `identityStatus`) under field-level gating.
-  Gating the server on `provenanceGroupOf` would wrongly reject those.
+  `saveCandidates`).** Recomputes the same canonical contact projection before
+  any durable write. `needs_identity_confirmation` and `missing_email` return
+  explicit per-candidate `withheld` results. A mixed batch can still save its
+  independent ready rows; only server-confirmed saved keys graduate.
 
 **Enforcement points.** `lib/utils/reviewer-provenance.js` (`provenanceGroupOf`) ·
 `lib/services/reviewer-finder/save-candidates-service.js`
-(`isUnresolvedIdentity` and `saveCandidates`, including the per-row rejection
-and batch 422 result).
+(`saveCandidates`) · `lib/utils/reviewer-vetted-email.js`
+(`projectReviewerContact`) ·
+`shared/components/reviewers/reviewer-search-logic.js`
+(`isCandidateSelectable`).
 
-**Why.** The clients hide ungrounded rows, but the standalone Reviewer Finder and any
-bypassed/direct caller can still POST them, so the field-level gate alone is insufficient —
-the server rejects the whole row (writes neither person nor suggestion). When the whole batch
-is rejected the route returns **422** with `rejectedUnresolved`; a mixed batch returns 200 and
-saves the resolved rows. The gate must survive a Find-roster reload — `pruneCandidateForRoster`
-persists `identityStatus`/`needsIdentification`/`verificationStatus`, else a deferred candidate
-re-surfaces as selectable.
+**Why.** Client gating is explanatory only; a direct caller can still POST the
+row. The server projection is therefore the authority and the roster preserves
+the evidence needed to reproduce the same decision after reload.
 
 **Audit.** `tests/unit/reviewer-route-identity-gate.test.js`.
 
 ---
 
-## 2. PI-named / cited / referred exemption + contact force-null `[VERIFIED 2026-06-13]`
+## 2. Human-grounded provenance retains recall but never promotes name-only `[VERIFIED 2026-07-29 IN SOURCE; NOT DEPLOYED]`
 
-**Contract.** A candidate whose provenance kind is `cited_reference`, `proposal_named`, or
-`referred` (the proposal author named/cited THIS specific person, or a contacted reviewer referred
-them — a human-grounded signal, S249) is NOT hard-blocked when unresolved — it is
-selectable for identity review. BUT until its identity is confirmed/probable, the save boundary
-**force-nulls ALL contact + identity-derived fields** (email, website, faculty-page, affiliation,
-ORCID, Scholar, bibliometrics, department, expertise). A selectable-but-unverified row therefore
-cannot carry a wrong-person email — it could be a namesake of the named person.
+**Contract.** `cited_reference`, `proposal_named`, and `referred` provenance may
+retain a candidate in Find even when automated identity resolution abstains.
+That provenance is discovery evidence, not contact authority. Until the exact
+identity/contact projection is ready—or staff stores an exact actor-bound
+identity/contact confirmation—the row is read-only for promotion and no
+potential-reviewer or selected suggestion is created.
 
 **Enforcement points.**
-`lib/services/reviewer-finder/save-candidates-service.js`
-(`contactBlockedForUnresolvedExempt` and `saveCandidates`) gates the force-null
-application, including ORCID/OpenAlex/metrics through `blockByIdentity`. The exemption itself is
-`isIdentityReviewExemptProvenance(...)` checked BEFORE the unresolved gate in `isUnresolvedIdentity`
-. System-discovered (`literature_retrieved`, incl. Slice-E deferred Track-B) stays
-hard-blocked. The card shows an amber "⚠ Verify identity — no contact saved until confirmed" pill.
+`lib/utils/reviewer-vetted-email.js` (`projectReviewerContact`) derives the
+effective nested identity decision, exact normalized email/source, persistence
+flags, affiliation rescue, and anti-scrape rejection. The Find card renders
+**Needs identity confirmation** or **Missing verified email**; only `ready`
+renders a promotion checkbox. `save-candidates-service.js` recomputes the
+decision before adapters are called.
 
-**Why.** Anchor-or-abstain at the persistence boundary, turned from assumption into enforced
-invariant (Codex HIGH, S235).
+Automated attestation v3 binds the exact projected email, source, persistence
+flags, request, immutable roster key, identity decision, and eligibility
+evidence. V1/v2 receipts still verify their historical identity claims during
+their TTL but are never contact-authoritative. Staff confirmation remains an
+exact server-stored, actor-bound value contract; changing any confirmed contact
+field requires reconfirmation.
+
+**Why.** The old force-null path safely withheld a possibly wrong email but
+still created a selected name-only row, which made retention look like a
+successful Invite promotion. The new contract preserves recall without
+creating that ambiguous durable state.
 
 ---
 
@@ -175,11 +187,17 @@ still moves the value. Downgrades remain explicit for the same reason — those 
 assertions rather than evidence claims.
 
 **Address + source are ONE write, enforced at the ADAPTER rather than per caller.** Every
-`wmkf_emailaddress` writer in `potential-reviewer.js` carries `wmkf_emailsource` in the same
-payload: `update`, `create`, `upsertByEmail`, and `clearEmail` (which nulls BOTH — a source left
-behind describes an address the row no longer has, so the next address written without a source
-would inherit it; in the merge flow that is a loser row keeping `orcid` after its address moved to
-the keeper). Adapter support is NOT the invariant, though — `pruneEmpty` drops the field when a caller omits
+`wmkf_emailaddress` writer in `potential-reviewer.js` carries
+`wmkf_emailsource` in the same payload: `update`, `create`, `upsertByEmail`,
+merge-only `clearEmail`, and staff-edit `clearEmailForEdit` (both clear
+address and source together). A source left behind describes an address the row
+no longer has, so the next address written without a source would inherit it;
+in the merge flow that is a loser row keeping `orcid` after its address moved
+to the keeper. Normal `update` ignores null/blank email rather than treating
+absence as destructive authority. `clearEmailForEdit` requires the exact
+expected address/source, a reason, and the person ETag, so a concurrent
+shared-person edit fails stale instead of being overwritten. Adapter support is
+NOT the invariant, though — `pruneEmpty` drops the field when a caller omits
 it, so every CALLER must supply a source. Three successive reviews each found a caller the
 previous claim had missed, so the invariant is now enforced by a scanner rather than by
 enumeration: `tests/unit/email-source-pairing-invariant.test.js` walks `lib/`, `pages/`,

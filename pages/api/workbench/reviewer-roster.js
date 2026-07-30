@@ -4,12 +4,12 @@
  * (`reviewer_find_roster` via `reviewer-roster-store`); no Dataverse, so no
  * `bypassDynamicsRestrictions` needed. See docs/atlas/postgres-reviewer-find-roster.md.
  *
- *   GET   ?requestId            → { active, excluded, ineligible, savedKeys, allNames }
+ *   GET   ?requestId            → { active, excluded, ineligible, blocked, savedKeys, allNames }
  *   POST  { requestId, candidates }                  → record surfaced
  *     (active, or ineligible only with a bound server eligibility receipt)
  *   PATCH { requestId, action:'exclude', candidate } → set aside
  *   PATCH { requestId, action:'promote', candidateKey } → excluded → active (returns blob)
- *   PATCH { requestId, action:'saved', candidates }  → graduated to the Dataverse pool
+ *   PATCH { requestId, action:'saved', candidates }  → rejected; promotion services own graduation
  *   PATCH { requestId, action:'confirm_identity', candidate } → staff attestation
  *   PATCH { requestId, action:'remove_previous_results' } → delete active search history
  *
@@ -23,7 +23,6 @@ import {
   setExcluded,
   promote,
   confirmIdentity,
-  markSaved,
   listForRequest,
   findCandidateBySuggestionAnchor,
   findCandidatesByKeys,
@@ -243,27 +242,10 @@ async function handlePatch(req, res, access) {
   }
 
   if (action === 'saved') {
-    const { candidates } = req.body;
-    if (!Array.isArray(candidates) || candidates.length === 0) {
-      return res.status(400).json({ error: 'candidates[] is required to mark saved' });
-    }
-    const pruned = [];
-    for (const candidate of candidates) {
-      let safeCandidate = stripClientRosterAuthority(pruneCandidateForRoster(candidate));
-      if (isServerManagedApplicantCandidate(candidate)) {
-        safeCandidate = await authoritativeApplicantCandidate(requestId, candidate);
-        if (!safeCandidate) {
-          return res.status(409).json({ error: 'Applicant reviewer row is stale or missing; reload before marking it saved.' });
-        }
-      }
-      if (safeCandidate?.name && safeCandidate?.candidateKey) pruned.push(safeCandidate);
-    }
-    if (pruned.length !== candidates.length) {
-      return res.status(400).json({ error: 'Every saved candidate requires name and candidateKey' });
-    }
-    const authoritativePruned = await preserveStoredRosterAuthority(requestId, pruned);
-    const saved = await markSaved(requestId, authoritativePruned);
-    return res.status(200).json({ success: true, saved });
+    return res.status(409).json({
+      error: 'Roster saved state is server-owned; use the reviewer promotion endpoint.',
+      code: 'server_owned_transition',
+    });
   }
 
   if (action === 'confirm_identity') {

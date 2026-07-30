@@ -11,6 +11,8 @@ const REQ_B = 'bbbbbbbb-2222-2222-2222-222222222222';
 const candidate = (name, email) => ({
   name,
   email,
+  emailSource: 'pubmed',
+  emailPersistAllowed: true,
   identityStatus: 'probable',
   provenance: {
     kind: 'literature_retrieved',
@@ -61,7 +63,7 @@ async function runStaleSave(saveResponse) {
   />);
   await screen.findByLabelText('Select Dr Candidate A');
   fireEvent.click(screen.getByLabelText('Select Dr Candidate A'));
-  fireEvent.click(screen.getByRole('button', { name: /save 1 selected as candidates/i }));
+  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
 
   await act(async () => {
     rerender(<ReviewerSearchSection

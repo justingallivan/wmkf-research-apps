@@ -13,6 +13,7 @@ import { setMatchReason, ensureStaffManualCandidate, APPLICANT_DISPOSITION_EXCLU
 import { upsertByPotentialReviewer, updateById as updateResearcherById } from '../../lib/dataverse/adapters/researcher.js';
 import {
   create as createPotentialReviewer,
+  clearEmailForEdit,
   update as updatePotentialReviewer,
   upsertByEmail as upsertPotentialReviewerByEmail,
 } from '../../lib/dataverse/adapters/potential-reviewer.js';
@@ -626,10 +627,105 @@ describe('potential-reviewer.wmkf_name whitespace normalization', () => {
     expect(out).toEqual({ id: 'pr-new', created: true, reusedAffiliation: null });
   });
 
+  test('upsertByEmail converges to the active exact-email owner after a concurrent create wins', async () => {
+    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
+      records: [{
+        wmkf_potentialreviewersid: 'pr-winner',
+        wmkf_emailaddress: 'race@example.edu',
+        statecode: 0,
+        wmkf_name: null,
+      }],
+    });
+    const duplicate = Object.assign(
+      new Error('0x80060892 Entity Key violated DuplicateAttributes><wmkf_emailaddress>race@example.edu</'),
+      { status: 412 },
+    );
+    jest.spyOn(DynamicsService, 'createRecord').mockRejectedValue(duplicate);
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    const out = await upsertPotentialReviewerByEmail(
+      { name: 'Race Winner', email: 'Race@Example.edu', emailSource: 'manual' },
+      { existing: null, actingUserSystemId: 'user-1' },
+    );
+
+    expect(out).toMatchObject({ id: 'pr-winner', created: false });
+    expect(update).toHaveBeenCalledWith(
+      'wmkf_potentialreviewerses',
+      'pr-winner',
+      expect.objectContaining({ wmkf_name: 'Race Winner' }),
+      { actingUserSystemId: 'user-1' },
+    );
+  });
+
+  test('upsertByEmail refuses an inactive exact-email owner', async () => {
+    const existing = {
+      wmkf_potentialreviewersid: 'pr-inactive',
+      wmkf_emailaddress: 'inactive@example.edu',
+      statecode: 1,
+    };
+
+    await expect(upsertPotentialReviewerByEmail(
+      { name: 'Inactive Owner', email: 'inactive@example.edu' },
+      { existing },
+    )).rejects.toMatchObject({ code: 'inactive_email_owner', status: 409 });
+  });
+
   test('update normalizes wmkf_name (empty existing → written clean)', async () => {
     jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({}); // no existing value → a real diff
     const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
     await updatePotentialReviewer('pr-3', { name: ' Test 3 Reviewer ' });
     expect(update.mock.calls[0][2].wmkf_name).toBe('Test 3 Reviewer');
+  });
+
+  test('ordinary update ignores an empty email instead of clearing shared contact', async () => {
+    const get = jest.spyOn(DynamicsService, 'getRecord');
+    const update = jest.spyOn(DynamicsService, 'updateRecord');
+
+    await updatePotentialReviewer('pr-3', { email: '', emailSource: 'manual' });
+
+    expect(get).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  test('explicit email clear requires and passes the exact address/source/ETag', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      wmkf_potentialreviewersid: 'pr-3',
+      wmkf_emailaddress: 'Person@Example.edu',
+      wmkf_emailsource: 'manual',
+      _etag: 'W/"11"',
+    });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    await expect(clearEmailForEdit('pr-3', {
+      expectedEmail: 'person@example.edu',
+      expectedEmailSource: 'manual',
+      expectedEtag: 'W/"11"',
+      reason: 'staff_removed_incorrect_address',
+    }, { actingUserSystemId: 'user-1' })).resolves.toMatchObject({ cleared: true });
+
+    expect(update).toHaveBeenCalledWith(
+      'wmkf_potentialreviewerses',
+      'pr-3',
+      { wmkf_emailaddress: null, wmkf_emailsource: null },
+      { actingUserSystemId: 'user-1', ifMatch: 'W/"11"' },
+    );
+  });
+
+  test('explicit email clear fails closed when the shared person changed', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      wmkf_potentialreviewersid: 'pr-3',
+      wmkf_emailaddress: 'new@example.edu',
+      wmkf_emailsource: 'manual',
+      _etag: 'W/"12"',
+    });
+    const update = jest.spyOn(DynamicsService, 'updateRecord');
+
+    await expect(clearEmailForEdit('pr-3', {
+      expectedEmail: 'old@example.edu',
+      expectedEmailSource: 'manual',
+      expectedEtag: 'W/"11"',
+      reason: 'staff_removed_incorrect_address',
+    })).rejects.toMatchObject({ code: 'contact_clear_conflict', status: 409 });
+    expect(update).not.toHaveBeenCalled();
   });
 });

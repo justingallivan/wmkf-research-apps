@@ -29,11 +29,12 @@ function queryTextOf(callIndex) {
 }
 
 describe('listForRequest', () => {
-  test('partitions active/excluded/ineligible and collects allNames across EVERY status', async () => {
+  test('partitions active/excluded/ineligible/blocked and collects allNames across EVERY status', async () => {
     sql.mockResolvedValueOnce({ rows: [
       { status: 'active', display_name: 'Ann Lee', candidate: { name: 'Ann Lee' } },
       { status: 'excluded', display_name: 'Bob Roe', candidate: { name: 'Bob Roe' } },
       { status: 'ineligible', display_name: 'Pat Thiel', candidate: { name: 'Pat Thiel', eligibilityStatus: 'deceased' } },
+      { status: 'blocked', display_name: 'Eve Poe', candidate: { name: 'Eve Poe', promotionDecision: 'blocked_applicant_excluded' } },
       { status: 'saved', candidate_key: 'suggestion:sug-9', display_name: 'Cy Poe', candidate: { name: 'Cy Poe', suggestionId: 'SUG-9' } },
       { status: 'coi_dropped', display_name: 'Dee Coe', candidate: { name: 'Dee Coe', hasInstitutionCOI: true } },
     ] });
@@ -41,9 +42,10 @@ describe('listForRequest', () => {
     expect(out.active.map((c) => c.name)).toEqual(['Ann Lee']);
     expect(out.excluded.map((c) => c.name)).toEqual(['Bob Roe']);
     expect(out.ineligible.map((c) => c.name)).toEqual(['Pat Thiel']);
+    expect(out.blocked.map((c) => c.name)).toEqual(['Eve Poe']);
     expect(out.savedKeys).toEqual(['suggestion:sug-9']);
     // allNames is the cross-run dedup union — must include saved + excluded + coi_dropped too.
-    expect(out.allNames).toEqual(['Ann Lee', 'Bob Roe', 'Pat Thiel', 'Cy Poe', 'Dee Coe']);
+    expect(out.allNames).toEqual(['Ann Lee', 'Bob Roe', 'Pat Thiel', 'Eve Poe', 'Cy Poe', 'Dee Coe']);
   });
 });
 
@@ -396,29 +398,66 @@ describe('staff identity confirmation', () => {
   });
 });
 
-describe('markSaved', () => {
-  test('upserts each exact candidate row to saved (eviction-tolerant, leaving excluded untouched)', async () => {
-    const n = await store.markSaved(REQ, [
-      { name: 'Ann Lee', candidateKey: 'candidate:ann' },
-      { name: 'Bob Roe', candidateKey: 'candidate:bob' },
-      { name: '' },
-    ]);
-    expect(n).toBe(2); // one upsert per valid name; blank dropped
-    expect(sql).toHaveBeenCalledTimes(2);
+describe('finalizeCandidatePromotion', () => {
+  test('server-owned finalization persists exact Dataverse anchors and returns the key', async () => {
+    sql.mockResolvedValueOnce({ rows: [{ candidate_key: 'candidate:ann' }], rowCount: 1 });
+
+    const result = await store.finalizeCandidatePromotion(
+      REQ,
+      { name: 'Ann Lee', candidateKey: 'candidate:ann', email: 'ann@example.edu' },
+      {
+        candidateKey: 'candidate:ann',
+        suggestionId: 'SUG-1',
+        potentialReviewerId: 'PID-1',
+      },
+    );
+
+    expect(result).toEqual({ saved: true, candidateKey: 'candidate:ann' });
     const text = queryTextOf(0);
-    expect(text).toMatch(/INSERT INTO reviewer_find_roster/); // upsert, not bare UPDATE → eviction-tolerant
+    expect(text).toMatch(/INSERT INTO reviewer_find_roster/);
     expect(text).toMatch(/status = 'saved'/);
     expect(text).toMatch(/status IN \('active', 'saved'\)/);
-    expect(text).toMatch(/ON CONFLICT \(request_id, candidate_key\)/);
+    expect(text).toMatch(/RETURNING candidate_key/);
     expect(allInterpolations()).toEqual(expect.arrayContaining([
-      'ann lee', 'bob roe', 'candidate:ann', 'candidate:bob',
+      REQ,
+      'candidate:ann',
+      JSON.stringify({ suggestionId: 'SUG-1', potentialReviewerId: 'PID-1' }),
     ]));
   });
 
-  test('no-op (0) on an empty candidate list — no sql issued', async () => {
-    const n = await store.markSaved(REQ, [{ name: '' }, null]);
-    expect(n).toBe(0);
-    expect(sql).not.toHaveBeenCalled();
+  test('does not graduate an excluded/ineligible collision', async () => {
+    sql.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    await expect(store.finalizeCandidatePromotion(
+      REQ,
+      { name: 'Ann Lee' },
+      {
+        candidateKey: 'candidate:ann',
+        suggestionId: 'SUG-1',
+        potentialReviewerId: 'PID-1',
+      },
+    )).resolves.toEqual({ saved: false, candidateKey: 'candidate:ann' });
+  });
+});
+
+describe('markPromotionBlocked', () => {
+  test('moves only the exact active/blocked key into terminal blocked state with a durable reason', async () => {
+    sql.mockResolvedValueOnce({ rows: [{ candidate_key: 'candidate:ann' }], rowCount: 1 });
+
+    await expect(store.markPromotionBlocked(REQ, 'candidate:ann', {
+      decision: 'blocked_applicant_excluded',
+      code: 'applicant_excluded',
+      reason: 'Applicant excluded this reviewer.',
+    })).resolves.toEqual({ blocked: true, candidateKey: 'candidate:ann' });
+
+    const text = queryTextOf(0);
+    expect(text).toMatch(/SET status = 'blocked'/);
+    expect(text).toMatch(/status IN \('active', 'blocked'\)/);
+    expect(allInterpolations()).toContain('candidate:ann');
+    expect(allInterpolations()).toContain(JSON.stringify({
+      promotionDecision: 'blocked_applicant_excluded',
+      promotionBlockCode: 'applicant_excluded',
+      promotionBlockReason: 'Applicant excluded this reviewer.',
+    }));
   });
 });
 

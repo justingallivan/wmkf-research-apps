@@ -75,10 +75,25 @@ lineage field does not duplicate that evidence payload.
 ## Adapter contract (`lib/dataverse/adapters/potential-reviewer.js`)
 
 Methods:
-- `getByEmail`, `getById`
-- `upsertByEmail({ name, email, affiliation, expertise, whyChosen })` — find-or-create on email; on match, **fill-if-empty only** (preserves staff edits)
-- `update(id, updates)` — partial update with name-splitting
+- `findByEmailCandidates`, `getByEmail`, `getById` — exact normalized-email
+  lookup is uniqueness-aware. Promotion reuses only one active exact owner;
+  multiple active owners fail for repair, and an inactive owner is not silently
+  reused.
+- `upsertByEmail({ name, email, affiliation, expertise, whyChosen })` —
+  find-or-create on exact email; on match, **fill-if-empty only** (preserves
+  staff edits). A lost alternate-key create race re-reads the exact owner and
+  converges rather than creating another person.
+- `update(id, updates, { ifMatch })` — partial ETag-capable update with
+  name-splitting. Null/blank email is omitted, not interpreted as a clear.
+- `clearEmailForEdit(id, { expectedEmail, expectedEmailSource, ifMatch,
+  reason })` — the only staff-edit destructive clear; fresh exact-value checks
+  plus ETag, and address/source are cleared atomically.
+- `clearEmail(id, { ifMatch })` — merge-only atomic address/source clear.
+- `deleteExactNew(id, { ifMatch })` — bounded save compensation for the exact
+  newly created, freshly proven unreferenced person only.
 - `setContactLink(potentialReviewerId, contactId)` — sets `wmkf_Contact@odata.bind`
+- `getByIdForMerge` / `deactivate` — wide merge read and ETag-guarded terminal
+  mutation.
 
 `splitName` strips `Dr./Prof./Professor` prefixes and splits on whitespace.
 `clamp` truncates to FIELD_MAX with `…` suffix.
@@ -95,9 +110,31 @@ Methods:
 ## Write paths
 
 - Endpoints: same as read (via `upsertByEmail` / `update` / `setContactLink`)
+- `lib/services/reviewer-finder/save-candidates-service.js` — canonical contact
+  projection precedes all writes; exact active email-owner reuse, create-race
+  convergence, and bounded exact-new-person compensation protect the promotion
+  boundary.
+- `lib/services/reviewer-finder/my-candidates-service.js` — normal edits never
+  infer an email clear; the explicit clear command carries expected
+  address/source, reason, and person ETag.
+- `lib/services/reviewer-merge.js` — plans and preflights keeper/loser plus all
+  reference ETags; every person mutation passes `ifMatch`.
 - `scripts/backfill-postgres-to-dataverse.js` — `upsertByEmail` against the Postgres `researchers` pool during Wave 2 backfill.
 - `lib/services/reviewer-identity-binding-writer.js` — one complete ETag-guarded person PATCH after transition validation; first production caller is live in acceptance-drain self-report
 - `lib/services/capture-self-reported-orcid.js` — stable acceptance events use the binding writer with the event identity (`boundAt`/`resolvedAt`) truncated to Dataverse second precision (DateTime columns drop fractional seconds on round-trip, so a job retry must replay as an exact no-op); only typed `legacy_classification_required` falls back to the transitional person writes, and contact fill follows person persistence
+
+### Shared-person identity/contact monotonicity
+
+The person row is shared across requests. The compatibility writer in
+`lib/dataverse/adapters/researcher.js` therefore treats automated decisions
+monotonically: `confirmed` is sticky; `probable` is not downgraded by
+unresolved/ambiguous evidence; a probable refresh requires overlapping trusted
+anchors; and a binding conflict abstains rather than overwriting. Automated
+confirmed input is capped at probable unless it entered through the dedicated
+binding-writer authority. Legacy rows do not carry field-level lineage, so
+`clearIdentityFields` now deliberately abstains instead of destructively
+clearing shared identity fields. Every compatibility transition is
+ETag-guarded; conflicts require a fresh read/retry.
 
 ## Cross-system
 

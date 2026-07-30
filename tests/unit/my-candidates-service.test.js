@@ -39,6 +39,7 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   __esModule: true,
   queryReviewers: jest.fn(async () => ({ records: [] })),
   update: jest.fn(async () => {}),
+  clearEmailForEdit: jest.fn(async () => ({ cleared: true })),
   findByEmailCandidates: jest.fn(),
 }));
 jest.mock('../../lib/dataverse/adapters/researcher', () => ({
@@ -449,6 +450,46 @@ describe('patchMyCandidates', () => {
     expect(researcherAdapter.updateById).not.toHaveBeenCalledWith(
       PERSON_ID, expect.objectContaining({ emailSource: 'manual' }), expect.anything(),
     );
+  });
+
+  test('empty email routes through the explicit ETag-bound clear command', async () => {
+    suggestionAdapter.findById.mockResolvedValue({ _wmkf_potentialreviewer_value: PERSON_ID });
+    const emailClear = {
+      expectedEmail: 'old@example.edu',
+      expectedEmailSource: 'manual',
+      expectedEtag: 'W/"8"',
+      reason: 'staff_removed_incorrect_address',
+    };
+
+    const out = await patchMyCandidates({
+      body: { suggestionId: SUGGESTION_ID, email: '', emailClear },
+      actingUserSystemId: SYS,
+    });
+
+    expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
+    expect(potentialReviewerAdapter.clearEmailForEdit).toHaveBeenCalledWith(
+      PERSON_ID,
+      emailClear,
+      { actingUserSystemId: SYS },
+    );
+    expect(out.success).toBe(true);
+  });
+
+  test('empty email without clear evidence is a typed client error', async () => {
+    suggestionAdapter.findById.mockResolvedValue({ _wmkf_potentialreviewer_value: PERSON_ID });
+    potentialReviewerAdapter.clearEmailForEdit.mockRejectedValue(
+      Object.assign(new Error('clear evidence required'), {
+        code: 'contact_clear_evidence_required',
+        status: 400,
+      }),
+    );
+
+    await expect(patchMyCandidates({
+      body: { suggestionId: SUGGESTION_ID, email: '' },
+    })).rejects.toMatchObject({
+      httpStatus: 400,
+      body: { code: 'contact_clear_evidence_required' },
+    });
   });
 
   test('duplicate-key conflicting owner is fail-closed: ambiguous/inactive owner → conflictingRecordId null', async () => {

@@ -23,6 +23,10 @@ function slotRow(requestId, slotMap, etag = 'W/"req1"') {
 }
 
 function makeDeps({ keeperRow, loserRow, loserSug = [], keeperSug = [], slots = [], slotsCapped = false } = {}) {
+  const withEtags = (rows, prefix) => rows.map((row, index) => ({
+    _etag: `W/"${prefix}-${index}"`,
+    ...row,
+  }));
   return {
     potentialReviewer: {
       getByIdForMerge: jest.fn(async (id) => (id === KEEPER ? keeperRow : loserRow)),
@@ -31,7 +35,9 @@ function makeDeps({ keeperRow, loserRow, loserSug = [], keeperSug = [], slots = 
       deactivate: jest.fn(async () => {}),
     },
     suggestions: {
-      findAllByPotentialReviewer: jest.fn(async (id) => (id === LOSER ? loserSug : keeperSug)),
+      findAllByPotentialReviewer: jest.fn(async (id) => (
+        id === LOSER ? withEtags(loserSug, 'loser-suggestion') : withEtags(keeperSug, 'keeper-suggestion')
+      )),
       repointToPotentialReviewer: jest.fn(async () => {}),
       hardDeleteById: jest.fn(async () => {}),
       isExcluded: jest.fn((row) => row?.wmkf_applicantdisposition === 'EXCLUDED'),
@@ -44,6 +50,7 @@ function makeDeps({ keeperRow, loserRow, loserSug = [], keeperSug = [], slots = 
     },
     requests: {
       queryAllRequests: jest.fn(async () => ({ records: slots, capped: slotsCapped })),
+      getById: jest.fn(async (id) => ({ akoya_requestid: id, _etag: 'W/"request-refresh"' })),
       updateById: jest.fn(async () => {}),
       disassociate: jest.fn(async () => {}),
     },
@@ -51,8 +58,8 @@ function makeDeps({ keeperRow, loserRow, loserSug = [], keeperSug = [], slots = 
   };
 }
 
-const bareKeeper = { wmkf_potentialreviewersid: KEEPER, wmkf_name: 'Avery Quinn', wmkf_emailaddress: 'avery.quinn@example.org' };
-const bareLoser = { wmkf_potentialreviewersid: LOSER, wmkf_name: 'Avery Quill', wmkf_emailaddress: null };
+const bareKeeper = { wmkf_potentialreviewersid: KEEPER, wmkf_name: 'Avery Quinn', wmkf_emailaddress: 'avery.quinn@example.org', _etag: 'W/"keeper"' };
+const bareLoser = { wmkf_potentialreviewersid: LOSER, wmkf_name: 'Avery Quill', wmkf_emailaddress: null, _etag: 'W/"loser"' };
 
 describe('planMerge — validation', () => {
   test('rejects non-GUID ids and identical ids', async () => {
@@ -150,6 +157,58 @@ describe('planMerge — near-name duplicate shape (both pre-engagement, no colli
 });
 
 describe('executeMerge', () => {
+  test('missing person ETag fails preflight before any merge write', async () => {
+    const deps = makeDeps({
+      keeperRow: { ...bareKeeper, _etag: null },
+      loserRow: bareLoser,
+      loserSug: [],
+    });
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER }, deps))
+      .rejects.toMatchObject({
+        code: 'merge_retryable_replan',
+        operation: 'preflight',
+        reason: 'etag_missing',
+      });
+    expect(deps.potentialReviewer.deactivate).not.toHaveBeenCalled();
+  });
+
+  test('missing suggestion ETag fails preflight before repoint/delete', async () => {
+    const deps = makeDeps({
+      keeperRow: bareKeeper,
+      loserRow: bareLoser,
+      loserSug: [{
+        wmkf_appreviewersuggestionid: SUG_L,
+        _wmkf_request_value: REQ1,
+        _etag: null,
+      }],
+    });
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER }, deps))
+      .rejects.toMatchObject({
+        code: 'merge_retryable_replan',
+        operation: 'preflight',
+        reason: 'etag_missing',
+      });
+    expect(deps.suggestions.repointToPotentialReviewer).not.toHaveBeenCalled();
+    expect(deps.suggestions.hardDeleteById).not.toHaveBeenCalled();
+  });
+
+  test('missing applicant-slot request ETag fails preflight before slot writes', async () => {
+    const deps = makeDeps({
+      keeperRow: bareKeeper,
+      loserRow: bareLoser,
+      loserSug: [],
+      slots: [slotRow(REQ1, { 2: LOSER }, null)],
+    });
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER }, deps))
+      .rejects.toMatchObject({
+        code: 'merge_retryable_replan',
+        operation: 'preflight',
+        reason: 'etag_missing',
+      });
+    expect(deps.requests.updateById).not.toHaveBeenCalled();
+    expect(deps.requests.disassociate).not.toHaveBeenCalled();
+  });
+
   test('refuses a blocked plan and mutates nothing', async () => {
     const deps = makeDeps({ keeperRow: bareKeeper, loserRow: { ...bareLoser, _wmkf_contact_value: 'ffffffff-ffff-ffff-ffff-ffffffffffff' } });
     await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER }, deps)).rejects.toThrow(/Merge blocked/);
@@ -164,7 +223,7 @@ describe('executeMerge', () => {
     });
     const summary = await executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: {}, actingUserSystemId: 'sys' }, deps);
     expect(deps.suggestions.repointToPotentialReviewer).toHaveBeenCalledWith(SUG_L, KEEPER, { actingUserSystemId: 'sys', ifMatch: 'W/"1"' });
-    expect(deps.potentialReviewer.deactivate).toHaveBeenCalledWith(LOSER, { actingUserSystemId: 'sys' });
+    expect(deps.potentialReviewer.deactivate).toHaveBeenCalledWith(LOSER, { actingUserSystemId: 'sys', ifMatch: 'W/"loser"' });
     expect(deps.potentialReviewer.clearEmail).not.toHaveBeenCalled();
     expect(summary).toMatchObject({ repointed: 1, deleted: 0, emailMoved: false });
   });
@@ -307,7 +366,7 @@ describe('executeMerge — applicant-slot repoint (v1 block lifted)', () => {
       slots: [slotRow(REQ1, { 2: LOSER, 3: KEEPER })],
     });
     const summary = await executeMerge({ keeperId: KEEPER, loserId: LOSER, actingUserSystemId: 'sys' }, deps);
-    expect(deps.requests.disassociate).toHaveBeenCalledWith(REQ1, 'wmkf_PotentialReviewer2', { actingUserSystemId: 'sys' });
+    expect(deps.requests.disassociate).toHaveBeenCalledWith(REQ1, 'wmkf_PotentialReviewer2', { actingUserSystemId: 'sys', ifMatch: 'W/"req1"' });
     expect(deps.requests.updateById).not.toHaveBeenCalled();
     expect(summary).toMatchObject({ slotsRepointed: 0, slotsCleared: 1 });
   });
@@ -384,7 +443,10 @@ describe('executeMerge — collision-row applicant-provenance union', () => {
     deps.suggestions.ensureApplicantRecommended = jest.fn(async () => { order.push('union'); return { skippedExcluded: false }; });
     deps.suggestions.hardDeleteById = jest.fn(async () => { order.push('delete'); });
     const summary = await executeMerge({ keeperId: KEEPER, loserId: LOSER, actingUserSystemId: 'sys' }, deps);
-    expect(deps.suggestions.ensureApplicantRecommended).toHaveBeenCalledWith({ potentialReviewerId: KEEPER, requestId: REQ1 }, { actingUserSystemId: 'sys' });
+    expect(deps.suggestions.ensureApplicantRecommended).toHaveBeenCalledWith(
+      { potentialReviewerId: KEEPER, requestId: REQ1 },
+      { actingUserSystemId: 'sys', requireEtag: true },
+    );
     expect(order).toEqual(['union', 'delete']);
     expect(summary).toMatchObject({ provenanceTransferred: 1, deleted: 1 });
   });

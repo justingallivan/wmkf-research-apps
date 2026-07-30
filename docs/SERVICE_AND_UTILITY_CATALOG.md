@@ -6,7 +6,7 @@ status: canonical
 summary: "If you're touching a service or utility, read its header before this catalog. If a header is sparse or stale, fix it in the same commit as your..."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-07-26
+last_verified: 2026-07-29
 owner: product-engineering
 related:
   - lib/services/
@@ -98,8 +98,24 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`contact-enrichment-service.js`** — Tiered contact lookup with identity anchoring, structured scholarly-email evidence, and Dataverse writeback.
 - **`reviewer-contact-reconciliation.js`** — Read-only, sequential exact-email/ORCID reconciliation for enriched search cards. Produces bounded staff-facing Dataverse evidence only; provisional ORCID hits can require review but never establish a known identity or grant save authority.
 - **`contact-enrichment/scholarly-email.js`** — Free NCBI PubMed + Europe PMC author-affiliation email resolver; requires full-forename or exact-ORCID identity plus affiliation corroboration, deduplicates the same work across providers, and abstains on tied addresses.
-- **`reviewer-roster-store.js`** — Postgres operational roster for request-scoped Find state; active-row staff identity confirmation is stored here and re-read fail-closed at save.
-- **`reviewer-candidate-attestation.js`** — Transitional `NEXTAUTH_SECRET`-signed receipt binding server-computed automated identity fields to one request/candidate bundle before save. Version 2 binds the complete persisted identity decision; legacy receipts remain metrics-valid but cannot authorize an identity-decision write.
+- **`reviewer-roster-store.js`** — Postgres operational roster for
+  request-scoped Find state and server-owned promotion finalization. Stores
+  actor-bound staff identity confirmation; only the successful Dataverse
+  promotion service can finalize exact keys as `saved`, while authoritative
+  applicant-excluded collisions become `blocked`.
+- **`reviewer-candidate-attestation.js`** — `NEXTAUTH_SECRET`-signed
+  request/candidate receipt. Projection v3 binds the exact canonical contact
+  projection in addition to identity/eligibility; v1/v2 remain verifiable
+  against their historical projections but are never contact-authoritative.
+- **`reviewer-finder/save-candidates-service.js`** — Server-owned Find→Invite
+  promotion boundary: canonical contact projection, v3/staff authority,
+  exact-email owner reuse and race convergence, per-row result contract,
+  bounded new-person compensation, and exact roster finalization.
+- **`reviewer-promotion-repair-classifier.js`** — Pure read-only historical
+  classifier (`D/C/U/E/N`) and redacted canonical manifest/hash builder.
+  Classification D requires one active exact-email owner, independent
+  same-person confirmation, and an unblocked ETag-complete merge plan; it does
+  not execute repairs.
 - **`capture-self-reported-orcid.js`** — Self-reported ORCID persistence seam. Accept-drain calls with a stable acceptance timestamp use the Wave 13 binding writer before contact fill; only typed `legacy_classification_required` falls back to the transitional person writes. Older/decline calls without a stable event retain the transitional path.
 - **`reviewer-identity-binding-writer.js`** — Server-owned Wave 13 person-binding transition seam: fail-closed snapshot + ETag read, strict UTC timestamp normalization, lineage/source precedence, one complete conditional PATCH, and bounded 412 reread/recompute. Its first production caller is live since PR #57 / `00ffb09c`: acceptance-drain self-report only. Dirty legacy rows, revocation, unauthorized human correction, policy-reader migration, and automated writer migration remain blocked or deferred.
 
@@ -177,6 +193,12 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`reviewer-save-key.js`** — Shared browser/server partial-save correlation key; explicit client ids win, otherwise normalized submitted anchors distinguish same-name rows. Never use it for person merging.
 - **`reviewer-identity-fields.js`** — Literal seven-field authority for resolver-sourced reviewer identity values that require durable lineage; shared by the legacy resolver and Wave 13 binding contract.
 - **`reviewer-manual-confirmation.js`** — Canonical name/contact projection and exact matcher for request-scoped staff identity confirmation records.
+- **`reviewer-vetted-email.js`** — Canonical pure reviewer contact projection
+  shared by attestation mint/save, Find selectability, applicant backfill, and
+  legacy reconciliation. Produces `ready`,
+  `needs_identity_confirmation`, or `missing_email` with exact
+  email/source/persistence authority; `pickVettedEmail` is its compatibility
+  wrapper.
 
 ### Secrets
 

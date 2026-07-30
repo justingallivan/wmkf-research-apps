@@ -331,9 +331,31 @@ describe('isCandidateSelectable', () => {
   test('resolved non-COI rows remain selectable', () => {
     expect(isCandidateSelectable({
       name: 'Clean',
+      email: 'clean@example.edu',
+      emailSource: 'pubmed',
+      emailPersistAllowed: true,
+      identityStatus: 'probable',
       hasInstitutionCOI: false,
       provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
     })).toBe(true);
+  });
+
+  test('nested unresolved identity overrides top-level verified/selectable signals', () => {
+    expect(isCandidateSelectable({
+      name: 'Contradictory',
+      email: 'contradictory@example.edu',
+      emailSource: 'pubmed',
+      emailPersistAllowed: true,
+      identityStatus: 'probable',
+      verificationStatus: 'verified',
+      contactEnrichment: {
+        email: 'contradictory@example.edu',
+        emailSource: 'pubmed',
+        emailPersistAllowed: true,
+        identity: { status: 'unresolved' },
+      },
+      hasInstitutionCOI: false,
+    })).toBe(false);
   });
 
   test('deceased rows are never selectable, including after PD identity confirmation', () => {
@@ -617,8 +639,8 @@ describe('saved candidate correlation', () => {
     expect(candidateWasSaved(sibling, [reviewerSaveKey(saved)], ['Dr Same Name'])).toBe(false);
   });
 
-  test('legacy savedNames remain supported only when stable keys are absent', () => {
-    expect(candidateWasSaved({ name: 'Dr Legacy' }, [], ['Legacy'])).toBe(true);
+  test('legacy savedNames cannot graduate a candidate without an exact stable key', () => {
+    expect(candidateWasSaved({ name: 'Dr Legacy' }, [], ['Legacy'])).toBe(false);
   });
 });
 

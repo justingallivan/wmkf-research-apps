@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-28
+last_verified: 2026-07-29
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -24,6 +24,9 @@ source_files:
   - shared/components/reviewers/RemoveEntirelyModal.js
   - pages/api/reviewer-finder/enrich-contacts.js
   - pages/api/reviewer-finder/save-candidates.js
+  - lib/services/reviewer-finder/save-candidates-service.js
+  - lib/services/reviewer-candidate-attestation.js
+  - lib/utils/reviewer-vetted-email.js
   - pages/api/review-manager/campaign-timeline-defaults.js
   - pages/api/review-manager/terminal-transition.js
   - pages/api/workbench/enrich-recommended.js
@@ -71,6 +74,32 @@ cross-run deduplication, referral capture, address collection, lifecycle state,
 and staff-facing reviewer management.
 
 **Reviewer-engagement build (Model B):** spec is `docs/REVIEWER_ENGAGEMENT_SPEC.md`. The 9 backing Dataverse fields are **provisioned in prod (2026-06-21, wave `7-reviewer-engagement`)**. Per-request campaign config (offset/due-date/reminder toggles+leads/desired-count/quota-notified-at) lives on `akoya_request`; the per-reviewer fire-once respond-reminder marker `wmkf_respondremindersentat` lives on `wmkf_appreviewersuggestion`. **Phase 1 LIVE (S275):** the invite panel's respond-by is now a "days to respond" offset; `wmkf_respondoffsetdays` + `wmkf_reviewduedate` are written on first invite (`send-emails.js`) and edited via `/api/review-manager/campaign-config` (Reviewers-tab "Campaign settings"). Current-cycle invitation defaults are now edited in `/admin` as "Reviewer Campaign Timeline", stored in `wmkf_appsystemsettings` key `reviewer.campaign_timeline_defaults`, and read by `InviteEmailModal` through `/api/review-manager/campaign-timeline-defaults`; request config overlays those defaults when present. **Phase 2 LIVE (S275):** per-recipient token TTL (`lib/external/reviewer-token-ttl.js` via `render-emails` — invitee/non-responder link caps at review-due+2d, accepted gets review-due+90d, fallback now+90); accepted-only "Release to reviewers" materials send (server-gated in `send-emails`, plus a one-click button on the **Track Reviewers** sub-tab, `ReviewerManagePanel.js`); and a `materials_not_sent` upload guard (`review-upload.js` self-token path → 403). **Phase 3 LIVE (S275):** `/api/cron/reviewer-reminders` (daily) sends two per-request opt-in reminders — respond-by (invited non-responders, deadline = emailSentAt + respondOffsetDays - lead, token-live, fire-once `wmkf_respondremindersentat`) and review-due (accepted/materials-sent/not-submitted, deadline = reviewDueDate - lead, fire-once via the existing `wmkf_remindersentat`). Both claim-before-send (If-Match) → at-most-once; the server `allowResend` re-mint clears the respond marker (the **manual "Re-invite already-invited" Invite-Reviewers-panel button (`ReviewerInvitePanel`) was removed S277** — the respond-by reminder is the nudge for invited non-responders; `allowResend` is retained only as the programmatic re-mint contract). Server-side render in `lib/external/reviewer-reminder-email.js`; service in `lib/services/reviewer-reminder-sweep.js`. **Phase 4 LIVE (S275; actual PD email + quota seeding S352):** quota → PD notify + selective decline. `lib/services/reviewer-quota.js` (called from the acceptance drain `lib/services/reviewer-acceptance-drain.js` after it re-verifies the accept committed — moved off `respond.js` by the S350 accept-fast-response build) notifies the lead PD once when the accepted count first reaches `wmkf_desiredcount` — concurrency-gated by a conditional null→set of `wmkf_quotanotifiedat` (If-Match). **S352:** the notify now actually EMAILS the lead PD (`emailAdmins: true`, `explicitRecipients` = resolved PD only, no `category` fan-out; degrades to dashboard-alert-only when the PD email is unresolvable), and `wmkf_desiredcount` is settable end-to-end — admin "Reviewer quota" default (4) in the Reviewer Campaign Timeline settings, seeded non-clobbering on first invite send (`send-emails-service.js`, server-side default read only), and editable in the Campaign settings modal, which prefills due-date/quota from the admin defaults (`docs/REVIEWER_QUOTA_PD_EMAIL_PLAN.md`, Status: SHIPPED). `POST /api/review-manager/withdraw-sufficient` (the **Invite Reviewers** tab's "Release as no longer needed") writes `withdrawn_sufficient` + `wmkf_withdrawnsufficientat` + clears `wmkf_respondremindersentat` on still-pending rows only (the §2.9 missing writer). **All four phases shipped.** See the two Atlas pages for the exact column list.
+
+## Find → Invite promotion contract (implemented in source 2026-07-29; not deployed)
+
+Find retention is no longer equivalent to Invite readiness. The shared
+`projectReviewerContact` projection derives one server-reproducible decision
+from nested identity evidence, the exact normalized email/source, persistence
+flags, affiliation rescue, and anti-scrape policy. Only `ready` candidates are
+selectable for **Promote to Invite**. `needs_identity_confirmation` and
+`missing_email` remain visible with their exact staff action and produce no
+person/suggestion write.
+
+Automated receipt v3 binds that exact contact projection to the request and
+immutable roster key; v1/v2 remain identity-only during their TTL. A staff
+override remains an exact actor-bound server record. `save-candidates-service`
+recomputes authority before adapters, resolves a unique active exact-email
+owner before creation, converges create races, checks applicant exclusion, and
+returns exact per-key `saved`/`withheld`/`failed` results. Only the server
+finalizes an exact roster key as `saved`; the roster endpoint rejects browser
+`action:'saved'`. An applicant-excluded collision becomes durable read-only
+`blocked`.
+
+On a partial non-2xx response, Find still reconciles server-confirmed saved
+keys. After an unknown transport outcome it refetches roster/Invite state
+before retry, and never graduates by normalized name. Invite continues to read
+only the linked canonical person email; a legacy selected email-empty row shows
+a diagnostic rather than falling back to the roster address.
 
 ## Candidate removal, decline archival, and restore (Invite Reviewers)
 
@@ -144,11 +173,41 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
 
 **Unified candidate list:** Enriched applicant candidates (`recCandidates`) are prepended into `displayCandidates` so fresh enrichment wins over stale roster copies. Candidates with a resolved identity surface in the `applicant_suggested` provenance section — which appears after `cited_or_proposal_named` and `literature_retrieved` in that order — via `provenanceGroupOf` detecting `isApplicantRecommended: true` → `APPLICANT_SUGGESTED` kind. **Exception:** candidates where enrichment could not confirm identity (`needsIdentification: true`, typically when the applicant provided no affiliation) route to `needs_identity_review` instead — `provenanceGroupOf` checks `needsIdentification` before `APPLICANT_SUGGESTED` (reviewer-provenance.js:228 vs :231). The `applicant_suggested` section is selectable unless normal safety gates make a row read-only; selecting it calls `POST /api/workbench/promote-applicant-reviewer` with the existing `suggestionId` instead of `save-candidates`.
 
-**Roster persistence:** `/api/workbench/enrich-recommended` snapshots each canonical suggestion row and its roster `updated_at`, stamps each final applicant-enriched row with `enrichedProposalKey` and the current `applicantEnrichmentCacheVersion`, prunes it through `pruneCandidateForRoster`, and records it in `reviewer_find_roster` via concurrency-guarded `recordSurfaced`: ordinary rows are `active`; direct official deceased evidence is `ineligible`. Incrementing `APPLICANT_ENRICHMENT_CACHE_VERSION` makes older roster JSON refresh once under the new enrichment semantics; the successful refresh persists the new version and restores normal cache reuse. The applicant final-coherence gate uses the current-run PubMed/ORCID verification institution when available and falls back to the applicant/stored institution only when it is absent; this permits legitimate moves without allowing a stored stale affiliation to self-confirm a later namesake substitution. The prune carries bounded `staffIdentityConfirmation` and `manualContactFields` so a rerun does not erase an actor-bound confirmation. Browser-authored roster POST/exclude/saved paths strip client-supplied authority, then one bounded request/candidate-key read carries forward only a genuine stored confirmation and its canonical manual contact; applicant mutations re-read the full server row. If a row is confirmed, excluded, saved, or otherwise updated after the snapshot, the stale enrichment write affects zero rows and leaves the newer/terminal state intact; a suggestion with no row at snapshot can still insert. Deceased rows skip Dataverse contact/identity/metric writeback, render only in the Not eligible section, and remain in cross-run dedup. `suggestionId` is part of the pruned DTO because the promotion path needs the existing Dataverse junction row. Excluding an applicant row removes it from `recCandidates` and the active roster; promoting one marks its canonical roster key `saved` so it does not restore after reload.
+**Roster persistence:** `/api/workbench/enrich-recommended` snapshots each
+canonical suggestion row and its roster `updated_at`, stamps each final
+applicant-enriched row with `enrichedProposalKey` and the current cache version,
+prunes it through `pruneCandidateForRoster`, and records it through the
+concurrency-guarded roster store as `active` or direct-deceased `ineligible`.
+The current-run verification institution outranks stale stored affiliation in
+the final coherence check. The prune retains bounded actor-owned staff
+confirmation. Browser POST/exclude strips client-supplied authority and
+restores only a genuine server confirmation; the browser cannot write `saved`
+or `blocked`. Concurrently confirmed/excluded/saved/blocked rows resist stale
+enrichment. `suggestionId` remains the exact applicant-promotion anchor.
+Exclusion removes an applicant row from the active roster; only a successful
+server promotion finalizes it `saved`, while an authoritative
+applicant-excluded collision finalizes it `blocked`.
 
-**Explicit promotion:** `/api/workbench/promote-applicant-reviewer` validates `requestId` and `suggestionId` as GUIDs, reads the existing suggestion, checks ownership (`_wmkf_request_value`) and `wmkf_applicantdisposition=Recommended`, then requires the canonical request/`suggestion:<id>` roster row before flipping `wmkf_selected=true`; a missing row returns `identity_verification_required`, an unresolved row requires its matching server confirmation, and a known-deceased row returns `candidate_ineligible`, all before any lifecycle/contact write. Browser roster POST cannot mint applicant/suggestion rows; applicant exclude/saved/confirm actions re-read the canonical server blob so a client payload cannot replace identity or eligibility evidence. This avoids duplicate person upserts and bypasses the normal `save-candidates` COI path that intentionally excludes applicant-origin rows. **Persist hand-corrections (S306):** applicant-suggested is the lowest-trust input (no email / wrong-namesake is common), so the route now also carries the PD's `contact` corrections — but ONLY the fields the Find card marked manual (`candidate.manualContactFields`, set by `setManualContact`; `affiliationPersistAllowed`/`hIndex` are NOT manual signals — enrichment sets them too). For eligible/unknown rows it flips `selected` FIRST, THEN writes those fields to the suggestion's OWN `_wmkf_potentialreviewer_value` (never a client-supplied id), conflict-safe fields first + email isolated last, FORCING `emailSource:'manual'` server-side (don't trust a client source label — mirrors `save-candidates`' trust-boundary defense). A duplicate-email collision is NON-fatal: the row stays promoted and the route returns `partialSuccess` + a `contactError` so the now-promoted row resolves via the Invite-tab merge flow. Before S306 this route flipped `selected` only and silently dropped the correction — including PD identity-confirmed (`pdIdentityConfirmed`) rows, which route here by provenance kind (`provenanceKindOf`→`APPLICANT_SUGGESTED`), NOT to `save-candidates`. The contact write logic is duplicated from `my-candidates.js handlePatch` (shared-helper extraction deferred — refactoring the just-shipped my-candidates code carries more blast radius). **Backfill the vetted enrichment email (B1, S317):** even without a manual correction, an applicant reviewer could reach the Invite tab with an EMPTY `wmkf_emailaddress` — `enrich-recommended` discovers the email and writes it to the roster + `researcherAdapter.upsertByPotentialReviewer`, but that writeback has NO email param (`researcher.js:94` ignores identity email), so the address was never persisted to the person. Promote now, when no manual email was given, reads the roster candidate blob SERVER-SIDE by the canonical request/`suggestion:<id>` key (`reviewer-roster-store.findCandidateBySuggestion` — an exact id anchor, NEVER a normalized name, and never a client-supplied identity verdict) and persists the email through the SAME envelope `save-candidates` uses: only when enrichment marked it persistable (`emailPersistAllowed===true` — false on any identity/domain abstain) AND identity is resolved, ONLY when the person has no email yet (idempotent — a manual correction always wins), source FORCED to the roster's vetted provenance server-side (not `'manual'`). Duplicate-email collision stays non-fatal (same `contactError` path). Missing or legacy non-canonical rows fail promotion closed; there is never a name fallback. This is the cause-#1 "roster has email, Dataverse empty" fix for the applicant path. **Find save anchor (S317 follow-up):** Find-discovered rows enter `reviewer_find_roster` at search time before a Dataverse suggestion exists, so their pruned blob can have `suggestionId:null`. After `save-candidates` upserts the person and suggestion, it now best-effort stamps `suggestionId` + `potentialReviewerId` onto the matching `(request_id, candidate_key)` roster row; failure logs but does not fail the save. Existing legacy Find rows are handled by `scripts/backfill-reviewer-roster-suggestion-anchors.mjs`, which is dry-run by default and stamps only when exactly one selected suggestion on that request has the same normalized linked-person name. **Backstop (Fix A, S317):** the cron `/api/cron/reviewer-email-reconcile` → `lib/services/reviewer-email-reconciler.js` sweeps roster rows that already carry `candidate.suggestionId` (`reviewer-roster-store.findReconcilableCandidates`, gated by the shared `pickVettedEmail` + LIVE Dataverse reads): WRITEs an ownerless vetted email, REPOINTs to a single active keeper (guarded against `(person,request)` collision), or ALERTs (`reviewer_email_reconcile_needs_merge`) for ambiguous/inactive/colliding. It never falls back to reconcile-time name matching and does not loosen the `suggestionId IS NOT NULL` scan filter. `?dryRun=1`/`?maxBatch=N`. **B2 Find timeout partial-return (S317 follow-up):** `/api/reviewer-finder/enrich-contacts` now opts into `ContactEnrichmentService.enrichCandidates({ returnPartialOnAbort:true })`; when a deadline fires after at least one candidate completed, the route reruns its normal PI-institution COI recompute on the completed prefix and streams a normal `complete` frame with `partial:true` / `timeout:true` metadata. The existing client merge leaves missing candidates un-enriched, so completed contact/metrics can still flow into `save-candidates`. `/api/workbench/enrich-recommended` is intentionally not opted in and keeps fail-stop timeout behavior for its id-keyed writeback flow. Cause #2 (enrichment completed but no email surfaced) is resolved separately; see `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md`.
+**Explicit applicant promotion (hardened in source 2026-07-29; not
+deployed):** `/api/workbench/promote-applicant-reviewer` validates request and
+suggestion ownership/disposition, requires the canonical
+request/`suggestion:<id>` roster row, and rechecks identity, eligibility, COI,
+and canonical contact authority before selection. Hand corrections are limited
+to fields explicitly marked manual and remain bound to the suggestion's
+server-read person. When no manual email exists, the route can backfill only the
+email authorized by the same canonical contact projection as ordinary Find
+promotion; it then freshly reads the person and refuses selection unless the
+canonical email is present. Duplicate-email collision, stale write, missing
+roster authority, and roster-finalization failure are blocking outcomes—not
+partial successful promotions. After `wmkf_selected=true` succeeds, the server
+finalizes the exact roster key as `saved`. There is no name fallback and no
+successful no-roster legacy path.
 
-**Promotion eligibility safety (2026-07-19):** The request/suggestion-keyed roster read is a pre-mutation boundary. A known-deceased row returns `candidate_ineligible`; a roster read failure returns retryable `eligibility_unavailable` (503) before any lifecycle/contact write. Successful no-row reads retain legacy promotion behavior.
+Find-discovered rows still receive their exact suggestion/person anchors after
+ordinary save. The read-only reconciler remains a legacy backstop: it requires
+an existing server-stored suggestion anchor, uses `pickVettedEmail` as a thin
+caller of the canonical projection, and never creates/selects a suggestion.
+Contact enrichment partial-timeout behavior is unchanged.
 
 **Status card:** The bottom card below the search is a status/progress/error surface only — no candidate list or per-person verification control. It shows ingestion state, enrichment progress while running, a done summary ("N verified — see Applicant-suggested section above") with an **Update applicant suggestions** batch action, or an error with a "Try again" button.
 

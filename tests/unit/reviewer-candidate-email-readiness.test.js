@@ -124,7 +124,7 @@ describe('CandidateCard email readiness', () => {
     expect(screen.queryByText('✓ High-confidence email')).not.toBeInTheDocument();
     expect(screen.queryByText('⚠ Email needs confirmation')).not.toBeInTheDocument();
     expect(screen.queryByText('Email not found')).not.toBeInTheDocument();
-    expect(screen.getByText(/Verify identity — no contact saved until confirmed/)).toBeInTheDocument();
+    expect(screen.getByText(/Keep in Find — identity\/contact confirmation required/)).toBeInTheDocument();
   });
 });
 

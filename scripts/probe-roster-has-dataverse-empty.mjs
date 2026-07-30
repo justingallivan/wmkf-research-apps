@@ -22,6 +22,21 @@ const sinceIso = new Date(Date.now() - DAYS * 86400_000).toISOString();
 const { sql } = await import('@vercel/postgres');
 const norm = (s) => String(s || '').toLowerCase().replace(/^(dr\.?|prof\.?|professor)\s+/i, '').replace(/[^a-z\s]/g, '').replace(/\s+/g, ' ').trim();
 const fmt = (iso) => (iso ? new Date(iso).toISOString().slice(0, 16).replace('T', ' ') : '—');
+function promotionDecisionInputs(candidate) {
+  const enrichment = candidate?.contactEnrichment || {};
+  return {
+    topLevelIdentity: candidate?.identityStatus || candidate?.verificationStatus || null,
+    nestedIdentity: enrichment.identity?.status || null,
+    hasEffectiveEmail: Boolean(candidate?.email || enrichment.email),
+    effectiveEmailSource: candidate?.emailSource || enrichment.emailSource || null,
+    emailPersistAllowed: candidate?.emailPersistAllowed ?? enrichment.emailPersistAllowed ?? null,
+    websitePersistAllowed: candidate?.websitePersistAllowed ?? enrichment.websitePersistAllowed ?? null,
+    affiliationPersistAllowed: candidate?.affiliationPersistAllowed ?? enrichment.affiliationPersistAllowed ?? null,
+    contactStatus: candidate?.contactStatus || enrichment.contactStatus || null,
+    staffConfirmed: candidate?.pdIdentityConfirmed === true,
+    receiptPresent: typeof candidate?.automatedIdentityAttestation === 'string',
+  };
+}
 
 async function getToken() {
   const r = await fetch(`https://login.microsoftonline.com/${process.env.DYNAMICS_TENANT_ID}/oauth2/v2.0/token`, {
@@ -69,6 +84,7 @@ async function getAll(token, urlPath) {
       contactStatus: (c.contactStatus || enr.contactStatus || null),
       status: row.status,
       updatedAt: row.updated_at,
+      promotionInputs: promotionDecisionInputs(c),
     };
   }
 
@@ -96,6 +112,7 @@ async function getAll(token, urlPath) {
           : '';
     console.log(`• ${r.name}  (req ${reqNum[r.requestId] || '?'})`);
     console.log(`    roster: status=${rr.status}  email=${rr.email}  source=${rr.source || '∅'}  emailPersistAllowed=${rr.epa}  contactStatus=${rr.contactStatus || '∅'}`);
+    console.log(`    promotionInputs=${JSON.stringify(rr.promotionInputs)}`);
     console.log(`    timing: saved=${fmt(r.savedAt)}  rosterUpdated=${fmt(rr.updatedAt)}  ${timingNote}`);
     console.log(`    dataverse: email=∅  personModified=${fmt(r.pModified)}`);
   }

@@ -24,6 +24,21 @@ describe('potential-reviewer candidate helpers', () => {
     expect(query.mock.calls[0][1]).toMatchObject({ top: 2 });
   });
 
+  test('findByEmailCandidates prefers one active exact owner over an inactive historical owner', async () => {
+    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
+      records: [
+        { wmkf_potentialreviewersid: 'inactive', wmkf_emailaddress: 'ada@example.edu', statecode: 1 },
+        { wmkf_potentialreviewersid: 'active', wmkf_emailaddress: 'ADA@example.edu', statecode: 0 },
+      ],
+    });
+
+    await expect(potentialReviewer.findByEmailCandidates('ada@example.edu')).resolves.toMatchObject({
+      one: true,
+      id: 'active',
+      inactiveRows: [expect.objectContaining({ wmkf_potentialreviewersid: 'inactive' })],
+    });
+  });
+
   test('findByOrcidCandidates returns one by canonical normalized ORCID', async () => {
     jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
       records: [{ wmkf_potentialreviewersid: 'r1', wmkf_orcid: `https://orcid.org/${ORCID}` }],

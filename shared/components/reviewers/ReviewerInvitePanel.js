@@ -467,6 +467,12 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
                     )}
                     {c.emailSentAt && <span>invited {new Date(c.emailSentAt).toLocaleDateString()}</span>}
                   </div>
+                  {!c.email && !c.invited && (
+                    <div className="mt-1.5 p-2 rounded border border-amber-300 bg-amber-50 text-xs text-amber-800">
+                      <span className="font-medium">Contact withheld / identity review required.</span>{' '}
+                      This legacy selected row has no canonical email. Verify the person and add the exact address before inviting.
+                    </div>
+                  )}
 
                   {/* Persisted selection rationale — the key "refresh my memory"
                       content when a PD returns to the list across invite rounds. */}

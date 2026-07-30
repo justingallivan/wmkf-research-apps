@@ -51,6 +51,7 @@ import {
   applicantTerminalSuggestionKeys,
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
+  getCandidatePromotionDecision,
   candidateWasSaved,
   getCandidateEmailReadiness,
   normalizeReviewerName,
@@ -248,13 +249,14 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const dataverseInstitutions = Array.isArray(dataverseEvidence?.institutions)
     ? dataverseEvidence.institutions.filter((entry) => entry?.value && dataverseInstitutionSourceLabel(entry.source))
     : [];
+  const promotionDecision = getCandidatePromotionDecision(c);
+  const needsIdentityConfirmation = promotionDecision?.decision === 'needs_identity_confirmation';
+  const missingVerifiedEmail = promotionDecision?.decision === 'missing_email';
 
-  // A cited/PI-named candidate the spine couldn't auto-verify is selectable (the PI vouched for
-  // them) but its contact/bibliometrics are force-nulled at save (save-candidates) until identity
-  // is confirmed. Suppress the contact/affiliation/metric display so the card matches that promise
-  // (Codex post-impl #4); show only name + reasoning + the amber "verify identity" pill.
-  const identityUnverified = provenanceGroupOf(c) !== 'needs_identity_review'
-    && (c.needsIdentification === true || c.identityStatus === 'unresolved' || c.verificationStatus === 'unresolved');
+  // Unresolved identity never enters Invite. Suppress contact/bibliometrics that
+  // could belong to a namesake while keeping the row actionable in Find.
+  const identityUnverified = needsIdentityConfirmation
+    && promotionDecision?.reason === 'identity_not_resolved';
 
   const border = checked ? 'border-blue-500 bg-blue-50'
     : hasAnyCOI ? 'border-red-300 bg-red-50'
@@ -384,6 +386,19 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             </div>
           )}
 
+          {needsIdentityConfirmation && (
+            <div className="mt-2 p-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-800">
+              <span className="font-medium">Keep in Find — identity/contact confirmation required.</span>{' '}
+              Confirm the exact person and email before promoting this reviewer to Invite.
+            </div>
+          )}
+          {missingVerifiedEmail && (
+            <div className="mt-2 p-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-800">
+              <span className="font-medium">Keep in Find — verified email missing.</span>{' '}
+              Add or verify an email before promoting this reviewer to Invite.
+            </div>
+          )}
+
           {reason && <p className="text-xs text-gray-700 mt-2"><span className="font-medium">Why: </span>{reason}</p>}
 
           {c.identityNote && <p className="text-[11px] text-gray-500 mt-2 italic border-t border-gray-100 pt-1.5">{c.identityNote}</p>}
@@ -403,12 +418,11 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               : <Pill tone={provenanceGroupOf(c) === 'needs_identity_review' ? 'amber' : 'gray'}>{provenanceLabel}</Pill>}
             {eligibilityStatus === 'emeritus' && <Pill tone="amber">Emeritus / retired</Pill>}
             {previousResult && <Pill tone="blue">Previously found</Pill>}
-            {/* A cited/PI-named candidate the spine couldn't auto-verify is SELECTABLE (the PI
-                vouched for them) but its contact/bibliometrics are force-nulled at save until
-                identity is confirmed — flag that, and suppress the unverified contact/metrics
-                display below so the card matches the "no contact saved" promise. */}
             {identityUnverified && (
-              <Pill tone="amber">⚠ Verify identity — no contact saved until confirmed</Pill>
+              <Pill tone="amber">⚠ Identity review required</Pill>
+            )}
+            {missingVerifiedEmail && (
+              <Pill tone="amber">⚠ Verified email required</Pill>
             )}
           </div>
           {eligibilityStatus === 'emeritus' && eligibilityEvidence?.url && (
@@ -651,6 +665,7 @@ export default function ReviewerSearchSection({
   const [rosterActive, setRosterActive] = useState([]);
   const [rosterExcluded, setRosterExcluded] = useState([]);
   const [rosterIneligible, setRosterIneligible] = useState([]);
+  const [rosterBlocked, setRosterBlocked] = useState([]);
   const [rosterSavedKeys, setRosterSavedKeys] = useState([]);
   const [rosterNames, setRosterNames] = useState([]);
   // Gates the search button until the roster GET resolves, so a run can't skip
@@ -705,7 +720,7 @@ export default function ReviewerSearchSection({
     setPhase('idle'); setProgress([]); setCandidates([]); setUnverified([]); setAnalysis(null);
     setSelected(new Set()); setError(null); setErrorMeta(null); setSavedMsg(null); setEnrichNote(null); setExportError(null);
     setExcludedRemoved(0); setRosterNote(null); setRemovingPrevious(false);
-    setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterSavedKeys([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false);
+    setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterBlocked([]); setRosterSavedKeys([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false);
     setSearchSources({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
     setReviewerCount(DEFAULT_REVIEWER_COUNT);
     setAdditionalNotes('');
@@ -730,6 +745,7 @@ export default function ReviewerSearchSection({
             setRosterActive(Array.isArray(data.active) ? data.active : []);
             setRosterExcluded(Array.isArray(data.excluded) ? data.excluded : []);
             setRosterIneligible(Array.isArray(data.ineligible) ? data.ineligible : []);
+            setRosterBlocked(Array.isArray(data.blocked) ? data.blocked : []);
             setRosterSavedKeys(Array.isArray(data.savedKeys) ? data.savedKeys : []);
             setRosterNames(Array.isArray(data.allNames) ? data.allNames : []);
           }
@@ -1217,6 +1233,7 @@ export default function ReviewerSearchSection({
       setRosterActive(Array.isArray(data.active) ? data.active : []);
       setRosterExcluded(Array.isArray(data.excluded) ? data.excluded : []);
       setRosterIneligible(Array.isArray(data.ineligible) ? data.ineligible : []);
+      setRosterBlocked(Array.isArray(data.blocked) ? data.blocked : []);
       setRosterSavedKeys(Array.isArray(data.savedKeys) ? data.savedKeys : []);
       setRosterNames(Array.isArray(data.allNames) ? data.allNames : []);
       setSelected((prev) => {
@@ -1376,10 +1393,11 @@ export default function ReviewerSearchSection({
       }
 
       let saved = 0;
-      let savedNames = [];
       let savedKeys = [];
+      let blockedKeys = [];
       if (toSave.length > 0) {
         pushProgress(`Saving ${toSave.length} candidate(s)…`);
+        let receivedResponse = false;
         try {
           const sRes = await fetch('/api/reviewer-finder/save-candidates', {
             method: 'POST',
@@ -1392,28 +1410,59 @@ export default function ReviewerSearchSection({
               candidates: toSave,
             }),
           });
+          receivedResponse = true;
           const sData = await sRes.json().catch(() => ({}));
-          if (!sRes.ok || !sData.success) {
-            const detail = formatSaveFailureDetails(sData.errors);
-            throw new Error(detail ? `${sData.error || `Save failed (${sRes.status})`} ${detail}` : (sData.error || `Save failed (${sRes.status})`));
-          }
           saved = sData.savedCount || 0;
-          if (saved === 0) {
-            const detail = formatSaveFailureDetails(sData.errors);
-            throw new Error(detail ? `No candidates were saved: ${detail}` : 'No candidates were saved.');
-          }
-          savedNames = Array.isArray(sData.savedNames) ? sData.savedNames : [];
           savedKeys = Array.isArray(sData.savedKeys) ? sData.savedKeys : [];
-          const normalFailed = toSave.length - saved;
-          if (normalFailed > 0 && Array.isArray(sData.errors)) failures.push(...sData.errors);
+          blockedKeys = (Array.isArray(sData.results) ? sData.results : [])
+            .filter((result) => (
+              result?.outcome === 'failed'
+              && result?.code === 'applicant_excluded'
+              && typeof result?.candidateKey === 'string'
+            ))
+            .map((result) => result.candidateKey);
+          if (Array.isArray(sData.errors)) failures.push(...sData.errors);
+          if ((!sRes.ok || !sData.success) && saved === 0) {
+            const detail = formatSaveFailureDetails(sData.errors);
+            failures.push({
+              name: 'Reviewer promotion',
+              error: detail
+                ? `${sData.error || `Save failed (${sRes.status})`} ${detail}`
+                : (sData.error || `Save failed (${sRes.status})`),
+            });
+          }
         } catch (e) {
-          failures.push(...toSave.map((c) => ({ name: c.name || 'Unknown candidate', error: e.message })));
+          if (!receivedResponse && requestId) {
+            // The request may have committed before the connection failed. Treat
+            // this as unknown-outcome and reload the server-owned roster before a
+            // retry can create another person/suggestion.
+            try {
+              const rosterRes = await fetch(`/api/workbench/reviewer-roster?requestId=${encodeURIComponent(requestId)}`);
+              const rosterData = await rosterRes.json().catch(() => ({}));
+              if (isCurrent() && rosterRes.ok && rosterData.success) {
+                const currentSavedKeys = Array.isArray(rosterData.savedKeys) ? rosterData.savedKeys : [];
+                savedKeys = currentSavedKeys;
+                saved = toSave.filter((candidate) => currentSavedKeys.includes(candKey(candidate))).length;
+                setRosterActive(Array.isArray(rosterData.active) ? rosterData.active : []);
+                setRosterExcluded(Array.isArray(rosterData.excluded) ? rosterData.excluded : []);
+                setRosterIneligible(Array.isArray(rosterData.ineligible) ? rosterData.ineligible : []);
+                setRosterBlocked(Array.isArray(rosterData.blocked) ? rosterData.blocked : []);
+                setRosterSavedKeys(currentSavedKeys);
+                setRosterNames(Array.isArray(rosterData.allNames) ? rosterData.allNames : []);
+              }
+            } catch { /* retain unknown-outcome error below */ }
+          }
+          failures.push(...toSave
+            .filter((candidate) => !savedKeys.includes(candKey(candidate)))
+            .map((c) => ({
+              name: c.name || 'Unknown candidate',
+              error: receivedResponse ? e.message : 'Save outcome is unknown; roster state was refreshed before retry.',
+            })));
         }
       }
 
       let promoted = 0;
       const promotedCandidates = [];
-      const contactConflicts = [];
       if (applicantChosen.length > 0) {
         if (isCurrent()) pushProgress(`Promoting ${applicantChosen.length} applicant-referred reviewer(s)…`);
         const results = await Promise.all(applicantChosen.map(async (c) => {
@@ -1440,9 +1489,11 @@ export default function ReviewerSearchSection({
             if (!res.ok || !data.success) {
               throw new Error(data.error || `Promotion failed (${res.status})`);
             }
-            // Promotion succeeded even if a contact correction conflicted (the row is
-            // selected; the conflict resolves via the Invite-tab merge flow).
-            return { ok: true, candidate: c, contactError: data.contactError || null };
+            return {
+              ok: true,
+              candidate: c,
+              rosterFinalized: data.rosterFinalized === true,
+            };
           } catch (e) {
             return { ok: false, candidate: c, error: e.message };
           }
@@ -1451,11 +1502,49 @@ export default function ReviewerSearchSection({
           if (result.ok) {
             promoted += 1;
             promotedCandidates.push(result.candidate);
-            if (result.contactError) contactConflicts.push(result.candidate.name || 'a reviewer');
+            if (!result.rosterFinalized && isCurrent()) {
+              setRosterNote('A promoted reviewer was saved, but the Find roster could not be finalized. Reload before retrying.');
+            }
           } else {
             failures.push({ name: result.candidate.name || 'Applicant-referred reviewer', error: result.error });
           }
         }
+      }
+
+      // The server owns the durable `saved` transition. The browser only
+      // reconciles exact successful keys into its current view.
+      if (savedKeys.length > 0) {
+        const wasSaved = (candidate) => candidateWasSaved(candidate, savedKeys);
+        if (isCurrent()) {
+          setCandidates((prev) => prev.filter((c) => !wasSaved(c)));
+          setRosterActive((prev) => prev.filter((c) => !wasSaved(c)));
+          setRosterSavedKeys((prev) => Array.from(new Set([...prev, ...savedKeys])));
+          setSelected((prev) => {
+            const next = new Set(prev);
+            displayCandidates.filter(wasSaved).forEach((candidate) => next.delete(candKey(candidate)));
+            return next;
+          });
+        }
+      }
+      if (blockedKeys.length > 0 && isCurrent()) {
+        const blockedSet = new Set(blockedKeys);
+        const blockedCandidates = displayCandidates
+          .filter((candidate) => blockedSet.has(candKey(candidate)))
+          .map((candidate) => ({
+            ...candidate,
+            promotionDecision: 'blocked_applicant_excluded',
+            promotionBlockCode: 'applicant_excluded',
+            promotionBlockReason: 'This reviewer is applicant-excluded for the request and cannot be promoted.',
+          }));
+        setCandidates((prev) => prev.filter((candidate) => !blockedSet.has(candKey(candidate))));
+        setRecCandidates((prev) => prev.filter((candidate) => !blockedSet.has(candKey(candidate))));
+        setRosterActive((prev) => prev.filter((candidate) => !blockedSet.has(candKey(candidate))));
+        setRosterBlocked((prev) => dedupeByName([...blockedCandidates, ...prev]));
+        setSelected((prev) => {
+          const next = new Set(prev);
+          blockedKeys.forEach((key) => next.delete(key));
+          return next;
+        });
       }
 
       const totalSucceeded = saved + promoted;
@@ -1467,9 +1556,6 @@ export default function ReviewerSearchSection({
       const messageParts = [];
       if (saved > 0) messageParts.push(`Saved ${saved} of ${toSave.length} to this request's candidate pool.`);
       if (promoted > 0) messageParts.push(`Promoted ${promoted} of ${applicantChosen.length} applicant-referred reviewer${applicantChosen.length === 1 ? '' : 's'}.`);
-      if (contactConflicts.length > 0) {
-        messageParts.push(`Couldn't save the corrected email for ${contactConflicts.join(', ')} — that address is already used by another reviewer record. Open them on the Invite Reviewers tab to merge or re-enter it.`);
-      }
       if (failures.length > 0) {
         const detail = failures.map((f) => `${f.name || 'Unknown candidate'}: ${f.error || 'failed'}`).join('; ');
         messageParts.push(`${failures.length} could not be saved (${detail}).`);
@@ -1477,33 +1563,6 @@ export default function ReviewerSearchSection({
       if (isCurrent()) {
         setSavedMsg(messageParts.join(' '));
         setPhase('done');
-      }
-
-      // Graduate ONLY the successfully-saved names: flip them to status='saved'
-      // in the roster (so they leave the active Find list → Candidates tab, but
-      // stay deduped) and splice them out of the active view. Failed rows remain
-      // active/selectable. Best-effort — a roster failure doesn't fail the save.
-      if (savedNames.length > 0 || savedKeys.length > 0) {
-        const wasSaved = (candidate) => candidateWasSaved(candidate, savedKeys, savedNames);
-        const savedRosterCandidates = displayCandidates.filter(wasSaved).map(pruneCandidateForRoster);
-        if (isCurrent()) {
-          setCandidates((prev) => prev.filter((c) => !wasSaved(c)));
-          setRosterActive((prev) => prev.filter((c) => !wasSaved(c)));
-          setSelected((prev) => {
-            const next = new Set(prev);
-            displayCandidates.filter(wasSaved).forEach((candidate) => next.delete(candKey(candidate)));
-            return next;
-          });
-        }
-        if (requestId) {
-          try {
-            await fetch('/api/workbench/reviewer-roster', {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ requestId, action: 'saved', candidates: savedRosterCandidates }),
-            });
-          } catch { /* best-effort — savedPoolNames dedup covers re-surfacing */ }
-        }
       }
       if (promotedCandidates.length > 0) {
         const promotedKeys = new Set(promotedCandidates.map(candKey));
@@ -1513,24 +1572,8 @@ export default function ReviewerSearchSection({
           setRosterActive((prev) => prev.filter((c) => !promotedKeys.has(candKey(c))));
           setSelected((prev) => { const next = new Set(prev); promotedKeys.forEach((k) => next.delete(k)); return next; });
         }
-        if (requestId) {
-          try {
-            const rosterResponse = await fetch('/api/workbench/reviewer-roster', {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                requestId,
-                action: 'saved',
-                candidates: promotedCandidates.map(pruneCandidateForRoster),
-              }),
-            });
-            if (!rosterResponse.ok) throw new Error('mark saved failed');
-            if (isCurrent()) {
-              setRosterSavedKeys((prev) => Array.from(new Set([...prev, ...promotedKeys])));
-            }
-          } catch {
-            if (isCurrent()) setRosterNote("Couldn't mark promoted applicant-referred reviewers as saved in the Find roster — they may reappear after reload.");
-          }
+        if (isCurrent()) {
+          setRosterSavedKeys((prev) => Array.from(new Set([...prev, ...promotedKeys])));
         }
       }
       if (isCurrent() && onSaved && totalSucceeded > 0) onSaved();
@@ -1852,7 +1895,7 @@ export default function ReviewerSearchSection({
           {/* Durable roster + this-run results — rendered INDEPENDENT of `phase`
               so the per-request candidate list (active + the collapsed Excluded
               set) shows on reload and even when no proposal is loaded. */}
-          {(displayCandidates.length > 0 || rosterExcluded.length > 0 || rosterIneligible.length > 0 || phase === 'results' || phase === 'done') && (
+          {(displayCandidates.length > 0 || rosterExcluded.length > 0 || rosterIneligible.length > 0 || rosterBlocked.length > 0 || phase === 'results' || phase === 'done') && (
             <div className="space-y-3 mt-3">
               {savedMsg && <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm">{savedMsg}</div>}
               {enrichNote && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{enrichNote}</div>}
@@ -1898,7 +1941,7 @@ export default function ReviewerSearchSection({
                   </ul>
                 </div>
               )}
-              {displayCandidates.length === 0 && rosterExcluded.length === 0 && rosterIneligible.length === 0 && unverifiedToShow.length === 0 ? (
+              {displayCandidates.length === 0 && rosterExcluded.length === 0 && rosterIneligible.length === 0 && rosterBlocked.length === 0 && unverifiedToShow.length === 0 ? (
                 <p className="text-sm text-gray-600">No candidates were found for this proposal.</p>
               ) : (
                 <>
@@ -1952,7 +1995,7 @@ export default function ReviewerSearchSection({
                             )}
                             {section.key === 'applicant_suggested' && (
                               <p className="text-xs text-gray-400 mb-1.5">
-                                Named by the applicant — select to add to this request's candidate pool.
+                                Named by the applicant — promote only after the identity and exact email are verified.
                               </p>
                             )}
                             <div className="space-y-2">
@@ -1961,6 +2004,14 @@ export default function ReviewerSearchSection({
                                 // card; unconfirmed ones stay read-only but get the "confirm
                                 // identity" affordance so a PD can rescue a real reviewer.
                                 const selectableNow = isCandidateSelectable(c);
+                                const promotionDecision = getCandidatePromotionDecision(c);
+                                const canConfirmForPromotion = !selectableNow
+                                  && !c.hasInstitutionCOI
+                                  && (c.eligibilityStatus || c.contactEnrichment?.eligibilityStatus) !== 'deceased'
+                                  && (
+                                    promotionDecision?.decision === 'needs_identity_confirmation'
+                                    || promotionDecision?.decision === 'missing_email'
+                                  );
                                 if (selectableNow && !readOnlySection) {
                                   return <CandidateCard key={candKey(c)} candidate={c} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} onUseLead={useLead} onEdit={setEditingContact} canManage={canManage} />;
                                 }
@@ -1968,7 +2019,7 @@ export default function ReviewerSearchSection({
                                   // needs-review row the PD just confirmed → selectable + editable.
                                   return <CandidateCard key={candKey(c)} candidate={c} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} onUseLead={useLead} onEdit={setEditingContact} canManage={canManage} />;
                                 }
-                                return <CandidateCard key={candKey(c)} candidate={c} previousResult={previousSearchKeys.has(candKey(c))} readOnly onExclude={excludeCandidate} onConfirmIdentity={readOnlySection ? (cand) => setConfirmingContact(cand) : undefined} canManage={canManage} />;
+                                return <CandidateCard key={candKey(c)} candidate={c} previousResult={previousSearchKeys.has(candKey(c))} readOnly onExclude={excludeCandidate} onConfirmIdentity={canConfirmForPromotion ? (cand) => setConfirmingContact(cand) : undefined} canManage={canManage} />;
                               })}
                             </div>
                           </div>
@@ -1982,7 +2033,7 @@ export default function ReviewerSearchSection({
                           disabled={selected.size === 0}
                           className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                          Save {selected.size > 0 ? selected.size : ''} selected as candidates
+                          Promote {selected.size > 0 ? selected.size : ''} selected to Invite
                         </button>
                         <button
                           type="button"
@@ -2047,6 +2098,23 @@ export default function ReviewerSearchSection({
                           );
                         })}
                       </ul>
+                    </details>
+                  )}
+
+                  {rosterBlocked.length > 0 && (
+                    <details className="border border-amber-200 bg-amber-50 rounded-lg p-2">
+                      <summary className="text-xs font-medium text-amber-900 cursor-pointer">
+                        Promotion blocked ({rosterBlocked.length}) — applicant-excluded for this request
+                      </summary>
+                      <div className="space-y-2 mt-2">
+                        {rosterBlocked.map((candidate) => (
+                          <CandidateCard
+                            key={`blocked-${candKey(candidate)}`}
+                            candidate={candidate}
+                            readOnly
+                          />
+                        ))}
+                      </div>
                     </details>
                   )}
 

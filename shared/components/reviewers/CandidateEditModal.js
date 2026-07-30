@@ -159,6 +159,18 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
       if (nameEditable && formData.name !== (candidate.name || '')) updates.name = formData.name;
       if (formData.affiliation !== (candidate.affiliation || '')) updates.affiliation = formData.affiliation;
       if (formData.email !== (candidate.email || '')) updates.email = formData.email;
+      if (
+        updates.email !== undefined
+        && !String(updates.email).trim()
+        && candidate.email
+      ) {
+        updates.emailClear = {
+          expectedEmail: candidate.email,
+          expectedEmailSource: candidate.emailSource || null,
+          expectedEtag: candidate.personEtag || null,
+          reason: 'staff_removed_incorrect_address',
+        };
+      }
       if (formData.website !== (candidate.website || '')) updates.website = formData.website;
       // S308 board-writeup identity (saved-candidate edit only — hidden in local/confirm
       // modes, so these never differ there). Only changed fields are sent.

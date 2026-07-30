@@ -106,9 +106,50 @@ no drift). The 8 contracts:
 
 A PD who recognizes a `needs_identity_review` candidate (real person, but the auto-resolver couldn't confirm and the suggested email/website are wrong) can rescue them WITHOUT a full re-resolve. On the Find tab, such a card shows **"✓ This is the right person → edit & add"** → opens `CandidateEditModal` in `confirmMode` (email/website/affiliation editable + a required "I've verified this is the correct person" checkbox). On confirm, `ReviewerSearchSection` first calls the authenticated roster `PATCH action:'confirm_identity'`. The server requires an existing active request row and atomically stores a random confirmation id, canonical manual contact, actor profile/system-user ids, timestamp, and `source:'staff_confirmed'`; only then does the client apply its `pdIdentityConfirmed` UI marker and opaque confirmation id. `save-candidates` treats the boolean as non-authoritative: it re-reads the confirmation by the same request + opaque id and requires exact canonical name/email/website/affiliation agreement. Missing, fake, cross-request, changed-contact, or failed reads stop before any adapter write.
 
-A valid confirmation skips the unresolved hard-reject and persists only the PD-typed email/website/affiliation (manual provenance), while force-nulling all resolver-sourced ORCID/Scholar/metrics and skipping `writeIdentityDecision`; institution COI is still enforced. Independently, automated `confirmed`/`probable` identity fields loosen persistence only with the request- and identity-bundle-bound signed receipt minted by `/api/reviewer-finder/enrich-contacts`. **Hardened 2026-07-13:** unsigned client identity is now deny-only for both field persistence and the durable resolver-decision write; `save-candidates-service` calls `writeIdentityDecision` only when `automatedIdentityReceipt.valid`, while the invalid-receipt path still clears stale resolver-sourced fields. Email remains manual/`quick_check`, so per-recipient acknowledgement still fires. Audit: `matchReason` gets `[Identity confirmed by PD; contact entered manually]`. Tests: `reviewer-route-identity-gate`, `reviewer-roster-store`/endpoint, `reviewer-candidate-attestation`, and stale-save UI tests. This covers the *contact-wrong, person-right* case; the *person-wrong* (namesake) case below is still deferred.
+A valid confirmation skips the unresolved hard-reject and persists only the
+PD-typed email/website/affiliation (manual provenance), while declining to
+promote resolver-sourced ORCID/Scholar/metrics; institution COI is still
+enforced. Independently, automated `confirmed`/`probable` identity fields
+loosen persistence only with the request- and identity-bundle-bound signed
+receipt minted by `/api/reviewer-finder/enrich-contacts`. **Hardened
+2026-07-29 in source; not deployed:** v3 additionally binds the exact contact
+projection (normalized email/source plus persistence flags). V1/v2 remain
+identity-only during their TTL. Unsigned or mismatched client identity is
+deny-only for persistence and durable decision writes. The legacy person row
+lacks per-field lineage, so the invalid/abstain path now preserves shared
+resolver fields instead of blanket-clearing them; destructive automated clears
+remain blocked until same-binding lineage can prove ownership. Email remains
+manual/`quick_check`, so per-recipient acknowledgement still fires. Audit:
+`matchReason` gets
+`[Identity confirmed by PD; contact entered manually]`. Tests cover roster
+authority, attestation, contradictory envelopes, stale values, and UI
+reconciliation. This covers the *contact-wrong, person-right* case; the
+*person-wrong* (namesake) case below is still deferred.
 
-**Gate parity — the client group test IS the server promote gate (S387).** For applicant-referred rows, `provenanceGroupOf` routes to `needs_identity_review` exactly when `requiresStaffIdentityConfirmation` is true and no `pdIdentityConfirmed` marker is set, and `promote-applicant-reviewer-service` refuses on the same predicate — one implementation in `lib/utils/reviewer-provenance.js`, imported by both. Before this, the client tested three of the four clauses, so an applicant row with `institutionMismatch:true`, or an `identityStatus` outside confirmed/probable/unresolved (`ambiguous`/`abstain`), rendered a selectable checkbox that 422'd `identity_confirmation_required` on save with no confirm affordance on that card (the affordance only renders in the read-only `needs_identity_review` section). Deliberately scoped to `APPLICANT_SUGGESTED`: `save-candidates` gates on the explicit unresolved markers instead (`isUnresolvedIdentity`), because rows with a resolver verdict but no top-level `identityStatus` are legitimately saved there under field-level gating. Cross-product parity test: `tests/unit/reviewer-provenance.test.js`. The separate way this dead-end is reachable — one person split across a placeholder-keyed and a canonical roster row, only the unpromotable copy selectable — is a roster-key hazard, documented in `docs/atlas/postgres-reviewer-find-roster.md`.
+**Promotion parity — one canonical contact projection (2026-07-29 in source;
+not deployed).** For every Find-origin candidate,
+`projectReviewerContact` is the shared identity/contact authority: it prefers
+the effective nested identity result over contradictory top-level UI hints,
+requires an authoritative normalized email/source, enforces persistence flags,
+applies the same affiliation rescue, and rejects research-only/scraped contact.
+`isCandidateSelectable` requires `decision==='ready'`, while
+`save-candidates-service` recomputes that decision before any adapter write.
+Proposal/cited/referred provenance can keep a row visible but cannot turn an
+unresolved or email-less row into a name-only Invite candidate. Applicant
+promotion retains its `requiresStaffIdentityConfirmation` parity and now also
+requires the canonical roster row plus a fresh canonical person email before
+selection. The server alone finalizes exact roster keys as `saved`; an
+applicant-excluded collision becomes read-only `blocked`. The placeholder-key
+hazard remains documented in
+`docs/atlas/postgres-reviewer-find-roster.md`.
+
+**Shared-person monotonicity (2026-07-29 in source; not deployed).** Automated
+`confirmed` is sticky, `probable` resists unresolved/ambiguous downgrades, and a
+probable refresh requires overlapping trusted anchors. A different-binding
+result abstains and alerts rather than overwriting a person shared by other
+requests. Compatibility writes require the person ETag. Normal edits ignore an
+empty email; an intentional clear is a distinct exact-value/source/reason/ETag
+command.
 
 ## Future Work — Edit-and-Re-Resolve (Deferred)
 

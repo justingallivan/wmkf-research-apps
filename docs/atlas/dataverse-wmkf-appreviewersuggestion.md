@@ -132,8 +132,20 @@ Methods:
 - `findApplicantRecommendedByRequest(requestId)` — Workbench Find enrichment reader for applicant-suggested rows; filters by `_wmkf_request_value`, `wmkf_applicantdisposition=Recommended`, and `notExcludedFilter()` with **no** `wmkf_selected` constraint so unpromoted rows are enriched for PD review
 - `findByPD(systemuserid, { cycleCode, selectedOnly })` — two-step: query `akoya_requests` by lead PD then suggestions by request OR-chain (chunks of 25); carries `notExcludedFilter()`
 - `findAcceptedByPD` — same shape, `wmkf_accepted eq true` filter; carries `notExcludedFilter()`
-- `upsert` — save-candidates path; accepts `applicantDisposition`; refuses to convert an existing excluded row into a selected candidate (returns `{ skippedExcluded: true }`)
-- `ensureApplicantRecommended({ potentialReviewerId, requestId, … })` — **Workbench ingestion** of the legacy `wmkf_potentialreviewer1..5` slots. Idempotently materializes a `disposition=recommended` row with `selected=false` on first create; an existing row's `wmkf_selected` is left untouched so lazy ingestion never promotes or resurrects a row. It **unions** `applicant` into existing `wmkf_sources` (no clobber), fills descriptive fields only when empty, honors "excluded wins" (`{ skippedExcluded: true }`), and is **race-safe** (catches a lost alternate-key create race, re-fetches, converges to update). Returns `{ id, created, selected }`.
+- `upsert` — save-candidates path; accepts `applicantDisposition`; refuses to
+  convert an existing excluded row into a selected candidate (returns
+  `{ skippedExcluded: true }`) and converges after a lost alternate-key create
+  race by re-reading the exact person/request junction. The save orchestrator
+  treats `skippedExcluded` as named failure `applicant_excluded`, never success.
+- `ensureApplicantRecommended({ potentialReviewerId, requestId, …, ifMatch })`
+  — **Workbench ingestion** of the legacy `wmkf_potentialreviewer1..5` slots.
+  Idempotently materializes a `disposition=recommended` row with
+  `selected=false` on first create; an existing row's `wmkf_selected` is left
+  untouched so lazy ingestion never promotes or resurrects a row. It **unions**
+  `applicant` into existing `wmkf_sources` (no clobber), fills descriptive
+  fields only when empty, honors "excluded wins", and is race-safe. Merge
+  provenance union may require the current suggestion ETag; a missing/stale
+  value forces a re-plan. Returns `{ id, created, selected }`.
 - `ensureStaffManualCandidate({ potentialReviewerId, requestId, … })` — **Workbench manual reviewer add**. Idempotently materializes/reselects a non-excluded staff-added row, **unions** `staff_manual` into existing `wmkf_sources` (no clobber), preserves applicant recommendation state when an existing row already has it, honors "excluded wins" (`{ skippedExcluded: true }`), and catches a lost alternate-key create race. Unlike lazy applicant ingestion, this is an explicit staff action, so an existing soft-deleted non-excluded row is re-selected. **Re-add fresh start (S343):** when the re-selected row was *removed* (`wmkf_selected===false`), `ENGAGEMENT_STAMP_RESET` clears the stale engagement stamps (`wmkf_invited=false`; `wmkf_emailsentat`, `wmkf_respondremindersentat`, `wmkf_remindersentat`, `wmkf_remindercount`, `wmkf_materialssentat`, `wmkf_reviewreceivedat`, `wmkf_responsereceivedat`, `wmkf_thankyousentat`, `wmkf_completedat`, `wmkf_withdrawnsufficientat`, `wmkf_proposalfirstaccessed` = `null`) so the row returns to a clean engagement lifecycle; an already-active row's stamps are left untouched. The re-select PATCHes are ETag-guarded from the fetched row; on 412 they re-fetch, source-union without reset if the row is now active, or retry the reset if it is still removed.
 - `updateLifecycle(id, updates, { actingUserSystemId, ifMatch })` — partial update with picklist mapping for `responseType`/`reviewStatus`/`applicantDisposition`; supports `completedAt`. Reads the row once per write to (a) THROW on an applicant-excluded row, (b) refuse status changes out of `withdrew`/`released`, and (c) stamp `wmkf_completedat`+`wmkf_reviewreceivedat` idempotently only on a `reviewStatus=complete` transition. Status-changing writes bind to the guard read's ETag when the caller does not supply a stricter one.
 - `applyStaffReviewerWithdrawal(id, { ifMatch, actingUserSystemId, deleteHonorariumRequestId })` — PD-recorded post-accept withdrawal. Requires the fresh row ETag; atomically writes `accepted=false`, `declined=true`, declined response metadata, `reviewStatus=withdrew`, and token revocation while deleting the exact server-read linked honorarium `akoya_request` in one changeset. Without an honorarium link, performs the same ETag-guarded row correction as one PATCH.
@@ -171,9 +183,21 @@ Read:
 Write (verified 2026-05-07; +Phase 3 ingestion S210):
 - `pages/api/workbench/applicant-reviewers.js` — adapter `ensureApplicantRecommended` per populated legacy slot (lazy on Find-tab open). Writes only `disposition=recommended`, `wmkf_selected=false` rows; **writes NO `disposition=excluded` rows** (S210 option B — excluded names are parsed via `lib/services/reviewer-exclusion-parser.js` and returned for the search soft-block only, nothing global touched).
 - `pages/api/workbench/enrich-recommended.js` — adapter `findApplicantRecommendedByRequest` reads applicant-recommended rows regardless of `wmkf_selected`; writes deterministic COI tags to `wmkf_matchreason` through `setMatchReason` and per-person enrichment through the researcher adapter.
-- `pages/api/workbench/promote-applicant-reviewer.js` — adapter `findById` ownership/disposition read + `updateLifecycle(suggestionId, { selected: true })`; explicit PD promotion for applicant-recommended rows, no person upsert.
+- `pages/api/workbench/promote-applicant-reviewer.js` — requires the canonical
+  roster row/key, rechecks canonical contact authority (including bounded
+  backfill followed by a fresh person read), then uses adapter `findById` and
+  `updateLifecycle(suggestionId, { selected: true })`. Only after selection
+  succeeds does the server finalize the exact roster key as `saved`; missing
+  contact, identity conflict, absent roster authority, or roster-finalization
+  failure never reports a clean promotion.
 - `pages/api/workbench/manual-reviewer.js` — adapter `ensureStaffManualCandidate` for sparse staff-entered reviewers. Creates/reuses the person through `potential-reviewer.upsertByEmail`, stamps any staff-entered email as `wmkf_emailsource=manual` through `researcher.updateById`, then writes/reselects the per-request suggestion with `staff_manual` in `wmkf_sources`.
-- `pages/api/reviewer-finder/save-candidates.js` — adapter `upsert` (per-(reviewer,request) suggestion creation)
+- `pages/api/reviewer-finder/save-candidates.js` — canonical contact projection
+  and v3/staff-confirmation authority are checked before person/suggestion
+  writes. Adapter `upsert` creates/converges the per-(reviewer,request)
+  suggestion; the service returns exact per-key `saved`/`withheld`/`failed`
+  results and performs the server-owned roster finalization. An
+  applicant-excluded collision is stored as roster `blocked`, not counted as
+  saved.
 - `pages/api/reviewer-finder/my-candidates.js` — adapter `updateLifecycle` (single suggestion lifecycle PATCH), `bulkUpdateByRequest` (per-proposal cycle/program-area assignment), `softDelete` (`wmkf_selected = false`); when `accepted` flips to `true` calls `ensureToken` from `lib/external/token-lifecycle.js` which is idempotent but may write `wmkf_externaltoken*` fields if no usable token exists. `DELETE {mode:'hard'}` dispatches instead to `removeCandidateEntirely` (see the Permanent removal bullet above) — a hard delete, not a `softDelete` variant.
 - `pages/api/review-manager/render-emails.js` — `mintAndStore` from `lib/external/token-lifecycle.js`; mints + stores HMAC token hash on `wmkf_externaltokenhash` + `wmkf_externaltokenissued` + `wmkf_externaltokenexpires` per recipient before email render
 - `pages/api/review-manager/send-emails.js` — adapter `updateLifecycle`; materials sends retain the existing best-effort `wmkf_materialssentat` / `materials_sent` lifecycle update after dispatch. Thank-you sends do not move a terminal row to `complete`.

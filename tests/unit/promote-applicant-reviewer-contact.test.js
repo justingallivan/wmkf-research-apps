@@ -22,10 +22,13 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   updateLifecycle: jest.fn(async () => undefined),
   APPLICANT_DISPOSITION_MAP: { recommended: 100000000 },
 }));
+let mockPersonEmail = null;
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   __esModule: true,
-  update: jest.fn(async () => undefined),
-  getById: jest.fn(async () => ({})), // no existing email by default
+  update: jest.fn(async (_id, updates) => {
+    if (updates?.email) mockPersonEmail = updates.email;
+  }),
+  getById: jest.fn(async () => ({ wmkf_emailaddress: mockPersonEmail })),
 }));
 jest.mock('../../lib/dataverse/adapters/researcher', () => ({
   __esModule: true,
@@ -35,18 +38,24 @@ jest.mock('../../lib/dataverse/duplicate-key', () => ({ translateDuplicateKeyErr
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   __esModule: true,
   findCandidateBySuggestion: jest.fn(async () => null), // no roster row by default → no backfill
+  finalizeCandidatePromotion: jest.fn(async () => ({ saved: true })),
+}));
+jest.mock('../../lib/services/notification-service', () => ({
+  __esModule: true,
+  default: { notify: jest.fn(async () => ({ id: 'alert-1' })) },
 }));
 
 const suggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
 const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const { translateDuplicateKeyError } = require('../../lib/dataverse/duplicate-key');
-const { findCandidateBySuggestion } = require('../../lib/services/reviewer-roster-store');
+const { findCandidateBySuggestion, finalizeCandidatePromotion } = require('../../lib/services/reviewer-roster-store');
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const SUGGESTION_ID = '33333333-3333-3333-3333-333333333333';
 const PERSON_ID = '22222222-2222-2222-2222-222222222222';
 const SAFE_ROSTER_CANDIDATE = {
+  candidateKey: 'candidate:applicant',
   suggestionId: SUGGESTION_ID,
   identityStatus: 'probable',
   needsIdentification: false,
@@ -71,6 +80,14 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPersonEmail = 'existing@example.org';
+    potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
+      if (updates?.email) mockPersonEmail = updates.email;
+    });
+    potentialReviewerAdapter.getById.mockImplementation(async () => ({
+      wmkf_emailaddress: mockPersonEmail,
+    }));
+    finalizeCandidatePromotion.mockResolvedValue({ saved: true });
     suggestionAdapter.findById.mockResolvedValue({
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
       _wmkf_request_value: REQUEST_ID,
@@ -115,7 +132,7 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
     );
   });
 
-  test('email collision: still promoted, partialSuccess with a contactError', async () => {
+  test('email collision withholds promotion and returns a conflict', async () => {
     potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
       if (updates && 'email' in updates) throw new Error('alt-key duplicate');
       return undefined;
@@ -133,14 +150,9 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
     const res = mockRes();
     await handler(req, res);
 
-    expect(res.statusCode).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.partialSuccess).toBe(true);
+    expect(res.statusCode).toBe(409);
     expect(res.body.contactError).toMatchObject({ code: 'email_conflict', value: 'ava.mercer@example.org' });
-    expect(res.body.savedFields).toContain('affiliation');
-    expect(res.body.savedFields).not.toContain('email');
-    // Promotion stuck despite the contact conflict.
-    expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(SUGGESTION_ID, { selected: true }, expect.anything());
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
   });
 
   test('no contact payload: behaves as a plain promote (selected only)', async () => {
@@ -183,7 +195,13 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     jest.clearAllMocks();
     // Restore clean adapter defaults — clearAllMocks clears calls but NOT the throwing
     // mockImplementation the describe-1 collision test installs, which would leak here.
-    potentialReviewerAdapter.update.mockResolvedValue(undefined);
+    mockPersonEmail = null;
+    potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
+      if (updates?.email) mockPersonEmail = updates.email;
+    });
+    potentialReviewerAdapter.getById.mockImplementation(async () => ({
+      wmkf_emailaddress: mockPersonEmail,
+    }));
     researcherAdapter.updateById.mockResolvedValue(undefined);
     suggestionAdapter.findById.mockResolvedValue({
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
@@ -191,8 +209,8 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
       _wmkf_potentialreviewer_value: PERSON_ID,
       wmkf_applicantdisposition: 100000000,
     });
-    potentialReviewerAdapter.getById.mockResolvedValue({}); // person has no email
     findCandidateBySuggestion.mockResolvedValue(SAFE_ROSTER_CANDIDATE);
+    finalizeCandidatePromotion.mockResolvedValue({ saved: true });
   });
 
   const promote = async () => {
@@ -204,7 +222,7 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
 
   test('backfills a vetted roster email, stamping the roster source (NOT manual)', async () => {
     findCandidateBySuggestion.mockResolvedValue({
-      suggestionId: SUGGESTION_ID,
+      ...SAFE_ROSTER_CANDIDATE,
       email: 'noor.patel@example.org',
       emailSource: 'claude_search',
       emailPersistAllowed: true,
@@ -224,14 +242,27 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
   });
 
   test('does NOT backfill when emailPersistAllowed is not true', async () => {
-    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'reviewer@example.org', emailSource: 'serp_search', emailPersistAllowed: false });
+    findCandidateBySuggestion.mockResolvedValue({
+      ...SAFE_ROSTER_CANDIDATE,
+      email: 'reviewer@example.org',
+      emailSource: 'serp_search',
+      emailPersistAllowed: false,
+    });
     const res = await promote();
-    expect(res.body.savedFields).not.toContain('email');
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toMatchObject({ code: 'missing_verified_email' });
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
   });
 
   test('rejects identity-unresolved promotion before lifecycle or contact writes', async () => {
-    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'reviewer@example.org', emailSource: 'affiliation', emailPersistAllowed: true, needsIdentification: true });
+    findCandidateBySuggestion.mockResolvedValue({
+      ...SAFE_ROSTER_CANDIDATE,
+      email: 'reviewer@example.org',
+      emailSource: 'affiliation',
+      emailPersistAllowed: true,
+      needsIdentification: true,
+    });
     const res = await promote();
     expect(res.statusCode).toBe(422);
     expect(res.body).toMatchObject({ code: 'identity_confirmation_required' });
@@ -240,15 +271,15 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
   });
 
   test('idempotent: does NOT override a person that already has an email', async () => {
-    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'roster@example.org', emailSource: 'claude_search', emailPersistAllowed: true });
-    potentialReviewerAdapter.getById.mockResolvedValue({ wmkf_emailaddress: 'existing@example.org' });
+    findCandidateBySuggestion.mockResolvedValue({ ...SAFE_ROSTER_CANDIDATE, email: 'roster@example.org', emailSource: 'claude_search', emailPersistAllowed: true });
+    mockPersonEmail = 'existing@example.org';
     const res = await promote();
     expect(res.body.savedFields).not.toContain('email');
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
   });
 
   test('a manual email wins: backfill is skipped after the eligibility read', async () => {
-    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'roster@example.org', emailSource: 'claude_search', emailPersistAllowed: true });
+    findCandidateBySuggestion.mockResolvedValue({ ...SAFE_ROSTER_CANDIDATE, email: 'roster@example.org', emailSource: 'claude_search', emailPersistAllowed: true });
     const req = { method: 'POST', body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, contact: { email: 'manual@example.org' } } };
     const res = mockRes();
     await handler(req, res);
@@ -262,21 +293,17 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     expect(findCandidateBySuggestion).toHaveBeenCalledTimes(1);
   });
 
-  test('duplicate-email collision on backfill is non-fatal (promoted + contactError)', async () => {
-    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'duplicate@example.org', emailSource: 'serp_search', emailPersistAllowed: true });
+  test('duplicate-email collision on backfill withholds promotion', async () => {
+    findCandidateBySuggestion.mockResolvedValue({ ...SAFE_ROSTER_CANDIDATE, email: 'duplicate@example.org', emailSource: 'serp_search', emailPersistAllowed: true });
     potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
       if (updates && 'email' in updates) throw new Error('alt-key duplicate');
       return undefined;
     });
     translateDuplicateKeyError.mockReturnValue({ field: 'wmkf_emailaddress', value: 'duplicate@example.org' });
     const res = await promote();
-    expect(res.statusCode).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.partialSuccess).toBe(true);
+    expect(res.statusCode).toBe(409);
     expect(res.body.contactError).toMatchObject({ code: 'email_conflict', value: 'duplicate@example.org' });
-    expect(res.body.savedFields).not.toContain('email');
-    // Promotion still stuck.
-    expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(SUGGESTION_ID, { selected: true }, expect.anything());
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
   });
 
   test('no roster row (legacy / no id anchor): fails closed before promotion', async () => {
@@ -290,7 +317,7 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
 
   test('a manual email that COLLIDES is not silently overwritten by the roster email', async () => {
     // PD typed a conflicting email; the manual write 409s → not in savedFields.
-    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'roster@example.org', emailSource: 'claude_search', emailPersistAllowed: true });
+    findCandidateBySuggestion.mockResolvedValue({ ...SAFE_ROSTER_CANDIDATE, email: 'roster@example.org', emailSource: 'claude_search', emailPersistAllowed: true });
     potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
       if (updates && 'email' in updates) throw new Error('alt-key duplicate');
       return undefined;
@@ -301,7 +328,8 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     await handler(req, res);
     // The PD's explicit choice routes to merge — backfill must NOT run.
     expect(findCandidateBySuggestion).toHaveBeenCalledTimes(1);
+    expect(res.statusCode).toBe(409);
     expect(res.body.contactError).toMatchObject({ code: 'email_conflict', value: 'manual@example.org' });
-    expect(res.body.savedFields).not.toContain('email');
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
   });
 });

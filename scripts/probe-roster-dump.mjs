@@ -23,6 +23,21 @@ const requestNumber = args.includes('--request') ? args[args.indexOf('--request'
 const grepIdx = args.indexOf('--grep');
 const grep = grepIdx >= 0 ? args[grepIdx + 1].toLowerCase() : null;
 const includeDataverse = args.includes('--include-dataverse');
+function promotionDecisionInputs(candidate) {
+  const enrichment = candidate?.contactEnrichment || {};
+  return {
+    topLevelIdentity: candidate?.identityStatus || candidate?.verificationStatus || null,
+    nestedIdentity: enrichment.identity?.status || null,
+    hasEffectiveEmail: Boolean(candidate?.email || enrichment.email),
+    effectiveEmailSource: candidate?.emailSource || enrichment.emailSource || null,
+    emailPersistAllowed: candidate?.emailPersistAllowed ?? enrichment.emailPersistAllowed ?? null,
+    websitePersistAllowed: candidate?.websitePersistAllowed ?? enrichment.websitePersistAllowed ?? null,
+    affiliationPersistAllowed: candidate?.affiliationPersistAllowed ?? enrichment.affiliationPersistAllowed ?? null,
+    contactStatus: candidate?.contactStatus || enrichment.contactStatus || null,
+    staffConfirmed: candidate?.pdIdentityConfirmed === true,
+    receiptPresent: typeof candidate?.automatedIdentityAttestation === 'string',
+  };
+}
 if (!guid && !requestNumber) {
   console.error('--guid <request_guid> or --request <request_number> required');
   process.exit(2);
@@ -78,6 +93,7 @@ for (const r of matchingRows) {
   console.log(`area        affiliation=${c.affiliation || e.affiliation || '—'}  expertise=${JSON.stringify(c.expertiseAreas || c.keywords)}`);
   console.log(`contact     email=${c.email || e.email || '—'} (src=${e.emailSource || '—'})  orcid=${c.orcid || e.orcid || '—'}`);
   console.log(`persist     emailAllowed=${c.emailPersistAllowed ?? e.emailPersistAllowed ?? '—'} contactStatus=${c.contactStatus || e.contactStatus || '—'} resolverIdentity=${e.identity?.status || '—'}`);
+  console.log(`promotion   ${JSON.stringify(promotionDecisionInputs(c))}`);
   console.log(`links       ${links.join('  |  ') || '—'}`);
   if (linkedin.length) console.log(`LINKEDIN    ${linkedin.join('  ')}`);
   if (c.reasoning) console.log(`reasoning   ${String(c.reasoning).slice(0, 200)}`);
