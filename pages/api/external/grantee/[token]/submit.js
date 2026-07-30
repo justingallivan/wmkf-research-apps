@@ -134,8 +134,10 @@ export default async function handler(req, res) {
       return res.status(result.status || 500).json({ ok: false, reason: result.reason });
     }
 
-    // Post-commit and best-effort: awaited so the serverless invocation doesn't end
-    // mid-send, but the service never throws, so it cannot change the response.
+    // Post-commit and best-effort. The service never throws and bounds its own wait
+    // (NOTIFY_BUDGET_MS), so it can neither change this response nor let the platform
+    // kill the invocation before the 200 is written — a timeout here would look like
+    // a failed submit on a package that DID commit, and the retry would 409.
     // hasImage describes the package AFTER this submit: a resubmit with no new file
     // (REVISION_REQUESTED is editable) retains the existing ref, because the writer
     // only patches wmkf_imagefileref when it uploaded something.

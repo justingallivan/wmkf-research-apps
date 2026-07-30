@@ -36,6 +36,7 @@ import NotificationService from '../../lib/services/notification-service';
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
 import * as systemUserAdapter from '../../lib/dataverse/adapters/system-user.js';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
+import { NOTIFY_BUDGET_MS, notifyGranteeSubmission } from '../../lib/services/grantee-submit-notification';
 import handler from '../../pages/api/external/grantee/[token]/submit';
 
 const VER = '33333333-3333-3333-3333-333333333333';
@@ -223,7 +224,7 @@ describe('submitted notification (best-effort, post-commit)', () => {
     expect(res.body).toEqual({ ok: true });
   });
 
-  test('PD read throws → still notifies, empty explicitRecipients', async () => {
+  test('PD read throws → still notifies, empty explicitRecipients, PI name KEPT', async () => {
     verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
     systemUserAdapter.getByIdWithSelect.mockRejectedValue(new Error('dataverse 503'));
     const res = mockRes();
@@ -232,6 +233,42 @@ describe('submitted notification (best-effort, post-commit)', () => {
     expect(res.statusCode).toBe(200);
     expect(NotificationService.notify).toHaveBeenCalledTimes(1);
     expect(notifyArg().explicitRecipients).toEqual([]);
+    // The two reads degrade independently — a failed PD lookup must not discard a
+    // PI name the request read already produced.
+    expect(notifyArg().metadata.pi).toBe('Dr. Ada Lovelace');
+    expect(notifyArg().message).toContain('Dr. Ada Lovelace');
+  });
+
+  test('request read throws → still notifies, nothing resolved', async () => {
+    verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+    grantRequestAdapter.getById.mockRejectedValue(new Error('dataverse 503'));
+    const res = mockRes();
+    await handler(successReq(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(notifyArg().metadata.pi).toBeNull();
+    expect(notifyArg().explicitRecipients).toEqual([]);
+    expect(systemUserAdapter.getByIdWithSelect).not.toHaveBeenCalled();
+  });
+
+  // A committed submit must not be held hostage by a hanging notification: the
+  // platform could kill the invocation before the 200 is written, and the grantee
+  // would see a timeout on a package that DID commit (their retry then 409s).
+  // Driven on the service directly with a tiny budget — fake timers deadlock the
+  // route's multipart stream, and the route does not thread budgetMs through.
+  test('hanging notify → the service still resolves, bounded by its budget', async () => {
+    NotificationService.notify.mockReturnValue(new Promise(() => {})); // never settles
+    const started = Date.now();
+    await expect(notifyGranteeSubmission({
+      requestId: 'r1', requestNum: '1002794', title: 't',
+      hasImage: true, captionPresent: true, budgetMs: 25,
+    })).resolves.toBeUndefined();
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
+  test('the shipped default budget is bounded well under a platform timeout', () => {
+    expect(NOTIFY_BUDGET_MS).toBeGreaterThan(0);
+    expect(NOTIFY_BUDGET_MS).toBeLessThanOrEqual(5000);
   });
 
   test('disabled PD is not a recipient', async () => {

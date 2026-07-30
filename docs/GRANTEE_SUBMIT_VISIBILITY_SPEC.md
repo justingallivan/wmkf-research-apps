@@ -375,9 +375,20 @@ Where the shipped code differs from, or resolves, the plan above:
   `lib/dataverse/adapters/*` and the PD lookup needs two adapter reads — `check:route-service-boundary`
   is a law-mode gate and failed on the first attempt. The route calls
   `notifyGranteeSubmission()` and nothing else.
-- **It is awaited but cannot throw.** Awaited before the 200 so a serverless invocation cannot be
-  frozen mid-send; the service catches everything internally — recipient resolution and `notify` each
-  have their own swallow. Test: `notify throws → submit still 200`.
+- **It is awaited, cannot throw, and cannot stall the response.** The service catches everything
+  internally, and it bounds its own wait at `NOTIFY_BUDGET_MS` (3s). The bound matters because this
+  route is absent from `vercel.json`'s `functions` map — it runs on the platform default duration,
+  after the request has already spent time on virus scan, SharePoint upload, and the changeset. An
+  unbounded await could let the platform kill the invocation before the 200 is written, so the grantee
+  would see a timeout on a submission that *did* commit and their retry would 409 `not_editable`. A
+  try/catch cannot catch platform termination; only bounding the wait helps. On expiry the send is
+  abandoned — it may still land, since `notify()` is not transactional — and the pull surfaces
+  (Awardee tab, awardees list) remain the backstop. Tests: `notify throws → submit still 200`, and a
+  hanging `notify` resolving inside a tiny injected budget.
+- **`budgetMs` is an injectable test seam.** Jest fake timers deadlock the route's busboy stream, so
+  the timeout is exercised by calling the service directly with a small budget instead.
+- **Recipient resolution degrades per-read.** A failed PD lookup keeps the PI name the request read
+  already produced; only a failed *request* read yields both nulls. Pinned by two tests.
 - **Two reads, as specified.** `grantRequestAdapter.getById` for
   `_wmkf_programdirector_value,_wmkf_projectleader_value`, then `systemUserAdapter.getByIdWithSelect`
   for the PD's `internalemailaddress` + `isdisabled`. The PI name comes from the
@@ -393,7 +404,7 @@ Where the shipped code differs from, or resolves, the plan above:
 - **Gate results.** `check:route-service-boundary`, `check:api-routes`, `check:trust-boundary-guid`,
   `check:dataverse-access-layer`, `check:dynamics-context-boundary`, `check:odata-escape`,
   `check:atlas`, `check:doc-symbol-refs`, `check:doc-currency`, `check:fact-consistency`,
-  `check:agent-wiki`, and `check:docs-catalog` all exit 0. Unit suite: 6052 passing. Two suites fail
+  `check:agent-wiki`, and `check:docs-catalog` all exit 0. Unit suite: 6055 passing. Two suites fail
   (`signin-server-props`, `dependency-security-compat`) — both fail identically on a stashed clean tree,
   so they are pre-existing and unrelated. ESLint adds no new warnings (`AwardeeTab.js` carries the same
   four pre-existing `react-hooks/set-state-in-effect` warnings before and after).
