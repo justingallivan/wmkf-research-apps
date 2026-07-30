@@ -55,6 +55,12 @@ function wireFetch({
     etag: abstract?.etag ?? 'W/"1"',
     status: abstract?.status ?? null,
     editable: abstract?.editable ?? true,
+    // Grantee submission fields — absent/false unless a test supplies them.
+    caption: abstract?.caption ?? null,
+    imageRef: abstract?.imageRef ?? null,
+    imageUrl: abstract?.imageUrl ?? null,
+    hasImage: abstract?.hasImage ?? false,
+    submittedAt: abstract?.submittedAt ?? null,
   };
   global.fetch = jest.fn(async (url, opts = {}) => {
     const u = String(url);
@@ -78,6 +84,9 @@ function wireFetch({
       return { ok: true, json: async () => ({
         effective: state.effective, effectiveField: state.effectiveField,
         etag: state.etag, status: state.status, editable: state.editable,
+        caption: state.caption, imageRef: state.imageRef,
+        imageUrl: state.imageUrl, hasImage: state.hasImage,
+        submittedAt: state.submittedAt,
       }) };
     }
     if (u.includes('/grantee-deliverables/generate')) {
@@ -514,4 +523,77 @@ test('preserves a custom body verbatim incl. leading/trailing whitespace (no tri
   wireFetch();
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^ {2}Hello Raj, spaced body\. {2}$/));
+});
+
+// ── Grantee submission section (caption + image visibility) ──
+
+const SP_URL = 'https://wmkf.sharepoint.com/sites/grants/Grantee_Uploads/fig.png';
+
+const submitted = (over = {}) => ({
+  effective: 'The grantee-approved abstract text.',
+  effectiveField: 'approved',
+  status: 100000003, // Submitted
+  editable: true,
+  submittedAt: '2026-07-12T15:04:05Z',
+  ...over,
+});
+
+test('submission section is hidden entirely pre-submit', async () => {
+  wireFetch();
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('To email')).toHaveValue('monika.raj@emory.edu'));
+  expect(screen.queryByText('Grantee submission')).not.toBeInTheDocument();
+});
+
+test('shows caption and a SharePoint link once submitted', async () => {
+  wireFetch({ abstract: submitted({ caption: 'Cryo-EM structure.', imageRef: SP_URL, imageUrl: SP_URL, hasImage: true }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+
+  await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
+  expect(screen.getByText('Cryo-EM structure.')).toBeInTheDocument();
+  const link = screen.getByRole('link', { name: /open image in sharepoint/i });
+  expect(link).toHaveAttribute('href', SP_URL);
+  expect(link).toHaveAttribute('target', '_blank');
+  expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  // Labeled as the waiver acknowledgment, not as a submitted date.
+  expect(screen.getByText(/Waiver acknowledged/)).toBeInTheDocument();
+});
+
+test('relative image ref renders as text, never as a link', async () => {
+  wireFetch({ abstract: submitted({
+    imageRef: '1002794_ABCDEF/Grantee_Uploads/fig.png', imageUrl: null, hasImage: true,
+  }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+
+  await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
+  expect(screen.getByText('1002794_ABCDEF/Grantee_Uploads/fig.png')).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /open image in sharepoint/i })).not.toBeInTheDocument();
+  expect(screen.getByText(/path in the grantee SharePoint library/)).toBeInTheDocument();
+});
+
+test('submitted with no image says so', async () => {
+  wireFetch({ abstract: submitted({ caption: 'A caption without an image.' }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+
+  await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
+  expect(screen.getByText('No image uploaded.')).toBeInTheDocument();
+});
+
+test('image with no caption says so', async () => {
+  wireFetch({ abstract: submitted({ imageRef: SP_URL, imageUrl: SP_URL, hasImage: true }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+
+  await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
+  expect(screen.getByText('No caption provided.')).toBeInTheDocument();
+});
+
+test('a caption containing markup renders as literal text', async () => {
+  const hostile = '<script>alert(1)</script> and <b>bold</b>';
+  wireFetch({ abstract: submitted({ caption: hostile, imageRef: SP_URL, imageUrl: SP_URL, hasImage: true }) });
+  const { container } = render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+
+  await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
+  expect(screen.getByText(hostile)).toBeInTheDocument();
+  expect(container.querySelector('script')).toBeNull();
+  expect(container.querySelector('b')).toBeNull();
 });

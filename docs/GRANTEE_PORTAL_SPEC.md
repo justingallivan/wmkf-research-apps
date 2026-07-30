@@ -108,7 +108,18 @@ Per grantee, exactly:
    either row rolls back the whole changeset). SharePoint is outside the changeset: on a non-412
    failure the writer re-reads the deliverable before deleting the upload, so it never deletes an
    image a committed row references (`lib/services/grantee-upload.js`). Virus-scan the image on intake.
-6. **Cadence:** a daily cron selects packages still in `Invited` whose first
+6. **Notify (2026-07-29):** after the changeset commits, a best-effort notification tells the assigned
+   Program Director the package arrived — `grantee_deliverable_submitted`, emailed via
+   `explicitRecipients` (PD) ∪ the `grantee-deliverables` category, carrying a deep link to the Awardee
+   tab. It is post-commit and fully swallowed: it cannot fail a submission the grantee completed. The
+   PD/PI lookup values are re-read from the request, because the token verifier's projection does not
+   carry them. See `docs/GRANTEE_SUBMIT_VISIBILITY_SPEC.md`.
+7. **Staff review surface (2026-07-29):** the Awardee tab shows what came back — the approved abstract
+   (editable), the caption (read-only), and a SharePoint link to the image, plus the waiver
+   acknowledgment time. Only an absolute http(s) `wmkf_imagefileref` becomes a link; the relative-path
+   fallback renders as text. Served by the existing staff-guarded
+   `GET /api/workbench/grantee-deliverables/abstract`, not a new route.
+8. **Cadence:** a daily cron selects packages still in `Invited` whose first
    `wmkf_inviteddate` is at least 12 days old. It sends one reminder from the
    assigned Program Director to the PI, Cc'ing the liaison, with a day-14 COB
    deadline. The service conditionally claims the package as `Reminder Sent`

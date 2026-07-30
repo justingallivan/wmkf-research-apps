@@ -26,6 +26,8 @@ import { WAIVER_SLOT_CODE } from '../../../../../lib/external/grantee-waiver-pol
 import { isGuid } from '../../../../../lib/utils/guid';
 import NotificationService from '../../../../../lib/services/notification-service';
 import { isGranteeEditableStatus } from '../../../../../shared/config/granteeDeliverableStatus';
+import * as grantRequestAdapter from '../../../../../lib/dataverse/adapters/grant-request.js';
+import * as systemUserAdapter from '../../../../../lib/dataverse/adapters/system-user.js';
 
 /**
  * Best-effort operator alert when a grantee submit is blocked by a waiver-token
@@ -53,6 +55,87 @@ async function alertWaiverBlock({ requestId, detail }) {
   } catch (err) {
     console.error('[grantee/submit] waiver-block alert failed (non-fatal):', err?.message || err);
   }
+}
+
+/**
+ * Best-effort staff notification that a grantee submitted. Fires only AFTER the
+ * atomic write committed, and every failure path here is swallowed: a submission
+ * the grantee completed must never 500 because a notification failed.
+ *
+ * Recipients: the assigned Program Director via `explicitRecipients` (unioned
+ * with the 'grantee-deliverables' category recipients and deduped by notify()),
+ * matching review-upload / reviewer-quota / reviewer-withdrawal.
+ *
+ * The PD and PI fields are NOT on `verified.request` — verify-grantee-token's
+ * projection deliberately carries only request identity + abstract text, so this
+ * re-reads the request for the two lookup values rather than widening a public
+ * token-authed read to carry staff-assignment fields. An unresolvable PD is not
+ * an error: category recipients still get it.
+ */
+async function notifySubmission({ requestId, requestNum, title, hasImage, captionPresent }) {
+  try {
+    await withDalContext('grantee-submit-notify', async () => {
+      let pdEmail = null;
+      let piName = null;
+      try {
+        const row = await grantRequestAdapter.getById(requestId, {
+          select: '_wmkf_programdirector_value,_wmkf_projectleader_value',
+        });
+        piName = row?._wmkf_projectleader_value_formatted || null;
+        const pdId = row?._wmkf_programdirector_value || null;
+        if (pdId) {
+          const pd = await systemUserAdapter.getByIdWithSelect(pdId, 'systemuserid,internalemailaddress,isdisabled');
+          if (pd && pd.isdisabled !== true) pdEmail = pd.internalemailaddress || null;
+        }
+      } catch (err) {
+        // Recipient resolution is advisory; category recipients still receive it.
+        console.error('[grantee/submit] PD resolution failed (non-fatal):', err?.message || err);
+      }
+
+      const label = requestNum || requestId;
+      const who = piName || 'The grantee';
+      const url = awardeeTabUrl(requestId);
+      await NotificationService.notify({
+        type: 'grantee_deliverable_submitted',
+        severity: 'info',
+        emailAdmins: true, // an 'info' event only emails when this is set
+        title: `Grantee deliverables submitted (${label})`,
+        message:
+          `${who} submitted deliverables for ${title || label}. `
+          + `Review them on the Awardee tab: ${url}`,
+        metadata: {
+          requestId,
+          requestNumber: requestNum || null,
+          title: title || null,
+          pi: piName,
+          hasImage,
+          // The caption itself is grantee-controlled text; presence is all a PD
+          // needs to know to go look, so the raw value stays out of the email.
+          captionPresent,
+          awardeeTabUrl: url,
+        },
+        source: 'grantee-portal',
+        category: 'grantee-deliverables',
+        explicitRecipients: pdEmail ? [pdEmail] : [],
+      });
+    });
+  } catch (err) {
+    console.error('[grantee/submit] submitted notification failed (non-fatal):', err?.message || err);
+  }
+}
+
+/**
+ * Absolute Awardee-tab deep link for an email body.
+ *
+ * NEXTAUTH_URL is the STAFF app origin. Deliberately not getGranteePortalBaseUrl():
+ * that prefers GRANTEE_PORTAL_BASE_URL, the public grantee domain, which would
+ * point staff at the wrong host. With no origin configured, fall back to the
+ * relative path rather than emitting a malformed `https:///workbench/...`.
+ */
+function awardeeTabUrl(requestId) {
+  const path = `/workbench/${requestId}?tab=awardee`;
+  const origin = (process.env.NEXTAUTH_URL || '').replace(/\/$/, '');
+  return origin ? `${origin}${path}` : path;
 }
 
 export const config = {
@@ -131,6 +214,16 @@ export default async function handler(req, res) {
       // Generic, non-leaky reasons (service already logged specifics server-side).
       return res.status(result.status || 500).json({ ok: false, reason: result.reason });
     }
+
+    // Post-commit and best-effort: awaited so the serverless invocation doesn't end
+    // mid-send, but it cannot change the response — see notifySubmission.
+    await notifySubmission({
+      requestId: verified.requestId,
+      requestNum: request?.akoya_requestnum || null,
+      title: request?.akoya_title || null,
+      hasImage: Boolean(imageFile),
+      captionPresent: Boolean(caption && caption.trim()),
+    });
     return res.status(200).json({ ok: true });
   } catch (e) {
     console.error('[grantee/submit] unexpected error:', e?.message || e);

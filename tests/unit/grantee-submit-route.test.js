@@ -22,12 +22,18 @@ jest.mock('../../lib/services/grantee-upload', () => ({
 }));
 jest.mock('../../lib/services/external-token', () => ({ verifyWaiverRenderToken: jest.fn() }));
 jest.mock('../../lib/services/notification-service', () => ({ __esModule: true, default: { notify: jest.fn() } }));
+// The submitted-notification path re-reads the request for the PD/PI lookup values
+// (verify-grantee-token's projection carries neither) and then reads the PD user.
+jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({ getById: jest.fn() }));
+jest.mock('../../lib/dataverse/adapters/system-user.js', () => ({ getByIdWithSelect: jest.fn() }));
 
 import { checkRateLimit, recordTokenOutcome } from '../../lib/external/rate-limit';
 import { verifyGranteeToken } from '../../lib/external/verify-grantee-token';
 import { writeGranteeDeliverables } from '../../lib/services/grantee-upload';
 import { verifyWaiverRenderToken } from '../../lib/services/external-token';
 import NotificationService from '../../lib/services/notification-service';
+import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
+import * as systemUserAdapter from '../../lib/dataverse/adapters/system-user.js';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 import handler from '../../pages/api/external/grantee/[token]/submit';
 
@@ -84,7 +90,24 @@ beforeEach(() => {
   // Default: a valid render token bound to this request (r1) with a GUID version.
   verifyWaiverRenderToken.mockReset().mockResolvedValue({ valid: true, requestId: 'r1', versionId: VER, bodyHash: 'bodyhash-abc' });
   NotificationService.notify.mockReset().mockResolvedValue({});
+  grantRequestAdapter.getById.mockReset().mockResolvedValue({
+    _wmkf_programdirector_value: 'pd-1',
+    _wmkf_projectleader_value: 'pi-1',
+    _wmkf_projectleader_value_formatted: 'Dr. Ada Lovelace',
+  });
+  systemUserAdapter.getByIdWithSelect.mockReset().mockResolvedValue({
+    systemuserid: 'pd-1', internalemailaddress: 'pd@wmkf.example', isdisabled: false,
+  });
 });
+
+/** The multipart body every success-path test uses. */
+const successReq = () => multipartReq({
+  fields: { editedAbstract: 'x', caption: 'A figure.', waiverToken: 'signed.tok' },
+  file: { filename: 'fig.png', buffer: Buffer.from([0x89, 0x50]) },
+});
+
+/** The notify() payload from the single expected call. */
+const notifyArg = () => NotificationService.notify.mock.calls[0][0];
 
 test('non-POST → 405', async () => {
   const res = mockRes();
@@ -154,6 +177,139 @@ test('happy path: parses multipart, calls service, returns 200', async () => {
   // The server-resolved (verified) version id + body hash are passed through.
   expect(arg.waiverVersionId).toBe(VER);
   expect(arg.waiverBodyHash).toBe('bodyhash-abc');
+});
+
+describe('submitted notification (best-effort, post-commit)', () => {
+  test('success → one grantee_deliverable_submitted notification', async () => {
+    verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+    const res = mockRes();
+    await handler(successReq(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(NotificationService.notify).toHaveBeenCalledTimes(1);
+    expect(notifyArg().type).toBe('grantee_deliverable_submitted');
+    expect(notifyArg().severity).toBe('info');
+    // 'info' only emails when emailAdmins is set — without this the PD gets nothing.
+    expect(notifyArg().emailAdmins).toBe(true);
+    expect(notifyArg().category).toBe('grantee-deliverables');
+    expect(notifyArg().metadata).toMatchObject({
+      requestId: 'r1', requestNumber: '1002794', pi: 'Dr. Ada Lovelace',
+      hasImage: true, captionPresent: true,
+    });
+  });
+
+  // REGRESSION: the PD/PI fields are absent from verify-grantee-token's projection,
+  // so reading them off `verified.request` yields undefined → empty recipients and a
+  // silently undelivered notification. Assert the resolved ADDRESS, not just the call.
+  test('PD address actually lands in explicitRecipients', async () => {
+    verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+    await handler(successReq(), mockRes());
+
+    expect(notifyArg().explicitRecipients).toEqual(['pd@wmkf.example']);
+    // Resolved from a FRESH request read, not the token-verified request object.
+    expect(grantRequestAdapter.getById).toHaveBeenCalledWith('r1', expect.objectContaining({
+      select: expect.stringContaining('_wmkf_programdirector_value'),
+    }));
+  });
+
+  test('notify throws → submit still 200 (a completed submission must not fail)', async () => {
+    verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+    NotificationService.notify.mockRejectedValue(new Error('smtp down'));
+    const res = mockRes();
+    await handler(successReq(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ ok: true });
+  });
+
+  test('PD read throws → still notifies, empty explicitRecipients', async () => {
+    verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+    systemUserAdapter.getByIdWithSelect.mockRejectedValue(new Error('dataverse 503'));
+    const res = mockRes();
+    await handler(successReq(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(NotificationService.notify).toHaveBeenCalledTimes(1);
+    expect(notifyArg().explicitRecipients).toEqual([]);
+  });
+
+  test('disabled PD is not a recipient', async () => {
+    verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+    systemUserAdapter.getByIdWithSelect.mockResolvedValue({
+      systemuserid: 'pd-1', internalemailaddress: 'pd@wmkf.example', isdisabled: true,
+    });
+    await handler(successReq(), mockRes());
+
+    expect(notifyArg().explicitRecipients).toEqual([]);
+  });
+
+  test('no PD assigned → still notifies, no PD lookup', async () => {
+    verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+    grantRequestAdapter.getById.mockResolvedValue({ _wmkf_programdirector_value: null });
+    await handler(successReq(), mockRes());
+
+    expect(notifyArg().explicitRecipients).toEqual([]);
+    expect(systemUserAdapter.getByIdWithSelect).not.toHaveBeenCalled();
+  });
+
+  test('deep link is absolute against NEXTAUTH_URL (staff origin)', async () => {
+    const prev = process.env.NEXTAUTH_URL;
+    process.env.NEXTAUTH_URL = 'https://apps.wmkf.example/';
+    try {
+      verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+      await handler(successReq(), mockRes());
+      expect(notifyArg().metadata.awardeeTabUrl).toBe('https://apps.wmkf.example/workbench/r1?tab=awardee');
+      expect(notifyArg().message).toContain('https://apps.wmkf.example/workbench/r1?tab=awardee');
+    } finally {
+      if (prev === undefined) delete process.env.NEXTAUTH_URL; else process.env.NEXTAUTH_URL = prev;
+    }
+  });
+
+  test('no NEXTAUTH_URL → relative path, never a malformed https:/// URL', async () => {
+    const prev = process.env.NEXTAUTH_URL;
+    delete process.env.NEXTAUTH_URL;
+    try {
+      verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+      await handler(successReq(), mockRes());
+      expect(notifyArg().metadata.awardeeTabUrl).toBe('/workbench/r1?tab=awardee');
+      expect(notifyArg().message).not.toContain('https:///');
+    } finally {
+      if (prev !== undefined) process.env.NEXTAUTH_URL = prev;
+    }
+  });
+
+  test('the raw caption never reaches the notification', async () => {
+    verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+    await handler(multipartReq({
+      fields: {
+        editedAbstract: 'x',
+        caption: '<img src=x onerror=alert(1)>',
+        waiverToken: 'signed.tok',
+      },
+      file: { filename: 'fig.png', buffer: Buffer.from([0x89, 0x50]) },
+    }), mockRes());
+
+    expect(JSON.stringify(notifyArg())).not.toContain('onerror');
+    expect(notifyArg().metadata.captionPresent).toBe(true);
+  });
+
+  test('no image / no caption → flags false, still notifies', async () => {
+    verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+    await handler(multipartReq({
+      fields: { editedAbstract: 'x', caption: '   ', waiverToken: 'signed.tok' },
+    }), mockRes());
+
+    expect(notifyArg().metadata.hasImage).toBe(false);
+    expect(notifyArg().metadata.captionPresent).toBe(false);
+  });
+
+  test('service failure → NO submitted notification', async () => {
+    verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+    writeGranteeDeliverables.mockResolvedValue({ ok: false, reason: 'stale_row', status: 409 });
+    await handler(successReq(), mockRes());
+
+    expect(NotificationService.notify).not.toHaveBeenCalled();
+  });
 });
 
 test('missing/expired render token (client stale) → 409 waiver_invalid, service NOT called, no alert', async () => {

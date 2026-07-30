@@ -2,8 +2,8 @@
 title: "Grantee Submission Visibility — Spec"
 domain: grantee-portal
 kind: spec
-status: draft
-summary: "Proposed: a best-effort submit notification to the assigned PD, plus caption and image visibility on the staff Awardee tab."
+status: active
+summary: "Built: a best-effort submit notification to the assigned PD, plus caption and image visibility on the staff Awardee tab."
 canonical: false
 cataloged: 2026-07-29
 owner: product-engineering
@@ -17,10 +17,15 @@ related:
 
 # Grantee Submission Visibility — Spec
 
-Status: **DRAFT / PROPOSED — nothing in this document is built.** Every as-built claim is labeled
-`[VERIFIED via file:line]` against a file read while drafting this spec (2026-07-29); every proposed
-behavior is `[PLANNED]`. Read `docs/GRANTEE_PORTAL_SPEC.md` first — that is the canonical as-built
-contract, and this spec is strictly additive to it.
+Status: **BUILT (2026-07-29), unpromoted.** Both features are implemented on
+`claude/grantee-submit-visibility-spec` with unit coverage; neither has been exercised against live
+Dataverse/M365, and the branch has not been promoted. The `[PLANNED]` labels below record the design
+intent this was built to — they are retained deliberately, since the shipped code follows them.
+Deltas between spec and code are called out in **Implementation notes** at the end.
+
+Every as-built claim about *pre-existing* code is labeled `[VERIFIED via file:line]` against a file
+read while drafting (2026-07-29). Read `docs/GRANTEE_PORTAL_SPEC.md` first — that is the canonical
+as-built contract for the surrounding flow, and this work is strictly additive to it.
 
 ## Problem
 
@@ -351,5 +356,34 @@ against it at implementation time.
 Tier: runtime work on a live flow → branch and deliberate promotion per
 `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`, not a direct `main` landing.
 
-On implementation, reconcile `docs/GRANTEE_PORTAL_SPEC.md` (its flow section gains a notification
-step; the staff-visibility gap closes) and this file's `status:` per `.claude/rules/durable-docs.md`.
+`docs/GRANTEE_PORTAL_SPEC.md` has been reconciled: its flow section now carries the notification step
+and the staff-visibility surface.
+
+---
+
+## Implementation notes (2026-07-29)
+
+Where the shipped code differs from, or resolves, the plan above:
+
+- **The open question was decided as (a).** The notification goes through `NotificationService.notify`,
+  so each submission also writes a durable `info` alert row. If the alerts dashboard turns out to be
+  the wrong tenant for routine successes, option (b) is still the fallback and nothing else has to
+  change.
+- **`notifySubmission` awaits.** It is awaited before the 200 so a serverless invocation cannot be
+  frozen mid-send, but every internal failure is caught — PD resolution and `notify` each have their
+  own swallow. Test: `notify throws → submit still 200`.
+- **Two reads, as specified.** `grantRequestAdapter.getById` for
+  `_wmkf_programdirector_value,_wmkf_projectleader_value`, then `systemUserAdapter.getByIdWithSelect`
+  for the PD's `internalemailaddress` + `isdisabled`. The PI name comes from the
+  `_wmkf_projectleader_value_formatted` annotation on the first read rather than a third contact read.
+- **`toStaffImageUrl` uses `new URL()`** rather than a string prefix test, so `JavaScript:` and other
+  case-variant or exotic schemes are rejected by protocol, not by pattern.
+- **Gate results.** `check:api-routes`, `check:trust-boundary-guid`, `check:dataverse-access-layer`,
+  `check:dynamics-context-boundary`, `check:odata-escape`, `check:atlas`, `check:doc-symbol-refs`, and
+  `check:docs-catalog` pass. Unit suite: 6051 passing. Two suites fail
+  (`signin-server-props`, `dependency-security-compat`) — both fail identically on a stashed clean tree,
+  so they are pre-existing and unrelated. ESLint adds no new warnings (`AwardeeTab.js` carries the same
+  four pre-existing `react-hooks/set-state-in-effect` warnings before and after).
+- **Not yet verified live.** No Dataverse or M365 round-trip, and `NOTIFICATION_EMAIL_FROM` /
+  `NEXTAUTH_URL` per-environment values remain `[ASSUMED]`. A submitted-package smoke test is the
+  promotion gate.

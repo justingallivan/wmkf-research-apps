@@ -28,6 +28,15 @@ import { fillInviteBody, fillInviteSubject } from '../../config/granteeInviteEma
 
 const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || '').trim());
 
+// Mirrors formatMeetingDate in OverviewTab.
+function formatSubmissionDate(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? null
+    : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
 export default function AwardeeTab({ requestId, context }) {
   const [status, setStatus] = useState(null);
   // Editable abstract (S278). `abstractText` is the working copy; `savedAbstractText`
@@ -43,6 +52,12 @@ export default function AwardeeTab({ requestId, context }) {
   const [abstractEditable, setAbstractEditable] = useState(false);
   const [savingAbstract, setSavingAbstract] = useState(false);
   const [abstractMsg, setAbstractMsg] = useState(null);
+  // What the grantee returned, read-only. `imageUrl` is server-derived and is
+  // non-null ONLY for an absolute http(s) ref, so it is the sole value allowed
+  // into an href; `imageRef` may be a relative SharePoint library path.
+  const [submission, setSubmission] = useState({
+    caption: null, imageRef: null, imageUrl: null, hasImage: false, submittedAt: null,
+  });
   const [recipients, setRecipients] = useState(null);
   const [toEmail, setToEmail] = useState('');
   const [ccEmail, setCcEmail] = useState('');
@@ -166,6 +181,13 @@ export default function AwardeeTab({ requestId, context }) {
         setAbstractField(data.effectiveField || null);
         setAbstractEtag(data.etag || '');
         setAbstractEditable(Boolean(data.editable));
+        setSubmission({
+          caption: data.caption || null,
+          imageRef: data.imageRef || null,
+          imageUrl: data.imageUrl || null,
+          hasImage: Boolean(data.hasImage),
+          submittedAt: data.submittedAt || null,
+        });
         if (data.status !== undefined) setStatus(data.status);
       }
     } catch { /* abstract load is best-effort; "Generate abstract" still works */ }
@@ -321,6 +343,9 @@ export default function AwardeeTab({ requestId, context }) {
   }
 
   const statusLabel = status != null ? (GRANTEE_DELIVERABLE_LABEL[status] || String(status)) : 'Not started';
+  // Hidden entirely pre-submit: nothing to show until the grantee returns something.
+  const hasSubmission = Boolean(submission.hasImage || submission.caption || submission.submittedAt);
+  const waiverAckedLabel = formatSubmissionDate(submission.submittedAt);
   const hasAbstract = abstractText.trim().length > 0;
   const abstractDirty = abstractText !== savedAbstractText;
   const effectiveBaseBody = hasSavedBody ? savedBodyRaw : adminDefaultBody;
@@ -390,6 +415,49 @@ export default function AwardeeTab({ requestId, context }) {
           </div>
         )}
       </section>
+
+      {hasSubmission && (
+        <section className="space-y-2">
+          <h4 className="text-sm font-medium text-gray-800">Grantee submission</h4>
+          {waiverAckedLabel && (
+            // Labeled as the waiver acknowledgment, not "submitted": the deliverable
+            // row has no submitted-date field. wmkf_waiverackedat is stamped in the
+            // same submit changeset, so it is an accurate proxy — but a future
+            // resubmit path could separate the two, and this label stays true if so.
+            <p className="text-xs text-gray-500">Waiver acknowledged {waiverAckedLabel}</p>
+          )}
+
+          <div>
+            <p className="text-xs font-medium text-gray-700">Caption</p>
+            {submission.caption
+              // Grantee-authored text. Rendered as a text child so React escapes it —
+              // never dangerouslySetInnerHTML here.
+              ? <p className="text-sm text-gray-900 whitespace-pre-wrap">{submission.caption}</p>
+              : <p className="text-sm text-gray-500">No caption provided.</p>}
+          </div>
+
+          <div>
+            <p className="text-xs font-medium text-gray-700">Image</p>
+            {submission.imageUrl ? (
+              <a
+                href={submission.imageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-700 hover:underline"
+              >
+                Open image in SharePoint ↗
+              </a>
+            ) : submission.hasImage ? (
+              <p className="text-sm text-gray-900">
+                <span className="font-mono text-xs break-all">{submission.imageRef}</span>
+                <span className="text-gray-500"> (path in the grantee SharePoint library)</span>
+              </p>
+            ) : (
+              <p className="text-sm text-gray-500">No image uploaded.</p>
+            )}
+          </div>
+        </section>
+      )}
 
       <section className="space-y-2">
         <h4 className="text-sm font-medium text-gray-800">Invitation</h4>
