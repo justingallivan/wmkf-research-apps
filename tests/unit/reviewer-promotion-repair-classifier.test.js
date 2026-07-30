@@ -1,6 +1,8 @@
 import {
   buildReviewerPromotionRepairManifest,
   classifyReviewerPromotionRepair,
+  hasReceiptBoundOrcidMatch,
+  summarizeReviewerMergePlan,
 } from '../../lib/services/reviewer-promotion-repair-classifier';
 
 const BASE = {
@@ -41,6 +43,47 @@ test('class D requires a unique active owner, independent same-person evidence, 
   expect(JSON.stringify(row)).not.toContain('redacted@example.edu');
 });
 
+test('merge-plan summary consumes the real planMerge ETag shape and fails closed on a missing ETag', () => {
+  const plan = {
+    blocked: false,
+    reasons: [],
+    keeper: { id: 'PERSON-KEEPER', etag: 'W/"keeper"' },
+    loser: { id: 'PERSON-LOSER', etag: 'W/"loser"' },
+    repoint: [{ suggestionId: 'SUG-1', etag: 'W/"suggestion"' }],
+    collisions: [],
+    slotRepoints: [{ requestId: 'REQ-1', etag: 'W/"request"' }],
+  };
+  expect(summarizeReviewerMergePlan(plan)).toEqual({
+    blocked: false,
+    etagComplete: true,
+    referenceScanComplete: true,
+    otherReferenceCount: 0,
+  });
+  expect(summarizeReviewerMergePlan({
+    ...plan,
+    loser: { id: 'PERSON-LOSER', etag: null },
+  }).etagComplete).toBe(false);
+});
+
+test('ORCID equality is independent evidence only when the receipt binds the identity projection', () => {
+  const match = {
+    candidateOrcid: 'https://orcid.org/0000-0002-1825-0097',
+    ownerOrcid: '0000-0002-1825-0097',
+  };
+  expect(hasReceiptBoundOrcidMatch({
+    ...match,
+    attestation: { valid: true, identityDecisionBound: true },
+  })).toBe(true);
+  expect(hasReceiptBoundOrcidMatch({
+    ...match,
+    attestation: { valid: false, identityDecisionBound: true },
+  })).toBe(false);
+  expect(hasReceiptBoundOrcidMatch({
+    ...match,
+    attestation: { valid: true, identityDecisionBound: false },
+  })).toBe(false);
+});
+
 test.each([
   ['different-person proof absent', {
     exactEmailOwners: [{ personId: 'PERSON-KEEPER', statecode: 0 }],
@@ -53,6 +96,12 @@ test.each([
   ['engaged person', {
     references: { ...BASE.references, engagedSuggestionCount: 1 },
     exactEmailOwners: [],
+  }, 'E'],
+  ['incomplete reference inventory', {
+    references: { ...BASE.references, scanComplete: false },
+    exactEmailOwners: [{ personId: 'PERSON-KEEPER', statecode: 0 }],
+    independentlyConfirmedSamePerson: true,
+    mergePlan: { blocked: false, etagComplete: true },
   }, 'E'],
   ['already repaired', {
     person: { ...BASE.person, email: 'present@example.edu' },

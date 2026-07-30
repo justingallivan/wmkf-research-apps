@@ -358,6 +358,65 @@ test('clean full success: 200 payload with NO rejected*/errors keys (undefined-v
   });
 });
 
+test('roster-managed promotion finalizes the receipt-bound roster key while returning the submitted correlation key', async () => {
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+    valid: true,
+    source: 'automated_resolver',
+    identityDecisionBound: true,
+    contactAuthorityBound: true,
+    rosterCandidateKey: 'suggestion:receipt-bound',
+  });
+
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Receipt Bound',
+      clientCandidateId: 'receipt-correlation',
+      candidateKey: 'suggestion:receipt-bound',
+      automatedIdentityAttestation: 'signed-v3',
+    }],
+  });
+
+  expect(reviewerRosterStore.findEligibilityByCandidateKey)
+    .toHaveBeenCalledWith(BASE.requestId, 'suggestion:receipt-bound');
+  expect(reviewerRosterStore.finalizeCandidatePromotion).toHaveBeenCalledWith(
+    BASE.requestId,
+    expect.objectContaining({ name: 'Dr Receipt Bound' }),
+    expect.objectContaining({ candidateKey: 'suggestion:receipt-bound' }),
+  );
+  expect(out.savedKeys).toEqual(['client:receipt-correlation']);
+  expect(out.results).toEqual([
+    expect.objectContaining({
+      candidateKey: 'client:receipt-correlation',
+      rosterFinalized: true,
+    }),
+  ]);
+});
+
+test('a false roster finalization result emits an alert and remains explicit in the saved result', async () => {
+  reviewerRosterStore.finalizeCandidatePromotion.mockResolvedValueOnce({
+    saved: false,
+    candidateKey: 'candidate:missing',
+  });
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [{ name: 'Dr Missing Roster' }],
+  });
+
+  expect(out.results).toEqual([
+    expect.objectContaining({
+      outcome: 'saved',
+      rosterFinalized: false,
+    }),
+  ]);
+  expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
+    type: 'reviewer_roster_promotion_finalize_failed',
+  }));
+  warn.mockRestore();
+});
+
 test('per-row validation rejects malformed rows before any adapter write', async () => {
   const out = await saveCandidates({
     ...BASE,
@@ -1521,12 +1580,17 @@ test('email-less candidate with conflict reviewerId at applicant institution fai
 });
 
 test('applicant-excluded suggestion collision becomes a terminal blocked roster row, never saved', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
   verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
     valid: true,
     source: 'automated_resolver',
     identityDecisionBound: true,
     contactAuthorityBound: true,
-    rosterCandidateKey: 'client:applicant-excluded',
+    rosterCandidateKey: 'suggestion:authoritative-excluded',
+  });
+  reviewerRosterStore.markPromotionBlocked.mockResolvedValueOnce({
+    blocked: false,
+    candidateKey: 'suggestion:authoritative-excluded',
   });
   reviewerSuggestionAdapter.upsert.mockResolvedValueOnce({
     id: 'S-EXCLUDED',
@@ -1555,13 +1619,20 @@ test('applicant-excluded suggestion collision becomes a terminal blocked roster 
   ]);
   expect(reviewerRosterStore.markPromotionBlocked).toHaveBeenCalledWith(
     BASE.requestId,
-    'client:applicant-excluded',
+    'suggestion:authoritative-excluded',
     expect.objectContaining({
       decision: 'blocked_applicant_excluded',
       code: 'applicant_excluded',
     }),
   );
+  expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
+    type: 'reviewer_roster_promotion_block_failed',
+    metadata: expect.objectContaining({
+      candidateKey: 'suggestion:authoritative-excluded',
+    }),
+  }));
   expect(reviewerRosterStore.finalizeCandidatePromotion).not.toHaveBeenCalled();
+  warn.mockRestore();
 });
 
 test('suggestion failure deletes only the exact newly-created unreferenced person under its fresh ETag', async () => {

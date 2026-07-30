@@ -8,7 +8,7 @@
  *   POST  { requestId, candidates }                  → record surfaced
  *     (active, or ineligible only with a bound server eligibility receipt)
  *   PATCH { requestId, action:'exclude', candidate } → set aside
- *   PATCH { requestId, action:'promote', candidateKey } → excluded → active (returns blob)
+ *   PATCH { requestId, action:'promote', candidateKey } → excluded → active (returns blob; stale/no-op is 409)
  *   PATCH { requestId, action:'saved', candidates }  → rejected; promotion services own graduation
  *   PATCH { requestId, action:'confirm_identity', candidate } → staff attestation
  *   PATCH { requestId, action:'remove_previous_results' } → delete active search history
@@ -29,7 +29,10 @@ import {
   removePreviousActiveSearchResults,
 } from '../../../lib/services/reviewer-roster-store';
 import { verifyAutomatedIdentityAttestation } from '../../../lib/services/reviewer-candidate-attestation';
-import { pruneCandidateForRoster } from '../../../shared/components/reviewers/reviewer-search-logic';
+import {
+  pruneCandidateForRoster,
+  reviewerCandidateKey,
+} from '../../../shared/components/reviewers/reviewer-search-logic';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Cap candidates per POST — a Find run asks for at most 25, but guard against an
@@ -100,6 +103,20 @@ function stripClientRosterAuthority(candidate) {
     ...safe
   } = candidate;
   return safe;
+}
+
+function bindServerRosterCandidateKey(candidate, receipt) {
+  if (!candidate || typeof candidate !== 'object') return candidate;
+  const {
+    candidateKey: _submittedCandidateKey,
+    ...candidateWithoutClientKey
+  } = candidate;
+  const candidateKey = receipt?.valid === true && receipt?.rosterCandidateKey
+    ? receipt.rosterCandidateKey
+    : reviewerCandidateKey(candidateWithoutClientKey);
+  return candidateKey
+    ? { ...candidateWithoutClientKey, candidateKey }
+    : candidateWithoutClientKey;
 }
 
 function hasStoredStaffAuthority(candidate) {
@@ -193,7 +210,7 @@ async function handlePost(req, res) {
       : 'unknown';
     const preserveEvidence = eligibilityStatus !== 'unknown';
     return {
-      ...compact,
+      ...bindServerRosterCandidateKey(compact, receipt),
       eligibilityStatus,
       eligibilityReason: preserveEvidence ? compact.eligibilityReason : null,
       eligibilityEvidence: preserveEvidence ? compact.eligibilityEvidence : null,
@@ -238,6 +255,13 @@ async function handlePatch(req, res, access) {
     const { candidateKey } = req.body;
     if (!candidateKey) return res.status(400).json({ error: 'candidateKey is required to promote' });
     const candidate = await promote(requestId, candidateKey);
+    if (!candidate) {
+      return res.status(409).json({
+        success: false,
+        error: 'Candidate is no longer excluded; reload the reviewer roster.',
+        code: 'candidate_not_excluded',
+      });
+    }
     return res.status(200).json({ success: true, candidate });
   }
 

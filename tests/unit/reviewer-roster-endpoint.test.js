@@ -35,6 +35,7 @@ import handler from '../../pages/api/workbench/reviewer-roster';
 import { requireAppAccess } from '../../lib/utils/auth';
 import { verifyAutomatedIdentityAttestation } from '../../lib/services/reviewer-candidate-attestation';
 import * as store from '../../lib/services/reviewer-roster-store';
+import { reviewerCandidateKey } from '../../shared/components/reviewers/reviewer-search-logic';
 
 const REQ = '11111111-1111-1111-1111-111111111111';
 
@@ -110,6 +111,42 @@ describe('POST recordSurfaced', () => {
     expect(store.recordSurfaced).not.toHaveBeenCalled();
   });
 
+  it('re-derives an untrusted browser candidate key before writing the roster', async () => {
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [{
+      name: 'Mallory Example',
+      candidateKey: 'candidate:existing-victim',
+      email: 'mallory@example.edu',
+      affiliation: 'Example University',
+    }] } }, r);
+
+    expect(r.statusCode).toBe(200);
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed[0].candidateKey).toEqual(expect.any(String));
+    expect(passed[0].candidateKey).not.toBe('candidate:existing-victim');
+    expect(store.findCandidatesByKeys).toHaveBeenCalledWith(
+      REQ,
+      [passed[0].candidateKey],
+    );
+  });
+
+  it('preserves a receipt-bound immutable roster candidate key', async () => {
+    verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+      valid: true,
+      rosterCandidateKey: 'candidate:receipt-bound',
+      eligibilityEvidenceBound: false,
+    });
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [{
+      name: 'Receipt Bound',
+      candidateKey: 'candidate:receipt-bound',
+      automatedIdentityAttestation: 'signed',
+    }] } }, r);
+
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed[0].candidateKey).toBe('candidate:receipt-bound');
+  });
+
   it('prunes server-side and records named candidates', async () => {
     const r = res();
     await handler({ method: 'POST', body: { requestId: REQ, candidates: [
@@ -162,9 +199,14 @@ describe('POST recordSurfaced', () => {
   });
 
   it('preserves a server-stored confirmation when a discovered row resurfaces', async () => {
+    const resurfaced = {
+      name: 'Ann Lee',
+      email: 'automated@example.net',
+    };
+    const derivedCandidateKey = reviewerCandidateKey(resurfaced);
     store.findCandidatesByKeys.mockResolvedValueOnce([{
       name: 'Ann Lee',
-      candidateKey: 'candidate:ann',
+      candidateKey: derivedCandidateKey,
       pdIdentityConfirmed: true,
       pdIdentityConfirmationId: 'confirm-1',
       manualContactFields: ['email', 'website', 'affiliation'],
@@ -180,9 +222,8 @@ describe('POST recordSurfaced', () => {
     }]);
     const r = res();
     await handler({ method: 'POST', body: { requestId: REQ, candidates: [{
-      name: 'Ann Lee',
-      candidateKey: 'candidate:ann',
-      email: 'automated@example.net',
+      ...resurfaced,
+      candidateKey: derivedCandidateKey,
     }] } }, r);
 
     const [, passed] = store.recordSurfaced.mock.calls[0];
@@ -415,6 +456,17 @@ describe('PATCH', () => {
     expect(r.statusCode).toBe(200);
     expect(store.promote).toHaveBeenCalledWith(REQ, 'candidate:bob');
     expect(r.body.candidate).toEqual({ name: 'Bob Roe' });
+  });
+
+  it('promote → 409 when the candidate is no longer excluded', async () => {
+    store.promote.mockResolvedValueOnce(null);
+    const r = res();
+    await handler({ method: 'PATCH', body: { requestId: REQ, action: 'promote', candidateKey: 'candidate:stale' } }, r);
+    expect(r.statusCode).toBe(409);
+    expect(r.body).toMatchObject({
+      success: false,
+      code: 'candidate_not_excluded',
+    });
   });
 
   it('saved → 409 because promotion services own the roster transition', async () => {

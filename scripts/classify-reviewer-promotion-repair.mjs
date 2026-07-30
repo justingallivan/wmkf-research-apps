@@ -60,6 +60,8 @@ const { verifyAutomatedIdentityAttestation } = await import('../lib/services/rev
 const {
   buildReviewerPromotionRepairManifest,
   classifyReviewerPromotionRepair,
+  hasReceiptBoundOrcidMatch,
+  summarizeReviewerMergePlan,
 } = await import('../lib/services/reviewer-promotion-repair-classifier.js');
 
 function normalizedEmail(value) {
@@ -158,12 +160,15 @@ async function currentProjection(requestId, candidate) {
     && projection.decision === 'ready'
   ) {
     return {
-      ...projection,
-      decision: 'needs_identity_confirmation',
-      reason: `contact_attestation_${receipt.reason || `v${receipt.projectionVersion || 'unknown'}`}`,
+      projection: {
+        ...projection,
+        decision: 'needs_identity_confirmation',
+        reason: `contact_attestation_${receipt.reason || `v${receipt.projectionVersion || 'unknown'}`}`,
+      },
+      receipt,
     };
   }
-  return projection;
+  return { projection, receipt };
 }
 
 async function run() {
@@ -243,7 +248,8 @@ async function run() {
       `${suggestion._wmkf_request_value}::${String(suggestion.wmkf_appreviewersuggestionid).toLowerCase()}`,
     ) || null;
     const candidate = roster?.candidate || {};
-    const projection = await currentProjection(suggestion._wmkf_request_value, candidate);
+    const projectionContext = await currentProjection(suggestion._wmkf_request_value, candidate);
+    const projection = projectionContext.projection;
     let exactEmailOwners = [];
     if (projection.email) {
       exactEmailOwners = await getAll(
@@ -263,11 +269,18 @@ async function run() {
     const rosterOrcid = normalizedOrcid(candidate.orcid || candidate.contactEnrichment?.orcidId);
     const activeOwners = exactEmailOwners.filter((owner) => owner.statecode === 0);
     const independentlyConfirmedSamePerson = activeOwners.length === 1
-      && rosterOrcid
-      && rosterOrcid === normalizedOrcid(activeOwners[0].wmkf_orcid);
+      && hasReceiptBoundOrcidMatch({
+        candidateOrcid: rosterOrcid,
+        ownerOrcid: activeOwners[0].wmkf_orcid,
+        attestation: projectionContext.receipt,
+      });
 
     let mergePlan = { blocked: true, etagComplete: false };
-    if (independentlyConfirmedSamePerson) {
+    let mergePlanSummary = null;
+    const uniqueDifferentOwner = activeOwners.length === 1
+      && String(activeOwners[0].wmkf_potentialreviewersid || '').toLowerCase()
+        !== String(personId || '').toLowerCase();
+    if (uniqueDifferentOwner) {
       try {
         const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
         enterDynamicsBypassForScript('classify-reviewer-promotion-repair');
@@ -276,18 +289,27 @@ async function run() {
           keeperId: activeOwners[0].wmkf_potentialreviewersid,
           loserId: personId,
         });
-        const etagComplete = Boolean(
-          plan.keeper?._etag
-          && plan.loser?._etag
-          && (plan.repoint || []).every((entry) => entry.etag)
-          && (plan.collisions || []).every((entry) => entry.etag)
-          && (plan.slotRepoints || []).every((entry) => entry.etag),
-        );
-        mergePlan = { blocked: plan.blocked === true, etagComplete };
+        mergePlanSummary = summarizeReviewerMergePlan(plan);
+        mergePlan = {
+          blocked: mergePlanSummary.blocked,
+          etagComplete: mergePlanSummary.etagComplete,
+        };
       } catch (error) {
         mergePlan = { blocked: true, etagComplete: false, reason: error?.code || 'plan_failed' };
       }
     }
+    // The supported relationship inventory mirrors reviewer-merge: paginated
+    // suggestion rows (including engagement/honorarium), the person's contact
+    // link, and paginated applicant slots. A duplicate candidate additionally
+    // requires planMerge to return its complete reference collections.
+    const baseReferenceScanComplete = Boolean(
+      person
+      && Array.isArray(personSuggestions)
+      && Array.isArray(slotRefs),
+    );
+    const referenceScanComplete = baseReferenceScanComplete
+      && (!uniqueDifferentOwner || mergePlanSummary?.referenceScanComplete === true);
+    const otherReferenceCount = mergePlanSummary?.otherReferenceCount || 0;
 
     rows.push(classifyReviewerPromotionRepair({
       requestId: suggestion._wmkf_request_value,
@@ -317,8 +339,8 @@ async function run() {
         engagedSuggestionCount: personSuggestions.filter(isEngaged).length,
         contactLinked: Boolean(person._wmkf_contact_value),
         applicantSlotCount: slotRefs.length,
-        otherReferenceCount: 0,
-        scanComplete: true,
+        otherReferenceCount,
+        scanComplete: referenceScanComplete,
       },
       independentlyConfirmedSamePerson,
       mergePlan,
