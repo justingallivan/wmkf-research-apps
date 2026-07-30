@@ -129,6 +129,31 @@ describe('CandidateCard email readiness', () => {
 });
 
 describe('CandidateCard affiliation and Dataverse evidence', () => {
+  test('keeps exact applicant linkage distinct from general-search Dataverse evidence', () => {
+    renderCandidate({
+      isApplicantRecommended: true,
+      applicantKnownReviewer: {
+        status: 'known',
+        potentialReviewerId: 'person-1',
+        name: 'Dr Contact Ready',
+        affiliation: 'Example University',
+        email: 'linked@example.edu',
+        emailSource: null,
+        emailReadiness: {
+          level: 'low',
+          action: 'quick_check',
+          reason: 'Email source not recorded — confirm before sending',
+        },
+        orcid: '0000-0001-2345-6789',
+      },
+    });
+
+    expect(screen.getByText('✓ Existing linked reviewer record')).toBeInTheDocument();
+    expect(screen.getByText('📧 linked@example.edu')).toBeInTheDocument();
+    expect(screen.getByText('⚠ Email needs confirmation')).toBeInTheDocument();
+    expect(screen.queryByText(/Known in Dataverse by exact/)).not.toBeInTheDocument();
+  });
+
   test('labels publication and OpenAlex evidence without claiming both are current', () => {
     const { rerender } = renderCandidate({ affiliationSource: 'pubmed_recency' });
     expect(screen.getByText(/publication affiliation/)).toBeInTheDocument();

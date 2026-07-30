@@ -2,7 +2,7 @@
 title: Applicant-Recommended Reviewer Dataverse-First Hydration Plan
 domain: reviewer-identity
 kind: plan
-status: draft
+status: active
 summary: "Exact-person Dataverse hydration plan for applicant-recommended reviewers, preserving identity, contact, COI, and partial-success safeguards."
 canonical: false
 cataloged: 2026-07-29
@@ -21,7 +21,8 @@ related:
 
 ## Status and decision
 
-**REVISED AFTER CLAUDE OPUS ADVERSARIAL REVIEW.**
+**IMPLEMENTED LOCALLY AND PASSED POST-IMPLEMENTATION OPUS REVIEW; DELIBERATE
+DEPLOYMENT SMOKE PENDING.**
 
 The first draft received a `NEEDS REWORK` verdict. The revision removes the
 shared-contact-projection/attestation blast radius, adds the missing
@@ -29,6 +30,11 @@ request-switch guard, uses a distinct applicant-link field and badge, preserves
 current `research_only` promotion behavior, specifies roster pairing and SSE
 failure shapes, and corrects the inactive-owner and null-email fall-throughs.
 The review receipt and disposition are at the end of this document.
+
+The revised design is implemented on `codex/reviewer-promotion-remediation`.
+Focused tests and the Dataverse-access and route/service-boundary gates pass.
+The plan remains active until the deliberate reviewer-campaign
+deployment/signed-in no-send smoke is performed.
 
 Applicant-recommended reviewers already arrive through
 `akoya_request.wmkf_potentialreviewer1..5` lookups. Those values are exact
@@ -635,6 +641,43 @@ page is planned.
 8. No person, suggestion, contact, or invitation is created by hydration.
 9. Relevant tests/gates and a signed-in no-send smoke pass.
 
+## Implementation log
+
+### 2026-07-29 — local implementation
+
+- Added an exact-GUID, read-only applicant person loader and a bounded
+  `applicantKnownReviewer` projection with paired email/source, active-state,
+  and active owner checks.
+- Hydrated ingestion after suggestion materialization, with separate
+  per-person lookup status and a request-switch guard that discards late
+  success and failure state writes.
+- Re-read exact people during SSE enrichment, seeded canonical
+  affiliation/ORCID, made per-row failures explicit, removed the false empty
+  all-read-failed result, and advanced the roster cache to version 3.
+- Prevented stored-address/enriched-address disagreement from relabeling the
+  stored address with the enriched source.
+- Revalidated the suggestion, exact person, and active email ownership at
+  promotion time. Canonical reuse performs no email write; stable failures
+  cover unavailable, inactive, conflict, mismatch, and missing email.
+- Preserved an identity-vetted enrichment email as a paired roster claim when
+  the exact person has no address, while withholding its source from the
+  bibliometric writer. Promotion B1 writes the address and source atomically,
+  then re-reads canonical contact.
+- Staff confirmation clears historical mismatch evidence, but unavailable
+  applicant person rows cannot be confirmed through either UI or direct API.
+  Anti-scrape manual addresses are rejected before any person write.
+- Kept applicant-link evidence distinct from general-search
+  `dataverseContactEvidence`, and kept the invitation send classifier
+  authoritative for `quick_check` and `research_only`.
+- Added service, route, roster, UI, stale-request, and contact-readiness tests.
+  Sixteen focused suites (340 tests) pass. Dataverse-access-layer and
+  route/service-boundary gates and their self-tests pass.
+
+**Not yet production-verified:** acceptance criteria 2 and 9 require deliberate
+deployment followed by the signed-in request 1002959 no-send smoke. No
+production person, suggestion, contact, or invitation mutation was performed
+as part of local implementation.
+
 ## Review receipt
 
 **Reviewer:** Claude Opus, high effort, read-only  
@@ -672,3 +715,17 @@ document. The revised design:
 
 The complete review is preserved in
 `docs/audits/applicant-reviewer-dataverse-first-hydration-opus-review-2026-07-29.md`.
+
+### Post-implementation Opus review
+
+The first implementation review returned `NEEDS FIXES`; two remediation passes
+closed the sticky mismatch/manual correction, cache convergence, transient
+confirmation, mixed partial-success/COI, owner resolution, no-stored-email B1,
+orphan provenance, anti-scrape write ordering, and unavailable-row
+confirmation findings.
+
+**Closing verdict:** `PASS` — no P0–P2 findings. Remaining notes are
+fail-closed P3 feedback edges, a pre-existing research-adapter concurrency
+note, explicit re-enrichment after stable Dataverse repair, and the pending
+live deployment smoke. The implementation review receipt is preserved in
+`docs/audits/applicant-reviewer-dataverse-first-hydration-opus-implementation-review-2026-07-29.md`.

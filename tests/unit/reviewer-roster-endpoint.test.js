@@ -568,6 +568,12 @@ describe('PATCH', () => {
       verificationStatus: 'unresolved',
       needsIdentification: true,
       isApplicantRecommended: true,
+      applicantKnownReviewer: {
+        status: 'known',
+        potentialReviewerId: '22222222-2222-2222-2222-222222222222',
+        email: null,
+        emailSource: null,
+      },
     });
     const r = res();
     await handler({ method: 'PATCH', body: {
@@ -595,6 +601,39 @@ describe('PATCH', () => {
       }),
       expect.anything(),
     );
+  });
+
+  it('confirm_identity rejects an applicant row whose exact person hydration is unavailable', async () => {
+    const suggestionId = '33333333-3333-3333-3333-333333333333';
+    store.findCandidateBySuggestionAnchor.mockResolvedValueOnce({
+      name: 'Applicant Reviewer',
+      suggestionId,
+      candidateKey: `suggestion:${suggestionId}`,
+      identityStatus: 'unresolved',
+      needsIdentification: true,
+      isApplicantRecommended: true,
+      applicantKnownReviewer: {
+        status: 'unavailable',
+        code: 'person_unavailable',
+        potentialReviewerId: '22222222-2222-2222-2222-222222222222',
+      },
+    });
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'confirm_identity',
+      candidate: {
+        name: 'Applicant Reviewer',
+        email: 'verified@example.edu',
+        suggestionId,
+        candidateKey: `suggestion:${suggestionId}`,
+        isApplicantRecommended: true,
+      },
+    } }, r);
+
+    expect(r.statusCode).toBe(422);
+    expect(r.body).toMatchObject({ code: 'applicant_hydration_required' });
+    expect(store.confirmIdentity).not.toHaveBeenCalled();
   });
 
   it('confirm_identity returns 409 when the active roster row is gone', async () => {

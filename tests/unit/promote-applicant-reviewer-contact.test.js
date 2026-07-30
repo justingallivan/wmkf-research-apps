@@ -23,12 +23,24 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   APPLICANT_DISPOSITION_MAP: { recommended: 100000000 },
 }));
 let mockPersonEmail = null;
+let mockPersonEmailSource = null;
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   __esModule: true,
   update: jest.fn(async (_id, updates) => {
     if (updates?.email) mockPersonEmail = updates.email;
+    if (updates?.emailSource !== undefined) mockPersonEmailSource = updates.emailSource;
   }),
-  getById: jest.fn(async () => ({ wmkf_emailaddress: mockPersonEmail })),
+  getById: jest.fn(async () => ({
+    wmkf_potentialreviewersid: '22222222-2222-2222-2222-222222222222',
+    wmkf_emailaddress: mockPersonEmail,
+    wmkf_emailsource: mockPersonEmailSource,
+    statecode: 0,
+  })),
+  findByEmailCandidates: jest.fn(async () => ({
+    one: true,
+    id: '22222222-2222-2222-2222-222222222222',
+    row: { wmkf_potentialreviewersid: '22222222-2222-2222-2222-222222222222', statecode: 0 },
+  })),
 }));
 jest.mock('../../lib/dataverse/adapters/researcher', () => ({
   __esModule: true,
@@ -81,11 +93,16 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPersonEmail = 'existing@example.org';
+    mockPersonEmailSource = 'scholarly_multi';
     potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
       if (updates?.email) mockPersonEmail = updates.email;
+      if (updates?.emailSource !== undefined) mockPersonEmailSource = updates.emailSource;
     });
     potentialReviewerAdapter.getById.mockImplementation(async () => ({
+      wmkf_potentialreviewersid: PERSON_ID,
       wmkf_emailaddress: mockPersonEmail,
+      wmkf_emailsource: mockPersonEmailSource,
+      statecode: 0,
     }));
     finalizeCandidatePromotion.mockResolvedValue({ saved: true });
     suggestionAdapter.findById.mockResolvedValue({
@@ -98,7 +115,6 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
   });
 
   test('flips selected and persists the marked contact, stamping email manual', async () => {
-    potentialReviewerAdapter.update.mockResolvedValue(undefined);
     const req = {
       method: 'POST',
       body: {
@@ -196,11 +212,16 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     // Restore clean adapter defaults — clearAllMocks clears calls but NOT the throwing
     // mockImplementation the describe-1 collision test installs, which would leak here.
     mockPersonEmail = null;
+    mockPersonEmailSource = null;
     potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
       if (updates?.email) mockPersonEmail = updates.email;
+      if (updates?.emailSource !== undefined) mockPersonEmailSource = updates.emailSource;
     });
     potentialReviewerAdapter.getById.mockImplementation(async () => ({
+      wmkf_potentialreviewersid: PERSON_ID,
       wmkf_emailaddress: mockPersonEmail,
+      wmkf_emailsource: mockPersonEmailSource,
+      statecode: 0,
     }));
     researcherAdapter.updateById.mockResolvedValue(undefined);
     suggestionAdapter.findById.mockResolvedValue({
@@ -270,10 +291,12 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
   });
 
-  test('idempotent: does NOT override a person that already has an email', async () => {
-    findCandidateBySuggestion.mockResolvedValue({ ...SAFE_ROSTER_CANDIDATE, email: 'roster@example.org', emailSource: 'claude_search', emailPersistAllowed: true });
+  test('idempotent: does NOT rewrite the same email already stored on the person', async () => {
+    findCandidateBySuggestion.mockResolvedValue({ ...SAFE_ROSTER_CANDIDATE, email: 'existing@example.org', emailSource: 'claude_search', emailPersistAllowed: true });
     mockPersonEmail = 'existing@example.org';
+    mockPersonEmailSource = 'claude_search';
     const res = await promote();
+    expect(res.statusCode).toBe(200);
     expect(res.body.savedFields).not.toContain('email');
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
   });

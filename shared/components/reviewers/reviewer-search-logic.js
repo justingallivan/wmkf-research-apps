@@ -19,11 +19,15 @@ import {
 } from '../../../lib/utils/reviewer-candidate-key';
 import { emailConfidence } from '../../../lib/utils/reviewer-invite';
 import { projectReviewerContact } from '../../../lib/utils/reviewer-vetted-email';
+import {
+  projectCanonicalApplicantContact,
+  pruneApplicantKnownReviewer,
+} from '../../../lib/utils/applicant-known-reviewer';
 
 // Increment when applicant-recommended enrichment semantics change in a way
 // that requires existing roster JSON to be recomputed. Unversioned legacy rows
 // deliberately miss the cache once and are stamped by the enrichment service.
-export const APPLICANT_ENRICHMENT_CACHE_VERSION = 2;
+export const APPLICANT_ENRICHMENT_CACHE_VERSION = 3;
 
 /**
  * Merge contact-enrichment results (from /enrich-contacts) back onto the chosen
@@ -49,7 +53,7 @@ export const sanitizeInstitutionCOIDetails = _sanitizeInstitutionCOIDetails;
 export function isCandidateSelectable(c) {
   const eligibilityStatus = c?.eligibilityStatus || c?.contactEnrichment?.eligibilityStatus || 'unknown';
   return eligibilityStatus !== 'deceased'
-    && projectReviewerContact(c, { staffConfirmed: c?.pdIdentityConfirmed === true })?.decision === 'ready'
+    && getCandidatePromotionDecision(c)?.decision === 'ready'
     && !c?.hasInstitutionCOI;
 }
 
@@ -59,9 +63,49 @@ export function candidateWasSaved(candidate, savedKeys = []) {
 }
 
 export function getCandidatePromotionDecision(candidate) {
-  return projectReviewerContact(candidate, {
+  const shared = projectReviewerContact(candidate, {
     staffConfirmed: candidate?.pdIdentityConfirmed === true,
   });
+  if (!candidate?.isApplicantRecommended || !candidate?.applicantKnownReviewer) {
+    return shared;
+  }
+  if (
+    shared?.decision === 'needs_identity_confirmation'
+    && (shared.reason === 'identity_not_resolved' || shared.reason === 'contact_claim_mismatch')
+  ) {
+    return shared;
+  }
+
+  const canonical = projectCanonicalApplicantContact({
+    applicantKnownReviewer: candidate.applicantKnownReviewer,
+    candidate,
+    allowStaffManualContact: true,
+  });
+  if (canonical.decision === 'ready') {
+    return {
+      ...shared,
+      decision: 'ready',
+      reason: null,
+      email: canonical.email,
+      emailSource: canonical.emailSource,
+      emailAction: canonical.emailReadiness?.action || null,
+      emailActionReason: canonical.emailReadiness?.reason || null,
+    };
+  }
+  if (canonical.decision === 'missing_email') {
+    // The exact person may legitimately have no stored address yet while this
+    // request's enrichment produced a vetted, identity-gated pair. Keep that
+    // row selectable so the server-owned B1 path can persist the pair before
+    // re-reading canonical contact. The shared projection is the authority for
+    // this narrow fallback; client-only top-level claims cannot make it ready.
+    if (shared?.decision === 'ready') return shared;
+    return { ...shared, decision: 'missing_email', reason: 'email_missing' };
+  }
+  return {
+    ...shared,
+    decision: 'needs_identity_confirmation',
+    reason: canonical.decision,
+  };
 }
 
 /**
@@ -87,6 +131,12 @@ export const withReviewerCandidateKey = _withReviewerCandidateKey;
  */
 export function getCandidateEmailReadiness(candidate) {
   const enrichment = candidate?.contactEnrichment || {};
+  const known = pruneApplicantKnownReviewer(candidate?.applicantKnownReviewer);
+  const manualEmail = Array.isArray(candidate?.manualContactFields)
+    && candidate.manualContactFields.includes('email');
+  if (!manualEmail && known?.status === 'known' && known.email) {
+    return known.emailReadiness;
+  }
   const email = candidate?.email || enrichment.email || null;
   if (!email) {
     return {
@@ -357,6 +407,8 @@ export function hasValidApplicantEnrichmentCache(
       && candidate?.candidateKey === canonicalKey
       && candidate?.enrichedProposalKey === proposalKey
       && candidate?.applicantEnrichmentCacheVersion === APPLICANT_ENRICHMENT_CACHE_VERSION
+      && candidate?.applicantKnownReviewer
+      && candidate.applicantKnownReviewer.status !== 'unavailable'
       && (candidate.isApplicantRecommended || provenanceKindOf(candidate) === PROVENANCE_KINDS.APPLICANT_SUGGESTED)
     ) {
       canonicalRowsByKey.set(canonicalKey, candidate);
@@ -665,6 +717,8 @@ export function pruneCandidateForRoster(c) {
     seedIdentityMatchKey: c.seedIdentityMatchKey || null,
     seedIdentityNameConsistent: c.seedIdentityNameConsistent === false ? false : (c.seedIdentityNameConsistent === true ? true : null),
     isApplicantRecommended: !!c.isApplicantRecommended,
+    applicantKnownReviewer: pruneApplicantKnownReviewer(c.applicantKnownReviewer),
+    applicantContactMismatch: c.applicantContactMismatch === true,
     enrichedProposalKey: c.enrichedProposalKey || null,
     applicantEnrichmentCacheVersion: Number.isInteger(c.applicantEnrichmentCacheVersion)
       ? c.applicantEnrichmentCacheVersion
@@ -705,7 +759,9 @@ export function pruneCandidateForRoster(c) {
     identityNote: c.identityNote || null,
     // Contact + bibliometrics (prefer the merged top-level, fall back to enrichment).
     email: c.email || e.email || null,
-    emailSource: e.emailSource || null,
+    emailSource: c.isApplicantRecommended
+      ? (c.emailSource || e.emailSource || null)
+      : (e.emailSource || null),
     emailYear: e.emailYear || null,
     emailAction: e.emailAction || null,
     emailActionReason: e.emailActionReason || null,

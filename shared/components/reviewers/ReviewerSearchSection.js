@@ -32,6 +32,7 @@
  *   - excludedRaw           : the applicant's original free-text exclusion field (shown as a disclosure under the box)
  *   - recommended           : applicant-recommended candidate rows (rendered + verifiable in the bottom card)
  *   - recommendedFailed      : applicant-recommended rows that failed to ingest (warning in the bottom card)
+ *   - knownLookupFailed      : materialized rows whose exact linked person could not be safely hydrated
  *   - slotsPopulated        : how many wmkf_potentialreviewer slots the applicant filled (null = unknown)
  *   - ingestLoading / ingestError / onRetryIngestion : applicant-reviewer ingestion state + retry (from ReviewerFindPanel)
  *   - onSaved               : optional callback after a successful save
@@ -217,14 +218,24 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   // pass judged this retrieved candidate possibly off-topic. A warning, never a gate.
   const aiFlaggedNotRelevant = !!c.aiFlaggedNotRelevant;
   const enr = c.contactEnrichment || {};
-  const email = c.email || enr.email || null;
-  const emailSource = c.emailSource || enr.emailSource || null;
+  const knownReviewer = c.applicantKnownReviewer || null;
+  const manualEmail = Array.isArray(c.manualContactFields) && c.manualContactFields.includes('email');
+  const email = manualEmail
+    ? (c.email || enr.email || null)
+    : (knownReviewer?.email || c.email || enr.email || null);
+  const emailSource = manualEmail
+    ? (c.emailSource || enr.emailSource || null)
+    : (knownReviewer?.emailSource || c.emailSource || enr.emailSource || null);
   const emailReadiness = getCandidateEmailReadiness(c);
   const emailAction = email
-    ? (enr.emailAction || c.emailAction || emailReadiness.action)
+    ? (!manualEmail && knownReviewer?.email
+      ? emailReadiness.action
+      : (enr.emailAction || c.emailAction || emailReadiness.action))
     : 'missing';
   const emailActionReason = email
-    ? (enr.emailActionReason || c.emailActionReason || emailReadiness.reason)
+    ? (!manualEmail && knownReviewer?.email
+      ? emailReadiness.reason
+      : (enr.emailActionReason || c.emailActionReason || emailReadiness.reason))
     : emailReadiness.reason;
   const emailEvidence = enr.emailEvidence || null;
   const evidencePublications = Array.isArray(emailEvidence?.publications)
@@ -301,6 +312,31 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               title={dataverseEvidence.checkedAt ? `Dataverse checked ${dataverseEvidence.checkedAt}` : undefined}
             >
               ✓ Known in Dataverse by exact {dataverseEvidence.matchKey || 'key'} (checked during this search)
+            </div>
+          )}
+          {knownReviewer?.status === 'known' && (
+            <div className="mt-2 p-2 border rounded text-xs bg-emerald-50 border-emerald-200 text-emerald-800">
+              <div className="font-medium">✓ Existing linked reviewer record</div>
+              {knownReviewer.affiliation && <div>{knownReviewer.affiliation}</div>}
+              {knownReviewer.orcid && <div>ORCID {knownReviewer.orcid}</div>}
+              {knownReviewer.email && (
+                <div>
+                  {knownReviewer.email} · {knownReviewer.emailReadiness?.action || 'quick_check'}
+                  {knownReviewer.emailReadiness?.reason ? ` — ${knownReviewer.emailReadiness.reason}` : ''}
+                </div>
+              )}
+              {!knownReviewer.email && <div>No stored email address</div>}
+            </div>
+          )}
+          {knownReviewer && knownReviewer.status !== 'known' && (
+            <div className="mt-2 p-2 border rounded text-xs bg-amber-50 border-amber-300 text-amber-800">
+              ⚠ Existing linked reviewer record needs repair: {
+                knownReviewer.status === 'inactive'
+                  ? 'the person record is inactive'
+                  : knownReviewer.status === 'email_conflict'
+                    ? 'the stored email is owned by another or ambiguous reviewer record'
+                    : 'the person record could not be loaded'
+              }.
             </div>
           )}
           {!identityUnverified && dataverseEvidence?.status === 'review_required' && (
@@ -640,6 +676,7 @@ export default function ReviewerSearchSection({
   excludedRaw = null,
   recommended = [],
   recommendedFailed = [],
+  knownLookupFailed = [],
   slotsPopulated = null,
   ingestLoading = false,
   ingestError = null,
@@ -1381,6 +1418,7 @@ export default function ReviewerSearchSection({
       ...c,
       pdIdentityConfirmed: true,
       pdIdentityConfirmationId: data.confirmationId,
+      applicantContactMismatch: false,
     } : c);
     setCandidates((prev) => prev.map(stamp));
     setRecCandidates((prev) => prev.map(stamp));
@@ -2210,6 +2248,10 @@ export default function ReviewerSearchSection({
                                 const promotionDecision = getCandidatePromotionDecision(c);
                                 const canConfirmForPromotion = !selectableNow
                                   && !c.hasInstitutionCOI
+                                  && (
+                                    !c.isApplicantRecommended
+                                    || c.applicantKnownReviewer?.status === 'known'
+                                  )
                                   && (c.eligibilityStatus || c.contactEnrichment?.eligibilityStatus) !== 'deceased'
                                   && (
                                     promotionDecision?.decision === 'needs_identity_confirmation'
@@ -2402,6 +2444,39 @@ export default function ReviewerSearchSection({
               . They are <span className="font-medium">not</span> saved as candidates.{' '}
               <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
             </div>
+          )}
+          {knownLookupFailed.length > 0 && (
+            <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
+              {knownLookupFailed.length} materialized reviewer record{knownLookupFailed.length === 1 ? '' : 's'} could not be safely hydrated from Dataverse.{' '}
+              <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
+            </div>
+          )}
+          {recommended.length > 0 && (
+            <ul className="space-y-2">
+              {recommended.map((row) => {
+                const known = row.applicantKnownReviewer;
+                return (
+                  <li key={row.suggestionId || row.potentialReviewerId} className="p-2 border border-gray-200 rounded text-xs text-gray-700">
+                    <div className="font-medium">{known?.name || row.name || 'Applicant-recommended reviewer'}</div>
+                    {known?.status === 'known' ? (
+                      <>
+                        <div className="text-emerald-700">✓ Existing linked reviewer record</div>
+                        {known.affiliation && <div>{known.affiliation}</div>}
+                        {known.orcid && <div>ORCID {known.orcid}</div>}
+                        <div>
+                          {known.email || 'No stored email'}
+                          {known.emailReadiness?.action ? ` · ${known.emailReadiness.action}` : ''}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-amber-700">
+                        Existing linked record needs repair ({known?.code || 'person_unavailable'}).
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           )}
           {recPhase === 'idle' && !blobUrl && recCount > 0 && (
             <p className="text-sm text-gray-500">

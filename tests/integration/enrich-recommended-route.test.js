@@ -257,13 +257,34 @@ describe('empty frames (terminal complete with recommended: [])', () => {
     expect(res.ended).toBe(true);
   });
 
-  test('rows without person id/name yield no suggestions → complete { recommended: [] }', async () => {
+  test('rows without a person id yield an explicit unresolved result, never false clean empty', async () => {
     findApplicantRecommendedByRequest.mockResolvedValue([
       { _wmkf_potentialreviewer_value: null, wmkf_appreviewersuggestionid: SUG },
     ]);
     const res = sseRes();
     await handler(post(baseBody()), res);
-    expect(res.events()).toEqual([{ event: 'complete', data: { recommended: [] } }]);
+    const events = res.events();
+    expect(events[0]).toMatchObject({
+      event: 'progress',
+      data: {
+        stage: 'applicant_hydration',
+        status: 'failed',
+        suggestionId: SUG,
+        code: 'person_unavailable',
+      },
+    });
+    expect(events[events.length - 1]).toMatchObject({
+      event: 'complete',
+      data: {
+        recommended: [
+          expect.objectContaining({
+            suggestionId: SUG,
+            needsIdentification: true,
+            applicantKnownReviewer: expect.objectContaining({ status: 'unavailable' }),
+          }),
+        ],
+      },
+    });
     expect(res.ended).toBe(true);
   });
 });
@@ -367,6 +388,12 @@ describe('happy path (progress ordering + full card payload)', () => {
       expertiseAreas: [],
       email: 'rec.one@rec.edu',
       emailSource: 'claude_search',
+      contactEnrichment: {
+        identity: { status: 'probable' },
+        email: 'rec.one@rec.edu',
+        emailSource: 'claude_search',
+        emailPersistAllowed: false,
+      },
       website: 'https://rec.edu/one',
       orcidUrl: null,
       googleScholarUrl: null,
@@ -376,6 +403,23 @@ describe('happy path (progress ordering + full card payload)', () => {
       eligibilityReason: null,
       eligibilityEvidence: null,
       isApplicantRecommended: true,
+      applicantKnownReviewer: {
+        status: 'known',
+        code: null,
+        potentialReviewerId: PR,
+        name: null,
+        affiliation: 'Rec University',
+        email: null,
+        emailSource: null,
+        emailReadiness: {
+          level: 'low',
+          action: 'missing',
+          reason: 'No email address found',
+        },
+        orcid: null,
+        contactLinked: false,
+      },
+      applicantContactMismatch: false,
     });
 
     // Writeback + roster persistence happened (id-keyed, best-effort).

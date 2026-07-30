@@ -283,6 +283,12 @@ async function handlePatch(req, res, access) {
       if (!authoritativeCandidate) {
         return res.status(409).json({ error: 'Applicant reviewer row is stale or missing; reload before confirming identity.' });
       }
+      if (authoritativeCandidate?.applicantKnownReviewer?.status !== 'known') {
+        return res.status(422).json({
+          error: 'The exact applicant-linked reviewer record must be available before identity can be confirmed.',
+          code: 'applicant_hydration_required',
+        });
+      }
     }
     const manualCandidate = {
       ...authoritativeCandidate,

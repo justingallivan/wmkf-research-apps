@@ -377,6 +377,7 @@ describe('staff identity confirmation', () => {
     expect(stored).toMatchObject({
       email: 'ann@example.edu',
       pdIdentityConfirmed: true,
+      applicantContactMismatch: false,
       pdIdentityConfirmationId: out.confirmationId,
       staffIdentityConfirmation: {
         source: 'staff_confirmed',

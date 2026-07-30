@@ -106,15 +106,19 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
 
   const runIngestion = useCallback(async () => {
     if (!requestId) return;
+    const submittedRequestId = requestId;
     setIngest({ loading: true, data: null, error: null });
     try {
-      const res = await fetch(`/api/workbench/applicant-reviewers?requestId=${encodeURIComponent(requestId)}`);
+      const res = await fetch(`/api/workbench/applicant-reviewers?requestId=${encodeURIComponent(submittedRequestId)}`);
+      if (requestIdRef.current !== submittedRequestId) return;
       const data = await res.json().catch(() => ({}));
+      if (requestIdRef.current !== submittedRequestId) return;
       if (!res.ok || !data.success) {
         throw new Error(data.error || `Ingestion failed (${res.status})`);
       }
       setIngest({ loading: false, data, error: null });
     } catch (e) {
+      if (requestIdRef.current !== submittedRequestId) return;
       setIngest({ loading: false, data: null, error: e.message });
     }
   }, [requestId]);
@@ -367,6 +371,7 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
   const data = ingest.data;
   const recommended = data?.recommended || [];
   const recommendedFailed = data?.recommendedFailed || [];
+  const knownLookupFailed = data?.knownLookupFailed || [];
   // How many slots the applicant actually populated. `null` when the field is
   // absent (older response / fetch error). Lets us tell a genuine "applicant
   // listed none" from "ingestion failed so the list looks empty."
@@ -662,6 +667,7 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
         excludedRaw={excludedRaw}
         recommended={recommended}
         recommendedFailed={recommendedFailed}
+        knownLookupFailed={knownLookupFailed}
         slotsPopulated={slotsPopulated}
         ingestLoading={ingest.loading}
         ingestError={ingest.error}
