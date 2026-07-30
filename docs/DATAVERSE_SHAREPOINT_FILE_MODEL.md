@@ -52,8 +52,8 @@ hood.
 > Final Writeup design as well as the Site Visit dossier and its materials. It
 > The application generated and registered the canonical artifact, both
 > consumers found it, and exact-input retry created no duplicate. The pilot is
-> not closed because the source-tested recovery/run-linkage fixes still need
-> production promotion and re-proof, and substantive staff editing remains
+> not closed because the deployed recovery/run-linkage fixes still need
+> production re-proof, and substantive staff editing remains
 > unverified. **[VERIFIED via owner decisions 2026-07-28, repository source,
 > production Dataverse/Graph probes, and signed-in consumer checks
 > 2026-07-30.]**
@@ -134,15 +134,15 @@ fails, the intended recovery downloads the deterministic SharePoint item and
 compares it with the stored governed-content hash. **The controlled pilot
 disproved whole-package byte hashing for the target library:** SharePoint
 repacks the DOCX during ingestion. Branch
-`codex/initial-assessment-runtime-fixes` instead stores a `gdc1:`-tagged
+production commit `9c88a1fa` instead stores a `gdc1:`-tagged
 SHA-256 over every `word/` part and canonicalizes the document relationship
 part only to remove SharePoint-injected `customXml` relationships and XML
 ordering/whitespace. Synthetic tests and the actual pilot packages prove
 producer=v1 and producer≠v2. Untagged legacy hashes that do not match the
 downloaded package exactly block for operator reconciliation without another
 model call or upload. Recovery-stage exceptions are persisted as Failed rather
-than leaving a live Generating lease. Production promotion and
-interrupted-finalization proof remain open. If a scheme-tagged item's governed
+than leaving a live Generating lease. Interrupted-finalization proof remains
+open. If a scheme-tagged item's governed
 content does not match, the producer preserves its exact identity in the
 operator-visible cleanup queue and generate to a fresh claim-specific
 filename; it does not overwrite or repeatedly dead-end on the changed file.

@@ -119,8 +119,7 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    editing is not yet proven. Durable evidence:
    `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`.
 
-10. **Initial Assessment runtime fixes are source-tested on
-    `codex/initial-assessment-runtime-fixes`.**
+10. **Initial Assessment runtime fixes are deployed in Production.**
     New `wmkf_contenthash` values use a `gdc1:`-tagged SHA-256 of normalized
     governed DOCX content: every `word/` package part remains covered, while
     the document relationship part is canonicalized only to remove
@@ -133,10 +132,11 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
     and triggering a duplicate model/upload attempt. Recovery-stage exceptions
     persist Failed state immediately. The Executor call includes the request
     GUID with `requireNoPersistence`, so a mutable prompt row cannot turn this
-    producer into an `akoya_request` writer. Production promotion,
-    interrupted-finalization recovery proof, and a new linked AI run remain
-    open after an Opus `READY WITH CHANGES` review whose material findings were
-    addressed locally.
+    producer into an `akoya_request` writer. Opus returned `READY` after its
+    material findings were addressed. Commit `9c88a1fa` is on `main` and
+    production deployment `dpl_EVPb3vTWBYSUSABJYdKAPohruyQ1` is Ready with a
+    clean initial error scan. Interrupted-finalization recovery proof and a new
+    linked AI run remain open.
 
 ### Commits
 
@@ -158,9 +158,8 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
 ### Verified Open
 
 1. **Close the partial governed Initial Assessment artifact pilot.**
-   Complete adversarial review, promote the source-tested recovery and
-   request-linkage fixes, and exercise the interrupted-finalization recovery
-   branch plus one new linked AI run. Then complete a substantive authorized
+   Exercise the deployed interrupted-finalization recovery branch plus one new
+   linked AI run. Then complete a substantive authorized
    staff edit—including Foundation Opportunity—and verify the saved version
    through both consumers. Finish target-library restore, recycle-bin,
    retention, permission, and milestone checks before describing the artifact

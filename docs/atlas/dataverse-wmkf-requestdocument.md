@@ -3,7 +3,7 @@ title: Dataverse wmkf_requestdocument
 domain: application-state
 kind: atlas
 status: active
-summary: Governed request-artifact registry and Initial Assessment pilot flow; normalized recovery hashing is source-tested while production re-proof remains open.
+summary: Governed request-artifact registry and Initial Assessment pilot flow; normalized recovery hashing is deployed while production re-proof remains open.
 canonical: false
 owner: product-engineering
 related:
@@ -47,8 +47,8 @@ post-upload recovery contract has not passed an interrupted-finalization
 rehearsal. Exact evidence:
 `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`.
 
-**[VERIFIED IN SOURCE/TESTS 2026-07-30; NOT YET DEPLOYED]** Branch
-`codex/initial-assessment-runtime-fixes` replaces whole-package byte hashing
+**[VERIFIED DEPLOYED 2026-07-30; NOT YET PRODUCTION RE-PROVED]** Production
+commit `9c88a1fa` replaces whole-package byte hashing
 with a `gdc1:`-tagged normalized governed-DOCX digest. It covers every `word/`
 part and canonicalizes the document relationship part only to remove
 SharePoint-injected `customXml` relationships and ordering/whitespace noise.
@@ -143,8 +143,8 @@ transition.
    `dpl_AxxroabhpXLX1pz75MW6486fB4ci` Ready.
 7. **Partially completed 2026-07-30:** Request `1002788` generation, lineage,
    both consumers, Word opening/version creation, and exact-input retry passed.
-   The recovery-hash and future-run linkage fixes are source-tested; production
-   promotion/re-proof, substantive human editing, and target-library
+   The recovery-hash and future-run linkage fixes are deployed; production
+   re-proof, substantive human editing, and target-library
    protection checks remain open.
 
 No live command in this sequence is authorized merely by this page.

@@ -3,7 +3,7 @@ title: Initial Assessment Controlled Production Pilot — 2026-07-30
 domain: architecture
 kind: audit
 status: active
-summary: Request 1002788 pilot evidence and the tested source fixes for recovery hashing and future AI-run request linkage; production re-proof remains open.
+summary: Request 1002788 pilot evidence and deployed recovery/run-linkage fixes; interrupted-finalization and new-run production re-proof remain open.
 canonical: false
 cataloged: 2026-07-30
 last_verified: 2026-07-30
@@ -31,9 +31,8 @@ Two defects were found during the rehearsal:
 2. the Initial Assessment Executor call did not pass `requestId`, so the exact
    AI run has prompt lineage but a null `wmkf_ai_request` lookup.
 
-**[VERIFIED in source/tests on
-`codex/initial-assessment-runtime-fixes`; NOT YET DEPLOYED OR PRODUCTION
-RE-PROVED]** The candidate fix stores a `gdc1:`-tagged SHA-256 of normalized
+**[VERIFIED DEPLOYED 2026-07-30; NOT YET PRODUCTION RE-PROVED]** Production
+commit `9c88a1fa` stores a `gdc1:`-tagged SHA-256 of normalized
 governed `word/` package content while canonicalizing only
 SharePoint-injected `customXml` relationships, and passes `requestId` to the
 Executor with a fail-closed no-persistence requirement. Synthetic complement
@@ -41,7 +40,9 @@ tests passed, and a one-off check against the actual pilot packages produced
 the same normalized hash for the producer and SharePoint v1 files while
 distinguishing the later v2 file. Legacy untagged hashes are recoverable only
 when the downloaded package bytes still match exactly; otherwise retry blocks
-for operator reconciliation without another model call or upload.
+for operator reconciliation without another model call or upload. Production
+deployment `dpl_EVPb3vTWBYSUSABJYdKAPohruyQ1` reached Ready with a clean
+initial error scan.
 
 Human opening, AutoSave, and SharePoint version creation were observed. A
 substantive human content edit was not verified: visible document text remained
@@ -53,11 +54,11 @@ staff-input marker.
 | Contract | Producer/source | Persistence | Consumer/readback | Result |
 | --- | --- | --- | --- | --- |
 | Generate canonical artifact | Signed-in Workbench generation for Request `1002788` (`feabe26f-dc1b-f111-8341-000d3a306da2`) | Registry row `fb995f0f-628c-f111-ab0f-6045bd018a07`; request pointer set to that row; SharePoint item `01G4GVMS77A2SBVPGA4VFINZFWAFIZGVFG` | Workbench showed `Ready · Draft` and opened the canonical item | PASS |
-| Prompt/run/template lineage | `initial-assessment.generate` v1; template `initial-assessment-standard-business-brief` v1.0.0 | Prompt `fc8a4c3b-5e8c-f111-ab0f-7ced8d3d15a6`; run `b7ae9b17-628c-f111-ab0f-000d3a31c468`; generation key and input fingerprint persisted | Registry readback matched the generating prompt, run, template, and request | PARTIAL — historical pilot run lookup is null; future-run fix is source-tested, not production-proved |
+| Prompt/run/template lineage | `initial-assessment.generate` v1; template `initial-assessment-standard-business-brief` v1.0.0 | Prompt `fc8a4c3b-5e8c-f111-ab0f-7ced8d3d15a6`; run `b7ae9b17-628c-f111-ab0f-000d3a31c468`; generation key and input fingerprint persisted | Registry readback matched the generating prompt, run, template, and request | PARTIAL — historical pilot run lookup is null; future-run fix is deployed, not production-proved |
 | Shared discovery contract | Same canonical registry row | Stable drive/item identity and request pointer | Per-request Workbench and `/workbench/artifacts` both listed the same artifact and Open link | PASS |
 | Exact-input retry | `Refresh from current inputs` on the Ready artifact | Still one registry row; same row, run, SharePoint item, timestamps, and attempt count | UI returned the existing Ready artifact | PASS — no model call, upload, overwrite, or duplicate |
 | Editable SharePoint lifecycle | Opened canonical Word file | SharePoint created version `2.0`, modified by Justin Gallivan | Current file remained reachable from both application consumers | PARTIAL — open/AutoSave proven; substantive edit not proven |
-| Post-upload recovery | Pilot code compared whole-package bytes; candidate code stores a `gdc1:`-tagged normalized governed Word digest | The historical row retains an untagged legacy digest; future rows are scheme-tagged | Actual producer and SharePoint v1 packages normalize equally; later v2 differs | SOURCE-VERIFIED — production deployment and interrupted-finalization rehearsal pending |
+| Post-upload recovery | Pilot code compared whole-package bytes; deployed code stores a `gdc1:`-tagged normalized governed Word digest | The historical row retains an untagged legacy digest; future rows are scheme-tagged | Actual producer and SharePoint v1 packages normalize equally; later v2 differs | DEPLOYED — interrupted-finalization rehearsal pending |
 
 ## Exact persisted lineage
 
@@ -90,8 +91,8 @@ not an intervening staff edit. Version `2.0` later hashed to
 
 ## Required follow-up
 
-1. Complete adversarial review and promote the source fix deliberately. The
-   schema-as-code field description is corrected on this branch, but the
+1. The runtime fix is deployed. The schema-as-code field description is
+   corrected on `main`, but the
    creation-only schema applicator does not update an existing Dataverse
    attribute description; that optional live metadata cleanup is separate and
    does not block the runtime fix.

@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has seven implemented tabs and three placeholders; the partial Initial Assessment pilot has source-tested recovery/run-linkage fixes awaiting production proof, and the full Editor Dashboard remains planned.
+description: The unified Request Workbench has seven implemented tabs and three placeholders; the partial Initial Assessment pilot has deployed recovery/run-linkage fixes awaiting production proof, and the full Editor Dashboard remains planned.
 metadata:
   type: project
   status: active
@@ -51,8 +51,8 @@ existing Dataverse sandbox organization into an integrated application/file
 test environment. Request `1002788` became the authorized target. Generation,
 registry/pointer lineage, both consumer surfaces, native SharePoint version
 creation, and exact-input retry passed on 2026-07-30. Normalized recovery
-hashing and future-run request linkage are source-tested on the candidate
-branch; production re-proof, substantive human editing, and target-library
+hashing and future-run request linkage are deployed in production commit
+`9c88a1fa`; production re-proof, substantive human editing, and target-library
 controls remain open.
 Use the near-term execution plan for current authority; the chronology below
 remains the rationale record.
@@ -135,7 +135,7 @@ planned. Current authority is
   one Ready/Draft registry row, populated the request pointer, and proved both
   consumers plus exact-input retry. It also exposed whole-package hash drift
   after SharePoint canonicalization and a null AI-run request lookup. The
-  candidate branch fixes both for future generations; production re-proof
+  deployed runtime fixes both for future generations; production re-proof
   remains open.
 - Reviewer Pool remains planned and optional, not a shipped Workbench-v1 deliverable.
 

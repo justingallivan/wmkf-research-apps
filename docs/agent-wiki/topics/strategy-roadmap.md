@@ -66,9 +66,9 @@ document inventory, and individual implementation plans do not establish priorit
   The controlled Request `1002788` rehearsal proved generation, registry and
   pointer lineage, both consumers, native version creation, and exact-input
   retry. It exposed a recovery-hash mismatch and a null AI-run request lookup.
-  The candidate branch now has source-tested normalized DOCX hashing and
-  future-run request linkage; production promotion/re-proof, substantive staff
-  editing, and target-library controls remain open. See
+  Production commit `9c88a1fa` has normalized DOCX hashing and future-run
+  request linkage; production re-proof, substantive staff editing, and
+  target-library controls remain open. See
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
 - Pre-Site input direction (owner-decided 2026-07-28): draft factual material
   from the full proposal through an iterated governed `phase-ii.summarize`;
@@ -157,7 +157,7 @@ document inventory, and individual implementation plans do not establish priorit
   path. It is draft-functional proof, not broad production readiness, and does
   not require the later lifecycle tabs. Request `1002788` is the authorized
   pilot target; generation and exact retry passed. Recovery and future-run
-  lineage fixes are source-tested but need production proof; substantive
+  lineage fixes are deployed but need production proof; substantive
   editing and library controls remain open. See the near-term plan.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel: `project-virtual-review-panel`.
