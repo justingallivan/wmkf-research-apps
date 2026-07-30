@@ -162,7 +162,8 @@ operation `[VERIFIED via submit.js:79,123]`. The notification path both reads Da
 sends email, so it needs its own `withDalContext('grantee-submit-notify', ...)`: `sendEmail`,
 `createEmailActivity`, and `addEmailAttachment` all call `assertTrustedDalContext` first (CLAUDE.md
 Universal Safety Invariants, closed S330). `alertWaiverBlock` is the precedent
-`[VERIFIED via submit.js:39]`.
+`[VERIFIED via submit.js:39]`. As built, this wrapper lives inside
+`lib/services/grantee-submit-notification.js` rather than the route — see the implementation notes.
 
 ### Escaping `[PLANNED]`
 
@@ -369,18 +370,30 @@ Where the shipped code differs from, or resolves, the plan above:
   so each submission also writes a durable `info` alert row. If the alerts dashboard turns out to be
   the wrong tenant for routine successes, option (b) is still the fallback and nothing else has to
   change.
-- **`notifySubmission` awaits.** It is awaited before the 200 so a serverless invocation cannot be
-  frozen mid-send, but every internal failure is caught — PD resolution and `notify` each have their
-  own swallow. Test: `notify throws → submit still 200`.
+- **The notification lives in a service, not the route.** `lib/services/grantee-submit-notification.js`
+  owns it. The spec above implied route-local code like `alertWaiverBlock`, but a route may not import
+  `lib/dataverse/adapters/*` and the PD lookup needs two adapter reads — `check:route-service-boundary`
+  is a law-mode gate and failed on the first attempt. The route calls
+  `notifyGranteeSubmission()` and nothing else.
+- **It is awaited but cannot throw.** Awaited before the 200 so a serverless invocation cannot be
+  frozen mid-send; the service catches everything internally — recipient resolution and `notify` each
+  have their own swallow. Test: `notify throws → submit still 200`.
 - **Two reads, as specified.** `grantRequestAdapter.getById` for
   `_wmkf_programdirector_value,_wmkf_projectleader_value`, then `systemUserAdapter.getByIdWithSelect`
   for the PD's `internalemailaddress` + `isdisabled`. The PI name comes from the
   `_wmkf_projectleader_value_formatted` annotation on the first read rather than a third contact read.
+- **`hasImage` describes the package, not the upload.** `REVISION_REQUESTED` is an editable status
+  `[VERIFIED via shared/config/granteeDeliverableStatus.js:74-79]`, and the writer patches
+  `wmkf_imagefileref` only when it uploaded something
+  `[VERIFIED via lib/services/grantee-upload.js:134]` — so a resubmit with no new file retains the
+  existing image. The flag is `Boolean(imageFile || deliverable?.wmkf_imagefileref)`; checking only the
+  multipart file would have reported `hasImage: false` for a package that has one.
 - **`toStaffImageUrl` uses `new URL()`** rather than a string prefix test, so `JavaScript:` and other
   case-variant or exotic schemes are rejected by protocol, not by pattern.
-- **Gate results.** `check:api-routes`, `check:trust-boundary-guid`, `check:dataverse-access-layer`,
-  `check:dynamics-context-boundary`, `check:odata-escape`, `check:atlas`, `check:doc-symbol-refs`, and
-  `check:docs-catalog` pass. Unit suite: 6051 passing. Two suites fail
+- **Gate results.** `check:route-service-boundary`, `check:api-routes`, `check:trust-boundary-guid`,
+  `check:dataverse-access-layer`, `check:dynamics-context-boundary`, `check:odata-escape`,
+  `check:atlas`, `check:doc-symbol-refs`, `check:doc-currency`, `check:fact-consistency`,
+  `check:agent-wiki`, and `check:docs-catalog` all exit 0. Unit suite: 6052 passing. Two suites fail
   (`signin-server-props`, `dependency-security-compat`) — both fail identically on a stashed clean tree,
   so they are pre-existing and unrelated. ESLint adds no new warnings (`AwardeeTab.js` carries the same
   four pre-existing `react-hooks/set-state-in-effect` warnings before and after).

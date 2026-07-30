@@ -22,8 +22,9 @@ jest.mock('../../lib/services/grantee-upload', () => ({
 }));
 jest.mock('../../lib/services/external-token', () => ({ verifyWaiverRenderToken: jest.fn() }));
 jest.mock('../../lib/services/notification-service', () => ({ __esModule: true, default: { notify: jest.fn() } }));
-// The submitted-notification path re-reads the request for the PD/PI lookup values
-// (verify-grantee-token's projection carries neither) and then reads the PD user.
+// lib/services/grantee-submit-notification (called by the route) re-reads the request
+// for the PD/PI lookup values — verify-grantee-token's projection carries neither —
+// and then reads the PD user. Mocked here so the route test drives the real service.
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({ getById: jest.fn() }));
 jest.mock('../../lib/dataverse/adapters/system-user.js', () => ({ getByIdWithSelect: jest.fn() }));
 
@@ -301,6 +302,20 @@ describe('submitted notification (best-effort, post-commit)', () => {
 
     expect(notifyArg().metadata.hasImage).toBe(false);
     expect(notifyArg().metadata.captionPresent).toBe(false);
+  });
+
+  // A resubmit from REVISION_REQUESTED (an editable status) with no new file keeps
+  // the existing image: the writer patches wmkf_imagefileref only when it uploaded
+  // something. hasImage describes the package after the submit, not the multipart.
+  test('resubmit with no new file but a retained image → hasImage true', async () => {
+    const v = okVerify(GRANTEE_DELIVERABLE_STATUS.REVISION_REQUESTED);
+    v.deliverable.wmkf_imagefileref = 'https://wmkf.sharepoint.com/x/fig.png';
+    verifyGranteeToken.mockResolvedValue(v);
+    await handler(multipartReq({
+      fields: { editedAbstract: 'x', caption: 'kept', waiverToken: 'signed.tok' },
+    }), mockRes());
+
+    expect(notifyArg().metadata.hasImage).toBe(true);
   });
 
   test('service failure → NO submitted notification', async () => {
