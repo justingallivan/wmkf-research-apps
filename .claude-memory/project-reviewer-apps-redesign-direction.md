@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has seven implemented tabs and three placeholders; Initial Assessment canonical-input generation, new-run lineage, and interrupted-finalization recovery are production-proved, while substantive editing and library controls remain open.
+description: The unified Request Workbench has seven implemented tabs and three placeholders; Initial Assessment generation, lineage, recovery, and attributed editing are production-proved, while current-version readback and library controls remain open.
 metadata:
   type: project
   status: active
@@ -60,8 +60,10 @@ the exact canonical input, a newly linked AI run, the Ready/Draft registry and
 request pointer, and exact-input no-duplicate reuse on deployment
 `dpl_GiWsUy84mXW9bLDwSXYGoyHehqcW`. A controlled recovery retry then
 restored the same row/run/SharePoint item and version without another model
-call or upload. Substantive human editing and target-library controls remain
-open.
+call or upload. An attributed substantive edit then advanced the same stable
+item to SharePoint version `2.0`, replaced the Foundation Opportunity marker,
+and remained reachable through both consumers. Graph-current metadata
+refresh/display and target-library controls remain open.
 Use the near-term execution plan for current authority; the chronology below
 remains the rationale record.
 

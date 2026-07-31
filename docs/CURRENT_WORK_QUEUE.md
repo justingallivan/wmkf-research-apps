@@ -34,8 +34,8 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Close the remaining Initial Assessment pilot gates | Request `1002788` preserves mechanics-only evidence because it used an old Phase I proposal. PR #103 / merge `84155a5a` deployed the exact active `Reviewer Materials/Proposal_{Request#}.pdf` contract, and Request `1003109` then production-proved canonical-input generation, a newly linked AI run, Ready/Draft request-pointer lineage, exact-input no-duplicate reuse, and interrupted-finalization recovery using the same row/run/SharePoint item and version. Before declaring the August 10 gate complete: complete a substantive staff edit including Foundation Opportunity, then finish target-library protection/readback checks. | An authorized staff edit is visible through both consumers, and restore/permission/retention/milestone boundaries are recorded. |
-| 2 | First deadline-bound writeup slice | Treat the governed-artifact spine as production-proved for canonical-input generation, registry lineage, shared discovery, exact retry, new-run request linkage, and interrupted-finalization recovery. Pre Site Visit becomes the next reuse only after the two remaining pilot blockers above close. | One dedicated production request produces a durable, searchable, editable, and recoverable Word artifact with complete prompt/run/request lineage and verified human review. The full Editor Dashboard contract remains a later reuse. |
+| 1 | Close the remaining Initial Assessment pilot gates | Request `1002788` preserves mechanics-only evidence because it used an old Phase I proposal. PR #103 / merge `84155a5a` deployed the exact active `Reviewer Materials/Proposal_{Request#}.pdf` contract, and Request `1003109` then production-proved canonical-input generation, a newly linked AI run, Ready/Draft request-pointer lineage, exact-input no-duplicate reuse, interrupted-finalization recovery, and an attributed substantive edit including Foundation Opportunity. Both consumers still resolve the same stable item. The edit exposed that Dataverse and the UI retain upload-time version metadata after native Word edits. Before declaring the August 10 gate complete, finish current-version refresh/display and the target-library protection/readback checks. | Graph-current version/last-modified context is accurate in the read contract, and restore/permission/retention/milestone boundaries are recorded. |
+| 2 | First deadline-bound writeup slice | Treat the governed-artifact spine as production-proved for canonical-input generation, registry lineage, shared discovery, exact retry, new-run request linkage, interrupted-finalization recovery, and attributed human editing. Pre Site Visit becomes the next reuse only after the remaining library/readback gate above closes. | One dedicated production request produces a durable, searchable, editable, and recoverable Word artifact with complete prompt/run/request lineage and verified human review. The full Editor Dashboard contract remains a later reuse. |
 
 ## Audit follow-ups — verified open, not silently prioritized
 
@@ -49,6 +49,15 @@ sequence.
   bill of health.
 
 ## Completed in this execution
+
+- Initial Assessment substantive human edit: Request `1003109`'s canonical
+  SharePoint item advanced to version `2.0`, attributed to Justin Gallivan.
+  Foundation Opportunity now contains staff-authored content and no
+  `STAFF INPUT REQUIRED` marker. The per-request Workbench and D26 locator
+  still open the same stable item. The edit also verified that the current
+  read model retains upload-time version `1.0` metadata; refreshing and
+  displaying Graph-current version context remains in the open library/readback
+  gate.
 
 - Initial Assessment interrupted-finalization recovery: Request `1003109`
   was staged as Failed after its SharePoint upload and retried through the

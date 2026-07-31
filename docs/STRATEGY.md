@@ -146,8 +146,10 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term 
    request GUID to the Executor; tests include the actual pilot packages.
    Request `1003109` production-proved the canonical proposal, exact-input
    reuse, a new linked run, and interrupted-finalization recovery using the
-   same registry row, AI run, SharePoint item, and version. Complete
-   substantive staff editing and verify target-library protections;
+   same registry row, AI run, SharePoint item, and version. An attributed
+   substantive edit then passed on that same stable item through both
+   consumers. Complete Graph-current version/last-modified refresh/display and
+   verify target-library protections;
 2. finish the user/input/storage/access/deadline contract for the remaining
    Workbench lifecycle tabs, including the three-document writeup lineage,
    Site Visit dossier, narrow request-scoped applicant-material upload, and

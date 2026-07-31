@@ -3,7 +3,7 @@ title: Dataverse wmkf_requestdocument
 domain: application-state
 kind: atlas
 status: active
-summary: Governed request-artifact registry; Request 1003109 production-proved canonical input, new-run lineage, exact-input reuse, and interrupted-finalization recovery, while human editing and library-control gates remain open.
+summary: Governed request-artifact registry; Request 1003109 proves generation, recovery, and attributed editing, while current-version readback and library controls remain open.
 canonical: false
 owner: product-engineering
 related:
@@ -44,8 +44,9 @@ Ready row without another run, upload, overwrite, or duplicate. Opening the
 canonical Word file created a native SharePoint version. At that point, the
 broader pilot was not complete: the source was an old Phase I proposal rather than the approved
 Phase II reviewer package and no substantive staff content edit was verified.
-Request `1003109` later closed the canonical-input and recovery gaps; the
-substantive edit and target-library controls remain. Exact evidence:
+Request `1003109` later closed the canonical-input, recovery, and substantive
+edit gaps; current-version readback and target-library controls remain. Exact
+evidence:
 `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`.
 
 **[VERIFIED DEPLOYED AND PRODUCTION-EXERCISED 2026-07-30]** Production
@@ -73,6 +74,16 @@ The actual pilot producer and SharePoint v1 packages hash equally; v2 differs.
 The historical pilot row retains an untagged legacy digest. A non-Ready legacy
 row recovers only if downloaded bytes match that digest exactly; otherwise it
 blocks for operator reconciliation without a model call or duplicate upload.
+
+**[VERIFIED 2026-07-30 local / 2026-07-31 UTC via Graph, DOCX inspection,
+Dataverse readback, and both signed-in consumers]** Justin Gallivan's
+substantive edit advanced Request `1003109`'s stable SharePoint item to version
+`2.0`; Foundation Opportunity contains staff-authored content and no
+`STAFF INPUT REQUIRED` marker. Both consumers still open the same item.
+Dataverse retains the upload-time version `1.0`, eTag, size, and last-modified
+values, however, and neither current consumer displays version context. The
+registry fields are therefore an upload/finalization snapshot today, not
+Graph-current metadata after native Word edits.
 
 ## Ownership
 
@@ -166,7 +177,9 @@ transition.
    for mechanics. The old Phase I source invalidates approved-input semantic
    proof. Request `1003109` then passed canonical-input generation,
    exact-input reuse, new-run request lineage, and interrupted-finalization
-   recovery using the same row/run/SharePoint item and version. Substantive
-   human editing and target-library protection checks remain open.
+   recovery using the same row/run/SharePoint item and version. An attributed
+   substantive edit on the stable item then passed through both consumers.
+   Current-version refresh/display and target-library protection checks remain
+   open.
 
 No live command in this sequence is authorized merely by this page.

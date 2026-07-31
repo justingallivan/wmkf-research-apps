@@ -57,9 +57,12 @@ hood.
 > mechanics evidence only because its source was an old Phase I proposal.
 > Request `1003109` subsequently proved canonical-input generation,
 > exact-input reuse, new-run request linkage, and recovery using the same
-> registry row, AI run, SharePoint item, and version. The pilot is not closed
-> because substantive staff editing and target-library controls remain
-> unverified. **[VERIFIED via owner decisions 2026-07-28
+> registry row, AI run, SharePoint item, and version. An attributed
+> substantive edit then advanced the same stable item to SharePoint version
+> `2.0`, replaced the Foundation Opportunity marker, and remained discoverable
+> through both consumers. The pilot is not closed because current-version
+> refresh/display and target-library controls remain unverified.
+> **[VERIFIED via owner decisions 2026-07-28
 > and 2026-07-30, repository source,
 > production Dataverse/Graph probes, and signed-in consumer checks
 > 2026-07-30.]**
@@ -82,6 +85,13 @@ hood.
   every request separately. This narrow cycle list does not yet implement the
   full Editor Dashboard filters, preview/version context, or Reviewed progress
   contract below.
+- **Current metadata readback (pilot gap observed 2026-07-30 local /
+  2026-07-31 UTC):** native Word editing preserves stable item identity, but
+  the current registry/read model retains upload-time eTag, version, size, and
+  last-modified values. After Request `1003109` advanced to Graph version
+  `2.0`, Dataverse still reported version `1.0`, and neither consumer rendered
+  current version context. The target contract below still requires a
+  Graph-current refresh/display strategy.
 - **Replacement/current rule (deployed; exact-input retry exercised):**
   changed authoritative inputs or cycle produce a distinct generation row. The
   replacement's Ready transition and prior-Ready supersession are one

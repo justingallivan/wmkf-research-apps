@@ -3,7 +3,7 @@ title: "Request Workbench — near-term execution plan"
 domain: architecture
 kind: plan
 status: canonical
-summary: "Initial Assessment canonical input, new-run lineage, and interrupted-finalization recovery are proven; substantive editing and library controls remain."
+summary: "Initial Assessment canonical input, lineage, recovery, and attributed editing are proven; library/readback controls remain."
 canonical: true
 cataloged: 2026-07-26
 last_verified: 2026-07-30
@@ -73,8 +73,12 @@ production-proved a verified canonical proposal, one new linked AI run, and
 exact-input reuse on merge commit `84155a5a`. A controlled production
 interrupted-finalization exercise then restored the same registry row,
 request pointer, AI run, and SharePoint item/version without another model
-call or upload. A substantive staff edit and target-library protection checks
-remain required before the pilot is complete.
+call or upload. An attributed substantive staff edit then advanced the same
+item to SharePoint version `2.0`, replaced the Foundation Opportunity marker,
+and remained discoverable through both consumers. The edit showed that the
+current read model retains upload-time version `1.0` metadata, so
+current-version refresh/display and target-library protection checks remain
+required before the pilot is complete.
 Passing this draft-functional gate is not a broad production-readiness claim
 and does not require the later Pre-Site, Site Visit, or Final slices to be
 built by August 10.
@@ -709,10 +713,12 @@ Explicit non-goals during design freeze:
 > `fc8a4c3b-5e8c-f111-ab0f-7ced8d3d15a6`. PR #102 merged as `1e958ee0`, and production deployment
 > `dpl_AxxroabhpXLX1pz75MW6486fB4ci` is Ready on the expected aliases with a
 > clean initial error scan. Requests `1002788` and `1003109` now provide the
-> controlled production evidence described above. The remaining pilot
-> acceptance work is a substantive authorized staff edit through both
-> consumers plus the target-library restore, recycle, retention, permission,
-> and milestone-snapshot checks.
+> controlled production evidence described above. Request `1003109`'s
+> attributed substantive edit then passed through both consumers on stable
+> SharePoint item identity. The remaining pilot acceptance work is
+> Graph-current version/last-modified refresh and display plus the
+> target-library restore, recycle, retention, permission, and
+> milestone-snapshot checks.
 
 The August 10 minimum changes the former default. Exercise the now-live
 governed artifact spine through the J27 Initial Assessment first;
@@ -909,7 +915,10 @@ Owner-decided:
     evidence. Request `1003109` subsequently production-proved canonical-input
     generation, exact-input reuse, new-run request linkage, and
     interrupted-finalization recovery using the same row/run/item/version.
-    Substantive editing and target-library controls remain open. The owner
+    The subsequent attributed substantive edit advanced that same item to
+    SharePoint version `2.0` and remained reachable through both consumers.
+    Current-version metadata refresh/display and target-library controls remain
+    open. The owner
     accepts service-principal attribution for system-generated Dataverse
     registry writes; SharePoint native version attribution remains the
     required human-edit audit surface.

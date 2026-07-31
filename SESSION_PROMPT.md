@@ -121,7 +121,8 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    omitted `requestId` from `executePrompt()`, leaving the exact run's
    `wmkf_ai_request` lookup null. Visible v1/v2 text was semantically unchanged
    and Foundation Opportunity still required staff input, so substantive human
-   editing is not yet proven. Durable evidence:
+   editing was not proven by that first rehearsal; Request `1003109` later
+   closed that gate. Durable evidence:
    `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`.
 
 10. **Initial Assessment runtime fixes are deployed in Production.**
@@ -170,7 +171,18 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
     call, upload, overwrite, duplicate row, or cleanup work. The owner accepts
     service-principal attribution for system-generated Dataverse registry
     writes; SharePoint native version history remains the required human-edit
-    attribution surface. Substantive staff editing and target-library
+    attribution surface.
+
+13. **Substantive Initial Assessment editing passed on Request `1003109`.**
+    Justin Gallivan edited the canonical SharePoint Word document, including
+    Foundation Opportunity. Graph readback showed version `2.0`, attributed to
+    Justin's user identity, on the same stable SharePoint item
+    `01G4GVMS3U3DHMJQ7GERBLB2QA3SYTLNHO`. Read-only DOCX inspection found no
+    remaining `STAFF INPUT REQUIRED` marker, and both the per-request Workbench
+    and D26 locator still open the same item. The Dataverse registry still
+    carries upload-time version `1.0` metadata and neither consumer currently
+    renders version/last-modified context. Current-version refresh/display and
+    target-library restore, recycle, retention, permission, and milestone
     controls remain open.
 
 ### Commits
@@ -194,11 +206,12 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
 
 1. **Complete the remaining governed Initial Assessment pilot gates.**
    Canonical-input generation, new-run request lineage, exact reuse, and
-   interrupted-finalization recovery passed on Request `1003109`. Complete a
-   substantive authorized staff edit—including Foundation Opportunity—and
-   verify the saved version through both consumers. Then finish target-library
-   restore, recycle-bin, retention, permission, and milestone checks before
-   describing the artifact system as production-ready.
+   interrupted-finalization recovery passed on Request `1003109`. The
+   attributed substantive edit, including Foundation Opportunity, also passed,
+   and both consumers still resolve the same stable item. Refresh and display
+   Graph-current version/last-modified metadata after native Word edits, then
+   finish target-library restore, recycle-bin, retention, permission, and
+   milestone checks before describing the artifact system as production-ready.
 
 2. **Exercise address attestation only when a truthful eligible production row exists.**
    Evidence: the signed-in Workbench inspection covered requests `1002912` and `1002874`.
@@ -218,7 +231,7 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    The pilot registry schema and governed prompt v1 are live in Production; the
    application, applicant-title (`akoya_title`) source, and staff-authored
    Foundation Opportunity requirement are implemented in source. Verify
-   SharePoint version, restore, recycle,
+   Graph-current SharePoint version/last-modified readback, restore, recycle,
    retention, permission, and milestone-snapshot behavior against the dedicated
    production dummy requests before the controlled rehearsal. The generic registry has
    source-document/version/hash fields, but this pilot producer currently fingerprints
