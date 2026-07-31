@@ -118,44 +118,32 @@ creating that ambiguous durable state.
 
 ---
 
-## 3. Invitation address-action gate `[VERIFIED 2026-07-18]`
+## 3. Reviewer address-action gate `[IMPLEMENTED IN SOURCE 2026-07-31; NOT DEPLOYED]`
 
 **Contract.** On a first-contact **invitation**, the server independently computes
-`emailConfidence(person)` and applies one of four actions. A client-provided confidence label
+`emailConfidence(person)` and applies one of five actions. A client-provided confidence label
 never authorizes a send.
 
 - **Ready** = `orcid`, `institution_page`, or `scholarly_multi` (the same address on at least
   two distinct recent, identity-matched scholarly works). Sends without an extra address check.
-- **Quick check** = `scholarly_single`, legacy `pubmed`, `manual`, `affiliation`, `staff_verified`,
+- **Quick check** = `scholarly_single`, legacy `pubmed`, `manual`, `affiliation`, legacy source-only `staff_verified`,
   or unknown/null source. The recipient's `suggestionId` must be in `confirmedLowConfidenceIds`; the
   acknowledgement is recipient-specific, not a batch boolean.
-- **Research only** = `serp_search`, `claude_search`, or `search_contested`. The server always
-  skips the invitation with `email_research_only`; a checkbox or forged allowlist entry cannot
-  override it. The ONLY way out is a durable provenance change: either a different address via
-  the contact editor (`manual`), or an explicit staff attestation for the SAME address —
-  `PATCH /api/reviewer-finder/my-candidates { requestId, suggestionId, verifyEmailAddress:true,
-  verifiedEmail }` stamps `emailSource='staff_verified'` (S387). Preconditions, all server-side:
-  `requestId` must be a GUID matching the suggestion's `_wmkf_request_value` (the address lives on
-  the SHARED person row, so an unscoped attestation would change send behavior for every request
-  using that person); the suggestion must be `wmkf_selected`, not invited, and not already
-  responded; `verifiedEmail` must match the re-read stored address (the address is never taken
-  from the client); the current source must be `research_only`, which both prevents downgrading a
-  `ready` address and makes a second click a refusal rather than a duplicate write; and the write
-  is **ETag-conditional** on the person row, so a concurrent address swap yields 409
-  `stale_person_row` instead of stamping "verified" on a string nobody attested. It lands in
-  **quick check**, not ready — the per-recipient acknowledgement still applies at send.
-  Precedence: it is **TERMINAL against machine evidence** — a later `scholarly_multi`
-  corroboration of the SAME address does NOT supersede it to `ready`
-  (`emailSourceUpgradeAllowed('scholarly_multi', 'staff_verified')` is `false`). Only another
-  human assertion (`manual`) or contradicting evidence (`search_contested`, which re-blocks the
-  send) moves the value. Asserted in `tests/unit/my-candidates-verify-address.test.js`; the full
-  rule and its rationale are under **Source PRECEDENCE (S387)** below. It exists because the previously
-  documented hatch ("verify it, then Edit contact") is a no-op when the verified address is the one
-  already stored: `CandidateEditModal` omits an unchanged email, so `emailSource` never moved and
-  the reviewer could not be invited in-app at all.
+- **Research only** = `serp_search`, `claude_search`, or `search_contested`. The server skips the
+  invitation with `email_research_only`; a checkbox cannot override it. Find or Invite now calls
+  `POST /api/workbench/reviewer-address-trust` with the exact address, affirmative person/address
+  attestation, and a publication or institution-page link (or another validated evidence type).
+  Before promotion this produces a server-owned roster receipt; after promotion it re-reads the
+  exact suggestion/person and ETag-writes address + `staff_verified` + the versioned exact-address
+  bundle atomically. The retired `my-candidates verifyEmailAddress` action returns 409
+  `address_verification_moved` and cannot relabel provenance without evidence.
+- **Blocked** = a valid exact-email bundle has `conflict_pending`. Promotion, invitation,
+  materials, follow-up, and thank-you all refuse the address with
+  `address_conflict_pending`; no low-confidence acknowledgement bypasses it. Staff choose and
+  verify the stored or found address in Find, or create a durable repair request.
 - **Missing** = no address. There is nothing to send.
-- **Scope.** Gated to `templateType==='invitation'` only. Post-acceptance materials / followup /
-  thankyou are NOT re-gated.
+- **Scope.** Ready/quick/research-only remain first-contact invitation policy. A pending
+  contradiction is a wrong-recipient risk and therefore blocks every outbound reviewer template.
 
 **Enforcement points.** `lib/utils/reviewer-invite.js` (`emailConfidence`) ·
 `lib/services/review-manager/render-emails-service.js` (server-computed action in preview;
@@ -215,9 +203,10 @@ historical backfills, three fixture/smoke scripts, and one raw smoke payload —
 Two entries are exempt and argued in code: the field-DESCRIPTION map in
 `shared/config/prompts/dynamics-explorer.js` (documentation, not a write) and
 `scripts/probe-merge-altkey-ordering.mjs` (its purpose is to observe `wmkf_emailaddress_unique`
-alt-key behavior by setting the address alone; pairing would change what it measures). The one remaining source-only writer is deliberate — the `verifyEmailAddress`
-attestation, which re-labels the address ALREADY stored and is ETag-guarded, so it has no address
-to pair with. Previously each of these wrote the address, then
+alt-key behavior by setting the address alone; pairing would change what it measures). The former
+source-only `verifyEmailAddress` writer is retired; evidence-backed verification now writes the
+address, source, and trust bundle atomically through the potential-reviewer adapter. Previously
+each of these wrote the address, then
 the source, in two calls — so an address that landed while the source write failed left the row
 describing the NEW address under the OLD source, and a hand-typed address inheriting a stored
 `orcid` reads as `ready` and sends with no acknowledgement. One patch means a duplicate-key

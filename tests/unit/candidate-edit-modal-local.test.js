@@ -78,6 +78,8 @@ describe('CandidateEditModal — identity confirmation', () => {
     await waitFor(() => expect(screen.getByText('Confirmation could not be recorded')).toBeInTheDocument());
     expect(onConfirm).toHaveBeenCalledWith({
       email: 'wrong@gmail.com', website: '', affiliation: 'MIT',
+    }, {
+      evidenceType: 'publication_corresponding_author', evidenceUrl: null, note: null,
     });
     expect(onClose).not.toHaveBeenCalled();
   });

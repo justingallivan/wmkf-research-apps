@@ -423,6 +423,45 @@ describe('send-emails-service — invitation body-integrity gate', () => {
 });
 
 describe('send-emails-service — address action gate', () => {
+  test.each(['invitation', 'materials', 'followup', 'thankyou'])(
+    'pending person-scoped conflict blocks %s even when other lifecycle gates pass',
+    async (templateType) => {
+      SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, {
+        wmkf_accepted: templateType !== 'invitation',
+        wmkf_reviewstatus: templateType === 'invitation' ? null : 100000000,
+      });
+      PERSONS[`person-${SUG_OK}`] = person(`person-${SUG_OK}`, {
+        wmkf_addresstruststatejson: JSON.stringify({
+          version: 1,
+          email: 'rev@example.org',
+          status: 'conflict_pending',
+          attestation: null,
+          conflict: {
+            reason: 'email_mismatch',
+            storedEmail: 'rev@example.org',
+            foundEmail: 'reviewer@example.org',
+            source: 'institution_page',
+            requestId: REQUEST_ID,
+            candidateKey: `suggestion:${SUG_OK}`,
+            detectedAt: '2026-07-31T12:00:00.000Z',
+          },
+          resolution: null,
+        }),
+      });
+      const emitted = await run({
+        drafts: [draft(SUG_OK)],
+        templateType,
+        confirmedLowConfidenceIds: [SUG_OK],
+      });
+      expect(createAndSendEmail).not.toHaveBeenCalled();
+      expect(resultOf(emitted).skipped[0]).toMatchObject({
+        suggestionId: SUG_OK,
+        reason: 'address_conflict_pending',
+        emailConfidence: { action: 'blocked' },
+      });
+    },
+  );
+
   test('quick-check address requires recipient-specific confirmation', async () => {
     PERSONS[`person-${SUG_OK}`] = person(`person-${SUG_OK}`, { wmkf_emailsource: 'scholarly_single' });
     const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });

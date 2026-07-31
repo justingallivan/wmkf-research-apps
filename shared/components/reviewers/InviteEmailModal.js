@@ -58,6 +58,7 @@ function skipReasonLabel(reason) {
   if (reason === 'missing_secure_link') return 'missing secure link';
   if (reason === 'unresolved_placeholder') return 'unfilled {{field}}';
   if (reason === 'email_research_only') return 'address is research-only, not invite-ready';
+  if (reason === 'address_conflict_pending') return 'stored and newly found addresses conflict';
   if (reason === 'program_director_sender_unavailable') return 'assigned Program Director cannot send email';
   return reason;
 }
@@ -170,6 +171,8 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   // Per-recipient state for the S387 staff address attestation offered on the same
   // research-only rows: suggestionId -> { verifying, error }.
   const [verifyState, setVerifyState] = useState({});
+  const [verifyEvidence, setVerifyEvidence] = useState({});
+  const [repairState, setRepairState] = useState({});
   const mountedRef = useRef(true);
   const timelineError = validateInvitationTimeline(timing);
 
@@ -360,13 +363,20 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     }
   };
 
-  // S387: record a staff attestation that a research-only (web-search-found) address
-  // is correct, so the reviewer can be invited in-app. Sends the address BACK for the
-  // server to compare against the stored value — the server never takes the address
-  // from here. On success the previews re-render, which re-classifies the row as
-  // sendable and mints a fresh secure link.
+  // Record a staff attestation plus independent evidence for an already-promoted,
+  // research-only address. The server re-reads the exact suggestion/person and
+  // requires the submitted address to equal current Dataverse state before it
+  // atomically writes staff_verified + the versioned trust bundle.
   const verifyResearchOnlyAddress = async (draft) => {
     if (!draft?.suggestionId || !draft?.candidateEmail) return;
+    const evidence = verifyEvidence[draft.suggestionId] || {};
+    if (!evidence.url?.trim()) {
+      setVerifyState((prev) => ({
+        ...prev,
+        [draft.suggestionId]: { verifying: false, error: 'Paste the publication or institution page used to verify this address.' },
+      }));
+      return;
+    }
     // Surface the SERVER's reason in the prompt. It matters which research-only case
     // this is: a plain search lead is merely unproven, while `search_contested` means
     // the address contradicts verified identity evidence — a staffer waving that one
@@ -382,16 +392,16 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     if (!ok) return;
     setVerifyState((prev) => ({ ...prev, [draft.suggestionId]: { verifying: true, error: null } }));
     try {
-      const res = await fetch('/api/reviewer-finder/my-candidates', {
-        method: 'PATCH',
+      const res = await fetch('/api/workbench/reviewer-address-trust', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          // requestId scopes the attestation to the request being previewed — the
-          // server rejects a suggestion that belongs to another request.
           requestId,
           suggestionId: draft.suggestionId,
-          verifyEmailAddress: true,
-          verifiedEmail: draft.candidateEmail,
+          action: 'verify_person_and_address',
+          email: draft.candidateEmail,
+          evidenceType: evidence.type || 'publication_corresponding_author',
+          evidenceUrl: evidence.url.trim(),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -405,6 +415,33 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     } catch (e) {
       if (!mountedRef.current) return;
       setVerifyState((prev) => ({ ...prev, [draft.suggestionId]: { verifying: false, error: e.message } }));
+    }
+  };
+
+  const requestAddressRepair = async (draft) => {
+    if (!requestId || !draft?.suggestionId) return;
+    setRepairState((prev) => ({ ...prev, [draft.suggestionId]: { requesting: true, error: null } }));
+    try {
+      const res = await fetch('/api/workbench/reviewer-address-trust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId,
+          suggestionId: draft.suggestionId,
+          action: 'create_repair_request',
+          code: draft.skipped || 'address_conflict_pending',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.message || data.error || 'Could not create a repair request.');
+      if (!mountedRef.current) return;
+      setRepairState((prev) => ({
+        ...prev,
+        [draft.suggestionId]: { requesting: false, error: null, message: data.message, adminUrl: data.adminUrl },
+      }));
+    } catch (e) {
+      if (!mountedRef.current) return;
+      setRepairState((prev) => ({ ...prev, [draft.suggestionId]: { requesting: false, error: e.message } }));
     }
   };
 
@@ -722,6 +759,31 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                   (the verified address is the one already stored — CandidateEditModal
                                   omits an unchanged email), so a staff attestation is its own action. */}
                               <div className="mt-2">
+                                <div className="mb-2 grid gap-2 sm:grid-cols-[11rem_1fr]">
+                                  <select
+                                    aria-label={`Evidence type for ${d.candidateName || 'reviewer'}`}
+                                    value={verifyEvidence[d.suggestionId]?.type || 'publication_corresponding_author'}
+                                    onChange={(e) => setVerifyEvidence((prev) => ({
+                                      ...prev,
+                                      [d.suggestionId]: { ...(prev[d.suggestionId] || {}), type: e.target.value },
+                                    }))}
+                                    className="rounded border border-amber-300 bg-white px-2 py-1"
+                                  >
+                                    <option value="publication_corresponding_author">Corresponding-author paper</option>
+                                    <option value="institution_page">Institution or lab page</option>
+                                  </select>
+                                  <input
+                                    type="url"
+                                    aria-label={`Evidence link for ${d.candidateName || 'reviewer'}`}
+                                    value={verifyEvidence[d.suggestionId]?.url || ''}
+                                    onChange={(e) => setVerifyEvidence((prev) => ({
+                                      ...prev,
+                                      [d.suggestionId]: { ...(prev[d.suggestionId] || {}), url: e.target.value },
+                                    }))}
+                                    placeholder="Paste the evidence link"
+                                    className="rounded border border-amber-300 bg-white px-2 py-1"
+                                  />
+                                </div>
                                 <button
                                   type="button"
                                   onClick={() => verifyResearchOnlyAddress(d)}
@@ -746,8 +808,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                   </p>
                                 )}
                                 <p className="mt-1 text-[11px] text-amber-700">
-                                  Recorded as your verification. The address still needs the per-recipient
-                                  confirmation below before sending.
+                                  The app records the exact address, evidence link, staff actor, and request before making it sendable.
                                 </p>
                               </div>
                               <p className="mt-1 text-[11px] text-amber-700">
@@ -802,6 +863,32 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                 <p className="mt-2 text-red-700">
                                   A secure link could not be generated. Close this window and try again.
                                 </p>
+                              )}
+                            </div>
+                          )}
+                          {d.skipped === 'address_conflict_pending' && (
+                            <div className="mt-2 rounded border border-red-200 bg-white/70 p-2 text-red-800">
+                              <p>
+                                Resolve the stored-versus-found address in the Find tab before sending. Inspect the
+                                papers or institutional source, choose the correct address, and record the exact
+                                person-and-address verification. If neither choice is safe, create a repair request.
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => requestAddressRepair(d)}
+                                disabled={!requestId || repairState[d.suggestionId]?.requesting}
+                                className="mt-2 rounded border border-red-300 bg-white px-2.5 py-1 font-medium hover:bg-red-50 disabled:opacity-50"
+                              >
+                                {repairState[d.suggestionId]?.requesting ? 'Creating…' : 'Create repair request'}
+                              </button>
+                              {repairState[d.suggestionId]?.message && (
+                                <p className="mt-1 text-[11px]">
+                                  {repairState[d.suggestionId].message}{' '}
+                                  {repairState[d.suggestionId].adminUrl && <a className="underline" href={repairState[d.suggestionId].adminUrl}>View repair queue</a>}
+                                </p>
+                              )}
+                              {repairState[d.suggestionId]?.error && (
+                                <p role="alert" className="mt-1 text-[11px] text-red-700">{repairState[d.suggestionId].error}</p>
                               )}
                             </div>
                           )}

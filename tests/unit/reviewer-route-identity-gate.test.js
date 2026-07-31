@@ -24,6 +24,7 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   upsertByEmail: jest.fn(async () => ({ id: 'PID-1' })),
   getById: jest.fn(async () => ({ wmkf_primaryaffiliation: 'MIT' })),
   getByEmail: jest.fn(async () => null),
+  update: jest.fn(async () => undefined),
   setContactLink: jest.fn(async () => ({ action: 'link' })),
 }));
 jest.mock('../../lib/dataverse/adapters/contact', () => ({
@@ -77,6 +78,7 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   findCandidateBySuggestion: jest.fn(async () => null),
   findEligibilityByCandidateKey: jest.fn(async () => null),
   findIdentityConfirmation: jest.fn(async () => null),
+  findAddressTrustReceipt: jest.fn(async () => null),
   finalizeCandidatePromotion: jest.fn(async (_requestId, candidate, anchors) => ({
     saved: true,
     candidateKey: anchors.candidateKey || candidate.candidateKey,
@@ -279,10 +281,33 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   });
 
   test('validated referred seed anchor reuses the existing potential reviewer instead of email-upserting', async () => {
+    rosterStore.findAddressTrustReceipt.mockResolvedValueOnce({
+      receiptId: 'receipt-seed',
+      personConfirmed: true,
+      email: 'seed@example.edu',
+      evidenceType: 'direct_correspondence',
+      attestedAt: '2026-07-31T12:00:00.000Z',
+    });
     potentialReviewerAdapter.getById.mockResolvedValueOnce({
       wmkf_potentialreviewersid: 'PID-SEED',
       wmkf_emailaddress: 'seed@example.edu',
       _wmkf_contact_value: 'CONTACT-SEED',
+    }).mockResolvedValueOnce({
+      wmkf_potentialreviewersid: 'PID-SEED',
+      wmkf_emailaddress: 'seed@example.edu',
+      _wmkf_contact_value: 'CONTACT-SEED',
+      wmkf_primaryaffiliation: 'Seed University',
+      _etag: 'W/"seed-person"',
+    }).mockResolvedValueOnce({
+      wmkf_potentialreviewersid: 'PID-SEED',
+      wmkf_emailaddress: 'seed@example.edu',
+      _wmkf_contact_value: 'CONTACT-SEED',
+      _etag: 'W/"seed-person"',
+    }).mockResolvedValueOnce({
+      wmkf_potentialreviewersid: 'PID-SEED',
+      wmkf_emailaddress: 'seed@example.edu',
+      _wmkf_contact_value: 'CONTACT-SEED',
+      _etag: 'W/"seed-person"',
     });
     lookupReviewerIdentity.mockResolvedValueOnce({
       outcome: 'confident',

@@ -210,7 +210,7 @@ surfaces no evidence the confirm modal did not already capture.
 3. **Blanket promotion to `ready`** — removes the second check globally.
    Rejected by the S388 assessment: person-scoped, unbounded in time, inherits
    every failure mode in §1.1.
-4. **Variant 3R (Codex recommendation, not yet decided)** — a **request-scoped,
+4. **Variant 3R (historical recommendation, not adopted)** — a **request-scoped,
    time-boxed** waiver: do not rewrite the global email source; reword the
    attestation to cover person *and* address; require server-side
    re-verification that the address is unchanged, plus corroborating evidence
@@ -627,12 +627,17 @@ Note `lib/db/migrations/002_contact_enrichment.sql` added an `email_verified_at`
 column to `researchers` — a table dropped by migration 018. That column is
 historical; do not cite it as an existing verification timestamp.
 
-### §5.3 The staleness check is already computed [VERIFIED]
+### §5.3 The staleness check and durable contradiction write [CURRENT S391]
 
-`lib/services/reviewer-contact-reconciliation.js` runs during search, read-only,
-and attaches `contactEnrichment.dataverseContactEvidence` to each candidate. Its
-header is emphatic that it "never writes, exposes Dataverse record IDs, changes
-candidate identity/contact fields, or grants save authority."
+`lib/services/reviewer-contact-reconciliation.js` runs during search and
+attaches bounded `contactEnrichment.dataverseContactEvidence` to each candidate.
+Most outcomes remain read-only. S391 adds one narrow write: when a trusted ORCID
+resolves one exact reviewer person and independently persist-worthy enrichment
+finds a different address from that person's stored address, the service records
+person-scoped `conflict_pending` state with an ETag guard. Provisional ORCID,
+name-only, ambiguous, and unmatched results never write. Neither address is
+changed, Dataverse IDs remain hidden, and a write failure stays visible with
+retry plus durable repair-request actions.
 
 Its conflict vocabulary is the staleness vocabulary
 (`lib/services/reviewer-identity-lookup.js`):
@@ -752,7 +757,7 @@ exception.
 | # | Decision | Owner | Blocking |
 | --- | --- | --- | --- |
 | 0 | **Remove send-time contact promotion** — invitation success does not merit creation/linking | **Implemented, S389** | Done |
-| 1 | Exact-address staff attestation, person-scoped trust-until-contradicted state, and no-dead-end remedy contract | Justin | Draft recommendations P1–P4 in `REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` |
+| 1 | Exact-address staff attestation, person-scoped trust-until-contradicted state, and no-dead-end remedy contract | **Approved and implemented in source, S391** | Wave 17 schema-first deploy + runtime promotion + controlled pilot |
 | 2 | Acceptance-time promotion scope (§4.1): every identity-bearing accept, including honorarium opt-outs | **Implemented, S389** | Done |
 | 3 | Contact provenance attribute(s) (§3) | Justin + Dataverse schema | §3 |
 | 4 | Durable vs disposable home for the non-response signal (§5.2) | Justin | §5 |
@@ -773,10 +778,10 @@ traced call graph.]**
 
 ## Sequencing suggestion
 
-**Current after S390.** §4.2, the acceptance scope, identity-aware matching, and
+**Current after S391.** §4.2, the acceptance scope, identity-aware matching, and
 idempotent new-contact creation are implemented. §2.3 is also done. Do not build
 the older §2.2 unchanged-address shortcut or §1's 3R waiver. Review and approve
-`docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` first; its order is
+`docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md`; its source implementation is complete and its remaining order is
 additive schema/readers, shared remedy contracts, working UI actions, durable
 conflict enforcement, and only then exact-bundle `staff_verified` readiness.
 

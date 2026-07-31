@@ -8,7 +8,7 @@
 **Live row count:** 4,427
 **Entity set:** `wmkf_potentialreviewerses` (note Dynamics-pluralized form)
 **Adapter:** `lib/dataverse/adapters/potential-reviewer.js`
-**Extension manifests:** `lib/dataverse/schema/wave2-existing/wmkf_potentialreviewers-extensions.json` + `lib/dataverse/schema/wave13-reviewer-identity-binding/01_wmkf_potentialreviewers_identity_binding.json`
+**Extension manifests:** `lib/dataverse/schema/wave2-existing/wmkf_potentialreviewers-extensions.json` + `lib/dataverse/schema/wave13-reviewer-identity-binding/01_wmkf_potentialreviewers_identity_binding.json`; Wave 17 address-trust schema exists in source but is **not yet production-verified/deployed**
 
 ## Source of truth
 
@@ -31,6 +31,11 @@ Contact:
 - `wmkf_emailaddress` (de-dupe key in adapter)
 - `wmkf_organizationname`
 - `wmkf_areaofexpertise`
+- `wmkf_addresstruststatejson` (Wave 17 Memo, **planned production apply**):
+  versioned server-owned current state binding the exact normalized email to a
+  staff attestation or pending contradiction. Null, malformed, unknown-version,
+  or wrong-email bundles grant no authority. This is current state, not an event
+  log; native Dataverse audit supplies field history.
 
 Provenance / linking:
 - `wmkf_source` (Picklist — where the lead came from)

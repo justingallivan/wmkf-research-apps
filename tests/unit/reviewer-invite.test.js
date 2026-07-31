@@ -113,6 +113,14 @@ describe('emailConfidence — Slice G invite-confidence gate', () => {
     expect(emailConfidence({ wmkf_emailsource: 'something_new' }).level).toBe('low');
   });
 
+  test('legacy staff_verified remains quick-check without an exact-address trust bundle', () => {
+    expect(emailConfidence({
+      wmkf_emailaddress: 'reviewer@example.edu',
+      wmkf_emailsource: 'staff_verified',
+      wmkf_addresstruststatejson: null,
+    })).toMatchObject({ action: 'quick_check', level: 'low' });
+  });
+
   test('name-resolved/discovery-tier contested source never inherits anchored search HIGH', () => {
     expect(emailConfidence({ emailSource: 'search_contested', identityStatus: 'confirmed' }).action).toBe('research_only');
     expect(emailConfidence({ emailSource: 'search_contested', identityStatus: 'probable' }).action).toBe('research_only');

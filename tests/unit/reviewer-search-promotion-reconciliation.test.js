@@ -17,6 +17,11 @@ const candidate = (name, email) => ({
   email,
   emailSource: 'pubmed',
   emailPersistAllowed: true,
+  addressTrustReceipt: {
+    receiptId: `receipt-${email}`,
+    personConfirmed: true,
+    email,
+  },
   identityStatus: 'probable',
   provenance: {
     kind: 'literature_retrieved',
@@ -313,7 +318,8 @@ test('expired verification is refreshed durably and deselected for review withou
 
   expect(await screen.findByText(/Contact verification was refreshed for 1 reviewer/i)).toBeInTheDocument();
   expect(screen.getByRole('link', { name: /fresh@example.edu/i })).toBeInTheDocument();
-  expect(screen.getByLabelText(`Select ${expired.name}`)).not.toBeChecked();
+  expect(screen.queryByLabelText(`Select ${expired.name}`)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /verify \/ edit address/i })).toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledWith(
     '/api/reviewer-finder/save-candidates',
     expect.any(Object),
@@ -414,6 +420,7 @@ test('mixed saved and expired rows reconcile independently before the refreshed 
   expect(await screen.findByText(/Saved 1 of 2/i)).toBeInTheDocument();
   expect(screen.queryByText(saved.name)).not.toBeInTheDocument();
   expect(screen.getByText(expired.name)).toBeInTheDocument();
-  expect(screen.getByLabelText(`Select ${expired.name}`)).not.toBeChecked();
+  expect(screen.queryByLabelText(`Select ${expired.name}`)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /verify \/ edit address/i })).toBeInTheDocument();
   expect(screen.getByText(/Contact verification was refreshed for 1 reviewer/i)).toBeInTheDocument();
 });

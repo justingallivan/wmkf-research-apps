@@ -223,6 +223,10 @@ test('422 envelope pinned exactly when every candidate is rejected as unresolved
       error: 'Candidate identity is unresolved (needs identity review); not saved.',
       code: 'identity_unresolved',
       outcome: 'withheld',
+      remediation: [
+        { action: 'retry_check', label: 'Retry check' },
+        { action: 'create_repair_request', label: 'Create repair request' },
+      ],
     }],
     results: [{
       name: 'Dr Unresolved',
@@ -231,6 +235,10 @@ test('422 envelope pinned exactly when every candidate is rejected as unresolved
       error: 'Candidate identity is unresolved (needs identity review); not saved.',
       code: 'identity_unresolved',
       outcome: 'withheld',
+      remediation: [
+        { action: 'retry_check', label: 'Retry check' },
+        { action: 'create_repair_request', label: 'Create repair request' },
+      ],
     }],
   });
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();

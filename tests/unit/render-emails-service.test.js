@@ -127,6 +127,43 @@ test('post-engagement render does not re-gate a research-only source', async () 
   expect(out.drafts[0].skipped).toBeUndefined();
 });
 
+test.each(['invitation', 'materials', 'followup', 'thankyou'])(
+  'pending person-scoped address conflict blocks %s rendering before token mint',
+  async (templateType) => {
+    findById.mockResolvedValueOnce(suggestion());
+    getReviewerByIdWithSelect.mockResolvedValueOnce(person({
+      wmkf_addresstruststatejson: JSON.stringify({
+        version: 1,
+        email: 'jane@uni.edu',
+        status: 'conflict_pending',
+        attestation: null,
+        conflict: {
+          reason: 'email_mismatch',
+          storedEmail: 'jane@uni.edu',
+          foundEmail: 'jane.roe@uni.edu',
+          source: 'institution_page',
+          requestId: REQ,
+          candidateKey: `suggestion:${SUG1}`,
+          detectedAt: '2026-07-31T12:00:00.000Z',
+        },
+        resolution: null,
+      }),
+    }));
+    const out = await renderEmails({
+      suggestionIds: [SUG1],
+      template: { subject: 'Review request', body: 'Respond: {{externalLink}}' },
+      settings: {},
+      templateType,
+      actingUserSystemId: null,
+    });
+    expect(out.drafts[0]).toMatchObject({
+      skipped: 'address_conflict_pending',
+      emailConfidence: { action: 'blocked' },
+    });
+    expect(mintAndStore).not.toHaveBeenCalled();
+  },
+);
+
 test('mint only when the template references {{externalLink}}; failure is BEST-EFFORT per recipient (empty link, no throw)', async () => {
   // No placeholder → no mint at all.
   findById.mockResolvedValueOnce(suggestion());

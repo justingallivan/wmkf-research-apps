@@ -173,6 +173,8 @@ describe('happy-path envelope (full pin)', () => {
         applicantKnownReviewer: {
           status: 'known',
           code: null,
+          addressTrustVerified: false,
+          addressConflictPending: false,
           potentialReviewerId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
           name: null,
           affiliation: null,

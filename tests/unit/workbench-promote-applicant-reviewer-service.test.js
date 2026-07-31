@@ -34,9 +34,11 @@ jest.mock('../../lib/dataverse/duplicate-key', () => ({
 }));
 
 const findCandidateBySuggestion = jest.fn(async () => null);
+const findAddressTrustReceipt = jest.fn(async () => null);
 const finalizeCandidatePromotion = jest.fn(async () => ({ saved: true, candidateKey: 'candidate:applicant' }));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   findCandidateBySuggestion: (...a) => findCandidateBySuggestion(...a),
+  findAddressTrustReceipt: (...a) => findAddressTrustReceipt(...a),
   finalizeCandidatePromotion: (...a) => finalizeCandidatePromotion(...a),
 }));
 jest.mock('../../lib/services/notification-service', () => ({
@@ -68,7 +70,19 @@ beforeEach(() => {
   });
   update.mockResolvedValue(undefined);
   updateById.mockResolvedValue(undefined);
-  getById.mockResolvedValue({ wmkf_emailaddress: 'existing@example.edu' });
+  getById.mockResolvedValue({
+    wmkf_emailaddress: 'existing@example.edu',
+    wmkf_emailsource: 'scholarly_multi',
+    _etag: 'W/"person"',
+  });
+  findAddressTrustReceipt.mockResolvedValue({
+    receiptId: 'receipt-existing',
+    personConfirmed: true,
+    email: 'existing@example.edu',
+    evidenceType: 'publication_corresponding_author',
+    evidenceUrl: 'https://example.edu/paper',
+    attestedAt: '2026-07-31T12:00:00.000Z',
+  });
   findCandidateBySuggestion.mockResolvedValue({
     candidateKey: 'candidate:applicant',
     suggestionId: SUG,
@@ -138,8 +152,13 @@ test('plain promote: canonical email verified, selected flipped, roster finalize
   });
 });
 
-test('source-null canonical contact promotes without an email write and reports quick_check', async () => {
-  loadApplicantKnownReviewerContext.mockResolvedValue({
+test('source-null canonical contact requires evidence and becomes exact-bundle ready', async () => {
+  getById.mockResolvedValue({
+    wmkf_emailaddress: 'existing@example.edu',
+    wmkf_emailsource: null,
+    _etag: 'W/"person"',
+  });
+  loadApplicantKnownReviewerContext.mockResolvedValueOnce({
     applicantKnownReviewer: {
       status: 'known',
       potentialReviewerId: PERSON,
@@ -151,14 +170,36 @@ test('source-null canonical contact promotes without an email write and reports 
         reason: 'Email source not recorded — confirm before sending',
       },
     },
+  }).mockResolvedValueOnce({
+    applicantKnownReviewer: {
+      status: 'known',
+      potentialReviewerId: PERSON,
+      email: 'existing@example.edu',
+      emailSource: 'staff_verified',
+      addressTrustVerified: true,
+      emailReadiness: { level: 'high', action: 'ready', reason: 'Exact address verified by staff' },
+    },
   });
   const body = await promoteApplicantReviewer(args());
-  expect(update).not.toHaveBeenCalled();
-  expect(body).toMatchObject({ success: true, emailAction: 'quick_check' });
+  expect(update).toHaveBeenCalledWith(
+    PERSON,
+    expect.objectContaining({
+      email: 'existing@example.edu',
+      emailSource: 'staff_verified',
+      addressTrustStateJson: expect.any(String),
+    }),
+    { actingUserSystemId: 'u-1', ifMatch: 'W/"person"' },
+  );
+  expect(body).toMatchObject({ success: true, emailAction: 'ready' });
 });
 
-test('research-only canonical contact preserves promotion behavior and reports the send block', async () => {
-  loadApplicantKnownReviewerContext.mockResolvedValue({
+test('research-only canonical contact requires evidence and becomes exact-bundle ready', async () => {
+  getById.mockResolvedValue({
+    wmkf_emailaddress: 'existing@example.edu',
+    wmkf_emailsource: 'serp_search',
+    _etag: 'W/"person"',
+  });
+  loadApplicantKnownReviewerContext.mockResolvedValueOnce({
     applicantKnownReviewer: {
       status: 'known',
       potentialReviewerId: PERSON,
@@ -170,10 +211,19 @@ test('research-only canonical contact preserves promotion behavior and reports t
         reason: 'Search lead lacks address-specific first-party evidence',
       },
     },
+  }).mockResolvedValueOnce({
+    applicantKnownReviewer: {
+      status: 'known',
+      potentialReviewerId: PERSON,
+      email: 'existing@example.edu',
+      emailSource: 'staff_verified',
+      addressTrustVerified: true,
+      emailReadiness: { level: 'high', action: 'ready', reason: 'Exact address verified by staff' },
+    },
   });
   const body = await promoteApplicantReviewer(args());
   expect(updateLifecycle).toHaveBeenCalled();
-  expect(body).toMatchObject({ success: true, emailAction: 'research_only' });
+  expect(body).toMatchObject({ success: true, emailAction: 'ready' });
 });
 
 test.each([
@@ -232,6 +282,13 @@ test('stored/enriched email mismatch blocks promotion and does not select the su
 });
 
 test('actor-confirmed manual correction clears a historical mismatch, writes first, then passes the fresh exact-person gate', async () => {
+  findAddressTrustReceipt.mockResolvedValueOnce({
+    receiptId: 'receipt-corrected',
+    personConfirmed: true,
+    email: 'corrected@example.edu',
+    evidenceType: 'direct_correspondence',
+    attestedAt: '2026-07-31T12:00:00.000Z',
+  });
   findCandidateBySuggestion.mockResolvedValue({
     candidateKey: 'candidate:applicant',
     suggestionId: SUG,
@@ -259,11 +316,12 @@ test('actor-confirmed manual correction clears a historical mismatch, writes fir
         status: 'known',
         potentialReviewerId: PERSON,
         email: 'corrected@example.edu',
-        emailSource: 'manual',
+        emailSource: 'staff_verified',
+        addressTrustVerified: true,
         emailReadiness: {
-          level: 'low',
-          action: 'quick_check',
-          reason: 'Manual address — confirm before sending',
+          level: 'high',
+          action: 'ready',
+          reason: 'Exact address verified by staff',
         },
       },
     });
@@ -274,11 +332,15 @@ test('actor-confirmed manual correction clears a historical mismatch, writes fir
 
   expect(update).toHaveBeenCalledWith(
     PERSON,
-    { email: 'corrected@example.edu', emailSource: 'manual' },
-    { actingUserSystemId: 'u-1' },
+    expect.objectContaining({
+      email: 'corrected@example.edu',
+      emailSource: 'staff_verified',
+      addressTrustStateJson: expect.any(String),
+    }),
+    { actingUserSystemId: 'u-1', ifMatch: 'W/"person"' },
   );
   expect(updateLifecycle).toHaveBeenCalled();
-  expect(body).toMatchObject({ success: true, emailAction: 'quick_check' });
+  expect(body).toMatchObject({ success: true, emailAction: 'ready' });
 });
 
 test('anti-scrape manual correction is rejected before any person write', async () => {
@@ -363,6 +425,13 @@ test('server-recorded staff confirmation permits promotion of an identity-review
 });
 
 test('manual email collision withholds promotion and returns a merge-required conflict', async () => {
+  findAddressTrustReceipt.mockResolvedValueOnce({
+    receiptId: 'receipt-manual',
+    personConfirmed: true,
+    email: 'a@b.edu',
+    evidenceType: 'direct_correspondence',
+    attestedAt: '2026-07-31T12:00:00.000Z',
+  });
   update.mockImplementation(async (_id, updates) => {
     if (updates && 'email' in updates) throw new Error('alt-key duplicate');
   });
@@ -377,6 +446,14 @@ test('manual email collision withholds promotion and returns a merge-required co
 });
 
 test('B1 backfill: vetted roster email written with roster provenance when no manual email', async () => {
+  findAddressTrustReceipt.mockResolvedValueOnce({
+    receiptId: 'receipt-kaang',
+    personConfirmed: true,
+    email: 'kaang@snu.ac.kr',
+    evidenceType: 'publication_corresponding_author',
+    evidenceUrl: 'https://example.edu/paper',
+    attestedAt: '2026-07-31T12:00:00.000Z',
+  });
   findCandidateBySuggestion.mockResolvedValue({
     candidateKey: 'candidate:kaang',
     suggestionId: SUG,
@@ -392,7 +469,11 @@ test('B1 backfill: vetted roster email written with roster provenance when no ma
   });
   getById
     .mockResolvedValueOnce({})
-    .mockResolvedValueOnce({ wmkf_emailaddress: 'kaang@snu.ac.kr' });
+    .mockResolvedValueOnce({
+      wmkf_emailaddress: 'kaang@snu.ac.kr',
+      wmkf_emailsource: 'claude_search',
+      _etag: 'W/"kaang"',
+    });
   loadApplicantKnownReviewerContext.mockResolvedValue({
     applicantKnownReviewer: {
       status: 'known',
@@ -406,12 +487,26 @@ test('B1 backfill: vetted roster email written with roster provenance when no ma
   // S387: the vetted address and its roster provenance land in ONE patch, so a rejected
   // address cannot leave the row labelled with a source for a different one.
   expect(update).toHaveBeenCalledWith(
-    PERSON, { email: 'kaang@snu.ac.kr', emailSource: 'claude_search' }, { actingUserSystemId: 'u-1' },
+    PERSON,
+    expect.objectContaining({
+      email: 'kaang@snu.ac.kr',
+      emailSource: 'staff_verified',
+      addressTrustStateJson: expect.any(String),
+    }),
+    { actingUserSystemId: 'u-1', ifMatch: 'W/"kaang"' },
   );
   expect(updateById).not.toHaveBeenCalledWith(PERSON, { emailSource: 'claude_search' }, { actingUserSystemId: 'u-1' });
 });
 
-test('B1 idempotency: existing person email blocks the backfill', async () => {
+test('existing research-only person email is upgraded only after exact attestation', async () => {
+  findAddressTrustReceipt.mockResolvedValueOnce({
+    receiptId: 'receipt-x',
+    personConfirmed: true,
+    email: 'x@y.edu',
+    evidenceType: 'publication_corresponding_author',
+    evidenceUrl: 'https://example.edu/paper',
+    attestedAt: '2026-07-31T12:00:00.000Z',
+  });
   findCandidateBySuggestion.mockResolvedValue({
     candidateKey: 'candidate:x',
     suggestionId: SUG,
@@ -420,7 +515,11 @@ test('B1 idempotency: existing person email blocks the backfill', async () => {
     emailSource: 'claude_search',
     emailPersistAllowed: true,
   });
-  getById.mockResolvedValue({ wmkf_emailaddress: 'x@y.edu' });
+  getById.mockResolvedValue({
+    wmkf_emailaddress: 'x@y.edu',
+    wmkf_emailsource: 'claude_search',
+    _etag: 'W/"x"',
+  });
   loadApplicantKnownReviewerContext.mockResolvedValue({
     applicantKnownReviewer: {
       status: 'known',
@@ -430,8 +529,16 @@ test('B1 idempotency: existing person email blocks the backfill', async () => {
     },
   });
   const body = await promoteApplicantReviewer(args());
-  expect(body.savedFields).toEqual([]);
-  expect(update).not.toHaveBeenCalled();
+  expect(body.savedFields).toEqual(['email']);
+  expect(update).toHaveBeenCalledWith(
+    PERSON,
+    expect.objectContaining({
+      email: 'x@y.edu',
+      emailSource: 'staff_verified',
+      addressTrustStateJson: expect.any(String),
+    }),
+    { actingUserSystemId: 'u-1', ifMatch: 'W/"x"' },
+  );
 });
 
 test('eligibility roster read failure returns retryable 503 before lifecycle mutation', async () => {

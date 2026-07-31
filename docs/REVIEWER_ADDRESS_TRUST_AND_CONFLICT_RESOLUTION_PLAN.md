@@ -2,8 +2,8 @@
 title: Reviewer Address Trust and Actionable Conflict Resolution Plan
 domain: reviewer-identity
 kind: plan
-status: draft
-summary: "Proposed exact-address staff attestation, person-scoped trust-until-contradicted state, and a no-dead-end remedy contract across reviewer promotion and sending."
+status: active
+summary: "Exact-address attestation, person trust/conflicts, and actionable remedies are built; Wave 17 deployment and a production pilot remain."
 canonical: false
 cataloged: 2026-07-31
 last_verified: 2026-07-31
@@ -28,10 +28,10 @@ related:
 
 ## Status
 
-**DRAFT FOR OWNER REVIEW. Nothing in this document is implemented.** The current
-runtime remains governed by `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` and
-the current-state sections of
-`docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md`.
+**IMPLEMENTED ON `codex/reviewer-address-trust-plan`; NOT YET DEPLOYED.** The
+owner approved P1–P4 on 2026-07-31. Source, tests, Wave 17 schema-as-code, and the
+read-only preflight are implemented. Production still requires schema-first
+deployment, runtime promotion, and a controlled signed-in pilot.
 
 This document replaces the rejected Session 390 design from
 `codex/claude-ui-followup`. It incorporates the subsequent Codex whole-flow
@@ -45,18 +45,18 @@ paths, the send boundary, and a total reason-to-remedy contract.
 
 ## Change surface (`/contract-reconcile` Step 0)
 
-- **Change surface [PLANNED]:** verify an exact reviewer address while its
+- **Change surface [IMPLEMENTED IN SOURCE / NOT DEPLOYED]:** verify an exact reviewer address while its
   supporting evidence is visible, persist person-scoped trust until contradicted,
   and ensure every reviewer warning or block has an actionable remedy.
 - **Entry points [VERIFIED]:** Find cards and `CandidateEditModal`; ordinary
   promotion through `/api/reviewer-finder/save-candidates`; applicant-recommended
   promotion through `/api/workbench/promote-applicant-reviewer`; Invite rendering
   and sending.
-- **Persistence [VERIFIED current / PLANNED target]:** the Find roster is
+- **Persistence [VERIFIED current / IMPLEMENTED target]:** the Find roster is
   request-scoped Postgres working state; the reviewer person is the Dataverse
   source of truth. The target adds one server-owned current-state bundle to the
   Dataverse person and keeps only pending, pre-promotion evidence in the roster.
-- **Consumers [PLANNED]:** Find-card badges/actions, both promotion services,
+- **Consumers [IMPLEMENTED IN SOURCE]:** Find-card badges/actions, both promotion services,
   Invite rendering, first-contact sending, later outbound-email policy, merge and
   repair affordances, Atlas/docs/tests/gates.
 - **Prior findings:** the ordinary save path does not necessarily resolve the old
@@ -77,14 +77,14 @@ paths, the send boundary, and a total reason-to-remedy contract.
 | D6 | **No dead ends:** every warning/block names the problem and provides a primary remedy; a state that staff cannot safely repair themselves provides retry plus a one-click durable repair request. | Owner-decided |
 | D7 | Invitation sending never creates or links a CRM Contact; identity-bearing acceptance remains the Contact-promotion event. | Implemented current contract |
 
-## Proposed decisions that still require owner approval
+## Approved implementation decisions
 
 | # | Recommendation | Why it is the smallest safe choice |
 |---|---|---|
-| P1 | Store the current exact-address trust/conflict bundle in one new Dataverse Memo field on the reviewer person. | The state is person-scoped and read on promotion/send. A server-owned JSON bundle is additive, ETag-capable, and avoids a new child entity until history/query requirements justify one. |
-| P2 | Treat `staff_verified` as `ready` **only** when the current person carries a valid versioned trust bundle for the exact stored email. | Legacy `staff_verified` rows lack the new evidence/actor contract and therefore retain today's `quick_check`; there is no unsafe bulk promotion. |
-| P3 | A detected high-confidence contradiction is persisted automatically against the stable person during search reconciliation. | Otherwise an already-Invite suggestion remains sendable merely because staff did not try to promote the newly found card. The automatic write records a conflict only; it never changes an address or links a Contact. |
-| P4 | A pending contradiction blocks all new outbound reviewer email using that exact address, not only the initial invitation. | A possible wrong-recipient address is also unsafe for proposal materials and follow-ups. Already-sent mail and tokens are not retroactively revoked by this plan. |
+| P1 | Store the current exact-address trust/conflict bundle in one new Dataverse Memo field on the reviewer person. | **Approved and implemented; Wave 17 not yet applied.** |
+| P2 | Treat `staff_verified` as `ready` **only** when the current person carries a valid versioned trust bundle for the exact stored email. | **Approved and implemented.** Legacy source-only rows remain `quick_check`. |
+| P3 | A detected high-confidence contradiction is persisted automatically against the stable person during search reconciliation. | **Approved and implemented** for exact applicant-linked people and ordinary candidates resolved by a trusted ORCID; provisional/name-only matches never write. Failure remains visible/retryable with a repair action. |
+| P4 | A pending contradiction blocks all new outbound reviewer email using that exact address, not only the initial invitation. | **Approved and implemented** in render and send for invitation, materials, follow-up, and thank-you. |
 
 If P1 or P3 is rejected, this plan must be redesigned before the
 `staff_verified` tier changes. Postgres roster state alone is request-scoped,
@@ -178,8 +178,8 @@ the shared policy. An email match to one person and ORCID match to another is
 
 ### Recommended schema
 
-Add one nullable Memo field to `wmkf_potentialreviewers`, proposed logical name
-`wmkf_addresstruststatejson`, in a new Wave 17 extension manifest. Null means
+Add one nullable Memo field to `wmkf_potentialreviewers`, logical name
+`wmkf_addresstruststatejson`, in the Wave 17 extension manifest. Null means
 legacy/unbound and grants no new authority.
 
 The bounded server-owned payload is current state, not an event log:
@@ -307,10 +307,13 @@ has a total mapping for known actions and a safe unknown-code fallback:
 **Retry check** plus **Create repair request**. An unknown code never disappears,
 falls through to “ready,” or renders as a dead badge.
 
-The proposed mutation seam is one authenticated route,
+The mutation seam is one authenticated route,
 `POST /api/workbench/reviewer-address-trust`, dispatching an allowlisted action:
-`verify_person_and_address`, `resolve_use_found`, `resolve_keep_stored`,
-`resolve_different_person`, `retry_check`, or `create_repair_request`.
+`verify_person_and_address`, `retry_check`, or `create_repair_request`.
+Stored-versus-found resolution uses the verification action with the selected
+exact address; promotion records `keep_stored` or `use_found` in the durable
+bundle. “Different person” routes to existing identity/merge repair rather than
+granting this route authority to create or merge people.
 `open_merge` deep-links to the existing candidate-merge flow and
 `set_aside` uses the existing roster exclusion action. The shared route returns
 the exact candidate key and resulting decision after every action; it never
@@ -590,9 +593,9 @@ Each stage preserves current send safety. The ready-tier change is last.
 - Revoking already-sent invitation tokens solely because a later conflict was
   discovered.
 
-## Exit criteria before runtime implementation begins
+## Runtime/deployment exit criteria
 
-1. Owner approves or changes P1–P4.
+1. **Complete:** owner approved P1–P4.
 2. Every emitted reason code is in the remedy matrix and every action has a
    named server path.
 3. The stable-person resolver contract is accepted for ordinary and applicant
@@ -601,4 +604,4 @@ Each stage preserves current send safety. The ready-tier change is last.
    behavior are fixed before the schema manifest is written.
 5. Existing Invite, later outbound-email, and already-sent-token behavior are
    explicitly accepted.
-6. A fresh adversarial plan review returns no unresolved high-severity finding.
+6. A fresh adversarial implementation review returns no unresolved high-severity finding.

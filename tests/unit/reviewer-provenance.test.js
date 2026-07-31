@@ -187,6 +187,11 @@ describe('applicant identity gate parity with promote-applicant-reviewer', () =>
     email: 'applicant.pick@example.edu',
     emailSource: 'applicant_form',
     emailPersistAllowed: true,
+    addressTrustReceipt: {
+      receiptId: 'receipt-applicant-pick',
+      personConfirmed: true,
+      email: 'applicant.pick@example.edu',
+    },
     isApplicantRecommended: true,
     ...extra,
   });

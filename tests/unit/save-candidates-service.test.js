@@ -14,7 +14,8 @@
 
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   upsertByEmail: jest.fn(async () => ({ id: 'PID-1' })),
-  getById: jest.fn(async () => ({ wmkf_primaryaffiliation: 'MIT' })),
+  getById: jest.fn(async () => ({ wmkf_primaryaffiliation: 'MIT', _etag: 'W/"person"' })),
+  update: jest.fn(async () => undefined),
   getByIdForMerge: jest.fn(async () => ({ wmkf_potentialreviewersid: 'PID-1', _etag: 'W/"1"' })),
   getByEmail: jest.fn(async () => null),
   setContactLink: jest.fn(async () => ({ action: 'link' })),
@@ -50,6 +51,7 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   })),
   findIdentityConfirmation: jest.fn(async () => null),
   findEligibilityByCandidateKey: jest.fn(async () => null),
+  findAddressTrustReceipt: jest.fn(async () => null),
 }));
 jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
   verifyAutomatedIdentityAttestation: jest.fn(async () => ({
@@ -113,7 +115,7 @@ const saveCandidates = (args) => saveCandidatesImpl({
 beforeEach(() => {
   jest.clearAllMocks();
   potentialReviewerAdapter.getByEmail.mockResolvedValue(null);
-  potentialReviewerAdapter.getById.mockResolvedValue({ wmkf_primaryaffiliation: 'MIT' });
+  potentialReviewerAdapter.getById.mockResolvedValue({ wmkf_primaryaffiliation: 'MIT', _etag: 'W/"person"' });
   potentialReviewerAdapter.getByIdForMerge.mockResolvedValue({
     wmkf_potentialreviewersid: 'PID-1',
     _etag: 'W/"1"',
@@ -179,6 +181,7 @@ test('422 SaveCandidatesError with the full body (both rejected counts always pr
         error: 'Candidate identity is unresolved (needs identity review); not saved.',
         code: 'identity_unresolved',
         outcome: 'withheld',
+        remediation: expect.any(Array),
       },
       {
         name: 'Dr COI',
@@ -186,6 +189,7 @@ test('422 SaveCandidatesError with the full body (both rejected counts always pr
         index: 1,
         error: 'Candidate is at the proposal PI’s institution (institution COI); not saved.',
         code: 'institution_coi',
+        remediation: expect.any(Array),
       },
     ],
     results: [
@@ -289,6 +293,13 @@ test('stored staff confirmation supplies the authoritative roster key when the a
     website: '',
     affiliation: 'Example University',
     rosterCandidateKey: 'candidate:staff-confirmed',
+  });
+  reviewerRosterStore.findAddressTrustReceipt.mockResolvedValueOnce({
+    receiptId: 'receipt-staff',
+    personConfirmed: true,
+    email: 'ann@example.edu',
+    evidenceType: 'direct_correspondence',
+    attestedAt: '2026-07-31T12:00:00.000Z',
   });
 
   const out = await saveCandidates({
@@ -444,6 +455,14 @@ test('roster-managed promotion finalizes the receipt-bound roster key while retu
     contactAuthorityBound: true,
     rosterCandidateKey: 'suggestion:receipt-bound',
   });
+  reviewerRosterStore.findAddressTrustReceipt.mockResolvedValueOnce({
+    receiptId: 'receipt-bound',
+    personConfirmed: true,
+    email: 'ready-0@example.edu',
+    evidenceType: 'institution_page',
+    evidenceUrl: 'https://example.edu/reviewer',
+    attestedAt: '2026-07-31T12:00:00.000Z',
+  });
 
   const out = await saveCandidates({
     ...BASE,
@@ -469,6 +488,135 @@ test('roster-managed promotion finalizes the receipt-bound roster key while retu
       rosterFinalized: true,
     }),
   ]);
+});
+
+test('trusted ORCID match reuses the stable person and requires attestation before changing its address', async () => {
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+    valid: true,
+    source: 'automated_resolver',
+    identityDecisionBound: true,
+    contactAuthorityBound: true,
+    rosterCandidateKey: 'orcid:stable-person',
+  });
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'confident',
+    match: {
+      reviewerId: 'PID-STABLE',
+      contactId: null,
+      matchKey: 'orcid',
+      nameConsistent: true,
+      context: { email: 'old@example.edu', affiliation: 'Different University' },
+    },
+    referencedReviewers: [{
+      reviewerId: 'PID-STABLE',
+      viaNameMatch: false,
+      affiliation: 'Different University',
+    }],
+    referencedContacts: [],
+  });
+  potentialReviewerAdapter.getById.mockResolvedValue({
+    wmkf_potentialreviewersid: 'PID-STABLE',
+    wmkf_name: 'Dr Stable',
+    wmkf_emailaddress: 'old@example.edu',
+    wmkf_emailsource: 'scholarly_multi',
+    wmkf_primaryaffiliation: 'Different University',
+    statecode: 0,
+    _etag: 'W/"stable"',
+  });
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Stable',
+      email: 'new@example.edu',
+      emailSource: 'scholarly_multi',
+      orcid: '0000-0002-1825-0097',
+      affiliation: 'Different University',
+      candidateKey: 'orcid:stable-person',
+      automatedIdentityAttestation: 'signed-stable',
+    }],
+  }).catch((error) => error);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.body).toMatchObject({
+    savedCount: 0,
+    errors: [expect.objectContaining({ code: 'address_verification_required' })],
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
+});
+
+test('attested trusted-ORCID address change updates the exact stable person atomically without creating a duplicate', async () => {
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+    valid: true,
+    source: 'automated_resolver',
+    identityDecisionBound: true,
+    contactAuthorityBound: true,
+    rosterCandidateKey: 'orcid:stable-person',
+  });
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'confident',
+    match: {
+      reviewerId: 'PID-STABLE',
+      contactId: null,
+      matchKey: 'orcid',
+      nameConsistent: true,
+      context: { email: 'old@example.edu', affiliation: 'Different University' },
+    },
+    referencedReviewers: [{
+      reviewerId: 'PID-STABLE',
+      viaNameMatch: false,
+      affiliation: 'Different University',
+    }],
+    referencedContacts: [],
+  });
+  potentialReviewerAdapter.getById.mockResolvedValue({
+    wmkf_potentialreviewersid: 'PID-STABLE',
+    wmkf_name: 'Dr Stable',
+    wmkf_emailaddress: 'old@example.edu',
+    wmkf_emailsource: 'scholarly_multi',
+    wmkf_primaryaffiliation: 'Different University',
+    statecode: 0,
+    _etag: 'W/"stable"',
+  });
+  reviewerRosterStore.findAddressTrustReceipt.mockResolvedValueOnce({
+    receiptId: 'receipt-stable',
+    personConfirmed: true,
+    email: 'new@example.edu',
+    actorProfileId: 'profile-1',
+    actorSystemUserId: 'SYS-1',
+    evidenceType: 'publication_corresponding_author',
+    evidenceUrl: 'https://example.edu/paper',
+    attestedAt: '2026-07-31T12:00:00.000Z',
+  });
+
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Stable',
+      email: 'new@example.edu',
+      emailSource: 'scholarly_multi',
+      orcid: '0000-0002-1825-0097',
+      affiliation: 'Different University',
+      candidateKey: 'orcid:stable-person',
+      automatedIdentityAttestation: 'signed-stable',
+    }],
+  });
+
+  expect(out.savedCount).toBe(1);
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(
+    'PID-STABLE',
+    expect.objectContaining({
+      email: 'new@example.edu',
+      emailSource: 'staff_verified',
+      addressTrustStateJson: expect.stringContaining('"status":"staff_verified"'),
+    }),
+    { actingUserSystemId: 'SYS-1', ifMatch: 'W/"stable"' },
+  );
+  expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalledWith(expect.objectContaining({
+    potentialReviewerId: 'PID-STABLE',
+  }), expect.anything());
 });
 
 test('a false roster finalization result emits an alert and remains explicit in the saved result', async () => {
@@ -1682,6 +1830,7 @@ test('applicant-excluded suggestion collision becomes a terminal blocked roster 
       clientCandidateId: 'applicant-excluded',
       automatedIdentityAttestation: 'signed-v3',
       email: 'excluded@example.edu',
+      emailSource: 'scholarly_multi',
     }],
   }).catch((error) => error);
 

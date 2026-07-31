@@ -175,7 +175,7 @@ function emailOwnershipLabel(evidence) {
 // without a checkbox for the non-selectable Unverified section. `onExclude` adds
 // a set-aside action (active cards); `onPromote` adds a restore action (the
 // collapsed Excluded section).
-export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, canManage = true }) {
+export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, canManage = true }) {
   const [expanded, setExpanded] = useState(false);
   // Identity-unverified rows only: the retrieved-but-unconfirmed evidence panel.
   // Collapsed by default so a list of these stays scannable.
@@ -267,6 +267,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const promotionDecision = getCandidatePromotionDecision(c);
   const needsIdentityConfirmation = promotionDecision?.decision === 'needs_identity_confirmation';
   const missingVerifiedEmail = promotionDecision?.decision === 'missing_email';
+  const needsAddressVerification = !needsIdentityConfirmation && emailReadiness.action !== 'ready';
 
   // Unresolved identity never enters Invite. Suppress contact/bibliometrics that
   // could belong to a namesake while keeping the row actionable in Find.
@@ -464,6 +465,11 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             {missingVerifiedEmail && (
               <Pill tone="amber">⚠ Verified email required</Pill>
             )}
+            {needsAddressVerification && (
+              <Pill tone={emailReadiness.action === 'blocked' ? 'red' : 'amber'}>
+                {emailReadiness.action === 'blocked' ? '⛔ Address conflict' : '⚠ Address verification required'}
+              </Pill>
+            )}
           </div>
           {eligibilityStatus === 'emeritus' && eligibilityEvidence?.url && (
             <p className="mt-1 text-[11px] text-amber-700">
@@ -540,6 +546,8 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                 className={`inline-flex items-center gap-1 px-2 py-1 rounded border ${
                   emailAction === 'ready'
                     ? 'bg-green-50 text-green-800 border-green-200'
+                    : emailAction === 'blocked'
+                      ? 'bg-red-50 text-red-800 border-red-200'
                     : emailAction === 'research_only'
                       ? 'bg-red-50 text-red-800 border-red-200'
                       : emailAction === 'quick_check'
@@ -552,6 +560,8 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               >
                 {emailAction === 'ready'
                   ? '✓ High-confidence email'
+                  : emailAction === 'blocked'
+                    ? '⛔ Address conflict must be resolved'
                   : emailAction === 'research_only'
                     ? '⚠ Research only'
                     : emailAction === 'quick_check'
@@ -767,14 +777,26 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             {/* Manual contact edit (manage-only): correct a wrong email/website
                 (or affiliation/h-index) by hand. A typed email is stamped manual
                 → quick check at invite (per-recipient acknowledgement). */}
-            {!readOnly && canManage && onEdit && !identityUnverified && (
+            {canManage && onEdit && !identityUnverified && (
               <button
                 type="button"
                 onClick={() => onEdit(c)}
                 className="text-xs text-gray-500 hover:text-blue-700 flex items-center gap-1"
-                title="Edit contact details (email/website/affiliation) for this candidate"
+                title={needsAddressVerification
+                  ? 'Review the evidence, correct the address if needed, and verify the exact person and address'
+                  : 'Edit contact details (email/website/affiliation) for this candidate'}
               >
-                ✏️ Edit contact
+                {needsAddressVerification ? '✓ Verify / edit address' : '✏️ Edit contact'}
+              </button>
+            )}
+            {canManage && onRequestRepair && (emailReadiness.action === 'blocked' || c.conflictRecordUnavailable) && (
+              <button
+                type="button"
+                onClick={() => onRequestRepair(c)}
+                className="text-xs text-red-600 hover:text-red-800 flex items-center gap-1"
+                title="Create a durable repair request if neither address can be verified safely"
+              >
+                ⚑ Create repair request
               </button>
             )}
             {/* Needs-identity-review escape hatch: a PD who recognizes the person can
@@ -1531,13 +1553,86 @@ export default function ReviewerSearchSection({
     setCandidates((prev) => prev.map(apply));
     setRecCandidates((prev) => prev.map(apply));
     setRosterActive((prev) => prev.map(apply));
-    setSelected((prev) => { const next = new Set(prev); next.add(key); return next; });
   }, []);
 
-  // Slice 4: one-click promotion of a quarantined lead → manual contact.
+  const applyAuthoritativeRosterCandidate = useCallback((key, candidate) => {
+    if (!key || !candidate) return;
+    const replace = (current) => (candKey(current) === key ? candidate : current);
+    setCandidates((prev) => prev.map(replace));
+    setRecCandidates((prev) => prev.map(replace));
+    setRosterActive((prev) => prev.map(replace));
+  }, []);
+
+  const verifyAddressContact = useCallback(async (cand, updates, evidence) => {
+    if (!cand || !requestId) throw new Error('Reload this request before verifying an address.');
+    const key = candKey(cand);
+    if (!key) throw new Error('This reviewer has no stable roster key. Reload and try again.');
+    const myGen = genRef.current;
+    const response = await fetch('/api/workbench/reviewer-address-trust', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId,
+        candidateKey: key,
+        action: 'verify_person_and_address',
+        email: updates.email,
+        evidenceType: evidence.evidenceType,
+        evidenceUrl: evidence.evidenceUrl,
+        note: evidence.note,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success || !data.candidate) {
+      const nextAction = data.remediation?.[0]?.label;
+      throw new Error(`${data.message || data.error || 'Could not verify this address.'}${nextAction ? ` Next: ${nextAction}.` : ''}`);
+    }
+    if (genRef.current !== myGen) return;
+    const candidate = {
+      ...data.candidate,
+      ...updates,
+      addressTrustReceipt: data.candidate.addressTrustReceipt,
+      contactEnrichment: {
+        ...(data.candidate.contactEnrichment || {}),
+        ...(updates.email !== undefined ? { email: updates.email } : {}),
+        ...(updates.website !== undefined ? { website: updates.website } : {}),
+        ...(updates.affiliation !== undefined ? { affiliation: updates.affiliation } : {}),
+      },
+    };
+    applyAuthoritativeRosterCandidate(key, candidate);
+    setSelected((prev) => { const next = new Set(prev); next.add(key); return next; });
+    setRosterNote(`${data.candidate.name || cand.name}: exact person and address verified.`);
+  }, [requestId, applyAuthoritativeRosterCandidate]);
+
+  const requestAddressRepair = useCallback(async (cand) => {
+    const key = candKey(cand);
+    if (!requestId || !key) return;
+    const response = await fetch('/api/workbench/reviewer-address-trust', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId,
+        candidateKey: key,
+        action: 'create_repair_request',
+        code: getCandidateEmailReadiness(cand).action === 'blocked'
+          ? 'address_conflict_pending'
+          : 'address_verification_required',
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    setRosterNote(response.ok && data.success
+      ? `${data.message} Repair queue: ${data.adminUrl || '/admin#system-alerts'}`
+      : (data.message || data.error || 'Could not create a repair request. Retry from this reviewer card.'));
+  }, [requestId]);
+
+  // Slice 4: a quarantined email lead must pass through the evidence form;
+  // website-only leads remain a direct non-address edit.
   const useLead = useCallback((cand, lead) => {
     if (!cand || !lead || !lead.value) return;
-    setManualContact(cand, lead.type === 'email' ? { email: lead.value } : { website: lead.value });
+    if (lead.type === 'email') {
+      setEditingContact({ ...cand, email: lead.value, emailSource: 'manual' });
+      return;
+    }
+    setManualContact(cand, { website: lead.value });
   }, [setManualContact]);
 
   // The candidate currently open in the on-card Edit-contact modal (local mode).
@@ -1548,7 +1643,7 @@ export default function ReviewerSearchSection({
   // PD confirms a needs-identity-review row IS the right person + supplies corrected
   // contact. The authenticated roster PATCH stores the request-scoped attestation
   // first; only then do we stamp manual contact + the UI marker/opaque id locally.
-  const confirmIdentityContact = useCallback(async (cand, updates) => {
+  const confirmIdentityContact = useCallback(async (cand, updates, evidence) => {
     if (!cand) return;
     const key = candKey(cand);
     if (!key || !requestId) return;
@@ -1577,17 +1672,8 @@ export default function ReviewerSearchSection({
       throw new Error(data.error || 'Could not record identity confirmation. Please retry.');
     }
     if (genRef.current !== myGen) return;
-    setManualContact(cand, updates);
-    const stamp = (c) => (candKey(c) === key ? {
-      ...c,
-      pdIdentityConfirmed: true,
-      pdIdentityConfirmationId: data.confirmationId,
-      applicantContactMismatch: false,
-    } : c);
-    setCandidates((prev) => prev.map(stamp));
-    setRecCandidates((prev) => prev.map(stamp));
-    setRosterActive((prev) => prev.map(stamp));
-  }, [requestId, setManualContact]);
+    await verifyAddressContact(data.candidate || confirmedCandidate, updates, evidence);
+  }, [requestId, verifyAddressContact]);
 
   const refreshExpiredVerification = useCallback(async (staleCandidates, expectedGeneration) => {
     if (!requestId || !Array.isArray(staleCandidates) || staleCandidates.length === 0) {
@@ -1714,6 +1800,9 @@ export default function ReviewerSearchSection({
       let savedRosterKeys = [];
       let blockedKeys = [];
       let expiredKeys = [];
+      let addressVerificationKeys = [];
+      let addressRepairKeys = [];
+      let identityReviewResults = [];
       let needsRosterReload = false;
       let refreshedVerificationCandidates = [];
       const rosterWarnings = [];
@@ -1750,6 +1839,22 @@ export default function ReviewerSearchSection({
               && typeof result?.candidateKey === 'string'
             ))
             .map((result) => result.candidateKey);
+          addressVerificationKeys = saveResults
+            .filter((result) => (
+              result?.code === 'address_verification_required'
+              && typeof result?.candidateKey === 'string'
+            ))
+            .map((result) => result.candidateKey);
+          addressRepairKeys = saveResults
+            .filter((result) => (
+              result?.code === 'conflict_record_unavailable'
+              && typeof result?.candidateKey === 'string'
+            ))
+            .map((result) => result.candidateKey);
+          identityReviewResults = saveResults.filter((result) => (
+            result?.decision === 'identity_choice_required'
+            && typeof result?.candidateKey === 'string'
+          ));
           needsRosterReload = saveResults.some((result) => (
             result?.outcome === 'saved' && result?.rosterFinalized === false
           ));
@@ -1926,9 +2031,68 @@ export default function ReviewerSearchSection({
         });
       }
 
+      if ((addressVerificationKeys.length > 0 || addressRepairKeys.length > 0) && isCurrent()) {
+        const verificationSet = new Set(addressVerificationKeys);
+        const repairSet = new Set(addressRepairKeys);
+        const exposeRemedy = (candidate) => {
+          const key = candKey(candidate);
+          if (!verificationSet.has(key) && !repairSet.has(key)) return candidate;
+          return {
+            ...candidate,
+            addressTrustReceipt: verificationSet.has(key) ? null : candidate.addressTrustReceipt,
+            addressVerificationRequired: verificationSet.has(key) || candidate.addressVerificationRequired === true,
+            conflictRecordUnavailable: repairSet.has(key) || candidate.conflictRecordUnavailable === true,
+          };
+        };
+        setCandidates((prev) => prev.map(exposeRemedy));
+        setRecCandidates((prev) => prev.map(exposeRemedy));
+        setRosterActive((prev) => prev.map(exposeRemedy));
+        setSelected((prev) => {
+          const next = new Set(prev);
+          [...addressVerificationKeys, ...addressRepairKeys].forEach((key) => next.delete(key));
+          return next;
+        });
+        if (addressVerificationKeys.length > 0) {
+          rosterWarnings.push('Address verification is required. Use “Verify / edit address” on each affected reviewer, then select and promote again.');
+        }
+        if (addressRepairKeys.length > 0) {
+          rosterWarnings.push('A conflict safety record could not be written. Retry from the reviewer card or create a durable repair request.');
+        }
+      }
+
+      if (identityReviewResults.length > 0 && isCurrent()) {
+        const reasonByKey = new Map(identityReviewResults.map((result) => [
+          result.candidateKey,
+          result.code || 'ambiguous_or_name_mismatch',
+        ]));
+        const exposeIdentityRemedy = (candidate) => {
+          const reason = reasonByKey.get(candKey(candidate));
+          return reason ? { ...candidate, serverIdentityReviewReason: reason } : candidate;
+        };
+        setCandidates((prev) => prev.map(exposeIdentityRemedy));
+        setRecCandidates((prev) => prev.map(exposeIdentityRemedy));
+        setRosterActive((prev) => prev.map(exposeIdentityRemedy));
+        setSelected((prev) => {
+          const next = new Set(prev);
+          identityReviewResults.forEach((result) => next.delete(result.candidateKey));
+          return next;
+        });
+        rosterWarnings.push('Dataverse identity evidence needs review. Use “This is the right person” to verify the person and exact address, or set the reviewer aside.');
+      }
+
       const totalSucceeded = saved + promoted;
       if (totalSucceeded === 0) {
         if (refreshedVerificationCandidates.length > 0 && isCurrent()) {
+          setRosterNote(Array.from(new Set(rosterWarnings)).join(' '));
+          setPhase('results');
+          return;
+        }
+        if ((addressVerificationKeys.length > 0 || addressRepairKeys.length > 0) && isCurrent()) {
+          setRosterNote(Array.from(new Set(rosterWarnings)).join(' '));
+          setPhase('results');
+          return;
+        }
+        if (identityReviewResults.length > 0 && isCurrent()) {
           setRosterNote(Array.from(new Set(rosterWarnings)).join(' '));
           setPhase('results');
           return;
@@ -2428,7 +2592,21 @@ export default function ReviewerSearchSection({
                                   // needs-review row the PD just confirmed → selectable + editable.
                                   return <CandidateCard key={candKey(c)} candidate={c} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} onUseLead={useLead} onEdit={setEditingContact} canManage={canManage} />;
                                 }
-                                return <CandidateCard key={candKey(c)} candidate={c} previousResult={previousSearchKeys.has(candKey(c))} readOnly onExclude={excludeCandidate} onConfirmIdentity={canConfirmForPromotion ? (cand) => setConfirmingContact(cand) : undefined} canManage={canManage} />;
+                                return <CandidateCard
+                                  key={candKey(c)}
+                                  candidate={c}
+                                  previousResult={previousSearchKeys.has(candKey(c))}
+                                  readOnly
+                                  onExclude={excludeCandidate}
+                                  onEdit={(
+                                    promotionDecision?.decision === 'ready'
+                                    || promotionDecision?.reason === 'contact_claim_mismatch'
+                                    || c.applicantContactMismatch === true
+                                  ) ? setEditingContact : undefined}
+                                  onRequestRepair={requestAddressRepair}
+                                  onConfirmIdentity={canConfirmForPromotion ? (cand) => setConfirmingContact(cand) : undefined}
+                                  canManage={canManage}
+                                />;
                               })}
                             </div>
                           </div>
@@ -2550,6 +2728,8 @@ export default function ReviewerSearchSection({
           candidate={editingContact}
           nameEditable={false}
           onApply={(updates) => setManualContact(editingContact, updates)}
+          onVerifyAddress={(updates, evidence) => verifyAddressContact(editingContact, updates, evidence)}
+          requireAddressVerification={getCandidateEmailReadiness(editingContact).action !== 'ready'}
           onClose={() => setEditingContact(null)}
         />
       )}
@@ -2561,7 +2741,9 @@ export default function ReviewerSearchSection({
           candidate={confirmingContact}
           nameEditable={false}
           confirmMode
-          onConfirm={(updates) => confirmIdentityContact(confirmingContact, updates)}
+          onVerifyAddress={() => {}}
+          requireAddressVerification
+          onConfirm={(updates, evidence) => confirmIdentityContact(confirmingContact, updates, evidence)}
           onClose={() => setConfirmingContact(null)}
         />
       )}

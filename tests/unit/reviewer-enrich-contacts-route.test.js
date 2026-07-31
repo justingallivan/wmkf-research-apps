@@ -115,7 +115,7 @@ test('opts into partial abort results and streams partial complete metadata', as
   expect(res.ended).toBe(true);
   expect(reconcileReviewerContacts).toHaveBeenCalledWith(
     expect.any(Array),
-    expect.objectContaining({ skip: true }),
+    expect.objectContaining({ skip: true, requestId: null }),
   );
 });
 
@@ -139,7 +139,10 @@ test('adds a server identity receipt to enriched candidates when requestId is pr
   expect(complete.results[0].automatedIdentityAttestation).toBe('receipt:Dr. A');
   expect(reconcileReviewerContacts).toHaveBeenCalledWith(
     expect.any(Array),
-    expect.objectContaining({ skip: false }),
+    expect.objectContaining({
+      skip: false,
+      requestId: '11111111-1111-1111-1111-111111111111',
+    }),
   );
 });
 

@@ -61,7 +61,7 @@ test('applicant canonical email/source pair and promotion decision survive roste
     emailReadiness: { action: 'quick_check' },
   });
   expect(after).toEqual(before);
-  expect(isCandidateSelectable(pruned)).toBe(true);
+  expect(isCandidateSelectable(pruned)).toBe(false);
 });
 
 test('vetted enrichment pair stays selectable when the exact applicant person has no stored email', () => {
@@ -126,6 +126,11 @@ test('applicant contact-claim mismatch survives roster pruning and remains non-s
     contactEnrichment: { email: 'corrected@example.edu', emailSource: 'manual' },
     pdIdentityConfirmed: true,
     manualContactFields: ['email'],
+    addressTrustReceipt: {
+      receiptId: 'receipt-corrected',
+      personConfirmed: true,
+      email: 'corrected@example.edu',
+    },
   })).toBe(true);
 });
 
@@ -431,7 +436,7 @@ describe('isCandidateSelectable', () => {
     })).toBe(false);
   });
 
-  test('resolved non-COI rows remain selectable', () => {
+  test('resolved non-COI quick-check rows remain visible but require exact-address verification', () => {
     expect(isCandidateSelectable({
       name: 'Clean',
       email: 'clean@example.edu',
@@ -440,7 +445,49 @@ describe('isCandidateSelectable', () => {
       identityStatus: 'probable',
       hasInstitutionCOI: false,
       provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
+    })).toBe(false);
+  });
+
+  test('an exact person-and-address receipt makes a resolved quick-check row selectable', () => {
+    expect(isCandidateSelectable({
+      name: 'Clean',
+      email: 'clean@example.edu',
+      emailSource: 'pubmed',
+      emailPersistAllowed: true,
+      identityStatus: 'probable',
+      hasInstitutionCOI: false,
+      addressTrustReceipt: {
+        receiptId: 'receipt-clean',
+        personConfirmed: true,
+        email: 'clean@example.edu',
+      },
+      provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
     })).toBe(true);
+  });
+
+  test('Dataverse split identity remains actionable but nonselectable until staff confirms person and address', () => {
+    const candidate = {
+      name: 'Split Identity',
+      email: 'split@example.edu',
+      emailSource: 'scholarly_multi',
+      emailPersistAllowed: true,
+      identityStatus: 'probable',
+      hasInstitutionCOI: false,
+      contactEnrichment: {
+        identity: { status: 'probable' },
+        dataverseContactEvidence: {
+          status: 'review_required',
+          reason: 'orcid_email_split',
+        },
+      },
+      provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
+    };
+    expect(getCandidatePromotionDecision(candidate)).toMatchObject({
+      decision: 'needs_identity_confirmation',
+      reason: 'orcid_email_split',
+    });
+    expect(isCandidateSelectable(candidate)).toBe(false);
+    expect(isCandidateSelectable({ ...candidate, pdIdentityConfirmed: true })).toBe(true);
   });
 
   test('nested unresolved identity overrides top-level verified/selectable signals', () => {

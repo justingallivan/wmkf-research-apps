@@ -1,0 +1,15 @@
+{
+  "name": "wmkf_potentialreviewers-address-trust",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_potentialreviewers",
+  "_comment": "S391 additive reviewer-address trust state. This is a bounded, server-owned current-state bundle, not an event log. Null, malformed JSON, an unknown version, or an email mismatch grants no authority. The field must be deployed before code that includes it in a Dataverse $select. Deploy only after the read-only metadata preflight: node scripts/preflight-reviewer-address-trust-field.mjs --target=prod; then node scripts/apply-dataverse-schema.js --target=prod --wave=17-reviewer-address-trust --execute.",
+  "attributes": [
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_AddressTrustStateJson",
+      "displayName": "Address Trust State (JSON)",
+      "description": "Versioned server-owned current state binding one exact normalized reviewer email to staff attestation, contradiction, and resolution metadata. Null or invalid state grants no readiness authority.",
+      "maxLength": 50000
+    }
+  ]
+}

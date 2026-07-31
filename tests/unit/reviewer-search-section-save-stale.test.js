@@ -13,6 +13,11 @@ const candidate = (name, email) => ({
   email,
   emailSource: 'pubmed',
   emailPersistAllowed: true,
+  addressTrustReceipt: {
+    receiptId: `receipt-${email}`,
+    personConfirmed: true,
+    email,
+  },
   identityStatus: 'probable',
   provenance: {
     kind: 'literature_retrieved',

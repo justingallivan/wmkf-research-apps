@@ -195,10 +195,11 @@ export default async function handler(req, res) {
       console.log('[enrich-contacts] contact-leads audit:', JSON.stringify(results.stats.contactAudit));
     }
 
-    // Read-only, exact-key reconciliation against Dataverse. This is display
-    // evidence only: it never changes contact fields, identity, COI, or save
-    // authority. Keep lookups sequential inside the service to avoid a burst,
-    // and do no Dataverse reads for an already-partial/timed-out enrichment.
+    // Exact-key reconciliation against Dataverse. It normally returns bounded
+    // display evidence; a trusted-ORCID/exact-person address contradiction is
+    // also persisted as person-scoped conflict state so every send path blocks
+    // until staff resolves it. It never changes either address. Keep lookups
+    // sequential and do no Dataverse reads for partial/timed-out enrichment.
     if (Array.isArray(results?.enriched)) {
       try {
         await withDalContext(
@@ -206,6 +207,8 @@ export default async function handler(req, res) {
           () => reconcileReviewerContacts(results.enriched, {
             signal: deadlineController.signal,
             skip: !!results.partial || !!results.timeout,
+            requestId,
+            actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
           }),
         );
       } catch (error) {

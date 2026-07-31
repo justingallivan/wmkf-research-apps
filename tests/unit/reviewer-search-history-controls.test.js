@@ -13,12 +13,19 @@ jest.mock('../../shared/components/reviewers/sse', () => ({
 
 const REQ = '11111111-1111-1111-1111-111111111111';
 
+const addressTrustReceipt = (email) => ({
+  receiptId: `receipt-${email}`,
+  personConfirmed: true,
+  email,
+});
+
 const generatedCandidate = {
   candidateKey: 'candidate:prior-generated',
   name: 'Prior Generated Reviewer',
   email: 'prior@example.edu',
   emailSource: 'openalex',
   emailPersistAllowed: true,
+  addressTrustReceipt: addressTrustReceipt('prior@example.edu'),
   identityStatus: 'probable',
   verificationConfidence: 0.8,
   rosterUpdatedAt: '2026-07-19T16:00:00.000Z',
@@ -312,6 +319,7 @@ test('a search blocks prior-result removal until its roster write settles', asyn
     candidateKey: 'candidate:fresh',
     name: 'Fresh Reviewer',
     email: 'fresh@example.edu',
+    addressTrustReceipt: addressTrustReceipt('fresh@example.edu'),
   };
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
@@ -371,6 +379,7 @@ test('a rejected stale roster write cannot change the newly selected request pha
     candidateKey: 'candidate:fresh',
     name: 'Fresh Reviewer',
     email: 'fresh@example.edu',
+    addressTrustReceipt: addressTrustReceipt('fresh@example.edu'),
   };
   const requestBCandidate = {
     ...generatedCandidate,
@@ -486,6 +495,7 @@ test('continues after a terminal discovery read failure when the complete ranked
     ...generatedCandidate,
     name: 'Fresh Reviewer',
     email: 'fresh@example.edu',
+    addressTrustReceipt: addressTrustReceipt('fresh@example.edu'),
   };
 
   global.fetch = jest.fn((url, options = {}) => {

@@ -23,7 +23,7 @@ const CONTACT_SELECT =
   'contactid,firstname,lastname,fullname,emailaddress1,wmkf_orcid,statecode';
 const PR_SELECT =
   'wmkf_potentialreviewersid,wmkf_name,wmkf_firstname,wmkf_lastname,wmkf_emailaddress,' +
-  'wmkf_emailsource,wmkf_orcid,wmkf_organizationname,wmkf_primaryaffiliation,wmkf_areaofexpertise,' +
+  'wmkf_emailsource,wmkf_addresstruststatejson,wmkf_orcid,wmkf_organizationname,wmkf_primaryaffiliation,wmkf_areaofexpertise,' +
   'wmkf_whyreviewerwaschosen,wmkf_academicrank,wmkf_primarydepartment,wmkf_maininstitution,' +
   '_wmkf_contact_value,statecode';
 

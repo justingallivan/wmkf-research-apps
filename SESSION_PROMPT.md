@@ -7,13 +7,16 @@
 > `dpl_35pUuvT8DowJPHbyBsiJxKGRNMZT` reached Ready. Claude's original
 > `codex/claude-ui-cleanup` branch and worktree remain preserved at `2df84aae`.
 
-> **S390/S391 planning addendum (2026-07-31):** the §1 1/2/3R decision frame
+> **S390/S391 implementation addendum (2026-07-31):** the §1 1/2/3R decision frame
 > below is superseded for current planning. The owner chose person-scoped,
 > no-expiry trust until contradicted, accepted a linked corresponding-author
 > paper as valid evidence for an explicit exact-address attestation, and required
 > every error/warning to offer a working remedy. The replacement draft is
-> `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md`. No address-trust
-> runtime or schema change is built; current send tiers remain unchanged.
+> `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md`. The runtime,
+> tests, and Wave 17 schema-as-code are built on
+> `codex/reviewer-address-trust-plan`; Wave 17 and the runtime have not been
+> deployed, so Production behavior remains unchanged pending schema-first release
+> and a controlled signed-in pilot.
 
 ## Session 388 Summary
 
@@ -270,13 +273,13 @@ Seven Claude commits were replayed without content conflicts onto
    the extracted canonical reviewer-proposal content rather than binding a governed source
    artifact/version; decide whether that stronger lineage is required before rehearsal.
 
-1. **Reviewer address-trust draft recommendations P1–P4.** Review and approve or
-   change the proposed Dataverse current-state bundle, exact-bundle-only
-   `staff_verified` readiness, automatic durable contradiction write, and the
-   scope of outbound-email blocking. The draft also requires a total
-   reason-to-remedy matrix and shared enforcement across ordinary and
-   applicant-recommended promotion. Evidence:
-   `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md`.
+1. **Reviewer address trust P1–P4 — implemented in source, deployment pending.**
+   The owner approved the Dataverse current-state bundle, exact-bundle-only
+   `staff_verified` readiness, automatic durable contradiction writes, and
+   all-outbound-email blocking. The implementation includes a total
+   reason-to-remedy matrix across ordinary and applicant-recommended promotion.
+   Apply Wave 17 before runtime promotion, then run the controlled signed-in
+   pilot. Evidence: `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md`.
 2. ~~**Acceptance-time promotion scope (§4.1/§4.3).**~~ **DONE in source, S389:**
    sending never promotes; every identity-bearing acceptance—including honorarium
    opt-outs—promotes through identity-aware/idempotent matching; declines do not.
@@ -320,8 +323,9 @@ Seven Claude commits were replayed without content conflicts onto
    `tests/unit/my-candidates-verify-address.test.js:297-313`. S387 decision after
    adversarial review. Do not change this before the replacement plan's durable
    conflict enforcement exists. The draft proposes that only a new, valid,
-   exact-address trust bundle makes `staff_verified` ready; legacy source-only
-   rows remain quick-check. §5.4's `reviewer_confirmed` proposal would still need
+   exact-address trust bundle now makes `staff_verified` ready in the S391
+   implementation; legacy source-only rows remain quick-check. Wave 17 and the
+   runtime branch are not yet deployed. §5.4's `reviewer_confirmed` proposal would still need
    an explicit carve-out, not a silent exception.
 
 2. **The evidence disclosure's paper list must not be truncated or collapsed**, and its
@@ -333,7 +337,7 @@ Seven Claude commits were replayed without content conflicts onto
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` | Draft replacement for §1/§2 address trust and §5.3 conflict remedies; no runtime built |
+| `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` | Owner-approved S391 implementation contract; source/tests built, Wave 17 + runtime deploy/pilot pending |
 | `docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md` | Active §4 promotion contract plus remaining §1/§2/§3-provenance/§5 proposals |
 | `shared/components/reviewers/ReviewerSearchSection.js` | The identity-evidence disclosure (the only feature change this session) |
 | `tests/unit/reviewer-candidate-identity-evidence.test.js` | 7 tests pinning the disclosure, incl. the no-truncation and no-stored-profile guards |

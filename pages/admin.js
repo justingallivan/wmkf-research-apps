@@ -460,6 +460,7 @@ function SystemAlertsSection() {
   }
 
   return (
+    <div id="system-alerts" className="scroll-mt-6">
     <Card>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-900">System Alerts</h2>
@@ -539,6 +540,7 @@ function SystemAlertsSection() {
         </div>
       )}
     </Card>
+    </div>
   );
 }
 

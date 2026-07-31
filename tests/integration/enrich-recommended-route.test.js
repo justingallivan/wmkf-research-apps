@@ -365,6 +365,8 @@ describe('happy path (progress ordering + full card payload)', () => {
       potentialReviewerId: PR,
       suggestionId: SUG,
       enrichedProposalKey: 'blob-key-1',
+      addressTrustStateJson: null,
+      conflictRecordUnavailable: false,
       name: 'Dr. Rec One',
       identityStatus: 'probable',
       needsIdentification: false,
@@ -406,6 +408,8 @@ describe('happy path (progress ordering + full card payload)', () => {
       applicantKnownReviewer: {
         status: 'known',
         code: null,
+        addressTrustVerified: false,
+        addressConflictPending: false,
         potentialReviewerId: PR,
         name: null,
         affiliation: 'Rec University',

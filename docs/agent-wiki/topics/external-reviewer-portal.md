@@ -76,13 +76,13 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
 - Review materials and uploaded files route through SharePoint buckets
   (`lib/utils/sharepoint-buckets.js`); confirm the bucket model in
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` before changing file paths.
-- Invitation address gating is enforced in `send-emails.js` via
+- Reviewer address gating is enforced server-side via
   `lib/utils/reviewer-invite.js`: quick-check recipients require per-recipient
-  acknowledgement, while research-only addresses are never invitation-sendable at
-  that provenance — a staff attestation (`verifyEmailAddress` → `staff_verified`,
-  S387) or a different address via the contact editor (`manual`) moves them into
-  quick-check first; the send gate itself never yields to a client label. See the
-  [Reviewer Identity](reviewer-identity.md) page for the full gate semantics.
+  acknowledgement; research-only addresses require evidence-backed verification
+  through `/api/workbench/reviewer-address-trust`; and a pending exact-address
+  contradiction blocks every outbound reviewer template. The retired
+  provenance-only `verifyEmailAddress` action cannot bypass this contract. See
+  [Reviewer Identity](reviewer-identity.md) for full semantics.
 
 ## Operating Notes
 

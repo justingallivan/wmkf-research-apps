@@ -51,6 +51,7 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   __esModule: true,
   findCandidateBySuggestion: jest.fn(async () => null), // no roster row by default → no backfill
   finalizeCandidatePromotion: jest.fn(async () => ({ saved: true })),
+  findAddressTrustReceipt: jest.fn(async () => null),
 }));
 jest.mock('../../lib/services/notification-service', () => ({
   __esModule: true,
@@ -61,7 +62,7 @@ const suggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggest
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
 const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const { translateDuplicateKeyError } = require('../../lib/dataverse/duplicate-key');
-const { findCandidateBySuggestion, finalizeCandidatePromotion } = require('../../lib/services/reviewer-roster-store');
+const { findCandidateBySuggestion, finalizeCandidatePromotion, findAddressTrustReceipt } = require('../../lib/services/reviewer-roster-store');
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const SUGGESTION_ID = '33333333-3333-3333-3333-333333333333';
@@ -72,6 +73,17 @@ const SAFE_ROSTER_CANDIDATE = {
   identityStatus: 'probable',
   needsIdentification: false,
 };
+
+function mockAddressReceipt(email) {
+  findAddressTrustReceipt.mockResolvedValue({
+    receiptId: `receipt:${email}`,
+    personConfirmed: true,
+    email,
+    evidenceType: 'institution_page',
+    evidenceUrl: 'https://example.edu/reviewer',
+    attestedAt: '2026-07-31T12:00:00.000Z',
+  });
+}
 
 function mockRes() {
   const res = {};
@@ -102,6 +114,7 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
       wmkf_potentialreviewersid: PERSON_ID,
       wmkf_emailaddress: mockPersonEmail,
       wmkf_emailsource: mockPersonEmailSource,
+      _etag: 'W/"person"',
       statecode: 0,
     }));
     finalizeCandidatePromotion.mockResolvedValue({ saved: true });
@@ -115,6 +128,7 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
   });
 
   test('flips selected and persists the marked contact, stamping email manual', async () => {
+    mockAddressReceipt('ava.mercer@example.org');
     const req = {
       method: 'POST',
       body: {
@@ -139,7 +153,11 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
     );
     // Writes target the suggestion's OWN person, never the client-supplied id.
     expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { affiliation: 'Example Research Lab' }, expect.anything());
-    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { email: 'ava.mercer@example.org', emailSource: 'manual' }, expect.anything());
+    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, expect.objectContaining({
+      email: 'ava.mercer@example.org',
+      emailSource: 'staff_verified',
+      addressTrustStateJson: expect.any(String),
+    }), expect.anything());
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalledWith('99999999-9999-9999-9999-999999999999', expect.anything(), expect.anything());
     // S387: emailSource is forced manual in the SAME patch as the address, never as a
     // follow-up write — a source must not be able to outlive the address it describes.
@@ -149,6 +167,7 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
   });
 
   test('email collision withholds promotion and returns a conflict', async () => {
+    mockAddressReceipt('ava.mercer@example.org');
     potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
       if (updates && 'email' in updates) throw new Error('alt-key duplicate');
       return undefined;
@@ -221,6 +240,7 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
       wmkf_potentialreviewersid: PERSON_ID,
       wmkf_emailaddress: mockPersonEmail,
       wmkf_emailsource: mockPersonEmailSource,
+      _etag: 'W/"person"',
       statecode: 0,
     }));
     researcherAdapter.updateById.mockResolvedValue(undefined);
@@ -242,6 +262,7 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
   };
 
   test('backfills a vetted roster email, stamping the roster source (NOT manual)', async () => {
+    mockAddressReceipt('noor.patel@example.org');
     findCandidateBySuggestion.mockResolvedValue({
       ...SAFE_ROSTER_CANDIDATE,
       email: 'noor.patel@example.org',
@@ -256,7 +277,11 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     // Read is id-anchored on requestId + suggestionId.
     expect(findCandidateBySuggestion).toHaveBeenCalledWith(REQUEST_ID, SUGGESTION_ID);
     // Email written to the suggestion's OWN person.
-    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { email: 'noor.patel@example.org', emailSource: 'claude_search' }, expect.anything());
+    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, expect.objectContaining({
+      email: 'noor.patel@example.org',
+      emailSource: 'staff_verified',
+      addressTrustStateJson: expect.any(String),
+    }), expect.anything());
     // Source forced from the vetted roster provenance — NOT 'manual' — and written in the
     // SAME patch as the address (S387), not as a follow-up call.
     expect(researcherAdapter.updateById).not.toHaveBeenCalledWith(PERSON_ID, { emailSource: 'claude_search' }, expect.anything());
@@ -291,24 +316,34 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
   });
 
-  test('idempotent: does NOT rewrite the same email already stored on the person', async () => {
+  test('same research-only email still binds the exact staff attestation', async () => {
+    mockAddressReceipt('existing@example.org');
     findCandidateBySuggestion.mockResolvedValue({ ...SAFE_ROSTER_CANDIDATE, email: 'existing@example.org', emailSource: 'claude_search', emailPersistAllowed: true });
     mockPersonEmail = 'existing@example.org';
     mockPersonEmailSource = 'claude_search';
     const res = await promote();
     expect(res.statusCode).toBe(200);
-    expect(res.body.savedFields).not.toContain('email');
-    expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
+    expect(res.body.savedFields).toContain('email');
+    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, expect.objectContaining({
+      email: 'existing@example.org',
+      emailSource: 'staff_verified',
+      addressTrustStateJson: expect.any(String),
+    }), expect.anything());
   });
 
   test('a manual email wins: backfill is skipped after the eligibility read', async () => {
+    mockAddressReceipt('manual@example.org');
     findCandidateBySuggestion.mockResolvedValue({ ...SAFE_ROSTER_CANDIDATE, email: 'roster@example.org', emailSource: 'claude_search', emailPersistAllowed: true });
     const req = { method: 'POST', body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, contact: { email: 'manual@example.org' } } };
     const res = mockRes();
     await handler(req, res);
     // Manual email persisted; the one roster read is the eligibility boundary,
     // and no separate email-backfill lookup occurs.
-    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { email: 'manual@example.org', emailSource: 'manual' }, expect.anything());
+    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, expect.objectContaining({
+      email: 'manual@example.org',
+      emailSource: 'staff_verified',
+      addressTrustStateJson: expect.any(String),
+    }), expect.anything());
     // S387: one atomic patch, not an address write followed by a source write.
     expect(researcherAdapter.updateById).not.toHaveBeenCalledWith(
       PERSON_ID, { emailSource: 'manual' }, expect.anything(),
@@ -317,6 +352,7 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
   });
 
   test('duplicate-email collision on backfill withholds promotion', async () => {
+    mockAddressReceipt('duplicate@example.org');
     findCandidateBySuggestion.mockResolvedValue({ ...SAFE_ROSTER_CANDIDATE, email: 'duplicate@example.org', emailSource: 'serp_search', emailPersistAllowed: true });
     potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
       if (updates && 'email' in updates) throw new Error('alt-key duplicate');
@@ -339,6 +375,7 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
   });
 
   test('a manual email that COLLIDES is not silently overwritten by the roster email', async () => {
+    mockAddressReceipt('manual@example.org');
     // PD typed a conflicting email; the manual write 409s → not in savedFields.
     findCandidateBySuggestion.mockResolvedValue({ ...SAFE_ROSTER_CANDIDATE, email: 'roster@example.org', emailSource: 'claude_search', emailPersistAllowed: true });
     potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {

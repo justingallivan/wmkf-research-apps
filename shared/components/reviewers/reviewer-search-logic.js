@@ -54,6 +54,7 @@ export function isCandidateSelectable(c) {
   const eligibilityStatus = c?.eligibilityStatus || c?.contactEnrichment?.eligibilityStatus || 'unknown';
   return eligibilityStatus !== 'deceased'
     && getCandidatePromotionDecision(c)?.decision === 'ready'
+    && getCandidateEmailReadiness(c)?.action === 'ready'
     && !c?.hasInstitutionCOI;
 }
 
@@ -63,6 +64,24 @@ export function candidateWasSaved(candidate, savedKeys = []) {
 }
 
 export function getCandidatePromotionDecision(candidate) {
+  const dataverseReason = candidate?.serverIdentityReviewReason
+    || candidate?.contactEnrichment?.dataverseContactEvidence?.reason
+    || null;
+  const dataverseNeedsIdentityChoice = new Set([
+    'provisional_orcid_match',
+    'ambiguous_or_name_mismatch',
+    'orcid_email_split',
+    'contact_linked_elsewhere',
+    'identity_conflict',
+    'person_inactive',
+  ]).has(dataverseReason);
+  if (candidate?.pdIdentityConfirmed !== true && dataverseNeedsIdentityChoice) {
+    return {
+      decision: 'needs_identity_confirmation',
+      reason: dataverseReason,
+      email: null,
+    };
+  }
   const shared = projectReviewerContact(candidate, {
     staffConfirmed: candidate?.pdIdentityConfirmed === true,
   });
@@ -127,7 +146,7 @@ export const withReviewerCandidateKey = _withReviewerCandidateKey;
  * re-derives high/low from the persisted person row immediately before send.
  *
  * @param {object} candidate
- * @returns {{ level: 'high'|'low'|'missing', action: 'ready'|'quick_check'|'research_only'|'missing', reason: string }}
+ * @returns {{ level: 'high'|'low'|'missing', action: 'ready'|'blocked'|'quick_check'|'research_only'|'missing', reason: string }}
  */
 export function getCandidateEmailReadiness(candidate) {
   const enrichment = candidate?.contactEnrichment || {};
@@ -145,9 +164,43 @@ export function getCandidateEmailReadiness(candidate) {
       reason: 'No email address found during contact enrichment',
     };
   }
+  if (candidate?.conflictRecordUnavailable === true || enrichment.conflictRecordUnavailable === true) {
+    return {
+      level: 'low',
+      action: 'blocked',
+      reason: 'The address conflict could not be recorded safely; retry or request repair',
+    };
+  }
+  if (candidate?.addressVerificationRequired === true || enrichment.addressVerificationRequired === true) {
+    return {
+      level: 'low',
+      action: 'research_only',
+      reason: 'Staff must verify this exact person and address before promotion',
+    };
+  }
+  if (candidate?.addressConflictPending === true || enrichment.addressConflictPending === true) {
+    return {
+      level: 'low',
+      action: 'blocked',
+      reason: 'Stored and newly found addresses conflict and require resolution',
+    };
+  }
+  const receipt = candidate?.addressTrustReceipt;
+  if (
+    receipt?.personConfirmed === true
+    && typeof receipt.email === 'string'
+    && receipt.email.trim().toLowerCase() === String(email).trim().toLowerCase()
+  ) {
+    return {
+      level: 'high',
+      action: 'ready',
+      reason: 'Staff verified this exact person and address for promotion',
+    };
+  }
   const confidence = emailConfidence({
     email,
     emailSource: candidate?.emailSource || enrichment.emailSource || null,
+    addressTrustStateJson: candidate?.addressTrustStateJson || null,
     identityStatus: candidate?.identityStatus
       || enrichment.identityStatus
       || enrichment.identity?.status
@@ -203,6 +256,19 @@ export function mergeEnrichment(candidates, enrichmentResults) {
     return {
       ...c,
       automatedIdentityAttestation: enriched.automatedIdentityAttestation || null,
+      addressConflictPending: enriched.addressConflictPending === true
+        || e.addressConflictPending === true
+        || c.addressConflictPending === true,
+      conflictRecordUnavailable: enriched.conflictRecordUnavailable === true
+        || e.conflictRecordUnavailable === true
+        || c.conflictRecordUnavailable === true,
+      addressVerificationRequired: enriched.addressVerificationRequired === true
+        || e.addressVerificationRequired === true
+        || c.addressVerificationRequired === true,
+      serverIdentityReviewReason: enriched.serverIdentityReviewReason
+        || e.serverIdentityReviewReason
+        || c.serverIdentityReviewReason
+        || null,
       contactEnrichment,
       eligibilityStatus: e.eligibilityStatus || enriched.eligibilityStatus || c.eligibilityStatus || 'unknown',
       eligibilityReason: e.eligibilityReason || enriched.eligibilityReason || c.eligibilityReason || null,
@@ -794,5 +860,9 @@ export function pruneCandidateForRoster(c) {
       ? c.pdIdentityConfirmationId
       : null,
     staffIdentityConfirmation: pruneStaffIdentityConfirmation(c.staffIdentityConfirmation),
+    addressConflictPending: c.addressConflictPending === true || e.addressConflictPending === true,
+    conflictRecordUnavailable: c.conflictRecordUnavailable === true || e.conflictRecordUnavailable === true,
+    addressVerificationRequired: c.addressVerificationRequired === true || e.addressVerificationRequired === true,
+    serverIdentityReviewReason: c.serverIdentityReviewReason || e.serverIdentityReviewReason || null,
   };
 }

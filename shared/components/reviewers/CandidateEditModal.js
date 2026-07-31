@@ -78,13 +78,17 @@ function defaultFieldChoices(plan, conflictValue) {
   return choices;
 }
 
-export default function CandidateEditModal({ candidate, onClose, onSaved, onApply, onConfirm, confirmMode = false, nameEditable = true }) {
+export default function CandidateEditModal({ candidate, onClose, onSaved, onApply, onConfirm, onVerifyAddress, requireAddressVerification = false, confirmMode = false, nameEditable = true }) {
   const [formData, setFormData] = useState({ name: '', affiliation: '', email: '', website: '', academicRank: '', primaryDepartment: '', mainInstitution: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
   // confirmMode only: the PD must tick "I've verified this is the correct person"
   // before the candidate can be added (the deliberate identity-gate override).
   const [identityConfirmed, setIdentityConfirmed] = useState(false);
+  const [addressConfirmed, setAddressConfirmed] = useState(false);
+  const [evidenceType, setEvidenceType] = useState('publication_corresponding_author');
+  const [evidenceUrl, setEvidenceUrl] = useState('');
+  const [evidenceNote, setEvidenceNote] = useState('');
 
   // Merge mode (S289 chunk-4). Set when a saved-candidate email edit hits a 409
   // duplicate-key conflict and we have the data to offer a record merge. Shape:
@@ -113,6 +117,10 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
       });
       setError(null);
       setIdentityConfirmed(false);
+      setAddressConfirmed(false);
+      setEvidenceType('publication_corresponding_author');
+      setEvidenceUrl('');
+      setEvidenceNote('');
       setMerge(null);
     }
     // On unmount / candidate change, invalidate again so a late response can't
@@ -131,6 +139,30 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
     const submitToken = reqToken.current;
 
     try {
+      const normalizedEmail = formData.email.trim();
+      const emailChanged = normalizedEmail.toLowerCase() !== String(candidate.email || '').trim().toLowerCase();
+      const needsAddressVerification = !!onVerifyAddress && (requireAddressVerification || emailChanged || confirmMode);
+      if (needsAddressVerification) {
+        if (!normalizedEmail) {
+          setError('An email address is required before it can be verified.');
+          return;
+        }
+        if (!addressConfirmed) {
+          setError('Confirm that this is the correct person and exact address.');
+          return;
+        }
+        if (
+          (evidenceType === 'publication_corresponding_author' || evidenceType === 'institution_page')
+          && !evidenceUrl.trim()
+        ) {
+          setError('Paste the publication or institution page you used to verify the address.');
+          return;
+        }
+        if (evidenceType === 'other' && !evidenceNote.trim()) {
+          setError('Briefly describe the evidence used to verify the address.');
+          return;
+        }
+      }
       // CONFIRM mode: always send email/website/affiliation as the PD-confirmed
       // contact — even an unchanged field is an explicit "use this". The parent
       // must await the authenticated server attestation before stamping local UI.
@@ -144,9 +176,13 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
           return;
         }
         await onConfirm({
-          email: formData.email.trim(),
+          email: normalizedEmail,
           website: formData.website.trim(),
           affiliation: formData.affiliation.trim(),
+        }, {
+          evidenceType,
+          evidenceUrl: evidenceUrl.trim() || null,
+          note: evidenceNote.trim() || null,
         });
         onClose();
         return;
@@ -178,7 +214,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
       if (formData.primaryDepartment !== (candidate.primaryDepartment || '')) updates.primaryDepartment = formData.primaryDepartment;
       if (formData.mainInstitution !== mainInstitutionFallback(candidate)) updates.mainInstitution = formData.mainInstitution;
 
-      if (Object.keys(updates).length === 0) {
+      if (Object.keys(updates).length === 0 && !needsAddressVerification) {
         onClose();
         return;
       }
@@ -186,7 +222,15 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
       // LOCAL mode: apply to client state via the parent (no PATCH — the Find-card
       // candidate isn't a saved row yet). The parent stamps manual provenance.
       if (onApply) {
-        onApply(updates);
+        if (needsAddressVerification) {
+          await onVerifyAddress({ ...updates, email: normalizedEmail }, {
+            evidenceType,
+            evidenceUrl: evidenceUrl.trim() || null,
+            note: evidenceNote.trim() || null,
+          });
+        } else {
+          onApply(updates);
+        }
         onClose();
         return;
       }
@@ -462,6 +506,85 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
             <p className="text-xs text-gray-400 mt-1">Correct this if the listed address belongs to an assistant or department.</p>
           </div>
 
+          {candidate.applicantContactMismatch === true
+            && candidate.applicantKnownReviewer?.email
+            && candidate.contactEnrichment?.email
+            && candidate.applicantKnownReviewer.email.toLowerCase() !== candidate.contactEnrichment.email.toLowerCase() && (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-900">
+              <p className="font-medium">Two different addresses were found. Choose one only after checking the evidence.</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData((data) => ({ ...data, email: candidate.applicantKnownReviewer.email }))}
+                  className="rounded border border-red-300 bg-white px-2 py-1 font-mono"
+                >
+                  Use stored: {candidate.applicantKnownReviewer.email}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData((data) => ({ ...data, email: candidate.contactEnrichment.email }))}
+                  className="rounded border border-red-300 bg-white px-2 py-1 font-mono"
+                >
+                  Use found: {candidate.contactEnrichment.email}
+                </button>
+              </div>
+              <p className="mt-2">If neither belongs to this person, cancel and create a repair request from the reviewer card.</p>
+            </div>
+          )}
+
+          {!!onVerifyAddress && (requireAddressVerification || confirmMode || formData.email.trim().toLowerCase() !== String(candidate.email || '').trim().toLowerCase()) && (
+            <div className="space-y-3 rounded-md bg-blue-50 border border-blue-200 p-3">
+              <label className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={addressConfirmed}
+                  onChange={(e) => setAddressConfirmed(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600"
+                />
+                <span className="text-xs text-blue-900">
+                  I verified that this is the correct person and that {formData.email.trim() || 'the address above'} is their address.
+                </span>
+              </label>
+              <div>
+                <label className="block text-xs font-medium text-blue-900 mb-1">Evidence checked</label>
+                <select
+                  value={evidenceType}
+                  onChange={(e) => setEvidenceType(e.target.value)}
+                  className="w-full px-2 py-1.5 text-sm border border-blue-200 rounded-md bg-white"
+                >
+                  <option value="publication_corresponding_author">Corresponding-author publication</option>
+                  <option value="institution_page">Institution or lab page</option>
+                  <option value="direct_correspondence">Direct correspondence</option>
+                  <option value="other">Other evidence</option>
+                </select>
+              </div>
+              {(evidenceType === 'publication_corresponding_author' || evidenceType === 'institution_page') && (
+                <div>
+                  <label className="block text-xs font-medium text-blue-900 mb-1">Evidence link</label>
+                  <input
+                    type="url"
+                    value={evidenceUrl}
+                    onChange={(e) => setEvidenceUrl(e.target.value)}
+                    placeholder="https://..."
+                    className="w-full px-2 py-1.5 text-sm border border-blue-200 rounded-md"
+                  />
+                </div>
+              )}
+              {(evidenceType === 'direct_correspondence' || evidenceType === 'other') && (
+                <div>
+                  <label className="block text-xs font-medium text-blue-900 mb-1">Note {evidenceType === 'other' ? '(required)' : '(optional)'}</label>
+                  <textarea
+                    value={evidenceNote}
+                    onChange={(e) => setEvidenceNote(e.target.value)}
+                    rows={2}
+                    className="w-full px-2 py-1.5 text-sm border border-blue-200 rounded-md"
+                    placeholder="What did you check?"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
             <input
@@ -521,9 +644,8 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
                 className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600"
               />
               <span className="text-xs text-amber-800">
-                I’ve verified this is the correct person. Add them using the contact above — the
-                auto-suggested ORCID / metrics won’t be carried over, and the email is marked
-                unverified and requires a quick check before any invitation is sent.
+                I’ve verified this is the correct person. The auto-suggested ORCID and metrics
+                won’t be carried over. Verify the exact address separately above.
               </span>
             </label>
           )}
