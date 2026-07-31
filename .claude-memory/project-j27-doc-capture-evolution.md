@@ -76,11 +76,11 @@ seeding, application promotion, generation, shared discovery, and exact retry
 completed on 2026-07-30. Recovery/run-linkage fixes are deployed; production
 run-linkage and interrupted-finalization recovery proof later passed on
 Request `1003109`. An attributed substantive edit then passed on the same
-stable item through both consumers. Response-only Graph-current
-version/last-modified refresh and display in both consumers are implemented
-and locally verified on `codex/initial-assessment-current-metadata`;
-deployment/live verification and target-library controls remain controlled
-follow-up work.
+stable item through both consumers. Production deployment
+`dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2` (`68bcb4e8`) now refreshes response-only
+Graph-current version/last-modified metadata, and both signed-in consumers
+displayed the same current version `2.0`. Target-library controls remain
+controlled follow-up work.
 
 **Hold step already RETIRED (S279) — this contingency resolved early, for a different reason.** The reviewer "hold step" ([[project-reviewer-hold-step-decouple]]) was removed in S279 (commit `a8676af1`) when the direction shifted to onboarding at a single final Accept — independent of J27. So the earlier "single-submission may un-scaffold the hold step" note is now moot: there is no hold step left to un-scaffold. (Kept here only so the J27 doc-capture planning doesn't re-raise it.)
 

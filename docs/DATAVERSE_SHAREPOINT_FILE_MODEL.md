@@ -60,12 +60,12 @@ hood.
 > registry row, AI run, SharePoint item, and version. An attributed
 > substantive edit then advanced the same stable item to SharePoint version
 > `2.0`, replaced the Foundation Opportunity marker, and remained discoverable
-> through both consumers. **[VERIFIED on branch
-> `codex/initial-assessment-current-metadata` via source and focused tests
-> 2026-07-30; not yet deployed]** response-only current metadata refresh by
-> stable drive/item identity and display in both consumers are implemented.
-> The pilot is not closed because live Production verification and
-> target-library controls remain unverified.
+> through both consumers. **[VERIFIED DEPLOYED 2026-07-30 via production
+> deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`, commit `68bcb4e8`, and
+> signed-in Request `1003109` checks]** response-only current metadata refresh
+> by stable drive/item identity is live in both consumers, which displayed
+> SharePoint version `2.0` and the same stable document link. The pilot is not
+> closed because target-library controls remain unverified.
 > **[VERIFIED via owner decisions 2026-07-28
 > and 2026-07-30, repository source,
 > production Dataverse/Graph probes, and signed-in consumer checks

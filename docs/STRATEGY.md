@@ -149,10 +149,9 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term 
    same registry row, AI run, SharePoint item, and version. An attributed
    substantive edit then passed on that same stable item through both
    consumers. Response-only Graph-current refresh by stable identity is
-   implemented and locally verified on
-   `codex/initial-assessment-current-metadata`, including consistent display
-   in both consumers; deploy/live-verify it and verify target-library
-   protections;
+   deployed and live-verified in both consumers on Request `1003109` via
+   production deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`; verify
+   target-library protections;
 2. finish the user/input/storage/access/deadline contract for the remaining
    Workbench lifecycle tabs, including the three-document writeup lineage,
    Site Visit dossier, narrow request-scoped applicant-material upload, and

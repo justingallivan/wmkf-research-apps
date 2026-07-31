@@ -34,7 +34,7 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Close the remaining Initial Assessment pilot gates | Request `1002788` preserves mechanics-only evidence because it used an old Phase I proposal. PR #103 / merge `84155a5a` deployed the exact active `Reviewer Materials/Proposal_{Request#}.pdf` contract, and Request `1003109` then production-proved canonical-input generation, a newly linked AI run, Ready/Draft request-pointer lineage, exact-input no-duplicate reuse, interrupted-finalization recovery, and an attributed substantive edit including Foundation Opportunity. Both consumers still resolve the same stable item. The edit exposed that Dataverse and the UI retain upload-time version metadata after native Word edits. **[VERIFIED on branch `codex/initial-assessment-current-metadata` via source and focused tests 2026-07-30; not yet deployed]** response-only Graph-current metadata refresh by stable identity and display in both consumers are implemented. Before declaring the August 10 gate complete, deploy/live-verify that contract and finish the target-library protection/readback checks. | Graph-current version/last-modified context is accurate and visible, and restore/permission/retention/milestone boundaries are recorded. |
+| 1 | Close the remaining Initial Assessment pilot gates | Request `1002788` preserves mechanics-only evidence because it used an old Phase I proposal. PR #103 / merge `84155a5a` deployed the exact active `Reviewer Materials/Proposal_{Request#}.pdf` contract, and Request `1003109` then production-proved canonical-input generation, a newly linked AI run, Ready/Draft request-pointer lineage, exact-input no-duplicate reuse, interrupted-finalization recovery, and an attributed substantive edit including Foundation Opportunity. Both consumers still resolve the same stable item. The edit exposed that Dataverse retains upload-time version metadata after native Word edits. **[VERIFIED DEPLOYED 2026-07-30 via deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`, commit `68bcb4e8`, and signed-in Request `1003109` checks]** response-only Graph-current metadata refresh by stable identity is live in both consumers, which displayed current SharePoint version `2.0`. Before declaring the August 10 gate complete, finish the target-library protection/readback checks. | Graph-current version/last-modified context is accurate and visible, and restore/permission/retention/milestone boundaries are recorded. |
 | 2 | First deadline-bound writeup slice | Treat the governed-artifact spine as production-proved for canonical-input generation, registry lineage, shared discovery, exact retry, new-run request linkage, interrupted-finalization recovery, and attributed human editing. Pre Site Visit becomes the next reuse only after the remaining library/readback gate above closes. | One dedicated production request produces a durable, searchable, editable, and recoverable Word artifact with complete prompt/run/request lineage and verified human review. The full Editor Dashboard contract remains a later reuse. |
 
 ## Audit follow-ups — verified open, not silently prioritized
@@ -56,9 +56,9 @@ sequence.
   `STAFF INPUT REQUIRED` marker. The per-request Workbench and D26 locator
   still open the same stable item. The edit also verified that the current
   Dataverse registry retains upload-time version `1.0` metadata. Response-only
-  Graph-current refresh and consumer display are locally verified on
-  `codex/initial-assessment-current-metadata`; deployment/live proof remains
-  in the open library/readback gate.
+  Graph-current refresh and consumer display are deployed and live-verified on
+  Request `1003109` via deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`;
+  target-library controls remain in the open library/readback gate.
 
 - Initial Assessment interrupted-finalization recovery: Request `1003109`
   was staged as Failed after its SharePoint upload and retried through the

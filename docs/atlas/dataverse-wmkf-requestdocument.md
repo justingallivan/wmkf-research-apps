@@ -3,7 +3,7 @@ title: Dataverse wmkf_requestdocument
 domain: application-state
 kind: atlas
 status: active
-summary: Governed request-artifact registry; Request 1003109 proves generation, recovery, and attributed editing, while the current-metadata UI/deploy proof and library controls remain open.
+summary: Governed request-artifact registry; Request 1003109 proves generation, recovery, attributed editing, and current-metadata display, while library controls remain open.
 canonical: false
 owner: product-engineering
 related:
@@ -44,11 +44,10 @@ Ready row without another run, upload, overwrite, or duplicate. Opening the
 canonical Word file created a native SharePoint version. At that point, the
 broader pilot was not complete: the source was an old Phase I proposal rather than the approved
 Phase II reviewer package and no substantive staff content edit was verified.
-Request `1003109` later closed the canonical-input, recovery, and substantive
-edit gaps. Response-only current-version readback and display in both consumers
-are locally verified on `codex/initial-assessment-current-metadata`;
-deployment/live verification and target-library controls remain. Exact
-evidence:
+Request `1003109` later closed the canonical-input, recovery, substantive-edit,
+and current-version readback gaps. Production deployment
+`dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2` (`68bcb4e8`) is live-verified in both
+consumers; target-library controls remain. Exact evidence:
 `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`.
 
 **[VERIFIED DEPLOYED AND PRODUCTION-EXERCISED 2026-07-30]** Production
@@ -86,8 +85,9 @@ Dataverse retains the upload-time version `1.0`, eTag, size, and last-modified
 values, however. The registry fields are therefore an upload/finalization
 snapshot, not Graph-current metadata after native Word edits.
 
-**[VERIFIED on branch `codex/initial-assessment-current-metadata` via source
-and focused tests 2026-07-30; not yet deployed]** the shared read model now
+**[VERIFIED DEPLOYED 2026-07-30 via production deployment
+`dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`, commit `68bcb4e8`, and signed-in Request
+`1003109` checks]** the shared read model now
 uses stable Graph drive/item identity to overlay response-only current
 name/size/link/version/eTag/last-modified metadata. Successful reads are marked
 `current`; 404, transient failure, incomplete-identity, mismatched/non-file,
@@ -97,7 +97,8 @@ reads deduplicate identical identities and cap Graph concurrency at eight
 under a ten-second total refresh budget. Only Graph's publication version is
 labeled as a version. Both consumers use one renderer for
 current/missing/unavailable/unchecked semantics and suppress the Open link
-after a confirmed 404. Live Production verification remains open.
+after a confirmed 404. Both live consumers displayed current SharePoint
+version `2.0` and the same stable document link.
 
 ## Ownership
 
@@ -194,8 +195,8 @@ transition.
    recovery using the same row/run/SharePoint item and version. An attributed
    substantive edit on the stable item then passed through both consumers.
    Response-only current-version refresh and display in both consumers are
-   implemented and locally verified on
-   `codex/initial-assessment-current-metadata`; Production verification and
-   target-library protection checks remain open.
+   deployed and live-verified on Request `1003109` via deployment
+   `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`; target-library protection checks remain
+   open.
 
 No live command in this sequence is authorized merely by this page.

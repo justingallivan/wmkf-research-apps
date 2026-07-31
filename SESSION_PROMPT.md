@@ -180,12 +180,12 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
     `01G4GVMS3U3DHMJQ7GERBLB2QA3SYTLNHO`. Read-only DOCX inspection found no
     remaining `STAFF INPUT REQUIRED` marker, and both the per-request Workbench
     and D26 locator still open the same item. The Dataverse registry correctly
-    remains an upload/finalization snapshot at version `1.0`. Response-only
-    Graph-current refresh and consistent current/missing/unavailable display in
-    both consumers are implemented and locally verified on
-    `codex/initial-assessment-current-metadata`; deployment/live verification
-    and target-library restore, recycle, retention, permission, and milestone
-    controls remain open.
+    remains an upload/finalization snapshot at version `1.0`. Production
+    deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2` (`68bcb4e8`) now performs
+    response-only Graph-current refresh, and signed-in checks showed both
+    consumers displaying the same current SharePoint version `2.0` and
+    last-modified time. Target-library restore, recycle, retention, permission,
+    and milestone controls remain open.
 
 ### Commits
 
@@ -212,11 +212,10 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    attributed substantive edit, including Foundation Opportunity, also passed,
    and both consumers still resolve the same stable item. Refresh and display
    Response-only Graph-current version/last-modified refresh by stable
-   drive/item identity and display in both consumers are implemented and
-   locally verified on `codex/initial-assessment-current-metadata`;
-   deploy/live-verify them, then finish target-library restore,
-   recycle-bin, retention, permission, and milestone checks before describing
-   the artifact system as production-ready.
+   drive/item identity is deployed and live-verified in both consumers on
+   Request `1003109`. Finish target-library restore, recycle-bin, retention,
+   permission, and milestone checks before describing the artifact system as
+   production-ready.
 
 2. **Exercise address attestation only when a truthful eligible production row exists.**
    Evidence: the signed-in Workbench inspection covered requests `1002912` and `1002874`.

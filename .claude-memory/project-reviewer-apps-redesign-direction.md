@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has seven implemented tabs and three placeholders; Initial Assessment core behavior is production-proved, while current-metadata deployment proof and library controls remain open.
+description: The unified Request Workbench has seven implemented tabs and three placeholders; Initial Assessment generation, recovery, editing, and current-metadata display are production-proved, while library controls remain open.
 metadata:
   type: project
   status: active
@@ -62,10 +62,10 @@ request pointer, and exact-input no-duplicate reuse on deployment
 restored the same row/run/SharePoint item and version without another model
 call or upload. An attributed substantive edit then advanced the same stable
 item to SharePoint version `2.0`, replaced the Foundation Opportunity marker,
-and remained reachable through both consumers. Response-only Graph-current
-refresh and display in both consumers are implemented and locally verified on
-`codex/initial-assessment-current-metadata`; deployment/live verification and
-target-library controls remain open.
+and remained reachable through both consumers. Production deployment
+`dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2` (`68bcb4e8`) now refreshes response-only
+Graph-current metadata, and both signed-in consumers displayed current
+SharePoint version `2.0`. Target-library controls remain open.
 Use the near-term execution plan for current authority; the chronology below
 remains the rationale record.
 
