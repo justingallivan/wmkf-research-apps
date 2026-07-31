@@ -34,7 +34,7 @@
 ## Task Routing
 - Reviewer origination / retrieval: ../docs/agent-wiki/topics/reviewer-origination.md; project-reviewer-sourcing-constraints.md
 - Reviewer identity / finding / contact / COI: ../docs/agent-wiki/topics/reviewer-identity.md; ../docs/REVIEWER_IDENTITY_CONTACT_PLAN.md; project-reviewer-verify-fail-dangerous.md
-- Contact promotion / address lifecycle: ../docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md; ../docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md (S389: accept promotes; send/decline do not)
+- Contact promotion / address lifecycle: ../docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md; ../docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md; ../docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md (S389 runtime: accept promotes; send/decline do not. S390 address-trust/remedy redesign is draft, not built.)
 - Reviewer workbench / lifecycle / roster / referral: ../docs/agent-wiki/topics/reviewer-workbench-lifecycle.md; project-workbench-consolidation-rollout.md
 - Reviewer-invite local testing / capture side effects: reviewer-invite-capture-mode-not-full-sandbox.md
 - External reviewer portal / accept / forms / SharePoint: ../docs/agent-wiki/topics/external-reviewer-portal.md; ../docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md; project-reviewer-upload-dormant-not-deleted.md

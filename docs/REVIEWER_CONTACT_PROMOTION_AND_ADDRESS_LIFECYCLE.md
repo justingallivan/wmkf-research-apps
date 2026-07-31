@@ -54,7 +54,10 @@ an invitation or exercise identity confirmation, decline, or acceptance.
 
 Sections 1, 2, 3 provenance, and 5 remain proposals unless explicitly marked
 resolved. The S388 source trace is retained as historical rationale and is not
-the current runtime contract.
+the current runtime contract. The current replacement design for the §1/§2
+staff-address problem and §5.3 contradiction affordance is
+`docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` [DRAFT]; the older
+options below remain historical reasoning, not the recommended build order.
 
 Origin: S388, a UI-cleanup session on `codex/claude-ui-cleanup` that began with a
 Find-tab presentation complaint and traced the send gate through to contact
@@ -113,12 +116,15 @@ result), and the paper list is marked load-bearing in source and in
 `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` so a future UI tidy-up does
 not truncate or collapse the one item that does the work.
 
-**Residual risk, accepted and recorded:** a same-field namesake; a fragmented
-cluster of the right person (`docs/agent-wiki/topics/reviewer-identity.md:97`); and
-— the one that matters for this document — **the paper check confirms the PERSON,
-never the ADDRESS**, which came from a single work's affiliation string. The confirm
-modal nevertheless stamps `emailSource: 'manual'`, recording an address assertion
-the staffer did not make. That is an independent argument for §2.2.
+**Residual risk, accepted and recorded:** a same-field namesake and a fragmented
+cluster of the right person (`docs/agent-wiki/topics/reviewer-identity.md:97`). A
+paper-title/relevance check confirms the PERSON, not automatically the ADDRESS.
+However, the owner clarified in S390 that staff can open a linked paper and find
+the corresponding author's exact address; that explicit check is valid
+address-specific evidence. The current modal does not distinguish that action
+from merely reviewing the paper list and still stamps `emailSource: 'manual'`.
+The replacement plan therefore requires a separate exact-address attestation
+instead of inferring one from identity confirmation or string equality.
 
 ## Terms
 
@@ -225,11 +231,16 @@ surfaces no evidence the confirm modal did not already capture.
 - Cross-request authorization: a person-scoped waiver silently applies for
   staffers who never saw the evidence.
 
-### Open decision
+### Superseded decision frame [HISTORICAL]
 
-Which of 1 / 2 / 3R, and whether 3R's waiver expires by time, by request, or
-both. **Owner decision required** — this reopens an item recorded under "Do Not
-Reopen Without New Decision."
+The 1 / 2 / 3R choice above is no longer the recommended implementation frame.
+The owner subsequently chose person-scoped trust, no calendar expiry,
+contradiction-driven review, and verification on the Find card. The replacement
+design in `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` keeps
+legacy source-only `staff_verified` rows at `quick_check`, makes new readiness
+depend on a durable exact-address attestation bundle, and requires an accessible
+remedy for every warning or block. Its storage and rollout recommendations
+remain draft decisions requiring owner approval before runtime work.
 
 ---
 
@@ -260,22 +271,15 @@ Nuance [VERIFIED]: terminal against *upgrades*, not immutable — `manual` and
 `search_contested` overwrite unconditionally as explicit safety assertions
 (`researcher.js:203-208`). A human still supersedes a human.
 
-### §2.2 Proposal [PROPOSED]
+### §2.2 Earlier proposal [SUPERSEDED]
 
-Do not rewrite the email source when the confirm modal returns an address
-identical to the stored one. Keep the machine source (e.g. `pubmed`), also
-`quick_check`, so **today's friction is unchanged** — but the address stays
-eligible for automatic promotion later.
-
-Narrowest available change, and it does not reopen the S387 decision: it does
-not weaken a human assertion, it declines to *record* one where the human
-asserted nothing about the address.
-
-### Open decision
-
-Whether "unchanged" is judged client-side or re-verified server-side. Codex
-recommends server-side: the client value is caller-supplied and the comparison
-decides a provenance write.
+The earlier proposal was to preserve the machine source whenever the modal
+returned an unchanged address. It is superseded because changed/unchanged does
+not express what staff verified. A newly typed corresponding-author address can
+be explicitly verified, while an unchanged machine value is not verified merely
+because nobody edited it. The replacement plan makes the explicit, server-bound
+exact-address attestation authoritative and treats string equality only as an
+integrity check, never as evidence.
 
 ### §2.3 Also found — RESOLVED in S388 [VERIFIED]
 
@@ -660,11 +664,15 @@ to auto-resolve" (`:1-10`). That judgment transfers to institutions but **not**
 to email addresses, which are exact-comparable — so an address mismatch is a far
 better candidate for a decisive staff prompt than an affiliation mismatch is.
 
-### Proposal [PROPOSED]
+### Replacement design [DRAFT]
 
-Treat a search-time `email_mismatch` against a linked contact as a first-class
-staff prompt: show stored versus found with both provenances, and offer an
-explicit update. Adjudication stays with the staffer; no auto-write.
+`docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` broadens this into
+a total remedy contract. `email_mismatch` offers “use found,” “keep stored,” and
+“different people”; identity/contact splits offer a verified-address path that
+keeps the Contact unlinked plus a durable repair request; timeouts offer retry;
+duplicate owners deep-link to merge. Unknown codes fail closed with retry and a
+repair request rather than a dead warning. Address adjudication remains a staff
+decision and never creates or links a Contact.
 
 ### §5.4 The ground truth is collected and never written back [VERIFIED]
 
@@ -744,14 +752,14 @@ exception.
 | # | Decision | Owner | Blocking |
 | --- | --- | --- | --- |
 | 0 | **Remove send-time contact promotion** — invitation success does not merit creation/linking | **Implemented, S389** | Done |
-| 1 | §1 option: 1 / 2 / 3R | Justin | 3R implementation |
+| 1 | Exact-address staff attestation, person-scoped trust-until-contradicted state, and no-dead-end remedy contract | Justin | Draft recommendations P1–P4 in `REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` |
 | 2 | Acceptance-time promotion scope (§4.1): every identity-bearing accept, including honorarium opt-outs | **Implemented, S389** | Done |
 | 3 | Contact provenance attribute(s) (§3) | Justin + Dataverse schema | §3 |
 | 4 | Durable vs disposable home for the non-response signal (§5.2) | Justin | §5 |
 | 6 | **`reviewer_confirmed` address source (§5.4)** — write the reviewer's own confirmation back to provenance; needs an explicit carve-out from §2.1 terminality | Justin | §5.4 |
 | 5 | ~~Reconcile the `staff_verified` contradiction in the enforcement contracts doc~~ | — | **Done in S388 (§2.3)** |
 
-## Blast radius (Codex estimate, 3R only)
+## Historical blast-radius estimate (superseded 3R design)
 
 `CandidateEditModal.js`, `ReviewerSearchSection.js`,
 `pages/api/workbench/reviewer-roster.js`, `reviewer-roster-store.js`,
@@ -765,11 +773,12 @@ traced call graph.]**
 
 ## Sequencing suggestion
 
-**Current after S389.** §4.2, the acceptance scope, identity-aware matching, and
-idempotent new-contact creation are implemented. §2.3 is also done. §2.2 is the
-cheapest remaining proposal and reopens nothing. §1's 3R still depends on the
-§1.1 attestation rewording. §5.3 remains mostly a UI affordance over data that
-already exists.
+**Current after S390.** §4.2, the acceptance scope, identity-aware matching, and
+idempotent new-contact creation are implemented. §2.3 is also done. Do not build
+the older §2.2 unchanged-address shortcut or §1's 3R waiver. Review and approve
+`docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` first; its order is
+additive schema/readers, shared remedy contracts, working UI actions, durable
+conflict enforcement, and only then exact-bundle `staff_verified` readiness.
 
 ## Verification standard for any implementation
 

@@ -7,6 +7,14 @@
 > `dpl_35pUuvT8DowJPHbyBsiJxKGRNMZT` reached Ready. Claude's original
 > `codex/claude-ui-cleanup` branch and worktree remain preserved at `2df84aae`.
 
+> **S390/S391 planning addendum (2026-07-31):** the §1 1/2/3R decision frame
+> below is superseded for current planning. The owner chose person-scoped,
+> no-expiry trust until contradicted, accepted a linked corresponding-author
+> paper as valid evidence for an explicit exact-address attestation, and required
+> every error/warning to offer a working remedy. The replacement draft is
+> `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md`. No address-trust
+> runtime or schema change is built; current send tiers remain unchanged.
+
 ## Session 388 Summary
 
 Started as a narrow UI-cleanup mandate in an isolated worktree, which the owner
@@ -262,9 +270,13 @@ Seven Claude commits were replayed without content conflicts onto
    the extracted canonical reviewer-proposal content rather than binding a governed source
    artifact/version; decide whether that stronger lineage is required before rehearsal.
 
-1. **§1 option 1 / 2 / 3R** — whether a staff identity attestation may reduce send
-   friction. `gpt-5.6-sol` recommends 3R (request-scoped, time-boxed waiver) over blanket
-   promotion. Reopens an S387 "Do Not Reopen" item.
+1. **Reviewer address-trust draft recommendations P1–P4.** Review and approve or
+   change the proposed Dataverse current-state bundle, exact-bundle-only
+   `staff_verified` readiness, automatic durable contradiction write, and the
+   scope of outbound-email blocking. The draft also requires a total
+   reason-to-remedy matrix and shared enforcement across ordinary and
+   applicant-recommended promotion. Evidence:
+   `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md`.
 2. ~~**Acceptance-time promotion scope (§4.1/§4.3).**~~ **DONE in source, S389:**
    sending never promotes; every identity-bearing acceptance—including honorarium
    opt-outs—promotes through identity-aware/idempotent matching; declines do not.
@@ -302,12 +314,15 @@ Seven Claude commits were replayed without content conflicts onto
 
 ### Do Not Reopen Without New Decision
 
-1. **`manual` / `staff_verified` are TERMINAL against machine evidence.**
+1. **Current runtime only: `manual` / `staff_verified` are TERMINAL against machine evidence.**
    Evidence: `lib/utils/reviewer-invite.js:151` `emailSourceUpgradeAllowed`;
    `lib/dataverse/adapters/researcher.js:238-243`;
    `tests/unit/my-candidates-verify-address.test.js:297-313`. S387 decision after
-   adversarial review. §5.4's `reviewer_confirmed` proposal would need an EXPLICIT
-   carve-out, not a silent exception.
+   adversarial review. Do not change this before the replacement plan's durable
+   conflict enforcement exists. The draft proposes that only a new, valid,
+   exact-address trust bundle makes `staff_verified` ready; legacy source-only
+   rows remain quick-check. §5.4's `reviewer_confirmed` proposal would still need
+   an explicit carve-out, not a silent exception.
 
 2. **The evidence disclosure's paper list must not be truncated or collapsed**, and its
    Scholar link must stay a name search. Evidence: source comments in
@@ -318,6 +333,7 @@ Seven Claude commits were replayed without content conflicts onto
 
 | File | Purpose |
 |------|---------|
+| `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` | Draft replacement for §1/§2 address trust and §5.3 conflict remedies; no runtime built |
 | `docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md` | Active §4 promotion contract plus remaining §1/§2/§3-provenance/§5 proposals |
 | `shared/components/reviewers/ReviewerSearchSection.js` | The identity-evidence disclosure (the only feature change this session) |
 | `tests/unit/reviewer-candidate-identity-evidence.test.js` | 7 tests pinning the disclosure, incl. the no-truncation and no-stored-profile guards |
