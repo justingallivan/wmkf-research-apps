@@ -38,7 +38,7 @@
  *   - onSaved               : optional callback after a successful save
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, useId } from 'react';
 import { Card } from '../Layout';
 import { readSseStream } from './sse';
 import ReviewerPromptOverridePanel from './ReviewerPromptOverridePanel';
@@ -177,6 +177,10 @@ function emailOwnershipLabel(evidence) {
 // collapsed Excluded section).
 export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, canManage = true }) {
   const [expanded, setExpanded] = useState(false);
+  // Identity-unverified rows only: the retrieved-but-unconfirmed evidence panel.
+  // Collapsed by default so a list of these stays scannable.
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const evidencePanelId = `${useId()}-identity-evidence`;
   const c = candidate;
   const confidence = typeof c.verificationConfidence === 'number' ? c.verificationConfidence : undefined;
   const isLowConfidence = confidence !== undefined && confidence < 0.35;
@@ -585,6 +589,143 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               hideValues={[email, website]}
               onUse={!readOnly && canManage && onUseLead ? (lead) => onUseLead(candidate, lead) : undefined}
             />
+          )}
+
+          {/* Identity-unverified rows suppress the normal contact/bibliometric chips
+              above, because those read as verified facts about a specific person and
+              this row is not yet resolved to one. Staff still have to decide whether
+              this IS the right person, so the same retrieved evidence is offered here
+              — collapsed, plain, and explicitly labelled unconfirmed. Deliberately not
+              the verified treatment: no mailto, no green ✓ readiness chip, and the
+              Scholar link is always a NAME SEARCH, never a stored profile URL (a
+              stored profile is exactly the namesake trap). */}
+          {identityUnverified && (
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={() => setEvidenceOpen((v) => !v)}
+                aria-expanded={evidenceOpen}
+                // Only reference the panel while it exists — the collapsed panel is
+                // unmounted, and a dangling aria-controls target confuses screen readers.
+                aria-controls={evidenceOpen ? evidencePanelId : undefined}
+                className="text-xs text-blue-600 hover:text-blue-800 text-left"
+              >
+                <span aria-hidden="true">{evidenceOpen ? '▾' : '▸'}</span>{' '}
+                <span className="font-medium">
+                  {evidenceOpen ? 'Hide evidence' : 'Review evidence before confirming'}
+                </span>
+                <span className="text-gray-500">
+                  {' '}(unconfirmed — may be a different person with this name)
+                </span>
+              </button>
+              {evidenceOpen && (
+                <div
+                  id={evidencePanelId}
+                  className="mt-1.5 p-2 rounded border border-gray-200 bg-gray-50 space-y-1.5 text-xs text-gray-700"
+                >
+                  <p className="text-[11px] text-gray-500">
+                    Retrieved for the name “{c.name}”. None of this is confirmed to be the
+                    same person as the one named in the proposal — use it to decide, not as
+                    a record of who they are.
+                  </p>
+
+                  <div>
+                    <span className="font-medium">Affiliation: </span>
+                    {c.affiliation
+                      ? (
+                        <>
+                          {c.affiliation}
+                          {affiliationEvidenceLabel(c.affiliationSource || enr.affiliationSource) && (
+                            <span className="text-gray-500">
+                              {' '}· {affiliationEvidenceLabel(c.affiliationSource || enr.affiliationSource)}
+                            </span>
+                          )}
+                        </>
+                      )
+                      : <span className="text-gray-500">none retrieved</span>}
+                  </div>
+
+                  {dataverseEvidence?.status === 'known' && (
+                    <div>
+                      <span className="font-medium">Dataverse: </span>
+                      matched an existing person record by exact{' '}
+                      {dataverseEvidence.matchKey || 'key'} during this search
+                    </div>
+                  )}
+                  {dataverseEvidence?.status === 'review_required' && (
+                    <div className="text-amber-700">
+                      <span className="font-medium">Dataverse: </span>
+                      an existing person record matched but needs review
+                    </div>
+                  )}
+                  {dataverseInstitutions.length > 0 && (
+                    <div className={dataverseInstitutions.length > 1 ? 'text-amber-700' : undefined}>
+                      <span className="font-medium">
+                        {dataverseInstitutions.length > 1
+                          ? 'Dataverse institutions (may include co-affiliations or history): '
+                          : 'Dataverse institution: '}
+                      </span>
+                      {dataverseInstitutions.map((entry, index) => (
+                        <span key={`${entry.source}:${entry.value}`}>
+                          {index > 0 ? '; ' : ''}{entry.value} ({dataverseInstitutionSourceLabel(entry.source)})
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div>
+                    <span className="font-medium">Address on file: </span>
+                    {email
+                      ? (
+                        <>
+                          <span className="font-mono break-all">{email}</span>
+                          <span className="text-gray-500">
+                            {' '}(from {emailSource || 'an unrecorded source'}
+                            {enr.emailYear ? `, ${enr.emailYear}` : ''})
+                          </span>
+                        </>
+                      )
+                      : <span className="text-gray-500">none retrieved</span>}
+                  </div>
+
+                  <div>
+                    <span className="font-medium">
+                      Recent papers retrieved
+                      {pubs.length > 0 && hasPubCount && pubCount > pubs.length
+                        ? ` (showing ${pubs.length} of ${pubCount})`
+                        : ''}
+                      :{' '}
+                    </span>
+                    {pubs.length === 0 && <span className="text-gray-500">none retrieved</span>}
+                  </div>
+                  {pubs.length > 0 && (
+                    <ul className="space-y-0.5">
+                      {pubs.map((pub, i) => (
+                        <li key={i} className="text-gray-600">
+                          • {pub.title}{pub.year ? ` (${pub.year})` : ''}
+                          {pub.url && (
+                            <a href={pub.url} target="_blank" rel="noopener noreferrer" className="ml-1 text-blue-500 hover:text-blue-700">[link]</a>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <div>
+                    <a
+                      href={buildScholarSearchUrl(c.name, c.affiliation)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-purple-600 hover:text-purple-800"
+                      title="Search Google Scholar by name — results may include other researchers with this name"
+                    >
+                      🎓 Search Google Scholar for this name
+                    </a>
+                    <span className="text-gray-500"> — results may include other people with this name</span>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           <div className="mt-2 flex items-center gap-3">
