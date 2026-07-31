@@ -14,7 +14,8 @@ related:
 # Reviewer Materials — SharePoint Folder Convention
 
 **Audience:** Connor (PowerAutomate / file generation owner)
-**Status:** Owner-confirmed 2026-07-26. Code aligned to this exact folder/file contract.
+**Status:** Owner-confirmed 2026-07-30. External delivery and automated
+proposal-analysis code are aligned to this exact folder/file contract.
 **Related:** `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` (file storage architecture)
 
 ---
@@ -71,9 +72,9 @@ The only reviewer-visible file is:
 
 `Reviewer Materials/Proposal_{Request#}.pdf`
 
-Example for Request #1002788:
+Live-verified example for Request #1003109:
 
-`Reviewer Materials/Proposal_1002788.pdf`
+`Reviewer Materials/Proposal_1003109.pdf`
 
 PowerAutomate owns assembling the approved reviewer-facing content into that
 single PDF.
@@ -115,8 +116,7 @@ change and matching tests; an environment edit cannot expose another folder.
 
 ## What the system does on its end
 
-For reference — you don't need to build any of this; it's already in
-place.
+For reference — you don't need to build any of this; it's already in place.
 
 1. **Magic link generation** — when a reviewer accepts, the app mints
    a one-time JWT and sends them a `https://[app]/external/review/{token}`
@@ -133,6 +133,18 @@ place.
    submit writes structured `wmkf_appreviewanswer` snapshots to Dataverse; no
    reviewer PDF is required. Retained legacy upload infrastructure is outside
    this outbound-materials contract.
+5. **Automated proposal analysis** — Reviewer Finder's default proposal load,
+   Workbench Field Primer request mode, and Initial Assessment generation all
+   read this same exact file from the active `akoya_request` library. They do
+   not fall back to `Phase I/ProjectDescription.pdf`, a raw application export,
+   an archive library, or another PDF. Missing or duplicate active canonical
+   files stop before the model call and before any Blob, artifact, or Dataverse
+   result write.
+
+Reviewer Finder retains an explicit authenticated `fileKey` override for
+deliberate staff analysis of a historical or ad-hoc source. That manual action
+does not change the default, and it does not widen the files visible to an
+external reviewer.
 
 ---
 
@@ -147,6 +159,12 @@ place.
    approved for external reviewers.
 
 That's it. The rest happens automatically.
+
+For the current cycle this PDF contains the separate Phase II proposal. This
+is expected to be the last cycle with a separate Phase II submission. The
+stable contract for this work remains
+`Reviewer Materials/Proposal_{Request#}.pdf` when the application process
+moves to a single submission, unless the owner explicitly changes it.
 
 ---
 

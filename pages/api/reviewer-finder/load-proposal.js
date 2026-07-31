@@ -2,8 +2,9 @@
  * API: /api/reviewer-finder/load-proposal
  *
  * Used by the Dataverse-native entry path (replacing PDF upload). Given an
- * akoya_request GUID, finds the proposal document on SharePoint, downloads
- * it, uploads to Vercel Blob, and returns the blob URL — which the existing
+ * akoya_request GUID, loads the exact active
+ * `Reviewer Materials/Proposal_{Request#}.pdf` from SharePoint, uploads it to
+ * Vercel Blob, and returns the blob URL — which the existing
  * /api/reviewer-finder/analyze pipeline already accepts.
  *
  * Thin route shell (Route→Service Consolidation Plan, Stage 3): method
@@ -16,7 +17,8 @@
  *
  * POST body:
  *   - requestId   (required) — akoya_request GUID
- *   - fileKey     (optional) — explicit "library::folder::filename" override.
+ *   - fileKey     (optional) — explicit "library::folder::filename" override
+ *                   for deliberate historical/ad-hoc work.
  *
  * Response: { success, blobUrl, filename, contentType, size, picked,
  *             requestNumber, allFiles[] }

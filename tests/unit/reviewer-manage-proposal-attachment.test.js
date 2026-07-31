@@ -199,7 +199,7 @@ describe('ReviewerManagePanel proposal attachment in materials EmailModal', () =
 
     await openReleaseModal();
     await screen.findByText(/Will attach:/);
-    fireEvent.change(screen.getByLabelText(/wrong document\? choose another/i), {
+    fireEvent.change(screen.getByLabelText(/historical\/manual override/i), {
       target: { value: alternateKey },
     });
 
@@ -216,7 +216,7 @@ describe('ReviewerManagePanel proposal attachment in materials EmailModal', () =
     });
 
     await openReleaseModal();
-    expect(await screen.findByText(/No proposal document found for this request yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/No canonical reviewer proposal was found/)).toBeInTheDocument();
 
     await previewAndSend();
 
@@ -295,7 +295,7 @@ describe('ReviewerManagePanel release with attach-proposal-email OFF (default)',
 
     expect(screen.queryByText('Proposal document')).not.toBeInTheDocument();
     expect(screen.queryByText(/Attachments \(included in \.eml files\)/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/wrong document\? choose another/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/historical\/manual override/i)).not.toBeInTheDocument();
     expect(global.fetch.mock.calls.some(([url]) => url === '/api/reviewer-finder/load-proposal')).toBe(false);
   });
 

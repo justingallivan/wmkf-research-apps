@@ -16,7 +16,13 @@ related:
 
 # Request Workbench — Proposal Tab + Field Primer persistence (build plan)
 
-> **Current routing:** Historical S258 implementation record. Use `shared/components/workbench/ProposalTab.js` and the current Workbench roadmap for live behavior and follow-up work.
+> **Current routing:** Historical S258 implementation record. Its statements
+> that Field Primer and Reviewer Finder ingest `ProjectDescription.pdf` are
+> superseded: automated request-bound analysis now requires
+> `Reviewer Materials/Proposal_{Request#}.pdf`. The Proposal tab itself still
+> displays the D26 Phase I slots. Use
+> `shared/components/workbench/ProposalTab.js` and the current Workbench roadmap
+> for live behavior and follow-up work.
 
 **Status at drafting:** spec / pre-design (S258, 2026-06-14). The Proposal tab and Field Primer persistence subsequently shipped.
 **Cycle:** D26. Several pieces are deliberately interim (see "J27 / out of scope").

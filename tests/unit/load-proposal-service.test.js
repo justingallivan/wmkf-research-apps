@@ -3,9 +3,9 @@
  *
  * Unit tests for lib/services/reviewer-finder/load-proposal-service.js
  * (Route→Service Consolidation Plan, Stage 3 wave) — logic-level coverage
- * with adapters/Graph/Blob mocked: best-guess picking tiers, bucket dedupe,
- * per-bucket listing failure tolerance, and each LoadProposalError with its
- * pinned httpStatus/body.
+ * with adapters/Graph/Blob mocked: exact canonical selection, explicit
+ * historical override, bucket dedupe, per-bucket listing failure tolerance,
+ * and each LoadProposalError with its pinned httpStatus/body.
  */
 
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
@@ -39,13 +39,22 @@ const { loadProposal, LoadProposalError } = require('../../lib/services/reviewer
 const REQ = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
 function file(name, over = {}) {
-  return { name, size: 10, mimeType: 'application/pdf', lastModified: '2026-01-01', folder: 'F', ...over };
+  return {
+    name,
+    size: 10,
+    mimeType: 'application/pdf',
+    lastModified: '2026-01-01',
+    folder: 'F/Reviewer Materials',
+    ...over,
+  };
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
   grantRequestAdapter.getById.mockResolvedValue({ akoya_requestid: REQ, akoya_requestnum: '1002836' });
-  getRequestSharePointBuckets.mockResolvedValue([{ library: 'lib1', folder: 'F' }]);
+  getRequestSharePointBuckets.mockResolvedValue([
+    { library: 'akoya_request', folder: 'F', source: 'dynamics' },
+  ]);
   downloadFileByPath.mockResolvedValue({
     buffer: Buffer.from('x'), filename: 'picked.pdf', mimeType: 'application/pdf', size: 10,
   });
@@ -63,11 +72,11 @@ test('404 LoadProposalError with default { error } body when the request is miss
 
 test('404 with explicit { error, requestNumber, libraries } body when no files exist; per-bucket errors surfaced', async () => {
   getRequestSharePointBuckets.mockResolvedValue([
-    { library: 'lib1', folder: 'F' },
-    { library: 'lib2', folder: 'G' },
+    { library: 'akoya_request', folder: 'F', source: 'dynamics' },
+    { library: 'RequestArchive1', folder: 'G', source: 'archive' },
   ]);
   listFiles.mockImplementation(async (library) => {
-    if (library === 'lib2') throw new Error('Graph 403');
+    if (library === 'RequestArchive1') throw new Error('Graph 403');
     return [];
   });
   const err = await loadProposal({ requestId: REQ }).catch((e) => e);
@@ -76,8 +85,8 @@ test('404 with explicit { error, requestNumber, libraries } body when no files e
     error: 'No SharePoint files found for this request.',
     requestNumber: '1002836',
     libraries: [
-      { library: 'lib1', folder: 'F', error: null },
-      { library: 'lib2', folder: 'G', error: 'Graph 403' },
+      { library: 'akoya_request', folder: 'F', error: null },
+      { library: 'RequestArchive1', folder: 'G', error: 'Graph 403' },
     ],
   });
 });
@@ -90,37 +99,41 @@ test('400 with { error, allFiles } body when an explicit fileKey is not found', 
   expect(err.body.allFiles).toHaveLength(1);
 });
 
-test('404 with { error, allFiles } body when nothing classifies as a proposal', async () => {
-  listFiles.mockResolvedValue([file('budget.xlsx')]);
+test('default fails closed when only an old Phase I proposal is present', async () => {
+  listFiles.mockResolvedValue([
+    file('ProjectDescription.pdf', { folder: 'F/Phase I' }),
+  ]);
   const err = await loadProposal({ requestId: REQ }).catch((e) => e);
   expect(err.httpStatus).toBe(404);
-  expect(err.body.error).toBe('No proposal-classified file found. Pass fileKey to override.');
+  expect(err.body.error).toBe(
+    'Canonical reviewer proposal not found at Reviewer Materials/Proposal_1002836.pdf. Pass fileKey to override.',
+  );
   expect(err.body.allFiles).toHaveLength(1);
+  expect(downloadFileByPath).not.toHaveBeenCalled();
+  expect(put).not.toHaveBeenCalled();
 });
 
-test('best-guess tiers: project-narrative beats phase-II beats generic proposal; pdf beats docx', async () => {
+test('default selects the exact active canonical proposal, not a better-named legacy file', async () => {
   listFiles.mockResolvedValue([
-    file('Generic Proposal.pdf'),
-    file('Phase II Proposal.pdf'),
-    file('Project Narrative.docx'),
-    file('Project Narrative.pdf'),
+    file('Project Narrative.pdf', { folder: 'F/Phase I' }),
+    file('Proposal_1002836.pdf'),
   ]);
   const out = await loadProposal({ requestId: REQ });
-  expect(out.picked).toBe('lib1::F::Project Narrative.pdf');
+  expect(out.picked).toBe('akoya_request::F/Reviewer Materials::Proposal_1002836.pdf');
 });
 
 test('duplicate library::folder::name entries across buckets are deduped in allFiles', async () => {
   getRequestSharePointBuckets.mockResolvedValue([
-    { library: 'lib1', folder: 'F' },
-    { library: 'lib1', folder: 'F' },
+    { library: 'akoya_request', folder: 'F', source: 'dynamics' },
+    { library: 'akoya_request', folder: 'F', source: 'dynamics' },
   ]);
-  listFiles.mockResolvedValue([file('Narrative.pdf')]);
+  listFiles.mockResolvedValue([file('Proposal_1002836.pdf')]);
   const out = await loadProposal({ requestId: REQ });
   expect(out.allFiles).toHaveLength(1);
 });
 
 test('golden path returns the exact payload and uploads with random suffix under reviewer-finder/<num>/', async () => {
-  listFiles.mockResolvedValue([file('Narrative.pdf')]);
+  listFiles.mockResolvedValue([file('Proposal_1002836.pdf')]);
   const out = await loadProposal({ requestId: REQ });
   expect(out).toEqual({
     success: true,
@@ -128,25 +141,51 @@ test('golden path returns the exact payload and uploads with random suffix under
     filename: 'picked.pdf',
     contentType: 'application/pdf',
     size: 10,
-    picked: 'lib1::F::Narrative.pdf',
+    picked: 'akoya_request::F/Reviewer Materials::Proposal_1002836.pdf',
     requestNumber: '1002836',
-    allFiles: [expect.objectContaining({ name: 'Narrative.pdf', classification: 'proposal' })],
+    allFiles: [expect.objectContaining({
+      name: 'Proposal_1002836.pdf',
+      classification: 'proposal',
+      source: 'dynamics',
+    })],
   });
   expect(put).toHaveBeenCalledWith(
-    'reviewer-finder/1002836/Narrative.pdf',
+    'reviewer-finder/1002836/Proposal_1002836.pdf',
     expect.any(Buffer),
     { access: 'public', contentType: 'application/pdf', addRandomSuffix: true },
   );
 });
 
-test('explicit fileKey override wins over the best-guess pick', async () => {
-  listFiles.mockResolvedValue([file('Project Narrative.pdf'), file('other-proposal.docx')]);
-  const out = await loadProposal({ requestId: REQ, fileKey: 'lib1::F::other-proposal.docx' });
-  expect(out.picked).toBe('lib1::F::other-proposal.docx');
+test('explicit fileKey override still permits deliberate historical analysis', async () => {
+  listFiles.mockResolvedValue([
+    file('Proposal_1002836.pdf'),
+    file('ProjectDescription.pdf', { folder: 'F/Phase I' }),
+  ]);
+  const key = 'akoya_request::F/Phase I::ProjectDescription.pdf';
+  const out = await loadProposal({ requestId: REQ, fileKey: key });
+  expect(out.picked).toBe(key);
+});
+
+test('multiple active canonical matches fail closed before download or Blob upload', async () => {
+  getRequestSharePointBuckets.mockResolvedValue([
+    { library: 'akoya_request', folder: 'F1', source: 'dynamics' },
+    { library: 'akoya_request', folder: 'F2', source: 'dynamics' },
+  ]);
+  listFiles.mockImplementation(async (_library, folder) => [
+    file('Proposal_1002836.pdf', { folder: `${folder}/Reviewer Materials` }),
+  ]);
+
+  const err = await loadProposal({ requestId: REQ }).catch((e) => e);
+  expect(err.httpStatus).toBe(409);
+  expect(err.body.error).toBe(
+    'Multiple active canonical reviewer proposals were found for request 1002836.',
+  );
+  expect(downloadFileByPath).not.toHaveBeenCalled();
+  expect(put).not.toHaveBeenCalled();
 });
 
 test('untyped failures (e.g. Blob upload) propagate for the shell 500 mapping', async () => {
-  listFiles.mockResolvedValue([file('Narrative.pdf')]);
+  listFiles.mockResolvedValue([file('Proposal_1002836.pdf')]);
   put.mockRejectedValue(new Error('blob quota'));
   await expect(loadProposal({ requestId: REQ })).rejects.toThrow('blob quota');
 });

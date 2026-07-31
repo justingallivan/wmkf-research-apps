@@ -103,15 +103,23 @@ test('404s when the request has no request number', async () => {
   expect(r.statusCode).toBe(404);
 });
 
-test('golden path: downloads the best-guess proposal and uploads it to Blob', async () => {
+test('golden path: downloads the exact canonical reviewer proposal and uploads it to Blob', async () => {
   getRecord.mockResolvedValue({ akoya_requestid: VALID_GUID, akoya_requestnum: '1002836' });
-  getRequestSharePointBuckets.mockResolvedValue([{ library: 'akoya_request', folder: 'FOLDER' }]);
+  getRequestSharePointBuckets.mockResolvedValue([
+    { library: 'akoya_request', folder: 'FOLDER', source: 'dynamics' },
+  ]);
   listFiles.mockResolvedValue([
-    { name: 'Project Narrative.pdf', size: 100, mimeType: 'application/pdf', lastModified: '2026-01-01', folder: 'FOLDER' },
+    {
+      name: 'Proposal_1002836.pdf',
+      size: 100,
+      mimeType: 'application/pdf',
+      lastModified: '2026-01-01',
+      folder: 'FOLDER/Reviewer Materials',
+    },
   ]);
   downloadFileByPath.mockResolvedValue({
     buffer: Buffer.from('x'),
-    filename: 'Project Narrative.pdf',
+    filename: 'Proposal_1002836.pdf',
     mimeType: 'application/pdf',
     size: 100,
   });
@@ -124,27 +132,29 @@ test('golden path: downloads the best-guess proposal and uploads it to Blob', as
   expect(r.body).toMatchObject({
     success: true,
     blobUrl: 'https://blob.example/proposal.pdf',
-    filename: 'Project Narrative.pdf',
+    filename: 'Proposal_1002836.pdf',
     contentType: 'application/pdf',
     size: 100,
     requestNumber: '1002836',
   });
-  expect(r.body.picked).toBe('akoya_request::FOLDER::Project Narrative.pdf');
+  expect(r.body.picked)
+    .toBe('akoya_request::FOLDER/Reviewer Materials::Proposal_1002836.pdf');
   expect(r.body).toEqual({
     success: true,
     blobUrl: 'https://blob.example/proposal.pdf',
-    filename: 'Project Narrative.pdf',
+    filename: 'Proposal_1002836.pdf',
     contentType: 'application/pdf',
     size: 100,
-    picked: 'akoya_request::FOLDER::Project Narrative.pdf',
+    picked: 'akoya_request::FOLDER/Reviewer Materials::Proposal_1002836.pdf',
     requestNumber: '1002836',
     allFiles: [{
-      name: 'Project Narrative.pdf',
+      name: 'Proposal_1002836.pdf',
       size: 100,
       mimeType: 'application/pdf',
       lastModified: '2026-01-01',
       library: 'akoya_request',
-      folder: 'FOLDER',
+      folder: 'FOLDER/Reviewer Materials',
+      source: 'dynamics',
       classification: 'proposal',
     }],
   });

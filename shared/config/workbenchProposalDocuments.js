@@ -2,10 +2,11 @@
  * Per-cycle Phase I document map for the Workbench Proposal tab.
  *
  * D26 documents live in the request's SharePoint `Phase I` subfolder with
- * consistent filenames (Justin, S258). This is an INTERIM bridge — J27 collects
- * documents differently (new naming at least) and the converging target is
- * direct Dataverse-table references, so the matching rules live here, keyed by
- * cycle, NOT hard-coded in the route or UI. See
+ * consistent filenames (Justin, S258). This is an INTERIM bridge for displaying
+ * the historical D26 Phase I source set; automated proposal analysis now uses
+ * the separate canonical `Reviewer Materials/Proposal_{Request#}.pdf` contract.
+ * The converging target is direct Dataverse-table references, so these display
+ * rules live here, keyed by cycle, NOT hard-coded in the route or UI. See
  * docs/WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md and
  * .claude-memory/project-j27-doc-capture-evolution.md.
  *

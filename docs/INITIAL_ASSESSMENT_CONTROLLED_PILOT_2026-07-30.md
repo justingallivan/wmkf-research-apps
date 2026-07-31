@@ -3,7 +3,7 @@ title: Initial Assessment Controlled Production Pilot — 2026-07-30
 domain: architecture
 kind: audit
 status: active
-summary: Request 1002788 pilot evidence and deployed recovery/run-linkage fixes; interrupted-finalization and new-run production re-proof remain open.
+summary: Request 1002788 mechanics evidence, invalid Phase II input evidence, and deployed recovery/run-linkage fixes; a canonical-input pilot remains open.
 canonical: false
 cataloged: 2026-07-30
 last_verified: 2026-07-30
@@ -19,16 +19,22 @@ related:
 
 ## Verdict
 
-**PARTIAL PASS.** The controlled production rehearsal on Request `1002788`
-proved the primary producer → persistence → consumer flow and exact-input
-idempotency. It did not close the full pilot acceptance contract.
+**MECHANICS PASS; CONTENT PROOF INVALID.** The controlled production rehearsal
+on Request `1002788` proved the producer → persistence → consumer mechanics
+and same-input idempotency. The source document was later identified as an old
+Phase I proposal, not the current Phase II proposal. The generated prose is
+therefore not evidence that Initial Assessment works semantically on the
+approved input, and the rehearsal did not close the full pilot acceptance
+contract.
 
-Two defects were found during the rehearsal:
+Three defects or evidence gaps were found during the rehearsal:
 
-1. post-upload recovery compares downloaded SharePoint bytes with the
+1. the proposal source was an old Phase I document rather than the approved
+   Phase II reviewer package;
+2. post-upload recovery compares downloaded SharePoint bytes with the
    producer's pre-upload DOCX hash, but SharePoint rewrites the Office package
    during ingestion; and
-2. the Initial Assessment Executor call did not pass `requestId`, so the exact
+3. the Initial Assessment Executor call did not pass `requestId`, so the exact
    AI run has prompt lineage but a null `wmkf_ai_request` lookup.
 
 **[VERIFIED DEPLOYED 2026-07-30; NOT YET PRODUCTION RE-PROVED]** Production
@@ -53,7 +59,8 @@ staff-input marker.
 
 | Contract | Producer/source | Persistence | Consumer/readback | Result |
 | --- | --- | --- | --- | --- |
-| Generate canonical artifact | Signed-in Workbench generation for Request `1002788` (`feabe26f-dc1b-f111-8341-000d3a306da2`) | Registry row `fb995f0f-628c-f111-ab0f-6045bd018a07`; request pointer set to that row; SharePoint item `01G4GVMS77A2SBVPGA4VFINZFWAFIZGVFG` | Workbench showed `Ready · Draft` and opened the canonical item | PASS |
+| Generate canonical artifact | Signed-in Workbench generation for Request `1002788` (`feabe26f-dc1b-f111-8341-000d3a306da2`) | Registry row `fb995f0f-628c-f111-ab0f-6045bd018a07`; request pointer set to that row; SharePoint item `01G4GVMS77A2SBVPGA4VFINZFWAFIZGVFG` | Workbench showed `Ready · Draft` and opened the canonical item | PASS for mechanics only |
+| Approved proposal input | The runtime loaded an old Phase I proposal rather than `Reviewer Materials/Proposal_1002788.pdf` | The resulting fingerprint and artifact faithfully represent the wrong source | The artifact is reachable but its generated content is not a valid Phase II assessment proof | FAIL — canonical-input run required |
 | Prompt/run/template lineage | `initial-assessment.generate` v1; template `initial-assessment-standard-business-brief` v1.0.0 | Prompt `fc8a4c3b-5e8c-f111-ab0f-7ced8d3d15a6`; run `b7ae9b17-628c-f111-ab0f-000d3a31c468`; generation key and input fingerprint persisted | Registry readback matched the generating prompt, run, template, and request | PARTIAL — historical pilot run lookup is null; future-run fix is deployed, not production-proved |
 | Shared discovery contract | Same canonical registry row | Stable drive/item identity and request pointer | Per-request Workbench and `/workbench/artifacts` both listed the same artifact and Open link | PASS |
 | Exact-input retry | `Refresh from current inputs` on the Ready artifact | Still one registry row; same row, run, SharePoint item, timestamps, and attempt count | UI returned the existing Ready artifact | PASS — no model call, upload, overwrite, or duplicate |
@@ -91,18 +98,22 @@ not an intervening staff edit. Version `2.0` later hashed to
 
 ## Required follow-up
 
-1. The runtime fix is deployed. The schema-as-code field description is
+1. Promote the canonical proposal-source runtime change, then generate against
+   a request whose active request folder contains exactly
+   `Reviewer Materials/Proposal_{Request#}.pdf`. Verify the source identity and
+   content class before treating the output as semantic pilot evidence.
+2. The recovery/run-linkage runtime fix is deployed. The schema-as-code field description is
    corrected on `main`, but the
    creation-only schema applicator does not update an existing Dataverse
    attribute description; that optional live metadata cleanup is separate and
    does not block the runtime fix.
-2. Exercise the post-upload/final-registry-failure recovery branch and verify
+3. Exercise the post-upload/final-registry-failure recovery branch and verify
    it reuses the canonical SharePoint item without another model call/upload.
-3. Generate a new controlled artifact and verify the resulting
+4. Generate a new controlled artifact and verify the resulting
    `wmkf_ai_run.wmkf_ai_request` lookup.
-4. Complete a substantive authorized staff review/edit, including Foundation
+5. Complete a substantive authorized staff review/edit, including Foundation
    Opportunity, and verify the saved version through both consumers.
-5. Complete the broader target-library restore, recycle-bin, retention,
+6. Complete the broader target-library restore, recycle-bin, retention,
    permission, and milestone-snapshot checks before calling the artifact system
    production-ready.
 

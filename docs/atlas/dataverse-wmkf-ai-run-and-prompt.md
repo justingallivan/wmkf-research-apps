@@ -81,11 +81,13 @@ Migration plans touching either entity must preserve these foreign keys.
   version-history guard. The production entity held 20 prompt rows after this
   seed. The controlled Request `1002788` pilot created completed run
   `b7ae9b17-628c-f111-ab0f-000d3a31c468` against this prompt with
-  `claude-sonnet-5`. Its `wmkf_ai_request` lookup is null because the Initial
+  `claude-sonnet-5`. The run used an old Phase I proposal, so it is mechanics
+  evidence rather than approved Phase II semantic evidence. Its
+  `wmkf_ai_request` lookup is null because the Initial
   Assessment producer deployed for that rehearsal omitted `requestId` from
   `executePrompt()`; the registry still links the exact run to the exact
-  request artifact. Branch `codex/initial-assessment-runtime-fixes` now passes
-  the request GUID and asserts it in focused tests, but a new production run is
+  request artifact. Production commit `9c88a1fa` now passes the request GUID
+  and asserts it in focused tests, but a new canonical-input production run is
   still required to prove the live lookup. The historical pilot run remains
   null and append-only.
 - **`review-synthesis.generate` production publication (2026-07-26):** the

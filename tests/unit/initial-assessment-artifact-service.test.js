@@ -160,7 +160,7 @@ beforeEach(() => {
   grantRequestAdapter.findByIds.mockResolvedValue({ records: [request] });
   getProposalText.mockResolvedValue({
     text: 'Proposal source material '.repeat(20),
-    filename: 'ProjectDescription.pdf',
+    filename: 'Proposal_1003001.pdf',
   });
   getRequestSharePointBuckets.mockResolvedValue([{
     source: 'dynamics',
@@ -321,11 +321,25 @@ it('returns a Ready row without rerunning AI or overwriting SharePoint', async (
 
   const result = await generateInitialAssessment({ requestId: REQUEST_ID });
 
+  expect(getProposalText).toHaveBeenCalledWith(REQUEST_ID, '1003001');
   expect(result.reused).toBe(true);
   expect(result.artifact.operationStatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.READY);
   expect(executePrompt).not.toHaveBeenCalled();
   expect(GraphService.uploadFile).not.toHaveBeenCalled();
   expect(requestDocumentAdapter.update).not.toHaveBeenCalled();
+});
+
+it('fails closed before persistence or AI when the canonical reviewer proposal is absent', async () => {
+  getProposalText.mockResolvedValue(null);
+
+  await expect(generateInitialAssessment({ requestId: REQUEST_ID })).rejects.toMatchObject({
+    httpStatus: 409,
+    message:
+      'No usable canonical reviewer proposal was found at Reviewer Materials/Proposal_1003001.pdf.',
+  });
+  expect(requestDocumentAdapter.create).not.toHaveBeenCalled();
+  expect(executePrompt).not.toHaveBeenCalled();
+  expect(GraphService.uploadFile).not.toHaveBeenCalled();
 });
 
 it('atomically reactivates an exact superseded Ready artifact when inputs revert', async () => {
@@ -1207,7 +1221,7 @@ it('changes deterministic artifact identity when the authoritative cycle changes
     requestNumber: request.akoya_requestnum,
     title: request.akoya_title,
     institution: request.wmkf_organizationname,
-    proposalFilename: 'ProjectDescription.pdf',
+    proposalFilename: 'Proposal_1003001.pdf',
     proposalText: 'Proposal source material '.repeat(20),
   };
   const d26 = buildInitialAssessmentIdentity({ ...base, cycleCode: 'D26' });
