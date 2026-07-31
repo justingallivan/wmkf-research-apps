@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-29
+last_verified: 2026-07-30
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -17,6 +17,9 @@ source_files:
   - shared/components/reviewers/ReviewerSearchSection.js
   - shared/components/reviewers/ReviewerManagePanel.js
   - lib/services/review-manager/send-emails-service.js
+  - lib/services/reviewer-acceptance-drain.js
+  - lib/bill/honorarium-onboard-orchestrator.js
+  - lib/dataverse/adapters/contact.js
   - pages/external/review/[token].js
   - shared/components/reviewers/reviewer-search-logic.js
   - pages/api/reviewer-finder/my-candidates.js
@@ -100,6 +103,31 @@ keys. After an unknown transport outcome it refetches roster/Invite state
 before retry, and never graduates by normalized name. Invite continues to read
 only the linked canonical person email; a legacy selected email-empty row shows
 a diagnostic rather than falling back to the roster address.
+
+## Reviewer → CRM contact promotion (implemented in source 2026-07-30; not deployed)
+
+Sending an invitation never creates or links a CRM contact. The send service
+retains `contactPromoted:false` and `orcidBackprop:null` in its response only for
+consumer compatibility. Invitation and non-response history stays on the
+suggestion/person rows.
+
+Every accepted reviewer—including honorarium opt-outs—enters
+`ensureAcceptedReviewerContact`; declines do not. Non-opt-outs reach it through
+`ensureHonorariumOnboarding`, while opt-outs call it directly from the acceptance
+drain. Existing links are re-read and must pass active-state, name, and
+email/ORCID identity checks before any Contact mutation. Otherwise, exact email
+and ORCID candidate sets must be unambiguous, agree with each other, be active,
+and match the accepted reviewer's name. Ambiguity, inactive-only matches, split
+keys, a namesake, or an unsafe pre-existing link preserves the unlinked state
+and raises a deduplicated `accepted_reviewer_contact_identity_review` alert.
+
+For a genuine new person, the contact primary key is deterministically derived
+from a valid canonical ORCID across reviewer rows, with the global
+potential-reviewer ID as the fallback when no valid ORCID exists. Contact
+creation and the reviewer lookup link commit in one Dataverse changeset with an
+ETag guard on the reviewer. Concurrent retries therefore converge without an
+orphan Contact; a concurrent reviewer-link winner is adopted only after its
+Contact passes the same identity validation.
 
 ## Candidate removal, decline archival, and restore (Invite Reviewers)
 

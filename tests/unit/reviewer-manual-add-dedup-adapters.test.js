@@ -76,11 +76,35 @@ describe('potential-reviewer candidate helpers', () => {
   });
 
   test('setContactLink conflicts when contact is linked to another reviewer', async () => {
-    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ wmkf_potentialreviewersid: 'r1', _wmkf_contact_value: null });
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      wmkf_potentialreviewersid: 'r1',
+      _wmkf_contact_value: null,
+      _etag: 'W/"1"',
+    });
     jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [{ wmkf_potentialreviewersid: 'r2', _wmkf_contact_value: 'c1' }] });
     const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
     await expect(potentialReviewer.setContactLink('r1', 'c1')).rejects.toMatchObject({ code: 'contact_linked_elsewhere', status: 409 });
     expect(patch).not.toHaveBeenCalled();
+  });
+
+  test('setContactLink uses the reviewer ETag for an atomic compare-and-set', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      wmkf_potentialreviewersid: 'r1',
+      _wmkf_contact_value: null,
+      _etag: 'W/"9"',
+    });
+    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
+    const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    await expect(potentialReviewer.setContactLink('r1', 'c1', {
+      actingUserSystemId: 'user-1',
+    })).resolves.toEqual({ action: 'link', contactId: 'c1' });
+    expect(patch).toHaveBeenCalledWith(
+      'wmkf_potentialreviewerses',
+      'r1',
+      { 'wmkf_Contact@odata.bind': '/contacts(c1)' },
+      { actingUserSystemId: 'user-1', ifMatch: 'W/"9"' },
+    );
   });
 });
 
@@ -97,6 +121,23 @@ describe('contact candidate helpers', () => {
       records: [{ contactid: 'c1', wmkf_orcid: ORCID }, { contactid: 'c2', wmkf_orcid: ORCID }],
     });
     await expect(contact.findByOrcidCandidates(ORCID)).resolves.toMatchObject({ ambiguous: true, count: 2 });
+  });
+
+  test('exact inactive-only contact matches are never auto-link candidates', async () => {
+    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
+      records: [{
+        contactid: 'inactive',
+        emailaddress1: 'ada@example.edu',
+        statecode: 1,
+      }],
+    });
+
+    await expect(contact.findByEmailCandidates('ada@example.edu')).resolves.toMatchObject({
+      ambiguous: true,
+      inactiveOnly: true,
+      count: 1,
+      rows: [expect.objectContaining({ contactid: 'inactive' })],
+    });
   });
 
   test('searchByName ranks active contacts first', async () => {

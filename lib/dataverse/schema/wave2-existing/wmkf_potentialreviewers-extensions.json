@@ -9,7 +9,7 @@
       "referencedEntity": "contact",
       "lookupSchemaName": "wmkf_Contact",
       "lookupDisplayName": "Contact",
-      "lookupDescription": "The promoted CRM contact for this reviewer. Populated when staff first reaches out — until then null. 1:1 with the potential-reviewer row.",
+      "lookupDescription": "The promoted CRM contact for this reviewer. Populated after an identity-bearing acceptance; invitation send and decline leave it null. 1:1 with the potential-reviewer row.",
       "required": "None"
     }
   ],

@@ -99,15 +99,15 @@ async function create(email, requestNum) {
       `Refusing to touch it. Run "cleanup" (or "cleanup --person <guid>") first, or use a different throwaway email.`
     );
   }
-  // Also refuse if the email is already a CRM contact: the invitation send does
-  // find-or-create-by-email, so a pre-existing contact would get LINKED to our
-  // test person and teardown could then delete a real contact. Requiring a
-  // brand-new email guarantees any promoted contact is genuinely ours.
+  // Also refuse if the email is already a CRM contact: an acceptance can link a
+  // unique identity match to our test person, and teardown could then delete a
+  // real contact. Requiring a brand-new email guarantees any Contact created by
+  // this smoke's acceptance is genuinely ours.
   const existingContact = await contact.findByEmail(email);
   if (existingContact) {
     throw new Error(
       `Email ${email} already exists as a CRM contact "${existingContact.fullname}" (${existingContact.contactid}). ` +
-      `Refusing — a smoke invitation would link this real contact. Use a different throwaway email.`
+      `Refusing — a smoke acceptance could link this real contact. Use a different throwaway email.`
     );
   }
 

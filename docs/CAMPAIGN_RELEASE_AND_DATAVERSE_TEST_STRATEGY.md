@@ -6,6 +6,7 @@ status: active
 summary: "Campaign-aware release, rehearsal, Dataverse isolation, promotion, and rollback strategy for the twice-yearly proposal-review workflow."
 canonical: false
 cataloged: 2026-07-09
+last_verified: 2026-07-30
 owner: product-engineering
 related:
   - docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md
@@ -250,11 +251,12 @@ controls. A Dataverse interlock alone does not make a flow harmless.
 
 ## 7. Capture Mode Is an Email Control, Not a Sandbox
 
-**[CURRENT — verified from source 2026-07-09]**
+**[CURRENT — verified from source 2026-07-30]**
 
 - `REVIEWER_EMAIL_DELIVERY_MODE=capture` is refused when `VERCEL_ENV=production`.
 - It returns a rendered artifact instead of creating/sending a Dynamics email.
-- It skips contact promotion and ORCID back-propagation in the send service.
+- The send service performs no contact promotion or ORCID back-propagation in
+  capture or live mode. Those writes occur later on identity-bearing acceptance.
 - Rendering a template that contains an external-review link calls
   `mintAndStore()` and persists a fresh token hash/expiry on the reviewer suggestion.
 - A captured invitation send with `markAsSent=true` still stamps the invitation

@@ -962,7 +962,15 @@ describe('notification trust-model Stage 2 pushed-up wrappers', () => {
       return { ok: true, status: 'ambiguous_match' };
     });
     const ensureHonorarium = jest.fn((args) => ensureHonorariumOnboarding(args, {
-      contacts: { updateFields: jest.fn().mockResolvedValue(undefined) },
+      contacts: {
+        getById: jest.fn().mockResolvedValue({
+          contactid: CONTACT_ID,
+          fullname: 'Reviewer One',
+          emailaddress1: 'reviewer@example.com',
+          statecode: 0,
+        }),
+        updateFields: jest.fn().mockResolvedValue(undefined),
+      },
       onboard,
       backProp: jest.fn().mockResolvedValue(undefined),
       isDeferred: () => false,

@@ -6,6 +6,7 @@ status: active
 summary: "Safe reviewer invitation and return rehearsal through browser mocks, capture-mode controlled writes, or an allowlisted live smoke."
 canonical: false
 cataloged: 2026-07-02
+last_verified: 2026-07-30
 owner: product-engineering
 related:
   - docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
@@ -35,7 +36,9 @@ environment-variable definitions and rotation guidance.
 
 - `REVIEWER_EMAIL_DELIVERY_MODE=capture` is for non-production rehearsal only.
 - The send route refuses capture mode when `VERCEL_ENV=production`.
-- Capture mode skips Dynamics email send, skips contact promotion/back-propagation, and returns the rendered email artifact in the send result.
+- Capture mode skips Dynamics email send and returns the rendered email artifact
+  in the send result. Contact promotion and ORCID back-propagation are absent
+  from every invitation-send mode; they occur later on acceptance.
 - Capture mode does **not** suppress every Dataverse write. Rendering a template
   containing the external-link placeholder persists a fresh token hash/expiry, and
   a captured invitation send with `markAsSent=true` still stamps invitation

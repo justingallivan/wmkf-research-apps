@@ -4,7 +4,7 @@ description: REVIEWER_EMAIL_DELIVERY_MODE=capture blocks reviewer email delivery
 metadata:
   type: project
   status: active
-  last_verified: 2026-07-27 via render-emails-service.js, token-lifecycle.js, and send-emails-service.js
+last_verified: 2026-07-30 via render-emails-service.js, token-lifecycle.js, and send-emails-service.js
 ---
 
 ## Recall Rule
@@ -32,9 +32,11 @@ sandbox. Two write paths on the invite flow still hit real Dataverse in capture:
    [VERIFIED 2026-07-27 via
    `lib/services/review-manager/send-emails-service.js:625-647`].
 
-Capture skips contact promotion and ORCID back-prop (`skipped_capture`)
-[VERIFIED 2026-07-27 via
-`lib/services/review-manager/send-emails-service.js:573-610`]. The
+Contact promotion and ORCID back-prop are absent from **all** send modes after
+S389; capture returns the same legacy `contactPromoted:false` /
+`orcidBackprop:null` fields as real send
+[VERIFIED 2026-07-30 via
+`lib/services/review-manager/send-emails-service.js`]. The
 abstract-edit route (`update-abstract`) is a separate write, not capture-aware.
 
 **How to apply:** a render that needs an external link is not side-effect-free.

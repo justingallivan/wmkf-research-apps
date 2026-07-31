@@ -52,7 +52,7 @@ Procedure documented in `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md` § Step 
 **Shipped Session 129 (adapter chain + token lifecycle):**
 - `lib/dataverse/adapters/{contact,potential-reviewer,researcher,reviewer-suggestion}.js` — every write helper takes `{ actingUserSystemId } = {}` as trailing opts, forwards to `DynamicsService.updateRecord`/`createRecord`. Reads stay clean.
 - `lib/external/token-lifecycle.js` — `mintAndStore`, `revoke`, `ensureToken`, `extendForPostSubmissionWindow` all accept and forward.
-- 8 endpoints plumbed: `reviewer-finder/{save-candidates,my-candidates}`, `review-manager/{render-emails,send-emails,regenerate-token,revoke-token,reviewers,upload-review}`. Audit-trail mismatch closed: contact promotion + token writes now attribute to the same staff user as the surrounding action.
+- 8 endpoints plumbed: `reviewer-finder/{save-candidates,my-candidates}`, `review-manager/{render-emails,send-emails,regenerate-token,revoke-token,reviewers,upload-review}`. Historical note: contact promotion was then a staff-driven send write. Since S389 it occurs in the token-authenticated acceptance drain and is therefore service-principal-attributed; staff-driven token/lifecycle writes still carry the acting user.
 - 20 pass-through tests in `tests/unit/adapters-caller-id.test.js`. Suite 333/333.
 
 **How to apply going forward:**

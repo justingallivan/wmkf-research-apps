@@ -25,12 +25,14 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   REVIEW_STATUS_MAP: { accepted: 100000000, materials_sent: 100000001, under_review: 100000002 },
 }));
 const getPersonById = jest.fn(async (id) => PERSONS[id] ?? null);
+const mockSetContactLink = jest.fn(async () => {});
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   getByIdWithSelect: (...a) => getPersonById(...a),
-  setContactLink: jest.fn(async () => {}),
+  setContactLink: (...a) => mockSetContactLink(...a),
 }));
+const mockFindOrCreateByEmail = jest.fn(async () => ({ id: 'c-1', created: false }));
 jest.mock('../../lib/dataverse/adapters/contact', () => ({
-  findOrCreateByEmail: jest.fn(async () => ({ id: 'c-1', created: false })),
+  findOrCreateByEmail: (...a) => mockFindOrCreateByEmail(...a),
 }));
 const getSystemUserById = jest.fn(async () => ({
   systemuserid: 'pd-1',
@@ -46,8 +48,9 @@ jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   getById: jest.fn(async () => REQUEST),
   updateById: (...a) => updateRequestById(...a),
 }));
+const mockBackPropReviewerOrcidToContact = jest.fn(async () => ({ action: 'noop' }));
 jest.mock('../../lib/services/backprop-reviewer-orcid', () => ({
-  backPropReviewerOrcidToContact: jest.fn(async () => ({ action: 'noop' })),
+  backPropReviewerOrcidToContact: (...a) => mockBackPropReviewerOrcidToContact(...a),
 }));
 jest.mock('../../lib/services/settings-service', () => ({
   getSettingStrict: jest.fn(async () => ({ found: false, value: null })),
@@ -239,6 +242,27 @@ describe('send-emails-service — lifecycle-after-send ordering', () => {
       { invited: true, emailSentAt: expect.any(String), respondReminderSentAt: null },
       { actingUserSystemId: 'u-1' },
     );
+  });
+
+  test('a successful send never creates, links, or mutates a CRM contact', async () => {
+    PERSONS[`person-${SUG_OK}`] = person(`person-${SUG_OK}`, {
+      _wmkf_contact_value: null,
+      wmkf_orcid: '0000-0002-1825-0097',
+    });
+
+    const emitted = await run({
+      drafts: [draft(SUG_OK)],
+      templateType: 'invitation',
+    });
+
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(mockFindOrCreateByEmail).not.toHaveBeenCalled();
+    expect(mockSetContactLink).not.toHaveBeenCalled();
+    expect(mockBackPropReviewerOrcidToContact).not.toHaveBeenCalled();
+    expect(resultOf(emitted).sent[0]).toMatchObject({
+      contactPromoted: false,
+      orcidBackprop: null,
+    });
   });
 
   test('an invitation send-time failure lands in unconfirmed[] (not failed[]) via email_unconfirmed; batch ends result -> complete', async () => {

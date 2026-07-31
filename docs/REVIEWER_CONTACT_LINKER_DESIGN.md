@@ -1,9 +1,9 @@
 ---
-title: "Reviewer ↔ Contact linker & consistency — design notes (v0, not built)"
+title: "Reviewer ↔ Contact linker & consistency — historical design notes"
 domain: reviewer-workbench
 kind: spec
-status: active
-summary: "1. wmkf_potentialreviewers ↔ wmkf_potentialreviewers — duplicate reviewer rows (the misspelled-duplicate bug). Being fixed now..."
+status: historical
+summary: "Historical S289 reviewer-to-Contact linker proposal; its runtime baseline was superseded by S389 acceptance-time identity-aware promotion."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -14,12 +14,18 @@ related:
   - scripts/probe-contact-dedup.js
 ---
 
-# Reviewer ↔ Contact linker & consistency — design notes (v0, not built)
+# Reviewer ↔ Contact linker & consistency — historical design notes
 
-status: PLANNED (not built) — design capture 2026-06-25 (S289)
+status: HISTORICAL — design capture 2026-06-25 (S289), runtime baseline
+superseded 2026-07-30 (S389)
 owner: reviewer-finder
 
-> Forward-looking. Nothing here is built. Sibling docs:
+> **Do not implement this document as written.** S389 removed invitation-send
+> promotion and replaced the acceptance path's email-only create/link behavior
+> with identity-aware matching plus deterministic creation. Current authority:
+> `docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md` and
+> `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`. The remainder is
+> retained as historical design context. Sibling docs:
 > `docs/REVIEWER_MERGE_DESIGN.md` (reviewer↔reviewer merge, being built S289) and
 > `docs/CONNOR_CONTACT_MERGE_AND_REVIEWER_LINKING.md` (contact↔contact dedup +
 > the open questions to Connor). This doc is the **reviewer↔contact** half.

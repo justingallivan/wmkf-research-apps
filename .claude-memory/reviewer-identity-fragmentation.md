@@ -118,8 +118,8 @@ PR1 (runtime forward-flow) + PR2 (one-shot backfill), both on `main` 2026-06-03,
 Codex-reviewed (incl. an adversarial pass). Mechanics: `lib/utils/orcid-normalize.js`
 (mod-11-2 checksum) → `contactAdapter.resolveForBackprop`/`setOrcidIfAbsent`
 (fill-only, conditional If-Match, conflict-surfacing) → shared
-`lib/services/backprop-reviewer-orcid.js` helper, wired into send-emails +
-honorarium-onboard-orchestrator + workbench/enrich-recommended (each hydrates
+`lib/services/backprop-reviewer-orcid.js` helper, wired into accepted-reviewer
+promotion through honorarium onboarding plus workbench/enrich-recommended (each hydrates
 `wmkf_orcid`/`wmkf_identitystatus`/`_wmkf_contact_value` first). Eligibility =
 valid iD + `mayPersistIdentity` (confirmed/probable). Runs forward automatically
 on every promotion now. **Historical backfill RAN + verified**

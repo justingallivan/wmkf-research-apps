@@ -6,6 +6,7 @@ status: canonical
 summary: "Visual orientation for the reviewer-domain Dataverse entities and how they connect. Use this when you're not sure which entity holds which piece..."
 canonical: true
 cataloged: 2026-07-02
+last_verified: 2026-07-30
 owner: product-engineering
 related:
   - docs/REVIEWER_INTERACTION_DESIGN.md
@@ -19,6 +20,12 @@ related:
 Visual orientation for the reviewer-domain Dataverse entities and how they connect. Use this when you're not sure which entity holds which piece of data, or when a piece of reviewer data is created.
 
 > **Authoritative source for any single entity is its atlas page** (`docs/atlas/dataverse-*.md`). This doc summarizes the connections; the atlas pages have the per-field detail.
+
+> **Release boundary (2026-07-30):** deployed production remains on the prior
+> send-time Contact-promotion release until
+> `codex/reviewer-contact-integration` is promoted. The source model documented
+> below is the integration-branch target: invitation send never creates/links a
+> Contact or back-propagates ORCID; identity-bearing acceptance does.
 
 > **Current review-content authority (owner-confirmed 2026-07-26):** the live
 > reviewer workflow is the in-browser form. Final submit writes structured
@@ -54,7 +61,7 @@ Visual orientation for the reviewer-domain Dataverse entities and how they conne
 |---|---|---|---|
 | `wmkf_potentialreviewer` | The **person**. Custom Foundation entity (not vendor). Global. One row per real human, dedup'd on email. Row origin tracked in `wmkf_source` — currently two main paths: (a) **Reviewer Finder** discovery (rich enrichment, full bibliometrics), (b) **Applicant-submitted** during application intake (sparse: usually just name + affiliation + email). The same person can later be enriched if Reviewer Finder picks them up, or via the Workbench "enrich recommended reviewers" action (S211). | First touch by either path. | 4,427 |
 | ~~`wmkf_appresearcher`~~ | **DROPPED S213** — the bibliometric sidecar (h-index, ORCID, citations, scholar URL) was collapsed onto `wmkf_potentialreviewer`. Those fields now live on the person; written by Reviewer Finder enrichment + the Workbench "enrich recommended reviewers" action. See "What changed" below. | — |
-| `contact` | The **CRM contact**. Where canonical identity ultimately lives. | Promoted from `wmkf_potentialreviewer` on first staff outreach. | (vendor table — many) |
+| `contact` | The **CRM contact**. Where canonical identity ultimately lives. | Integration-branch target: promoted from `wmkf_potentialreviewer` on identity-bearing acceptance, including honorarium opt-out; invitation send and decline do not promote. Production remains on the prior send-time release until branch promotion. | (vendor table — many) |
 | `wmkf_appreviewersuggestion` | The **per-(reviewer, request) engagement**. Lifecycle ledger for state, timestamps, decline reason, policy acknowledgments, and links. Current structured review content lives in its `wmkf_appreviewanswer` children. | Reviewer Finder save-candidates creates one per (person, request). | 724 |
 | `wmkf_appreviewanswer` | One immutable structured answer snapshot per submitted question, linked to the engagement. This is the current review-content authority for ratings, multiselect selections, and narratives. | Final form submit; alternate key is suggestion + question key. | (child rows) |
 | `akoya_request` (grant) | The **proposal being reviewed**. | Created when WMKF intakes a grant request. | 25,473+ |
@@ -69,7 +76,7 @@ Visual orientation for the reviewer-domain Dataverse entities and how they conne
 
 ```mermaid
 erDiagram
-    POTENTIALREVIEWER ||--o| CONTACT : "promoted via wmkf_contact lookup (on first outreach)"
+    POTENTIALREVIEWER ||--o| CONTACT : "promoted via wmkf_contact lookup (on acceptance)"
     POTENTIALREVIEWER ||--o{ APPREVIEWERSUGGESTION : "per engagement (one person, many requests over time)"
 
     APPREVIEWERSUGGESTION }o--o| POLICYVERSION_COI : "wmkf_coipolicyversion (which COI text reviewer saw)"
@@ -217,17 +224,19 @@ flowchart TD
     S0["Stage 0 — Reviewer Finder discovers candidate"] --> S0w["WRITES:<br/>• wmkf_potentialreviewer (upsert by email; bibliometrics on the person since S213)<br/>• wmkf_appreviewersuggestion (engagement, selected=true)"]
 
     S0w --> S1["Stage 1 — PD invites (send-emails)"]
-    S1 --> S1w["WRITES:<br/>• wmkf_appreviewersuggestion: invited=true, wmkf_emailsentat, external token fields<br/>• contact: created if missing; wmkf_contact lookup set on wmkf_potentialreviewer (promotion)"]
+    S1 --> S1w["WRITES:<br/>• wmkf_appreviewersuggestion: invited=true, wmkf_emailsentat, external token fields<br/>• no Contact create/link/update"]
 
     S1w --> S2A{"Stage 2a — Reviewer responds"}
     S2A -->|Accept| S2acc["WRITES on wmkf_appreviewersuggestion:<br/>• accepted=true, wmkf_responsereceivedat, wmkf_responsetype<br/>• engagement-scope contact corrections (wmkf_reviewerfirstname, lastname, email, ORCID, title)<br/>• wmkf_coiackedat + wmkf_coipolicyversion<br/>• wmkf_aiuseackedat + wmkf_aiusepolicyversion<br/>• wmkf_honorariumoptout"]
-    S2acc --> S2hon["Current no-BILL honorarium chain:<br/>• akoya_request CREATED (honorarium row)<br/>• wmkf_appreviewersuggestion.wmkf_HonorariumRequest set<br/>• honorarium links to reviewed proposal<br/>• mailing address/phone remain on contact<br/>• BILL onboarding returns deferred (no vendor/network call)"]
+    S2acc --> S2contact["Accepted-contact follow-up (all accepts, including opt-outs):<br/>• validate active existing links and identity-aware Contact reuse<br/>• ORCID-scoped deterministic create + reviewer link in one ETag-guarded changeset<br/>• ambiguous/split/inactive/namesake evidence stays unlinked for staff review<br/>• mailing address + eligible ORCID captured after a safe link"]
+    S2contact -->|Honorarium not opted out| S2hon["Current no-BILL honorarium chain:<br/>• akoya_request CREATED (honorarium row)<br/>• wmkf_appreviewersuggestion.wmkf_HonorariumRequest set<br/>• honorarium links to reviewed proposal<br/>• BILL onboarding returns deferred (no vendor/network call)"]
 
     S2A -->|Decline| S2dec["WRITES on wmkf_appreviewersuggestion:<br/>• declined=true, wmkf_responsetype<br/>• wmkf_declinereasonpicklist + wmkf_declinereason (free text)<br/>• wmkf_declinereferral (free text)"]
 
     S2A -->|No response| S2nor["No write at decision time; staff cancels later as<br/>wmkf_withdrawnsufficientat (Withdrawn-Sufficient state)"]
 
     S2hon --> S3["Stage 3 — Materials sent"]
+    S2contact -->|Honorarium opted out| S3
     S3 --> S3w["WRITES on wmkf_appreviewersuggestion:<br/>• wmkf_materialssentat<br/>• wmkf_proposalurl, wmkf_proposalpassword<br/>• wmkf_reviewstatus = materials_sent"]
 
     S3w --> S4["Stage 4 — Reviewer works in form<br/>(Postgres review_drafts scratchpad)"]
@@ -247,8 +256,8 @@ flowchart TD
 
 | Question | Entity / field | Notes |
 |---|---|---|
-| Reviewer's canonical name + email | `contact` (post-promotion) or `wmkf_potentialreviewer` (pre-promotion) | Promotion happens on first outreach via `wmkf_potentialreviewer.wmkf_contact` |
-| Reviewer's engagement-scope corrections (they updated their email at accept) | `wmkf_appreviewersuggestion.wmkf_revieweremail` etc. | Engagement-scoped — never auto-promoted to contact or person record |
+| Reviewer's canonical name + email | `contact` (post-promotion) or `wmkf_potentialreviewer` (pre-promotion) | Identity-bearing acceptance promotes via `wmkf_potentialreviewer.wmkf_contact`; invitation send and decline do not |
+| Reviewer's engagement-scope corrections (they updated their email at accept) | `wmkf_appreviewersuggestion.wmkf_revieweremail` etc. | The engagement keeps its snapshot. Accepted-contact resolution may use submitted name/email to safely reuse or create a Contact and separately sync trusted name/title, but it never blindly overwrites an existing Contact email. |
 | h-index / citation count / ORCID / scholar URL | `wmkf_potentialreviewer.wmkf_hindex` etc. | on the person (S213; was the `wmkf_appresearcher` sidecar) |
 | Accept/decline state | `wmkf_appreviewersuggestion.wmkf_responsetype` (picklist) + `.wmkf_accepted` / `.wmkf_declined` booleans | |
 | Decline reason | `wmkf_appreviewersuggestion.wmkf_declinereasonpicklist` (structured) + `.wmkf_declinereason` (free text) + `.wmkf_declinereferral` | |

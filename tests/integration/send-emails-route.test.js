@@ -129,7 +129,7 @@ function basePerson(over = {}) {
     wmkf_potentialreviewersid: 'pr-1',
     wmkf_name: 'Dr. Reviewer',
     wmkf_emailaddress: 'rev@example.org',
-    _wmkf_contact_value: 'c-1', // set → skip contact promotion
+    _wmkf_contact_value: 'c-1', // existing durable link; invitation send never promotes
     wmkf_emailsource: 'orcid',  // HIGH confidence (not first-contact-gated)
     wmkf_identitystatus: 'confirmed',
     ...over,
@@ -397,8 +397,8 @@ describe('send-emails — capture delivery mode', () => {
       suggestionId: SUG_1,
       deliveryMode: 'capture',
       emailId: `captured-${SUG_1}`,
-      contactPromoted: 'skipped_capture',
-      orcidBackprop: 'skipped_capture',
+      contactPromoted: false,
+      orcidBackprop: null,
     });
     expect(r.sent[0].capturedEmail).toMatchObject({
       subject: 'Invitation',

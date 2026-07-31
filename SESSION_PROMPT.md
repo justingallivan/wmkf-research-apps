@@ -11,7 +11,8 @@
 Started as a narrow UI-cleanup mandate in an isolated worktree, which the owner
 expanded mid-session. One presentation change shipped; the rest of the session traced
 a Find-tab complaint through the send gate into contact promotion and produced a
-problem statement, a canonical-doc fix, and one live defect.
+problem statement, a canonical-doc fix, and one then-live defect that S389
+subsequently resolved.
 
 Ownership transferred to Codex at end of session. Claude made no feature changes after
 that point.
@@ -51,9 +52,9 @@ that point.
    fan-out over `docs/` and `.claude-memory/` found no other surface repeating it.
 
 3. **New problem statement (`6ee00ae4`, extended `d9ed574f`/`e00d238c`/`41399610`)**
-   `docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md` — §0–§5.4. **Nothing in
-   it is built.** Every "today" claim is cited to `file:line` and verified against
-   source; proposals are `[PROPOSED]`; unverifiable claims are `[ASSUMED]`.
+   `docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md` — §0–§5.4. At the
+   Claude handoff it was a problem statement only. S389 subsequently implemented
+   §4 (item 14); the other sections remain proposed unless marked resolved.
 
 4. **Adversarial review by Codex `gpt-5.6-sol`, and the response (`d9ed574f`)**
    Verdict needs-attention / NO-SHIP for §4 as drafted. Findings were re-verified
@@ -63,8 +64,9 @@ that point.
 
 5. **Promotion-site map (`e00d238c`)**
    Bounded by disconfirming query: `wmkf_contact` can only be set by
-   `potentialReviewer.setContactLink`, so its callers are the complete set. Exactly four
-   runtime doors — candidate save, manual add, invitation send, and the ACCEPT DRAIN.
+   `potentialReviewer.setContactLink`, so its callers bounded the set. At the S388
+   baseline there were four runtime doors — candidate save, manual add, invitation
+   send, and the ACCEPT DRAIN.
    Door 4 already promotes the contact and writes the reviewer's self-supplied mailing
    address at accept, before its capture-only deferral short-circuit, so it runs today
    with BILL tabled. So "promote on response, not send" is not new work; it is "remove
@@ -190,6 +192,20 @@ that point.
     permissions, Workbench history/admin restore, and milestone snapshots
     remain open.
 
+14. **Reviewer contact-promotion boundary implemented on the integration branch.**
+    Invitation send no longer creates/links contacts or back-propagates ORCID.
+    Every accepted reviewer, including honorarium opt-outs, enters one
+    identity-aware promotion path; declines do not. Ambiguous email/ORCID,
+    split identities, and namesakes remain unlinked with a durable alert.
+    Genuine new contacts use a canonical-ORCID-derived primary key across
+    duplicate reviewer rows, with reviewer-ID fallback when ORCID is absent.
+    Contact creation and the reviewer link commit atomically under a reviewer
+    ETag; existing links and inactive matches fail closed unless identity
+    validation succeeds. The first post-implementation adversarial review found
+    four P1 and four P2 issues; all were fixed. A fresh full re-review returned
+    `READY`. This is source-verified and test-covered but not yet merged or
+    deployed.
+
 ### Commits
 
 Seven Claude commits were replayed without content conflicts onto
@@ -223,8 +239,10 @@ Seven Claude commits were replayed without content conflicts onto
 2. **Review, release, and visual verification of the Codex integration branch.**
    The seven Claude commits are now on `codex/reviewer-contact-integration`, based
    on current `main`. `docs/DOCS_CATALOG.md` was regenerated successfully after
-   replay. The branch still requires Codex verification, review of the exact
-   runtime-fix boundary, and deliberate promotion before it reaches `main`.
+   replay. The reviewer-contact runtime boundary is implemented; the full suite,
+   static checks, build, relevant gates/self-tests, and final adversarial
+   re-review are green. The branch still requires commit/push, deliberate
+   promotion to `main`, deployment verification, and the UI render check below.
 
 3. **The UI change has never been rendered against a real request.**
    Evidence: `.env.local` `DYNAMICS_URL=https://wmkf.crm.dynamics.com` (production, per
@@ -254,10 +272,9 @@ Seven Claude commits were replayed without content conflicts onto
 1. **§1 option 1 / 2 / 3R** — whether a staff identity attestation may reduce send
    friction. `gpt-5.6-sol` recommends 3R (request-scoped, time-boxed waiver) over blanket
    promotion. Reopens an S387 "Do Not Reopen" item.
-2. **Acceptance-time promotion scope (§4.1/§4.3).** Owner decision, S389:
-   successfully sending an invitation does **not** merit promotion to `contacts`;
-   remove door 3. Still decide whether every identity-bearing acceptance promotes,
-   including honorarium opt-outs, or whether the existing non-opt-out boundary remains.
+2. ~~**Acceptance-time promotion scope (§4.1/§4.3).**~~ **DONE in source, S389:**
+   sending never promotes; every identity-bearing acceptance—including honorarium
+   opt-outs—promotes through identity-aware/idempotent matching; declines do not.
 3. **Contact provenance attribute(s) (§3)** — Dataverse schema decision.
 4. **Durable vs disposable home for the non-response signal (§5.2).**
 5. ~~Contracts-doc contradiction~~ — **DONE** in `06e5505d`.
@@ -308,14 +325,16 @@ Seven Claude commits were replayed without content conflicts onto
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md` | The problem statement — §0–§5.4; S389 rejects send-time contact promotion, while the acceptance boundary and other proposals remain open |
+| `docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md` | Active §4 promotion contract plus remaining §1/§2/§3-provenance/§5 proposals |
 | `shared/components/reviewers/ReviewerSearchSection.js` | The identity-evidence disclosure (the only feature change this session) |
 | `tests/unit/reviewer-candidate-identity-evidence.test.js` | 7 tests pinning the disclosure, incl. the no-truncation and no-stored-profile guards |
 | `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` | Canonical send-gate contract — the `staff_verified` contradiction is fixed here |
 | `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` | Load-bearing-papers note + Scholar 4th-site rule |
-| `lib/services/review-manager/send-emails-service.js:573-597` | Door 3 — the §4.2 live defect |
-| `lib/bill/honorarium-onboard-orchestrator.js:86,108,369` | Door 4 — accept-time promotion + address capture, live today |
-| `lib/services/reviewer-finder/save-candidates-service.js:1084-1121` | Door 1 — the deliberate do-not-link decision that door 3 overrides |
+| `lib/services/review-manager/send-emails-service.js` | Explicit no-contact-write send boundary |
+| `lib/services/reviewer-acceptance-drain.js` | Accept-only promotion trigger, including opt-outs |
+| `lib/bill/honorarium-onboard-orchestrator.js` | Identity-aware accepted-contact promotion + address/ORCID capture |
+| `lib/dataverse/adapters/contact.js` | Deterministic accepted-reviewer contact creation |
+| `lib/services/reviewer-finder/save-candidates-service.js:1084-1121` | Origination-time confident-link / ambiguous-unlinked policy |
 | `lib/utils/reviewer-invite.js` | Send-gate buckets + provenance precedence |
 
 ## Testing

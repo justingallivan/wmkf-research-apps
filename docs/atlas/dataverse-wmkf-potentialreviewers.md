@@ -4,7 +4,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** Wave 13 metadata/population refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population`; row count re-probed 2026-07-26 via `scripts/reconcile-memory-claims.js`
+**Last verified:** Wave 13 metadata/population refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population`; row count re-probed 2026-07-26 via `scripts/reconcile-memory-claims.js`; promotion trigger re-verified from source/tests 2026-07-30
 **Live row count:** 4,427
 **Entity set:** `wmkf_potentialreviewerses` (note Dynamics-pluralized form)
 **Adapter:** `lib/dataverse/adapters/potential-reviewer.js`
@@ -12,7 +12,10 @@
 
 ## Source of truth
 
-**Connor's lead/person record.** One row per real person — global, not per-proposal. Email is the de-dupe key. Promoted to a CRM `contact` when staff first reaches out (via `wmkf_contact` lookup).
+**Connor's lead/person record.** One row per real person — global, not
+per-proposal. Email is the de-dupe key. An identity-bearing acceptance promotes
+the person to a CRM `contact` via `wmkf_contact`; invitation send does not.
+Honorarium opt-outs promote, while declines do not.
 
 This is the **canonical person record** for the reviewer-finder domain. Dataverse `wmkf_potentialreviewers` has 4,427 rows because Connor's team also tracks reviewers from other systems and historical outreach; dropped Postgres `researchers` was only a small, 331-row historical pool.
 
@@ -157,7 +160,7 @@ ETag-guarded; conflicts require a fresh read/retry.
 | Source | Mapping |
 |---|---|
 | Postgres `researchers` | Migrates 1:1 by email match — produces the identity half of the new model |
-| Dataverse `contacts` | Promoted on first outreach via `wmkf_contact` lookup; AppendTo permission granted 2026-05-01 |
+| Dataverse `contacts` | Promoted on identity-bearing acceptance via `wmkf_contact`; invitation send and decline do not promote. AppendTo permission granted 2026-05-01 |
 | ~~Dataverse `wmkf_appresearcher`~~ | **DROPPED S213** — bibliometric snapshots folded onto this entity (see Key fields) |
 | Vendor `akoya_requests.wmkf_potentialreviewer1..5` | Legacy per-proposal slots (not the canonical link — those are in `wmkf_appreviewersuggestion`) |
 

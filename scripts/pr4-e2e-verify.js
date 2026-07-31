@@ -58,14 +58,14 @@ await bypassDynamicsRestrictions('pr4-e2e-verify', async () => {
   console.log(`  ${mark(person.wmkf_identitystatus === 'confirmed')} wmkf_identitystatus = ${JSON.stringify(person.wmkf_identitystatus)}  (expect 'confirmed')`);
   console.log('Contact:');
   if (!contactId) {
-    console.log('  (no contact — person was not promoted; expected only if --no-promote + honorarium opt-out)');
+    console.log('  ✗ no contact — every accepted reviewer should be promoted, including honorarium opt-outs');
   } else {
     console.log(`  contactid=${contactId}`);
     console.log(`  ${mark(eq(contact?.wmkf_orcid))} wmkf_orcid          = ${JSON.stringify(contact?.wmkf_orcid)}`);
   }
 
   const personOk = eq(person.wmkf_orcid) && person.wmkf_identitystatus === 'confirmed';
-  const contactOk = !contactId || eq(contact?.wmkf_orcid);
+  const contactOk = !!contactId && eq(contact?.wmkf_orcid);
   const engagementOk = eq(sug.wmkf_reviewerorcid);
   const pass = personOk && contactOk && engagementOk;
   console.log(`\n${pass ? '✓ PASS' : '✗ FAIL'} — person ${personOk ? 'ok' : 'BAD'}, contact ${contactOk ? 'ok' : 'BAD'}, engagement ${engagementOk ? 'ok' : 'BAD'}`);

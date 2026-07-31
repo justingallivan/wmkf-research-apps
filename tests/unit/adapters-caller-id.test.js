@@ -81,6 +81,26 @@ describe('contact adapter', () => {
 
     expect(DynamicsService.createRecord).not.toHaveBeenCalled();
   });
+
+  test('acceptedReviewerContactPayload requires a surname and preserves the deterministic id', () => {
+    expect(contactAdapter.acceptedReviewerContactPayload({
+      contactId: CONTACT_ID,
+      firstName: 'A',
+      lastName: 'B',
+      email: 'a@b.org',
+    })).toEqual({
+      contactid: CONTACT_ID,
+      firstname: 'A',
+      lastname: 'B',
+      emailaddress1: 'a@b.org',
+    });
+    expect(() => contactAdapter.acceptedReviewerContactPayload({
+      contactId: CONTACT_ID,
+      firstName: 'Ada',
+      lastName: null,
+      email: 'ada@example.org',
+    })).toThrow('lastName required');
+  });
 });
 
 describe('potential-reviewer adapter', () => {
@@ -111,8 +131,16 @@ describe('potential-reviewer adapter', () => {
   });
 
   test('setContactLink forwards', async () => {
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_potentialreviewersid: PR_ID,
+      _wmkf_contact_value: null,
+      _etag: 'W/"17"',
+    });
     await potentialReviewerAdapter.setContactLink(PR_ID, CONTACT_ID, { actingUserSystemId: ACTING });
-    expect(lastCallOpts(DynamicsService.updateRecord)).toEqual({ actingUserSystemId: ACTING });
+    expect(lastCallOpts(DynamicsService.updateRecord)).toEqual({
+      actingUserSystemId: ACTING,
+      ifMatch: 'W/"17"',
+    });
   });
 
   test('omitting opts yields actingUserSystemId: undefined (header suppressed in DynamicsService)', async () => {

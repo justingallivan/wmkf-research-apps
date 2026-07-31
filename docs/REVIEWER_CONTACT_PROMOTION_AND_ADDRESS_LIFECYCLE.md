@@ -3,7 +3,7 @@ title: Reviewer Contact Promotion & Address Lifecycle — Problem Statement
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "Problem statement only — nothing here is built. Five linked defects in how a reviewer address earns trust, becomes a canonical contact, and ages."
+summary: "Current reviewer contact-promotion contract plus remaining address-provenance and staleness decisions."
 canonical: false
 cataloged: 2026-07-30
 owner: product-engineering
@@ -31,10 +31,20 @@ related:
 
 ## Status and posture
 
-**PROBLEM STATEMENT — NOTHING HERE IS BUILT.** Every "today" claim is
-`[VERIFIED]` against source read in session 388 at the cited line, on tree
-`8a34a057`. Every proposal is `[PROPOSED]`: no implementation, no migration, no
-owner sign-off. Nothing here may be cited as existing behavior.
+**ACTIVE CONTRACT + HISTORICAL PROBLEM STATEMENT.** Section 4 is implemented on
+`codex/reviewer-contact-integration`: sending never creates or links a contact;
+every accepted reviewer, including honorarium opt-outs, enters the same
+identity-aware promotion path; declines do not promote. Ambiguous email/ORCID
+matches, split identities, and namesakes remain unlinked with a durable staff
+alert. New contacts use a deterministic primary key derived from valid
+canonical ORCID across duplicate reviewer rows, falling back to the reviewer ID
+only without ORCID. Post-review hardening atomically commits Contact creation
+plus an ETag-guarded reviewer link so concurrent acceptance retries converge
+without leaving an orphan Contact.
+
+Sections 1, 2, 3 provenance, and 5 remain proposals unless explicitly marked
+resolved. The S388 source trace is retained as historical rationale and is not
+the current runtime contract.
 
 Origin: S388, a UI-cleanup session on `codex/claude-ui-cleanup` that began with a
 Find-tab presentation complaint and traced the send gate through to contact
@@ -44,11 +54,11 @@ the way and are deliberately **not** implemented in that branch.
 
 **Reviewed.** Codex `gpt-5.6-sol` ran an adversarial review over the branch in S388
 and returned **needs-attention / NO-SHIP** for §4 as originally drafted. Its findings
-are recorded inline — §0 (UI), §4.1 (what changed and why), §4.2 (a live defect it
+are recorded inline — §0 (UI), §4.1 (what changed and why), §4.2 (the then-live defect it
 escalated), and the §5.2 downgrade — with each claim re-verified against source
 rather than accepted on report. One §4 proposal was withdrawn, several VERIFIED
 labels became ASSUMED, and the sequencing changed. **§1 has been reviewed; §3 and §5
-have now been reviewed once; nothing here has owner sign-off.**
+have now been reviewed once. S389 decided and implemented the §4 boundary.**
 
 ## The thread that connects these
 
@@ -60,7 +70,7 @@ five points:
 1. A human attestation cannot reduce send friction (§1)
 2. …and permanently forecloses machine improvement of that address (§2)
 3. …then the contact write drops all provenance anyway (§3)
-4. …and promotion is triggered by send success rather than evidence of delivery (§4)
+4. …and promotion formerly occurred on send; it now occurs on acceptance (§4)
 5. …after which nothing re-checks the address as it ages (§5)
 
 **Framing caveat (S388 review).** The one-story framing above is a lens, not a
@@ -286,27 +296,30 @@ stale claim: `agent-wiki/topics/external-reviewer-portal.md:82` and
 
 ### Today [VERIFIED]
 
-`contactAdapter.findOrCreateByEmail` (`lib/dataverse/adapters/contact.js:65-75`)
-writes exactly three fields: `emailaddress1`, `firstname`, `lastname`.
+Acceptance promotion builds the Contact body through
+`contactAdapter.acceptedReviewerContactPayload`, then atomically submits the
+deterministic Contact create and ETag-guarded reviewer link in one Dataverse
+changeset. The acceptance helper then captures mailing address/phone and
+fill-only ORCID. No contact attribute records the reviewer's prior email
+provenance or send tier, so the provenance problem remains.
 
-The tier system is maintained on the `potentialreviewer` row up to the send and
-then dropped. The resulting `contacts` row is indistinguishable from one created
-from a verified institutional page. Nothing downstream can tell that an address
-was a staff guess that never received a reply.
+### §3.1 The wrong-contact-link hazard [RESOLVED for acceptance promotion]
 
-### §3.1 The wrong-contact-link hazard [VERIFIED]
+The accepted-contact path now queries `findByEmailCandidates` and
+`findByOrcidCandidates` together before linking. Multiple matches, email/ORCID
+splits, and name mismatches produce
+`accepted_reviewer_contact_identity_review`, preserve the unlinked state, and
+terminate the deterministic job rather than guessing. Pre-existing links must
+also pass active-state, name, and email/ORCID validation before Contact
+mutation. A genuine no-match uses an ORCID-scoped deterministic Contact ID
+across duplicate reviewer rows, with reviewer-ID fallback only when no valid
+ORCID exists. Contact creation and the reviewer lookup link are one atomic
+Dataverse changeset guarded by the reviewer's ETag, preventing create-then-link
+orphans.
 
-`findOrCreateByEmail` calls `findByEmail` first and **links the existing contact
-if one is found** (`contact.js:67-68`). If an attested address is wrong but
-belongs to a real person already in the CRM, the potential reviewer is linked to
-**that person's** contact. No new record is created; nothing signals the merge.
-
-Worse than creating a bad contact, and most likely precisely in the
-staff-attested case where the address was inferred. Note that
-`findByEmailCandidates` and `resolveForBackprop` already select `top: 2` because,
-per the adapter's own comment, "the 7 measured ambiguous cases prove email isn't
-1:1" (`contact.js:196-207`) — the ambiguity is known and measured, and
-`findOrCreateByEmail` does not consult it.
+`findOrCreateByEmail` remains a general adapter primitive for other bounded
+callers, but neither invitation send nor accepted-reviewer promotion uses its
+email-only linking behavior.
 
 ### Proposal [PROPOSED]
 
@@ -317,26 +330,41 @@ where it becomes canonical.
 ### Open decisions
 
 - Which attribute(s) on `contacts`, and whether strictly additive.
-- Whether `findOrCreateByEmail` should refuse or flag an ambiguous/unexpected
-  email match rather than silently linking (§3.1).
+- Whether other remaining `findOrCreateByEmail` callers need the same
+  identity-aware policy; acceptance promotion is already fail-closed.
 
 ---
 
-## §4 — Send-time promotion is rejected; acceptance scope remains open
+## §4 — Contact promotion follows acceptance, never send
 
-### Owner decision [DECIDED, S389]
+### Owner decision and implementation [IMPLEMENTED, S389]
 
 Successfully sending an invitation does **not** merit promotion to `contacts`.
-Door 3 in §4.3 must be removed. Invitation and non-response history remains on
-the reviewer/suggestion records; it does not require a canonical contact.
+Door 3 in §4.3 is removed. Invitation and non-response history remains on the
+reviewer/suggestion records; it does not require a canonical contact.
 
-This decision does not by itself settle whether every identity-bearing
-acceptance should promote, including honorarium opt-outs. That narrower boundary
-remains open below.
+Every identity-bearing acceptance now promotes, including honorarium opt-outs.
+Declines do not promote. The acceptance drain performs durable ORCID capture
+first, then promotes through `ensureAcceptedReviewerContact`; non-opt-outs
+continue into honorarium capture, while opt-outs stop after ordinary
+accepted-reviewer follow-up.
 
-### Today [VERIFIED]
+### Current runtime [VERIFIED]
 
-Contact promotion runs inside the per-recipient send loop, immediately **after**
+`send-emails-service.js` retains the legacy `contactPromoted` and
+`orcidBackprop` response keys for consumer compatibility, but always emits
+`false` / `null` and calls no contact adapter. The acceptance drain calls
+`ensureAcceptedReviewerContact` for opt-outs and
+`ensureHonorariumOnboarding`—which calls the same helper—for non-opt-outs.
+
+Promotion is identity-aware and fail-closed. Contact lookup errors retry;
+deterministic identity conflicts alert staff and terminate without retry churn.
+Generic `setContactLink` failures abort before honorarium creation. A concurrent
+link to another contact uses the reviewer row's live link as authoritative.
+
+### Historical S388 baseline [HISTORICAL]
+
+Contact promotion ran inside the per-recipient send loop, immediately **after**
 `createAndSendEmail` returns
 (`lib/services/review-manager/send-emails-service.js:573-596`), gated only on
 `person && !person._wmkf_contact_value`. It is wrapped in a try/catch whose
@@ -348,8 +376,8 @@ contact. **No bounce or delivery-failure handling exists in this repo**: greps
 over `lib/services/review-manager`, `lib/services/reviewer-finder`, and
 `pages/api/external` found none. Whether Dynamics records an NDR natively via
 server-side sync is a platform-configuration question **[ASSUMED — not verified;
-needs a Dynamics-side check, not a source read]**. What is certain: no code here
-consumes such a signal.
+needs a Dynamics-side check, not a source read]**. This paragraph describes the
+pre-S389 baseline; no code in this repo consumed such a signal then.
 
 ### Proposal [SUPERSEDED by the S388 adversarial review — see §4.1]
 
@@ -457,17 +485,17 @@ matching on email alone (§3.1).
 **Do not promote on decline.** Treat decline as engagement history on the suggestion
 row, where it already lives (§5.1).
 
-### §4.3 The promotion-site map — and why §4 is smaller than it looks [VERIFIED]
+### §4.3 Current promotion-site map [VERIFIED]
 
 Codex required a complete map of promotion sites before §4 could be scoped.
-Building it changed the conclusion. Four doors are live today:
+Four potential doors remain in source history, but only three are live:
 
 | # | Where | Behavior | Code |
 | --- | --- | --- | --- |
 | 1 | Candidate save | links a CONFIDENT existing contact match; ambiguous/conflict deliberately left unlinked + staff alert | `save-candidates-service.js:1084-1088`, `:1098-1121` |
 | 2 | Manual add | can link an existing contact before any invitation | `manual-reviewer-service.js:264` |
-| 3 | Invitation send | `findOrCreateByEmail` + `setContactLink`, email-only, no identity check | `send-emails-service.js:573-596` |
-| 4 | **Accept drain** (honorarium data capture) | `ensureContact` (find-or-create + link) then `patchContactAddress`, gated `if (!optedOut)` | `reviewer-acceptance-drain.js:442-446`; `lib/bill/honorarium-onboard-orchestrator.js:86,108` |
+| 3 | Invitation send | **No promotion.** Legacy response fields remain `false` / `null`. | `send-emails-service.js` |
+| 4 | **Accept drain** | Every accept promotes through `ensureAcceptedReviewerContact`; ambiguous/conflicting matches remain unlinked; non-opt-outs then continue into honorarium capture | `reviewer-acceptance-drain.js`; `honorarium-onboard-orchestrator.js` |
 
 > **What door 4 is, operationally (owner, S388).** Despite living under `lib/bill/`,
 > this path is **honorarium payment-information collection only**. The apps do **not**
@@ -480,74 +508,47 @@ Building it changed the conclusion. Four doors are live today:
 
 **The map is complete, by disconfirming query.** `wmkf_contact` can only be pointed
 by `potentialReviewer.setContactLink`, so enumerating its callers bounds the set.
-Runtime callers are exactly the four above (`honorarium-onboard-orchestrator.js:369`,
-`send-emails-service.js:590`, `save-candidates-service.js:1088`,
-`manual-reviewer-service.js:264`); likewise `findOrCreateByEmail`, whose only runtime
-callers are doors 3 and 4 (`send-emails-service.js:585`,
-`honorarium-onboard-orchestrator.js:352`). Deliberately excluded, and NOT doors:
+Runtime promotion callers are candidate save, manual add, and the accepted-contact
+helper. Deliberately excluded, and NOT doors:
 `scripts/pr4-e2e.js:120-121` and `scripts/pr4-e2e-setup.js:98-100` (E2E fixtures, not
 runtime), and `lib/services/contact-bridge-service.js:156-170`, which creates contacts
 for PORTAL-LOGIN identity keyed on `wmkf_portaloid` and never sets `wmkf_contact`.
 
-**Precedent for the idempotency gap.** That same portal path gates contact creation
-on an ACTIVE ALTERNATE KEY (`contact-bridge-service.js:160`, `ensureAltKeyActive`)
-expressly so "parallel first-time bridge calls could each create a duplicate contact
-for the same OID" cannot happen. That is structurally the fix
-`BILL_CHUNK_4_DESIGN.md:209` named as the only airtight answer for the reviewer
-find-or-create race and then scoped out. **The pattern is already built and running
-in this repo on `wmkf_portaloid`** — so §4.1's duplicate-contact prerequisite has a
-working in-house model to copy rather than a design to invent.
+**Idempotency is now enforced without an email alternate key.** Genuine new
+accepted-reviewer contacts receive a UUIDv5 primary key derived from canonical
+ORCID across duplicate reviewer rows, with the global potential-reviewer ID as
+fallback when no valid ORCID exists. `claimNewAcceptedReviewerContact` submits
+the Contact create and ETag-guarded reviewer link in one atomic Dataverse
+changeset, then reconciles exact IDs after an unknown outcome. This prevents the
+prior check-then-create/link race without asserting that email is globally
+unique or leaving an orphan Contact on a losing link race.
 
-**Door 4 is already the change §4.1 proposed.** The honorarium orchestrator promotes
-the contact and writes the reviewer's self-supplied mailing address at accept, and it
-does so BEFORE the capture-only deferral short-circuit
-(`honorarium-onboard-orchestrator.js:114-133`) — so it runs today even with
-`HONORARIUM_ONBOARDING_DEFERRED=true` and BILL tabled. It seldom has anything to do
-only because door 3 already created the link at invitation time, leaving
-`ensureContact` an existing `_wmkf_contact_value` to return.
+Still to decide outside the implemented §4 boundary:
 
-So §4 is not "build accept-time promotion." It is **"remove door 3 and let door 4
-create new contacts,"** which is a far smaller and better-evidenced change than the
-original framing, and it partly answers the NO-SHIP: the accept-side machinery exists
-and is running in production.
-
-Still to decide before implementing the acceptance-side policy:
-
-- **Opt-out accepts never reach door 4** (`reviewer-acceptance-drain.js:442`). With
-  door 3 removed they would hold no contact. Probably correct — an opt-out reviewer
-  has no payment relationship — but it must be a decision, not a side effect.
 - **Doors 1 and 2 need their own policy.** They LINK pre-existing contacts rather
   than creating new ones, which is a materially different act; §4.1's create/link
   split applies here.
-- **Door 4 inherits §3.1.** `ensureContact` resolves by email and lets an email match
-  win even when ORCID identifies a different contact
-  (`honorarium-onboard-orchestrator.js:256-290`), so moving volume onto it without
-  the §4.2 identity-aware fix would relocate the wrong-contact hazard, not remove it.
-- **Idempotency.** `docs/BILL_CHUNK_4_DESIGN.md:209` (historical/tabled, cited here
-  only as a recorded observation, not as authority) names an `emailaddress1`
-  alternate key as the only airtight fix for the find-or-create race, and explicitly
-  scoped it out. It remains unbuilt and is the real answer to §4.1's duplicate-contact
-  concern.
 
-### §4.2 §3.1 is a LIVE defect, not a future risk [VERIFIED]
+### §4.2 Send overriding save's do-not-link decision [RESOLVED, S389]
 
-The same review escalated §3.1 to *do this first*, and verifying it here made it
-sharper than §3.1 originally stated. Save-time screening deliberately leaves an
+The same review escalated §3.1 to *do this first*, and verifying it made the
+historical defect sharper than §3.1 originally stated. Save-time screening leaves an
 ambiguous or conflicting contact match **unlinked** and raises a staff alert stamped
 `policyDecision: 'save_unlinked_staff_review'`
-(`save-candidates-service.js:1098-1121`). Send-time promotion then discards that
-decision entirely: it calls email-only `findOrCreateByEmail` and links whatever
-comes back (`send-emails-service.js:573-597`), with no name, ORCID, or ambiguity
-check (`contact.js:65-75`). A later accept can then overwrite that contact's
-name/title (`lib/services/reviewer-acceptance-drain.js:479-488`).
+(`save-candidates-service.js:1098-1121`). Before S389, send-time promotion then
+discarded that decision entirely: it called email-only `findOrCreateByEmail` and
+linked whatever came back, with no name, ORCID, or ambiguity check. A later
+accept could then overwrite that contact's name/title.
 
-So the system makes a careful decision not to link, and then links anyway one step
-later. **This exists in production today and is independent of every proposal in
-this document.** The S389 owner decision makes the immediate fix smaller and
-stronger: remove send-time contact creation/linking entirely, preserve the
-unlinked state, and add a regression test where save rejects a contact match and
-send later encounters the same address. Identity-aware matching remains required
-at whichever acceptance boundary is ultimately approved.
+That was the production defect at the S388 baseline. S389 removed all send-time
+contact creation/linking, so a save-time ambiguous/unlinked decision survives the
+send. Regression coverage constructs an unlinked reviewer with an ORCID, performs a
+successful invitation send, and proves the contact create/link/back-prop functions
+are not called.
+
+Acceptance does not reintroduce the bypass: it independently checks email
+ambiguity, ORCID ambiguity, email/ORCID splits, and name consistency before
+linking. Conflicts remain unlinked with a durable staff-review alert.
 
 ---
 
@@ -659,19 +660,19 @@ explicit update. Adjudication stays with the staffer; no auto-write.
 
 This is the most actionable finding in the document, and it closes the loop on §1.
 
-When a reviewer accepts and does not opt out of an honorarium, they submit their own
-contact and mailing details so they can be paid (§4.3). That is first-party evidence
-from the person, given deliberately, with an incentive to be correct — categorically
-stronger than any machine tier `emailConfidence` recognizes (`orcid`,
-`institution_page`, `scholarly_multi`).
+Every accepted reviewer now enters accepted-contact promotion, including honorarium
+opt-outs. Non-opt-outs also submit mailing/payment details; opt-outs may provide only
+the ordinary contact edits carried by acceptance. In both cases acceptance is
+first-party engagement evidence, but the amount of newly supplied address evidence
+differs. It remains stronger identity evidence than a successful send.
 
 The accept path already does a great deal with it:
 
 - captures a self-reported ORCID and stamps `wmkf_identitystatus: 'confirmed'` when
   it persists (`lib/services/reviewer-acceptance-drain.js:53-56,432-439`)
 - syncs reviewer name/title onto the contact (`syncReviewerNameTitleToContact`, `:392`)
-- writes the mailing address onto the contact
-  (`lib/bill/honorarium-onboard-orchestrator.js:108`)
+- writes any supplied mailing address onto the contact through
+  `ensureAcceptedReviewerContact`
 - runs an email-mismatch alert (`alertReviewerEmailMismatch`, `:393`)
 
 **But nothing on that path writes `emailSource` / `wmkf_emailsource`.** Established by
@@ -732,9 +733,9 @@ exception.
 
 | # | Decision | Owner | Blocking |
 | --- | --- | --- | --- |
-| 0 | **Remove send-time contact promotion** — invitation success does not merit creation/linking, and currently overrides save's deliberate do-not-link decision | **Decided by Justin, S389** | Runtime removal + regression coverage |
+| 0 | **Remove send-time contact promotion** — invitation success does not merit creation/linking | **Implemented, S389** | Done |
 | 1 | §1 option: 1 / 2 / 3R | Justin | 3R implementation |
-| 2 | Acceptance-time promotion scope (§4.1): every identity-bearing accept, or only the existing non-opt-out honorarium path | Justin | §4 acceptance-side changes |
+| 2 | Acceptance-time promotion scope (§4.1): every identity-bearing accept, including honorarium opt-outs | **Implemented, S389** | Done |
 | 3 | Contact provenance attribute(s) (§3) | Justin + Dataverse schema | §3 |
 | 4 | Durable vs disposable home for the non-response signal (§5.2) | Justin | §5 |
 | 6 | **`reviewer_confirmed` address source (§5.4)** — write the reviewer's own confirmation back to provenance; needs an explicit carve-out from §2.1 terminality | Justin | §5.4 |
@@ -754,13 +755,11 @@ traced call graph.]**
 
 ## Sequencing suggestion
 
-**Revised after the S388 review.** §4.2 goes first — it is a live defect in current
-behavior, not a proposal, and the review escalated it independently. §2.3 is already
-done. §2.2 is the cheapest remaining proposal and reopens nothing. §4 is no longer
-"the clearest feasibility evidence" — that claim was withdrawn in §4.1; it now needs
-a promotion-site map and an idempotency design before it can be scoped. §1's 3R
-still depends on the §1.1 attestation rewording. §5.3 remains mostly a UI affordance
-over data that already exists.
+**Current after S389.** §4.2, the acceptance scope, identity-aware matching, and
+idempotent new-contact creation are implemented. §2.3 is also done. §2.2 is the
+cheapest remaining proposal and reopens nothing. §1's 3R still depends on the
+§1.1 attestation rewording. §5.3 remains mostly a UI affordance over data that
+already exists.
 
 ## Verification standard for any implementation
 

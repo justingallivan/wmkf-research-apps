@@ -16,11 +16,15 @@ related:
 
 # Reviewer ORCID Back-Propagation Design (S216)
 
-**Status:** **SHIPPED** (updated 2026-07-27) — was "DESIGN rev3, build-ready for PR1". Both
-increments are live: PR1 (resolver-gated reviewer ORCIDs flow onto matched contacts at
-outreach/promotion) is `lib/services/backprop-reviewer-orcid.js` via
-`contactAdapter.setOrcidIfAbsent`; PR2 (one-shot historical catch-up of the already-eligible pool)
-is `scripts/backfill-contact-orcid.js`. Both use the fill-only, conflict-surfacing,
+**Status:** **SHIPPED helper/backfill; trigger transition is branch-only**
+(updated 2026-07-30). PR1's resolver-gated helper is live as
+`lib/services/backprop-reviewer-orcid.js` via
+`contactAdapter.setOrcidIfAbsent`; PR2's one-shot historical catch-up is
+`scripts/backfill-contact-orcid.js`. Deployed production remains on PR1's
+original send-time trigger until `codex/reviewer-contact-integration` is
+promoted. That branch removes send-time back-propagation and invokes the helper
+only after identity-safe acceptance promotion or bounded already-linked
+maintenance. Both increments use the fill-only, conflict-surfacing,
 contact-never-created safety described below. A read-only production reconciliation
 confirmed all 162 historical fills still match exactly, so the PR2 rollback window is
 closed. The ignored checkpoint sources were disposed on 2026-07-27 after their
@@ -61,10 +65,12 @@ durable cross-store join key over time — without creating or polluting contact
 ### Non-goals (explicit scope fences)
 - **No contact creation by back-prop.** The ~1,348 reviewers with no existing contact
   match stay unmatched. Creating contacts = registry pollution (fragmentation memory:
-  "de-dupe + curation, not creation"). **Clarification (Codex #11):** PR1's runtime hook
-  runs *after* the existing outreach promotion, which legitimately find-or-creates a
-  contact; filling ORCID on that just-created contact is in scope. What's out of scope
-  is creating a contact *solely* to hold an ORCID — the PR2 backfill never creates.
+  "de-dupe + curation, not creation"). **Historical clarification (Codex #11):**
+  PR1 originally ran after the then-current send-time outreach promotion. On the
+  2026-07-30 integration branch, invitation send no longer promotes or
+  back-propagates; the runtime fill follows identity-safe acceptance promotion.
+  What's out of scope is creating a contact *solely* to hold an ORCID — the PR2
+  backfill never creates.
 - **No auto-promotion.** Back-propagation must NOT set the reviewer→contact link
   (`wmkf_Contact` / `_wmkf_contact_value`) — see §8.1.
 - **No bibliometric propagation.** `contact` has only `wmkf_orcid` (no `wmkf_orcidurl`,
@@ -153,9 +159,10 @@ branch is live code, not defensive dead weight.
 
 ## 5. Shared back-prop helper (resolves Codex #7/#8/#9/#10/#22)
 
-The single most important review catch: ORCID back-prop must NOT live inline in
-`send-emails.js`. Every site that links a reviewer to a contact is a back-prop trigger.
-Encapsulate the flow in one helper:
+The single most important review catch remains: ORCID back-prop must live in
+one shared helper, not inline in a delivery route. On the integration branch,
+accepted-reviewer promotion and bounded already-linked maintenance invoke it;
+invitation send does not:
 
 ```
 backPropReviewerOrcidToContact({ reviewer, contactId, actingUserSystemId }):
@@ -169,38 +176,19 @@ Crucially it runs against `contactId (just promoted) ?? existing pointer` — **
 behind `if (!_wmkf_contact_value)` — so already-linked reviewers with an empty-ORCID
 contact are still filled (Codex #8, HIGH).
 
-> **Caller field-hydration contract (Codex confirmation pass, HIGH).** The helper reads
-> `reviewer.{wmkf_orcid, wmkf_identitystatus, _wmkf_contact_value}`. None of the three
-> call sites currently loads all three — **each caller MUST hydrate them before calling**,
-> or the helper silently no-ops (eligible→ineligible, or pointer→undefined). This is the
-> finding that keeps PR1 from being a one-line insert. Per site:
-> - **send-emails**: extend the `person` `$select` (L145) — currently
->   `…,_wmkf_contact_value` but **no** `wmkf_orcid,wmkf_identitystatus`.
-> - **honorarium**: the `reviewer` object originates from `verifySuggestionToken`
->   (`lib/external/verify-suggestion-token.js` select, ~L77) and is passed through
->   `respond.js` (~L257) — that select also lacks the three fields; extend it there.
-> - **enrich-recommended**: the endpoint **fetches then discards** the person after using
->   affiliation (~L149→L251), so `_wmkf_contact_value` is out of scope at the writeback
->   call — retain the person (or its pointer) through to the post-writeback hook.
-
-### Call sites
-1. **`pages/api/review-manager/send-emails.js`** (Codex #8) — the outreach promotion
-   block (~L300-312). Call the helper after promotion, with the just-found/created
-   `contactId` OR the existing pointer. Non-fatal (email already shipped; the helper's
-   operational throw is caught by the existing inner try/catch — confirmation pass
-   verified this does NOT move the recipient to `failed`). **The Candidates invite path
-   routes through this endpoint (Codex #10, confirmed), so it's covered for free once the
-   helper is correct.**
-2. **`lib/bill/honorarium-onboard-orchestrator.js`** (Codex #7, HIGH) — `ensureContact` /
-   the promote-on-accept fallback (L131/L142) is a *second* promotion site. Wire the same
-   helper there. Requires (a) threading `actingUserSystemId` into the orchestrator's
-   contact helpers, which they don't accept today (Codex #13), and (b) the
-   `verify-suggestion-token` select extension above — do both first.
-3. **`pages/api/workbench/enrich-recommended.js`** (Codex #9) — writes a reviewer's
-   `wmkf_orcid` + `wmkf_identitystatus` without promoting. After that identity writeback,
-   if the reviewer is already linked (`_wmkf_contact_value`), call the helper so a newly
-   eligible ORCID flows immediately instead of waiting for a later send. Keep the fetched
-   person in scope (see hydration contract above).
+> **Historical PR1 caller/hydration notes.** The original implementation had
+> three callers, including send-emails, and each needed
+> `reviewer.{wmkf_orcid, wmkf_identitystatus, _wmkf_contact_value}` hydrated.
+> Those build instructions are superseded. On the integration branch,
+> invitation send is explicitly not a caller. The current runtime callers are:
+>
+> 1. `lib/bill/honorarium-onboard-orchestrator.js`, after acceptance has
+>    validated or atomically established the reviewer→Contact link; and
+> 2. `lib/services/workbench/enrich-recommended-service.js`, as bounded
+>    maintenance for an already-linked reviewer.
+>
+> Both callers supply the required identity fields. The historical production
+> send trigger remains only until the integration branch is deployed.
 
 ### `contactAdapter.setOrcidIfAbsent(contactId, orcid, { actingUserSystemId })` contract
 - **Re-read by contactid** (Codex #12) — `getRecord('contacts', contactId, { select:
@@ -270,7 +258,8 @@ native record history. See
 ### 8.1 Auto-promotion — set the `wmkf_Contact` pointer during back-prop? → **NO**
 The pointer is **load-bearing**: `honorarium-onboard-orchestrator.js:131` (payment-onboarding
 contact), `external/review/[token]/context.js` (reviewer-facing contact name + ORCID
-prefill), `send-emails.js:302` (gates outreach promotion), `membership-service.js`,
+prefill), the historical production send-time promotion path (removed on the
+integration branch), `membership-service.js`,
 `contact-history.js`, `generate-emails.js`. Setting it on a fuzzy email match asserts
 "this reviewer IS this CRM contact" into payment + reviewer-facing flows — the
 discovery≠identity error class the resolver work exists to prevent
@@ -280,14 +269,13 @@ setting the pointer is an identity assertion (high stakes). Back-prop writes the
 field only. This decision also *bounds Codex #17*: a back-prop ORCID becomes
 reviewer-visible only after a genuine promotion sets the pointer, never on a bare match.
 
-### 8.2 Conflict surfacing — log-only, or review queue / alert? → **log-only + counters**
-**Measured conflicts = 0.** Conflict/malformed branches route to `console.warn` + the
-backfill JSONL — no `system_alerts` row or review queue. **Runtime durability (Codex #21):**
-the send-emails response already returns a per-recipient `contactPromoted` field; add an
-`orcidBackprop: {action}` sibling, and aggregate `written/noop/conflict/malformed/error`
-counters into the response so a runtime failure isn't a vanished `console.warn`. Native
-audit (§7) is the durable record. Escalate to `system_alerts` only if the conflict counter
-becomes non-trivial.
+### 8.2 Conflict surfacing — historical PR1 decision, superseded on integration branch
+
+PR1 originally used log-only send-response counters because measured conflicts
+were zero. The integration branch removes the send trigger and its counters
+from runtime behavior. A conflict or malformed Contact ORCID during acceptance
+now produces one durable reviewer-domain staff alert and terminates Contact
+follow-up without later address/honorarium mutation; operational failures retry.
 
 ### 8.3 `contact.wmkf_orcidsource` provenance field → **NOT NEEDED** (was "defer")
 Resolved by §7: native attribute auditing on `contact.wmkf_orcid` already records
@@ -313,7 +301,8 @@ schema-minimization (`feedback-human-legibility-schema-principle`). Revisit only
   table — else it passes while runtime still uses `top:1`).
 - Shared helper: eligible + already-linked (pointer set) → fills the linked contact;
   ineligible (`unresolved`/null status) → skip; no contact → skip.
-- send-emails promotion hook + honorarium `ensureContact` path both invoke the helper.
+- accepted-reviewer promotion invokes the helper after identity-safe linking;
+  invitation send deliberately does not promote or back-propagate.
 
 ## 11. Codex pre-impl disposition (all 24)
 - **Accepted as-is:** #1, #2, #4, #5, #6, #7, #8, #9, #11, #12, #13, #14, #18, #22, #23, #24,
@@ -324,16 +313,19 @@ schema-minimization (`feedback-human-legibility-schema-principle`). Revisit only
   counters).
 - **Concern accepted, fix changed:** #15 (provenance) — Codex proposed a contact source
   field; resolved instead via native Dataverse audit (§7), no schema. #16 likewise.
-- **Confirmation only:** #10 (Candidates routes through send-emails — verified true).
+- **Historical confirmation only:** #10 (the original PR1 Candidates path
+  routed through send-emails).
 
 ## 12. Phasing
-- **PR1 — ✅ SHIPPED S217** (`main` 2026-06-03): centralized ORCID normalizer +
+- **PR1 baseline — ✅ SHIPPED S217** (`main` 2026-06-03): centralized ORCID normalizer +
   ambiguity-aware contact resolver + `contactAdapter.setOrcidIfAbsent` + shared
   `backPropReviewerOrcidToContact` helper + wire all three call sites (send-emails,
   honorarium, enrich-recommended) + person-select fields + actingUserSystemId
   threading + tests (§10). Codex-reviewed (pre-impl + confirmation + an adversarial
   pass — tightened 412 detection to `err.status===412`, kept the missing-etag
-  unconditional fallback per `updateIfEmpty`).
+  unconditional fallback per `updateIfEmpty`). **Integration-branch delta
+  (2026-07-30):** send-emails is no longer a caller; identity-safe acceptance
+  promotion replaces that trigger.
 - **PR2 — ✅ SHIPPED + RAN S217**: `scripts/backfill-contact-orcid.js`
   (resolve/summary/apply/verify, group-by-contact, status_null exception). Live
   counts matched the projection exactly — **162 write / 0 conflict / 0 malformed /
@@ -350,8 +342,9 @@ schema-minimization (`feedback-human-legibility-schema-principle`). Revisit only
   applicant-suggested reviewers come from the **legacy GOapply slots**
   (`akoya_request.wmkf_potentialreviewer1..5` → existing person GUIDs, ingested by
   `/api/workbench/applicant-reviewers`), where the applicant supplies no ORCID —
-  and that path is **already covered by PR1** (those persons back-prop their ORCID
-  when staff enrich them via `enrich-recommended` or invite them via `send-emails`).
+  and that path is covered by the current helper (those persons back-prop their
+  ORCID when staff enrich them via `enrich-recommended` or after an
+  identity-bearing acceptance).
   So PR3 has zero incremental value until the intake-portal **direct** reviewer-
   capture form exists, which is a Connor-gated intake scope item, not part of this
   ORCID work.
@@ -371,22 +364,25 @@ schema-minimization (`feedback-human-legibility-schema-principle`). Revisit only
   onto `contact.wmkf_orcid` at intake (§1; the disjoint 423-row population) — do
   NOT conflate it with their suggested reviewers'.
 
-## 13. Codex confirmation-pass disposition (rev2 → rev3)
-Second pass (post-rev2): **3 RESOLVED, 3 PARTIALLY-RESOLVED, 0 new architectural issues**;
+## 13. Historical Codex confirmation-pass disposition (rev2 → rev3)
+
+The following describes the original PR1 review, not current caller
+instructions. Second pass (post-rev2): **3 RESOLVED, 3 PARTIALLY-RESOLVED, 0 new architectural issues**;
 it also independently verified `DynamicsService.updateRecord` supports `If-Match`/ETag
 (so §5 conditional PATCH is real, not a fallback) and that the operational-throw posture
-is safe inside send-emails' catch. The three partials are folded into rev3:
-- **HIGH — caller field-hydration**: the helper's three reviewer fields aren't loaded at
-  any of the three call sites today. Added the explicit hydration contract in §5
+was safe inside the then-current send-emails catch. The three partials were
+folded into rev3:
+- **HIGH — caller field-hydration**: the helper's three reviewer fields were not loaded at
+  any of the three original call sites. The review added an explicit hydration contract
   (send-emails select, `verify-suggestion-token` select for the honorarium path,
-  retain-person in enrich-recommended). This is the gating PR1 work item.
+  retain-person in enrich-recommended). This was a gating PR1 work item.
 - **MEDIUM — resolver API**: §3 now states the ambiguity-aware `resolveForBackprop` is a
   **new, separate** function; `findByEmail`/`findOrCreateByEmail` stay untouched so the
   promotion-create path keeps its record|null contract.
 - **MEDIUM — staff visibility**: §1 now records the second visibility surface — Dynamics
   Explorer exposes `contact.wmkf_orcid` to staff — **accepted as intended** (standard CRM
   field), reinforcing the corroborated-`probable` bar rather than narrowing the claim.
-- **RESOLVED, no change needed**: throw-compatible-with-send-emails, native-audit
+- **RESOLVED for that baseline**: throw-compatible-with-send-emails, native-audit
   provenance sufficiency, conditional-PATCH availability.
 
 ## 14. Reviewer-self-reported ORCID capture (PR4 — the reviewer-side twin of PR3)

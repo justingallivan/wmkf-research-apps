@@ -10,7 +10,7 @@
  * `withDalContext('review-manager-send', …)` → one service call. All
  * business logic — recipient resolution, attachment fetching, the
  * per-recipient send loop with its server-authoritative gates, lifecycle
- * updates, campaign-config persistence, ORCID back-prop — lives in
+ * updates and campaign-config persistence — lives in
  * lib/services/review-manager/send-emails-service.js, which emits events
  * through an `onEvent` callback and never touches `res`.
  *
@@ -32,8 +32,9 @@
  *
  * Data boundary: staff-shared. Any `review-manager` user can send to any
  * suggestion's reviewer; the sender attribution is the caller's session
- * email (Dynamics email activity sender + MSCRMCallerID on lifecycle and
- * contact-promotion writes when impersonation is enabled). The trusted DAL
+ * email (Dynamics email activity sender + MSCRMCallerID on lifecycle writes
+ * when impersonation is enabled). Contact promotion occurs later in the
+ * token-authenticated acceptance drain. The trusted DAL
  * context is established here because reviewer outreach is a foundation-
  * owned workflow, not user-private.
  */

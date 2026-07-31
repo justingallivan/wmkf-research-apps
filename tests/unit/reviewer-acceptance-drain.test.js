@@ -84,6 +84,7 @@ function deps(currentSuggestion = acceptedSuggestion()) {
       getById: jest.fn(async () => reviewer()),
     },
     ensureHonorarium: jest.fn(async () => ({ status: 'deferred', contactId: 'contact-1' })),
+    ensureAcceptedContact: jest.fn(async () => ({ contactId: 'contact-optout', addressCaptureError: null })),
     captureOrcid: jest.fn(async () => ({ persisted: true })),
     captureIdentity: jest.fn(async () => ({})),
     syncNameTitle: jest.fn(async () => ({})),
@@ -119,7 +120,7 @@ describe('processReviewerAcceptanceJob', () => {
       body: expect.objectContaining({ address: expect.any(Object) }),
     }));
     expect(d.captureOrcid).toHaveBeenCalledWith(expect.objectContaining({
-      contactId: '44444444-4444-4444-8444-444444444444',
+      contactId: null,
       bindingEventAt: '2026-07-01T10:00:00.000Z',
     }));
     expect(d.captureOrcid.mock.invocationCallOrder[0])
@@ -194,9 +195,57 @@ describe('processReviewerAcceptanceJob', () => {
     await processReviewerAcceptanceJob(job({ optedOut: true }), d);
 
     expect(d.ensureHonorarium).not.toHaveBeenCalled();
+    expect(d.ensureAcceptedContact).toHaveBeenCalledWith(expect.objectContaining({
+      reviewer: expect.objectContaining({ wmkf_potentialreviewersid: REVIEWER_ID }),
+      suggestion: expect.objectContaining({ wmkf_appreviewersuggestionid: SUGGESTION_ID }),
+      body: expect.objectContaining({ contactEdits: expect.any(Object) }),
+    }));
     expect(d.captureOrcid).toHaveBeenCalled();
+    expect(d.syncNameTitle).toHaveBeenCalledWith(expect.objectContaining({
+      contactId: 'contact-optout',
+    }));
     expect(d.sendAcceptanceEmail).toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).toHaveBeenCalled();
+  });
+
+  it('opt-out identity conflict remains unlinked, alerts staff, and terminates without retry churn', async () => {
+    const d = deps(acceptedSuggestion({ wmkf_honorariumoptout: true }));
+    const conflict = Object.assign(new Error('accepted reviewer contact requires staff identity review'), {
+      code: 'accepted_reviewer_contact_identity_review_required',
+      retryable: false,
+    });
+    d.potentialReviewers.getById.mockResolvedValueOnce(reviewer({ _wmkf_contact_value: null }));
+    d.ensureAcceptedContact.mockRejectedValueOnce(conflict);
+
+    await expect(processReviewerAcceptanceJob(job({ optedOut: true }), d)).rejects.toBe(conflict);
+
+    expect(d.notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'accepted_reviewer_contact_promotion_failed',
+      metadata: expect.objectContaining({
+        potentialReviewerId: REVIEWER_ID,
+        optedOut: true,
+        code: 'accepted_reviewer_contact_identity_review_required',
+      }),
+    }));
+    expect(d.syncNameTitle).toHaveBeenCalledWith(expect.objectContaining({ contactId: null }));
+    expect(d.sendAcceptanceEmail).toHaveBeenCalled();
+    expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
+  });
+
+  it('does not duplicate an identity-review alert already emitted by contact promotion', async () => {
+    const d = deps(acceptedSuggestion({ wmkf_honorariumoptout: true }));
+    const conflict = Object.assign(new Error('staff review required'), {
+      code: 'accepted_reviewer_contact_identity_review_required',
+      retryable: false,
+      staffAlerted: true,
+    });
+    d.ensureAcceptedContact.mockRejectedValueOnce(conflict);
+
+    await expect(processReviewerAcceptanceJob(job({ optedOut: true }), d)).rejects.toBe(conflict);
+
+    expect(d.notify).not.toHaveBeenCalledWith(expect.objectContaining({
+      type: 'accepted_reviewer_contact_promotion_failed',
+    }));
   });
 
   it('cancels immediately when the reviewer already withdrew', async () => {
@@ -212,6 +261,7 @@ describe('processReviewerAcceptanceJob', () => {
       reason: 'reviewer_withdrew_before_materials',
     });
     expect(d.ensureHonorarium).not.toHaveBeenCalled();
+    expect(d.ensureAcceptedContact).not.toHaveBeenCalled();
     expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
     expect(d.quota).not.toHaveBeenCalled();
   });
@@ -355,6 +405,23 @@ describe('processReviewerAcceptanceJob', () => {
       type: 'honorarium_capture_failed',
       autoResolveKey: `honorarium_capture_failed:${SUGGESTION_ID}`,
     }));
+    expect(d.sendAcceptanceEmail).toHaveBeenCalled();
+    expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
+  });
+
+  it('keeps full-mode address failures retryable instead of silently finalizing', async () => {
+    const d = deps();
+    d.ensureHonorarium.mockResolvedValueOnce({
+      status: 'alert_only',
+      contactId: 'contact-1',
+      honorariumRequestId: 'hon-1',
+      addressCaptureError: 'Dataverse contact PATCH failed',
+    });
+
+    await expect(processReviewerAcceptanceJob(job(), d)).rejects.toMatchObject({
+      message: expect.stringContaining('address_capture_failed'),
+      retryable: true,
+    });
     expect(d.sendAcceptanceEmail).toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
   });

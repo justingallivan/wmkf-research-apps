@@ -3,10 +3,10 @@ title: "Reviewer Architecture — Mental Model"
 domain: reviewer-workbench
 kind: spec
 status: active
-summary: "Plus, when a potential reviewer is first invited:."
+summary: "Current reviewer person, engagement, invitation, and acceptance-promotion mental model."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-07-26
+last_verified: 2026-07-30
 owner: product-engineering
 related:
   - docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md
@@ -16,7 +16,14 @@ related:
 
 # Reviewer Architecture — Mental Model
 
-> **⚠ SUPERSEDED IN PART (S213, 2026-06-02): now TWO core tables, not three.** The `wmkf_appresearcher` bibliometric sidecar was collapsed onto `wmkf_potentialreviewers` and **dropped** — h-index/citations/affiliation/ORCID/Scholar now live directly on the person row, written by `adapters/researcher.js` (repointed to the person). Everywhere below shows a 1:1 `wmkf_appresearcher` sidecar; **read it as folded into `wmkf_potentialreviewers`**. The "Why three tables" rationale (avoid churning identity on metric refresh) didn't survive scrutiny — see `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md` and the "What changed" note in `docs/REVIEWER_DATA_MODEL.md`. The diagrams/steps below are kept as the historical 3-table mental model.
+> **Release boundary (2026-07-30):** the acceptance-promotion flow below is
+> implemented and test-covered on `codex/reviewer-contact-integration`, not yet
+> deployed. Production remains on the prior send-time promotion release until
+> this branch is deliberately promoted. The integration-branch contract is that
+> invitation send never creates/links a Contact or back-propagates ORCID;
+> identity-bearing acceptance does.
+
+> **⚠ SUPERSEDED IN PART (S213, 2026-06-02): now TWO core tables, not three.** The `wmkf_appresearcher` bibliometric sidecar was collapsed onto `wmkf_potentialreviewers` and **dropped** — h-index/citations/affiliation/ORCID/Scholar now live directly on the person row, written by `adapters/researcher.js` (repointed to the person). Any historical diagram below that shows a 1:1 `wmkf_appresearcher` sidecar should be read as folded into `wmkf_potentialreviewers`. Current prose and flow steps describe the two-table model and acceptance-time promotion. See `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md` and the "What changed" note in `docs/REVIEWER_DATA_MODEL.md`.
 
 ## The two Dataverse tables (live in prod — cutover W3–W6 complete 2026-05-12; S213 collapse complete)
 
@@ -37,11 +44,11 @@ wmkf_appreviewersuggestion  ← one row per (person, request)
 akoya_request               ← the proposal
 ```
 
-Plus, when a potential reviewer is first invited:
+Then, when a reviewer accepts (including an honorarium opt-out):
 
 ```
 wmkf_potentialreviewers ──── wmkf_contact ───► contact
-                             (lookup, set on first outreach)
+                             (identity-aware acceptance promotion)
 ```
 
 ## Why two tables, not one
@@ -60,7 +67,13 @@ The split exists so the same person can have an unbounded number of suggestion r
 - **Bibliometrics ↔ potentialreviewer:** h-index/citations/affiliation/ORCID/Scholar fields live directly on `wmkf_potentialreviewers` after S213.
 - **Suggestion → request:** `_wmkf_request_value` → `akoya_request`.
 - **Suggestion → person:** `_wmkf_potentialreviewer_value` → `wmkf_potentialreviewers`.
-- **Promotion to CRM contact:** `wmkf_contact` lookup on `wmkf_potentialreviewers` (set when staff first reaches out — a potential reviewer becomes a real CRM contact at first invitation).
+- **Promotion to CRM contact:** `wmkf_contact` lookup on
+  `wmkf_potentialreviewers`. Invitation send does not set it. An
+  identity-bearing acceptance promotes through an ambiguity-aware resolver;
+  honorarium opt-outs promote too, while declines do not. Existing links must
+  pass active-state and identity validation before Contact mutation. New
+  Contacts use an ORCID-scoped deterministic ID (reviewer-ID fallback) and the
+  Contact create plus reviewer link commit in one ETag-guarded changeset.
 
 ## How a reviewer flows through the system
 
@@ -69,8 +82,12 @@ The split exists so the same person can have an unbounded number of suggestion r
    - Upsert `wmkf_potentialreviewers` by email (creates or fills empty; writes bibliometrics onto the person).
    - Upsert `wmkf_appreviewersuggestion` on (person, request) with score/reason/sources, `selected=true`.
 3. **Selection** — staff reviews candidates; `wmkf_selected` toggles on the suggestion row.
-4. **Invitation** — Review Manager sends email; on first contact, person is promoted to CRM `contact` (link via `wmkf_contact`). Suggestion row's lifecycle fields populate: `wmkf_invited`, `wmkf_emailsentat`, `wmkf_responsereceivedat`, etc.
-5. **Outreach lifecycle** — accept/decline, materials sent, reminders, review received, thank-you all timestamp on the suggestion row.
+4. **Invitation** — Review Manager sends email without creating or linking a CRM
+   `contact`. Suggestion-row invitation lifecycle fields populate.
+5. **Outreach lifecycle** — an identity-bearing acceptance promotes to CRM
+   `contact` (including honorarium opt-outs); a decline does not. Accept/decline,
+   materials sent, reminders, review received, and thank-you all timestamp on
+   the suggestion row.
 
 ## Existing parallel: the `akoya_request` 5 slots
 
