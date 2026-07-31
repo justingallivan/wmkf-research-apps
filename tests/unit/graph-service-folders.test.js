@@ -94,3 +94,48 @@ it('reuses a supplied site id when resolving a drive', async () => {
   expect(siteSpy).not.toHaveBeenCalled();
   expect(global.fetch.mock.calls[0][0]).toContain('/sites/known-site/drives');
 });
+
+it('reads current file metadata by encoded stable drive and item identity', async () => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn().mockResolvedValueOnce(response(200, {
+    id: 'item/id',
+    name: 'Current Assessment.docx',
+    size: 125,
+    webUrl: 'https://example.sharepoint.com/current',
+    eTag: '"current-etag"',
+    cTag: '"current-ctag"',
+    lastModifiedDateTime: '2026-07-31T01:33:55Z',
+    file: {
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    },
+    publication: { versionId: '2.0' },
+    parentReference: { driveId: 'drive/id' },
+  }));
+
+  await expect(GraphService.getFileMetadataById(
+    'drive/id',
+    'item/id',
+    { siteId: 'site' },
+  )).resolves.toEqual({
+    siteId: 'site',
+    driveId: 'drive/id',
+    id: 'item/id',
+    name: 'Current Assessment.docx',
+    size: 125,
+    webUrl: 'https://example.sharepoint.com/current',
+    eTag: '"current-etag"',
+    versionId: '2.0',
+    lastModified: '2026-07-31T01:33:55Z',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    parentReference: { driveId: 'drive/id' },
+  });
+  expect(global.fetch.mock.calls[0][0]).toContain('/drives/drive%2Fid/items/item%2Fid');
+});
+
+it('returns null when a stable Graph item no longer exists', async () => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn().mockResolvedValueOnce(response(404));
+
+  await expect(GraphService.getFileMetadataById('drive', 'missing-item'))
+    .resolves.toBeNull();
+});

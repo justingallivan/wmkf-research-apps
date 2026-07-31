@@ -60,8 +60,12 @@ hood.
 > registry row, AI run, SharePoint item, and version. An attributed
 > substantive edit then advanced the same stable item to SharePoint version
 > `2.0`, replaced the Foundation Opportunity marker, and remained discoverable
-> through both consumers. The pilot is not closed because current-version
-> refresh/display and target-library controls remain unverified.
+> through both consumers. **[VERIFIED on branch
+> `codex/initial-assessment-current-metadata` via source and focused tests
+> 2026-07-30; not yet deployed]** response-only current metadata refresh by
+> stable drive/item identity is implemented. The pilot is not closed because
+> UI display, live Production verification, and target-library controls remain
+> unverified.
 > **[VERIFIED via owner decisions 2026-07-28
 > and 2026-07-30, repository source,
 > production Dataverse/Graph probes, and signed-in consumer checks
@@ -86,12 +90,14 @@ hood.
   full Editor Dashboard filters, preview/version context, or Reviewed progress
   contract below.
 - **Current metadata readback (pilot gap observed 2026-07-30 local /
-  2026-07-31 UTC):** native Word editing preserves stable item identity, but
-  the current registry/read model retains upload-time eTag, version, size, and
-  last-modified values. After Request `1003109` advanced to Graph version
-  `2.0`, Dataverse still reported version `1.0`, and neither consumer rendered
-  current version context. The target contract below still requires a
-  Graph-current refresh/display strategy.
+  2026-07-31 UTC; backend refresh implemented locally 2026-07-30):** native
+  Word editing preserves stable item identity, while Dataverse intentionally
+  remains the upload/finalization snapshot. The branch read model queries
+  current metadata by stable drive/item ID, overlays successful Graph values
+  in the response only, and distinguishes `current`, `missing`, and
+  `unavailable` without path guessing or registry writes. Neither consumer yet
+  renders current version context; deployment and live Request `1003109`
+  verification also remain open.
 - **Replacement/current rule (deployed; exact-input retry exercised):**
   changed authoritative inputs or cycle produce a distinct generation row. The
   replacement's Ready transition and prior-Ready supersession are one

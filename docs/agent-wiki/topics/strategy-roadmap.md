@@ -73,8 +73,10 @@ document inventory, and individual implementation plans do not establish priorit
   row/run/SharePoint item and version without another model call or upload.
   An attributed substantive edit then advanced that same stable item to
   SharePoint version `2.0`, replaced the Foundation Opportunity marker, and
-  remained reachable through both consumers. Graph-current metadata
-  refresh/display and target-library controls remain open. See
+  remained reachable through both consumers. Response-only Graph-current
+  refresh by stable identity is implemented and locally verified on
+  `codex/initial-assessment-current-metadata`; UI display, deployment/live
+  verification, and target-library controls remain open. See
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
 - Pre-Site input direction (owner-decided 2026-07-28): draft factual material
   from the full proposal through an iterated governed `phase-ii.summarize`;
@@ -167,8 +169,10 @@ document inventory, and individual implementation plans do not establish priorit
   production-proved canonical input, exact-input reuse, new-run lineage, and
   interrupted-finalization recovery using the same row/run/item/version.
   Attributed substantive editing then passed on the same stable item through
-  both consumers. Current-version refresh/display and library controls remain
-  open. See the near-term plan.
+  both consumers. Response-only current-version refresh is implemented and
+  locally verified on `codex/initial-assessment-current-metadata`; UI display,
+  deployment/live verification, and library controls remain open. See the
+  near-term plan.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel: `project-virtual-review-panel`.
 - Roadmap snapshots: `project-app-roadmap-2026-04-25`, `project-phase-i-summary-app-winddown`.

@@ -3,7 +3,7 @@ title: Dataverse wmkf_requestdocument
 domain: application-state
 kind: atlas
 status: active
-summary: Governed request-artifact registry; Request 1003109 proves generation, recovery, and attributed editing, while current-version readback and library controls remain open.
+summary: Governed request-artifact registry; Request 1003109 proves generation, recovery, and attributed editing, while the current-metadata UI/deploy proof and library controls remain open.
 canonical: false
 owner: product-engineering
 related:
@@ -45,8 +45,9 @@ canonical Word file created a native SharePoint version. At that point, the
 broader pilot was not complete: the source was an old Phase I proposal rather than the approved
 Phase II reviewer package and no substantive staff content edit was verified.
 Request `1003109` later closed the canonical-input, recovery, and substantive
-edit gaps; current-version readback and target-library controls remain. Exact
-evidence:
+edit gaps. Response-only current-version readback is locally verified on
+`codex/initial-assessment-current-metadata`; UI display, deployment/live
+verification, and target-library controls remain. Exact evidence:
 `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`.
 
 **[VERIFIED DEPLOYED AND PRODUCTION-EXERCISED 2026-07-30]** Production
@@ -81,17 +82,26 @@ substantive edit advanced Request `1003109`'s stable SharePoint item to version
 `2.0`; Foundation Opportunity contains staff-authored content and no
 `STAFF INPUT REQUIRED` marker. Both consumers still open the same item.
 Dataverse retains the upload-time version `1.0`, eTag, size, and last-modified
-values, however, and neither current consumer displays version context. The
-registry fields are therefore an upload/finalization snapshot today, not
-Graph-current metadata after native Word edits.
+values, however. The registry fields are therefore an upload/finalization
+snapshot, not Graph-current metadata after native Word edits.
+
+**[VERIFIED on branch `codex/initial-assessment-current-metadata` via source
+and focused tests 2026-07-30; not yet deployed]** the shared read model now
+uses stable Graph drive/item identity to overlay response-only current
+name/size/link/version/eTag/last-modified metadata. Successful reads are marked
+`current`; 404, transient failure, and incomplete-identity cases preserve the
+registry snapshot as `missing` or `unavailable` and never guess by path or
+write Dataverse. Request and cycle reads deduplicate identical identities and
+cap Graph concurrency at eight. Consumer display and live Production
+verification remain open.
 
 ## Ownership
 
 - SharePoint owns editable Word bytes and native version history.
 - `wmkf_requestdocument` owns the request/cycle relationship, typed artifact and
   lifecycle state, producer operation state, stable Graph site/drive/item
-  identity, current eTag/version metadata, and prompt/run/input/template/content
-  provenance.
+  identity, upload/finalization eTag/version snapshot, and
+  prompt/run/input/template/content provenance.
 - `akoya_request.wmkf_CurrentInitialAssessment` is the request-level canonical
   pointer and shared concurrency fence for Initial Assessment activation.
 - Workbench and the pilot locator consume the same registry row; neither joins
@@ -179,7 +189,8 @@ transition.
    exact-input reuse, new-run request lineage, and interrupted-finalization
    recovery using the same row/run/SharePoint item and version. An attributed
    substantive edit on the stable item then passed through both consumers.
-   Current-version refresh/display and target-library protection checks remain
-   open.
+   Response-only current-version refresh is implemented and locally verified
+   on `codex/initial-assessment-current-metadata`; UI display, Production
+   verification, and target-library protection checks remain open.
 
 No live command in this sequence is authorized merely by this page.

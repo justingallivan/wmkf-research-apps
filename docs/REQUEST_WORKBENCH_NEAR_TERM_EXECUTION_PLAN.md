@@ -75,10 +75,12 @@ interrupted-finalization exercise then restored the same registry row,
 request pointer, AI run, and SharePoint item/version without another model
 call or upload. An attributed substantive staff edit then advanced the same
 item to SharePoint version `2.0`, replaced the Foundation Opportunity marker,
-and remained discoverable through both consumers. The edit showed that the
-current read model retains upload-time version `1.0` metadata, so
-current-version refresh/display and target-library protection checks remain
-required before the pilot is complete.
+and remained discoverable through both consumers. The edit showed that
+Dataverse retains upload-time version `1.0` metadata. Response-only
+Graph-current refresh is implemented and locally verified on
+`codex/initial-assessment-current-metadata`; UI display, deployment/live
+verification, and target-library protection checks remain required before the
+pilot is complete.
 Passing this draft-functional gate is not a broad production-readiness claim
 and does not require the later Pre-Site, Site Visit, or Final slices to be
 built by August 10.
@@ -715,8 +717,10 @@ Explicit non-goals during design freeze:
 > clean initial error scan. Requests `1002788` and `1003109` now provide the
 > controlled production evidence described above. Request `1003109`'s
 > attributed substantive edit then passed through both consumers on stable
-> SharePoint item identity. The remaining pilot acceptance work is
-> Graph-current version/last-modified refresh and display plus the
+> SharePoint item identity. Response-only Graph-current
+> version/last-modified refresh is implemented and locally verified on
+> `codex/initial-assessment-current-metadata`. The remaining pilot acceptance
+> work is deployment/live verification, consumer display, and the
 > target-library restore, recycle, retention, permission, and
 > milestone-snapshot checks.
 
@@ -917,8 +921,9 @@ Owner-decided:
     interrupted-finalization recovery using the same row/run/item/version.
     The subsequent attributed substantive edit advanced that same item to
     SharePoint version `2.0` and remained reachable through both consumers.
-    Current-version metadata refresh/display and target-library controls remain
-    open. The owner
+    Response-only current-version metadata refresh is implemented and locally
+    verified on branch `codex/initial-assessment-current-metadata`; UI display,
+    deployment/live verification, and target-library controls remain open. The owner
     accepts service-principal attribution for system-generated Dataverse
     registry writes; SharePoint native version attribution remains the
     required human-edit audit surface.
@@ -929,9 +934,10 @@ Still required:
    testers, the exact pilot schedule, and deadlines for later lifecycle stages;
 2. first approved Pre-Site Word template and prompt/template compatibility
    contract;
-3. target-library configuration/readback for the decided request-relative
-   SharePoint destination; the production Dataverse registry/pointer
-   provisioning and readback are complete;
+3. deployment/live verification of the stable-identity Graph metadata
+   read-through plus UI display, and target-library configuration/readback for
+   the decided request-relative SharePoint destination; the production
+   Dataverse registry/pointer provisioning and readback are complete;
 4. target-library version, retention, recycle, and permission audit;
 5. exact Dataverse schema and dossier read model for the decided Site Visit
    metadata, material categories, and observations;

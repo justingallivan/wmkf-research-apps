@@ -179,11 +179,13 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
     Justin's user identity, on the same stable SharePoint item
     `01G4GVMS3U3DHMJQ7GERBLB2QA3SYTLNHO`. Read-only DOCX inspection found no
     remaining `STAFF INPUT REQUIRED` marker, and both the per-request Workbench
-    and D26 locator still open the same item. The Dataverse registry still
-    carries upload-time version `1.0` metadata and neither consumer currently
-    renders version/last-modified context. Current-version refresh/display and
-    target-library restore, recycle, retention, permission, and milestone
-    controls remain open.
+    and D26 locator still open the same item. The Dataverse registry correctly
+    remains an upload/finalization snapshot at version `1.0`, and neither
+    consumer currently renders version/last-modified context. Response-only
+    Graph-current refresh is implemented and locally verified on
+    `codex/initial-assessment-current-metadata`; UI display, deployment/live
+    verification, and target-library restore, recycle, retention, permission,
+    and milestone controls remain open.
 
 ### Commits
 
@@ -209,9 +211,12 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    interrupted-finalization recovery passed on Request `1003109`. The
    attributed substantive edit, including Foundation Opportunity, also passed,
    and both consumers still resolve the same stable item. Refresh and display
-   Graph-current version/last-modified metadata after native Word edits, then
-   finish target-library restore, recycle-bin, retention, permission, and
-   milestone checks before describing the artifact system as production-ready.
+   Response-only Graph-current version/last-modified refresh by stable
+   drive/item identity is implemented and locally verified on
+   `codex/initial-assessment-current-metadata`; deploy/live-verify it and expose
+   the context in both consumers, then finish target-library restore,
+   recycle-bin, retention, permission, and milestone checks before describing
+   the artifact system as production-ready.
 
 2. **Exercise address attestation only when a truthful eligible production row exists.**
    Evidence: the signed-in Workbench inspection covered requests `1002912` and `1002874`.
@@ -230,10 +235,11 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    Evidence: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
    The pilot registry schema and governed prompt v1 are live in Production; the
    application, applicant-title (`akoya_title`) source, and staff-authored
-   Foundation Opportunity requirement are implemented in source. Verify
-   Graph-current SharePoint version/last-modified readback, restore, recycle,
-   retention, permission, and milestone-snapshot behavior against the dedicated
-   production dummy requests before the controlled rehearsal. The generic registry has
+   Foundation Opportunity requirement are implemented in source. Deploy and
+   live-verify the branch's Graph-current SharePoint version/last-modified
+   readback, then verify restore, recycle, retention, permission, and
+   milestone-snapshot behavior against the dedicated production dummy
+   requests. The generic registry has
    source-document/version/hash fields, but this pilot producer currently fingerprints
    the extracted canonical reviewer-proposal content rather than binding a governed source
    artifact/version; decide whether that stronger lineage is required before rehearsal.

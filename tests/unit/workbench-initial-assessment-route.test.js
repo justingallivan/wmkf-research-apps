@@ -15,7 +15,10 @@ jest.mock('../../lib/services/initial-assessment/artifact-service', () => ({
 }));
 
 import { requireAppAccess } from '../../lib/utils/auth';
-import { generateInitialAssessment } from '../../lib/services/initial-assessment/artifact-service';
+import {
+  generateInitialAssessment,
+  listInitialAssessmentArtifacts,
+} from '../../lib/services/initial-assessment/artifact-service';
 import handler from '../../pages/api/workbench/initial-assessment';
 import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument';
 
@@ -47,6 +50,37 @@ beforeEach(() => {
   generateInitialAssessment.mockResolvedValue({
     artifact: { operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY },
     reused: true,
+  });
+  listInitialAssessmentArtifacts.mockResolvedValue({
+    success: true,
+    artifacts: [{
+      artifactId: '44444444-4444-4444-4444-444444444444',
+      file: {
+        itemId: 'stable-item',
+        versionId: '2.0',
+        metadataStatus: 'current',
+      },
+    }],
+    latestAttempts: [],
+  });
+});
+
+it('returns the service current-metadata status for a request-scoped GET', async () => {
+  const res = responseHarness();
+  await handler({
+    method: 'GET',
+    query: { requestId: REQUEST_ID },
+  }, res);
+
+  expect(res.statusCode).toBe(200);
+  expect(listInitialAssessmentArtifacts).toHaveBeenCalledWith({
+    requestId: REQUEST_ID,
+    cycleCode: null,
+  });
+  expect(res.body.artifacts[0].file).toMatchObject({
+    itemId: 'stable-item',
+    versionId: '2.0',
+    metadataStatus: 'current',
   });
 });
 

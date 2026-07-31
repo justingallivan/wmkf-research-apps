@@ -27,6 +27,7 @@ jest.mock('../../lib/services/workbench-proposal-documents.js', () => ({
 }));
 jest.mock('../../lib/services/graph-service.js', () => ({
   GraphService: {
+    getFileMetadataById: jest.fn(),
     getFileMetadataByPath: jest.fn(),
     ensureFolderPath: jest.fn(),
     downloadFile: jest.fn(),
@@ -232,6 +233,7 @@ beforeEach(() => {
     },
   });
   GraphService.getFileMetadataByPath.mockResolvedValue(null);
+  GraphService.getFileMetadataById.mockResolvedValue(null);
   GraphService.deleteFile.mockResolvedValue(undefined);
   GraphService.ensureFolderPath.mockResolvedValue({
     siteId: 'site',
@@ -1278,6 +1280,136 @@ it('keeps the canonical Ready artifact while exposing a newer failed attempt sep
     .toBe(REQUEST_DOCUMENT_OPERATION_STATUS.FAILED);
 });
 
+it('refreshes file metadata from the stable Graph identity without writing Dataverse', async () => {
+  const ready = registryRow({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_sharepointsiteid: 'site',
+    wmkf_sharepointdriveid: 'drive',
+    wmkf_sharepointitemid: 'ready-item',
+    wmkf_sharepointweburl: 'https://example.sharepoint.com/old',
+    wmkf_sharepointversionid: '1.0',
+    wmkf_sharepointetag: '"old-etag"',
+    wmkf_filename: 'old-name.docx',
+    wmkf_filesize: 100,
+    wmkf_sharepointlastmodified: '2026-07-29T12:00:00Z',
+  });
+  requestDocumentAdapter.findByRequest.mockResolvedValue({ records: [ready] });
+  request._wmkf_currentinitialassessment_value = ready.wmkf_requestdocumentid;
+  GraphService.getFileMetadataById.mockResolvedValue({
+    siteId: 'site',
+    driveId: 'drive',
+    id: 'ready-item',
+    webUrl: 'https://example.sharepoint.com/current',
+    versionId: '2.0',
+    eTag: '"current-etag"',
+    name: 'current-name.docx',
+    size: 125,
+    lastModified: '2026-07-31T01:33:55Z',
+  });
+
+  const result = await listInitialAssessmentArtifacts({ requestId: REQUEST_ID });
+
+  expect(GraphService.getFileMetadataById).toHaveBeenCalledWith(
+    'drive',
+    'ready-item',
+    { siteId: 'site' },
+  );
+  expect(result.artifacts[0].file).toMatchObject({
+    itemId: 'ready-item',
+    webUrl: 'https://example.sharepoint.com/current',
+    versionId: '2.0',
+    eTag: '"current-etag"',
+    name: 'current-name.docx',
+    size: 125,
+    lastModified: '2026-07-31T01:33:55Z',
+    metadataStatus: 'current',
+  });
+  expect(result.artifacts[0].file.metadataCheckedAt).toBeTruthy();
+  expect(requestDocumentAdapter.update).not.toHaveBeenCalled();
+});
+
+it('labels a missing Graph item without presenting the registry snapshot as current', async () => {
+  const ready = registryRow({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_sharepointsiteid: 'site',
+    wmkf_sharepointdriveid: 'drive',
+    wmkf_sharepointitemid: 'missing-item',
+    wmkf_sharepointversionid: '1.0',
+    wmkf_sharepointetag: '"snapshot-etag"',
+    wmkf_sharepointlastmodified: '2026-07-29T12:00:00Z',
+  });
+  requestDocumentAdapter.findByRequest.mockResolvedValue({ records: [ready] });
+  request._wmkf_currentinitialassessment_value = ready.wmkf_requestdocumentid;
+  GraphService.getFileMetadataById.mockResolvedValue(null);
+
+  const result = await listInitialAssessmentArtifacts({ requestId: REQUEST_ID });
+
+  expect(result.artifacts[0].file).toMatchObject({
+    itemId: 'missing-item',
+    versionId: '1.0',
+    eTag: '"snapshot-etag"',
+    lastModified: '2026-07-29T12:00:00Z',
+    metadataStatus: 'missing',
+  });
+  expect(result.artifacts[0].file.metadataCheckedAt).toBeTruthy();
+});
+
+it('labels transient Graph failures without discarding the registry snapshot', async () => {
+  const ready = registryRow({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_sharepointsiteid: 'site',
+    wmkf_sharepointdriveid: 'drive',
+    wmkf_sharepointitemid: 'temporarily-unavailable-item',
+    wmkf_sharepointversionid: '1.0',
+    wmkf_sharepointetag: '"snapshot-etag"',
+  });
+  requestDocumentAdapter.findByRequest.mockResolvedValue({ records: [ready] });
+  request._wmkf_currentinitialassessment_value = ready.wmkf_requestdocumentid;
+  GraphService.getFileMetadataById.mockRejectedValue(Object.assign(
+    new Error('Graph unavailable'),
+    { status: 503, code: 'graph_unavailable' },
+  ));
+  const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+  const result = await listInitialAssessmentArtifacts({ requestId: REQUEST_ID });
+
+  expect(result.success).toBe(true);
+  expect(result.artifacts[0].file).toMatchObject({
+    itemId: 'temporarily-unavailable-item',
+    versionId: '1.0',
+    eTag: '"snapshot-etag"',
+    metadataStatus: 'unavailable',
+  });
+  expect(warning).toHaveBeenCalledWith(
+    '[initial-assessment] current SharePoint metadata unavailable',
+    expect.objectContaining({
+      artifactId: ready.wmkf_requestdocumentid,
+      status: 503,
+      code: 'graph_unavailable',
+    }),
+  );
+});
+
+it('labels an incomplete stable identity unavailable without guessing by path', async () => {
+  const ready = registryRow({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_sharepointdriveid: null,
+    wmkf_sharepointitemid: 'item-without-drive',
+    wmkf_sharepointversionid: '1.0',
+  });
+  requestDocumentAdapter.findByRequest.mockResolvedValue({ records: [ready] });
+  request._wmkf_currentinitialassessment_value = ready.wmkf_requestdocumentid;
+
+  const result = await listInitialAssessmentArtifacts({ requestId: REQUEST_ID });
+
+  expect(result.artifacts[0].file).toMatchObject({
+    itemId: 'item-without-drive',
+    versionId: '1.0',
+    metadataStatus: 'unavailable',
+  });
+  expect(GraphService.getFileMetadataById).not.toHaveBeenCalled();
+});
+
 it('fails closed when a non-null request pointer does not resolve to the active Ready row', async () => {
   const ready = registryRow({
     wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
@@ -1357,6 +1489,60 @@ it('loads request pointers in bounded batches when a cycle contains more than 10
   expect(grantRequestAdapter.findByIds).toHaveBeenCalledTimes(3);
   expect(grantRequestAdapter.findByIds.mock.calls.map(([ids]) => ids.length))
     .toEqual([50, 50, 1]);
+});
+
+it('bounds and deduplicates current Graph metadata reads across a cycle', async () => {
+  const requestIds = Array.from({ length: 10 }, (_, index) => (
+    `${String(index + 1).padStart(8, '0')}-1111-1111-1111-111111111111`
+  ));
+  const rows = requestIds.map((ownerRequestId, index) => registryRow({
+    wmkf_requestdocumentid:
+      `${String(index + 2001).padStart(8, '0')}-2222-2222-2222-222222222222`,
+    wmkf_generationkey: String(index).padStart(64, '0'),
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_sharepointsiteid: 'site',
+    wmkf_sharepointdriveid: 'drive',
+    wmkf_sharepointitemid: index === 9 ? 'item-8' : `item-${index}`,
+    _wmkf_request_value: ownerRequestId,
+    createdon: `2026-07-29T12:${String(index).padStart(2, '0')}:00Z`,
+  }));
+  const rowByRequest = new Map(rows.map((row) => [row._wmkf_request_value, row]));
+  requestDocumentAdapter.findByCycle.mockResolvedValue({ records: rows });
+  grantRequestAdapter.findByIds.mockImplementation(async (ids) => ({
+    records: ids.map((id) => ({
+      ...request,
+      akoya_requestid: id,
+      _wmkf_currentinitialassessment_value: rowByRequest.get(id).wmkf_requestdocumentid,
+    })),
+  }));
+  let activeReads = 0;
+  let maxActiveReads = 0;
+  GraphService.getFileMetadataById.mockImplementation(async (driveId, itemId, { siteId }) => {
+    activeReads += 1;
+    maxActiveReads = Math.max(maxActiveReads, activeReads);
+    await new Promise((resolve) => setTimeout(resolve, 1));
+    activeReads -= 1;
+    return {
+      siteId,
+      driveId,
+      id: itemId,
+      name: `${itemId}.docx`,
+      size: 100,
+      webUrl: `https://example.sharepoint.com/${itemId}`,
+      eTag: `"${itemId}"`,
+      versionId: '2.0',
+      lastModified: '2026-07-31T01:33:55Z',
+    };
+  });
+
+  const result = await listInitialAssessmentArtifacts({ cycleCode: 'D26' });
+
+  expect(result.artifacts).toHaveLength(10);
+  expect(result.artifacts.every((artifact) => artifact.file.metadataStatus === 'current'))
+    .toBe(true);
+  expect(GraphService.getFileMetadataById).toHaveBeenCalledTimes(9);
+  expect(maxActiveReads).toBeLessThanOrEqual(8);
+  expect(maxActiveReads).toBeGreaterThan(1);
 });
 
 it('derives staff-wide dashboard cycles from the artifact registry, not PD-scoped requests', async () => {
