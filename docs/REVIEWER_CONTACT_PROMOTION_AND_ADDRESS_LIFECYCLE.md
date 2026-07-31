@@ -322,7 +322,17 @@ where it becomes canonical.
 
 ---
 
-## §4 — Promotion is triggered by send success, not delivery
+## §4 — Send-time promotion is rejected; acceptance scope remains open
+
+### Owner decision [DECIDED, S389]
+
+Successfully sending an invitation does **not** merit promotion to `contacts`.
+Door 3 in §4.3 must be removed. Invitation and non-response history remains on
+the reviewer/suggestion records; it does not require a canonical contact.
+
+This decision does not by itself settle whether every identity-bearing
+acceptance should promote, including honorarium opt-outs. That narrower boundary
+remains open below.
 
 ### Today [VERIFIED]
 
@@ -387,7 +397,7 @@ narrower and is stated in §4.1.
   which came from never-answered invitations is a **separate read-only
   investigation**. No deletion is proposed here.
 
-### The genuine tradeoff — needs a human answer, not a code answer
+### Accepted tradeoff
 
 An invited-but-unresponsive reviewer would no longer exist as a `contacts` row.
 If staff look people up in the CRM contact list to see who has been approached,
@@ -396,7 +406,8 @@ it. The information is not lost — the reviewer and suggestion rows retain name
 address, and invite timestamp (§5.1) — but it moves somewhere staff may not be
 looking.
 
-**Check with CRM-facing staff before committing.**
+The owner accepted this tradeoff in S389: invitation alone is not sufficient
+evidence to create or link a canonical contact.
 
 ### §4.1 What the S388 adversarial review changed
 
@@ -500,7 +511,7 @@ create new contacts,"** which is a far smaller and better-evidenced change than 
 original framing, and it partly answers the NO-SHIP: the accept-side machinery exists
 and is running in production.
 
-Still to decide before implementing:
+Still to decide before implementing the acceptance-side policy:
 
 - **Opt-out accepts never reach door 4** (`reviewer-acceptance-drain.js:442`). With
   door 3 removed they would hold no contact. Probably correct — an opt-out reviewer
@@ -532,10 +543,11 @@ name/title (`lib/services/reviewer-acceptance-drain.js:479-488`).
 
 So the system makes a careful decision not to link, and then links anyway one step
 later. **This exists in production today and is independent of every proposal in
-this document.** Recommended fix: route send-time promotion through the
-ambiguity-aware resolver, require name/ORCID consistency, preserve the unlinked
-state otherwise, and add a regression test where save rejects a contact match and
-send later encounters the same address.
+this document.** The S389 owner decision makes the immediate fix smaller and
+stronger: remove send-time contact creation/linking entirely, preserve the
+unlinked state, and add a regression test where save rejects a contact match and
+send later encounters the same address. Identity-aware matching remains required
+at whichever acceptance boundary is ultimately approved.
 
 ---
 
@@ -720,9 +732,9 @@ exception.
 
 | # | Decision | Owner | Blocking |
 | --- | --- | --- | --- |
-| 0 | **Fix the live §4.2 defect** — send-time promotion overrides save's deliberate do-not-link decision | — | Nothing; it is a current-behavior bug |
+| 0 | **Remove send-time contact promotion** — invitation success does not merit creation/linking, and currently overrides save's deliberate do-not-link decision | **Decided by Justin, S389** | Runtime removal + regression coverage |
 | 1 | §1 option: 1 / 2 / 3R | Justin | 3R implementation |
-| 2 | Promotion on identity-bearing ACCEPT (§4.1), incl. the promotion-site map and CRM-visibility tradeoff | Justin + CRM-facing staff | §4 |
+| 2 | Acceptance-time promotion scope (§4.1): every identity-bearing accept, or only the existing non-opt-out honorarium path | Justin | §4 acceptance-side changes |
 | 3 | Contact provenance attribute(s) (§3) | Justin + Dataverse schema | §3 |
 | 4 | Durable vs disposable home for the non-response signal (§5.2) | Justin | §5 |
 | 6 | **`reviewer_confirmed` address source (§5.4)** — write the reviewer's own confirmation back to provenance; needs an explicit carve-out from §2.1 terminality | Justin | §5.4 |

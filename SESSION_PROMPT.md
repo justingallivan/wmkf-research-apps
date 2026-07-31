@@ -1,12 +1,10 @@
 # Session 389 Prompt: Codex integration of the reviewer contact/address findings
 
-> **BRANCH-SCOPED DOCUMENT.** This file was written on `codex/claude-ui-cleanup` by
-> owner instruction (S388): session documentation lands on the feature branch, NOT
-> `main`. `main`'s `SESSION_PROMPT.md` is untouched and still describes S388-as-planned.
-> **Codex owns this work as of S388** and will create a fresh integration branch from
-> current `main`. Treat this file as a handoff record, not as the repo-wide session
-> prompt — and expect it to conflict with `main`'s copy on merge. Resolve in Codex's
-> favor or drop it; nothing here is load-bearing for anyone but the integrator.
+> **INTEGRATION-BRANCH DOCUMENT.** Codex accepted Claude's S388 handoff and replayed
+> all seven commits onto `codex/reviewer-contact-integration`, based on current
+> `main` (`6618256e`). Claude's original `codex/claude-ui-cleanup` branch and
+> worktree remain preserved at `2df84aae`. Codex owns all further review,
+> implementation, integration, and release decisions for this work.
 
 ## Session 388 Summary
 
@@ -194,13 +192,15 @@ that point.
 
 ### Commits
 
-6 commits, `8a34a057..41399610`, all on `codex/claude-ui-cleanup`:
-- `3716d801` — Show identity evidence before staff confirm a reviewer
-- `6ee00ae4` — Problem statement for reviewer contact promotion and address lifecycle
-- `06e5505d` — Fix the `staff_verified` precedence contradiction; record the UI change
-- `d9ed574f` — Act on the S388 adversarial review: UI wording, load-bearing papers, doc
-- `e00d238c` — Map every contact-promotion site; §4 is smaller than it looked
-- `41399610` — The reviewer's own contact confirmation never reaches the send gate
+Seven Claude commits were replayed without content conflicts onto
+`codex/reviewer-contact-integration`:
+- `f2244653` — Show identity evidence before staff confirm a reviewer
+- `c1ae9791` — Problem statement for reviewer contact promotion and address lifecycle
+- `39e200d3` — Fix the `staff_verified` precedence contradiction; record the UI change
+- `9b8437a5` — Act on the S388 adversarial review: UI wording, load-bearing papers, doc
+- `072ac969` — Map every contact-promotion site; §4 is smaller than it looked
+- `ed2cd351` — The reviewer's own contact confirmation never reaches the send gate
+- `f7a3d7e9` — Record the S388 handoff to Codex
 
 ## Next Items
 
@@ -220,12 +220,11 @@ that point.
    Workbench history/admin restore and milestone snapshots before describing
    the artifact system as production-ready.
 
-2. **Push/integration of this branch.**
-   Evidence: `git log --oneline main..codex/claude-ui-cleanup` (6 commits). Base
-   `8a34a057`; `main` has advanced 4 commits (SharePoint metadata work). Only
-   `docs/DOCS_CATALOG.md` overlaps and it is GENERATED — resolve with
-   `npm run generate:docs-catalog`, never a hand-merge. Codex will create a fresh
-   integration branch from current `main`.
+2. **Review, release, and visual verification of the Codex integration branch.**
+   The seven Claude commits are now on `codex/reviewer-contact-integration`, based
+   on current `main`. `docs/DOCS_CATALOG.md` was regenerated successfully after
+   replay. The branch still requires Codex verification, review of the exact
+   runtime-fix boundary, and deliberate promotion before it reaches `main`.
 
 3. **The UI change has never been rendered against a real request.**
    Evidence: `.env.local` `DYNAMICS_URL=https://wmkf.crm.dynamics.com` (production, per
@@ -255,9 +254,10 @@ that point.
 1. **§1 option 1 / 2 / 3R** — whether a staff identity attestation may reduce send
    friction. `gpt-5.6-sol` recommends 3R (request-scoped, time-boxed waiver) over blanket
    promotion. Reopens an S387 "Do Not Reopen" item.
-2. **Promotion on identity-bearing accept (§4.1/§4.3)**, including the CRM-visibility
-   tradeoff — an invited-but-unresponsive reviewer would no longer appear as a `contacts`
-   row. Needs a CRM-facing staff answer, not a code answer.
+2. **Acceptance-time promotion scope (§4.1/§4.3).** Owner decision, S389:
+   successfully sending an invitation does **not** merit promotion to `contacts`;
+   remove door 3. Still decide whether every identity-bearing acceptance promotes,
+   including honorarium opt-outs, or whether the existing non-opt-out boundary remains.
 3. **Contact provenance attribute(s) (§3)** — Dataverse schema decision.
 4. **Durable vs disposable home for the non-response signal (§5.2).**
 5. ~~Contracts-doc contradiction~~ — **DONE** in `06e5505d`.
@@ -308,7 +308,7 @@ that point.
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md` | The problem statement — §0–§5.4, nothing built, six owner decisions |
+| `docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md` | The problem statement — §0–§5.4; S389 rejects send-time contact promotion, while the acceptance boundary and other proposals remain open |
 | `shared/components/reviewers/ReviewerSearchSection.js` | The identity-evidence disclosure (the only feature change this session) |
 | `tests/unit/reviewer-candidate-identity-evidence.test.js` | 7 tests pinning the disclosure, incl. the no-truncation and no-stored-profile guards |
 | `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` | Canonical send-gate contract — the `staff_verified` contradiction is fixed here |
