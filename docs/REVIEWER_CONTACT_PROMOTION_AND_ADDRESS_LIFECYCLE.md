@@ -212,12 +212,28 @@ Whether "unchanged" is judged client-side or re-verified server-side. Codex
 recommends server-side: the client value is caller-supplied and the comparison
 decides a provenance write.
 
-### §2.3 Also found [VERIFIED, Codex]
+### §2.3 Also found — RESOLVED in S388 [VERIFIED]
 
-`docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` **contradicts itself** on whether
-`staff_verified` can later be superseded by machine evidence. That is the
-canonical contract doc for this gate and must be reconciled regardless of which
-option §1 takes. Independent of every proposal here — do it first.
+Codex found that `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` contradicted
+itself on whether `staff_verified` can later be superseded by machine evidence.
+Confirmed and fixed in this session.
+
+The stale side was the attestation bullet, which claimed "a later
+`scholarly_multi` corroboration of the same address DOES supersede it to `ready`"
+and cited `tests/unit/my-candidates-verify-address.test.js` as asserting it. The
+correct side was the doc's own **Source PRECEDENCE (S387)** paragraph. Source and
+tests agree with the latter: `my-candidates-verify-address.test.js:297-313`
+carries an explicit `CORRECTED` note recording that a second adversarial review
+reversed the original decision, and asserts
+`emailSourceUpgradeAllowed('scholarly_multi', 'staff_verified') === false`. S387
+updated the test file and the precedence paragraph but missed the earlier bullet,
+which then cited a test that refutes it.
+
+The bullet now states the terminal rule and points at the precedence section.
+A fan-out over `docs/` and `.claude-memory/` found no other surface repeating the
+stale claim: `agent-wiki/topics/external-reviewer-portal.md:82` and
+`REVIEWER_IDENTITY_CONTACT_PLAN.md:111` describe only the promotion *into*
+`quick_check`, which is accurate.
 
 ---
 
@@ -436,7 +452,7 @@ explicit update. Adjudication stays with the staffer; no auto-write.
 | 2 | Response-gated promotion (§4), incl. the CRM-visibility tradeoff | Justin + CRM-facing staff | §4 |
 | 3 | Contact provenance attribute(s) (§3) | Justin + Dataverse schema | §3 |
 | 4 | Durable vs disposable home for the non-response signal (§5.2) | Justin | §5 |
-| 5 | Reconcile the `staff_verified` contradiction in the enforcement contracts doc (§2.3) | — | Nothing; do independently |
+| 5 | ~~Reconcile the `staff_verified` contradiction in the enforcement contracts doc~~ | — | **Done in S388 (§2.3)** |
 
 ## Blast radius (Codex estimate, 3R only)
 
@@ -452,8 +468,8 @@ traced call graph.]**
 
 ## Sequencing suggestion
 
-§2.3 (contracts-doc reconciliation) and §2.2 are cheapest and reopen nothing —
-they can proceed independently of every decision below. §4 is the largest
+§2.3 is already done. §2.2 is the cheapest remaining item and reopens nothing —
+it can proceed independently of every decision below. §4 is the largest
 behavioral change but has the clearest feasibility evidence. §1's 3R depends on
 the §1.1 attestation rewording. §5.3 is mostly a UI affordance over data that
 already exists.

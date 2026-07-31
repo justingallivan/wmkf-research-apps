@@ -144,9 +144,12 @@ never authorizes a send.
   is **ETag-conditional** on the person row, so a concurrent address swap yields 409
   `stale_person_row` instead of stamping "verified" on a string nobody attested. It lands in
   **quick check**, not ready — the per-recipient acknowledgement still applies at send.
-  Precedence: a later `scholarly_multi` corroboration of the same address DOES supersede it to
-  `ready` (two independent recent works outrank one attestation), and an incoming
-  `search_contested` re-blocks it; both are asserted in `tests/unit/my-candidates-verify-address.test.js`. It exists because the previously
+  Precedence: it is **TERMINAL against machine evidence** — a later `scholarly_multi`
+  corroboration of the SAME address does NOT supersede it to `ready`
+  (`emailSourceUpgradeAllowed('scholarly_multi', 'staff_verified')` is `false`). Only another
+  human assertion (`manual`) or contradicting evidence (`search_contested`, which re-blocks the
+  send) moves the value. Asserted in `tests/unit/my-candidates-verify-address.test.js`; the full
+  rule and its rationale are under **Source PRECEDENCE (S387)** below. It exists because the previously
   documented hatch ("verify it, then Edit contact") is a no-op when the verified address is the one
   already stored: `CandidateEditModal` omits an unchanged email, so `emailSource` never moved and
   the reviewer could not be invited in-app at all.
