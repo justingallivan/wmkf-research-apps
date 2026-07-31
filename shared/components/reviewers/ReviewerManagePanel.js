@@ -794,7 +794,8 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                   </div>
                   {proposalDoc.error === 'not_found' ? (
                     <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
-                      No proposal document found for this request yet — has it been submitted?
+                      No canonical reviewer proposal was found at
+                      {' '}Reviewer Materials/Proposal_&#123;Request#&#125;.pdf.
                     </div>
                   ) : proposalDoc.error ? (
                     <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
@@ -808,13 +809,16 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                       Will attach: <span className="font-medium">{proposalDoc.filename}</span>
                     </p>
                   ) : (
-                    <p className="text-sm text-gray-600">No proposal document found for this request yet — has it been submitted?</p>
+                    <p className="text-sm text-gray-600">
+                      No canonical reviewer proposal was found at
+                      {' '}Reviewer Materials/Proposal_&#123;Request#&#125;.pdf.
+                    </p>
                   )}
 
                   {proposalFiles.length > 0 && (
                     <div className="mt-3">
                       <label className="block text-xs text-gray-500 mb-1" htmlFor="proposal-document-picker">
-                        Wrong document? choose another
+                        Historical/manual override: choose a different request file
                       </label>
                       <select
                         id="proposal-document-picker"

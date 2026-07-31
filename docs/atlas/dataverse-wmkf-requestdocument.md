@@ -3,7 +3,7 @@ title: Dataverse wmkf_requestdocument
 domain: application-state
 kind: atlas
 status: active
-summary: Governed request-artifact registry and Initial Assessment pilot flow; normalized recovery hashing is deployed while production re-proof remains open.
+summary: Governed request-artifact registry; the 1002788 pilot proved mechanics only, while canonical-input semantic proof and recovery re-proof remain open.
 canonical: false
 owner: product-engineering
 related:
@@ -42,7 +42,8 @@ post-deploy error scan was clean.
 **[PARTIAL PILOT 2026-07-30]** A same-input UI retry returned the existing
 Ready row without another run, upload, overwrite, or duplicate. Opening the
 canonical Word file created a native SharePoint version. The broader pilot is
-not complete: no substantive staff content edit was verified, and the deployed
+not complete: the source was an old Phase I proposal rather than the approved
+Phase II reviewer package, no substantive staff content edit was verified, and the deployed
 post-upload recovery contract has not passed an interrupted-finalization
 rehearsal. Exact evidence:
 `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`.
@@ -75,6 +76,10 @@ blocks for operator reconciliation without a model call or duplicate upload.
 - Artifact type: `Initial Assessment`.
 - SharePoint library: the request's single Dynamics-tracked active
   `akoya_request` drive.
+- Proposal input: exactly one active
+  `Reviewer Materials/Proposal_{Request#}.pdf`. Phase I display documents,
+  archive-only matches, neighboring PDFs, and ambiguous active matches do not
+  satisfy the producer contract.
 - Request-relative destination: `Artifacts/Initial Assessment/`.
 - Prompt: `initial-assessment.generate`, version 1.
 - Template: `initial-assessment-standard-business-brief`, version `1.0.0`.
@@ -142,9 +147,11 @@ transition.
 6. **Completed 2026-07-30:** merge PR #102 and verify production deployment
    `dpl_AxxroabhpXLX1pz75MW6486fB4ci` Ready.
 7. **Partially completed 2026-07-30:** Request `1002788` generation, lineage,
-   both consumers, Word opening/version creation, and exact-input retry passed.
-   The recovery-hash and future-run linkage fixes are deployed; production
-   re-proof, substantive human editing, and target-library
+   both consumers, Word opening/version creation, and same-input retry passed
+   for mechanics. The old Phase I source invalidates approved-input semantic
+   proof. The recovery-hash and future-run linkage fixes are deployed;
+   canonical-input production proof, recovery re-proof, substantive human
+   editing, and target-library
    protection checks remain open.
 
 No live command in this sequence is authorized merely by this page.

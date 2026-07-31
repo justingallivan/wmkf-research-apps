@@ -92,6 +92,23 @@ describe('generateForRequest (Mode A)', () => {
     expect(last[2]).toBeUndefined();
   });
 
+  it('missing canonical reviewer proposal restores the prior value and stops before generation', async () => {
+    grantRequestAdapter.getById.mockResolvedValueOnce(row());
+    getProposalText.mockResolvedValue(null);
+
+    await expect(generateForRequest({ requestId: GUID })).rejects.toMatchObject({
+      httpStatus: 400,
+      message:
+        'No readable canonical reviewer proposal was found at Reviewer Materials/Proposal_1002900.pdf.',
+    });
+    expect(getProposalText).toHaveBeenCalledWith(GUID, '1002900');
+    expect(generateFieldPrimer).not.toHaveBeenCalled();
+    expect(grantRequestAdapter.updateById).toHaveBeenLastCalledWith(
+      GUID,
+      { wmkf_ai_fieldprimer: null },
+    );
+  });
+
   it('golden: claims lease with ifMatch, persists conditionally when nonce still owned', async () => {
     let writtenLease = null;
     grantRequestAdapter.getById
@@ -109,6 +126,7 @@ describe('generateForRequest (Mode A)', () => {
     });
 
     const r = await generateForRequest({ requestId: GUID });
+    expect(getProposalText).toHaveBeenCalledWith(GUID, '1002900');
     expect(r.persisted).toBe(true);
     expect(r.envelope.model).toBe('claude-test');
     expect(grantRequestAdapter.updateById).toHaveBeenNthCalledWith(

@@ -1,10 +1,10 @@
 ---
 name: J27 document capture & Proposal-tab evolution
-description: D26 proposal inputs still resolve by a fragile SharePoint filename bridge. The Request 1002788 artifact pilot is partial; recovery/run-linkage fixes are deployed while production proof, human editing, and broader J27 capture remain open.
+description: The D26 Proposal tab retains its Phase I display bridge, while automated proposal analysis now requires the canonical Reviewer Materials proposal. The 1002788 artifact pilot proved mechanics only.
 type: project
 status: active
 scope: strategy
-last_verified: 2026-07-30 via controlled Request 1002788 generation, registry/Graph readback, both Workbench consumers, and exact-input retry
+last_verified: 2026-07-30 via source/tests, live Request 1003109 canonical-file probe, and the corrected Request 1002788 pilot evidence
 ---
 
 ## Recall Rule
@@ -20,7 +20,20 @@ copy the co-edited Word body into a second editable Dataverse memo.
 
 ## The decision picture (S258, Justin + Connor)
 
-**D26 document resolution is an INTERIM BRIDGE — do not treat it as permanent.** The Proposal tab (and the field primer / reviewer-finder proposal-text path) locates documents by listing the request's SharePoint **`Phase I` subfolder** and matching **consistent filenames** for this cycle: `ProjectDescription.pdf` (the proposal — same file the primer + reviewer finding ingest, NOT a separate doc), `Biosketches.pdf`, `ProjectBudget.pdf`, `Project Budget spreadsheet.xlsx`; `Application Cover Page.docx` is excluded (it's the Dataverse-derived top panel). The existing `classifyFile()` heuristic already tags `ProjectDescription` as the proposal and budget/biosketch/cover as `other`.
+**D26 Proposal-tab document display is an INTERIM BRIDGE — do not treat it as
+permanent.** The Proposal tab lists the request's SharePoint **`Phase I`
+subfolder** and matches the cycle filenames `ProjectDescription.pdf`,
+`Biosketches.pdf`, `ProjectBudget.pdf`, and
+`Project Budget spreadsheet.xlsx`; `Application Cover Page.docx` is excluded
+because its content comes from the Dataverse-derived top panel.
+
+**Automated proposal analysis is separate and canonical as of 2026-07-30.**
+Initial Assessment, Workbench Field Primer request mode, and Reviewer Finder's
+default loader require the exact active
+`Reviewer Materials/Proposal_{Request#}.pdf` file. They do not use the
+Proposal-tab `ProjectDescription.pdf` bridge, a raw Phase I export, an archive
+match, or a best-guess classifier. Missing or ambiguous exact input fails
+before model/result writes. Request `1003109` is the live-verified example.
 
 **Filename-match is FRAGILE — but do NOT assert it "will break in J27."** (Corrected S265, Justin: the earlier "J27 will use new naming conventions / a different collection mechanism, so filename-match WILL break" claim was **unsubstantiated** — Connor pushed back on dropping filename-reconciliation on that premise. There is **no evidence** J27 changes naming; filename-match only breaks **if the names actually change**, which isn't established.) The real, durable case for moving OFF filename-match is **fragility + Dataverse legibility**, NOT a J27-will-break prediction: it depends on PDs naming files consistently/correctly, with **no structured fallback** when they don't. **Strongest argument:** if we **auto-generate writeups** in a future cycle, there is **nowhere structured to store them that the apps can read back** — a filename heuristic can't anchor a machine-produced doc that a PD may never (re)name correctly. Keep the D26 name→label map in one small per-cycle config; never hard-code D26 names as permanent (consistent with [[project-grant-phasing-evolution]]).
 
@@ -41,7 +54,10 @@ request-bound Initial Assessment service; broader applicant-capture producers
 remain future work. The controlled Request `1002788` rehearsal generated the
 canonical artifact, populated the registry/pointer, exposed the same item in
 both consumers, and proved exact-input retry without another run or upload.
-It also showed that SharePoint repacks the DOCX so whole-package hashing cannot
+That request's loaded proposal was later identified as an old Phase I
+document, so the rehearsal proves artifact mechanics but not semantic
+correctness on the approved Phase II input. It also showed that SharePoint
+repacks the DOCX so whole-package hashing cannot
 support interrupted-finalization recovery, and that the deployed producer
 omitted the Executor `requestId`, leaving the run lookup null. Branch
 Production commit `9c88a1fa` now hashes normalized governed Word parts and
@@ -56,7 +72,8 @@ rehearsal after colleagues create representative dummy `akoya_request` records.
 Request `1002788` became the authorized target. Production schema apply, prompt
 seeding, application promotion, generation, shared discovery, and exact retry
 completed on 2026-07-30. Recovery/run-linkage fixes are deployed; production
-re-proof, substantive staff editing, and target-library controls remain
+re-proof on a verified canonical input, substantive staff editing, and
+target-library controls remain
 controlled follow-up work.
 
 **Hold step already RETIRED (S279) — this contingency resolved early, for a different reason.** The reviewer "hold step" ([[project-reviewer-hold-step-decouple]]) was removed in S279 (commit `a8676af1`) when the direction shifted to onboarding at a single final Accept — independent of J27. So the earlier "single-submission may un-scaffold the hold step" note is now moot: there is no hold step left to un-scaffold. (Kept here only so the J27 doc-capture planning doesn't re-raise it.)
@@ -67,9 +84,11 @@ J27 design is a **large planning effort with many moving parts** that must **sta
 
 Ground truth: [VERIFIED 2026-07-30 via
 `shared/config/workbenchProposalDocuments.js`,
-`lib/services/grant-reporting/classify-file.js`,
+`lib/external/reviewer-materials.js`,
+`lib/services/workbench-proposal-documents.js`,
 `lib/services/reviewer-finder/load-proposal-service.js`, and
 `docs/CURRENT_WORK_QUEUE.md`, production Wave 16 readback, prompt verification,
-and deployment inspection plus the Request `1002788` production rehearsal].
+deployment inspection, the Request `1002788` mechanics rehearsal, and the live
+Request `1003109` canonical-file probe].
 The typed registry is live and exercised; broader J27 applicant-capture
 producers and the partial-pilot blockers remain open.

@@ -49,12 +49,14 @@ hood.
 > provisioned 2026-07-30; controlled Request `1002788` pilot partially passed
 > 2026-07-30.**
 > This section governs the Initial Assessment, Pre Site Visit Writeup, and
-> Final Writeup design as well as the Site Visit dossier and its materials. It
+> Final Writeup design as well as the Site Visit dossier and its materials.
 > The application generated and registered the canonical artifact, both
 > consumers found it, and exact-input retry created no duplicate. The pilot is
-> not closed because the deployed recovery/run-linkage fixes still need
-> production re-proof, and substantive staff editing remains
-> unverified. **[VERIFIED via owner decisions 2026-07-28, repository source,
+> mechanics evidence only because its source was an old Phase I proposal, not
+> the current Phase II reviewer package. The pilot is not closed because a
+> canonical-input run, deployed recovery/run-linkage re-proof, and substantive
+> staff editing remain unverified. **[VERIFIED via owner decisions 2026-07-28
+> and 2026-07-30, repository source,
 > production Dataverse/Graph probes, and signed-in consumer checks
 > 2026-07-30.]**
 
@@ -90,6 +92,30 @@ hood.
   producer requires a positively resolved Dynamics-tracked `akoya_request`
   parent library. The best-effort fallback retained for legacy read-only bucket
   discovery is never accepted as a write target.
+
+### Automated proposal input contract
+
+The default proposal source for Initial Assessment, Workbench Field Primer
+request mode, and Reviewer Finder analysis is the one exact active request
+file:
+
+`Reviewer Materials/Proposal_{Request#}.pdf`
+
+The file must be under the request's Dynamics-associated `akoya_request`
+SharePoint folder. An archive-only match, multiple active exact matches, a raw
+application export, or `Phase I/ProjectDescription.pdf` does not satisfy the
+contract; default automation fails before the model and before result
+persistence. Reviewer Finder's authenticated explicit `fileKey` remains a
+deliberate historical/ad-hoc staff override, not a default-selection fallback.
+The Workbench Proposal tab separately continues to display the D26 Phase I
+document slots.
+
+**[VERIFIED 2026-07-30 via live read-only Graph/Dataverse probe]** Request
+`1003109` has the exact active file
+`Reviewer Materials/Proposal_1003109.pdf` in library `akoya_request`.
+Request `1002788`'s earlier Initial Assessment instead used an old Phase I
+proposal, so its registry and SharePoint results prove mechanics but not
+approved-input semantics.
 
 Do not mirror the Word body into an independently editable Dataverse memo. That
 would create two competing sources of truth and an unsafe Word→Dataverse merge
@@ -129,7 +155,8 @@ path `Artifacts/Initial Assessment/`. It records the friendly path/filename for
 humans but registers the Graph site, drive, and item IDs as identity. Exact
 retries use a deterministic SHA-256 alternate key; a Ready row is never
 regenerated or overwritten. The Request `1002788` exact-input retry proved
-that Ready-row behavior. If upload succeeds before the final registry PATCH
+that Ready-row behavior for the then-loaded Phase I input, but not correct
+Phase II source selection. If upload succeeds before the final registry PATCH
 fails, the intended recovery downloads the deterministic SharePoint item and
 compares it with the stored governed-content hash. **The controlled pilot
 disproved whole-package byte hashing for the target library:** SharePoint

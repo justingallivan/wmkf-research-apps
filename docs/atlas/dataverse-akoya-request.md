@@ -58,8 +58,10 @@ Governed artifact pointers:
   via Wave 16 apply and idempotent metadata readback.** This is the canonical
   Initial Assessment pointer and shared request-level ETag fence. The
   controlled production pilot populated it for Request `1002788` with registry
-  row `fb995f0f-628c-f111-ab0f-6045bd018a07`; exact-input retry preserved that
-  same pointer and row.
+  row `fb995f0f-628c-f111-ab0f-6045bd018a07`; same-input retry preserved that
+  pointer and row. The proposal source was later identified as an old Phase I
+  document, so this proves pointer/idempotency mechanics but not approved
+  Phase II semantics.
 
 WMKF AI writeback fields (canonical: `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` — v2 is archived, do not use):
 - `wmkf_ai_summary` (Memo) — Phase I summary text. **Field Set A: ready, live writeback active.**

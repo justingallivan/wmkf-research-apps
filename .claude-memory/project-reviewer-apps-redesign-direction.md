@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has seven implemented tabs and three placeholders; the partial Initial Assessment pilot has deployed recovery/run-linkage fixes awaiting production proof, and the full Editor Dashboard remains planned.
+description: The unified Request Workbench has seven implemented tabs and three placeholders; the Initial Assessment pilot proved mechanics only because it used an old Phase I proposal, and canonical-input proof remains open.
 metadata:
   type: project
   status: active
@@ -50,10 +50,14 @@ colleague-created representative dummy requests rather than building the
 existing Dataverse sandbox organization into an integrated application/file
 test environment. Request `1002788` became the authorized target. Generation,
 registry/pointer lineage, both consumer surfaces, native SharePoint version
-creation, and exact-input retry passed on 2026-07-30. Normalized recovery
-hashing and future-run request linkage are deployed in production commit
-`9c88a1fa`; production re-proof, substantive human editing, and target-library
-controls remain open.
+creation, and same-input retry mechanics passed on 2026-07-30. The source was
+an old Phase I proposal, so approved-input semantic proof did not pass.
+Automated request-bound analysis now requires the exact active
+`Reviewer Materials/Proposal_{Request#}.pdf`; Request `1003109` is the
+live-verified example. Normalized recovery hashing and future-run request
+linkage are deployed in production commit `9c88a1fa`; canonical-input
+production proof, recovery re-proof, substantive human editing, and
+target-library controls remain open.
 Use the near-term execution plan for current authority; the chronology below
 remains the rationale record.
 
@@ -121,7 +125,7 @@ planned. Current authority is
   Assessment, Reviewers, Reviews, Status, Awardee) and three placeholders (Pre
   Site Visit Writeup, Site Visit, Final Writeup). Initial Assessment production
   registry/pointer schema, governed prompt v1, and application are live and
-  verified; the Request `1002788` human artifact pilot is a partial pass.
+  verified; the Request `1002788` human artifact pilot proves mechanics only.
 - Reviews is built and production-proved: governed-v3 structured output
   persisted successfully, the automatic all-in drain is enabled, and its
   producer/persistence/consumer lifecycle completed a controlled production
@@ -133,10 +137,11 @@ planned. Current authority is
   the production-provisioned `wmkf_requestdocument` registry and governed
   `initial-assessment.generate` v1. The controlled production rehearsal created
   one Ready/Draft registry row, populated the request pointer, and proved both
-  consumers plus exact-input retry. It also exposed whole-package hash drift
+  consumers plus same-input retry, but used an old Phase I proposal and did not
+  prove approved-input semantics. It also exposed whole-package hash drift
   after SharePoint canonicalization and a null AI-run request lookup. The
-  deployed runtime fixes both for future generations; production re-proof
-  remains open.
+  deployed runtime fixes both for future generations; canonical-input
+  production proof and recovery re-proof remain open.
 - Reviewer Pool remains planned and optional, not a shipped Workbench-v1 deliverable.
 
 ## Historical decision chronology

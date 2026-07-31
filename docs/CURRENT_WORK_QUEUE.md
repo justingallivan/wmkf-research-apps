@@ -34,7 +34,7 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Close the partial Initial Assessment pilot | The controlled Request `1002788` rehearsal generated one Ready/Draft artifact, set the canonical pointer, exposed the same file in Workbench and the cycle locator, created native SharePoint version history, and proved exact-input no-duplicate retry. Production commit `9c88a1fa` now has focused-test coverage for normalized governed-DOCX recovery hashing and passes `requestId` to the Executor. Before declaring the August 10 gate complete: exercise post-upload recovery, prove a new linked run, complete a substantive staff edit including Foundation Opportunity, and finish target-library protection/readback checks. | The deployed recovery path repairs an interrupted finalization without a second model call or overwrite; a new run has its request lookup; an authorized staff edit is visible through both consumers; restore/permission/retention boundaries are recorded. |
+| 1 | Close the partial Initial Assessment pilot | The controlled Request `1002788` rehearsal generated one Ready/Draft artifact, set the canonical pointer, exposed the same file in Workbench and the cycle locator, created native SharePoint version history, and proved same-input no-duplicate retry. It used an old Phase I proposal, so it is mechanics evidence only, not valid Phase II content evidence. Source now requires the exact active `Reviewer Materials/Proposal_{Request#}.pdf` contract but is not deployed from this branch yet. Production commit `9c88a1fa` has focused-test coverage for normalized governed-DOCX recovery hashing and passes `requestId` to the Executor. Before declaring the August 10 gate complete: run once on a verified canonical proposal, exercise post-upload recovery, prove a new linked run, complete a substantive staff edit including Foundation Opportunity, and finish target-library protection/readback checks. | A verified canonical reviewer proposal produces a semantically reviewed assessment; the deployed recovery path repairs an interrupted finalization without a second model call or overwrite; a new run has its request lookup; an authorized staff edit is visible through both consumers; restore/permission/retention boundaries are recorded. |
 | 2 | First deadline-bound writeup slice | Treat the governed-artifact spine as production-proved for generation, registry lineage, shared discovery, and exact retry. Recovery and future-run request linkage are deployed but not yet production-re-proved. Pre Site Visit becomes the next reuse only after the pilot blockers above close. | One dedicated production request produces a durable, searchable, editable, and recoverable Word artifact with complete prompt/run/request lineage and verified human review. The full Editor Dashboard contract remains a later reuse. |
 
 ## Audit follow-ups — verified open, not silently prioritized
@@ -56,8 +56,10 @@ sequence.
   `b7ae9b17-628c-f111-ab0f-000d3a31c468`, and canonical SharePoint item
   `01G4GVMS77A2SBVPGA4VFINZFWAFIZGVFG`. Both Workbench consumers opened the
   same item, and a same-input retry preserved the one row/run/item with no new
-  attempt. The rehearsal also exposed the recovery hash mismatch and null
-  AI-run request lookup recorded in
+  attempt. This is valid mechanics evidence only: the loaded document was an
+  old Phase I proposal, so the generated content is not valid Phase II
+  semantic evidence. The rehearsal also exposed the recovery hash mismatch and
+  null AI-run request lookup recorded in
   [the pilot report](INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md).
 
 - Review-synthesis lifecycle rollout: signed-in read-only verification passed;

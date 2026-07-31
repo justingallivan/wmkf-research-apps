@@ -7,9 +7,9 @@
  *      request's legacy `wmkf_potentialreviewer1..5` slots into
  *      `disposition=recommended` candidate rows and to parse the free-text
  *      `wmkf_excludedreviewers` into clean names.
- *   2. Auto-loads the request's proposal document via `/api/reviewer-finder/
- *      load-proposal` (the "Find defaults to the request's documents"
- *      modernization — no PDF-upload entry in the Workbench).
+ *   2. Auto-loads the request's exact canonical reviewer proposal via
+ *      `/api/reviewer-finder/load-proposal` (no PDF-upload entry in the
+ *      Workbench and no filename-heuristic fallback).
  *   3. Surfaces the applicant RECOMMENDED set (badged, now candidates), the
  *      applicant EXCLUDED set (per-request soft-block, badged), and the loaded
  *      proposal — and pre-computes the exclude list staff carry into a search.
@@ -123,9 +123,9 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
     }
   }, [requestId]);
 
-  // fileKey is an optional "library::folder::filename" override; when omitted the
-  // endpoint auto-picks the proposal best-guess. The manual picker below passes
-  // a fileKey so staff can correct a wrong auto-pick (unconventional filenames).
+  // fileKey is an optional "library::folder::filename" override for deliberate
+  // historical/ad-hoc analysis. When omitted, the endpoint accepts only the
+  // request's exact canonical Reviewer Materials proposal.
   const loadProposal = useCallback(async (fileKey) => {
     if (!requestId) return;
     setDoc({ loading: true, data: null, error: null });
@@ -137,8 +137,8 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
-        // Carry allFiles through on a 404 so the picker can still offer a manual
-        // choice when the auto-pick found no proposal-classified file.
+        // Carry allFiles through on a 404 so staff can make a deliberate
+        // historical/ad-hoc override when the canonical file is absent.
         const err = new Error(data.error || `Could not load the proposal document (${res.status})`);
         err.allFiles = data.allFiles || null;
         throw err;
@@ -379,9 +379,9 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
   const excludedRaw = data?.excludedRaw || null;
   const excludedParseFailed = data?.excludedParseFailed || false;
 
-  // File list for the manual override picker — present on a successful load and,
-  // via the carried error, on a no-proposal-found 404. Proposal-classified files
-  // sort first so the likely choice is at the top.
+  // File list for the deliberate historical/ad-hoc override picker — present
+  // on a successful load and, via the carried error, when the canonical file
+  // is absent. Proposal-classified files sort first.
   const rawFiles = doc.data?.allFiles || doc.allFiles || [];
   const availableFiles = [...rawFiles].sort((a, b) => {
     const ap = a.classification === 'proposal' ? 0 : 1;
@@ -617,19 +617,18 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
           <p className="text-sm text-gray-500">Loading the request’s proposal from SharePoint…</p>
         ) : doc.data ? (
           <p className="text-sm text-gray-700">
-            Auto-loaded <span className="font-medium">{doc.data.filename}</span> from the request’s documents.
+            Loaded canonical reviewer proposal <span className="font-medium">{doc.data.filename}</span>.
           </p>
         ) : (
           <p className="text-sm text-gray-600">No proposal document found for this request.</p>
         )}
 
-        {/* Manual override: the auto-pick uses filename heuristics and can miss
-            unconventional names — let staff choose the right file. allFiles is
-            present on success and (via the carried error) on a no-match 404. */}
+        {/* Deliberate override for historical/ad-hoc analysis. allFiles is
+            present on success and when the canonical file is absent. */}
         {availableFiles.length > 0 && (
           <div className="mt-3">
             <label className="block text-xs text-gray-500 mb-1">
-              Wrong document? Choose the proposal manually:
+              Historical/manual override: choose a different request file
             </label>
             <select
               className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"

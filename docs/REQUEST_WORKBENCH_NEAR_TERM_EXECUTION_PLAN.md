@@ -3,7 +3,7 @@ title: "Request Workbench — near-term execution plan"
 domain: architecture
 kind: plan
 status: canonical
-summary: "Initial Assessment recovery/run-linkage fixes are deployed; production proof, substantive editing, and library controls remain."
+summary: "Initial Assessment mechanics are proven, but canonical-proposal content proof, recovery re-proof, substantive editing, and library controls remain."
 canonical: true
 cataloged: 2026-07-26
 last_verified: 2026-07-30
@@ -35,8 +35,11 @@ foundation and the J27 Initial Assessment must work end to end in draft form,
 ahead of proposal intake beginning around **2026-08-18**.
 
 The August 10 acceptance path is a real human-in-the-loop pilot. On
-2026-07-30, Request `1002788` completed steps 1–4 and 6 below, proved
-exact-input no-duplicate retry, and created native SharePoint version history:
+2026-07-30, Request `1002788` completed the mechanics in steps 1–4 and 6
+below, proved same-input no-duplicate retry, and created native SharePoint
+version history. It used an old Phase I proposal rather than the current Phase
+II reviewer package, so it did not complete step 2's approved-input or
+semantic-content requirement:
 
 1. authorized staff starts Initial Assessment generation for a dedicated
    representative dummy production request through the intended Workbench
@@ -62,11 +65,13 @@ application/file test environment. Request `1002788` became the authorized
 pilot target. Its same-input retry passed, but the intended post-upload
 recovery path exposed whole-package byte-hash drift when SharePoint
 canonicalized the DOCX, and the historical linked Executor run has a null
-request lookup. Production commit `9c88a1fa` now hashes normalized governed
+request lookup. The proposal source was also later identified as an old Phase
+I proposal. Production commit `9c88a1fa` now hashes normalized governed
 Word parts and passes `requestId`; focused synthetic tests and the actual pilot
 packages verify the hash complement. Interrupted-finalization and new
-linked-run re-proof, a substantive staff edit, and target-library protection
-checks remain required before the pilot is complete.
+linked-run re-proof, one run from a verified canonical proposal, a substantive
+staff edit, and target-library protection checks remain required before the
+pilot is complete.
 Passing this draft-functional gate is not a broad production-readiness claim
 and does not require the later Pre-Site, Site Visit, or Final slices to be
 built by August 10.
@@ -225,6 +230,14 @@ Initial Assessment. Each is a one-page Word document with this sequence:
 4. a **Rationale** heading; and
 5. four labeled rationale bullets: **Significance & Impact**, **Research
    Plan**, **Team Expertise**, and **Foundation Opportunity**.
+
+The approved automated proposal input is exactly
+`Reviewer Materials/Proposal_{Request#}.pdf` in the active request's
+Dynamics-associated `akoya_request` SharePoint folder. Initial Assessment,
+Workbench Field Primer request mode, and Reviewer Finder's default loader
+share that contract. They must fail before any model or result write when the
+exact active file is missing or ambiguous; they must not silently fall back to
+the D26 Proposal-tab `Phase I/ProjectDescription.pdf` display bridge.
 
 The AI drafts Summary, Significance & Impact, Research Plan, and Team
 Expertise from the approved proposal inputs. **Foundation Opportunity is a
@@ -884,8 +897,10 @@ Owner-decided:
     PR #102 then merged as `1e958ee0` and deployed Ready as
     `dpl_AxxroabhpXLX1pz75MW6486fB4ci`. Artifact generation remains the
     separate controlled pilot gate. The 2026-07-30 Request `1002788` rehearsal
-    proved generation, shared consumers, and exact retry. Recovery hashing and
-    future-run linkage are deployed; production re-proof, substantive editing,
+    proved generation mechanics, shared consumers, and same-input retry, but
+    used an old Phase I proposal and therefore is not semantic Phase II
+    evidence. Recovery hashing and future-run linkage are deployed; a
+    canonical-input production run, recovery re-proof, substantive editing,
     and target-library controls remain open.
 
 Still required:

@@ -138,7 +138,7 @@ describe('POST /api/field-primer/generate (requestId mode, grant-request adapter
     expect(generateFieldPrimer).not.toHaveBeenCalled();
     // Read went through the adapter's entity set + select shape unchanged.
     expect(DynamicsService.getRecord).toHaveBeenCalledWith('akoya_requests', GUID, {
-      select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate,wmkf_ai_fieldprimer',
+      select: 'akoya_requestid,akoya_requestnum,wmkf_ai_fieldprimer',
     });
   });
 

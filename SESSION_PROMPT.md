@@ -99,7 +99,7 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    PR #102 subsequently merged as `1e958ee0` and deployed Ready as
    `dpl_AxxroabhpXLX1pz75MW6486fB4ci`.
 
-9. **Controlled Initial Assessment pilot partially passed on Request `1002788`.**
+9. **Controlled Initial Assessment pilot proved mechanics only on Request `1002788`.**
    Signed-in generation created Ready/Draft registry row
    `fb995f0f-628c-f111-ab0f-6045bd018a07`, populated the canonical request
    pointer, wrote SharePoint item `01G4GVMS77A2SBVPGA4VFINZFWAFIZGVFG`,
@@ -110,7 +110,12 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    overwrite, upload, or second model call. Opening the Word file created
    SharePoint version `2.0`.
 
-   The pilot also exposed two defects. SharePoint repacked the uploaded DOCX,
+   The source was later identified as an old Phase I proposal, not the current
+   Phase II proposal. The resulting artifact is therefore valid evidence for
+   registry, SharePoint, consumer, and idempotency mechanics, but not for
+   approved-input semantic correctness.
+
+   The pilot also exposed two runtime defects. SharePoint repacked the uploaded DOCX,
    so canonical version `1.0` did not match the registry's pre-upload hash;
    `recoverUploadedFile()` would reject an untouched upload. The producer also
    omitted `requestId` from `executePrompt()`, leaving the exact run's
@@ -158,6 +163,8 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
 ### Verified Open
 
 1. **Close the partial governed Initial Assessment artifact pilot.**
+   Promote the exact canonical proposal-source change, then run on a request
+   with a verified active `Reviewer Materials/Proposal_{Request#}.pdf`.
    Exercise the deployed interrupted-finalization recovery branch plus one new
    linked AI run. Then complete a substantive authorized
    staff edit—including Foundation Opportunity—and verify the saved version
@@ -187,7 +194,7 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    retention, permission, and milestone-snapshot behavior against the dedicated
    production dummy requests before the controlled rehearsal. The generic registry has
    source-document/version/hash fields, but this pilot producer currently fingerprints
-   the extracted Project Description content rather than binding a governed source
+   the extracted canonical reviewer-proposal content rather than binding a governed source
    artifact/version; decide whether that stronger lineage is required before rehearsal.
 
 2. **Re-key the 12 `candidate:`-keyed saved rows that carry a suggestion anchor.**
