@@ -1,75 +1,76 @@
-# Session 388 Prompt: Close the partial governed Initial Assessment pilot
+# Session 389 Prompt: Codex integration of the reviewer contact/address findings
 
-## Session 387 Summary
+> **BRANCH-SCOPED DOCUMENT.** This file was written on `codex/claude-ui-cleanup` by
+> owner instruction (S388): session documentation lands on the feature branch, NOT
+> `main`. `main`'s `SESSION_PROMPT.md` is untouched and still describes S388-as-planned.
+> **Codex owns this work as of S388** and will create a fresh integration branch from
+> current `main`. Treat this file as a handoff record, not as the repo-wide session
+> prompt — and expect it to conflict with `main`'s copy on merge. Resolve in Codex's
+> favor or drop it; nothing here is load-bearing for anyone but the integrator.
 
-Session 387 did **not** do the work its own prompt planned. The owner opened with a
-production bug — a reviewer who could not be invited — and the session became a
-diagnosis-and-remediation run on the reviewer address/identity gates. The Initial
-Assessment pilot proceeded in parallel on `codex/initial-assessment-pilot` (Codex). Its
-two commits have now been recovered onto current `main` as
-`codex/initial-assessment-pilot-recovery`; see Next Items.
+## Session 388 Summary
 
-Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and verified
-`● Ready`). Four production data sweeps were executed and verified.
+Started as a narrow UI-cleanup mandate in an isolated worktree, which the owner
+expanded mid-session. One presentation change shipped; the rest of the session traced
+a Find-tab complaint through the send gate into contact promotion and produced a
+problem statement, a canonical-doc fix, and one live defect.
+
+Ownership transferred to Codex at end of session. Claude made no feature changes after
+that point.
 
 ### What Was Completed
 
-1. **Diagnosed the original report: "cannot invite W. Lee Kraus on request 1002852"**
-   Two independent causes, both confirmed against live data:
-   - **Gate parity.** The Find-tab card grouping (`provenanceGroupOf`) tested three of the
-     four clauses the promote route's `requiresIdentityConfirmation` enforces, so a card
-     could be selectable while the server refused it with 422
-     `identity_confirmation_required`. The predicate now lives once in
-     `lib/utils/reviewer-provenance.js` (`requiresStaffIdentityConfirmation`) and both
-     sides import it. Applied to `APPLICANT_SUGGESTED` only — widening it would make
-     literature/proposal-named rows unsavable via `save-candidates`' `isUnresolvedIdentity`.
-     [VERIFIED: 0 of 145 live active applicant rows are reclassified, so no staff-visible
-     change today; this closes a latent hole.]
-   - **Split roster rows.** `stampSuggestionAnchor` writes `suggestionId` into a blob
-     without re-keying the row, so a migration-025 `legacy-row:<id>` placeholder carried a
-     suggestion anchor while applicant enrichment wrote the canonical `suggestion:<id>` row
-     separately. The client keys cards off the stored `candidateKey`, so one person rendered
-     twice — and the selectable copy was the one `findCandidateBySuggestion` cannot resolve.
+1. **Find-tab identity evidence disclosure (`3716d801`, refined in `d9ed574f`)**
+   A needs-identity-review card showed a publication COUNT but suppressed the papers,
+   affiliation, address, and Dataverse evidence, so staff answered "is this the right
+   person?" with nothing to answer from — the evidence appeared only AFTER
+   "✓ This is the right person → edit & add", which commits a durable request-scoped
+   attestation. Added a collapsed "Review evidence before confirming" disclosure on
+   `identityUnverified` cards only: affiliation + provenance label, Dataverse match,
+   address as plain text with its source, all recent papers, and a Google Scholar NAME
+   SEARCH. The verified TREATMENT stays suppressed (no mailto chip, no readiness
+   verdict, no green "known in Dataverse"). 7 unit tests in
+   `tests/unit/reviewer-candidate-identity-evidence.test.js`.
 
-2. **Staff address attestation for research-only addresses** (`verifyEmailAddress`)
-   An address whose only provenance is a web search is `research_only`: render and send both
-   refuse it, and no send-time checkbox can promote it. The advertised escape hatch
-   ("verify it, then Edit contact") is a **no-op** when the verified address is the one
-   already stored, because `CandidateEditModal:161` omits an unchanged email. New
-   `PATCH /api/reviewer-finder/my-candidates { requestId, suggestionId, verifyEmailAddress,
-   verifiedEmail }` stamps `emailSource='staff_verified'` → `quick_check` (never `ready`).
-   Request-scoped, lifecycle-gated (selected / not invited / not responded), address
-   re-read and matched server-side, and ETag-conditional.
+   Two deliberate properties, both recorded in
+   `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`:
+   - **The paper list is LOAD-BEARING** — do not truncate or collapse it. Affiliation,
+     address, and the Dataverse match all descend from the SAME retrieval and agree
+     with each other whether or not the right person was retrieved. The papers are the
+     only item checkable against the proposal, which is what breaks the circularity.
+   - The Scholar link always uses `buildScholarSearchUrl()`, never `googleScholarUrl` —
+     stricter than the other three render sites, because on an unresolved row a stored
+     profile URL is the namesake trap itself.
 
-3. **Address-provenance precedence** (the root cause behind Prashant Mali)
-   `wmkf_emailsource` was fill-if-empty, so the FIRST source recorded for a person pinned
-   their address tier forever. Mali's person row read `serp_search` (unsendable) while
-   request 1002874's roster row read `affiliation` — his address is embedded in his own
-   PubMed affiliation string. `researcher.upsertByPotentialReviewer` now lets a strictly
-   stronger tier supersede a weaker one for the SAME address, ETag-conditional, with tiers
-   derived from `emailSourceTier`/`emailSourceUpgradeAllowed` in the same module that
-   defines the send-gate buckets. **A stored human assertion (`manual`/`staff_verified`) is
-   TERMINAL against machine evidence** — reversed after review, because the person row is
-   shared across requests, so an automatic promotion to `ready` would delete a send-time
-   acknowledgement everywhere including where the staffer made it.
+2. **Fixed a self-contradiction in a canonical contract doc (`06e5505d`)**
+   `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` asserted both that a later
+   `scholarly_multi` corroboration DOES supersede `staff_verified` to `ready` AND that
+   human assertions are terminal against machine evidence. It cited
+   `tests/unit/my-candidates-verify-address.test.js` in support of the first — but that
+   test carries an explicit `CORRECTED` note (`:297-305`) recording the S387 reversal
+   and asserts `emailSourceUpgradeAllowed('scholarly_multi','staff_verified') === false`.
+   S387 updated the test and the precedence paragraph and missed the bullet. Fixed;
+   fan-out over `docs/` and `.claude-memory/` found no other surface repeating it.
 
-4. **Address and provenance are now written together, enforced by a scanner**
-   All four `wmkf_emailaddress` writers in `potential-reviewer.js` (`update`, `create`,
-   `upsertByEmail`, `clearEmail` — which nulls both) carry `wmkf_emailsource`, and every
-   caller passes one. `tests/unit/email-source-pairing-invariant.test.js` parses `lib/`,
-   `pages/`, `scripts/`, `shared/` and fails on an address written without a source, with a
-   positive control and an argued exemption set. It found **seven** call sites that three
-   adversarial reviews had read past, including a live one in
-   `contact-enrichment/persistence.js`.
+3. **New problem statement (`6ee00ae4`, extended `d9ed574f`/`e00d238c`/`41399610`)**
+   `docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md` — §0–§5.4. **Nothing in
+   it is built.** Every "today" claim is cited to `file:line` and verified against
+   source; proposals are `[PROPOSED]`; unverifiable claims are `[ASSUMED]`.
 
-5. **Four production data sweeps, executed and verified**
+4. **Adversarial review by Codex `gpt-5.6-sol`, and the response (`d9ed574f`)**
+   Verdict needs-attention / NO-SHIP for §4 as drafted. Findings were re-verified
+   against source rather than accepted on report. Promotion-on-decline was withdrawn
+   (a response proves token possession, not receipt by the intended person); several
+   `VERIFIED` labels became `[ASSUMED]`; the one-story framing was demoted to a lens.
 
-   | Sweep | Result |
-   | --- | --- |
-   | `dedupe-reviewer-roster-suggestion-twins.mjs` | 26 placeholder twins deleted, 17 withheld emails carried onto canonical rows as quarantined `contactLeads`; +2 test rows later |
-   | `recanonicalize-reviewer-roster-anchors.mjs` | 156 rows re-keyed to `suggestion:<id>` after Dataverse ownership validation; 50 stamped `needsIdentification` (fail-closed) |
-   | `stamp-ungated-applicant-roster-rows.mjs` | 35 active applicant rows that were promotable with NO identity gate, stamped |
-   | `backfill-email-source-precedence.mjs` | 6 pinned person rows upgraded (5 → `affiliation`, Walsworth → `institution_page`) |
+5. **Promotion-site map (`e00d238c`)**
+   Bounded by disconfirming query: `wmkf_contact` can only be set by
+   `potentialReviewer.setContactLink`, so its callers are the complete set. Exactly four
+   runtime doors — candidate save, manual add, invitation send, and the ACCEPT DRAIN.
+   Door 4 already promotes the contact and writes the reviewer's self-supplied mailing
+   address at accept, before its capture-only deferral short-circuit, so it runs today
+   with BILL tabled. So "promote on response, not send" is not new work; it is "remove
+   door 3, let door 4 create new contacts."
 
    Final state [VERIFIED via read-only probes]: 0 placeholder-keyed rows carrying an anchor,
    0 duplicate `(request_id, suggestionId)` pairs, 0 rows failing the ungated-promotable
@@ -193,18 +194,13 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
 
 ### Commits
 
-15 commits, `3f56bb7d..c688aa0c` on `main`. Highlights:
-- `5a6c863c` — applicant card selectability matches the promote identity gate
-- `908dfa3e` — staff attestation for a research-only address
-- `57023db9` — scope + ETag-guard the attestation (Codex review)
-- `f377e2f5` — anchor-based roster resolution + fail-closed recanonicalization
-- `4aee09d4` — fail-closed stamp for ungated applicant rows
-- `33092e00` — stronger provenance supersedes a weaker stored source
-- `fc157a4a` — the four adversarial-review findings on precedence
-- `4256e853` — close the two findings the verification pass kept open
-- `f21c0761`, `538d4878` — invariant enforced by scanner, raw payloads included
-- `ba976d83` — AST-based scanner (Codex fix, plus two gaps in it)
-- `c688aa0c` — paginate the person query (the backfill was scanning 25 of 385)
+6 commits, `8a34a057..41399610`, all on `codex/claude-ui-cleanup`:
+- `3716d801` — Show identity evidence before staff confirm a reviewer
+- `6ee00ae4` — Problem statement for reviewer contact promotion and address lifecycle
+- `06e5505d` — Fix the `staff_verified` precedence contradiction; record the UI change
+- `d9ed574f` — Act on the S388 adversarial review: UI wording, load-bearing papers, doc
+- `e00d238c` — Map every contact-promotion site; §4 is smaller than it looked
+- `41399610` — The reviewer's own contact confirmation never reaches the send gate
 
 ## Next Items
 
@@ -224,16 +220,21 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    Workbench history/admin restore and milestone snapshots before describing
    the artifact system as production-ready.
 
-2. **Exercise address attestation only when a truthful eligible production row exists.**
-   Evidence: the signed-in Workbench inspection covered requests `1002912` and `1002874`.
-   Every checked research-address candidate had already been invited, so the server's
-   selected/not-invited/not-responded gate correctly made none eligible. No invitation was
-   sent and no shared-person provenance was falsely stamped merely to satisfy a smoke.
+2. **Push/integration of this branch.**
+   Evidence: `git log --oneline main..codex/claude-ui-cleanup` (6 commits). Base
+   `8a34a057`; `main` has advanced 4 commits (SharePoint metadata work). Only
+   `docs/DOCS_CATALOG.md` overlaps and it is GENERATED — resolve with
+   `npm run generate:docs-catalog`, never a hand-merge. Codex will create a fresh
+   integration branch from current `main`.
 
-3. **Run the Q9 ordinary-user app-access smoke in the office.**
-   Evidence: `docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md:47,245,428`;
-   `.claude-memory/project-app-access-control.md`. Unchanged from S386 — still a required
-   Stage 4 release gate needing another person's ordinary staff account in Preview.
+3. **The UI change has never been rendered against a real request.**
+   Evidence: `.env.local` `DYNAMICS_URL=https://wmkf.crm.dynamics.com` (production, per
+   `lib/dataverse/core/target-registry.js:28`); `DATAVERSE_TARGET_INTERLOCK=on` with
+   `VERCEL_ENV` unset → deployment `local`, so `lib/dataverse/core/interlock.js` denies
+   prod reads without `DATAVERSE_ALLOW_PROD_READS=yes` and denies prod writes outright.
+   Also `shared/components/reviewers/ReviewerSearchSection.js:1265-1275` auto-fires
+   `enrichRecommended()` on mount, which spends paid enrichment and writes roster rows to
+   production Neon. Verified by jsdom tests and gates only.
 
 ### Owner Decision Needed
 
@@ -251,89 +252,83 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    the extracted canonical reviewer-proposal content rather than binding a governed source
    artifact/version; decide whether that stronger lineage is required before rehearsal.
 
-2. **Re-key the 12 `candidate:`-keyed saved rows that carry a suggestion anchor.**
-   Evidence: S387 probe — they are `saved`, so there is no live dead-end; left untouched.
-   Re-keying would make `savedKeys` count them. Cosmetic until someone re-opens those
-   requests.
-
-3. **The 3 person rows with `wmkf_emailsource='database'`.**
-   Evidence: S387 probe of 385 person rows. An unrecognized source: `emailConfidence`
-   classifies it `quick_check`, `emailSourceTier` gives it no precedence claim. Decide
-   whether `database` is a real source to classify or a value to retire.
+1. **§1 option 1 / 2 / 3R** — whether a staff identity attestation may reduce send
+   friction. `gpt-5.6-sol` recommends 3R (request-scoped, time-boxed waiver) over blanket
+   promotion. Reopens an S387 "Do Not Reopen" item.
+2. **Promotion on identity-bearing accept (§4.1/§4.3)**, including the CRM-visibility
+   tradeoff — an invited-but-unresponsive reviewer would no longer appear as a `contacts`
+   row. Needs a CRM-facing staff answer, not a code answer.
+3. **Contact provenance attribute(s) (§3)** — Dataverse schema decision.
+4. **Durable vs disposable home for the non-response signal (§5.2).**
+5. ~~Contracts-doc contradiction~~ — **DONE** in `06e5505d`.
+6. **`reviewer_confirmed` address source (§5.4)** — write the reviewer's own
+   confirmation back to provenance. Needs an explicit carve-out from §2.1 terminality.
 
 ### Parked
 
-1. **`stampSuggestionAnchor` still stamps anchors without re-keying.**
-   Evidence: `lib/services/reviewer-roster-store.js:368-384`;
-   `docs/atlas/postgres-reviewer-find-roster.md`.
-   Dormant — the recanonicalization removed the fuel (0 placeholder-keyed rows carry an
-   anchor). Re-open if twins reappear, or before any path makes a search-origin row
-   promote-routed. The recurrence path is PASSIVE: opening the Find tab on a request with
-   pre-spine rows auto-runs enrichment and mints a canonical row beside the placeholder.
+1. **Always-show-the-proposal-anchor comparison in the evidence disclosure.**
+   Evidence: `shared/components/reviewers/ReviewerSearchSection.js:407-414` —
+   `institutionMismatch` / `expertiseMismatch` already compute proposal-side vs retrieved
+   and render ONLY when they fire, so silence is ambiguous between "they agree" (real
+   corroboration) and "no comparison possible". Owner deprioritized: the restructure would
+   push the papers down, and the papers are the working control. Re-open if namesake
+   confirmations are observed in practice.
 
 ### Verify Before Acting
 
-1. **Anything that assumes `main` is at `3f56bb7d`.**
-   `main` is now `c688aa0c`. The worktree branch `worktree-claude+main-diagnosis` (in
-   `.claude/worktrees/claude+main-diagnosis`) is fully merged into `main` and can be removed
-   once its `scripts/.roster-dedupe-backup/` JSON backups are no longer wanted — they hold
-   the pre-change state of all four sweeps and contain reviewer names and emails
-   (gitignored, local-only).
+1. **Anything treating `docs/BILL_CHUNK_4_DESIGN.md` as current.**
+   Evidence: its own frontmatter `status: historical` and banner — automated BILL
+   integration was TABLED 2026-07-12. Owner confirmed S388: the apps do **not** refer
+   reviewers to BILL.com in any way; the accept-time path under `lib/bill/` is honorarium
+   payment-INFORMATION COLLECTION only and the naming is vestigial. Cite it only as a
+   recorded historical observation.
 
-2. **`check:agent-wiki` in a fresh worktree.**
-   It fails on a missing `.agents/skills` symlink, which is untracked and local. That is an
-   environment artifact, not a red gate: `ln -sfn ../.claude/skills .agents/skills` makes it
-   pass. Do not "fix" the wiki page it names.
+2. **Anything reading `wmkf_responsereceivedat` as "a response arrived".**
+   Evidence: `lib/services/reviewer-suggestion-sweep.js:93-96` stamps it with the SWEEP
+   time alongside `wmkf_responsetype = no_response`. `wmkf_responsetype` is the
+   discriminator; the timestamp is not.
+
+3. **Anything assuming `main` is at `8a34a057`.** It is 4 commits ahead.
 
 ### Do Not Reopen Without New Decision
 
-1. **Human assertions (`manual`/`staff_verified`) are terminal against machine evidence.**
-   Evidence: `lib/utils/reviewer-invite.js` `emailSourceUpgradeAllowed`;
-   `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`. Decided after an adversarial review
-   argued both sides; an earlier commit claimed the opposite and was corrected in place.
+1. **`manual` / `staff_verified` are TERMINAL against machine evidence.**
+   Evidence: `lib/utils/reviewer-invite.js:151` `emailSourceUpgradeAllowed`;
+   `lib/dataverse/adapters/researcher.js:238-243`;
+   `tests/unit/my-candidates-verify-address.test.js:297-313`. S387 decision after
+   adversarial review. §5.4's `reviewer_confirmed` proposal would need an EXPLICIT
+   carve-out, not a silent exception.
 
-2. **`promote-applicant-reviewer` keeps the canonical-key-only lookup.**
-   Evidence: `findCandidateBySuggestionAnchor`'s header. Resolving a pre-identity-spine blob
-   there is fail-OPEN: its gate inputs are null and the row would be waved through.
-
-3. **`provenanceGroupOf` applies the full server gate to `APPLICANT_SUGGESTED` only.**
-   Evidence: `save-candidates-service.js` `isUnresolvedIdentity` — widening it makes
-   literature/proposal-named rows unsavable.
+2. **The evidence disclosure's paper list must not be truncated or collapsed**, and its
+   Scholar link must stay a name search. Evidence: source comments in
+   `ReviewerSearchSection.js` and the S388 block in
+   `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`.
 
 ## Key Files Reference
 
 | File | Purpose |
-| --- | --- |
-| `lib/utils/reviewer-invite.js` | Send-gate buckets AND provenance precedence (`emailSourceTier`/`emailSourceUpgradeAllowed`) — one module so the adapter cannot disagree with the gate |
-| `lib/utils/reviewer-provenance.js` | `requiresStaffIdentityConfirmation` — the shared applicant identity gate |
-| `lib/utils/reviewer-vetted-email.js` | `pickVettedEmail` (may this persist?) vs `pickAssertedEmailPair` (does this blob vouch for this pairing?) |
-| `lib/dataverse/adapters/potential-reviewer.js` | The only writer of `wmkf_emailaddress`; all four writers pair the source. `queryAllReviewers` for population sweeps |
-| `lib/services/reviewer-roster-store.js` | `findCandidateBySuggestion` (canonical-only, promote) vs `findCandidateBySuggestionAnchor` (roster actions) |
-| `tests/unit/email-source-pairing-invariant.test.js` | The scanner enforcing address+provenance across the repo |
-| `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` | Canonical send-gate + precedence contract |
-| `docs/atlas/postgres-reviewer-find-roster.md` | Roster key hazards, twin recurrence, executed sweep results |
-| `scripts/.roster-dedupe-backup/` | Pre-change backups for all four sweeps (gitignored, contains PII) |
+|------|---------|
+| `docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md` | The problem statement — §0–§5.4, nothing built, six owner decisions |
+| `shared/components/reviewers/ReviewerSearchSection.js` | The identity-evidence disclosure (the only feature change this session) |
+| `tests/unit/reviewer-candidate-identity-evidence.test.js` | 7 tests pinning the disclosure, incl. the no-truncation and no-stored-profile guards |
+| `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` | Canonical send-gate contract — the `staff_verified` contradiction is fixed here |
+| `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` | Load-bearing-papers note + Scholar 4th-site rule |
+| `lib/services/review-manager/send-emails-service.js:573-597` | Door 3 — the §4.2 live defect |
+| `lib/bill/honorarium-onboard-orchestrator.js:86,108,369` | Door 4 — accept-time promotion + address capture, live today |
+| `lib/services/reviewer-finder/save-candidates-service.js:1084-1121` | Door 1 — the deliberate do-not-link decision that door 3 overrides |
+| `lib/utils/reviewer-invite.js` | Send-gate buckets + provenance precedence |
 
 ## Testing
 
 ```bash
-rtk npx jest tests/unit tests/integration   # 544 suites / 6553 tests green
-rtk npm run lint
-rtk npm run check:agent-wiki && rtk npm run check:agent-wiki:self-test
-rtk npm run check:atlas && rtk npm run check:atlas:self-test
-rtk npm run check:doc-symbol-refs && rtk npm run check:fact-consistency
+rtk npx jest tests/unit tests/integration    # 546 suites / 6576 tests green at 41399610
+rtk npm run lint                             # 0 errors (51 pre-existing warnings, none in touched files)
+rtk npm run build                            # clean
+rtk npx jest tests/unit/reviewer-candidate-identity-evidence.test.js   # the 7 disclosure tests
 ```
 
-A bare `npx jest` additionally picks up `tests/e2e/*.spec.js`, which are Playwright specs
-that cannot load under jest (pre-existing, unrelated). Scope runs to `tests/unit` and
-`tests/integration`.
+All `check:*` gates were green at `41399610`, including `check:agent-wiki`,
+`check:doc-symbol-refs`, `check:fact-consistency`, `check:drain-table-mentions`,
+`check:docs-catalog`, and `check:types`.
 
-Re-verify the S387 data invariants (read-only; the last needs
-`DATAVERSE_ALLOW_PROD_READS=yes`):
-
-```bash
-rtk node scripts/stamp-ungated-applicant-roster-rows.mjs        # expect 0 to stamp
-rtk node scripts/dedupe-reviewer-roster-suggestion-twins.mjs    # expect 0 pairs
-DATAVERSE_ALLOW_PROD_READS=yes rtk node scripts/backfill-email-source-precedence.mjs
-# expect: 385 person rows scanned, 0 pinned
-```
+Not run: any live/visual verification (see Verified Open #3).
