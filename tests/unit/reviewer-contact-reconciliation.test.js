@@ -4,6 +4,10 @@ import {
   compactDataverseContactEvidence,
   reconcileReviewerContacts,
 } from '../../lib/services/reviewer-contact-reconciliation';
+import {
+  createConflictPendingState,
+  createStaffVerifiedState,
+} from '../../lib/utils/reviewer-address-trust';
 
 const ORCID = '0000-0002-1825-0097';
 
@@ -204,6 +208,102 @@ test('failed contradiction write remains visible and offers the repair path', as
       },
     },
   });
+});
+
+test('a previously resolved exact address pair is not reopened by enrichment', async () => {
+  const priorConflict = createConflictPendingState({
+    email: 'stored@example.edu',
+    foundEmail: 'found@example.edu',
+    reason: 'email_mismatch',
+    requestId: '11111111-1111-1111-1111-111111111111',
+    candidateKey: 'orcid:test',
+    detectedAt: '2026-07-20T12:00:00.000Z',
+  });
+  const resolved = createStaffVerifiedState({
+    email: 'stored@example.edu',
+    requestId: '11111111-1111-1111-1111-111111111111',
+    candidateKey: 'orcid:test',
+    evidenceType: 'institution_page',
+    evidenceUrl: 'https://example.edu/profile',
+    attestedAt: '2026-07-20T13:00:00.000Z',
+    resolution: {
+      conflict: priorConflict.conflict,
+      decision: 'keep_stored',
+      resolvedAt: '2026-07-20T13:00:00.000Z',
+    },
+  });
+  const updateReviewer = jest.fn();
+  const rows = [candidate('Trusted Researcher', {
+    identity: {
+      status: 'probable',
+      anchors: [{ type: 'orcid_public', canonicalKey: `orcid:${ORCID}` }],
+    },
+    orcidId: ORCID,
+    email: 'found@example.edu',
+    emailSource: 'scholarly_single',
+    emailPersistAllowed: true,
+  })];
+  await reconcileReviewerContacts(rows, {
+    requestId: '11111111-1111-1111-1111-111111111111',
+    lookup: jest.fn(async () => ({
+      outcome: 'confident',
+      match: {
+        reviewerId: 'reviewer-1', matchKey: 'orcid', nameConsistent: true,
+        context: { email: 'stored@example.edu' },
+      },
+      referencedReviewers: [], referencedContacts: [],
+    })),
+    getReviewer: jest.fn(async () => ({
+      wmkf_emailaddress: 'stored@example.edu',
+      wmkf_addresstruststatejson: JSON.stringify(resolved),
+      _etag: 'W/"2"',
+    })),
+    updateReviewer,
+  });
+  expect(updateReviewer).not.toHaveBeenCalled();
+  expect(rows[0].addressConflictPending).not.toBe(true);
+});
+
+test('a third address replaces an older pending pair', async () => {
+  const pending = createConflictPendingState({
+    email: 'stored@example.edu',
+    foundEmail: 'old-found@example.edu',
+    reason: 'email_mismatch',
+    requestId: '11111111-1111-1111-1111-111111111111',
+    candidateKey: 'orcid:test',
+    detectedAt: '2026-07-20T12:00:00.000Z',
+  });
+  const updateReviewer = jest.fn();
+  const rows = [candidate('Trusted Researcher', {
+    identity: {
+      status: 'probable',
+      anchors: [{ type: 'orcid_public', canonicalKey: `orcid:${ORCID}` }],
+    },
+    orcidId: ORCID,
+    email: 'third@example.edu',
+    emailSource: 'scholarly_single',
+    emailPersistAllowed: true,
+  })];
+  await reconcileReviewerContacts(rows, {
+    requestId: '11111111-1111-1111-1111-111111111111',
+    lookup: jest.fn(async () => ({
+      outcome: 'confident',
+      match: {
+        reviewerId: 'reviewer-1', matchKey: 'orcid', nameConsistent: true,
+        context: { email: 'stored@example.edu' },
+      },
+      referencedReviewers: [], referencedContacts: [],
+    })),
+    getReviewer: jest.fn(async () => ({
+      wmkf_emailaddress: 'stored@example.edu',
+      wmkf_addresstruststatejson: JSON.stringify(pending),
+      _etag: 'W/"2"',
+    })),
+    updateReviewer,
+    now: () => '2026-07-21T12:00:00.000Z',
+  });
+  const written = JSON.parse(updateReviewer.mock.calls[0][1].addressTrustStateJson);
+  expect(written.conflict).toMatchObject({ foundEmail: 'third@example.edu' });
 });
 
 test('a probable identity without an ORCID-specific anchor still treats the ORCID as provisional', async () => {

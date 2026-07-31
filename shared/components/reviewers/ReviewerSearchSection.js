@@ -175,7 +175,7 @@ function emailOwnershipLabel(evidence) {
 // without a checkbox for the non-selectable Unverified section. `onExclude` adds
 // a set-aside action (active cards); `onPromote` adds a restore action (the
 // collapsed Excluded section).
-export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, canManage = true }) {
+export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, canManage = true }) {
   const [expanded, setExpanded] = useState(false);
   // Identity-unverified rows only: the retrieved-but-unconfirmed evidence panel.
   // Collapsed by default so a list of these stays scannable.
@@ -267,6 +267,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const promotionDecision = getCandidatePromotionDecision(c);
   const needsIdentityConfirmation = promotionDecision?.decision === 'needs_identity_confirmation';
   const missingVerifiedEmail = promotionDecision?.decision === 'missing_email';
+  const needsRecordRepair = promotionDecision?.decision === 'needs_record_repair';
   const needsAddressVerification = !needsIdentityConfirmation && emailReadiness.action !== 'ready';
 
   // Unresolved identity never enters Invite. Suppress contact/bibliometrics that
@@ -777,19 +778,30 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             {/* Manual contact edit (manage-only): correct a wrong email/website
                 (or affiliation/h-index) by hand. A typed email is stamped manual
                 → quick check at invite (per-recipient acknowledgement). */}
-            {canManage && onEdit && !identityUnverified && (
+            {canManage && (onEdit || onReviewAddressConflict) && !identityUnverified && (
               <button
                 type="button"
-                onClick={() => onEdit(c)}
+                onClick={() => (c.addressConflictPending && onReviewAddressConflict
+                  ? onReviewAddressConflict(c)
+                  : onEdit?.(c))}
                 className="text-xs text-gray-500 hover:text-blue-700 flex items-center gap-1"
                 title={needsAddressVerification
                   ? 'Review the evidence, correct the address if needed, and verify the exact person and address'
                   : 'Edit contact details (email/website/affiliation) for this candidate'}
               >
-                {needsAddressVerification ? '✓ Verify / edit address' : '✏️ Edit contact'}
+                {c.addressConflictPending ? 'Review address conflict' : (needsAddressVerification ? '✓ Verify / edit address' : '✏️ Edit contact')}
               </button>
             )}
-            {canManage && onRequestRepair && (emailReadiness.action === 'blocked' || c.conflictRecordUnavailable) && (
+            {canManage && onRetryAddressCheck && c.conflictRecordUnavailable === true && (
+              <button
+                type="button"
+                onClick={() => onRetryAddressCheck(c)}
+                className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
+              >
+                ↻ Retry conflict check
+              </button>
+            )}
+            {canManage && onRequestRepair && (emailReadiness.action === 'blocked' || c.conflictRecordUnavailable || needsRecordRepair) && (
               <button
                 type="button"
                 onClick={() => onRequestRepair(c)}
@@ -1582,11 +1594,11 @@ export default function ReviewerSearchSection({
       }),
     });
     const data = await response.json().catch(() => ({}));
+    if (genRef.current !== myGen) return;
     if (!response.ok || !data.success || !data.candidate) {
       const nextAction = data.remediation?.[0]?.label;
       throw new Error(`${data.message || data.error || 'Could not verify this address.'}${nextAction ? ` Next: ${nextAction}.` : ''}`);
     }
-    if (genRef.current !== myGen) return;
     const candidate = {
       ...data.candidate,
       ...updates,
@@ -1603,9 +1615,47 @@ export default function ReviewerSearchSection({
     setRosterNote(`${data.candidate.name || cand.name}: exact person and address verified.`);
   }, [requestId, applyAuthoritativeRosterCandidate]);
 
+  const reviewAddressConflict = useCallback(async (cand) => {
+    const key = candKey(cand);
+    if (!requestId || !key) return;
+    const myGen = genRef.current;
+    const response = await fetch('/api/workbench/reviewer-address-trust', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requestId, candidateKey: key, action: 'get_address_conflict' }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (genRef.current !== myGen) return;
+    if (!response.ok || !data.success || !data.conflict) {
+      setRosterNote(data.message || data.error || 'Could not load the current address conflict. Retry the check or request repair.');
+      return;
+    }
+    setEditingContact({ ...cand, addressConflict: data.conflict });
+  }, [requestId]);
+
+  const retryAddressCheck = useCallback(async (cand) => {
+    const key = candKey(cand);
+    if (!requestId || !key) return;
+    const myGen = genRef.current;
+    const response = await fetch('/api/workbench/reviewer-address-trust', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requestId, candidateKey: key, action: 'retry_check' }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (genRef.current !== myGen) return;
+    if (!response.ok || !data.success || !data.candidate) {
+      setRosterNote(data.message || data.error || 'The conflict check could not be retried. Create a repair request if it continues to fail.');
+      return;
+    }
+    applyAuthoritativeRosterCandidate(key, data.candidate);
+    setRosterNote(`${data.candidate.name || cand.name}: conflict check refreshed.`);
+  }, [requestId, applyAuthoritativeRosterCandidate]);
+
   const requestAddressRepair = useCallback(async (cand) => {
     const key = candKey(cand);
     if (!requestId || !key) return;
+    const myGen = genRef.current;
     const response = await fetch('/api/workbench/reviewer-address-trust', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1613,12 +1663,17 @@ export default function ReviewerSearchSection({
         requestId,
         candidateKey: key,
         action: 'create_repair_request',
-        code: getCandidateEmailReadiness(cand).action === 'blocked'
-          ? 'address_conflict_pending'
-          : 'address_verification_required',
+        code: cand.serverRepairReason
+          || (getCandidatePromotionDecision(cand)?.decision === 'needs_record_repair'
+            ? getCandidatePromotionDecision(cand).reason
+            : null)
+          || (getCandidateEmailReadiness(cand).action === 'blocked'
+            ? 'address_conflict_pending'
+            : 'address_verification_required'),
       }),
     });
     const data = await response.json().catch(() => ({}));
+    if (genRef.current !== myGen) return;
     setRosterNote(response.ok && data.success
       ? `${data.message} Repair queue: ${data.adminUrl || '/admin#system-alerts'}`
       : (data.message || data.error || 'Could not create a repair request. Retry from this reviewer card.'));
@@ -1803,6 +1858,7 @@ export default function ReviewerSearchSection({
       let addressVerificationKeys = [];
       let addressRepairKeys = [];
       let identityReviewResults = [];
+      let serverRepairResults = [];
       let needsRosterReload = false;
       let refreshedVerificationCandidates = [];
       const rosterWarnings = [];
@@ -1853,6 +1909,17 @@ export default function ReviewerSearchSection({
             .map((result) => result.candidateKey);
           identityReviewResults = saveResults.filter((result) => (
             result?.decision === 'identity_choice_required'
+            && result?.code !== 'person_inactive'
+            && typeof result?.candidateKey === 'string'
+          ));
+          serverRepairResults = saveResults.filter((result) => (
+            new Set([
+              'person_inactive',
+              'email_conflict',
+              'ambiguous_email_owner',
+              'inactive_email_owner',
+              'contact_linked_elsewhere',
+            ]).has(result?.code)
             && typeof result?.candidateKey === 'string'
           ));
           needsRosterReload = saveResults.some((result) => (
@@ -1951,7 +2018,9 @@ export default function ReviewerSearchSection({
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.success) {
-              throw new Error(data.error || `Promotion failed (${res.status})`);
+              const error = new Error(data.message || data.error || `Promotion failed (${res.status})`);
+              error.code = data.code || null;
+              throw error;
             }
             return {
               ok: true,
@@ -1959,7 +2028,7 @@ export default function ReviewerSearchSection({
               rosterFinalized: data.rosterFinalized === true,
             };
           } catch (e) {
-            return { ok: false, candidate: c, error: e.message };
+            return { ok: false, candidate: c, error: e.message, code: e.code || null };
           }
         }));
         for (const result of results) {
@@ -1972,6 +2041,12 @@ export default function ReviewerSearchSection({
             }
           } else {
             failures.push({ name: result.candidate.name || 'Applicant-referred reviewer', error: result.error });
+            if (new Set(['person_inactive', 'email_conflict', 'ambiguous_email_owner', 'inactive_email_owner']).has(result.code)) {
+              serverRepairResults.push({
+                candidateKey: candKey(result.candidate),
+                code: result.code,
+              });
+            }
           }
         }
       }
@@ -2080,6 +2155,26 @@ export default function ReviewerSearchSection({
         rosterWarnings.push('Dataverse identity evidence needs review. Use “This is the right person” to verify the person and exact address, or set the reviewer aside.');
       }
 
+      if (serverRepairResults.length > 0 && isCurrent()) {
+        const reasonByKey = new Map(serverRepairResults.map((result) => [
+          result.candidateKey,
+          result.code || 'record_repair_required',
+        ]));
+        const exposeRepair = (candidate) => {
+          const reason = reasonByKey.get(candKey(candidate));
+          return reason ? { ...candidate, serverRepairReason: reason } : candidate;
+        };
+        setCandidates((prev) => prev.map(exposeRepair));
+        setRecCandidates((prev) => prev.map(exposeRepair));
+        setRosterActive((prev) => prev.map(exposeRepair));
+        setSelected((prev) => {
+          const next = new Set(prev);
+          serverRepairResults.forEach((result) => next.delete(result.candidateKey));
+          return next;
+        });
+        rosterWarnings.push('A reviewer record must be repaired before promotion. Use “Create repair request” on the affected card.');
+      }
+
       const totalSucceeded = saved + promoted;
       if (totalSucceeded === 0) {
         if (refreshedVerificationCandidates.length > 0 && isCurrent()) {
@@ -2093,6 +2188,11 @@ export default function ReviewerSearchSection({
           return;
         }
         if (identityReviewResults.length > 0 && isCurrent()) {
+          setRosterNote(Array.from(new Set(rosterWarnings)).join(' '));
+          setPhase('results');
+          return;
+        }
+        if (serverRepairResults.length > 0 && isCurrent()) {
           setRosterNote(Array.from(new Set(rosterWarnings)).join(' '));
           setPhase('results');
           return;
@@ -2604,6 +2704,8 @@ export default function ReviewerSearchSection({
                                     || c.applicantContactMismatch === true
                                   ) ? setEditingContact : undefined}
                                   onRequestRepair={requestAddressRepair}
+                                  onReviewAddressConflict={reviewAddressConflict}
+                                  onRetryAddressCheck={retryAddressCheck}
                                   onConfirmIdentity={canConfirmForPromotion ? (cand) => setConfirmingContact(cand) : undefined}
                                   canManage={canManage}
                                 />;

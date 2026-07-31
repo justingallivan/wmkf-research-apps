@@ -17,6 +17,10 @@
 > `codex/reviewer-address-trust-plan`; Wave 17 and the runtime have not been
 > deployed, so Production behavior remains unchanged pending schema-first release
 > and a controlled signed-in pilot.
+> Claude Opus 5's first adversarial implementation review returned NO-SHIP; its
+> confirmed lifecycle, chronology, executable-remedy, raw-disclosure, retry, and
+> inactive-record findings have been fixed on the branch. A fresh Opus review is
+> the next release gate.
 
 ## Session 388 Summary
 
@@ -280,6 +284,8 @@ Seven Claude commits were replayed without content conflicts onto
    reason-to-remedy matrix across ordinary and applicant-recommended promotion.
    Apply Wave 17 before runtime promotion, then run the controlled signed-in
    pilot. Evidence: `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md`.
+   The first Opus implementation review's confirmed findings are remediated;
+   rerun the adversarial review before schema/runtime promotion.
 2. ~~**Acceptance-time promotion scope (§4.1/§4.3).**~~ **DONE in source, S389:**
    sending never promotes; every identity-bearing acceptance—including honorarium
    opt-outs—promotes through identity-aware/idempotent matching; declines do not.

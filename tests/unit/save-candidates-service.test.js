@@ -87,6 +87,7 @@ const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const grantRequestAdapter = require('../../lib/dataverse/adapters/grant-request');
 const reviewerRosterStore = require('../../lib/services/reviewer-roster-store');
+const { createConflictPendingState } = require('../../lib/utils/reviewer-address-trust');
 const { verifyAutomatedIdentityAttestation } = require('../../lib/services/reviewer-candidate-attestation');
 const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity-lookup');
 const { loadCoiContext } = require('../../lib/services/reviewer-request-context');
@@ -617,6 +618,76 @@ test('attested trusted-ORCID address change updates the exact stable person atom
   expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalledWith(expect.objectContaining({
     potentialReviewerId: 'PID-STABLE',
   }), expect.anything());
+});
+
+test('an address receipt created before the current conflict cannot resolve it', async () => {
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+    valid: true,
+    source: 'automated_resolver',
+    identityDecisionBound: true,
+    contactAuthorityBound: true,
+    rosterCandidateKey: 'orcid:stable-person',
+  });
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'confident',
+    match: {
+      reviewerId: 'PID-STABLE',
+      contactId: null,
+      matchKey: 'orcid',
+      nameConsistent: true,
+      context: { email: 'old@example.edu', affiliation: 'Different University' },
+    },
+    referencedReviewers: [{ reviewerId: 'PID-STABLE', viaNameMatch: false, affiliation: 'Different University' }],
+    referencedContacts: [],
+  });
+  const conflict = createConflictPendingState({
+    email: 'old@example.edu',
+    foundEmail: 'new@example.edu',
+    reason: 'email_mismatch',
+    requestId: BASE.requestId,
+    candidateKey: 'orcid:stable-person',
+    detectedAt: '2026-07-31T13:00:00.000Z',
+  });
+  potentialReviewerAdapter.getById.mockResolvedValue({
+    wmkf_potentialreviewersid: 'PID-STABLE',
+    wmkf_name: 'Dr Stable',
+    wmkf_emailaddress: 'old@example.edu',
+    wmkf_emailsource: 'scholarly_multi',
+    wmkf_addresstruststatejson: JSON.stringify(conflict),
+    wmkf_primaryaffiliation: 'Different University',
+    statecode: 0,
+    _etag: 'W/"stable"',
+  });
+  reviewerRosterStore.findAddressTrustReceipt.mockResolvedValueOnce({
+    receiptId: 'receipt-stale',
+    personConfirmed: true,
+    email: 'new@example.edu',
+    evidenceType: 'institution_page',
+    evidenceUrl: 'https://example.edu/profile',
+    attestedAt: '2026-07-31T12:00:00.000Z',
+  });
+
+  const error = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Stable',
+      email: 'new@example.edu',
+      emailSource: 'scholarly_multi',
+      orcid: '0000-0002-1825-0097',
+      affiliation: 'Different University',
+      candidateKey: 'orcid:stable-person',
+      automatedIdentityAttestation: 'signed-stable',
+    }],
+  }).catch((caught) => caught);
+
+  expect(error).toBeInstanceOf(SaveCandidatesError);
+  expect(error.body.errors).toEqual([
+    expect.objectContaining({
+      code: 'address_verification_required',
+      reason: 'stale_address_attestation',
+    }),
+  ]);
+  expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
 });
 
 test('a false roster finalization result emits an alert and remains explicit in the saved result', async () => {

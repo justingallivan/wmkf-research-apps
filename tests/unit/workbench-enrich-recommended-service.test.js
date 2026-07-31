@@ -19,9 +19,11 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 
 const getPersonById = jest.fn();
 const findPersonByEmailCandidates = jest.fn();
+const updatePerson = jest.fn();
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   getById: (...a) => getPersonById(...a),
   findByEmailCandidates: (...a) => findPersonByEmailCandidates(...a),
+  update: (...a) => updatePerson(...a),
 }));
 
 const upsertByPotentialReviewer = jest.fn(async () => ({}));
@@ -173,6 +175,7 @@ beforeEach(() => {
     })),
   }));
   upsertByPotentialReviewer.mockResolvedValue({});
+  updatePerson.mockResolvedValue(undefined);
 });
 
 test('happy path: progress frames strictly precede one terminal complete; never touches res', async () => {
@@ -481,6 +484,44 @@ test('stored A plus enriched B surfaces a mismatch and never relabels A with B p
     },
   });
   expect(rec.events.some((event) => event.data?.code === 'contact_claim_mismatch')).toBe(true);
+});
+
+test('a durable conflict is projected as booleans without sending the trust bundle to the browser', async () => {
+  getPersonById.mockResolvedValue({
+    wmkf_potentialreviewersid: PR,
+    wmkf_name: 'Dr. Rec One',
+    wmkf_primaryaffiliation: 'Rec University',
+    wmkf_emailaddress: 'stored@example.edu',
+    wmkf_emailsource: null,
+    wmkf_addresstruststatejson: null,
+    statecode: 0,
+    _etag: 'W/"person"',
+  });
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((candidate) => ({
+      ...candidate,
+      email: 'new@example.edu',
+      contactEnrichment: {
+        identity: { status: 'probable' },
+        email: 'new@example.edu',
+        emailSource: 'scholarly_multi',
+        emailPersistAllowed: true,
+      },
+    })),
+  }));
+
+  const rec = recorder();
+  await enrichRecommended(args(), rec.onEvent);
+  const result = rec.events.find((event) => event.event === 'complete').data.recommended[0];
+  expect(result).toMatchObject({
+    addressConflictPending: true,
+    applicantKnownReviewer: { addressConflictPending: true },
+  });
+  expect(result).not.toHaveProperty('addressTrustStateJson');
+  expect(JSON.stringify(result)).not.toContain('detectedAt');
+  expect(updatePerson).toHaveBeenCalledWith(PR, {
+    addressTrustStateJson: expect.stringContaining('conflict_pending'),
+  }, { actingUserSystemId: 'u-1', ifMatch: 'W/"person"' });
 });
 
 test('vetted email for a person with no stored address stays paired in the roster but does not orphan its source in Dataverse', async () => {

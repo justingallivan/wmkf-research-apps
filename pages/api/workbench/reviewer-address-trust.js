@@ -12,6 +12,7 @@ import { isGuid } from '../../../lib/utils/guid';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import {
   verifyPersonAndAddress,
+  getAddressConflict,
   retryAddressCheck,
   createAddressRepairRequest,
 } from '../../../lib/services/reviewer-address-trust-service';
@@ -19,6 +20,7 @@ import { withRemediation } from '../../../lib/utils/reviewer-remediation';
 
 const ACTIONS = new Set([
   'verify_person_and_address',
+  'get_address_conflict',
   'retry_check',
   'create_repair_request',
 ]);
@@ -73,8 +75,10 @@ export default async function handler(req, res) {
           note: req.body?.note,
           ...actor,
         });
+      } else if (action === 'get_address_conflict') {
+        result = await getAddressConflict({ requestId, candidateKey });
       } else if (action === 'retry_check') {
-        result = await retryAddressCheck({ requestId, candidateKey });
+        result = await retryAddressCheck({ requestId, candidateKey, ...actor });
       } else {
         result = await createAddressRepairRequest({
           requestId,

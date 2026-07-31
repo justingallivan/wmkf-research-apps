@@ -58,6 +58,39 @@ describe('CandidateEditModal — local (onApply) mode', () => {
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledWith('/api/reviewer-finder/my-candidates', expect.objectContaining({ method: 'PATCH' })));
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
   });
+
+  test('a fresh conflict disclosure offers both addresses and verifies the chosen side', async () => {
+    const onVerifyAddress = jest.fn(async () => {});
+    render(<CandidateEditModal
+      candidate={{
+        ...candidate,
+        addressConflict: {
+          storedEmail: 'stored@example.edu',
+          foundEmail: 'found@example.edu',
+        },
+      }}
+      onApply={jest.fn()}
+      onVerifyAddress={onVerifyAddress}
+      requireAddressVerification
+      onClose={jest.fn()}
+      nameEditable={false}
+    />);
+
+    fireEvent.click(screen.getByRole('button', { name: /use found: found@example.edu/i }));
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.change(screen.getAllByPlaceholderText('https://...')[0], {
+      target: { value: 'https://example.edu/paper' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => expect(onVerifyAddress).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'found@example.edu' }),
+      expect.objectContaining({
+        evidenceType: 'publication_corresponding_author',
+        evidenceUrl: 'https://example.edu/paper',
+      }),
+    ));
+  });
 });
 
 describe('CandidateEditModal — identity confirmation', () => {

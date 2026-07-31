@@ -5,6 +5,8 @@
 const {
   createStaffVerifiedState,
   createConflictPendingState,
+  addressConflictDisposition,
+  receiptCanResolveConflict,
   parseAddressTrustState,
   addressTrustDecision,
 } = require('../../lib/utils/reviewer-address-trust');
@@ -79,6 +81,86 @@ describe('reviewer address trust bundle', () => {
       remediation: expect.arrayContaining([
         expect.objectContaining({ action: 'resolve_address_conflict' }),
       ]),
+    });
+  });
+
+  test('a resolved address pair is not silently reopened', () => {
+    const conflict = createConflictPendingState({
+      email: BASE.email,
+      foundEmail: 'new@example.edu',
+      reason: 'email_mismatch',
+      requestId: BASE.requestId,
+      candidateKey: BASE.candidateKey,
+      detectedAt: '2026-07-31T21:00:00.000Z',
+    });
+    const resolved = createStaffVerifiedState({
+      ...BASE,
+      email: 'new@example.edu',
+      attestedAt: '2026-07-31T22:00:00.000Z',
+      resolution: {
+        conflict: conflict.conflict,
+        decision: 'use_found',
+        resolvedAt: '2026-07-31T22:00:00.000Z',
+      },
+    });
+    expect(addressConflictDisposition(resolved, {
+      email: 'new@example.edu',
+      foundEmail: BASE.email,
+      reason: 'email_mismatch',
+    })).toBe('resolved');
+  });
+
+  test('the same pending pair is reused but a third address supersedes it', () => {
+    const pending = createConflictPendingState({
+      email: BASE.email,
+      foundEmail: 'new@example.edu',
+      reason: 'email_mismatch',
+      requestId: BASE.requestId,
+      candidateKey: BASE.candidateKey,
+      detectedAt: '2026-07-31T21:00:00.000Z',
+    });
+    expect(addressConflictDisposition(pending, {
+      email: BASE.email,
+      foundEmail: 'new@example.edu',
+      reason: 'email_mismatch',
+    })).toBe('existing');
+    expect(addressConflictDisposition(pending, {
+      email: BASE.email,
+      foundEmail: 'third@example.edu',
+      reason: 'email_mismatch',
+    })).toBe('write');
+  });
+
+  test('only a post-detection receipt can resolve a conflict', () => {
+    const conflict = { detectedAt: '2026-07-31T21:00:00.000Z' };
+    expect(receiptCanResolveConflict({
+      personConfirmed: true,
+      attestedAt: '2026-07-31T20:59:59.000Z',
+    }, conflict)).toBe(false);
+    expect(receiptCanResolveConflict({
+      personConfirmed: true,
+      attestedAt: '2026-07-31T21:00:00.000Z',
+    }, conflict)).toBe(true);
+  });
+
+  test('a malformed resolution cannot suppress a later contradiction', () => {
+    const state = createStaffVerifiedState(BASE);
+    state.resolution = {
+      decision: 'keep_stored',
+      conflict: {
+        reason: 'email_mismatch',
+        storedEmail: BASE.email,
+        foundEmail: 'new@example.edu',
+        requestId: BASE.requestId,
+        candidateKey: BASE.candidateKey,
+        detectedAt: '2026-07-31T21:00:00.000Z',
+      },
+      resolvedAt: '2026-07-31T20:00:00.000Z',
+    };
+    expect(parseAddressTrustState(state, { storedEmail: BASE.email })).toEqual({
+      valid: false,
+      reason: 'invalid_attestation_or_resolution',
+      state: null,
     });
   });
 

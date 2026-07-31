@@ -64,6 +64,17 @@ export function candidateWasSaved(candidate, savedKeys = []) {
 }
 
 export function getCandidatePromotionDecision(candidate) {
+  const knownRepairReason = candidate?.applicantKnownReviewer?.status === 'inactive'
+    ? 'person_inactive'
+    : (candidate?.applicantKnownReviewer?.status === 'email_conflict' ? 'email_conflict' : null);
+  const serverRepairReason = candidate?.serverRepairReason || knownRepairReason;
+  if (serverRepairReason) {
+    return {
+      decision: 'needs_record_repair',
+      reason: serverRepairReason,
+      email: null,
+    };
+  }
   const dataverseReason = candidate?.serverIdentityReviewReason
     || candidate?.contactEnrichment?.dataverseContactEvidence?.reason
     || null;
@@ -73,7 +84,6 @@ export function getCandidatePromotionDecision(candidate) {
     'orcid_email_split',
     'contact_linked_elsewhere',
     'identity_conflict',
-    'person_inactive',
   ]).has(dataverseReason);
   if (candidate?.pdIdentityConfirmed !== true && dataverseNeedsIdentityChoice) {
     return {
@@ -200,7 +210,6 @@ export function getCandidateEmailReadiness(candidate) {
   const confidence = emailConfidence({
     email,
     emailSource: candidate?.emailSource || enrichment.emailSource || null,
-    addressTrustStateJson: candidate?.addressTrustStateJson || null,
     identityStatus: candidate?.identityStatus
       || enrichment.identityStatus
       || enrichment.identity?.status
@@ -785,6 +794,9 @@ export function pruneCandidateForRoster(c) {
     isApplicantRecommended: !!c.isApplicantRecommended,
     applicantKnownReviewer: pruneApplicantKnownReviewer(c.applicantKnownReviewer),
     applicantContactMismatch: c.applicantContactMismatch === true,
+    serverRepairReason: typeof c.serverRepairReason === 'string'
+      ? c.serverRepairReason.slice(0, 100)
+      : null,
     enrichedProposalKey: c.enrichedProposalKey || null,
     applicantEnrichmentCacheVersion: Number.isInteger(c.applicantEnrichmentCacheVersion)
       ? c.applicantEnrichmentCacheVersion

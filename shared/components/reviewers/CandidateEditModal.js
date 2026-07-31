@@ -130,6 +130,18 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
 
   if (!candidate) return null;
 
+  const addressConflict = candidate.addressConflict || (
+    candidate.applicantContactMismatch === true
+      && candidate.applicantKnownReviewer?.email
+      && candidate.contactEnrichment?.email
+      && candidate.applicantKnownReviewer.email.toLowerCase() !== candidate.contactEnrichment.email.toLowerCase()
+      ? {
+          storedEmail: candidate.applicantKnownReviewer.email,
+          foundEmail: candidate.contactEnrichment.email,
+        }
+      : null
+  );
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSaving(true);
@@ -506,26 +518,23 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
             <p className="text-xs text-gray-400 mt-1">Correct this if the listed address belongs to an assistant or department.</p>
           </div>
 
-          {candidate.applicantContactMismatch === true
-            && candidate.applicantKnownReviewer?.email
-            && candidate.contactEnrichment?.email
-            && candidate.applicantKnownReviewer.email.toLowerCase() !== candidate.contactEnrichment.email.toLowerCase() && (
+          {addressConflict && (
             <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-900">
               <p className="font-medium">Two different addresses were found. Choose one only after checking the evidence.</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => setFormData((data) => ({ ...data, email: candidate.applicantKnownReviewer.email }))}
+                  onClick={() => setFormData((data) => ({ ...data, email: addressConflict.storedEmail }))}
                   className="rounded border border-red-300 bg-white px-2 py-1 font-mono"
                 >
-                  Use stored: {candidate.applicantKnownReviewer.email}
+                  Use stored: {addressConflict.storedEmail}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFormData((data) => ({ ...data, email: candidate.contactEnrichment.email }))}
+                  onClick={() => setFormData((data) => ({ ...data, email: addressConflict.foundEmail }))}
                   className="rounded border border-red-300 bg-white px-2 py-1 font-mono"
                 >
-                  Use found: {candidate.contactEnrichment.email}
+                  Use found: {addressConflict.foundEmail}
                 </button>
               </div>
               <p className="mt-2">If neither belongs to this person, cancel and create a repair request from the reviewer card.</p>

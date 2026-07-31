@@ -64,6 +64,40 @@ test('applicant canonical email/source pair and promotion decision survive roste
   expect(isCandidateSelectable(pruned)).toBe(false);
 });
 
+test('an inactive or duplicate reviewer is routed to record repair, not identity confirmation', () => {
+  const candidate = pruneCandidateForRoster({
+    name: 'Inactive Reviewer',
+    email: 'inactive@example.edu',
+    emailSource: 'scholarly_multi',
+    serverRepairReason: 'person_inactive',
+    contactEnrichment: { identity: { status: 'probable' } },
+  });
+  expect(candidate.serverRepairReason).toBe('person_inactive');
+  expect(getCandidatePromotionDecision(candidate)).toEqual({
+    decision: 'needs_record_repair',
+    reason: 'person_inactive',
+    email: null,
+  });
+  expect(isCandidateSelectable(candidate)).toBe(false);
+});
+
+test('an applicant-linked inactive person exposes repair before a failed promotion attempt', () => {
+  const candidate = {
+    name: 'Inactive Applicant Reviewer',
+    isApplicantRecommended: true,
+    applicantKnownReviewer: {
+      status: 'inactive',
+      code: 'person_inactive',
+      email: 'inactive@example.edu',
+      emailSource: 'scholarly_multi',
+    },
+  };
+  expect(getCandidatePromotionDecision(candidate)).toMatchObject({
+    decision: 'needs_record_repair',
+    reason: 'person_inactive',
+  });
+});
+
 test('vetted enrichment pair stays selectable when the exact applicant person has no stored email', () => {
   const pruned = pruneCandidateForRoster({
     name: 'Applicant With New Email',

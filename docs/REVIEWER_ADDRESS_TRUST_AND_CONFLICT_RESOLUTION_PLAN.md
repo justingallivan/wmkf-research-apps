@@ -33,6 +33,16 @@ owner approved P1–P4 on 2026-07-31. Source, tests, Wave 17 schema-as-code, and
 read-only preflight are implemented. Production still requires schema-first
 deployment, runtime promotion, and a controlled signed-in pilot.
 
+The first Claude Opus 5 adversarial implementation review returned **NO-SHIP**.
+Its confirmed findings have now been remediated in source: resolved tuples are
+not reopened, a new third address supersedes an older pending tuple, an
+attestation must postdate the conflict it resolves, conflict cards fetch a
+fresh bounded two-address disclosure and can adjudicate either side, failed
+conflict writes have a real retry, inactive/duplicate records route to durable
+repair instead of an impossible identity-confirmation loop, raw trust bundles
+no longer enter browser DTOs, and stale async responses cannot mutate a new
+request. A second adversarial review is still required before release.
+
 This document replaces the rejected Session 390 design from
 `codex/claude-ui-followup`. It incorporates the subsequent Codex whole-flow
 review and the owner's additional requirement:
@@ -296,8 +306,7 @@ stable code plus server-approved remediation descriptors:
   "remediation": [
     { "action": "resolve_address_conflict", "label": "Review both addresses" },
     { "action": "set_aside", "label": "Set reviewer aside" }
-  ],
-  "conflictToken": "opaque-server-token"
+  ]
 }
 ```
 
@@ -309,7 +318,12 @@ falls through to “ready,” or renders as a dead badge.
 
 The mutation seam is one authenticated route,
 `POST /api/workbench/reviewer-address-trust`, dispatching an allowlisted action:
-`verify_person_and_address`, `retry_check`, or `create_repair_request`.
+`get_address_conflict`, `verify_person_and_address`, `retry_check`, or
+`create_repair_request`.
+`get_address_conflict` resolves the person again and returns only the fresh
+stored/found pair, reason, and detection timestamp. The subsequent verification
+action repeats that person/tuple/ETag validation; the browser never carries the
+person trust bundle or authority-bearing conflict state.
 Stored-versus-found resolution uses the verification action with the selected
 exact address; promotion records `keep_stored` or `use_found` in the durable
 bundle. “Different person” routes to existing identity/merge repair rather than
@@ -340,8 +354,8 @@ alert alone never changes a blocked decision to ready.
 | `email_mismatch` | Blocking | Stored and newly found addresses differ. | **Use found address**, **Keep stored address**, or **These are different people**. | One ETag-guarded exact-tuple resolution; address/source/trust update is atomic when changed. |
 | `orcid_email_split` | Blocking until exact person/address attestation; CRM repair itself need not block afterward | ORCID and email resolve to different records. | **Review records and choose**, or **Verify this person/address and continue unlinked**; automatically **Create repair request**. | Candidate may proceed only with explicit attestation; Contact stays unlinked pending repair. |
 | `contact_linked_elsewhere` | Same policy as split | The matching Contact is already linked to another reviewer. | **Open merge/repair**, or **Verify and continue unlinked**; automatically **Create repair request**. | No Contact relink by this workflow. |
-| `email_conflict` / duplicate owner | Blocking | Another active reviewer owns the exact address. | **Open reviewer merge**, **Choose the existing person**, or **Use another address**. | Existing merge/repair service completes; promotion retries afterward. |
-| `person_inactive` | Blocking | The resolved reviewer record is inactive. | **Open record repair/reactivation**, **Choose an active record**, or **Create a separate correct person** when identity evidence supports it. | Server confirms one active stable person before retry. |
+| `email_conflict` / duplicate owner | Blocking | Another active reviewer owns the exact address. | **Create repair request** from the card; saved-candidate surfaces that already have a safe merge plan may still use that existing flow. | An administrator repairs/merges the records; promotion retries afterward. The Find card never presents a fake merge action. |
+| `person_inactive` | Blocking | The resolved reviewer record is inactive. | **Create repair request** from the card. | An administrator reactivates or repairs the stable person; the user reloads and retries. Identity confirmation cannot bypass inactivity. |
 | `conflict_record_unavailable` | Blocking for this request | Contradiction was detected but could not be recorded durably. | **Retry recording/check**; if repeated, **Create repair request**. | Durable person state must succeed before promotion. |
 | `identity_unavailable` / service timeout | Blocking, retryable | Authoritative identity check is temporarily unavailable. | **Retry check**; repeated failures expose **Create repair request**. | Fresh successful server check; no cached fail-open. |
 | unknown/unrecognized code | Blocking by default | A safe generic explanation plus reference. | **Retry check** and **Create repair request**. | Only a subsequently recognized server decision can proceed. |
@@ -368,8 +382,8 @@ and does not itself link a Contact.
 
 Server prerequisites:
 
-1. opaque conflict token resolves to the current person and tuple;
-2. the person ETag and stored email/source still match the token;
+1. the server resolves the request-scoped roster candidate to the exact person;
+2. a fresh read still contains the displayed stored/found tuple and person ETag;
 3. the found address has an explicit staff attestation;
 4. no different active person owns the found address;
 5. identity/COI gates still pass.
@@ -495,9 +509,10 @@ future decision; it can later write the same trust bundle under a distinct
 - The server derives actor identity from the authenticated session.
 - Client fields are display assertions only. Person IDs, Contact IDs, trust
   statuses, resolution authority, and ETags are server-derived.
-- Conflict tokens are opaque, request/candidate-bound, exact-tuple-bound, and
-  short-lived or server-stored. Replaying one after any person/address change
-  returns 409 with **Refresh and review again**.
+- The browser receives no conflict token or raw trust bundle. The review action
+  fetches a bounded fresh pair, and the mutation independently re-resolves the
+  request/candidate/person and ETag. Replaying a stale displayed value returns
+  409 with **Refresh and review again**.
 - The existing bounded evidence DTO remains the default. Stored/found addresses
   may be disclosed to authorized staff only inside the conflict action, from a
   fresh server read; raw lookup details and unrelated record IDs remain hidden.
