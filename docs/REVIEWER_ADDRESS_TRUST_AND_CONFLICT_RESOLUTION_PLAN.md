@@ -41,7 +41,17 @@ fresh bounded two-address disclosure and can adjudicate either side, failed
 conflict writes have a real retry, inactive/duplicate records route to durable
 repair instead of an impossible identity-confirmation loop, raw trust bundles
 no longer enter browser DTOs, and stale async responses cannot mutate a new
-request. A second adversarial review is still required before release.
+request.
+
+The second Claude Opus 5 review of `f1b85e78` also returned **NO-SHIP**. It
+confirmed all nine first-review findings as fixed, then found one new release
+blocker: `retry_check` can bind a provisional ORCID and write person-scoped
+conflict state under a weaker rule than normal reconciliation. Open medium
+findings are: correct the security-matrix write classification; prevent a
+resolved applicant A/B pair from re-blocking in client projection; report the
+roster-receipt-before-Dataverse-write partial success; translate stale ETags to
+409; and make every applicant-promotion error body carry remediation. Wave 17
+and runtime promotion remain prohibited until these are fixed and rereviewed.
 
 This document replaces the rejected Session 390 design from
 `codex/claude-ui-followup`. It incorporates the subsequent Codex whole-flow
