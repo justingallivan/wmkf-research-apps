@@ -39,8 +39,16 @@ owner sign-off. Nothing here may be cited as existing behavior.
 Origin: S388, a UI-cleanup session on `codex/claude-ui-cleanup` that began with a
 Find-tab presentation complaint and traced the send gate through to contact
 promotion. The UI fix that prompted it shipped separately (commit `3716d801`,
-identity-evidence disclosure). The five problems below were found on the way and
-are deliberately **not** in that branch.
+identity-evidence disclosure; reviewed in §0). The five problems below were found on
+the way and are deliberately **not** implemented in that branch.
+
+**Reviewed.** Codex `gpt-5.6-sol` ran an adversarial review over the branch in S388
+and returned **needs-attention / NO-SHIP** for §4 as originally drafted. Its findings
+are recorded inline — §0 (UI), §4.1 (what changed and why), §4.2 (a live defect it
+escalated), and the §5.2 downgrade — with each claim re-verified against source
+rather than accepted on report. One §4 proposal was withdrawn, several VERIFIED
+labels became ASSUMED, and the sequencing changed. **§1 has been reviewed; §3 and §5
+have now been reviewed once; nothing here has owner sign-off.**
 
 ## The thread that connects these
 
@@ -54,6 +62,43 @@ five points:
 3. …then the contact write drops all provenance anyway (§3)
 4. …and promotion is triggered by send success rather than evidence of delivery (§4)
 5. …after which nothing re-checks the address as it ages (§5)
+
+**Framing caveat (S388 review).** The one-story framing above is a lens, not a
+finding. Codex judged "trust is tracked carefully then discarded at promotion"
+**overstated**: promotion already happens at several stages (§4.1), and the
+`contacts` row is an engagement record rather than the trust ledger — address
+provenance lives on the potential-reviewer row by design. Read §1–§5 as five
+separately-scoped problems that happen to share a subject, not as one defect with
+five symptoms.
+
+## §0 — The UI change that started this, and its review
+
+The Find-tab disclosure shipped as `3716d801`. The S388 review raised a [medium]
+finding against it: for a row classified as identity-unresolved, the panel shows
+affiliation, address, institutions, and publications that all descend from the SAME
+retrieval, so they corroborate each other whether or not the right person was
+retrieved — a bundle that reads as four facts but is one piece of evidence shown
+four ways.
+
+**Owner response (accepted, S388).** The papers break the circle in practice. The
+working method is to scan the top line, then open the papers and check them against
+the proposal — evidence the retrieval did not produce. A famous namesake surfaces in
+the top line but fails the paper check. The disclosure is what makes that check
+possible on these rows at all; before it, staff decided from a name and an
+LLM-written rationale.
+
+**Changes made in response:** the Dataverse line no longer reads as independent
+identity confirmation (it states that the matched key came from the same search
+result), and the paper list is marked load-bearing in source and in
+`docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` so a future UI tidy-up does
+not truncate or collapse the one item that does the work.
+
+**Residual risk, accepted and recorded:** a same-field namesake; a fragmented
+cluster of the right person (`docs/agent-wiki/topics/reviewer-identity.md:97`); and
+— the one that matters for this document — **the paper check confirms the PERSON,
+never the ADDRESS**, which came from a single work's affiliation string. The confirm
+modal nevertheless stamps `emailSource: 'manual'`, recording an address assertion
+the staffer did not make. That is an independent argument for §2.2.
 
 ## Terms
 
@@ -296,12 +341,19 @@ server-side sync is a platform-configuration question **[ASSUMED — not verifie
 needs a Dynamics-side check, not a source read]**. What is certain: no code here
 consumes such a signal.
 
-### Proposal [PROPOSED] — promote on response, not on send
+### Proposal [SUPERSEDED by the S388 adversarial review — see §4.1]
 
-Defer promotion until the reviewer responds. Accept **or decline** both prove a
-human received mail at that address; both should promote.
+~~Defer promotion until the reviewer responds. Accept **or decline** both prove a
+human received mail at that address; both should promote.~~
 
-**Feasibility is good [VERIFIED]:**
+**Withdrawn as written.** A response proves possession of a suggestion-bound
+token, not that the intended person received it, and **decline is the worst case
+to promote on** — it frequently means "you have the wrong person." Current code
+deliberately creates no contact on decline
+(`lib/services/external-review/respond-service.js:307-309`). The surviving idea is
+narrower and is stated in §4.1.
+
+**Feasibility notes — all [ASSUMED], downgraded from VERIFIED in S388:**
 
 - **The send does not need a contact.** To-recipients are unresolved activity
   parties carrying only `addressused` (`lib/services/dynamics/email.js:94-97`);
@@ -346,6 +398,73 @@ looking.
 
 **Check with CRM-facing staff before committing.**
 
+### §4.1 What the S388 adversarial review changed
+
+Reviewed by Codex `gpt-5.6-sol` against the branch diff. Verdict:
+**needs-attention / NO-SHIP** for §4 as originally written. Findings, each
+re-verified here against source:
+
+- **Send is not the only promotion door [VERIFIED].** A confident contact match is
+  linked during candidate save
+  (`lib/services/reviewer-finder/save-candidates-service.js:1084-1088`), and manual
+  add can link before any invitation
+  (`lib/services/workbench/manual-reviewer-service.js:262-273`). Removing the send
+  hook therefore produces a MIXED policy, not the clean boundary that was this
+  proposal's main selling point. **Any rewrite must start from a complete map of
+  promotion sites**, treating "link a pre-existing CRM contact" and "create a new
+  contact" as separate policies.
+- **The honoraria precedent is narrower than §4 claimed.** It runs only for
+  accepted reviewers who did not opt out
+  (`lib/services/reviewer-acceptance-drain.js:441-454`), and lets an email match win
+  even when ORCID uniquely identifies a different contact, warning afterward
+  (`lib/bill/honorarium-onboard-orchestrator.js:256-290`). Accept has a durable
+  retry job; decline has no equivalent post-commit queue, so promotion in the
+  decline handler would tear either side of the response CAS. "Lazy promotion is
+  proven" → **[ASSUMED]**.
+- **Duplicate-contact races are unhandled.** `findOrCreateByEmail` is an unguarded
+  check-then-create (`lib/dataverse/adapters/contact.js:65-75`); `setContactLink`
+  guards the reviewer pointer only after creation
+  (`lib/dataverse/adapters/potential-reviewer.js:419-444`). Concurrent responses for
+  a shared reviewer can mint competing contacts and orphan the loser. An idempotency
+  design is a prerequisite for moving the trigger at all.
+- **`docs/BILL_CHUNK_4_DESIGN.md` is a TABLED plan** (owner, S388) and is not
+  authority for current behavior. An earlier revision of this document cited it as
+  precedent; that citation is withdrawn. Its `:209` records the duplicate-contact
+  race above, so it did not support the claim it was cited for.
+
+**What survives, and is stronger than the original.** Promotion should follow an
+**identity-bearing accept**, not "a response." At accept the reviewer supplies their
+own mailing address and phone through the token-authenticated portal
+(`lib/external/required-address.js:11` — `line1`, `city`, `postalCode`, `country`,
+`phone`), and honorarium onboarding confirms an email
+(`lib/bill/honorarium-onboard-orchestrator.js:246`). That is first-party contact
+data from the person — a materially better trust event than send success or a bare
+response, and the natural place for an address to EARN verified status (§5.3's first
+open decision). Promotion at that point must still resolve identity rather than
+matching on email alone (§3.1).
+
+**Do not promote on decline.** Treat decline as engagement history on the suggestion
+row, where it already lives (§5.1).
+
+### §4.2 §3.1 is a LIVE defect, not a future risk [VERIFIED]
+
+The same review escalated §3.1 to *do this first*, and verifying it here made it
+sharper than §3.1 originally stated. Save-time screening deliberately leaves an
+ambiguous or conflicting contact match **unlinked** and raises a staff alert stamped
+`policyDecision: 'save_unlinked_staff_review'`
+(`save-candidates-service.js:1098-1121`). Send-time promotion then discards that
+decision entirely: it calls email-only `findOrCreateByEmail` and links whatever
+comes back (`send-emails-service.js:573-597`), with no name, ORCID, or ambiguity
+check (`contact.js:65-75`). A later accept can then overwrite that contact's
+name/title (`lib/services/reviewer-acceptance-drain.js:479-488`).
+
+So the system makes a careful decision not to link, and then links anyway one step
+later. **This exists in production today and is independent of every proposal in
+this document.** Recommended fix: route send-time promotion through the
+ambiguity-aware resolver, require name/ORCID consistency, preserve the unlinked
+state otherwise, and add a regression test where save rejects a contact match and
+send later encounters the same address.
+
 ---
 
 ## §5 — Nothing re-checks an address as it ages
@@ -363,6 +482,15 @@ This resolves a concern raised against §4: deferring promotion loses no
 contacted-but-unresponsive history, because the contact was never where that
 history lived. The gap is that nothing surfaces or acts on the state.
 
+**Trap for any implementer [VERIFIED, S388].** Do NOT read
+`wmkf_responsereceivedat` as "a response arrived." The no-response sweep stamps it
+with the SWEEP time alongside `wmkf_responsetype = no_response`
+(`lib/services/reviewer-suggestion-sweep.js:93-96`), so a non-responder carries a
+populated received-at timestamp that no human ever generated. The sweep only runs
+after the parent request's meeting date plus a grace window (`:73-77`), and skips
+rows whose request has no meeting date (`:75`). `wmkf_responsetype` is the field
+that distinguishes a real response from a swept one; the timestamp is not.
+
 ### §5.2 Where this class of data belongs
 
 The Postgres/Dataverse boundary is settled and written down. Migration 018
@@ -377,6 +505,17 @@ class as `search_cache`"; the canonical pool stays in Dataverse
 Applied here: invite-and-response outcome is per-request engagement state and
 already sits canonically in Dataverse. Derived operational signal computed from
 it (a non-response tally used to rank) could fit Postgres.
+
+**Downgraded in S388 [ASSUMED].** "Non-response is reviewer-quality evidence" is
+not safe as stated. The `no_response` classification is stamped by a cron only
+after the request meeting date, and it writes `wmkf_responsereceivedat` with the
+SWEEP time even though no response occurred
+(`lib/services/reviewer-suggestion-sweep.js:43-96`). That outcome cannot separate a
+bad address, spam filtering, leave, or genuine unreliability. Derive non-response
+counts from the canonical engagement rows; treat any Postgres value as a
+rebuildable ranking cache only. Do not persist a person-level reliability score, and
+do not lower an address tier on non-response, until dispatch semantics and
+exclusions are defined.
 
 **Caution:** the S369 owner goal in
 `.claude-memory/project-reviewer-reliability-data.md` is for **durable** evidence
@@ -448,8 +587,9 @@ explicit update. Adjudication stays with the staffer; no auto-write.
 
 | # | Decision | Owner | Blocking |
 | --- | --- | --- | --- |
+| 0 | **Fix the live §4.2 defect** — send-time promotion overrides save's deliberate do-not-link decision | — | Nothing; it is a current-behavior bug |
 | 1 | §1 option: 1 / 2 / 3R | Justin | 3R implementation |
-| 2 | Response-gated promotion (§4), incl. the CRM-visibility tradeoff | Justin + CRM-facing staff | §4 |
+| 2 | Promotion on identity-bearing ACCEPT (§4.1), incl. the promotion-site map and CRM-visibility tradeoff | Justin + CRM-facing staff | §4 |
 | 3 | Contact provenance attribute(s) (§3) | Justin + Dataverse schema | §3 |
 | 4 | Durable vs disposable home for the non-response signal (§5.2) | Justin | §5 |
 | 5 | ~~Reconcile the `staff_verified` contradiction in the enforcement contracts doc~~ | — | **Done in S388 (§2.3)** |
@@ -468,11 +608,13 @@ traced call graph.]**
 
 ## Sequencing suggestion
 
-§2.3 is already done. §2.2 is the cheapest remaining item and reopens nothing —
-it can proceed independently of every decision below. §4 is the largest
-behavioral change but has the clearest feasibility evidence. §1's 3R depends on
-the §1.1 attestation rewording. §5.3 is mostly a UI affordance over data that
-already exists.
+**Revised after the S388 review.** §4.2 goes first — it is a live defect in current
+behavior, not a proposal, and the review escalated it independently. §2.3 is already
+done. §2.2 is the cheapest remaining proposal and reopens nothing. §4 is no longer
+"the clearest feasibility evidence" — that claim was withdrawn in §4.1; it now needs
+a promotion-site map and an idempotency design before it can be scoped. §1's 3R
+still depends on the §1.1 attestation rewording. §5.3 remains mostly a UI affordance
+over data that already exists.
 
 ## Verification standard for any implementation
 

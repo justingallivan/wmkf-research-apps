@@ -645,11 +645,19 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                       : <span className="text-gray-500">none retrieved</span>}
                   </div>
 
+                  {/* Deliberately NOT phrased as "known in Dataverse" (the verified
+                      card wording). The match is keyed on the email/ORCID that came
+                      out of the SAME search result as the rest of this panel, so it
+                      corroborates that the key is on file — not that this is the
+                      person the proposal named. Saying otherwise reads as independent
+                      identity confirmation when it isn't. */}
                   {dataverseEvidence?.status === 'known' && (
                     <div>
                       <span className="font-medium">Dataverse: </span>
-                      matched an existing person record by exact{' '}
-                      {dataverseEvidence.matchKey || 'key'} during this search
+                      the {dataverseEvidence.matchKey || 'key'} above is already on an
+                      existing person record — so that {dataverseEvidence.matchKey || 'key'}{' '}
+                      is known to us. It does not confirm this is the person the proposal
+                      named; it came from the same search result as everything else here.
                     </div>
                   )}
                   {dataverseEvidence?.status === 'review_required' && (
@@ -688,6 +696,14 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                       : <span className="text-gray-500">none retrieved</span>}
                   </div>
 
+                  {/* LOAD-BEARING — this is the identity control, not a detail.
+                      Affiliation, address, and the Dataverse match all descend from
+                      the same retrieval, so they agree with each other whether or not
+                      the right person was retrieved. The papers are the one item a
+                      staffer can check against the PROPOSAL, which is evidence the
+                      retrieval did not produce. Keep them listed in full and easy to
+                      scan; do not truncate, collapse, or drop this list to reduce
+                      clutter. */}
                   <div>
                     <span className="font-medium">
                       Recent papers retrieved
@@ -696,7 +712,14 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                         : ''}
                       :{' '}
                     </span>
-                    {pubs.length === 0 && <span className="text-gray-500">none retrieved</span>}
+                    {pubs.length === 0
+                      ? <span className="text-gray-500">none retrieved</span>
+                      : (
+                        <span className="text-gray-500">
+                          do these match what the proposal is about? This is the check the
+                          rest of this panel cannot make.
+                        </span>
+                      )}
                   </div>
                   {pubs.length > 0 && (
                     <ul className="space-y-0.5">

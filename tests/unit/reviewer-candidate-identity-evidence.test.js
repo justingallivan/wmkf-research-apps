@@ -90,8 +90,12 @@ describe('CandidateCard identity evidence disclosure', () => {
     expect(screen.getByText(/Department of Biochemistry, Example University/)).toBeInTheDocument();
     expect(screen.getByText(/publication affiliation/)).toBeInTheDocument();
 
-    // Dataverse identity evidence, with the co-affiliation caveat retained.
-    expect(screen.getByText(/matched an existing person record by exact email/)).toBeInTheDocument();
+    // Dataverse evidence states what the match does and does not prove. It is keyed on
+    // the email that came from the same retrieval, so it must not read as independent
+    // identity confirmation.
+    expect(screen.getByText(/already on an existing person record/)).toBeInTheDocument();
+    expect(screen.getByText(/does not confirm this is the person the proposal named/)).toBeInTheDocument();
+    expect(screen.queryByText(/matched an existing person record by exact/)).not.toBeInTheDocument();
     const institutionRow = screen.getByText(/may include co-affiliations or history/).parentElement;
     expect(institutionRow).toHaveTextContent('Example University (primary affiliation)');
     expect(institutionRow).toHaveTextContent('Other Institute (organization)');
@@ -135,6 +139,23 @@ describe('CandidateCard identity evidence disclosure', () => {
     // The gate itself is untouched.
     expect(screen.getByText(/Keep in Find — identity\/contact confirmation required/)).toBeInTheDocument();
     expect(screen.getByText(/⚠ Identity review required/)).toBeInTheDocument();
+  });
+
+  test('points the staffer at the papers as the check the panel cannot make', async () => {
+    // The papers are the identity control: affiliation, address, and the Dataverse
+    // match all descend from one retrieval and agree with each other regardless of
+    // whether the right person was found. Only the papers can be checked against the
+    // proposal — evidence that retrieval did not produce. Guards against a future
+    // tidy-up truncating or dropping the list.
+    const user = userEvent.setup();
+    renderUnresolved();
+
+    await user.click(screen.getByRole('button', { name: TOGGLE }));
+
+    expect(screen.getByText(/do these match what the proposal is about/)).toBeInTheDocument();
+    // Every retrieved paper is listed, not a sample.
+    expect(screen.getByText(/Quantitative MS of histone marks/)).toBeInTheDocument();
+    expect(screen.getByText(/Synthetic readers benchmarked/)).toBeInTheDocument();
   });
 
   test('states plainly when a field was never retrieved', async () => {
