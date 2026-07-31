@@ -446,6 +446,69 @@ matching on email alone (§3.1).
 **Do not promote on decline.** Treat decline as engagement history on the suggestion
 row, where it already lives (§5.1).
 
+### §4.3 The promotion-site map — and why §4 is smaller than it looks [VERIFIED]
+
+Codex required a complete map of promotion sites before §4 could be scoped.
+Building it changed the conclusion. Four doors are live today:
+
+| # | Where | Behavior | Code |
+| --- | --- | --- | --- |
+| 1 | Candidate save | links a CONFIDENT existing contact match; ambiguous/conflict deliberately left unlinked + staff alert | `save-candidates-service.js:1084-1088`, `:1098-1121` |
+| 2 | Manual add | can link an existing contact before any invitation | `manual-reviewer-service.js:264` |
+| 3 | Invitation send | `findOrCreateByEmail` + `setContactLink`, email-only, no identity check | `send-emails-service.js:573-596` |
+| 4 | **Accept drain** | `ensureContact` (find-or-create + link) then `patchContactAddress`, gated `if (!optedOut)` | `reviewer-acceptance-drain.js:442-446`; `lib/bill/honorarium-onboard-orchestrator.js:86,108` |
+
+**The map is complete, by disconfirming query.** `wmkf_contact` can only be pointed
+by `potentialReviewer.setContactLink`, so enumerating its callers bounds the set.
+Runtime callers are exactly the four above (`honorarium-onboard-orchestrator.js:369`,
+`send-emails-service.js:590`, `save-candidates-service.js:1088`,
+`manual-reviewer-service.js:264`); likewise `findOrCreateByEmail`, whose only runtime
+callers are doors 3 and 4 (`send-emails-service.js:585`,
+`honorarium-onboard-orchestrator.js:352`). Deliberately excluded, and NOT doors:
+`scripts/pr4-e2e.js:120-121` and `scripts/pr4-e2e-setup.js:98-100` (E2E fixtures, not
+runtime), and `lib/services/contact-bridge-service.js:156-170`, which creates contacts
+for PORTAL-LOGIN identity keyed on `wmkf_portaloid` and never sets `wmkf_contact`.
+
+**Precedent for the idempotency gap.** That same portal path gates contact creation
+on an ACTIVE ALTERNATE KEY (`contact-bridge-service.js:160`, `ensureAltKeyActive`)
+expressly so "parallel first-time bridge calls could each create a duplicate contact
+for the same OID" cannot happen. That is structurally the fix
+`BILL_CHUNK_4_DESIGN.md:209` named as the only airtight answer for the reviewer
+find-or-create race and then scoped out. **The pattern is already built and running
+in this repo on `wmkf_portaloid`** — so §4.1's duplicate-contact prerequisite has a
+working in-house model to copy rather than a design to invent.
+
+**Door 4 is already the change §4.1 proposed.** The honorarium orchestrator promotes
+the contact and writes the reviewer's self-supplied mailing address at accept, and it
+does so BEFORE the capture-only deferral short-circuit
+(`honorarium-onboard-orchestrator.js:114-133`) — so it runs today even with
+`HONORARIUM_ONBOARDING_DEFERRED=true` and BILL tabled. It seldom has anything to do
+only because door 3 already created the link at invitation time, leaving
+`ensureContact` an existing `_wmkf_contact_value` to return.
+
+So §4 is not "build accept-time promotion." It is **"remove door 3 and let door 4
+create new contacts,"** which is a far smaller and better-evidenced change than the
+original framing, and it partly answers the NO-SHIP: the accept-side machinery exists
+and is running in production.
+
+Still to decide before implementing:
+
+- **Opt-out accepts never reach door 4** (`reviewer-acceptance-drain.js:442`). With
+  door 3 removed they would hold no contact. Probably correct — an opt-out reviewer
+  has no payment relationship — but it must be a decision, not a side effect.
+- **Doors 1 and 2 need their own policy.** They LINK pre-existing contacts rather
+  than creating new ones, which is a materially different act; §4.1's create/link
+  split applies here.
+- **Door 4 inherits §3.1.** `ensureContact` resolves by email and lets an email match
+  win even when ORCID identifies a different contact
+  (`honorarium-onboard-orchestrator.js:256-290`), so moving volume onto it without
+  the §4.2 identity-aware fix would relocate the wrong-contact hazard, not remove it.
+- **Idempotency.** `docs/BILL_CHUNK_4_DESIGN.md:209` (historical/tabled, cited here
+  only as a recorded observation, not as authority) names an `emailaddress1`
+  alternate key as the only airtight fix for the find-or-create race, and explicitly
+  scoped it out. It remains unbuilt and is the real answer to §4.1's duplicate-contact
+  concern.
+
 ### §4.2 §3.1 is a LIVE defect, not a future risk [VERIFIED]
 
 The same review escalated §3.1 to *do this first*, and verifying it here made it
