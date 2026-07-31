@@ -1596,6 +1596,13 @@ export default function ReviewerSearchSection({
     const data = await response.json().catch(() => ({}));
     if (genRef.current !== myGen) return;
     if (!response.ok || !data.success || !data.candidate) {
+      // Verification can commit the server-owned roster receipt before an
+      // ETag-guarded Dataverse adjudication fails. Reflect only that explicit
+      // partial success so the card and the next retry use the authoritative
+      // receipt instead of silently reverting to the pre-verification state.
+      if (data.partialSuccess === true && data.receiptRecorded === true && data.candidate) {
+        applyAuthoritativeRosterCandidate(key, data.candidate);
+      }
       const nextAction = data.remediation?.[0]?.label;
       throw new Error(`${data.message || data.error || 'Could not verify this address.'}${nextAction ? ` Next: ${nextAction}.` : ''}`);
     }

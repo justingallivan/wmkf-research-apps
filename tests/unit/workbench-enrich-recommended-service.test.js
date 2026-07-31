@@ -127,6 +127,11 @@ jest.mock('../../lib/utils/contact-parser', () => ({
 jest.mock('../../lib/utils/name-normalization', () => ({ normalizeName: (n) => String(n).toLowerCase() }));
 
 const { ContactParser } = require('../../lib/utils/contact-parser');
+const {
+  createConflictPendingState,
+  createStaffVerifiedState,
+} = require('../../lib/utils/reviewer-address-trust');
+const { projectCanonicalApplicantContact } = require('../../lib/utils/applicant-known-reviewer');
 import { enrichRecommended } from '../../lib/services/workbench/enrich-recommended-service';
 
 const REQ = '11111111-1111-1111-1111-111111111111';
@@ -522,6 +527,73 @@ test('a durable conflict is projected as booleans without sending the trust bund
   expect(updatePerson).toHaveBeenCalledWith(PR, {
     addressTrustStateJson: expect.stringContaining('conflict_pending'),
   }, { actingUserSystemId: 'u-1', ifMatch: 'W/"person"' });
+});
+
+test('an already-resolved stored/found pair projects only the canonical address and remains promotable', async () => {
+  const priorConflict = createConflictPendingState({
+    email: 'stored@example.edu',
+    foundEmail: 'new@example.edu',
+    reason: 'email_mismatch',
+    requestId: REQ,
+    candidateKey: `suggestion:${SUG}`,
+    detectedAt: '2026-07-31T20:00:00.000Z',
+  });
+  const resolvedTrust = createStaffVerifiedState({
+    email: 'stored@example.edu',
+    requestId: REQ,
+    candidateKey: `suggestion:${SUG}`,
+    evidenceType: 'institution_page',
+    evidenceUrl: 'https://example.edu/profile',
+    attestedAt: '2026-07-31T21:00:00.000Z',
+    resolution: {
+      conflict: priorConflict.conflict,
+      decision: 'keep_stored',
+      resolvedAt: '2026-07-31T21:00:00.000Z',
+    },
+  });
+  getPersonById.mockResolvedValue({
+    wmkf_potentialreviewersid: PR,
+    wmkf_name: 'Dr. Rec One',
+    wmkf_primaryaffiliation: 'Rec University',
+    wmkf_emailaddress: 'stored@example.edu',
+    wmkf_emailsource: 'staff_verified',
+    wmkf_addresstruststatejson: JSON.stringify(resolvedTrust),
+    statecode: 0,
+    _etag: 'W/"person"',
+  });
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((candidate) => ({
+      ...candidate,
+      email: 'new@example.edu',
+      contactEnrichment: {
+        identity: { status: 'probable' },
+        email: 'new@example.edu',
+        emailSource: 'scholarly_multi',
+        emailPersistAllowed: true,
+      },
+    })),
+  }));
+
+  const rec = recorder();
+  await enrichRecommended(args(), rec.onEvent);
+  const result = rec.events.find((event) => event.event === 'complete').data.recommended[0];
+
+  expect(updatePerson).not.toHaveBeenCalled();
+  expect(result).toMatchObject({
+    email: 'stored@example.edu',
+    emailSource: 'staff_verified',
+    applicantContactMismatch: false,
+    addressConflictPending: false,
+    contactEnrichment: {
+      email: 'stored@example.edu',
+      emailSource: 'staff_verified',
+      emailPersistAllowed: false,
+    },
+  });
+  expect(projectCanonicalApplicantContact({
+    applicantKnownReviewer: result.applicantKnownReviewer,
+    candidate: result,
+  })).toMatchObject({ decision: 'ready', reusable: true });
 });
 
 test('vetted email for a person with no stored address stays paired in the roster but does not orphan its source in Dataverse', async () => {

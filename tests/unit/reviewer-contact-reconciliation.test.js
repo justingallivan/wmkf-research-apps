@@ -3,6 +3,7 @@
 import {
   compactDataverseContactEvidence,
   reconcileReviewerContacts,
+  resolveTrustedReviewerPerson,
 } from '../../lib/services/reviewer-contact-reconciliation';
 import {
   createConflictPendingState,
@@ -80,6 +81,44 @@ test('a provisional OpenAlex ORCID hit can only require review', async () => {
     status: 'review_required',
     reason: 'provisional_orcid_match',
   });
+});
+
+test('a provisional provider ORCID cannot resolve a person for a durable write', async () => {
+  const lookup = jest.fn();
+  const getReviewer = jest.fn();
+  const result = await resolveTrustedReviewerPerson(candidate('J. Smith', {
+    identity: { status: 'unresolved', anchors: [] },
+    tierResults: { openalex_author: { orcid: ORCID } },
+  }), { lookup, getReviewer });
+
+  expect(result).toBeNull();
+  expect(lookup).not.toHaveBeenCalled();
+  expect(getReviewer).not.toHaveBeenCalled();
+});
+
+test('only an active reviewer matched through an anchor-grounded ORCID is a durable write target', async () => {
+  const row = candidate('Trusted Researcher', {
+    identity: {
+      status: 'probable',
+      anchors: [{ type: 'orcid_public', canonicalKey: `orcid:${ORCID}` }],
+    },
+    orcidId: ORCID,
+  });
+  const lookup = jest.fn(async () => ({
+    outcome: 'confident',
+    match: { reviewerId: 'reviewer-1', matchKey: 'orcid', nameConsistent: true },
+  }));
+  const getReviewer = jest.fn(async () => ({
+    wmkf_potentialreviewersid: 'reviewer-1',
+    statecode: 0,
+  }));
+
+  await expect(resolveTrustedReviewerPerson(row, { lookup, getReviewer })).resolves.toEqual({
+    personId: 'reviewer-1',
+    person: { wmkf_potentialreviewersid: 'reviewer-1', statecode: 0 },
+  });
+  getReviewer.mockResolvedValueOnce({ wmkf_potentialreviewersid: 'reviewer-1', statecode: 1 });
+  await expect(resolveTrustedReviewerPerson(row, { lookup, getReviewer })).resolves.toBeNull();
 });
 
 test('an ORCID explicitly grounded by a trusted identity anchor can become known', async () => {

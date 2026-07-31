@@ -114,6 +114,7 @@ test('wrong-request suggestion → 404 typed error, no lifecycle write', async (
   expect(err).toBeInstanceOf(ServiceHttpError);
   expect(err.httpStatus).toBe(404);
   expect(err.message).toBe('Applicant reviewer suggestion not found for this request');
+  expect(err.body.remediation).not.toHaveLength(0);
   expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
@@ -127,6 +128,11 @@ test('non-recommended row → 400; adapter applicant-excluded refusal → same 4
   err = await promoteApplicantReviewer(args()).catch((e) => e);
   expect(err.httpStatus).toBe(400);
   expect(err.message).toBe('Only applicant-recommended reviewers can be promoted');
+  expect(err.body).toMatchObject({
+    code: 'applicant_excluded',
+    remediation: expect.any(Array),
+  });
+  expect(err.body.remediation).not.toHaveLength(0);
 });
 
 test('typed 404 is NOT eaten by the applicant-excluded regex translation (P1m note 4)', async () => {

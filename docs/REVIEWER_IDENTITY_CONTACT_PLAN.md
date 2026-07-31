@@ -105,12 +105,14 @@ plan's Wave 13 binding model rather than duplicating it.
 1. **Safety posture is preserved.** Abstain-is-safe, fail-closed at the
    persistence/send boundary, forename-contradiction gate, and
    `research_only`-never-sends remain unchanged. No phase weakens them.
-   *Clarification (S387, outside this plan):* the send gate still refuses
+   *Current clarification (S391, outside this plan):* the send gate still refuses
    `research_only` unconditionally and still ignores client-supplied confidence.
-   What changed is upstream provenance — an explicit staff attestation
-   (`verifyEmailAddress` → `emailSource='staff_verified'`) can move an address into
-   `quick_check`, where the per-recipient acknowledgement applies. No phase of this
-   plan relies on `research_only` being permanent for a given address.
+   Evidence-backed staff attestation now uses
+   `/api/workbench/reviewer-address-trust`; a valid bundle for the exact
+   `staff_verified` address is ready, while legacy source-only values remain
+   `quick_check`. The former provenance-only `verifyEmailAddress` action is
+   retired. No phase of this plan relies on `research_only` being permanent for
+   a given address.
 2. **Match institutions in ID space.** Resolve to OpenAlex `I-id`/ROR before
    comparing; names/aliases/geography are fallbacks, not the primary key.
 3. **`associated_institutions` is a consistency tool only — it must NEVER widen

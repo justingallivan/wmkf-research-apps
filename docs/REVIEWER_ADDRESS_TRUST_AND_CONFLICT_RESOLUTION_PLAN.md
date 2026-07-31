@@ -45,13 +45,17 @@ request.
 
 The second Claude Opus 5 review of `f1b85e78` also returned **NO-SHIP**. It
 confirmed all nine first-review findings as fixed, then found one new release
-blocker: `retry_check` can bind a provisional ORCID and write person-scoped
-conflict state under a weaker rule than normal reconciliation. Open medium
-findings are: correct the security-matrix write classification; prevent a
-resolved applicant A/B pair from re-blocking in client projection; report the
-roster-receipt-before-Dataverse-write partial success; translate stale ETags to
-409; and make every applicant-promotion error body carry remediation. Wave 17
-and runtime promotion remain prohibited until these are fixed and rereviewed.
+blocker and five medium contract gaps. Those findings are now remediated in
+source and locally verified, but a third adversarial review is still pending:
+ordinary retry uses the same anchor-grounded ORCID rule as normal
+reconciliation; retry is restricted to active, already-flagged roster rows and
+replays an existing receipt instead of reopening it; resolved applicant A/B
+pairs project only the canonical address; roster-receipt partial success is
+explicit and applied by the client; stale ETags return retryable
+`candidate_stale`; applicant-promotion typed errors have remediation; and the
+security matrix classifies retry's writes. The full local suite is green at 550
+suites / 6,639 tests, with clean build, types, DAL gates, and route-matrix gates.
+Wave 17 and runtime promotion remain prohibited until the fresh review passes.
 
 This document replaces the rejected Session 390 design from
 `codex/claude-ui-followup`. It incorporates the subsequent Codex whole-flow
@@ -567,7 +571,38 @@ Each stage preserves current send safety. The ready-tier change is last.
      ambiguous identity, mismatch resolution, duplicate owner/merge, retryable
      outage, promotion parity, render, and capture-mode send before a real send.
    - Probe Dataverse person state, native audit, explicit actor fields, suggestion
-     lifecycle, and absence of Contact promotion.
+   lifecycle, and absence of Contact promotion.
+
+## Second-review remediation status (2026-07-31)
+
+**[IMPLEMENTED IN SOURCE / THIRD REVIEW PENDING]** The follow-up remediation
+closes the second Opus review's H1 and M2–M6 findings plus its active-state and
+Invite-remedy low findings. The relevant enforced complements are:
+
+- a provisional/provider-only ORCID cannot resolve a durable person write
+  target; an ordinary candidate requires a persist-worthy identity decision
+  with an ORCID-specific anchor, a confident name-consistent ORCID lookup, and
+  an active person;
+- `retry_check` rejects unflagged, saved, excluded, and ineligible roster rows;
+- a current roster receipt is replayed as the exact prior adjudication and is
+  never reinterpreted as a new contradiction;
+- a roster receipt committed before a Dataverse failure returns
+  `partialSuccess`, `receiptRecorded`, the exact receipt/candidate, and working
+  remediation; the client applies that authoritative partial candidate after
+  its request-generation guard;
+- non-duplicate ETag 412s return `candidate_stale`, while alternate-key 412s
+  remain `email_conflict`;
+- inactive people cannot be disclosed through the conflict action or relabeled
+  `staff_verified`; and
+- the Invite conflict card deep-links directly to Reviewers → Find while still
+  offering durable repair.
+
+Verification at the review target: focused trust/promotion tests 95/95; full
+suite 550/550 suites and 6,640/6,640 tests; `check:types`; lint with zero errors
+and 51 pre-existing warnings; production build; API route matrix + self-test;
+Dataverse DAL gate + self-test; doc-currency gate + self-test. This evidence is
+local only and does not satisfy the schema-first deployment or signed-in pilot
+exit criteria.
 
 ## Verification matrix
 

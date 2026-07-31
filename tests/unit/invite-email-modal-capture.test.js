@@ -98,6 +98,41 @@ describe('InviteEmailModal invitation timing contract', () => {
 });
 
 describe('InviteEmailModal capture-mode result display', () => {
+  test('gives an address-conflict skip an executable Find-tab remedy and repair fallback', async () => {
+    const conflictedDraft = {
+      suggestionId: 'S1',
+      candidateName: 'Dr. Test Reviewer',
+      candidateEmail: 'reviewer@example.org',
+      skipped: 'address_conflict_pending',
+    };
+    global.fetch.mockImplementation(async (url) => {
+      if (String(url).startsWith('/api/user-preferences')) return mockJson({});
+      if (url === '/api/review-manager/campaign-timeline-defaults') {
+        return mockJson({ timeline: {}, isDefault: true, malformed: false });
+      }
+      if (url === '/api/review-manager/campaign-config?requestId=request-guid') {
+        return mockJson({ config: {} });
+      }
+      if (url === '/api/review-manager/render-emails') return mockJson({ drafts: [conflictedDraft] });
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    render(
+      <InviteEmailModal
+        requestId="request-guid"
+        candidates={[{ suggestionId: 'S1', name: 'Dr. Test Reviewer', email: 'reviewer@example.org' }]}
+        settings={{ signature: 'Program Director' }}
+        onClose={jest.fn()}
+        onSent={jest.fn()}
+      />,
+    );
+
+    expect(await screen.findByText(/resolve the stored-versus-found address/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /open find to resolve address/i }))
+      .toHaveAttribute('href', '/workbench/request-guid?tab=reviewers&sub=find');
+    expect(screen.getByRole('button', { name: /create repair request/i })).toBeEnabled();
+  });
+
   test('shows captured email artifacts returned by send-emails', async () => {
     render(
       <InviteEmailModal

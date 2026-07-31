@@ -365,7 +365,7 @@ describe('happy path (progress ordering + full card payload)', () => {
       potentialReviewerId: PR,
       suggestionId: SUG,
       enrichedProposalKey: 'blob-key-1',
-      addressTrustStateJson: null,
+      addressConflictPending: false,
       conflictRecordUnavailable: false,
       name: 'Dr. Rec One',
       identityStatus: 'probable',

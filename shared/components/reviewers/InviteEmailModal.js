@@ -873,11 +873,19 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                 papers or institutional source, choose the correct address, and record the exact
                                 person-and-address verification. If neither choice is safe, create a repair request.
                               </p>
+                              {requestId && (
+                                <a
+                                  href={`/workbench/${encodeURIComponent(requestId)}?tab=reviewers&sub=find`}
+                                  className="mt-2 inline-block rounded border border-red-300 bg-white px-2.5 py-1 font-medium hover:bg-red-50"
+                                >
+                                  Open Find to resolve address
+                                </a>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => requestAddressRepair(d)}
                                 disabled={!requestId || repairState[d.suggestionId]?.requesting}
-                                className="mt-2 rounded border border-red-300 bg-white px-2.5 py-1 font-medium hover:bg-red-50 disabled:opacity-50"
+                                className="ml-2 mt-2 rounded border border-red-300 bg-white px-2.5 py-1 font-medium hover:bg-red-50 disabled:opacity-50"
                               >
                                 {repairState[d.suggestionId]?.requesting ? 'Creating…' : 'Create repair request'}
                               </button>
