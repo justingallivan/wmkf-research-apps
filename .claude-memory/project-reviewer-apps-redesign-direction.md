@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has seven implemented tabs and three placeholders; Initial Assessment generation, recovery, editing, and current-metadata display are production-proved, while library controls remain open.
+description: The unified Request Workbench has seven implemented tabs and three placeholders; Initial Assessment and native first-stage recovery are production-proved, while administrator and milestone controls remain open.
 metadata:
   type: project
   status: active
@@ -65,7 +65,11 @@ item to SharePoint version `2.0`, replaced the Foundation Opportunity marker,
 and remained reachable through both consumers. Production deployment
 `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2` (`68bcb4e8`) now refreshes response-only
 Graph-current metadata, and both signed-in consumers displayed current
-SharePoint version `2.0`. Target-library controls remain open.
+SharePoint version `2.0`. A disposable production-library audit then proved
+native previous-version inspection/restore and signed-in first-stage recycle
+recovery. Administrator checks for version limits, second-stage recovery,
+retention, and editor permissions plus Workbench history/admin restore and
+milestone snapshots remain open.
 Use the near-term execution plan for current authority; the chronology below
 remains the rationale record.
 

@@ -3,7 +3,7 @@ title: Dataverse wmkf_requestdocument
 domain: application-state
 kind: atlas
 status: active
-summary: Governed request-artifact registry; Request 1003109 proves generation, recovery, attributed editing, and current-metadata display, while library controls remain open.
+summary: Governed request-artifact registry; core flow, native version restore, and first-stage recovery pass while administrative controls remain.
 canonical: false
 owner: product-engineering
 related:
@@ -47,7 +47,7 @@ Phase II reviewer package and no substantive staff content edit was verified.
 Request `1003109` later closed the canonical-input, recovery, substantive-edit,
 and current-version readback gaps. Production deployment
 `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2` (`68bcb4e8`) is live-verified in both
-consumers; target-library controls remain. Exact evidence:
+consumers. The remaining target-library boundary is classified below. Exact evidence:
 `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`.
 
 **[VERIFIED DEPLOYED AND PRODUCTION-EXERCISED 2026-07-30]** Production
@@ -99,6 +99,16 @@ labeled as a version. Both consumers use one renderer for
 current/missing/unavailable/unchecked semantics and suppress the Open link
 after a confirmed 404. Both live consumers displayed current SharePoint
 version `2.0` and the same stable document link.
+
+**[VERIFIED 2026-07-30 local / 2026-07-31 UTC via production Graph and
+signed-in SharePoint probes]** a disposable file in the actual Request library
+proved prior-version inspection/download and restore to a new current version
+with exact expected bytes. Justin then restored the deleted probe from the
+first-stage recycle bin, and Graph confirmed the same item and exact contents
+live. Both probes were removed from the first-stage bin after testing. Justin
+was denied the second-stage administrator view; configured version limits,
+site/library Purview retention, ordinary-editor least privilege, Workbench
+history/admin restore, and immutable milestone snapshots remain open.
 
 ## Ownership
 
@@ -196,7 +206,8 @@ transition.
    substantive edit on the stable item then passed through both consumers.
    Response-only current-version refresh and display in both consumers are
    deployed and live-verified on Request `1003109` via deployment
-   `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`; target-library protection checks remain
-   open.
+   `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`. Native version restore and first-stage
+   recycle recovery also pass. Administrator policy/access evidence and
+   Workbench history/admin restore plus milestone snapshots remain open.
 
 No live command in this sequence is authorized merely by this page.

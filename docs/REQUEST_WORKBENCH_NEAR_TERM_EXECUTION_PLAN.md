@@ -3,7 +3,7 @@ title: "Request Workbench — near-term execution plan"
 domain: architecture
 kind: plan
 status: canonical
-summary: "Initial Assessment canonical input, lineage, recovery, and attributed editing are proven; library/readback controls remain."
+summary: "Initial Assessment core flow, native version restore, and first-stage recovery are proven; administrative and milestone controls remain."
 canonical: true
 cataloged: 2026-07-26
 last_verified: 2026-07-30
@@ -80,7 +80,12 @@ Dataverse retains upload-time version `1.0` metadata. Response-only
 Graph-current refresh and display in both consumers are deployed and
 live-verified on Request `1003109` via production deployment
 `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`. Target-library protection checks remain
-required before the pilot is complete.
+required before the pilot is complete. A controlled disposable-file audit
+subsequently proved previous-version inspection/restore and signed-in
+first-stage recycle recovery in the production Request library. It did not
+prove the configured version limit, second-stage administrator recovery,
+site/library Purview retention, or ordinary-editor least privilege; Workbench
+history/admin restore and milestone snapshots also remain unbuilt.
 Passing this draft-functional gate is not a broad production-readiness claim
 and does not require the later Pre-Site, Site Visit, or Final slices to be
 built by August 10.
@@ -148,6 +153,19 @@ file-body search layer.
   version history, and restrict restore to an approved administrative role.
 - Every official Board milestone must retain the exact SharePoint item/version,
   actor, timestamp, content hash, and a protected DOCX and/or PDF snapshot.
+
+**Controlled audit result 2026-07-30 local / 2026-07-31 UTC:** native version
+listing, prior-version content inspection, restore to a new current version,
+exact byte recovery, and signed-in first-stage recycle restore all passed in
+the production Request library using disposable probes. Justin's account was
+denied the second-stage administrator recycle-bin view. The app's
+`Sites.Selected` token could read the drive/list but received `403` when
+enumerating site permissions. An item-level retention-label read returned no
+label fields, which does not establish whether a site/library Purview policy
+applies. Library version limits, second-stage recovery, retention, and
+ordinary-editor permission design therefore still require administrator
+evidence. The Workbench current-metadata portion is live; its version-history
+link/admin restore and the Board milestone freeze remain planned.
 
 ### Cycle-wide editing
 
@@ -720,9 +738,11 @@ Explicit non-goals during design freeze:
 > SharePoint item identity. Response-only Graph-current
 > version/last-modified refresh is deployed and live-verified in both consumers
 > on Request `1003109` via deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`.
-> The remaining pilot acceptance work is the target-library restore, recycle,
-> retention, permission, and
-> milestone-snapshot checks.
+> A controlled production-library probe also passed native previous-version
+> inspection/restore and signed-in first-stage recycle recovery. The remaining
+> pilot acceptance work is the administrator audit of version limits,
+> second-stage recovery, Purview retention, and ordinary-editor permissions,
+> plus Workbench history/admin restore and milestone snapshots.
 
 The August 10 minimum changes the former default. Exercise the now-live
 governed artifact spine through the J27 Initial Assessment first;
@@ -923,8 +943,10 @@ Owner-decided:
     SharePoint version `2.0` and remained reachable through both consumers.
     Response-only current-version metadata refresh and display in both
     consumers are deployed and live-verified on Request `1003109` via
-    deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`; target-library controls
-    remain open. The owner
+    deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`. Native previous-version
+    inspection/restore and first-stage recycle recovery subsequently passed
+    in the production Request library; administrator policy/access checks and
+    product history/milestone controls remain open. The owner
     accepts service-principal attribution for system-generated Dataverse
     registry writes; SharePoint native version attribution remains the
     required human-edit audit surface.
@@ -935,11 +957,14 @@ Still required:
    testers, the exact pilot schedule, and deadlines for later lifecycle stages;
 2. first approved Pre-Site Word template and prompt/template compatibility
    contract;
-3. target-library configuration/readback for the decided request-relative
-   SharePoint destination; the stable-identity Graph metadata read-through,
-   consumer display, and production
-   Dataverse registry/pointer provisioning and readback are complete;
-4. target-library version, retention, recycle, and permission audit;
+3. administrator verification of the target library's configured version
+   limit, second-stage recycle recovery, applicable site/library Purview
+   retention, and ordinary-editor least-privilege policy; stable-identity
+   metadata read-through, consumer display, native version restore,
+   first-stage recycle recovery, and production registry/pointer readback are
+   complete;
+4. Workbench version-history navigation, administrator-only restore, and
+   immutable Board milestone snapshot behavior;
 5. exact Dataverse schema and dossier read model for the decided Site Visit
    metadata, material categories, and observations;
 6. Site Visit Materials Upload visible sender/reply-to and lead-PD copy

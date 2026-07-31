@@ -18,7 +18,7 @@ related:
 
 # Where We're Headed
 
-**Last verified: 2026-07-29.** This document owns long-term direction and principles. The
+**Last verified: 2026-07-30.** This document owns long-term direction and principles. The
 ordered, current delivery agenda lives in `docs/CURRENT_WORK_QUEUE.md`; this document is not a
 backlog.
 
@@ -150,8 +150,12 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term 
    substantive edit then passed on that same stable item through both
    consumers. Response-only Graph-current refresh by stable identity is
    deployed and live-verified in both consumers on Request `1003109` via
-   production deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`; verify
-   target-library protections;
+   production deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`. A disposable
+   production-library audit also proved previous-version inspection/restore
+   and signed-in first-stage recycle recovery. Next obtain administrator
+   evidence for version limits, second-stage recovery, retention, and editor
+   least privilege, and build Workbench history/admin restore plus milestone
+   snapshots;
 2. finish the user/input/storage/access/deadline contract for the remaining
    Workbench lifecycle tabs, including the three-document writeup lineage,
    Site Visit dossier, narrow request-scoped applicant-material upload, and

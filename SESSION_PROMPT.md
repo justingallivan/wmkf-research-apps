@@ -184,8 +184,12 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
     deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2` (`68bcb4e8`) now performs
     response-only Graph-current refresh, and signed-in checks showed both
     consumers displaying the same current SharePoint version `2.0` and
-    last-modified time. Target-library restore, recycle, retention, permission,
-    and milestone controls remain open.
+    last-modified time. A disposable production-library audit then proved
+    previous-version inspection/restore and signed-in first-stage recycle
+    recovery. Justin's account was denied the second-stage administrator view;
+    configured version limits, site/library retention, ordinary-editor
+    permissions, Workbench history/admin restore, and milestone snapshots
+    remain open.
 
 ### Commits
 
@@ -213,9 +217,12 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    and both consumers still resolve the same stable item. Refresh and display
    Response-only Graph-current version/last-modified refresh by stable
    drive/item identity is deployed and live-verified in both consumers on
-   Request `1003109`. Finish target-library restore, recycle-bin, retention,
-   permission, and milestone checks before describing the artifact system as
-   production-ready.
+   Request `1003109`. Native previous-version inspection/restore and
+   first-stage recycle recovery also pass in the production Request library.
+   Finish the administrator checks for configured version limits, second-stage
+   recovery, site/library retention, and ordinary-editor permissions, then add
+   Workbench history/admin restore and milestone snapshots before describing
+   the artifact system as production-ready.
 
 2. **Exercise address attestation only when a truthful eligible production row exists.**
    Evidence: the signed-in Workbench inspection covered requests `1002912` and `1002874`.
@@ -234,11 +241,12 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
    Evidence: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
    The pilot registry schema and governed prompt v1 are live in Production; the
    application, applicant-title (`akoya_title`) source, and staff-authored
-   Foundation Opportunity requirement are implemented in source. Deploy and
-   live-verify the branch's Graph-current SharePoint version/last-modified
-   readback, then verify restore, recycle, retention, permission, and
-   milestone-snapshot behavior against the dedicated production dummy
-   requests. The generic registry has
+   Foundation Opportunity requirement are implemented and production-proved.
+   Graph-current readback, native version restore, and first-stage recycle
+   recovery pass. Obtain SharePoint/Purview administrator evidence for version
+   limits, second-stage recovery, retention, and ordinary-editor permissions,
+   then implement Workbench history/admin restore and milestone-snapshot
+   behavior. The generic registry has
    source-document/version/hash fields, but this pilot producer currently fingerprints
    the extracted canonical reviewer-proposal content rather than binding a governed source
    artifact/version; decide whether that stronger lineage is required before rehearsal.

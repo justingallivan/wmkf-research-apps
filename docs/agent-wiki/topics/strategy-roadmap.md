@@ -76,7 +76,11 @@ document inventory, and individual implementation plans do not establish priorit
   remained reachable through both consumers. Response-only Graph-current
   refresh and display in both consumers are deployed and live-verified on
   Request `1003109` via deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`;
-  target-library controls remain open. See
+  native previous-version inspection/restore and signed-in first-stage
+  recycle recovery also passed in the production Request library.
+  Administrator checks for version limits, second-stage recovery, retention,
+  and editor permissions plus Workbench history/admin restore and milestone
+  snapshots remain open. See
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
 - Pre-Site input direction (owner-decided 2026-07-28): draft factual material
   from the full proposal through an iterated governed `phase-ii.summarize`;
@@ -171,8 +175,9 @@ document inventory, and individual implementation plans do not establish priorit
   Attributed substantive editing then passed on the same stable item through
   both consumers. Response-only current-version refresh is deployed and
   live-verified in both consumers on Request `1003109` via deployment
-  `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`; library controls remain open. See the
-  near-term plan.
+  `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`; native version restore and first-stage
+  recycle recovery now pass, while administrator policy/access evidence and
+  product history/milestone controls remain open. See the near-term plan.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel: `project-virtual-review-panel`.
 - Roadmap snapshots: `project-app-roadmap-2026-04-25`, `project-phase-i-summary-app-winddown`.

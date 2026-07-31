@@ -3,7 +3,7 @@ title: Initial Assessment Controlled Production Pilot — 2026-07-30
 domain: architecture
 kind: audit
 status: active
-summary: Request 1003109 proves the core pilot and current-metadata display; library controls remain.
+summary: Request 1003109 proves the core pilot; native version and first-stage recovery pass while administrative controls remain.
 canonical: false
 cataloged: 2026-07-30
 last_verified: 2026-07-30
@@ -19,8 +19,9 @@ related:
 
 ## Verdict
 
-**CANONICAL INPUT, NEW-RUN LINEAGE, INTERRUPTED-FINALIZATION RECOVERY, AND
-ATTRIBUTED HUMAN EDITING PASS; FULL PILOT STILL PARTIAL.**
+**CANONICAL INPUT, NEW-RUN LINEAGE, INTERRUPTED-FINALIZATION RECOVERY,
+ATTRIBUTED HUMAN EDITING, NATIVE VERSION RESTORE, AND FIRST-STAGE RECYCLE
+RECOVERY PASS; FULL PILOT STILL PARTIAL.**
 The first controlled production rehearsal
 on Request `1002788` proved the producer → persistence → consumer mechanics
 and same-input idempotency. The source document was later identified as an old
@@ -113,7 +114,22 @@ token waits over single-flight cold-token acquisition, rejects
 mismatched/non-file Graph items, prevents content tags from being labeled as
 versions, and suppresses the Open link after a confirmed 404. Both live
 consumers displayed current SharePoint version `2.0` and the same stable
-document link. The broader target-library controls remain open.
+document link. The controlled audit below closes the native version and
+first-stage recovery portions; its named administrator and product controls
+remain open.
+
+On 2026-07-30 local time / 2026-07-31 UTC, a disposable-file audit exercised
+the actual production Request library without modifying Request `1003109`.
+Graph created versions `1.0` and `2.0`, downloaded the prior version, restored
+`1.0` as new current version `3.0`, and verified exact expected bytes. After
+deletion, Justin's signed-in SharePoint session found the probe in the
+first-stage recycle bin, restored it, and Graph confirmed the same item and
+exact contents were live. The probe was deleted again; both controlled probe
+artifacts were removed from the first-stage bin. Justin was denied access to
+the second-stage administrator recycle-bin view. Library version limits,
+site/library Purview retention, ordinary-editor permissions, Workbench
+history/restore controls, and immutable Board milestone snapshots therefore
+remain open.
 
 ## Evidence matrix
 
@@ -126,6 +142,10 @@ document link. The broader target-library controls remain open.
 | Exact-input retry | `Refresh from current inputs` on the Ready artifact | Still one registry row; same row, run, SharePoint item, timestamps, and attempt count | UI returned the existing Ready artifact | PASS — no model call, upload, overwrite, or duplicate |
 | Editable SharePoint lifecycle | Justin Gallivan edited the canonical Request `1003109` Word file, including Foundation Opportunity | SharePoint created version `2.0` under Justin's user identity; the stable item ID was unchanged; the staff-input marker is absent | Both application consumers still open the same stable item | PASS |
 | Current-version readback | Native Word editing advanced the canonical item from version `1.0` to `2.0` | Dataverse remains the upload/finalization snapshot; the deployed read model overlays current Graph values in the response only | Both live consumers display the same current/missing/unavailable/unchecked semantics | PASS — Request `1003109` displayed current SharePoint version `2.0` in both consumers on deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2` |
+| Native version inspection/restore | Disposable file in the production Request library was uploaded twice, then prior version `1.0` was downloaded and restored | SharePoint retained `2.0` and `1.0`; restore created `3.0` and exact current bytes matched version one | Graph version list/content/restore operations | PASS — controlled probe only; no Request `1003109` mutation |
+| First-stage recycle recovery | Controlled probe was deleted after its version test | SharePoint first-stage bin retained the item and original Request-library location | Justin restored it through the signed-in SharePoint UI; Graph confirmed the same item and exact contents live | PASS — probe then deleted again and both probe artifacts removed from first-stage |
+| Administrative library controls | Direct policy/permission probes and signed-in administrator view | Item-level retention-label read returned no label fields; site-permission enumeration returned `403`; second-stage admin bin returned Access Denied | N/A until SharePoint/Purview administrator verification | PARTIAL/UNKNOWN — library limits, second-stage recovery, site/library retention, and least-privilege editor policy remain open |
+| Workbench history/restore and milestone freeze | No current producer/action | Current metadata readback exists; no milestone snapshot row/artifact is created | Workbench shows current version/time but no history link or administrator restore | PLANNED |
 | Post-upload recovery | Request `1003109` was staged as Failed after upload while retaining generation/run/file/hash identity, then retried through the signed-in Workbench | Same registry row, AI run, request pointer target, and SharePoint item; attempt count advanced `1 → 2`; no cleanup work | Same SharePoint version `1.0`, eTag, last-modified time, size, and governed hash; exactly one request AI run | PASS — no model call, upload, overwrite, or duplicate |
 | Approved canonical input follow-up | Signed-in Workbench generation read `Reviewer Materials/Proposal_1003109.pdf` (33,011 extracted characters; text SHA-256 `0fc490d0fc1c635878f36b35376f952e0e35ea8225441c4fe2644f0e3456f36e`) | Row `3cec63a4-768c-f111-ab0f-6045bd018a07`; input fingerprint `df23a4ebfa2661d89dce81ea4c6cbe2937fa9f4607fb3e2a50981a49b1851a1b`; generation key `4803841d396aa1d2563aa36d2135efe6b51cc527183755dfbeca37f1f85f582f` | Workbench showed `Ready · Draft` and the exact recomputation matched both stored identities | PASS |
 | New-run request lineage | `initial-assessment.generate` v1 under Request `1003109` | AI run `528b97af-768c-f111-ab0f-7ced8d3d15a6`; `_wmkf_ai_request_value=b2a683cb-ec6f-f111-ab0d-000d3a306d45`; SharePoint item `01G4GVMS3U3DHMJQ7GERBLB2QA3SYTLNHO` | Registry and request pointer both target `3cec63a4-768c-f111-ab0f-6045bd018a07` | PASS |
@@ -177,11 +197,13 @@ not an intervening staff edit. Version `2.0` later hashed to
    `1003109`: SharePoint version `2.0` is attributed to Justin Gallivan,
    Foundation Opportunity no longer contains the staff-input marker, and both
    consumers resolve the same stable item.
-5. **Completed 2026-07-30:** deploy and live-verify the response-only current
-   SharePoint metadata refresh and consumer display after native Word edits.
-   Complete the broader target-library restore, recycle-bin, retention,
-   permission, and milestone-snapshot checks before calling the artifact
-   system production-ready.
+5. **Partially completed 2026-07-30:** response-only current SharePoint
+   metadata display, native version inspection/restore, and signed-in
+   first-stage recycle recovery are production-proved. Complete the
+   administrator checks for library version limits, second-stage recovery,
+   site/library Purview retention, and ordinary-editor least privilege; then
+   add Workbench version-history/admin restore and milestone snapshots before
+   calling the artifact system production-ready.
 6. Attribution policy is settled: SharePoint native version history is the
    required human-edit audit surface, while system-generated Dataverse
    registry writes may use service-principal attribution.

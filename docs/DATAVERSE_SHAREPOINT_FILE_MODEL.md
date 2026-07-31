@@ -65,7 +65,11 @@ hood.
 > signed-in Request `1003109` checks]** response-only current metadata refresh
 > by stable drive/item identity is live in both consumers, which displayed
 > SharePoint version `2.0` and the same stable document link. The pilot is not
-> closed because target-library controls remain unverified.
+> closed because target-library controls are only partially verified: version
+> inspection/restore and first-stage recycle recovery passed, while library
+> limits, second-stage administrative recovery, retention, editor
+> least-privilege, Workbench history/restore, and milestone snapshots remain
+> open.
 > **[VERIFIED via owner decisions 2026-07-28
 > and 2026-07-30, repository source,
 > production Dataverse/Graph probes, and signed-in consumer checks
@@ -89,15 +93,16 @@ hood.
   every request separately. This narrow cycle list does not yet implement the
   full Editor Dashboard filters, preview/version context, or Reviewed progress
   contract below.
-- **Current metadata readback (pilot gap observed 2026-07-30 local /
-  2026-07-31 UTC; backend refresh implemented locally 2026-07-30):** native
+- **Current metadata readback (deployed and live-verified 2026-07-30 local /
+  2026-07-31 UTC):** native
   Word editing preserves stable item identity, while Dataverse intentionally
-  remains the upload/finalization snapshot. The branch read model queries
+  remains the upload/finalization snapshot. The production read model queries
   current metadata by stable drive/item ID, overlays successful Graph values
   in the response only, and distinguishes `current`, `missing`, and
-  `unavailable` without path guessing or registry writes. Both branch
+  `unavailable` without path guessing or registry writes. Both production
   consumers use one renderer for current/missing/unavailable/unchecked
-  semantics; deployment and live Request `1003109` verification remain open.
+  semantics. Signed-in Request `1003109` checks showed SharePoint version
+  `2.0` and the same stable link in both consumers.
 - **Replacement/current rule (deployed; exact-input retry exercised):**
   changed authoritative inputs or cycle produce a distinct generation row. The
   replacement's Ready transition and prior-Ready supersession are one
@@ -551,6 +556,46 @@ identifiable even after later edits to the working document. The current app
 can download, search, upload, and delete SharePoint files, but it does not yet
 implement Graph version-history, restore, retention, or milestone-snapshot
 operations.
+
+### Controlled target-library audit — 2026-07-30 local / 2026-07-31 UTC
+
+**[VERIFIED via production Microsoft Graph and signed-in SharePoint probes]**
+The actual `akoya_request` Request library supports native version creation,
+specific-version inspection/download, and restore. A disposable text file was
+uploaded twice, exposing versions `2.0` and `1.0`; version `1.0` was downloaded,
+restored through Graph, and became current as new version `3.0`. Exact expected
+bytes matched before and after restoration. The probe was then deleted.
+
+The same deleted probe was visible in the first-stage SharePoint recycle bin
+with its original library location. Justin restored it through the normal
+signed-in SharePoint UI, Graph readback confirmed the same item and exact
+version-one contents were live, and the file was deleted again. Both
+disposable probe artifacts were then removed from the first-stage bin. This
+proves ordinary signed-in first-stage recovery and leaves no probe file live
+or in the first-stage bin.
+
+The remaining controls are deliberately not collapsed into that pass:
+
+- **[UNKNOWN] Library version-limit policy.** The library exposes version
+  history, but its configured limit requires SharePoint administrator
+  inspection (for example, `Get-SPOListVersionPolicy`); the current Graph
+  application read does not prove the limit.
+- **[PARTIAL] Second-stage recycle recovery.** Removing the probes from the
+  first-stage bin exercised the transition, but Justin's signed-in account was
+  denied access to `AdminRecycleBin.aspx?view=13`. A site collection
+  administrator must inspect and exercise second-stage recovery.
+- **[UNKNOWN] Retention.** The controlled Request `1003109` item's Graph
+  `retentionLabel` response contained no label fields. That does not prove
+  that no site- or library-wide Microsoft Purview retention policy applies.
+- **[UNKNOWN] Least-privilege human editing.** The app token contains only
+  `Sites.Selected`; `/sites/{siteId}/permissions` returned `403 accessDenied`,
+  so it cannot enumerate its own site grants. The ordinary-editor permission
+  design still needs an administrator audit.
+- **[PARTIAL] Workbench recovery UI.** Current version and last-modified
+  metadata are live. Version-history navigation and an administrator-only
+  restore action are not implemented.
+- **[PLANNED] Board milestone freeze.** No immutable milestone snapshot
+  operation exists yet.
 
 Platform references:
 [Microsoft Graph file versions](https://learn.microsoft.com/en-us/graph/api/driveitem-list-versions?view=graph-rest-1.0),
