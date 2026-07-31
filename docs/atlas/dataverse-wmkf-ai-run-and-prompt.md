@@ -91,7 +91,9 @@ Migration plans touching either entity must preserve these foreign keys.
   production run `528b97af-768c-f111-ab0f-7ced8d3d15a6` subsequently proved
   the live `_wmkf_ai_request_value` equals
   `b2a683cb-ec6f-f111-ab0d-000d3a306d45`. The historical `1002788` pilot run
-  remains null and append-only.
+  remains null and append-only. The later controlled interrupted-finalization
+  retry reused the same Request `1003109` run; the request still had exactly
+  one Initial Assessment AI run after recovery.
 - **`review-synthesis.generate` production publication (2026-07-26):** the
   authenticated superuser admin route published current v2
   `7423049a-3f89-f111-ab0f-7ced8d3d15a6` and retired v1

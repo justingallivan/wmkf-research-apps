@@ -3,7 +3,7 @@ title: Initial Assessment Controlled Production Pilot — 2026-07-30
 domain: architecture
 kind: audit
 status: active
-summary: Request 1002788 preserves mechanics-only evidence; Request 1003109 proves canonical input, new-run lineage, and exact reuse; recovery/editing remain.
+summary: Request 1003109 production-proves canonical input, linked run, exact reuse, and recovery; human editing and library controls remain.
 canonical: false
 cataloged: 2026-07-30
 last_verified: 2026-07-30
@@ -19,7 +19,8 @@ related:
 
 ## Verdict
 
-**CANONICAL INPUT AND NEW-RUN LINEAGE PASS; FULL PILOT STILL PARTIAL.**
+**CANONICAL INPUT, NEW-RUN LINEAGE, AND INTERRUPTED-FINALIZATION RECOVERY
+PASS; FULL PILOT STILL PARTIAL.**
 The first controlled production rehearsal
 on Request `1002788` proved the producer → persistence → consumer mechanics
 and same-input idempotency. The source document was later identified as an old
@@ -41,14 +42,30 @@ row/run/item, attempt count, and modification timestamp. Production route
 GET/POST calls returned 200 and the deployment error scan found no runtime
 errors.
 
-The first-write runtime logs recorded three service-layer fallbacks: the
+On 2026-07-30, a second controlled Request `1003109` exercise staged the
+existing row as Failed after its SharePoint upload while retaining its
+generation key, input fingerprint, governed content hash, AI run, folder, and
+filename. The signed-in Workbench displayed that failure and the normal
+`Retry draft` action recovered it to Ready/Draft with attempt count `2`.
+Readback proved that recovery reused registry row
+`3cec63a4-768c-f111-ab0f-6045bd018a07`, AI run
+`528b97af-768c-f111-ab0f-7ced8d3d15a6`, and SharePoint item
+`01G4GVMS3U3DHMJQ7GERBLB2QA3SYTLNHO`. The SharePoint version remained `1.0`;
+its eTag, last-modified timestamp, size, and governed hash were unchanged, and
+the request pointer was restored to the same row. The request still had
+exactly one Initial Assessment AI run and no cleanup work. This
+production-proves recovery without another model call, upload, overwrite, or
+duplicate row.
+
+The first-write and recovery runtime logs recorded service-layer fallbacks: the
 acting Dataverse user lacked direct permission for the new
 `wmkf_requestdocument` create/update and final changeset, so the application
 retried those operations as its service principal and completed the request.
-This did not affect artifact correctness, but native Dataverse `createdby` /
-`modifiedby` attribution for these writes is the application identity rather
-than the staff user. Granting the intended staff security-role privileges is
-an operational follow-up if native per-user attribution is required.
+This did not affect artifact correctness. **Owner decision 2026-07-30:**
+native SharePoint version attribution is the required human-edit audit surface;
+system-generated Dataverse registry writes may use application identity.
+The fallback is therefore non-blocking, and no registry-role change or custom
+version ledger is required now.
 
 Three defects or evidence gaps were found during the rehearsal:
 
@@ -88,7 +105,7 @@ staff-input marker.
 | Shared discovery contract | Same canonical registry row | Stable drive/item identity and request pointer | Per-request Workbench and `/workbench/artifacts` both listed the same artifact and Open link | PASS |
 | Exact-input retry | `Refresh from current inputs` on the Ready artifact | Still one registry row; same row, run, SharePoint item, timestamps, and attempt count | UI returned the existing Ready artifact | PASS — no model call, upload, overwrite, or duplicate |
 | Editable SharePoint lifecycle | Opened canonical Word file | SharePoint created version `2.0`, modified by Justin Gallivan | Current file remained reachable from both application consumers | PARTIAL — open/AutoSave proven; substantive edit not proven |
-| Post-upload recovery | Pilot code compared whole-package bytes; deployed code stores a `gdc1:`-tagged normalized governed Word digest | The historical row retains an untagged legacy digest; future rows are scheme-tagged | Actual producer and SharePoint v1 packages normalize equally; later v2 differs | DEPLOYED — interrupted-finalization rehearsal pending |
+| Post-upload recovery | Request `1003109` was staged as Failed after upload while retaining generation/run/file/hash identity, then retried through the signed-in Workbench | Same registry row, AI run, request pointer target, and SharePoint item; attempt count advanced `1 → 2`; no cleanup work | Same SharePoint version `1.0`, eTag, last-modified time, size, and governed hash; exactly one request AI run | PASS — no model call, upload, overwrite, or duplicate |
 | Approved canonical input follow-up | Signed-in Workbench generation read `Reviewer Materials/Proposal_1003109.pdf` (33,011 extracted characters; text SHA-256 `0fc490d0fc1c635878f36b35376f952e0e35ea8225441c4fe2644f0e3456f36e`) | Row `3cec63a4-768c-f111-ab0f-6045bd018a07`; input fingerprint `df23a4ebfa2661d89dce81ea4c6cbe2937fa9f4607fb3e2a50981a49b1851a1b`; generation key `4803841d396aa1d2563aa36d2135efe6b51cc527183755dfbeca37f1f85f582f` | Workbench showed `Ready · Draft` and the exact recomputation matched both stored identities | PASS |
 | New-run request lineage | `initial-assessment.generate` v1 under Request `1003109` | AI run `528b97af-768c-f111-ab0f-7ced8d3d15a6`; `_wmkf_ai_request_value=b2a683cb-ec6f-f111-ab0d-000d3a306d45`; SharePoint item `01G4GVMS3U3DHMJQ7GERBLB2QA3SYTLNHO` | Registry and request pointer both target `3cec63a4-768c-f111-ab0f-6045bd018a07` | PASS |
 | Canonical exact-input retry | Workbench `Refresh from current inputs` on Request `1003109` | Still one row, same run/item, attempt count `1`, and unchanged `modifiedon` | UI returned the same Ready/Draft artifact | PASS — no duplicate/model/upload |
@@ -127,22 +144,22 @@ not an intervening staff edit. Version `2.0` later hashed to
 1. The canonical proposal-source deployment, generation, identity
    recomputation, new-run request lineage, and exact-input reuse are complete
    on Request `1003109`.
-2. The recovery/run-linkage runtime fix is deployed. The schema-as-code field description is
+2. The interrupted-finalization recovery branch is production-proved on
+   Request `1003109`: it restored the same row and request pointer while
+   preserving the single AI run and SharePoint item/version.
+3. The recovery/run-linkage runtime fix is deployed. The schema-as-code field description is
    corrected on `main`, but the
    creation-only schema applicator does not update an existing Dataverse
    attribute description; that optional live metadata cleanup is separate and
    does not block the runtime fix.
-3. Exercise the post-upload/final-registry-failure recovery branch and verify
-   it reuses the canonical SharePoint item without another model call/upload.
 4. Complete a substantive authorized staff review/edit, including Foundation
    Opportunity, and verify the saved version through both consumers.
 5. Complete the broader target-library restore, recycle-bin, retention,
    permission, and milestone-snapshot checks before calling the artifact system
    production-ready.
-6. Decide whether native Dataverse staff-user attribution is required for the
-   request-document registry. If yes, grant and verify the minimum create,
-   update, and changeset privileges so the existing service-principal fallback
-   is not used for this workflow.
+6. Attribution policy is settled: SharePoint native version history is the
+   required human-edit audit surface, while system-generated Dataverse
+   registry writes may use service-principal attribution.
 
 No source proposal text or applicant-sensitive content is reproduced in this
 report.

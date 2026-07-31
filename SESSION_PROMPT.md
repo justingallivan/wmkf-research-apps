@@ -157,8 +157,21 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
     `528b97af-768c-f111-ab0f-7ced8d3d15a6` has the correct request lookup.
     An exact-input UI retry preserved the single row/run/item and attempt
     count. Production GET/POST returned 200 and the deployment error scan was
-    clean. Interrupted-finalization recovery, substantive staff editing, and
-    target-library controls remain open.
+    clean.
+
+12. **Interrupted-finalization recovery passed on Request `1003109`.**
+    A controlled post-upload/pre-finalization failure left the existing
+    SharePoint file intact while the registry row was Failed and the request
+    pointer was empty. Signed-in `Retry draft` restored the same registry row
+    and request pointer with attempt count `2`, while preserving AI run
+    `528b97af-768c-f111-ab0f-7ced8d3d15a6`, SharePoint item
+    `01G4GVMS3U3DHMJQ7GERBLB2QA3SYTLNHO`, version `1.0`, eTag,
+    last-modified time, size, and governed hash. There was no second model
+    call, upload, overwrite, duplicate row, or cleanup work. The owner accepts
+    service-principal attribution for system-generated Dataverse registry
+    writes; SharePoint native version history remains the required human-edit
+    attribution surface. Substantive staff editing and target-library
+    controls remain open.
 
 ### Commits
 
@@ -180,13 +193,12 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
 ### Verified Open
 
 1. **Complete the remaining governed Initial Assessment pilot gates.**
-   Canonical-input generation and new-run request lineage passed on Request
-   `1003109`. Exercise the deployed interrupted-finalization recovery branch.
-   Then complete a substantive authorized
-   staff edit—including Foundation Opportunity—and verify the saved version
-   through both consumers. Finish target-library restore, recycle-bin,
-   retention, permission, and milestone checks before describing the artifact
-   system as production-ready.
+   Canonical-input generation, new-run request lineage, exact reuse, and
+   interrupted-finalization recovery passed on Request `1003109`. Complete a
+   substantive authorized staff edit—including Foundation Opportunity—and
+   verify the saved version through both consumers. Then finish target-library
+   restore, recycle-bin, retention, permission, and milestone checks before
+   describing the artifact system as production-ready.
 
 2. **Exercise address attestation only when a truthful eligible production row exists.**
    Evidence: the signed-in Workbench inspection covered requests `1002912` and `1002874`.

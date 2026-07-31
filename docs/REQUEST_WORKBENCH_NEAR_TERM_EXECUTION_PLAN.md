@@ -3,7 +3,7 @@ title: "Request Workbench — near-term execution plan"
 domain: architecture
 kind: plan
 status: canonical
-summary: "Initial Assessment canonical input and new-run lineage are proven; recovery, substantive editing, and library controls remain."
+summary: "Initial Assessment canonical input, new-run lineage, and interrupted-finalization recovery are proven; substantive editing and library controls remain."
 canonical: true
 cataloged: 2026-07-26
 last_verified: 2026-07-30
@@ -70,8 +70,10 @@ I proposal. Production commit `9c88a1fa` now hashes normalized governed
 Word parts and passes `requestId`; focused synthetic tests and the actual pilot
 packages verify the hash complement. Request `1003109` subsequently
 production-proved a verified canonical proposal, one new linked AI run, and
-exact-input reuse on merge commit `84155a5a`. Interrupted-finalization
-recovery, a substantive staff edit, and target-library protection checks
+exact-input reuse on merge commit `84155a5a`. A controlled production
+interrupted-finalization exercise then restored the same registry row,
+request pointer, AI run, and SharePoint item/version without another model
+call or upload. A substantive staff edit and target-library protection checks
 remain required before the pilot is complete.
 Passing this draft-functional gate is not a broad production-readiness claim
 and does not require the later Pre-Site, Site Visit, or Final slices to be
@@ -696,17 +698,21 @@ Explicit non-goals during design freeze:
 > intended content-hash recovery without a second AI call. The 2026-07-30
 > pilot falsified whole-package hashing; the deployed runtime now uses a
 > normalized governed-DOCX hash that matches the actual producer/v1 packages
-> and distinguishes v2, with interrupted-finalization proof still pending, and
-> fresh-filename regeneration while retaining mismatched-item identity when
-> they do not. **[VERIFIED 2026-07-30]** The complete Wave 16 entity,
+> and distinguishes v2. A controlled Request `1003109`
+> interrupted-finalization exercise then recovered the same registry row,
+> request pointer, AI run, and SharePoint item/version without another model
+> call, upload, overwrite, or duplicate. Mismatched content still triggers
+> fresh-filename regeneration while retaining the prior item identity for
+> operator cleanup. **[VERIFIED 2026-07-30]** The complete Wave 16 entity,
 > relationships, alternate key, and request pointer are live in Production,
 > and governed `initial-assessment.generate` v1 is live at
-> `fc8a4c3b-5e8c-f111-ab0f-7ced8d3d15a6`; the fresh registry and pointer counts
-> remain zero. PR #102 merged as `1e958ee0`, and production deployment
+> `fc8a4c3b-5e8c-f111-ab0f-7ced8d3d15a6`. PR #102 merged as `1e958ee0`, and production deployment
 > `dpl_AxxroabhpXLX1pz75MW6486fB4ci` is Ready on the expected aliases with a
-> clean initial error scan. No pilot request has run. Steps 8–11 and the live
-> SharePoint/artifact portions of steps 4–6 remain open until colleagues create and identify the representative
-> production dummy request(s) and the owner names the testers and schedule.
+> clean initial error scan. Requests `1002788` and `1003109` now provide the
+> controlled production evidence described above. The remaining pilot
+> acceptance work is a substantive authorized staff edit through both
+> consumers plus the target-library restore, recycle, retention, permission,
+> and milestone-snapshot checks.
 
 The August 10 minimum changes the former default. Exercise the now-live
 governed artifact spine through the J27 Initial Assessment first;
@@ -901,8 +907,12 @@ Owner-decided:
     proved generation mechanics, shared consumers, and same-input retry, but
     used an old Phase I proposal and therefore is not semantic Phase II
     evidence. Request `1003109` subsequently production-proved canonical-input
-    generation, exact-input reuse, and new-run request linkage. Recovery
-    re-proof, substantive editing, and target-library controls remain open.
+    generation, exact-input reuse, new-run request linkage, and
+    interrupted-finalization recovery using the same row/run/item/version.
+    Substantive editing and target-library controls remain open. The owner
+    accepts service-principal attribution for system-generated Dataverse
+    registry writes; SharePoint native version attribution remains the
+    required human-edit audit surface.
 
 Still required:
 

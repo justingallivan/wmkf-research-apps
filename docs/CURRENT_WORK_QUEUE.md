@@ -34,17 +34,10 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Close the remaining Initial Assessment pilot gates | Request `1002788` preserves mechanics-only evidence because it used an old Phase I proposal. PR #103 / merge `84155a5a` deployed the exact active `Reviewer Materials/Proposal_{Request#}.pdf` contract, and Request `1003109` then production-proved canonical-input generation, a newly linked AI run, Ready/Draft request-pointer lineage, and exact-input no-duplicate reuse. Before declaring the August 10 gate complete: exercise post-upload recovery, complete a substantive staff edit including Foundation Opportunity, and finish target-library protection/readback checks. | The deployed recovery path repairs an interrupted finalization without a second model call or overwrite; an authorized staff edit is visible through both consumers; restore/permission/retention boundaries are recorded. |
-| 2 | First deadline-bound writeup slice | Treat the governed-artifact spine as production-proved for canonical-input generation, registry lineage, shared discovery, exact retry, and new-run request linkage. Interrupted-finalization recovery is deployed but not yet production-re-proved. Pre Site Visit becomes the next reuse only after the pilot blockers above close. | One dedicated production request produces a durable, searchable, editable, and recoverable Word artifact with complete prompt/run/request lineage and verified human review. The full Editor Dashboard contract remains a later reuse. |
+| 1 | Close the remaining Initial Assessment pilot gates | Request `1002788` preserves mechanics-only evidence because it used an old Phase I proposal. PR #103 / merge `84155a5a` deployed the exact active `Reviewer Materials/Proposal_{Request#}.pdf` contract, and Request `1003109` then production-proved canonical-input generation, a newly linked AI run, Ready/Draft request-pointer lineage, exact-input no-duplicate reuse, and interrupted-finalization recovery using the same row/run/SharePoint item and version. Before declaring the August 10 gate complete: complete a substantive staff edit including Foundation Opportunity, then finish target-library protection/readback checks. | An authorized staff edit is visible through both consumers, and restore/permission/retention/milestone boundaries are recorded. |
+| 2 | First deadline-bound writeup slice | Treat the governed-artifact spine as production-proved for canonical-input generation, registry lineage, shared discovery, exact retry, new-run request linkage, and interrupted-finalization recovery. Pre Site Visit becomes the next reuse only after the two remaining pilot blockers above close. | One dedicated production request produces a durable, searchable, editable, and recoverable Word artifact with complete prompt/run/request lineage and verified human review. The full Editor Dashboard contract remains a later reuse. |
 
 ## Audit follow-ups — verified open, not silently prioritized
-
-- **Initial Assessment native Dataverse attribution:** Request `1003109`
-  completed correctly, but the acting user lacked the new request-document
-  write privileges, so the existing service-principal fallback performed the
-  create/update/changeset writes. Decide whether native staff-user
-  `createdby`/`modifiedby` attribution is required; if yes, grant and verify
-  the minimum security-role privileges.
 
 - **Retired-table operational scripts:** 25 non-archive scripts mention the
   dropped `reviewer_suggestions` table. `scripts/README.md` now blocks the
@@ -56,6 +49,16 @@ sequence.
   bill of health.
 
 ## Completed in this execution
+
+- Initial Assessment interrupted-finalization recovery: Request `1003109`
+  was staged as Failed after its SharePoint upload and retried through the
+  signed-in Workbench. Recovery restored the same registry row and request
+  pointer while preserving the single AI run and SharePoint item/version;
+  attempt count advanced to `2`, with no second model call, upload, overwrite,
+  duplicate, or cleanup work. Runtime logs again used the service-principal
+  fallback for Dataverse registry writes. The owner accepts application
+  attribution for system-generated registry changes; native SharePoint
+  version attribution remains the required human-edit audit surface.
 
 - Initial Assessment controlled-production rehearsal: Request `1002788`
   generated registry row `fb995f0f-628c-f111-ab0f-6045bd018a07`, the matching

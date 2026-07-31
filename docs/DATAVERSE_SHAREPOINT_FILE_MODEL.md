@@ -47,7 +47,8 @@ hood.
 > **Owner-decided direction (2026-07-28); Initial Assessment implemented in
 > source 2026-07-29; production registry/pointer schema and governed prompt v1
 > provisioned 2026-07-30; Request `1002788` proved mechanics and Request
-> `1003109` production-proved canonical input and new-run lineage
+> `1003109` production-proved canonical input, new-run lineage, and
+> interrupted-finalization recovery
 > 2026-07-30.**
 > This section governs the Initial Assessment, Pre Site Visit Writeup, and
 > Final Writeup design as well as the Site Visit dossier and its materials.
@@ -55,9 +56,10 @@ hood.
 > consumers found it, and exact-input retry created no duplicate. The pilot is
 > mechanics evidence only because its source was an old Phase I proposal.
 > Request `1003109` subsequently proved canonical-input generation,
-> exact-input reuse, and new-run request linkage. The pilot is not closed
-> because interrupted-finalization recovery and substantive staff editing
-> remain unverified. **[VERIFIED via owner decisions 2026-07-28
+> exact-input reuse, new-run request linkage, and recovery using the same
+> registry row, AI run, SharePoint item, and version. The pilot is not closed
+> because substantive staff editing and target-library controls remain
+> unverified. **[VERIFIED via owner decisions 2026-07-28
 > and 2026-07-30, repository source,
 > production Dataverse/Graph probes, and signed-in consumer checks
 > 2026-07-30.]**
@@ -125,6 +127,10 @@ registry row `3cec63a4-768c-f111-ab0f-6045bd018a07` from that exact PDF. The
 recomputed input fingerprint and generation key match the persisted values;
 AI run `528b97af-768c-f111-ab0f-7ced8d3d15a6` carries the correct request
 lookup. Exact-input retry preserved one row/run/SharePoint item.
+A controlled interrupted-finalization retry then restored the same registry
+row and request pointer with attempt count `2` while preserving the one AI run
+and SharePoint item/version, eTag, last-modified timestamp, size, and governed
+hash.
 
 Do not mirror the Word body into an independently editable Dataverse memo. That
 would create two competing sources of truth and an unsafe Word→Dataverse merge
@@ -178,8 +184,9 @@ ordering/whitespace. Synthetic tests and the actual pilot packages prove
 producer=v1 and producer≠v2. Untagged legacy hashes that do not match the
 downloaded package exactly block for operator reconciliation without another
 model call or upload. Recovery-stage exceptions are persisted as Failed rather
-than leaving a live Generating lease. Interrupted-finalization proof remains
-open. If a scheme-tagged item's governed
+than leaving a live Generating lease. Request `1003109` production-proved the
+matching-content path without another model call, upload, overwrite, duplicate
+row, or SharePoint version change. If a scheme-tagged item's governed
 content does not match, the producer preserves its exact identity in the
 operator-visible cleanup queue and generate to a fresh claim-specific
 filename; it does not overwrite or repeatedly dead-end on the changed file.

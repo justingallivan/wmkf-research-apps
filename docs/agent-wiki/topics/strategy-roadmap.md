@@ -69,8 +69,9 @@ document inventory, and individual implementation plans do not establish priorit
   Production commit `9c88a1fa` has normalized DOCX hashing and future-run
   request linkage. Request `1003109` production-proved the canonical proposal,
   exact-input reuse, and a new AI run with the correct request lookup.
-  Interrupted-finalization recovery, substantive staff editing, and
-  target-library controls remain open. See
+  A controlled interrupted-finalization retry then restored the same
+  row/run/SharePoint item and version without another model call or upload.
+  Substantive staff editing and target-library controls remain open. See
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
 - Pre-Site input direction (owner-decided 2026-07-28): draft factual material
   from the full proposal through an iterated governed `phase-ii.summarize`;
@@ -160,9 +161,9 @@ document inventory, and individual implementation plans do not establish priorit
   not require the later lifecycle tabs. Request `1002788` is the authorized
   mechanics pilot target; generation and exact retry passed, but its old
   Phase I source invalidated semantic proof. Request `1003109` then
-  production-proved canonical input, exact-input reuse, and new-run lineage.
-  Interrupted-finalization recovery, substantive editing, and library
-  controls remain open. See the near-term plan.
+  production-proved canonical input, exact-input reuse, new-run lineage, and
+  interrupted-finalization recovery using the same row/run/item/version.
+  Substantive editing and library controls remain open. See the near-term plan.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel: `project-virtual-review-panel`.
 - Roadmap snapshots: `project-app-roadmap-2026-04-25`, `project-phase-i-summary-app-winddown`.

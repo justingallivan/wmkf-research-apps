@@ -3,7 +3,7 @@ title: Dataverse wmkf_requestdocument
 domain: application-state
 kind: atlas
 status: active
-summary: Governed request-artifact registry; Request 1003109 production-proved canonical input, new-run lineage, and exact-input reuse, while recovery and human-edit gates remain open.
+summary: Governed request-artifact registry; Request 1003109 production-proved canonical input, new-run lineage, exact-input reuse, and interrupted-finalization recovery, while human editing and library-control gates remain open.
 canonical: false
 owner: product-engineering
 related:
@@ -43,12 +43,12 @@ post-deploy error scan was clean.
 Ready row without another run, upload, overwrite, or duplicate. Opening the
 canonical Word file created a native SharePoint version. At that point, the
 broader pilot was not complete: the source was an old Phase I proposal rather than the approved
-Phase II reviewer package, no substantive staff content edit was verified, and the deployed
-post-upload recovery contract has not passed an interrupted-finalization
-rehearsal. Exact evidence:
+Phase II reviewer package and no substantive staff content edit was verified.
+Request `1003109` later closed the canonical-input and recovery gaps; the
+substantive edit and target-library controls remain. Exact evidence:
 `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`.
 
-**[VERIFIED DEPLOYED 2026-07-30; RECOVERY PATH NOT YET PRODUCTION RE-PROVED]** Production
+**[VERIFIED DEPLOYED AND PRODUCTION-EXERCISED 2026-07-30]** Production
 commit `9c88a1fa` replaces whole-package byte hashing
 with a `gdc1:`-tagged normalized governed-DOCX digest. It covers every `word/`
 part and canonicalizes the document relationship part only to remove
@@ -64,6 +64,11 @@ lookup. A fresh recomputation from `Reviewer Materials/Proposal_1003109.pdf`
 matched the persisted input fingerprint and generation key. Exact-input retry
 left one row, the same run/item, attempt count `1`, and unchanged
 `modifiedon`.
+The controlled interrupted-finalization exercise then retried the Failed row
+through the Workbench and restored the same row and request pointer with
+attempt count `2`. It preserved the one AI run and the same SharePoint
+item/version, eTag, last-modified timestamp, size, and governed hash, proving
+that recovery made no second model call, upload, overwrite, or duplicate.
 The actual pilot producer and SharePoint v1 packages hash equally; v2 differs.
 The historical pilot row retains an untagged legacy digest. A non-Ready legacy
 row recovers only if downloaded bytes match that digest exactly; otherwise it
@@ -110,13 +115,12 @@ scheme-tagged governed-DOCX content hash and deterministic target. The intended
 retry downloads the item, verifies normalized Word content, and finalizes
 stable identity without rerunning AI. Recovery-stage errors transition an
 owned claim to Failed immediately rather than leaving a misleading Generating
-lease. The candidate source fix is test-proven against the actual pilot
-packages but remains unproven in Production until promoted and exercised
-through the interrupted-finalization branch. If the
-existing item's bytes no longer match, the producer retains its exact
-drive/item identity for operator cleanup and generates to a fresh
-claim-specific filename instead of overwriting the changed file or dead-ending
-every retry.
+lease. Request `1003109` production-proved this branch by reusing the same
+registry row, AI run, and SharePoint item/version while restoring the request
+pointer. If the existing item's bytes no longer match, the producer retains
+its exact drive/item identity for operator cleanup and generates to a fresh
+claim-specific filename instead of overwriting the changed file or
+dead-ending every retry.
 
 Changed authoritative inputs or cycle create a distinct generation row. Its
 Ready transition, the supersession of prior Ready rows, and the
@@ -161,8 +165,8 @@ transition.
    both consumers, Word opening/version creation, and same-input retry passed
    for mechanics. The old Phase I source invalidates approved-input semantic
    proof. Request `1003109` then passed canonical-input generation,
-   exact-input reuse, and new-run request lineage. Recovery re-proof,
-   substantive human editing, and target-library protection checks remain
-   open.
+   exact-input reuse, new-run request lineage, and interrupted-finalization
+   recovery using the same row/run/SharePoint item and version. Substantive
+   human editing and target-library protection checks remain open.
 
 No live command in this sequence is authorized merely by this page.

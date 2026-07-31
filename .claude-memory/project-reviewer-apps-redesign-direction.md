@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has seven implemented tabs and three placeholders; Initial Assessment canonical-input generation and new-run lineage are production-proved, while recovery, substantive editing, and library controls remain open.
+description: The unified Request Workbench has seven implemented tabs and three placeholders; Initial Assessment canonical-input generation, new-run lineage, and interrupted-finalization recovery are production-proved, while substantive editing and library controls remain open.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-30 via source/live probes, production deployment 84155a5a, signed-in Request 1003109 generation/retry, and Dataverse/SharePoint lineage readback
+  last_verified: 2026-07-30 via source/live probes, production deployment 84155a5a, signed-in Request 1003109 generation/retry/recovery, and Dataverse/SharePoint lineage readback
 ---
 
 ## Recall Rule
@@ -58,8 +58,10 @@ live-verified example. Normalized recovery hashing and future-run request
 linkage are deployed in production. Request `1003109` then production-proved
 the exact canonical input, a newly linked AI run, the Ready/Draft registry and
 request pointer, and exact-input no-duplicate reuse on deployment
-`dpl_GiWsUy84mXW9bLDwSXYGoyHehqcW`. Interrupted-finalization recovery,
-substantive human editing, and target-library controls remain open.
+`dpl_GiWsUy84mXW9bLDwSXYGoyHehqcW`. A controlled recovery retry then
+restored the same row/run/SharePoint item and version without another model
+call or upload. Substantive human editing and target-library controls remain
+open.
 Use the near-term execution plan for current authority; the chronology below
 remains the rationale record.
 
@@ -128,8 +130,8 @@ planned. Current authority is
   Site Visit Writeup, Site Visit, Final Writeup). Initial Assessment production
   registry/pointer schema, governed prompt v1, and application are live and
   verified; Request `1002788` preserves mechanics-only historical evidence,
-  while Request `1003109` proves canonical-input generation and linked-run
-  lineage in production.
+  while Request `1003109` proves canonical-input generation, linked-run
+  lineage, exact reuse, and interrupted-finalization recovery in production.
 - Reviews is built and production-proved: governed-v3 structured output
   persisted successfully, the automatic all-in drain is enabled, and its
   producer/persistence/consumer lifecycle completed a controlled production
@@ -145,8 +147,9 @@ planned. Current authority is
   prove approved-input semantics. It also exposed whole-package hash drift
   after SharePoint canonicalization and a null AI-run request lookup. The
   deployed runtime fixes both for future generations. Request `1003109`
-  production-proved the canonical input and non-null AI-run request lookup;
-  interrupted-finalization recovery remains open.
+  production-proved the canonical input, non-null AI-run request lookup, and
+  interrupted-finalization recovery using the same row/run/SharePoint item and
+  version.
 - Reviewer Pool remains planned and optional, not a shipped Workbench-v1 deliverable.
 
 ## Historical decision chronology
