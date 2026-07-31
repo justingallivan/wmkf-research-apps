@@ -3,7 +3,7 @@ title: Dataverse wmkf_requestdocument
 domain: application-state
 kind: atlas
 status: active
-summary: Governed request-artifact registry; the 1002788 pilot proved mechanics only, while canonical-input semantic proof and recovery re-proof remain open.
+summary: Governed request-artifact registry; Request 1003109 production-proved canonical input, new-run lineage, and exact-input reuse, while recovery and human-edit gates remain open.
 canonical: false
 owner: product-engineering
 related:
@@ -41,18 +41,29 @@ post-deploy error scan was clean.
 
 **[PARTIAL PILOT 2026-07-30]** A same-input UI retry returned the existing
 Ready row without another run, upload, overwrite, or duplicate. Opening the
-canonical Word file created a native SharePoint version. The broader pilot is
-not complete: the source was an old Phase I proposal rather than the approved
+canonical Word file created a native SharePoint version. At that point, the
+broader pilot was not complete: the source was an old Phase I proposal rather than the approved
 Phase II reviewer package, no substantive staff content edit was verified, and the deployed
 post-upload recovery contract has not passed an interrupted-finalization
 rehearsal. Exact evidence:
 `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`.
 
-**[VERIFIED DEPLOYED 2026-07-30; NOT YET PRODUCTION RE-PROVED]** Production
+**[VERIFIED DEPLOYED 2026-07-30; RECOVERY PATH NOT YET PRODUCTION RE-PROVED]** Production
 commit `9c88a1fa` replaces whole-package byte hashing
 with a `gdc1:`-tagged normalized governed-DOCX digest. It covers every `word/`
 part and canonicalizes the document relationship part only to remove
 SharePoint-injected `customXml` relationships and ordering/whitespace noise.
+
+**[VERIFIED 2026-07-30 via signed-in Workbench generation/retry plus
+Dataverse, Graph, and Vercel readback]** Merge `84155a5a` deployed the exact
+canonical proposal-source contract. Request `1003109` has Ready/Draft registry
+row `3cec63a4-768c-f111-ab0f-6045bd018a07`; the request pointer targets that
+row, SharePoint item `01G4GVMS3U3DHMJQ7GERBLB2QA3SYTLNHO` is registered, and
+AI run `528b97af-768c-f111-ab0f-7ced8d3d15a6` carries the correct request
+lookup. A fresh recomputation from `Reviewer Materials/Proposal_1003109.pdf`
+matched the persisted input fingerprint and generation key. Exact-input retry
+left one row, the same run/item, attempt count `1`, and unchanged
+`modifiedon`.
 The actual pilot producer and SharePoint v1 packages hash equally; v2 differs.
 The historical pilot row retains an untagged legacy digest. A non-Ready legacy
 row recovers only if downloaded bytes match that digest exactly; otherwise it
@@ -149,9 +160,9 @@ transition.
 7. **Partially completed 2026-07-30:** Request `1002788` generation, lineage,
    both consumers, Word opening/version creation, and same-input retry passed
    for mechanics. The old Phase I source invalidates approved-input semantic
-   proof. The recovery-hash and future-run linkage fixes are deployed;
-   canonical-input production proof, recovery re-proof, substantive human
-   editing, and target-library
-   protection checks remain open.
+   proof. Request `1003109` then passed canonical-input generation,
+   exact-input reuse, and new-run request lineage. Recovery re-proof,
+   substantive human editing, and target-library protection checks remain
+   open.
 
 No live command in this sequence is authorized merely by this page.

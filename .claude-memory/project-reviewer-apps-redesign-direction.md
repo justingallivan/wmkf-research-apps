@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has seven implemented tabs and three placeholders; the Initial Assessment pilot proved mechanics only because it used an old Phase I proposal, and canonical-input proof remains open.
+description: The unified Request Workbench has seven implemented tabs and three placeholders; Initial Assessment canonical-input generation and new-run lineage are production-proved, while recovery, substantive editing, and library controls remain open.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-30 via source/live probes, production schema/prompt apply and readback, Workbench truth audit, and owner production-pilot decisions
+  last_verified: 2026-07-30 via source/live probes, production deployment 84155a5a, signed-in Request 1003109 generation/retry, and Dataverse/SharePoint lineage readback
 ---
 
 ## Recall Rule
@@ -55,9 +55,11 @@ an old Phase I proposal, so approved-input semantic proof did not pass.
 Automated request-bound analysis now requires the exact active
 `Reviewer Materials/Proposal_{Request#}.pdf`; Request `1003109` is the
 live-verified example. Normalized recovery hashing and future-run request
-linkage are deployed in production commit `9c88a1fa`; canonical-input
-production proof, recovery re-proof, substantive human editing, and
-target-library controls remain open.
+linkage are deployed in production. Request `1003109` then production-proved
+the exact canonical input, a newly linked AI run, the Ready/Draft registry and
+request pointer, and exact-input no-duplicate reuse on deployment
+`dpl_GiWsUy84mXW9bLDwSXYGoyHehqcW`. Interrupted-finalization recovery,
+substantive human editing, and target-library controls remain open.
 Use the near-term execution plan for current authority; the chronology below
 remains the rationale record.
 
@@ -125,7 +127,9 @@ planned. Current authority is
   Assessment, Reviewers, Reviews, Status, Awardee) and three placeholders (Pre
   Site Visit Writeup, Site Visit, Final Writeup). Initial Assessment production
   registry/pointer schema, governed prompt v1, and application are live and
-  verified; the Request `1002788` human artifact pilot proves mechanics only.
+  verified; Request `1002788` preserves mechanics-only historical evidence,
+  while Request `1003109` proves canonical-input generation and linked-run
+  lineage in production.
 - Reviews is built and production-proved: governed-v3 structured output
   persisted successfully, the automatic all-in drain is enabled, and its
   producer/persistence/consumer lifecycle completed a controlled production
@@ -140,8 +144,9 @@ planned. Current authority is
   consumers plus same-input retry, but used an old Phase I proposal and did not
   prove approved-input semantics. It also exposed whole-package hash drift
   after SharePoint canonicalization and a null AI-run request lookup. The
-  deployed runtime fixes both for future generations; canonical-input
-  production proof and recovery re-proof remain open.
+  deployed runtime fixes both for future generations. Request `1003109`
+  production-proved the canonical input and non-null AI-run request lookup;
+  interrupted-finalization recovery remains open.
 - Reviewer Pool remains planned and optional, not a shipped Workbench-v1 deliverable.
 
 ## Historical decision chronology

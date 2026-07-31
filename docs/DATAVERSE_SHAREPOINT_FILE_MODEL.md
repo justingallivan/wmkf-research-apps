@@ -46,16 +46,18 @@ hood.
 
 > **Owner-decided direction (2026-07-28); Initial Assessment implemented in
 > source 2026-07-29; production registry/pointer schema and governed prompt v1
-> provisioned 2026-07-30; controlled Request `1002788` pilot partially passed
+> provisioned 2026-07-30; Request `1002788` proved mechanics and Request
+> `1003109` production-proved canonical input and new-run lineage
 > 2026-07-30.**
 > This section governs the Initial Assessment, Pre Site Visit Writeup, and
 > Final Writeup design as well as the Site Visit dossier and its materials.
 > The application generated and registered the canonical artifact, both
 > consumers found it, and exact-input retry created no duplicate. The pilot is
-> mechanics evidence only because its source was an old Phase I proposal, not
-> the current Phase II reviewer package. The pilot is not closed because a
-> canonical-input run, deployed recovery/run-linkage re-proof, and substantive
-> staff editing remain unverified. **[VERIFIED via owner decisions 2026-07-28
+> mechanics evidence only because its source was an old Phase I proposal.
+> Request `1003109` subsequently proved canonical-input generation,
+> exact-input reuse, and new-run request linkage. The pilot is not closed
+> because interrupted-finalization recovery and substantive staff editing
+> remain unverified. **[VERIFIED via owner decisions 2026-07-28
 > and 2026-07-30, repository source,
 > production Dataverse/Graph probes, and signed-in consumer checks
 > 2026-07-30.]**
@@ -117,6 +119,13 @@ Request `1002788`'s earlier Initial Assessment instead used an old Phase I
 proposal, so its registry and SharePoint results prove mechanics but not
 approved-input semantics.
 
+**[VERIFIED 2026-07-30 via signed-in production generation/retry and exact
+read-only identity recomputation]** Request `1003109` generated Ready/Draft
+registry row `3cec63a4-768c-f111-ab0f-6045bd018a07` from that exact PDF. The
+recomputed input fingerprint and generation key match the persisted values;
+AI run `528b97af-768c-f111-ab0f-7ced8d3d15a6` carries the correct request
+lookup. Exact-input retry preserved one row/run/SharePoint item.
+
 Do not mirror the Word body into an independently editable Dataverse memo. That
 would create two competing sources of truth and an unsafe Word→Dataverse merge
 problem after co-editing. If later search or AI requirements need extracted
@@ -129,8 +138,9 @@ The approved typed registry is implemented in schema-as-code as
 `wmkf_requestdocument` (entity set `wmkf_requestdocuments`) rather than one ad
 hoc URL field per writeup. Its complete Wave 16 schema, alternate key,
 relationships, and request pointer are live in Production as of 2026-07-30.
-The controlled pilot created one Ready/Draft row and populated the pointer for
-Request `1002788`.
+The two controlled requests now each have one Ready/Draft row and matching
+pointer: mechanics-only Request `1002788` and canonical-input Request
+`1003109`.
 The persistence contract accounts for:
 
 - request and cycle;

@@ -3,7 +3,7 @@ title: "Request Workbench — near-term execution plan"
 domain: architecture
 kind: plan
 status: canonical
-summary: "Initial Assessment mechanics are proven, but canonical-proposal content proof, recovery re-proof, substantive editing, and library controls remain."
+summary: "Initial Assessment canonical input and new-run lineage are proven; recovery, substantive editing, and library controls remain."
 canonical: true
 cataloged: 2026-07-26
 last_verified: 2026-07-30
@@ -68,10 +68,11 @@ canonicalized the DOCX, and the historical linked Executor run has a null
 request lookup. The proposal source was also later identified as an old Phase
 I proposal. Production commit `9c88a1fa` now hashes normalized governed
 Word parts and passes `requestId`; focused synthetic tests and the actual pilot
-packages verify the hash complement. Interrupted-finalization and new
-linked-run re-proof, one run from a verified canonical proposal, a substantive
-staff edit, and target-library protection checks remain required before the
-pilot is complete.
+packages verify the hash complement. Request `1003109` subsequently
+production-proved a verified canonical proposal, one new linked AI run, and
+exact-input reuse on merge commit `84155a5a`. Interrupted-finalization
+recovery, a substantive staff edit, and target-library protection checks
+remain required before the pilot is complete.
 Passing this draft-functional gate is not a broad production-readiness claim
 and does not require the later Pre-Site, Site Visit, or Final slices to be
 built by August 10.
@@ -899,9 +900,9 @@ Owner-decided:
     separate controlled pilot gate. The 2026-07-30 Request `1002788` rehearsal
     proved generation mechanics, shared consumers, and same-input retry, but
     used an old Phase I proposal and therefore is not semantic Phase II
-    evidence. Recovery hashing and future-run linkage are deployed; a
-    canonical-input production run, recovery re-proof, substantive editing,
-    and target-library controls remain open.
+    evidence. Request `1003109` subsequently production-proved canonical-input
+    generation, exact-input reuse, and new-run request linkage. Recovery
+    re-proof, substantive editing, and target-library controls remain open.
 
 Still required:
 

@@ -87,9 +87,11 @@ Migration plans touching either entity must preserve these foreign keys.
   Assessment producer deployed for that rehearsal omitted `requestId` from
   `executePrompt()`; the registry still links the exact run to the exact
   request artifact. Production commit `9c88a1fa` now passes the request GUID
-  and asserts it in focused tests, but a new canonical-input production run is
-  still required to prove the live lookup. The historical pilot run remains
-  null and append-only.
+  and asserts it in focused tests. The canonical-input Request `1003109`
+  production run `528b97af-768c-f111-ab0f-7ced8d3d15a6` subsequently proved
+  the live `_wmkf_ai_request_value` equals
+  `b2a683cb-ec6f-f111-ab0d-000d3a306d45`. The historical `1002788` pilot run
+  remains null and append-only.
 - **`review-synthesis.generate` production publication (2026-07-26):** the
   authenticated superuser admin route published current v2
   `7423049a-3f89-f111-ab0f-7ced8d3d15a6` and retired v1

@@ -4,7 +4,7 @@ description: The D26 Proposal tab retains its Phase I display bridge, while auto
 type: project
 status: active
 scope: strategy
-last_verified: 2026-07-30 via source/tests, live Request 1003109 canonical-file probe, and the corrected Request 1002788 pilot evidence
+last_verified: 2026-07-30 via source/tests, production deployment 84155a5a, signed-in Request 1003109 generation/retry, and Dataverse/SharePoint lineage readback
 ---
 
 ## Recall Rule
@@ -59,11 +59,12 @@ document, so the rehearsal proves artifact mechanics but not semantic
 correctness on the approved Phase II input. It also showed that SharePoint
 repacks the DOCX so whole-package hashing cannot
 support interrupted-finalization recovery, and that the deployed producer
-omitted the Executor `requestId`, leaving the run lookup null. Branch
+omitted the Executor `requestId`, leaving the run lookup null. Production
 Production commit `9c88a1fa` now hashes normalized governed Word parts and
 passes the request GUID; focused tests and the actual pilot packages verify the
-hash complement. Interrupted-finalization and new linked-run re-proof remain
-open.
+hash complement. Request `1003109` production-proved canonical-input
+generation, exact-input reuse, and a new AI run with the correct request
+lookup. Interrupted-finalization recovery remains open.
 
 **Pilot environment decision (owner, 2026-07-29):** do not build the reachable
 but incompletely provisioned Dataverse sandbox organization into an integrated
@@ -72,9 +73,9 @@ rehearsal after colleagues create representative dummy `akoya_request` records.
 Request `1002788` became the authorized target. Production schema apply, prompt
 seeding, application promotion, generation, shared discovery, and exact retry
 completed on 2026-07-30. Recovery/run-linkage fixes are deployed; production
-re-proof on a verified canonical input, substantive staff editing, and
-target-library controls remain
-controlled follow-up work.
+run-linkage proof later passed on Request `1003109`. An
+interrupted-finalization recovery rehearsal, substantive staff editing, and
+target-library controls remain controlled follow-up work.
 
 **Hold step already RETIRED (S279) — this contingency resolved early, for a different reason.** The reviewer "hold step" ([[project-reviewer-hold-step-decouple]]) was removed in S279 (commit `a8676af1`) when the direction shifted to onboarding at a single final Accept — independent of J27. So the earlier "single-submission may un-scaffold the hold step" note is now moot: there is no hold step left to un-scaffold. (Kept here only so the J27 doc-capture planning doesn't re-raise it.)
 
@@ -88,7 +89,7 @@ Ground truth: [VERIFIED 2026-07-30 via
 `lib/services/workbench-proposal-documents.js`,
 `lib/services/reviewer-finder/load-proposal-service.js`, and
 `docs/CURRENT_WORK_QUEUE.md`, production Wave 16 readback, prompt verification,
-deployment inspection, the Request `1002788` mechanics rehearsal, and the live
-Request `1003109` canonical-file probe].
+deployment inspection, the Request `1002788` mechanics rehearsal, and the
+signed-in Request `1003109` generation/retry plus live lineage probes].
 The typed registry is live and exercised; broader J27 applicant-capture
 producers and the partial-pilot blockers remain open.

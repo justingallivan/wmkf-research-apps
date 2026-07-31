@@ -67,7 +67,9 @@ document inventory, and individual implementation plans do not establish priorit
   pointer lineage, both consumers, native version creation, and exact-input
   retry. It exposed a recovery-hash mismatch and a null AI-run request lookup.
   Production commit `9c88a1fa` has normalized DOCX hashing and future-run
-  request linkage; production re-proof, substantive staff editing, and
+  request linkage. Request `1003109` production-proved the canonical proposal,
+  exact-input reuse, and a new AI run with the correct request lookup.
+  Interrupted-finalization recovery, substantive staff editing, and
   target-library controls remain open. See
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
 - Pre-Site input direction (owner-decided 2026-07-28): draft factual material
@@ -156,9 +158,11 @@ document inventory, and individual implementation plans do not establish priorit
   cycle-wide pilot locator. The pilot also exercises a safe failure/retry
   path. It is draft-functional proof, not broad production readiness, and does
   not require the later lifecycle tabs. Request `1002788` is the authorized
-  pilot target; generation and exact retry passed. Recovery and future-run
-  lineage fixes are deployed but need production proof; substantive
-  editing and library controls remain open. See the near-term plan.
+  mechanics pilot target; generation and exact retry passed, but its old
+  Phase I source invalidated semantic proof. Request `1003109` then
+  production-proved canonical input, exact-input reuse, and new-run lineage.
+  Interrupted-finalization recovery, substantive editing, and library
+  controls remain open. See the near-term plan.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel: `project-virtual-review-panel`.
 - Roadmap snapshots: `project-app-roadmap-2026-04-25`, `project-phase-i-summary-app-winddown`.

@@ -140,8 +140,25 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
     producer into an `akoya_request` writer. Opus returned `READY` after its
     material findings were addressed. Commit `9c88a1fa` is on `main` and
     production deployment `dpl_EVPb3vTWBYSUSABJYdKAPohruyQ1` is Ready with a
-    clean initial error scan. Interrupted-finalization recovery proof and a new
-    linked AI run remain open.
+    clean initial error scan.
+
+11. **Canonical-input Initial Assessment production proof passed on Request `1003109`.**
+    PR #103 merged as `84155a5a`; production deployment
+    `dpl_GiWsUy84mXW9bLDwSXYGoyHehqcW` reached Ready. Signed-in Workbench
+    generation used the exact active
+    `Reviewer Materials/Proposal_1003109.pdf`. A fresh read-only recomputation
+    from that file matched the stored input fingerprint
+    `df23a4ebfa2661d89dce81ea4c6cbe2937fa9f4607fb3e2a50981a49b1851a1b`
+    and generation key
+    `4803841d396aa1d2563aa36d2135efe6b51cc527183755dfbeca37f1f85f582f`.
+    Registry row `3cec63a4-768c-f111-ab0f-6045bd018a07` is Ready/Draft,
+    the request pointer targets it, SharePoint item
+    `01G4GVMS3U3DHMJQ7GERBLB2QA3SYTLNHO` is registered, and AI run
+    `528b97af-768c-f111-ab0f-7ced8d3d15a6` has the correct request lookup.
+    An exact-input UI retry preserved the single row/run/item and attempt
+    count. Production GET/POST returned 200 and the deployment error scan was
+    clean. Interrupted-finalization recovery, substantive staff editing, and
+    target-library controls remain open.
 
 ### Commits
 
@@ -162,11 +179,10 @@ Shipped to production as `c688aa0c` (fast-forward, 15 commits, auto-deployed and
 
 ### Verified Open
 
-1. **Close the partial governed Initial Assessment artifact pilot.**
-   Promote the exact canonical proposal-source change, then run on a request
-   with a verified active `Reviewer Materials/Proposal_{Request#}.pdf`.
-   Exercise the deployed interrupted-finalization recovery branch plus one new
-   linked AI run. Then complete a substantive authorized
+1. **Complete the remaining governed Initial Assessment pilot gates.**
+   Canonical-input generation and new-run request lineage passed on Request
+   `1003109`. Exercise the deployed interrupted-finalization recovery branch.
+   Then complete a substantive authorized
    staff edit—including Foundation Opportunity—and verify the saved version
    through both consumers. Finish target-library restore, recycle-bin,
    retention, permission, and milestone checks before describing the artifact

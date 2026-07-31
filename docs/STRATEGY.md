@@ -144,7 +144,8 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term 
    interrupted-finalization recovery and a missing AI-run request lookup. The
    deployed runtime now uses normalized governed-DOCX hashing and supplies the
    request GUID to the Executor; tests include the actual pilot packages.
-   Exercise recovery, prove a new linked run,
+   Request `1003109` production-proved the canonical proposal, exact-input
+   reuse, and a new linked run. Exercise interrupted-finalization recovery,
    complete substantive staff editing, and verify target-library protections;
 2. finish the user/input/storage/access/deadline contract for the remaining
    Workbench lifecycle tabs, including the three-document writeup lineage,
