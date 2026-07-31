@@ -456,7 +456,16 @@ Building it changed the conclusion. Four doors are live today:
 | 1 | Candidate save | links a CONFIDENT existing contact match; ambiguous/conflict deliberately left unlinked + staff alert | `save-candidates-service.js:1084-1088`, `:1098-1121` |
 | 2 | Manual add | can link an existing contact before any invitation | `manual-reviewer-service.js:264` |
 | 3 | Invitation send | `findOrCreateByEmail` + `setContactLink`, email-only, no identity check | `send-emails-service.js:573-596` |
-| 4 | **Accept drain** | `ensureContact` (find-or-create + link) then `patchContactAddress`, gated `if (!optedOut)` | `reviewer-acceptance-drain.js:442-446`; `lib/bill/honorarium-onboard-orchestrator.js:86,108` |
+| 4 | **Accept drain** (honorarium data capture) | `ensureContact` (find-or-create + link) then `patchContactAddress`, gated `if (!optedOut)` | `reviewer-acceptance-drain.js:442-446`; `lib/bill/honorarium-onboard-orchestrator.js:86,108` |
+
+> **What door 4 is, operationally (owner, S388).** Despite living under `lib/bill/`,
+> this path is **honorarium payment-information collection only**. The apps do **not**
+> refer reviewers to BILL.com in any way. A reviewer who accepts and does not opt out
+> of an honorarium supplies their contact and mailing details so they can be paid —
+> which makes that submission **reviewer-supplied ground truth about their own contact
+> information**, the strongest evidence any part of this system ever receives. Read
+> every "BILL" name on this path as vestigial naming around a tabled integration
+> (`docs/BILL_CHUNK_4_DESIGN.md`, historical), not as an active referral.
 
 **The map is complete, by disconfirming query.** `wmkf_contact` can only be pointed
 by `potentialReviewer.setContactLink`, so enumerating its callers bounds the set.
@@ -634,6 +643,67 @@ Treat a search-time `email_mismatch` against a linked contact as a first-class
 staff prompt: show stored versus found with both provenances, and offer an
 explicit update. Adjudication stays with the staffer; no auto-write.
 
+### §5.4 The ground truth is collected and never written back [VERIFIED]
+
+This is the most actionable finding in the document, and it closes the loop on §1.
+
+When a reviewer accepts and does not opt out of an honorarium, they submit their own
+contact and mailing details so they can be paid (§4.3). That is first-party evidence
+from the person, given deliberately, with an incentive to be correct — categorically
+stronger than any machine tier `emailConfidence` recognizes (`orcid`,
+`institution_page`, `scholarly_multi`).
+
+The accept path already does a great deal with it:
+
+- captures a self-reported ORCID and stamps `wmkf_identitystatus: 'confirmed'` when
+  it persists (`lib/services/reviewer-acceptance-drain.js:53-56,432-439`)
+- syncs reviewer name/title onto the contact (`syncReviewerNameTitleToContact`, `:392`)
+- writes the mailing address onto the contact
+  (`lib/bill/honorarium-onboard-orchestrator.js:108`)
+- runs an email-mismatch alert (`alertReviewerEmailMismatch`, `:393`)
+
+**But nothing on that path writes `emailSource` / `wmkf_emailsource`.** Established by
+disconfirming query rather than by absence of grep hits: `wmkf_emailsource` is written
+in exactly two adapters — `potential-reviewer.js:163,263,372,490,533` and
+`researcher.js:180,242` — so reaching one of those functions is necessary to change
+provenance. The accept path imports the potential-reviewer adapter but calls only
+`getById` (read) and `setContactLink` (writes `wmkf_contact` alone); its single
+`.create(` is `requests.create`, the honorarium `akoya_request`
+(`honorarium-onboard-orchestrator.js:207`), a different entity. No provenance writer
+is reachable from accept. The reviewer's own `contactEdits.email` flows into the
+contact and the deferred payment payload
+(`honorarium-onboard-orchestrator.js:246,414`) and stops there.
+
+**Consequence.** The address provenance tier is unchanged by the strongest evidence
+the system can obtain. A reviewer personally confirms their address to get paid, and
+the next cycle that address is still `quick_check` — or permanently pinned there if a
+staffer used the confirm modal (§2.1) — so staff tick the acknowledgement box again
+for an address its owner verified. **This is the mechanism that would make §1's
+friction self-limiting, and the data for it is already being collected.**
+
+### Proposal [PROPOSED]
+
+Introduce a `reviewer_confirmed` address source, ranked `ready`, written only when the
+reviewer themselves submits or confirms the address through the token-authenticated
+accept flow. It is the one source that should outrank a staff assertion, because it
+comes from the address's owner rather than a third party — which means §2.1's
+human-assertion terminality needs an explicit carve-out for it, not a silent
+exception.
+
+### Open decisions
+
+- Does it require an EXPLICIT confirm affordance ("this is my correct email"), or does
+  submitting the honorarium form imply it? Today the email is prefilled and merely
+  passed through, so implicit consent is thin evidence — an explicit tick is cheap and
+  much more defensible.
+- Does `reviewer_confirmed` decay? An address confirmed three years ago is not a
+  current address (§5's whole premise).
+- What happens when `alertReviewerEmailMismatch` fires — reviewer-supplied disagrees
+  with stored? Almost certainly the reviewer wins, but that must be decided, and it is
+  the natural place to hang the write-back.
+- Does the same logic extend to the mailing address and phone, or is email the only
+  field that feeds a gate?
+
 ### Open decisions
 
 - Does an accept/decline response count as delivery proof strong enough to raise
@@ -655,6 +725,7 @@ explicit update. Adjudication stays with the staffer; no auto-write.
 | 2 | Promotion on identity-bearing ACCEPT (§4.1), incl. the promotion-site map and CRM-visibility tradeoff | Justin + CRM-facing staff | §4 |
 | 3 | Contact provenance attribute(s) (§3) | Justin + Dataverse schema | §3 |
 | 4 | Durable vs disposable home for the non-response signal (§5.2) | Justin | §5 |
+| 6 | **`reviewer_confirmed` address source (§5.4)** — write the reviewer's own confirmation back to provenance; needs an explicit carve-out from §2.1 terminality | Justin | §5.4 |
 | 5 | ~~Reconcile the `staff_verified` contradiction in the enforcement contracts doc~~ | — | **Done in S388 (§2.3)** |
 
 ## Blast radius (Codex estimate, 3R only)
