@@ -45,9 +45,10 @@ canonical Word file created a native SharePoint version. At that point, the
 broader pilot was not complete: the source was an old Phase I proposal rather than the approved
 Phase II reviewer package and no substantive staff content edit was verified.
 Request `1003109` later closed the canonical-input, recovery, and substantive
-edit gaps. Response-only current-version readback is locally verified on
-`codex/initial-assessment-current-metadata`; UI display, deployment/live
-verification, and target-library controls remain. Exact evidence:
+edit gaps. Response-only current-version readback and display in both consumers
+are locally verified on `codex/initial-assessment-current-metadata`;
+deployment/live verification and target-library controls remain. Exact
+evidence:
 `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`.
 
 **[VERIFIED DEPLOYED AND PRODUCTION-EXERCISED 2026-07-30]** Production
@@ -89,11 +90,14 @@ snapshot, not Graph-current metadata after native Word edits.
 and focused tests 2026-07-30; not yet deployed]** the shared read model now
 uses stable Graph drive/item identity to overlay response-only current
 name/size/link/version/eTag/last-modified metadata. Successful reads are marked
-`current`; 404, transient failure, and incomplete-identity cases preserve the
-registry snapshot as `missing` or `unavailable` and never guess by path or
-write Dataverse. Request and cycle reads deduplicate identical identities and
-cap Graph concurrency at eight. Consumer display and live Production
-verification remain open.
+`current`; 404, transient failure, incomplete-identity, mismatched/non-file,
+and total-budget cases preserve the registry snapshot as `missing` or
+`unavailable` and never guess by path or write Dataverse. Request and cycle
+reads deduplicate identical identities and cap Graph concurrency at eight
+under a ten-second total refresh budget. Only Graph's publication version is
+labeled as a version. Both consumers use one renderer for
+current/missing/unavailable/unchecked semantics and suppress the Open link
+after a confirmed 404. Live Production verification remains open.
 
 ## Ownership
 
@@ -189,8 +193,9 @@ transition.
    exact-input reuse, new-run request lineage, and interrupted-finalization
    recovery using the same row/run/SharePoint item and version. An attributed
    substantive edit on the stable item then passed through both consumers.
-   Response-only current-version refresh is implemented and locally verified
-   on `codex/initial-assessment-current-metadata`; UI display, Production
-   verification, and target-library protection checks remain open.
+   Response-only current-version refresh and display in both consumers are
+   implemented and locally verified on
+   `codex/initial-assessment-current-metadata`; Production verification and
+   target-library protection checks remain open.
 
 No live command in this sequence is authorized merely by this page.

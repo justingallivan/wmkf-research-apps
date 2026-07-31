@@ -3,7 +3,7 @@ title: Initial Assessment Controlled Production Pilot — 2026-07-30
 domain: architecture
 kind: audit
 status: active
-summary: Request 1003109 proves the core pilot; current-metadata display/deploy proof and library controls remain.
+summary: Request 1003109 proves the core pilot; current-metadata deployment proof and library controls remain.
 canonical: false
 cataloged: 2026-07-30
 last_verified: 2026-07-30
@@ -101,14 +101,18 @@ the D26 pilot locator still opened that exact stable item.
 
 The edit also exposed the remaining readback gap precisely. The Dataverse
 registry still carries its upload-time version `1.0`, eTag, size, and
-last-modified timestamp, while Graph reports current version `2.0`; neither
-current consumer renders version/last-modified context. Stable identity and
-discovery are correct. **[VERIFIED on branch
+last-modified timestamp, while Graph reports current version `2.0`. Stable
+identity and discovery are correct. **[VERIFIED on branch
 `codex/initial-assessment-current-metadata` via source and focused tests
 2026-07-30; not yet deployed]** the shared read model now overlays
 Graph-current response metadata by stable drive/item ID without modifying the
-Dataverse snapshot. Current-metadata UI display, live Production verification,
-and the broader target-library controls remain open.
+Dataverse snapshot, and both consumers use one renderer that distinguishes
+current, missing, unavailable, and unchecked metadata. Adversarial follow-up
+added a ten-second total cycle-read budget including independently bounded
+token waits over single-flight cold-token acquisition, rejects
+mismatched/non-file Graph items, prevents content tags from being labeled as
+versions, and suppresses the Open link after a confirmed 404. Live Production verification and the
+broader target-library controls remain open.
 
 ## Evidence matrix
 
@@ -120,7 +124,7 @@ and the broader target-library controls remain open.
 | Shared discovery contract | Same canonical registry row | Stable drive/item identity and request pointer | Per-request Workbench and `/workbench/artifacts` both listed the same artifact and Open link | PASS |
 | Exact-input retry | `Refresh from current inputs` on the Ready artifact | Still one registry row; same row, run, SharePoint item, timestamps, and attempt count | UI returned the existing Ready artifact | PASS — no model call, upload, overwrite, or duplicate |
 | Editable SharePoint lifecycle | Justin Gallivan edited the canonical Request `1003109` Word file, including Foundation Opportunity | SharePoint created version `2.0` under Justin's user identity; the stable item ID was unchanged; the staff-input marker is absent | Both application consumers still open the same stable item | PASS |
-| Current-version readback | Native Word editing advanced the canonical item from version `1.0` to `2.0` | Dataverse remains the upload/finalization snapshot; the branch read model overlays current Graph values in the response only | Current consumers do not yet display version/last-modified context | PARTIAL — backend refresh is locally verified on `codex/initial-assessment-current-metadata`; UI display, deployment, and live verification remain open |
+| Current-version readback | Native Word editing advanced the canonical item from version `1.0` to `2.0` | Dataverse remains the upload/finalization snapshot; the branch read model overlays current Graph values in the response only | Both branch consumers display the same current/missing/unavailable/unchecked semantics | PARTIAL — backend and consumer display are locally verified on `codex/initial-assessment-current-metadata`; deployment and live verification remain open |
 | Post-upload recovery | Request `1003109` was staged as Failed after upload while retaining generation/run/file/hash identity, then retried through the signed-in Workbench | Same registry row, AI run, request pointer target, and SharePoint item; attempt count advanced `1 → 2`; no cleanup work | Same SharePoint version `1.0`, eTag, last-modified time, size, and governed hash; exactly one request AI run | PASS — no model call, upload, overwrite, or duplicate |
 | Approved canonical input follow-up | Signed-in Workbench generation read `Reviewer Materials/Proposal_1003109.pdf` (33,011 extracted characters; text SHA-256 `0fc490d0fc1c635878f36b35376f952e0e35ea8225441c4fe2644f0e3456f36e`) | Row `3cec63a4-768c-f111-ab0f-6045bd018a07`; input fingerprint `df23a4ebfa2661d89dce81ea4c6cbe2937fa9f4607fb3e2a50981a49b1851a1b`; generation key `4803841d396aa1d2563aa36d2135efe6b51cc527183755dfbeca37f1f85f582f` | Workbench showed `Ready · Draft` and the exact recomputation matched both stored identities | PASS |
 | New-run request lineage | `initial-assessment.generate` v1 under Request `1003109` | AI run `528b97af-768c-f111-ab0f-7ced8d3d15a6`; `_wmkf_ai_request_value=b2a683cb-ec6f-f111-ab0d-000d3a306d45`; SharePoint item `01G4GVMS3U3DHMJQ7GERBLB2QA3SYTLNHO` | Registry and request pointer both target `3cec63a4-768c-f111-ab0f-6045bd018a07` | PASS |
@@ -173,8 +177,8 @@ not an intervening staff edit. Version `2.0` later hashed to
    Foundation Opportunity no longer contains the staff-input marker, and both
    consumers resolve the same stable item.
 5. Deploy and live-verify the response-only current SharePoint metadata
-   refresh, display version/last-modified context after native Word edits, and
-   complete the broader target-library restore, recycle-bin, retention,
+   refresh and consumer display after native Word edits, and complete the
+   broader target-library restore, recycle-bin, retention,
    permission, and milestone-snapshot checks before calling the artifact
    system production-ready.
 6. Attribution policy is settled: SharePoint native version history is the

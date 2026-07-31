@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Layout, { Card, PageHeader } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
+import ArtifactFileMetadata from '../../shared/components/workbench/ArtifactFileMetadata';
 
 function ArtifactDashboard() {
   const [cycles, setCycles] = useState([]);
@@ -121,16 +122,10 @@ function ArtifactDashboard() {
                 <div className="text-right text-sm">
                   <div className="font-medium text-gray-900">{artifact.operationLabel}</div>
                   <div className="text-gray-500">{artifact.lifecycleLabel}</div>
-                  {artifact.file?.webUrl && (
-                    <a
-                      href={artifact.file.webUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-block mt-2 text-blue-700 hover:underline"
-                    >
-                      Open document →
-                    </a>
-                  )}
+                  <ArtifactFileMetadata
+                    file={artifact.file}
+                    linkLabel="Open document →"
+                  />
                 </div>
               </div>
             </Card>

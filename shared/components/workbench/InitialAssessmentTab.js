@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
 import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../config/requestDocument';
+import ArtifactFileMetadata from './ArtifactFileMetadata';
 
 export default function InitialAssessmentTab({ requestId }) {
   const [artifact, setArtifact] = useState(null);
@@ -151,15 +152,11 @@ export default function InitialAssessmentTab({ requestId }) {
                 <span className="text-gray-500">· {artifact.attemptCount} attempts</span>
               )}
             </div>
-            {ready && artifact.file?.webUrl && (
-              <a
-                href={artifact.file.webUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-block mt-3 text-blue-700 hover:underline"
-              >
-                Open {artifact.file.name || 'Initial Assessment'} in Word/SharePoint →
-              </a>
+            {ready && artifact.file && (
+              <ArtifactFileMetadata
+                file={artifact.file}
+                linkLabel={`Open ${artifact.file.name || 'Initial Assessment'} in Word/SharePoint →`}
+              />
             )}
             {artifact.lastError && (
               <p className="mt-3 text-red-700">

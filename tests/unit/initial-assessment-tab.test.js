@@ -18,6 +18,9 @@ function readyArtifact() {
     file: {
       name: '1003001 Initial Assessment.docx',
       webUrl: 'https://example.sharepoint.com/initial-assessment.docx',
+      metadataStatus: 'current',
+      versionId: '2.0',
+      lastModified: '2026-07-30T18:00:00Z',
     },
   };
 }
@@ -46,6 +49,8 @@ afterEach(() => {
 it('lets staff refresh a Ready artifact so changed authoritative inputs can create a replacement', async () => {
   render(<InitialAssessmentTab requestId={REQUEST_ID} />);
 
+  expect(await screen.findByText(/Current in SharePoint · version 2\.0 · modified/))
+    .toBeInTheDocument();
   const refresh = await screen.findByRole('button', {
     name: 'Refresh from current inputs',
   });

@@ -77,10 +77,10 @@ call or upload. An attributed substantive staff edit then advanced the same
 item to SharePoint version `2.0`, replaced the Foundation Opportunity marker,
 and remained discoverable through both consumers. The edit showed that
 Dataverse retains upload-time version `1.0` metadata. Response-only
-Graph-current refresh is implemented and locally verified on
-`codex/initial-assessment-current-metadata`; UI display, deployment/live
-verification, and target-library protection checks remain required before the
-pilot is complete.
+Graph-current refresh and display in both consumers are implemented and
+locally verified on `codex/initial-assessment-current-metadata`;
+deployment/live verification and target-library protection checks remain
+required before the pilot is complete.
 Passing this draft-functional gate is not a broad production-readiness claim
 and does not require the later Pre-Site, Site Visit, or Final slices to be
 built by August 10.
@@ -720,8 +720,8 @@ Explicit non-goals during design freeze:
 > SharePoint item identity. Response-only Graph-current
 > version/last-modified refresh is implemented and locally verified on
 > `codex/initial-assessment-current-metadata`. The remaining pilot acceptance
-> work is deployment/live verification, consumer display, and the
-> target-library restore, recycle, retention, permission, and
+> work is deployment/live verification and the target-library restore,
+> recycle, retention, permission, and
 > milestone-snapshot checks.
 
 The August 10 minimum changes the former default. Exercise the now-live
@@ -921,9 +921,10 @@ Owner-decided:
     interrupted-finalization recovery using the same row/run/item/version.
     The subsequent attributed substantive edit advanced that same item to
     SharePoint version `2.0` and remained reachable through both consumers.
-    Response-only current-version metadata refresh is implemented and locally
-    verified on branch `codex/initial-assessment-current-metadata`; UI display,
-    deployment/live verification, and target-library controls remain open. The owner
+    Response-only current-version metadata refresh and display in both
+    consumers are implemented and locally verified on branch
+    `codex/initial-assessment-current-metadata`; deployment/live verification
+    and target-library controls remain open. The owner
     accepts service-principal attribution for system-generated Dataverse
     registry writes; SharePoint native version attribution remains the
     required human-edit audit surface.
@@ -935,8 +936,9 @@ Still required:
 2. first approved Pre-Site Word template and prompt/template compatibility
    contract;
 3. deployment/live verification of the stable-identity Graph metadata
-   read-through plus UI display, and target-library configuration/readback for
-   the decided request-relative SharePoint destination; the production
+   read-through and consumer display, and target-library
+   configuration/readback for the decided request-relative SharePoint
+   destination; the production
    Dataverse registry/pointer provisioning and readback are complete;
 4. target-library version, retention, recycle, and permission audit;
 5. exact Dataverse schema and dossier read model for the decided Site Visit

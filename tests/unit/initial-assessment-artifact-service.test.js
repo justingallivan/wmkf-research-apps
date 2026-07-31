@@ -1312,7 +1312,10 @@ it('refreshes file metadata from the stable Graph identity without writing Datav
   expect(GraphService.getFileMetadataById).toHaveBeenCalledWith(
     'drive',
     'ready-item',
-    { siteId: 'site' },
+    {
+      siteId: 'site',
+      timeoutMs: expect.any(Number),
+    },
   );
   expect(result.artifacts[0].file).toMatchObject({
     itemId: 'ready-item',
@@ -1543,6 +1546,61 @@ it('bounds and deduplicates current Graph metadata reads across a cycle', async 
   expect(GraphService.getFileMetadataById).toHaveBeenCalledTimes(9);
   expect(maxActiveReads).toBeLessThanOrEqual(8);
   expect(maxActiveReads).toBeGreaterThan(1);
+});
+
+it('stops scheduling cycle metadata reads when the total refresh budget expires', async () => {
+  jest.useFakeTimers();
+  const requestIds = Array.from({ length: 101 }, (_, index) => (
+    `${String(index + 1).padStart(8, '0')}-1111-1111-1111-111111111111`
+  ));
+  const rows = requestIds.map((ownerRequestId, index) => registryRow({
+    wmkf_requestdocumentid:
+      `${String(index + 3001).padStart(8, '0')}-2222-2222-2222-222222222222`,
+    wmkf_generationkey: String(index).padStart(64, '0'),
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_sharepointsiteid: 'site',
+    wmkf_sharepointdriveid: 'drive',
+    wmkf_sharepointitemid: `item-${index}`,
+    _wmkf_request_value: ownerRequestId,
+    createdon: `2026-07-29T12:${String(index % 60).padStart(2, '0')}:00Z`,
+  }));
+  const rowByRequest = new Map(rows.map((row) => [row._wmkf_request_value, row]));
+  requestDocumentAdapter.findByCycle.mockResolvedValue({ records: rows });
+  grantRequestAdapter.findByIds.mockImplementation(async (ids) => ({
+    records: ids.map((id) => ({
+      ...request,
+      akoya_requestid: id,
+      _wmkf_currentinitialassessment_value: rowByRequest.get(id).wmkf_requestdocumentid,
+    })),
+  }));
+  GraphService.getFileMetadataById.mockImplementation(
+    async (_driveId, _itemId, { timeoutMs }) => (
+      new Promise((_resolve, reject) => {
+        setTimeout(() => reject(Object.assign(new Error('timed out'), {
+          code: 'graph_timeout',
+        })), timeoutMs);
+      })
+    ),
+  );
+  const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+  try {
+    const pending = listInitialAssessmentArtifacts({ cycleCode: 'D26' });
+    await jest.advanceTimersByTimeAsync(10_000);
+    const result = await pending;
+
+    expect(result.artifacts).toHaveLength(101);
+    expect(result.artifacts.every((artifact) => (
+      artifact.file.metadataStatus === 'unavailable'
+    ))).toBe(true);
+    expect(GraphService.getFileMetadataById).toHaveBeenCalledTimes(8);
+    expect(Math.max(...GraphService.getFileMetadataById.mock.calls.map(
+      ([, , options]) => options.timeoutMs,
+    ))).toBeLessThanOrEqual(10_000);
+  } finally {
+    warning.mockRestore();
+    jest.useRealTimers();
+  }
 });
 
 it('derives staff-wide dashboard cycles from the artifact registry, not PD-scoped requests', async () => {

@@ -63,9 +63,9 @@ hood.
 > through both consumers. **[VERIFIED on branch
 > `codex/initial-assessment-current-metadata` via source and focused tests
 > 2026-07-30; not yet deployed]** response-only current metadata refresh by
-> stable drive/item identity is implemented. The pilot is not closed because
-> UI display, live Production verification, and target-library controls remain
-> unverified.
+> stable drive/item identity and display in both consumers are implemented.
+> The pilot is not closed because live Production verification and
+> target-library controls remain unverified.
 > **[VERIFIED via owner decisions 2026-07-28
 > and 2026-07-30, repository source,
 > production Dataverse/Graph probes, and signed-in consumer checks
@@ -95,9 +95,9 @@ hood.
   remains the upload/finalization snapshot. The branch read model queries
   current metadata by stable drive/item ID, overlays successful Graph values
   in the response only, and distinguishes `current`, `missing`, and
-  `unavailable` without path guessing or registry writes. Neither consumer yet
-  renders current version context; deployment and live Request `1003109`
-  verification also remain open.
+  `unavailable` without path guessing or registry writes. Both branch
+  consumers use one renderer for current/missing/unavailable/unchecked
+  semantics; deployment and live Request `1003109` verification remain open.
 - **Replacement/current rule (deployed; exact-input retry exercised):**
   changed authoritative inputs or cycle produce a distinct generation row. The
   replacement's Ready transition and prior-Ready supersession are one
