@@ -6,6 +6,7 @@ status: active
 summary: "Shipped reviewer-to-Contact ORCID propagation design; the historical backfill's rollback window closed after aggregate production reconciliation."
 canonical: false
 cataloged: 2026-07-02
+last_verified: 2026-07-31
 owner: product-engineering
 related:
   - lib/services/backprop-reviewer-orcid.js
@@ -16,15 +17,15 @@ related:
 
 # Reviewer ORCID Back-Propagation Design (S216)
 
-**Status:** **SHIPPED helper/backfill; trigger transition is branch-only**
-(updated 2026-07-30). PR1's resolver-gated helper is live as
+**Status:** **SHIPPED helper/backfill; acceptance trigger deployed**
+(updated 2026-07-31). PR1's resolver-gated helper is live as
 `lib/services/backprop-reviewer-orcid.js` via
 `contactAdapter.setOrcidIfAbsent`; PR2's one-shot historical catch-up is
-`scripts/backfill-contact-orcid.js`. Deployed production remains on PR1's
-original send-time trigger until `codex/reviewer-contact-integration` is
-promoted. That branch removes send-time back-propagation and invokes the helper
-only after identity-safe acceptance promotion or bounded already-linked
-maintenance. Both increments use the fill-only, conflict-surfacing,
+`scripts/backfill-contact-orcid.js`. Production deployment
+`dpl_35pUuvT8DowJPHbyBsiJxKGRNMZT` (`824bfcc6`) removed PR1's original
+send-time trigger. The helper now runs only after identity-safe acceptance
+promotion or bounded already-linked maintenance. Both increments use the
+fill-only, conflict-surfacing,
 contact-never-created safety described below. A read-only production reconciliation
 confirmed all 162 historical fills still match exactly, so the PR2 rollback window is
 closed. The ignored checkpoint sources were disposed on 2026-07-27 after their
@@ -67,7 +68,8 @@ durable cross-store join key over time — without creating or polluting contact
   match stay unmatched. Creating contacts = registry pollution (fragmentation memory:
   "de-dupe + curation, not creation"). **Historical clarification (Codex #11):**
   PR1 originally ran after the then-current send-time outreach promotion. On the
-  2026-07-30 integration branch, invitation send no longer promotes or
+  production deployment `dpl_35pUuvT8DowJPHbyBsiJxKGRNMZT`, invitation send no
+  longer promotes or
   back-propagates; the runtime fill follows identity-safe acceptance promotion.
   What's out of scope is creating a contact *solely* to hold an ORCID — the PR2
   backfill never creates.
@@ -160,7 +162,7 @@ branch is live code, not defensive dead weight.
 ## 5. Shared back-prop helper (resolves Codex #7/#8/#9/#10/#22)
 
 The single most important review catch remains: ORCID back-prop must live in
-one shared helper, not inline in a delivery route. On the integration branch,
+one shared helper, not inline in a delivery route. In production,
 accepted-reviewer promotion and bounded already-linked maintenance invoke it;
 invitation send does not:
 
@@ -179,7 +181,7 @@ contact are still filled (Codex #8, HIGH).
 > **Historical PR1 caller/hydration notes.** The original implementation had
 > three callers, including send-emails, and each needed
 > `reviewer.{wmkf_orcid, wmkf_identitystatus, _wmkf_contact_value}` hydrated.
-> Those build instructions are superseded. On the integration branch,
+> Those build instructions are superseded. In current production,
 > invitation send is explicitly not a caller. The current runtime callers are:
 >
 > 1. `lib/bill/honorarium-onboard-orchestrator.js`, after acceptance has
@@ -188,7 +190,8 @@ contact are still filled (Codex #8, HIGH).
 >    maintenance for an already-linked reviewer.
 >
 > Both callers supply the required identity fields. The historical production
-> send trigger remains only until the integration branch is deployed.
+> send trigger was removed by deployment
+> `dpl_35pUuvT8DowJPHbyBsiJxKGRNMZT` on 2026-07-31.
 
 ### `contactAdapter.setOrcidIfAbsent(contactId, orcid, { actingUserSystemId })` contract
 - **Re-read by contactid** (Codex #12) — `getRecord('contacts', contactId, { select:
@@ -258,8 +261,8 @@ native record history. See
 ### 8.1 Auto-promotion — set the `wmkf_Contact` pointer during back-prop? → **NO**
 The pointer is **load-bearing**: `honorarium-onboard-orchestrator.js:131` (payment-onboarding
 contact), `external/review/[token]/context.js` (reviewer-facing contact name + ORCID
-prefill), the historical production send-time promotion path (removed on the
-integration branch), `membership-service.js`,
+prefill), the historical production send-time promotion path (removed from
+production 2026-07-31), `membership-service.js`,
 `contact-history.js`, `generate-emails.js`. Setting it on a fuzzy email match asserts
 "this reviewer IS this CRM contact" into payment + reviewer-facing flows — the
 discovery≠identity error class the resolver work exists to prevent
@@ -269,10 +272,10 @@ setting the pointer is an identity assertion (high stakes). Back-prop writes the
 field only. This decision also *bounds Codex #17*: a back-prop ORCID becomes
 reviewer-visible only after a genuine promotion sets the pointer, never on a bare match.
 
-### 8.2 Conflict surfacing — historical PR1 decision, superseded on integration branch
+### 8.2 Conflict surfacing — historical PR1 decision, superseded in production
 
 PR1 originally used log-only send-response counters because measured conflicts
-were zero. The integration branch removes the send trigger and its counters
+were zero. The current production release removes the send trigger and its counters
 from runtime behavior. A conflict or malformed Contact ORCID during acceptance
 now produces one durable reviewer-domain staff alert and terminates Contact
 follow-up without later address/honorarium mutation; operational failures retry.
@@ -323,9 +326,9 @@ schema-minimization (`feedback-human-legibility-schema-principle`). Revisit only
   honorarium, enrich-recommended) + person-select fields + actingUserSystemId
   threading + tests (§10). Codex-reviewed (pre-impl + confirmation + an adversarial
   pass — tightened 412 detection to `err.status===412`, kept the missing-etag
-  unconditional fallback per `updateIfEmpty`). **Integration-branch delta
-  (2026-07-30):** send-emails is no longer a caller; identity-safe acceptance
-  promotion replaces that trigger.
+  unconditional fallback per `updateIfEmpty`). **Production delta
+  (deployed 2026-07-31):** send-emails is no longer a caller; identity-safe
+  acceptance promotion replaces that trigger.
 - **PR2 — ✅ SHIPPED + RAN S217**: `scripts/backfill-contact-orcid.js`
   (resolve/summary/apply/verify, group-by-contact, status_null exception). Live
   counts matched the projection exactly — **162 write / 0 conflict / 0 malformed /

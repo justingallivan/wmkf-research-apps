@@ -6,7 +6,7 @@ status: canonical
 summary: "Visual orientation for the reviewer-domain Dataverse entities and how they connect. Use this when you're not sure which entity holds which piece..."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-07-30
+last_verified: 2026-07-31
 owner: product-engineering
 related:
   - docs/REVIEWER_INTERACTION_DESIGN.md
@@ -21,11 +21,10 @@ Visual orientation for the reviewer-domain Dataverse entities and how they conne
 
 > **Authoritative source for any single entity is its atlas page** (`docs/atlas/dataverse-*.md`). This doc summarizes the connections; the atlas pages have the per-field detail.
 
-> **Release boundary (2026-07-30):** deployed production remains on the prior
-> send-time Contact-promotion release until
-> `codex/reviewer-contact-integration` is promoted. The source model documented
-> below is the integration-branch target: invitation send never creates/links a
-> Contact or back-propagates ORCID; identity-bearing acceptance does.
+> **Production boundary (2026-07-31):** deployment
+> `dpl_35pUuvT8DowJPHbyBsiJxKGRNMZT` at `824bfcc6` serves the source model
+> below: invitation send never creates/links a Contact or back-propagates ORCID;
+> identity-bearing acceptance does.
 
 > **Current review-content authority (owner-confirmed 2026-07-26):** the live
 > reviewer workflow is the in-browser form. Final submit writes structured
@@ -61,7 +60,7 @@ Visual orientation for the reviewer-domain Dataverse entities and how they conne
 |---|---|---|---|
 | `wmkf_potentialreviewer` | The **person**. Custom Foundation entity (not vendor). Global. One row per real human, dedup'd on email. Row origin tracked in `wmkf_source` — currently two main paths: (a) **Reviewer Finder** discovery (rich enrichment, full bibliometrics), (b) **Applicant-submitted** during application intake (sparse: usually just name + affiliation + email). The same person can later be enriched if Reviewer Finder picks them up, or via the Workbench "enrich recommended reviewers" action (S211). | First touch by either path. | 4,427 |
 | ~~`wmkf_appresearcher`~~ | **DROPPED S213** — the bibliometric sidecar (h-index, ORCID, citations, scholar URL) was collapsed onto `wmkf_potentialreviewer`. Those fields now live on the person; written by Reviewer Finder enrichment + the Workbench "enrich recommended reviewers" action. See "What changed" below. | — |
-| `contact` | The **CRM contact**. Where canonical identity ultimately lives. | Integration-branch target: promoted from `wmkf_potentialreviewer` on identity-bearing acceptance, including honorarium opt-out; invitation send and decline do not promote. Production remains on the prior send-time release until branch promotion. | (vendor table — many) |
+| `contact` | The **CRM contact**. Where canonical identity ultimately lives. | Promoted from `wmkf_potentialreviewer` on identity-bearing acceptance, including honorarium opt-out; invitation send and decline do not promote. | (vendor table — many) |
 | `wmkf_appreviewersuggestion` | The **per-(reviewer, request) engagement**. Lifecycle ledger for state, timestamps, decline reason, policy acknowledgments, and links. Current structured review content lives in its `wmkf_appreviewanswer` children. | Reviewer Finder save-candidates creates one per (person, request). | 724 |
 | `wmkf_appreviewanswer` | One immutable structured answer snapshot per submitted question, linked to the engagement. This is the current review-content authority for ratings, multiselect selections, and narratives. | Final form submit; alternate key is suggestion + question key. | (child rows) |
 | `akoya_request` (grant) | The **proposal being reviewed**. | Created when WMKF intakes a grant request. | 25,473+ |

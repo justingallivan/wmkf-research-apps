@@ -6,6 +6,7 @@ status: active
 summary: "Current reviewer contact-promotion contract plus remaining address-provenance and staleness decisions."
 canonical: false
 cataloged: 2026-07-30
+last_verified: 2026-07-31
 owner: product-engineering
 related:
   - docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md
@@ -31,8 +32,9 @@ related:
 
 ## Status and posture
 
-**ACTIVE CONTRACT + HISTORICAL PROBLEM STATEMENT.** Section 4 is implemented on
-`codex/reviewer-contact-integration`: sending never creates or links a contact;
+**ACTIVE CONTRACT + HISTORICAL PROBLEM STATEMENT.** Section 4 is deployed in
+production at `824bfcc6` / `dpl_35pUuvT8DowJPHbyBsiJxKGRNMZT`: sending never
+creates or links a contact;
 every accepted reviewer, including honorarium opt-outs, enters the same
 identity-aware promotion path; declines do not promote. Ambiguous email/ORCID
 matches, split identities, and namesakes remain unlinked with a durable staff
@@ -41,6 +43,14 @@ canonical ORCID across duplicate reviewer rows, falling back to the reviewer ID
 only without ORCID. Post-review hardening atomically commits Contact creation
 plus an ETag-guarded reviewer link so concurrent acceptance retries converge
 without leaving an orphan Contact.
+
+Production visual verification passed on Request `1002912` on 2026-07-31. An
+unresolved candidate remained unselectable in Find while the disclosure showed
+unconfirmed identity/contact provenance, the complete retrieved five-paper
+collection, and a Scholar name-search link. Owner-authorized normal Find
+ingestion also recognized Rotem Sorek and four other applicant referrals as
+existing linked reviewers with known email data. This verification did not send
+an invitation or exercise identity confirmation, decline, or acceptance.
 
 Sections 1, 2, 3 provenance, and 5 remain proposals unless explicitly marked
 resolved. The S388 source trace is retained as historical rationale and is not

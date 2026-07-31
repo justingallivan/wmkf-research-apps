@@ -6,7 +6,7 @@ status: active
 summary: "Current reviewer person, engagement, invitation, and acceptance-promotion mental model."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-07-30
+last_verified: 2026-07-31
 owner: product-engineering
 related:
   - docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md
@@ -16,12 +16,10 @@ related:
 
 # Reviewer Architecture — Mental Model
 
-> **Release boundary (2026-07-30):** the acceptance-promotion flow below is
-> implemented and test-covered on `codex/reviewer-contact-integration`, not yet
-> deployed. Production remains on the prior send-time promotion release until
-> this branch is deliberately promoted. The integration-branch contract is that
-> invitation send never creates/links a Contact or back-propagates ORCID;
-> identity-bearing acceptance does.
+> **Production boundary (2026-07-31):** the acceptance-promotion flow below is
+> deployed from `824bfcc6` in production deployment
+> `dpl_35pUuvT8DowJPHbyBsiJxKGRNMZT`. Invitation send never creates/links a
+> Contact or back-propagates ORCID; identity-bearing acceptance does.
 
 > **⚠ SUPERSEDED IN PART (S213, 2026-06-02): now TWO core tables, not three.** The `wmkf_appresearcher` bibliometric sidecar was collapsed onto `wmkf_potentialreviewers` and **dropped** — h-index/citations/affiliation/ORCID/Scholar now live directly on the person row, written by `adapters/researcher.js` (repointed to the person). Any historical diagram below that shows a 1:1 `wmkf_appresearcher` sidecar should be read as folded into `wmkf_potentialreviewers`. Current prose and flow steps describe the two-table model and acceptance-time promotion. See `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md` and the "What changed" note in `docs/REVIEWER_DATA_MODEL.md`.
 

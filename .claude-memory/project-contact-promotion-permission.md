@@ -5,7 +5,7 @@ type: project
 originSessionId: 9ea67012-f70f-47e6-ba56-ded9f73601c4
 status: active
 scope: reviewer
-last_verified: 2026-07-30 — source contract moved promotion from send to every acceptance; Create/AppendTo grant and no-DeleteAccess remain privilege facts from the controlled writes
+last_verified: 2026-07-31 — acceptance-boundary contract deployed at 824bfcc6; Create/AppendTo grant and no-DeleteAccess remain privilege facts from the controlled writes
 ---
 
 ## Recall Rule
@@ -31,7 +31,8 @@ Ground truth: `lib/services/reviewer-acceptance-drain.js`,
 `lib/services/review-manager/send-emails-service.js` (explicit no-promotion
 boundary). Related: [[project-reviewer-workbench-invite-workflow]].
 
-**Current branch behavior (S389; not yet merged/deployed):** sending an
+**Current production behavior (S389; deployed 2026-07-31 as `824bfcc6`,
+`dpl_35pUuvT8DowJPHbyBsiJxKGRNMZT`):** sending an
 invitation does not merit promotion.
 Every accepted reviewer—including honorarium opt-outs—enters the
 identity-aware accepted-contact path; declines do not. Exact email and ORCID

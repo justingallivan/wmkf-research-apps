@@ -1,10 +1,11 @@
 # Session 389 Prompt: Codex integration of the reviewer contact/address findings
 
-> **INTEGRATION-BRANCH DOCUMENT.** Codex accepted Claude's S388 handoff and replayed
-> all seven commits onto `codex/reviewer-contact-integration`, based on current
-> `main` (`6618256e`). Claude's original `codex/claude-ui-cleanup` branch and
-> worktree remain preserved at `2df84aae`. Codex owns all further review,
-> implementation, integration, and release decisions for this work.
+> **RELEASED INTEGRATION DOCUMENT.** Codex accepted Claude's S388 handoff,
+> replayed all seven commits onto `codex/reviewer-contact-integration`, and
+> implemented the acceptance-boundary hardening there. Reviewer runtime release
+> `824bfcc6` entered `main` on 2026-07-31; its production deployment
+> `dpl_35pUuvT8DowJPHbyBsiJxKGRNMZT` reached Ready. Claude's original
+> `codex/claude-ui-cleanup` branch and worktree remain preserved at `2df84aae`.
 
 ## Session 388 Summary
 
@@ -192,7 +193,7 @@ that point.
     permissions, Workbench history/admin restore, and milestone snapshots
     remain open.
 
-14. **Reviewer contact-promotion boundary implemented on the integration branch.**
+14. **Reviewer contact-promotion boundary deployed in Production.**
     Invitation send no longer creates/links contacts or back-propagates ORCID.
     Every accepted reviewer, including honorarium opt-outs, enters one
     identity-aware promotion path; declines do not. Ambiguous email/ORCID,
@@ -203,8 +204,17 @@ that point.
     ETag; existing links and inactive matches fail closed unless identity
     validation succeeds. The first post-implementation adversarial review found
     four P1 and four P2 issues; all were fixed. A fresh full re-review returned
-    `READY`. This is source-verified and test-covered but not yet merged or
-    deployed.
+    `READY`. Runtime release `824bfcc6` entered `main`; deployment
+    `dpl_35pUuvT8DowJPHbyBsiJxKGRNMZT` reached Ready on 2026-07-31. Deployment-
+    scoped logs showed signed-in Workbench/API traffic completing with HTTP 200.
+    The authenticated production visual check then passed on Request `1002912`:
+    Petr Cejka remained unselectable in Find pending identity confirmation, the
+    disclosure rendered the unconfirmed affiliation/address provenance and all
+    five retrieved papers, and its Scholar destination was a name search rather
+    than a stored profile. The owner-authorized normal Find ingestion also
+    restored the prior candidate set and recognized Rotem Sorek and four other
+    applicant referrals as existing linked reviewers with known email data. No
+    invitation, acceptance, decline, or identity-confirmation action was taken.
 
 ### Commits
 
@@ -235,23 +245,6 @@ Seven Claude commits were replayed without content conflicts onto
    recovery, site/library retention, and ordinary-editor permissions, then add
    Workbench history/admin restore and milestone snapshots before describing
    the artifact system as production-ready.
-
-2. **Review, release, and visual verification of the Codex integration branch.**
-   The seven Claude commits are now on `codex/reviewer-contact-integration`, based
-   on current `main`. `docs/DOCS_CATALOG.md` was regenerated successfully after
-   replay. The reviewer-contact runtime boundary is implemented; the full suite,
-   static checks, build, relevant gates/self-tests, and final adversarial
-   re-review are green. The branch still requires commit/push, deliberate
-   promotion to `main`, deployment verification, and the UI render check below.
-
-3. **The UI change has never been rendered against a real request.**
-   Evidence: `.env.local` `DYNAMICS_URL=https://wmkf.crm.dynamics.com` (production, per
-   `lib/dataverse/core/target-registry.js:28`); `DATAVERSE_TARGET_INTERLOCK=on` with
-   `VERCEL_ENV` unset → deployment `local`, so `lib/dataverse/core/interlock.js` denies
-   prod reads without `DATAVERSE_ALLOW_PROD_READS=yes` and denies prod writes outright.
-   Also `shared/components/reviewers/ReviewerSearchSection.js:1265-1275` auto-fires
-   `enrichRecommended()` on mount, which spends paid enrichment and writes roster rows to
-   production Neon. Verified by jsdom tests and gates only.
 
 ### Owner Decision Needed
 
@@ -340,14 +333,17 @@ Seven Claude commits were replayed without content conflicts onto
 ## Testing
 
 ```bash
-rtk npx jest tests/unit tests/integration    # 546 suites / 6576 tests green at 41399610
+rtk npx jest tests/unit tests/integration    # 547 suites / 6614 tests green at 824bfcc6
 rtk npm run lint                             # 0 errors (51 pre-existing warnings, none in touched files)
 rtk npm run build                            # clean
 rtk npx jest tests/unit/reviewer-candidate-identity-evidence.test.js   # the 7 disclosure tests
 ```
 
-All `check:*` gates were green at `41399610`, including `check:agent-wiki`,
+All relevant `check:*` gates were green at `824bfcc6`, including `check:agent-wiki`,
 `check:doc-symbol-refs`, `check:fact-consistency`, `check:drain-table-mentions`,
 `check:docs-catalog`, and `check:types`.
 
-Not run: any live/visual verification (see Verified Open #3).
+Production deployment, signed-in Workbench/API HTTP checks, and the authenticated
+Request `1002912` Find-tab visual check passed. The normal Find ingestion was run
+with explicit owner authorization; no live invitation, identity confirmation,
+decline, or acceptance write-path rehearsal was run.
