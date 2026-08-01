@@ -283,6 +283,46 @@ test('failed contradiction write remains visible and offers the repair path', as
   });
 });
 
+test('missing person ETag fails closed before a durable contradiction write', async () => {
+  const updateReviewer = jest.fn();
+  const rows = [candidate('Trusted Researcher', {
+    identity: {
+      status: 'probable',
+      anchors: [{ type: 'orcid_public', canonicalKey: `orcid:${ORCID}` }],
+    },
+    orcidId: ORCID,
+    email: 'found@example.edu',
+    emailSource: 'scholarly_single',
+    emailPersistAllowed: true,
+  })];
+
+  await reconcileReviewerContacts(rows, {
+    requestId: '11111111-1111-1111-1111-111111111111',
+    lookup: jest.fn(async () => ({
+      outcome: 'confident',
+      match: {
+        reviewerId: 'reviewer-1',
+        matchKey: 'orcid',
+        nameConsistent: true,
+        context: { email: 'stored@example.edu' },
+      },
+      referencedReviewers: [{ reviewerId: 'reviewer-1', institutions: [] }],
+      referencedContacts: [],
+    })),
+    getReviewer: jest.fn(async () => ({
+      wmkf_emailaddress: 'stored@example.edu',
+      wmkf_addresstruststatejson: null,
+    })),
+    updateReviewer,
+  });
+
+  expect(updateReviewer).not.toHaveBeenCalled();
+  expect(rows[0]).toMatchObject({
+    conflictRecordUnavailable: true,
+    contactEnrichment: { conflictRecordUnavailable: true },
+  });
+});
+
 test('a previously resolved exact address pair is not reopened by enrichment', async () => {
   const priorConflict = createConflictPendingState({
     email: 'stored@example.edu',

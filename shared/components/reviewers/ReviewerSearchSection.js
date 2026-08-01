@@ -789,7 +789,8 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             {/* Manual contact edit (manage-only): correct a wrong email/website
                 (or affiliation/h-index) by hand. A typed email is stamped manual
                 → quick check at invite (per-recipient acknowledgement). */}
-            {canManage && (onEdit || onReviewAddressConflict) && !identityUnverified && (
+            {canManage && (onEdit || onReviewAddressConflict) && !identityUnverified
+              && c.conflictRecordUnavailable !== true && (
               <button
                 type="button"
                 onClick={() => (c.addressConflictPending && onReviewAddressConflict
@@ -1614,8 +1615,7 @@ export default function ReviewerSearchSection({
       if (data.partialSuccess === true && data.receiptRecorded === true && data.candidate) {
         applyAuthoritativeRosterCandidate(key, data.candidate);
       }
-      const nextAction = data.remediation?.[0]?.label;
-      throw new Error(`${data.message || data.error || 'Could not verify this address.'}${nextAction ? ` Next: ${nextAction}.` : ''}`);
+      throw new Error(addressTrustFailureMessage(data, 'Could not verify this address.'));
     }
     const candidate = {
       ...data.candidate,
@@ -2065,7 +2065,9 @@ export default function ReviewerSearchSection({
             }
           } else {
             failures.push({ name: result.candidate.name || 'Applicant-referred reviewer', error: result.error });
-            if (new Set(['person_inactive', 'email_conflict', 'ambiguous_email_owner', 'inactive_email_owner']).has(result.code)) {
+            if (result.code === 'conflict_record_unavailable') {
+              addressRepairKeys.push(candKey(result.candidate));
+            } else if (new Set(['person_inactive', 'email_conflict', 'ambiguous_email_owner', 'inactive_email_owner']).has(result.code)) {
               serverRepairResults.push({
                 candidateKey: candKey(result.candidate),
                 code: result.code,

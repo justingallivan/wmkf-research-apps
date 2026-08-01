@@ -346,11 +346,15 @@ ETags remain explicit and retryable. Promoted conflicts expose both current
 addresses and evidence directly in the Invite modal; ordinary manual email edits
 cannot bypass the pending block. The complete paper list and Scholar name-search
 rule remain load-bearing. The fifth Opus review of `e4349a76` returned NO-SHIP;
-its findings are remediated: no-bundle retry persists the A/B resolution in an
-ETag-guarded person bundle, fresh receipts survive staff pruning, all
-address-trust writes require ETags, null identity decisions receive no receipt,
-and repair guidance no longer contradicts reload instructions. A sixth review is
-pending. Wave 17 and runtime promotion remain blocked until it passes.
+its findings were remediated, but the sixth review rejected the follow-up's
+inferred no-bundle A/B resolution. Fable's fresh-eyes review supplied the current
+fail-closed state machine: a failed conflict write blocks direct verification
+plus both promotion paths; retry persists only a real `conflict_pending`
+contradiction, and may clear the roster flag without a person write only after a
+fresh read shows the contradiction disappeared. Receipts resolve only existing
+exact pending tuples. Every block exposes Retry, repair, or set-aside. One final
+bounded review remains pending. Wave 17 and runtime promotion remain blocked
+until it passes.
 
 ## Reviews tab (workbench consumption of submitted reviews)
 

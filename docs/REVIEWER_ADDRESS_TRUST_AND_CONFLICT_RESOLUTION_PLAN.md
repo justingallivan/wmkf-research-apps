@@ -81,14 +81,19 @@ The fifth review of `e4349a76` confirmed H1, H2, M2, and L2 fixed, but returned
 literature path does not produce. It also found that staff-authority pruning
 could drop a fresh identity receipt, three address-trust writes still tolerated
 a missing ETag, UI fallback guidance could contradict a reload instruction, and
-a server receipt could be minted for a null identity decision. The current
-follow-up writes a real ETag-guarded `staff_verified` person bundle containing
-the exact A/B adjudication before clearing the no-bundle roster block; preserves
-fresh receipts through staff pruning; requires ETags at every address-trust
-write; presents repair as a fallback rather than an immediate contradictory
-instruction; and refuses to create an identity receipt without a resolver
-decision. A sixth read-only adversarial review is pending. Wave 17 and runtime
-promotion remain prohibited until it passes.
+a server receipt could be minted for a null identity decision. Those findings
+were remediated, but the sixth Opus review correctly rejected the resulting
+attempt to infer an A/B adjudication from one-sided receipt evidence when the
+original conflict write had failed. A subsequent Fable fresh-eyes review
+recommended the simpler fail-closed state machine now implemented in source:
+while `conflictRecordUnavailable` is true and no real `conflict_pending` person
+bundle exists, direct verification, applicant promotion, and ordinary promotion
+all block with Retry/repair/set-aside remedies. Retry may persist the actual
+contradiction as `conflict_pending`; it may clear the roster flag without a
+person write only when a fresh authoritative read shows the contradiction has
+disappeared. A receipt may resolve only an existing exact pending tuple. One
+final bounded adversarial review remains pending. Wave 17 and runtime promotion
+remain prohibited until it passes.
 
 This document replaces the rejected Session 390 design from
 `codex/claude-ui-followup`. It incorporates the subsequent Codex whole-flow
@@ -159,6 +164,9 @@ evictable, and insufficient for a person-scoped send gate.
 | A legacy `staff_verified` row without a valid exact-address bundle remains `quick_check`. | `emailConfidence`, render, send | legacy complement test |
 | A pending conflict blocks promotion and outbound email server-side. | both promotion services, render/send | stale UI and direct-route bypass tests |
 | A resolved conflict stays resolved only for the exact `(person, stored email, found email, reason)` tuple; new evidence reopens review. | trust parser/writer | replay and changed-tuple tests |
+| A failed conflict write never turns a one-sided roster receipt into an inferred A/B adjudication or promotion authority. | direct trust action, both promotion services, retry | all three promotion doors block while the roster flag is true and no pending person bundle exists |
+| A conflict receipt resolves only a real, current `conflict_pending` person bundle with the exact stored/found tuple. | retry service, person trust parser | no-bundle and changed-tuple complements remain blocked or project pending state |
+| The request-scoped unavailable flag clears only after the corresponding person write succeeds or a fresh authoritative read shows that the contradiction disappeared. | retry service, roster store | Dataverse failure retains the flag; vanished/stored-address-missing cases clear without a person write |
 | Every visible warning/block has at least one rendered action whose server endpoint can complete or advance the remedy. | decision DTO, card/modal | total reason/action table test; unknown-code fallback test |
 | A system or permission failure leaves the candidate retryable and never masquerades as a domain conflict. | routes/services/client | retry state, generation guard, and partial-success tests |
 | Address adjudication never creates or links a CRM Contact. | address-trust service | contact adapter not called in positive and negative tests |
@@ -608,17 +616,18 @@ Each stage preserves current send safety. The ready-tier change is last.
 
 ## Adversarial-review remediation status (2026-07-31)
 
-**[IMPLEMENTED IN SOURCE / SIXTH REVIEW PENDING]** The remediation sequence
-closes the first five Opus reviews' confirmed findings. The relevant enforced
-complements are:
+**[IMPLEMENTED IN SOURCE / FINAL BOUNDED REVIEW PENDING]** The remediation
+sequence incorporates six Opus reviews and the subsequent Fable fresh-eyes
+review. The relevant enforced complements are:
 
 - a provisional/provider-only ORCID cannot resolve a durable person write
   target; an ordinary candidate requires a persist-worthy identity decision
   with an ORCID-specific anchor, a confident name-consistent ORCID lookup, and
   an active person;
 - `retry_check` rejects unflagged, saved, excluded, and ineligible roster rows;
-- a current roster receipt is replayed as the exact prior adjudication and is
-  never reinterpreted as a new contradiction;
+- a current roster receipt is replayed only against a real, current
+  `conflict_pending` person bundle with the exact stored/found tuple; it never
+  fabricates the missing side of a failed conflict write;
 - a roster receipt committed before a Dataverse failure returns
   `partialSuccess`, `receiptRecorded`, the exact receipt/candidate, and working
   remediation; the client applies that authoritative partial candidate after
@@ -633,8 +642,14 @@ complements are:
   receipt whose canonical identity-only digest still matches the roster row;
 - the receipt is invariant under JSONB key reordering and later address or
   affiliation adjudication, but invalidates when the identity decision changes;
-- no-person-bundle retry writes the exact stored/found/selected resolution into
-  an ETag-guarded person bundle before clearing the request-scoped roster block;
+- no-person-bundle retry persists the actual contradiction as an ETag-guarded
+  `conflict_pending` person bundle and keeps promotion blocked; it clears the
+  request-scoped roster flag without a person write only when a fresh
+  authoritative read shows that the contradiction disappeared or the stored
+  address is gone;
+- direct roster verification, applicant promotion, and ordinary promotion all
+  reject `conflictRecordUnavailable` when no pending person bundle exists, with
+  executable Retry, repair, and set-aside remedies;
 - all person-address writes fail closed when the Dataverse ETag is unavailable;
 - fresh identity receipts survive staff-authority pruning, while null resolver
   decisions never receive a server identity receipt;
@@ -643,12 +658,14 @@ complements are:
 - manual saved-candidate edits cannot invalidate a pending bundle and silently
   downgrade the send block.
 
-Verification after the fifth-review remediation: focused affected-surface tests
-163/163; full suite 550/550 suites and 6,659/6,659 tests; `check:types`; lint with zero errors
-and 51 pre-existing warnings; production build; API route matrix + self-test;
-Dataverse DAL gate + self-test; doc-currency gate + self-test. This evidence is
-local only and does not satisfy the schema-first deployment or signed-in pilot
-exit criteria.
+Verification after the Fable remediation: eight affected-surface suites and 253
+tests pass; the full suite passes 550/550 suites and 6,673/6,673 tests;
+`check:types`, production build, and lint pass (zero errors and 51 pre-existing
+warnings); and the relevant API-security, Dataverse-access, route-boundary,
+documentation, wiki, memory, instruction, and migration-manifest gates plus
+self-tests pass. The final bounded adversarial review remains pending. This work
+remains local and does not satisfy the schema-first deployment or signed-in
+pilot exit criteria.
 
 ## Verification matrix
 

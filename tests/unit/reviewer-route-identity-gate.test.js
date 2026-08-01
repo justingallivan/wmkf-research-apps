@@ -24,6 +24,7 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   upsertByEmail: jest.fn(async () => ({ id: 'PID-1' })),
   getById: jest.fn(async () => ({ wmkf_primaryaffiliation: 'MIT' })),
   getByEmail: jest.fn(async () => null),
+  findByEmailCandidates: jest.fn(async () => []),
   update: jest.fn(async () => undefined),
   setContactLink: jest.fn(async () => ({ action: 'link' })),
 }));
@@ -79,6 +80,9 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   findEligibilityByCandidateKey: jest.fn(async () => null),
   findIdentityConfirmation: jest.fn(async () => null),
   findAddressTrustReceipt: jest.fn(async () => null),
+  findCandidatesByKeys: jest.fn(async (_requestId, candidateKeys) => (
+    candidateKeys.map((candidateKey) => ({ candidateKey, rosterStatus: 'active' }))
+  )),
   finalizeCandidatePromotion: jest.fn(async (_requestId, candidate, anchors) => ({
     saved: true,
     candidateKey: anchors.candidateKey || candidate.candidateKey,
@@ -173,6 +177,9 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
       ...(token && candidate?.candidateKey ? { rosterCandidateKey: candidate.candidateKey } : {}),
     }));
     rosterStore.findIdentityConfirmation.mockResolvedValue(null);
+    rosterStore.findCandidatesByKeys.mockImplementation(async (_requestId, candidateKeys) => (
+      candidateKeys.map((candidateKey) => ({ candidateKey, rosterStatus: 'active' }))
+    ));
   });
 
   const run = (identity) => {
@@ -1187,6 +1194,15 @@ describe('enrich-recommended route — applicant identity gate', () => {
       _wmkf_potentialreviewer_value_formatted: 'Dr X',
       wmkf_appreviewersuggestionid: 'SUG-1',
     }]);
+    potentialReviewerAdapter.getById.mockResolvedValue({
+      wmkf_potentialreviewersid: 'PID-1',
+      wmkf_name: 'Dr X',
+      wmkf_emailaddress: null,
+      wmkf_primaryaffiliation: null,
+      statecode: 0,
+      _etag: 'W/"person-1"',
+    });
+    potentialReviewerAdapter.findByEmailCandidates.mockResolvedValue([]);
   });
 
   const run = (identity, extraBody = {}) => {

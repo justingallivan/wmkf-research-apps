@@ -287,6 +287,88 @@ test('stored/enriched email mismatch blocks promotion and does not select the su
   expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
+test('applicant promotion cannot use a receipt when the address conflict was never durably recorded', async () => {
+  findCandidateBySuggestion.mockResolvedValue({
+    candidateKey: 'candidate:applicant',
+    suggestionId: SUG,
+    identityStatus: 'probable',
+    needsIdentification: false,
+    email: 'found@example.edu',
+    emailSource: 'scholarly_multi',
+    emailPersistAllowed: true,
+    applicantContactMismatch: true,
+    conflictRecordUnavailable: true,
+    addressTrustReceipt: {
+      receiptId: 'old-receipt',
+      personConfirmed: true,
+      email: 'found@example.edu',
+    },
+    contactEnrichment: {
+      email: 'found@example.edu',
+      emailSource: 'scholarly_multi',
+      emailPersistAllowed: true,
+      conflictRecordUnavailable: true,
+    },
+  });
+  getById.mockResolvedValueOnce({
+    wmkf_emailaddress: 'existing@example.edu',
+    wmkf_emailsource: 'scholarly_multi',
+    wmkf_addresstruststatejson: null,
+    _etag: 'W/"person"',
+  });
+  const error = await promoteApplicantReviewer(args()).catch((caught) => caught);
+
+  expect(error).toBeInstanceOf(ServiceHttpError);
+  expect(error.httpStatus).toBe(409);
+  expect(error.body).toMatchObject({
+    code: 'conflict_record_unavailable',
+    remediation: expect.arrayContaining([
+      expect.objectContaining({ action: 'retry_check' }),
+      expect.objectContaining({ action: 'create_repair_request' }),
+      expect.objectContaining({ action: 'set_aside' }),
+    ]),
+  });
+  expect(findAddressTrustReceipt).not.toHaveBeenCalled();
+  expect(update).not.toHaveBeenCalled();
+  expect(updateLifecycle).not.toHaveBeenCalled();
+});
+
+test('a manual applicant address cannot bypass a failed conflict write', async () => {
+  findCandidateBySuggestion.mockResolvedValue({
+    candidateKey: 'candidate:applicant',
+    suggestionId: SUG,
+    identityStatus: 'probable',
+    needsIdentification: false,
+    email: 'found@example.edu',
+    emailSource: 'manual',
+    manualContactFields: ['email'],
+    applicantContactMismatch: true,
+    conflictRecordUnavailable: true,
+    contactEnrichment: {
+      email: 'found@example.edu',
+      emailSource: 'manual',
+      emailPersistAllowed: true,
+      conflictRecordUnavailable: true,
+    },
+  });
+  getById.mockResolvedValueOnce({
+    wmkf_emailaddress: 'existing@example.edu',
+    wmkf_emailsource: 'scholarly_multi',
+    wmkf_addresstruststatejson: null,
+    _etag: 'W/"person"',
+  });
+
+  const error = await promoteApplicantReviewer(args({
+    contact: { email: 'found@example.edu' },
+  })).catch((caught) => caught);
+
+  expect(error).toBeInstanceOf(ServiceHttpError);
+  expect(error.body).toMatchObject({ code: 'conflict_record_unavailable' });
+  expect(findAddressTrustReceipt).not.toHaveBeenCalled();
+  expect(update).not.toHaveBeenCalled();
+  expect(updateLifecycle).not.toHaveBeenCalled();
+});
+
 test('actor-confirmed manual correction clears a historical mismatch, writes first, then passes the fresh exact-person gate', async () => {
   findAddressTrustReceipt.mockResolvedValueOnce({
     receiptId: 'receipt-corrected',

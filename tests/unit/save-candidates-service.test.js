@@ -52,6 +52,9 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   findIdentityConfirmation: jest.fn(async () => null),
   findEligibilityByCandidateKey: jest.fn(async () => null),
   findAddressTrustReceipt: jest.fn(async () => null),
+  findCandidatesByKeys: jest.fn(async (_requestId, candidateKeys) => (
+    candidateKeys.map((candidateKey) => ({ candidateKey }))
+  )),
 }));
 jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
   verifyAutomatedIdentityAttestation: jest.fn(async () => ({
@@ -136,6 +139,9 @@ beforeEach(() => {
     blocked: true,
     candidateKey,
   }));
+  reviewerRosterStore.findCandidatesByKeys.mockImplementation(async (_requestId, candidateKeys) => (
+    candidateKeys.map((candidateKey) => ({ candidateKey }))
+  ));
   verifyAutomatedIdentityAttestation.mockResolvedValue({
     valid: true,
     source: 'automated_resolver',
@@ -282,6 +288,86 @@ test.each([
     errors: [expect.objectContaining({ code: 'identity_attestation_required' })],
   });
   expect(reviewerRosterStore.findEligibilityByCandidateKey).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+});
+
+test('a roster row whose conflict write failed cannot be promoted through ordinary saving', async () => {
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+    valid: true,
+    source: 'automated_resolver',
+    identityDecisionBound: true,
+    contactAuthorityBound: true,
+    rosterCandidateKey: 'candidate:blocked-address',
+  });
+  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([{
+    candidateKey: 'candidate:blocked-address',
+    conflictRecordUnavailable: true,
+    addressTrustReceipt: {
+      receiptId: 'old-receipt',
+      email: 'found@example.edu',
+      personConfirmed: true,
+    },
+  }]);
+
+  const error = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Blocked Address',
+      candidateKey: 'candidate:blocked-address',
+      automatedIdentityAttestation: 'signed-blocked-address',
+    }],
+  }).catch((caught) => caught);
+
+  expect(error).toBeInstanceOf(SaveCandidatesError);
+  expect(error.httpStatus).toBe(422);
+  expect(error.body.errors).toEqual([
+    expect.objectContaining({
+      code: 'conflict_record_unavailable',
+      remediation: expect.arrayContaining([
+        expect.objectContaining({ action: 'retry_check' }),
+        expect.objectContaining({ action: 'create_repair_request' }),
+        expect.objectContaining({ action: 'set_aside' }),
+      ]),
+    }),
+  ]);
+  expect(reviewerRosterStore.findAddressTrustReceipt).not.toHaveBeenCalled();
+  expect(reviewerRosterStore.findEligibilityByCandidateKey).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
+});
+
+test('ordinary saving refreshes verification when the authoritative roster row is missing', async () => {
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+    valid: true,
+    source: 'automated_resolver',
+    identityDecisionBound: true,
+    contactAuthorityBound: true,
+    rosterCandidateKey: 'candidate:missing-roster',
+  });
+  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([]);
+
+  const error = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Missing Roster',
+      candidateKey: 'candidate:missing-roster',
+      automatedIdentityAttestation: 'signed-missing-roster',
+    }],
+  }).catch((caught) => caught);
+
+  expect(error).toBeInstanceOf(SaveCandidatesError);
+  expect(error.httpStatus).toBe(422);
+  expect(error.body.errors).toEqual([
+    expect.objectContaining({
+      code: 'identity_attestation_required',
+      remediation: expect.arrayContaining([
+        expect.objectContaining({ action: 'retry_check' }),
+        expect.objectContaining({ action: 'verify_person_and_address' }),
+        expect.objectContaining({ action: 'set_aside' }),
+      ]),
+    }),
+  ]);
+  expect(reviewerRosterStore.findAddressTrustReceipt).not.toHaveBeenCalled();
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
 });
 

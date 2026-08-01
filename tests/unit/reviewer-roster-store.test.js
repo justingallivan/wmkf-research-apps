@@ -407,6 +407,118 @@ describe('staff identity confirmation', () => {
   });
 });
 
+describe('address attestation', () => {
+  test('persists a receipt for the real literature-row shape with matching top-level and enrichment emails', async () => {
+    sql
+      .mockResolvedValueOnce({
+        rows: [{
+          candidate_key: 'candidate:ann',
+          status: 'active',
+          source_kind: 'literature_retrieved',
+          updated_at_token: '2026-07-30 10:00:00+00',
+          candidate: {
+            name: 'Ann Lee',
+            email: 'found@example.edu',
+            emailSource: 'scholarly_multi',
+            conflictRecordUnavailable: true,
+            contactEnrichment: {
+              email: 'found@example.edu',
+              emailSource: 'scholarly_multi',
+              conflictRecordUnavailable: true,
+            },
+          },
+        }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{
+          candidate_key: 'candidate:ann',
+          source_kind: 'literature_retrieved',
+          updated_at_token: '2026-07-30 10:01:00+00',
+          candidate: { name: 'Ann Lee', email: 'found@example.edu' },
+        }],
+        rowCount: 1,
+      });
+
+    const out = await store.attestAddress(REQ, 'candidate:ann', {
+      email: 'found@example.edu',
+      evidenceType: 'institution_page',
+      evidenceUrl: 'https://example.edu/profile',
+      actorProfileId: '7',
+      actorSystemUserId: 'SYS-7',
+    });
+
+    expect(out.receipt).toMatchObject({
+      receiptId: expect.any(String),
+      email: 'found@example.edu',
+      personConfirmed: true,
+      requestId: REQ,
+      candidateKey: 'candidate:ann',
+    });
+    const persisted = JSON.parse(allInterpolations().find((entry) => (
+      typeof entry === 'string' && entry.includes('addressTrustReceipt')
+    )));
+    expect(persisted).toMatchObject({
+      email: 'found@example.edu',
+      emailSource: 'scholarly_multi',
+      manualContactFields: [],
+      addressTrustReceipt: { email: 'found@example.edu' },
+      contactEnrichment: {
+        email: 'found@example.edu',
+        emailSource: 'scholarly_multi',
+      },
+    });
+    expect(queryTextOf(1)).toMatch(/updated_at::text/);
+    expect(allInterpolations()).toContain('2026-07-30 10:00:00+00');
+  });
+
+  test('an explicitly changed attested address replaces both candidate projections and becomes manual', async () => {
+    sql
+      .mockResolvedValueOnce({
+        rows: [{
+          candidate_key: 'candidate:ann',
+          status: 'active',
+          source_kind: 'literature_retrieved',
+          updated_at_token: 'row-version-1',
+          candidate: {
+            name: 'Ann Lee',
+            email: 'found@example.edu',
+            emailSource: 'scholarly_multi',
+            contactEnrichment: { email: 'found@example.edu', emailSource: 'scholarly_multi' },
+          },
+        }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{
+          candidate_key: 'candidate:ann',
+          source_kind: 'literature_retrieved',
+          updated_at_token: 'row-version-2',
+          candidate: { name: 'Ann Lee', email: 'stored@example.edu' },
+        }],
+        rowCount: 1,
+      });
+
+    await store.attestAddress(REQ, 'candidate:ann', {
+      email: 'stored@example.edu',
+      evidenceType: 'direct_correspondence',
+      note: 'Confirmed directly.',
+    });
+
+    const persisted = JSON.parse(allInterpolations().find((entry) => (
+      typeof entry === 'string' && entry.includes('addressTrustReceipt')
+    )));
+    expect(persisted).toMatchObject({
+      email: 'stored@example.edu',
+      emailSource: 'manual',
+      manualContactFields: ['email'],
+      addressTrustReceipt: { email: 'stored@example.edu' },
+      contactEnrichment: {
+        email: 'stored@example.edu',
+        emailSource: 'manual',
+      },
+    });
+  });
+});
+
 describe('finalizeCandidatePromotion', () => {
   test('server-owned finalization persists exact Dataverse anchors and returns the key', async () => {
     sql.mockResolvedValueOnce({ rows: [{ candidate_key: 'candidate:ann' }], rowCount: 1 });

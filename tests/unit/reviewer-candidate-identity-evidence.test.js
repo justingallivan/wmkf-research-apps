@@ -63,6 +63,35 @@ test('address-trust failure guidance does not duplicate a repair remedy already 
   }, 'Fallback')).toBe('Retry or create a repair request.');
 });
 
+test('a failed conflict write suppresses verification and exposes all executable remedies', async () => {
+  const user = userEvent.setup();
+  const retry = jest.fn();
+  const repair = jest.fn();
+  const exclude = jest.fn();
+  render(
+    <CandidateCard
+      candidate={{
+        ...unresolvedCandidate,
+        identityStatus: 'probable',
+        conflictRecordUnavailable: true,
+      }}
+      readOnly
+      onEdit={jest.fn()}
+      onRetryAddressCheck={retry}
+      onRequestRepair={repair}
+      onExclude={exclude}
+    />
+  );
+
+  expect(screen.queryByRole('button', { name: /Verify \/ edit address/i })).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /Retry conflict check/i }));
+  await user.click(screen.getByRole('button', { name: /Create repair request/i }));
+  await user.click(screen.getByRole('button', { name: /Exclude/i }));
+  expect(retry).toHaveBeenCalledTimes(1);
+  expect(repair).toHaveBeenCalledTimes(1);
+  expect(exclude).toHaveBeenCalledTimes(1);
+});
+
 function renderUnresolved(overrides = {}) {
   return render(
     <CandidateCard

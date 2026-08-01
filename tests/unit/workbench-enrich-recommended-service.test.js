@@ -529,6 +529,43 @@ test('a durable conflict is projected as booleans without sending the trust bund
   }, { actingUserSystemId: 'u-1', ifMatch: 'W/"person"' });
 });
 
+test('a missing person ETag leaves the applicant conflict blocked and does not write unconditionally', async () => {
+  getPersonById.mockResolvedValue({
+    wmkf_potentialreviewersid: PR,
+    wmkf_name: 'Dr. Rec One',
+    wmkf_primaryaffiliation: 'Rec University',
+    wmkf_emailaddress: 'stored@example.edu',
+    wmkf_emailsource: null,
+    wmkf_addresstruststatejson: null,
+    statecode: 0,
+  });
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((candidate) => ({
+      ...candidate,
+      email: 'new@example.edu',
+      contactEnrichment: {
+        identity: { status: 'probable' },
+        email: 'new@example.edu',
+        emailSource: 'scholarly_multi',
+        emailPersistAllowed: true,
+      },
+    })),
+  }));
+
+  const rec = recorder();
+  await enrichRecommended(args(), rec.onEvent);
+  const result = rec.events.find((event) => event.event === 'complete').data.recommended[0];
+
+  expect(updatePerson).not.toHaveBeenCalled();
+  expect(result).toMatchObject({
+    applicantContactMismatch: true,
+    conflictRecordUnavailable: true,
+  });
+  expect(rec.events).toEqual(expect.arrayContaining([
+    expect.objectContaining({ data: expect.objectContaining({ code: 'conflict_record_unavailable' }) }),
+  ]));
+});
+
 test('an already-resolved stored/found pair projects only the canonical address and remains promotable', async () => {
   const priorConflict = createConflictPendingState({
     email: 'stored@example.edu',

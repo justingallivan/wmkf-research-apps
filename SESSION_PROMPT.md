@@ -38,8 +38,16 @@
 > shape, fresh receipts could be lost during staff pruning, sibling
 > address-trust writes still lacked mandatory ETags, null identity decisions
 > could receive receipts, and a UI fallback could contradict reload guidance.
-> Those findings are remediated in source; a sixth read-only adversarial review
-> is pending.
+> Those findings were remediated, but the sixth Opus review rejected the
+> follow-up's inferred A/B resolution when the original conflict write had
+> failed. Fable's fresh-eyes review recommended the current fail-closed state
+> machine: while the roster records `conflictRecordUnavailable` and no real
+> pending person bundle exists, direct verification and both promotion paths
+> block with executable remedies; retry may persist the actual contradiction as
+> pending, or clear the roster flag only after a fresh read shows the
+> contradiction disappeared. Receipt replay requires an existing exact pending
+> tuple. Source and focused tests implement that contract; one final bounded
+> adversarial review remains pending.
 > Wave 17/runtime promotion remains blocked until it passes.
 
 ## Session 388 Summary
@@ -314,8 +322,12 @@ Seven Claude commits were replayed without content conflicts onto
    failures omitted their repair action. The fifth review of `e4349a76` found
    the no-bundle tuple unreachable on the real literature shape, fresh-receipt
    loss during staff pruning, remaining optional ETags, null-decision receipts,
-   and contradictory fallback guidance. Those gaps are remediated; obtain a
-   sixth read-only Opus review before release.
+   and contradictory fallback guidance. The sixth review rejected the resulting
+   inferred no-bundle A/B adjudication. Fable's fresh-eyes review supplied the
+   implemented fail-closed replacement: all three promotion/verification doors
+   block until retry persists a real pending contradiction or a fresh read
+   proves it disappeared. Obtain one final bounded adversarial review before
+   release.
 2. ~~**Acceptance-time promotion scope (§4.1/§4.3).**~~ **DONE in source, S389:**
    sending never promotes; every identity-bearing acceptance—including honorarium
    opt-outs—promotes through identity-aware/idempotent matching; declines do not.
