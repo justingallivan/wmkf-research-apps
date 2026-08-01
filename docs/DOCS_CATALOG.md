@@ -360,7 +360,7 @@ related:
 | [REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md](REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md) | audit | historical |  | Fresh Fable session to reconstruct the Reviewer Workbench Find regression, challenge the stabilization plan, and recommend the next bounded slice. | 2026-07-08 |
 | [REVIEWER_REFERRAL_SEEDING_DESIGN.md](REVIEWER_REFERRAL_SEEDING_DESIGN.md) | plan | historical |  | Implemented build plan: guarantee externally-referred seed names into the reviewer pool (seed-only, folded-in); relabel two existing kinds, no new enum. | 2026-07-02 |
 | [REVIEWER_REMOVE_ENTIRELY_BUILD_PLAN.md](REVIEWER_REMOVE_ENTIRELY_BUILD_PLAN.md) | plan | historical |  | Shipped permanent reviewer-removal behavior; retained as historical implementation record. |  |
-| [REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md](REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md) | plan | canonical | yes | Proposed reviewer stabilization contract, now gated by an independent Fable challenge pass before baseline tests, runtime repair, or data reconciliation. | 2026-07-31 |
+| [REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md](REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md) | plan | canonical | yes | Reviewer stabilization contract; the independent challenge pass is complete and owner-accepted, and implementation is authorized via SESSION_PROMPT.md. | 2026-07-31 |
 
 ## security-auth
 

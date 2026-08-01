@@ -3,7 +3,7 @@ title: Reviewer Workflow Stabilization Directive
 domain: reviewers
 kind: plan
 status: canonical
-summary: "Proposed reviewer stabilization contract, now gated by an independent Fable challenge pass before baseline tests, runtime repair, or data reconciliation."
+summary: "Reviewer stabilization contract; the independent challenge pass is complete and owner-accepted, and implementation is authorized via SESSION_PROMPT.md."
 canonical: true
 cataloged: 2026-07-31
 last_verified: 2026-08-01
@@ -117,8 +117,10 @@ the synthesis below.
 | Proposal selection can destabilize the same cache loop | default loading is strict canonical-file-only; a manual dropdown choice is component state rather than reload-stable navigation state; applicant enrichment keys itself to the chosen file | **SOURCE-SUPPORTED hypothesis; verify actual cache invalidation behavior** |
 
 The July 31 synthesis classified the incident as a **projection and orchestration
-regression**, not loss of the inspected invitation records. Fable must test that
-classification rather than inherit it.
+regression**, not loss of the inspected invitation records. That classification
+was tested and is **partly corrected**: Sorek-shaped resurfacing is a genuine
+regression from `ad8e0299`, while Isberg-shaped resurfacing is a latent
+projection gap. See the assessment's §0 C1.
 
 ## Proposed contract to evaluate
 
