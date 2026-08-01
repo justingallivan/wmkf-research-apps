@@ -19,6 +19,7 @@ import {
 } from '../../../lib/utils/reviewer-candidate-key';
 import { emailConfidence } from '../../../lib/utils/reviewer-invite';
 import { projectReviewerContact } from '../../../lib/utils/reviewer-vetted-email';
+import { normalizeOrcid } from '../../../lib/utils/orcid-normalize';
 import {
   projectCanonicalApplicantContact,
   pruneApplicantKnownReviewer,
@@ -423,6 +424,79 @@ export function dedupeByNamePreferReferred(list, keyFn) {
     }
     posByKey.set(k, out.length);
     out.push(c);
+  }
+  return out;
+}
+
+function exactReviewerIdentityKey(candidate) {
+  if (!candidate || typeof candidate !== 'object') return null;
+  // Applicant suggestions retain their own lifecycle lane even after they point
+  // at the same person as a search result. Promotion-by-suggestionId has distinct
+  // durable semantics; this helper only collapses aliases within a lane.
+  const lane = candidate.isApplicantRecommended
+    || provenanceKindOf(candidate) === PROVENANCE_KINDS.APPLICANT_SUGGESTED
+    ? 'applicant'
+    : 'search';
+  const personId = candidate.potentialReviewerId
+    || candidate.seedResolvedPotentialReviewerId
+    || candidate.applicantKnownReviewer?.potentialReviewerId;
+  if (typeof personId === 'string' && personId.trim()) {
+    return `${lane}:person:${personId.trim().toLowerCase()}`;
+  }
+  const rawOrcid = candidate.orcid
+    || candidate.contactEnrichment?.orcidId
+    || candidate.contactEnrichment?.orcid
+    || candidate.applicantKnownReviewer?.orcid;
+  const orcid = normalizeOrcid(rawOrcid);
+  return orcid.state === 'valid' ? `${lane}:orcid:${orcid.id}` : null;
+}
+
+function exactAddressReceiptMatches(candidate) {
+  const receipt = candidate?.addressTrustReceipt;
+  const email = String(candidate?.email || candidate?.contactEnrichment?.email || '')
+    .trim()
+    .toLowerCase();
+  return receipt?.personConfirmed === true
+    && !!receipt?.receiptId
+    && !!email
+    && String(receipt.email || '').trim().toLowerCase() === email;
+}
+
+function candidateAuthorityScore(candidate) {
+  let score = 0;
+  if (candidate?.pdIdentityConfirmed === true && candidate?.pdIdentityConfirmationId) score += 100;
+  if (exactAddressReceiptMatches(candidate)) score += 50;
+  if (candidate?.serverIdentityDecisionReceipt?.source === 'automated_resolver') score += 20;
+  const emailSource = candidate?.emailSource || candidate?.contactEnrichment?.emailSource;
+  if (emailSource === 'manual' || emailSource === 'staff_verified') score += 10;
+  if (candidate?.contactEnrichment?.dataverseContactEvidence?.status === 'known') score += 5;
+  return score;
+}
+
+/**
+ * Collapse only proven identity aliases (exact person id or checksum-valid ORCID).
+ * Distinct correlation keys remain distinct when no exact anchor exists, so
+ * same-name people are never merged. On an alias collision the strongest
+ * server/staff contact authority wins, while referral provenance is retained.
+ */
+export function dedupeReviewerCandidates(list) {
+  const posByKey = new Map();
+  const out = [];
+  for (const candidate of (Array.isArray(list) ? list : [])) {
+    const key = exactReviewerIdentityKey(candidate)
+      || `candidate:${reviewerCandidateKey(candidate) || ''}`;
+    if (!key || key === 'candidate:') continue;
+    if (!posByKey.has(key)) {
+      posByKey.set(key, out.length);
+      out.push(candidate);
+      continue;
+    }
+    const pos = posByKey.get(key);
+    const current = out[pos];
+    const incomingWins = candidateAuthorityScore(candidate) > candidateAuthorityScore(current);
+    const preferred = incomingWins ? candidate : current;
+    const other = incomingWins ? current : candidate;
+    out[pos] = mergeReferredProvenance(preferred, other);
   }
   return out;
 }

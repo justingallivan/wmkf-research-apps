@@ -21,12 +21,54 @@ import {
   sanitizeInstitutionCOIDetails,
   mergeReferredProvenance,
   dedupeByNamePreferReferred,
+  dedupeReviewerCandidates,
   reviewerCandidateKey,
   withReviewerCandidateKey,
 } from '../../shared/components/reviewers/reviewer-search-logic.js';
 import { projectCanonicalApplicantContact } from '../../lib/utils/applicant-known-reviewer.js';
 const { PROVENANCE_KINDS, provenanceGroupOf, provenanceKindOf, provenanceLabelForCandidate } = require('../../lib/utils/reviewer-provenance');
 const { normalizeReviewerName: normName } = require('../../lib/utils/reviewer-name-match');
+
+describe('dedupeReviewerCandidates', () => {
+  test('collapses exact-ORCID search aliases and keeps the staff-attested address projection', () => {
+    const foundAgain = {
+      name: 'Ellen Zhong',
+      candidateKey: 'orcid:0000-0001-6345-1907',
+      orcid: '0000-0001-6345-1907',
+      email: 'zhonge@princeton.edu',
+      emailSource: 'scholarly_multi',
+      source: 'proposal_named',
+    };
+    const staffAttested = {
+      name: 'Ellen Zhong',
+      candidateKey: 'candidate:ellen-legacy',
+      orcid: '0000-0001-6345-1907',
+      email: 'zhonge@cs.princeton.edu',
+      emailSource: 'staff_verified',
+      source: 'proposal_named',
+      addressTrustReceipt: {
+        receiptId: 'receipt-ellen',
+        email: 'zhonge@cs.princeton.edu',
+        personConfirmed: true,
+      },
+    };
+
+    expect(dedupeReviewerCandidates([foundAgain, staffAttested])).toEqual([
+      expect.objectContaining({
+        candidateKey: 'candidate:ellen-legacy',
+        email: 'zhonge@cs.princeton.edu',
+      }),
+    ]);
+  });
+
+  test('keeps same-name search candidates separate when their exact ORCIDs differ', () => {
+    const rows = [
+      { name: 'Alex Kim', candidateKey: 'candidate:alex-1', orcid: '0000-0002-1825-0097' },
+      { name: 'Alex Kim', candidateKey: 'candidate:alex-2', orcid: '0000-0001-5109-3700' },
+    ];
+    expect(dedupeReviewerCandidates(rows)).toEqual(rows);
+  });
+});
 
 test('applicant canonical email/source pair and promotion decision survive roster pruning', () => {
   const candidate = {
