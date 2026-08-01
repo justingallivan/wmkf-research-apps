@@ -1131,6 +1131,109 @@ it; if it is "two ever", W7(b) alone may be the whole fix. One field read across
 declined suggestions. *(The companion excluded-reviewers read was done — §3.2.1
 — and is what deprioritized the intake half of this section.)*
 
+### 6a.1 Decline-form referral field — the three owner questions answered
+
+**The cheapest fact first: the server already takes these fields.**
+`addManualReviewer` accepts `{ name, email, affiliation, orcid, note,
+referredBy, resolution }` `[VERIFIED via manual-reviewer-service.js:108-110]`.
+Structured rows map onto the existing endpoint one-to-one. **No API change, no
+service change** — only the capture form, the storage of the answer, and the
+Track-tab consumer. That makes this much smaller than a normal schema feature.
+
+#### Q1 — What to change on the form
+
+`DeclineFormView` today is a single `<textarea>` whose placeholder reads
+"e.g., Dr. Sarah Chen at Stanford works on similar problems and would be a great
+fit." `[VERIFIED via DeclineFormView.js:102-118]`. It teaches prose, and the
+consumer treats the result as one person's name.
+
+Replace it with a **repeating row**: `Name` · `Institution` (optional) ·
+`Email` (optional), rendering **one row by default with "+ Add another" up to
+four**. Most referrals are one or two people — the observed case was two — so
+showing 12 empty inputs to someone who has just declined is the wrong default;
+progressive disclosure keeps the common case to a single line.
+
+Wording that matters:
+
+- Drop the prose placeholder. Per-field placeholders instead: `Jane Doe` /
+  `Stanford University` / `jane.doe@stanford.edu`.
+- Add one line of microcopy: **"Full name as they publish — no titles or
+  degrees."** This is the evidence-backed part: ~47 person rows carry credential
+  suffixes and `normalizeReviewerName` keeps the token, so "jane doe phd" never
+  matches "jane doe" (§3.3).
+- Keep the whole block **optional**, and keep a short free-text **note** field
+  (per row or one shared) for context like "junior but excellent". `note` is
+  already an accepted parameter and lands in the match reason — it gives prose
+  somewhere legitimate to go **without** feeding person creation, which is the
+  distinction that was missing.
+
+#### Q2 — Is a parser worth adding? **Yes for legacy rows only, and make it
+deterministic rather than an LLM.**
+
+A parser is still needed, because structured capture fixes only *new* referrals
+while existing `wmkf_declinereferral` values stay plain text and keep appearing
+in the Track tab until those requests cycle out. Without one, the "Add as
+candidate" button on a legacy row must either stay dangerous or be disabled.
+
+But it should **not** be an LLM parse, and it must **never** authorize person
+creation:
+
+- **Deterministic beats LLM here.** The observed format is already regular — one
+  person per line, institution after a comma (screenshot, §3.3.1). A split on
+  newlines, then on the first comma, recovers `name` + `institution` for that
+  shape with no model call, no latency, and no prompt surface to govern.
+- **Its output is staff-confirmed anyway**, which is what makes parse quality
+  secondary: the parser pre-fills editable rows, staff eyeball them and press
+  Add. A wrong split is *visible and corrected*; a wrong LLM extraction is
+  equally wrong but costs more and hides behind confidence.
+- Reserve `extractExcludedReviewers`-style LLM parsing as a fallback only if the
+  deterministic split proves inadequate on real legacy values — measurable by
+  running it over stored referrals before building anything.
+
+Pair it with **W7(b)**: whatever the parser produces, a lookup returning
+`outcome:'none'` on an implausible name must route to the staff picker instead
+of auto-`create_new`. That guard is what actually closes Finding C, for legacy
+and structured input alike.
+
+#### Q3 — Separate optional institution and email fields? **Yes — but they are
+not equally valuable, and the reason is specific.**
+
+- **Email — high value, and the single highest-leverage field on this form.**
+  The identity lookup keys on ORCID, then email, then a name fallback
+  `[VERIFIED via reviewer-identity-lookup.js:365-423]`. The name fallback
+  **never returns a confident match** — only candidates or nothing — so a
+  name-only referral is structurally incapable of reusing an existing person,
+  which is exactly the create-a-duplicate path. An email moves the lookup onto
+  `findByEmailCandidates`, which can match confidently. **This field is what
+  turns duplicate-prevention from cleanup into non-occurrence.**
+- **Institution — worth collecting, but do not expect it to fix matching.**
+  `addManualReviewer` passes `affiliation` into the lookup, yet `lookup()`
+  destructures only `{ name, email, orcid }`
+  `[VERIFIED via manual-reviewer-service.js:132 and reviewer-identity-lookup.js:365]`
+  — so **affiliation is ignored by the matcher today.** Its value is real but
+  downstream: it lands on the person record, disambiguates for the human in the
+  staff picker, and feeds COI and enrichment later. Collect it; do not count it
+  as dedupe.
+- **Do not ask for ORCID.** The endpoint accepts it and it would be the
+  strongest key, but a declining reviewer will rarely know a colleague's iD, and
+  the field cost is paid by everyone.
+- **Note this is the opposite of my advice on the *exclusion* field** (§6a),
+  where I said not to ask for institution. That still holds — exclusions are
+  matched name-only and the affiliation is discarded at the API boundary. Here
+  the affiliation is persisted and used. Same-looking field, different contract.
+
+**One trust caveat.** A reviewer-supplied email is an untrusted claim and may be
+stale or a namesake's. It should feed identity lookup and dedupe only, and must
+enter as `emailSource: 'manual'` so the existing address-trust machinery still
+requires attestation before promotion or send. Structured capture must not be
+mistaken for verified contact.
+
+**Storage.** Keep writing a human-readable line to `wmkf_declinereferral` so
+every existing reader and the Track-tab display keep working, and add a JSON
+column alongside it for the structured rows, following the
+`wmkf_addresstruststatejson` precedent. Readers prefer the JSON and fall back to
+the text. Do not overload one field with two formats.
+
 ---
 
 ## 7. Stop doing
