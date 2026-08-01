@@ -595,6 +595,85 @@ write W6(c) — Restore still works — as a guard against over-correcting.
 
 ---
 
+## 6a. Referral input design (owner question, 2026-08-01)
+
+Owner proposal: replace the free-text referral with structured rows — name +
+optional institution + email, up to 4 — and/or write a better parser.
+
+**Recommendation: structured input is the fix; a parser is at most a
+compatibility aid. Do not build the parser as the primary remedy.** Three
+reasons, in order of weight:
+
+1. **Structured fields don't just clean the input — they repair the dedupe.**
+   This is the argument that matters and it is not a UX argument. Today the
+   referral carries a name and nothing else, which forces
+   `lookupReviewerIdentity` down its *weakest* branch: the name fallback, which
+   by construction never returns a confident match — it returns candidates for
+   a staff picker, or nothing `[VERIFIED via reviewer-identity-lookup.js:411-422]`.
+   An **email** promotes the lookup to `findByEmailCandidates`, which can return
+   a confident match and reuse the existing person
+   `[VERIFIED via reviewer-identity-lookup.js:402-409]`. So capturing an email
+   converts the duplicate problem from "detect and clean up afterwards" into
+   "does not occur". Institution similarly feeds the resolver's affiliation
+   anchor and the COI checks. A parser can only ever recover a *name* from
+   prose; it cannot invent the anchors that make matching reliable.
+2. **We own this form, so fixing the input is cheaper than parsing the output.**
+   `extractExcludedReviewers` exists because the applicant's excluded-reviewers
+   text arrives on an intake form we do not control — parsing is the only option
+   there. The decline form is ours: a plain `<textarea>` in
+   `shared/components/external/DeclineFormView.js`
+   `[VERIFIED via DeclineFormView.js:102-118]`. Adding an LLM parse step to an
+   input we can simply constrain buys a new failure mode, new latency, and a new
+   prompt surface to govern, in exchange for less information than the form can
+   collect directly.
+3. **The current placeholder actively teaches the failing shape.** It reads
+   "e.g., Dr. Sarah Chen at Stanford works on similar problems and would be a
+   great fit." `[VERIFIED via DeclineFormView.js:114]` — an honorific, an
+   institution, and two clauses of prose, all of which land verbatim in
+   `wmkf_name` if staff click Add. The form is not neutral about the bug; it
+   induces it. Four labeled rows make the desired shape self-evident and need no
+   instructions.
+
+**Sequencing — keep this OUT of the stabilization slice.** Structured referrals
+mean new durable storage, a change to the reviewer-facing external portal, and
+a new staff-side consumer: that is a feature with its own build plan, schema
+review, and release, and folding it into §6 would blow the slice's boundary and
+delay the engagement fix. Instead split it:
+
+- **In the stabilization slice (cheap, stops the bleeding):** W7(b) — refuse to
+  auto-`create_new` when the submitted name fails a plausibility check (multiple
+  connectors, commas, an `@`, prose markers, or an implausible token count).
+  Route those to the existing staff picker/confirm affordance, which is already
+  built and already handles the ambiguous case. This is a guard in
+  `addManualReviewer`, needs no schema and no portal change, and closes the
+  silent-create path for legacy free-text rows *permanently* — including for
+  referrals already stored.
+- **As a follow-on feature:** the structured input. Notes for that build plan:
+  - **Storage:** 4 rows × 3 fields is 12 columns — do not add them. This repo
+    already stores bounded structured state as JSON on the parent
+    (`wmkf_addresstruststatejson`) and uses child rows for genuinely open-ended
+    sets (`wmkf_appreviewanswer`). For a hard cap of 4, a single JSON memo column
+    on the suggestion is the proportionate choice; revisit child rows only if the
+    cap is ever lifted.
+  - **Compatibility:** keep reading legacy `wmkf_declinereferral` and keep
+    rendering it, but never let a legacy free-text value take the auto-create
+    branch — that is exactly what W7(b) enforces, which is why the guard belongs
+    in the slice regardless of when the form changes.
+  - **Keep it optional and low-friction.** This field is answered by a reviewer
+    who has just declined; every required field costs referrals. Name required
+    per row, institution and email optional, all four rows optional.
+  - **Don't trust it more because it is structured.** A reviewer-typed email is
+    still an untrusted claim: it may resolve to a namesake or be stale. It should
+    feed *identity lookup* and dedupe, and must not bypass the address-trust
+    machinery or land as a verified address.
+
+**Unknown worth checking first:** how many stored referrals actually name more
+than one person. If the answer is "most", the structured form is clearly worth
+it; if it is "two ever", W7(b) alone may be the whole fix. That is one field
+read across declined suggestions — cheap, and it should precede the build plan.
+
+---
+
 ## 7. Stop doing
 
 - **Stop investigating "what regressed".** Nothing did (claim 8); redirect that
@@ -631,7 +710,8 @@ Still open:
 | Whether `1002912`'s applicant cache is currently valid (§2 hop 9) | Same extension: print `applicantEnrichmentCacheVersion` + `applicantKnownReviewer.status` | Yes |
 | **Whether door A (§1 Finding A) has already fired on any request** — an ungated referral/manual promotion of an applicant-recommended person | Query `wmkf_appreviewersuggestion` for `wmkf_applicantdisposition eq recommended and wmkf_selected eq true`, then split by whether `wmkf_sources` contains `staff_manual`/`referred` vs only search/applicant tokens. Rows with a manual/referred token are candidates for an ungated promotion; rows whose engagement stamps are empty despite prior invitation are candidates for a silent reset. **Worth running before the next campaign** — it is read-only and bounds the exposure repo-wide, not just for `1002912`. | Yes — one filtered query |
 | Whether Wolberger's referral text actually names Lima, and whether it names **more than one** person (Finding C's trigger) | Read `wmkf_declinereferral` on her suggestion, or open the Track-tab referral callout | Yes — one field |
-| **Whether Finding C has already created duplicate/malformed person rows** | Read-only scan of `wmkf_potentialreviewers` for name shapes that cannot be a single person — containing ` and `, `,`, `&`, `/`, or >4 whitespace tokens — plus near-duplicate surname+email clusters. This is the query that would surface the Lima duplicate my probe cannot see (§3.1 caveat). **Highest-value remaining probe.** | Yes — one filtered query |
+| **Whether Findings A and C have already damaged data** | **Written this session:** `scripts/probe-referral-path-exposure.mjs` (read-only; Dataverse GETs only). §1 flags person names that cannot denote one person (Finding C's fingerprint — the shape §3.1's probe structurally cannot see); §2 counts applicant-recommended rows that are `selected=true`, split by whether they carry a `staff_manual`/`referred` token (Finding A); §3 lists invited rows holding no response state (possible silent reset — a lead only, since a pending invitee looks identical). Run: `DATAVERSE_ALLOW_PROD_READS=yes node --import ./scripts/lib/use-extensionless.mjs scripts/probe-referral-path-exposure.mjs`. Names are redacted unless `--show-names`. **Not yet run.** | Yes — read-only, prints denominators |
+| How many stored referrals name more than one person (decides whether §6a's structured form is worth building) | Read `wmkf_declinereferral` across declined suggestions and count multi-name answers | Yes — one field, one filter |
 | Demand for the legacy-filename fallback (§4.6) | Count active-cycle requests with no canonical proposal file but a `Project Narrative.pdf` (SharePoint listing over the current cycle's requests; read-only Graph) | Yes — bounded to one cycle |
 | Whether the two July 31 Lima 409s were fresh-enrichment confirms (claim 3 causation) | Vercel request logs for the two PATCHes (payload presence of `candidateKey`), if retained | Maybe — log retention dependent |
 | How many other requests currently have engaged-but-unterminal applicant recommendations (blast radius of the perpetual re-enrich loop) | One roster/Dataverse join query — natural extension of the probe script | Yes — read-only |
