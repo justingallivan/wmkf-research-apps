@@ -143,6 +143,105 @@ test('partial non-2xx response still graduates only the exact server-confirmed s
   expect(screen.getByLabelText(`Select ${withheld.name}`)).toBeInTheDocument();
 });
 
+test('verify contact sends every confirmation-bound field and promotes the server-authoritative candidate', async () => {
+  const staleConfirmation = {
+    confirmationId: 'confirmation-old',
+    source: 'staff_confirmed',
+    normalizedName: 'tatiana kutateladze',
+    email: 'tatiana@example.edu',
+    website: 'https://example.edu/old-profile',
+    affiliation: 'Old Department',
+  };
+  const reviewer = {
+    ...candidate('Tatiana Kutateladze', 'tatiana@example.edu'),
+    candidateKey: 'candidate:tatiana',
+    website: staleConfirmation.website,
+    affiliation: staleConfirmation.affiliation,
+    addressTrustReceipt: null,
+    addressVerificationRequired: true,
+    pdIdentityConfirmed: true,
+    pdIdentityConfirmationId: staleConfirmation.confirmationId,
+    staffIdentityConfirmation: staleConfirmation,
+  };
+  const verifiedCandidate = {
+    ...reviewer,
+    website: 'https://example.edu/current-profile',
+    affiliation: 'Current Department',
+    addressVerificationRequired: false,
+    addressTrustReceipt: {
+      receiptId: 'receipt-current',
+      personConfirmed: true,
+      email: reviewer.email,
+    },
+    pdIdentityConfirmationId: 'confirmation-current',
+    staffIdentityConfirmation: {
+      ...staleConfirmation,
+      confirmationId: 'confirmation-current',
+      website: 'https://example.edu/current-profile',
+      affiliation: 'Current Department',
+    },
+  };
+  let addressBody;
+  let saveBody;
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [reviewer],
+        excluded: [],
+        ineligible: [],
+        blocked: [],
+        savedKeys: [],
+        allNames: [reviewer.name],
+      }));
+    }
+    if (target === '/api/workbench/reviewer-address-trust') {
+      addressBody = JSON.parse(options.body);
+      return Promise.resolve(response({ success: true, candidate: verifiedCandidate }));
+    }
+    if (target === '/api/reviewer-finder/save-candidates') {
+      saveBody = JSON.parse(options.body);
+      return Promise.resolve(response({
+        success: true,
+        savedCount: 1,
+        savedNames: [reviewer.name],
+        savedKeys: [reviewerSaveKey(verifiedCandidate)],
+      }));
+    }
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByRole('button', { name: /verify \/ edit address/i }));
+  fireEvent.change(screen.getByText('Affiliation').parentElement.querySelector('input'), { target: { value: 'Current Department' } });
+  fireEvent.change(screen.getByText('Website').parentElement.querySelector('input'), { target: { value: 'https://example.edu/current-profile' } });
+  fireEvent.click(screen.getByLabelText(/I verified that this is the correct person/i));
+  fireEvent.change(screen.getByText('Evidence link').parentElement.querySelector('input'), { target: { value: 'https://example.edu/current-profile' } });
+  fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+  expect(await screen.findByText(/exact person and address verified/i)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+  await waitFor(() => expect(saveBody).toBeDefined());
+
+  expect(addressBody).toMatchObject({
+    email: reviewer.email,
+    verifiedContact: {
+      website: 'https://example.edu/current-profile',
+      affiliation: 'Current Department',
+    },
+  });
+  expect(saveBody.candidates[0]).toMatchObject({
+    website: verifiedCandidate.website,
+    affiliation: verifiedCandidate.affiliation,
+    pdIdentityConfirmationId: 'confirmation-current',
+    staffIdentityConfirmation: {
+      website: verifiedCandidate.website,
+      affiliation: verifiedCandidate.affiliation,
+    },
+  });
+});
+
 test('stale promote conflict reloads server truth instead of restoring the reviewer to Excluded', async () => {
   const stale = {
     ...candidate('Stale Excluded Reviewer', 'stale@example.edu'),

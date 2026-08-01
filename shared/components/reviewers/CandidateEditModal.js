@@ -17,11 +17,10 @@
  *   - candidate : { suggestionId, name, affiliation, email, website, hIndex }
  *   - onClose()
  *   - onSaved()  — called after a successful PATCH so the parent can refresh
- *   - onApply(updates)  — LOCAL mode (the Find/Workbench card, which isn't saved
- *       yet): when provided, Save hands the changed fields to the parent to apply
- *       to client state instead of PATCHing my-candidates. The parent stamps
- *       manual provenance (email/website → emailSource/websiteSource 'manual',
- *       which the invite gate reads as quick-check). No suggestionId needed.
+ *   - onApply(updates)  — LOCAL mode for the Find/Workbench card. Non-address
+ *       edits stay in client state; exact-address verification is handled by
+ *       onVerifyAddress, which durably records the verified contact on the
+ *       request roster before the modal closes. No suggestionId needed.
  *   - nameEditable (default true) — set false in local mode: the Find card keys
  *       candidates by normalized name, so renaming there would desync selection/
  *       dedup. Name is shown read-only and never included in the emitted updates.
@@ -234,8 +233,9 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
         return;
       }
 
-      // LOCAL mode: apply to client state via the parent (no PATCH — the Find-card
-      // candidate isn't a saved row yet). The parent stamps manual provenance.
+      // LOCAL mode: plain edits apply to client state. Address verification goes
+      // through the parent's authenticated roster endpoint so the verified
+      // contact and its confirmation are durable before the modal closes.
       if (onApply) {
         if (needsAddressVerification) {
           await onVerifyAddress({ ...updates, email: normalizedEmail }, {
@@ -666,7 +666,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
           {!confirmMode && (
             <p className="text-xs text-gray-500">
               {onApply
-                ? 'A manually entered email/website is marked unverified — a quick check is required before any invitation is sent. Saved with this request when you save the candidate.'
+                ? 'A manually entered email/website is marked unverified — a quick check is required before any invitation is sent. Once verified, contact is recorded with this request.'
                 : 'Changes apply to this researcher across all proposals that reference them.'}
             </p>
           )}

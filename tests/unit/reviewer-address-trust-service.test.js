@@ -156,6 +156,56 @@ test('already-ready provenance is preserved instead of being relabeled staff_ver
   expect(update).not.toHaveBeenCalled();
 });
 
+test('roster verification carries the complete verified contact into the atomic attestation write', async () => {
+  const candidateKey = 'candidate:tatiana';
+  const verifiedContact = {
+    website: 'https://example.edu/current-profile',
+    affiliation: 'Current Department',
+  };
+  findCandidatesByKeys.mockResolvedValueOnce([{
+    candidateKey,
+    name: 'Tatiana Kutateladze',
+    email: 'tatiana@example.edu',
+    rosterStatus: 'active',
+  }]);
+  attestAddress.mockResolvedValueOnce({
+    receiptId: 'receipt-current',
+    candidate: {
+      candidateKey,
+      name: 'Tatiana Kutateladze',
+      email: 'tatiana@example.edu',
+      ...verifiedContact,
+      pdIdentityConfirmationId: 'confirmation-current',
+    },
+  });
+
+  const result = await verifyPersonAndAddress({
+    requestId: REQUEST_ID,
+    candidateKey,
+    email: 'tatiana@example.edu',
+    verifiedContact,
+    evidenceType: 'institution_page',
+    evidenceUrl: verifiedContact.website,
+    actorProfileId: 'profile-1',
+    actorSystemUserId: 'system-1',
+  });
+
+  expect(attestAddress).toHaveBeenCalledWith(REQUEST_ID, candidateKey, {
+    email: 'tatiana@example.edu',
+    evidenceType: 'institution_page',
+    evidenceUrl: verifiedContact.website,
+    note: undefined,
+    verifiedContact,
+    actorProfileId: 'profile-1',
+    actorSystemUserId: 'system-1',
+  });
+  expect(result).toMatchObject({
+    success: true,
+    decision: 'attested_pending_promotion',
+    candidate: { pdIdentityConfirmationId: 'confirmation-current' },
+  });
+});
+
 test('ordinary roster conflict discloses only the current address pair', async () => {
   const conflict = createConflictPendingState({
     email: 'reviewer@example.edu',
