@@ -862,12 +862,51 @@ Revised position:
 - **Referrals: structure them.** Unchanged and well-supported — Finding C is a
   verified mechanism with a real duplicate behind it, and the email/institution
   anchors materially improve dedupe (reason 1 above).
-- **Excluded reviewers: leave the format alone for now.** The safety argument
-  for restructuring evaporated with Finding D. What remains is tidiness — an
-  explicit "no exclusions" checkbox would stop ~8 per 200 applicants writing a
-  polite sentence — which is not worth a coordination cycle with Connor on its
-  own. Revisit only if it rides along with another intake change he is already
-  making.
+- **Excluded reviewers: no schema change; a prompt-copy change is worth it, but
+  for a different reason than the one proposed.** *(Owner, 2026-08-01: Connor
+  can add a phrase requesting names only, blank otherwise.)* Endorsed — but the
+  noise it removes is trivial (~8 per 200 applicants writing a polite "none",
+  which the system already handles correctly). **The real value is match
+  reliability**, per the constraint below. A full restructure of the field
+  remains unjustified: the safety argument for it died with Finding D.
+
+  **Why the copy change earns its keep — exclusion matching is exact and
+  order-sensitive.** `normalizeReviewerName` folds diacritics, strips honorifics
+  and punctuation, and lowercases — and nothing else
+  `[VERIFIED via lib/utils/reviewer-name-match.js:26-36]`; matching is then
+  exact set membership `[VERIFIED via reviewer-name-match.js:39-65]`. So each of
+  these **silently fails to exclude anyone**:
+  - `"Lima, Christopher"` → normalizes to `lima christopher`, which never equals
+    the surfaced `christopher lima`. Last-name-first is a common way people
+    write name lists, and it does not match.
+  - `"Chris Lima"` vs a surfaced `"Christopher Lima"` — no diminutive handling
+    (the same variant class as Finding C).
+  - `"C. Lima"` → `c lima` — initials do not match either.
+
+  A prompt asking for **first name then last name, one per line, spelled as the
+  person publishes** raises the hit rate against all three at the cost of one
+  sentence. That is a better argument for the change than tidiness.
+
+  **`[UNMEASURED]` — and deliberately labeled so.** I have not measured how
+  often a stored exclusion fails to match a surfaced candidate; the mechanism is
+  verified, the incidence is not. Given that Finding D was withdrawn for exactly
+  this kind of over-reading, treat it as a plausible reason to prefer good
+  wording, **not** as a claimed defect. It is measurable: for each request,
+  re-parse the exclusion names and compare them against
+  `reviewer_find_roster.display_name` for near-misses (same normalized surname,
+  different forename token). Worth doing only if the copy change is deferred.
+
+  **Two constraints on the wording:**
+  - **Do not ask for institution.** The parser already extracts an optional
+    affiliation, but the API drops it — `excludedNames: excluded.map((e) => e.name)`
+    `[VERIFIED via applicant-reviewers-service.js:196]` — and matching is
+    name-only. Collecting a field nothing consumes invites the belief that it
+    narrows the exclusion when it does not.
+  - **Give the rare non-name concern somewhere to go.** "Names only, blank
+    otherwise" actively discourages writing the 1-in-115 case (the observed
+    "everybody who's not listed above"). Since it genuinely cannot be enforced
+    here, point it at the program officer explicitly rather than letting the
+    instruction silence it with no destination.
 - `extractExcludedReviewers` **stays** and is doing its job correctly: 0 parse
   failures and 0 wrong extractions across every answer examined.
 - Keep the staff-editable exclusion box regardless — it is how staff add names
