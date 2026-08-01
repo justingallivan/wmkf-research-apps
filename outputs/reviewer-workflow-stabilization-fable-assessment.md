@@ -167,6 +167,11 @@ contradiction, not a forename one, so **I am not claiming this caused his
 unresolved state** — but a diminutive being treated as evidence of a different
 person deserves its own test.
 
+**MEASURED 2026-08-01 (§3.3): door A has fired 5 times in production**, once via
+the decline-referral path. All 5 were invited, 4 accepted, none declined — so no
+evidence of harm or of a cleared decline, but the applicant promotion contract
+was bypassed in every case. Finding A is no longer a code-reading; it is a count.
+
 **Finding B — the resurfacing also has an ungated promotion door.**
 The resurfacing is not display-only — it exposes a **state-corrupting write
 path**. `promoteApplicantReviewer` validates only
@@ -539,6 +544,75 @@ One clean result worth stating positively: **0 parse failures and 0 errors
 across 171 LLM extractions.** `extractExcludedReviewers` is reliable on real
 production text; whatever the 13 turn out to be, LLM flakiness is not it.
 
+### 3.3 Findings A and C measured (referral-path probe, 2026-08-01)
+
+`scripts/probe-referral-path-exposure.mjs`, owner-run, read-only, test records
+excluded (26 test requests / 28 test person rows filtered).
+
+**Finding A — CONFIRMED, and it has actually fired.** Of 49 applicant-recommended
+rows that are `selected=true` (7 further rows on test requests excluded),
+**5 carry a `staff_manual` or `referred` source token**. Only
+`ensureStaffManualCandidate` unions those tokens — `promoteApplicantReviewer`
+writes `selected` through `updateLifecycle` and never touches `sources` — so
+each of the 5 was promoted through door A, bypassing the identity/COI/address
+gates. One of them carries `referred`, i.e. a decline-referral add landing on an
+applicant-recommended person: **the Wolberger→Lima scenario, on a different
+request.** All 5 are `invited=true` and 4 are `accepted=true`.
+
+Severity, stated carefully: these look like reviewers staff genuinely wanted —
+they were invited and mostly accepted, and **none shows `declined=true`**, so
+there is no evidence of a cleared decline. The defect is that the applicant
+promotion contract was skipped, not that the wrong people were engaged. It moves
+Finding A from "reachable in code" to **"has occurred 5 times"**, which is the
+strongest argument in this document for shipping W6.
+
+**Finding C — the mechanism is real, but my predicted trigger has zero
+instances, and a different trigger is common.** Across 4,430 active person rows:
+
+| Signal | Count |
+|---|---|
+| `connector_and` ("X and Y") — the shape I predicted | **0** |
+| `prose_marker` ("works on…", "would be…") | **0** |
+| `has_email` | **0** |
+| Genuine malformed — a JSON literal stored as a person name | **1** |
+| `slash_or_semicolon` | 1 |
+| **Credential suffixes** ("Jane Doe, PhD") | **~47** |
+
+So the free-text-referral concatenation I inferred from the owner's recollection
+**does not appear in production data**. Whatever produced the historical Lima
+duplicate, it did not leave a multi-name person row behind.
+
+**But the same matching failure is live at scale through credentials.**
+`normalizeReviewerName` strips punctuation and keeps the token, so
+`"Jane Doe, PhD"` normalizes to `jane doe phd`, which never equals `jane doe`
+`[VERIFIED by running the real normalizer against both forms]`. Every one of
+those ~47 rows therefore:
+
+- silently misses exact-match **exclusion** (an applicant excluding "Jane Doe"
+  does not block "Jane Doe, PhD", or the reverse);
+- silently misses cross-run **dedup** by normalized name; and
+- defeats **identity lookup**, because `splitName` puts the credential in the
+  surname — `wmkf_lastname eq 'Doe, PhD'` matches nothing, which is the exact
+  create-a-duplicate path from Finding C.
+
+That last point matters: **Finding C's create-new hazard is reachable through
+credentials, not just concatenation** — and credentials are 47× more common than
+the shape I hypothesized. The one JSON-literal row is a separate, genuine
+data-quality defect worth a look at whatever wrote it.
+
+**Finding A's reset branch — clean.** Section 3 returned a single lead, and it
+resolves benignly: suggestion `fdd093f6…` on request `1002912` is Ralph Isberg,
+`emailSentAt=2026-07-30`, with no response state — a genuine **pending invitee**,
+exactly matching §3.1. **No evidence of `ENGAGEMENT_STAMP_RESET` firing outside
+the deliberate Restore flow.**
+
+**Probe correction applied.** Section 1's first run reported 49 undifferentiated
+hits, 47 of them credential false-positives for its stated purpose. The
+classifier now separates a `credential_suffix` bucket from the multi-person
+signal (and adds a `json_or_markup` test), so the Finding-C number is not
+inflated by a different problem. Counts above are restated under the corrected
+classification; re-run for the cleaner output.
+
 ---
 
 ## 4. Critique of the stabilization directive
@@ -684,15 +758,17 @@ Golden workflows (revised; each must fail against baseline before the fix):
    Test (b) with the exact live shape: a person holding a
    `disposition=recommended, selected=false` row who is then referred by a
    decliner — the Wolberger→Lima scenario.
-7. **W7 (new) — A referral is a suggestion, not a name.** Free-text referral
-   input containing more than one person, or trailing prose, must not become a
-   reviewer's name and must not silently create a person. Assert: (a) multi-name
-   / prose referral text does not reach `manual-reviewer` as `name`; (b) a
-   lookup returning `outcome:'none'` for input that fails a name-plausibility
-   check requires explicit staff confirmation instead of auto
-   `create_new`; (c) a clean diminutive ("Chris" for "Christopher") still
-   resolves to the staff picker, not a new person. Baseline-failing today
-   (§1 Finding C).
+7. **W7 (new) — A name that cannot match must not silently create a person.**
+   *(Retargeted after §3.3: the multi-name shape has zero production instances,
+   while credential suffixes have ~47 and break matching identically.)* Assert:
+   (a) a lookup returning `outcome:'none'` for input that fails a
+   name-plausibility check requires explicit staff confirmation instead of auto
+   `create_new`; (b) **the plausibility check covers credential suffixes
+   ("Jane Doe, PhD") and last-name-first ("Doe, Jane")**, not only multi-name
+   text — these are the forms that actually occur; (c) multi-name / prose
+   referral text still does not reach `manual-reviewer` as `name`; (d) a clean
+   diminutive ("Chris" for "Christopher") still resolves to the staff picker,
+   not a new person. Baseline-failing today.
 
 Complement coverage the directive asked about: all-failed enrichment batches
 (hydration-failure path exists and is tested by shape — keep one assertion),
@@ -927,14 +1003,16 @@ Revised position:
   person publishes** raises the hit rate against all three at the cost of one
   sentence. That is a better argument for the change than tidiness.
 
-  **`[UNMEASURED]` — and deliberately labeled so.** I have not measured how
-  often a stored exclusion fails to match a surfaced candidate; the mechanism is
-  verified, the incidence is not. Given that Finding D was withdrawn for exactly
-  this kind of over-reading, treat it as a plausible reason to prefer good
-  wording, **not** as a claimed defect. It is measurable: for each request,
-  re-parse the exclusion names and compare them against
-  `reviewer_find_roster.display_name` for near-misses (same normalized surname,
-  different forename token). Worth doing only if the copy change is deferred.
+  **Now partly MEASURED (§3.3), which strengthens this.** ~47 of 4,430 active
+  person rows carry a credential suffix ("Jane Doe, PhD"), and the real
+  normalizer confirms `jane doe phd ≠ jane doe`. So the variant-mismatch hazard
+  is not hypothetical for at least one common form — roughly 1% of people, and
+  disproportionately the applicant-supplied ones. What remains `[UNMEASURED]` is
+  how often such a mismatch has actually caused a *specific* exclusion to fail
+  (that needs a per-request comparison of exclusion names against
+  `reviewer_find_roster.display_name`). Asking applicants for names **without
+  degrees or titles** is therefore worth an explicit clause in the phrasing —
+  it is now the best-evidenced part of this recommendation.
 
   **Two constraints on the wording:**
   - **Do not ask for institution.** The parser already extracts an optional

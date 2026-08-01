@@ -122,14 +122,50 @@ const APPLICANT_DISPOSITION_RECOMMENDED = 100000000;
 // are shapes a human name does not take, not merely unusual ones. Particles
 // (van, de, del) and hyphenated surnames must NOT match, so the token test is
 // generous and the connector test requires whitespace-delimited " and "/" & ".
+// Degree/credential suffixes. On the first real run 47 of 49 "comma" hits were
+// these ("Jane Doe, PhD"), not multi-person names — so they get their own bucket
+// rather than inflating the Finding-C signal. They are NOT harmless: normalization
+// keeps the token, so "jane doe phd" never equals "jane doe" and the row silently
+// misses every exact-match exclusion/dedup comparison.
+const CREDENTIAL_TOKENS = new Set([
+  'phd', 'ph', 'd', 'md', 'dphil', 'scd', 'dsc', 'msc', 'ms', 'ma', 'mph', 'mba',
+  'dvm', 'dds', 'pharmd', 'drph', 'bsc', 'bs', 'ba', 'meng', 'rn', 'np', 'pa',
+  'frcp', 'facs', 'faaas', 'facp', 'frs', 'esq', 'jr', 'sr', 'ii', 'iii', 'iv',
+  'emeritus', 'emerita',
+]);
+
+// Is every comma-separated tail segment just credentials?
+function tailIsCredentialsOnly(name) {
+  const segments = String(name).split(',').map((s) => s.trim()).filter(Boolean);
+  if (segments.length < 2) return false;
+  return segments.slice(1).every((seg) => {
+    const tokens = seg.toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/).filter(Boolean);
+    return tokens.length > 0 && tokens.every((t) => CREDENTIAL_TOKENS.has(t));
+  });
+}
+
+// Strip credential tails before applying the length test, so "Jane Doe, Ph.D.,
+// F.A.C.S." is not counted as a long multi-person string.
+function withoutCredentialTail(name) {
+  return tailIsCredentialsOnly(name) ? String(name).split(',')[0].trim() : String(name);
+}
+
 const MULTI_PERSON_PATTERNS = [
   { key: 'connector_and', test: (n) => /\s(and|&)\s/i.test(n) },
-  { key: 'comma', test: (n) => /,/.test(n) },
+  { key: 'comma', test: (n) => /,/.test(n) && !tailIsCredentialsOnly(n) },
   { key: 'slash_or_semicolon', test: (n) => /[;/]/.test(n) },
   { key: 'prose_marker', test: (n) => /\b(works? on|would be|at the|is a|suggest|recommend|professor of|who)\b/i.test(n) },
-  { key: 'very_long', test: (n) => n.trim().split(/\s+/).length > 5 },
+  { key: 'very_long', test: (n) => withoutCredentialTail(n).trim().split(/\s+/).length > 5 },
   { key: 'has_email', test: (n) => /@/.test(n) },
+  { key: 'json_or_markup', test: (n) => /[{}[\]<>]|"\s*:/.test(n) },
+  // Reported separately: a match-breaking hygiene problem, not a Finding-C duplicate.
+  { key: 'credential_suffix', test: (n) => tailIsCredentialsOnly(n) },
 ];
+
+const MULTI_PERSON_KEYS = new Set([
+  'connector_and', 'comma', 'slash_or_semicolon', 'prose_marker', 'very_long',
+  'has_email', 'json_or_markup',
+]);
 
 function classifyName(name) {
   return MULTI_PERSON_PATTERNS.filter((p) => p.test(name)).map((p) => p.key);
@@ -171,22 +207,40 @@ for (const p of people) {
   if (reasons.length) flagged.push({ id: p.wmkf_potentialreviewersid, name, reasons, created: p.createdon, email: p.wmkf_emailaddress });
 }
 
+const multiPerson = flagged.filter((f) => f.reasons.some((r) => MULTI_PERSON_KEYS.has(r)));
+const credentialOnly = flagged.filter((f) => !f.reasons.some((r) => MULTI_PERSON_KEYS.has(r)));
+
 console.log('─'.repeat(78));
-console.log(`SECTION 1 — person names that cannot denote one person (Finding C)`);
+console.log('SECTION 1 — person names that cannot denote one person (Finding C)');
 console.log(`  scanned: ${people.length} active person row(s)${peopleCapped ? ' [CAPPED — rerun with a higher --limit]' : ''}`);
 if (testPeopleSkipped) console.log(`  skipped: ${testPeopleSkipped} known test-record person row(s)`);
-console.log(`  flagged: ${flagged.length}`);
-if (flagged.length) {
+console.log(`  MULTI-PERSON / malformed (the Finding C signal): ${multiPerson.length}`);
+if (multiPerson.length) {
   const byReason = {};
-  for (const f of flagged) for (const r of f.reasons) byReason[r] = (byReason[r] || 0) + 1;
-  console.log(`  by pattern: ${JSON.stringify(byReason)}`);
+  for (const f of multiPerson) for (const r of f.reasons) if (MULTI_PERSON_KEYS.has(r)) byReason[r] = (byReason[r] || 0) + 1;
+  console.log(`    by pattern: ${JSON.stringify(byReason)}`);
   console.log('');
-  for (const f of flagged) {
+  for (const f of multiPerson) {
     console.log(`  ${f.id}  [${f.reasons.join(',')}]  created=${(f.created || '').slice(0, 10)}`);
     console.log(`      name=${redact(f.name)}${f.email ? `  email=${redact(f.email)}` : '  email=—'}`);
   }
 } else {
-  console.log('  → no malformed person names found; Finding C has not produced a duplicate in this window.');
+  console.log('    → none; the free-text-referral concatenation shape does not appear in this window.');
+}
+
+console.log('');
+console.log(`  CREDENTIAL SUFFIXES ("Jane Doe, PhD"): ${credentialOnly.length}`);
+console.log('    Not multi-person, but NOT harmless: normalizeReviewerName keeps the');
+console.log('    credential token, so "jane doe phd" never equals "jane doe" — these rows');
+console.log('    silently miss every exact-match exclusion and dedup comparison, and');
+console.log('    splitName sends the credential into the surname for identity lookup.');
+if (credentialOnly.length && showNames) {
+  console.log('');
+  for (const f of credentialOnly) {
+    console.log(`  ${f.id}  created=${(f.created || '').slice(0, 10)}  name=${redact(f.name)}`);
+  }
+} else if (credentialOnly.length) {
+  console.log('    (pass --show-names to list them)');
 }
 console.log('');
 
