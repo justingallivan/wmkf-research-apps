@@ -597,25 +597,56 @@ this document is therefore a strict lower bound on historical incidence**, and
 "0 multi-name rows" means "0 currently unrepaired", nothing more. The probe now
 says so in its own output rather than implying absence.
 
-**Two consequences that matter more than the count.**
+#### 3.3.1 The duplicate still exists — full artifact trail
 
-*(a) The record was created by the intake integration, not by our code.* This
-**undercuts an argument I made in §6a** and should be corrected there: I cited
-the applicant-recommended path as proof that structure prevents this class of
-bug, because the slots are exact person GUIDs. The GUIDs *are* exact — but the
-person records they point at are minted by the akoyaGO integration from whatever
-the applicant typed. Structure at the *lookup* layer does not protect data
-quality at the *record-creation* layer. The 47 credential-suffix rows are the
-same pattern at scale, and the probe now reports `createdby` per flagged row so
-the producing surface is visible rather than inferred.
+*(Supersedes my previous attribution, which blamed the akoyaGO intake
+integration. That was wrong: I read `createdby` off the pre-existing
+applicant-slot person and drew a conclusion about a different record. The owner
+corrected the source — **this came from our own decline-referral field, not
+Connor's intake** — and the person rows bear that out.)*
 
-*(b) A concatenated line may silently drop a person.* If two reviewers share one
-line and intake mints one record, the second reviewer never becomes a candidate
-at all — worse than a duplicate, because nothing surfaces to be noticed.
-`[UNKNOWN]` whether "Other Name NCI" was ever created separately on `1002912`;
-the owner can answer that faster than a query can, and it is worth asking,
-because a silently-lost applicant recommendation is a different severity than a
-malformed name.
+The owner's screenshot of Request `1002912` → Reviewers → Track Reviewers shows
+the referral callout verbatim, two people on two lines in one free-text field:
+
+```
+Chris Lima, Memorial Sloan Kettering
+Kylie Walters, NCI
+        — suggested by Cynthia Wolberger        [Add as candidate]
+```
+
+Person rows for that request `[VERIFIED via read-only lookup 2026-08-01]`:
+
+| Person | Name | Created | State |
+|---|---|---|---|
+| `ad90a3f5…` | "Christopher Lima" | 2026-04-30 by **akoyaGO Integration** | active — the pre-existing applicant-slot person |
+| `0ae2bbf4…` | `" Chris Lima "` | **2026-08-01 03:06:18 by Justin Gallivan** | **inactive** — the duplicate, repaired then deactivated at 03:09:24 |
+| `8129d6b9…` | `" Kylie Walters "` | 2026-08-01 03:11:46 by Justin Gallivan | active, `kylie.walters@nih.gov`, National Cancer Institute |
+
+**Finding C is now confirmed by a surviving production artifact**, not only by
+testimony: a second Lima person record was minted from the two-line referral,
+repaired by hand, and deactivated. The remediation cost three manual operations
+inside six minutes — fix the canonical record, kill the duplicate, re-add the
+second reviewer.
+
+**Open question answered: Kylie Walters was not lost.** The owner added her
+separately and her record is active with a real NIH address. The silent-drop
+risk I raised is real in principle but did not occur here, because a human
+noticed. Nothing in the system would have flagged it.
+
+**Two details worth keeping:**
+
+- **Provenance of `0ae2bbf4` is not determinable from Dataverse metadata.** Both
+  our app (which impersonates the acting user) and a hand-entry in the Dynamics
+  UI record `createdby = Justin Gallivan`. What is certain: the referral text
+  holds two people (screenshot), our button sends that entire text as `name`
+  `[VERIFIED via ReviewersTab.js:186-202]`, and a duplicate appeared. The fix is
+  the same either way.
+- **Both new person rows carry untrimmed names** (`" Chris Lima "`,
+  `" Kylie Walters "`). The adapter has a `cleanName` that trims and collapses
+  whitespace `[VERIFIED via potential-reviewer.js:30-37]`, so these either
+  bypassed it or fell through its `|| name` fallback. Matching is unaffected
+  (`normalizeReviewerName` trims), so this is cosmetic — but it is a small
+  signal that the write path used here was not the normalized one.
 
 **But the same matching failure is live at scale through credentials.**
 `normalizeReviewerName` strips punctuation and keeps the token, so
@@ -906,21 +937,18 @@ reasons, in order of weight:
    "does not occur". Institution similarly feeds the resolver's affiliation
    anchor and the COI checks. A parser can only ever recover a *name* from
    prose; it cannot invent the anchors that make matching reliable.
-2. ~~**The same intake form already proves the approach.**~~ **RETRACTED
-   2026-08-01 (§3.3).** I argued that the applicant-recommended path is immune
-   because its slots hold exact person GUIDs
-   `[VERIFIED via applicant-reviewers-service.js:43-55,100-105]` while the
-   excluded field is free text. The GUID half is true and the conclusion was
-   still wrong: those person records are **created by the akoyaGO intake
-   integration from whatever the applicant typed**, so a single line naming two
-   reviewers becomes one malformed person record — confirmed on the Lima record,
-   `createdby "# BCO akoyaGO Integration"`. **Exactness at the lookup layer says
-   nothing about data quality at the record-creation layer**, and the ~47
-   credential-suffix rows are the same failure at scale. The corrected version
-   of this point is stronger, not weaker: *both* applicant reviewer inputs are
-   free text underneath, so **the recommended-reviewer entry format deserves the
-   fix more than the excluded-reviewer wording does** — see the reprioritized ask
-   below.
+2. **Structured beats free-text within this codebase — with one honest
+   qualifier.** The applicant's *recommended* reviewers arrive as
+   `wmkf_potentialreviewer1..5` lookup slots holding exact person GUIDs, which
+   ingestion consumes with no name matching at all
+   `[VERIFIED via applicant-reviewers-service.js:43-55,100-105]`; the *excluded*
+   field on the same form is free text needing an LLM extractor. The qualifier,
+   learned the hard way this session: **exactness at the lookup layer does not
+   guarantee data quality at the record-creation layer** — the person rows behind
+   those GUIDs are still authored by a human somewhere, which is how ~47 of them
+   ended up carrying credential suffixes. So structure removes the *parsing* and
+   *namesake-guessing* failure modes, not every failure mode. That is still the
+   right trade, and it is exactly what the referral field lacks today.
 3. **Fixing the input is cheaper than parsing the output — and this holds for
    both surfaces.** *(Corrected 2026-08-01 on owner input: I previously wrote
    that parsing was "the only option" for the intake field because we do not own
@@ -1016,18 +1044,28 @@ Revised position:
 - **Referrals: structure them.** Unchanged and well-supported — Finding C is a
   verified mechanism with a real duplicate behind it, and the email/institution
   anchors materially improve dedupe (reason 1 above).
-- **PRIORITY ORDER FOR CONNOR, revised 2026-08-01 (§3.3).** If only one intake
-  change is made, make it to the **recommended-reviewer entry**, not the
-  excluded-reviewer wording. Rationale: those entries become
-  `wmkf_potentialreviewers` **person records** that feed identity resolution,
-  contact promotion, COI, and invitations — a malformed one needs hand-repair
-  (the owner repaired Lima's on 2026-08-01) and may silently drop a second
-  reviewer entirely. Exclusion text, by contrast, feeds only a name soft-block
-  and its worst observed failure is a no-op. Ask for: **one reviewer per line
-  (or separate fields), full name as published, no degrees or titles,
-  institution in its own field.** That single change addresses the confirmed
-  Lima concatenation, the ~47 credential-suffix rows, and the Finding-C
-  create-duplicate path at their common source.
+- **PRIORITY, settled 2026-08-01 (§3.3.1): the fix is OURS, not Connor's.**
+  *(This reverses the reprioritization I made one revision earlier, which
+  routed the fix to intake on a misattributed record. The owner corrected the
+  source: the concatenation came from our decline-referral field.)* The
+  confirmed duplicate was minted from **our** free-text referral, on **our**
+  form, through **our** "Add as candidate" button. So the owner's original
+  instinct — structured referral rows, name + optional institution + email, up
+  to four — is the right fix, aimed at the right surface, and is now backed by a
+  production artifact rather than a mechanism argument. **Build it here; no
+  Connor dependency, no coordination cycle.**
+
+  The screenshot also settles the *shape*: reviewers already type one person per
+  line with the institution after a comma. Four rows of `name` +
+  `institution` + `email` is not asking them to change how they think — it is
+  giving the format they are already using somewhere to land. And per reason 1,
+  the email field is what converts this from "detect duplicates" to "no
+  duplicate".
+
+- **Intake (Connor) remains a lower-priority, separate item.** The ~47
+  credential-suffix person rows are an intake-side artifact and still argue for
+  "names without degrees or titles" in that form's wording — but no confirmed
+  duplicate traces to intake, so it does not compete with the referral fix.
 
 - **Excluded reviewers: no schema change; a prompt-copy change is worth it, but
   for a different reason than the one proposed.** *(Owner, 2026-08-01: Connor
