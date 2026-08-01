@@ -64,7 +64,17 @@ an ordinary roster row can authorize a durable person lookup; renders both
 conflict addresses and their evidence form directly in the invitation modal for
 already-promoted rows; rejects raw manual-email edits while a conflict is pending
 and routes the editor to that invitation adjudication surface; reports inactive
-ordinary people precisely; and reconciles the stale test count. A fourth
+ordinary people precisely; and reconciles the stale test count.
+
+The fourth review of `c5e6d008` confirmed those six findings as fixed, but
+returned **NO-SHIP** because the new identity receipt depended on JSON object key
+order, also bound mutable email/affiliation, the no-person-bundle fallback erased
+the adjudicated address pair, raw manual edits could proceed without an ETag,
+and two UI failure messages did not carry their available repair action. The
+follow-up source replaces the receipt payload with a canonical identity-only
+digest, verifies it after minting and on every durable lookup, retains the exact
+stored/found/selected tuple in the roster receipt, fails closed when the person
+ETag is absent, and surfaces the server remediation on both UI failures. A fifth
 read-only adversarial review is pending. Wave 17 and runtime promotion remain
 prohibited until it passes.
 
@@ -584,11 +594,11 @@ Each stage preserves current send safety. The ready-tier change is last.
    - Probe Dataverse person state, native audit, explicit actor fields, suggestion
    lifecycle, and absence of Contact promotion.
 
-## Second-review remediation status (2026-07-31)
+## Adversarial-review remediation status (2026-07-31)
 
-**[IMPLEMENTED IN SOURCE / THIRD REVIEW PENDING]** The follow-up remediation
-closes the second Opus review's H1 and M2–M6 findings plus its active-state and
-Invite-remedy low findings. The relevant enforced complements are:
+**[IMPLEMENTED IN SOURCE / FIFTH REVIEW PENDING]** The remediation sequence
+closes the first four Opus reviews' confirmed findings. The relevant enforced
+complements are:
 
 - a provisional/provider-only ORCID cannot resolve a durable person write
   target; an ordinary candidate requires a persist-worthy identity decision
@@ -608,12 +618,18 @@ Invite-remedy low findings. The relevant enforced complements are:
 - the Invite conflict card adjudicates either current address in place for an
   already-promoted suggestion while still offering durable repair;
 - ordinary durable person lookup requires a server-bound identity-decision
-  receipt whose exact projection still matches the roster row; and
+  receipt whose canonical identity-only digest still matches the roster row;
+- the receipt is invariant under JSONB key reordering and later address or
+  affiliation adjudication, but invalidates when the identity decision changes;
+- no-person-bundle resolution retains the exact stored/found/selected tuple in
+  the request-scoped roster receipt;
+- raw person-address edits fail closed when the Dataverse ETag is unavailable;
+- failed conflict load/retry responses expose their available repair action; and
 - manual saved-candidate edits cannot invalidate a pending bundle and silently
   downgrade the send block.
 
-Verification after the third-review remediation: focused affected-surface tests
-135/135; full suite 550/550 suites and 6,650/6,650 tests; `check:types`; lint with zero errors
+Verification after the fourth-review remediation: focused affected-surface tests
+167/167; full suite 550/550 suites and 6,652/6,652 tests; `check:types`; lint with zero errors
 and 51 pre-existing warnings; production build; API route matrix + self-test;
 Dataverse DAL gate + self-test; doc-currency gate + self-test. This evidence is
 local only and does not satisfy the schema-first deployment or signed-in pilot

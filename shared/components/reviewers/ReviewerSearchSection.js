@@ -1634,7 +1634,9 @@ export default function ReviewerSearchSection({
     const data = await response.json().catch(() => ({}));
     if (genRef.current !== myGen) return;
     if (!response.ok || !data.success || !data.conflict) {
-      setRosterNote(data.message || data.error || 'Could not load the current address conflict. Retry the check or request repair.');
+      const nextAction = data.remediation?.find((item) => item?.action === 'create_repair_request')?.label
+        || data.remediation?.[0]?.label;
+      setRosterNote(`${data.message || data.error || 'Could not load the current address conflict.'}${nextAction ? ` Next: ${nextAction}.` : ' Create a repair request from this reviewer card.'}`);
       return;
     }
     setEditingContact({ ...cand, addressConflict: data.conflict });
@@ -1652,7 +1654,9 @@ export default function ReviewerSearchSection({
     const data = await response.json().catch(() => ({}));
     if (genRef.current !== myGen) return;
     if (!response.ok || !data.success || !data.candidate) {
-      setRosterNote(data.message || data.error || 'The conflict check could not be retried. Create a repair request if it continues to fail.');
+      const nextAction = data.remediation?.find((item) => item?.action === 'create_repair_request')?.label
+        || data.remediation?.[0]?.label;
+      setRosterNote(`${data.message || data.error || 'The conflict check could not be retried.'}${nextAction ? ` Next: ${nextAction}.` : ' Create a repair request from this reviewer card.'}`);
       return;
     }
     applyAuthoritativeRosterCandidate(key, data.candidate);

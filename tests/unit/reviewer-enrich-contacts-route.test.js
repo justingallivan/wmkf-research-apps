@@ -38,7 +38,13 @@ jest.mock('../../lib/services/contact-enrichment-service', () => ({
 }));
 
 jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
+  createServerIdentityDecisionReceipt: jest.fn(() => ({
+    version: 1,
+    source: 'automated_resolver',
+    identityDigest: 'server-digest',
+  })),
   mintAutomatedIdentityAttestation: jest.fn(async ({ candidate }) => `receipt:${candidate.name}`),
+  verifyAutomatedIdentityAttestation: jest.fn(async () => ({ valid: true, identityDecisionBound: true })),
 }));
 
 jest.mock('../../lib/services/reviewer-contact-reconciliation', () => ({
@@ -137,6 +143,12 @@ test('adds a server identity receipt to enriched candidates when requestId is pr
   const complete = res.frames.find((frame) => frame.type === 'complete');
   expect(mintAutomatedIdentityAttestation).toHaveBeenCalled();
   expect(complete.results[0].automatedIdentityAttestation).toBe('receipt:Dr. A');
+  expect(complete.results[0].serverIdentityDecisionReceipt).toMatchObject({
+    source: 'automated_resolver',
+    identityDigest: 'server-digest',
+  });
+  expect(reconcileReviewerContacts.mock.calls[0][0][0].serverIdentityDecisionReceipt)
+    .toMatchObject({ identityDigest: 'server-digest' });
   expect(reconcileReviewerContacts).toHaveBeenCalledWith(
     expect.any(Array),
     expect.objectContaining({

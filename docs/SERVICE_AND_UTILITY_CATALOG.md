@@ -115,8 +115,9 @@ If you're touching a service or utility, read its header before this catalog. If
   request/candidate receipt. Projection v3 binds the exact canonical contact
   projection in addition to identity/eligibility; v1/v2 remain verifiable
   against their historical projections but are never contact-authoritative. A
-  compact server-only roster receipt preserves the accepted identity-decision
-  projection after ingestion and must still match the current row at use time.
+  compact server-only roster receipt preserves a canonical digest of the
+  accepted identity decision after ingestion and must still match the current
+  row at use time. Mutable address/affiliation fields are deliberately excluded.
 - **`reviewer-finder/save-candidates-service.js`** — Server-owned Find→Invite
   promotion boundary: canonical contact projection, v3/staff authority,
   exact-email owner reuse and race convergence, per-row result contract,

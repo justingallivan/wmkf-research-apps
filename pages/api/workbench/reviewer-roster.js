@@ -142,13 +142,16 @@ async function preserveStoredRosterAuthority(requestId, candidates) {
   const storedByKey = new Map(storedRows.map((candidate) => [candidate.candidateKey, candidate]));
   return list.map((candidate) => {
     const stored = storedByKey.get(candidate?.candidateKey);
-    const preserveIdentityReceipt = !!stored
-      && hasServerIdentityDecisionReceipt(stored)
-      && JSON.stringify(stored.serverIdentityDecisionReceipt.projection)
-        === JSON.stringify(candidate?.serverIdentityDecisionReceipt?.projection
-          || createServerIdentityDecisionReceipt(candidate).projection);
-    const withIdentityReceipt = preserveIdentityReceipt
+    const freshIdentityReceipt = hasServerIdentityDecisionReceipt(candidate);
+    const candidateWithStoredReceipt = stored?.serverIdentityDecisionReceipt
       ? { ...candidate, serverIdentityDecisionReceipt: stored.serverIdentityDecisionReceipt }
+      : candidate;
+    const preserveIdentityReceipt = !freshIdentityReceipt
+      && !!stored
+      && hasServerIdentityDecisionReceipt(stored)
+      && hasServerIdentityDecisionReceipt(candidateWithStoredReceipt);
+    const withIdentityReceipt = preserveIdentityReceipt
+      ? candidateWithStoredReceipt
       : candidate;
     if (!stored || !hasStoredStaffAuthority(stored)) return withIdentityReceipt;
     const confirmation = stored.staffIdentityConfirmation;

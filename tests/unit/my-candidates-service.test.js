@@ -41,6 +41,7 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   getById: jest.fn(async () => ({
     wmkf_emailaddress: 'old@example.edu',
     wmkf_addresstruststatejson: null,
+    _etag: 'W/"person"',
   })),
   update: jest.fn(async () => {}),
   clearEmailForEdit: jest.fn(async () => ({ cleared: true })),
@@ -541,6 +542,29 @@ describe('patchMyCandidates', () => {
       { email: 'new@example.edu', emailSource: 'manual' },
       { actingUserSystemId: SYS, ifMatch: 'W/"person-1"' },
     );
+  });
+
+  test('manual address edit fails closed with a reload remedy when the person ETag is missing', async () => {
+    suggestionAdapter.findById.mockResolvedValue({ _wmkf_potentialreviewer_value: PERSON_ID });
+    potentialReviewerAdapter.getById.mockResolvedValueOnce({
+      wmkf_emailaddress: 'old@example.edu',
+      wmkf_addresstruststatejson: null,
+    });
+
+    const error = await patchMyCandidates({
+      body: { suggestionId: SUGGESTION_ID, email: 'new@example.edu' },
+      actingUserSystemId: SYS,
+    }).catch((caught) => caught);
+
+    expect(error).toMatchObject({
+      httpStatus: 409,
+      body: {
+        code: 'candidate_stale',
+        partialSuccess: false,
+        remediation: [expect.objectContaining({ action: 'reload_candidate' })],
+      },
+    });
+    expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
   });
 
   test('empty email routes through the explicit ETag-bound clear command', async () => {

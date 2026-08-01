@@ -29,6 +29,7 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   getById: jest.fn(async () => ({
     wmkf_emailaddress: 'old@example.org',
     wmkf_addresstruststatejson: null,
+    _etag: 'W/"person"',
   })),
   update: jest.fn(),
   findByEmailCandidates: jest.fn(),

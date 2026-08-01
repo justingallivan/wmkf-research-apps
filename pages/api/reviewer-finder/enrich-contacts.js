@@ -32,6 +32,7 @@ import { resolveProposalPI, piInstitutions } from '../../../lib/services/proposa
 import {
   createServerIdentityDecisionReceipt,
   mintAutomatedIdentityAttestation,
+  verifyAutomatedIdentityAttestation,
 } from '../../../lib/services/reviewer-candidate-attestation';
 import { reconcileReviewerContacts } from '../../../lib/services/reviewer-contact-reconciliation';
 
@@ -205,11 +206,15 @@ export default async function handler(req, res) {
     if (requestId && Array.isArray(results?.enriched)) {
       await Promise.all(results.enriched.map(async (candidate) => {
         try {
-          candidate.automatedIdentityAttestation = await mintAutomatedIdentityAttestation({
+          const token = await mintAutomatedIdentityAttestation({
             requestId,
             candidate,
           });
-          candidate.serverIdentityDecisionReceipt = createServerIdentityDecisionReceipt(candidate);
+          candidate.automatedIdentityAttestation = token;
+          const verified = await verifyAutomatedIdentityAttestation(token, { requestId, candidate });
+          if (verified.valid && verified.identityDecisionBound === true) {
+            candidate.serverIdentityDecisionReceipt = createServerIdentityDecisionReceipt(candidate);
+          }
         } catch (error) {
           console.error('[enrich-contacts] identity receipt mint failed:', error.message);
         }

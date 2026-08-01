@@ -109,6 +109,11 @@ test('only an active reviewer matched through an anchor-grounded ORCID is a dura
     },
     orcidId: ORCID,
   });
+  // Address adjudication may update these mutable contact fields after the
+  // server identity decision was recorded; it must not invalidate person identity.
+  row.email = 'corrected@example.edu';
+  row.affiliation = 'Corrected University';
+  row.contactEnrichment.email = 'corrected@example.edu';
   const lookup = jest.fn(async () => ({
     outcome: 'confident',
     match: { reviewerId: 'reviewer-1', matchKey: 'orcid', nameConsistent: true },

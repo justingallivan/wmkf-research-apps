@@ -55,7 +55,7 @@ test('server receipt carries the owner-approved 14-day lifetime', async () => {
   expect(payload.projectionVersion).toBe(PROJECTION_VERSION);
 });
 
-test('persisted server identity receipt binds the exact compact identity projection', () => {
+test('persisted server identity receipt survives JSONB key reordering and address edits but not identity edits', () => {
   const candidate = {
     ...CANDIDATE,
     candidateKey: 'candidate:jane',
@@ -72,8 +72,21 @@ test('persisted server identity receipt binds the exact compact identity project
     ...candidate,
     serverIdentityDecisionReceipt: createServerIdentityDecisionReceipt(candidate),
   };
+  const jsonbOrder = (value) => {
+    if (Array.isArray(value)) return value.map(jsonbOrder);
+    if (!value || typeof value !== 'object') return value;
+    return Object.fromEntries(Object.keys(value)
+      .sort((left, right) => left.length - right.length || left.localeCompare(right))
+      .map((key) => [key, jsonbOrder(value[key])]));
+  };
 
   expect(hasServerIdentityDecisionReceipt(bound)).toBe(true);
+  expect(hasServerIdentityDecisionReceipt(jsonbOrder(bound))).toBe(true);
+  expect(hasServerIdentityDecisionReceipt({
+    ...bound,
+    email: 'corrected@example.edu',
+    affiliation: 'Corrected University',
+  })).toBe(true);
   expect(hasServerIdentityDecisionReceipt({
     ...bound,
     contactEnrichment: { ...bound.contactEnrichment, orcidId: '0000-0001-5109-3700' },

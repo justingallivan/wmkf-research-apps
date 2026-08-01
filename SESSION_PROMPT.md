@@ -29,7 +29,11 @@
 > `21b44680` confirmed those fixes but returned NO-SHIP on a no-bundle receipt
 > retry dead end, the promoted-conflict UI, roster identity authority, manual
 > edit bypass, inactive-person reason, and one count typo. Codex has remediated
-> those findings in source; a fourth read-only adversarial review is pending.
+> those findings in source. The fourth review of `c5e6d008` confirmed them but
+> returned NO-SHIP on JSONB-unstable and mutable-contact-bound identity receipts,
+> loss of the adjudicated address pair in the no-bundle path, optional ETag
+> enforcement, and incomplete UI repair guidance. Those findings are remediated
+> in source; a fifth read-only adversarial review is pending.
 > Wave 17/runtime promotion remains blocked until it passes.
 
 ## Session 388 Summary
@@ -298,8 +302,11 @@ Seven Claude commits were replayed without content conflicts onto
    The second review of `f1b85e78` returned NO-SHIP on the retry path's weaker
    ORCID binding plus five medium contract gaps. The third review of `21b44680`
    confirmed those fixes, found six additional gaps, and returned NO-SHIP. Those
-   gaps are remediated in source; obtain a fourth read-only Opus review before
-   release.
+   gaps are remediated in source. The fourth review of `c5e6d008` found the
+   identity receipt was JSONB-order-sensitive and contact-mutable, the no-bundle
+   receipt lost its address pair, ETag enforcement was optional, and two UI
+   failures omitted their repair action. Those gaps are remediated; obtain a
+   fifth read-only Opus review before release.
 2. ~~**Acceptance-time promotion scope (§4.1/§4.3).**~~ **DONE in source, S389:**
    sending never promotes; every identity-bearing acceptance—including honorarium
    opt-outs—promotes through identity-aware/idempotent matching; declines do not.

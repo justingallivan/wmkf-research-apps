@@ -164,7 +164,7 @@ describe('POST recordSurfaced', () => {
       candidateKey: 'candidate:receipt-bound',
       orcid: '0000-0002-1825-0097',
       automatedIdentityAttestation: 'signed',
-      serverIdentityDecisionReceipt: { version: 1, source: 'forged', projection: {} },
+      serverIdentityDecisionReceipt: { version: 1, source: 'forged', identityDigest: 'forged' },
       contactEnrichment: {
         orcidId: '0000-0002-1825-0097',
         identity: {
@@ -178,7 +178,7 @@ describe('POST recordSurfaced', () => {
     expect(passed[0].serverIdentityDecisionReceipt).toMatchObject({
       version: 1,
       source: 'automated_resolver',
-      projection: { candidateKey: expect.any(String) },
+      identityDigest: expect.any(String),
     });
   });
 
@@ -189,7 +189,7 @@ describe('POST recordSurfaced', () => {
       serverIdentityDecisionReceipt: {
         version: 1,
         source: 'automated_resolver',
-        projection: { candidateKey: 'candidate:victim' },
+        identityDigest: 'forged',
       },
     }] } }, r);
 

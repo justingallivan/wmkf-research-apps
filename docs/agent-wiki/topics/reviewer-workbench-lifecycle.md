@@ -345,9 +345,11 @@ clear without inventing person state. Receipt-first partial success and stale
 ETags remain explicit and retryable. Promoted conflicts expose both current
 addresses and evidence directly in the Invite modal; ordinary manual email edits
 cannot bypass the pending block. The complete paper list and Scholar name-search
-rule remain load-bearing. The third Opus review of `21b44680` returned NO-SHIP;
-its findings are remediated and a fourth review is pending. Wave 17 and runtime
-promotion remain blocked until it passes.
+rule remain load-bearing. The fourth Opus review of `c5e6d008` returned NO-SHIP;
+its findings are remediated with a JSONB-stable identity-only receipt digest,
+retained no-bundle address tuple, mandatory edit ETag, and surfaced repair
+actions. A fifth review is pending. Wave 17 and runtime promotion remain blocked
+until it passes.
 
 ## Reviews tab (workbench consumption of submitted reviews)
 
