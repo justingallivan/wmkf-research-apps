@@ -293,7 +293,7 @@ describe('POST recordSurfaced', () => {
     });
   });
 
-  it('preserves stored address blocks and persistence authority when a stale card resurfaces', async () => {
+  it('preserves stored address blocks without carrying email persistence authority to a resurfaced card', async () => {
     const resurfaced = {
       name: 'Blocked Reviewer',
       email: 'found@example.edu',
@@ -328,12 +328,12 @@ describe('POST recordSurfaced', () => {
 
     const [, passed] = store.recordSurfaced.mock.calls[0];
     expect(passed[0]).toMatchObject({
-      emailPersistAllowed: true,
+      emailPersistAllowed: false,
       addressConflictPending: true,
       conflictRecordUnavailable: true,
       addressVerificationRequired: true,
       contactEnrichment: {
-        emailPersistAllowed: true,
+        emailPersistAllowed: false,
         addressConflictPending: true,
         conflictRecordUnavailable: true,
         addressVerificationRequired: true,

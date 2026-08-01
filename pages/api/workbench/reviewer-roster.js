@@ -170,13 +170,11 @@ async function preserveStoredRosterAuthority(requestId, candidates) {
           addressConflictPending: preserveStoredTrue('addressConflictPending'),
           conflictRecordUnavailable: preserveStoredTrue('conflictRecordUnavailable'),
           addressVerificationRequired: preserveStoredTrue('addressVerificationRequired'),
-          emailPersistAllowed: preserveStoredTrue('emailPersistAllowed'),
           contactEnrichment: {
             ...(withIdentityReceipt.contactEnrichment || {}),
             addressConflictPending: preserveStoredTrue('addressConflictPending'),
             conflictRecordUnavailable: preserveStoredTrue('conflictRecordUnavailable'),
             addressVerificationRequired: preserveStoredTrue('addressVerificationRequired'),
-            emailPersistAllowed: preserveStoredTrue('emailPersistAllowed'),
           },
         }
       : withIdentityReceipt;
