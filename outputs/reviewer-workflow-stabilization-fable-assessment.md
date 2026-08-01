@@ -181,10 +181,13 @@ a hybrid state the decline-archival invariant ("declined ⇒ leaves the active
 pool") assumes cannot exist, entered without the deliberate
 `ENGAGEMENT_STAMP_RESET` that the explicit Restore path uses.
 
-**Finding D — an applicant exclusion that names no one is silently enforced
-against nobody. MEASURED 2026-08-01: real, bounded at 7.6%, and no reviewer was
-ever selected on an affected request. I escalated this before measuring it; the
-measurement de-escalates it — see §3.2.** Exclusion enforcement is exact normalized-name matching
+**Finding D — WITHDRAWN as a safety concern (measured and then read, 2026-08-01;
+§3.2). The code-level hazard is real — exclusion enforcement is name-matching
+only, so a category exclusion cannot be honored — but reading the affected
+answers shows 8 of 10 are simply prose for "none" (a no-op is correct), 1 is
+junk, 1 is a genuine inverted request, and 0 are names the parser missed. The
+scenario I described occurs in ~1% of substantive exclusions, not 8%. Retained
+below only so the reasoning and its correction are both on the record.** Exclusion enforcement is exact normalized-name matching
 `[VERIFIED via lib/utils/reviewer-name-match.js:54-65]`. A substantive answer
 that states a category rather than names ("direct competitors") parses to zero
 names, so the excluded set is empty and **no candidate is filtered**
@@ -401,7 +404,73 @@ It is not a campaign blocker and should not jump the queue ahead of the §6
 slice. I flagged it as "the thing I would measure first"; that was right, and
 the result is that it moves *down* the list rather than up.
 
-Three honest limits on that reassurance:
+#### 3.2.1 The 13 read (second probe run, `--show-text`, 2026-08-01) — Finding D is REFUTED
+
+The follow-up run capped correctly at the 200 most recent (reporting the 94 it
+skipped), so it re-derived **10 of the 13**; within that window the ratio was
+10 of 115 substantive (8.7%). Reading them decides the open question, and the
+answer is the one that removes the finding rather than confirming it:
+
+| What the 10 actually say | Count |
+|---|---|
+| **Prose ways of saying "none"** — "No exclusions", "No reviewers excluded.", "There are no reviewers to exclude." (×2), "There are no reviewers we would like to exclude.", "No reviewers are requested for exclusion.", "There are no potential reviewers the principal investigator wishes to exclude.", "The project team is not aware of any potential reviewers who would be biased against this application." | **8** |
+| **Junk / apparent field-label leak** — "rev excluded names" | 1 |
+| **A genuine unactionable exclusion** — "everybody who's not listed above." | **1** |
+| **Real names the parser missed** | **0** |
+
+**Both hypotheses I offered are wrong.** The parser-defect hypothesis is dead:
+zero missed names, and `extractExcludedReviewers` correctly returned nothing in
+all 10 cases because there was nothing to return. And the Finding-D story —
+applicants stating category exclusions they believe are honored — occurs in
+**1 of 115 substantive answers (0.9%)** in this window, not at the 8.7% headline
+rate. The 8.7% is almost entirely applicants politely writing "none" in a
+sentence.
+
+For those 8, a no-op is the **correct** behavior. There is no divergence between
+what the applicant believed and what the system did, because the applicant
+excluded nobody. My framing — "the applicant believes they excluded someone and
+the system blocked no one" — does not describe them.
+
+**Finding D is therefore REFUTED as a safety concern.** I escalated it on a
+plausible reading of the code, then measured it down to "small", then read it
+down to "essentially absent". The code-level observation that made me raise it
+remains true — enforcement is name-matching only, so a category exclusion
+cannot be honored — but it is a hazard almost nobody triggers, and it is not
+fail-open in practice.
+
+The one real instance is instructive rather than alarming: "everybody who's not
+listed above" is an *inverted* request — an allowlist ("use only my
+recommendations"), which no blocklist of names can express at any level of
+input structure. That one needs a PD conversation, not a schema.
+
+Residue, both trivial and neither safety-relevant:
+
+- `isSubstantiveExclusionText` classifies prose negatives as substantive, so
+  ~8 per 200 requests spend a Haiku call to return nothing. **No staff-facing
+  consequence:** the resulting `excludedSubstantive` flag is returned by the
+  service but consumed nowhere in the UI `[VERIFIED via grep across
+  shared/components/reviewers/ and the route — no references]`. Extending the
+  parser's `NOISE_VALUES` with a negation pattern would save the calls; the
+  saving is pennies and the change is optional.
+- One value reads like a form label or placeholder leaked into the field
+  ("rev excluded names") — cosmetic, worth a glance at whatever produced it.
+
+**Denominator honesty:** 10 of 13 read; the 3 oldest (requests `1001500`,
+`1000972`, `1000916`, all 2024-10 to 2025-04) fell outside the 200-request
+window and remain unread. Re-run with `--limit 300` to close that, though the
+pattern across 10 makes a different answer in the remaining 3 unlikely, and all
+three predate the current reviewer workflow.
+
+**Base rate, now measured:** 5 of 20 sampled enforceable-exclusion requests have
+selected reviewers (25%). So the zero-impact column is informative rather than
+vacuous — at that rate roughly 2–3 of the 10 would be expected to have reviewers
+had the exclusions mattered. Combined with the content finding, harm is ruled
+out rather than merely unobserved.
+
+#### 3.2.2 Original caveats from the first run
+
+Three honest limits on the first run's reassurance, retained for the record —
+(1) and (3) are now resolved by §3.2.1:
 
 1. **The zero-impact reading is weak without a base rate.** All 13 affected
    requests having no reviewers may simply mean those requests never reached
@@ -782,29 +851,38 @@ enforceable name is a manual, undocumented step that no gate requires and any
 busy PD can skip. An unenforceable exclusion is not a softer exclusion — it is
 the appearance of one.
 
-That reframes the recommendation: **both fields want structured person rows,
-for the same reason** — the system can only act on names, so the form should
-collect names. A genuinely sweeping concern ("anyone from my former
-institution") is a conversation with program staff, not a form field, and per
-the owner it does reach us through other channels. `extractExcludedReviewers`
-then becomes a legacy-compatibility component for already-stored values rather
-than a permanent part of the contract. Keep the staff-editable exclusion box
-regardless — it is how staff add names they learn by any route.
+That reframed the recommendation toward "both fields want structured person
+rows". **The measurement then undercut the intake half of it** (§3.2.1):
+category exclusions — the failure this would prevent — occur in about 1% of
+substantive answers, and the dominant real pattern is applicants writing "none"
+in a sentence, which the system already handles correctly by doing nothing.
 
-**Sequencing is unchanged:** referrals first (ours, one repo, and the live
-defect), intake second (needs Connor, and no known active failure).
+Revised position:
 
-**Two reads worth doing — the second matters more than I first thought:**
+- **Referrals: structure them.** Unchanged and well-supported — Finding C is a
+  verified mechanism with a real duplicate behind it, and the email/institution
+  anchors materially improve dedupe (reason 1 above).
+- **Excluded reviewers: leave the format alone for now.** The safety argument
+  for restructuring evaporated with Finding D. What remains is tidiness — an
+  explicit "no exclusions" checkbox would stop ~8 per 200 applicants writing a
+  polite sentence — which is not worth a coordination cycle with Connor on its
+  own. Revisit only if it rides along with another intake change he is already
+  making.
+- `extractExcludedReviewers` **stays** and is doing its job correctly: 0 parse
+  failures and 0 wrong extractions across every answer examined.
+- Keep the staff-editable exclusion box regardless — it is how staff add names
+  they learn by any route, and it is the standing remedy for the rare inverted
+  or category request.
 
-- How many stored referrals actually name more than one person. If the answer
-  is "most", the structured form is clearly worth it; if it is "two ever",
-  W7(b) alone may be the whole fix. One field read across declined suggestions.
-- **How many requests have a substantive excluded-reviewers answer that yielded
-  zero enforceable names.** I originally framed this as sizing a design choice.
-  It is better understood as sizing a **live fail-open exposure**: each such
-  request is one where an applicant stated an exclusion and the search blocked
-  nobody. That is worth knowing before the next campaign independently of any
-  form change, and it is answerable from stored values today.
+**Sequencing, with a new reason:** referrals first (ours, one repo, live defect
+with observed consequences); intake **deprioritized outright** rather than
+merely second, because the measurement found no failure there to fix.
+
+**One read still worth doing:** how many stored referrals actually name more
+than one person. If the answer is "most", the structured form is clearly worth
+it; if it is "two ever", W7(b) alone may be the whole fix. One field read across
+declined suggestions. *(The companion excluded-reviewers read was done — §3.2.1
+— and is what deprioritized the intake half of this section.)*
 
 ---
 
@@ -847,8 +925,9 @@ Still open:
 | **Whether Findings A and C have already damaged data** | **Written this session:** `scripts/probe-referral-path-exposure.mjs` (read-only; Dataverse GETs only). §1 flags person names that cannot denote one person (Finding C's fingerprint — the shape §3.1's probe structurally cannot see); §2 counts applicant-recommended rows that are `selected=true`, split by whether they carry a `staff_manual`/`referred` token (Finding A); §3 lists invited rows holding no response state (possible silent reset — a lead only, since a pending invitee looks identical). Run: `DATAVERSE_ALLOW_PROD_READS=yes node --import ./scripts/lib/use-extensionless.mjs scripts/probe-referral-path-exposure.mjs`. Names are redacted unless `--show-names`. **Not yet run.** | Yes — read-only, prints denominators |
 | How many stored referrals name more than one person (decides whether §6a's structured form is worth building) | Read `wmkf_declinereferral` across declined suggestions and count multi-name answers | Yes — one field, one filter |
 | ~~Finding D exposure size~~ | **ANSWERED 2026-08-01 — see §3.2.** 13 of 171 substantive exclusions (7.6%) unenforceable; 0 affected requests ever selected a reviewer. | — |
-| **Whether the 13 fail-open answers are category text or names the parser missed** | Re-run with `--show-text` and read them; 13 short strings. Category text ⇒ Finding D stands as an input problem (form-level fix, low priority). Real names ⇒ a **parser** defect, which is more serious and needs its own fix. **This is the only Finding-D question that could still change a recommendation.** | Yes — same probe, one flag |
-| Whether Finding D's zero-impact reading is meaningful or an artifact of those requests never reaching review | Re-run the probe: a base-rate sample was added after the first run and now reports how many enforceable-exclusion requests do have selected reviewers, flagging the reading as weak when comparable requests also have none | Yes — same probe, bounded 20-request sample |
+| ~~Whether the fail-open answers are category text or missed names~~ | **ANSWERED 2026-08-01 (§3.2.1): neither, mostly.** 8 of 10 are prose for "none", 1 junk, 1 genuine inverted request, 0 missed names → Finding D withdrawn as a safety concern. | — |
+| ~~Whether the zero-impact reading is meaningful~~ | **ANSWERED: base rate 25%** (5 of 20 enforceable-exclusion requests have selected reviewers), so the zero-impact column is informative, not vacuous. | — |
+| The 3 oldest fail-open answers (`1001500`, `1000972`, `1000916`) are still unread | Re-run with `--limit 300`. Low value — the pattern across the other 10 is uniform and all three predate the current reviewer workflow | Yes — same probe |
 | Demand for the legacy-filename fallback (§4.6) | Count active-cycle requests with no canonical proposal file but a `Project Narrative.pdf` (SharePoint listing over the current cycle's requests; read-only Graph) | Yes — bounded to one cycle |
 | Whether the two July 31 Lima 409s were fresh-enrichment confirms (claim 3 causation) | Vercel request logs for the two PATCHes (payload presence of `candidateKey`), if retained | Maybe — log retention dependent |
 | How many other requests currently have engaged-but-unterminal applicant recommendations (blast radius of the perpetual re-enrich loop) | One roster/Dataverse join query — natural extension of the probe script | Yes — read-only |
@@ -882,11 +961,15 @@ silent-data-loss risk on a workflow staff are actively encouraged to use.
 
 Owner context supplied during review also produced **Finding C** (free-text
 referral becomes a reviewer's name; a malformed name defeats dedupe and
-auto-creates a selected duplicate person), **Finding D** (a category-shaped
-applicant exclusion is enforced against nobody — fail-open, and possibly live
-right now), and **W7**. Findings A and C are the two halves of the referral
-path — a clean name promotes the wrong way, a malformed one duplicates — and
-none of A, C, or D was in the inherited diagnosis.
+auto-creates a selected duplicate person) and **W7**. Findings A and C are the
+two halves of the referral path — a clean name promotes the wrong way, a
+malformed one duplicates — and neither was in the inherited diagnosis.
+
+**Finding D was raised and then withdrawn during this review** (§3.2.1). It is
+recorded rather than deleted because the correction is the useful part: the
+code reading was sound, the projected consequence was not, and only reading the
+production text distinguished them. Two probes were written to settle it; both
+are committed and re-runnable.
 
 They do not change the verdict on the directive, but they do change what
 "campaign safe" means. The common thread across C and D is that **free-text
@@ -897,10 +980,8 @@ person typing believed. The applicant's *recommended* reviewers avoid this
 entirely by being exact person GUIDs — the fix pattern is already in the
 building, just not applied to the free-text fields.
 
-**Finding D was measured during review and came back small** — 13 of 171
-substantive exclusions unenforceable (7.6%), none on a request that ever
-selected a reviewer (§3.2). It stays on the list as a real defect and an
-argument for structured input, but it is **not** a campaign blocker and does not
-displace the §6 slice. The one open question is whether those 13 are category
-answers (input problem) or missed names (parser problem) — a `--show-text`
-re-run settles it, and only the second would change any recommendation here.
+**Finding D was raised, measured, read, and withdrawn** across this review
+(§3.2.1): 8 of 10 affected answers are prose for "none" where a no-op is
+correct, 1 is junk, 1 is a genuine inverted request, 0 are missed names. It is
+not a campaign blocker, does not displace the §6 slice, and no longer supports
+restructuring the intake exclusion field.
