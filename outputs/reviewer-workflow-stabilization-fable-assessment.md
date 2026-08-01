@@ -617,16 +617,32 @@ reasons, in order of weight:
    "does not occur". Institution similarly feeds the resolver's affiliation
    anchor and the COI checks. A parser can only ever recover a *name* from
    prose; it cannot invent the anchors that make matching reliable.
-2. **We own this form, so fixing the input is cheaper than parsing the output.**
-   `extractExcludedReviewers` exists because the applicant's excluded-reviewers
-   text arrives on an intake form we do not control — parsing is the only option
-   there. The decline form is ours: a plain `<textarea>` in
+2. **The same intake form already proves the approach — on its other reviewer
+   field.** The applicant's *recommended* reviewers are not free text: they are
+   `wmkf_potentialreviewer1..5` lookup slots holding **exact person GUIDs**,
+   which ingestion consumes directly with no name matching at all
+   `[VERIFIED via applicant-reviewers-service.js:43-55,100-105]`. That is
+   precisely why the applicant-recommendation path has never had this class of
+   bug — there is nothing to parse and no namesake to guess. The *excluded*
+   reviewers field on the same form is free text and needs an LLM extractor
+   `[VERIFIED via reviewer-exclusion-parser.js:123-171]`. **One form, two
+   reviewer fields, structured and unstructured, and the bug lives entirely on
+   the unstructured one.** That is the strongest available evidence for the
+   proposal, and it is internal rather than theoretical.
+3. **Fixing the input is cheaper than parsing the output — and this holds for
+   both surfaces.** *(Corrected 2026-08-01 on owner input: I previously wrote
+   that parsing was "the only option" for the intake field because we do not own
+   that form. That was an organizational constraint stated as a technical one,
+   and it was wrong — Connor can amend the intake format.)* The difference
+   between the two surfaces is coordination cost, not possibility: the decline
+   form is a plain `<textarea>` in our own
    `shared/components/external/DeclineFormView.js`
-   `[VERIFIED via DeclineFormView.js:102-118]`. Adding an LLM parse step to an
-   input we can simply constrain buys a new failure mode, new latency, and a new
-   prompt surface to govern, in exchange for less information than the form can
-   collect directly.
-3. **The current placeholder actively teaches the failing shape.** It reads
+   `[VERIFIED via DeclineFormView.js:102-118]` and changes in one repo, while
+   the intake field changes through Connor. Adding an LLM parse to an input that
+   can be constrained at its source buys a new failure mode, new latency, and a
+   new prompt surface to govern, in exchange for less information than the form
+   could collect directly.
+4. **The current placeholder actively teaches the failing shape.** It reads
    "e.g., Dr. Sarah Chen at Stanford works on similar problems and would be a
    great fit." `[VERIFIED via DeclineFormView.js:114]` — an honorific, an
    institution, and two clauses of prose, all of which land verbatim in
@@ -667,10 +683,37 @@ delay the engagement fix. Instead split it:
     feed *identity lookup* and dedupe, and must not bypass the address-trust
     machinery or land as a verified address.
 
-**Unknown worth checking first:** how many stored referrals actually name more
-than one person. If the answer is "most", the structured form is clearly worth
-it; if it is "two ever", W7(b) alone may be the whole fix. That is one field
-read across declined suggestions — cheap, and it should precede the build plan.
+**Do not generalize this to the excluded-reviewers field without adapting it.**
+Since the intake format turns out to be amendable, the obvious next thought is
+"structure that too" — but the two fields are not the same shape of question,
+and the difference is load-bearing:
+
+- A **decline referral** is inherently a short list of *people*. Structure fits
+  it completely; there is no residue a name/institution/email row cannot carry.
+- **Excluded reviewers** is inherently heterogeneous. The parser's own contract
+  anticipates input that names nobody — it returns `substantive:false` for
+  N/A-style answers and legitimately returns zero names for "a reason with no
+  name" `[VERIFIED via reviewer-exclusion-parser.js:129-171]`. Applicants
+  genuinely need to express category exclusions ("anyone at my former
+  institution", "direct competitors"), which no fixed name list can represent.
+
+So if that field is ever revisited, the right shape is **hybrid**: structured
+person rows for named exclusions *plus* a retained free-text box for
+category/reason exclusions — and `extractExcludedReviewers` keeps earning its
+keep on the remainder. Structuring it into name rows alone would silently
+discard a class of exclusion the foundation actually honors, which would be a
+worse defect than the one being fixed. **Referrals are the clean case; do that
+one first, and treat intake as a separate question with its own design.**
+
+**Two unknowns worth checking before either build plan:**
+
+- How many stored referrals actually name more than one person. If the answer
+  is "most", the structured form is clearly worth it; if it is "two ever",
+  W7(b) alone may be the whole fix. One field read across declined suggestions.
+- What proportion of excluded-reviewers answers are person-names versus
+  category/reason text. That ratio decides whether a hybrid intake change is
+  worth Connor's time at all — and it is answerable from existing stored values
+  without changing anything.
 
 ---
 
