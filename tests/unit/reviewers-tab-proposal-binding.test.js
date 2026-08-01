@@ -5,13 +5,15 @@
 import { render, screen, waitFor } from '@testing-library/react';
 
 let findPanelProps = null;
+const existingKey = 'akoya_request::REQ/Phase I::ProjectDescription.pdf';
+const mockReplacementKey = 'akoya_request::REQ/Reviewer Materials::Proposal_1003010.pdf';
 jest.mock('../../shared/components/reviewers/ReviewerFindPanel', () => function FindPanelStub(props) {
   findPanelProps = props;
   return (
     <button
       data-testid="persist-proposal"
       data-file-key={props.proposalFileKey || ''}
-      onClick={() => props.onProposalFileKeyChange('akoya_request::REQ/Phase I::ProjectDescription.pdf')}
+      onClick={() => props.onProposalFileKeyChange(mockReplacementKey)}
     >persist</button>
   );
 });
@@ -28,7 +30,6 @@ jest.mock('../../shared/components/reviewers/CampaignConfigModal', () => functio
   return null;
 });
 
-const existingKey = 'akoya_request::REQ/Phase I::Project Narrative.pdf';
 const mockReplace = jest.fn();
 const router = {
   isReady: true,
@@ -92,7 +93,7 @@ test('passes the URL-backed proposal file key into Find and replaces it without 
         requestId: REQ,
         tab: 'reviewers',
         sub: 'find',
-        proposalFile: 'akoya_request::REQ/Phase I::ProjectDescription.pdf',
+        proposalFile: mockReplacementKey,
       }),
     },
     undefined,

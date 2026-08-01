@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-finder-proposal-doc-context
-description: Reviewer Finder currently defaults to the exact canonical Reviewer Materials proposal; the proposed stabilization plan adds one exact legacy Project Narrative fallback, which the Session 393 Fable challenge must independently evaluate before implementation.
+description: Reviewer Finder currently defaults to the exact canonical Reviewer Materials proposal; the proposed stabilization plan adds one exact current-cycle Phase I/ProjectDescription.pdf fallback before the next combined grant cycle.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-08-01 via source, branch tests, and live read-only request 1003010 SharePoint probe
+  last_verified: 2026-08-01 via owner correction, source, branch tests, and live read-only request 1003010 SharePoint probe
 ---
 
 ## Recall Rule
@@ -43,14 +43,14 @@ from rerunning applicant enrichment. A stale or cross-request key fails closed
 and returns to the picker. [VERIFIED via source + focused tests]
 
 The automatic fallback proposal remains open: preserve the canonical reviewer
-package as first priority, then (if separately implemented) select exactly one
-server-listed file named `Project Narrative.pdf`. A duplicate canonical file
-must remain an error. This is not permission to restore `classifyFile`,
-best-guess PDFs, or broad filename heuristics. Request `1003010` currently has
-neither canonical nor `Project Narrative.pdf`; its one substantive proposal is
-`Phase I/ProjectDescription.pdf`, so it continues through the deliberate picker
-whose validated binding now survives reload. [VERIFIED 2026-08-01 via read-only
-Dataverse + SharePoint probe]
+package as first priority, then (if separately implemented before the next
+grant cycle) select exactly one server-listed file at
+`Phase I/ProjectDescription.pdf`. A duplicate canonical file must remain an
+error. This is not permission to restore `classifyFile`, best-guess PDFs, or
+broad filename heuristics. Request `1003010` currently has no canonical package
+and does have that exact Phase I file, so it continues through the deliberate
+picker whose validated binding now survives reload. [VERIFIED 2026-08-01 via
+owner correction + read-only Dataverse/SharePoint probe]
 
 The next cycle combines Phase I + Phase II into a single submission with richer
 proposal text and a separate bibliography. Power Automate should still
@@ -63,13 +63,14 @@ Reviewer-finder quality is gated by the proposal context it sees. Phase I's thin
 
 ## How to apply
 - When the combined-cycle intake/documents are built, keep the PA output at
-  the same exact canonical path; the legacy fallback does not change the
-  outbound package contract.
+  the same exact canonical path; the temporary Phase I fallback does not change
+  the outbound package contract.
 - Preserve the dedicated exact Reviewer Finder selector; do not reintroduce
   cross-purpose `classifyFile` or heuristic selection. The only proposed
-  automatic compatibility fallback is the exact legacy
-  `Project Narrative.pdf` rule above; other files remain deliberate,
-  server-validated dropdown choices.
+  automatic compatibility fallback is the exact current-cycle
+  `Phase I/ProjectDescription.pdf` rule above; other files remain deliberate,
+  server-validated dropdown choices. `Project Narrative.pdf` was an owner-
+  corrected naming mistake and is not the current-cycle fallback.
 - Consider surfacing Claude-origin (and the greyed "needs identity review" Claude names) in the Workbench Find tab the way the standalone does, so the PD can see what Claude found.
 
 Related: [[project-grant-phasing-evolution]], [[project-reviewer-finder-retrieval-redesign]], [[project-reviewer-finder-next-topics]].
