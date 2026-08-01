@@ -923,7 +923,7 @@ export default function ReviewerSearchSection({
   const [excludedOpen, setExcludedOpen] = useState(false);
   const [error, setError] = useState(null);
   const [errorMeta, setErrorMeta] = useState(null);
-  const [savedMsg, setSavedMsg] = useState(null);
+  const [promotionNotice, setPromotionNotice] = useState(null); // promotion outcome kept beside the action that triggered it
   const [enrichNote, setEnrichNote] = useState(null);
   const [excludeText, setExcludeText] = useState((excludedNames || []).join(', '));
   const [excludedRemoved, setExcludedRemoved] = useState(0);
@@ -986,7 +986,7 @@ export default function ReviewerSearchSection({
     genRef.current += 1; // invalidate any in-flight run
     const myGen = genRef.current;
     setPhase('idle'); setProgress([]); setCandidates([]); setUnverified([]); setAnalysis(null);
-    setSelected(new Set()); setError(null); setErrorMeta(null); setSavedMsg(null); setEnrichNote(null); setExportError(null);
+    setSelected(new Set()); setError(null); setErrorMeta(null); setPromotionNotice(null); setEnrichNote(null); setExportError(null);
     setExcludedRemoved(0); setRosterNote(null); setRemovingPrevious(false);
     setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterBlocked([]); setRosterHandled([]); setRosterSavedKeys([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false); setRosterLoadFailed(false);
     setSearchSources({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
@@ -1075,7 +1075,7 @@ export default function ReviewerSearchSection({
     const referredSeeds = parseReferredSeeds(referredSeedsText, referredBy);
     setPhase('running');
     setError(null); setErrorMeta(null); setProgress([]); setCandidates([]); setUnverified([]); setSelected(new Set());
-    setSavedMsg(null); setEnrichNote(null); setAnalysis(null); setExcludedRemoved(0); setExportError(null); setBlockedReferredSeeds([]);
+    setPromotionNotice(null); setEnrichNote(null); setAnalysis(null); setExcludedRemoved(0); setExportError(null); setBlockedReferredSeeds([]);
     try {
       // 1. Analyze the proposal (Claude). excludedNames soft-blocks Claude's own
       //    suggestions; we still hard-filter discovery results below.
@@ -1919,7 +1919,7 @@ export default function ReviewerSearchSection({
     savingRef.current = myGen;
     const isCurrent = () => genRef.current === myGen;
     setPhase('saving');
-    setError(null); setErrorMeta(null); setProgress([]); setSavedMsg(null);
+    setError(null); setErrorMeta(null); setProgress([]); setPromotionNotice(null);
     try {
       // Candidates were already enriched at results time (stage 4 of runSearch),
       // so the chosen rows carry contact info + bibliometrics — save them directly.
@@ -2265,22 +2265,30 @@ export default function ReviewerSearchSection({
       const totalSucceeded = saved + promoted;
       if (totalSucceeded === 0) {
         if (refreshedVerificationCandidates.length > 0 && isCurrent()) {
-          setRosterNote(Array.from(new Set(rosterWarnings)).join(' '));
+          const warning = Array.from(new Set(rosterWarnings)).join(' ');
+          setRosterNote(warning);
+          setPromotionNotice({ tone: 'warning', message: warning });
           setPhase('results');
           return;
         }
         if ((addressVerificationKeys.length > 0 || addressRepairKeys.length > 0) && isCurrent()) {
-          setRosterNote(Array.from(new Set(rosterWarnings)).join(' '));
+          const warning = Array.from(new Set(rosterWarnings)).join(' ');
+          setRosterNote(warning);
+          setPromotionNotice({ tone: 'warning', message: warning });
           setPhase('results');
           return;
         }
         if (identityReviewResults.length > 0 && isCurrent()) {
-          setRosterNote(Array.from(new Set(rosterWarnings)).join(' '));
+          const warning = Array.from(new Set(rosterWarnings)).join(' ');
+          setRosterNote(warning);
+          setPromotionNotice({ tone: 'warning', message: warning });
           setPhase('results');
           return;
         }
         if (serverRepairResults.length > 0 && isCurrent()) {
-          setRosterNote(Array.from(new Set(rosterWarnings)).join(' '));
+          const warning = Array.from(new Set(rosterWarnings)).join(' ');
+          setRosterNote(warning);
+          setPromotionNotice({ tone: 'warning', message: warning });
           setPhase('results');
           return;
         }
@@ -2296,7 +2304,8 @@ export default function ReviewerSearchSection({
         messageParts.push(`${failures.length} could not be saved (${detail}).`);
       }
       if (isCurrent()) {
-        setSavedMsg(messageParts.join(' '));
+        const message = messageParts.join(' ');
+        setPromotionNotice({ tone: 'success', message });
         setPhase('done');
       }
       if (promotedCandidates.length > 0) {
@@ -2326,6 +2335,7 @@ export default function ReviewerSearchSection({
     } catch (e) {
       if (isCurrent()) {
         setError(e.message);
+        setPromotionNotice({ tone: 'error', message: e.message });
         setPhase('error');
       }
     } finally {
@@ -2600,7 +2610,7 @@ export default function ReviewerSearchSection({
                   </details>
                 )}
               </div>
-              {error && (
+              {error && !promotionNotice && (
                 <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
                   {errorMeta?.status === 'analysis_invalid' ? (
                     <>
@@ -2641,9 +2651,9 @@ export default function ReviewerSearchSection({
             </div>
           )}
 
-          {busy && (
+          {phase === 'running' && (
             <div className="space-y-2">
-              <p className="text-sm text-gray-600">{phase === 'saving' ? 'Saving candidates…' : 'Searching… this can take several minutes — please keep this tab open.'}</p>
+              <p className="text-sm text-gray-600">Searching… this can take several minutes — please keep this tab open.</p>
               <ul className="text-xs text-gray-500 space-y-0.5">
                 {progress.map((m, i) => <li key={i}>{m}</li>)}
               </ul>
@@ -2655,7 +2665,6 @@ export default function ReviewerSearchSection({
               set) shows on reload and even when no proposal is loaded. */}
           {(rosterNote || displayCandidates.length > 0 || rosterExcluded.length > 0 || rosterIneligible.length > 0 || rosterBlocked.length > 0 || phase === 'results' || phase === 'done') && (
             <div className="space-y-3 mt-3">
-              {savedMsg && <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm">{savedMsg}</div>}
               {enrichNote && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{enrichNote}</div>}
               {incompleteCoiCandidates.length > 0 && (
                 <div className="p-3 bg-amber-50 text-amber-800 rounded-lg text-sm">
@@ -2663,7 +2672,7 @@ export default function ReviewerSearchSection({
                   {' '}A missing coauthor warning is not conclusive for {incompleteCoiCandidates.length === 1 ? 'that reviewer' : 'those reviewers'}.
                 </div>
               )}
-              {rosterNote && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{rosterNote}</div>}
+              {rosterNote && rosterNote !== promotionNotice?.message && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{rosterNote}</div>}
               {previousSearchKeys.size > 0 && (
                 <div className="flex items-center justify-between gap-3 p-3 bg-blue-50 text-blue-800 rounded-lg text-sm">
                   <span>
@@ -2736,7 +2745,7 @@ export default function ReviewerSearchSection({
                           </button>
                         </div>
                       </div>
-                      <div className="max-h-[32rem] overflow-y-auto space-y-4 pr-1">
+                      <div data-testid="reviewer-candidate-list" className="space-y-4">
                         {provenanceSections.map((section) => {
                           // Slice E: the needs-identity-review section is read-only.
                           const readOnlySection = section.key === 'needs_identity_review';
@@ -2804,14 +2813,22 @@ export default function ReviewerSearchSection({
                           );
                         })}
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur">
                         <button
                           type="button"
                           onClick={saveSelected}
-                          disabled={selected.size === 0}
-                          className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                          disabled={selected.size === 0 || phase === 'saving'}
+                          aria-busy={phase === 'saving'}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                          Promote {selected.size > 0 ? selected.size : ''} selected to Invite
+                          {phase === 'saving' ? (
+                            <>
+                              <span aria-hidden="true" className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                              Promoting {selected.size} selected reviewer{selected.size === 1 ? '' : 's'}…
+                            </>
+                          ) : (
+                            <>Promote {selected.size > 0 ? selected.size : ''} selected to Invite</>
+                          )}
                         </button>
                         <button
                           type="button"
@@ -2909,6 +2926,38 @@ export default function ReviewerSearchSection({
                     </details>
                   )}
                 </>
+              )}
+              {(phase === 'saving' || promotionNotice) && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  className={`sticky bottom-3 z-20 flex items-center gap-2 rounded-lg border p-3 text-sm shadow-md ${
+                    phase === 'saving'
+                      ? 'border-blue-200 bg-blue-50 text-blue-800'
+                      : promotionNotice?.tone === 'success'
+                        ? 'border-green-200 bg-green-50 text-green-800'
+                        : promotionNotice?.tone === 'error'
+                          ? 'border-red-200 bg-red-50 text-red-800'
+                          : 'border-amber-200 bg-amber-50 text-amber-800'
+                  }`}
+                >
+                  {phase === 'saving' && (
+                    <span aria-hidden="true" className="h-4 w-4 shrink-0 rounded-full border-2 border-blue-300 border-t-blue-700 animate-spin" />
+                  )}
+                  <div>
+                    <p>
+                      {phase === 'saving'
+                        ? `Promoting ${selected.size} selected reviewer${selected.size === 1 ? '' : 's'}…`
+                        : promotionNotice?.message}
+                    </p>
+                    {phase === 'saving' && progress.length > 0 && (
+                      <ul className="mt-1 space-y-0.5 text-xs text-blue-700">
+                        {progress.map((message, index) => <li key={index}>{message}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           )}

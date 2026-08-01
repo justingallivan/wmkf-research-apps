@@ -106,3 +106,62 @@ test('late failure from the prior request cannot paint an error onto the new req
   expect(screen.queryByText(/Old request failed/)).not.toBeInTheDocument();
   expect(onSaved).not.toHaveBeenCalled();
 });
+
+test('candidate results use the page scroll instead of a nested fixed-height scroller', async () => {
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [CANDIDATE_A],
+        excluded: [],
+        allNames: [CANDIDATE_A.name],
+      }));
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ_A} blobUrl="blob-a" proposalKey="proposal-a" />);
+
+  const list = await screen.findByTestId('reviewer-candidate-list');
+  expect(list).not.toHaveClass('max-h-[32rem]');
+  expect(list).not.toHaveClass('overflow-y-auto');
+});
+
+test('promotion progress and completion stay in a live status beside the action', async () => {
+  const save = deferred();
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [CANDIDATE_A],
+        excluded: [],
+        allNames: [CANDIDATE_A.name],
+      }));
+    }
+    if (target === '/api/reviewer-finder/save-candidates') return save.promise;
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ_A} blobUrl="blob-a" proposalKey="proposal-a" />);
+  fireEvent.click(await screen.findByLabelText('Select Dr Candidate A'));
+  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+
+  const status = await screen.findByRole('status');
+  expect(status).toHaveTextContent('Promoting 1 selected reviewer…');
+  expect(screen.getByRole('button', { name: /promoting 1 selected reviewer/i })).toBeDisabled();
+
+  await act(async () => {
+    save.resolve(response({
+      success: true,
+      savedCount: 1,
+      savedNames: [CANDIDATE_A.name],
+      savedKeys: [reviewerSaveKey(CANDIDATE_A)],
+    }));
+    await save.promise;
+  });
+
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent("Saved 1 of 1 to this request's candidate pool."));
+  expect(screen.queryByLabelText('Select Dr Candidate A')).not.toBeInTheDocument();
+});
