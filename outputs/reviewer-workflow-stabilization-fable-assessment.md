@@ -26,6 +26,95 @@ Verdict (details in §4): **PLAN SOUND WITH NAMED CHANGES**.
 
 ---
 
+## 0. Corrections after independent Codex review (2026-08-01) — READ FIRST
+
+An independent adversarial review (`gpt-5.6-sol`, effort high) was run against
+this document; its output is reproduced verbatim in
+`outputs/reviewer-workflow-codex-adversarial-review-2026-08-01.md`. Its verdict
+was **needs-attention**, and it was right on the substance. **Where §0 conflicts
+with anything later in this document, §0 wins.** The owner accepted these
+corrections rather than requiring re-verification.
+
+**C1 — "This is not a regression" is WRONG. (Overturns the §1 headline.)**
+My archaeology searched for field names (`git log -S wmkf_invited/-S
+wmkf_declined`) when the filter that mattered was *behavioral*. Verified:
+`fe825933` had `pages/api/workbench/enrich-recommended.js` load
+`findByRequest(requestId, { selectedOnly: true })` and then filter to
+disposition in JS — and because decline archival sets `selected=false`, that
+**functionally excluded declined reviewers from enrichment**. Commit
+`ad8e0299` (2026-06-16, *"applicant-suggested reviewers require explicit PD
+promotion"*) replaced it with disposition-only lookup while simultaneously
+making applicant rows `selected=false` by default
+`[VERIFIED via git show fe825933:pages/api/workbench/enrich-recommended.js:98-101
+and git log -1 ad8e0299]`.
+
+**Refinement neither review drew, and it matters for the fix:** the regression
+explains **Sorek** but not **Isberg**. Isberg is `selected=true, invited=true`,
+so he was enriched under the old code too. **Sorek is the `ad8e0299`
+regression; Isberg is the latent roster-twin gap.** Both accounts are partly
+right. This is why the remedy does not change: engagement projection covers
+both, whereas restoring `selectedOnly:true` would fix only Sorek and would
+break the S264 design that applicant rows stay unselected until promoted.
+
+**C2 — "Door A fired 5 times" is NOT PROVEN. Downgrade to 5 ambiguous
+candidates.** The signature `disposition=recommended + selected=true +
+staff_manual/referred` is not directional. `ensureApplicantRecommended`
+deliberately preserves `selected` and unions `applicant` into sources
+`[VERIFIED via reviewer-suggestion.js:538-574]`, so a staff-manual row later
+tagged by applicant ingestion produces the identical final state with no door-A
+promotion. The **mechanism** stays CONFIRMED from source; its **production
+occurrence is UNKNOWN** pending Dataverse audit history. My own probe correctly
+said "candidates"; §3.3's prose upgraded them to events. That is the same
+final-state-read-as-event error as the withdrawn Finding D — twice in one
+session, and worth treating as a pattern rather than an incident.
+
+**C3 — The W6 guard as I specified it is unsafe.** Three defects: (a) placed in
+`updateLifecycle` it fires only *after* `promoteApplicantReviewer` has mutated
+person/contact state, leaving partial writes; (b) `updateLifecycle` derives an
+ETag only for review-status changes, not `selected`-only writes, so it is TOCTOU
+against a concurrent decline; (c) **"reset fields present" cannot be the
+authority signal, because door A and the legitimate Restore both carry
+`ENGAGEMENT_STAMP_RESET`.** Correct shape: validate engagement **before any
+contact mutation**, then re-check atomically at the final selection write bound
+to the suggestion ETag; `restore()` remains the explicit scoped reset path.
+
+**C4 — The `candidateKey` fix is three branches, not two.**
+`hydrationFailureCandidate` is a third emitted applicant DTO and omits the key
+`[VERIFIED: zero `candidateKey` occurrences in enrich-recommended-service.js:107-141]`.
+Canonicalize once over the whole outgoing DTO array — preserved,
+hydration-failure, needs-review, resolved, and any handled entries — or I-4 stays
+false.
+
+**C5 — A provenance-only door-A fix creates a silent no-op.** Dropping
+`selected=true` without changing the endpoint contract leaves
+`addManualReviewer` returning `success:true` while the UI says "Added" and
+navigates to Invite, where the row will not appear. Needs a typed
+`promotion_required` / `restore_required` response with a rendered remedy.
+
+**C6 — I-1's scope was inconsistent with the slice. RESOLVED BY OWNER:**
+engagement monotonicity applies to **every roster row carrying a suggestion
+anchor**, not applicant-origin rows only. §5 I-1 stands as written; §6 must be
+widened accordingly, including the `save-candidates` path where roster
+finalization is non-fatal after a successful Dataverse write
+(`save-candidates-service.js`), which can strand an engaged row as actionable.
+
+**C7 — Enrichment partial success is reported as complete success.**
+`persistRecommendedRoster` catches per-row Postgres failures and reports only
+aggregate counts, while the service still emits every candidate in `complete`
+and the client renders them as actionable. A failed insert therefore produces a
+card that immediately 409s. Needs recorded / skipped / failed suggestion IDs
+returned separately, with only authoritative rows rendered actionable.
+
+**C8 — Two overstatements to strike.** (a) Finding C's *mechanism* is
+CONFIRMED, but the specific causation of person `0ae2bbf4` is
+**PLAUSIBLE/UNKNOWN** — Dataverse metadata cannot distinguish our button from
+direct Dynamics entry, as §3.3.1 itself admits; the confident phrasing elsewhere
+is withdrawn. (b) The verdict's "common thread across C and D" paragraph still
+leans on **withdrawn Finding D** and is struck; any exclusion-copy
+recommendation rests solely on the separately measured name-variant evidence.
+
+---
+
 ## 1. Executive verdict and reframe
 
 **The staff problem, in my own terms.** When a Program Director opens the Find
@@ -62,7 +151,12 @@ co-occur, and each has a much smaller fix than the plan's framing suggests:
    canonical-only, so on requests without a canonical file, staff re-pick every
    visit. `[VERIFIED via shared/components/reviewers/ReviewerFindPanel.js:129-153, lib/services/reviewer-finder/load-proposal-service.js:129-145]`
 
-**"Regression" is the wrong word, and it matters.** I found no evidence that
+**⚠ SUPERSEDED BY §0 C1 — the paragraph below is WRONG and retained only for
+the record.** A behavioral filter (`selectedOnly:true`) did exist and was
+removed by `ad8e0299`; this is a regression for declined reviewers (Sorek),
+alongside a genuine latent gap for already-selected ones (Isberg).
+
+~~**"Regression" is the wrong word, and it matters.**~~ I found no evidence that
 engagement filtering ever existed on this path: the S263/S264 design read by
 disposition from the start, and the wiki describes the current behavior as
 standing ("the enrichment route reads by `wmkf_applicantdisposition=Recommended`
@@ -564,7 +658,13 @@ production text; whatever the 13 turn out to be, LLM flakiness is not it.
 `scripts/probe-referral-path-exposure.mjs`, owner-run, read-only, test records
 excluded (26 test requests / 28 test person rows filtered).
 
-**Finding A — CONFIRMED, and it has actually fired.** Of 49 applicant-recommended
+**Finding A — mechanism CONFIRMED; occurrence UNKNOWN. ⚠ §0 C2 supersedes the
+"has actually fired" reading below:** `ensureApplicantRecommended` preserves
+`selected` and unions `applicant`, so a staff-manual row later tagged by
+applicant ingestion yields this same signature without door A. Read the counts
+below as **5 ambiguous final-state candidates**, not 5 events.
+
+**Finding A — the counts.** Of 49 applicant-recommended
 rows that are `selected=true` (7 further rows on test requests excluded),
 **5 carry a `staff_manual` or `referred` source token**. Only
 `ensureStaffManualCandidate` unions those tokens — `promoteApplicantReviewer`
@@ -1367,13 +1467,14 @@ production text distinguished them. Two probes were written to settle it; both
 are committed and re-runnable.
 
 They do not change the verdict on the directive, but they do change what
-"campaign safe" means. The common thread across C and D is that **free-text
-reviewer input is treated as though it were structured data**: a referral
-sentence becomes a person's name, and an exclusion category becomes an empty
-filter. In both cases the system's behavior diverges silently from what the
-person typing believed. The applicant's *recommended* reviewers avoid this
-entirely by being exact person GUIDs — the fix pattern is already in the
-building, just not applied to the free-text fields.
+"campaign safe" means. **(§0 C8b: an earlier version of this paragraph drew a
+"common thread" across C and D. Finding D is withdrawn, so that synthesis is
+struck.)** The surviving point rests on C alone: **free-text reviewer input is
+treated as though it were structured data** — a referral sentence becomes a
+person's name, and the system's behavior diverges silently from what the person
+typing believed. The exclusion-copy recommendation rests solely on the
+separately measured name-variant evidence (~47 credential-suffix rows), not on
+Finding D.
 
 **Finding D was raised, measured, read, and withdrawn** across this review
 (§3.2.1–3.2.2): of the affected answers, 8 of 10 are prose for "none" where a

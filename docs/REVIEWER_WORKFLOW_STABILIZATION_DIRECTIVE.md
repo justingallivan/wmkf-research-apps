@@ -21,18 +21,38 @@ related:
 
 ## Current process position
 
-On 2026-08-01, the owner inserted one fresh Claude Fable review session before
-implementation. Fable is to reconstruct the reviewer workflow from current
-source and safe read-only evidence, try to falsify the incident claims, and
-challenge this directive's authority model, golden workflows, and phase order.
-The controlling session brief is
-`docs/REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md`.
+**Phase -1 is COMPLETE and its findings are owner-accepted (2026-08-01).**
+Implementation is authorized and owned by Codex; the work order is
+`SESSION_PROMPT.md`.
 
-This directive remains the proposed stabilization contract and the record of the
-July 31 diagnosis. It is **not** evidence that its observations are still true,
-that its framing is correct, or that its prescribed patch is ready to execute.
-No runtime implementation or data repair should begin until Justin reviews
-Fable's assessment and accepts or revises the next slice.
+The Fable challenge pass ran, was independently reviewed by Codex
+(`gpt-5.6-sol`, effort high), corrected, and accepted:
+
+- `outputs/reviewer-workflow-stabilization-fable-assessment.md` — the
+  assessment. **Its §0 records corrections that supersede its own body**; read
+  §0 first.
+- `outputs/reviewer-workflow-codex-adversarial-review-2026-08-01.md` — the
+  verbatim independent review.
+
+**Two corrections change this directive's own framing:**
+
+1. **The incident IS partly a regression.** The Fable pass initially concluded
+   nothing had regressed; that was wrong. `fe825933` read applicant rows via
+   `findByRequest(..., { selectedOnly: true })`, which — because decline
+   archival sets `selected=false` — functionally excluded declined reviewers
+   from enrichment. `ad8e0299` (2026-06-16) replaced it with a disposition-only
+   read while making applicant rows `selected=false` by default. So
+   **Sorek-shaped (`selected=false, invited=true`) resurfacing is a regression
+   introduced by `ad8e0299`, while Isberg-shaped (`selected=true`) resurfacing
+   is the latent roster-twin gap.** Both are fixed by projecting engagement;
+   restoring `selectedOnly` would fix only the first and would break the S264
+   explicit-promotion design.
+2. **Owner decision:** engagement monotonicity applies to **every roster row
+   carrying a suggestion anchor**, not applicant-origin rows only.
+
+The July 31 incident table below remains a historical record. Mutable rows in it
+were re-probed on 2026-08-01 and agreed with the baseline (assessment §3.1);
+re-probe again before any write.
 
 ## Controlling instruction after the Fable challenge pass
 
@@ -145,7 +165,18 @@ lives. “Already invited” and “declined” are statuses, not errors.
 
 ## Required execution sequence
 
-### Phase -1 — Independent Fable challenge pass (current)
+### Phase -1 — Independent Fable challenge pass — **COMPLETE 2026-08-01**
+
+Outcome: verdict **PLAN SOUND WITH NAMED CHANGES**, then independently reviewed
+by Codex (**needs-attention**), corrected in the assessment's §0, and accepted
+by the owner. Net changes to this directive: Contract 1 narrows to invariants
+I-1/I-2/I-2a (assessment §5); Phases 0 and 2 shrink to the Slice A work order in
+`SESSION_PROMPT.md`; the `Project Narrative.pdf` fallback is deferred; data
+repair is post-fix hygiene rather than a correctness gate; and two new golden
+workflows (W6 ungated `selected=true`, W7 implausible-name create) join the set.
+The original Phase -1 instructions are retained below as the historical record.
+
+
 
 1. Run `/start` in a completely new Claude Code CLI session and follow
    `SESSION_PROMPT.md` plus
