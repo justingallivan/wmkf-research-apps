@@ -182,8 +182,9 @@ pool") assumes cannot exist, entered without the deliberate
 `ENGAGEMENT_STAMP_RESET` that the explicit Restore path uses.
 
 **Finding D — an applicant exclusion that names no one is silently enforced
-against nobody (surfaced 2026-08-01 while the owner corrected Finding C's
-design note).** Exclusion enforcement is exact normalized-name matching
+against nobody. MEASURED 2026-08-01: real, bounded at 7.6%, and no reviewer was
+ever selected on an affected request. I escalated this before measuring it; the
+measurement de-escalates it — see §3.2.** Exclusion enforcement is exact normalized-name matching
 `[VERIFIED via lib/utils/reviewer-name-match.js:54-65]`. A substantive answer
 that states a category rather than names ("direct competitors") parses to zero
 names, so the excluded set is empty and **no candidate is filtered**
@@ -375,6 +376,59 @@ Two observations the inherited diagnosis did not record:
   this slice and NOT a blocker, but it is latent fuel for future
   identity-binding confusion and belongs on the hygiene list, not in the
   stabilization slice.
+
+### 3.2 Finding D measured (probe, 2026-08-01)
+
+`scripts/probe-exclusion-enforcement-exposure.mjs`, owner-run, read-only,
+whole-history (no `--since`):
+
+| Bucket | Count |
+|---|---|
+| Requests with a non-null `wmkf_excludedreviewers` | **294** |
+| …blank / "N/A" style — no exposure | 123 |
+| …**substantive** (a real exclusion attempt) | **171** |
+| — enforceable, names extracted | 158 |
+| — **FAIL-OPEN, substantive but zero names** | **13** |
+| — parser output unusable | 0 |
+| — errored / unclassified | 0 |
+
+**13 of 171 substantive exclusions (7.6%) block nobody.** Every one of the 13
+shows `selected=0, invited=0` — no reviewer was ever chosen on any affected
+request. Oldest 2024-10-30, newest 2026-04-30.
+
+**Verdict: CONFIRMED as a real defect, but LOW severity and no observed harm.**
+It is not a campaign blocker and should not jump the queue ahead of the §6
+slice. I flagged it as "the thing I would measure first"; that was right, and
+the result is that it moves *down* the list rather than up.
+
+Three honest limits on that reassurance:
+
+1. **The zero-impact reading is weak without a base rate.** All 13 affected
+   requests having no reviewers may simply mean those requests never reached
+   reviewer selection — many predate the reviewer workflow — rather than that
+   the unenforced exclusion was harmless. The probe did not compute the
+   comparison denominator on this run. **I have since added a base-rate sample
+   to the script**, which reports how many *enforceable*-exclusion requests do
+   have selected reviewers and states plainly when the zero-impact reading is
+   uninformative. Re-run to get it.
+2. **`--limit 200` did not bind on this run.** `queryAllRecords` paginates to
+   completion — its `top` is a page size, not a cap — so all 294 rows were
+   scanned rather than 200. Harmless here (broader coverage, 171 LLM calls), and
+   **now fixed** so the flag caps as documented and reports what it skipped. The
+   numbers above are therefore whole-history, not a recent-window sample.
+3. **The 13 have not been read.** The script cannot distinguish "the applicant
+   wrote a category" (the Finding-D story: input problem, form-level fix) from
+   "the applicant wrote real names and the parser missed them" (a *parser* bug:
+   worse, enforceable in principle, and a different fix entirely). Several are
+   very short — two are 13 characters, several are 2–4 words — which reads more
+   like a terse category or a stray value than a missed name list, but that is
+   an impression, not evidence. **Reading 13 short strings settles it**:
+   re-run with `--show-text`. Until then the *cause* of the 7.6% is
+   `[UNKNOWN]`, even though its size is now known.
+
+One clean result worth stating positively: **0 parse failures and 0 errors
+across 171 LLM extractions.** `extractExcludedReviewers` is reliable on real
+production text; whatever the 13 turn out to be, LLM flakiness is not it.
 
 ---
 
@@ -792,7 +846,9 @@ Still open:
 | Whether Wolberger's referral text actually names Lima, and whether it names **more than one** person (Finding C's trigger) | Read `wmkf_declinereferral` on her suggestion, or open the Track-tab referral callout | Yes — one field |
 | **Whether Findings A and C have already damaged data** | **Written this session:** `scripts/probe-referral-path-exposure.mjs` (read-only; Dataverse GETs only). §1 flags person names that cannot denote one person (Finding C's fingerprint — the shape §3.1's probe structurally cannot see); §2 counts applicant-recommended rows that are `selected=true`, split by whether they carry a `staff_manual`/`referred` token (Finding A); §3 lists invited rows holding no response state (possible silent reset — a lead only, since a pending invitee looks identical). Run: `DATAVERSE_ALLOW_PROD_READS=yes node --import ./scripts/lib/use-extensionless.mjs scripts/probe-referral-path-exposure.mjs`. Names are redacted unless `--show-names`. **Not yet run.** | Yes — read-only, prints denominators |
 | How many stored referrals name more than one person (decides whether §6a's structured form is worth building) | Read `wmkf_declinereferral` across declined suggestions and count multi-name answers | Yes — one field, one filter |
-| **How many requests have a substantive `wmkf_excludedreviewers` answer that yields zero enforceable names (Finding D fail-open exposure)** | **Written this session:** `scripts/probe-exclusion-enforcement-exposure.mjs` (read-only). Classifies every stored exclusion into not-substantive / names-extracted / **zero-names** / parse-failed using the live parser, prints the fail-open ratio over the substantive denominator, and for each fail-open request reports how many reviewers were actually **selected and invited** — impact, not just presence. Run: `DATAVERSE_ALLOW_PROD_READS=yes node --import ./scripts/lib/use-extensionless.mjs scripts/probe-exclusion-enforcement-exposure.mjs --limit 200`. Applicant text is redacted unless `--show-text`; costs one Haiku call per substantive answer, so it is `--limit`-bounded. **Not yet run.** | Yes — read-only, bounded, prints denominators |
+| ~~Finding D exposure size~~ | **ANSWERED 2026-08-01 — see §3.2.** 13 of 171 substantive exclusions (7.6%) unenforceable; 0 affected requests ever selected a reviewer. | — |
+| **Whether the 13 fail-open answers are category text or names the parser missed** | Re-run with `--show-text` and read them; 13 short strings. Category text ⇒ Finding D stands as an input problem (form-level fix, low priority). Real names ⇒ a **parser** defect, which is more serious and needs its own fix. **This is the only Finding-D question that could still change a recommendation.** | Yes — same probe, one flag |
+| Whether Finding D's zero-impact reading is meaningful or an artifact of those requests never reaching review | Re-run the probe: a base-rate sample was added after the first run and now reports how many enforceable-exclusion requests do have selected reviewers, flagging the reading as weak when comparable requests also have none | Yes — same probe, bounded 20-request sample |
 | Demand for the legacy-filename fallback (§4.6) | Count active-cycle requests with no canonical proposal file but a `Project Narrative.pdf` (SharePoint listing over the current cycle's requests; read-only Graph) | Yes — bounded to one cycle |
 | Whether the two July 31 Lima 409s were fresh-enrichment confirms (claim 3 causation) | Vercel request logs for the two PATCHes (payload presence of `candidateKey`), if retained | Maybe — log retention dependent |
 | How many other requests currently have engaged-but-unterminal applicant recommendations (blast radius of the perpetual re-enrich loop) | One roster/Dataverse join query — natural extension of the probe script | Yes — read-only |
@@ -841,6 +897,10 @@ person typing believed. The applicant's *recommended* reviewers avoid this
 entirely by being exact person GUIDs — the fix pattern is already in the
 building, just not applied to the free-text fields.
 
-**Of everything in this document, Finding D is the one I would measure first.**
-It is the only item that is independent of the `1002912` incident, needs no
-code change to assess, and could be affecting live requests today.
+**Finding D was measured during review and came back small** — 13 of 171
+substantive exclusions unenforceable (7.6%), none on a request that ever
+selected a reviewer (§3.2). It stays on the list as a real defect and an
+argument for structured input, but it is **not** a campaign blocker and does not
+displace the §6 slice. The one open question is whether those 13 are category
+answers (input problem) or missed names (parser problem) — a `--show-text`
+re-run settles it, and only the second would change any recommendation here.

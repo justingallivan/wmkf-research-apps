@@ -84,16 +84,23 @@ function preview(text) {
 const filters = ['wmkf_excludedreviewers ne null'];
 if (since) filters.push(`createdon ge ${since}T00:00:00Z`);
 
-const { records: requests, capped } = await DynamicsService.queryAllRecords('akoya_requests', {
+// NB: queryAllRecords paginates to completion — its `top` is the PAGE size, not
+// a total cap — so the cap must be applied here. (Caught on the first real run:
+// --limit 200 returned 294 rows.)
+const { records: allRequests } = await DynamicsService.queryAllRecords('akoya_requests', {
   select: 'akoya_requestid,akoya_requestnum,akoya_title,wmkf_excludedreviewers,createdon',
   filter: filters.join(' and '),
   orderby: 'createdon desc',
-  top: limit,
 });
+const requests = allRequests.slice(0, limit);
+const truncated = allRequests.length - requests.length;
 
 console.log('READ-ONLY exclusion-enforcement exposure scan (Finding D)');
 console.log(`limit=${limit}${since ? ` since=${since}` : ''} showText=${showText}\n`);
-console.log(`Requests with a non-null exclusion field: ${requests.length}${capped ? ' [CAPPED — raise --limit]' : ''}`);
+console.log(`Requests with a non-null exclusion field: ${allRequests.length}`);
+if (truncated > 0) {
+  console.log(`  ⚠ scanning the ${requests.length} most recent; ${truncated} NOT examined — raise --limit for full coverage`);
+}
 
 const buckets = { not_substantive: [], names_extracted: [], zero_names: [], parse_failed: [], error: [] };
 
@@ -176,6 +183,36 @@ if (failOpen.length) {
   console.log('these are leads to review, not confirmed unhonored exclusions.');
 } else {
   console.log('No fail-open exclusions found in this window.');
+}
+
+// Base rate. "Every fail-open request had zero reviewers" is only reassuring if
+// comparable requests normally DO have reviewers — otherwise the impact column
+// is measuring "this request never went to review", not "the exclusion was
+// harmless". Sample the ENFORCEABLE bucket to get that comparison denominator.
+if (!skipImpact && failOpen.length && buckets.names_extracted.length) {
+  const sample = buckets.names_extracted.slice(0, 20);
+  let withReviewers = 0;
+  let sampled = 0;
+  for (const row of sample) {
+    try {
+      const c = await selectedReviewerCount(row.id);
+      sampled += 1;
+      if (c.selected > 0) withReviewers += 1;
+    } catch { /* skip; reported via `sampled` */ }
+  }
+  console.log('');
+  console.log('─'.repeat(78));
+  console.log('BASE RATE (how to read the impact column above)');
+  console.log(`  of ${sampled} sampled requests whose exclusion WAS enforceable, ${withReviewers} have selected reviewers.`);
+  if (sampled > 0 && withReviewers === 0) {
+    console.log('  → comparable requests also have no reviewers, so the zero-impact reading');
+    console.log('    above is WEAK: it likely reflects requests that never reached reviewer');
+    console.log('    selection at all, not that the unenforced exclusions were harmless.');
+  } else if (sampled > 0) {
+    const pct = ((withReviewers / sampled) * 100).toFixed(0);
+    console.log(`  → ${pct}% of comparable requests do reach reviewer selection, so a fail-open`);
+    console.log('    request with zero selected reviewers is meaningfully unharmed.');
+  }
 }
 
 if (buckets.error.length) {
