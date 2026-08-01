@@ -190,40 +190,67 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
     for (const field of ENGAGEMENT_STAMP_RESET_FIELDS) expect(payload).not.toHaveProperty(field);
   });
 
-  test('re-adding an ALREADY-ACTIVE row must NOT wipe its live invitation (S343)', async () => {
+  test.each([
+    ['declined removed row', { wmkf_selected: false, wmkf_declined: true }, 'restore_required', 'declined'],
+    ['already-selected row', { wmkf_selected: true }, 'already_handled', 'selected'],
+    ['already-invited row', { wmkf_selected: true, wmkf_invited: true }, 'already_handled', 'invited'],
+  ])('re-adding a non-applicant %s returns a typed remedy without lifecycle mutation', async (_label, engagement, outcome, stage) => {
     jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
       records: [{
         wmkf_appreviewersuggestionid: 'sug-live',
         _etag: 'W/"live"',
         wmkf_sources: 'staff_manual',
-        wmkf_selected: true, // already in the pool, genuinely invited
         wmkf_applicantdisposition: null,
-        wmkf_invited: true,
+        ...engagement,
         wmkf_emailsentat: '2026-07-02T00:00:00Z',
-        wmkf_respondremindersentat: '2026-07-03T00:00:00Z',
-        wmkf_remindersentat: '2026-07-04T00:00:00Z',
-        wmkf_remindercount: 2,
-        wmkf_materialssentat: '2026-07-05T00:00:00Z',
-        wmkf_reviewreceivedat: '2026-07-06T00:00:00Z',
-        wmkf_responsereceivedat: '2026-07-07T00:00:00Z',
-        wmkf_thankyousentat: '2026-07-08T00:00:00Z',
-        wmkf_completedat: '2026-07-09T00:00:00Z',
-        wmkf_withdrawnsufficientat: '2026-07-10T00:00:00Z',
-        wmkf_proposalfirstaccessed: '2026-07-11T00:00:00Z',
       }],
     });
     const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
 
-    await ensureStaffManualCandidate({
+    const out = await ensureStaffManualCandidate({
+      potentialReviewerId: 'pr-1',
+      requestId: 'req-1',
+      sources: ['staff_manual', 'referred'],
+    }, { actingUserSystemId: 'u1' });
+
+    expect(out).toEqual({
+      id: 'sug-live',
+      created: false,
+      selected: engagement.wmkf_selected === true,
+      outcome,
+      stage,
+    });
+    const [, , payload] = patch.mock.calls[0];
+    expect(payload).toEqual({ wmkf_sources: 'staff_manual,referred' });
+    expect(payload).not.toHaveProperty('wmkf_selected');
+    for (const field of ENGAGEMENT_STAMP_RESET_FIELDS) {
+      expect(payload).not.toHaveProperty(field);
+    }
+  });
+
+  test('re-adding an unengaged removed non-applicant row still selects it', async () => {
+    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
+      records: [{
+        wmkf_appreviewersuggestionid: 'sug-removed',
+        _etag: 'W/"removed"',
+        wmkf_sources: 'pubmed',
+        wmkf_selected: false,
+        wmkf_applicantdisposition: null,
+      }],
+    });
+    const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    const out = await ensureStaffManualCandidate({
       potentialReviewerId: 'pr-1',
       requestId: 'req-1',
     }, { actingUserSystemId: 'u1' });
 
-    // Only the source union + selected touch — NO engagement-reset keys present.
-    const [, , payload] = patch.mock.calls[0];
-    for (const field of ENGAGEMENT_STAMP_RESET_FIELDS) {
-      expect(payload).not.toHaveProperty(field);
-    }
+    expect(out).toEqual({ id: 'sug-removed', created: false, selected: true });
+    expect(patch.mock.calls[0][2]).toEqual({
+      wmkf_sources: 'pubmed,staff_manual',
+      wmkf_selected: true,
+      ...ENGAGEMENT_STAMP_RESET_PAYLOAD,
+    });
   });
 
   test('412 on removed-row re-add re-reads and does not reset stamps if the row is now active', async () => {
@@ -235,10 +262,6 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
           wmkf_sources: 'pubmed',
           wmkf_selected: false,
           wmkf_applicantdisposition: null,
-          wmkf_invited: true,
-          wmkf_emailsentat: '2026-07-02T00:00:00Z',
-          wmkf_remindersentat: '2026-07-03T00:00:00Z',
-          wmkf_reviewreceivedat: '2026-07-04T00:00:00Z',
         }],
       })
       .mockResolvedValueOnce({
@@ -263,7 +286,13 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
       requestId: 'req-1',
     }, { actingUserSystemId: 'u1' });
 
-    expect(out).toEqual({ id: 'sug-race', created: false, selected: true });
+    expect(out).toEqual({
+      id: 'sug-race',
+      created: false,
+      selected: true,
+      outcome: 'already_handled',
+      stage: 'review_received',
+    });
     expect(patch).toHaveBeenCalledTimes(2);
     expect(patch.mock.calls[0][2]).toMatchObject(ENGAGEMENT_STAMP_RESET_PAYLOAD);
     expect(patch.mock.calls[0][3]).toEqual({ actingUserSystemId: 'u1', ifMatch: 'W/"1"' });
@@ -271,7 +300,6 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
     const [, , retryPayload, retryOpts] = patch.mock.calls[1];
     expect(retryPayload).toEqual({
       wmkf_sources: 'pubmed,invited_elsewhere,staff_manual',
-      wmkf_selected: true,
     });
     for (const field of ENGAGEMENT_STAMP_RESET_FIELDS) {
       expect(retryPayload).not.toHaveProperty(field);

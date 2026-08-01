@@ -201,10 +201,11 @@ test('referral: match reason + dual source tokens + provenanceKind in the DTO', 
 });
 
 test.each([
-  ['promotion_required', 'Promote this applicant-recommended reviewer from Find.'],
-  ['restore_required', 'Restore this previously declined reviewer from Removed.'],
-  ['already_handled', 'Open Track Reviewers to continue from the current engagement stage.'],
-])('applicant-row provenance merge returns typed %s instead of a false Added success', async (outcome, remedy) => {
+  ['promotion_required', 'recommended', 'Promote this applicant-recommended reviewer from Find.'],
+  ['restore_required', 'declined', 'Restore this previously declined reviewer from Removed.'],
+  ['already_handled', 'invited', 'Open Track Reviewers to continue from the current engagement stage.'],
+  ['already_handled', 'selected', 'Open Invite Reviewers to continue from the selected stage.'],
+])('typed %s/%s result returns a remedy instead of a false Added success', async (outcome, stage, remedy) => {
   lookupReviewerIdentity.mockResolvedValue({
     outcome: 'confident',
     match: { reviewerId: PR, nameConsistent: true },
@@ -214,7 +215,7 @@ test.each([
     created: false,
     selected: false,
     outcome,
-    stage: outcome === 'restore_required' ? 'declined' : outcome === 'already_handled' ? 'invited' : 'recommended',
+    stage,
   });
 
   const body = await addManualReviewer(args({
@@ -231,6 +232,43 @@ test.each([
   expect(body.candidate).toBeUndefined();
   expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
   expect(setContactLink).not.toHaveBeenCalled();
+});
+
+test('an unselected adapter result without a recognized remedy fails closed', async () => {
+  ensureStaffManualCandidate.mockResolvedValue({
+    id: 'sug-unknown',
+    created: false,
+    selected: false,
+  });
+
+  const err = await addManualReviewer(args()).catch((error) => error);
+
+  expect(err).toBeInstanceOf(ServiceHttpError);
+  expect(err.httpStatus).toBe(409);
+  expect(err.body).toMatchObject({
+    code: 'reviewer_not_actionable',
+    suggestionId: 'sug-unknown',
+  });
+  expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
+});
+
+test('an unknown adapter outcome fails closed instead of falling through to Added', async () => {
+  ensureStaffManualCandidate.mockResolvedValue({
+    id: 'sug-future',
+    created: false,
+    selected: true,
+    outcome: 'future_state',
+  });
+
+  const err = await addManualReviewer(args()).catch((error) => error);
+
+  expect(err).toBeInstanceOf(ServiceHttpError);
+  expect(err.httpStatus).toBe(409);
+  expect(err.body).toMatchObject({
+    code: 'unsupported_manual_reviewer_outcome',
+    suggestionId: 'sug-future',
+  });
+  expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
 });
 
 test('reuse_contact fills email from the contact and links it (fill-only enrichment single round-trip)', async () => {
