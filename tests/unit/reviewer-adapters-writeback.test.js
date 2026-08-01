@@ -312,6 +312,54 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
     expect(retryOpts).toEqual({ actingUserSystemId: 'u1', ifMatch: 'W/"2"' });
   });
 
+  test('412 on staff re-add routes a fresh applicant-provenance row through promotion gating', async () => {
+    jest.spyOn(DynamicsService, 'queryRecords')
+      .mockResolvedValueOnce({
+        records: [{
+          wmkf_appreviewersuggestionid: 'sug-applicant-race',
+          _etag: 'W/"1"',
+          wmkf_sources: 'pubmed',
+          wmkf_selected: false,
+          wmkf_applicantdisposition: null,
+        }],
+      })
+      .mockResolvedValueOnce({
+        records: [{
+          wmkf_appreviewersuggestionid: 'sug-applicant-race',
+          _etag: 'W/"2"',
+          wmkf_sources: 'pubmed,applicant',
+          wmkf_selected: false,
+          wmkf_applicantdisposition: 100000000,
+        }],
+      });
+    const patch = jest.spyOn(DynamicsService, 'updateRecord')
+      .mockRejectedValueOnce(err412())
+      .mockResolvedValueOnce(undefined);
+
+    const out = await ensureStaffManualCandidate({
+      potentialReviewerId: 'pr-applicant-race',
+      requestId: 'req-applicant-race',
+      sources: ['staff_manual', 'referred'],
+    }, { actingUserSystemId: 'u1' });
+
+    expect(out).toEqual({
+      id: 'sug-applicant-race',
+      created: false,
+      selected: false,
+      outcome: 'promotion_required',
+      stage: 'recommended',
+    });
+    expect(patch).toHaveBeenCalledTimes(2);
+    expect(patch.mock.calls[1][2]).toEqual({
+      wmkf_sources: 'pubmed,applicant,staff_manual,referred',
+    });
+    expect(patch.mock.calls[1][3]).toEqual({ actingUserSystemId: 'u1', ifMatch: 'W/"2"' });
+    expect(patch.mock.calls[1][2]).not.toHaveProperty('wmkf_selected');
+    for (const field of ENGAGEMENT_STAMP_RESET_FIELDS) {
+      expect(patch.mock.calls[1][2]).not.toHaveProperty(field);
+    }
+  });
+
   test('existing excluded row is not resurrected', async () => {
     jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
       records: [{
