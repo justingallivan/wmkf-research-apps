@@ -363,13 +363,16 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     }
   };
 
-  // Record a staff attestation plus independent evidence for an already-promoted,
-  // research-only address. The server re-reads the exact suggestion/person and
-  // requires the submitted address to equal current Dataverse state before it
-  // atomically writes staff_verified + the versioned trust bundle.
-  const verifyResearchOnlyAddress = async (draft) => {
+  // Record a staff attestation plus independent evidence for an already-promoted
+  // research-only address or one side of a pending conflict. The server re-reads
+  // the exact suggestion/person and permits only the current stored address or
+  // current conflict alternative before atomically writing staff_verified + bundle.
+  const verifyDraftAddress = async (draft) => {
     if (!draft?.suggestionId || !draft?.candidateEmail) return;
     const evidence = verifyEvidence[draft.suggestionId] || {};
+    const selectedEmail = evidence.email
+      || draft.addressConflict?.storedEmail
+      || draft.candidateEmail;
     if (!evidence.url?.trim()) {
       setVerifyState((prev) => ({
         ...prev,
@@ -377,12 +380,10 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
       }));
       return;
     }
-    // Surface the SERVER's reason in the prompt. It matters which research-only case
-    // this is: a plain search lead is merely unproven, while `search_contested` means
-    // the address contradicts verified identity evidence — a staffer waving that one
-    // through should see so before attesting.
+    // Surface the SERVER's reason in the prompt. It matters whether this is an
+    // unproven search lead, a contested search address, or a durable A/B conflict.
     const ok = window.confirm(
-      `Confirm that ${draft.candidateEmail} is the correct address for `
+      `Confirm that ${selectedEmail} is the correct address for `
       + `${draft.candidateName || 'this reviewer'}.\n\n`
       + `Why the app withheld it: ${draft.emailConfidence?.reason || 'address provenance is unproven'}.\n\n`
       + 'Only continue if you have checked it against an independent source — the '
@@ -399,7 +400,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
           requestId,
           suggestionId: draft.suggestionId,
           action: 'verify_person_and_address',
-          email: draft.candidateEmail,
+          email: selectedEmail,
           evidenceType: evidence.type || 'publication_corresponding_author',
           evidenceUrl: evidence.url.trim(),
         }),
@@ -786,7 +787,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                 </div>
                                 <button
                                   type="button"
-                                  onClick={() => verifyResearchOnlyAddress(d)}
+                                  onClick={() => verifyDraftAddress(d)}
                                   disabled={
                                     verifyState[d.suggestionId]?.verifying === true
                                     // `requestId` defaults to null on this component; the
@@ -869,17 +870,74 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                           {d.skipped === 'address_conflict_pending' && (
                             <div className="mt-2 rounded border border-red-200 bg-white/70 p-2 text-red-800">
                               <p>
-                                Resolve the stored-versus-found address in the Find tab before sending. Inspect the
-                                papers or institutional source, choose the correct address, and record the exact
-                                person-and-address verification. If neither choice is safe, create a repair request.
+                                Resolve the stored-versus-found address before sending. Inspect the papers or
+                                institutional source, choose the correct address, and record the exact
+                                person-and-address verification below. If neither choice is safe, create a repair request.
                               </p>
-                              {requestId && (
-                                <a
-                                  href={`/workbench/${encodeURIComponent(requestId)}?tab=reviewers&sub=find`}
-                                  className="mt-2 inline-block rounded border border-red-300 bg-white px-2.5 py-1 font-medium hover:bg-red-50"
-                                >
-                                  Open Find to resolve address
-                                </a>
+                              {d.addressConflict?.storedEmail && d.addressConflict?.foundEmail ? (
+                                <div className="mt-2 space-y-2">
+                                  <fieldset>
+                                    <legend className="font-medium">Which address did you verify?</legend>
+                                    {[d.addressConflict.storedEmail, d.addressConflict.foundEmail].map((address) => (
+                                      <label key={address} className="mt-1 flex items-center gap-2">
+                                        <input
+                                          type="radio"
+                                          name={`conflict-address-${d.suggestionId}`}
+                                          value={address}
+                                          checked={(verifyEvidence[d.suggestionId]?.email
+                                            || d.addressConflict.storedEmail) === address}
+                                          onChange={() => setVerifyEvidence((prev) => ({
+                                            ...prev,
+                                            [d.suggestionId]: { ...(prev[d.suggestionId] || {}), email: address },
+                                          }))}
+                                        />
+                                        <span>{address}</span>
+                                      </label>
+                                    ))}
+                                  </fieldset>
+                                  <div className="grid gap-2 sm:grid-cols-[11rem_1fr]">
+                                    <select
+                                      aria-label={`Evidence type for ${d.candidateName || 'reviewer'}`}
+                                      value={verifyEvidence[d.suggestionId]?.type || 'publication_corresponding_author'}
+                                      onChange={(e) => setVerifyEvidence((prev) => ({
+                                        ...prev,
+                                        [d.suggestionId]: { ...(prev[d.suggestionId] || {}), type: e.target.value },
+                                      }))}
+                                      className="rounded border border-red-300 bg-white px-2 py-1"
+                                    >
+                                      <option value="publication_corresponding_author">Corresponding-author paper</option>
+                                      <option value="institution_page">Institution or lab page</option>
+                                    </select>
+                                    <input
+                                      type="url"
+                                      aria-label={`Evidence link for ${d.candidateName || 'reviewer'}`}
+                                      value={verifyEvidence[d.suggestionId]?.url || ''}
+                                      onChange={(e) => setVerifyEvidence((prev) => ({
+                                        ...prev,
+                                        [d.suggestionId]: { ...(prev[d.suggestionId] || {}), url: e.target.value },
+                                      }))}
+                                      placeholder="Paste the evidence link"
+                                      className="rounded border border-red-300 bg-white px-2 py-1"
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => verifyDraftAddress(d)}
+                                    disabled={verifyState[d.suggestionId]?.verifying === true || !requestId}
+                                    className="rounded border border-red-300 bg-white px-2.5 py-1 font-medium hover:bg-red-50 disabled:opacity-50"
+                                  >
+                                    {verifyState[d.suggestionId]?.verifying ? 'Recording…' : 'Record verified address'}
+                                  </button>
+                                  {verifyState[d.suggestionId]?.error && (
+                                    <p role="alert" className="text-[11px] text-red-700">
+                                      {verifyState[d.suggestionId].error}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="mt-2 text-red-700">
+                                  The current address pair could not be loaded. Create a repair request.
+                                </p>
                               )}
                               <button
                                 type="button"

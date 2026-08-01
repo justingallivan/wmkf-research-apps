@@ -159,6 +159,11 @@ test.each(['invitation', 'materials', 'followup', 'thankyou'])(
     expect(out.drafts[0]).toMatchObject({
       skipped: 'address_conflict_pending',
       emailConfidence: { action: 'blocked' },
+      addressConflict: {
+        storedEmail: 'jane@uni.edu',
+        foundEmail: 'jane.roe@uni.edu',
+        reason: 'email_mismatch',
+      },
     });
     expect(mintAndStore).not.toHaveBeenCalled();
   },

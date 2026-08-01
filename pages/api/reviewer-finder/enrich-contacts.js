@@ -29,7 +29,10 @@ import { loadModelOverrides } from '../../../lib/services/model-override-loader'
 import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { resolveProposalPI, piInstitutions } from '../../../lib/services/proposal-pi-identity';
-import { mintAutomatedIdentityAttestation } from '../../../lib/services/reviewer-candidate-attestation';
+import {
+  createServerIdentityDecisionReceipt,
+  mintAutomatedIdentityAttestation,
+} from '../../../lib/services/reviewer-candidate-attestation';
 import { reconcileReviewerContacts } from '../../../lib/services/reviewer-contact-reconciliation';
 
 const limiter = nextRateLimiter({ max: 10 });
@@ -195,6 +198,24 @@ export default async function handler(req, res) {
       console.log('[enrich-contacts] contact-leads audit:', JSON.stringify(results.stats.contactAudit));
     }
 
+    // Bind the server-computed identity bundle before any durable reconciliation.
+    // The signed token is the client/save contract; the compact server receipt
+    // lets the reconciliation service prove that the identity fields it sees
+    // came from this server computation rather than a browser-authored roster row.
+    if (requestId && Array.isArray(results?.enriched)) {
+      await Promise.all(results.enriched.map(async (candidate) => {
+        try {
+          candidate.automatedIdentityAttestation = await mintAutomatedIdentityAttestation({
+            requestId,
+            candidate,
+          });
+          candidate.serverIdentityDecisionReceipt = createServerIdentityDecisionReceipt(candidate);
+        } catch (error) {
+          console.error('[enrich-contacts] identity receipt mint failed:', error.message);
+        }
+      }));
+    }
+
     // Exact-key reconciliation against Dataverse. It normally returns bounded
     // display evidence; a trusted-ORCID/exact-person address contradiction is
     // also persisted as person-scoped conflict state so every send path blocks
@@ -216,24 +237,6 @@ export default async function handler(req, res) {
         // failure must not discard otherwise-successful enrichment results.
         console.error('[enrich-contacts] Dataverse reconciliation failed (fail-open):', error.message);
       }
-    }
-
-    // Bind the server-computed identity bundle to this request before returning
-    // it to the browser. Save-candidates treats unsigned/modified identity fields
-    // as hints that may tighten gates, never as permission to persist ORCID,
-    // Scholar, or metrics. A mint failure degrades to a safe contact/name-only
-    // save rather than hiding otherwise useful search results.
-    if (requestId && Array.isArray(results?.enriched)) {
-      await Promise.all(results.enriched.map(async (candidate) => {
-        try {
-          candidate.automatedIdentityAttestation = await mintAutomatedIdentityAttestation({
-            requestId,
-            candidate,
-          });
-        } catch (error) {
-          console.error('[enrich-contacts] identity receipt mint failed:', error.message);
-        }
-      }));
     }
 
     // Send final results

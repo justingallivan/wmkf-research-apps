@@ -6,9 +6,13 @@
  * runs for real (pure) so we also confirm the route prunes server-side.
  */
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn(async () => ({ profileId: 5 })) }));
-jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
-  verifyAutomatedIdentityAttestation: jest.fn(async () => ({ valid: false, reason: 'no_token' })),
-}));
+jest.mock('../../lib/services/reviewer-candidate-attestation', () => {
+  const actual = jest.requireActual('../../lib/services/reviewer-candidate-attestation');
+  return {
+    ...actual,
+    verifyAutomatedIdentityAttestation: jest.fn(async () => ({ valid: false, reason: 'no_token' })),
+  };
+});
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   listForRequest: jest.fn(async () => ({ active: [], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [] })),
   recordSurfaced: jest.fn(async () => 0),
@@ -145,6 +149,52 @@ describe('POST recordSurfaced', () => {
 
     const [, passed] = store.recordSurfaced.mock.calls[0];
     expect(passed[0].candidateKey).toBe('candidate:receipt-bound');
+  });
+
+  it('stores identity-decision authority only from a valid server attestation', async () => {
+    verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+      valid: true,
+      rosterCandidateKey: 'candidate:receipt-bound',
+      identityDecisionBound: true,
+      eligibilityEvidenceBound: false,
+    });
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [{
+      name: 'Receipt Bound',
+      candidateKey: 'candidate:receipt-bound',
+      orcid: '0000-0002-1825-0097',
+      automatedIdentityAttestation: 'signed',
+      serverIdentityDecisionReceipt: { version: 1, source: 'forged', projection: {} },
+      contactEnrichment: {
+        orcidId: '0000-0002-1825-0097',
+        identity: {
+          status: 'probable',
+          anchors: [{ type: 'orcid_public', canonicalKey: 'orcid:0000-0002-1825-0097' }],
+        },
+      },
+    }] } }, r);
+
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed[0].serverIdentityDecisionReceipt).toMatchObject({
+      version: 1,
+      source: 'automated_resolver',
+      projection: { candidateKey: expect.any(String) },
+    });
+  });
+
+  it('strips a browser-forged identity-decision receipt when no valid token or stored receipt backs it', async () => {
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [{
+      name: 'Forged Receipt',
+      serverIdentityDecisionReceipt: {
+        version: 1,
+        source: 'automated_resolver',
+        projection: { candidateKey: 'candidate:victim' },
+      },
+    }] } }, r);
+
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed[0].serverIdentityDecisionReceipt).toBeUndefined();
   });
 
   it('prunes server-side and records named candidates', async () => {

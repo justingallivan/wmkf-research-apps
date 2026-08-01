@@ -649,6 +649,11 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
           candidate={editing}
           onClose={() => setEditing(null)}
           onSaved={() => { if (onRefresh) onRefresh(); }}
+          onResolveAddressConflict={() => {
+            const target = editing;
+            setEditing(null);
+            openInvite([target], false);
+          }}
         />
       )}
     </Card>

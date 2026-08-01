@@ -338,11 +338,15 @@ quick-check. High-confidence stored-versus-found contradictions on exact
 applicant-linked people persist `conflict_pending`, which blocks promotion and all
 outbound reviewer templates until staff verifies the stored or found address.
 Every blocked card offers verification/editing, set-aside, or a durable repair
-request. Ordinary conflict retries use only anchor-grounded ORCID identity and
-active people; an existing roster receipt is replayed as the prior adjudication,
-not converted into a new conflict. Receipt-first partial success and stale ETags
-remain explicit and retryable. The complete paper list and Scholar name-search
-rule remain load-bearing. A third Opus review is pending; Wave 17 and runtime
+request. Ordinary conflict retries require a still-matching server-bound identity
+receipt plus anchor-grounded ORCID identity; an existing address receipt is
+replayed as the prior adjudication, while a failed pre-bundle conflict write can
+clear without inventing person state. Receipt-first partial success and stale
+ETags remain explicit and retryable. Promoted conflicts expose both current
+addresses and evidence directly in the Invite modal; ordinary manual email edits
+cannot bypass the pending block. The complete paper list and Scholar name-search
+rule remain load-bearing. The third Opus review of `21b44680` returned NO-SHIP;
+its findings are remediated and a fourth review is pending. Wave 17 and runtime
 promotion remain blocked until it passes.
 
 ## Reviews tab (workbench consumption of submitted reviews)

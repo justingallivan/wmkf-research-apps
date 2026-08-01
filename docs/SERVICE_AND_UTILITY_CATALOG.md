@@ -103,7 +103,7 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`reviewer-identity-shadow-log.js`** — Best-effort Postgres persistence for resolver comparisons (`reviewer_identity_shadow_log`, migration 026). Whitelisted data-minimized scalars only (pseudonymous hashed candidate key, decisions, reason, anchors-agree, error code); awaited inserts are capped at 2 seconds, always resolve, and circuit-break after repeated failure. Non-authoritative: no application decision reader; the canonical operator report is `scripts/report-reviewer-identity-shadow-log.js`, and retention/cap cleanup runs in the daily maintenance cron.
 - **`reviewer-works-first.js`** / **`reviewer-works-first-authoritative.js`** — Shared works-first resolver, exact sparse-fragment/byline-ORCID equivalence, W4.1 evidence-bundle builder/parser, and authoritative-result adapter used by the frozen evaluator and runtime seam. Uses byline-filtered works plus W0 institution identities; same-ORCID fragments may collapse, every distinct-ORCID set goes to review, and automated rescues cap at `probable`.
 - **`contact-enrichment-service.js`** — Tiered contact lookup with identity anchoring, structured scholarly-email evidence, and Dataverse writeback.
-- **`reviewer-contact-reconciliation.js`** — Sequential exact-email/ORCID reconciliation for enriched search cards. Produces bounded staff-facing Dataverse evidence; a trusted, name-consistent ORCID may also ETag-write person-scoped pending address-conflict state. Provider-only/provisional ORCIDs can require review but never establish a known identity or authorize a durable person write.
+- **`reviewer-contact-reconciliation.js`** — Sequential exact-email/ORCID reconciliation for enriched search cards. Produces bounded staff-facing Dataverse evidence; a still-matching server-bound identity decision plus trusted, name-consistent ORCID may also ETag-write person-scoped pending address-conflict state. Provider-only/provisional or browser-authored ORCIDs can require review but never establish a known identity or authorize a durable person write.
 - **`reviewer-address-trust-service.js`** — Authenticated exact-address attestation, fresh conflict disclosure, active-roster retry, and durable repair orchestration. Roster receipts are request-scoped; person conflict/adjudication writes are stable-person-bound and ETag-conditional; receipt-first partial success is explicit.
 - **`contact-enrichment/scholarly-email.js`** — Free NCBI PubMed + Europe PMC author-affiliation email resolver; requires full-forename or exact-ORCID identity plus affiliation corroboration, deduplicates the same work across providers, and abstains on tied addresses.
 - **`reviewer-roster-store.js`** — Postgres operational roster for
@@ -114,7 +114,9 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`reviewer-candidate-attestation.js`** — `NEXTAUTH_SECRET`-signed
   request/candidate receipt. Projection v3 binds the exact canonical contact
   projection in addition to identity/eligibility; v1/v2 remain verifiable
-  against their historical projections but are never contact-authoritative.
+  against their historical projections but are never contact-authoritative. A
+  compact server-only roster receipt preserves the accepted identity-decision
+  projection after ingestion and must still match the current row at use time.
 - **`reviewer-finder/save-candidates-service.js`** — Server-owned Find→Invite
   promotion boundary: canonical contact projection, v3/staff authority,
   exact-email owner reuse and race convergence, per-row result contract,

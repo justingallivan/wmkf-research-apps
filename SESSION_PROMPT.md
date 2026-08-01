@@ -25,10 +25,12 @@
 > anchor-grounded active-person rule, existing receipts are replayed rather
 > than reopened, resolved applicant pairs remain unblocked, receipt-first
 > partial success and stale ETags are explicit, typed promotion blocks retain
-> remedies, and the route matrix records retry's writes. Local verification is
-> green at 550 suites / 6,640 tests plus build/types/lint/DAL/route gates. A
-> third adversarial review is pending; Wave 17/runtime promotion remains blocked
-> until it passes.
+> remedies, and the route matrix records retry's writes. The third review of
+> `21b44680` confirmed those fixes but returned NO-SHIP on a no-bundle receipt
+> retry dead end, the promoted-conflict UI, roster identity authority, manual
+> edit bypass, inactive-person reason, and one count typo. Codex has remediated
+> those findings in source; a fourth read-only adversarial review is pending.
+> Wave 17/runtime promotion remains blocked until it passes.
 
 ## Session 388 Summary
 
@@ -294,8 +296,10 @@ Seven Claude commits were replayed without content conflicts onto
    pilot. Evidence: `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md`.
    The first Opus implementation review's confirmed findings are remediated.
    The second review of `f1b85e78` returned NO-SHIP on the retry path's weaker
-   ORCID binding plus five medium contract gaps. Those findings are remediated
-   and locally verified; obtain the third read-only Opus review before release.
+   ORCID binding plus five medium contract gaps. The third review of `21b44680`
+   confirmed those fixes, found six additional gaps, and returned NO-SHIP. Those
+   gaps are remediated in source; obtain a fourth read-only Opus review before
+   release.
 2. ~~**Acceptance-time promotion scope (§4.1/§4.3).**~~ **DONE in source, S389:**
    sending never promotes; every identity-bearing acceptance—including honorarium
    opt-outs—promotes through identity-aware/idempotent matching; declines do not.

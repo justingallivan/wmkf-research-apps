@@ -6,6 +6,8 @@ import { decodeJwt, SignJWT } from 'jose';
 import crypto from 'crypto';
 import {
   contactAttestationProjection,
+  createServerIdentityDecisionReceipt,
+  hasServerIdentityDecisionReceipt,
   identityAttestationProjection,
   legacyIdentityAttestationProjection,
   mintAutomatedIdentityAttestation,
@@ -51,6 +53,31 @@ test('server receipt carries the owner-approved 14-day lifetime', async () => {
   expect(TTL_SECONDS).toBe(14 * 24 * 60 * 60);
   expect(payload.exp - payload.iat).toBe(TTL_SECONDS);
   expect(payload.projectionVersion).toBe(PROJECTION_VERSION);
+});
+
+test('persisted server identity receipt binds the exact compact identity projection', () => {
+  const candidate = {
+    ...CANDIDATE,
+    candidateKey: 'candidate:jane',
+    contactEnrichment: {
+      ...CANDIDATE.contactEnrichment,
+      orcidId: CANDIDATE.orcid,
+      identity: {
+        status: 'probable',
+        anchors: [{ type: 'orcid', canonicalKey: `orcid:${CANDIDATE.orcid}` }],
+      },
+    },
+  };
+  const bound = {
+    ...candidate,
+    serverIdentityDecisionReceipt: createServerIdentityDecisionReceipt(candidate),
+  };
+
+  expect(hasServerIdentityDecisionReceipt(bound)).toBe(true);
+  expect(hasServerIdentityDecisionReceipt({
+    ...bound,
+    contactEnrichment: { ...bound.contactEnrichment, orcidId: '0000-0001-5109-3700' },
+  })).toBe(false);
 });
 
 test('server receipt signs and returns deceased eligibility evidence', async () => {

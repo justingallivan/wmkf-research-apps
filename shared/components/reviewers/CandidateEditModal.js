@@ -78,10 +78,11 @@ function defaultFieldChoices(plan, conflictValue) {
   return choices;
 }
 
-export default function CandidateEditModal({ candidate, onClose, onSaved, onApply, onConfirm, onVerifyAddress, requireAddressVerification = false, confirmMode = false, nameEditable = true }) {
+export default function CandidateEditModal({ candidate, onClose, onSaved, onApply, onConfirm, onVerifyAddress, onResolveAddressConflict, requireAddressVerification = false, confirmMode = false, nameEditable = true }) {
   const [formData, setFormData] = useState({ name: '', affiliation: '', email: '', website: '', academicRank: '', primaryDepartment: '', mainInstitution: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [errorRemediation, setErrorRemediation] = useState([]);
   // confirmMode only: the PD must tick "I've verified this is the correct person"
   // before the candidate can be added (the deliberate identity-gate override).
   const [identityConfirmed, setIdentityConfirmed] = useState(false);
@@ -116,6 +117,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
         mainInstitution: mainInstitutionFallback(candidate),
       });
       setError(null);
+      setErrorRemediation([]);
       setIdentityConfirmed(false);
       setAddressConfirmed(false);
       setEvidenceType('publication_corresponding_author');
@@ -146,6 +148,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
     e.preventDefault();
     setIsSaving(true);
     setError(null);
+    setErrorRemediation([]);
     // Capture the token BEFORE the PATCH so a 409 that lands after the candidate
     // changed doesn't open merge mode for the stale candidate (Codex S290 post-impl).
     const submitToken = reqToken.current;
@@ -255,6 +258,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
+        setErrorRemediation(Array.isArray(data.remediation) ? data.remediation : []);
         // Duplicate-key 409 on a saved-candidate email edit → offer a record merge
         // (S289 chunk-4). Only in the saved-Candidates path: we need the edited
         // record's person id, and the local Find-card (onApply) / confirm paths
@@ -272,7 +276,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
         }
         // Prefer the human-readable `message` (set for translated errors like
         // duplicate-key 409s); fall back to the machine code or a generic line.
-        throw new Error(data.message || data.error || 'Failed to update candidate');
+        throw new Error(`${data.partialSuccess ? 'Other changes were saved. ' : ''}${data.message || data.error || 'Failed to update candidate'}`);
       }
 
       if (onSaved) await onSaved();
@@ -668,6 +672,24 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
           )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && onResolveAddressConflict && errorRemediation.some((item) => item?.action === 'resolve_address_conflict') && (
+            <button
+              type="button"
+              onClick={onResolveAddressConflict}
+              className="rounded border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100"
+            >
+              Open invitation preview to resolve address
+            </button>
+          )}
+          {error && onSaved && errorRemediation.some((item) => item?.action === 'reload_candidate') && (
+            <button
+              type="button"
+              onClick={async () => { await onSaved(); onClose(); }}
+              className="rounded border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100"
+            >
+              Reload reviewer
+            </button>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">

@@ -28,7 +28,11 @@ import {
   findCandidatesByKeys,
   removePreviousActiveSearchResults,
 } from '../../../lib/services/reviewer-roster-store';
-import { verifyAutomatedIdentityAttestation } from '../../../lib/services/reviewer-candidate-attestation';
+import {
+  createServerIdentityDecisionReceipt,
+  hasServerIdentityDecisionReceipt,
+  verifyAutomatedIdentityAttestation,
+} from '../../../lib/services/reviewer-candidate-attestation';
 import {
   pruneCandidateForRoster,
   reviewerCandidateKey,
@@ -100,6 +104,7 @@ function stripClientRosterAuthority(candidate) {
     manualContactFields: _manualContactFields,
     pdIdentityConfirmed: _pdIdentityConfirmed,
     pdIdentityConfirmationId: _pdIdentityConfirmationId,
+    serverIdentityDecisionReceipt: _serverIdentityDecisionReceipt,
     ...safe
   } = candidate;
   return safe;
@@ -137,34 +142,47 @@ async function preserveStoredRosterAuthority(requestId, candidates) {
   const storedByKey = new Map(storedRows.map((candidate) => [candidate.candidateKey, candidate]));
   return list.map((candidate) => {
     const stored = storedByKey.get(candidate?.candidateKey);
-    if (!stored || !hasStoredStaffAuthority(stored)) return candidate;
+    const preserveIdentityReceipt = !!stored
+      && hasServerIdentityDecisionReceipt(stored)
+      && JSON.stringify(stored.serverIdentityDecisionReceipt.projection)
+        === JSON.stringify(candidate?.serverIdentityDecisionReceipt?.projection
+          || createServerIdentityDecisionReceipt(candidate).projection);
+    const withIdentityReceipt = preserveIdentityReceipt
+      ? { ...candidate, serverIdentityDecisionReceipt: stored.serverIdentityDecisionReceipt }
+      : candidate;
+    if (!stored || !hasStoredStaffAuthority(stored)) return withIdentityReceipt;
     const confirmation = stored.staffIdentityConfirmation;
     const email = confirmation.email || null;
     const website = confirmation.website || null;
     const affiliation = confirmation.affiliation || null;
-    return pruneCandidateForRoster({
-      ...candidate,
-      name: stored.name || candidate.name,
-      email,
-      emailSource: email ? 'manual' : null,
-      website,
-      websiteSource: website ? 'manual' : null,
-      affiliation,
-      affiliationSource: 'staff_manual',
-      manualContactFields: stored.manualContactFields,
-      contactEnrichment: {
-        ...(candidate.contactEnrichment || {}),
+    return {
+      ...pruneCandidateForRoster({
+        ...withIdentityReceipt,
+        name: stored.name || withIdentityReceipt.name,
         email,
         emailSource: email ? 'manual' : null,
         website,
         websiteSource: website ? 'manual' : null,
         affiliation,
         affiliationSource: 'staff_manual',
-      },
-      pdIdentityConfirmed: true,
-      pdIdentityConfirmationId: stored.pdIdentityConfirmationId,
-      staffIdentityConfirmation: confirmation,
-    });
+        manualContactFields: stored.manualContactFields,
+        contactEnrichment: {
+          ...(candidate.contactEnrichment || {}),
+          email,
+          emailSource: email ? 'manual' : null,
+          website,
+          websiteSource: website ? 'manual' : null,
+          affiliation,
+          affiliationSource: 'staff_manual',
+        },
+        pdIdentityConfirmed: true,
+        pdIdentityConfirmationId: stored.pdIdentityConfirmationId,
+        staffIdentityConfirmation: confirmation,
+      }),
+      ...(preserveIdentityReceipt
+        ? { serverIdentityDecisionReceipt: stored.serverIdentityDecisionReceipt }
+        : {}),
+    };
   });
 }
 
@@ -209,8 +227,12 @@ async function handlePost(req, res) {
       ? receipt.eligibilityStatus
       : 'unknown';
     const preserveEvidence = eligibilityStatus !== 'unknown';
+    const bound = bindServerRosterCandidateKey(compact, receipt);
     return {
-      ...bindServerRosterCandidateKey(compact, receipt),
+      ...bound,
+      ...(receipt.valid && receipt.identityDecisionBound === true
+        ? { serverIdentityDecisionReceipt: createServerIdentityDecisionReceipt(bound) }
+        : {}),
       eligibilityStatus,
       eligibilityReason: preserveEvidence ? compact.eligibilityReason : null,
       eligibilityEvidence: preserveEvidence ? compact.eligibilityEvidence : null,

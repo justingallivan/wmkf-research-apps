@@ -45,17 +45,28 @@ request.
 
 The second Claude Opus 5 review of `f1b85e78` also returned **NO-SHIP**. It
 confirmed all nine first-review findings as fixed, then found one new release
-blocker and five medium contract gaps. Those findings are now remediated in
-source and locally verified, but a third adversarial review is still pending:
+blocker and five medium contract gaps. Those findings were remediated in source
+and confirmed fixed by the third adversarial review:
 ordinary retry uses the same anchor-grounded ORCID rule as normal
 reconciliation; retry is restricted to active, already-flagged roster rows and
 replays an existing receipt instead of reopening it; resolved applicant A/B
 pairs project only the canonical address; roster-receipt partial success is
 explicit and applied by the client; stale ETags return retryable
 `candidate_stale`; applicant-promotion typed errors have remediation; and the
-security matrix classifies retry's writes. The full local suite is green at 550
-suites / 6,639 tests, with clean build, types, DAL gates, and route-matrix gates.
-Wave 17 and runtime promotion remain prohibited until the fresh review passes.
+security matrix classifies retry's writes.
+
+The third Claude Opus 5 review of `21b44680` confirmed all six second-review
+high/medium findings as fixed, but returned **NO-SHIP** on two newly exposed
+workflow failures plus two medium and two low findings. The follow-up source now:
+lets a receipt clear a failed conflict-write flag when no person bundle exists to
+replay; persists and revalidates a server-bound identity-decision receipt before
+an ordinary roster row can authorize a durable person lookup; renders both
+conflict addresses and their evidence form directly in the invitation modal for
+already-promoted rows; rejects raw manual-email edits while a conflict is pending
+and routes the editor to that invitation adjudication surface; reports inactive
+ordinary people precisely; and reconciles the stale test count. A fourth
+read-only adversarial review is pending. Wave 17 and runtime promotion remain
+prohibited until it passes.
 
 This document replaces the rejected Session 390 design from
 `codex/claude-ui-followup`. It incorporates the subsequent Codex whole-flow
@@ -594,11 +605,15 @@ Invite-remedy low findings. The relevant enforced complements are:
   remain `email_conflict`;
 - inactive people cannot be disclosed through the conflict action or relabeled
   `staff_verified`; and
-- the Invite conflict card deep-links directly to Reviewers → Find while still
-  offering durable repair.
+- the Invite conflict card adjudicates either current address in place for an
+  already-promoted suggestion while still offering durable repair;
+- ordinary durable person lookup requires a server-bound identity-decision
+  receipt whose exact projection still matches the roster row; and
+- manual saved-candidate edits cannot invalidate a pending bundle and silently
+  downgrade the send block.
 
-Verification at the review target: focused trust/promotion tests 95/95; full
-suite 550/550 suites and 6,640/6,640 tests; `check:types`; lint with zero errors
+Verification after the third-review remediation: focused affected-surface tests
+135/135; full suite 550/550 suites and 6,650/6,650 tests; `check:types`; lint with zero errors
 and 51 pre-existing warnings; production build; API route matrix + self-test;
 Dataverse DAL gate + self-test; doc-currency gate + self-test. This evidence is
 local only and does not satisfy the schema-first deployment or signed-in pilot

@@ -381,6 +381,58 @@ test('retry_check applies a current roster receipt instead of reopening its addr
   expect(recordSurfaced).not.toHaveBeenCalled();
 });
 
+test('retry_check clears a failed-write flag when a later receipt has no person bundle to replay', async () => {
+  const candidateKey = 'suggestion:row';
+  const receipt = {
+    receiptId: 'receipt-1',
+    email: 'found@example.edu',
+    personConfirmed: true,
+    actorProfileId: 'profile-1',
+    actorSystemUserId: 'system-1',
+    requestId: REQUEST_ID,
+    candidateKey,
+    evidenceType: 'institution_page',
+    evidenceUrl: 'https://example.edu/profile',
+    note: null,
+    attestedAt: '2026-07-31T21:00:00.000Z',
+  };
+  const failedCandidate = {
+    candidateKey,
+    suggestionId: SUGGESTION_ID,
+    rosterStatus: 'active',
+    rosterUpdatedAt: 'row-version-2',
+    conflictRecordUnavailable: true,
+    addressTrustReceipt: receipt,
+    email: 'found@example.edu',
+    contactEnrichment: {
+      email: 'found@example.edu',
+      emailSource: 'manual',
+      emailPersistAllowed: true,
+      conflictRecordUnavailable: true,
+    },
+  };
+  findCandidatesByKeys.mockResolvedValueOnce([failedCandidate]);
+  getById.mockResolvedValueOnce({
+    wmkf_emailaddress: 'stored@example.edu',
+    wmkf_addresstruststatejson: null,
+    statecode: 0,
+    _etag: 'W/"person"',
+  });
+  clearAddressTrustBlocks.mockResolvedValueOnce({
+    ...failedCandidate,
+    conflictRecordUnavailable: false,
+  });
+
+  const result = await retryAddressCheck({ requestId: REQUEST_ID, candidateKey });
+
+  expect(result).toMatchObject({ success: true, decision: 'address_conflict_resolved' });
+  expect(update).not.toHaveBeenCalled();
+  expect(clearAddressTrustBlocks).toHaveBeenCalledWith(REQUEST_ID, candidateKey, {
+    receiptId: 'receipt-1',
+    expectedUpdatedAt: 'row-version-2',
+  });
+});
+
 test('a Dataverse failure after roster attestation returns explicit partial success and the authoritative candidate', async () => {
   const candidateKey = 'suggestion:row';
   const conflict = createConflictPendingState({
@@ -508,6 +560,30 @@ test('inactive people cannot be relabeled staff_verified', async () => {
 
   expect(result).toMatchObject({ success: false, code: 'person_inactive' });
   expect(update).not.toHaveBeenCalled();
+});
+
+test('ordinary roster actions report an inactive resolved person as repair-only', async () => {
+  findCandidatesByKeys.mockResolvedValueOnce([{
+    candidateKey: 'orcid:trusted',
+    name: 'Reviewer Name',
+    rosterStatus: 'active',
+    addressConflictPending: true,
+  }]);
+  resolveTrustedReviewerPerson.mockResolvedValueOnce({
+    personId: PERSON_ID,
+    person: { statecode: 1, wmkf_emailaddress: 'reviewer@example.edu' },
+  });
+
+  const result = await getAddressConflict({
+    requestId: REQUEST_ID,
+    candidateKey: 'orcid:trusted',
+  });
+
+  expect(resolveTrustedReviewerPerson).toHaveBeenCalledWith(
+    expect.anything(),
+    { allowInactive: true },
+  );
+  expect(result).toMatchObject({ success: false, code: 'person_inactive' });
 });
 
 test.each(['saved', 'excluded', 'ineligible'])(

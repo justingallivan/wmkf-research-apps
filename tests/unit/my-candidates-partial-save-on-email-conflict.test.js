@@ -26,6 +26,10 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 }));
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   __esModule: true,
+  getById: jest.fn(async () => ({
+    wmkf_emailaddress: 'old@example.org',
+    wmkf_addresstruststatejson: null,
+  })),
   update: jest.fn(),
   findByEmailCandidates: jest.fn(),
 }));

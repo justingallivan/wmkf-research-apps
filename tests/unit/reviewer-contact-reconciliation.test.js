@@ -9,16 +9,21 @@ import {
   createConflictPendingState,
   createStaffVerifiedState,
 } from '../../lib/utils/reviewer-address-trust';
+import { createServerIdentityDecisionReceipt } from '../../lib/services/reviewer-candidate-attestation';
 
 const ORCID = '0000-0002-1825-0097';
 
 function candidate(name, enrichment = {}) {
-  return {
+  const row = {
     name,
     contactEnrichment: {
       identity: { status: 'probable' },
       ...enrichment,
     },
+  };
+  return {
+    ...row,
+    serverIdentityDecisionReceipt: createServerIdentityDecisionReceipt(row),
   };
 }
 
@@ -119,6 +124,30 @@ test('only an active reviewer matched through an anchor-grounded ORCID is a dura
   });
   getReviewer.mockResolvedValueOnce({ wmkf_potentialreviewersid: 'reviewer-1', statecode: 1 });
   await expect(resolveTrustedReviewerPerson(row, { lookup, getReviewer })).resolves.toBeNull();
+  getReviewer.mockResolvedValueOnce({ wmkf_potentialreviewersid: 'reviewer-1', statecode: 1 });
+  await expect(resolveTrustedReviewerPerson(row, {
+    lookup,
+    getReviewer,
+    allowInactive: true,
+  })).resolves.toEqual({
+    personId: 'reviewer-1',
+    person: { wmkf_potentialreviewersid: 'reviewer-1', statecode: 1 },
+  });
+});
+
+test('an otherwise trusted ORCID cannot authorize a durable lookup without the server-bound identity receipt', async () => {
+  const row = candidate('Trusted Researcher', {
+    identity: {
+      status: 'probable',
+      anchors: [{ type: 'orcid_public', canonicalKey: `orcid:${ORCID}` }],
+    },
+    orcidId: ORCID,
+  });
+  delete row.serverIdentityDecisionReceipt;
+  const lookup = jest.fn();
+
+  await expect(resolveTrustedReviewerPerson(row, { lookup })).resolves.toBeNull();
+  expect(lookup).not.toHaveBeenCalled();
 });
 
 test('an ORCID explicitly grounded by a trusted identity anchor can become known', async () => {

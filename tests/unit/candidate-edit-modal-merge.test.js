@@ -112,6 +112,45 @@ describe('CandidateEditModal — merge mode', () => {
     expect(screen.queryByText(/Merge duplicate reviewer records/i)).not.toBeInTheDocument();
   });
 
+  test('a pending-conflict edit offers a working transition to the invitation adjudication surface', async () => {
+    const onResolveAddressConflict = jest.fn();
+    jest.spyOn(global, 'fetch').mockResolvedValue(resp({
+      error: 'Resolve the pending address conflict in the invitation preview before editing this email.',
+      message: 'Resolve the pending address conflict in the invitation preview before editing this email.',
+      code: 'address_conflict_pending',
+      remediation: [{ action: 'resolve_address_conflict', label: 'Resolve address conflict' }],
+    }, { ok: false, status: 409 }));
+    render(
+      <CandidateEditModal
+        candidate={candidate}
+        onClose={jest.fn()}
+        onSaved={jest.fn()}
+        onResolveAddressConflict={onResolveAddressConflict}
+      />,
+    );
+
+    triggerMerge();
+    const remedy = await screen.findByRole('button', { name: /open invitation preview to resolve address/i });
+    fireEvent.click(remedy);
+    expect(onResolveAddressConflict).toHaveBeenCalledTimes(1);
+  });
+
+  test('a stale edit offers an executable reload remedy', async () => {
+    const onSaved = jest.fn(async () => {});
+    const onClose = jest.fn();
+    jest.spyOn(global, 'fetch').mockResolvedValue(resp({
+      error: 'The reviewer changed. Reload and review the current address.',
+      code: 'candidate_stale',
+      remediation: [{ action: 'reload_candidate', label: 'Reload reviewer' }],
+    }, { ok: false, status: 409 }));
+    render(<CandidateEditModal candidate={candidate} onClose={onClose} onSaved={onSaved} />);
+
+    triggerMerge();
+    fireEvent.click(await screen.findByRole('button', { name: /reload reviewer/i }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   // (c)
   test('a blocked plan shows the reasons, keeps Swap, and offers no Merge button', async () => {
     jest.spyOn(global, 'fetch').mockImplementation(async (url) => {

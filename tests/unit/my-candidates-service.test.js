@@ -38,6 +38,10 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   __esModule: true,
   queryReviewers: jest.fn(async () => ({ records: [] })),
+  getById: jest.fn(async () => ({
+    wmkf_emailaddress: 'old@example.edu',
+    wmkf_addresstruststatejson: null,
+  })),
   update: jest.fn(async () => {}),
   clearEmailForEdit: jest.fn(async () => ({ cleared: true })),
   findByEmailCandidates: jest.fn(),
@@ -449,6 +453,93 @@ describe('patchMyCandidates', () => {
     // emailSource never stamped manual for an email that did not land.
     expect(researcherAdapter.updateById).not.toHaveBeenCalledWith(
       PERSON_ID, expect.objectContaining({ emailSource: 'manual' }), expect.anything(),
+    );
+  });
+
+  test('manual email edit cannot bypass a pending address conflict and returns executable remedies', async () => {
+    suggestionAdapter.findById.mockResolvedValue({ _wmkf_potentialreviewer_value: PERSON_ID });
+    potentialReviewerAdapter.getById.mockResolvedValueOnce({
+      wmkf_emailaddress: 'stored@example.edu',
+      wmkf_addresstruststatejson: JSON.stringify({
+        version: 1,
+        email: 'stored@example.edu',
+        status: 'conflict_pending',
+        attestation: null,
+        conflict: {
+          reason: 'email_mismatch',
+          storedEmail: 'stored@example.edu',
+          foundEmail: 'found@example.edu',
+          source: 'scholarly_multi',
+          requestId: REQUEST_ID,
+          candidateKey: `suggestion:${SUGGESTION_ID}`,
+          detectedAt: '2026-07-31T20:00:00.000Z',
+        },
+        resolution: null,
+      }),
+    });
+
+    const error = await patchMyCandidates({
+      body: {
+        suggestionId: SUGGESTION_ID,
+        affiliation: 'Updated Institute',
+        email: 'found@example.edu',
+      },
+      actingUserSystemId: SYS,
+    }).catch((caught) => caught);
+
+    expect(error).toBeInstanceOf(MyCandidatesError);
+    expect(error).toMatchObject({
+      httpStatus: 409,
+      body: {
+        code: 'address_conflict_pending',
+        partialSuccess: true,
+        savedFields: ['affiliation'],
+        remediation: expect.arrayContaining([
+          expect.objectContaining({ action: 'resolve_address_conflict' }),
+          expect.objectContaining({ action: 'create_repair_request' }),
+        ]),
+      },
+    });
+    expect(potentialReviewerAdapter.update).not.toHaveBeenCalledWith(
+      PERSON_ID,
+      expect.objectContaining({ email: expect.anything() }),
+      expect.anything(),
+    );
+  });
+
+  test('concurrent person change makes a manual address edit a retryable 409 with partial-save detail', async () => {
+    suggestionAdapter.findById.mockResolvedValue({ _wmkf_potentialreviewer_value: PERSON_ID });
+    potentialReviewerAdapter.getById.mockResolvedValueOnce({
+      wmkf_emailaddress: 'old@example.edu',
+      wmkf_addresstruststatejson: null,
+      _etag: 'W/"person-1"',
+    });
+    potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
+      if (updates?.email) throw Object.assign(new Error('Precondition Failed'), { status: 412 });
+    });
+
+    const error = await patchMyCandidates({
+      body: {
+        suggestionId: SUGGESTION_ID,
+        affiliation: 'Updated Institute',
+        email: 'new@example.edu',
+      },
+      actingUserSystemId: SYS,
+    }).catch((caught) => caught);
+
+    expect(error).toMatchObject({
+      httpStatus: 409,
+      body: {
+        code: 'candidate_stale',
+        partialSuccess: true,
+        savedFields: ['affiliation'],
+        remediation: [expect.objectContaining({ action: 'reload_candidate' })],
+      },
+    });
+    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(
+      PERSON_ID,
+      { email: 'new@example.edu', emailSource: 'manual' },
+      { actingUserSystemId: SYS, ifMatch: 'W/"person-1"' },
     );
   });
 

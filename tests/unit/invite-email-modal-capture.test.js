@@ -98,12 +98,17 @@ describe('InviteEmailModal invitation timing contract', () => {
 });
 
 describe('InviteEmailModal capture-mode result display', () => {
-  test('gives an address-conflict skip an executable Find-tab remedy and repair fallback', async () => {
+  test('lets staff adjudicate a promoted address conflict in place and keeps a repair fallback', async () => {
     const conflictedDraft = {
       suggestionId: 'S1',
       candidateName: 'Dr. Test Reviewer',
       candidateEmail: 'reviewer@example.org',
       skipped: 'address_conflict_pending',
+      addressConflict: {
+        storedEmail: 'reviewer@example.org',
+        foundEmail: 'reviewer@new.example.org',
+        reason: 'email_mismatch',
+      },
     };
     global.fetch.mockImplementation(async (url) => {
       if (String(url).startsWith('/api/user-preferences')) return mockJson({});
@@ -114,6 +119,9 @@ describe('InviteEmailModal capture-mode result display', () => {
         return mockJson({ config: {} });
       }
       if (url === '/api/review-manager/render-emails') return mockJson({ drafts: [conflictedDraft] });
+      if (url === '/api/workbench/reviewer-address-trust') {
+        return mockJson({ success: true, decision: 'person_address_verified' });
+      }
       throw new Error(`Unexpected fetch: ${url}`);
     });
 
@@ -128,8 +136,23 @@ describe('InviteEmailModal capture-mode result display', () => {
     );
 
     expect(await screen.findByText(/resolve the stored-versus-found address/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open find to resolve address/i }))
-      .toHaveAttribute('href', '/workbench/request-guid?tab=reviewers&sub=find');
+    fireEvent.click(screen.getByRole('radio', { name: 'reviewer@new.example.org' }));
+    fireEvent.change(screen.getByLabelText(/evidence link for dr\. test reviewer/i), {
+      target: { value: 'https://example.org/corresponding-author' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /record verified address/i }));
+    await waitFor(() => {
+      const verifyCall = global.fetch.mock.calls.find(([url, options]) => (
+        url === '/api/workbench/reviewer-address-trust'
+        && JSON.parse(options.body).action === 'verify_person_and_address'
+      ));
+      expect(JSON.parse(verifyCall[1].body)).toMatchObject({
+        requestId: 'request-guid',
+        suggestionId: 'S1',
+        email: 'reviewer@new.example.org',
+        evidenceUrl: 'https://example.org/corresponding-author',
+      });
+    });
     expect(screen.getByRole('button', { name: /create repair request/i })).toBeEnabled();
   });
 
