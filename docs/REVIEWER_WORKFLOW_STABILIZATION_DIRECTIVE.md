@@ -3,12 +3,13 @@ title: Reviewer Workflow Stabilization Directive
 domain: reviewers
 kind: plan
 status: canonical
-summary: "Freeze reviewer feature work; prove five golden workflows; repair lifecycle, roster, confirmation, and document selection before data repair."
+summary: "Proposed reviewer stabilization contract, now gated by an independent Fable challenge pass before baseline tests, runtime repair, or data reconciliation."
 canonical: true
 cataloged: 2026-07-31
-last_verified: 2026-07-31
+last_verified: 2026-08-01
 owner: product-engineering
 related:
+  - docs/REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md
   - docs/atlas/postgres-reviewer-find-roster.md
   - docs/agent-wiki/topics/reviewer-workbench-lifecycle.md
   - docs/REVIEWER_CANDIDATE_PROMOTION_REMEDIATION_PLAN.md
@@ -18,17 +19,33 @@ related:
 
 # Reviewer Workflow Stabilization Directive
 
-## Controlling instruction for the next session
+## Current process position
+
+On 2026-08-01, the owner inserted one fresh Claude Fable review session before
+implementation. Fable is to reconstruct the reviewer workflow from current
+source and safe read-only evidence, try to falsify the incident claims, and
+challenge this directive's authority model, golden workflows, and phase order.
+The controlling session brief is
+`docs/REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md`.
+
+This directive remains the proposed stabilization contract and the record of the
+July 31 diagnosis. It is **not** evidence that its observations are still true,
+that its framing is correct, or that its prescribed patch is ready to execute.
+No runtime implementation or data repair should begin until Justin reviews
+Fable's assessment and accepts or revises the next slice.
+
+## Controlling instruction after the Fable challenge pass
 
 The reviewer workflow is in **stabilization mode**. Do not resume reviewer
 feature development, speculative cleanup, or one-symptom-at-a-time patching.
 Do not perform another production roster repair until the runtime recurrence
-path is closed. Do not roll back reviewer work blindly: the authoritative
-Dataverse invitation/contact state inspected on Request `1002912` remains
-intact, and an unverified rollback could restore earlier duplicate-person and
-missing-email defects.
+path is closed. Do not roll back reviewer work blindly: the July 31 inspection
+found the relevant Dataverse invitation/contact state intact, while an
+unverified rollback could restore earlier duplicate-person and missing-email
+defects. Re-probe before stating that mutable state is still current.
 
-The next session must first establish one executable contract across:
+The next authorized implementation session must first establish one executable
+contract across:
 
 1. Dataverse reviewer lifecycle and engagement;
 2. the Postgres `reviewer_find_roster` working projection;
@@ -56,29 +73,34 @@ That makes another local UI or endpoint fix likely to move the symptom rather
 than close the contract. The remedy is a bounded stabilization slice with
 executable end-to-end acceptance tests, not another open-ended review loop.
 
-## Verified incident baseline — Request `1002912`
+## Time-bounded incident baseline — Request `1002912`
 
-Evidence was established on 2026-07-31 PT / 2026-08-01 UTC through current
+Evidence was established on 2026-07-31 PT / 2026-08-01 UTC through then-current
 source, read-only Production Dataverse/Postgres probes, and Vercel request logs.
-No production write was made during this diagnosis.
+No production write was made during this diagnosis. The source-backed rows in
+this table should be re-checked against current source; the mutable Production
+rows are historical evidence only and must be re-probed before being stated as
+current or used to authorize a write. Fable is explicitly permitted to refute
+the synthesis below.
 
-| Claim | Evidence | Status |
+| Claim | Evidence | Status in the July 31 diagnosis |
 | --- | --- | --- |
-| Ralph Isberg's invitation is intact | Dataverse suggestion `fdd093f6-fc68-f111-a826-000d3a3064b7` is `selected=true`, `invited=true`, with invitation email/token timestamps | **VERIFIED** |
-| Rotem Sorek's engagement is intact | Dataverse suggestion `522d186b-a68b-f111-ab0f-70a8a59cded0` is `invited=true`, `declined=true`, `selected=false`, with invitation email/token timestamps | **VERIFIED** |
-| Find incorrectly resurfaced both as unresolved prospects | Both have canonical active applicant rows in `reviewer_find_roster`, while older terminal rows remain under noncanonical `candidate:` keys | **VERIFIED** |
-| Sorek also has stale pre-merge roster state | Active roster key `suggestion:bb81d1f6-fc68-f111-a826-000d3a306da2` points to a Dataverse suggestion that returns 404 | **VERIFIED** |
-| Applicant enrichment ignores engagement | `findApplicantRecommendedByRequest` filters on applicant disposition but not selected/invited/declined; `enrichRecommended` processes the returned set | **VERIFIED via source** |
-| Ingestion computes but drops selected state | `ensureApplicantRecommended` returns `selected`; `ingestApplicantReviewers` omits it from the response DTO | **VERIFIED via source** |
-| Legacy saved keys do not satisfy the terminal cache contract | `rosterFromRows` exposes `savedKeys` only when the stored key equals canonical `suggestion:<id>` | **VERIFIED via source and live rows** |
-| Christopher Lima's correction did not commit | Two `PATCH /api/workbench/reviewer-roster` requests returned 409; the roster row retains no staff confirmation or manual contact fields | **VERIFIED** |
-| Lima's immediate failure is a key-contract defect | the SSE candidate omitted explicit `candidateKey`; the confirmation request therefore lacked the canonical key required by the authoritative roster lookup | **VERIFIED via source** |
-| Proposal selection can destabilize the same cache loop | default loading is strict canonical-file-only; a manual dropdown choice is component state rather than reload-stable navigation state; applicant enrichment keys itself to the chosen file | **VERIFIED via source** |
+| Ralph Isberg's invitation is intact | Dataverse suggestion `fdd093f6-fc68-f111-a826-000d3a3064b7` is `selected=true`, `invited=true`, with invitation email/token timestamps | **VERIFIED then; current live state UNKNOWN** |
+| Rotem Sorek's engagement is intact | Dataverse suggestion `522d186b-a68b-f111-ab0f-70a8a59cded0` is `invited=true`, `declined=true`, `selected=false`, with invitation email/token timestamps | **VERIFIED then; current live state UNKNOWN** |
+| Find incorrectly resurfaced both as unresolved prospects | Both have canonical active applicant rows in `reviewer_find_roster`, while older terminal rows remain under noncanonical `candidate:` keys | **VERIFIED then; mechanism to re-check** |
+| Sorek also has stale pre-merge roster state | Active roster key `suggestion:bb81d1f6-fc68-f111-a826-000d3a306da2` points to a Dataverse suggestion that returns 404 | **VERIFIED then; current live state UNKNOWN** |
+| Applicant enrichment ignores engagement | `findApplicantRecommendedByRequest` filters on applicant disposition but not selected/invited/declined; `enrichRecommended` processes the returned set | **SOURCE-SUPPORTED then; re-check current callers and complements** |
+| Ingestion computes but drops selected state | `ensureApplicantRecommended` returns `selected`; `ingestApplicantReviewers` omits it from the response DTO | **SOURCE-SUPPORTED then; question whether `selected` is sufficient** |
+| Legacy saved keys do not satisfy the terminal cache contract | `rosterFromRows` exposes `savedKeys` only when the stored key equals canonical `suggestion:<id>` | **SOURCE/LIVE-SUPPORTED then; re-check intended compatibility paths** |
+| Christopher Lima's correction did not commit | Two `PATCH /api/workbench/reviewer-roster` requests returned 409; the roster row retains no staff confirmation or manual contact fields | **VERIFIED then; causation not established by status alone** |
+| Lima's immediate failure is a key-contract defect | the SSE candidate omitted explicit `candidateKey`; the confirmation request therefore lacked the canonical key required by the authoritative roster lookup | **SOURCE-SUPPORTED hypothesis; trace every binding/fallback path** |
+| Proposal selection can destabilize the same cache loop | default loading is strict canonical-file-only; a manual dropdown choice is component state rather than reload-stable navigation state; applicant enrichment keys itself to the chosen file | **SOURCE-SUPPORTED hypothesis; verify actual cache invalidation behavior** |
 
-The incident is therefore a **projection and orchestration regression**, not
-loss of the inspected invitation records.
+The July 31 synthesis classified the incident as a **projection and orchestration
+regression**, not loss of the inspected invitation records. Fable must test that
+classification rather than inherit it.
 
-## Authoritative contract to enforce
+## Proposed contract to evaluate
 
 ### 1. Dataverse lifecycle always wins
 
@@ -122,6 +144,25 @@ information, or navigate to the lifecycle stage where the reviewer already
 lives. “Already invited” and “declined” are statuses, not errors.
 
 ## Required execution sequence
+
+### Phase -1 — Independent Fable challenge pass (current)
+
+1. Run `/start` in a completely new Claude Code CLI session and follow
+   `SESSION_PROMPT.md` plus
+   `docs/REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md`.
+2. Work read-only against reviewer runtime and Production state. Write only the
+   requested assessment artifact on a review branch; do not implement, repair,
+   merge, deploy, or send.
+3. Confirm, refute, or leave unknown every material incident claim. For each
+   conclusion, cite current evidence and perform or name a disconfirming check.
+4. Reconstruct caller → persistence → response → consumer behavior across
+   Dataverse, Postgres, SharePoint/Blob, enrichment/cache, confirmation, reload,
+   and rendering.
+5. Challenge the proposed authority boundaries, five golden workflows, repair
+   ordering, and campaign-readiness criteria. Prefer a simpler contract when the
+   evidence supports one.
+6. Return the findings to Justin. The owner decides whether this directive is
+   accepted, revised, or replaced before Phase 0 begins.
 
 ### Phase 0 — Freeze and baseline
 

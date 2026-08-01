@@ -3,10 +3,10 @@ title: Agent Adjacent-Verification Pilot Directive
 domain: agent-harness
 kind: plan
 status: canonical
-summary: "Pilot a narrow, privacy-safe evidence contract for agent claims before adding blocking hooks or broad instruction changes."
+summary: "Implemented advisory-only adjacent-verification contract, local observation window, and evidence required before any future narrow blocking proposal."
 canonical: true
 cataloged: 2026-07-31
-last_verified: 2026-07-31
+last_verified: 2026-08-01
 owner: product-engineering
 related:
   - docs/AGENT_HARNESS_STYLE_GUIDE.md
@@ -17,20 +17,20 @@ related:
 
 # Agent Adjacent-Verification Pilot Directive
 
-## Controlling instruction for Session 392
+## Historical Session 392 mandate and current status
 
-Session 392 must address the agent **adjacent-verification** failure before
-resuming reviewer runtime stabilization. Adjacent verification occurs when an
+Session 392 addressed the agent **adjacent-verification** failure before
+reviewer runtime stabilization resumed. Adjacent verification occurs when an
 agent inspects genuine evidence but writes a broader claim than that evidence
 supports—for example, reading a function body and claiming when every caller
 runs it, or finding one detector and concluding no other detector exists.
 
-This is a bounded agent-harness pilot, not a general instruction rewrite. Do
-not merge or implement Claude's proposed enforcement plan wholesale. Do not
-change reviewer runtime code, reviewer data, or Production state during this
-pilot. The existing reviewer stabilization directive remains valid and is the
-first application priority after this pilot reaches a documented stop
-decision.
+The bounded pilot is now implemented on `main`, its owner disposition is
+**Keep advisory**, and metadata-only normal-session observation remains open.
+It did not change reviewer runtime code or reviewer data and does not authorize
+blocking behavior. The current application handoff is the independent Fable
+challenge pass in `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md` and
+`docs/REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md`.
 
 ## Why this outranks the application work temporarily
 
@@ -322,10 +322,14 @@ avoidable review findings; it does not replace adversarial review.
 ## Parked application priority
 
 `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md` remains canonical and
-unchanged. Once this pilot reaches its documented stop decision, resume that
-directive from its first step: build the read-only diagnostic harness and make
-the five golden workflows fail for their expected current reasons before any
-reviewer runtime change or Production repair.
+the pilot's documented stop decision has been reached. The owner inserted a
+fresh Claude Fable challenge pass before implementation so the July 31
+observations, authority boundaries, five proposed golden workflows, and phase
+order are independently tested rather than accepted. Justin will decide
+whether to retain, revise, or replace the proposed stabilization sequence after
+reviewing Fable's findings.
 
 Do not interpret this temporary reprioritization as evidence that the reviewer
-regressions are resolved. They remain verified open work.
+regressions are resolved. They remain unresolved stabilization work whose
+current observations, causal account, and proposed remedies are now assigned to
+the Fable challenge pass.

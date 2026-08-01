@@ -1,235 +1,174 @@
-# Session 392 Prompt: Adjacent-verification evidence pilot
+# Session 393 Prompt: Fable holistic reviewer-workflow challenge
 
-> **READ FIRST:** `docs/AGENT_ADJACENT_VERIFICATION_PILOT_DIRECTIVE.md` is the
-> controlling directive for this session. Implement only its bounded,
-> advisory-first pilot. Do not merge Claude's proposed enforcement plan
-> wholesale, introduce blocking behavior, rewrite memory, change reviewer
-> runtime code, or modify Production state during this pilot.
+> **Owner-directed one-session exception:** Justin is handing the reviewer
+> workflow to Claude Fable for one fresh Claude Code CLI session. Run `/start`
+> first. Do not infer a permanent reordering of `docs/CURRENT_WORK_QUEUE.md`.
 
-## Session 391 Summary
+## Read First
 
-The session completed and production-piloted the bounded reviewer address-trust
-work through commit `e31cf992`. A later signed-in inspection of Request
-`1002912` exposed a separate cross-layer regression: already-engaged applicant
-reviewers were resurfacing in Find as unresolved prospects, Christopher Lima's
-identity/contact correction returned a dead-end 409, and proposal selection /
-reload behavior could unnecessarily gate or re-enrich applicant rows.
+1. `CLAUDE.md` and the normal `/start` output.
+2. `docs/REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md` — the controlling brief for
+   this session.
+3. `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md` — the current proposed
+   stabilization contract, **under review rather than accepted as truth**.
+4. `docs/atlas/postgres-reviewer-find-roster.md` and
+   `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` for persistence and
+   lifecycle routing.
 
-The session stopped implementation rather than continuing the patch/review loop.
-It established a live/source-backed incident baseline and wrote the canonical
-stabilization directive for Session 392. No production data was changed during
-that diagnosis.
+## Ownership and Safety Boundary
 
-After the initial stop handoff, Claude's separate agent-harness analysis was
-reviewed against the current hooks and official Claude Code hook contract. Its
-“adjacent verification” diagnosis was accepted: an agent can inspect genuine
-evidence yet assert an unchecked neighboring property. Its proposed
-enforcement plan was not accepted as implementation-ready because it overstated
-what pasted output and regex-based hooks can prove, omitted privacy controls,
-blurred normative and descriptive claims, and treated Claude-only hooks as
-general agent enforcement. The owner reprioritized a narrow evidence pilot
-ahead of reviewer stabilization.
+- **Active owner:** Claude Fable.
+- **Owned surface:** read-only reviewer-workflow investigation, plan challenge,
+  and one findings artifact.
+- **Codex status:** no active implementation work; the prior Codex session
+  prepared this handoff only.
+- Start from clean `main` at or after `74247536`. Create a review branch before
+  writing the findings artifact; do not work directly on auto-deploying `main`.
+- Do **not** edit reviewer runtime code, execute data repair, merge, deploy, send
+  email, or perform Production writes in this session.
+- Read-only source inspection, tests, logs, and bounded Dataverse/Postgres/
+  SharePoint probes are allowed. Never treat the July 31 probe as standing
+  authority for a later write.
+- Write the requested analysis artifact only. Do not rewrite the controlling
+  directive, memory, Atlas, wiki, or `SESSION_PROMPT.md`; Justin will decide
+  what to accept after reviewing the findings.
 
-### What Was Completed
+## Why This Session Exists
 
-1. **Confirmed authoritative invitation state is intact.**
-   - Ralph Isberg's suggestion is selected and invited, with email/token
-     timestamps.
-   - Rotem Sorek's suggestion is invited and declined; `selected=false` is the
-     post-decline state, not evidence that he was never promoted.
+The original problem was a Reviewer Workbench **Find** regression on Request
+`1002912`. The work then detoured into an adjacent-verification agent-harness
+pilot. That pilot is now implemented, reviewed, committed, and deployed as an
+advisory. It did not repair the reviewer workflow.
 
-2. **Identified the Find projection failure.**
-   - Isberg and Sorek each have an older terminal Postgres row under a
-     noncanonical `candidate:` key plus a newer canonical active applicant row.
-   - The terminal cache recognizes only canonical `suggestion:<id>` saved keys.
-   - Applicant enrichment reads every `disposition=recommended` row without
-     considering selected/invited/declined engagement.
-   - Sorek also has an active roster row whose old pre-merge Dataverse
-     suggestion no longer exists.
+The reviewer issue was diagnosed and documented, but no stabilization runtime
+patch or Production roster repair followed. Justin now wants Fable's greatest
+value applied before implementation: step back, reconstruct the real product
+and data contract, question the observations and plans, look for a simpler or
+more correct framing, and identify where a bounded implementation session can
+help most.
 
-3. **Diagnosed Lima's failed confirmation.**
-   - Two roster PATCH requests returned 409.
-   - The current roster row contains no staff confirmation/manual contact, so a
-     successful correction was not later erased.
-   - The enriched applicant candidate omitted the canonical `candidateKey`
-     required by the authoritative confirmation mutation.
+## Current Process State
 
-4. **Confirmed proposal-selector coupling.**
-   - Current default loading requires the exact canonical
-     `Reviewer Materials/Proposal_{Request#}.pdf`.
-   - The dropdown override is not reload-stable navigation state.
-   - Applicant cache/enrichment identity depends on the selected exact file key.
+### Completed
 
-5. **Switched to stabilization mode.**
-   - The directive defines the authoritative state contract, five golden
-     workflows, a read-only diagnostic harness, a bounded implementation slice,
-     dry-run-first data reconciliation, review stop rules, and release criteria.
-   - It records the exact legacy `Project Narrative.pdf` fallback as an explicit
-     implementation todo without weakening the outbound canonical-file contract.
+- Reviewer address-trust work reached a no-send production pilot before the
+  regression was discovered; latest related runtime record is `e31cf992`.
+- The regression received a source/read-only-live diagnosis and a proposed
+  stabilization directive in `dbdca6e1`.
+- The adjacent-verification advisory pilot was accepted as **Keep advisory** in
+  `5e14a811`, `40f6e224`, and `74247536`.
+- `main` and Production reached `74247536`; that release changed agent harness
+  and documentation surfaces, not Reviewer Workbench runtime behavior.
 
-6. **Established the adjacent-verification pilot directive.**
-   - The directive preserves Claude's claim-shape/query-shape insight while
-     rejecting wholesale implementation of the proposed enforcement plan.
-   - It requires a canonical rule, representative fixtures, an advisory-only
-     detector, an observation window, and an explicit retire/advisory/block
-     decision before broader harness changes.
-   - It prohibits raw-output mandates, privacy leakage, semantic-proof claims,
-     and unexplained blockers.
+### Not completed
 
-7. **Implemented and accepted the bounded advisory pilot.**
-   - Commit `5e14a811` adds the rule, 35-case replay corpus, advisory hook, and
-     focused enforcement tests without reviewer runtime or Production changes.
-   - The replay detected all 19 seeded adjacent-verification cases, preserved
-     seven exclusions, and records one known regex-boundary miss.
-   - On 2026-07-31, the owner selected **Keep advisory** and authorized merge.
-     Normal-session observation is required before any later narrow blocking
-     proposal, not before advisory use.
-   - After the owner rejected manual-only observation as unreliable, the hook
-     gained automatic metadata-only local occurrence records, bounded 60-day /
-     500-event retention, a deterministic report command, and `/stop`
-     reconciliation. It stores no claim text, transcript content, commands,
-     output, environment values, or live-record data.
+- No read-only cross-store diagnostic harness for the reviewer incident.
+- No baseline-failing versions of the five proposed golden workflows.
+- No engagement-aware applicant projection patch.
+- No complete applicant `candidateKey`/confirmation correction.
+- No exact `Project Narrative.pdf` compatibility fallback or reload-stable
+  proposal override.
+- No dry-run roster reconciliation tool for this incident.
+- No new signed-in no-send `1002912` stabilization pilot.
+- No Production roster cleanup or repair.
 
-### Recent Runtime Commits
+## Claims Fable Must Verify or Falsify
 
-- `e31cf992` — Record reviewer address trust production pilot
-- `6bc6d2f5` — Fix verified reviewer email badge precedence
-- `87cbb8e5` — Record reviewer conflict review closure
-- `974bb64e` — Keep roster email authority address-bound
-- `86bf5d11` — Preserve reviewer address blocks on roster refresh
+These are **inputs to investigation**, not premises. Reconstruct the full
+caller → persistence → response → consumer path and actively seek contrary
+cases.
 
-## Next Items
+| Claim inherited from the diagnosis | Current evidence available to re-check | Status entering Fable session |
+| --- | --- | --- |
+| Applicant enrichment can process already-handled recommendations | `findApplicantRecommendedByRequest` filters disposition but not engagement; `enrichRecommended` consumes its full result | **Source-supported; independently re-verify** |
+| Ingestion loses lifecycle information | `ensureApplicantRecommended` returns `selected`; `ingestApplicantReviewers` does not project it | **Source-supported; independently re-verify and test whether `selected` is even the right stage signal** |
+| Lima-style correction can dead-end on key mismatch | ordinary SSE applicant DTO branches omit explicit `candidateKey`; confirmation binds to the stored request/key/row | **Source-supported; trace every fallback and authoritative-anchor path before concluding** |
+| Proposal/cache identity is unstable across reload | default loader is canonical-only; dropdown override lives in component state; enrichment/cache uses the exact file key | **Source-supported; verify actual navigation/cache consumers and whether the proposed fallback is correct** |
+| Isberg and Sorek's Dataverse lifecycle was intact | July 31 read-only probe found invited / invited+declined records | **Time-bounded historical baseline; UNKNOWN current live state until re-probed** |
+| Duplicate/noncanonical/orphan Postgres rows caused resurfacing | July 31 probe found legacy terminal twins, canonical active rows, and one missing-suggestion anchor | **Time-bounded historical baseline; UNKNOWN current live state until re-probed** |
+| The incident is best framed as a projection/orchestration regression | Proposed directive synthesis | **Hypothesis to challenge** |
+| Dataverse lifecycle must always dominate the Find projection | Proposed directive invariant | **Product/architecture hypothesis to challenge, including its edge cases** |
 
-### Verified Open
+## Fable's Mission
 
-1. **Observe the advisory without interrupting the work campaign.**
-   Evidence: the controlling directive's owner-disposition and campaign-
-   observation section. During the next three to five normal Claude Code
-   documentation sessions, let the hook record metadata-only occurrences and
-   run `rtk npm run report:claim-evidence-pilot -- --current` at `/stop`. Classify
-   only the exact current eligible session in the canonical table. Do not add
-   mid-session owner check-ins or persist claim, transcript, command-output, or
-   live-record content.
+1. **Reframe before recommending.** State the actual staff outcome and failure
+   modes in your own terms. Do not begin from the proposed patch list.
+2. **Falsify the incident story.** Confirm, refute, or leave unknown each
+   inherited claim using current source, tests, and safe read-only evidence.
+3. **Trace the whole contract.** Cover Dataverse lifecycle, Postgres projection,
+   SharePoint file identity, Blob handoff, applicant enrichment, roster/cache
+   identity, staff confirmation, reload, and UI rendering/remedies.
+4. **Audit the plan, not just the code.** Identify assumptions, missing
+   invariants, unnecessary layers, false authority boundaries, and tests that
+   could pass for the wrong reason.
+5. **Look for simplification.** Ask whether the working Postgres projection,
+   proposal-coupled applicant cache, dual key schemes, and current stage model
+   are earning their complexity.
+6. **Recommend the smallest high-leverage next slice.** It may differ from the
+   current Phase 0–4 sequence. Say what to stop doing as well as what to do.
 
-2. **Resume reviewer workflow stabilization.**
-   The adjacent-verification pilot has reached its advisory stop decision.
-   Resume `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md` from its first
-   implementation step: the read-only diagnostic harness and five golden
-   workflows before reviewer runtime changes or Production repair.
+## Questions the Existing Plan May Be Wrong About
 
-### Owner Decision Needed
+- Is `selected` a lifecycle fact, a curation flag, or both? Which engagement
+  signals are monotonic, and which can legitimately reverse?
+- Does “Dataverse lifecycle always wins” produce the right UI for declined,
+  removed, merged, stale, or partially materialized records?
+- Should Postgres continue projecting applicant candidates at all, or can the
+  authoritative and working-state responsibilities be reduced?
+- Is canonical `suggestion:<id>` the correct action identity, or is the missing
+  `candidateKey` merely a symptom of split identity and cache ownership?
+- Should applicant recommendations depend on proposal analysis/cache identity
+  before staff can see their lifecycle state?
+- Is exact `Project Narrative.pdf` fallback the right compatibility rule, and
+  what evidence distinguishes it from another filename heuristic?
+- Do the five proposed golden workflows cover partial success, concurrent
+  enrichment/confirmation, stale reloads, missing anchors, duplicate rows, and
+  every terminal engagement path?
+- Is “close recurrence, then repair data” sufficient, or can stale data still
+  invalidate tests and the proposed projection design?
+- What would make this safe for an imminent reviewer campaign, and what remains
+  a genuine campaign blocker?
 
-1. **Any future narrow blocking proposal.**
-   The current disposition is **Keep advisory**. Promotion requires three or
-   more normal-session observations for the exact claim shape, the directive's
-   pattern-specific evidence, a new adversarial review, and explicit owner
-   approval. No blocking proposal is currently authorized.
+## Required Deliverable
 
-2. **Later Production promotion and data-repair authorization.**
-   When reviewer stabilization resumes, explicit owner authorization remains
-   required before merging/deploying Tier 1–3 runtime changes or executing the
-   Production roster repair.
+Write `outputs/reviewer-workflow-stabilization-fable-assessment.md` with:
 
-### Parked
+1. Executive verdict and reframe.
+2. Claim matrix: **CONFIRMED / REFUTED / PARTIAL / UNKNOWN**, with evidence and
+   a disconfirming check for each material claim.
+3. Whole-flow map from authoritative lifecycle through staff-visible Find state.
+4. Critique of the existing stabilization directive and its five workflows.
+5. Revised invariant/golden-workflow set, if needed.
+6. Recommended first implementation slice, prerequisites, and explicit non-goals.
+7. “Stop doing” list.
+8. Remaining unknowns and the exact probes/tests needed to resolve them.
 
-1. **Reviewer workflow stabilization.**
-   `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md` remains canonical and is
-   the first application priority after the evidence pilot reaches its stop
-   decision. Its diagnostic harness, five golden workflows, proposal-selector
-   fallback, and dry-run reconciliation requirements remain open.
+Use `[VERIFIED via file:line or command]`, `[ASSUMED]`, and `[UNKNOWN]`. Cite
+current source, not only plans or this prompt. Include denominators for every
+clean/complete claim. A green test is evidence only for the behavior it actually
+exercises.
 
-2. **Other reviewer feature/policy work.**
-   Contact-provenance schema, non-response storage, `reviewer_confirmed`
-   provenance, identity-policy expansion, and nice-to-have UI work remain parked
-   until stabilization exits successfully.
+## Stop Conditions
 
-3. **Remaining Initial Assessment infrastructure gates.**
-   SharePoint administrator evidence, Workbench history/admin restore, and
-   milestone snapshots remain valid but are not the Session 392 coding priority.
+Stop and report rather than expanding scope if:
 
-### Verify Before Acting
+- a needed conclusion requires a Production write;
+- current live state materially contradicts the July 31 baseline;
+- the plan's authority model cannot be made coherent without a product decision;
+- review work turns into runtime implementation;
+- a relevant gate is red; or
+- roughly one session is consumed without producing an evidence-backed reframe
+  and next-slice recommendation.
 
-1. **Do not treat command output as semantic proof.**
-   Verify that the query shape answers the actual claim. Model-authored pasted
-   output is reviewable provenance, not an incorruptible receipt.
+## Handoff Expected From Fable
 
-2. **Do not confuse requirements with current-state assertions.**
-   Normative, hypothetical, historical, and quoted language needs explicit
-   handling before any detector can be considered safe.
-
-3. **Do not infer reviewer stage from `wmkf_selected` alone when stabilization
-   resumes.**
-   Rotem Sorek is `selected=false` because he declined after invitation. Inspect
-   invitation/response/token/material/review/completion signals together.
-
-4. **Do not assume `savedKeys` covers every historical promotion.**
-   The current reader exposes only canonical saved applicant keys; legacy
-   terminal rows under `candidate:` keys can coexist with canonical active rows.
-
-5. **Do not assume a missing Find card means the applicant list must be rerun.**
-   Separate proposal resolution, durable roster restore, and model enrichment;
-   a same-file reload must be a cache restore.
-
-6. **Re-probe Request `1002912` immediately before any later write.**
-   The incident table records a point-in-time baseline, not standing authority
-   for future mutation.
-
-### Do Not Reopen Without New Decision
-
-1. **No wholesale implementation of Claude's enforcement proposal.**
-   In particular, do not require raw output in durable documents, claim hooks
-   provide semantic proof, consolidate memory, or introduce blocking behavior
-   without new pattern-specific evidence and an explicit owner decision.
-
-2. **No blind reviewer rollback and no one-symptom production patch.**
-   A rollback could restore earlier duplicate-person/missing-email behavior.
-   A patch that does not satisfy the five golden workflows is not releasable.
-
-3. **Do not weaken the canonical outbound reviewer package.**
-   New packages remain `Reviewer Materials/Proposal_{Request#}.pdf`. The planned
-   exact `Project Narrative.pdf` fallback is Reviewer Finder compatibility only;
-   do not restore `classifyFile` or best-guess PDF selection.
-
-4. **Do not truncate the unresolved-reviewer paper evidence or replace its
-   Scholar name search with a stored profile URL.**
-   Those remain load-bearing identity controls.
-
-## Key Files Reference
-
-| File | Purpose |
-| --- | --- |
-| `docs/AGENT_ADJACENT_VERIFICATION_PILOT_DIRECTIVE.md` | Controlling Session 392 pilot, safety constraints, phases, fixtures, observation, and stop rules |
-| `.claude/hooks/lib/document-guards.js` | Existing transcript/read-evidence and newly-introduced-text helpers; does not prove semantic support |
-| `.claude/hooks/plan-named-source-read-guard.js` | Current plan-doc named-source read enforcement |
-| `.claude/hooks/scope-claim-reminder.js` | Current broad-quantifier advisory behavior |
-| `.claude/hooks/design-doc-assertion-guard.js` | Current narrow design-claim enforcement and advisories |
-| `.claude/hooks/lib/claim-evidence-observations.js` | Metadata-only local occurrence schema, atomic persistence, retention, and summary |
-| `scripts/report-claim-evidence-pilot.js` | Local current-session observation report and retention maintenance used by `/stop` |
-| `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md` | Parked but canonical reviewer stabilization plan, golden workflows, selector fallback todo, and exit criteria |
-| `lib/services/workbench/applicant-reviewers-service.js` | Applicant-slot materialization; currently drops adapter-returned selected state from its DTO |
-| `lib/services/workbench/enrich-recommended-service.js` | Applicant enrichment; currently processes all applicant-recommended rows regardless of engagement |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | Dataverse suggestion reads and lifecycle fields |
-| `lib/services/reviewer-roster-store.js` | Postgres Find projection and canonical saved-key behavior |
-| `shared/components/reviewers/ReviewerSearchSection.js` | Cache, applicant display, confirmation payload, and terminal filtering |
-| `shared/components/reviewers/ReviewerFindPanel.js` | Proposal auto-load and manual selector state |
-| `lib/services/reviewer-finder/load-proposal-service.js` | Current strict canonical proposal default and validated override |
-| `docs/atlas/postgres-reviewer-find-roster.md` | Authoritative Postgres roster ownership/current gotchas |
-
-## Testing Direction
-
-Start with the fixture corpus and focused hook enforcement tests. Run the gate
-and its self-test sequentially where one exists. After the bounded pilot:
-
-```bash
-rtk node .claude/hooks/lib/claim-evidence-observations.test.js
-rtk node .claude/hooks/hook-enforcement.test.js
-rtk node .claude/hooks/lib/document-guards.test.js
-rtk npm run report:claim-evidence-pilot -- --current
-rtk npm run check:instruction-architecture
-rtk npm run check:agent-invariants
-rtk npm run check:docs-catalog
+```text
+Owner: Claude Fable
+Branch: <review branch>
+Status: review complete | blocked
+Changed surfaces: outputs/reviewer-workflow-stabilization-fable-assessment.md only
+Commits: <hash or none>
+Verification/probes: <exact bounded list>
+Dirty worktree: clean | listed
+Next owner/action: Justin reviews findings before any implementation authorization
 ```
-
-Run every additionally relevant documentation/gate self-test sequentially as
-required by `docs/CI_GATES_REFERENCE.md`. Do not perform the signed-in reviewer
-pilot or any Production writes during the adjacent-verification work.

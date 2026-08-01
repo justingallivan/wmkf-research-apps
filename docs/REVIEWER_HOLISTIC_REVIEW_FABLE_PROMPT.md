@@ -1,197 +1,238 @@
 ---
-title: Reviewer Finding & Disambiguation — Holistic Review Prompt (for Fable)
-domain: reviewer-identity
+title: Reviewer Workflow Stabilization — Holistic Challenge Prompt for Fable
+domain: reviewers
 kind: audit
-status: draft
-summary: "Pointer-based prompt for a Fable session to holistically reassess reviewer finding and disambiguation — reframe-first, full latitude, curated reading map."
+status: active
+summary: "Fresh Fable session to reconstruct the Reviewer Workbench Find regression, challenge the stabilization plan, and recommend the next bounded slice."
 canonical: false
 cataloged: 2026-07-08
+last_verified: 2026-08-01
 owner: product-engineering
 related:
-  - lib/services/reviewer-identity-resolver.js
-  - lib/dataverse/adapters/researcher.js
-  - docs/audits/memory-triage-2026-07-08.md
+  - docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md
+  - docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md
+  - docs/REVIEWER_CANDIDATE_PROMOTION_REMEDIATION_PLAN.md
+  - docs/atlas/postgres-reviewer-find-roster.md
+  - docs/agent-wiki/topics/reviewer-workbench-lifecycle.md
 ---
 
-# Holistic review request — reviewer finding & disambiguation (for Fable)
+# Holistic challenge request — Reviewer Workbench Find stabilization
 
-You are being asked, as a stronger and more holistic model, to step *all the way back*
-on the two hardest, highest-stakes capabilities in this codebase and tell us whether
-we are solving the right problem the right way. You are running inside the repo with
-full read access, `git`, grep, and the ability to run scripts. You are a top-level
-session, so you **may dispatch parallel sub-agents** to cover the reading map faster —
-but the synthesis, judgment, and the final opinion must be *yours*, held in one mind.
-**Read the ground truth before you conclude.** Do not take the framing below as settled — it is deliberately
-thin so it does not steer you. Your value is a fresh read that we, having lived through
-every incremental decision, can no longer produce.
+You are Claude Fable in a fresh, top-level Claude Code CLI session. Justin has
+asked you to spend one session on the reviewer workflow because the team has
+accumulated many locally correct fixes while the end-to-end staff experience
+remains vulnerable to cross-store and cross-layer contradictions.
 
-## Mission
+Your job is **not** to endorse the current diagnosis, execute its phase list, or
+produce another broad redesign. Your job is to independently reconstruct the
+problem, try to falsify the inherited observations, challenge the architecture
+and proposed stabilization plan, and identify the smallest next implementation
+slice that would materially improve campaign safety.
 
-1. **Reframe first.** Before any recommendation: are we even solving the right problem,
-   framed the right way? Where are we over-engineering, and where are we under-investing?
-2. **Then give direction** for both halves — finding good reviewers, and disambiguating
-   them — grounded in what you actually read here.
-3. **Then say what to STOP doing.**
+`SESSION_PROMPT.md` owns the session boundary and required output. This document
+owns the review posture and investigation contract.
 
-You have **full latitude**. You may challenge anything: the data sources
-(OpenAlex / ORCID / PubMed / SerpAPI), buy-vs-build, whether a given step should be
-automated at all, the data model, even our definition of success. Nothing is fixed.
+## Non-negotiable posture
 
-## How to behave (this matters more than usual)
+- **Reframe first.** State the staff problem in your own terms before adopting
+  any plan vocabulary such as “projection regression,” “lifecycle always wins,”
+  “canonical key,” or “golden workflow.”
+- **Plans are claims, not evidence.** Treat
+  `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md`, this prompt, memory, and
+  prior session summaries as hypotheses to test against current source, tests,
+  and safe read-only probes.
+- **Seek disconfirmation.** For every material conclusion, name what would make
+  it false and perform that check when it is safe and bounded.
+- **Trace adjacent properties.** Do not infer invitation stage from `selected`,
+  identity from a suggestion ID, cache validity from a Blob URL, or durable
+  authority from a UI key without reading the enforcing producer and consumer.
+- **Prefer simplification.** The best recommendation may remove or narrow a
+  projection, cache, state transition, or repair step rather than adding another
+  reconciliation layer.
+- **Stay read-only.** No reviewer runtime edits, Production writes, repair
+  execution, sends, deploys, or merges. Write only the requested findings
+  artifact on a review branch.
 
-- **Stay at problem/architecture altitude.** We have repeatedly gotten lost in the weeds
-  — line-level fixes, one-namesake-at-a-time patches — across many sessions, only to
-  conclude the whole direction was wrong. Do NOT propose code diffs. Think in problems,
-  approaches, and tradeoffs.
-- **Read before you conclude.** Use the reading map below. Pull threads. Run the eval
-  harnesses if they help. Ungrounded opinion is worse than useless here.
-- **Be blunt. No sycophancy.** If we are overcomplicating this, say so. If we are
-  optimizing the wrong metric, say so. If a whole subsystem should not exist, say so. We
-  would rather hear "you are solving the wrong problem" than a polite endorsement.
-- **Distrust our own conclusions.** Where you read a decision or a "principle" we
-  adopted, ask whether it was right, not just whether it was implemented.
+## The user outcome to reconstruct
 
-## Why this is the load-bearing problem
+Foundation staff open a request's **Find** tab to understand applicant-named
+reviewers, discover additional candidates, verify identity/contact evidence,
+and move a person forward without losing or reversing prior lifecycle state.
 
-This app suite supports a private foundation's (WMKF) grant-review workflow. For each
-proposal, staff must find qualified, conflict-free external reviewers and correctly
-identify who those people actually *are* (the same name can be several researchers; the
-right person carries the right publications, affiliation, and conflicts). This is the
-heaviest, highest-consequence load the suite bears: a missed good reviewer, or a
-mis-identified one, degrades the review or creates an undetected conflict of interest.
-Scale is small-batch and high-stakes (order tens of proposals per cycle, not thousands),
-which may itself change what the right approach is — consider that.
+The same person/request may currently be represented by:
 
-## What we believe "getting it right" means — CHALLENGE THIS
+- a Dataverse `wmkf_appreviewersuggestion` lifecycle row;
+- a Dataverse potential-reviewer person;
+- one or more Postgres `reviewer_find_roster` working rows;
+- an applicant-recommendation ingestion DTO;
+- proposal-dependent enrichment/cache state;
+- a server-generated or legacy candidate key; and
+- browser state tied to an exact SharePoint file that has been copied to Blob.
 
-Our governing principle is a *frame*, not a metric ranking: **the tool surfaces and
-informs; the human decides.** It has two symmetric halves:
+Do not assume all of these representations are necessary, aligned, or owned by
+the right layer.
 
-- **Never silently filter.** Surface candidates — and their conflicts — widely and let
-  staff make the call. Missing a genuinely good, conflict-free reviewer is a silent,
-  unrecoverable loss (no one knows what they didn't see). This is why COI is "surface,
-  don't gate" except permanent conflicts, and why we prize recall over precision.
-- **Never silently assert.** When binding an identity — ORCID, publications, affiliation,
-  conflicts — to a candidate, calibrate confidence honestly and defer to a human rather
-  than freeze a guess. A confidently-*wrong* binding is the dangerous failure (see the
-  fail-dangerous hazard and the sticky-`confirmed` question below).
+## Why the current diagnosis may be incomplete
 
-Interrogate this frame directly — it is the thing we most want your judgment on:
+The July 31 diagnosis of Request `1002912` reported three visible symptoms:
 
-- Is "surface and inform, human decides" the right organizing principle at this scale, or
-  is it a rationalization for never committing to automated decisions we could actually
-  trust? Where should the tool decide, not just inform?
-- We have NOT settled the **severity ordering among the failure modes.** Is a *missed
-  conflict of interest* the single worst outcome (which would argue for gating some COI
-  after all)? Worse than a missed good reviewer? Worse than a confidently-wrong identity
-  binding? Tell us how you would rank the failures — that ranking should drive the design.
-- Are "recall of candidates" and "integrity of the identity binding" even the right two
-  axes, or is there a better decomposition?
+1. already-engaged applicant reviewers resurfaced as unresolved Find prospects;
+2. a Lima-style identity/contact correction ended in HTTP 409; and
+3. proposal selection/reload could unnecessarily gate or rerun applicant work.
 
-## The two problems, precisely
+It synthesized those symptoms as a projection/orchestration regression and
+proposed five golden workflows plus a four-phase repair sequence. That is a
+plausible account, not an accepted proof.
 
-- **Finding (origination / discovery):** given a proposal, produce a ranked set of
-  candidate reviewers from external sources, screened for conflicts.
-- **Disambiguation (identity resolution):** given a candidate name (+ weak signals),
-  decide which real-world researcher it is, with what confidence, and bind the right
-  ORCID / publications / affiliation / conflicts to them — without freezing a wrong guess.
+Challenge at least these possibilities:
 
-## How we got here — read these and form YOUR OWN view of the pattern
+- the visible cards may be wrong for more than one independent reason;
+- `selected`, invitation, response, token, materials, review, and completion
+  signals may not form the simple monotonic ordering assumed by the plan;
+- a noncanonical roster key may be a migration artifact, an intentional
+  compatibility surface, or a symptom of missing ownership—not merely bad data;
+- the confirmation 409 may arise from more than an omitted client key;
+- proposal identity may be correctly exact while cache invalidation or UI
+  orchestration is wrong;
+- the proposed `Project Narrative.pdf` fallback may be a useful bounded rule or
+  another undocumented heuristic;
+- cleanup-after-runtime-fix may be insufficient if stale rows affect how the new
+  contract is designed or tested; and
+- “handled but visible” may not be the right staff experience for every terminal
+  or reversible state.
 
-We have made several reversals. They are documented; do not just accept our stated
-reasons — judge whether the *pattern* of how we reason is itself the problem. Start with:
+## Required whole-flow trace
 
-- `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` (§"Increment 2a") — we designed
-  automated institution→account matching that writes `contact.parentcustomerid`, then
-  **reversed** it as high-harm/low-yield; shipped an alert-only design instead.
-- `.claude-memory/project-reviewer-institution-match.md` (now marked **stale**) — the
-  memory for the reversed plan.
-- `.claude-memory/project-reviewer-coi-rely-on-self-disclosure.md` — COI moved from a
-  hard gate to "surface, don't gate" (except permanent conflicts).
-- `.claude-memory/project-reviewer-recall-over-precision.md` — the recall-over-precision
-  principle we adopted.
-- `.claude-memory/project-reviewer-verify-fail-dangerous.md` — the "fabricated
-  wrong-forename lands on a same-surname namesake" hazard and our forename-gating saves.
-- `.claude-memory/project-reviewer-self-report-orcid-sticky-confirmed.md` +
-  `docs/audits/memory-triage-2026-07-08.md` (finding #1) — an OPEN, unresolved design
-  question: the automated resolver now emits a `confirmed` status that was meant to be a
-  human-attestation-only sentinel, so a fallible automated identity can become
-  un-correctable. This is a live symptom of the disambiguation model straining.
-- `.claude-memory/reviewer-identity-fragmentation.md` — the underlying failure mode
-  (one researcher fragmented across disjoint stores with no shared key).
-- `.claude-memory/project-openalex-merge-use-orcid-works.md` — OpenAlex merges
-  same-name authors; a data-source-quality hazard we worked around.
-- Also skim: `git log --oneline -- lib/services/discovery lib/services/reviewer-identity-resolver.js lib/dataverse/adapters/researcher.js`
-  and the reviewer-heavy `DEVELOPMENT_LOG.md` entries, to see how many passes this took.
+Account for every applicable hop; mark a hop N/A rather than silently skipping
+it:
 
-## Reading map (curated; each launch-pad routes onward — follow the threads)
+1. Request/proposal selection in the Workbench UI.
+2. SharePoint bucket/file resolution and exact file-key selection.
+3. Blob handoff and proposal-dependent analysis/cache identity.
+4. Applicant slot ingestion and Dataverse materialization.
+5. Dataverse suggestion/person lifecycle reads.
+6. Applicant enrichment and identity/contact evidence.
+7. Postgres roster write, restore, terminal ledger, and key normalization.
+8. Confirmation/promotion request binding and partial-success behavior.
+9. Reload, concurrent enrichment, and stale-generation handling.
+10. Staff-visible rendering, actionability, and executable remedies.
+11. Tests, diagnostic scripts, Atlas/wiki/docs, and release verification.
 
-**Start at the two retrieval launch-pads (they route to canonical docs, Atlas, memories, hazards):**
-- `docs/agent-wiki/topics/reviewer-origination.md` — the finding half.
-- `docs/agent-wiki/topics/reviewer-identity.md` — the disambiguation half.
+For each state transition, identify:
 
-**Finding — design + code:**
-- Docs: `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md`,
-  `docs/REVIEWER_FINDER_ORIGINATION_PLAN.md`,
-  `docs/REVIEWER_FINDER_ORIGINATION_EXPERIMENT_2026-06-12.md` (an actual experiment —
-  empirical signal), `docs/REVIEWER_ARCHITECTURE.md`, `docs/REVIEWER_DATA_MODEL.md`.
-- Code: `lib/services/discovery-service.js` (facade) and `lib/services/discovery/`
-  (`match-signals.js`, `ranking.js`, `name-matching.js`, `affiliation.js`,
-  `publications.js`, `literature-search.js`, `coauthor-coi.js`, `provenance.js`); <!-- drain-table:ignore reason=code-module -->
-  `lib/services/reviewer-finder/save-candidates-service.js`;
-  `lib/services/contact-enrichment/`, `lib/services/openalex-service.js`,
-  `lib/services/serp-contact-service.js`.
+- authoritative producer;
+- persistence location;
+- stable identity/key;
+- consumers;
+- monotonic and reversible fields;
+- stale/concurrent-write guard;
+- behavior when the adjacent store disagrees; and
+- a test or probe that would catch regression.
 
-**Disambiguation — design + code:**
-- Docs: `docs/REVIEWER_IDENTITY_STRATEGY_EVALUATION.md` (our own strategy eval — a good
-  holistic starting point), `docs/REVIEWER_IDENTITY_RESOLUTION_PLAN.md`,
-  `docs/REVIEWER_ORCID_SPINE_SPEC.md`, `docs/REVIEWER_FIELD_AWARE_VERIFICATION_DESIGN.md`,
-  `docs/REVIEWER_IDENTITY_ORCID_EMPLOYMENT_PROMOTION_DESIGN.md`,
-  `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` (§14 = reviewer self-report),
-  `docs/REVIEWER_FINDER_PI_IDENTITY_WIREIN_PLAN.md`.
-- Code: `lib/services/reviewer-identity-resolver.js` (the classifier — see
-  `classifySpineEvidence`), `lib/dataverse/adapters/researcher.js` (`writeIdentityDecision`
-  / `clearIdentityFields` — the sticky-`confirmed` guards),
-  `lib/services/discovery/name-matching.js`.
+## Plans and assumptions to interrogate
 
-**Empirical harnesses (run or read their methodology — real ground truth beats our prose):**
-- `scripts/eval-orcid-spine-sweep.mjs`
-- `scripts/probe-source-coverage.mjs`
-- Look for `docs/atlas/evidence/` artifacts and any origination-experiment outputs.
+### Authority and lifecycle
 
-**Constraints / whole-system context:**
-- `docs/STRATEGY.md`, `docs/SYSTEM_MODEL.md`, `.claude-memory/project-system-model.md`
-  (WMKF direction: Dataverse/Dynamics is the source of truth; minimize AkoyaGO reliance;
-  small-batch cycles).
-- `shared/config/appRegistry.js` (`reviewers` is the live app; reviewer-finder +
-  review-manager were consolidated into the Request Workbench).
+- Is Dataverse the correct authority for every lifecycle property, or only
+  engagement/outreach facts?
+- Is Postgres strictly a disposable working projection in current code, or does
+  it own staff confirmation and evidence that Dataverse does not?
+- What precisely makes an applicant recommendation “handled”? Enumerate all
+  terminal and nonterminal states rather than relying on a single boolean.
+- Can declined, removed, withdrawn, merged, released, or re-referred people
+  legitimately re-enter Find? If so, through what explicit transition?
 
-## What we want back
+### Identity and action binding
 
-Structure your answer as:
+- Is `suggestion:<id>` the correct canonical action key everywhere?
+- Do server-owned suggestion anchors already provide a safer binding than
+  trusting a browser `candidateKey`?
+- Which legacy-key fallbacks are deliberate, and which weaken fail-closed
+  request/person/suggestion binding?
+- Does confirmation preserve only successful fields and remain retryable after
+  partial success or concurrent enrichment?
 
-1. **Reframe** — are we solving the right problem(s)? State the problem(s) as *you* would
-   frame them after reading. Where is our "surface and inform, human decides" frame — and
-   our unsettled failure-severity ranking — wrong or incomplete? Where should the tool
-   decide rather than defer?
-2. **Where we over- and under-invest** — name the specific places we've sunk effort that
-   don't earn it, and the gaps we've neglected.
-3. **Recommended direction — finding.** The approach you'd take, and why, at small scale.
-4. **Recommended direction — disambiguation.** Same. Address the `confirmed`-sentinel /
-   sticky-identity question head-on as a symptom: is the whole confidence-status model
-   right?
-5. **Stop doing** — a short, concrete list of things to abandon.
-6. **The pattern** — from the reversal history, what recurring mistake in *how we reason*
-   about this should we watch for?
+### Proposal and cache coupling
 
-Be specific, cite what you read (`file:line` or doc section), and prefer a strong opinion
-you can defend over a balanced menu. If you need to run a script or grep to ground a
-claim, do it.
+- Which applicant facts genuinely depend on proposal content, and which should
+  remain visible while file resolution or model work is unavailable?
+- Is `library::folder::filename` sufficient identity if a file's content changes
+  in place?
+- Should same-key reload reuse enrichment automatically, or must a version/hash
+  participate?
+- Does the legacy filename fallback solve observed requests, and what exact
+  contrary cases make it unsafe?
 
-## Where to put your answer
+### Test and repair strategy
 
-Write your analysis to a new file **`outputs/reviewer-holistic-review-fable-findings.md`**
-so it can be picked up in a later working session. Do **not** run the `/stop` routine and
-do **not** edit `SESSION_PROMPT.md`, the memory store, or any other durable doc — your job
-is the analysis artifact only; a human will decide what to act on and reconcile it from
-there.
+- Do the five proposed golden workflows cover the complement of their happy
+  paths, including all-failed batches and stale post-await writes?
+- Can tests create the bad input they claim to exclude, so they fail if the guard
+  is removed?
+- Should a read-only diagnostic harness precede the plan review, or is existing
+  source/test evidence sufficient for some claims?
+- Can data cleanup be defined without assuming the new authority/key model?
+
+## Reading map
+
+Start narrow, then follow actual callers and consumers:
+
+1. `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md`
+2. `docs/atlas/postgres-reviewer-find-roster.md`
+3. `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`
+4. `lib/services/workbench/applicant-reviewers-service.js`
+5. `lib/dataverse/adapters/reviewer-suggestion.js`
+6. `lib/services/workbench/enrich-recommended-service.js`
+7. `lib/services/reviewer-roster-store.js`
+8. `pages/api/workbench/reviewer-roster.js`
+9. `lib/services/workbench/promote-applicant-reviewer-service.js`
+10. `shared/components/reviewers/ReviewerFindPanel.js`
+11. `shared/components/reviewers/ReviewerSearchSection.js`
+12. `shared/components/reviewers/reviewer-search-logic.js`
+13. `lib/services/reviewer-finder/load-proposal-service.js`
+
+Then inspect relevant tests, current git history, and these broader contracts:
+
+- `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`
+- `docs/REVIEWER_CANDIDATE_PROMOTION_REMEDIATION_PLAN.md`
+- `docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md`
+- `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md`
+- `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`
+
+Use CodeGraph before grep/read when tracing code. For any live probe, record the
+target, timestamp, denominator, and why it is read-only. Current source outranks
+the July 31 incident table; current live state outranks both for mutable rows.
+
+## What we most need from Fable
+
+The team does **not** need another exhaustive catalog of every reviewer feature.
+We most need judgment in four places:
+
+1. **Correct problem boundary:** Is this one stabilization slice or evidence that
+   the Find/lifecycle architecture needs a smaller redesign boundary?
+2. **Authority simplification:** Which store and key should own each fact, and
+   which duplicated representation should stop driving behavior?
+3. **Campaign-critical workflow set:** What must be proven before staff can rely
+   on Find, and which proposed workflows are distractions?
+4. **Smallest safe next slice:** What can one implementation session change and
+   verify without reopening the entire reviewer architecture?
+
+Be opinionated. A recommendation is useful only if you state its prerequisite,
+the evidence tested, a disconfirming check, and its explicit non-goals.
+
+## Required output
+
+Write only:
+
+`outputs/reviewer-workflow-stabilization-fable-assessment.md`
+
+Use the structure in `SESSION_PROMPT.md`. End with a clear verdict:
+
+- `PLAN SOUND — PROCEED TO BASELINE TESTS`
+- `PLAN SOUND WITH NAMED CHANGES`
+- `PLAN NEEDS REWORK`
+- `INSUFFICIENT EVIDENCE`
+
+Do not edit the plan to make it agree with your findings. Preserve the separation
+between independent assessment and accepted durable guidance. Do not run `/stop`;
+hand the findings and branch state back to Justin for a decision.

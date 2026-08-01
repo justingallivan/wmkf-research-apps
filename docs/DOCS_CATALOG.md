@@ -22,7 +22,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [AGENT_ADJACENT_VERIFICATION_PILOT_DIRECTIVE.md](AGENT_ADJACENT_VERIFICATION_PILOT_DIRECTIVE.md) | plan | canonical | yes | Pilot a narrow, privacy-safe evidence contract for agent claims before adding blocking hooks or broad instruction changes. | 2026-07-31 |
+| [AGENT_ADJACENT_VERIFICATION_PILOT_DIRECTIVE.md](AGENT_ADJACENT_VERIFICATION_PILOT_DIRECTIVE.md) | plan | canonical | yes | Implemented advisory-only adjacent-verification contract, local observation window, and evidence required before any future narrow blocking proposal. | 2026-07-31 |
 | [AGENT_COLLABORATION_PLAN.md](AGENT_COLLABORATION_PLAN.md) | plan | active |  | Active operating contract for coordinating Justin, Claude, and Codex across branches, worktrees, reviews, and handoffs. | 2026-07-02 |
 | [AGENT_HARNESS_STYLE_GUIDE.md](AGENT_HARNESS_STYLE_GUIDE.md) | spec | active |  | This guide keeps agent-facing instructions precise, confident, and low-noise. | 2026-07-02 |
 | [AGENT_INSTRUCTION_AUDIT_S322.md](AGENT_INSTRUCTION_AUDIT_S322.md) | audit | historical |  | Historical S322 instruction audit; the approved consolidation shipped and the rejected path-glob change remains closed. | 2026-07-26 |
@@ -283,7 +283,6 @@ related:
 | [REVIEWER_HOLISTIC_REDESIGN_ADVERSARIAL_FINDINGS_HANDOFF.md](REVIEWER_HOLISTIC_REDESIGN_ADVERSARIAL_FINDINGS_HANDOFF.md) | audit | historical |  | Completed remediation record for the eight findings from the 2026-07-13 adversarial review. | 2026-07-12 |
 | [REVIEWER_HOLISTIC_REDESIGN_ADVERSARIAL_REVIEW_PROMPT.md](REVIEWER_HOLISTIC_REDESIGN_ADVERSARIAL_REVIEW_PROMPT.md) | audit | historical |  | Historical read-only Claude review brief for the B0/C0/I1 implementation through commit 75d26a22, completed before the first caller promotion. | 2026-07-12 |
 | [REVIEWER_HOLISTIC_REVIEW_CODEX_PROMPT.md](REVIEWER_HOLISTIC_REVIEW_CODEX_PROMPT.md) | audit | draft |  | Pointer-based prompt for a CODEX session to holistically reassess reviewer finding and disambiguation — reframe-first, full latitude, curated reading map. | 2026-07-08 |
-| [REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md](REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md) | audit | draft |  | Pointer-based prompt for a Fable session to holistically reassess reviewer finding and disambiguation — reframe-first, full latitude, curated reading map. | 2026-07-08 |
 | [REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md](REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Active hybrid plan: safe slices reach main behind legacy-default seams; identity containment, measured rollout, and post-campaign cleanup. | 2026-07-12 |
 | [REVIEWER_IDENTITY_BINDING_PRODUCTION_SMOKE_ADVERSARIAL_REVIEW_HANDOFF.md](REVIEWER_IDENTITY_BINDING_PRODUCTION_SMOKE_ADVERSARIAL_REVIEW_HANDOFF.md) | audit | historical |  | Historical read-only review brief that led to the dedicated reviewer-binding smoke; implementation and production execution are complete. | 2026-07-13 |
 | [REVIEWER_IDENTITY_CONTACT_HANDOFF.md](REVIEWER_IDENTITY_CONTACT_HANDOFF.md) | runbook | active |  | Continuation handoff: W0/W1 are live; W2 combined mode and W4.1 evidence persistence are built behind the legacy production default. | 2026-07-19 |
@@ -358,9 +357,10 @@ related:
 | [REVIEWER_EMAIL_PERSIST_FIX_PLAN.md](REVIEWER_EMAIL_PERSIST_FIX_PLAN.md) | plan | historical |  | Shipped reviewer email-persist fixes; remaining follow-ups are closed-deprecated. | 2026-07-02 |
 | [REVIEWER_GATING_STRATEGY_REDESIGN.md](REVIEWER_GATING_STRATEGY_REDESIGN.md) | spec | active |  | Per-gate over-gating verdict + redesign recovering or surfacing all 5 Cause #2 email misses without opening a wrong-person send path. | 2026-07-03 |
 | [REVIEWER_GATING_STRATEGY_REVIEW_PROMPT.md](REVIEWER_GATING_STRATEGY_REVIEW_PROMPT.md) | draft | active |  | Brief for a fresh reviewing LLM: assess whether reviewer-finder fail-closed gates over-gate or fire at the wrong stage/input, and produce a redesign doc. | 2026-07-03 |
+| [REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md](REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md) | audit | active |  | Fresh Fable session to reconstruct the Reviewer Workbench Find regression, challenge the stabilization plan, and recommend the next bounded slice. | 2026-07-08 |
 | [REVIEWER_REFERRAL_SEEDING_DESIGN.md](REVIEWER_REFERRAL_SEEDING_DESIGN.md) | plan | historical |  | Implemented build plan: guarantee externally-referred seed names into the reviewer pool (seed-only, folded-in); relabel two existing kinds, no new enum. | 2026-07-02 |
 | [REVIEWER_REMOVE_ENTIRELY_BUILD_PLAN.md](REVIEWER_REMOVE_ENTIRELY_BUILD_PLAN.md) | plan | historical |  | Shipped permanent reviewer-removal behavior; retained as historical implementation record. |  |
-| [REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md](REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md) | plan | canonical | yes | Freeze reviewer feature work; prove five golden workflows; repair lifecycle, roster, confirmation, and document selection before data repair. | 2026-07-31 |
+| [REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md](REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md) | plan | canonical | yes | Proposed reviewer stabilization contract, now gated by an independent Fable challenge pass before baseline tests, runtime repair, or data reconciliation. | 2026-07-31 |
 
 ## security-auth
 
