@@ -36,6 +36,9 @@
  *
  *   --show-names  print matched person names (off by default: this is PII, and
  *                 the counts alone answer "is there exposure?")
+ *   --include-test  keep AkoyaGO test records (applicant = the Foundation
+ *                 itself). Excluded by default — their fixture people carry
+ *                 deliberately silly names that section 1 would otherwise flag.
  */
 import { readFileSync } from 'node:fs';
 
@@ -51,12 +54,67 @@ try {
 
 const args = process.argv.slice(2);
 const showNames = args.includes('--show-names');
+const includeTest = args.includes('--include-test');
 const limitIdx = args.indexOf('--limit');
 const limit = limitIdx >= 0 ? Math.min(Math.max(Number(args[limitIdx + 1]) || 5000, 1), 20000) : 5000;
 
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
 const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
 enterDynamicsBypassForScript('probe-referral-path-exposure');
+
+// ── Test-record exclusion ────────────────────────────────────────────────────
+// AkoyaGO staff mark test rows by making the Foundation its own applicant
+// (scripts/probe-akoya-test-record-predicate.js:6-15). Synthetic requests carry
+// synthetic people with deliberately silly names — exactly the shape section 1
+// hunts for — so without this the malformed-name count is inflated by fixtures.
+// Learned the hard way: the sibling exclusion probe reported a "genuine" finding
+// that turned out to be test request 1001931.
+const TEST_ORG_NAME = 'W. M. Keck Foundation';
+const testRequestIds = new Set();
+const testPersonIds = new Set();
+if (!includeTest) {
+  const { records: testAccounts } = await DynamicsService.queryRecords('accounts', {
+    select: 'accountid,name',
+    filter: `name eq '${TEST_ORG_NAME.replace(/'/g, "''")}'`,
+    top: 10,
+  });
+  if (testAccounts.length) {
+    const orChain = testAccounts
+      .map((a) => `_akoya_applicantid_value eq ${a.accountid}`)
+      .join(' or ');
+    const { records: testRequests } = await DynamicsService.queryAllRecords('akoya_requests', {
+      select: [
+        'akoya_requestid',
+        '_wmkf_potentialreviewer1_value', '_wmkf_potentialreviewer2_value',
+        '_wmkf_potentialreviewer3_value', '_wmkf_potentialreviewer4_value',
+        '_wmkf_potentialreviewer5_value',
+      ].join(','),
+      filter: `(${orChain})`,
+    });
+    for (const r of testRequests) {
+      testRequestIds.add(String(r.akoya_requestid).toLowerCase());
+      for (const n of ['1', '2', '3', '4', '5']) {
+        const pid = r[`_wmkf_potentialreviewer${n}_value`];
+        if (pid) testPersonIds.add(String(pid).toLowerCase());
+      }
+    }
+    // People reached only through suggestions on a test request. Bounded: skip
+    // the join rather than issue an unbounded OR-chain if there are many.
+    if (testRequestIds.size > 0 && testRequestIds.size <= 50) {
+      const reqChain = [...testRequestIds].map((id) => `_wmkf_request_value eq ${id}`).join(' or ');
+      const { records: testSuggestions } = await DynamicsService.queryAllRecords('wmkf_appreviewersuggestions', {
+        select: '_wmkf_potentialreviewer_value',
+        filter: `(${reqChain})`,
+      });
+      for (const s of testSuggestions) {
+        const pid = s._wmkf_potentialreviewer_value;
+        if (pid) testPersonIds.add(String(pid).toLowerCase());
+      }
+    }
+  }
+}
+const isTestPerson = (id) => testPersonIds.has(String(id || '').toLowerCase());
+const isTestRequest = (id) => testRequestIds.has(String(id || '').toLowerCase());
 
 const APPLICANT_DISPOSITION_RECOMMENDED = 100000000;
 
@@ -84,7 +142,11 @@ function redact(name) {
 }
 
 console.log('READ-ONLY referral-path exposure scan');
-console.log(`limit=${limit} showNames=${showNames}\n`);
+console.log(`limit=${limit} showNames=${showNames} includeTest=${includeTest}\n`);
+if (!includeTest) {
+  console.log(`Test-record exclusion: ${testRequestIds.size} test request(s), ${testPersonIds.size} test person row(s) will be filtered out.`);
+  console.log('  (applicant = "W. M. Keck Foundation"; pass --include-test to keep them)\n');
+}
 
 // ── Section 1 ────────────────────────────────────────────────────────────────
 // Name shape cannot be filtered server-side in OData without contains() over a
@@ -100,7 +162,9 @@ const { records: people, capped: peopleCapped } = await DynamicsService.queryAll
 );
 
 const flagged = [];
+let testPeopleSkipped = 0;
 for (const p of people) {
+  if (isTestPerson(p.wmkf_potentialreviewersid)) { testPeopleSkipped += 1; continue; }
   const name = p.wmkf_name || [p.wmkf_firstname, p.wmkf_lastname].filter(Boolean).join(' ');
   if (!name) continue;
   const reasons = classifyName(name);
@@ -110,6 +174,7 @@ for (const p of people) {
 console.log('─'.repeat(78));
 console.log(`SECTION 1 — person names that cannot denote one person (Finding C)`);
 console.log(`  scanned: ${people.length} active person row(s)${peopleCapped ? ' [CAPPED — rerun with a higher --limit]' : ''}`);
+if (testPeopleSkipped) console.log(`  skipped: ${testPeopleSkipped} known test-record person row(s)`);
 console.log(`  flagged: ${flagged.length}`);
 if (flagged.length) {
   const byReason = {};
@@ -126,7 +191,7 @@ if (flagged.length) {
 console.log('');
 
 // ── Sections 2 & 3 ───────────────────────────────────────────────────────────
-const { records: promoted, capped: promotedCapped } = await DynamicsService.queryAllRecords(
+const { records: promotedAll, capped: promotedCapped } = await DynamicsService.queryAllRecords(
   'wmkf_appreviewersuggestions',
   {
     select: [
@@ -140,11 +205,14 @@ const { records: promoted, capped: promotedCapped } = await DynamicsService.quer
   },
 );
 
+const promoted = promotedAll.filter((r) => !isTestRequest(r._wmkf_request_value));
+const promotedTestSkipped = promotedAll.length - promoted.length;
 const manualTokened = promoted.filter((r) => /staff_manual|referred/i.test(r.wmkf_sources || ''));
 
 console.log('─'.repeat(78));
 console.log('SECTION 2 — applicant-recommended rows that are selected=true (Finding A)');
 console.log(`  applicant-recommended AND selected: ${promoted.length}${promotedCapped ? ' [CAPPED]' : ''}`);
+if (promotedTestSkipped) console.log(`  (excluded ${promotedTestSkipped} row(s) on known test requests)`);
 console.log(`  ...of those, carrying a staff_manual/referred source token: ${manualTokened.length}`);
 console.log('    (these are the ones a manual/referral add could have promoted without the');
 console.log('     applicant promotion gates; the remainder were promoted by other paths)');
