@@ -213,7 +213,8 @@ export default async function handler(req, res) {
           candidate.automatedIdentityAttestation = token;
           const verified = await verifyAutomatedIdentityAttestation(token, { requestId, candidate });
           if (verified.valid && verified.identityDecisionBound === true) {
-            candidate.serverIdentityDecisionReceipt = createServerIdentityDecisionReceipt(candidate);
+            const identityReceipt = createServerIdentityDecisionReceipt(candidate);
+            if (identityReceipt) candidate.serverIdentityDecisionReceipt = identityReceipt;
           }
         } catch (error) {
           console.error('[enrich-contacts] identity receipt mint failed:', error.message);

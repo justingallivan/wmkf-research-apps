@@ -93,6 +93,23 @@ test('persisted server identity receipt survives JSONB key reordering and addres
   })).toBe(false);
 });
 
+test('server identity receipt is absent when the resolver made no identity decision', () => {
+  const candidate = {
+    name: 'Unresolved Person',
+    candidateKey: 'candidate:unresolved',
+    contactEnrichment: { identity: null },
+  };
+  expect(createServerIdentityDecisionReceipt(candidate)).toBeNull();
+  expect(hasServerIdentityDecisionReceipt({
+    ...candidate,
+    serverIdentityDecisionReceipt: {
+      version: 1,
+      source: 'automated_resolver',
+      identityDigest: 'client-computed',
+    },
+  })).toBe(false);
+});
+
 test('server receipt signs and returns deceased eligibility evidence', async () => {
   const candidate = {
     ...CANDIDATE,

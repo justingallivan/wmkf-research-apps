@@ -342,6 +342,29 @@ describe('patchMyCandidates', () => {
     });
   });
 
+  test('manual invitation: fails closed when the current lifecycle ETag is unavailable', async () => {
+    suggestionAdapter.findById.mockResolvedValue({
+      wmkf_selected: true,
+      wmkf_invited: false,
+      wmkf_accepted: false,
+      wmkf_declined: false,
+      wmkf_responsetype: null,
+      wmkf_externaltokenhash: 'hash:manual.token',
+      wmkf_externaltokenrevoked: false,
+      wmkf_externaltokenexpires: '2099-01-01T00:00:00.000Z',
+    });
+
+    await expect(patchMyCandidates({
+      body: {
+        suggestionId: SUGGESTION_ID,
+        markManualInviteSent: true,
+        manualLink: 'https://reviews.wmkeck.org/external/review/manual.token',
+      },
+      actingUserSystemId: SYS,
+    })).rejects.toMatchObject({ httpStatus: 409, body: { code: 'manual_invite_state_unavailable' } });
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  });
+
   test('manual invitation: rejects a replaced link without changing lifecycle state', async () => {
     suggestionAdapter.findById.mockResolvedValue({
       _etag: 'W/"7"',

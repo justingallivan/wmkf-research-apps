@@ -72,11 +72,23 @@ order, also bound mutable email/affiliation, the no-person-bundle fallback erase
 the adjudicated address pair, raw manual edits could proceed without an ETag,
 and two UI failure messages did not carry their available repair action. The
 follow-up source replaces the receipt payload with a canonical identity-only
-digest, verifies it after minting and on every durable lookup, retains the exact
-stored/found/selected tuple in the roster receipt, fails closed when the person
-ETag is absent, and surfaces the server remediation on both UI failures. A fifth
-read-only adversarial review is pending. Wave 17 and runtime promotion remain
-prohibited until it passes.
+digest, verifies it after minting and on every durable lookup, fails closed when
+the person ETag is absent, and surfaces the server remediation on both UI
+failures.
+
+The fifth review of `e4349a76` confirmed H1, H2, M2, and L2 fixed, but returned
+**NO-SHIP** because the proposed no-bundle tuple used a candidate shape that the
+literature path does not produce. It also found that staff-authority pruning
+could drop a fresh identity receipt, three address-trust writes still tolerated
+a missing ETag, UI fallback guidance could contradict a reload instruction, and
+a server receipt could be minted for a null identity decision. The current
+follow-up writes a real ETag-guarded `staff_verified` person bundle containing
+the exact A/B adjudication before clearing the no-bundle roster block; preserves
+fresh receipts through staff pruning; requires ETags at every address-trust
+write; presents repair as a fallback rather than an immediate contradictory
+instruction; and refuses to create an identity receipt without a resolver
+decision. A sixth read-only adversarial review is pending. Wave 17 and runtime
+promotion remain prohibited until it passes.
 
 This document replaces the rejected Session 390 design from
 `codex/claude-ui-followup`. It incorporates the subsequent Codex whole-flow
@@ -596,8 +608,8 @@ Each stage preserves current send safety. The ready-tier change is last.
 
 ## Adversarial-review remediation status (2026-07-31)
 
-**[IMPLEMENTED IN SOURCE / FIFTH REVIEW PENDING]** The remediation sequence
-closes the first four Opus reviews' confirmed findings. The relevant enforced
+**[IMPLEMENTED IN SOURCE / SIXTH REVIEW PENDING]** The remediation sequence
+closes the first five Opus reviews' confirmed findings. The relevant enforced
 complements are:
 
 - a provisional/provider-only ORCID cannot resolve a durable person write
@@ -621,15 +633,18 @@ complements are:
   receipt whose canonical identity-only digest still matches the roster row;
 - the receipt is invariant under JSONB key reordering and later address or
   affiliation adjudication, but invalidates when the identity decision changes;
-- no-person-bundle resolution retains the exact stored/found/selected tuple in
-  the request-scoped roster receipt;
-- raw person-address edits fail closed when the Dataverse ETag is unavailable;
-- failed conflict load/retry responses expose their available repair action; and
+- no-person-bundle retry writes the exact stored/found/selected resolution into
+  an ETag-guarded person bundle before clearing the request-scoped roster block;
+- all person-address writes fail closed when the Dataverse ETag is unavailable;
+- fresh identity receipts survive staff-authority pruning, while null resolver
+  decisions never receive a server identity receipt;
+- failed conflict load/retry responses expose repair as a non-contradictory
+  fallback action; and
 - manual saved-candidate edits cannot invalidate a pending bundle and silently
   downgrade the send block.
 
-Verification after the fourth-review remediation: focused affected-surface tests
-167/167; full suite 550/550 suites and 6,652/6,652 tests; `check:types`; lint with zero errors
+Verification after the fifth-review remediation: focused affected-surface tests
+163/163; full suite 550/550 suites and 6,659/6,659 tests; `check:types`; lint with zero errors
 and 51 pre-existing warnings; production build; API route matrix + self-test;
 Dataverse DAL gate + self-test; doc-currency gate + self-test. This evidence is
 local only and does not satisfy the schema-first deployment or signed-in pilot

@@ -407,63 +407,6 @@ describe('staff identity confirmation', () => {
   });
 });
 
-describe('address attestation', () => {
-  test('retains the adjudicated stored/found pair when the person conflict bundle is unavailable', async () => {
-    sql
-      .mockResolvedValueOnce({
-        rows: [{
-          candidate_key: 'candidate:ann',
-          status: 'active',
-          source_kind: 'literature_retrieved',
-          updated_at_token: '2026-07-30 10:00:00+00',
-          candidate: {
-            name: 'Ann Lee',
-            email: 'stored@example.edu',
-            contactEnrichment: { email: 'found@example.edu' },
-            conflictRecordUnavailable: true,
-          },
-        }],
-      })
-      .mockResolvedValueOnce({
-        rows: [{
-          candidate_key: 'candidate:ann',
-          source_kind: 'literature_retrieved',
-          updated_at_token: '2026-07-30 10:01:00+00',
-          candidate: { name: 'Ann Lee', email: 'found@example.edu' },
-        }],
-        rowCount: 1,
-      });
-
-    const out = await store.attestAddress(REQ, 'candidate:ann', {
-      email: 'found@example.edu',
-      evidenceType: 'publication_corresponding_author',
-      evidenceUrl: 'https://example.edu/paper',
-      actorProfileId: '7',
-      actorSystemUserId: 'SYS-7',
-    });
-
-    expect(out.receipt).toMatchObject({
-      email: 'found@example.edu',
-      personConfirmed: true,
-      resolvedAddressPair: {
-        storedEmail: 'stored@example.edu',
-        foundEmail: 'found@example.edu',
-        selectedEmail: 'found@example.edu',
-      },
-    });
-    const persisted = JSON.parse(allInterpolations().find((entry) => (
-      typeof entry === 'string' && entry.includes('resolvedAddressPair')
-    )));
-    expect(persisted.addressTrustReceipt.resolvedAddressPair).toEqual({
-      storedEmail: 'stored@example.edu',
-      foundEmail: 'found@example.edu',
-      selectedEmail: 'found@example.edu',
-    });
-    expect(queryTextOf(1)).toMatch(/updated_at::text/);
-    expect(allInterpolations()).toContain('2026-07-30 10:00:00+00');
-  });
-});
-
 describe('finalizeCandidatePromotion', () => {
   test('server-owned finalization persists exact Dataverse anchors and returns the key', async () => {
     sql.mockResolvedValueOnce({ rows: [{ candidate_key: 'candidate:ann' }], rowCount: 1 });

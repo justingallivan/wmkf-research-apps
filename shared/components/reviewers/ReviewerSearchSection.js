@@ -88,6 +88,17 @@ const BLOCKED_REFERRAL_REASON = {
   institution_coi: 'PI institution conflict',
 };
 
+export function addressTrustFailureMessage(data, fallback) {
+  const base = data?.message || data?.error || fallback;
+  const actions = Array.isArray(data?.remediation) ? data.remediation : [];
+  const repair = actions.find((item) => item?.action === 'create_repair_request');
+  const action = repair || actions[0];
+  if (!action?.label
+    || base.toLowerCase().includes(action.label.toLowerCase())
+    || (action.action === 'create_repair_request' && /repair request/i.test(base))) return base;
+  return `${base} If the problem persists, use “${action.label}” on this reviewer card.`;
+}
+
 function Spinner() {
   return <div className="w-5 h-5 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />;
 }
@@ -1634,9 +1645,10 @@ export default function ReviewerSearchSection({
     const data = await response.json().catch(() => ({}));
     if (genRef.current !== myGen) return;
     if (!response.ok || !data.success || !data.conflict) {
-      const nextAction = data.remediation?.find((item) => item?.action === 'create_repair_request')?.label
-        || data.remediation?.[0]?.label;
-      setRosterNote(`${data.message || data.error || 'Could not load the current address conflict.'}${nextAction ? ` Next: ${nextAction}.` : ' Create a repair request from this reviewer card.'}`);
+      setRosterNote(addressTrustFailureMessage(
+        data,
+        'Could not load the current address conflict. Use the available action on this reviewer card.',
+      ));
       return;
     }
     setEditingContact({ ...cand, addressConflict: data.conflict });
@@ -1654,9 +1666,10 @@ export default function ReviewerSearchSection({
     const data = await response.json().catch(() => ({}));
     if (genRef.current !== myGen) return;
     if (!response.ok || !data.success || !data.candidate) {
-      const nextAction = data.remediation?.find((item) => item?.action === 'create_repair_request')?.label
-        || data.remediation?.[0]?.label;
-      setRosterNote(`${data.message || data.error || 'The conflict check could not be retried.'}${nextAction ? ` Next: ${nextAction}.` : ' Create a repair request from this reviewer card.'}`);
+      setRosterNote(addressTrustFailureMessage(
+        data,
+        'The conflict check could not be retried. Use the available action on this reviewer card.',
+      ));
       return;
     }
     applyAuthoritativeRosterCandidate(key, data.candidate);

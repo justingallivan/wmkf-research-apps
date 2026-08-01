@@ -1,6 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { CandidateCard } from '../../shared/components/reviewers/ReviewerSearchSection';
+import {
+  addressTrustFailureMessage,
+  CandidateCard,
+} from '../../shared/components/reviewers/ReviewerSearchSection';
 
 /**
  * A needs-identity-review card suppresses the normal contact/bibliometric chips,
@@ -40,6 +43,25 @@ const unresolvedCandidate = {
     },
   },
 };
+
+test('address-trust failure guidance keeps reload as the immediate remedy and repair as a fallback', () => {
+  expect(addressTrustFailureMessage({
+    message: 'The reviewer changed. Reload the request.',
+    remediation: [
+      { action: 'retry_check', label: 'Retry check' },
+      { action: 'create_repair_request', label: 'Create repair request' },
+    ],
+  }, 'Fallback')).toBe(
+    'The reviewer changed. Reload the request. If the problem persists, use “Create repair request” on this reviewer card.',
+  );
+});
+
+test('address-trust failure guidance does not duplicate a repair remedy already in the message', () => {
+  expect(addressTrustFailureMessage({
+    message: 'Retry or create a repair request.',
+    remediation: [{ action: 'create_repair_request', label: 'Create repair request' }],
+  }, 'Fallback')).toBe('Retry or create a repair request.');
+});
 
 function renderUnresolved(overrides = {}) {
   return render(

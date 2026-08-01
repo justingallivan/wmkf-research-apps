@@ -142,16 +142,21 @@ async function preserveStoredRosterAuthority(requestId, candidates) {
   const storedByKey = new Map(storedRows.map((candidate) => [candidate.candidateKey, candidate]));
   return list.map((candidate) => {
     const stored = storedByKey.get(candidate?.candidateKey);
-    const freshIdentityReceipt = hasServerIdentityDecisionReceipt(candidate);
+    const freshIdentityReceipt = hasServerIdentityDecisionReceipt(candidate)
+      ? candidate.serverIdentityDecisionReceipt
+      : null;
     const candidateWithStoredReceipt = stored?.serverIdentityDecisionReceipt
       ? { ...candidate, serverIdentityDecisionReceipt: stored.serverIdentityDecisionReceipt }
       : candidate;
-    const preserveIdentityReceipt = !freshIdentityReceipt
+    const storedIdentityReceipt = !freshIdentityReceipt
       && !!stored
       && hasServerIdentityDecisionReceipt(stored)
-      && hasServerIdentityDecisionReceipt(candidateWithStoredReceipt);
-    const withIdentityReceipt = preserveIdentityReceipt
-      ? candidateWithStoredReceipt
+      && hasServerIdentityDecisionReceipt(candidateWithStoredReceipt)
+      ? stored.serverIdentityDecisionReceipt
+      : null;
+    const identityReceipt = freshIdentityReceipt || storedIdentityReceipt;
+    const withIdentityReceipt = identityReceipt
+      ? { ...candidate, serverIdentityDecisionReceipt: identityReceipt }
       : candidate;
     if (!stored || !hasStoredStaffAuthority(stored)) return withIdentityReceipt;
     const confirmation = stored.staffIdentityConfirmation;
@@ -182,8 +187,8 @@ async function preserveStoredRosterAuthority(requestId, candidates) {
         pdIdentityConfirmationId: stored.pdIdentityConfirmationId,
         staffIdentityConfirmation: confirmation,
       }),
-      ...(preserveIdentityReceipt
-        ? { serverIdentityDecisionReceipt: stored.serverIdentityDecisionReceipt }
+      ...(identityReceipt
+        ? { serverIdentityDecisionReceipt: identityReceipt }
         : {}),
     };
   });
@@ -231,10 +236,13 @@ async function handlePost(req, res) {
       : 'unknown';
     const preserveEvidence = eligibilityStatus !== 'unknown';
     const bound = bindServerRosterCandidateKey(compact, receipt);
+    const identityReceipt = receipt.valid && receipt.identityDecisionBound === true
+      ? createServerIdentityDecisionReceipt(bound)
+      : null;
     return {
       ...bound,
-      ...(receipt.valid && receipt.identityDecisionBound === true
-        ? { serverIdentityDecisionReceipt: createServerIdentityDecisionReceipt(bound) }
+      ...(identityReceipt
+        ? { serverIdentityDecisionReceipt: identityReceipt }
         : {}),
       eligibilityStatus,
       eligibilityReason: preserveEvidence ? compact.eligibilityReason : null,

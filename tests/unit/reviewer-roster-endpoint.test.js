@@ -37,7 +37,10 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
 
 import handler from '../../pages/api/workbench/reviewer-roster';
 import { requireAppAccess } from '../../lib/utils/auth';
-import { verifyAutomatedIdentityAttestation } from '../../lib/services/reviewer-candidate-attestation';
+import {
+  hasServerIdentityDecisionReceipt,
+  verifyAutomatedIdentityAttestation,
+} from '../../lib/services/reviewer-candidate-attestation';
 import * as store from '../../lib/services/reviewer-roster-store';
 import { reviewerCandidateKey } from '../../shared/components/reviewers/reviewer-search-logic';
 
@@ -288,6 +291,48 @@ describe('POST recordSurfaced', () => {
         actorProfileId: 5,
       }),
     });
+  });
+
+  it('preserves a fresh server identity receipt while restoring stored staff authority', async () => {
+    const resurfaced = {
+      name: 'Ann Lee',
+      orcid: '0000-0002-1825-0097',
+      contactEnrichment: {
+        orcidId: '0000-0002-1825-0097',
+        identity: {
+          status: 'probable',
+          anchors: [{ type: 'orcid', canonicalKey: 'orcid:0000-0002-1825-0097' }],
+        },
+      },
+    };
+    const derivedCandidateKey = reviewerCandidateKey(resurfaced);
+    verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+      valid: true,
+      identityDecisionBound: true,
+      eligibilityEvidenceBound: false,
+    });
+    store.findCandidatesByKeys.mockResolvedValueOnce([{
+      name: 'Ann Lee',
+      candidateKey: derivedCandidateKey,
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'confirm-1',
+      staffIdentityConfirmation: {
+        confirmationId: 'confirm-1',
+        source: 'staff_confirmed',
+        normalizedName: 'ann lee',
+        email: 'verified@example.edu',
+      },
+    }]);
+
+    const r = res();
+    await handler({ method: 'POST', body: {
+      requestId: REQ,
+      candidates: [{ ...resurfaced, candidateKey: derivedCandidateKey }],
+    } }, r);
+
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed[0].email).toBe('verified@example.edu');
+    expect(hasServerIdentityDecisionReceipt(passed[0])).toBe(true);
   });
 
   it('strips a browser-forged deceased claim without a bound server receipt', async () => {
