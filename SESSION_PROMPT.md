@@ -46,9 +46,13 @@
 > block with executable remedies; retry may persist the actual contradiction as
 > pending, or clear the roster flag only after a fresh read shows the
 > contradiction disappeared. Receipt replay requires an existing exact pending
-> tuple. Source and focused tests implement that contract; one final bounded
-> adversarial review remains pending.
-> Wave 17/runtime promotion remains blocked until it passes.
+> tuple. The final bounded Opus review of `5be12c0` found that a stale roster
+> POST could erase the stored address blocks. `86bf5d1` preserves the three
+> blocking flags; its targeted confirmation caught and `974bb64` removed an
+> unsafe carry-over of permissive `emailPersistAllowed` authority. The bounded
+> review cycle is closed with its stop-rule findings remediated.
+> Wave 17/runtime promotion remains blocked pending schema-first release and a
+> controlled pilot.
 
 ## Session 388 Summary
 
@@ -326,8 +330,9 @@ Seven Claude commits were replayed without content conflicts onto
    inferred no-bundle A/B adjudication. Fable's fresh-eyes review supplied the
    implemented fail-closed replacement: all three promotion/verification doors
    block until retry persists a real pending contradiction or a fresh read
-   proves it disappeared. Obtain one final bounded adversarial review before
-   release.
+   proves it disappeared. The final bounded review's stale-roster overwrite and
+   permissive-flag carry-over findings are remediated in `86bf5d1` and
+   `974bb64`; proceed only through the schema-first release and controlled pilot.
 2. ~~**Acceptance-time promotion scope (§4.1/§4.3).**~~ **DONE in source, S389:**
    sending never promotes; every identity-bearing acceptance—including honorarium
    opt-outs—promotes through identity-aware/idempotent matching; declines do not.

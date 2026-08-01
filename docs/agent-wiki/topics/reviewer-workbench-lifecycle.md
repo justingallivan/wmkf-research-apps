@@ -352,9 +352,12 @@ fail-closed state machine: a failed conflict write blocks direct verification
 plus both promotion paths; retry persists only a real `conflict_pending`
 contradiction, and may clear the roster flag without a person write only after a
 fresh read shows the contradiction disappeared. Receipts resolve only existing
-exact pending tuples. Every block exposes Retry, repair, or set-aside. One final
-bounded review remains pending. Wave 17 and runtime promotion remain blocked
-until it passes.
+exact pending tuples. Every block exposes Retry, repair, or set-aside. The final
+bounded review found and closed a stale-roster overwrite: resurfacing now
+preserves the three stored address blocks but does not carry permissive
+`emailPersistAllowed` authority to a resurfaced address (`86bf5d1`, corrected by
+`974bb64`). Wave 17 and runtime promotion remain blocked pending schema-first
+release and a controlled pilot.
 
 ## Reviews tab (workbench consumption of submitted reviews)
 

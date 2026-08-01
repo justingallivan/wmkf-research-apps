@@ -91,9 +91,16 @@ bundle exists, direct verification, applicant promotion, and ordinary promotion
 all block with Retry/repair/set-aside remedies. Retry may persist the actual
 contradiction as `conflict_pending`; it may clear the roster flag without a
 person write only when a fresh authoritative read shows the contradiction has
-disappeared. A receipt may resolve only an existing exact pending tuple. One
-final bounded adversarial review remains pending. Wave 17 and runtime promotion
-remain prohibited until it passes.
+disappeared. A receipt may resolve only an existing exact pending tuple. The
+final bounded Opus review of `5be12c0` found one stop-rule defect: a stale roster
+POST could replace the stored candidate blob and erase the new address blocks.
+`86bf5d1` preserves the three blocking flags across resurfacing. A targeted
+confirmation proved that F1 closed but caught that the first patch also carried
+the permissive `emailPersistAllowed` flag to a potentially changed address;
+`974bb64` removes that carry-over and pins the distinction in a route test. The
+bounded review cycle is closed with its stop-rule findings remediated. Wave 17
+and runtime promotion remain prohibited until schema-first release and a
+controlled pilot.
 
 This document replaces the rejected Session 390 design from
 `codex/claude-ui-followup`. It incorporates the subsequent Codex whole-flow
@@ -616,9 +623,10 @@ Each stage preserves current send safety. The ready-tier change is last.
 
 ## Adversarial-review remediation status (2026-07-31)
 
-**[IMPLEMENTED IN SOURCE / FINAL BOUNDED REVIEW PENDING]** The remediation
-sequence incorporates six Opus reviews and the subsequent Fable fresh-eyes
-review. The relevant enforced complements are:
+**[IMPLEMENTED IN SOURCE / BOUNDED REVIEW CLOSED]** The remediation sequence
+incorporates six Opus reviews, the subsequent Fable fresh-eyes review, and the
+final bounded Opus review plus targeted F1 confirmation. The relevant enforced
+complements are:
 
 - a provisional/provider-only ORCID cannot resolve a durable person write
   target; an ordinary candidate requires a persist-worthy identity decision
@@ -650,6 +658,10 @@ review. The relevant enforced complements are:
 - direct roster verification, applicant promotion, and ordinary promotion all
   reject `conflictRecordUnavailable` when no pending person bundle exists, with
   executable Retry, repair, and set-aside remedies;
+- stale roster resurfacing preserves stored `addressConflictPending`,
+  `conflictRecordUnavailable`, and `addressVerificationRequired` blocks, while
+  deliberately not carrying permissive `emailPersistAllowed` authority to the
+  resurfaced address;
 - all person-address writes fail closed when the Dataverse ETag is unavailable;
 - fresh identity receipts survive staff-authority pruning, while null resolver
   decisions never receive a server identity receipt;
@@ -658,14 +670,14 @@ review. The relevant enforced complements are:
 - manual saved-candidate edits cannot invalidate a pending bundle and silently
   downgrade the send block.
 
-Verification after the Fable remediation: eight affected-surface suites and 253
-tests pass; the full suite passes 550/550 suites and 6,673/6,673 tests;
+Verification after the bounded-review remediation: the targeted roster/address
+set passes 4/4 suites and 161/161 tests; the full suite passes 550/550 suites and
+6,674/6,674 tests;
 `check:types`, production build, and lint pass (zero errors and 51 pre-existing
 warnings); and the relevant API-security, Dataverse-access, route-boundary,
 documentation, wiki, memory, instruction, and migration-manifest gates plus
-self-tests pass. The final bounded adversarial review remains pending. This work
-remains local and does not satisfy the schema-first deployment or signed-in
-pilot exit criteria.
+self-tests pass. This work remains local and does not satisfy the schema-first
+deployment or signed-in pilot exit criteria.
 
 ## Verification matrix
 
