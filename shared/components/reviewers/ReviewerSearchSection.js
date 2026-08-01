@@ -1660,6 +1660,13 @@ export default function ReviewerSearchSection({
         candidateKey: key,
         action: 'verify_person_and_address',
         email: updates.email,
+        // Exact-person verification covers every field used by the promotion
+        // confirmation gate. The server stores these fields and renews the
+        // opaque confirmation in the same roster update as the address receipt.
+        verifiedContact: {
+          website: updates.website !== undefined ? updates.website : (cand.website || ''),
+          affiliation: updates.affiliation !== undefined ? updates.affiliation : (cand.affiliation || ''),
+        },
         evidenceType: evidence.evidenceType,
         evidenceUrl: evidence.evidenceUrl,
         note: evidence.note,
@@ -1677,18 +1684,7 @@ export default function ReviewerSearchSection({
       }
       throw new Error(addressTrustFailureMessage(data, 'Could not verify this address.'));
     }
-    const candidate = {
-      ...data.candidate,
-      ...updates,
-      addressTrustReceipt: data.candidate.addressTrustReceipt,
-      contactEnrichment: {
-        ...(data.candidate.contactEnrichment || {}),
-        ...(updates.email !== undefined ? { email: updates.email } : {}),
-        ...(updates.website !== undefined ? { website: updates.website } : {}),
-        ...(updates.affiliation !== undefined ? { affiliation: updates.affiliation } : {}),
-      },
-    };
-    applyAuthoritativeRosterCandidate(key, candidate);
+    applyAuthoritativeRosterCandidate(key, data.candidate);
     setSelected((prev) => { const next = new Set(prev); next.add(key); return next; });
     setRosterNote(`${data.candidate.name || cand.name}: exact person and address verified.`);
   }, [requestId, applyAuthoritativeRosterCandidate]);
@@ -1811,8 +1807,13 @@ export default function ReviewerSearchSection({
       throw new Error(data.error || 'Could not record identity confirmation. Please retry.');
     }
     if (genRef.current !== myGen) return;
-    await verifyAddressContact(data.candidate || confirmedCandidate, updates, evidence);
-  }, [requestId, verifyAddressContact]);
+    const authoritativeConfirmed = data.candidate || confirmedCandidate;
+    // The confirmation write has already committed. Keep that server truth in
+    // the card even if the following address-evidence write fails and the modal
+    // stays open for a retry.
+    applyAuthoritativeRosterCandidate(key, authoritativeConfirmed);
+    await verifyAddressContact(authoritativeConfirmed, updates, evidence);
+  }, [requestId, verifyAddressContact, applyAuthoritativeRosterCandidate]);
 
   const refreshExpiredVerification = useCallback(async (staleCandidates, expectedGeneration) => {
     if (!requestId || !Array.isArray(staleCandidates) || staleCandidates.length === 0) {
@@ -2911,8 +2912,8 @@ export default function ReviewerSearchSection({
               )}
             </div>
           )}
-      {/* On-card manual contact editor (local mode — applies to client state with
-          manual provenance; not a saved-row PATCH). Name is locked here. */}
+      {/* On-card contact editor. Plain edits are local; exact-address verification
+          durably updates the request roster. Name is locked here. */}
       {editingContact && (
         <CandidateEditModal
           candidate={editingContact}

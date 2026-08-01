@@ -70,6 +70,7 @@ export default async function handler(req, res) {
           candidateKey,
           suggestionId,
           email: req.body?.email,
+          verifiedContact: req.body?.verifiedContact,
           evidenceType: req.body?.evidenceType,
           evidenceUrl: req.body?.evidenceUrl,
           note: req.body?.note,

@@ -517,6 +517,87 @@ describe('address attestation', () => {
       },
     });
   });
+
+  test('verified contact and address renew one matching staff confirmation in the same roster update', async () => {
+    sql
+      .mockResolvedValueOnce({
+        rows: [{
+          candidate_key: 'candidate:ann',
+          status: 'active',
+          source_kind: 'literature_retrieved',
+          updated_at_token: 'row-version-1',
+          candidate: {
+            name: 'Ann Lee',
+            email: 'ann@example.edu',
+            website: 'https://example.edu/old',
+            affiliation: 'Old Department',
+            pdIdentityConfirmed: true,
+            pdIdentityConfirmationId: 'confirmation-old',
+            staffIdentityConfirmation: {
+              confirmationId: 'confirmation-old',
+              source: 'staff_confirmed',
+              normalizedName: 'ann lee',
+              email: 'ann@example.edu',
+              website: 'https://example.edu/old',
+              affiliation: 'Old Department',
+            },
+            contactEnrichment: { email: 'ann@example.edu' },
+          },
+        }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{
+          updated_at_token: 'row-version-2',
+          candidate: { name: 'Ann Lee', email: 'ann@example.edu' },
+        }],
+        rowCount: 1,
+      });
+
+    await store.attestAddress(REQ, 'candidate:ann', {
+      email: 'ann@example.edu',
+      verifiedContact: {
+        website: 'https://example.edu/current',
+        affiliation: 'Current Department',
+      },
+      evidenceType: 'institution_page',
+      evidenceUrl: 'https://example.edu/current',
+      actorProfileId: 'profile-1',
+      actorSystemUserId: 'system-1',
+    });
+
+    const persisted = JSON.parse(allInterpolations().find((entry) => (
+      typeof entry === 'string' && entry.includes('addressTrustReceipt')
+    )));
+    expect(persisted).toMatchObject({
+      email: 'ann@example.edu',
+      emailSource: 'manual',
+      website: 'https://example.edu/current',
+      websiteSource: 'manual',
+      affiliation: 'Current Department',
+      affiliationSource: 'staff_manual',
+      manualContactFields: expect.arrayContaining(['email', 'website', 'affiliation']),
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: expect.any(String),
+      addressTrustReceipt: { email: 'ann@example.edu' },
+      staffIdentityConfirmation: {
+        confirmationId: expect.any(String),
+        source: 'staff_confirmed',
+        normalizedName: 'ann lee',
+        email: 'ann@example.edu',
+        website: 'https://example.edu/current',
+        affiliation: 'Current Department',
+        actorProfileId: 'profile-1',
+        actorSystemUserId: 'system-1',
+      },
+      contactEnrichment: {
+        email: 'ann@example.edu',
+        website: 'https://example.edu/current',
+        affiliation: 'Current Department',
+      },
+    });
+    expect(persisted.pdIdentityConfirmationId)
+      .toBe(persisted.staffIdentityConfirmation.confirmationId);
+  });
 });
 
 describe('finalizeCandidatePromotion', () => {
