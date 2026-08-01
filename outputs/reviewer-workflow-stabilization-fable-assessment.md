@@ -2,10 +2,13 @@
 
 Author: Claude Fable, 2026-08-01. Read-only session; no runtime edits, no data
 repair, no Production writes. Evidence basis: current source on
-`main`@`ca9e9c5` plus the durable docs listed in the session brief. **No live
-probe ran this session** — the auto-mode permission classifier denied the
-read-only Production probe twice (see §8); all mutable-state claims are
-therefore labeled `[UNKNOWN]` rather than re-verified.
+`main`@`ca9e9c5`, the durable docs listed in the session brief, and **one
+owner-run read-only Production probe** (`scripts/probe-roster-dump.mjs
+--request 1002912 --include-dataverse`, executed 2026-08-01 after the session's
+own attempts were denied by the permission classifier; interlock logged
+`mode=on deployment=local target=production`, reads only). Probe results are
+labeled `[VERIFIED via probe 2026-08-01]`; where the probe does not print a
+field, the claim stays `[UNKNOWN]`.
 
 Verdict (details in §4): **PLAN SOUND WITH NAMED CHANGES**.
 
@@ -135,14 +138,18 @@ are not implicated.
 9. **Reload / concurrency / stale generation.** Cache validity requires every
    currently expected recommendation to have its exact canonical
    active/ineligible row at the current cache version with a terminal gate
-   result, or be staff-terminal (`excluded`/`saved` canonical keys). An
-   engaged-but-roster-stale recommendation therefore makes the cache invalid
-   **forever**, and the auto-run effect
+   result, or be staff-terminal (`excluded`/`saved` canonical keys). Note
+   `identityStatus==='unresolved'` **counts as a satisfied gate result**, so an
+   engaged reviewer's canonical row can satisfy the cache — the auto-run effect
    (`blobUrl && proposalKey && recommended.length>0 && rosterLoaded && !haveValidCache`)
-   re-enriches on every tab open — repeated Claude spend plus roster rewrites
-   until something makes the row terminal. Enrichment races are guarded by
-   per-suggestion `updated_at` snapshots (changed rows are skipped and
-   reported). `[VERIFIED via reviewer-search-logic.js:457-506; ReviewerSearchSection.js:1320-1340; enrich-recommended-service.js:250-308]`
+   then does *not* fire, and the stale engaged card simply restores from the
+   roster. Whether `1002912` currently re-enriches on every open depends on
+   `applicantEnrichmentCacheVersion`/`applicantKnownReviewer` per row, which the
+   probe does not print — `[UNKNOWN]`. Either way the **display** defect holds:
+   valid cache restores the engaged rows, invalid cache re-mints them.
+   Enrichment races are guarded by per-suggestion `updated_at` snapshots
+   (changed rows are skipped and reported).
+   `[VERIFIED via reviewer-search-logic.js:457-506,499-505; ReviewerSearchSection.js:1320-1340; enrich-recommended-service.js:250-308]`
 10. **Rendering and remedies.** `displayRosterActive` restores any active
     applicant-origin row whose `enrichedProposalKey` matches the current
     proposal — there is **no restriction to the current expected suggestion
@@ -174,11 +181,50 @@ the check I ran (or the one that remains) that would have falsified the claim.
 | 2 | Ingestion computes but drops `selected` | **CONFIRMED, but the framing is wrong** | `ensureApplicantRecommended` returns `selected` on all 5 branches `[VERIFIED via reviewer-suggestion.js:542,574,591,610,624]`; DTO omits it `[VERIFIED via applicant-reviewers-service.js:115-122,174-201]` | Projected `selected` alone would NOT have fixed Sorek: she was `selected=false, declined=true` — indistinguishable from unpromoted by `selected`. The correct projection is the engagement tuple (invited/accepted/declined/response/review/completed), all already in the fetched row. |
 | 3 | Lima correction dead-ends on key mismatch (409) | **CONFIRMED as mechanism; PLAUSIBLE as the specific July 31 causation** | Full chain: DTO branches omit `candidateKey` `[VERIFIED via enrich-recommended-service.js:870-963]` → client stores/sends raw candidate `[VERIFIED via ReviewerSearchSection.js:1296-1299,1726-1743]` → route requires `stored.candidateKey === candidate.candidateKey`, stored key always present `[VERIFIED via reviewer-roster.js:96, reviewer-roster-store.js:44-46]` → `undefined ≠ 'suggestion:<id>'` → 409. Also applies to `exclude`. | The counter-case exists and localizes the bug: roster-GET-restored candidates DO carry keys, so a reload-then-confirm would succeed. That the two historical PATCHes were fresh-enrichment confirms cannot be re-derived from source — hence PLAUSIBLE on causation, CONFIRMED on mechanism. |
 | 4 | Proposal/cache identity unstable across reload | **PARTIAL** | Canonical-only default + component-state override + random blob suffix all confirmed `[VERIFIED via load-proposal-service.js:129-152, ReviewerFindPanel.js:129-153]` | Same-key reload with a *valid* cache does NOT rerun Claude (`haveValidCache → recPhase 'done'` `[VERIFIED via ReviewerSearchSection.js:1330-1340]`) — the claim overstates instability for the happy path. The real instabilities: (a) override lost on reload when no canonical file exists; (b) claim-1's gap makes the cache invalid forever on affected requests → re-run on every open. |
-| 5 | Isberg's Dataverse invitation intact | **UNKNOWN** | July 31 baseline only; probe blocked this session (§8) | Run `probe-roster-dump.mjs --request 1002912 --include-dataverse` and read `wmkf_selected/invited` + token timestamps on suggestion `fdd093f6-…`. |
-| 6 | Sorek's engagement intact (invited+declined) + stale pre-merge orphan | **UNKNOWN** (live); orphan **render path CONFIRMED** in source | `displayRosterActive` has no expected-suggestion-set restriction; dedupe is by candidate key, so two suggestion ids for one person render twice `[VERIFIED via ReviewerSearchSection.js:1347-1371,118-131]` | Same probe; check roster key `suggestion:bb81d1f6-…` still exists and its embedded suggestion still 404s. |
-| 7 | Duplicate `candidate:` twins + canonical actives caused resurfacing | **Mechanism CONFIRMED; live rows UNKNOWN** | `savedKeys` counts canonical-key rows only `[VERIFIED via reviewer-roster-store.js:662-665]`; terminal set is roster-only `[VERIFIED via reviewer-search-logic.js:443-455]`; so a legacy saved twin cannot terminalize its person while enrichment mints a canonical active twin. | The disconfirming shape (a `candidate:`-keyed saved row that WOULD count as terminal) is impossible by code: the canonical-equality test is structural, not data-dependent. Live twin rows need the probe. |
+| 5 | Isberg's Dataverse invitation intact | **CONFIRMED, still true today** | Suggestion `fdd093f6-fc68-f111-a826-000d3a3064b7`: `selected=true, invited=true`, sources `pubmed,proposal_named,applicant` `[VERIFIED via probe 2026-08-01]`. Unchanged from the July 31 baseline. **And he still has an `active/applicant_suggested` roster row** rendering as an unresolved prospect. | The disconfirming case would be an engaged reviewer with no active applicant row — Isberg is the opposite: engaged *and* actionable, live, today. |
+| 6 | Sorek's engagement intact + stale pre-merge orphan | **CONFIRMED (engagement + orphan); `declined` flag UNKNOWN** | Suggestion `522d186b-a68b-f111-ab0f-70a8a59cded0`: `selected=false, invited=true` `[VERIFIED via probe 2026-08-01]` — engaged either way. The probe prints `selected/invited` only, so `declined=true` is not re-verified. **Sorek has THREE roster rows: two `active/applicant_suggested` + one `saved/proposal_named`** — the orphan render path from §2 hop 10, live. The two actives differ in shape (one has all-null persist fields), consistent with one pre-merge and one current. | Predicted from source (hop 10) *before* the probe ran and then observed — the duplicate-render path is real, not hypothetical. |
+| 7 | Duplicate twins + canonical actives caused resurfacing | **CONFIRMED in mechanism and in live data** | `savedKeys` counts canonical-key rows only `[VERIFIED via reviewer-roster-store.js:662-665]`. Live: Isberg and Sorek each hold a `saved/proposal_named` roster row (a *search-origin* save, differently keyed) alongside their `active/applicant_suggested` row `[VERIFIED via probe 2026-08-01]` — so a save that did happen cannot terminalize the applicant twin. | The disconfirming shape (a non-canonical saved row that WOULD count as terminal) is impossible by code: the canonical-equality test is structural, not data-dependent. |
+| 10 (added) | Lima's correction never committed | **CONFIRMED live** | Lima's roster row today: `staffConfirmed:false, receiptPresent:false`, `email=—`, identity `unresolved` `[VERIFIED via probe 2026-08-01]`; Dataverse `bdd093f6-…` is `selected=false, invited=false` — genuinely unhandled, correctly actionable. | Had the confirmation committed, the row would carry `staffIdentityConfirmation` + manual contact; it carries neither, 5 weeks later. |
 | 8 | Incident is a projection/orchestration **regression** | **REFUTED as "regression"; CONFIRMED as projection gap** | No engagement filter was ever present on this path; wiki records disposition-only reads as standing S263/S264 behavior `[VERIFIED via wiki topic + absence in traced source]` | Ran the disconfirming check: `git log -S wmkf_invited` and `-S wmkf_declined` over `pages/api/workbench/enrich-recommended.js` + `lib/services/workbench/enrich-recommended-service.js` return **zero commits** `[VERIFIED via git history, 2026-08-01]` — the filter never existed, so nothing regressed. |
 | 9 | "Dataverse lifecycle always wins" is the right invariant | **PARTIAL — overbroad as stated** | See §4 critique | The Restore feature (`ENGAGEMENT_STAMP_RESET`) is a deliberate, explicit re-entry transition — an absolutist "lifecycle always wins" would wrongly forbid it. The defensible invariant is narrower (§5, I-1/I-2). |
+
+### 3.1 Live state of Request `1002912` (probe, 2026-08-01) — with denominators
+
+Request `1002912` = `078498df-ce44-f111-88b4-000d3a306da2`; **19 roster rows**.
+
+Applicant-recommended people: **5** (Lima, Finley, Laub, Isberg, Sorek), carried
+by **6** `active/applicant_suggested` roster rows — the extra row is Sorek's
+orphan duplicate.
+
+| Person | Dataverse engagement | Roster rows | Correct to show as actionable? |
+|---|---|---|---|
+| Christopher Lima | `selected=false, invited=false` | 1 active | **Yes** — genuinely unhandled |
+| Daniel Finley | `selected=false, invited=false` | 1 active | **Yes** |
+| Michael Laub | `selected=false, invited=false` | 1 active | **Yes** |
+| Ralph Isberg | `selected=true, invited=true` | 1 active + 1 `saved` twin | **No** — engaged, still rendering |
+| Rotem Sorek | `selected=false, invited=true` | **2 active** + 1 `saved` twin | **No** — engaged, rendering twice |
+
+**So the defect's live blast radius on this request is 2 of 5 applicant
+recommendations wrongly actionable, plus 1 duplicate card — and 3 of 5 are
+correct.** That 3/5 control group matters: it shows the projection is not
+globally broken, which is exactly why a narrow engagement-input fix (§6) is the
+right size of change and why a wholesale redesign is not.
+
+Two observations the inherited diagnosis did not record:
+
+- **The engaged pattern is not applicant-specific.** Cynthia Wolberger
+  (`literature_retrieved`) is `selected=false, invited=true` with a `saved`
+  roster row `[VERIFIED via probe 2026-08-01]`. She does not resurface only
+  because her roster row is terminal — i.e. the search-origin path is protected
+  by roster state alone, and would be exposed to the same class of bug if that
+  row were ever keyed differently. The invariant in §5 (I-1) should be written
+  over *all* candidates, not just applicant-origin ones.
+- **Duplicate person rows exist upstream.** Schulman and Sorek each return 2
+  active name-matching `wmkf_potentialreviewers` rows, one of them empty
+  (no email, no suggestion) `[VERIFIED via probe 2026-08-01]`. Out of scope for
+  this slice and NOT a blocker, but it is latent fuel for future
+  identity-binding confusion and belongs on the hygiene list, not in the
+  stabilization slice.
 
 ---
 
@@ -266,7 +312,8 @@ enforced in the roster store and should be asserted by tests, not rebuilt.
 
 Invariants (replacing Contract 1's absolutism):
 
-- **I-1 (actionability is monotonic against engagement).** A suggestion with
+- **I-1 (actionability is monotonic against engagement).** Written over *all*
+  candidates, not only applicant-origin ones (§3.1, Wolberger). A suggestion with
   `selected=true` or any of invited/accepted/declined/response/review/completed
   signals never renders as an actionable *new* Find prospect and is never
   re-enriched as one, regardless of roster state. It may (and should) render
@@ -321,17 +368,14 @@ claim 7).
 
 One session, branch + deliberate promotion per the campaign release strategy.
 
-**Prerequisite (10 minutes, must happen first):** re-run the live probe —
-
-```
-DATAVERSE_ALLOW_PROD_READS=yes node --import ./scripts/lib/use-extensionless.mjs \
-  scripts/probe-roster-dump.mjs --request 1002912 --include-dataverse
-```
-
-— to re-establish Isberg/Sorek Dataverse engagement and the current roster row
-census (claims 5-7). If live state contradicts the July 31 baseline, stop and
-reassess per the directive's own rule. (Claim 8's git archaeology is already
-done — zero commits ever touched engagement fields on the enrichment path.)
+**Prerequisites: both are already satisfied.** The live probe ran 2026-08-01
+(§3.1) and *agrees with* the July 31 baseline — Isberg still
+`selected=true, invited=true`, Sorek still `invited=true`, both still carrying
+active applicant roster rows, so the directive's "stop if live state
+contradicts the baseline" rule is not triggered. Claim 8's git archaeology is
+also done (zero commits ever touched engagement fields on the enrichment path).
+**Implementation can begin without further investigation.** Re-probe once more
+immediately before any Phase-3 Production write, per the standing rule.
 
 **The slice (ordered; tests written first where marked ⊟):**
 
@@ -389,19 +433,26 @@ unless the reset stamp accompanies it).
 - **Stop opening further review loops on this incident** (this session is the
   directive's Phase -1; the next session should implement). One adversarial
   review of the finished implementation, per the directive's own Phase 4 rule.
-- **Stop letting the affected requests re-enrich on every open** — worth noting
-  operationally: until the slice ships, each Find visit to an affected request
-  costs a Claude analyze/enrich run and roster rewrites. Avoid idle re-opens of
-  `1002912` in Production.
+- **Do not treat re-enrichment cost as a driver.** I initially expected affected
+  requests to re-enrich on every Find open; on closer reading
+  `identityStatus='unresolved'` satisfies the cache gate, so that may not happen
+  at all (§2 hop 9, now `[UNKNOWN]` for `1002912`). Correctness, not spend, is
+  the reason to ship the slice.
 
 ---
 
 ## 8. Remaining unknowns and the exact probes/tests to resolve them
 
+*Resolved this session by the 2026-08-01 probe: Isberg/Sorek engagement, the
+roster census, the twin/orphan shapes, and Lima's uncommitted confirmation (§3.1).*
+
+Still open:
+
 | Unknown | Resolver | Bounded? |
 |---|---|---|
-| Current Isberg/Sorek Dataverse engagement (claims 5-6) | `DATAVERSE_ALLOW_PROD_READS=yes node --import ./scripts/lib/use-extensionless.mjs scripts/probe-roster-dump.mjs --request 1002912 --include-dataverse` — **blocked this session by the auto-mode permission classifier (two denials); needs Justin to run or grant a Bash allow rule** | Yes — read-only, one request |
-| Current roster row census for `1002912` (twins, orphan `suggestion:bb81d1f6-…`) | Same probe | Yes |
+| Sorek's `declined` flag (probe prints `selected`/`invited` only) | Add `wmkf_declined`/`wmkf_responsetype` to the probe's suggestion projection, or read suggestion `522d186b-…` directly | Yes — one row |
+| Which of Sorek's two active rows is the 404 orphan, and its exact key | Extend the probe to print `candidate_key` + `candidate->>'suggestionId'` per row (it prints neither today) — **the single highest-value probe improvement** | Yes |
+| Whether `1002912`'s applicant cache is currently valid (§2 hop 9) | Same extension: print `applicantEnrichmentCacheVersion` + `applicantKnownReviewer.status` | Yes |
 | Demand for the legacy-filename fallback (§4.6) | Count active-cycle requests with no canonical proposal file but a `Project Narrative.pdf` (SharePoint listing over the current cycle's requests; read-only Graph) | Yes — bounded to one cycle |
 | Whether the two July 31 Lima 409s were fresh-enrichment confirms (claim 3 causation) | Vercel request logs for the two PATCHes (payload presence of `candidateKey`), if retained | Maybe — log retention dependent |
 | How many other requests currently have engaged-but-unterminal applicant recommendations (blast radius of the perpetual re-enrich loop) | One roster/Dataverse join query — natural extension of the probe script | Yes — read-only |
@@ -410,9 +461,12 @@ unless the reset stamp accompanies it).
 greped for engagement terms are the four suites named in §2.11 (4/4 zero
 matches); the whole-flow trace covered 11/11 hops of the brief's required list
 (none N/A — all were implicated or explicitly cleared); the claim matrix covers
-9/9 rows (8 inherited + 1 added). Everything labeled `[VERIFIED]` cites the
-file/lines I read this session on `main`@`ca9e9c5`; no `[VERIFIED]` label in
-this document rests on the July 31 table or on any plan document.
+10/10 rows (8 inherited + 2 added). Live denominators are in §3.1 (19 roster
+rows; 5 applicant people / 6 applicant rows; 2 of 5 wrongly actionable).
+Everything labeled `[VERIFIED via file:line]` cites source I read this session
+on `main`@`ca9e9c5`; everything labeled `[VERIFIED via probe 2026-08-01]` cites
+the owner-run read-only probe output. No `[VERIFIED]` label in this document
+rests on the July 31 table or on any plan document.
 
 ---
 
