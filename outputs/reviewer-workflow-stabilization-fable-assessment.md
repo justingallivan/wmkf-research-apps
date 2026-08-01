@@ -61,7 +61,55 @@ back, "recurrence" is deterministic rather than probabilistic (every affected
 request re-mints state on every tab open), and the fix is completing a
 projection, not repairing an orchestration.
 
-**One finding beyond the inherited diagnosis (worst finding of the session).**
+**Finding A — the referral/manual-add path is an ungated promotion door
+(owner-prompted, 2026-08-01; the most serious finding in this assessment).**
+Owner ground truth: Wolberger was invited and **declined**, and her decline
+referral named Christopher Lima — who was also an applicant-recommended slot
+reviewer. Tracing that scenario: the Track-tab one-click "Add as candidate"
+(and the Find tab's Add-or-Refer form) POST to `/api/workbench/manual-reviewer`
+→ `addManualReviewer` → `ensureStaffManualCandidate`. When a junction row for
+that person/request **already exists** — which is exactly the case for an
+applicant-recommended person — it does not create anything; it calls
+`patchStaffManualReselect`, which writes `wmkf_selected = true`, and, because
+the applicant row is `selected === false`, **also applies
+`ENGAGEMENT_STAMP_RESET`**.
+`[VERIFIED via manual-reviewer-service.js:225-234, reviewer-suggestion.js:739-773, 684-724, 660-682]`
+
+Consequences, in order of severity:
+
+1. **It promotes an applicant-recommended reviewer with none of the promotion
+   gates.** `promoteApplicantReviewer` exists to enforce identity confirmation,
+   deceased/eligibility, COI, canonical contact, address-trust receipt, and
+   roster finalization before `selected=true`. This path flips the same bit
+   with none of them. The disposition stays `recommended`, so the row becomes
+   `disposition=recommended, selected=true` — a promoted applicant reviewer
+   that never passed the applicant promotion contract.
+2. **It can silently clear a decline.** `ENGAGEMENT_STAMP_RESET` fires on any
+   `selected=false` row, and a declined applicant reviewer is `selected=false`.
+   So adding a declined person as a referral wipes their decline/response
+   state — the deliberate Restore semantics, applied without staff choosing
+   Restore.
+3. **It is reachable by exactly the workflow Justin described**: a declining
+   reviewer names someone the applicant also recommended. That is not an exotic
+   case — decline referrals and applicant slots draw from the same small expert
+   pool.
+
+This is deliberate to a point — the adapter's own comment says "Applicant
+recommendation state is preserved when present so a row can carry both
+origins," and dual provenance is a legitimate goal. The defect is that
+*carrying both origins* was implemented as *selecting the row*, so a provenance
+merge doubles as an ungated promotion.
+
+**Did this actually happen to Lima?** No — and the probe proves it. His
+suggestion's `sources` is `applicant` only; a committed referral add would have
+unioned in `staff_manual,referred`
+`[VERIFIED via probe 2026-08-01 vs manual-reviewer-service.js:225]`. He is
+`selected=false, invited=false`. So the referral add for Lima was attempted and
+did not commit, or was never submitted. **The hazard is live in code but has
+not fired on this request** — which is the good news, and the reason to close
+it before the next campaign rather than treat it as an incident.
+
+**Finding B — the resurfacing also has an ungated promotion door.**
 The resurfacing is not display-only — it exposes a **state-corrupting write
 path**. `promoteApplicantReviewer` validates only
 `wmkf_applicantdisposition=recommended` before flipping `wmkf_selected=true`;
@@ -73,8 +121,16 @@ So a PD who clicks Promote on a resurfaced declined reviewer (the Sorek shape)
 writes `selected=true` while `declined=true` and the decline metadata remain —
 a hybrid state the decline-archival invariant ("declined ⇒ leaves the active
 pool") assumes cannot exist, entered without the deliberate
-`ENGAGEMENT_STAMP_RESET` that the explicit Restore path uses. The directive's
-golden workflows do not cover this case; the revised set in §5 does.
+`ENGAGEMENT_STAMP_RESET` that the explicit Restore path uses.
+
+**Findings A and B are the same missing invariant seen through two doors.**
+Nothing enforces "a row carrying live engagement cannot become `selected=true`
+except through an explicit, staff-chosen reset." Door B (promote) resets
+nothing and leaves a contradictory hybrid; door A (referral/manual add) resets
+everything and erases the decline. Both bypass the applicant promotion
+contract. That is why the guard belongs at a chokepoint covering every writer
+of `selected`, not in either route — see §5 I-2 and §6 step 5. The directive's
+five golden workflows cover neither door; the revised set in §5 does.
 
 ---
 
@@ -214,11 +270,21 @@ Two observations the inherited diagnosis did not record:
 
 - **The engaged pattern is not applicant-specific.** Cynthia Wolberger
   (`literature_retrieved`) is `selected=false, invited=true` with a `saved`
-  roster row `[VERIFIED via probe 2026-08-01]`. She does not resurface only
-  because her roster row is terminal — i.e. the search-origin path is protected
-  by roster state alone, and would be exposed to the same class of bug if that
-  row were ever keyed differently. The invariant in §5 (I-1) should be written
-  over *all* candidates, not just applicant-origin ones.
+  roster row `[VERIFIED via probe 2026-08-01]`; **owner ground truth: she was
+  invited and declined, and her decline referral named Lima.** She does not
+  resurface only because her roster row is terminal — i.e. the search-origin
+  path is protected by roster state alone, and would be exposed to the same
+  class of bug if that row were keyed differently. The invariant in §5 (I-1)
+  should therefore be written over *all* candidates, not just applicant-origin
+  ones.
+- **`selected=false, invited=true` is the decline signature.** Decline archival
+  writes `selected=false` alongside the declined response state
+  `[VERIFIED via docs/agent-wiki/topics/reviewer-workbench-lifecycle.md §Decline archival]`,
+  and Wolberger — independently known to have declined — shows exactly that
+  shape. **Sorek shows the same shape**, which corroborates the July 31
+  `declined=true` reading even though this probe does not print the flag
+  (claim 6). Two of this request's reviewers reaching a terminal decline is
+  also what made `1002912` the request where the latent gap finally surfaced.
 - **Duplicate person rows exist upstream.** Schulman and Sorek each return 2
   active name-matching `wmkf_potentialreviewers` rows, one of them empty
   (no email, no suggestion) `[VERIFIED via probe 2026-08-01]`. Out of scope for
@@ -320,9 +386,19 @@ Invariants (replacing Contract 1's absolutism):
   as a legible "already handled — <stage>" line with navigation.
 - **I-2 (re-entry only through explicit transitions).** The only paths that
   return an engaged person to actionable state are the deliberate Restore /
-  Reset-and-restore actions, which clear engagement via
-  `ENGAGEMENT_STAMP_RESET`. No Find-surface action may write `selected=true`
-  onto a row carrying live engagement or decline state without that reset.
+  Reset-and-restore actions, where staff explicitly choose to clear engagement
+  via `ENGAGEMENT_STAMP_RESET`. **No other path may write `selected=true` onto
+  a row carrying live engagement or decline state** — neither by leaving the
+  engagement stamps in place (door B, `promoteApplicantReviewer`) nor by
+  silently resetting them (door A, `ensureStaffManualCandidate` via
+  referral/manual add). Enforce at a chokepoint that sees every `selected`
+  writer, since the two doors fail in opposite directions.
+- **I-2a (provenance merge is not promotion).** Re-adding an existing
+  applicant-recommended person as a manual or referred candidate may union
+  `sources` and record the referral, but must not by itself set
+  `selected=true`; promotion of an applicant-recommended row goes through the
+  applicant promotion contract and its gates. Preserving dual origin is a
+  legitimate goal and should be kept — as a provenance write only.
 - **I-3 (staff decisions are terminal against automation).** Already largely
   enforced (concurrency snapshots, confirmed-row preservation, authority
   stripping); assert with race tests rather than rebuilding.
@@ -351,10 +427,16 @@ Golden workflows (revised; each must fail against baseline before the fix):
    auto-select; duplicate canonical still errors; deliberate override survives
    reload via validated navigation state and is revalidated server-side.
    (Legacy-filename fallback deferred — see §4.6.)
-6. **W6 (new) — No backward lifecycle write from Find:** promoting a suggestion
-   that is declined or already engaged is refused (or requires the explicit
-   restore flow); asserted at `promoteApplicantReviewer` and/or
-   `updateLifecycle`. Baseline-failing today (§1).
+6. **W6 (new) — No ungated `selected=true` on an engaged row, through any
+   door:** (a) promoting a declined/engaged suggestion via
+   `promoteApplicantReviewer` is refused; (b) re-adding an applicant-recommended
+   person through `manual-reviewer` (referral one-click or Add-or-Refer) records
+   provenance **without** setting `selected=true` and **without** applying
+   `ENGAGEMENT_STAMP_RESET`; (c) the explicit Restore path still works
+   unchanged. Both (a) and (b) are baseline-failing today (§1 Findings A/B).
+   Test (b) with the exact live shape: a person holding a
+   `disposition=recommended, selected=false` row who is then referred by a
+   decliner — the Wolberger→Lima scenario.
 
 Complement coverage the directive asked about: all-failed enrichment batches
 (hydration-failure path exists and is tested by shape — keep one assertion),
@@ -401,21 +483,37 @@ immediately before any Phase-3 Production write, per the standing rule.
 5. **Client, reload-stable override:** persist a deliberate fileKey override in
    validated navigation state (URL param), revalidated server-side by the
    existing `fileKey` path.
+5. **Server, close both promotion doors (I-2/I-2a).** Refuse `selected=true` on
+   a row carrying live engagement unless an explicit reset accompanies it.
+   Placement matters: the two doors fail oppositely, so guard where both are
+   visible — `updateLifecycle` sees door B but `ensureStaffManualCandidate`
+   calls `updateRecord` directly `[VERIFIED via reviewer-suggestion.js:696-709]`,
+   so an adapter-level `updateLifecycle` guard alone would miss door A. Either
+   route door A through the guarded path, or extract a shared
+   `assertSelectableTransition(existing, payload)` used by both. For door A
+   specifically, the minimal behavior change is: drop `wmkf_selected: true` and
+   the reset from the payload when `existing.wmkf_applicantdisposition ===
+   recommended`, keeping the `sources`/label union so referral provenance still
+   lands. Restore must keep working — its reset is staff-chosen.
 6. Gates for touched surfaces + full suite; one adversarial review of the
    finished implementation (not another plan loop).
 
 **Explicit non-goals for the slice:** no schema/migration; no Postgres
 ownership changes; no `Project Narrative.pdf` fallback; no repair execution;
 no changes to the fail-closed key binding, promotion lookup strictness, or
-address-trust machinery; no touching `save-candidates`/invite surfaces.
+address-trust machinery; no `save-candidates` changes; no rework of the
+referral capture/surface itself (only its `selected` side effect).
 
-**Estimated shape:** the server changes are confined to two traced files plus
-two DTO lines; the client changes to two components plus one logic module. The
-riskiest item is the W6 guard placement (service vs adapter) — decide in
-implementation review; the adapter is the safer chokepoint but touches more
-callers (restore legitimately writes `selected` on declined rows, so the guard
-must be predicate-scoped, e.g. refuse `selected:true` when declined/engaged
-unless the reset stamp accompanies it).
+**Estimated shape:** server changes touch four files
+(`enrich-recommended-service`, `applicant-reviewers-service`,
+`reviewer-suggestion` adapter, and whichever chokepoint step 5 lands on); client
+changes touch two components plus one logic module. **The riskiest item is step
+5's guard placement**, and it is riskier than I judged before finding door A:
+the two writers of `selected` disagree about resets, `ensureStaffManualCandidate`
+bypasses `updateLifecycle` entirely, and the legitimate Restore path writes
+`selected=true` on declined rows *by design*. Get that predicate wrong and you
+either break Restore or leave a door open. Budget the review time there, and
+write W6(c) — Restore still works — as a guard against over-correcting.
 
 ---
 
@@ -453,6 +551,8 @@ Still open:
 | Sorek's `declined` flag (probe prints `selected`/`invited` only) | Add `wmkf_declined`/`wmkf_responsetype` to the probe's suggestion projection, or read suggestion `522d186b-…` directly | Yes — one row |
 | Which of Sorek's two active rows is the 404 orphan, and its exact key | Extend the probe to print `candidate_key` + `candidate->>'suggestionId'` per row (it prints neither today) — **the single highest-value probe improvement** | Yes |
 | Whether `1002912`'s applicant cache is currently valid (§2 hop 9) | Same extension: print `applicantEnrichmentCacheVersion` + `applicantKnownReviewer.status` | Yes |
+| **Whether door A (§1 Finding A) has already fired on any request** — an ungated referral/manual promotion of an applicant-recommended person | Query `wmkf_appreviewersuggestion` for `wmkf_applicantdisposition eq recommended and wmkf_selected eq true`, then split by whether `wmkf_sources` contains `staff_manual`/`referred` vs only search/applicant tokens. Rows with a manual/referred token are candidates for an ungated promotion; rows whose engagement stamps are empty despite prior invitation are candidates for a silent reset. **Worth running before the next campaign** — it is read-only and bounds the exposure repo-wide, not just for `1002912`. | Yes — one filtered query |
+| Whether Wolberger's referral text actually names Lima (owner recollection vs stored `wmkf_declinereferral`) | Read `wmkf_declinereferral` on her suggestion, or open the Track-tab referral callout | Yes — one field |
 | Demand for the legacy-filename fallback (§4.6) | Count active-cycle requests with no canonical proposal file but a `Project Narrative.pdf` (SharePoint listing over the current cycle's requests; read-only Graph) | Yes — bounded to one cycle |
 | Whether the two July 31 Lima 409s were fresh-enrichment confirms (claim 3 causation) | Vercel request logs for the two PATCHes (payload presence of `candidateKey`), if retained | Maybe — log retention dependent |
 | How many other requests currently have engaged-but-unterminal applicant recommendations (blast radius of the perpetual re-enrich loop) | One roster/Dataverse join query — natural extension of the probe script | Yes — read-only |
@@ -474,7 +574,12 @@ rests on the July 31 table or on any plan document.
 
 **PLAN SOUND WITH NAMED CHANGES** — the directive's posture (stabilize, test
 first, repair last) survives challenge, but: reframe regression→latent gap;
-narrow Contract 1 to I-1/I-2; shrink Phases 0/2 to the slice in §6; defer the
-filename fallback; add W6 (the declined-promote write hazard, the one finding
-here that goes beyond the inherited diagnosis); and treat data repair as
-post-fix hygiene rather than a correctness gate.
+narrow Contract 1 to I-1/I-2/I-2a; shrink Phases 0/2 to the slice in §6; defer
+the filename fallback; treat data repair as post-fix hygiene rather than a
+correctness gate; and add W6 covering **both** ungated `selected=true` doors —
+`promoteApplicantReviewer` (leaves a contradictory hybrid) and
+`ensureStaffManualCandidate` via referral/manual add (silently resets a
+decline). The second door was found only because the owner supplied the
+Wolberger→Lima referral context, and it is the strongest argument for shipping
+the slice before the next campaign: it converts a display defect into a
+silent-data-loss risk on a workflow staff are actively encouraged to use.
