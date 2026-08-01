@@ -4,11 +4,11 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** Wave 13 metadata/population refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population`; row count re-probed 2026-07-26 via `scripts/reconcile-memory-claims.js`; promotion trigger re-verified from source/tests 2026-07-30
+**Last verified:** Wave 13 metadata/population refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population`; row count re-probed 2026-07-26 via `scripts/reconcile-memory-claims.js`; promotion trigger re-verified from source/tests 2026-07-30; Wave 17 metadata read back EXACT in Production and its receipt-backed runtime was exercised on Request `1002912` on 2026-07-31 PT / 2026-08-01 UTC
 **Live row count:** 4,427
 **Entity set:** `wmkf_potentialreviewerses` (note Dynamics-pluralized form)
 **Adapter:** `lib/dataverse/adapters/potential-reviewer.js`
-**Extension manifests:** `lib/dataverse/schema/wave2-existing/wmkf_potentialreviewers-extensions.json` + `lib/dataverse/schema/wave13-reviewer-identity-binding/01_wmkf_potentialreviewers_identity_binding.json`; Wave 17 address-trust schema exists in source but is **not yet production-verified/deployed**
+**Extension manifests:** `lib/dataverse/schema/wave2-existing/wmkf_potentialreviewers-extensions.json` + `lib/dataverse/schema/wave13-reviewer-identity-binding/01_wmkf_potentialreviewers_identity_binding.json` + `lib/dataverse/schema/wave17-reviewer-address-trust/01_wmkf_potentialreviewers_address_trust.json`; Wave 17 is production-live and read back EXACT
 
 ## Source of truth
 
@@ -31,7 +31,7 @@ Contact:
 - `wmkf_emailaddress` (de-dupe key in adapter)
 - `wmkf_organizationname`
 - `wmkf_areaofexpertise`
-- `wmkf_addresstruststatejson` (Wave 17 Memo, **planned production apply**):
+- `wmkf_addresstruststatejson` (Wave 17 Memo, **production-live**):
   versioned server-owned current state binding the exact normalized email to a
   staff attestation or pending contradiction. Null, malformed, unknown-version,
   or wrong-email bundles grant no authority. This is current state, not an event
@@ -130,6 +130,10 @@ Methods:
   promotion. Canonical contact reuse performs no email write and cannot bypass
   identity, current-request COI, or the invitation send classifier.
 - `lib/services/reviewer-identity-binding-writer.js` — fail-closed binding snapshot read; first production caller is live in acceptance-drain self-report
+- `lib/services/reviewer-address-trust-service.js` — reads the current exact
+  address trust/conflict bundle, requires fresh server-derived person identity
+  and ETag for mutation, and projects only bounded decision/remedy state to the
+  browser
 
 ## Write paths
 
@@ -146,6 +150,9 @@ Methods:
 - `scripts/backfill-postgres-to-dataverse.js` — `upsertByEmail` against the Postgres `researchers` pool during Wave 2 backfill.
 - `lib/services/reviewer-identity-binding-writer.js` — one complete ETag-guarded person PATCH after transition validation; first production caller is live in acceptance-drain self-report
 - `lib/services/capture-self-reported-orcid.js` — stable acceptance events use the binding writer with the event identity (`boundAt`/`resolvedAt`) truncated to Dataverse second precision (DateTime columns drop fractional seconds on round-trip, so a job retry must replay as an exact no-op); only typed `legacy_classification_required` falls back to the transitional person writes, and contact fill follows person persistence
+- `lib/services/reviewer-address-trust-service.js` — ETag-guards exact-address
+  attestation and contradiction bundles; receipt-first partial success remains
+  explicit, and address adjudication never creates or links a CRM Contact
 
 ### Shared-person identity/contact monotonicity
 

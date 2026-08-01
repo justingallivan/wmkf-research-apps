@@ -29,6 +29,7 @@ source_files:
   - pages/api/reviewer-finder/save-candidates.js
   - lib/services/reviewer-finder/save-candidates-service.js
   - lib/services/reviewer-candidate-attestation.js
+  - lib/services/reviewer-address-trust-service.js
   - lib/utils/reviewer-vetted-email.js
   - pages/api/review-manager/campaign-timeline-defaults.js
   - pages/api/review-manager/terminal-transition.js
@@ -79,7 +80,7 @@ and staff-facing reviewer management.
 
 **Reviewer-engagement build (Model B):** spec is `docs/REVIEWER_ENGAGEMENT_SPEC.md`. The 9 backing Dataverse fields are **provisioned in prod (2026-06-21, wave `7-reviewer-engagement`)**. Per-request campaign config (offset/due-date/reminder toggles+leads/desired-count/quota-notified-at) lives on `akoya_request`; the per-reviewer fire-once respond-reminder marker `wmkf_respondremindersentat` lives on `wmkf_appreviewersuggestion`. **Phase 1 LIVE (S275):** the invite panel's respond-by is now a "days to respond" offset; `wmkf_respondoffsetdays` + `wmkf_reviewduedate` are written on first invite (`send-emails.js`) and edited via `/api/review-manager/campaign-config` (Reviewers-tab "Campaign settings"). Current-cycle invitation defaults are now edited in `/admin` as "Reviewer Campaign Timeline", stored in `wmkf_appsystemsettings` key `reviewer.campaign_timeline_defaults`, and read by `InviteEmailModal` through `/api/review-manager/campaign-timeline-defaults`; request config overlays those defaults when present. **Phase 2 LIVE (S275):** per-recipient token TTL (`lib/external/reviewer-token-ttl.js` via `render-emails` — invitee/non-responder link caps at review-due+2d, accepted gets review-due+90d, fallback now+90); accepted-only "Release to reviewers" materials send (server-gated in `send-emails`, plus a one-click button on the **Track Reviewers** sub-tab, `ReviewerManagePanel.js`); and a `materials_not_sent` upload guard (`review-upload.js` self-token path → 403). **Phase 3 LIVE (S275):** `/api/cron/reviewer-reminders` (daily) sends two per-request opt-in reminders — respond-by (invited non-responders, deadline = emailSentAt + respondOffsetDays - lead, token-live, fire-once `wmkf_respondremindersentat`) and review-due (accepted/materials-sent/not-submitted, deadline = reviewDueDate - lead, fire-once via the existing `wmkf_remindersentat`). Both claim-before-send (If-Match) → at-most-once; the server `allowResend` re-mint clears the respond marker (the **manual "Re-invite already-invited" Invite-Reviewers-panel button (`ReviewerInvitePanel`) was removed S277** — the respond-by reminder is the nudge for invited non-responders; `allowResend` is retained only as the programmatic re-mint contract). Server-side render in `lib/external/reviewer-reminder-email.js`; service in `lib/services/reviewer-reminder-sweep.js`. **Phase 4 LIVE (S275; actual PD email + quota seeding S352):** quota → PD notify + selective decline. `lib/services/reviewer-quota.js` (called from the acceptance drain `lib/services/reviewer-acceptance-drain.js` after it re-verifies the accept committed — moved off `respond.js` by the S350 accept-fast-response build) notifies the lead PD once when the accepted count first reaches `wmkf_desiredcount` — concurrency-gated by a conditional null→set of `wmkf_quotanotifiedat` (If-Match). **S352:** the notify now actually EMAILS the lead PD (`emailAdmins: true`, `explicitRecipients` = resolved PD only, no `category` fan-out; degrades to dashboard-alert-only when the PD email is unresolvable), and `wmkf_desiredcount` is settable end-to-end — admin "Reviewer quota" default (4) in the Reviewer Campaign Timeline settings, seeded non-clobbering on first invite send (`send-emails-service.js`, server-side default read only), and editable in the Campaign settings modal, which prefills due-date/quota from the admin defaults (`docs/REVIEWER_QUOTA_PD_EMAIL_PLAN.md`, Status: SHIPPED). `POST /api/review-manager/withdraw-sufficient` (the **Invite Reviewers** tab's "Release as no longer needed") writes `withdrawn_sufficient` + `wmkf_withdrawnsufficientat` + clears `wmkf_respondremindersentat` on still-pending rows only (the §2.9 missing writer). **All four phases shipped.** See the two Atlas pages for the exact column list.
 
-## Find → Invite promotion contract (implemented in source 2026-07-29; not deployed)
+## Find → Invite promotion contract (production-live)
 
 Find retention is no longer equivalent to Invite readiness. The shared
 `projectReviewerContact` projection derives one server-reproducible decision
@@ -105,7 +106,7 @@ before retry, and never graduates by normalized name. Invite continues to read
 only the linked canonical person email; a legacy selected email-empty row shows
 a diagnostic rather than falling back to the roster address.
 
-## Reviewer → CRM contact promotion (implemented in source 2026-07-30; not deployed)
+## Reviewer → CRM contact promotion (production-live 2026-07-31)
 
 Sending an invitation never creates or links a CRM contact. The send service
 retains `contactPromoted:false` and `orcidBackprop:null` in its response only for
@@ -217,8 +218,8 @@ Exclusion removes an applicant row from the active roster; only a successful
 server promotion finalizes it `saved`, while an authoritative
 applicant-excluded collision finalizes it `blocked`.
 
-**Explicit applicant promotion (hardened in source 2026-07-29; not
-deployed):** `/api/workbench/promote-applicant-reviewer` validates request and
+**Explicit applicant promotion (production-live):**
+`/api/workbench/promote-applicant-reviewer` validates request and
 suggestion ownership/disposition, requires the canonical
 request/`suggestion:<id>` roster row, and rechecks identity, eligibility, COI,
 and canonical contact authority before selection. Hand corrections are limited
@@ -284,8 +285,8 @@ email activity and returned `emailId`. Owner goal and decisions:
 
 **Re-verify removed intentionally:** The "Re-verify" button was dropped because enrichment output is static within a cycle (COI computed against a fixed proposal author list; PubMed/Scholar data stable over weeks). The valid re-run use case is error recovery ("Try again"). Keep the general re-verify path retired; if a re-resolve-after-edit pattern is ever needed, see the Future Work section in `reviewer-identity.md`.
 
-**Exact applicant-linked person hydration (implemented locally 2026-07-29;
-production smoke pending):** populated
+**Exact applicant-linked person hydration (production-live; authenticated
+Request `1002912` visual check passed 2026-07-31):** populated
 `akoya_request.wmkf_potentialreviewer1..5` slots are exact
 `wmkf_potentialreviewers` GUIDs. Applicant ingestion and enrichment now re-read
 only that person, preserve a bounded `applicantKnownReviewer` email/source pair
@@ -325,8 +326,8 @@ under the existing readiness rules. Candidate cards and the roster retain the
 bounded evidence needed for action. Saved-candidate duplicate-email repair still
 uses the reviewed merge flow in `docs/REVIEWER_MERGE_DESIGN.md`.
 
-**S391 current address policy (implemented in source; Wave 17/runtime deployment
-pending):** the S387 `my-candidates verifyEmailAddress` flow described above is
+**S391 current address policy (production-live; bounded no-send pilot passed):**
+the S387 `my-candidates verifyEmailAddress` flow described above is
 retired and returns `address_verification_moved`; it no longer changes provenance
 without evidence. Find and Invite use `POST
 /api/workbench/reviewer-address-trust`, requiring an affirmative exact
@@ -356,8 +357,17 @@ exact pending tuples. Every block exposes Retry, repair, or set-aside. The final
 bounded review found and closed a stale-roster overwrite: resurfacing now
 preserves the three stored address blocks but does not carry permissive
 `emailPersistAllowed` authority to a resurfaced address (`86bf5d1`, corrected by
-`974bb64`). Wave 17 and runtime promotion remain blocked pending schema-first
-release and a controlled pilot.
+`974bb64`). Wave 17 then read back EXACT in Production and runtime commit
+`6bc6d2f5` reached Ready as deployment
+`dpl_F3TDD39h8gyDN2uxbCWXLwWSSHpA`. The signed-in Request `1002912` pilot
+verified Petr Cejka's exact person/address receipt against an official
+institution page, authenticated actor readback, reload, and no
+selection/promotion/send/Contact change. It caught a stale enrichment-time badge
+overriding receipt-backed readiness; `6bc6d2f5` corrected the precedence and the
+deployed reload showed **High-confidence email**. No suitable live conflict was
+present, so conflict adjudication, promotion parity, duplicate-owner handling,
+retryable outage, and capture-send scenarios remain unexercised rather than
+being manufactured in Production.
 
 ## Reviews tab (workbench consumption of submitted reviews)
 

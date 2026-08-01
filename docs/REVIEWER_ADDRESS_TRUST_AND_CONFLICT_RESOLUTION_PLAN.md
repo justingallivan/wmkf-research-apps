@@ -3,7 +3,7 @@ title: Reviewer Address Trust and Actionable Conflict Resolution Plan
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "Exact-address attestation, person trust/conflicts, and actionable remedies are built; Wave 17 deployment and a production pilot remain."
+summary: "Address trust/conflict remedies are production-live; the no-send pilot passed, while conflict and promotion-parity cases remain unexercised."
 canonical: false
 cataloged: 2026-07-31
 last_verified: 2026-07-31
@@ -28,10 +28,22 @@ related:
 
 ## Status
 
-**IMPLEMENTED ON `codex/reviewer-address-trust-plan`; NOT YET DEPLOYED.** The
-owner approved P1–P4 on 2026-07-31. Source, tests, Wave 17 schema-as-code, and the
-read-only preflight are implemented. Production still requires schema-first
-deployment, runtime promotion, and a controlled signed-in pilot.
+**PRODUCTION-LIVE; CONTROLLED PILOT PARTIAL.** The owner approved P1–P4 on
+2026-07-31. Wave 17 was applied schema-first and read back EXACT in Production.
+Runtime commit `6bc6d2f5` is live in deployment
+`dpl_F3TDD39h8gyDN2uxbCWXLwWSSHpA`.
+
+The signed-in Request `1002912` no-send pilot verified an exact
+person-and-address attestation for Petr Cejka against an official institution
+page, durable Postgres receipt and authenticated actor attribution, reload
+projection, and the absence of selection, Invite promotion, Contact promotion,
+or invitation-slate change. It also exposed a stale enrichment-time email badge
+overriding the new canonical receipt-backed readiness. Commit `6bc6d2f5` makes
+the card render only the canonical readiness result; the deployed reload now
+shows **High-confidence email**. No suitable existing production conflict was
+present, so conflict adjudication, changed-address verification, promotion
+parity, duplicate-owner handling, retryable-outage behavior, and capture-mode
+send remain unexercised rather than being manufactured in Production.
 
 The first Claude Opus 5 adversarial implementation review returned **NO-SHIP**.
 Its confirmed findings have now been remediated in source: resolved tuples are
@@ -99,8 +111,8 @@ confirmation proved that F1 closed but caught that the first patch also carried
 the permissive `emailPersistAllowed` flag to a potentially changed address;
 `974bb64` removes that carry-over and pins the distinction in a route test. The
 bounded review cycle is closed with its stop-rule findings remediated. Wave 17
-and runtime promotion remain prohibited until schema-first release and a
-controlled pilot.
+and runtime activation subsequently completed schema-first; the bounded
+no-send pilot result and its remaining scenarios are recorded above.
 
 This document replaces the rejected Session 390 design from
 `codex/claude-ui-followup`. It incorporates the subsequent Codex whole-flow
@@ -114,18 +126,18 @@ paths, the send boundary, and a total reason-to-remedy contract.
 
 ## Change surface (`/contract-reconcile` Step 0)
 
-- **Change surface [IMPLEMENTED IN SOURCE / NOT DEPLOYED]:** verify an exact reviewer address while its
+- **Change surface [PRODUCTION-LIVE]:** verify an exact reviewer address while its
   supporting evidence is visible, persist person-scoped trust until contradicted,
   and ensure every reviewer warning or block has an actionable remedy.
 - **Entry points [VERIFIED]:** Find cards and `CandidateEditModal`; ordinary
   promotion through `/api/reviewer-finder/save-candidates`; applicant-recommended
   promotion through `/api/workbench/promote-applicant-reviewer`; Invite rendering
   and sending.
-- **Persistence [VERIFIED current / IMPLEMENTED target]:** the Find roster is
+- **Persistence [VERIFIED LIVE]:** the Find roster is
   request-scoped Postgres working state; the reviewer person is the Dataverse
-  source of truth. The target adds one server-owned current-state bundle to the
+  source of truth. Wave 17 adds one server-owned current-state bundle to the
   Dataverse person and keeps only pending, pre-promotion evidence in the roster.
-- **Consumers [IMPLEMENTED IN SOURCE]:** Find-card badges/actions, both promotion services,
+- **Consumers [PRODUCTION-LIVE]:** Find-card badges/actions, both promotion services,
   Invite rendering, first-contact sending, later outbound-email policy, merge and
   repair affordances, Atlas/docs/tests/gates.
 - **Prior findings:** the ordinary save path does not necessarily resolve the old
@@ -150,7 +162,7 @@ paths, the send boundary, and a total reason-to-remedy contract.
 
 | # | Recommendation | Why it is the smallest safe choice |
 |---|---|---|
-| P1 | Store the current exact-address trust/conflict bundle in one new Dataverse Memo field on the reviewer person. | **Approved and implemented; Wave 17 not yet applied.** |
+| P1 | Store the current exact-address trust/conflict bundle in one new Dataverse Memo field on the reviewer person. | **Approved, implemented, and production-live; Wave 17 read back EXACT.** |
 | P2 | Treat `staff_verified` as `ready` **only** when the current person carries a valid versioned trust bundle for the exact stored email. | **Approved and implemented.** Legacy source-only rows remain `quick_check`. |
 | P3 | A detected high-confidence contradiction is persisted automatically against the stable person during search reconciliation. | **Approved and implemented** for exact applicant-linked people and ordinary candidates resolved by a trusted ORCID; provisional/name-only matches never write. Failure remains visible/retryable with a repair action. |
 | P4 | A pending contradiction blocks all new outbound reviewer email using that exact address, not only the initial invitation. | **Approved and implemented** in render and send for invitation, materials, follow-up, and thank-you. |
@@ -619,7 +631,15 @@ Each stage preserves current send safety. The ready-tier change is last.
      ambiguous identity, mismatch resolution, duplicate owner/merge, retryable
      outage, promotion parity, render, and capture-mode send before a real send.
    - Probe Dataverse person state, native audit, explicit actor fields, suggestion
-   lifecycle, and absence of Contact promotion.
+     lifecycle, and absence of Contact promotion.
+
+**Rollout status (2026-07-31 PT / 2026-08-01 UTC):** stages 1–5 are live. Stage
+6 is **partial**: the exact attestation, durable receipt/actor readback,
+receipt-backed readiness reload, and no-send/no-promotion boundaries passed on
+Request `1002912`. The pilot found and closed the stale badge-precedence defect
+in `6bc6d2f5`. The remaining conflict, duplicate-owner, retryable-outage,
+promotion-parity, and capture-send cases await a naturally occurring safe case
+or an explicit owner-selected reviewer; they were not synthesized in Production.
 
 ## Adversarial-review remediation status (2026-07-31)
 
@@ -670,14 +690,13 @@ complements are:
 - manual saved-candidate edits cannot invalidate a pending bundle and silently
   downgrade the send block.
 
-Verification after the bounded-review remediation: the targeted roster/address
-set passes 4/4 suites and 161/161 tests; the full suite passes 550/550 suites and
-6,674/6,674 tests;
+Verification after the bounded-review remediation and pilot fix: the targeted
+roster/address set passes 4/4 suites and 134/134 tests; the full suite passes
+550/550 suites and 6,675/6,675 tests;
 `check:types`, production build, and lint pass (zero errors and 51 pre-existing
-warnings); and the relevant API-security, Dataverse-access, route-boundary,
-documentation, wiki, memory, instruction, and migration-manifest gates plus
-self-tests pass. This work remains local and does not satisfy the schema-first
-deployment or signed-in pilot exit criteria.
+warnings). Wave 17 read back EXACT in Production. Signed-in Request `1002912`
+proved the bounded no-send slice described above; it does not satisfy the
+unexercised conflict/promotion scenarios in the full pilot matrix.
 
 ## Verification matrix
 

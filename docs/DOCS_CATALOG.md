@@ -262,7 +262,7 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [APPLICANT_REVIEWER_DATAVERSE_FIRST_HYDRATION_PLAN.md](APPLICANT_REVIEWER_DATAVERSE_FIRST_HYDRATION_PLAN.md) | plan | active |  | Exact-person Dataverse hydration plan for applicant-recommended reviewers, preserving identity, contact, COI, and partial-success safeguards. | 2026-07-29 |
-| [REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md](REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md) | plan | active |  | Exact-address attestation, person trust/conflicts, and actionable remedies are built; Wave 17 deployment and a production pilot remain. | 2026-07-31 |
+| [REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md](REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md) | plan | active |  | Address trust/conflict remedies are production-live; the no-send pilot passed, while conflict and promotion-parity cases remain unexercised. | 2026-07-31 |
 | [REVIEWER_BINDING_SMOKE_CODEX_HANDOFF.md](REVIEWER_BINDING_SMOKE_CODEX_HANDOFF.md) | audit | active |  | Reviewer-binding smoke: PR #60 merged and the owner-authorized production run passed with verified cleanup; completed queue job 25 is retained. | 2026-07-13 |
 | [REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md](REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md) | plan | active |  | Current reviewer contact-promotion contract plus remaining address-provenance and staleness decisions. | 2026-07-30 |
 | [REVIEWER_FINDER_COI_CHUNK2_DESIGN.md](REVIEWER_FINDER_COI_CHUNK2_DESIGN.md) | spec | historical |  | Historical design for shipped institution-COI and advisory-retirement work; current enforcement is documented separately. | 2026-07-02 |

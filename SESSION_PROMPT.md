@@ -12,11 +12,10 @@
 > no-expiry trust until contradicted, accepted a linked corresponding-author
 > paper as valid evidence for an explicit exact-address attestation, and required
 > every error/warning to offer a working remedy. The replacement draft is
-> `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md`. The runtime,
-> tests, and Wave 17 schema-as-code are built on
-> `codex/reviewer-address-trust-plan`; Wave 17 and the runtime have not been
-> deployed, so Production behavior remains unchanged pending schema-first release
-> and a controlled signed-in pilot.
+> `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md`. Wave 17 was
+> applied schema-first and read back EXACT in Production. Runtime commit
+> `6bc6d2f5` is live as deployment
+> `dpl_F3TDD39h8gyDN2uxbCWXLwWSSHpA`.
 > Claude Opus 5's first adversarial implementation review returned NO-SHIP; its
 > confirmed findings were fixed in `f1b85e78`. The second review confirmed all
 > nine fixes but also returned NO-SHIP: `retry_check` can write person-scoped
@@ -50,9 +49,14 @@
 > POST could erase the stored address blocks. `86bf5d1` preserves the three
 > blocking flags; its targeted confirmation caught and `974bb64` removed an
 > unsafe carry-over of permissive `emailPersistAllowed` authority. The bounded
-> review cycle is closed with its stop-rule findings remediated.
-> Wave 17/runtime promotion remains blocked pending schema-first release and a
-> controlled pilot.
+> review cycle is closed with its stop-rule findings remediated. The signed-in
+> Request `1002912` no-send pilot then passed exact person/address attestation,
+> durable receipt and actor readback, reload, and abstention from selection,
+> Invite promotion, Contact promotion, and sending. It exposed one stale badge-
+> precedence defect; `6bc6d2f5` fixed it and the deployed reload showed
+> **High-confidence email**. No suitable live conflict existed, so the conflict,
+> promotion-parity, duplicate-owner, outage, and capture-send scenarios remain
+> explicitly unexercised rather than being manufactured in Production.
 
 ## Session 388 Summary
 
@@ -309,13 +313,15 @@ Seven Claude commits were replayed without content conflicts onto
    the extracted canonical reviewer-proposal content rather than binding a governed source
    artifact/version; decide whether that stronger lineage is required before rehearsal.
 
-1. **Reviewer address trust P1–P4 — implemented in source, deployment pending.**
+1. **Reviewer address trust P1–P4 — production-live; full pilot matrix partial.**
    The owner approved the Dataverse current-state bundle, exact-bundle-only
    `staff_verified` readiness, automatic durable contradiction writes, and
    all-outbound-email blocking. The implementation includes a total
    reason-to-remedy matrix across ordinary and applicant-recommended promotion.
-   Apply Wave 17 before runtime promotion, then run the controlled signed-in
-   pilot. Evidence: `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md`.
+   Wave 17 was applied and read back EXACT before runtime promotion. The
+   controlled signed-in Request `1002912` no-send slice passed and the badge
+   regression it exposed was fixed in `6bc6d2f5`. Evidence:
+   `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md`.
    The first Opus implementation review's confirmed findings are remediated.
    The second review of `f1b85e78` returned NO-SHIP on the retry path's weaker
    ORCID binding plus five medium contract gaps. The third review of `21b44680`
@@ -332,7 +338,9 @@ Seven Claude commits were replayed without content conflicts onto
    block until retry persists a real pending contradiction or a fresh read
    proves it disappeared. The final bounded review's stale-roster overwrite and
    permissive-flag carry-over findings are remediated in `86bf5d1` and
-   `974bb64`; proceed only through the schema-first release and controlled pilot.
+   `974bb64`. Remaining work is evidence, not new design: exercise the conflict,
+   duplicate-owner, retryable-outage, promotion-parity, and capture-send cases
+   only when a naturally safe case or explicit owner-selected reviewer exists.
 2. ~~**Acceptance-time promotion scope (§4.1/§4.3).**~~ **DONE in source, S389:**
    sending never promotes; every identity-bearing acceptance—including honorarium
    opt-outs—promotes through identity-aware/idempotent matching; declines do not.
@@ -378,7 +386,7 @@ Seven Claude commits were replayed without content conflicts onto
    conflict enforcement exists. The draft proposes that only a new, valid,
    exact-address trust bundle now makes `staff_verified` ready in the S391
    implementation; legacy source-only rows remain quick-check. Wave 17 and the
-   runtime branch are not yet deployed. §5.4's `reviewer_confirmed` proposal would still need
+   runtime are production-live. §5.4's `reviewer_confirmed` proposal would still need
    an explicit carve-out, not a silent exception.
 
 2. **The evidence disclosure's paper list must not be truncated or collapsed**, and its
@@ -390,7 +398,7 @@ Seven Claude commits were replayed without content conflicts onto
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` | Owner-approved S391 implementation contract; source/tests built, Wave 17 + runtime deploy/pilot pending |
+| `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` | Owner-approved S391 production contract; Wave 17/runtime live, safe no-send pilot passed, conflict/promotion matrix partial |
 | `docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md` | Active §4 promotion contract plus remaining §1/§2/§3-provenance/§5 proposals |
 | `shared/components/reviewers/ReviewerSearchSection.js` | The identity-evidence disclosure (the only feature change this session) |
 | `tests/unit/reviewer-candidate-identity-evidence.test.js` | 7 tests pinning the disclosure, incl. the no-truncation and no-stored-profile guards |
@@ -406,17 +414,22 @@ Seven Claude commits were replayed without content conflicts onto
 ## Testing
 
 ```bash
-rtk npx jest tests/unit tests/integration    # 547 suites / 6614 tests green at 824bfcc6
+rtk npx jest tests/unit tests/integration    # 550 suites / 6675 tests green at 6bc6d2f5
 rtk npm run lint                             # 0 errors (51 pre-existing warnings, none in touched files)
 rtk npm run build                            # clean
 rtk npx jest tests/unit/reviewer-candidate-identity-evidence.test.js   # the 7 disclosure tests
 ```
 
-All relevant `check:*` gates were green at `824bfcc6`, including `check:agent-wiki`,
-`check:doc-symbol-refs`, `check:fact-consistency`, `check:drain-table-mentions`,
-`check:docs-catalog`, and `check:types`.
+Runtime `check:types`, build, lint, and the full suite were green at `6bc6d2f5`.
+The closeout Atlas, wiki, symbol-reference, doc-currency, fact-consistency,
+canonical-pointer, catalog, build-claim, memory, and agent-invariant gates plus
+their applicable self-tests also passed sequentially.
 
 Production deployment, signed-in Workbench/API HTTP checks, and the authenticated
-Request `1002912` Find-tab visual check passed. The normal Find ingestion was run
-with explicit owner authorization; no live invitation, identity confirmation,
-decline, or acceptance write-path rehearsal was run.
+Request `1002912` Find-tab visual check passed. The owner-authorized exact
+person/address attestation wrote and read back the bounded roster receipt and
+actor identity, but the candidate was immediately left unselected; no Invite
+promotion, Contact promotion, invitation, decline, or acceptance occurred. A
+post-deploy reload proved the `6bc6d2f5` canonical-readiness badge fix. The
+remaining conflict/promotion/capture-send cases were not synthesized in
+Production.
