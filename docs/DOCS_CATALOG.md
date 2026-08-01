@@ -22,6 +22,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
+| [AGENT_ADJACENT_VERIFICATION_PILOT_DIRECTIVE.md](AGENT_ADJACENT_VERIFICATION_PILOT_DIRECTIVE.md) | plan | canonical | yes | Pilot a narrow, privacy-safe evidence contract for agent claims before adding blocking hooks or broad instruction changes. | 2026-07-31 |
 | [AGENT_COLLABORATION_PLAN.md](AGENT_COLLABORATION_PLAN.md) | plan | active |  | Active operating contract for coordinating Justin, Claude, and Codex across branches, worktrees, reviews, and handoffs. | 2026-07-02 |
 | [AGENT_HARNESS_STYLE_GUIDE.md](AGENT_HARNESS_STYLE_GUIDE.md) | spec | active |  | This guide keeps agent-facing instructions precise, confident, and low-noise. | 2026-07-02 |
 | [AGENT_INSTRUCTION_AUDIT_S322.md](AGENT_INSTRUCTION_AUDIT_S322.md) | audit | historical |  | Historical S322 instruction audit; the approved consolidation shipped and the rejected path-glob change remains closed. | 2026-07-26 |
