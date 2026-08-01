@@ -34,6 +34,9 @@
  *   --since DATE   only requests created on/after DATE (default: no floor)
  *   --show-text    print the applicant's raw text (PII; redacted by default)
  *   --no-impact    skip the "were reviewers selected anyway?" follow-up query
+ *   --include-test include AkoyaGO test records (applicant = the Foundation
+ *                  itself). Excluded by default — they carry synthetic
+ *                  exclusion text that would otherwise inflate every count.
  */
 import { readFileSync } from 'node:fs';
 
@@ -50,6 +53,7 @@ try {
 const args = process.argv.slice(2);
 const showText = args.includes('--show-text');
 const skipImpact = args.includes('--no-impact');
+const includeTest = args.includes('--include-test');
 const argVal = (flag) => {
   const i = args.indexOf(flag);
   return i >= 0 ? args[i + 1] : null;
@@ -81,23 +85,40 @@ function preview(text) {
   return `[redacted — ${flat.length} chars, ${words} word(s); pass --show-text to read]`;
 }
 
+// Test-record predicate (scripts/probe-akoya-test-record-predicate.js): AkoyaGO
+// staff mark test rows by making the Foundation its own applicant. Without this
+// the counts below are inflated by synthetic data — the first run's single
+// "genuine category exclusion" (request 1001931) turned out to be exactly that.
+const TEST_ORG_NAME = 'W. M. Keck Foundation';
+const { records: testAccounts } = await DynamicsService.queryRecords('accounts', {
+  select: 'accountid,name',
+  filter: `name eq '${TEST_ORG_NAME.replace(/'/g, "''")}'`,
+  top: 10,
+});
+const testAccountIds = new Set(testAccounts.map((a) => String(a.accountid).toLowerCase()));
+const isTestRequest = (r) => testAccountIds.has(String(r._akoya_applicantid_value || '').toLowerCase());
+
 const filters = ['wmkf_excludedreviewers ne null'];
 if (since) filters.push(`createdon ge ${since}T00:00:00Z`);
 
 // NB: queryAllRecords paginates to completion — its `top` is the PAGE size, not
 // a total cap — so the cap must be applied here. (Caught on the first real run:
 // --limit 200 returned 294 rows.)
-const { records: allRequests } = await DynamicsService.queryAllRecords('akoya_requests', {
-  select: 'akoya_requestid,akoya_requestnum,akoya_title,wmkf_excludedreviewers,createdon',
+const { records: allRows } = await DynamicsService.queryAllRecords('akoya_requests', {
+  select: 'akoya_requestid,akoya_requestnum,akoya_title,wmkf_excludedreviewers,createdon,_akoya_applicantid_value',
   filter: filters.join(' and '),
   orderby: 'createdon desc',
 });
+const testRows = allRows.filter(isTestRequest);
+const allRequests = includeTest ? allRows : allRows.filter((r) => !isTestRequest(r));
 const requests = allRequests.slice(0, limit);
 const truncated = allRequests.length - requests.length;
 
 console.log('READ-ONLY exclusion-enforcement exposure scan (Finding D)');
-console.log(`limit=${limit}${since ? ` since=${since}` : ''} showText=${showText}\n`);
-console.log(`Requests with a non-null exclusion field: ${allRequests.length}`);
+console.log(`limit=${limit}${since ? ` since=${since}` : ''} showText=${showText} includeTest=${includeTest}\n`);
+console.log(`Requests with a non-null exclusion field: ${allRows.length}`);
+console.log(`  test records (applicant = "${TEST_ORG_NAME}"): ${testRows.length}${includeTest ? ' — INCLUDED (--include-test)' : ' — excluded'}`);
+console.log(`  real requests examined: ${allRequests.length}`);
 if (truncated > 0) {
   console.log(`  ⚠ scanning the ${requests.length} most recent; ${truncated} NOT examined — raise --limit for full coverage`);
 }

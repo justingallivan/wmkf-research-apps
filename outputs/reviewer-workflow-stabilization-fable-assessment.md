@@ -415,7 +415,7 @@ answer is the one that removes the finding rather than confirming it:
 |---|---|
 | **Prose ways of saying "none"** — "No exclusions", "No reviewers excluded.", "There are no reviewers to exclude." (×2), "There are no reviewers we would like to exclude.", "No reviewers are requested for exclusion.", "There are no potential reviewers the principal investigator wishes to exclude.", "The project team is not aware of any potential reviewers who would be biased against this application." | **8** |
 | **Junk / apparent field-label leak** — "rev excluded names" | 1 |
-| **A genuine unactionable exclusion** — "everybody who's not listed above." | **1** |
+| ~~A genuine unactionable exclusion~~ — "everybody who's not listed above." → **a TEST RECORD, see §3.2.2** | **0 real** |
 | **Real names the parser missed** | **0** |
 
 **Both hypotheses I offered are wrong.** The parser-defect hypothesis is dead:
@@ -467,7 +467,47 @@ vacuous — at that rate roughly 2–3 of the 10 would be expected to have revie
 had the exclusions mattered. Combined with the content finding, harm is ruled
 out rather than merely unobserved.
 
-#### 3.2.2 Original caveats from the first run
+#### 3.2.2 The last real instance was test data — incidence is zero
+
+Owner asked for the identity of the one genuine case. Request **`1001931`**
+(`f178c617-df7e-f011-b4cc-0022480aba6d`) is an **AkoyaGO test record**, not a
+real application `[VERIFIED via read-only lookup 2026-08-01]`:
+
+- `akoya_title` = "Test phase I project title"; `statuscode` = Inactive.
+- `_akoya_applicantid_value` = **"W. M. Keck Foundation"** — the Foundation as
+  its own applicant, which is precisely the established test-row predicate
+  documented in `scripts/probe-akoya-test-record-predicate.js:6-15`.
+- All five recommendation slots hold obviously synthetic people (surnames
+  repeated across slots, `@dog.com` / `@fish.com` addresses, joke
+  organizations).
+- Zero `wmkf_appreviewersuggestion` rows on the request.
+
+**So the category-exclusion scenario has ZERO observed real instances.** Not
+"rare" — absent from the examined window. Finding D's motivating story is
+supported by no production data at all: of the substantive exclusion answers,
+every non-name case is either prose for "none" (correct no-op) or synthetic.
+
+**A defect in my own probe, now fixed.** It did not exclude test records, so the
+counts in §3.2 (294 / 171 / 115 / 13 / 10) are **upper bounds inflated by
+synthetic rows** — this one certainly, others plausibly. The script now resolves
+the "W. M. Keck Foundation" applicant account and filters those rows by default,
+reporting how many it dropped, with `--include-test` to restore the old
+behavior. Re-run for clean denominators. **The direction of the error is
+favorable to the conclusion** — removing test rows can only shrink the fail-open
+count — so the withdrawal of Finding D stands and strengthens.
+
+**Owner's note, recorded:** these apps did not exist in 2025, so `selected=0` on
+the older fail-open requests reflects the reviewer workflow not existing yet,
+not that an exclusion was harmless. That confirms caveat (1) below: the
+zero-impact column is uninformative for pre-2026 rows regardless of base rate,
+and only the content reading (§3.2.1) actually settles the question.
+
+**One consequence for §6a:** my recommended wording constraint "give the rare
+non-name concern a destination" was justified solely by this instance. With it
+reclassified as test data, that constraint is **judgment, not evidence** — still
+harmless and probably kind, but no longer backed by an observed case.
+
+#### 3.2.3 Original caveats from the first run
 
 Three honest limits on the first run's reassurance, retained for the record —
 (1) and (3) are now resolved by §3.2.1:
@@ -902,11 +942,12 @@ Revised position:
     `[VERIFIED via applicant-reviewers-service.js:196]` — and matching is
     name-only. Collecting a field nothing consumes invites the belief that it
     narrows the exclusion when it does not.
-  - **Give the rare non-name concern somewhere to go.** "Names only, blank
-    otherwise" actively discourages writing the 1-in-115 case (the observed
-    "everybody who's not listed above"). Since it genuinely cannot be enforced
-    here, point it at the program officer explicitly rather than letting the
-    instruction silence it with no destination.
+  - **Optionally, give a non-name concern somewhere to go** — pointing it at the
+    program officer costs half a sentence. **Downgraded from a requirement to a
+    judgment call (§3.2.2):** the only instance that motivated it turned out to
+    be a test record, so there is no observed case of a real applicant needing
+    that route. Include it if the phrasing stays short; drop it rather than
+    complicate the field.
 - `extractExcludedReviewers` **stays** and is doing its job correctly: 0 parse
   failures and 0 wrong extractions across every answer examined.
 - Keep the staff-editable exclusion box regardless — it is how staff add names
@@ -1020,7 +1061,9 @@ entirely by being exact person GUIDs — the fix pattern is already in the
 building, just not applied to the free-text fields.
 
 **Finding D was raised, measured, read, and withdrawn** across this review
-(§3.2.1): 8 of 10 affected answers are prose for "none" where a no-op is
-correct, 1 is junk, 1 is a genuine inverted request, 0 are missed names. It is
-not a campaign blocker, does not displace the §6 slice, and no longer supports
-restructuring the intake exclusion field.
+(§3.2.1–3.2.2): of the affected answers, 8 of 10 are prose for "none" where a
+no-op is correct, 1 is junk, 0 are missed names, and the single apparently
+genuine case is an AkoyaGO **test record**. Real-world incidence of the scenario
+is **zero** in the examined window. It is not a campaign blocker, does not
+displace the §6 slice, and does not support restructuring the intake exclusion
+field.
