@@ -158,15 +158,37 @@ async function preserveStoredRosterAuthority(requestId, candidates) {
     const withIdentityReceipt = identityReceipt
       ? { ...candidate, serverIdentityDecisionReceipt: identityReceipt }
       : candidate;
-    if (!stored || !hasStoredStaffAuthority(stored)) return withIdentityReceipt;
+    const preserveStoredTrue = (field) => {
+      const incoming = withIdentityReceipt?.[field]
+        ?? withIdentityReceipt?.contactEnrichment?.[field];
+      const storedValue = stored?.[field] ?? stored?.contactEnrichment?.[field];
+      return storedValue === true || incoming === true ? true : incoming;
+    };
+    const withAddressAuthority = stored
+      ? {
+          ...withIdentityReceipt,
+          addressConflictPending: preserveStoredTrue('addressConflictPending'),
+          conflictRecordUnavailable: preserveStoredTrue('conflictRecordUnavailable'),
+          addressVerificationRequired: preserveStoredTrue('addressVerificationRequired'),
+          emailPersistAllowed: preserveStoredTrue('emailPersistAllowed'),
+          contactEnrichment: {
+            ...(withIdentityReceipt.contactEnrichment || {}),
+            addressConflictPending: preserveStoredTrue('addressConflictPending'),
+            conflictRecordUnavailable: preserveStoredTrue('conflictRecordUnavailable'),
+            addressVerificationRequired: preserveStoredTrue('addressVerificationRequired'),
+            emailPersistAllowed: preserveStoredTrue('emailPersistAllowed'),
+          },
+        }
+      : withIdentityReceipt;
+    if (!stored || !hasStoredStaffAuthority(stored)) return withAddressAuthority;
     const confirmation = stored.staffIdentityConfirmation;
     const email = confirmation.email || null;
     const website = confirmation.website || null;
     const affiliation = confirmation.affiliation || null;
     return {
       ...pruneCandidateForRoster({
-        ...withIdentityReceipt,
-        name: stored.name || withIdentityReceipt.name,
+        ...withAddressAuthority,
+        name: stored.name || withAddressAuthority.name,
         email,
         emailSource: email ? 'manual' : null,
         website,
@@ -175,7 +197,7 @@ async function preserveStoredRosterAuthority(requestId, candidates) {
         affiliationSource: 'staff_manual',
         manualContactFields: stored.manualContactFields,
         contactEnrichment: {
-          ...(candidate.contactEnrichment || {}),
+          ...(withAddressAuthority.contactEnrichment || {}),
           email,
           emailSource: email ? 'manual' : null,
           website,

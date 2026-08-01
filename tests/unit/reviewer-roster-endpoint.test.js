@@ -293,6 +293,54 @@ describe('POST recordSurfaced', () => {
     });
   });
 
+  it('preserves stored address blocks and persistence authority when a stale card resurfaces', async () => {
+    const resurfaced = {
+      name: 'Blocked Reviewer',
+      email: 'found@example.edu',
+      emailPersistAllowed: false,
+      contactEnrichment: {
+        email: 'found@example.edu',
+        emailPersistAllowed: false,
+      },
+    };
+    const derivedCandidateKey = reviewerCandidateKey(resurfaced);
+    store.findCandidatesByKeys.mockResolvedValueOnce([{
+      ...resurfaced,
+      candidateKey: derivedCandidateKey,
+      emailPersistAllowed: true,
+      addressConflictPending: true,
+      conflictRecordUnavailable: true,
+      addressVerificationRequired: true,
+      contactEnrichment: {
+        ...resurfaced.contactEnrichment,
+        emailPersistAllowed: true,
+        addressConflictPending: true,
+        conflictRecordUnavailable: true,
+        addressVerificationRequired: true,
+      },
+    }]);
+    const r = res();
+
+    await handler({ method: 'POST', body: {
+      requestId: REQ,
+      candidates: [{ ...resurfaced, candidateKey: derivedCandidateKey }],
+    } }, r);
+
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed[0]).toMatchObject({
+      emailPersistAllowed: true,
+      addressConflictPending: true,
+      conflictRecordUnavailable: true,
+      addressVerificationRequired: true,
+      contactEnrichment: {
+        emailPersistAllowed: true,
+        addressConflictPending: true,
+        conflictRecordUnavailable: true,
+        addressVerificationRequired: true,
+      },
+    });
+  });
+
   it('preserves a fresh server identity receipt while restoring stored staff authority', async () => {
     const resurfaced = {
       name: 'Ann Lee',
