@@ -1195,10 +1195,15 @@ Pair it with **W7(b)**: whatever the parser produces, a lookup returning
 of auto-`create_new`. That guard is what actually closes Finding C, for legacy
 and structured input alike.
 
-#### Q3 — Separate optional institution and email fields? **Yes — but they are
-not equally valuable, and the reason is specific.**
+#### Q3 — Separate optional institution and email fields? **Yes to both. They
+serve different stages of the pipeline, so neither substitutes for the other.**
 
-- **Email — high value, and the single highest-leverage field on this form.**
+The short version: **email answers "have we already got this person?"**
+(existing-record dedupe); **institution answers "which human is this?"**
+(identity resolution, ORCID discovery, human search, COI). A referral with only
+a name supports neither.
+
+- **Email — highest leverage for reusing an existing person, when present.**
   The identity lookup keys on ORCID, then email, then a name fallback
   `[VERIFIED via reviewer-identity-lookup.js:365-423]`. The name fallback
   **never returns a confident match** — only candidates or nothing — so a
@@ -1206,14 +1211,39 @@ not equally valuable, and the reason is specific.**
   which is exactly the create-a-duplicate path. An email moves the lookup onto
   `findByEmailCandidates`, which can match confidently. **This field is what
   turns duplicate-prevention from cleanup into non-occurrence.**
-- **Institution — worth collecting, but do not expect it to fix matching.**
-  `addManualReviewer` passes `affiliation` into the lookup, yet `lookup()`
-  destructures only `{ name, email, orcid }`
-  `[VERIFIED via manual-reviewer-service.js:132 and reviewer-identity-lookup.js:365]`
-  — so **affiliation is ignored by the matcher today.** Its value is real but
-  downstream: it lands on the person record, disambiguates for the human in the
-  staff picker, and feeds COI and enrichment later. Collect it; do not count it
-  as dedupe.
+- **Institution — I understated this; it is load-bearing, not a nice-to-have.**
+  *(Corrected 2026-08-01 on owner input: "John Smith is useless, John Smith,
+  University of Chicago is much more helpful.")* That is right, and the code
+  makes the case stronger than the human-search argument alone:
+  - **ORCID resolution is keyed on name + affiliation, and cannot use email at
+    all.** `/api/workbench/orcid-lookup` consumes `affiliation` and returns
+    `matchedInstitution` / `institutionCorroborated`, and its own header notes
+    that "ORCID's public API is searchable by name + affiliation, NOT by email"
+    `[VERIFIED via pages/api/workbench/orcid-lookup.js:5-14,47,62,98-99]`. So for
+    the strongest identity anchor in the system, **institution is the usable key
+    and email is not.**
+  - The Find-panel UI already tells staff exactly this on an ambiguous result —
+    "Add an affiliation to disambiguate, or enter the ORCID iD manually"
+    `[VERIFIED via ReviewerFindPanel.js:278-281]`.
+  - The identity resolver then reuses the claimed institution for its
+    `affiliation_match` and `orcid_employment_corroborated` anchors — the latter
+    weighted **strong** `[VERIFIED via reviewer-identity-evidence.js:386-397,424-428]`
+    — which is how a match reaches `confirmed` rather than `probable`.
+  - Plus the owner's point: staff and downstream search can actually find the
+    person, and COI/enrichment consume it later.
+
+  The narrow claim that remains true is only this: affiliation is **not** a key
+  in `lookupReviewerIdentity`'s existing-person dedupe, which destructures
+  `{ name, email, orcid }` `[VERIFIED via reviewer-identity-lookup.js:365]`. That
+  is one specific lookup, not "matching" in general — my earlier phrasing
+  over-generalized from it.
+
+- **Practical completion note, which cuts the other way from leverage.** A
+  declining reviewer usually knows a colleague's institution and often does not
+  know their email. So institution will likely be filled far more often than
+  email, even though email has more dedupe leverage when present. **Order the
+  fields Name · Institution · Email**, and treat institution as the expected
+  second field rather than an afterthought.
 - **Do not ask for ORCID.** The endpoint accepts it and it would be the
   strongest key, but a declining reviewer will rarely know a colleague's iD, and
   the field cost is paid by everyone.
