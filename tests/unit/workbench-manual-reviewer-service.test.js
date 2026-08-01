@@ -200,6 +200,39 @@ test('referral: match reason + dual source tokens + provenanceKind in the DTO', 
   expect(body.created).toEqual({ person: true, suggestion: true });
 });
 
+test.each([
+  ['promotion_required', 'Promote this applicant-recommended reviewer from Find.'],
+  ['restore_required', 'Restore this previously declined reviewer from Removed.'],
+  ['already_handled', 'Open Track Reviewers to continue from the current engagement stage.'],
+])('applicant-row provenance merge returns typed %s instead of a false Added success', async (outcome, remedy) => {
+  lookupReviewerIdentity.mockResolvedValue({
+    outcome: 'confident',
+    match: { reviewerId: PR, nameConsistent: true },
+  });
+  ensureStaffManualCandidate.mockResolvedValue({
+    id: 'sug-applicant',
+    created: false,
+    selected: false,
+    outcome,
+    stage: outcome === 'restore_required' ? 'declined' : outcome === 'already_handled' ? 'invited' : 'recommended',
+  });
+
+  const body = await addManualReviewer(args({
+    referredBy: 'Declining Reviewer',
+    email: 'ada@example.edu',
+  }));
+
+  expect(body).toEqual(expect.objectContaining({
+    success: true,
+    outcome,
+    suggestionId: 'sug-applicant',
+    remedy,
+  }));
+  expect(body.candidate).toBeUndefined();
+  expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(setContactLink).not.toHaveBeenCalled();
+});
+
 test('reuse_contact fills email from the contact and links it (fill-only enrichment single round-trip)', async () => {
   getContactById.mockResolvedValue({ contactid: CONTACT, fullname: 'Ada Lovelace', emailaddress1: 'ada@crm.edu', wmkf_orcid: '0000-0002-1825-0097' });
   const body = await addManualReviewer(args({ resolution: { mode: 'reuse_contact', contactId: CONTACT } }));

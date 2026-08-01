@@ -47,7 +47,7 @@ function fileKeyOf(f) {
   return `${f.library}::${f.folder}::${f.name}`;
 }
 
-export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSaved, canManage = true, prefill = null, onPrefillConsumed }) {
+export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSaved, onNavigate, canManage = true, prefill = null, onPrefillConsumed }) {
   const requestIdRef = useRef(requestId);
   requestIdRef.current = requestId;
   const manualCardRef = useRef(null);
@@ -63,6 +63,7 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
     saving: false,
     error: null,
     added: null,
+    remedy: null,
     lookingUp: false,
     lookupMsg: null, // { tone: 'ok' | 'warn', text }
     orcidAutofilled: false, // true iff the orcid field was set by a lookup (not typed)
@@ -177,7 +178,7 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
   const freshManual = (over = {}) => ({
     name: '', email: '', affiliation: '', orcid: '', note: '', referredBy: '',
     saving: false, error: null, added: null, lookingUp: false, lookupMsg: null,
-    orcidAutofilled: false, lookupResult: null, resolution: null,
+    orcidAutofilled: false, lookupResult: null, resolution: null, remedy: null,
     ...over,
   });
 
@@ -345,6 +346,18 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
       }
       const data = await submitManualReviewer(resolution);
       if (requestIdRef.current !== submittedRequestId) return;
+      if (['promotion_required', 'restore_required', 'already_handled'].includes(data.outcome)) {
+        setManual(freshManual({
+          remedy: {
+            outcome: data.outcome,
+            message: data.remedy,
+            suggestionId: data.suggestionId,
+            stage: data.stage,
+          },
+        }));
+        if (onSaved) onSaved();
+        return;
+      }
       setManual(freshManual({ added: data.candidate || { name } }));
       if (onSaved) onSaved();
     } catch (e) {
@@ -584,6 +597,28 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
               Added {manual.added.name || 'reviewer'} to Candidates.
             </span>
           )}
+          {manual.remedy && (
+            <div className="text-sm text-amber-800">
+              <span>{manual.remedy.message}</span>
+              {onNavigate && manual.remedy.outcome !== 'promotion_required' && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate(
+                    manual.remedy.outcome === 'restore_required' || manual.remedy.stage === 'selected'
+                      ? 'candidates'
+                      : 'track',
+                  )}
+                  className="ml-2 underline font-medium"
+                >
+                  {manual.remedy.outcome === 'restore_required'
+                    ? 'Open Removed'
+                    : manual.remedy.stage === 'selected'
+                      ? 'Open Invite'
+                      : 'Open Track'}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </form>
     </Card>
@@ -673,6 +708,7 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
         onRetryIngestion={runIngestion}
         savedPoolNames={savedPoolNames}
         onSaved={onSaved}
+        onNavigate={onNavigate}
         manualAddSlot={manualAddCard}
       />
     </div>

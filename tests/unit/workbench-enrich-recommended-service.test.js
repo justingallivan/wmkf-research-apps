@@ -193,6 +193,7 @@ test('happy path: progress frames strictly precede one terminal complete; never 
   const complete = events[events.length - 1].data;
   expect(complete.recommended).toHaveLength(1);
   expect(complete.recommended[0]).toMatchObject({
+    candidateKey: `suggestion:${SUG}`,
     potentialReviewerId: PR,
     suggestionId: SUG,
     enrichedProposalKey: 'key-1',
@@ -205,6 +206,37 @@ test('happy path: progress frames strictly precede one terminal complete; never 
     [expect.objectContaining({ applicantEnrichmentCacheVersion: 3 })],
     { expectedUpdatedAt: null },
   );
+});
+
+test.each([
+  ['declined recommendation', { wmkf_selected: false, wmkf_declined: true }, 'declined'],
+  ['invited selected recommendation', { wmkf_selected: true, wmkf_invited: true }, 'invited'],
+])('handled engagement is emitted as a compact terminal entry and never enriched: %s', async (_label, engagement, stage) => {
+  findApplicantRecommendedByRequest.mockResolvedValue([{
+    _wmkf_potentialreviewer_value: PR,
+    _wmkf_potentialreviewer_value_formatted: 'Dr. Handled',
+    wmkf_appreviewersuggestionid: SUG,
+    ...engagement,
+  }]);
+
+  const rec = recorder();
+  await enrichRecommended(args({ analysisResult: undefined, apiKey: undefined }), rec.onEvent);
+
+  expect(verifyClaudeSuggestions).not.toHaveBeenCalled();
+  expect(enrichCandidates).not.toHaveBeenCalled();
+  expect(recordSurfaced).not.toHaveBeenCalled();
+  expect(rec.events).toEqual([{
+    event: 'complete',
+    data: {
+      recommended: [],
+      handled: [{
+        suggestionId: SUG,
+        candidateKey: `suggestion:${SUG}`,
+        name: 'Dr. Handled',
+        stage,
+      }],
+    },
+  }]);
 });
 
 test('an enrichment write uses the pre-run roster token and leaves a concurrently changed row untouched', async () => {
@@ -388,9 +420,24 @@ test('empty junctions complete empty; malformed linked rows complete with an exp
   const complete = rec.events.find((event) => event.event === 'complete');
   expect(complete.data.recommended).toHaveLength(1);
   expect(complete.data.recommended[0]).toMatchObject({
+    candidateKey: null,
     isApplicantRecommended: true,
     needsIdentification: true,
     applicantKnownReviewer: { status: 'unavailable' },
+  });
+});
+
+test('hydration-failure DTOs with a suggestion anchor still carry the canonical candidate key', async () => {
+  findApplicantRecommendedByRequest.mockResolvedValue([{
+    _wmkf_potentialreviewer_value: null,
+    _wmkf_potentialreviewer_value_formatted: 'Unavailable Reviewer',
+    wmkf_appreviewersuggestionid: SUG,
+  }]);
+  const rec = recorder();
+  await enrichRecommended(args(), rec.onEvent);
+  expect(rec.events.at(-1).data.recommended[0]).toMatchObject({
+    suggestionId: SUG,
+    candidateKey: `suggestion:${SUG}`,
   });
 });
 

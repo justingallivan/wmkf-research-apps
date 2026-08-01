@@ -362,6 +362,7 @@ describe('happy path (progress ordering + full card payload)', () => {
     const { recommended } = events[events.length - 1].data;
     expect(recommended).toHaveLength(1);
     expect(recommended[0]).toEqual({
+      candidateKey: `suggestion:${SUG}`,
       potentialReviewerId: PR,
       suggestionId: SUG,
       enrichedProposalKey: 'blob-key-1',

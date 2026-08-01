@@ -15,6 +15,11 @@ disposition / gotchas and
 diagnosis built from it are not current proof. The Session 393 review pass is
 COMPLETE and owner-accepted (2026-08-01); re-probed 2026-08-01 and still true.
 Implementation work order: `SESSION_PROMPT.md`.
+**Slice A implementation status (not deployed):** source and focused tests on
+branch `codex/reviewer-find-stabilization-slice-a` now project authoritative
+Dataverse engagement over every suggestion-anchored active roster row before
+the GET response reaches Find. This is branch evidence only, not a Production
+claim.
 **Live row count:** 164 at verification time.
 
 ## NOT a regression of the S219/migration-018 Dataverse cutover
@@ -23,7 +28,8 @@ Migration 018 dropped the **canonical reviewer-identity** Postgres tables (`rese
 
 ## Source of truth
 
-**Postgres-primary.** This table IS the source of truth for the Find-tab
+**Postgres-primary for working state; Dataverse-authoritative for engagement.**
+This table IS the source of truth for the Find-tab
 per-request candidate roster (which candidates a request's searches or
 applicant-suggested enrichment have surfaced, and their
 active/excluded/ineligible/saved/blocked disposition for that request). It also
@@ -42,7 +48,9 @@ read-only and the save route rejects. The canonical reviewer pool remains
 Dataverse `wmkf_appreviewersuggestion`. Only the server that confirmed the
 Dataverse outcome may finalize an exact roster key as `saved`; an
 applicant-excluded collision is finalized as `blocked` instead of being hidden
-or retried indefinitely.
+or retried indefinitely. A row's active Postgres status never overrules a
+Dataverse suggestion that is already selected, invited, responded, declined,
+accepted, review-received, or completed.
 
 ## Schema (10 columns)
 
@@ -96,7 +104,17 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
   read for ineligible state. The roster GET is consumed by
   `ReviewerSearchSection` for active/excluded/ineligible/blocked rendering,
   exact saved keys, and the dedup name union. `coi_dropped` contributes only
-  through `allNames`.
+  through `allNames`. On the branch implementation, the roster GET then makes
+  one complete request-scoped
+  `findByRequest(..., { selectedOnly:false, requireComplete:true })` read for
+  every suggestion-anchored visible roster row. Rows with authoritative
+  engagement are removed from their working-state bucket and returned as
+  compact `handled` entries; a missing Dataverse anchor fails closed rather
+  than becoming actionable. Promotion from `excluded` revalidates the stored
+  suggestion anchor against Dataverse before changing the Postgres row.
+  Unanchored search results retain their Postgres working-state behavior. **[VERIFIED via
+  source + `workbench-reviewer-roster-projection-service.test.js`, 2026-08-01;
+  not deployed]**
 
 ## Write paths
 
@@ -118,14 +136,16 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
 
 ## Cross-system
 
-No Dataverse equivalent — operational/ephemeral by design. Crossing points:
+No Dataverse equivalent for the operational roster itself. Crossing points:
 `save-candidates-service.js` creates/reuses the canonical person and suggestion,
 then finalizes the exact roster key as `saved`; applicant promotion selects the
 existing suggestion, then performs the same server-owned finalization.
 Dataverse and Postgres are not one transaction, so a finalization failure emits
 an operational alert and the canonical Dataverse row remains authoritative.
 Applicant-excluded no-ops become `blocked`; the roster never governs the
-Dataverse `wmkf_applicantdisposition` picklist.
+Dataverse `wmkf_applicantdisposition` picklist. The branch roster GET also
+projects suggestion engagement from Dataverse as a read-only terminal overlay;
+it does not rewrite Postgres or Dataverse.
 
 ## Migration disposition / gotchas
 
@@ -143,7 +163,7 @@ Dataverse `wmkf_applicantdisposition` picklist.
   roster-managed candidates fail closed unless the receipt carries the verified
   immutable roster key; only bare pre-roster compatibility payloads retain the
   old mutable-correlation path.
-- Applicant-suggested restore is keyed on the complete expected canonical suggestion-key set plus `candidate.enrichedProposalKey` and the current `candidate.applicantEnrichmentCacheVersion`, not the proposal Blob URL. Canonical excluded/saved suggestion keys are subtracted as terminal staff actions; unrelated/non-canonical keys cannot hide a missing expected row. Unversioned and older-version rows refresh once; the successful refresh persists the current version. `load-proposal` uses `addRandomSuffix:true`, so `blobUrl` changes across reloads and is not a stable cache key. A completed batch exposes **Update applicant suggestions** even when its cache is valid, allowing a staff-requested rerun after source data or resolver behavior changes; reruns preserve actor-bound staff confirmations and manual contact. **CONFIRMED defect, owner-accepted 2026-08-01 (was an open hypothesis):** the roster-only terminal calculation does not cover an older `saved` row stored under a noncanonical `candidate:` key while a later applicant-enrichment run writes a canonical `active` twin, and it does not consult Dataverse invitation/response lifecycle. Re-probed 2026-08-01 and still true: Isberg (`selected=true, invited=true`) and Sorek (`selected=false, invited=true`) each hold a `saved` twin alongside an active applicant row and render as unresolved prospects; 3 of that request's 5 applicant recommendations are correctly actionable. **Two distinct causes:** Sorek-shaped resurfacing is a regression from `ad8e0299` (which replaced a `selectedOnly:true` read with a disposition-only one), while Isberg-shaped resurfacing is this roster-twin gap. **Owner decision:** Dataverse engagement becomes an independent terminal input for **every roster row carrying a suggestion anchor**, not applicant rows only — note `save-candidates` catches a roster-finalization failure, logs it non-fatally and raises an alert while the Dataverse write stands [VERIFIED via `lib/services/reviewer-finder/save-candidates-service.js:1517-1531`], so a search-origin row can strand as `active` while its suggestion is live. Implementation work order: `SESSION_PROMPT.md`; evidence: `outputs/reviewer-workflow-stabilization-fable-assessment.md` §0 and §3. Do not claim the current canonical-key cache prevents all re-display.
+- Applicant-suggested restore is keyed on the complete expected canonical suggestion-key set plus `candidate.enrichedProposalKey` and the current `candidate.applicantEnrichmentCacheVersion`, not the proposal Blob URL. Canonical excluded/saved suggestion keys are subtracted as terminal staff actions; unrelated/non-canonical keys cannot hide a missing expected row. Unversioned and older-version rows refresh once; the successful refresh persists the current version. `load-proposal` uses `addRandomSuffix:true`, so `blobUrl` changes across reloads and is not a stable cache key. A completed batch exposes **Update applicant suggestions** even when its cache is valid, allowing a staff-requested rerun after source data or resolver behavior changes; reruns preserve actor-bound staff confirmations and manual contact. **CONFIRMED Production defect, owner-accepted 2026-08-01 (was an open hypothesis):** the deployed roster-only terminal calculation does not cover an older `saved` row stored under a noncanonical `candidate:` key while a later applicant-enrichment run writes a canonical `active` twin, and it does not consult Dataverse invitation/response lifecycle. Re-probed 2026-08-01 and still true: Isberg (`selected=true, invited=true`) and Sorek (`selected=false, invited=true`) each hold a `saved` twin alongside an active applicant row and render as unresolved prospects; 3 of that request's 5 applicant recommendations are correctly actionable. **Two distinct causes:** Sorek-shaped resurfacing is a regression from `ad8e0299` (which replaced a `selectedOnly:true` read with a disposition-only one), while Isberg-shaped resurfacing is this roster-twin gap. **Owner decision:** Dataverse engagement becomes an independent terminal input for **every roster row carrying a suggestion anchor**, not applicant rows only — note `save-candidates` catches a roster-finalization failure, logs it non-fatally and raises an alert while the Dataverse write stands [VERIFIED via `lib/services/reviewer-finder/save-candidates-service.js:1517-1531`], so a search-origin row can strand as `active` while its suggestion is live. **Branch status:** Slice A implements that read overlay and the server/client applicant projection, with focused tests green; deployment and the signed-in no-send pilot remain open. Evidence: `SESSION_PROMPT.md`, `outputs/reviewer-workflow-stabilization-fable-assessment.md` §0/§3, and `tests/unit/workbench-reviewer-roster-projection-service.test.js`.
 - **CONFIRMED missing-suggestion defect (Request `1002912`; re-probed 2026-08-01):** active roster key `suggestion:bb81d1f6-fc68-f111-a826-000d3a306da2` embeds a Dataverse suggestion id that 404s after the earlier Sorek merge. Sorek consequently holds two `active` applicant rows and renders twice. Restricting restore to the current server-derived expected suggestion set is an ACCEPTED remedy scheduled in Slice B (`SESSION_PROMPT.md`); the dry-run data cleanup remains post-fix hygiene requiring explicit Production-write authorization.
 - Migration 025 backfills pre-existing rows with their stored `candidate.candidateKey` when present, otherwise an opaque `legacy-row:<id>` key, and writes that key into the candidate JSON so subsequent client actions remain exact.
 - **Anchor-stamped placeholder keys split one person across two rows (S387).** `stampSuggestionAnchor` writes `suggestionId` into a blob but never re-keys the row [VERIFIED via `lib/services/reviewer-roster-store.js:368-384`], so a migration-025 `legacy-row:<id>` row can carry a suggestion anchor while the canonical `suggestion:<id>` row is written separately by applicant enrichment. The unique index is `(request_id, candidate_key)` [VERIFIED via `lib/db/migrations/025_reviewer_find_roster_candidate_key.sql:22-23`], so both rows persist; the client keys cards off the stored `candidate.candidateKey` [VERIFIED via `lib/utils/reviewer-candidate-key.js:18-21`], so the person renders twice — once selectable from the placeholder row (pre-identity-spine flags, so it looks clean) and once read-only from the canonical row carrying the real verdict. `findCandidateBySuggestion` resolves a suggestion ONLY to the canonical key, so promoting the selectable copy always 422s. Live counts [VERIFIED 2026-07-29 via production read-only probe]: 184 `legacy-row:` rows carry a suggestion anchor; 26 of those had a canonical twin (deleted by `scripts/dedupe-reviewer-roster-suggestion-twins.mjs`, dry-run by default, backup written before any delete). The other 158 had NO canonical twin. Codex adversarial review established the impact is wider than promotion: `authoritativeApplicantCandidate` (`pages/api/workbench/reviewer-roster.js`) resolved applicant rows through the canonical-key lookup too, so `exclude`, `saved`, AND `confirm_identity` also 409'd — staff could see an applicant card they could neither action nor set aside. Two-part remediation:

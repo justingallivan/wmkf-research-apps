@@ -10,10 +10,12 @@
 
 const findById = jest.fn();
 const updateLifecycle = jest.fn(async () => {});
+const selectIfUnengaged = jest.fn(async () => ({}));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   APPLICANT_DISPOSITION_MAP: { recommended: 100000000, excluded: 100000001 },
   findById: (...a) => findById(...a),
   updateLifecycle: (...a) => updateLifecycle(...a),
+  selectIfUnengaged: (...a) => selectIfUnengaged(...a),
 }));
 
 const update = jest.fn(async () => {});
@@ -135,6 +137,28 @@ test('non-recommended row → 400; adapter applicant-excluded refusal → same 4
   expect(err.body.remediation).not.toHaveLength(0);
 });
 
+test.each([
+  ['declined', { wmkf_selected: false, wmkf_declined: true }, 'restore_required'],
+  ['invited', { wmkf_selected: true, wmkf_invited: true }, 'already_handled'],
+])('%s engagement is refused before any person/contact mutation', async (_label, engagement, code) => {
+  findById.mockResolvedValue({
+    wmkf_appreviewersuggestionid: SUG,
+    _wmkf_request_value: REQ,
+    _wmkf_potentialreviewer_value: PERSON,
+    wmkf_applicantdisposition: 100000000,
+    ...engagement,
+  });
+  const err = await promoteApplicantReviewer(args({
+    contact: { email: 'new@example.edu', manualEmail: true },
+  })).catch((error) => error);
+  expect(err).toBeInstanceOf(ServiceHttpError);
+  expect(err.httpStatus).toBe(409);
+  expect(err.body).toMatchObject({ code, stage: expect.any(String) });
+  expect(update).not.toHaveBeenCalled();
+  expect(updateById).not.toHaveBeenCalled();
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+});
+
 test('typed 404 is NOT eaten by the applicant-excluded regex translation (P1m note 4)', async () => {
   // A message that would ALSO match the regex must still surface as its own typed error.
   findById.mockResolvedValue({ _wmkf_request_value: 'other', wmkf_applicantdisposition: 100000000 });
@@ -144,7 +168,7 @@ test('typed 404 is NOT eaten by the applicant-excluded regex translation (P1m no
 
 test('plain promote: canonical email verified, selected flipped, roster finalized', async () => {
   const body = await promoteApplicantReviewer(args());
-  expect(updateLifecycle).toHaveBeenCalledWith(SUG, { selected: true }, { actingUserSystemId: 'u-1' });
+  expect(selectIfUnengaged).toHaveBeenCalledWith(SUG, { actingUserSystemId: 'u-1' });
   expect(body).toEqual({
     success: true,
     suggestionId: SUG,
@@ -228,7 +252,7 @@ test('research-only canonical contact requires evidence and becomes exact-bundle
     },
   });
   const body = await promoteApplicantReviewer(args());
-  expect(updateLifecycle).toHaveBeenCalled();
+  expect(selectIfUnengaged).toHaveBeenCalled();
   expect(body).toMatchObject({ success: true, emailAction: 'ready' });
 });
 
@@ -427,7 +451,7 @@ test('actor-confirmed manual correction clears a historical mismatch, writes fir
     }),
     { actingUserSystemId: 'u-1', ifMatch: 'W/"person"' },
   );
-  expect(updateLifecycle).toHaveBeenCalled();
+  expect(selectIfUnengaged).toHaveBeenCalled();
   expect(body).toMatchObject({ success: true, emailAction: 'ready' });
 });
 
@@ -509,7 +533,7 @@ test('server-recorded staff confirmation permits promotion of an identity-review
   });
   const body = await promoteApplicantReviewer(args());
   expect(body.success).toBe(true);
-  expect(updateLifecycle).toHaveBeenCalledWith(SUG, { selected: true }, { actingUserSystemId: 'u-1' });
+  expect(selectIfUnengaged).toHaveBeenCalledWith(SUG, { actingUserSystemId: 'u-1' });
 });
 
 test('manual email collision withholds promotion and returns a merge-required conflict', async () => {

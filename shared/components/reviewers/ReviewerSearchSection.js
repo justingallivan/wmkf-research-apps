@@ -61,6 +61,7 @@ import {
   reviewerCandidateKey,
   withReviewerCandidateKey,
 } from './reviewer-search-logic';
+import { reviewerEngagementProjection } from '../../utils/reviewer-engagement';
 import { rankByRelevance } from '../../../lib/utils/relevance-score';
 import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../lib/utils/scholar-url';
 import {
@@ -889,6 +890,7 @@ export default function ReviewerSearchSection({
   onRetryIngestion,
   savedPoolNames = [],
   onSaved,
+  onNavigate,
   manualAddSlot = null,
   canManage = true,
 }) {
@@ -909,11 +911,13 @@ export default function ReviewerSearchSection({
   const [rosterExcluded, setRosterExcluded] = useState([]);
   const [rosterIneligible, setRosterIneligible] = useState([]);
   const [rosterBlocked, setRosterBlocked] = useState([]);
+  const [rosterHandled, setRosterHandled] = useState([]);
   const [rosterSavedKeys, setRosterSavedKeys] = useState([]);
   const [rosterNames, setRosterNames] = useState([]);
   // Gates the search button until the roster GET resolves, so a run can't skip
   // the cross-run dedup by firing before rosterNames is loaded (Codex post-impl).
   const [rosterLoaded, setRosterLoaded] = useState(false);
+  const [rosterLoadFailed, setRosterLoadFailed] = useState(false);
   const [rosterNote, setRosterNote] = useState(null); // surfaced if a durable write fails
   const [removingPrevious, setRemovingPrevious] = useState(false);
   const [excludedOpen, setExcludedOpen] = useState(false);
@@ -938,6 +942,7 @@ export default function ReviewerSearchSection({
   // Applicant-recommended enrichment (separate flow from the search).
   const [recPhase, setRecPhase] = useState('idle'); // idle | running | done | error
   const [recCandidates, setRecCandidates] = useState([]);
+  const [recHandled, setRecHandled] = useState([]);
   const [recProgress, setRecProgress] = useState([]);
   const [recError, setRecError] = useState(null);
   const recRunningRef = useRef(false);
@@ -958,6 +963,7 @@ export default function ReviewerSearchSection({
     setRosterExcluded(Array.isArray(data?.excluded) ? data.excluded : []);
     setRosterIneligible(Array.isArray(data?.ineligible) ? data.ineligible : []);
     setRosterBlocked(Array.isArray(data?.blocked) ? data.blocked : []);
+    setRosterHandled(Array.isArray(data?.handled) ? data.handled : []);
     setRosterSavedKeys(Array.isArray(data?.savedKeys) ? data.savedKeys : []);
     setRosterNames(Array.isArray(data?.allNames) ? data.allNames : []);
   }, []);
@@ -982,14 +988,14 @@ export default function ReviewerSearchSection({
     setPhase('idle'); setProgress([]); setCandidates([]); setUnverified([]); setAnalysis(null);
     setSelected(new Set()); setError(null); setErrorMeta(null); setSavedMsg(null); setEnrichNote(null); setExportError(null);
     setExcludedRemoved(0); setRosterNote(null); setRemovingPrevious(false);
-    setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterBlocked([]); setRosterSavedKeys([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false);
+    setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterBlocked([]); setRosterHandled([]); setRosterSavedKeys([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false); setRosterLoadFailed(false);
     setSearchSources({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
     setReviewerCount(DEFAULT_REVIEWER_COUNT);
     setAdditionalNotes('');
     setReferredSeedsText('');
     setReferredBy('');
     setBlockedReferredSeeds([]);
-    setRecPhase('idle'); setRecCandidates([]); setRecProgress([]); setRecError(null);
+    setRecPhase('idle'); setRecCandidates([]); setRecHandled([]); setRecProgress([]); setRecError(null);
     setEditingContact(null); setConfirmingContact(null);
     excludeEditedRef.current = false;
     setExcludeText((excludedNames || []).join(', '));
@@ -1000,15 +1006,48 @@ export default function ReviewerSearchSection({
     if (requestId) {
       (async () => {
         try {
-          await reloadRoster(myGen);
-        } catch { /* best-effort — a missing roster just means no dedup/restore this load */ }
-        finally { if (genRef.current === myGen) setRosterLoaded(true); }
+          const snapshot = await reloadRoster(myGen);
+          if (genRef.current !== myGen) return;
+          if (snapshot) {
+            setRosterLoaded(true);
+          } else {
+            setRosterLoadFailed(true);
+            setRosterNote('Reviewer engagement could not be reconciled. Retry before searching.');
+          }
+        } catch {
+          if (genRef.current === myGen) {
+            setRosterLoadFailed(true);
+            setRosterNote('Reviewer engagement could not be reconciled. Retry before searching.');
+          }
+        }
       })();
     } else {
       setRosterLoaded(true); // no request → nothing to load; don't block the form
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestId, blobUrl, reloadRoster]);
+
+  const retryRosterLoad = useCallback(async () => {
+    const myGen = genRef.current;
+    setRosterLoaded(false);
+    setRosterLoadFailed(false);
+    setRosterNote(null);
+    try {
+      const snapshot = await reloadRoster(myGen);
+      if (genRef.current !== myGen) return;
+      if (snapshot) {
+        setRosterLoaded(true);
+      } else {
+        setRosterLoadFailed(true);
+        setRosterNote('Reviewer engagement could not be reconciled. Retry before searching.');
+      }
+    } catch {
+      if (genRef.current === myGen) {
+        setRosterLoadFailed(true);
+        setRosterNote('Reviewer engagement could not be reconciled. Retry before searching.');
+      }
+    }
+  }, [reloadRoster]);
 
   // When the applicant exclude list finishes loading (it can arrive after the
   // proposal), prefill the box — unless the user has already edited it.
@@ -1275,7 +1314,7 @@ export default function ReviewerSearchSection({
     if (!blobUrl || !proposalKey || recRunningRef.current) return;
     recRunningRef.current = true;
     const myGen = genRef.current;
-    setRecPhase('running'); setRecError(null); setRecProgress([]); setRecCandidates([]);
+    setRecPhase('running'); setRecError(null); setRecProgress([]); setRecCandidates([]); setRecHandled([]);
     try {
       if (genRef.current !== myGen) return; // abort if context changed before the request fires
       const res = await fetch('/api/workbench/enrich-recommended', {
@@ -1284,16 +1323,19 @@ export default function ReviewerSearchSection({
         body: JSON.stringify({ requestId, blobUrl, proposalKey, analysisResult: analysis || undefined }),
       });
       let result = null;
+      let handledResult = [];
       let streamError = null;
       await readSseStream(res, ({ event, data }) => {
         if (event === 'error') { streamError = data?.message || 'Enrichment failed'; return; }
         if (data?.error) { streamError = data.error; return; }
         if (data?.message) setRecProgress((p) => [...p.slice(-6), data.message]);
         if (data?.recommended) result = data.recommended;
+        if (Array.isArray(data?.handled)) handledResult = data.handled;
       });
       if (streamError) throw new Error(streamError);
       if (genRef.current !== myGen) return; // context changed — abort
       const recommendedResults = Array.isArray(result) ? result : [];
+      setRecHandled(handledResult);
       setRecCandidates(recommendedResults.filter((candidate) => (
         (candidate.eligibilityStatus || candidate.contactEnrichment?.eligibilityStatus) !== 'deceased'
       )));
@@ -1321,14 +1363,18 @@ export default function ReviewerSearchSection({
     () => applicantTerminalSuggestionKeys(rosterExcluded, rosterSavedKeys),
     [rosterExcluded, rosterSavedKeys],
   );
+  const actionableRecommended = useMemo(
+    () => recommended.filter((row) => !reviewerEngagementProjection(row).handled),
+    [recommended],
+  );
   const haveValidCache = hasValidApplicantEnrichmentCache(
     [...rosterActive, ...rosterIneligible],
     proposalKey,
-    recommended,
+    actionableRecommended,
     terminalApplicantKeys,
   );
   useEffect(() => {
-    const selectableCount = recommended.length;
+    const selectableCount = actionableRecommended.length;
     if (recPhase !== 'idle' || recRunningRef.current) return;
     if (rosterLoaded && haveValidCache) {
       setRecPhase('done');
@@ -1337,7 +1383,7 @@ export default function ReviewerSearchSection({
     if (blobUrl && proposalKey && selectableCount > 0 && rosterLoaded && !haveValidCache) {
       enrichRecommended();
     }
-  }, [blobUrl, proposalKey, recommended, recPhase, rosterLoaded, haveValidCache, enrichRecommended]);
+  }, [blobUrl, proposalKey, actionableRecommended, recPhase, rosterLoaded, haveValidCache, enrichRecommended]);
 
   // The selectable list = the durable active roster ∪ this run's results, deduped
   // by normalized name (run results win — freshest enrichment). Renders + ranks
@@ -1369,6 +1415,18 @@ export default function ReviewerSearchSection({
       updatedAt: candidate.rosterUpdatedAt,
     })), [previousSearchCandidates]);
   const displayCandidates = dedupeByName([...visibleRecCandidates, ...candidates, ...displayRosterActive].map((c) => withReviewerProvenance(c)));
+  const handledReviewers = useMemo(() => dedupeByName([
+    ...recHandled,
+    ...rosterHandled,
+    ...recommended
+      .filter((row) => reviewerEngagementProjection(row).handled)
+      .map((row) => ({
+        suggestionId: row.suggestionId,
+        candidateKey: row.suggestionId ? `suggestion:${row.suggestionId}` : null,
+        name: row.applicantKnownReviewer?.name || row.name || 'Applicant-recommended reviewer',
+        stage: reviewerEngagementProjection(row).stage,
+      })),
+  ]), [recHandled, rosterHandled, recommended]);
   const incompleteCoiCandidates = dedupeByName([...displayCandidates, ...rosterIneligible])
     .filter((candidate) => candidate.coauthorCheckStatus === 'incomplete');
   const incompleteCoiNames = incompleteCoiCandidates.map((candidate) => candidate.name).filter(Boolean);
@@ -1457,11 +1515,16 @@ export default function ReviewerSearchSection({
       });
       const data = await res.json().catch(() => ({}));
       if (genRef.current !== myGen) return;
-      if (res.status === 409 && data.code === 'candidate_not_excluded') {
+      if (res.status === 409 && [
+        'candidate_not_excluded',
+        'reviewer_already_handled',
+        'reviewer_anchor_unavailable',
+      ].includes(data.code)) {
         const snapshot = await reloadRoster(myGen);
         if (genRef.current === myGen) {
+          const stage = data.stage ? ` (${String(data.stage).replaceAll('_', ' ')})` : '';
           setRosterNote(snapshot
-            ? 'That reviewer changed elsewhere, so the reviewer roster was reloaded.'
+            ? `That reviewer is no longer actionable${stage}, so the reviewer roster was reloaded.`
             : 'That reviewer changed elsewhere. Reload this request before continuing.');
         }
         return;
@@ -1500,6 +1563,7 @@ export default function ReviewerSearchSection({
       setRosterExcluded(Array.isArray(data.excluded) ? data.excluded : []);
       setRosterIneligible(Array.isArray(data.ineligible) ? data.ineligible : []);
       setRosterBlocked(Array.isArray(data.blocked) ? data.blocked : []);
+      setRosterHandled(Array.isArray(data.handled) ? data.handled : []);
       setRosterSavedKeys(Array.isArray(data.savedKeys) ? data.savedKeys : []);
       setRosterNames(Array.isArray(data.allNames) ? data.allNames : []);
       setSelected((prev) => {
@@ -2561,11 +2625,13 @@ export default function ReviewerSearchSection({
               )}
               <button
                 type="button"
-                onClick={runSearch}
-                disabled={noSourcesSelected || !rosterLoaded || removingPrevious || errorMeta?.status === 'analysis_refused'}
+                onClick={rosterLoadFailed ? retryRosterLoad : runSearch}
+                disabled={!rosterLoadFailed && (noSourcesSelected || !rosterLoaded || removingPrevious || errorMeta?.status === 'analysis_refused')}
                 className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {!rosterLoaded
+                {rosterLoadFailed
+                  ? 'Retry reviewer state'
+                  : !rosterLoaded
                   ? 'Loading existing candidates…'
                   : errorMeta?.status === 'analysis_refused'
                     ? 'Alternate analysis required'
@@ -2876,6 +2942,37 @@ export default function ReviewerSearchSection({
     {/* Manual reviewer add — slot rendered BELOW the search and ABOVE the optional
         verify card (state + handlers live in ReviewerFindPanel). */}
     {manualAddSlot}
+
+    {handledReviewers.length > 0 && (
+      <Card hover={false}>
+        <div className="flex items-center justify-between mb-2">
+          <p className="font-medium text-gray-900">Already handled</p>
+          <span className="text-xs text-gray-500">Not actionable in Find</span>
+        </div>
+        <ul className="space-y-2">
+          {handledReviewers.map((reviewer) => (
+            <li key={reviewer.candidateKey || reviewer.suggestionId || reviewer.name} className="flex items-center justify-between gap-3 text-sm border border-gray-200 rounded p-2">
+              <span>
+                <span className="font-medium text-gray-900">{reviewer.name}</span>
+                <span className="ml-2 text-gray-500">{String(reviewer.stage || 'handled').replaceAll('_', ' ')}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => onNavigate?.(['selected', 'declined'].includes(reviewer.stage) ? 'candidates' : 'track')}
+                disabled={!onNavigate}
+                className="text-xs text-amber-900 underline whitespace-nowrap"
+              >
+                {reviewer.stage === 'selected'
+                  ? 'Open Invite'
+                  : reviewer.stage === 'declined'
+                    ? 'Open Removed'
+                    : 'Open Track'}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    )}
 
     {/* Applicant-referred reviewer status card — ingestion + enrichment state.
         Enriched candidates surface in the Applicant-referred provenance section

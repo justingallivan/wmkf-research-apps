@@ -19,7 +19,7 @@ jest.mock('../../lib/services/dynamics-context', () => ({
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   __esModule: true,
   findById: jest.fn(),
-  updateLifecycle: jest.fn(async () => undefined),
+  selectIfUnengaged: jest.fn(async () => ({ selected: true })),
   APPLICANT_DISPOSITION_MAP: { recommended: 100000000 },
 }));
 let mockPersonEmail = null;
@@ -148,8 +148,8 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
     expect(res.body.savedFields).toEqual(expect.arrayContaining(['affiliation', 'email']));
 
     // selected flipped.
-    expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(
-      SUGGESTION_ID, { selected: true }, expect.anything(),
+    expect(suggestionAdapter.selectIfUnengaged).toHaveBeenCalledWith(
+      SUGGESTION_ID, expect.anything(),
     );
     // Writes target the suggestion's OWN person, never the client-supplied id.
     expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { affiliation: 'Example Research Lab' }, expect.anything());
@@ -187,7 +187,7 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
 
     expect(res.statusCode).toBe(409);
     expect(res.body.contactError).toMatchObject({ code: 'email_conflict', value: 'ava.mercer@example.org' });
-    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+    expect(suggestionAdapter.selectIfUnengaged).not.toHaveBeenCalled();
   });
 
   test('no contact payload: behaves as a plain promote (selected only)', async () => {
@@ -199,7 +199,7 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.partialSuccess).toBe(false);
     expect(res.body.savedFields).toEqual([]);
-    expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(SUGGESTION_ID, { selected: true }, expect.anything());
+    expect(suggestionAdapter.selectIfUnengaged).toHaveBeenCalledWith(SUGGESTION_ID, expect.anything());
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
     expect(researcherAdapter.updateById).not.toHaveBeenCalled();
   });
@@ -215,7 +215,7 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
     await handler(req, res);
 
     expect(res.statusCode).toBe(404);
-    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+    expect(suggestionAdapter.selectIfUnengaged).not.toHaveBeenCalled();
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
   });
 });
@@ -298,7 +298,7 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     expect(res.statusCode).toBe(422);
     expect(res.body).toMatchObject({ code: 'missing_verified_email' });
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
-    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+    expect(suggestionAdapter.selectIfUnengaged).not.toHaveBeenCalled();
   });
 
   test('rejects identity-unresolved promotion before lifecycle or contact writes', async () => {
@@ -312,7 +312,7 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     const res = await promote();
     expect(res.statusCode).toBe(422);
     expect(res.body).toMatchObject({ code: 'identity_confirmation_required' });
-    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+    expect(suggestionAdapter.selectIfUnengaged).not.toHaveBeenCalled();
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
   });
 
@@ -362,7 +362,7 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     const res = await promote();
     expect(res.statusCode).toBe(409);
     expect(res.body.contactError).toMatchObject({ code: 'email_conflict', value: 'duplicate@example.org' });
-    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+    expect(suggestionAdapter.selectIfUnengaged).not.toHaveBeenCalled();
   });
 
   test('no roster row (legacy / no id anchor): fails closed before promotion', async () => {
@@ -370,7 +370,7 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     const res = await promote();
     expect(res.statusCode).toBe(422);
     expect(res.body).toMatchObject({ code: 'identity_verification_required' });
-    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+    expect(suggestionAdapter.selectIfUnengaged).not.toHaveBeenCalled();
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
   });
 
@@ -390,6 +390,6 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     expect(findCandidateBySuggestion).toHaveBeenCalledTimes(1);
     expect(res.statusCode).toBe(409);
     expect(res.body.contactError).toMatchObject({ code: 'email_conflict', value: 'manual@example.org' });
-    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+    expect(suggestionAdapter.selectIfUnengaged).not.toHaveBeenCalled();
   });
 });

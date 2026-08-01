@@ -1,8 +1,8 @@
 /**
  * /api/workbench/reviewer-roster — durable per-request reviewer-search candidate
  * roster behind the Workbench Reviewers→Find tab (S224). Pure Postgres
- * (`reviewer_find_roster` via `reviewer-roster-store`); no Dataverse, so no
- * `bypassDynamicsRestrictions` needed. See docs/atlas/postgres-reviewer-find-roster.md.
+ * (`reviewer_find_roster` via `reviewer-roster-store`) reconciled on GET with
+ * authoritative Dataverse engagement for every suggestion-anchored active row.
  *
  *   GET   ?requestId            → { active, excluded, ineligible, blocked, savedKeys, allNames }
  *   POST  { requestId, candidates }                  → record surfaced
@@ -28,6 +28,11 @@ import {
   findCandidatesByKeys,
   removePreviousActiveSearchResults,
 } from '../../../lib/services/reviewer-roster-store';
+import { withDalContext } from '../../../lib/dataverse/core/context';
+import {
+  reconcileRosterEngagement,
+  validateRosterPromotionEngagement,
+} from '../../../lib/services/workbench/reviewer-roster-projection-service';
 import {
   createServerIdentityDecisionReceipt,
   hasServerIdentityDecisionReceipt,
@@ -220,7 +225,10 @@ async function handleGet(req, res) {
     return res.status(400).json({ error: 'Valid requestId (GUID) is required' });
   }
   const roster = await listForRequest(requestId);
-  return res.status(200).json({ success: true, ...roster });
+  const reconciled = await withDalContext('workbench-reviewer-roster-get', () => (
+    reconcileRosterEngagement({ requestId, roster })
+  ));
+  return res.status(200).json({ success: true, ...reconciled });
 }
 
 async function handlePost(req, res) {
@@ -307,6 +315,20 @@ async function handlePatch(req, res, access) {
   if (action === 'promote') {
     const { candidateKey } = req.body;
     if (!candidateKey) return res.status(400).json({ error: 'candidateKey is required to promote' });
+    const [storedCandidate] = await findCandidatesByKeys(requestId, [candidateKey]);
+    if (!storedCandidate || storedCandidate.rosterStatus !== 'excluded') {
+      return res.status(409).json({
+        success: false,
+        error: 'Candidate is no longer excluded; reload the reviewer roster.',
+        code: 'candidate_not_excluded',
+      });
+    }
+    const promotionAuthority = await withDalContext('workbench-reviewer-roster-promote', () => (
+      validateRosterPromotionEngagement({ requestId, candidate: storedCandidate })
+    ));
+    if (!promotionAuthority.allowed) {
+      return res.status(409).json({ success: false, ...promotionAuthority });
+    }
     const candidate = await promote(requestId, candidateKey);
     if (!candidate) {
       return res.status(409).json({

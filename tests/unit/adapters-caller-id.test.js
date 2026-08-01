@@ -175,13 +175,20 @@ describe('researcher adapter', () => {
 describe('reviewer-suggestion adapter', () => {
   test('upsert (existing path) forwards on update', async () => {
     DynamicsService.queryRecords.mockResolvedValue({
-      records: [{ wmkf_appreviewersuggestionid: SUGGESTION_ID }],
+      records: [{
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        wmkf_selected: false,
+        _etag: 'W/"upsert"',
+      }],
     });
     await suggestionAdapter.upsert(
       { potentialReviewerId: PR_ID, requestId: REQUEST_ID, suggestionLabel: 'X' },
       { actingUserSystemId: ACTING },
     );
-    expect(lastCallOpts(DynamicsService.updateRecord)).toEqual({ actingUserSystemId: ACTING });
+    expect(lastCallOpts(DynamicsService.updateRecord)).toEqual({
+      actingUserSystemId: ACTING,
+      ifMatch: 'W/"upsert"',
+    });
   });
 
   test('upsert (create path) forwards on create', async () => {

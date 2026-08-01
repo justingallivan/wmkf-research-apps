@@ -37,11 +37,11 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
 }));
 
 const findById = jest.fn();
-const updateLifecycle = jest.fn(async () => {});
+const selectIfUnengaged = jest.fn(async () => ({ selected: true }));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   APPLICANT_DISPOSITION_MAP: { recommended: 100000000, excluded: 100000001 },
   findById: (...a) => findById(...a),
-  updateLifecycle: (...a) => updateLifecycle(...a),
+  selectIfUnengaged: (...a) => selectIfUnengaged(...a),
 }));
 
 import handler from '../../pages/api/workbench/promote-applicant-reviewer';
@@ -99,7 +99,7 @@ it('unauthenticated caller: short-circuit, no request/promotion work attempted',
   const r = res();
   await handler(post({ requestId: REQUEST_ID, suggestionId: SUGGESTION_ID }), r);
   expect(findById).not.toHaveBeenCalled();
-  expect(updateLifecycle).not.toHaveBeenCalled();
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
 });
 
 it('400s on non-GUID ids before any Dataverse selector', async () => {
@@ -107,7 +107,7 @@ it('400s on non-GUID ids before any Dataverse selector', async () => {
   await handler(post({ requestId: 'not-a-guid', suggestionId: SUGGESTION_ID }), r);
   expect(r.statusCode).toBe(400);
   expect(findById).not.toHaveBeenCalled();
-  expect(updateLifecycle).not.toHaveBeenCalled();
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
 });
 
 it('404s when the suggestion does not belong to the request', async () => {
@@ -121,7 +121,7 @@ it('404s when the suggestion does not belong to the request', async () => {
   await handler(post({ requestId: REQUEST_ID, suggestionId: SUGGESTION_ID }), r);
 
   expect(r.statusCode).toBe(404);
-  expect(updateLifecycle).not.toHaveBeenCalled();
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
 });
 
 it('400s when the row is not applicant-recommended', async () => {
@@ -135,7 +135,7 @@ it('400s when the row is not applicant-recommended', async () => {
   await handler(post({ requestId: REQUEST_ID, suggestionId: SUGGESTION_ID }), r);
 
   expect(r.statusCode).toBe(400);
-  expect(updateLifecycle).not.toHaveBeenCalled();
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
 });
 
 it('400s when the adapter refuses an applicant-excluded row', async () => {
@@ -145,7 +145,7 @@ it('400s when the adapter refuses an applicant-excluded row', async () => {
   await handler(post({ requestId: REQUEST_ID, suggestionId: SUGGESTION_ID }), r);
 
   expect(r.statusCode).toBe(400);
-  expect(updateLifecycle).not.toHaveBeenCalled();
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
 });
 
 it('selects the existing applicant-recommended row', async () => {
@@ -164,9 +164,8 @@ it('selects the existing applicant-recommended row', async () => {
     emailAction: 'ready',
     emailActionReason: 'Address source: scholarly_multi',
   });
-  expect(updateLifecycle).toHaveBeenCalledWith(
+  expect(selectIfUnengaged).toHaveBeenCalledWith(
     SUGGESTION_ID,
-    { selected: true },
     { actingUserSystemId: 'u-1' },
   );
 });

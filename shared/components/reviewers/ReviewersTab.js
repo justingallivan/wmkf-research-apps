@@ -203,6 +203,20 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
       const data = await res.json().catch(() => ({}));
       if (rid !== currentRequestIdRef.current) return; // request changed mid-flight — drop stale result
       if (res.ok && data.success) {
+        if (['promotion_required', 'restore_required', 'already_handled'].includes(data.outcome)) {
+          setReferralActions((prev) => ({
+            ...prev,
+            [sid]: {
+              status: 'remedy',
+              outcome: data.outcome,
+              remedy: data.remedy,
+              suggestionId: data.suggestionId,
+              stage: data.stage,
+            },
+          }));
+          refreshAll();
+          return;
+        }
         setReferralActions((prev) => ({
           ...prev,
           [sid]: {
@@ -337,6 +351,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           canManage={canManage}
           savedPoolNames={candidates.map((c) => c.name).filter(Boolean)}
           onSaved={refreshAll}
+          onNavigate={selectSub}
         />
       ) : current === 'candidates' ? (
         <ReviewerInvitePanel
@@ -361,6 +376,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           referralActions={referralActions}
           onAddReferral={addReferralCandidate}
           onGoToInvite={() => selectSub('candidates')}
+          onNavigate={selectSub}
           onDismissReferral={dismissReferralAction}
         />
       )}

@@ -161,3 +161,28 @@ test('an excluded reviewer surfaces a clear inline error', async () => {
   await waitFor(() => expect(actionsOf()['s-a']?.status).toBe('error'));
   expect(actionsOf()['s-a'].error).toMatch(/excluded/i);
 });
+
+test.each(['promotion_required', 'restore_required', 'already_handled'])('typed %s response renders a remedy and does not falsely navigate to Invite', async (outcome) => {
+  global.fetch = baseFetch(() => Promise.resolve({
+    ok: true,
+    json: async () => ({
+      success: true,
+      outcome,
+      suggestionId: 's-existing',
+      stage: outcome === 'restore_required' ? 'declined' : outcome === 'already_handled' ? 'invited' : 'recommended',
+      remedy: outcome === 'restore_required'
+        ? 'Restore this previously declined reviewer from Removed.'
+        : outcome === 'already_handled'
+          ? 'Open Track Reviewers to continue from the current engagement stage.'
+          : 'Promote this applicant-recommended reviewer from Find.',
+    }),
+  }));
+
+  render(<ReviewersTab requestId={REQ} />);
+  await waitFor(() => expect(screen.getByTestId('add-s-a')).toBeInTheDocument());
+  await act(async () => { screen.getByTestId('add-s-a').click(); });
+
+  await waitFor(() => expect(actionsOf()['s-a']?.status).toBe('remedy'));
+  expect(actionsOf()['s-a']).toMatchObject({ outcome, suggestionId: 's-existing' });
+  expect(mockPush).not.toHaveBeenCalled();
+});

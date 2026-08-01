@@ -36,7 +36,9 @@ source_files:
   - pages/api/workbench/enrich-recommended.js
   - pages/api/workbench/applicant-reviewers.js
   - pages/api/workbench/promote-applicant-reviewer.js
+  - pages/api/workbench/reviewer-roster.js
   - pages/api/workbench/export-candidates.js
+  - lib/services/workbench/reviewer-roster-projection-service.js
   - lib/services/reviewer-candidate-export.js
   - lib/services/reviewer-campaign-timeline.js
   - lib/services/review-manager/terminal-transition-service.js
@@ -203,7 +205,8 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
 
 **Auto-enrichment + restore:** `ReviewerSearchSection` fires `POST /api/workbench/enrich-recommended` automatically via `useEffect` as soon as the proposal is loaded, the stable proposal key is known, applicant `recommended` slots are ready, and the durable roster GET has completed. The effect gates on `recPhase === 'idle'`, `recRunningRef.current === false`, `rosterLoaded === true`, and no valid same-proposal applicant cache. The cache key is `doc.data.picked` (`library::folder::name`) passed as `proposalKey`; Blob URL is intentionally not used because `load-proposal` returns a random-suffixed URL on each load. On a same-file reload, the cache is valid only when every currently expected recommendation either has its exact canonical `suggestion:<suggestionId>` active/ineligible row for the same `enrichedProposalKey`, the current `applicantEnrichmentCacheVersion`, and a terminal gate result, or its canonical key is already terminal by staff action (`excluded`/`saved`). The roster GET returns canonical saved applicant keys separately as `savedKeys`; excluded candidates supply their canonical keys. Those canonical terminal rows are subtracted from the expected set and filtered from fresh SSE results. Legacy, unversioned, older-version, or unrelated terminal rows cannot hide a missing expected row, and a partial non-terminal canonical batch still invalidates the cache. Active rows restore into the candidate list while ineligible rows restore into the separate Not eligible section. Every completed non-empty batch offers **Update applicant suggestions**, which explicitly reruns enrichment even when the cache is valid; the rerun preserves actor-bound staff confirmations instead of replacing them with automated output. Re-picking a different proposal changes `proposalKey`, so the old rows do not satisfy the cache gate and enrichment re-runs. The enrichment route reads by `wmkf_applicantdisposition=Recommended`, not by `wmkf_selected` or invitation/response lifecycle, so it currently verifies and surfaces both unpromoted and already-engaged applicant rows.
 
-**CONFIRMED defect — owner-accepted 2026-08-01; implementation authorized.**
+**CONFIRMED Production defect — owner-accepted 2026-08-01; Slice A implemented
+on a branch but not deployed.**
 The roster-only terminal contract above is insufficient. Re-probed 2026-08-01
 and still live on Request `1002912`: Ralph Isberg holds a noncanonical saved row
 plus a canonical active applicant row while Dataverse reads
@@ -226,9 +229,16 @@ roster row carrying a suggestion anchor**, not applicant rows only. Work order:
 `SESSION_PROMPT.md`. Evidence and corrections:
 `outputs/reviewer-workflow-stabilization-fable-assessment.md` §0/§3 plus the
 verbatim independent review in
-`outputs/reviewer-workflow-codex-adversarial-review-2026-08-01.md`. Do not claim
-promotion/engagement universally prevents re-enrichment or re-display until the
-slice ships.
+`outputs/reviewer-workflow-codex-adversarial-review-2026-08-01.md`. On branch
+`codex/reviewer-find-stabilization-slice-a`, applicant ingestion now projects
+the engagement tuple, enrichment partitions handled rows before model work,
+and the roster GET makes one complete request-scoped Dataverse read for every
+suggestion-anchored visible roster row. Handled rows render only in a compact
+**Already handled** summary with Invite/Removed/Track navigation. An excluded
+row is also revalidated against Dataverse before it can return to active Find.
+Focused source tests are green;
+the signed-in no-send pilot and deployment remain open, so do not describe this
+as Production behavior yet.
 
 **Unified candidate list:** Enriched applicant candidates (`recCandidates`) are prepended into `displayCandidates` so fresh enrichment wins over stale roster copies. Candidates with a resolved identity surface in the `applicant_suggested` provenance section — which appears after `cited_or_proposal_named` and `literature_retrieved` in that order — via `provenanceGroupOf` detecting `isApplicantRecommended: true` → `APPLICANT_SUGGESTED` kind. **Exception:** candidates where enrichment could not confirm identity (`needsIdentification: true`, typically when the applicant provided no affiliation) route to `needs_identity_review` instead — `provenanceGroupOf` checks `needsIdentification` before `APPLICANT_SUGGESTED` (reviewer-provenance.js:228 vs :231). The `applicant_suggested` section is selectable unless normal safety gates make a row read-only; selecting it calls `POST /api/workbench/promote-applicant-reviewer` with the existing `suggestionId` instead of `save-candidates`.
 
@@ -247,7 +257,8 @@ Exclusion removes an applicant row from the active roster; only a successful
 server promotion finalizes it `saved`, while an authoritative
 applicant-excluded collision finalizes it `blocked`.
 
-**Explicit applicant promotion (production-live):**
+**Explicit applicant promotion (existing boundary is production-live; the W6
+engagement guard below is branch-only):**
 `/api/workbench/promote-applicant-reviewer` validates request and
 suggestion ownership/disposition, requires the canonical
 request/`suggestion:<id>` roster row, and rechecks identity, eligibility, COI,
@@ -261,6 +272,19 @@ roster authority, and roster-finalization failure are blocking outcomes—not
 partial successful promotions. After `wmkf_selected=true` succeeds, the server
 finalizes the exact roster key as `saved`. There is no name fallback and no
 successful no-roster legacy path.
+
+Slice A adds a fresh engagement check before any person/contact mutation and a
+second compare-and-set immediately before selection, bound to the suggestion
+ETag. A concurrent decline therefore wins and returns a reload-required 409.
+The ordinary `save-candidates` upsert path applies the same engagement check
+and ETag-bound selection rule, including its alternate-key conflict winner, so
+it cannot become a second re-selection door for search-origin rows.
+The explicit Restore path retains its separate ETag-bound reset authority.
+Manual/referral re-add of an applicant-recommended person unions provenance
+only: it never selects or clears lifecycle fields, and returns
+`promotion_required`, `restore_required`, or `already_handled` with an
+executable Find/Invite/Removed/Track remedy. **[VERIFIED via focused source tests on
+the Slice A branch, 2026-08-01; not deployed]**
 
 Find-discovered rows still receive their exact suggestion/person anchors after
 ordinary save. The read-only reconciler remains a legacy backstop: it requires
