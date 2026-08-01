@@ -190,7 +190,11 @@ if (!includeTest) {
 const { records: people, capped: peopleCapped } = await DynamicsService.queryAllRecords(
   'wmkf_potentialreviewerses',
   {
-    select: 'wmkf_potentialreviewersid,wmkf_name,wmkf_firstname,wmkf_lastname,wmkf_emailaddress,wmkf_organizationname,createdon',
+    // `_createdby_value` matters: it says WHICH surface produced a malformed row
+    // (the akoyaGO intake integration vs. a staff/manual add), i.e. where the fix
+    // belongs. Lima's record was created by the integration and hand-repaired
+    // later, which is exactly the pattern this column surfaces.
+    select: 'wmkf_potentialreviewersid,wmkf_name,wmkf_firstname,wmkf_lastname,wmkf_emailaddress,wmkf_organizationname,createdon,modifiedon,_createdby_value',
     filter: 'statecode eq 0',
     orderby: 'createdon desc',
     top: limit,
@@ -204,7 +208,17 @@ for (const p of people) {
   const name = p.wmkf_name || [p.wmkf_firstname, p.wmkf_lastname].filter(Boolean).join(' ');
   if (!name) continue;
   const reasons = classifyName(name);
-  if (reasons.length) flagged.push({ id: p.wmkf_potentialreviewersid, name, reasons, created: p.createdon, email: p.wmkf_emailaddress });
+  if (reasons.length) {
+    flagged.push({
+      id: p.wmkf_potentialreviewersid,
+      name,
+      reasons,
+      created: p.createdon,
+      modified: p.modifiedon,
+      createdBy: p['_createdby_value_formatted'] || null,
+      email: p.wmkf_emailaddress,
+    });
+  }
 }
 
 const multiPerson = flagged.filter((f) => f.reasons.some((r) => MULTI_PERSON_KEYS.has(r)));
@@ -221,11 +235,14 @@ if (multiPerson.length) {
   console.log(`    by pattern: ${JSON.stringify(byReason)}`);
   console.log('');
   for (const f of multiPerson) {
-    console.log(`  ${f.id}  [${f.reasons.join(',')}]  created=${(f.created || '').slice(0, 10)}`);
+    console.log(`  ${f.id}  [${f.reasons.join(',')}]  created=${(f.created || '').slice(0, 10)} by ${f.createdBy || '—'}`);
     console.log(`      name=${redact(f.name)}${f.email ? `  email=${redact(f.email)}` : '  email=—'}`);
   }
 } else {
-  console.log('    → none; the free-text-referral concatenation shape does not appear in this window.');
+  console.log('    → none IN THEIR ORIGINAL FORM. NOT evidence the shape never occurs:');
+  console.log('      a hand-repaired row looks normal here, and at least one confirmed');
+  console.log('      instance (Lima, request 1002912) was repaired before this scan ran.');
+  console.log('      Treat this count as a strict lower bound on historical incidence.');
 }
 
 console.log('');

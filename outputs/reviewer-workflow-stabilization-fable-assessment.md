@@ -578,9 +578,44 @@ instances, and a different trigger is common.** Across 4,430 active person rows:
 | `slash_or_semicolon` | 1 |
 | **Credential suffixes** ("Jane Doe, PhD") | **~47** |
 
-So the free-text-referral concatenation I inferred from the owner's recollection
-**does not appear in production data**. Whatever produced the historical Lima
-duplicate, it did not leave a multi-name person row behind.
+**That zero is an artifact of repair, not evidence of absence — corrected on
+owner testimony plus record forensics.** The owner states the original entry was
+`"Chris Lima MSKCC, Other Name NCI"` — **two people with their institutions on
+one line** — and that he later edited the contact down to the correct person.
+The record confirms it `[VERIFIED via read-only lookup of person
+ad90a3f5-ce44-f111-88b5-000d3a3064b7, 2026-08-01]`:
+
+- `createdon` 2026-04-30, **`createdby` = "# BCO akoyaGO Integration"**
+- `modifiedon` **2026-08-01T03:09:20Z, `modifiedby` = "Justin Gallivan"**
+- current value: `wmkf_name` "Christopher Lima", first "Christopher", last
+  "Lima", org "Memorial Sloan Kettering"
+
+So the confirmed instance was hand-repaired **hours before my scan ran**. The
+concatenation shape is real and did occur; my probe simply cannot see a repaired
+row, because a repaired row looks like a normal name. **Every Finding-C count in
+this document is therefore a strict lower bound on historical incidence**, and
+"0 multi-name rows" means "0 currently unrepaired", nothing more. The probe now
+says so in its own output rather than implying absence.
+
+**Two consequences that matter more than the count.**
+
+*(a) The record was created by the intake integration, not by our code.* This
+**undercuts an argument I made in §6a** and should be corrected there: I cited
+the applicant-recommended path as proof that structure prevents this class of
+bug, because the slots are exact person GUIDs. The GUIDs *are* exact — but the
+person records they point at are minted by the akoyaGO integration from whatever
+the applicant typed. Structure at the *lookup* layer does not protect data
+quality at the *record-creation* layer. The 47 credential-suffix rows are the
+same pattern at scale, and the probe now reports `createdby` per flagged row so
+the producing surface is visible rather than inferred.
+
+*(b) A concatenated line may silently drop a person.* If two reviewers share one
+line and intake mints one record, the second reviewer never becomes a candidate
+at all — worse than a duplicate, because nothing surfaces to be noticed.
+`[UNKNOWN]` whether "Other Name NCI" was ever created separately on `1002912`;
+the owner can answer that faster than a query can, and it is worth asking,
+because a silently-lost applicant recommendation is a different severity than a
+malformed name.
 
 **But the same matching failure is live at scale through credentials.**
 `normalizeReviewerName` strips punctuation and keeps the token, so
@@ -871,18 +906,21 @@ reasons, in order of weight:
    "does not occur". Institution similarly feeds the resolver's affiliation
    anchor and the COI checks. A parser can only ever recover a *name* from
    prose; it cannot invent the anchors that make matching reliable.
-2. **The same intake form already proves the approach — on its other reviewer
-   field.** The applicant's *recommended* reviewers are not free text: they are
-   `wmkf_potentialreviewer1..5` lookup slots holding **exact person GUIDs**,
-   which ingestion consumes directly with no name matching at all
-   `[VERIFIED via applicant-reviewers-service.js:43-55,100-105]`. That is
-   precisely why the applicant-recommendation path has never had this class of
-   bug — there is nothing to parse and no namesake to guess. The *excluded*
-   reviewers field on the same form is free text and needs an LLM extractor
-   `[VERIFIED via reviewer-exclusion-parser.js:123-171]`. **One form, two
-   reviewer fields, structured and unstructured, and the bug lives entirely on
-   the unstructured one.** That is the strongest available evidence for the
-   proposal, and it is internal rather than theoretical.
+2. ~~**The same intake form already proves the approach.**~~ **RETRACTED
+   2026-08-01 (§3.3).** I argued that the applicant-recommended path is immune
+   because its slots hold exact person GUIDs
+   `[VERIFIED via applicant-reviewers-service.js:43-55,100-105]` while the
+   excluded field is free text. The GUID half is true and the conclusion was
+   still wrong: those person records are **created by the akoyaGO intake
+   integration from whatever the applicant typed**, so a single line naming two
+   reviewers becomes one malformed person record — confirmed on the Lima record,
+   `createdby "# BCO akoyaGO Integration"`. **Exactness at the lookup layer says
+   nothing about data quality at the record-creation layer**, and the ~47
+   credential-suffix rows are the same failure at scale. The corrected version
+   of this point is stronger, not weaker: *both* applicant reviewer inputs are
+   free text underneath, so **the recommended-reviewer entry format deserves the
+   fix more than the excluded-reviewer wording does** — see the reprioritized ask
+   below.
 3. **Fixing the input is cheaper than parsing the output — and this holds for
    both surfaces.** *(Corrected 2026-08-01 on owner input: I previously wrote
    that parsing was "the only option" for the intake field because we do not own
@@ -978,6 +1016,19 @@ Revised position:
 - **Referrals: structure them.** Unchanged and well-supported — Finding C is a
   verified mechanism with a real duplicate behind it, and the email/institution
   anchors materially improve dedupe (reason 1 above).
+- **PRIORITY ORDER FOR CONNOR, revised 2026-08-01 (§3.3).** If only one intake
+  change is made, make it to the **recommended-reviewer entry**, not the
+  excluded-reviewer wording. Rationale: those entries become
+  `wmkf_potentialreviewers` **person records** that feed identity resolution,
+  contact promotion, COI, and invitations — a malformed one needs hand-repair
+  (the owner repaired Lima's on 2026-08-01) and may silently drop a second
+  reviewer entirely. Exclusion text, by contrast, feeds only a name soft-block
+  and its worst observed failure is a no-op. Ask for: **one reviewer per line
+  (or separate fields), full name as published, no degrees or titles,
+  institution in its own field.** That single change addresses the confirmed
+  Lima concatenation, the ~47 credential-suffix rows, and the Finding-C
+  create-duplicate path at their common source.
+
 - **Excluded reviewers: no schema change; a prompt-copy change is worth it, but
   for a different reason than the one proposed.** *(Owner, 2026-08-01: Connor
   can add a phrase requesting names only, blank otherwise.)* Endorsed — but the
