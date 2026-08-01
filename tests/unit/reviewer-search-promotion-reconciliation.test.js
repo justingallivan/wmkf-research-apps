@@ -185,7 +185,7 @@ test('stale promote conflict reloads server truth instead of restoring the revie
   fireEvent.click(await screen.findByText(/Excluded \(1\)/i));
   fireEvent.click(screen.getByRole('button', { name: /Promote back/i }));
 
-  expect(await screen.findByText(/changed elsewhere, so the reviewer roster was reloaded/i)).toBeInTheDocument();
+  expect(await screen.findByText(/no longer actionable, so the reviewer roster was reloaded/i)).toBeInTheDocument();
   expect(screen.queryByText(/Excluded \(1\)/i)).not.toBeInTheDocument();
   expect(rosterLoads).toBe(2);
 });

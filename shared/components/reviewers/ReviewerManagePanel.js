@@ -1151,7 +1151,7 @@ function referralContextLine(context) {
 // The compact right-side action for one referral row (idle / adding / added /
 // error). The 'confirm' state renders a full-width picker below instead — see
 // ReferralConfirm — so it is not handled here.
-function ReferralAction({ referral, state, canManage, onAdd, onGoToInvite }) {
+function ReferralAction({ referral, state, canManage, onAdd, onGoToInvite, onNavigate }) {
   const status = state?.status;
   if (status === 'adding') {
     return <span className="shrink-0 text-xs text-amber-800">Adding…</span>;
@@ -1178,6 +1178,31 @@ function ReferralAction({ referral, state, canManage, onAdd, onGoToInvite }) {
         {canManage && onAdd && (
           <button type="button" onClick={() => onAdd(referral)} className="text-xs text-amber-900 underline">
             Try again
+          </button>
+        )}
+      </div>
+    );
+  }
+  if (status === 'remedy') {
+    const target = state.outcome === 'promotion_required'
+      ? 'find'
+      : state.outcome === 'restore_required' || state.stage === 'selected'
+        ? 'candidates'
+        : 'track';
+    const targetLabel = target === 'find'
+      ? 'Open Find'
+      : state.outcome === 'restore_required'
+        ? 'Open Removed'
+        : target === 'candidates'
+          ? 'Open Invite'
+          : 'Open Track';
+    return (
+      <div className="shrink-0 text-right max-w-[18rem]">
+        <p className="text-xs font-medium text-amber-800">Already known to this request</p>
+        <p className="text-[11px] text-amber-700">{state.remedy}</p>
+        {onNavigate && (
+          <button type="button" onClick={() => onNavigate(target)} className="text-xs text-amber-900 underline">
+            {targetLabel}
           </button>
         )}
       </div>
@@ -1270,6 +1295,7 @@ export default function ReviewerManagePanel({
   referralActions = {},
   onAddReferral,
   onGoToInvite,
+  onNavigate,
   onDismissReferral,
 }) {
   const [selectedReviewers, setSelectedReviewers] = useState(new Set());
@@ -1503,6 +1529,7 @@ export default function ReviewerManagePanel({
                         canManage={canManage}
                         onAdd={onAddReferral}
                         onGoToInvite={onGoToInvite}
+                        onNavigate={onNavigate}
                       />
                     )}
                   </div>

@@ -19,6 +19,11 @@ import {
 } from '../../lib/dataverse/adapters/potential-reviewer.js';
 
 function err412() { const e = new Error('Precondition Failed'); e.status = 412; return e; }
+function duplicateConflict() {
+  const e = new Error('A record with matching key values already exists');
+  e.status = 412;
+  return e;
+}
 
 const ENGAGEMENT_STAMP_RESET_PAYLOAD = {
   wmkf_accepted: false,
@@ -104,7 +109,42 @@ describe('reviewer-suggestion.setMatchReason — atomic match-reason write', () 
 });
 
 describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excluded wins', () => {
-  test('re-adding a REMOVED row re-selects, unions staff_manual, and clears stale engagement stamps (S343)', async () => {
+  test.each([
+    ['unengaged applicant row', { wmkf_selected: false }, 'promotion_required', 'recommended'],
+    ['declined applicant row', { wmkf_selected: false, wmkf_declined: true }, 'restore_required', 'declined'],
+    ['already-invited applicant row', { wmkf_selected: true, wmkf_invited: true }, 'already_handled', 'invited'],
+  ])('%s unions provenance without selecting or resetting engagement', async (_label, engagement, outcome, stage) => {
+    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
+      records: [{
+        wmkf_appreviewersuggestionid: 'sug-applicant',
+        _etag: 'W/"applicant"',
+        wmkf_sources: 'applicant',
+        wmkf_applicantdisposition: 100000000,
+        ...engagement,
+      }],
+    });
+    const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    const result = await ensureStaffManualCandidate({
+      potentialReviewerId: 'pr-applicant',
+      requestId: 'req-applicant',
+      sources: ['staff_manual', 'referred'],
+    }, { actingUserSystemId: 'u1' });
+
+    expect(result).toEqual({
+      id: 'sug-applicant',
+      created: false,
+      selected: false,
+      outcome,
+      stage,
+    });
+    const payload = patch.mock.calls[0][2];
+    expect(payload).toEqual({ wmkf_sources: 'applicant,staff_manual,referred' });
+    expect(payload).not.toHaveProperty('wmkf_selected');
+    for (const field of ENGAGEMENT_STAMP_RESET_FIELDS) expect(payload).not.toHaveProperty(field);
+  });
+
+  test('source-only applicant provenance stays unselected and preserves completed engagement', async () => {
     jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
       records: [{
         wmkf_appreviewersuggestionid: 'sug-1',
@@ -139,50 +179,83 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
       matchReason: 'Manual note',
     }, { actingUserSystemId: 'u1' });
 
-    expect(out).toEqual({ id: 'sug-1', created: false, selected: true });
+    expect(out).toEqual({
+      id: 'sug-1',
+      created: false,
+      selected: false,
+      outcome: 'already_handled',
+      stage: 'completed',
+    });
     expect(create).not.toHaveBeenCalled();
-    // Fresh start: engagement stamps cleared so the row returns invitable/remindable.
     expect(patch).toHaveBeenCalledWith('wmkf_appreviewersuggestions', 'sug-1', {
       wmkf_sources: 'pubmed,applicant,staff_manual',
-      wmkf_selected: true,
-      ...ENGAGEMENT_STAMP_RESET_PAYLOAD,
     }, { actingUserSystemId: 'u1', ifMatch: 'W/"1"' });
+    const payload = patch.mock.calls[0][2];
+    expect(payload).not.toHaveProperty('wmkf_selected');
+    for (const field of ENGAGEMENT_STAMP_RESET_FIELDS) expect(payload).not.toHaveProperty(field);
   });
 
-  test('re-adding an ALREADY-ACTIVE row must NOT wipe its live invitation (S343)', async () => {
+  test.each([
+    ['declined removed row', { wmkf_selected: false, wmkf_declined: true }, 'restore_required', 'declined'],
+    ['already-selected row', { wmkf_selected: true }, 'already_handled', 'selected'],
+    ['already-invited row', { wmkf_selected: true, wmkf_invited: true }, 'already_handled', 'invited'],
+  ])('re-adding a non-applicant %s returns a typed remedy without lifecycle mutation', async (_label, engagement, outcome, stage) => {
     jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
       records: [{
         wmkf_appreviewersuggestionid: 'sug-live',
         _etag: 'W/"live"',
         wmkf_sources: 'staff_manual',
-        wmkf_selected: true, // already in the pool, genuinely invited
         wmkf_applicantdisposition: null,
-        wmkf_invited: true,
+        ...engagement,
         wmkf_emailsentat: '2026-07-02T00:00:00Z',
-        wmkf_respondremindersentat: '2026-07-03T00:00:00Z',
-        wmkf_remindersentat: '2026-07-04T00:00:00Z',
-        wmkf_remindercount: 2,
-        wmkf_materialssentat: '2026-07-05T00:00:00Z',
-        wmkf_reviewreceivedat: '2026-07-06T00:00:00Z',
-        wmkf_responsereceivedat: '2026-07-07T00:00:00Z',
-        wmkf_thankyousentat: '2026-07-08T00:00:00Z',
-        wmkf_completedat: '2026-07-09T00:00:00Z',
-        wmkf_withdrawnsufficientat: '2026-07-10T00:00:00Z',
-        wmkf_proposalfirstaccessed: '2026-07-11T00:00:00Z',
       }],
     });
     const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
 
-    await ensureStaffManualCandidate({
+    const out = await ensureStaffManualCandidate({
+      potentialReviewerId: 'pr-1',
+      requestId: 'req-1',
+      sources: ['staff_manual', 'referred'],
+    }, { actingUserSystemId: 'u1' });
+
+    expect(out).toEqual({
+      id: 'sug-live',
+      created: false,
+      selected: engagement.wmkf_selected === true,
+      outcome,
+      stage,
+    });
+    const [, , payload] = patch.mock.calls[0];
+    expect(payload).toEqual({ wmkf_sources: 'staff_manual,referred' });
+    expect(payload).not.toHaveProperty('wmkf_selected');
+    for (const field of ENGAGEMENT_STAMP_RESET_FIELDS) {
+      expect(payload).not.toHaveProperty(field);
+    }
+  });
+
+  test('re-adding an unengaged removed non-applicant row still selects it', async () => {
+    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
+      records: [{
+        wmkf_appreviewersuggestionid: 'sug-removed',
+        _etag: 'W/"removed"',
+        wmkf_sources: 'pubmed',
+        wmkf_selected: false,
+        wmkf_applicantdisposition: null,
+      }],
+    });
+    const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    const out = await ensureStaffManualCandidate({
       potentialReviewerId: 'pr-1',
       requestId: 'req-1',
     }, { actingUserSystemId: 'u1' });
 
-    // Only the source union + selected touch — NO engagement-reset keys present.
-    const [, , payload] = patch.mock.calls[0];
-    for (const field of ENGAGEMENT_STAMP_RESET_FIELDS) {
-      expect(payload).not.toHaveProperty(field);
-    }
+    expect(out).toEqual({ id: 'sug-removed', created: false, selected: true });
+    expect(patch.mock.calls[0][2]).toEqual({
+      wmkf_sources: 'pubmed,staff_manual',
+      wmkf_selected: true,
+      ...ENGAGEMENT_STAMP_RESET_PAYLOAD,
+    });
   });
 
   test('412 on removed-row re-add re-reads and does not reset stamps if the row is now active', async () => {
@@ -194,10 +267,6 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
           wmkf_sources: 'pubmed',
           wmkf_selected: false,
           wmkf_applicantdisposition: null,
-          wmkf_invited: true,
-          wmkf_emailsentat: '2026-07-02T00:00:00Z',
-          wmkf_remindersentat: '2026-07-03T00:00:00Z',
-          wmkf_reviewreceivedat: '2026-07-04T00:00:00Z',
         }],
       })
       .mockResolvedValueOnce({
@@ -222,7 +291,13 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
       requestId: 'req-1',
     }, { actingUserSystemId: 'u1' });
 
-    expect(out).toEqual({ id: 'sug-race', created: false, selected: true });
+    expect(out).toEqual({
+      id: 'sug-race',
+      created: false,
+      selected: true,
+      outcome: 'already_handled',
+      stage: 'review_received',
+    });
     expect(patch).toHaveBeenCalledTimes(2);
     expect(patch.mock.calls[0][2]).toMatchObject(ENGAGEMENT_STAMP_RESET_PAYLOAD);
     expect(patch.mock.calls[0][3]).toEqual({ actingUserSystemId: 'u1', ifMatch: 'W/"1"' });
@@ -230,12 +305,59 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
     const [, , retryPayload, retryOpts] = patch.mock.calls[1];
     expect(retryPayload).toEqual({
       wmkf_sources: 'pubmed,invited_elsewhere,staff_manual',
-      wmkf_selected: true,
     });
     for (const field of ENGAGEMENT_STAMP_RESET_FIELDS) {
       expect(retryPayload).not.toHaveProperty(field);
     }
     expect(retryOpts).toEqual({ actingUserSystemId: 'u1', ifMatch: 'W/"2"' });
+  });
+
+  test('412 on staff re-add routes a fresh applicant-provenance row through promotion gating', async () => {
+    jest.spyOn(DynamicsService, 'queryRecords')
+      .mockResolvedValueOnce({
+        records: [{
+          wmkf_appreviewersuggestionid: 'sug-applicant-race',
+          _etag: 'W/"1"',
+          wmkf_sources: 'pubmed',
+          wmkf_selected: false,
+          wmkf_applicantdisposition: null,
+        }],
+      })
+      .mockResolvedValueOnce({
+        records: [{
+          wmkf_appreviewersuggestionid: 'sug-applicant-race',
+          _etag: 'W/"2"',
+          wmkf_sources: 'pubmed,applicant',
+          wmkf_selected: false,
+          wmkf_applicantdisposition: 100000000,
+        }],
+      });
+    const patch = jest.spyOn(DynamicsService, 'updateRecord')
+      .mockRejectedValueOnce(err412())
+      .mockResolvedValueOnce(undefined);
+
+    const out = await ensureStaffManualCandidate({
+      potentialReviewerId: 'pr-applicant-race',
+      requestId: 'req-applicant-race',
+      sources: ['staff_manual', 'referred'],
+    }, { actingUserSystemId: 'u1' });
+
+    expect(out).toEqual({
+      id: 'sug-applicant-race',
+      created: false,
+      selected: false,
+      outcome: 'promotion_required',
+      stage: 'recommended',
+    });
+    expect(patch).toHaveBeenCalledTimes(2);
+    expect(patch.mock.calls[1][2]).toEqual({
+      wmkf_sources: 'pubmed,applicant,staff_manual,referred',
+    });
+    expect(patch.mock.calls[1][3]).toEqual({ actingUserSystemId: 'u1', ifMatch: 'W/"2"' });
+    expect(patch.mock.calls[1][2]).not.toHaveProperty('wmkf_selected');
+    for (const field of ENGAGEMENT_STAMP_RESET_FIELDS) {
+      expect(patch.mock.calls[1][2]).not.toHaveProperty(field);
+    }
   });
 
   test('existing excluded row is not resurrected', async () => {
@@ -256,6 +378,97 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
 
     expect(out).toEqual({ id: 'sug-ex', created: false, selected: false, skippedExcluded: true });
     expect(patch).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['unengaged winner', { wmkf_selected: false }, 'promotion_required', 'recommended'],
+    ['declined winner', { wmkf_selected: false, wmkf_declined: true }, 'restore_required', 'declined'],
+    ['invited winner', { wmkf_selected: true, wmkf_invited: true }, 'already_handled', 'invited'],
+  ])('create-conflict recovery keeps an applicant %s provenance-only', async (_label, engagement, outcome, stage) => {
+    jest.spyOn(DynamicsService, 'queryRecords')
+      .mockResolvedValueOnce({ records: [] })
+      .mockResolvedValueOnce({
+        records: [{
+          wmkf_appreviewersuggestionid: 'sug-race-winner',
+          _etag: 'W/"winner"',
+          wmkf_sources: 'applicant',
+          wmkf_applicantdisposition: 100000000,
+          ...engagement,
+        }],
+      });
+    jest.spyOn(DynamicsService, 'createRecord').mockRejectedValue(duplicateConflict());
+    const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    const out = await ensureStaffManualCandidate({
+      potentialReviewerId: 'pr-race',
+      requestId: 'req-race',
+      sources: ['staff_manual', 'referred'],
+    }, { actingUserSystemId: 'u1' });
+
+    expect(out).toEqual({
+      id: 'sug-race-winner',
+      created: false,
+      selected: false,
+      outcome,
+      stage,
+    });
+    expect(patch).toHaveBeenCalledWith(
+      'wmkf_appreviewersuggestions',
+      'sug-race-winner',
+      { wmkf_sources: 'applicant,staff_manual,referred' },
+      { actingUserSystemId: 'u1', ifMatch: 'W/"winner"' },
+    );
+    expect(patch.mock.calls[0][2]).not.toHaveProperty('wmkf_selected');
+    for (const field of ENGAGEMENT_STAMP_RESET_FIELDS) {
+      expect(patch.mock.calls[0][2]).not.toHaveProperty(field);
+    }
+  });
+
+  test('applicant provenance-only 412 retry re-reads engagement before retrying', async () => {
+    jest.spyOn(DynamicsService, 'queryRecords')
+      .mockResolvedValueOnce({
+        records: [{
+          wmkf_appreviewersuggestionid: 'sug-app-race',
+          _etag: 'W/"1"',
+          wmkf_sources: 'applicant',
+          wmkf_applicantdisposition: 100000000,
+          wmkf_selected: false,
+        }],
+      })
+      .mockResolvedValueOnce({
+        records: [{
+          wmkf_appreviewersuggestionid: 'sug-app-race',
+          _etag: 'W/"2"',
+          wmkf_sources: 'applicant,updated_elsewhere',
+          wmkf_applicantdisposition: 100000000,
+          wmkf_selected: true,
+          wmkf_invited: true,
+        }],
+      });
+    const patch = jest.spyOn(DynamicsService, 'updateRecord')
+      .mockRejectedValueOnce(err412())
+      .mockResolvedValueOnce(undefined);
+
+    const out = await ensureStaffManualCandidate({
+      potentialReviewerId: 'pr-app-race',
+      requestId: 'req-app-race',
+      sources: ['staff_manual', 'referred'],
+    }, { actingUserSystemId: 'u1' });
+
+    expect(out).toEqual({
+      id: 'sug-app-race',
+      created: false,
+      selected: false,
+      outcome: 'already_handled',
+      stage: 'invited',
+    });
+    expect(patch).toHaveBeenCalledTimes(2);
+    expect(patch.mock.calls[0][2]).toEqual({ wmkf_sources: 'applicant,staff_manual,referred' });
+    expect(patch.mock.calls[0][3]).toEqual({ actingUserSystemId: 'u1', ifMatch: 'W/"1"' });
+    expect(patch.mock.calls[1][2]).toEqual({
+      wmkf_sources: 'applicant,updated_elsewhere,staff_manual,referred',
+    });
+    expect(patch.mock.calls[1][3]).toEqual({ actingUserSystemId: 'u1', ifMatch: 'W/"2"' });
   });
 
   test('new row writes staff_manual and request/person binds', async () => {

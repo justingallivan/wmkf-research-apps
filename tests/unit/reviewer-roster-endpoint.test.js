@@ -34,6 +34,12 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
     allNames: ['Applicant Person', 'Excluded Person', 'Saved Person'],
   })),
 }));
+const mockReconcileRosterEngagement = jest.fn(async ({ roster }) => roster);
+const mockValidateRosterPromotionEngagement = jest.fn(async () => ({ allowed: true }));
+jest.mock('../../lib/services/workbench/reviewer-roster-projection-service', () => ({
+  reconcileRosterEngagement: (...args) => mockReconcileRosterEngagement(...args),
+  validateRosterPromotionEngagement: (...args) => mockValidateRosterPromotionEngagement(...args),
+}));
 
 import handler from '../../pages/api/workbench/reviewer-roster';
 import { requireAppAccess } from '../../lib/utils/auth';
@@ -57,6 +63,7 @@ beforeEach(() => {
   store.findCandidateBySuggestion.mockResolvedValue(null);
   store.findCandidateBySuggestionAnchor.mockResolvedValue(null);
   store.findCandidatesByKeys.mockResolvedValue([]);
+  mockValidateRosterPromotionEngagement.mockResolvedValue({ allowed: true });
 });
 
 describe('auth', () => {
@@ -82,6 +89,10 @@ describe('GET', () => {
     await handler({ method: 'GET', query: { requestId: REQ } }, r);
     expect(r.statusCode).toBe(200);
     expect(store.listForRequest).toHaveBeenCalledWith(REQ);
+    expect(mockReconcileRosterEngagement).toHaveBeenCalledWith({
+      requestId: REQ,
+      roster: { active: [{ name: 'Ann' }], excluded: [], allNames: ['Ann'] },
+    });
     expect(r.body.active).toEqual([{ name: 'Ann' }]);
   });
 });
@@ -594,6 +605,11 @@ describe('PATCH', () => {
   });
 
   it('promote → returns the restored blob', async () => {
+    store.findCandidatesByKeys.mockResolvedValueOnce([{
+      name: 'Bob Roe',
+      candidateKey: 'candidate:bob',
+      rosterStatus: 'excluded',
+    }]);
     const r = res();
     await handler({ method: 'PATCH', body: { requestId: REQ, action: 'promote', candidateKey: 'candidate:bob' } }, r);
     expect(r.statusCode).toBe(200);
@@ -602,7 +618,6 @@ describe('PATCH', () => {
   });
 
   it('promote → 409 when the candidate is no longer excluded', async () => {
-    store.promote.mockResolvedValueOnce(null);
     const r = res();
     await handler({ method: 'PATCH', body: { requestId: REQ, action: 'promote', candidateKey: 'candidate:stale' } }, r);
     expect(r.statusCode).toBe(409);
@@ -610,6 +625,31 @@ describe('PATCH', () => {
       success: false,
       code: 'candidate_not_excluded',
     });
+    expect(store.promote).not.toHaveBeenCalled();
+  });
+
+  it('promote → 409 when Dataverse says the anchored reviewer is handled', async () => {
+    store.findCandidatesByKeys.mockResolvedValueOnce([{
+      name: 'Handled Reviewer',
+      candidateKey: `suggestion:${REQ}`,
+      suggestionId: REQ,
+      rosterStatus: 'excluded',
+    }]);
+    mockValidateRosterPromotionEngagement.mockResolvedValueOnce({
+      allowed: false,
+      code: 'reviewer_already_handled',
+      stage: 'declined',
+      error: 'This reviewer has already entered the engagement lifecycle.',
+    });
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'promote',
+      candidateKey: `suggestion:${REQ}`,
+    } }, r);
+    expect(r.statusCode).toBe(409);
+    expect(r.body).toMatchObject({ code: 'reviewer_already_handled', stage: 'declined' });
+    expect(store.promote).not.toHaveBeenCalled();
   });
 
   it('saved → 409 because promotion services own the roster transition', async () => {

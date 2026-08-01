@@ -26,6 +26,7 @@ const {
   findApplicantRecommendedByRequest,
   upsert,
   updateLifecycle,
+  selectIfUnengaged,
   ensureApplicantRecommended,
   restore,
   APPLICANT_DISPOSITION_EXCLUDED,
@@ -183,6 +184,61 @@ describe('findById action chokepoint', () => {
     };
     DynamicsService.getRecord.mockResolvedValue(row);
     await expect(findById(SUGGESTION_ID)).resolves.toBe(row);
+  });
+});
+
+describe('selectIfUnengaged compare-and-set', () => {
+  test('selects from a fresh unengaged read with that row ETag', async () => {
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      wmkf_selected: false,
+      wmkf_invited: false,
+      wmkf_accepted: false,
+      wmkf_declined: false,
+      _etag: 'W/"51"',
+    });
+
+    await expect(selectIfUnengaged(SUGGESTION_ID, { actingUserSystemId: 'SYS-1' }))
+      .resolves.toEqual({ selected: true });
+
+    expect(DynamicsService.updateRecord).toHaveBeenCalledWith(
+      'wmkf_appreviewersuggestions',
+      SUGGESTION_ID,
+      { wmkf_selected: true },
+      { actingUserSystemId: 'SYS-1', ifMatch: 'W/"51"' },
+    );
+  });
+
+  test('refuses an already-declined row before any PATCH', async () => {
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      wmkf_selected: false,
+      wmkf_declined: true,
+      _etag: 'W/"52"',
+    });
+
+    await expect(selectIfUnengaged(SUGGESTION_ID)).rejects.toMatchObject({
+      code: 'reviewer_engagement_changed',
+      status: 409,
+    });
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('turns an ETag race at the final PATCH into a reload-required conflict', async () => {
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      wmkf_selected: false,
+      wmkf_declined: false,
+      _etag: 'W/"53"',
+    });
+    DynamicsService.updateRecord.mockRejectedValue(
+      Object.assign(new Error('Precondition failed'), { status: 412 }),
+    );
+
+    await expect(selectIfUnengaged(SUGGESTION_ID)).rejects.toMatchObject({
+      code: 'reviewer_engagement_changed',
+      status: 409,
+    });
   });
 });
 
@@ -374,7 +430,12 @@ describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
       matchReason: 'Recommended by applicant (legacy reviewer slot).',
     });
 
-    expect(result).toEqual({ id: SUGGESTION_ID, created: true, selected: false });
+    expect(result).toEqual({
+      id: SUGGESTION_ID,
+      created: true,
+      selected: false,
+      engagement: expect.objectContaining({ handled: false, stage: null }),
+    });
     const payload = DynamicsService.createRecord.mock.calls[0][1];
     expect(payload.wmkf_selected).toBe(false);
     expect(payload.wmkf_applicantdisposition).toBe(APPLICANT_DISPOSITION_MAP.recommended);
@@ -390,6 +451,7 @@ describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
         wmkf_applicantdisposition: null,
         wmkf_sources: 'claude,pubmed',
         wmkf_suggestionlabel: 'Existing label',
+        wmkf_selected: true,
       }],
     });
 
@@ -400,7 +462,12 @@ describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
       grantCycleCode: 'D26',
     });
 
-    expect(result).toEqual({ id: SUGGESTION_ID, created: false, selected: true });
+    expect(result).toEqual({
+      id: SUGGESTION_ID,
+      created: false,
+      selected: true,
+      engagement: expect.objectContaining({ handled: true, stage: 'selected' }),
+    });
     expect(DynamicsService.createRecord).not.toHaveBeenCalled();
     const payload = DynamicsService.updateRecord.mock.calls[0][2];
     expect(payload.wmkf_sources).toBe('claude,pubmed,applicant');
@@ -425,7 +492,12 @@ describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
 
     const result = await ensureApplicantRecommended({ potentialReviewerId: PR_ID, requestId: REQUEST_ID });
 
-    expect(result).toEqual({ id: SUGGESTION_ID, created: false, selected: false });
+    expect(result).toEqual({
+      id: SUGGESTION_ID,
+      created: false,
+      selected: false,
+      engagement: expect.objectContaining({ handled: false, stage: null }),
+    });
     const payload = DynamicsService.updateRecord.mock.calls[0][2];
     // The update must NOT flip wmkf_selected back to true.
     expect(payload.wmkf_selected).toBeUndefined();
@@ -473,12 +545,18 @@ describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
         wmkf_appreviewersuggestionid: SUGGESTION_ID,
         wmkf_applicantdisposition: null,
         wmkf_sources: 'claude',
+        wmkf_selected: true,
       }] });
     DynamicsService.createRecord.mockRejectedValue(Object.assign(new Error('Duplicate alternate key'), { status: 412 }));
 
     const result = await ensureApplicantRecommended({ potentialReviewerId: PR_ID, requestId: REQUEST_ID });
 
-    expect(result).toEqual({ id: SUGGESTION_ID, created: false, selected: true });
+    expect(result).toEqual({
+      id: SUGGESTION_ID,
+      created: false,
+      selected: true,
+      engagement: expect.objectContaining({ handled: true, stage: 'selected' }),
+    });
     const payload = DynamicsService.updateRecord.mock.calls[0][2];
     expect(payload.wmkf_sources).toBe('claude,applicant');
     expect(payload.wmkf_applicantdisposition).toBe(APPLICANT_DISPOSITION_MAP.recommended);
@@ -492,6 +570,7 @@ describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
         wmkf_appreviewersuggestionid: SUGGESTION_ID,
         wmkf_applicantdisposition: null,
         wmkf_sources: 'applicant',
+        wmkf_selected: true,
       }] });
     // No HTTP status, but the Dataverse duplicate-key message is present.
     DynamicsService.createRecord.mockRejectedValue(
@@ -500,7 +579,12 @@ describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
 
     const result = await ensureApplicantRecommended({ potentialReviewerId: PR_ID, requestId: REQUEST_ID });
 
-    expect(result).toEqual({ id: SUGGESTION_ID, created: false, selected: true });
+    expect(result).toEqual({
+      id: SUGGESTION_ID,
+      created: false,
+      selected: true,
+      engagement: expect.objectContaining({ handled: true, stage: 'selected' }),
+    });
     expect(DynamicsService.updateRecord).toHaveBeenCalled();
   });
 
@@ -545,6 +629,8 @@ describe('upsert never converts an excluded row into a candidate', () => {
     const winner = {
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
       wmkf_applicantdisposition: null,
+      wmkf_selected: false,
+      _etag: 'W/"winner"',
     };
     DynamicsService.queryRecords
       .mockResolvedValueOnce({ records: [] })
@@ -565,8 +651,45 @@ describe('upsert never converts an excluded row into a candidate', () => {
       'wmkf_appreviewersuggestions',
       SUGGESTION_ID,
       expect.objectContaining({ wmkf_selected: true, wmkf_sources: 'claude' }),
-      { actingUserSystemId: undefined },
+      { actingUserSystemId: undefined, ifMatch: 'W/"winner"' },
     );
+  });
+
+  test('refuses to reselect an existing declined row', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({
+      records: [{
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        wmkf_selected: false,
+        wmkf_declined: true,
+        _etag: 'W/"declined"',
+      }],
+    });
+
+    await expect(upsert({
+      potentialReviewerId: PR_ID,
+      requestId: REQUEST_ID,
+      sources: 'claude',
+      selected: true,
+    })).rejects.toMatchObject({ code: 'reviewer_engagement_changed', status: 409 });
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('translates a concurrent lifecycle update into a typed selection conflict', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({
+      records: [{
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        wmkf_selected: false,
+        _etag: 'W/"before"',
+      }],
+    });
+    DynamicsService.updateRecord.mockRejectedValue(Object.assign(new Error('precondition failed'), { status: 412 }));
+
+    await expect(upsert({
+      potentialReviewerId: PR_ID,
+      requestId: REQUEST_ID,
+      sources: 'claude',
+      selected: true,
+    })).rejects.toMatchObject({ code: 'reviewer_engagement_changed', status: 409 });
   });
 });
 

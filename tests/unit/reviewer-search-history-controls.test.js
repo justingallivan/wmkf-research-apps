@@ -115,6 +115,99 @@ test('restored incomplete PubMed COI checks remain selectable but show one compa
   expect(screen.getByLabelText(`Select ${incompleteCandidate.name}`)).toBeInTheDocument();
 });
 
+test('a handled suggestion-anchored roster row renders only in the Already handled summary with navigation', async () => {
+  const onNavigate = jest.fn();
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [],
+        excluded: [],
+        ineligible: [],
+        handled: [{
+          suggestionId: '22222222-2222-2222-2222-222222222222',
+          candidateKey: 'suggestion:22222222-2222-2222-2222-222222222222',
+          name: 'Already Invited Search Result',
+          stage: 'invited',
+        }],
+        allNames: ['Already Invited Search Result'],
+      }));
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  render(
+    <ReviewerSearchSection
+      requestId={REQ}
+      blobUrl="blob"
+      proposalKey="proposal"
+      onNavigate={onNavigate}
+    />,
+  );
+
+  expect(await screen.findByText('Already handled')).toBeInTheDocument();
+  expect(screen.getByText('Already Invited Search Result')).toBeInTheDocument();
+  expect(screen.queryByLabelText('Select Already Invited Search Result')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Open Track' }));
+  expect(onNavigate).toHaveBeenCalledWith('track');
+});
+
+test('a declined handled row navigates to Removed instead of Track', async () => {
+  const onNavigate = jest.fn();
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [],
+        excluded: [],
+        ineligible: [],
+        handled: [{
+          suggestionId: '22222222-2222-2222-2222-222222222223',
+          candidateKey: 'suggestion:22222222-2222-2222-2222-222222222223',
+          name: 'Declined Reviewer',
+          stage: 'declined',
+        }],
+        allNames: ['Declined Reviewer'],
+      }));
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" onNavigate={onNavigate} />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Open Removed' }));
+  expect(onNavigate).toHaveBeenCalledWith('candidates');
+});
+
+test('a failed authoritative roster load blocks search until an explicit retry succeeds', async () => {
+  let attempts = 0;
+  global.fetch = jest.fn((url) => {
+    if (String(url).includes('/api/workbench/reviewer-roster?')) {
+      attempts += 1;
+      if (attempts === 1) return Promise.resolve(response({ error: 'failed' }, false, 500));
+      return Promise.resolve(response({
+        success: true,
+        active: [],
+        excluded: [],
+        ineligible: [],
+        blocked: [],
+        handled: [],
+        allNames: [],
+      }));
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+
+  expect(await screen.findByText(/Reviewer engagement could not be reconciled/i)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Run reviewer search' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Retry reviewer state' }));
+  expect(await screen.findByRole('button', { name: 'Run reviewer search' })).toBeEnabled();
+  expect(attempts).toBe(2);
+});
+
 test('a completed unresolved applicant run offers a manual applicant-suggestion update', async () => {
   const suggestionId = '33333333-3333-3333-3333-333333333333';
   const unresolvedApplicant = {

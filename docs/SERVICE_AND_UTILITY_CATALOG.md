@@ -111,6 +111,11 @@ If you're touching a service or utility, read its header before this catalog. If
   actor-bound staff identity confirmation; only the successful Dataverse
   promotion service can finalize exact keys as `saved`, while authoritative
   applicant-excluded collisions become `blocked`.
+- **`workbench/reviewer-roster-projection-service.js`** — Read-only Find-roster
+  overlay that completely batches one request's visible suggestion anchors
+  through Dataverse, removes already-engaged rows from working-state buckets,
+  emits compact `handled` stage entries, and validates excluded→active
+  promotion; missing suggestion anchors fail closed.
 - **`reviewer-candidate-attestation.js`** — `NEXTAUTH_SECRET`-signed
   request/candidate receipt. Projection v3 binds the exact canonical contact
   projection in addition to identity/eligibility; v1/v2 remain verifiable
