@@ -87,6 +87,29 @@ describe('CandidateCard email readiness', () => {
     );
   });
 
+  test('lets a current address-trust receipt override stale enrichment readiness', () => {
+    renderCandidate({
+      email: 'verified@example.edu',
+      emailSource: 'manual',
+      addressTrustReceipt: {
+        personConfirmed: true,
+        email: 'verified@example.edu',
+      },
+      contactEnrichment: {
+        email: 'verified@example.edu',
+        emailSource: 'affiliation',
+        emailAction: 'quick_check',
+        emailActionReason: 'Derived from an affiliation string — not verified against the identity',
+      },
+    });
+
+    expect(screen.getByText('✓ High-confidence email')).toHaveAttribute(
+      'title',
+      'Staff verified this exact person and address for promotion. Confidence reflects address provenance and identity-grounded evidence, not deliverability.'
+    );
+    expect(screen.queryByText('⚠ Email needs confirmation')).not.toBeInTheDocument();
+  });
+
   test('surfaces missing contact instead of implying enrichment succeeded', () => {
     renderCandidate({ email: null, contactEnrichment: {} });
 

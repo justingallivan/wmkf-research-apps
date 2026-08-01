@@ -242,16 +242,12 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
     ? (c.emailSource || enr.emailSource || null)
     : (knownReviewer?.emailSource || c.emailSource || enr.emailSource || null);
   const emailReadiness = getCandidateEmailReadiness(c);
-  const emailAction = email
-    ? (!manualEmail && knownReviewer?.email
-      ? emailReadiness.action
-      : (enr.emailAction || c.emailAction || emailReadiness.action))
-    : 'missing';
-  const emailActionReason = email
-    ? (!manualEmail && knownReviewer?.email
-      ? emailReadiness.reason
-      : (enr.emailActionReason || c.emailActionReason || emailReadiness.reason))
-    : emailReadiness.reason;
+  // The shared readiness projection includes the current address-trust receipt.
+  // Do not let an older enrichment-time emailAction override a later staff
+  // attestation; that made a successfully verified roster card still render as
+  // "Email needs confirmation" until another enrichment run.
+  const emailAction = email ? emailReadiness.action : 'missing';
+  const emailActionReason = emailReadiness.reason;
   const emailEvidence = enr.emailEvidence || null;
   const evidencePublications = Array.isArray(emailEvidence?.publications)
     ? emailEvidence.publications.filter((publication) => publication?.url).slice(0, 3)
