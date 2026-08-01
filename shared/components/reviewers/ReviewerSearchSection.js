@@ -57,7 +57,7 @@ import {
   getCandidateEmailReadiness,
   normalizeReviewerName,
   pruneCandidateForRoster,
-  dedupeByNamePreferReferred,
+  dedupeReviewerCandidates,
   reviewerCandidateKey,
   withReviewerCandidateKey,
 } from './reviewer-search-logic';
@@ -128,7 +128,7 @@ function candKey(c) {
 // grafts referral provenance onto the survivor (S320) so a seeded Externally-Referred
 // reviewer that discovery also finds never loses its badge/referrer to relevance order.
 function dedupeByName(list) {
-  return dedupeByNamePreferReferred(list, candKey);
+  return dedupeReviewerCandidates(list);
 }
 
 function isApplicantOriginCandidate(c) {

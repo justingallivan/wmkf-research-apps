@@ -63,6 +63,8 @@ jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
     identityDecisionBound: true,
     contactAuthorityBound: true,
   })),
+  hasServerIdentityDecisionReceipt: jest.fn(() => false),
+  createServerIdentityDecisionReceipt: jest.fn(() => null),
 }));
 jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
   lookupReviewerIdentity: jest.fn(async () => ({ outcome: 'none' })),
@@ -91,7 +93,11 @@ const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer
 const grantRequestAdapter = require('../../lib/dataverse/adapters/grant-request');
 const reviewerRosterStore = require('../../lib/services/reviewer-roster-store');
 const { createConflictPendingState } = require('../../lib/utils/reviewer-address-trust');
-const { verifyAutomatedIdentityAttestation } = require('../../lib/services/reviewer-candidate-attestation');
+const {
+  verifyAutomatedIdentityAttestation,
+  hasServerIdentityDecisionReceipt,
+  createServerIdentityDecisionReceipt,
+} = require('../../lib/services/reviewer-candidate-attestation');
 const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity-lookup');
 const { loadCoiContext } = require('../../lib/services/reviewer-request-context');
 const { createInstitutionIdentityResolver } = require('../../lib/services/institution-identity-resolver');
@@ -148,6 +154,8 @@ beforeEach(() => {
     identityDecisionBound: true,
     contactAuthorityBound: true,
   });
+  hasServerIdentityDecisionReceipt.mockReturnValue(false);
+  createServerIdentityDecisionReceipt.mockReturnValue(null);
   lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
   loadCoiContext.mockResolvedValue({
     applicantInstitutionContext: { state: 'complete', names: ['Applicant University'] },
@@ -289,6 +297,150 @@ test.each([
   });
   expect(reviewerRosterStore.findEligibilityByCandidateKey).not.toHaveBeenCalled();
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+});
+
+test('server-owned identity and exact-address receipts recover a roster row whose contact edit invalidated its automated token', async () => {
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+    valid: false,
+    reason: 'claim_mismatch',
+  });
+  hasServerIdentityDecisionReceipt.mockReturnValueOnce(true);
+  createServerIdentityDecisionReceipt.mockReturnValueOnce({
+    version: 1,
+    source: 'automated_resolver',
+    identityDigest: 'identity-digest-1',
+  });
+  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([{
+    candidateKey: 'candidate:ellen',
+    rosterStatus: 'active',
+    name: 'Ellen Zhong',
+    email: 'zhonge@cs.princeton.edu',
+    serverIdentityDecisionReceipt: {
+      version: 1,
+      source: 'automated_resolver',
+      identityDigest: 'identity-digest-1',
+    },
+    addressTrustReceipt: {
+      receiptId: 'receipt-ellen',
+      email: 'zhonge@cs.princeton.edu',
+      personConfirmed: true,
+      requestId: BASE.requestId,
+      candidateKey: 'candidate:ellen',
+    },
+  }]);
+  reviewerRosterStore.findAddressTrustReceipt.mockResolvedValueOnce({
+    receiptId: 'receipt-ellen',
+    email: 'zhonge@cs.princeton.edu',
+    personConfirmed: true,
+    evidenceType: 'institution_page',
+    evidenceUrl: 'https://www.cs.princeton.edu/people/profile/zhonge',
+    attestedAt: '2026-08-01T22:24:29.040Z',
+  });
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'confident',
+    match: {
+      reviewerId: 'PID-ELLEN',
+      contactId: null,
+      matchKey: 'orcid',
+      nameConsistent: true,
+    },
+  });
+  potentialReviewerAdapter.getById.mockResolvedValue({
+    wmkf_potentialreviewersid: 'PID-ELLEN',
+    wmkf_name: 'Ellen Zhong',
+    wmkf_emailaddress: 'zhonge@cs.princeton.edu',
+    wmkf_emailsource: 'staff_verified',
+    wmkf_primaryaffiliation: 'Princeton University',
+    statecode: 0,
+    _etag: 'W/"ellen"',
+  });
+
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Ellen Zhong',
+      email: 'zhonge@cs.princeton.edu',
+      emailSource: 'staff_verified',
+      affiliation: 'Princeton University',
+      orcid: '0000-0001-6345-1907',
+      candidateKey: 'candidate:ellen',
+      automatedIdentityAttestation: 'stale-after-address-edit',
+      contactEnrichment: {
+        identity: { status: 'probable' },
+        email: 'zhonge@cs.princeton.edu',
+        emailSource: 'staff_verified',
+        emailPersistAllowed: true,
+        orcidId: '0000-0001-6345-1907',
+      },
+    }],
+  });
+
+  expect(out).toMatchObject({ success: true, savedCount: 1, savedNames: ['Ellen Zhong'] });
+  expect(reviewerRosterStore.findEligibilityByCandidateKey)
+    .toHaveBeenCalledWith(BASE.requestId, 'candidate:ellen');
+  expect(lookupReviewerIdentity).toHaveBeenCalledWith(expect.objectContaining({
+    name: 'Ellen Zhong',
+    email: 'zhonge@cs.princeton.edu',
+    orcid: '0000-0001-6345-1907',
+  }));
+  expect(reviewerRosterStore.finalizeCandidatePromotion).toHaveBeenCalledWith(
+    BASE.requestId,
+    expect.objectContaining({ name: 'Ellen Zhong', email: 'zhonge@cs.princeton.edu' }),
+    expect.objectContaining({ candidateKey: 'candidate:ellen' }),
+  );
+});
+
+test('server-owned identity receipt alone cannot authorize contact after an automated token mismatch', async () => {
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+    valid: false,
+    reason: 'claim_mismatch',
+  });
+  hasServerIdentityDecisionReceipt.mockReturnValueOnce(true);
+  createServerIdentityDecisionReceipt.mockReturnValueOnce({
+    version: 1,
+    source: 'automated_resolver',
+    identityDigest: 'identity-digest-1',
+  });
+  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([{
+    candidateKey: 'candidate:no-address-receipt',
+    rosterStatus: 'active',
+    name: 'Dr No Address Receipt',
+    serverIdentityDecisionReceipt: {
+      version: 1,
+      source: 'automated_resolver',
+      identityDigest: 'identity-digest-1',
+    },
+  }]);
+
+  const error = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr No Address Receipt',
+      email: 'new@example.edu',
+      emailSource: 'scholarly_multi',
+      orcid: '0000-0002-1825-0097',
+      candidateKey: 'candidate:no-address-receipt',
+      automatedIdentityAttestation: 'stale-after-contact-change',
+      contactEnrichment: {
+        identity: { status: 'probable' },
+        email: 'new@example.edu',
+        emailSource: 'scholarly_multi',
+        emailPersistAllowed: true,
+        orcidId: '0000-0002-1825-0097',
+      },
+    }],
+  }).catch((caught) => caught);
+
+  expect(error).toBeInstanceOf(SaveCandidatesError);
+  expect(error.httpStatus).toBe(422);
+  expect(error.body.errors).toEqual([
+    expect.objectContaining({
+      code: 'identity_attestation_required',
+      reason: 'contact_attestation_required',
+    }),
+  ]);
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
 });
 
 test('a roster row whose conflict write failed cannot be promoted through ordinary saving', async () => {

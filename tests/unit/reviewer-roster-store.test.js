@@ -639,6 +639,59 @@ describe('finalizeCandidatePromotion', () => {
       },
     )).resolves.toEqual({ saved: false, candidateKey: 'candidate:ann' });
   });
+
+  test('also retires active roster aliases with the same checksum-valid ORCID', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [{ candidate_key: 'candidate:ellen-legacy' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ candidate_key: 'orcid:0000-0001-6345-1907' }], rowCount: 1 });
+
+    const result = await store.finalizeCandidatePromotion(
+      REQ,
+      {
+        name: 'Ellen Zhong',
+        candidateKey: 'candidate:ellen-legacy',
+        email: 'zhonge@cs.princeton.edu',
+        orcid: '0000-0001-6345-1907',
+      },
+      {
+        candidateKey: 'candidate:ellen-legacy',
+        suggestionId: 'SUG-ELLEN',
+        potentialReviewerId: 'PID-ELLEN',
+      },
+    );
+
+    expect(result).toEqual({ saved: true, candidateKey: 'candidate:ellen-legacy' });
+    expect(sql).toHaveBeenCalledTimes(2);
+    expect(queryTextOf(1)).toMatch(/status = 'saved'/);
+    expect(queryTextOf(1)).toMatch(/candidate->>'orcid'/);
+    expect(queryTextOf(1)).toMatch(/candidate->'contactEnrichment'->>'orcidId'/);
+    expect(allInterpolations()).toEqual(expect.arrayContaining([
+      '0000-0001-6345-1907',
+      'candidate:ellen-legacy',
+    ]));
+  });
+
+  test('does not reverse a committed promotion when best-effort ORCID alias cleanup fails', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    sql
+      .mockResolvedValueOnce({ rows: [{ candidate_key: 'candidate:ellen-legacy' }], rowCount: 1 })
+      .mockRejectedValueOnce(new Error('alias cleanup unavailable'));
+
+    await expect(store.finalizeCandidatePromotion(
+      REQ,
+      { name: 'Ellen Zhong', orcid: '0000-0001-6345-1907' },
+      {
+        candidateKey: 'candidate:ellen-legacy',
+        suggestionId: 'SUG-ELLEN',
+        potentialReviewerId: 'PID-ELLEN',
+      },
+    )).resolves.toEqual({ saved: true, candidateKey: 'candidate:ellen-legacy' });
+    expect(consoleError).toHaveBeenCalledWith(
+      'reviewer-roster finalizeCandidatePromotion alias cleanup error:',
+      'alias cleanup unavailable',
+    );
+    consoleError.mockRestore();
+  });
 });
 
 describe('markPromotionBlocked', () => {

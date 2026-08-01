@@ -22,6 +22,24 @@ the GET response reaches Find. This is branch evidence only, not a Production
 claim.
 **Live row count:** 164 at verification time.
 
+**Request 1003010 incident supplement (2026-08-01; branch-only fix, not yet
+deployed):** [VERIFIED via production read-only Dataverse/Postgres probes] one
+active Ellen Zhong potential-reviewer person (`d9fd8a93-8845-f111-88b5-000d3a3065b8`)
+was projected as two active proposal-named roster rows carrying the same exact
+ORCID but different candidate keys and email evidence. The staff-attested row's
+address edit correctly changed the contact projection, but that made its older
+v3 automated token fail the contact digest before save could consume the new
+address receipt; the other alias retained the newly found unverified address.
+[VERIFIED via source + focused tests] branch
+`codex/reviewer-address-receipt-refresh` now permits recovery only from the
+current request-scoped active/saved roster row when its server-owned identity
+digest still matches the submitted identity and its request/key-bound exact
+address receipt matches the submitted email. Identity evidence alone remains
+insufficient. The client collapses search-lane aliases only on an exact person
+id or checksum-valid ORCID (never name alone), preferring the staff-attested
+projection; successful finalization also retires remaining active aliases with
+that ORCID on a best-effort basis.
+
 ## NOT a regression of the S219/migration-018 Dataverse cutover
 
 Migration 018 dropped the **canonical reviewer-identity** Postgres tables (`researchers`, `researcher_keywords`, `publications`, `proposal_searches`, `reviewer_suggestions`), whose source of truth is now Dataverse (`wmkf_potentialreviewer` / `wmkf_appreviewersuggestion`). `reviewer_find_roster` is a different concern: **operational, pre-save, per-request working state** for the Workbench Reviewers→Find tab — un-vetted search discoveries plus their render blobs. It is the same class of object as `search_cache`, which migration 018 deliberately KEPT in Postgres. The canonical saved reviewer pool still lives in Dataverse, untouched. This table is candidate-keyed. `candidate_key` prefers real person anchors already present in the surfaced DTO and otherwise uses a name/email/ORCID/affiliation correlation fingerprint. It is not an identity-resolution claim; it exists to keep same-name rows and their mutations separate. `normalized_name` remains only a conservative cross-run search-exclusion field.
@@ -122,7 +140,8 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
   (candidate-keyed upsert `active`/`ineligible`), `recordCoiDropped`,
   `setExcluded`, `promote`, `confirmIdentity`,
   `finalizeCandidatePromotion` (server-only exact-key `active`→`saved` after a
-  confirmed Dataverse suggestion success), `markPromotionBlocked`
+  confirmed Dataverse suggestion success, followed by best-effort retirement
+  of active aliases carrying the same checksum-valid ORCID), `markPromotionBlocked`
   (server-only exact-key `active`→`blocked` with decision/code/reason), and
   `removePreviousActiveSearchResults`. Terminal states are monotonic against
   ordinary result refreshes.
@@ -138,8 +157,9 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
 
 No Dataverse equivalent for the operational roster itself. Crossing points:
 `save-candidates-service.js` creates/reuses the canonical person and suggestion,
-then finalizes the exact roster key as `saved`; applicant promotion selects the
-existing suggestion, then performs the same server-owned finalization.
+then finalizes the exact roster key as `saved` and best-effort retires active
+same-ORCID aliases; applicant promotion selects the existing suggestion, then
+performs the same server-owned finalization.
 Dataverse and Postgres are not one transaction, so a finalization failure emits
 an operational alert and the canonical Dataverse row remains authoritative.
 Applicant-excluded no-ops become `blocked`; the roster never governs the
@@ -163,6 +183,12 @@ it does not rewrite Postgres or Dataverse.
   roster-managed candidates fail closed unless the receipt carries the verified
   immutable roster key; only bare pre-roster compatibility payloads retain the
   old mutable-correlation path.
+- An exact-address edit can deliberately invalidate a v3 token's contact digest.
+  Save may recover only by re-reading the submitted immutable key under the same
+  request, requiring an active/saved row whose valid server identity-decision
+  receipt matches the submitted identity digest and whose exact address receipt
+  is bound to that request, key, and email. The server identity receipt excludes
+  contact by design and cannot authorize promotion without that address receipt.
 - Applicant-suggested restore is keyed on the complete expected canonical suggestion-key set plus `candidate.enrichedProposalKey` and the current `candidate.applicantEnrichmentCacheVersion`, not the proposal Blob URL. Canonical excluded/saved suggestion keys are subtracted as terminal staff actions; unrelated/non-canonical keys cannot hide a missing expected row. Unversioned and older-version rows refresh once; the successful refresh persists the current version. `load-proposal` uses `addRandomSuffix:true`, so `blobUrl` changes across reloads and is not a stable cache key. A completed batch exposes **Update applicant suggestions** even when its cache is valid, allowing a staff-requested rerun after source data or resolver behavior changes; reruns preserve actor-bound staff confirmations and manual contact. **CONFIRMED Production defect, owner-accepted 2026-08-01 (was an open hypothesis):** the deployed roster-only terminal calculation does not cover an older `saved` row stored under a noncanonical `candidate:` key while a later applicant-enrichment run writes a canonical `active` twin, and it does not consult Dataverse invitation/response lifecycle. Re-probed 2026-08-01 and still true: Isberg (`selected=true, invited=true`) and Sorek (`selected=false, invited=true`) each hold a `saved` twin alongside an active applicant row and render as unresolved prospects; 3 of that request's 5 applicant recommendations are correctly actionable. **Two distinct causes:** Sorek-shaped resurfacing is a regression from `ad8e0299` (which replaced a `selectedOnly:true` read with a disposition-only one), while Isberg-shaped resurfacing is this roster-twin gap. **Owner decision:** Dataverse engagement becomes an independent terminal input for **every roster row carrying a suggestion anchor**, not applicant rows only — note `save-candidates` catches a roster-finalization failure, logs it non-fatally and raises an alert while the Dataverse write stands [VERIFIED via `lib/services/reviewer-finder/save-candidates-service.js:1517-1531`], so a search-origin row can strand as `active` while its suggestion is live. **Branch status:** Slice A implements that read overlay and the server/client applicant projection, with focused tests green; deployment and the signed-in no-send pilot remain open. Evidence: `SESSION_PROMPT.md`, `outputs/reviewer-workflow-stabilization-fable-assessment.md` §0/§3, and `tests/unit/workbench-reviewer-roster-projection-service.test.js`.
 - **CONFIRMED missing-suggestion defect (Request `1002912`; re-probed 2026-08-01):** active roster key `suggestion:bb81d1f6-fc68-f111-a826-000d3a306da2` embeds a Dataverse suggestion id that 404s after the earlier Sorek merge. Sorek consequently holds two `active` applicant rows and renders twice. Restricting restore to the current server-derived expected suggestion set is an ACCEPTED remedy scheduled in Slice B (`SESSION_PROMPT.md`); the dry-run data cleanup remains post-fix hygiene requiring explicit Production-write authorization.
 - Migration 025 backfills pre-existing rows with their stored `candidate.candidateKey` when present, otherwise an opaque `legacy-row:<id>` key, and writes that key into the candidate JSON so subsequent client actions remain exact.
