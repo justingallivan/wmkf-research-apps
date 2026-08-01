@@ -19,6 +19,11 @@ import {
 } from '../../lib/dataverse/adapters/potential-reviewer.js';
 
 function err412() { const e = new Error('Precondition Failed'); e.status = 412; return e; }
+function duplicateConflict() {
+  const e = new Error('A record with matching key values already exists');
+  e.status = 412;
+  return e;
+}
 
 const ENGAGEMENT_STAMP_RESET_PAYLOAD = {
   wmkf_accepted: false,
@@ -325,6 +330,97 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
 
     expect(out).toEqual({ id: 'sug-ex', created: false, selected: false, skippedExcluded: true });
     expect(patch).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['unengaged winner', { wmkf_selected: false }, 'promotion_required', 'recommended'],
+    ['declined winner', { wmkf_selected: false, wmkf_declined: true }, 'restore_required', 'declined'],
+    ['invited winner', { wmkf_selected: true, wmkf_invited: true }, 'already_handled', 'invited'],
+  ])('create-conflict recovery keeps an applicant %s provenance-only', async (_label, engagement, outcome, stage) => {
+    jest.spyOn(DynamicsService, 'queryRecords')
+      .mockResolvedValueOnce({ records: [] })
+      .mockResolvedValueOnce({
+        records: [{
+          wmkf_appreviewersuggestionid: 'sug-race-winner',
+          _etag: 'W/"winner"',
+          wmkf_sources: 'applicant',
+          wmkf_applicantdisposition: 100000000,
+          ...engagement,
+        }],
+      });
+    jest.spyOn(DynamicsService, 'createRecord').mockRejectedValue(duplicateConflict());
+    const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    const out = await ensureStaffManualCandidate({
+      potentialReviewerId: 'pr-race',
+      requestId: 'req-race',
+      sources: ['staff_manual', 'referred'],
+    }, { actingUserSystemId: 'u1' });
+
+    expect(out).toEqual({
+      id: 'sug-race-winner',
+      created: false,
+      selected: false,
+      outcome,
+      stage,
+    });
+    expect(patch).toHaveBeenCalledWith(
+      'wmkf_appreviewersuggestions',
+      'sug-race-winner',
+      { wmkf_sources: 'applicant,staff_manual,referred' },
+      { actingUserSystemId: 'u1', ifMatch: 'W/"winner"' },
+    );
+    expect(patch.mock.calls[0][2]).not.toHaveProperty('wmkf_selected');
+    for (const field of ENGAGEMENT_STAMP_RESET_FIELDS) {
+      expect(patch.mock.calls[0][2]).not.toHaveProperty(field);
+    }
+  });
+
+  test('applicant provenance-only 412 retry re-reads engagement before retrying', async () => {
+    jest.spyOn(DynamicsService, 'queryRecords')
+      .mockResolvedValueOnce({
+        records: [{
+          wmkf_appreviewersuggestionid: 'sug-app-race',
+          _etag: 'W/"1"',
+          wmkf_sources: 'applicant',
+          wmkf_applicantdisposition: 100000000,
+          wmkf_selected: false,
+        }],
+      })
+      .mockResolvedValueOnce({
+        records: [{
+          wmkf_appreviewersuggestionid: 'sug-app-race',
+          _etag: 'W/"2"',
+          wmkf_sources: 'applicant,updated_elsewhere',
+          wmkf_applicantdisposition: 100000000,
+          wmkf_selected: true,
+          wmkf_invited: true,
+        }],
+      });
+    const patch = jest.spyOn(DynamicsService, 'updateRecord')
+      .mockRejectedValueOnce(err412())
+      .mockResolvedValueOnce(undefined);
+
+    const out = await ensureStaffManualCandidate({
+      potentialReviewerId: 'pr-app-race',
+      requestId: 'req-app-race',
+      sources: ['staff_manual', 'referred'],
+    }, { actingUserSystemId: 'u1' });
+
+    expect(out).toEqual({
+      id: 'sug-app-race',
+      created: false,
+      selected: false,
+      outcome: 'already_handled',
+      stage: 'invited',
+    });
+    expect(patch).toHaveBeenCalledTimes(2);
+    expect(patch.mock.calls[0][2]).toEqual({ wmkf_sources: 'applicant,staff_manual,referred' });
+    expect(patch.mock.calls[0][3]).toEqual({ actingUserSystemId: 'u1', ifMatch: 'W/"1"' });
+    expect(patch.mock.calls[1][2]).toEqual({
+      wmkf_sources: 'applicant,updated_elsewhere,staff_manual,referred',
+    });
+    expect(patch.mock.calls[1][3]).toEqual({ actingUserSystemId: 'u1', ifMatch: 'W/"2"' });
   });
 
   test('new row writes staff_manual and request/person binds', async () => {
