@@ -100,14 +100,72 @@ origins," and dual provenance is a legitimate goal. The defect is that
 *carrying both origins* was implemented as *selecting the row*, so a provenance
 merge doubles as an ungated promotion.
 
-**Did this actually happen to Lima?** No — and the probe proves it. His
-suggestion's `sources` is `applicant` only; a committed referral add would have
-unioned in `staff_manual,referred`
-`[VERIFIED via probe 2026-08-01 vs manual-reviewer-service.js:225]`. He is
-`selected=false, invited=false`. So the referral add for Lima was attempted and
-did not commit, or was never submitted. **The hazard is live in code but has
-not fired on this request** — which is the good news, and the reason to close
-it before the next campaign rather than treat it as an incident.
+**Did door A fire on Lima's existing row?** No. His suggestion's `sources` is
+`applicant` only; a committed referral add against *that row* would have unioned
+in `staff_manual,referred`
+`[VERIFIED via probe 2026-08-01 vs manual-reviewer-service.js:225]`, and he is
+`selected=false, invited=false`.
+
+**But Finding C explains why door A was bypassed rather than exercised:** if the
+referral text was a concatenated/variant name, the lookup never resolved to
+Lima's existing person at all, so `ensureStaffManualCandidate` took the
+*create* branch on a NEW person instead of the *reselect* branch on his existing
+row. That is consistent with every piece of evidence — Lima's row untouched, and
+a separate duplicate entry that later needed name editing. **The two findings
+are complementary, not competing: a clean referral name hits door A; a malformed
+one hits Finding C.** Both need closing, and neither has damaged Lima's
+applicant row.
+
+**Finding C — the decline-referral add sends free text as a name, and a
+malformed name auto-creates a duplicate person (owner-prompted, 2026-08-01).**
+Owner ground truth: the Lima entry involved a "Christopher" vs "Chris" name
+conflict, and **two names were concatenated in the name field**, needing manual
+editing later; the entries may have been treated as distinct people. The source
+reproduces that exactly:
+
+1. **No name extraction.** `decline-referrals-service` returns the reviewer's
+   raw answer as `referralText` `[VERIFIED via decline-referrals-service.js:66-81]`,
+   and the one-click Add sets `const name = (referral?.referralText || '').trim()`
+   — **the entire free-text answer becomes the reviewer's name**
+   `[VERIFIED via ReviewersTab.js:186-202]`. A reviewer answering "Chris Lima
+   and Dan Finley" produces a person literally named that.
+2. **The codebase already solved this problem once, on the analogous surface.**
+   The applicant's free-text excluded-reviewers field goes through
+   `extractExcludedReviewers`, a hardened Claude extraction that yields clean
+   names `[VERIFIED via applicant-reviewers-service.js:157-172]`. The referral
+   surface has no equivalent. That asymmetry is the whole defect.
+3. **A malformed name cannot match anything, so dedupe never runs.**
+   `splitName` takes token 0 as the forename and *the entire remainder* as the
+   surname `[VERIFIED via potential-reviewer.js:21-28]`, so "Chris Lima and Dan
+   Finley" searches for surname "Lima and Dan Finley" — zero rows
+   `[VERIFIED via potential-reviewer.js:194-207]`. Lookup returns
+   `outcome:'none'`, which auto-resolves to `{ mode: 'create_new' }`
+   `[VERIFIED via manual-reviewer-service.js:131-138]` → **a brand-new person
+   row, plus a suggestion created with `wmkf_selected = true`**
+   `[VERIFIED via reviewer-suggestion.js:775-784]`. Two distinct entities for
+   one human, the second one selected into the candidate pool.
+4. **The existing safety guarantee is one-directional.** The documented promise
+   is that "a free-text suggestion never auto-resolves to a namesake" — true,
+   and the ambiguous case correctly returns a staff picker. But it guards the
+   *wrong-match* direction only. It offers nothing against *no match because the
+   input was garbage*, which silently takes the create-new branch with no picker
+   at all. **The worse the input, the quieter the failure.**
+
+Note what does *not* break here: a clean "Chris Lima" is fine —
+`startswith(wmkf_firstname,'Chris')` matches "Christopher"
+`[VERIFIED via potential-reviewer.js:202-204]`, and the name-fallback path always
+returns candidates for staff confirmation rather than auto-resolving
+`[VERIFIED via reviewer-identity-lookup.js:411-422]`. **The diminutive alone is
+handled; the concatenation is what defeats it.**
+
+*Related latent item, labeled hypothesis, not tested:* in the enrichment-side
+resolver, `forenamesContradict` returns true whenever two full forenames differ
+`[VERIFIED via reviewer-identity-evidence.js:336-341]`, so "Chris" vs
+"Christopher" would register as a forename *contradiction* and demote an
+otherwise-correct match. Lima's stored reason cites an institution
+contradiction, not a forename one, so **I am not claiming this caused his
+unresolved state** — but a diminutive being treated as evidence of a different
+person deserves its own test.
 
 **Finding B — the resurfacing also has an ungated promotion door.**
 The resurfacing is not display-only — it exposes a **state-corrupting write
@@ -247,6 +305,17 @@ the check I ran (or the one that remains) that would have falsified the claim.
 ### 3.1 Live state of Request `1002912` (probe, 2026-08-01) — with denominators
 
 Request `1002912` = `078498df-ce44-f111-88b4-000d3a306da2`; **19 roster rows**.
+
+> **Denominator caveat — this probe cannot see a Finding-C duplicate.** It reads
+> `reviewer_find_roster` for the request, then searches Dataverse **using those
+> roster rows' `display_name` values only**
+> `[VERIFIED via probe-roster-dump.mjs:77,113-117]`. A person created by the
+> manual/referral add is written to Dataverse but **never to the roster**
+> (`addManualReviewer` performs no roster write), and would carry a different or
+> malformed name. Such a row is therefore **structurally invisible** to the
+> output below. Everything in this section describes the Find-tab projection;
+> none of it is evidence about duplicate person records. The exposure query in
+> §8 is the one that would see them.
 
 Applicant-recommended people: **5** (Lima, Finley, Laub, Isberg, Sorek), carried
 by **6** `active/applicant_suggested` roster rows — the extra row is Sorek's
@@ -437,6 +506,15 @@ Golden workflows (revised; each must fail against baseline before the fix):
    Test (b) with the exact live shape: a person holding a
    `disposition=recommended, selected=false` row who is then referred by a
    decliner — the Wolberger→Lima scenario.
+7. **W7 (new) — A referral is a suggestion, not a name.** Free-text referral
+   input containing more than one person, or trailing prose, must not become a
+   reviewer's name and must not silently create a person. Assert: (a) multi-name
+   / prose referral text does not reach `manual-reviewer` as `name`; (b) a
+   lookup returning `outcome:'none'` for input that fails a name-plausibility
+   check requires explicit staff confirmation instead of auto
+   `create_new`; (c) a clean diminutive ("Chris" for "Christopher") still
+   resolves to the staff picker, not a new person. Baseline-failing today
+   (§1 Finding C).
 
 Complement coverage the directive asked about: all-failed enrichment batches
 (hydration-failure path exists and is tested by shape — keep one assertion),
@@ -552,7 +630,8 @@ Still open:
 | Which of Sorek's two active rows is the 404 orphan, and its exact key | Extend the probe to print `candidate_key` + `candidate->>'suggestionId'` per row (it prints neither today) — **the single highest-value probe improvement** | Yes |
 | Whether `1002912`'s applicant cache is currently valid (§2 hop 9) | Same extension: print `applicantEnrichmentCacheVersion` + `applicantKnownReviewer.status` | Yes |
 | **Whether door A (§1 Finding A) has already fired on any request** — an ungated referral/manual promotion of an applicant-recommended person | Query `wmkf_appreviewersuggestion` for `wmkf_applicantdisposition eq recommended and wmkf_selected eq true`, then split by whether `wmkf_sources` contains `staff_manual`/`referred` vs only search/applicant tokens. Rows with a manual/referred token are candidates for an ungated promotion; rows whose engagement stamps are empty despite prior invitation are candidates for a silent reset. **Worth running before the next campaign** — it is read-only and bounds the exposure repo-wide, not just for `1002912`. | Yes — one filtered query |
-| Whether Wolberger's referral text actually names Lima (owner recollection vs stored `wmkf_declinereferral`) | Read `wmkf_declinereferral` on her suggestion, or open the Track-tab referral callout | Yes — one field |
+| Whether Wolberger's referral text actually names Lima, and whether it names **more than one** person (Finding C's trigger) | Read `wmkf_declinereferral` on her suggestion, or open the Track-tab referral callout | Yes — one field |
+| **Whether Finding C has already created duplicate/malformed person rows** | Read-only scan of `wmkf_potentialreviewers` for name shapes that cannot be a single person — containing ` and `, `,`, `&`, `/`, or >4 whitespace tokens — plus near-duplicate surname+email clusters. This is the query that would surface the Lima duplicate my probe cannot see (§3.1 caveat). **Highest-value remaining probe.** | Yes — one filtered query |
 | Demand for the legacy-filename fallback (§4.6) | Count active-cycle requests with no canonical proposal file but a `Project Narrative.pdf` (SharePoint listing over the current cycle's requests; read-only Graph) | Yes — bounded to one cycle |
 | Whether the two July 31 Lima 409s were fresh-enrichment confirms (claim 3 causation) | Vercel request logs for the two PATCHes (payload presence of `candidateKey`), if retained | Maybe — log retention dependent |
 | How many other requests currently have engaged-but-unterminal applicant recommendations (blast radius of the perpetual re-enrich loop) | One roster/Dataverse join query — natural extension of the probe script | Yes — read-only |
@@ -583,3 +662,13 @@ decline). The second door was found only because the owner supplied the
 Wolberger→Lima referral context, and it is the strongest argument for shipping
 the slice before the next campaign: it converts a display defect into a
 silent-data-loss risk on a workflow staff are actively encouraged to use.
+
+Owner context supplied during review also produced **Finding C** (free-text
+referral becomes a reviewer's name; a malformed name defeats dedupe and
+auto-creates a selected duplicate person) and **W7**. Findings A and C are the
+two halves of the referral path — a clean name promotes the wrong way, a
+malformed one duplicates — and neither was in the inherited diagnosis. They do
+not change the verdict on the directive, but they do change what "campaign
+safe" means: the reviewer-facing decline referral is an untrusted free-text
+input that currently writes person records, and it should be treated with the
+same care as the applicant's excluded-reviewers field already receives.
