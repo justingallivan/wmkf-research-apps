@@ -181,6 +181,21 @@ a hybrid state the decline-archival invariant ("declined ⇒ leaves the active
 pool") assumes cannot exist, entered without the deliberate
 `ENGAGEMENT_STAMP_RESET` that the explicit Restore path uses.
 
+**Finding D — an applicant exclusion that names no one is silently enforced
+against nobody (surfaced 2026-08-01 while the owner corrected Finding C's
+design note).** Exclusion enforcement is exact normalized-name matching
+`[VERIFIED via lib/utils/reviewer-name-match.js:54-65]`. A substantive answer
+that states a category rather than names ("direct competitors") parses to zero
+names, so the excluded set is empty and **no candidate is filtered**
+`[VERIFIED via reviewer-exclusion-parser.js:167-171]`. The text is shown to
+staff, who may hand-type names, but nothing requires it
+`[VERIFIED via ReviewerSearchSection.js:2531-2534]`. The applicant believes
+they excluded someone; the system blocked no one. This is **fail-open**, it is
+independent of the `1002912` incident, and unlike Findings A–C it may be
+affecting requests right now. It needs no form change to measure — see §6a for
+the exposure read, and note that measuring it is worth doing before the next
+campaign regardless of whether any input is ever restructured.
+
 **Findings A and B are the same missing invariant seen through two doors.**
 Nothing enforces "a row carrying live engagement cannot become `selected=true`
 except through an explicit, staff-chosen reset." Door B (promote) resets
@@ -683,37 +698,59 @@ delay the engagement fix. Instead split it:
     feed *identity lookup* and dedupe, and must not bypass the address-trust
     machinery or land as a verified address.
 
-**Do not generalize this to the excluded-reviewers field without adapting it.**
-Since the intake format turns out to be amendable, the obvious next thought is
-"structure that too" — but the two fields are not the same shape of question,
-and the difference is load-bearing:
+**Excluded reviewers wants the same treatment — and the reason is a fail-open
+risk, not ergonomics.** *(Corrected 2026-08-01 on owner input. I previously
+argued for a hybrid form here, on the premise that structuring into name rows
+would "discard a class of exclusion the foundation honors." That premise was
+false, and the owner's objection is right: category exclusions are not
+actionable, because we cannot know who "direct competitors" are — we need
+names.)*
 
-- A **decline referral** is inherently a short list of *people*. Structure fits
-  it completely; there is no residue a name/institution/email row cannot carry.
-- **Excluded reviewers** is inherently heterogeneous. The parser's own contract
-  anticipates input that names nobody — it returns `substantive:false` for
-  N/A-style answers and legitimately returns zero names for "a reason with no
-  name" `[VERIFIED via reviewer-exclusion-parser.js:129-171]`. Applicants
-  genuinely need to express category exclusions ("anyone at my former
-  institution", "direct competitors"), which no fixed name list can represent.
+Checking what the system actually does with category text settles it:
 
-So if that field is ever revisited, the right shape is **hybrid**: structured
-person rows for named exclusions *plus* a retained free-text box for
-category/reason exclusions — and `extractExcludedReviewers` keeps earning its
-keep on the remainder. Structuring it into name rows alone would silently
-discard a class of exclusion the foundation actually honors, which would be a
-worse defect than the one being fixed. **Referrals are the clean case; do that
-one first, and treat intake as a separate question with its own design.**
+- Enforcement is **exact normalized-name set membership** —
+  `partitionByExcluded` drops a candidate only when their normalized name is in
+  the excluded set `[VERIFIED via lib/utils/reviewer-name-match.js:54-65]`.
+- A category phrase yields **zero** parsed names, so `buildExcludedSet` is
+  empty and **nothing is filtered at all** `[VERIFIED via reviewer-exclusion-parser.js:167-171
+  + reviewer-name-match.js:56-57]`.
+- Exclusions write no durable rows either — the S210 decision keeps them a
+  search soft-block only `[VERIFIED via applicant-reviewers-service.js:20-27,157-199]`.
+- The sole handling is display: the raw text renders as a `<pre>` disclosure
+  under an editable exclusion box `[VERIFIED via ReviewerSearchSection.js:2531-2534]`,
+  from which staff *may* hand-type names.
 
-**Two unknowns worth checking before either build plan:**
+So the foundation does not honor a category exclusion; it shows it to a human
+and hopes. **That makes the current field fail-open in a way that is worse than
+a rejected input: the applicant believes they have excluded someone, and the
+system silently never blocks anyone.** The bridge from vague answer to
+enforceable name is a manual, undocumented step that no gate requires and any
+busy PD can skip. An unenforceable exclusion is not a softer exclusion — it is
+the appearance of one.
+
+That reframes the recommendation: **both fields want structured person rows,
+for the same reason** — the system can only act on names, so the form should
+collect names. A genuinely sweeping concern ("anyone from my former
+institution") is a conversation with program staff, not a form field, and per
+the owner it does reach us through other channels. `extractExcludedReviewers`
+then becomes a legacy-compatibility component for already-stored values rather
+than a permanent part of the contract. Keep the staff-editable exclusion box
+regardless — it is how staff add names they learn by any route.
+
+**Sequencing is unchanged:** referrals first (ours, one repo, and the live
+defect), intake second (needs Connor, and no known active failure).
+
+**Two reads worth doing — the second matters more than I first thought:**
 
 - How many stored referrals actually name more than one person. If the answer
   is "most", the structured form is clearly worth it; if it is "two ever",
   W7(b) alone may be the whole fix. One field read across declined suggestions.
-- What proportion of excluded-reviewers answers are person-names versus
-  category/reason text. That ratio decides whether a hybrid intake change is
-  worth Connor's time at all — and it is answerable from existing stored values
-  without changing anything.
+- **How many requests have a substantive excluded-reviewers answer that yielded
+  zero enforceable names.** I originally framed this as sizing a design choice.
+  It is better understood as sizing a **live fail-open exposure**: each such
+  request is one where an applicant stated an exclusion and the search blocked
+  nobody. That is worth knowing before the next campaign independently of any
+  form change, and it is answerable from stored values today.
 
 ---
 
@@ -755,6 +792,7 @@ Still open:
 | Whether Wolberger's referral text actually names Lima, and whether it names **more than one** person (Finding C's trigger) | Read `wmkf_declinereferral` on her suggestion, or open the Track-tab referral callout | Yes — one field |
 | **Whether Findings A and C have already damaged data** | **Written this session:** `scripts/probe-referral-path-exposure.mjs` (read-only; Dataverse GETs only). §1 flags person names that cannot denote one person (Finding C's fingerprint — the shape §3.1's probe structurally cannot see); §2 counts applicant-recommended rows that are `selected=true`, split by whether they carry a `staff_manual`/`referred` token (Finding A); §3 lists invited rows holding no response state (possible silent reset — a lead only, since a pending invitee looks identical). Run: `DATAVERSE_ALLOW_PROD_READS=yes node --import ./scripts/lib/use-extensionless.mjs scripts/probe-referral-path-exposure.mjs`. Names are redacted unless `--show-names`. **Not yet run.** | Yes — read-only, prints denominators |
 | How many stored referrals name more than one person (decides whether §6a's structured form is worth building) | Read `wmkf_declinereferral` across declined suggestions and count multi-name answers | Yes — one field, one filter |
+| **How many requests have a substantive `wmkf_excludedreviewers` answer that yields zero enforceable names (Finding D fail-open exposure)** | Read `wmkf_excludedreviewers` across requests in the active cycles, run each through `extractExcludedReviewers`, and count non-empty answers returning zero names. Each hit is a request where an applicant stated an exclusion and the search blocked nobody. **Do this before the next campaign; it is independent of every other recommendation here.** | Yes — read-only; one LLM call per non-empty answer, so bound it to current cycles |
 | Demand for the legacy-filename fallback (§4.6) | Count active-cycle requests with no canonical proposal file but a `Project Narrative.pdf` (SharePoint listing over the current cycle's requests; read-only Graph) | Yes — bounded to one cycle |
 | Whether the two July 31 Lima 409s were fresh-enrichment confirms (claim 3 causation) | Vercel request logs for the two PATCHes (payload presence of `candidateKey`), if retained | Maybe — log retention dependent |
 | How many other requests currently have engaged-but-unterminal applicant recommendations (blast radius of the perpetual re-enrich loop) | One roster/Dataverse join query — natural extension of the probe script | Yes — read-only |
@@ -788,10 +826,21 @@ silent-data-loss risk on a workflow staff are actively encouraged to use.
 
 Owner context supplied during review also produced **Finding C** (free-text
 referral becomes a reviewer's name; a malformed name defeats dedupe and
-auto-creates a selected duplicate person) and **W7**. Findings A and C are the
-two halves of the referral path — a clean name promotes the wrong way, a
-malformed one duplicates — and neither was in the inherited diagnosis. They do
-not change the verdict on the directive, but they do change what "campaign
-safe" means: the reviewer-facing decline referral is an untrusted free-text
-input that currently writes person records, and it should be treated with the
-same care as the applicant's excluded-reviewers field already receives.
+auto-creates a selected duplicate person), **Finding D** (a category-shaped
+applicant exclusion is enforced against nobody — fail-open, and possibly live
+right now), and **W7**. Findings A and C are the two halves of the referral
+path — a clean name promotes the wrong way, a malformed one duplicates — and
+none of A, C, or D was in the inherited diagnosis.
+
+They do not change the verdict on the directive, but they do change what
+"campaign safe" means. The common thread across C and D is that **free-text
+reviewer input is treated as though it were structured data**: a referral
+sentence becomes a person's name, and an exclusion category becomes an empty
+filter. In both cases the system's behavior diverges silently from what the
+person typing believed. The applicant's *recommended* reviewers avoid this
+entirely by being exact person GUIDs — the fix pattern is already in the
+building, just not applied to the free-text fields.
+
+**Of everything in this document, Finding D is the one I would measure first.**
+It is the only item that is independent of the `1002912` incident, needs no
+code change to assess, and could be affecting live requests today.
