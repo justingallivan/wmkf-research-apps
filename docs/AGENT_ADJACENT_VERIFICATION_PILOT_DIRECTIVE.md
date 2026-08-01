@@ -176,11 +176,19 @@ remains advisory-only. The implementation surface is limited to:
 - `.claude/hooks/lib/claim-evidence.js` and
   `.claude/hooks/claim-evidence-advisory.js` — claim/query-shape matching and
   the Claude Code PreToolUse advisory;
+- `.claude/hooks/lib/claim-evidence-observations.js` — metadata-only local
+  occurrence records, bounded retention, validation, and aggregation;
 - `.claude/hooks/hook-enforcement.test.js` — fixture replay, delta-only plus
   touched-line qualifier/tag edits, fail-open, privacy-language, and
   configured-hook coverage; and
+- `.claude/hooks/lib/claim-evidence-observations.test.js` — schema allowlist,
+  privacy boundary, permissions, concurrent writers, retention, malformed
+  records, reporter, and storage-failure coverage;
 - `.claude/settings.json` — one `Write|Edit` registration with no blocker or
   shell exit wrapper;
+- `scripts/report-claim-evidence-pilot.js`, `package.json`, and
+  `.claude/skills/stop/SKILL.md` — a local report run by the session-closing
+  workflow;
 - this directive — bounded replay results and limitations; and
 - `SESSION_PROMPT.md` — corrected standalone Node commands for the existing
   hook test harnesses.
@@ -212,8 +220,10 @@ than proof or enforcement.
 Focused verification command:
 
 ```bash
+rtk node .claude/hooks/lib/claim-evidence-observations.test.js
 rtk node .claude/hooks/hook-enforcement.test.js
 rtk node .claude/hooks/lib/document-guards.test.js
+rtk npm run report:claim-evidence-pilot -- --current
 ```
 
 The previously suggested Jest path is not included by this repository's Jest
@@ -228,13 +238,49 @@ pilot. It does not authorize any blocking behavior. Normal-session evidence is
 required before a later proposal to block even a named narrow pattern, but it
 does not gate use of the current advisory.
 
-The v1 hook does not persist telemetry or transcript content. Observe it during
-the next three to five normal Claude Code documentation sessions without adding
-mid-session owner check-ins. At each session close, the working agent should
-append one bounded row below for the advisories it actually received. Do not
-record claim text, raw command output, secrets, environment values, reviewer
-data, or other live-record content. Codex and other non-Claude-Code edits are
-outside this hook's enforcement boundary and do not count as observation.
+The owner approved metadata-only local observation on 2026-07-31 after noting
+that a manual table alone was not reliable monitoring. SessionStart exports a
+hashed current-session key into Claude's session environment; it does not add an
+all-session telemetry record. On each eligible plan/design documentation edit,
+the hook atomically publishes or replaces one mode-`0600` per-session marker
+containing only the schema version, hashed session key, and last eligible-edit
+timestamp. When
+an advisory fires, it atomically publishes one mode-`0600` JSON event beneath the same
+OS-temporary, repository-hashed state root used by the existing Claude session
+lifecycle by default. The containing directory is mode `0700`. Cleanup runs
+after each successful record and before each report, retaining the newest 100
+eligible-session markers and 500 events that are no more than 60 days old;
+stale crash-pending files are removed after ten minutes. There is no background
+expiry daemon.
+Each event has an exact schema: version, event ID,
+timestamp, hashed Claude session identifier, repository-relative documentation
+path, `Write`/`Edit`, claim count, and fixed counts for call-path, universal, and
+count shapes. It does not retain claim text or fingerprints, transcript paths or
+content, commands or output, environment values, secrets, reviewer data, or
+other live-record content. It has no network, database, application-runtime, or
+Production path.
+
+Observation-storage failure is visible to the agent and user but remains
+fail-open: it cannot block the edit or suppress an applicable advisory. Records
+are written completely to an unlisted temporary file, flushed, and atomically
+published, so concurrent readers cannot observe partial JSON. The reporter
+validates canonical IDs, timestamps, filenames, paths, and count bounds;
+malformed files cannot displace valid retained events. Unreadable stores and
+retention-cleanup failures produce a nonzero, visible report rather than a clean
+zero. The reporter infers only occurrence counts. It cannot infer usefulness, false positives, repetition,
+resolution, `[ASSUMED]` avoidance, owner interruption, or sensitive-evidence
+requests.
+
+Observe the next three to five normal Claude Code documentation sessions without
+adding mid-session owner check-ins. At `/stop`, the session-closing agent runs
+`rtk npm run report:claim-evidence-pilot -- --current`; the exact hashed session key
+prevents a concurrent session from being selected. The agent classifies the
+advisories it actually received and appends one bounded row, including a
+zero-advisory row, when the eligible session key is not already present. A
+session with no eligible plan/design documentation edit produces no row. Do not
+copy claim text or raw evidence into the table. Codex
+and other non-Claude-Code edits are outside this hook's enforcement boundary and
+do not count as observation.
 
 | Session/date | Advisory instances / unique claims | Useful / false positive / repeated | Resolution: query / narrow / `[ASSUMED]` / ignored | Owner interrupted? | Sensitive evidence requested? | Notes |
 | --- | --- | --- | --- | --- | --- | --- |

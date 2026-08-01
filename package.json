@@ -91,7 +91,8 @@
     "check:scaffolding-tokens": "node scripts/check-scaffolding-tokens.js",
     "check:scaffolding-tokens:self-test": "node scripts/check-scaffolding-tokens-self-test.js",
     "check:harness-framing": "node scripts/check-harness-framing.js",
-    "check:harness-framing:self-test": "node scripts/check-harness-framing-self-test.js"
+    "check:harness-framing:self-test": "node scripts/check-harness-framing-self-test.js",
+    "report:claim-evidence-pilot": "node scripts/report-claim-evidence-pilot.js"
   },
   "dependencies": {
     "@tiptap/extension-link": "^2.27.2",

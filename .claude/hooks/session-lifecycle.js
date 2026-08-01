@@ -16,6 +16,9 @@ const {
   isQualifiedAdversarialReviewPrompt,
   isPlanOrDesignDoc,
 } = require('./lib/document-guards');
+const {
+  sessionKey: claimEvidenceSessionKey,
+} = require('./lib/claim-evidence-observations');
 
 const STATE_VERSION = 3;
 const GATE_MAP = [
@@ -292,6 +295,17 @@ function wikiAndRouterNotes(root) {
 
 function start(input, root, file) {
   const notes = wikiAndRouterNotes(root);
+  try {
+    const envFile = process.env.CLAUDE_ENV_FILE;
+    if (!envFile) throw new Error('CLAUDE_ENV_FILE unavailable');
+    fs.appendFileSync(
+      envFile,
+      `export WMKF_CLAIM_EVIDENCE_SESSION_KEY=${claimEvidenceSessionKey(input)}\n`,
+      { encoding: 'utf8', mode: 0o600 },
+    );
+  } catch {
+    notes.push('Claim-evidence current-session reporting is unavailable; advisories remain non-blocking.');
+  }
   const existing = loadState(file);
   if (existing) {
     const failures = invariantFailures(root);

@@ -24,6 +24,10 @@ const {
   findClaimEvidenceObligations,
   missingClaimEvidence,
 } = require('./lib/claim-evidence');
+const {
+  recordAdvisoryObservation,
+  recordObservationSession,
+} = require('./lib/claim-evidence-observations');
 
 function remedyFor(claim) {
   const remedies = [];
@@ -80,6 +84,20 @@ function advisory(missing) {
   ].join('\n');
 }
 
+function emitOutput({ context = null, observationFailure = false } = {}) {
+  const output = {};
+  if (observationFailure) {
+    output.systemMessage = 'Claim-evidence monitoring is unavailable for this documentation edit; the edit remains non-blocking.';
+  }
+  if (context) {
+    output.hookSpecificOutput = {
+      hookEventName: 'PreToolUse',
+      additionalContext: context,
+    };
+  }
+  if (Object.keys(output).length) process.stdout.write(JSON.stringify(output));
+}
+
 let input = '';
 process.stdin.on('data', (chunk) => { input += chunk; });
 process.stdin.on('end', () => {
@@ -95,25 +113,50 @@ process.stdin.on('end', () => {
 
     const proposed = proposedTextForTool(data, root);
     if (!proposed || !isPlanOrDesignDoc(rel, proposed)) return;
+    let observationFailure = false;
+    try {
+      recordObservationSession({ root, input: data });
+    } catch {
+      observationFailure = true;
+    }
     const introduced = introducedClaimText(data, root, rel, proposed);
-    if (!introduced) return;
+    if (!introduced) {
+      emitOutput({ observationFailure });
+      return;
+    }
 
     const claims = findClaimEvidenceObligations(introduced);
-    if (!claims.length) return;
+    if (!claims.length) {
+      emitOutput({ observationFailure });
+      return;
+    }
 
     const transcriptPath = typeof data.transcript_path === 'string' ? data.transcript_path : '';
     const transcript = transcriptPath && fs.existsSync(transcriptPath)
       ? fs.readFileSync(transcriptPath, 'utf8')
       : '';
     const missing = missingClaimEvidence(transcript, claims);
-    if (!missing.length) return;
+    if (!missing.length) {
+      emitOutput({ observationFailure });
+      return;
+    }
 
-    process.stdout.write(JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'PreToolUse',
-        additionalContext: advisory(missing),
-      },
-    }));
+    try {
+      recordAdvisoryObservation({
+        root,
+        input: data,
+        relativePath: rel,
+        missingClaims: missing,
+      });
+    } catch {
+      observationFailure = true;
+    }
+
+    const context = observationFailure
+      ? `${advisory(missing)}\nObservation logging is unavailable for this event; the advisory remains non-blocking.`
+      : advisory(missing);
+
+    emitOutput({ context, observationFailure });
   } catch {
     console.error('CLAIM-EVIDENCE ADVISORY skipped: internal hook error (fail-open).');
   }

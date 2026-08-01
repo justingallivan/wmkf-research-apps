@@ -84,6 +84,11 @@ ahead of reviewer stabilization.
    - On 2026-07-31, the owner selected **Keep advisory** and authorized merge.
      Normal-session observation is required before any later narrow blocking
      proposal, not before advisory use.
+   - After the owner rejected manual-only observation as unreliable, the hook
+     gained automatic metadata-only local occurrence records, bounded 60-day /
+     500-event retention, a deterministic report command, and `/stop`
+     reconciliation. It stores no claim text, transcript content, commands,
+     output, environment values, or live-record data.
 
 ### Recent Runtime Commits
 
@@ -100,9 +105,11 @@ ahead of reviewer stabilization.
 1. **Observe the advisory without interrupting the work campaign.**
    Evidence: the controlling directive's owner-disposition and campaign-
    observation section. During the next three to five normal Claude Code
-   documentation sessions, record a bounded advisory tally at session close.
-   Do not add mid-session owner check-ins or persist transcript/live-record
-   content.
+   documentation sessions, let the hook record metadata-only occurrences and
+   run `rtk npm run report:claim-evidence-pilot -- --current` at `/stop`. Classify
+   only the exact current eligible session in the canonical table. Do not add
+   mid-session owner check-ins or persist claim, transcript, command-output, or
+   live-record content.
 
 2. **Resume reviewer workflow stabilization.**
    The adjacent-verification pilot has reached its advisory stop decision.
@@ -196,6 +203,8 @@ ahead of reviewer stabilization.
 | `.claude/hooks/plan-named-source-read-guard.js` | Current plan-doc named-source read enforcement |
 | `.claude/hooks/scope-claim-reminder.js` | Current broad-quantifier advisory behavior |
 | `.claude/hooks/design-doc-assertion-guard.js` | Current narrow design-claim enforcement and advisories |
+| `.claude/hooks/lib/claim-evidence-observations.js` | Metadata-only local occurrence schema, atomic persistence, retention, and summary |
+| `scripts/report-claim-evidence-pilot.js` | Local current-session observation report and retention maintenance used by `/stop` |
 | `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md` | Parked but canonical reviewer stabilization plan, golden workflows, selector fallback todo, and exit criteria |
 | `lib/services/workbench/applicant-reviewers-service.js` | Applicant-slot materialization; currently drops adapter-returned selected state from its DTO |
 | `lib/services/workbench/enrich-recommended-service.js` | Applicant enrichment; currently processes all applicant-recommended rows regardless of engagement |
@@ -212,8 +221,10 @@ Start with the fixture corpus and focused hook enforcement tests. Run the gate
 and its self-test sequentially where one exists. After the bounded pilot:
 
 ```bash
+rtk node .claude/hooks/lib/claim-evidence-observations.test.js
 rtk node .claude/hooks/hook-enforcement.test.js
 rtk node .claude/hooks/lib/document-guards.test.js
+rtk npm run report:claim-evidence-pilot -- --current
 rtk npm run check:instruction-architecture
 rtk npm run check:agent-invariants
 rtk npm run check:docs-catalog

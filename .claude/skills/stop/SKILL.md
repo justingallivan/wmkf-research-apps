@@ -1,7 +1,7 @@
 ---
 name: stop
 description: End session by updating SESSION_PROMPT.md and relevant project documentation
-allowed-tools: Read, Edit, Write, Bash(git log:*, git status, git diff:*, git add:*, git commit:*, git push:*, git rev-parse:*)
+allowed-tools: Read, Edit, Write, Bash(git log:*, git status, git diff:*, git add:*, git commit:*, git push:*, git rev-parse:*), Bash(rtk npm run report\:claim-evidence-pilot*)
 ---
 
 # Session End
@@ -21,6 +21,18 @@ a feature branch and needed a cherry-pick rescue; see
   feature branch session may want them on the branch. Never assume.
 
 Then check `git log --oneline -10` and `git status` to see what this session produced.
+
+If the `report:claim-evidence-pilot` package script exists, run
+`rtk npm run report:claim-evidence-pilot -- --current`. SessionStart exports a
+hashed current-session key, so this report cannot select another concurrent
+session. The report reads local,
+metadata-only advisory observations; it does not read the Claude transcript. If
+the current eligible session key is not already represented in the canonical
+pilot directive's observation table, classify the advisories you actually
+received and add one bounded row during Step 3, including a zero-advisory row.
+If the report says no eligible plan/design documentation edit was recorded, do
+not add a row. Never copy claim text, command output, transcript content,
+environment values, secrets, or live-record data into the observation table.
 
 ## Step 2: Commit Any Remaining Changes
 

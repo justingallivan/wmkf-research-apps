@@ -30,5 +30,7 @@ label it `[ASSUMED]`.
 
 An advisory does not itself require an owner question. Resolve it autonomously
 when the evidence or narrower wording is discoverable. During the campaign
-observation window, report only a bounded advisory tally at session close as
-defined in `docs/AGENT_ADJACENT_VERIFICATION_PILOT_DIRECTIVE.md`.
+observation window, the hook records metadata-only local events. At `/stop`,
+run the bounded current-session report and classify the current unrecorded
+eligible session as defined in
+`docs/AGENT_ADJACENT_VERIFICATION_PILOT_DIRECTIVE.md`.

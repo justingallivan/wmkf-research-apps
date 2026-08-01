@@ -19,8 +19,17 @@ const {
   findClaimEvidenceObligations,
 } = require('./lib/claim-evidence');
 const claimEvidenceFixtures = require('./fixtures/claim-evidence.json');
+const {
+  readObservationEvents,
+} = require('./lib/claim-evidence-observations');
 
 const HOOK_DIR = __dirname;
+const TEST_OBSERVATION_STATE_ROOT = fs.mkdtempSync(
+  path.join(os.tmpdir(), 'wmkf-claim-evidence-hook-test-state-')
+);
+process.on('exit', () => {
+  try { fs.rmSync(TEST_OBSERVATION_STATE_ROOT, { recursive: true, force: true }); } catch { /* best effort */ }
+});
 
 function mkdirp(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -31,10 +40,15 @@ function write(file, text) {
   fs.writeFileSync(file, text);
 }
 
-function runHook(script, input) {
+function runHook(script, input, env = {}) {
   return spawnSync(process.execPath, [path.join(HOOK_DIR, script)], {
     input: JSON.stringify(input),
     encoding: 'utf8',
+    env: {
+      ...process.env,
+      WMKF_CLAIM_EVIDENCE_STATE_ROOT: TEST_OBSERVATION_STATE_ROOT,
+      ...env,
+    },
   });
 }
 
@@ -64,7 +78,11 @@ function runConfiguredHook(scriptName, input) {
   assert.ok(command, `${scriptName} is not wired in .claude/settings.json`);
   return spawnSync('/bin/bash', ['-lc', command], {
     cwd: root,
-    env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+    env: {
+      ...process.env,
+      CLAUDE_PROJECT_DIR: root,
+      WMKF_CLAIM_EVIDENCE_STATE_ROOT: TEST_OBSERVATION_STATE_ROOT,
+    },
     input: JSON.stringify(input),
     encoding: 'utf8',
   });
@@ -478,6 +496,138 @@ test('claim-evidence advisory examines the touched line when an edit promotes as
   });
   assert.strictEqual(result.status, 0, result.stderr);
   assert.match(result.stdout, /CLAIM-EVIDENCE ADVISORY/);
+});
+
+test('claim-evidence advisory records a metadata-only observation when it fires', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-claim-evidence-observed-'));
+  const stateRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-claim-evidence-observed-state-'));
+  const result = runHook('claim-evidence-advisory.js', {
+    session_id: 'integration-session',
+    tool_name: 'Write',
+    cwd: root,
+    tool_input: {
+      file_path: path.join(root, 'docs/TEST_PLAN.md'),
+      content: '[VERIFIED] All API routes use an authentication guard.',
+    },
+  }, { WMKF_CLAIM_EVIDENCE_STATE_ROOT: stateRoot });
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.match(result.stdout, /CLAIM-EVIDENCE ADVISORY/);
+  const observed = readObservationEvents(root, { stateRoot });
+  assert.strictEqual(observed.invalidFiles, 0);
+  assert.strictEqual(observed.events.length, 1);
+  assert.deepStrictEqual(observed.events[0].shapeCounts, {
+    'call-path': 0,
+    universal: 1,
+    count: 0,
+  });
+  assert.strictEqual(observed.events[0].documentPath, 'docs/TEST_PLAN.md');
+});
+
+test('claim-evidence advisory records nothing when no advisory fires', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-claim-evidence-unobserved-'));
+  const stateRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-claim-evidence-unobserved-state-'));
+  const result = runHook('claim-evidence-advisory.js', {
+    session_id: 'integration-session',
+    tool_name: 'Write',
+    cwd: root,
+    tool_input: {
+      file_path: path.join(root, 'docs/TEST_PLAN.md'),
+      content: 'All API routes must use an authentication guard.',
+    },
+  }, { WMKF_CLAIM_EVIDENCE_STATE_ROOT: stateRoot });
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stdout, /CLAIM-EVIDENCE ADVISORY/);
+  const observed = readObservationEvents(root, { stateRoot });
+  assert.strictEqual(observed.events.length, 0);
+  assert.strictEqual(observed.sessions.length, 1);
+});
+
+test('claim-evidence advisory stays non-blocking when observation storage fails', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-claim-evidence-observation-fail-'));
+  const stateRoot = path.join(root, 'not-a-directory');
+  write(stateRoot, 'x');
+  const result = runHook('claim-evidence-advisory.js', {
+    session_id: 'integration-session',
+    tool_name: 'Write',
+    cwd: root,
+    tool_input: {
+      file_path: path.join(root, 'docs/TEST_PLAN.md'),
+      content: '[VERIFIED] All API routes use an authentication guard.',
+    },
+  }, { WMKF_CLAIM_EVIDENCE_STATE_ROOT: stateRoot });
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.match(result.stdout, /CLAIM-EVIDENCE ADVISORY/);
+  assert.match(result.stdout, /Observation logging is unavailable/);
+});
+
+test('claim-evidence monitoring failure is visible even when no advisory fires', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-claim-evidence-marker-fail-'));
+  const stateRoot = path.join(root, 'not-a-directory');
+  write(stateRoot, 'x');
+  const result = runHook('claim-evidence-advisory.js', {
+    session_id: 'integration-session',
+    tool_name: 'Write',
+    cwd: root,
+    tool_input: {
+      file_path: path.join(root, 'docs/TEST_PLAN.md'),
+      content: 'All API routes must use an authentication guard.',
+    },
+  }, { WMKF_CLAIM_EVIDENCE_STATE_ROOT: stateRoot });
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stdout, /CLAIM-EVIDENCE ADVISORY/);
+  assert.match(result.stdout, /monitoring is unavailable/);
+});
+
+test('session lifecycle exports the current observation key without persisting an all-session marker', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-claim-evidence-session-start-'));
+  const stateRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-claim-evidence-session-state-'));
+  const envFile = path.join(root, 'claude-env');
+  write(envFile, '');
+  const input = {
+    session_id: 'current-session-marker',
+    hook_event_name: 'SessionStart',
+    cwd: root,
+  };
+  const result = spawnSync(
+    process.execPath,
+    [path.join(HOOK_DIR, 'session-lifecycle.js'), 'start'],
+    {
+      input: JSON.stringify(input),
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        CLAUDE_ENV_FILE: envFile,
+        WMKF_CLAIM_EVIDENCE_STATE_ROOT: stateRoot,
+      },
+    },
+  );
+  assert.strictEqual(result.status, 0, result.stderr);
+  const observed = readObservationEvents(root, { stateRoot });
+  assert.strictEqual(observed.invalidFiles, 0);
+  assert.strictEqual(observed.sessions.length, 0);
+  assert.match(fs.readFileSync(envFile, 'utf8'), /WMKF_CLAIM_EVIDENCE_SESSION_KEY=[0-9a-f]{16}/);
+  assert.strictEqual(fs.readFileSync(envFile, 'utf8').includes(input.session_id), false);
+});
+
+test('session lifecycle visibly reports when current-session export is unavailable', () => {
+  const root = path.resolve(HOOK_DIR, '../..');
+  const input = {
+    session_id: `current-session-export-fail-${process.pid}`,
+    hook_event_name: 'SessionStart',
+    cwd: root,
+  };
+  const result = spawnSync(
+    process.execPath,
+    [path.join(HOOK_DIR, 'session-lifecycle.js'), 'start'],
+    {
+      input: JSON.stringify(input),
+      encoding: 'utf8',
+      env: { ...process.env, CLAUDE_ENV_FILE: '' },
+    },
+  );
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.match(result.stdout, /current-session reporting is unavailable/);
+  try { fs.rmSync(statePath(input, root), { force: true }); } catch { /* best effort */ }
 });
 
 test('claim-evidence advisory fails open and reports malformed hook input', () => {
