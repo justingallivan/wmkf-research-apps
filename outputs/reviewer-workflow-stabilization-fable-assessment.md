@@ -2,13 +2,25 @@
 
 Author: Claude Fable, 2026-08-01. Read-only session; no runtime edits, no data
 repair, no Production writes. Evidence basis: current source on
-`main`@`ca9e9c5`, the durable docs listed in the session brief, and **one
-owner-run read-only Production probe** (`scripts/probe-roster-dump.mjs
---request 1002912 --include-dataverse`, executed 2026-08-01 after the session's
-own attempts were denied by the permission classifier; interlock logged
-`mode=on deployment=local target=production`, reads only). Probe results are
-labeled `[VERIFIED via probe 2026-08-01]`; where the probe does not print a
+`main`@`ca9e9c5`, the durable docs in the session brief, and **five read-only
+Production probe runs** executed 2026-08-01 (all `mode=on deployment=local
+target=production`, reads only):
+
+1. `probe-roster-dump.mjs --request 1002912 --include-dataverse` → §3.1
+2. `probe-exclusion-enforcement-exposure.mjs` ×2 (counts, then `--show-text`) → §3.2
+3. `probe-referral-path-exposure.mjs` → §3.3
+4. two scratchpad record lookups (request `1001931`; the Lima/Walters person
+   rows) → §3.2.2, §3.3.1
+
+Probes 2 and 3 were **written during this session** and are committed. Results
+are labeled `[VERIFIED via probe 2026-08-01]`; where a probe does not print a
 field, the claim stays `[UNKNOWN]`.
+
+**Reading note:** several findings were raised and then corrected or withdrawn
+as evidence arrived — Finding D was withdrawn outright, and Finding C's source
+was reattributed twice. Corrections are recorded in place rather than edited
+away, so a claim's history is auditable. Where a section is superseded it says
+so and points forward; **the current position is always the later text.**
 
 Verdict (details in §4): **PLAN SOUND WITH NAMED CHANGES**.
 
@@ -24,9 +36,12 @@ wrong store. Its only notion of "handled" is a set of canonical Postgres roster
 keys (`excluded` + `saved`), while the durable facts that actually make a
 person handled — invited, declined, accepted, review received — live in
 Dataverse and never reach the projection. The result on Request `1002912`: two
-reviewers who had completed their part of the lifecycle were re-presented as
-fresh, actionable prospects, and the enrichment machinery re-ran on them every
-time the tab opened.
+reviewers who had completed their part of the lifecycle are re-presented as
+fresh, actionable prospects — still true as of the 2026-08-01 probe (§3.1).
+*(An earlier draft added "and enrichment re-ran on them every tab open"; that
+is unconfirmed and struck — `identityStatus='unresolved'` can satisfy the cache
+gate, so re-enrichment may not fire at all. §2 hop 9. The display defect holds
+either way.)*
 
 **Three independent defects, not one.** The July 31 diagnosis is substantially
 correct, but its three symptoms are three *separate* defects that happen to
