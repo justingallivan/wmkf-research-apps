@@ -2,7 +2,7 @@
 title: Reviewer Workflow Stabilization — Holistic Challenge Prompt for Fable
 domain: reviewers
 kind: audit
-status: active
+status: historical
 summary: "Fresh Fable session to reconstruct the Reviewer Workbench Find regression, challenge the stabilization plan, and recommend the next bounded slice."
 canonical: false
 cataloged: 2026-07-08
@@ -17,6 +17,14 @@ related:
 ---
 
 # Holistic challenge request — Reviewer Workbench Find stabilization
+
+> **CLOSED 2026-08-01.** This brief was executed; the pass is complete and its
+> findings are owner-accepted. Outputs:
+> `outputs/reviewer-workflow-stabilization-fable-assessment.md` (read §0 first —
+> it records corrections that supersede the body) and
+> `outputs/reviewer-workflow-codex-adversarial-review-2026-08-01.md`.
+> Implementation is authorized and specified in `SESSION_PROMPT.md`.
+> Retained as the historical record of the review contract.
 
 You are Claude Fable in a fresh, top-level Claude Code CLI session. Justin has
 asked you to spend one session on the reviewer workflow because the team has

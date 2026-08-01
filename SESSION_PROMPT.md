@@ -1,174 +1,152 @@
-# Session 393 Prompt: Fable holistic reviewer-workflow challenge
+# Session Prompt: Reviewer Find stabilization — implementation (Codex)
 
-> **Owner-directed one-session exception:** Justin is handing the reviewer
-> workflow to Claude Fable for one fresh Claude Code CLI session. Run `/start`
-> first. Do not infer a permanent reordering of `docs/CURRENT_WORK_QUEUE.md`.
+> **Owner-directed handoff, 2026-08-01.** The Fable assessment session is
+> closed. Its findings were independently reviewed by Codex, corrected, and
+> **accepted by the owner**. This session implements. Run `/start` first.
 
-## Read First
+## Read First (in this order)
 
 1. `CLAUDE.md` and the normal `/start` output.
-2. `docs/REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md` — the controlling brief for
-   this session.
-3. `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md` — the current proposed
-   stabilization contract, **under review rather than accepted as truth**.
-4. `docs/atlas/postgres-reviewer-find-roster.md` and
-   `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` for persistence and
-   lifecycle routing.
+2. `outputs/reviewer-workflow-stabilization-fable-assessment.md` — **read §0
+   before anything else.** §0 records corrections that supersede the body; where
+   they conflict, §0 wins.
+3. `outputs/reviewer-workflow-codex-adversarial-review-2026-08-01.md` — the
+   verbatim review that produced those corrections.
+4. `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md` — the standing
+   stabilization contract, now amended by the assessment's §4.
 
 ## Ownership and Safety Boundary
 
-- **Active owner:** Claude Fable.
-- **Owned surface:** read-only reviewer-workflow investigation, plan challenge,
-  and one findings artifact.
-- **Codex status:** no active implementation work; the prior Codex session
-  prepared this handoff only.
-- Start from clean `main` at or after `74247536`. Create a review branch before
-  writing the findings artifact; do not work directly on auto-deploying `main`.
-- Do **not** edit reviewer runtime code, execute data repair, merge, deploy, send
-  email, or perform Production writes in this session.
-- Read-only source inspection, tests, logs, and bounded Dataverse/Postgres/
-  SharePoint probes are allowed. Never treat the July 31 probe as standing
-  authority for a later write.
-- Write the requested analysis artifact only. Do not rewrite the controlling
-  directive, memory, Atlas, wiki, or `SESSION_PROMPT.md`; Justin will decide
-  what to accept after reviewing the findings.
+- **Active owner:** Codex.
+- **Owned surface:** reviewer Find runtime — enrichment service, roster route,
+  promotion service, manual-reviewer service, the reviewer suggestion adapter,
+  and the Find client components, plus their tests.
+- **Tier:** this is Tier 1–3 runtime work. Create a fresh branch off `main`;
+  do not commit directly to `main`.
+- **Not authorized:** data repair, Production writes, deploys, sending email,
+  merging to `main`. Bring those back to the owner.
+- Read-only Production probes are allowed and two are already committed:
+  `scripts/probe-referral-path-exposure.mjs` and
+  `scripts/probe-exclusion-enforcement-exposure.mjs` (both read-only, both
+  filter AkoyaGO test records, both print denominators).
 
-## Why This Session Exists
+## What Is Settled (do not re-litigate)
 
-The original problem was a Reviewer Workbench **Find** regression on Request
-`1002912`. The work then detoured into an adjacent-verification agent-harness
-pilot. That pilot is now implemented, reviewed, committed, and deployed as an
-advisory. It did not repair the reviewer workflow.
+- **The defect.** Find decides "is this reviewer handled?" from Postgres roster
+  keys alone. Dataverse engagement (`selected`/`invited`/`accepted`/`declined`/
+  response/review/completed) never reaches the projection — **even though
+  `findApplicantRecommendedByRequest`'s `$select` already fetches every one of
+  those fields and `enrichRecommended` then discards them.** The fix needs no
+  new query.
+- **Two causes, not one.** Sorek-shaped rows (`selected=false, invited=true`)
+  resurface because `ad8e0299` replaced a `selectedOnly:true` read with a
+  disposition-only one. Isberg-shaped rows (`selected=true, invited=true`)
+  resurface because a legacy non-canonical `saved` roster twin cannot
+  terminalize the canonical active row. **Engagement projection fixes both;
+  restoring `selectedOnly` would fix only the first and would break the S264
+  design that applicant rows stay unselected until promoted.**
+- **Owner decision (2026-08-01):** engagement monotonicity applies to **every
+  roster row carrying a suggestion anchor**, not applicant-origin rows only.
+- **Live baseline**, Request `1002912`, probe 2026-08-01: 3 of 5 applicant
+  recommendations correctly actionable; Isberg and Sorek wrongly actionable;
+  Sorek renders twice via an orphan row whose suggestion 404s.
 
-The reviewer issue was diagnosed and documented, but no stabilization runtime
-patch or Production roster repair followed. Justin now wants Fable's greatest
-value applied before implementation: step back, reconstruct the real product
-and data contract, question the observations and plans, look for a simpler or
-more correct framing, and identify where a bounded implementation session can
-help most.
+## What Is NOT Settled (establish before relying on it)
 
-## Current Process State
+- **Door A's production occurrence.** 5 rows carry
+  `disposition=recommended + selected=true + staff_manual/referred`, but that
+  final state has at least two causal paths (§0 C2). Treat as candidates.
+  Dataverse audit history would resolve it. **Do not cite "5 occurrences" as
+  justification without establishing mutation order.**
+- **Finding C's specific causation.** The mechanism is confirmed from source;
+  whether person `0ae2bbf4` came through our button or direct Dynamics entry is
+  not determinable from metadata.
+- Whether Request `1002912`'s applicant cache is currently valid (§2 hop 9).
 
-### Completed
+## Slice A — correctness core (this session)
 
-- Reviewer address-trust work reached a no-send production pilot before the
-  regression was discovered; latest related runtime record is `e31cf992`.
-- The regression received a source/read-only-live diagnosis and a proposed
-  stabilization directive in `dbdca6e1`.
-- The adjacent-verification advisory pilot was accepted as **Keep advisory** in
-  `5e14a811`, `40f6e224`, and `74247536`.
-- `main` and Production reached `74247536`; that release changed agent harness
-  and documentation surfaces, not Reviewer Workbench runtime behavior.
+Write the baseline-failing tests first; each must fail against current `main`.
 
-### Not completed
+1. **Engagement projection.** In `enrichRecommended`, partition
+   `recommendedRows` with an `isHandled(row)` predicate (selected ∨ invited ∨
+   accepted ∨ declined ∨ responseReceivedAt ∨ reviewReceivedAt ∨ completedAt).
+   Do not enrich handled rows; emit them as compact
+   `{suggestionId, candidateKey, name, stage}` entries. Project the same
+   engagement tuple from `ingestApplicantReviewers` (not just `selected` — Sorek
+   is `selected=false` and still handled).
+2. **`candidateKey` on every applicant DTO.** Canonicalize **once over the whole
+   outgoing array** — preserved, hydration-failure, needs-review, resolved,
+   handled. `hydrationFailureCandidate` is the third branch that currently omits
+   it (§0 C4). Two branch-local assertions are not sufficient; test the contract
+   over the complete payload.
+3. **W6 guard — the delicate one (§0 C3).** No path may write `selected=true`
+   onto a row carrying live engagement except the explicit Restore. Required
+   shape: validate engagement **before any person/contact mutation** in
+   `promoteApplicantReviewer`, then re-check atomically at the final selection
+   write bound to the suggestion ETag. `restore()` keeps its own ETag-bound
+   reset and must continue to work unchanged. **"Reset fields present" cannot be
+   the authority signal** — door A and Restore both carry
+   `ENGAGEMENT_STAMP_RESET`. Note `ensureStaffManualCandidate` calls
+   `updateRecord` directly and bypasses `updateLifecycle`, so an adapter-level
+   `updateLifecycle` guard alone misses it.
+4. **Manual-add contract (§0 C5).** Re-adding an applicant-recommended person
+   via referral/manual add must union provenance **without** selecting the row
+   and **without** resetting engagement — and must return a typed
+   `promotion_required` / `restore_required` response that the referral UI
+   renders as a remedy. Never return "Added" for a row that will not appear in
+   Invite.
+5. **Widen to all anchored rows (owner decision).** `displayRosterActive`
+   currently restores every non-applicant active roster row with no Dataverse
+   check, and `save-candidates` treats roster finalization as non-fatal after a
+   successful Dataverse write — so an engaged search-origin row can stay
+   actionable. Cover roster rows carrying a suggestion anchor, not just
+   applicant-origin ones.
 
-- No read-only cross-store diagnostic harness for the reviewer incident.
-- No baseline-failing versions of the five proposed golden workflows.
-- No engagement-aware applicant projection patch.
-- No complete applicant `candidateKey`/confirmation correction.
-- No exact `Project Narrative.pdf` compatibility fallback or reload-stable
-  proposal override.
-- No dry-run roster reconciliation tool for this incident.
-- No new signed-in no-send `1002912` stabilization pilot.
-- No Production roster cleanup or repair.
+**Golden workflows to assert:** W2 engagement monotonic (incl.
+`selected=false, declined=true` and `selected=true, invited=true`); W3
+confirmation persists on a fresh-enrichment candidate without reload and across
+an overlapping enrichment run; W6 both doors refused and Restore still working;
+plus a concurrent-decline race test.
 
-## Claims Fable Must Verify or Falsify
+## Slice B — robustness (separate session, do not fold in)
 
-These are **inputs to investigation**, not premises. Reconstruct the full
-caller → persistence → response → consumer path and actively seek contrary
-cases.
+Enrichment partial-success contract (§0 C7 — return recorded / skipped / failed
+suggestion IDs; render only authoritative rows actionable); restrict orphan
+restore to the current expected suggestion set; reload-stable proposal override
+via validated navigation state. **Deferred and explicitly not in scope:** the
+`Project Narrative.pdf` legacy-filename fallback.
 
-| Claim inherited from the diagnosis | Current evidence available to re-check | Status entering Fable session |
-| --- | --- | --- |
-| Applicant enrichment can process already-handled recommendations | `findApplicantRecommendedByRequest` filters disposition but not engagement; `enrichRecommended` consumes its full result | **Source-supported; independently re-verify** |
-| Ingestion loses lifecycle information | `ensureApplicantRecommended` returns `selected`; `ingestApplicantReviewers` does not project it | **Source-supported; independently re-verify and test whether `selected` is even the right stage signal** |
-| Lima-style correction can dead-end on key mismatch | ordinary SSE applicant DTO branches omit explicit `candidateKey`; confirmation binds to the stored request/key/row | **Source-supported; trace every fallback and authoritative-anchor path before concluding** |
-| Proposal/cache identity is unstable across reload | default loader is canonical-only; dropdown override lives in component state; enrichment/cache uses the exact file key | **Source-supported; verify actual navigation/cache consumers and whether the proposed fallback is correct** |
-| Isberg and Sorek's Dataverse lifecycle was intact | July 31 read-only probe found invited / invited+declined records | **Time-bounded historical baseline; UNKNOWN current live state until re-probed** |
-| Duplicate/noncanonical/orphan Postgres rows caused resurfacing | July 31 probe found legacy terminal twins, canonical active rows, and one missing-suggestion anchor | **Time-bounded historical baseline; UNKNOWN current live state until re-probed** |
-| The incident is best framed as a projection/orchestration regression | Proposed directive synthesis | **Hypothesis to challenge** |
-| Dataverse lifecycle must always dominate the Find projection | Proposed directive invariant | **Product/architecture hypothesis to challenge, including its edge cases** |
+## Also Deferred (owner-aware, not this session)
 
-## Fable's Mission
+- Decline-referral structured rows (Name · Institution · Email, one row
+  expanding to four) — assessment §6a.1. Ours to build, no Connor dependency;
+  the server already accepts these fields.
+- Intake wording via Connor: "names as published, no degrees or titles."
+- Data repair for legacy twins/orphans — hygiene **after** the runtime fix, not
+  a correctness gate, and requires explicit Production-write authorization.
 
-1. **Reframe before recommending.** State the actual staff outcome and failure
-   modes in your own terms. Do not begin from the proposed patch list.
-2. **Falsify the incident story.** Confirm, refute, or leave unknown each
-   inherited claim using current source, tests, and safe read-only evidence.
-3. **Trace the whole contract.** Cover Dataverse lifecycle, Postgres projection,
-   SharePoint file identity, Blob handoff, applicant enrichment, roster/cache
-   identity, staff confirmation, reload, and UI rendering/remedies.
-4. **Audit the plan, not just the code.** Identify assumptions, missing
-   invariants, unnecessary layers, false authority boundaries, and tests that
-   could pass for the wrong reason.
-5. **Look for simplification.** Ask whether the working Postgres projection,
-   proposal-coupled applicant cache, dual key schemes, and current stage model
-   are earning their complexity.
-6. **Recommend the smallest high-leverage next slice.** It may differ from the
-   current Phase 0–4 sequence. Say what to stop doing as well as what to do.
+## Gates and Definition of Done
 
-## Questions the Existing Plan May Be Wrong About
+Run the gates for every surface touched, each gate and its `:self-test`
+sequentially. `check:status-enum-parity`, `check:route-service-boundary`,
+`check:dataverse-access-layer`, `check:trust-boundary-guid`, and `check:types`
+are the likely-relevant ones for this slice; run the full `check:*` set before
+declaring done. A red gate blocks completion.
 
-- Is `selected` a lifecycle fact, a curation flag, or both? Which engagement
-  signals are monotonic, and which can legitimately reverse?
-- Does “Dataverse lifecycle always wins” produce the right UI for declined,
-  removed, merged, stale, or partially materialized records?
-- Should Postgres continue projecting applicant candidates at all, or can the
-  authoritative and working-state responsibilities be reduced?
-- Is canonical `suggestion:<id>` the correct action identity, or is the missing
-  `candidateKey` merely a symptom of split identity and cache ownership?
-- Should applicant recommendations depend on proposal analysis/cache identity
-  before staff can see their lifecycle state?
-- Is exact `Project Narrative.pdf` fallback the right compatibility rule, and
-  what evidence distinguishes it from another filename heuristic?
-- Do the five proposed golden workflows cover partial success, concurrent
-  enrichment/confirmation, stale reloads, missing anchors, duplicate rows, and
-  every terminal engagement path?
-- Is “close recurrence, then repair data” sufficient, or can stale data still
-  invalidate tests and the proposed projection design?
-- What would make this safe for an imminent reviewer campaign, and what remains
-  a genuine campaign blocker?
+Done = the golden workflows pass, no path can move a reviewer backward without
+an explicit reset, handled reviewers are legible but not actionable, and the
+owner has an implementation summary. **Do not deploy or merge.**
 
-## Required Deliverable
-
-Write `outputs/reviewer-workflow-stabilization-fable-assessment.md` with:
-
-1. Executive verdict and reframe.
-2. Claim matrix: **CONFIRMED / REFUTED / PARTIAL / UNKNOWN**, with evidence and
-   a disconfirming check for each material claim.
-3. Whole-flow map from authoritative lifecycle through staff-visible Find state.
-4. Critique of the existing stabilization directive and its five workflows.
-5. Revised invariant/golden-workflow set, if needed.
-6. Recommended first implementation slice, prerequisites, and explicit non-goals.
-7. “Stop doing” list.
-8. Remaining unknowns and the exact probes/tests needed to resolve them.
-
-Use `[VERIFIED via file:line or command]`, `[ASSUMED]`, and `[UNKNOWN]`. Cite
-current source, not only plans or this prompt. Include denominators for every
-clean/complete claim. A green test is evidence only for the behavior it actually
-exercises.
-
-## Stop Conditions
-
-Stop and report rather than expanding scope if:
-
-- a needed conclusion requires a Production write;
-- current live state materially contradicts the July 31 baseline;
-- the plan's authority model cannot be made coherent without a product decision;
-- review work turns into runtime implementation;
-- a relevant gate is red; or
-- roughly one session is consumed without producing an evidence-backed reframe
-  and next-slice recommendation.
-
-## Handoff Expected From Fable
+## Handoff Expected From Codex
 
 ```text
-Owner: Claude Fable
-Branch: <review branch>
-Status: review complete | blocked
-Changed surfaces: outputs/reviewer-workflow-stabilization-fable-assessment.md only
-Commits: <hash or none>
-Verification/probes: <exact bounded list>
+Owner: Codex
+Branch: <implementation branch off main>
+Status: complete | blocked
+Changed surfaces: <files>
+Commits: <hashes>
+Tests: <baseline-failing → passing, named>
+Gates: <run, all green>
 Dirty worktree: clean | listed
-Next owner/action: Justin reviews findings before any implementation authorization
+Next owner/action: owner review, then independent review pass before deploy
 ```

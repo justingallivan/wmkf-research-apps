@@ -203,20 +203,32 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
 
 **Auto-enrichment + restore:** `ReviewerSearchSection` fires `POST /api/workbench/enrich-recommended` automatically via `useEffect` as soon as the proposal is loaded, the stable proposal key is known, applicant `recommended` slots are ready, and the durable roster GET has completed. The effect gates on `recPhase === 'idle'`, `recRunningRef.current === false`, `rosterLoaded === true`, and no valid same-proposal applicant cache. The cache key is `doc.data.picked` (`library::folder::name`) passed as `proposalKey`; Blob URL is intentionally not used because `load-proposal` returns a random-suffixed URL on each load. On a same-file reload, the cache is valid only when every currently expected recommendation either has its exact canonical `suggestion:<suggestionId>` active/ineligible row for the same `enrichedProposalKey`, the current `applicantEnrichmentCacheVersion`, and a terminal gate result, or its canonical key is already terminal by staff action (`excluded`/`saved`). The roster GET returns canonical saved applicant keys separately as `savedKeys`; excluded candidates supply their canonical keys. Those canonical terminal rows are subtracted from the expected set and filtered from fresh SSE results. Legacy, unversioned, older-version, or unrelated terminal rows cannot hide a missing expected row, and a partial non-terminal canonical batch still invalidates the cache. Active rows restore into the candidate list while ineligible rows restore into the separate Not eligible section. Every completed non-empty batch offers **Update applicant suggestions**, which explicitly reruns enrichment even when the cache is valid; the rerun preserves actor-bound staff confirmations instead of replacing them with automated output. Re-picking a different proposal changes `proposalKey`, so the old rows do not satisfy the cache gate and enrichment re-runs. The enrichment route reads by `wmkf_applicantdisposition=Recommended`, not by `wmkf_selected` or invitation/response lifecycle, so it currently verifies and surfaces both unpromoted and already-engaged applicant rows.
 
-**OPEN stabilization hypothesis (Request `1002912`, observed 2026-07-31 PT):**
-the July 31 diagnosis concluded that the roster-only terminal contract above
-was insufficient. Ralph Isberg then had a
-noncanonical `candidate:` saved row plus a canonical active applicant row while
-Dataverse remained selected+invited. Rotem Sorek had the same twin shape while
-Dataverse remained invited+declined, plus one active roster row whose old
-pre-merge suggestion now returns 404. Find therefore rendered both as unresolved
-prospects. Those mutable rows are a time-bounded baseline, not current proof.
-Current source still appears to omit engagement from applicant enrichment, but
-the owner-directed Fable session must independently trace and try to falsify the
-causal account. Do not claim promotion/engagement universally prevents
-re-enrichment or re-display. “Dataverse engagement first, canonical roster
-terminal state second” and restricting restore to the expected suggestion set
-are proposed invariants under review, not implementation authority.
+**CONFIRMED defect — owner-accepted 2026-08-01; implementation authorized.**
+The roster-only terminal contract above is insufficient. Re-probed 2026-08-01
+and still live on Request `1002912`: Ralph Isberg holds a noncanonical saved row
+plus a canonical active applicant row while Dataverse reads
+`selected=true, invited=true`; Rotem Sorek has the same twin shape at
+`selected=false, invited=true` plus an active row whose pre-merge suggestion
+404s, so he renders twice. Find shows both as unresolved prospects.
+
+**Two distinct causes — this matters for the fix.** Sorek-shaped resurfacing is
+a **regression**: `fe825933` read applicant rows via
+`findByRequest(..., { selectedOnly: true })`, which excluded declined reviewers
+because decline archival sets `selected=false`, and `ad8e0299` (2026-06-16)
+replaced it with a disposition-only read while making applicant rows
+`selected=false` by default. Isberg-shaped resurfacing is the **latent
+roster-twin gap** — he was `selected=true`, so the old filter passed him
+through too. Projecting engagement fixes both; restoring `selectedOnly` would
+fix only Sorek and would break the S264 explicit-promotion design.
+
+**Owner decision:** engagement is an independent terminal input for **every
+roster row carrying a suggestion anchor**, not applicant rows only. Work order:
+`SESSION_PROMPT.md`. Evidence and corrections:
+`outputs/reviewer-workflow-stabilization-fable-assessment.md` §0/§3 plus the
+verbatim independent review in
+`outputs/reviewer-workflow-codex-adversarial-review-2026-08-01.md`. Do not claim
+promotion/engagement universally prevents re-enrichment or re-display until the
+slice ships.
 
 **Unified candidate list:** Enriched applicant candidates (`recCandidates`) are prepended into `displayCandidates` so fresh enrichment wins over stale roster copies. Candidates with a resolved identity surface in the `applicant_suggested` provenance section — which appears after `cited_or_proposal_named` and `literature_retrieved` in that order — via `provenanceGroupOf` detecting `isApplicantRecommended: true` → `APPLICANT_SUGGESTED` kind. **Exception:** candidates where enrichment could not confirm identity (`needsIdentification: true`, typically when the applicant provided no affiliation) route to `needs_identity_review` instead — `provenanceGroupOf` checks `needsIdentification` before `APPLICANT_SUGGESTED` (reviewer-provenance.js:228 vs :231). The `applicant_suggested` section is selectable unless normal safety gates make a row read-only; selecting it calls `POST /api/workbench/promote-applicant-reviewer` with the existing `suggestionId` instead of `save-candidates`.
 
