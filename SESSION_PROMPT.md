@@ -201,7 +201,8 @@ Start with the fixture corpus and focused hook enforcement tests. Run the gate
 and its self-test sequentially where one exists. After the bounded pilot:
 
 ```bash
-rtk npx jest .claude/hooks/hook-enforcement.test.js
+rtk node .claude/hooks/hook-enforcement.test.js
+rtk node .claude/hooks/lib/document-guards.test.js
 rtk npm run check:instruction-architecture
 rtk npm run check:agent-invariants
 rtk npm run check:docs-catalog

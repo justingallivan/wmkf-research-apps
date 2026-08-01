@@ -15,6 +15,10 @@ const {
   unresolvedStaleDocWarnings,
 } = require('./session-lifecycle');
 const { checkAgentInvariants } = require('../../scripts/check-agent-invariants');
+const {
+  findClaimEvidenceObligations,
+} = require('./lib/claim-evidence');
+const claimEvidenceFixtures = require('./fixtures/claim-evidence.json');
 
 const HOOK_DIR = __dirname;
 
@@ -392,6 +396,108 @@ test('configured design assertion hook preserves the intentional blocking exit',
     },
   });
   assert.strictEqual(result.status, 2, result.stderr);
+});
+
+test('claim-evidence fixture corpus preserves query-shape and advisory boundaries', () => {
+  for (const fixture of claimEvidenceFixtures) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-claim-evidence-'));
+    const transcript = path.join(root, 'transcript.jsonl');
+    write(transcript, fixture.transcript.join('\n'));
+    const claims = findClaimEvidenceObligations(fixture.documentText);
+    const shapes = [...new Set(claims.flatMap((claim) => claim.shapes))];
+    assert.deepStrictEqual(shapes, fixture.expectedShapes, `${fixture.id}: detected shapes`);
+
+    const result = runHook('claim-evidence-advisory.js', {
+      tool_name: 'Write',
+      cwd: root,
+      transcript_path: transcript,
+      tool_input: {
+        file_path: path.join(root, 'docs/TEST_PLAN.md'),
+        content: fixture.documentText,
+      },
+    });
+    assert.strictEqual(result.status, 0, `${fixture.id}: ${result.stderr}`);
+    assert.strictEqual(result.stderr, '', `${fixture.id}: unexpected fail-open/error output`);
+    const advised = /CLAIM-EVIDENCE ADVISORY/.test(result.stdout);
+    assert.strictEqual(advised, fixture.expectedAdvisory, `${fixture.id}: ${result.stdout}`);
+    for (const required of fixture.requiredAdvisoryTerms || []) {
+      assert.strictEqual(result.stdout.includes(required), true, `${fixture.id}: missing advisory term ${required}`);
+    }
+    for (const forbidden of fixture.forbiddenAdvisoryTerms || []) {
+      assert.strictEqual(result.stdout.toLowerCase().includes(forbidden), false, `${fixture.id}: forbidden advisory term ${forbidden}`);
+    }
+  }
+});
+
+test('claim-evidence advisory judges only newly introduced edit text', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-claim-evidence-delta-'));
+  const doc = path.join(root, 'docs/TEST_PLAN.md');
+  write(doc, '# Test Plan\n\n[VERIFIED] All API routes use an authentication guard.\n\nOld ending.\n');
+  const result = runHook('claim-evidence-advisory.js', {
+    tool_name: 'Edit',
+    cwd: root,
+    tool_input: {
+      file_path: doc,
+      old_string: 'Old ending.',
+      new_string: 'New ending without a claim.',
+    },
+  });
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stdout, /CLAIM-EVIDENCE ADVISORY/);
+});
+
+test('claim-evidence advisory examines the touched line when an edit adds only a qualifier', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-claim-evidence-qualifier-'));
+  const doc = path.join(root, 'docs/TEST_PLAN.md');
+  write(doc, '# Test Plan\n\n[VERIFIED] Some API routes use an authentication guard.\n');
+  const result = runHook('claim-evidence-advisory.js', {
+    tool_name: 'Edit',
+    cwd: root,
+    tool_input: {
+      file_path: doc,
+      old_string: 'Some API routes',
+      new_string: 'All API routes',
+    },
+  });
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.match(result.stdout, /CLAIM-EVIDENCE ADVISORY/);
+});
+
+test('claim-evidence advisory examines the touched line when an edit promotes assumed to verified', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-claim-evidence-promote-'));
+  const doc = path.join(root, 'docs/TEST_PLAN.md');
+  write(doc, '# Test Plan\n\n[ASSUMED] All API routes use an authentication guard.\n');
+  const result = runHook('claim-evidence-advisory.js', {
+    tool_name: 'Edit',
+    cwd: root,
+    tool_input: {
+      file_path: doc,
+      old_string: '[ASSUMED]',
+      new_string: '[VERIFIED]',
+    },
+  });
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.match(result.stdout, /CLAIM-EVIDENCE ADVISORY/);
+});
+
+test('claim-evidence advisory fails open and reports malformed hook input', () => {
+  const result = runHookRaw('claim-evidence-advisory.js', '{not-json');
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.match(result.stderr, /internal hook error \(fail-open\)/);
+});
+
+test('configured claim-evidence hook remains advisory-only', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-claim-evidence-wiring-'));
+  const result = runConfiguredHook('claim-evidence-advisory.js', {
+    tool_name: 'Write',
+    cwd: root,
+    tool_input: {
+      file_path: path.join(root, 'docs/TEST_PLAN.md'),
+      content: '[VERIFIED] All API routes use an authentication guard.',
+    },
+  });
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.match(result.stdout, /CLAIM-EVIDENCE ADVISORY/);
 });
 
 test('adversarial review receipt is fingerprint-bound and becomes stale after an edit', () => {

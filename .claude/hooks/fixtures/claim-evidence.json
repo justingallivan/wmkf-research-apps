@@ -1,0 +1,323 @@
+[
+  {
+    "id": "correct-caller-trace",
+    "documentText": "[VERIFIED] `preserveStoredRosterAuthority` is called from the refresh and exclude entry points.",
+    "transcript": [
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg -n 'preserveStoredRosterAuthority\\\\(' pages lib shared\"}}"
+    ],
+    "expectedShapes": ["call-path"],
+    "expectedAdvisory": false
+  },
+  {
+    "id": "definition-read-is-not-caller-evidence",
+    "documentText": "[VERIFIED] `preserveStoredRosterAuthority` runs on every roster read.",
+    "transcript": [
+      "{\"tool_name\":\"Read\",\"tool_input\":{\"file_path\":\"lib/services/reviewer-roster-store.js\"}}",
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg -n 'preserveStoredRosterAuthority' lib/services/reviewer-roster-store.js\"}}"
+    ],
+    "expectedShapes": ["call-path", "universal"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["CodeGraph", "repo-scoped rg", "rg -L"]
+  },
+  {
+    "id": "symbol-free-call-path-wrong-predicate",
+    "documentText": "[VERIFIED] The refresh pipeline is called from the save entry point.",
+    "transcript": [
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg -n 'featureFlag' pages lib shared\"}}"
+    ],
+    "expectedShapes": ["call-path"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["repo-scoped rg"]
+  },
+  {
+    "id": "universal-with-complement",
+    "documentText": "[VERIFIED] All API routes use an authentication guard.",
+    "transcript": [
+      "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"command\":\"rtk rg -L 'requireAppAccess|requireAuth' pages/api -g '*.js'\"}}]}}"
+    ],
+    "expectedShapes": ["universal"],
+    "expectedAdvisory": false
+  },
+  {
+    "id": "universal-generic-predicate-with-complement",
+    "documentText": "[VERIFIED] All API routes set Cache-Control.",
+    "transcript": [
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg -L 'Cache-Control' pages/api -g '*.js'\"}}"
+    ],
+    "expectedShapes": ["universal"],
+    "expectedAdvisory": false
+  },
+  {
+    "id": "universal-type-filter-with-complement",
+    "documentText": "[VERIFIED] All API routes set Cache-Control.",
+    "transcript": [
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg --type js -L 'Cache-Control' pages/api\"}}"
+    ],
+    "expectedShapes": ["universal"],
+    "expectedAdvisory": false
+  },
+  {
+    "id": "universal-wrong-search-domain",
+    "documentText": "[VERIFIED] All API routes use an authentication guard.",
+    "transcript": [
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg -L 'requireAppAccess|requireAuth' docs -g '*.md'\"}}"
+    ],
+    "expectedShapes": ["universal"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["pages/api", "rg -L"]
+  },
+  {
+    "id": "universal-unrelated-predicate",
+    "documentText": "[VERIFIED] All API routes use an authentication guard.",
+    "transcript": [
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg -L 'featureFlag' pages/api -g '*.js'\"}}"
+    ],
+    "expectedShapes": ["universal"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["pages/api", "rg -L"]
+  },
+  {
+    "id": "universal-multiple-domains-partial",
+    "documentText": "[VERIFIED] All API routes and Claude hooks use authentication guards.",
+    "transcript": [
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg -L 'requireAppAccess|requireAuth' pages/api -g '*.js'\"}}"
+    ],
+    "expectedShapes": ["universal"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["pages/api", ".claude/hooks"]
+  },
+  {
+    "id": "universal-multiple-domains-complete",
+    "documentText": "[VERIFIED] All API routes and Claude hooks use authentication guards.",
+    "transcript": [
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg -L 'requireAppAccess|requireAuth' pages/api -g '*.js'\"}}",
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg -L 'requireAppAccess|requireAuth' .claude/hooks -g '*.js'\"}}"
+    ],
+    "expectedShapes": ["universal"],
+    "expectedAdvisory": false
+  },
+  {
+    "id": "universal-scope-text-in-pattern-not-target",
+    "documentText": "[VERIFIED] All API routes use an authentication guard.",
+    "transcript": [
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg -L 'pages/api auth' docs -g '*.md'\"}}"
+    ],
+    "expectedShapes": ["universal"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["pages/api", "rg -L"]
+  },
+  {
+    "id": "universal-subdirectory-is-not-full-domain",
+    "documentText": "[VERIFIED] All API routes use an authentication guard.",
+    "transcript": [
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg -L 'requireAppAccess|requireAuth' pages/api/admin -g '*.js'\"}}"
+    ],
+    "expectedShapes": ["universal"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["pages/api", "rg -L"]
+  },
+  {
+    "id": "universal-file-is-not-full-domain",
+    "documentText": "[VERIFIED] All API routes use an authentication guard.",
+    "transcript": [
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg -L 'requireAppAccess|requireAuth' pages/api/admin/foo.js\"}}"
+    ],
+    "expectedShapes": ["universal"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["pages/api", "rg -L"]
+  },
+  {
+    "id": "suggested-query-is-not-executed-evidence",
+    "documentText": "[VERIFIED] All API routes use an authentication guard.",
+    "transcript": [
+      "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Run rtk rg -L 'requireAppAccess|requireAuth' pages/api -g '*.js' next.\"}]}}"
+    ],
+    "expectedShapes": ["universal"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["pages/api", "rg -L"]
+  },
+  {
+    "id": "echoed-query-is-not-executed-evidence",
+    "documentText": "[VERIFIED] All API routes use an authentication guard.",
+    "transcript": [
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"echo \\\"rtk rg -L 'requireAppAccess|requireAuth' pages/api -g '*.js'\\\"\"}}"
+    ],
+    "expectedShapes": ["universal"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["pages/api", "rg -L"]
+  },
+  {
+    "id": "count-with-independent-denominator",
+    "documentText": "[VERIFIED] 153 of 153 API routes have access guards.",
+    "transcript": [
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg -l 'requireAppAccess|requireAuth' pages/api -g '*.js'\"}}",
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg --files pages/api -g '*.js'\"}}"
+    ],
+    "expectedShapes": ["count"],
+    "expectedAdvisory": false
+  },
+  {
+    "id": "count-missing-denominator",
+    "documentText": "[VERIFIED] 153 of 153 API routes have access guards.",
+    "transcript": [
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg -l 'requireAppAccess|requireAuth' pages/api -g '*.js'\"}}"
+    ],
+    "expectedShapes": ["count"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["denominator independently", "rg --files"]
+  },
+  {
+    "id": "count-mismatched-universes",
+    "documentText": "[VERIFIED] 153 of 153 API routes have access guards.",
+    "transcript": [
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg -l 'requireAppAccess|requireAuth' pages/api -g '*.js'\"}}",
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg --files pages/api -g '*.test.js'\"}}"
+    ],
+    "expectedShapes": ["count"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["denominator independently", "rg --files"]
+  },
+  {
+    "id": "count-mismatched-path-universes",
+    "documentText": "[VERIFIED] 153 of 153 API routes have access guards.",
+    "transcript": [
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg -l 'requireAppAccess|requireAuth' pages/api/admin -g '*.js'\"}}",
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg --files pages/api/public -g '*.js'\"}}"
+    ],
+    "expectedShapes": ["count"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["denominator independently", "rg --files"]
+  },
+  {
+    "id": "count-matching-subdirectory-is-not-full-domain",
+    "documentText": "[VERIFIED] 153 of 153 API routes have access guards.",
+    "transcript": [
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg -l 'requireAppAccess|requireAuth' pages/api/admin -g '*.js'\"}}",
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg --files pages/api/admin -g '*.js'\"}}"
+    ],
+    "expectedShapes": ["count"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["denominator independently", "rg --files"]
+  },
+  {
+    "id": "count-comment-is-not-denominator-execution",
+    "documentText": "[VERIFIED] 153 of 153 API routes have access guards.",
+    "transcript": [
+      "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rtk rg -l 'requireAppAccess|requireAuth' pages/api -g '*.js' # rtk rg --files pages/api -g '*.js'\"}}"
+    ],
+    "expectedShapes": ["count"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["denominator independently", "rg --files"]
+  },
+  {
+    "id": "normative-must-never",
+    "documentText": "[VERIFIED] The pilot must never retain raw command output.",
+    "transcript": [],
+    "expectedShapes": [],
+    "expectedAdvisory": false
+  },
+  {
+    "id": "historical-quotation-exclusion",
+    "documentText": "Historical quotation: \"[VERIFIED] the helper runs on every roster read.\"",
+    "transcript": [],
+    "expectedShapes": [],
+    "expectedAdvisory": false
+  },
+  {
+    "id": "worked-example-exclusion",
+    "documentText": "Worked example: [VERIFIED] All API routes use an authentication guard.",
+    "transcript": [],
+    "expectedShapes": [],
+    "expectedAdvisory": false
+  },
+  {
+    "id": "generic-example-exclusion",
+    "documentText": "Example: [VERIFIED] All API routes use an authentication guard.",
+    "transcript": [],
+    "expectedShapes": [],
+    "expectedAdvisory": false
+  },
+  {
+    "id": "conditional-hypothesis-exclusion",
+    "documentText": "[VERIFIED] If all API routes use an authentication guard, the census would be complete.",
+    "transcript": [],
+    "expectedShapes": [],
+    "expectedAdvisory": false
+  },
+  {
+    "id": "future-plan-exclusion",
+    "documentText": "[VERIFIED] All API routes will use an authentication guard.",
+    "transcript": [],
+    "expectedShapes": [],
+    "expectedAdvisory": false
+  },
+  {
+    "id": "hypothetical-exclusion",
+    "documentText": "Hypothetical: [VERIFIED] All API routes use an authentication guard.",
+    "transcript": [],
+    "expectedShapes": [],
+    "expectedAdvisory": false
+  },
+  {
+    "id": "assumed-visible-escape",
+    "documentText": "[ASSUMED] All API routes use an authentication guard.",
+    "transcript": [],
+    "expectedShapes": [],
+    "expectedAdvisory": false
+  },
+  {
+    "id": "assumed-sibling-does-not-suppress-verified-claim",
+    "documentText": "[VERIFIED] All API routes use an authentication guard; cache behavior is [ASSUMED].",
+    "transcript": [],
+    "expectedShapes": ["universal"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["pages/api", "[ASSUMED]"]
+  },
+  {
+    "id": "known-paraphrase-miss",
+    "documentText": "[VERIFIED] `preserveStoredRosterAuthority` applies whenever the roster is loaded.",
+    "transcript": [],
+    "expectedShapes": [],
+    "expectedAdvisory": false,
+    "knownMiss": true
+  },
+  {
+    "id": "privacy-sensitive-raw-output",
+    "documentText": "[VERIFIED] No plan document retains access tokens such as API_TOKEN=fixture-sensitive-value.",
+    "transcript": [],
+    "expectedShapes": ["universal"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["bounded and redacted", "[ASSUMED]"],
+    "forbiddenAdvisoryTerms": ["paste raw output", "retain raw output", "include access tokens", "fixture-sensitive-value"]
+  },
+  {
+    "id": "codegraph-caller-evidence",
+    "documentText": "[VERIFIED] `preserveStoredRosterAuthority` is called from two entry points.",
+    "transcript": [
+      "{\"tool_name\":\"mcp__codegraph__codegraph_explore\",\"tool_input\":{\"query\":\"callers and call paths for preserveStoredRosterAuthority\"}}",
+      "{\"type\":\"tool_result\",\"content\":\"preserveStoredRosterAuthority — 2 callers\"}"
+    ],
+    "expectedShapes": ["call-path"],
+    "expectedAdvisory": false
+  },
+  {
+    "id": "codegraph-wrong-named-scope",
+    "documentText": "[VERIFIED] `preserveStoredRosterAuthority` is called from API routes.",
+    "transcript": [
+      "{\"tool_name\":\"mcp__codegraph__codegraph_explore\",\"tool_input\":{\"query\":\"callers for preserveStoredRosterAuthority in .claude/hooks\"}}"
+    ],
+    "expectedShapes": ["call-path"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["pages/api", "CodeGraph"]
+  },
+  {
+    "id": "codegraph-wrong-generic-repo-scope",
+    "documentText": "[VERIFIED] `preserveStoredRosterAuthority` is called from API routes.",
+    "transcript": [
+      "{\"tool_name\":\"mcp__codegraph__codegraph_explore\",\"tool_input\":{\"query\":\"callers for preserveStoredRosterAuthority in shared\"}}"
+    ],
+    "expectedShapes": ["call-path"],
+    "expectedAdvisory": true,
+    "requiredAdvisoryTerms": ["pages/api", "CodeGraph"]
+  }
+]

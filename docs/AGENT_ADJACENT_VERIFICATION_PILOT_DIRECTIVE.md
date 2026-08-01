@@ -55,7 +55,7 @@ The following state was verified on 2026-07-31:
 | Current broad-quantifier handling is mostly advisory, with only narrow blocking cases | `.claude/hooks/scope-claim-reminder.js` and `.claude/hooks/design-doc-assertion-guard.js` | **VERIFIED via source** |
 | Claude Code hooks receive a transcript path; Stop hooks also receive the last assistant message and can require continuation | Official Claude Code hook contract reviewed 2026-07-31 | **VERIFIED via primary documentation** |
 | A hook can generally determine whether a command ran, but cannot infer that the command enumerated the semantically correct domain | Current hook implementation and contract review | **VERIFIED limitation** |
-| The usefulness and false-positive rate of the proposed claim-shape detector are not yet known | No pilot or representative fixture corpus exists | **UNVERIFIED — pilot purpose** |
+| The detector's usefulness and false-positive rate in normal documentation sessions are not yet known | The Session 392 branch has a 35-case replay corpus and green focused tests, but no normal-session observation window yet | **PARTIAL — replay evidence only** |
 
 Claude's source worktree is useful historical evidence but is not a dependency
 of this directive. At the point of review it was clean at commit `848bdb3b` on
@@ -163,6 +163,64 @@ After observation, make an explicit decision:
 Broad memory consolidation, hook-message repointing, wiki changes, and Stop-hook
 auditing require a separate approved phase after this decision. Use `/sweep`
 before any durable-memory consolidation.
+
+### Session 392 implementation and replay observation
+
+The bounded pilot is implemented on `codex/adjacent-verification-pilot` and
+remains advisory-only. The implementation surface is limited to:
+
+- `.claude/rules/claim-evidence.md` — the canonical four-row rule, normative /
+  descriptive distinction, bounded-redacted evidence contract, and honest
+  escapes;
+- `.claude/hooks/fixtures/claim-evidence.json` — 35 replay cases;
+- `.claude/hooks/lib/claim-evidence.js` and
+  `.claude/hooks/claim-evidence-advisory.js` — claim/query-shape matching and
+  the Claude Code PreToolUse advisory;
+- `.claude/hooks/hook-enforcement.test.js` — fixture replay, delta-only plus
+  touched-line qualifier/tag edits, fail-open, privacy-language, and
+  configured-hook coverage; and
+- `.claude/settings.json` — one `Write|Edit` registration with no blocker or
+  shell exit wrapper;
+- this directive — bounded replay results and limitations; and
+- `SESSION_PROMPT.md` — corrected standalone Node commands for the existing
+  hook test harnesses.
+
+Replay observation on 2026-07-31:
+
+| Observation | Replay result | Status / limitation |
+| --- | --- | --- |
+| Seeded adjacent-verification cases detected | 19 of 19: definition-only and symbol-free caller evidence, wrong-domain/unrelated/partial/subdirectory/file-only universal evidence, suggested/echoed but unexecuted query text, scope text confined to a regex pattern, exact and generic wrong-scope CodeGraph evidence, missing/mismatched/subdirectory/comment-only count denominators, a mixed `[ASSUMED]` sibling, and an unsupported sensitive negative claim produced advisories | **VERIFIED via fixture replay** |
+| Known cases missed | 1 of 1 recorded regex-boundary case: “applies whenever the roster is loaded” does not match the deliberately narrow v1 call-path signature | **KNOWN MISS** |
+| False positives on normative, conditional, future, hypothetical, historical, worked-example, and generic-example text | 0 of 7 isolated exclusion fixtures produced an advisory | **VERIFIED in replay only** |
+| Remedies understandable and executable | Advice names CodeGraph/repo-scoped caller search, complement search, independent denominator, and the detected domain; human understandability has not been observed in normal work | **PARTIAL** |
+| `[ASSUMED]` used as avoidance | The explicit escape is accepted by one fixture; replay cannot establish whether an agent will misuse it | **UNKNOWN pending normal sessions** |
+| Sensitive/raw output requested for retention | 0 cases; the privacy fixture asserts bounded/redacted guidance, redacts its secret-like placeholder, and rejects prohibited raw-output/access-token requests | **VERIFIED in replay only** |
+| Internal hook failure behavior | Malformed input exits successfully and emits a bounded fail-open diagnostic | **VERIFIED via focused test** |
+
+The v1 matcher recognizes a structured tool invocation and parses direct
+`rg`/`grep` commands (including glob and common type filters) into search
+pattern, path arguments, and filter universe before checking coarse claim terms
+and every named repository domain. It does not establish that those terms model
+the claim's true predicate, that a CodeGraph invocation returned a complete
+trace, that two count queries are logically independent beyond their separate
+invocations and matching path/filter universe, or that the result supports the
+sentence. Shell wrappers, command chains, and unrecognized value-bearing
+options may remain advisory even when the underlying search is valid. Those
+limits remain review obligations and are why this pilot is advisory rather
+than proof or enforcement.
+
+Focused verification command:
+
+```bash
+rtk node .claude/hooks/hook-enforcement.test.js
+rtk node .claude/hooks/lib/document-guards.test.js
+```
+
+The previously suggested Jest path is not included by this repository's Jest
+patterns and returns “No tests found”; the hook suites are executable Node test
+harnesses. No enforcement disposition has been taken. The detector remains
+advisory pending owner review of this replay record and, if required, a normal
+three-to-five-session observation window.
 
 ## Acceptance and stop rules
 

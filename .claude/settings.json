@@ -92,6 +92,17 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/claim-evidence-advisory.js\"",
+            "timeout": 10,
+            "statusMessage": "claim-evidence advisory"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/contract-surface-reminder.js\" 2>/dev/null || true",
             "timeout": 10,
             "statusMessage": "contract-surface check"
