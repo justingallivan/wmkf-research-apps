@@ -359,6 +359,7 @@ related:
 | [REVIEWER_GATING_STRATEGY_REVIEW_PROMPT.md](REVIEWER_GATING_STRATEGY_REVIEW_PROMPT.md) | draft | active |  | Brief for a fresh reviewing LLM: assess whether reviewer-finder fail-closed gates over-gate or fire at the wrong stage/input, and produce a redesign doc. | 2026-07-03 |
 | [REVIEWER_REFERRAL_SEEDING_DESIGN.md](REVIEWER_REFERRAL_SEEDING_DESIGN.md) | plan | historical |  | Implemented build plan: guarantee externally-referred seed names into the reviewer pool (seed-only, folded-in); relabel two existing kinds, no new enum. | 2026-07-02 |
 | [REVIEWER_REMOVE_ENTIRELY_BUILD_PLAN.md](REVIEWER_REMOVE_ENTIRELY_BUILD_PLAN.md) | plan | historical |  | Shipped permanent reviewer-removal behavior; retained as historical implementation record. |  |
+| [REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md](REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md) | plan | canonical | yes | Freeze reviewer feature work; prove five golden workflows; repair lifecycle, roster, confirmation, and document selection before data repair. | 2026-07-31 |
 
 ## security-auth
 

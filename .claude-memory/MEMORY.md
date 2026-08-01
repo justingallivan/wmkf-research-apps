@@ -37,6 +37,7 @@
 - Contact promotion / lifecycle: ../docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md; ../docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md
 - Reviewer address trust / remedies: ../docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md (S391 fail-closed state machine production-live; Wave 17 exact, safe no-send pilot passed, conflict/promotion matrix partial.)
 - Reviewer workbench / lifecycle / roster / referral: ../docs/agent-wiki/topics/reviewer-workbench-lifecycle.md; project-workbench-consolidation-rollout.md
+- Reviewer workflow stabilization / Request 1002912 regression: ../docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md (Session 392 controlling directive and repair order.)
 - Reviewer-invite local testing / capture side effects: reviewer-invite-capture-mode-not-full-sandbox.md
 - External reviewer portal / accept / forms / SharePoint: ../docs/agent-wiki/topics/external-reviewer-portal.md; ../docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md; project-reviewer-upload-dormant-not-deleted.md
 - Review-form multiselect: ../docs/agent-wiki/topics/external-reviewer-portal.md; ../docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md — implementation and production smoke are complete; broader exposure and rollback rehearsals remain held
