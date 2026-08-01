@@ -8,8 +8,9 @@
  *      `disposition=recommended` candidate rows and to parse the free-text
  *      `wmkf_excludedreviewers` into clean names.
  *   2. Auto-loads the request's exact canonical reviewer proposal via
- *      `/api/reviewer-finder/load-proposal` (no PDF-upload entry in the
- *      Workbench and no filename-heuristic fallback).
+ *      `/api/reviewer-finder/load-proposal`, or replays a deliberate dropdown
+ *      override from validated `?proposalFile=` navigation state (no PDF-upload
+ *      entry in the Workbench and no filename-heuristic fallback).
  *   3. Surfaces the applicant RECOMMENDED set (badged, now candidates), the
  *      applicant EXCLUDED set (per-request soft-block, badged), and the loaded
  *      proposal — and pre-computes the exclude list staff carry into a search.
@@ -30,6 +31,8 @@
  *   - savedPoolNames : names already saved to this request's Dataverse pool
  *                      (from ReviewersTab's my-candidates fetch), unioned into the
  *                      search exclude set so a re-search doesn't re-surface them.
+ *   - proposalFileKey / onProposalFileKeyChange : reload-stable navigation
+ *                      binding for a server-validated manual SharePoint choice.
  *   (context / canManage are passed by ReviewersTab but not needed here — the
  *   panel is request-scoped by requestId and all ingestion APIs stay org-open.)
  */
@@ -47,9 +50,22 @@ function fileKeyOf(f) {
   return `${f.library}::${f.folder}::${f.name}`;
 }
 
-export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSaved, onNavigate, canManage = true, prefill = null, onPrefillConsumed }) {
+export default function ReviewerFindPanel({
+  requestId,
+  savedPoolNames = [],
+  onSaved,
+  onNavigate,
+  canManage = true,
+  prefill = null,
+  onPrefillConsumed,
+  proposalFileKey = null,
+  proposalBindingReady = true,
+  onProposalFileKeyChange,
+}) {
   const requestIdRef = useRef(requestId);
   requestIdRef.current = requestId;
+  const proposalLoadGenerationRef = useRef(0);
+  const lastProposalLoadRef = useRef({ requestId: null, fileKey: undefined });
   const manualCardRef = useRef(null);
   const [ingest, setIngest] = useState({ loading: true, data: null, error: null });
   const [doc, setDoc] = useState({ loading: true, data: null, error: null });
@@ -125,18 +141,30 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
   }, [requestId]);
 
   // fileKey is an optional "library::folder::filename" override for deliberate
-  // historical/ad-hoc analysis. When omitted, the endpoint accepts only the
-  // request's exact canonical Reviewer Materials proposal.
-  const loadProposal = useCallback(async (fileKey) => {
+  // historical/ad-hoc analysis. A validated override is stored by the parent in
+  // reload-stable URL state, but the server re-lists this request's files and
+  // validates the opaque key on every load. When omitted, the endpoint accepts
+  // only the request's exact canonical Reviewer Materials proposal.
+  const loadProposal = useCallback(async (fileKey, { persist = false } = {}) => {
     if (!requestId) return;
-    setDoc({ loading: true, data: null, error: null });
+    const submittedRequestId = requestId;
+    const requestedFileKey = fileKey || null;
+    const myGeneration = ++proposalLoadGenerationRef.current;
+    lastProposalLoadRef.current = { requestId: submittedRequestId, fileKey: requestedFileKey };
+    setDoc({ loading: true, data: null, error: null, requestedFileKey });
     try {
       const res = await fetch('/api/reviewer-finder/load-proposal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(fileKey ? { requestId, fileKey } : { requestId }),
+        body: JSON.stringify(requestedFileKey
+          ? { requestId: submittedRequestId, fileKey: requestedFileKey }
+          : { requestId: submittedRequestId }),
       });
       const data = await res.json().catch(() => ({}));
+      if (
+        requestIdRef.current !== submittedRequestId
+        || proposalLoadGenerationRef.current !== myGeneration
+      ) return;
       if (!res.ok || !data.success) {
         // Carry allFiles through on a 404 so staff can make a deliberate
         // historical/ad-hoc override when the canonical file is absent.
@@ -144,14 +172,31 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
         err.allFiles = data.allFiles || null;
         throw err;
       }
-      setDoc({ loading: false, data, error: null });
+      setDoc({ loading: false, data, error: null, requestedFileKey });
+      if (persist && data.picked) onProposalFileKeyChange?.(data.picked);
     } catch (e) {
-      setDoc({ loading: false, data: null, error: e.message, allFiles: e.allFiles || null });
+      if (
+        requestIdRef.current !== submittedRequestId
+        || proposalLoadGenerationRef.current !== myGeneration
+      ) return;
+      setDoc({
+        loading: false,
+        data: null,
+        error: e.message,
+        allFiles: e.allFiles || null,
+        requestedFileKey,
+      });
     }
-  }, [requestId]);
+  }, [requestId, onProposalFileKeyChange]);
 
   useEffect(() => { runIngestion(); }, [runIngestion]);
-  useEffect(() => { loadProposal(); }, [loadProposal]);
+  useEffect(() => {
+    if (!proposalBindingReady) return;
+    const desiredFileKey = proposalFileKey || null;
+    const previous = lastProposalLoadRef.current;
+    if (previous.requestId === requestId && previous.fileKey === desiredFileKey) return;
+    loadProposal(desiredFileKey);
+  }, [requestId, proposalFileKey, proposalBindingReady, loadProposal]);
 
   const updateManual = (field, value) => {
     setManual((prev) => {
@@ -645,14 +690,23 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
         </div>
         {doc.error ? (
           <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
-            {doc.error}{' '}
-            <button type="button" onClick={() => loadProposal()} className="underline font-medium">Retry</button>
+            {availableFiles.length > 0
+              ? (doc.requestedFileKey
+                ? 'The saved proposal selection could not be loaded. Choose the proposal document below.'
+                : 'The standard reviewer proposal was not found. Choose the proposal document below.')
+              : doc.error}{' '}
+            <button
+              type="button"
+              onClick={() => loadProposal(doc.requestedFileKey || proposalFileKey || null)}
+              className="underline font-medium"
+            >Retry</button>
           </div>
         ) : doc.loading ? (
           <p className="text-sm text-gray-500">Loading the request’s proposal from SharePoint…</p>
         ) : doc.data ? (
           <p className="text-sm text-gray-700">
-            Loaded canonical reviewer proposal <span className="font-medium">{doc.data.filename}</span>.
+            Loaded {doc.requestedFileKey ? 'selected' : 'canonical reviewer'} proposal{' '}
+            <span className="font-medium">{doc.data.filename}</span>.
           </p>
         ) : (
           <p className="text-sm text-gray-600">No proposal document found for this request.</p>
@@ -663,13 +717,15 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
         {availableFiles.length > 0 && (
           <div className="mt-3">
             <label className="block text-xs text-gray-500 mb-1">
-              Historical/manual override: choose a different request file
+              {doc.error ? 'Choose the proposal document' : 'Use a different proposal document'}
             </label>
             <select
               className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
               value={pickedKey || ''}
               disabled={doc.loading}
-              onChange={(ev) => { if (ev.target.value) loadProposal(ev.target.value); }}
+              onChange={(ev) => {
+                if (ev.target.value) loadProposal(ev.target.value, { persist: true });
+              }}
             >
               {!pickedKey && <option value="">Select a file…</option>}
               {availableFiles.map((f) => {

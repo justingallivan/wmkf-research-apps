@@ -112,8 +112,12 @@ plus a concurrent-decline race test.
 
 Enrichment partial-success contract (§0 C7 — return recorded / skipped / failed
 suggestion IDs; render only authoritative rows actionable); restrict orphan
-restore to the current expected suggestion set; reload-stable proposal override
-via validated navigation state. **Deferred and explicitly not in scope:** the
+restore to the current expected suggestion set. **Branch-only follow-up,
+2026-08-01:** `codex/reviewer-proposal-binding-refresh` implements the
+reload-stable proposal override as validated `?proposalFile=` navigation state;
+the route still re-lists the request's server-owned SharePoint files before
+accepting that opaque key, and same-key Blob refresh remains cache-stable.
+**Still deferred and explicitly not implemented:** the automatic
 `Project Narrative.pdf` legacy-filename fallback.
 
 ## Also Deferred (owner-aware, not this session)

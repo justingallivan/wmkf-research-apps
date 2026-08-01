@@ -255,6 +255,16 @@ against the baseline before implementation.
 
 #### C. Proposal document selector fallback — explicit todo
 
+**Partial branch implementation (2026-08-01; not deployed):** branch
+`codex/reviewer-proposal-binding-refresh` closes items 6–7 for deliberate
+dropdown overrides. After a server-validated selection, Find stores the exact
+`library::folder::filename` in `?proposalFile=`, replays it on reload, and the
+route revalidates it against the current request's server-listed files. A new
+random-suffixed Blob URL for that same key does not invalidate a complete
+applicant-enrichment cache. The automatic exact `Project Narrative.pdf`
+fallback in items 2–5 remains unimplemented; the canonical default and external
+reviewer-materials rules are unchanged.
+
 Implement this precedence for **Reviewer Finder proposal ingestion only**:
 
 1. If exactly one active
@@ -265,11 +275,11 @@ Implement this precedence for **Reviewer Finder proposal ingestion only**:
 4. If neither exists, or legacy matches are ambiguous, require the existing
    authenticated dropdown selector.
 5. A duplicate canonical file remains an error; do not silently fall back.
-6. Persist a deliberate override in reload-stable navigation state (for
-   example a validated URL file-key parameter), and revalidate it server-side.
-7. Do not rerun Claude when reload resolves the same exact file key. Rerun only
-   when the exact key changes or staff explicitly selects **Update applicant
-   suggestions**.
+6. **Implemented on the branch above:** persist a deliberate override in
+   reload-stable navigation state and revalidate it server-side.
+7. **Implemented on the branch above:** do not rerun Claude when reload resolves
+   the same exact file key. Rerun only when the exact key changes or staff
+   explicitly selects **Update applicant suggestions**.
 8. Keep cached applicant rows visible while file resolution is in progress;
    gate only actions that genuinely require proposal-dependent evidence.
 
