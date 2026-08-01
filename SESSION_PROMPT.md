@@ -76,6 +76,15 @@ ahead of reviewer stabilization.
    - It prohibits raw-output mandates, privacy leakage, semantic-proof claims,
      and unexplained blockers.
 
+7. **Implemented and accepted the bounded advisory pilot.**
+   - Commit `5e14a811` adds the rule, 35-case replay corpus, advisory hook, and
+     focused enforcement tests without reviewer runtime or Production changes.
+   - The replay detected all 19 seeded adjacent-verification cases, preserved
+     seven exclusions, and records one known regex-boundary miss.
+   - On 2026-07-31, the owner selected **Keep advisory** and authorized merge.
+     Normal-session observation is required before any later narrow blocking
+     proposal, not before advisory use.
+
 ### Recent Runtime Commits
 
 - `e31cf992` — Record reviewer address trust production pilot
@@ -88,24 +97,26 @@ ahead of reviewer stabilization.
 
 ### Verified Open
 
-1. **Execute the adjacent-verification pilot directive in order.**
-   Evidence: `docs/AGENT_ADJACENT_VERIFICATION_PILOT_DIRECTIVE.md`, current hook
-   source, and Claude branch commit `848bdb3b` as historical input only.
-   Start on a clean feature branch. Build the rule and fixtures before the
-   advisory detector. Do not add blockers or broad instruction changes.
+1. **Observe the advisory without interrupting the work campaign.**
+   Evidence: the controlling directive's owner-disposition and campaign-
+   observation section. During the next three to five normal Claude Code
+   documentation sessions, record a bounded advisory tally at session close.
+   Do not add mid-session owner check-ins or persist transcript/live-record
+   content.
 
-2. **Obtain an explicit pilot disposition after observation.**
-   Evidence: the controlling directive's acceptance and stop rules.
-   Record whether the detector should be retired, remain advisory, or promote
-   only named narrow patterns to blocking. Owner approval is required before
-   blocking behavior or broader consolidation.
+2. **Resume reviewer workflow stabilization.**
+   The adjacent-verification pilot has reached its advisory stop decision.
+   Resume `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md` from its first
+   implementation step: the read-only diagnostic harness and five golden
+   workflows before reviewer runtime changes or Production repair.
 
 ### Owner Decision Needed
 
-1. **Post-observation enforcement posture.**
-   Decide whether the pilot is retired, remains advisory, or promotes named
-   narrow patterns to blocking. Evidence must include fixture results and the
-   observation record.
+1. **Any future narrow blocking proposal.**
+   The current disposition is **Keep advisory**. Promotion requires three or
+   more normal-session observations for the exact claim shape, the directive's
+   pattern-specific evidence, a new adversarial review, and explicit owner
+   approval. No blocking proposal is currently authorized.
 
 2. **Later Production promotion and data-repair authorization.**
    When reviewer stabilization resumes, explicit owner authorization remains
@@ -161,7 +172,7 @@ ahead of reviewer stabilization.
 1. **No wholesale implementation of Claude's enforcement proposal.**
    In particular, do not require raw output in durable documents, claim hooks
    provide semantic proof, consolidate memory, or introduce blocking behavior
-   before the pilot evidence and owner decision.
+   without new pattern-specific evidence and an explicit owner decision.
 
 2. **No blind reviewer rollback and no one-symptom production patch.**
    A rollback could restore earlier duplicate-person/missing-email behavior.

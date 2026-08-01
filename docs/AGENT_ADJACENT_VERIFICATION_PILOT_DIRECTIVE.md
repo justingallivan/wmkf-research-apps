@@ -218,9 +218,36 @@ rtk node .claude/hooks/lib/document-guards.test.js
 
 The previously suggested Jest path is not included by this repository's Jest
 patterns and returns “No tests found”; the hook suites are executable Node test
-harnesses. No enforcement disposition has been taken. The detector remains
-advisory pending owner review of this replay record and, if required, a normal
-three-to-five-session observation window.
+harnesses.
+
+### Owner disposition and campaign observation
+
+On 2026-07-31, the owner selected **Keep advisory** and authorized merging the
+bounded pilot. This is the explicit Phase 3 disposition for the replay-backed
+pilot. It does not authorize any blocking behavior. Normal-session evidence is
+required before a later proposal to block even a named narrow pattern, but it
+does not gate use of the current advisory.
+
+The v1 hook does not persist telemetry or transcript content. Observe it during
+the next three to five normal Claude Code documentation sessions without adding
+mid-session owner check-ins. At each session close, the working agent should
+append one bounded row below for the advisories it actually received. Do not
+record claim text, raw command output, secrets, environment values, reviewer
+data, or other live-record content. Codex and other non-Claude-Code edits are
+outside this hook's enforcement boundary and do not count as observation.
+
+| Session/date | Advisory instances / unique claims | Useful / false positive / repeated | Resolution: query / narrow / `[ASSUMED]` / ignored | Owner interrupted? | Sensitive evidence requested? | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| _Pending normal-session observation_ | — | — | — | — | — | — |
+
+Promotion remains pattern-specific, not detector-wide. A future blocking
+proposal must identify the exact claim shape, include observed examples from at
+least three normal sessions, show no known false positive for that shape, make
+every remedy executable without owner interpretation, review every
+`[ASSUMED]` resolution for avoidance, request no sensitive evidence, and add
+fixtures for the observed syntax. Unobserved forms and all other claim shapes
+must remain advisory. A new explicit owner decision and adversarial review are
+required before implementation.
 
 ## Acceptance and stop rules
 

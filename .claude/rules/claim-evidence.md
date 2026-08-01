@@ -27,3 +27,8 @@ cryptographic proof.
 
 If the obligation cannot be met, narrow the claim, run the missing query, or
 label it `[ASSUMED]`.
+
+An advisory does not itself require an owner question. Resolve it autonomously
+when the evidence or narrower wording is discoverable. During the campaign
+observation window, report only a bounded advisory tally at session close as
+defined in `docs/AGENT_ADJACENT_VERIFICATION_PILOT_DIRECTIVE.md`.
