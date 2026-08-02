@@ -57,6 +57,32 @@ const applicantCandidate = {
   },
 };
 
+const CURRENT_PROMOTION_STAGES = [
+  'identity', 'institution_coi', 'coauthor_coi', 'eligibility', 'contact', 'address_trust',
+];
+
+function currentServerPromotionPlan(candidateKey) {
+  return {
+    candidateKey,
+    cacheOutcome: 'hit',
+    currentStages: CURRENT_PROMOTION_STAGES,
+    pendingStages: [],
+    refreshes: [],
+    promotionAuthority: 'requires_promotion_checks',
+  };
+}
+
+function currentWarmRoster(body, candidatePlans) {
+  return {
+    ...body,
+    authorityState: 'current',
+    warmValidation: {
+      state: 'current',
+      candidatePlans,
+    },
+  };
+}
+
 function response(body, ok = true, status = ok ? 200 : 500) {
   return { ok, status, json: async () => body, body: {} };
 }
@@ -160,10 +186,10 @@ test('an embedded cold search fails closed until applicant inputs are explicitly
   ));
 });
 
-test('restored incomplete PubMed COI checks remain selectable but show one compact warning', async () => {
+test('restored incomplete PubMed COI checks remain visible but are not selectable', async () => {
   const incompleteCandidate = {
     ...generatedCandidate,
-    candidateKey: 'candidate:partial-coi',
+    candidateKey: 'person:partial-coi',
     name: 'Partially Checked Reviewer',
     coauthorCheckStatus: 'incomplete',
     coauthorCheckFailures: [{
@@ -172,16 +198,24 @@ test('restored incomplete PubMed COI checks remain selectable but show one compa
       reason: 'rate_limited',
     }],
   };
+  const incompleteCoiPlan = {
+    candidateKey: incompleteCandidate.candidateKey,
+    cacheOutcome: 'partial_hit',
+    currentStages: CURRENT_PROMOTION_STAGES.filter((stage) => stage !== 'coauthor_coi'),
+    pendingStages: [],
+    refreshes: [{ stage: 'coauthor_coi', reason: 'stage_incomplete' }],
+    promotionAuthority: 'blocked_refresh_required',
+  };
   global.fetch = jest.fn((url) => {
     const target = String(url);
     if (target.includes('/api/workbench/reviewer-roster?')) {
-      return Promise.resolve(response({
+      return Promise.resolve(response(currentWarmRoster({
         success: true,
         active: [incompleteCandidate],
         excluded: [],
         ineligible: [],
         allNames: [incompleteCandidate.name],
-      }));
+      }, [incompleteCoiPlan])));
     }
     throw new Error(`unexpected fetch ${target}`);
   });
@@ -191,7 +225,7 @@ test('restored incomplete PubMed COI checks remain selectable but show one compa
   expect(await screen.findByText(
     /PubMed coauthor checks were incomplete after automatic retries for Partially Checked Reviewer/i
   )).toBeInTheDocument();
-  expect(screen.getByLabelText(`Select ${incompleteCandidate.name}`)).toBeInTheDocument();
+  expect(screen.queryByLabelText(`Select ${incompleteCandidate.name}`)).not.toBeInTheDocument();
 });
 
 test('a handled suggestion-anchored roster row renders only in the Already handled summary with navigation', async () => {
@@ -546,7 +580,7 @@ test('a search blocks prior-result removal until its roster write settles', asyn
   const rosterWrite = deferred();
   const freshCandidate = {
     ...generatedCandidate,
-    candidateKey: 'candidate:fresh',
+    candidateKey: 'person:fresh',
     name: 'Fresh Reviewer',
     email: 'fresh@example.edu',
     addressTrustReceipt: addressTrustReceipt('fresh@example.edu'),
@@ -554,12 +588,12 @@ test('a search blocks prior-result removal until its roster write settles', asyn
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
     if (target.includes('/api/workbench/reviewer-roster?')) {
-      return Promise.resolve(response({
+      return Promise.resolve(response(currentWarmRoster({
         success: true,
         active: [generatedCandidate],
         excluded: [],
         allNames: [generatedCandidate.name],
-      }));
+      }, [currentServerPromotionPlan(freshCandidate.candidateKey)])));
     }
     if (target === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
@@ -606,7 +640,7 @@ test('a rejected stale roster write cannot change the newly selected request pha
   const rosterWrite = deferred();
   const freshCandidate = {
     ...generatedCandidate,
-    candidateKey: 'candidate:fresh',
+    candidateKey: 'person:fresh',
     name: 'Fresh Reviewer',
     email: 'fresh@example.edu',
     addressTrustReceipt: addressTrustReceipt('fresh@example.edu'),
@@ -620,12 +654,15 @@ test('a rejected stale roster write cannot change the newly selected request pha
     const target = String(url);
     if (target.includes('/api/workbench/reviewer-roster?')) {
       const active = target.includes(requestB) ? [requestBCandidate] : [generatedCandidate];
-      return Promise.resolve(response({
+      const candidatePlans = target.includes(requestB)
+        ? []
+        : [currentServerPromotionPlan(freshCandidate.candidateKey)];
+      return Promise.resolve(response(currentWarmRoster({
         success: true,
         active,
         excluded: [],
         allNames: active.map((candidate) => candidate.name),
-      }));
+      }, candidatePlans)));
     }
     if (target === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
@@ -680,18 +717,18 @@ test('a retained row stays selected when only another submitted key is deleted',
   };
   const retainedCandidate = {
     ...generatedCandidate,
-    candidateKey: 'candidate:retained',
+    candidateKey: 'person:retained',
     name: 'Concurrently Refreshed Reviewer',
   };
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
     if (target.includes('/api/workbench/reviewer-roster?')) {
-      return Promise.resolve(response({
+      return Promise.resolve(response(currentWarmRoster({
         success: true,
         active: [deletedCandidate, retainedCandidate],
         excluded: [],
         allNames: [deletedCandidate.name, retainedCandidate.name],
-      }));
+      }, [currentServerPromotionPlan(retainedCandidate.candidateKey)])));
     }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
       return Promise.resolve(response({
@@ -723,6 +760,7 @@ test('a retained row stays selected when only another submitted key is deleted',
 test('continues after a terminal discovery read failure when the complete ranked result was received', async () => {
   const freshCandidate = {
     ...generatedCandidate,
+    candidateKey: 'person:fresh',
     name: 'Fresh Reviewer',
     email: 'fresh@example.edu',
     addressTrustReceipt: addressTrustReceipt('fresh@example.edu'),
@@ -731,7 +769,10 @@ test('continues after a terminal discovery read failure when the complete ranked
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
     if (target.includes('/api/workbench/reviewer-roster?')) {
-      return Promise.resolve(response({ success: true, active: [], excluded: [], allNames: [] }));
+      return Promise.resolve(response(currentWarmRoster(
+        { success: true, active: [], excluded: [], allNames: [] },
+        [currentServerPromotionPlan(freshCandidate.candidateKey)],
+      )));
     }
     if (target === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
