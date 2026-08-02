@@ -175,6 +175,31 @@ test('makes a Graph metadata fault fail closed without using a download or Blob 
   upload.mockRestore();
 });
 
+test('fails closed before Graph metadata reads when the authoritative request does not match the roster scope', async () => {
+  const deps = metadataDeps({ entries: new Map([[
+    'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+  ]]) });
+
+  const result = await readReviewerWarmValidation({
+    requestId: REQUEST_ID,
+    roster: { active: [] },
+    deps: {
+      ...deps,
+      getRequestById: jest.fn(async () => request({
+        akoya_requestid: '99999999-9999-9999-9999-999999999999',
+      })),
+    },
+  });
+
+  expect(result).toEqual({
+    state: 'error',
+    reasonCode: 'authority_stale',
+    candidatePlans: [],
+  });
+  expect(deps.getRequestSharePointBuckets).not.toHaveBeenCalled();
+  expect(deps.getFileMetadataByPath).not.toHaveBeenCalled();
+});
+
 test('applicant input fingerprints are deterministic and their response projection has no raw people, emails, or exclusion prose', () => {
   const first = projectApplicantWarmInputs(request());
   const second = projectApplicantWarmInputs(request());
