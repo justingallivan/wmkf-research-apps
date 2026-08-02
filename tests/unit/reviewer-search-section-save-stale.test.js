@@ -129,7 +129,7 @@ test('candidate results use the page scroll instead of a nested fixed-height scr
   expect(list).not.toHaveClass('overflow-y-auto');
 });
 
-test('a parent-owned warm snapshot is display-only and does not issue a second roster GET', async () => {
+test('a parent-owned display-only warm snapshot permits an explicit prepared search but blocks roster mutations', async () => {
   global.fetch = jest.fn();
   render(
     <ReviewerSearchSection
@@ -137,6 +137,7 @@ test('a parent-owned warm snapshot is display-only and does not issue a second r
       blobUrl="blob-a"
       proposalKey="proposal-a"
       displayOnly
+      applicantInputsReady
       rosterSnapshot={{
         requestId: REQ_A,
         authorityState: 'current',
@@ -155,12 +156,46 @@ test('a parent-owned warm snapshot is display-only and does not issue a second r
 
   expect(await screen.findByText(CANDIDATE_A.name)).toBeInTheDocument();
   expect(screen.queryByLabelText(`Select ${CANDIDATE_A.name}`)).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /pubmed/i })).toBeDisabled();
-  expect(screen.getByRole('slider', { name: /number of candidates to find/i })).toBeDisabled();
+  expect(screen.getByRole('button', { name: /pubmed/i })).toBeEnabled();
+  expect(screen.getByRole('slider', { name: /number of candidates to find/i })).toBeEnabled();
   expect(screen.queryByRole('button', { name: /exclude/i })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /promote back/i })).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /run reviewer search/i })).toBeDisabled();
-  expect(screen.getByRole('button', { name: /promote/i })).toBeDisabled();
+  expect(screen.queryByRole('button', { name: /^add reviewer$/i })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /run reviewer search/i })).toBeEnabled();
+  expect(screen.getByRole('button', { name: /promote selected to invite/i })).toBeDisabled();
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+test('a display-only snapshot keeps cold-search configuration locked until applicant inputs are ready', async () => {
+  global.fetch = jest.fn();
+  render(
+    <ReviewerSearchSection
+      requestId={REQ_A}
+      blobUrl="blob-a"
+      proposalKey="proposal-a"
+      displayOnly
+      applicantInputsReady={false}
+      rosterSnapshot={{
+        requestId: REQ_A,
+        authorityState: 'current',
+        rosterVersion: 'v1',
+        data: {
+          active: [CANDIDATE_A],
+          excluded: [],
+          ineligible: [],
+          blocked: [],
+          savedKeys: [],
+          allNames: [CANDIDATE_A.name],
+        },
+      }}
+    />,
+  );
+
+  expect(await screen.findByText(CANDIDATE_A.name)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /pubmed/i })).toBeDisabled();
+  expect(screen.getByRole('slider', { name: /number of candidates to find/i })).toBeDisabled();
+  expect(screen.getByRole('button', { name: /load applicant suggestions first/i })).toBeDisabled();
+  expect(screen.queryByLabelText(`Select ${CANDIDATE_A.name}`)).not.toBeInTheDocument();
   expect(global.fetch).not.toHaveBeenCalled();
 });
 

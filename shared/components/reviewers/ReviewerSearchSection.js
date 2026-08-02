@@ -2608,6 +2608,7 @@ export default function ReviewerSearchSection({
                       key={key}
                       type="button"
                       onClick={() => setSearchSources((prev) => ({ ...prev, [key]: !prev[key] }))}
+                      disabled={!applicantInputsReady}
                       aria-pressed={searchSources[key]}
                       className={`px-3 py-1.5 rounded-lg border text-xs transition-colors flex flex-col items-center min-w-[80px] ${
                         searchSources[key]
@@ -2639,6 +2640,7 @@ export default function ReviewerSearchSection({
                     step="1"
                     value={reviewerCount}
                     onChange={(e) => setReviewerCount(parseInt(e.target.value, 10))}
+                    disabled={!applicantInputsReady}
                     className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                   />
                   <span className="text-xs text-gray-400 w-6 text-right">25</span>
@@ -2654,6 +2656,7 @@ export default function ReviewerSearchSection({
                   rows={2}
                   value={additionalNotes}
                   onChange={(e) => setAdditionalNotes(e.target.value)}
+                  disabled={!applicantInputsReady}
                   placeholder="e.g. prioritize clinical trialists; avoid industry-affiliated reviewers"
                 />
               </div>
@@ -2668,6 +2671,7 @@ export default function ReviewerSearchSection({
                     rows={2}
                   value={referredSeedsText}
                   onChange={(e) => setReferredSeedsText(e.target.value)}
+                  disabled={!applicantInputsReady}
                     placeholder="e.g. Jane Smith, jane@uni.edu, University of Example"
                   />
                 </div>
@@ -2681,6 +2685,7 @@ export default function ReviewerSearchSection({
                     className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
                   value={referredBy}
                   onChange={(e) => setReferredBy(e.target.value)}
+                  disabled={!applicantInputsReady}
                     placeholder="Reviewer name"
                   />
                 </div>
@@ -2694,6 +2699,7 @@ export default function ReviewerSearchSection({
                   rows={2}
                   value={excludeText}
                   onChange={onExcludeChange}
+                  disabled={!applicantInputsReady}
                   placeholder="e.g. Thomas K. Wood, Jens Hör"
                 />
                 {exclusionsUnavailable && (
